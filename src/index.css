@@ -1,0 +1,244 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@import "leaflet/dist/leaflet.css";
+
+@layer base {
+  :root {
+    /* Sleek command-center atlas */
+    --background: 218 22% 7%;
+    --foreground: 210 24% 92%;
+
+    --card: 220 20% 10%;
+    --card-foreground: 210 24% 92%;
+
+    --popover: 220 22% 9%;
+    --popover-foreground: 210 24% 92%;
+
+    --primary: 38 92% 58%;
+    --primary-foreground: 220 24% 8%;
+
+    --secondary: 218 17% 16%;
+    --secondary-foreground: 210 18% 88%;
+
+    --muted: 218 14% 15%;
+    --muted-foreground: 210 12% 62%;
+
+    --accent: 178 72% 42%;
+    --accent-foreground: 218 24% 8%;
+
+    --destructive: 0 65% 48%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 218 16% 22%;
+    --input: 218 16% 18%;
+    --ring: 36 70% 58%;
+
+    --radius: 0.375rem;
+
+    --ocean: 198 44% 16%;
+    --parchment: 42 54% 82%;
+    --ink: 220 25% 7%;
+
+    --sidebar-background: 220 23% 8%;
+    --sidebar-foreground: 210 18% 86%;
+    --sidebar-primary: 36 70% 58%;
+    --sidebar-primary-foreground: 28 30% 10%;
+    --sidebar-accent: 218 17% 15%;
+    --sidebar-accent-foreground: 38 35% 88%;
+    --sidebar-border: 218 16% 18%;
+    --sidebar-ring: 36 70% 58%;
+  }
+
+  .dark { /* same; app is dark-only */ }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+  }
+  h1, h2, h3, h4 { font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif; letter-spacing: 0; }
+}
+
+/* Leaflet overrides for fantasy theme */
+.leaflet-container {
+  background: hsl(var(--ocean));
+  font-family: inherit;
+  outline: none;
+}
+.leaflet-control-zoom a {
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+.leaflet-control-attribution {
+  background: hsl(var(--card) / 0.7) !important;
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+/* App chrome */
+.atlas-toolbar {
+  border-bottom: 1px solid hsl(var(--border));
+  background: linear-gradient(180deg, hsl(var(--card) / 0.96), hsl(var(--background) / 0.92));
+  box-shadow: 0 10px 30px hsl(220 30% 3% / 0.32);
+  backdrop-filter: blur(18px);
+}
+.atlas-toolbar h1 {
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.atlas-tool-button,
+.atlas-icon-button {
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--secondary) / 0.72);
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.04);
+}
+.atlas-side-panel {
+  border-left: 1px solid hsl(var(--border));
+  background: linear-gradient(180deg, hsl(var(--sidebar-background) / 0.98), hsl(var(--background) / 0.98));
+  box-shadow: -18px 0 44px hsl(220 30% 3% / 0.35);
+  backdrop-filter: blur(18px);
+}
+.atlas-list-card {
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--secondary) / 0.42);
+  padding: 0.55rem;
+}
+
+/* === Pins === */
+.atlas-pin-wrap {
+  position: relative;
+  width: 34px; height: 42px;
+  display: flex; flex-direction: column; align-items: center;
+  filter: drop-shadow(0 3px 4px hsl(0 0% 0% / 0.55));
+  transition: transform 120ms ease;
+}
+.atlas-pin-wrap:hover { transform: translateY(-2px) scale(1.05); z-index: 500; }
+.atlas-pin {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, hsl(0 0% 100% / 0.48), hsl(var(--primary)) 62%, hsl(38 88% 34%));
+  color: hsl(var(--primary-foreground));
+  border: 2px solid hsl(28 35% 14%);
+  box-shadow:
+    inset 0 0 0 1px hsl(36 90% 88% / 0.45),
+    inset 0 -4px 6px hsl(0 0% 0% / 0.25);
+  font-size: 16px;
+  overflow: hidden;
+}
+.atlas-pin > img {
+  width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
+  pointer-events: none; user-select: none;
+}
+.atlas-pin-glyph { line-height: 1; filter: drop-shadow(0 1px 0 hsl(0 0% 0% / 0.4)); }
+.atlas-pin-tail {
+  width: 0; height: 0; margin-top: -3px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid hsl(28 35% 14%);
+}
+.atlas-pin-label {
+  position: absolute;
+  bottom: -16px;
+  left: 50%; transform: translateX(-50%);
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.02em;
+  color: hsl(var(--foreground));
+  background: hsl(var(--card) / 0.92);
+  border: 1px solid hsl(var(--border));
+  padding: 1px 6px; border-radius: 4px;
+  white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity 120ms ease;
+  box-shadow: 0 2px 4px hsl(0 0% 0% / 0.4);
+}
+.atlas-pin-wrap:hover .atlas-pin-label,
+.atlas-pin-wrap.is-selected .atlas-pin-label { opacity: 1; }
+.atlas-pin-wrap.is-selected .atlas-pin {
+  border-color: hsl(var(--primary));
+  box-shadow:
+    0 0 0 2px hsl(var(--primary) / 0.5),
+    inset 0 0 0 1px hsl(36 90% 88% / 0.55),
+    inset 0 -4px 6px hsl(0 0% 0% / 0.25);
+}
+
+/* Party token variant */
+.atlas-pin.party {
+  background:
+    radial-gradient(circle at 30% 25%, hsl(0 0% 100% / 0.35), transparent 55%),
+    var(--party-color, hsl(var(--accent)));
+  width: 36px; height: 36px;
+  font-size: 18px;
+}
+
+.atlas-minimap {
+  padding: 4px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--card) / 0.88);
+  box-shadow: 0 18px 44px hsl(220 30% 3% / 0.42);
+  backdrop-filter: blur(14px);
+}
+.atlas-minimap svg { border-radius: 5px; }
+
+/* === Layer handles & selection === */
+.atlas-image-layer {
+  position: absolute;
+  transform-origin: top left;
+  overflow: hidden;
+  will-change: transform, width, height;
+  user-select: none;
+  touch-action: none;
+}
+.atlas-image-layer img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+}
+.atlas-layer-selected {
+  outline: 2px dashed hsl(var(--primary));
+  outline-offset: -2px;
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.4);
+}
+.atlas-layer-handle {
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 6px;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: 1px solid hsl(28 35% 14%);
+  font-size: 14px; font-weight: bold;
+  cursor: move; user-select: none;
+  box-shadow: 0 2px 6px hsl(0 0% 0% / 0.55), inset 0 0 0 1px hsl(36 90% 88% / 0.4);
+  transition: transform 100ms ease;
+}
+.atlas-layer-handle:hover { transform: scale(1.1); }
+.atlas-layer-handle.resize { cursor: nwse-resize; }
+
+/* Leaflet popup theming */
+.leaflet-popup-content-wrapper {
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--foreground)) !important;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  box-shadow: 0 6px 20px hsl(0 0% 0% / 0.5);
+}
+.leaflet-popup-tip { background: hsl(var(--card)) !important; }
+.leaflet-popup-close-button { color: hsl(var(--muted-foreground)) !important; }
+.leaflet-popup-content { margin: 10px 12px !important; font-size: 13px; }
+.leaflet-popup-content button {
+  margin-top: 6px; padding: 2px 8px; font-size: 11px;
+  background: hsl(var(--destructive)); color: hsl(var(--destructive-foreground));
+  border-radius: 4px; border: none; cursor: pointer;
+}
+
+.leaflet-pane, .leaflet-control { z-index: 1 !important; }
+.leaflet-top, .leaflet-bottom { z-index: 2 !important; }
