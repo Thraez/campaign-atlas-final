@@ -483,6 +483,9 @@ export default function AtlasPlacementEditor() {
             <TabsContent value="map" className="flex-1 flex flex-col min-h-0 m-0">
               {baseMap && <MapSettingsPanel map={activeMap} baseMap={baseMap} onPatch={patchMap} onReset={resetMap} />}
             </TabsContent>
+            <TabsContent value="import" className="flex-1 flex flex-col min-h-0 m-0">
+              <ImportPanel knownEntityNames={knownEntityNames} />
+            </TabsContent>
           </Tabs>
         </aside>
       </div>
