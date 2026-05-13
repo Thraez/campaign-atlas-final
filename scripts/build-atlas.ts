@@ -140,7 +140,14 @@ async function main() {
 
   // Load world config up-front so entity parsing can resolve dates against
   // the in-world calendar.
-  const worldCfg = loadWorldConfig(contentDir, cfg.defaultWorld);
+  let worldCfg: ReturnType<typeof loadWorldConfig> | null = null;
+  try {
+    worldCfg = loadWorldConfig(contentDir, cfg.defaultWorld);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`\n✗ ${msg}\n`);
+    process.exit(1);
+  }
 
   const warnings: string[] = [];
   const errors: string[] = [];
