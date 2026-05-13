@@ -136,7 +136,7 @@ export default function AtlasPlacementEditor() {
             out[k] = v;
           }
         }
-        if (migrated) localStorage.removeItem(LEGACY_STORAGE_KEY);
+        if (migrated) localStorage.removeItem(LEGACY_STORAGE_KEY_V1);
         return migrated ? out : o;
       });
     }).catch((e: Error) => setError(e.message));
