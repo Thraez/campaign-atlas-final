@@ -723,21 +723,38 @@ interface RowProps {
   coord?: { x: number; y: number };
   overridden?: boolean;
   isPending?: boolean;
+  pinOverride?: PinOverride;
+  label?: string;
+  /** Other maps the entity could be duplicated to (excludes the active one). */
+  otherMaps?: { id: string; name: string }[];
   onPlace?: () => void;
   onMove?: () => void;
   onGoTo?: () => void;
   onRemove?: () => void;
   onReset?: () => void;
+  onNudge?: (dx: number, dy: number) => void;
+  onChangeXY?: (x: number, y: number) => void;
+  onChangeLabel?: (label: string | undefined) => void;
+  onChangePin?: (pin: PinOverride | undefined) => void;
+  onDuplicateToMap?: (mapId: string) => void;
 }
 
-function EntityRow({ entity, state, coord, overridden, isPending, onPlace, onMove, onGoTo, onRemove, onReset }: RowProps) {
-  const color = TYPE_COLOR[entity.type] ?? TYPE_COLOR.default;
+function EntityRow({
+  entity, state, coord, overridden, isPending, pinOverride, label, otherMaps,
+  onPlace, onMove, onGoTo, onRemove, onReset, onNudge, onChangeXY, onChangeLabel, onChangePin, onDuplicateToMap,
+}: RowProps) {
+  const style = resolvePinStyle(entity.type, pinOverride);
   return (
     <div className={`group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/40 ${isPending ? "ring-1 ring-primary bg-accent/30" : ""}`}>
-      <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: color }} />
+      <span
+        className="shrink-0"
+        aria-hidden
+        // Inline preset-color preview keeps the row visually in sync with the map pin.
+        dangerouslySetInnerHTML={{ __html: pinSvg({ color: style.color, shape: style.shape }) }}
+      />
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium truncate flex items-center gap-1.5">
-          {entity.title}
+          {label || entity.title}
           {overridden && <Badge variant="secondary" className="h-4 text-[9px] px-1">edited</Badge>}
         </div>
         <div className="text-[10px] text-muted-foreground truncate">
@@ -749,13 +766,158 @@ function EntityRow({ entity, state, coord, overridden, isPending, onPlace, onMov
           <Crosshair className="h-3.5 w-3.5" />
         </Button>
       )}
-      {state === "placed" && (
+      {state === "placed" && coord && (
         <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition">
           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={onGoTo} title="Fly to"><Target className="h-3.5 w-3.5" /></Button>
           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={onMove} title="Re-place"><MapPin className="h-3.5 w-3.5" /></Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Style + advanced">
+                <Settings2 className="h-3.5 w-3.5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 space-y-3">
+              <PinStyleEditor
+                entityType={entity.type}
+                value={pinOverride}
+                onChange={(v) => onChangePin?.(v)}
+              />
+              <div className="space-y-1">
+                <Label className="text-[11px]">Label override</Label>
+                <Input
+                  className="h-8 text-xs"
+                  value={label ?? ""}
+                  placeholder={entity.title}
+                  onChange={(e) => onChangeLabel?.(e.target.value || undefined)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-[11px]">x</Label>
+                  <Input
+                    type="number"
+                    className="h-8 text-xs"
+                    value={coord.x}
+                    onChange={(e) => onChangeXY?.(Number(e.target.value) || 0, coord.y)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-[11px]">y</Label>
+                  <Input
+                    type="number"
+                    className="h-8 text-xs"
+                    value={coord.y}
+                    onChange={(e) => onChangeXY?.(coord.x, Number(e.target.value) || 0)}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label className="text-[11px]">Nudge</Label>
+                <div className="grid grid-cols-3 gap-1 w-28">
+                  <span />
+                  <Button size="sm" variant="outline" className="h-6 text-xs p-0" onClick={() => onNudge?.(0, 100)}>↑</Button>
+                  <span />
+                  <Button size="sm" variant="outline" className="h-6 text-xs p-0" onClick={() => onNudge?.(-100, 0)}>←</Button>
+                  <Button size="sm" variant="outline" className="h-6 text-xs p-0" onClick={() => onNudge?.(0, -100)}>↓</Button>
+                  <Button size="sm" variant="outline" className="h-6 text-xs p-0" onClick={() => onNudge?.(100, 0)}>→</Button>
+                </div>
+              </div>
+              {otherMaps && otherMaps.length > 0 && onDuplicateToMap && (
+                <div className="space-y-1 pt-1 border-t border-border">
+                  <Label className="text-[11px]">Duplicate to map</Label>
+                  <Select onValueChange={(v) => onDuplicateToMap(v)}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Choose map…" /></SelectTrigger>
+                    <SelectContent>
+                      {otherMaps.map((m) => (
+                        <SelectItem key={m.id} value={m.id} className="text-xs">{m.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
           {onReset && <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={onReset} title="Discard local edit"><RotateCcw className="h-3.5 w-3.5" /></Button>}
           <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={onRemove} title="Remove placement"><Trash2 className="h-3.5 w-3.5" /></Button>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Visual preset/color/shape/label-mode editor. Outputs a minimal PinOverride
+ *  (only fields that differ from the entity-type preset) — we never persist
+ *  preset defaults, so frontmatter stays clean. */
+function PinStyleEditor({
+  entityType,
+  value,
+  onChange,
+}: {
+  entityType: string;
+  value: PinOverride | undefined;
+  onChange: (v: PinOverride | undefined) => void;
+}) {
+  const presetId = (value?.preset ?? defaultPresetForType(entityType)) as PinPresetId;
+  const preset = PIN_PRESETS[presetId];
+  const merged = resolvePinStyle(entityType, value);
+
+  const update = (patch: Partial<typeof merged> & { preset?: PinPresetId }) => {
+    onChange(diffPinOverride(entityType, { ...merged, ...patch }));
+  };
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <Label className="text-[11px]">Pin preset</Label>
+        <Select value={presetId} onValueChange={(v) => update({ preset: v as PinPresetId })}>
+          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent className="max-h-72">
+            {(Object.keys(PIN_PRESETS) as PinPresetId[]).map((id) => (
+              <SelectItem key={id} value={id} className="text-xs">{PIN_PRESETS[id].label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label className="text-[11px]">Color</Label>
+          <Input type="color" className="h-8 p-1" value={merged.color} onChange={(e) => update({ color: e.target.value })} />
+        </div>
+        <div>
+          <Label className="text-[11px]">Shape</Label>
+          <Select value={merged.shape} onValueChange={(v) => update({ shape: v as typeof merged.shape })}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {["teardrop","circle","square","diamond","shield","star"].map((s) => (
+                <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div>
+        <Label className="text-[11px]">Label mode</Label>
+        <Select value={merged.labelMode} onValueChange={(v) => update({ labelMode: v as typeof merged.labelMode })}>
+          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {["auto","always","hover","never"].map((m) => (
+              <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <div className="flex justify-between"><Label className="text-[11px]">Priority</Label><span className="text-[10px] text-muted-foreground">{merged.priority}</span></div>
+        <Slider min={0} max={10} step={1} value={[merged.priority]} onValueChange={([v]) => update({ priority: v })} />
+      </div>
+      <div>
+        <div className="flex justify-between"><Label className="text-[11px]">Min zoom</Label><span className="text-[10px] text-muted-foreground">{merged.labelMinZoom}</span></div>
+        <Slider min={-6} max={4} step={1} value={[merged.labelMinZoom]} onValueChange={([v]) => update({ labelMinZoom: v })} />
+      </div>
+      {value && Object.keys(value).length > 0 && (
+        <Button size="sm" variant="ghost" className="h-7 text-xs w-full" onClick={() => onChange(undefined)}>
+          Reset to "{preset.label}" preset
+        </Button>
       )}
     </div>
   );
