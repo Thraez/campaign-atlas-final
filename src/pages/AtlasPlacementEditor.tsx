@@ -499,13 +499,13 @@ export default function AtlasPlacementEditor() {
             })}
 
             {placed.map((e) => {
-              const c = effectiveCoord(e.id)!;
-              const ov = overrides[overrideKey(activeMap.id, e.id)] as OverrideValue | undefined;
-              const style = resolvePinStyle(e.type, ov?.pin ?? canonPinFor(project, activeMap.id, e.id));
+              const eff = effectivePlacement(e.id);
+              if (!eff) return null;
+              const style = resolvePinStyle(e.type, eff.pin);
               return (
                 <Marker
                   key={e.id}
-                  position={[activeMap.height - c.y, c.x]}
+                  position={[activeMap.height - eff.y, eff.x]}
                   icon={pinDivIcon(style.color, style.shape, { pulse: pendingId === e.id })}
                   draggable
                   eventHandlers={{
