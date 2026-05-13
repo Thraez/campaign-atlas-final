@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Atlas DM-only build output (contains spoilers; never commit)
+.local-atlas/
+
