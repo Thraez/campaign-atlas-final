@@ -135,63 +135,25 @@ export function MapLayerPanel(props: Props) {
   };
 
   const exportPatch = () => {
-    const lines: string[] = [];
-    lines.push(`# Map layer patch — ${map.name} (${map.id})`);
-    lines.push(`# Generated ${new Date().toISOString()}`);
-    lines.push(`#`);
-    lines.push(`# HOW TO APPLY:`);
-    lines.push(`# Open content/<world>/_atlas/world.yaml and find the entry under "maps:"`);
-    lines.push(`# whose id is "${map.id}". REPLACE that map's settings + layers section`);
-    lines.push(`# with the YAML below (everything from "- id:" through the last layer).`);
-    lines.push(`# DO NOT paste this file's # comments into world.yaml — only the YAML.`);
-    lines.push(`# DO NOT wrap the YAML in markdown code fences (\`\`\`yaml). The build`);
-    lines.push(`# will fail if world.yaml contains fences.`);
-    lines.push(``);
-    lines.push(`maps:`);
-    lines.push(`  - id: ${map.id}`);
-    lines.push(`    name: ${yamlString(map.name)}`);
-    lines.push(`    width: ${map.width}`);
-    lines.push(`    height: ${map.height}`);
-    if (map.oceanColor) lines.push(`    oceanColor: ${yamlString(map.oceanColor)}`);
-    lines.push(`    wrapX: ${!!map.wrapX}`);
-    lines.push(`    layers:`);
-    for (const l of mergedLayers) {
-      const local = localLayers.find((x) => x.id === l.id);
-      const src = local?.origin === "upload"
-        ? `/${(local.targetPath ?? `public/atlas/assets/maps/${l.id}.webp`).replace(/^public\//, "")}`
-        : l.src;
-      lines.push(`      - id: ${yamlString(l.id)}`);
-      lines.push(`        src: ${yamlString(src)}`);
-      lines.push(`        x: ${Math.round(l.x)}`);
-      lines.push(`        y: ${Math.round(l.y)}`);
-      lines.push(`        width: ${Math.round(l.width)}`);
-      lines.push(`        height: ${Math.round(l.height)}`);
-      lines.push(`        opacity: ${l.opacity}`);
-      lines.push(`        zIndex: ${l.zIndex}`);
-      if (local?.origin === "upload") {
-        lines.push(`        # ⤷ uploaded locally — save file to ${local.targetPath}`);
-      }
+    let artifact;
+    try {
+      artifact = buildWorldMapPatch({ map, mergedLayers, localLayers });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+      return;
     }
-    lines.push(``);
-    const uploads = localLayers.filter((l) => l.origin === "upload");
-    if (uploads.length) {
-      lines.push(`# Asset checklist:`);
-      for (const u of uploads) {
-        lines.push(`#   - Save ${u.filename} → ${u.targetPath}`);
-      }
-    }
-    const content = lines.join("\n");
-    const result = validatePatchYaml(content, "map");
+    const result = validatePatchYaml(artifact.content, "map");
     if (!result.ok) {
       toast.error(`Patch validation failed: ${result.errors[0]}`);
       return;
     }
     if (result.warnings.length) toast.warning(result.warnings[0]);
-    downloadText(`map-layers-${map.id}.yaml`, content, "text/yaml");
+    downloadText(artifact.filename, artifact.content, artifact.mime);
+    const uploads = localLayers.filter((l) => l.origin === "upload");
     checklist.show({
       title: "Layer patch exported",
       description: "Your map layer YAML patch is ready. Follow the checklist to commit it.",
-      files: [`map-layers-${map.id}.yaml`],
+      files: [artifact.filename],
       steps: [
         { label: "Open the downloaded .yaml file", detail: "It is pure YAML — only the lines that are NOT '#' comments belong in world.yaml." },
         { label: "Paste under the matching map entry", detail: `In content/<world>/_atlas/world.yaml, find the map with id "${map.id}" and replace its settings + layers section with the YAML lines below the comment header. Never paste markdown code fences.` },
