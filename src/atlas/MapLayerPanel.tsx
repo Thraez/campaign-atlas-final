@@ -414,7 +414,3 @@ function Field({ label, value, onChange }: { label: string; value: number; onCha
   );
 }
 
-function yamlString(s: string): string {
-  if (/^[a-zA-Z0-9_./:#-]+$/.test(s)) return s;
-  return `"${s.replace(/"/g, '\\"')}"`;
-}
