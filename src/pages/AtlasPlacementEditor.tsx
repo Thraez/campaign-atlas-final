@@ -374,9 +374,10 @@ export default function AtlasPlacementEditor() {
           draftPlacements: draftPlacementsForValidation,
           draftMap: activeMap,
           draftLocalLayers: layerEditor.localLayers,
+          lastExportAt,
         })
       : null,
-    [project, activeMap, draftPlacementsForValidation, layerEditor.localLayers]
+    [project, activeMap, draftPlacementsForValidation, layerEditor.localLayers, lastExportAt]
   );
   const issuesByScope = (predicate: (i: import("@/atlas/yaml/validateProject").Issue) => boolean) => {
     const list = validation?.issues.filter(predicate) ?? [];
