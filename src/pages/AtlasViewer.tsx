@@ -168,6 +168,21 @@ export default function AtlasViewer() {
           <Compass className="h-5 w-5" /> <span className="hidden sm:inline">Astrath Atlas</span>
         </Link>
         <div className="flex-1" />
+        {data.project.maps.length > 1 && (
+          <Select value={activeMap.id} onValueChange={setActiveMapId}>
+            <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {data.project.maps.map((m) => (
+                <SelectItem key={m.id} value={m.id} className="text-xs">{m.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {activeMap.fog?.enabled && (
+          <Button variant="ghost" size="sm" onClick={() => setShowFog((v) => !v)} title={showFog ? "Hide fog" : "Show fog"}>
+            {showFog ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+          </Button>
+        )}
         <Button variant="secondary" size="sm" onClick={() => setSearchOpen(true)} className="gap-2">
           <Search className="h-4 w-4" />
           <span className="hidden sm:inline">Search</span>
@@ -194,6 +209,62 @@ export default function AtlasViewer() {
             style={{ width: "100%", height: "100%", background: activeMap.oceanColor ?? "#18313f" }}
           >
             <MapController flyTo={flyTarget} />
+
+            {/* Image base layers */}
+            {[...activeMap.layers].sort((a, b) => a.zIndex - b.zIndex).map((layer) => (
+              <ImageOverlay
+                key={layer.id}
+                url={layer.src}
+                bounds={[
+                  [activeMap.height - (layer.y + layer.height), layer.x],
+                  [activeMap.height - layer.y, layer.x + layer.width],
+                ] as L.LatLngBoundsLiteral}
+                opacity={layer.opacity}
+              />
+            ))}
+
+            {/* Region polygons */}
+            {(activeMap.regions ?? []).map((region) => {
+              const ent = region.entityId ? entityById.get(region.entityId) : undefined;
+              const color = region.color ?? (ent ? (ICON_BY_TYPE[ent.type] ?? ICON_BY_TYPE.default) : "#7fb069");
+              const positions = region.points.map(([x, y]) => [activeMap.height - y, x] as [number, number]);
+              return (
+                <Polygon
+                  key={region.id}
+                  positions={positions}
+                  pathOptions={{
+                    color,
+                    weight: 1.5,
+                    fillColor: color,
+                    fillOpacity: region.fillOpacity ?? 0.18,
+                    opacity: region.strokeOpacity ?? 0.85,
+                  }}
+                  eventHandlers={region.entityId ? { click: () => openEntity(region.entityId!, false) } : undefined}
+                >
+                  <Popup>
+                    <div className="text-sm font-medium">{region.name}</div>
+                    {ent?.summary && <div className="text-xs opacity-70">{ent.summary}</div>}
+                  </Popup>
+                </Polygon>
+              );
+            })}
+
+            {/* Fog of war: full-map polygon with reveal holes */}
+            {showFog && activeMap.fog?.enabled && (
+              <Polygon
+                positions={fogPositions(activeMap, activeMap.fog.reveals)}
+                pathOptions={{
+                  color: "transparent",
+                  fillColor: activeMap.fog.color ?? "rgba(8,12,20,0.55)",
+                  fillOpacity: 1,
+                  weight: 0,
+                  interactive: false,
+                  // @ts-expect-error - leaflet supports the SVG fill-rule prop
+                  fillRule: "evenodd",
+                }}
+              />
+            )}
+
             {placementsOnMap.map((p) => {
               const ent = entityById.get(p.entityId);
               if (!ent) return null;
