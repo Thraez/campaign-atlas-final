@@ -152,7 +152,14 @@ async function main() {
   let externalAssets = 0;
   let missingAssets = 0;
 
-  type Pending = { entity: Entity; rawBody: string; coords?: { x: number; y: number } };
+  type Pending = {
+    entity: Entity;
+    rawBody: string;
+    /** Explicit multi-map placements from atlas.placements[]. */
+    placements: Array<{ mapId?: string; x: number; y: number }>;
+    /** Legacy atlas.x / atlas.y, used only if `placements` is empty. */
+    legacy?: { x: number; y: number };
+  };
   const pending: Pending[] = [];
   const slugSeen = new Map<string, string>();
 
@@ -233,8 +240,9 @@ async function main() {
     const fmAtlas = (parsed.data.atlas as Record<string, unknown>) ?? {};
     const cx = typeof fmAtlas.x === "number" ? fmAtlas.x : undefined;
     const cy = typeof fmAtlas.y === "number" ? fmAtlas.y : undefined;
-    const coords = cx !== undefined && cy !== undefined ? { x: cx, y: cy } : undefined;
-    pending.push({ entity, rawBody: noDm, coords });
+    const legacy = cx !== undefined && cy !== undefined ? { x: cx, y: cy } : undefined;
+    const explicitPlacements = parsed.atlas.placements ?? [];
+    pending.push({ entity, rawBody: noDm, placements: explicitPlacements, legacy });
   }
 
   // Wikilink name index
