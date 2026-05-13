@@ -280,6 +280,55 @@ async function main() {
     });
   }
 
+  // Resolve route waypoints (entity ids → coordinates) and filter for player.
+  let routesExcluded = 0;
+  const placementByEntity = new Map<string, MapPlacement>();
+  placements.forEach((p) => placementByEntity.set(p.entityId, p));
+  const routes: Route[] = [];
+  for (const r of worldCfg?.routes ?? []) {
+    if (flags.player && !PLAYER_VISIBLE.has(r.visibility)) {
+      routesExcluded += 1;
+      continue;
+    }
+    const resolved: Point[] = [];
+    let dropped = false;
+    for (const w of r.waypoints) {
+      if (Array.isArray(w)) {
+        resolved.push([w[0], w[1]]);
+      } else {
+        const p = placementByEntity.get(w.entityId);
+        if (!p) {
+          warnings.push(`route "${r.id}": waypoint entity "${w.entityId}" has no placement on any map — route skipped`);
+          dropped = true;
+          break;
+        }
+        resolved.push([p.x, p.y]);
+      }
+    }
+    if (dropped || resolved.length < 2) continue;
+    routes.push({
+      id: r.id,
+      mapId: r.mapId,
+      name: r.name,
+      mode: r.mode,
+      speed: r.speed,
+      color: r.color,
+      weight: r.weight,
+      dashed: r.dashed,
+      visibility: r.visibility,
+      waypoints: r.waypoints,
+      resolvedPoints: resolved,
+    });
+  }
+
+  // Attach regions + fog + routes to their owning maps.
+  maps = maps.map((m) => ({
+    ...m,
+    regions: regions.filter((r) => r.mapId === m.id),
+    fog: fogs.find((f) => f.mapId === m.id),
+    routes: routes.filter((r) => r.mapId === m.id),
+  }));
+
   const project: AtlasProject = {
     version: new Date().toISOString().replace(/[:.]/g, "-"),
     publishedAt: new Date().toISOString(),
