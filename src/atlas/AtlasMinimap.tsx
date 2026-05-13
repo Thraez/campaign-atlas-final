@@ -18,7 +18,7 @@ interface Props {
  *
  * MUST be rendered as a child of <MapContainer> so useMap() resolves.
  */
-export function Minimap({ map, layers, width = 180, className }: Props) {
+export function AtlasMinimap({ map, layers, width = 180, className }: Props) {
   const parent = useMap();
   const ref = useRef<HTMLDivElement>(null);
   const [vp, setVp] = useState<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: 0, h: 0 });
