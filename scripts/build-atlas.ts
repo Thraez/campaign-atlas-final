@@ -42,25 +42,35 @@ function loadConfig(): Config {
   return JSON.parse(raw) as Config;
 }
 
-function walk(dir: string, exclude: string[], scanned: { excludedFiles: number }): string[] {
+function walk(
+  dir: string,
+  contentRoot: string,
+  include: string[],
+  exclude: string[],
+  scanned: { excludedFiles: number }
+): string[] {
   const out: string[] = [];
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
-    const rel = path.relative(ROOT, full).replace(/\\/g, "/");
-    if (matchAny(rel, exclude) || matchAny(entry.name, exclude.map(stripPrefix))) {
+    const contentRel = path.relative(contentRoot, full).replace(/\\/g, "/");
+    if (matchAny(contentRel, exclude)) {
       if (entry.isDirectory()) scanned.excludedFiles += countMd(full);
       else if (entry.name.endsWith(".md")) scanned.excludedFiles += 1;
       continue;
     }
-    if (entry.isDirectory()) out.push(...walk(full, exclude, scanned));
-    else if (entry.name.endsWith(".md")) out.push(full);
+    if (entry.isDirectory()) {
+      out.push(...walk(full, contentRoot, include, exclude, scanned));
+    } else if (entry.name.endsWith(".md")) {
+      // include globs only filter files (not dirs); empty list = include all.
+      if (include.length > 0 && !matchAny(contentRel, include)) {
+        scanned.excludedFiles += 1;
+        continue;
+      }
+      out.push(full);
+    }
   }
   return out;
-}
-
-function stripPrefix(g: string): string {
-  return g.replace(/^\*\*\//, "").replace(/\/\*\*$/, "");
 }
 
 function countMd(dir: string): number {
