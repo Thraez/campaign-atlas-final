@@ -614,8 +614,17 @@ const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function Entity
           )}
         </div>
         <div className="flex items-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => printEntityHandout(entity)}
+            title="Download as printable handout (PDF)"
+            aria-label="Download handout as PDF"
+          >
+            <Printer className="h-4 w-4" aria-hidden="true" />
+          </Button>
           <CopyLinkButton entityId={entity.id} />
-          <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close panel"><X className="h-4 w-4" aria-hidden="true" /></Button>
         </div>
       </div>
 
