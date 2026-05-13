@@ -557,35 +557,86 @@ export default function AtlasPlacementEditor() {
                 exportDisabled={dirtyCount === 0}
               >
                 <div className="-m-3">
-                  <div className="p-3 border-b border-border">
+                  <div className="p-3 border-b border-border space-y-2">
                     <Input placeholder="Filter entities…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+                    <div className="flex flex-wrap gap-1">
+                      {(["all","unplaced","placed"] as const).map((s) => (
+                        <Button key={s} size="sm" variant={stateFilter === s ? "secondary" : "ghost"} className="h-6 px-2 text-[10px] uppercase" onClick={() => setStateFilter(s)}>{s}</Button>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 text-[10px]">
+                      <Select value={visFilter} onValueChange={(v) => setVisFilter(v as typeof visFilter)}>
+                        <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1"><SelectValue placeholder="visibility" /></SelectTrigger>
+                        <SelectContent>
+                          {["all","player","rumor","dm","hidden"].map((v) => <SelectItem key={v} value={v} className="text-xs">{v}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Select value={typeFilter} onValueChange={setTypeFilter}>
+                        <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1"><SelectValue placeholder="type" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">all types</SelectItem>
+                          {allTypes.map((t) => <SelectItem key={t} value={t} className="text-xs">{t}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {allTags.length > 0 && (
+                        <Select value={tagFilter} onValueChange={setTagFilter}>
+                          <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1"><SelectValue placeholder="tag" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all" className="text-xs">all tags</SelectItem>
+                            {allTags.map((t) => <SelectItem key={t} value={t} className="text-xs">#{t}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      <Button
+                        size="sm"
+                        variant={chainPlaceMode ? "default" : "outline"}
+                        className="h-6 px-2 text-[10px]"
+                        onClick={() => {
+                          const next = !chainPlaceMode;
+                          setChainPlaceMode(next);
+                          if (next && !pendingId && unplaced[0]) setPendingId(unplaced[0].id);
+                        }}
+                        title="Auto-advance to the next unplaced entity after each click"
+                      >
+                        Place next
+                      </Button>
+                    </div>
                   </div>
                   <Section title={`Unplaced (${unplaced.length})`}>
                     {unplaced.map((e) => (
                       <EntityRow key={e.id} entity={e} state="unplaced" isPending={pendingId === e.id} onPlace={() => setPendingId(e.id)} />
                     ))}
-                    {unplaced.length === 0 && <Empty text="All entities have a coordinate." />}
+                    {unplaced.length === 0 && <Empty text="No unplaced entities match these filters." />}
                   </Section>
                   <Section title={`Placed (${placed.length})`}>
                     {placed.map((e) => {
-                      const c = effectiveCoord(e.id)!;
+                      const eff = effectivePlacement(e.id)!;
                       const overridden = overrideKey(activeMap.id, e.id) in overrides;
+                      const otherMaps = project.maps.filter((m) => m.id !== activeMap.id).map((m) => ({ id: m.id, name: m.name }));
                       return (
                         <EntityRow
                           key={e.id}
                           entity={e}
                           state="placed"
-                          coord={c}
+                          coord={{ x: eff.x, y: eff.y }}
+                          label={eff.label}
+                          pinOverride={eff.pin}
                           overridden={overridden}
                           isPending={pendingId === e.id}
+                          otherMaps={otherMaps}
                           onGoTo={() => goTo(e.id)}
                           onMove={() => setPendingId(e.id)}
                           onRemove={() => removeCoord(e.id)}
                           onReset={overridden ? () => clearOverride(e.id) : undefined}
+                          onNudge={(dx, dy) => nudge(e.id, dx, dy)}
+                          onChangeXY={(x, y) => setCoord(e.id, { x, y })}
+                          onChangeLabel={(l) => setLabel(e.id, l)}
+                          onChangePin={(p) => setPinOverride(e.id, p)}
+                          onDuplicateToMap={(mid) => duplicateToMap(e.id, mid)}
                         />
                       );
                     })}
-                    {placed.length === 0 && <Empty text="Pick something on the left to place." />}
+                    {placed.length === 0 && <Empty text="No placed entities match these filters." />}
                   </Section>
                 </div>
               </TabFrame>
