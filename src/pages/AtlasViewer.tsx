@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState, useCallback, forwardRef } from "react";
-import { MapContainer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, Marker, Popup, Polygon, ImageOverlay, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { loadAtlasContent, loadSearchIndex, type SearchIndexEntry } from "@/atlas/content/loader";
-import type { AtlasProject, Entity, MapDocument, MapPlacement } from "@/atlas/content/schema";
+import type { AtlasProject, Entity, MapDocument, MapPlacement, Region, Point } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Search, X, MapPin, ArrowLeft, Compass } from "lucide-react";
+import { Search, X, MapPin, ArrowLeft, Compass, Eye, EyeOff } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
