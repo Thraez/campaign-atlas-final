@@ -242,7 +242,7 @@ export function buildImportPlan(input: BuildPlanInput): ImportPlan {
     }
     plannedMap.layers.push({
       id: a.layerId,
-      src: "/" + a.targetAssetPath.replace(/^\\/?public\\//, "").replace(/^\\/+/, ""),
+      src: "/" + a.targetAssetPath.replace(/^\/?public\//, "").replace(/^\/+/, ""),
       x: sized.layer.x,
       y: sized.layer.y,
       width: sized.layer.width,
