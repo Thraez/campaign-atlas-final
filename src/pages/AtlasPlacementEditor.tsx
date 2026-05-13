@@ -774,6 +774,12 @@ export default function AtlasPlacementEditor() {
         draftPlacements={buildDraftPlacements()}
         mergedLayers={layerEditor.mergedLayers}
         localLayers={layerEditor.localLayers}
+        draftRegions={regionDraft.effective}
+        draftRoutes={routeDraft.effective}
+        draftFog={fogDraft.fog}
+        regionsDirty={regionDraft.dirty}
+        routesDirty={routeDraft.dirty}
+        fogDirty={fogDraft.dirty}
       />
       <MapImportWizard
         open={mapImportOpen}
