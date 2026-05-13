@@ -233,8 +233,9 @@ Implemented:
 - **Batch 3 — Safe publishing**: `--player` strict build with physical exclusion of dm/hidden content, GitHub Action, GitHub Pages deploy, "Updated" date in viewer. (US-0105, 0106, 0201, 0202, 0203, 0204, 0701)
 - **Batch 4 — Creator convenience**: `/atlas/edit` placement editor with drag-to-place pins, `placements.json` export, `apply-placements` CLI to round-trip back into markdown frontmatter, copy-paste YAML patch. (US-0601, 0602, 0603, 0604, 1303)
 - **Batch 5 — Layered maps & regions**: multi-map worlds, image layers, polygon regions linked to entities, fog of war with reveal areas, header map switcher and fog toggle. (US-0801, 0802, 0803, 0804, 0805)
+- **Batch 6 — Connections & travel**: routes with entity-id waypoint resolution, per-map scale and travel-mode speeds, distance + travel-time hover tooltips, optional hex/square grid overlay with viewer toggle. See `world.yaml` (`scale`, `grid`, `routes`). (US-0901, 0902, 0903, 0904, 1001)
 
 Next:
 
-- **Batch 6 — Connections & travel**: routes between settlements, distance/scale, travel-time tooltips, hex/grid overlay options.
+- **Batch 7 — Search depth & timeline**: full-text search across body, tag/type filters, optional in-world calendar timeline.
 
