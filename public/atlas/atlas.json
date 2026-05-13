@@ -1,7 +1,7 @@
 {
-  "version": "2026-05-13T23-46-51-556Z",
+  "version": "2026-05-13T23-51-22-250Z",
   "schemaVersion": 1,
-  "publishedAt": "2026-05-13T23:46:51.556Z",
+  "publishedAt": "2026-05-13T23:51:22.250Z",
   "worlds": [
     {
       "id": "astrath-deeprealm",
@@ -338,7 +338,7 @@
       "summary": "A misty valley beneath Thornhold's bluffs.",
       "images": [],
       "body": "\n# Raven's Vale\n\nA long, mist-choked valley running south from [[Thornhold]]. Locals say the\nravens that nest here can speak the names of those soon to die — a rumor most\ntravelers prefer not to test.\n",
-      "bodyHtml": "<h1>Raven&#39;s Vale</h1>\n<p>A long, mist-choked valley running south from <a class=\"atlas-wikilink\" data-entity-id=\"thornhold\" href=\"#/entity/thornhold\">Thornhold</a>. Locals say the\nravens that nest here can speak the names of those soon to die — a rumor most\ntravelers prefer not to test.</p>\n",
+      "bodyHtml": "<h1>Raven's Vale</h1>\n<p>A long, mist-choked valley running south from <a class=\"atlas-wikilink\" data-entity-id=\"thornhold\" href=\"#/entity/thornhold\">Thornhold</a>. Locals say the\nravens that nest here can speak the names of those soon to die — a rumor most\ntravelers prefer not to test.</p>\n",
       "frontmatter": {},
       "sourcePath": "",
       "links": [
@@ -416,7 +416,7 @@
       "summary": "The shining capital on the western shore.",
       "images": [],
       "body": "\n# Sunhaven\n\nSunhaven is the seat of the realm and Astrath's largest port. Its merchants trade\nregularly with [[Thornhold]] and host pilgrims bound for [[The Old Keep]].\n\n> \"All roads in the west bend toward Sunhaven.\"\n",
-      "bodyHtml": "<h1>Sunhaven</h1>\n<p>Sunhaven is the seat of the realm and Astrath&#39;s largest port. Its merchants trade\nregularly with <a class=\"atlas-wikilink\" data-entity-id=\"thornhold\" href=\"#/entity/thornhold\">Thornhold</a> and host pilgrims bound for <a class=\"atlas-wikilink\" data-entity-id=\"the-old-keep\" href=\"#/entity/the-old-keep\">The Old Keep</a>.</p>\n<blockquote>\n<p>&quot;All roads in the west bend toward Sunhaven.&quot;</p>\n</blockquote>\n",
+      "bodyHtml": "<h1>Sunhaven</h1>\n<p>Sunhaven is the seat of the realm and Astrath's largest port. Its merchants trade\nregularly with <a class=\"atlas-wikilink\" data-entity-id=\"thornhold\" href=\"#/entity/thornhold\">Thornhold</a> and host pilgrims bound for <a class=\"atlas-wikilink\" data-entity-id=\"the-old-keep\" href=\"#/entity/the-old-keep\">The Old Keep</a>.</p>\n<blockquote>\n<p>\"All roads in the west bend toward Sunhaven.\"</p>\n</blockquote>\n",
       "frontmatter": {},
       "sourcePath": "",
       "links": [
@@ -466,7 +466,7 @@
       "summary": "A red-stone mining city carved into the southern bluffs.",
       "images": [],
       "body": "\n# Thornhold\n\nThornhold is a fortified mining city perched above the [[Raven's Vale]].\nIt trades iron and rare resonance crystal with [[Sunhaven]] along the King's Road.\n\n## History\n\nFounded after the Sundering, Thornhold's walls were raised from the same red\nstone that gives the city its name. Travelers know it by its alias *The Red City*.\n\n## Notable places\n\n- The Iron Gate\n- Old Market\n- Foundry District\n",
-      "bodyHtml": "<h1>Thornhold</h1>\n<p>Thornhold is a fortified mining city perched above the <a class=\"atlas-wikilink\" data-entity-id=\"ravens-vale\" href=\"#/entity/ravens-vale\">Raven's Vale</a>.\nIt trades iron and rare resonance crystal with <a class=\"atlas-wikilink\" data-entity-id=\"sunhaven\" href=\"#/entity/sunhaven\">Sunhaven</a> along the King&#39;s Road.</p>\n<h2>History</h2>\n<p>Founded after the Sundering, Thornhold&#39;s walls were raised from the same red\nstone that gives the city its name. Travelers know it by its alias <em>The Red City</em>.</p>\n<h2>Notable places</h2>\n<ul>\n<li>The Iron Gate</li>\n<li>Old Market</li>\n<li>Foundry District</li>\n</ul>\n",
+      "bodyHtml": "<h1>Thornhold</h1>\n<p>Thornhold is a fortified mining city perched above the <a class=\"atlas-wikilink\" data-entity-id=\"ravens-vale\" href=\"#/entity/ravens-vale\">Raven's Vale</a>.\nIt trades iron and rare resonance crystal with <a class=\"atlas-wikilink\" data-entity-id=\"sunhaven\" href=\"#/entity/sunhaven\">Sunhaven</a> along the King's Road.</p>\n<h2>History</h2>\n<p>Founded after the Sundering, Thornhold's walls were raised from the same red\nstone that gives the city its name. Travelers know it by its alias <em>The Red City</em>.</p>\n<h2>Notable places</h2>\n<ul>\n<li>The Iron Gate</li>\n<li>Old Market</li>\n<li>Foundry District</li>\n</ul>\n",
       "frontmatter": {},
       "sourcePath": "",
       "links": [
