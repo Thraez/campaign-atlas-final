@@ -435,7 +435,7 @@ function WrappedWorld({ dx, map, placements, entityById, showFog, showGrid, onOp
 
       {(map.regions ?? []).map((region) => {
         const ent = region.entityId ? entityById.get(region.entityId) : undefined;
-        const color = region.color ?? (ent ? (ICON_BY_TYPE[ent.type] ?? ICON_BY_TYPE.default) : "#7fb069");
+        const color = region.color ?? (ent ? resolvePinStyle(ent.type).color : "#7fb069");
         const positions = region.points.map(([x, y]) => [H - y, x + dx] as [number, number]);
         return (
           <Polygon
