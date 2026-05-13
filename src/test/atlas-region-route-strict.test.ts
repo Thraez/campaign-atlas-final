@@ -19,6 +19,12 @@
  *   4. region linked to hidden entity              → exit 6
  *   5. route waypoint → dm entity                  → exit 7
  *   6. route waypoint → unknown entity             → exit 7
+ *
+ * Note on warning text: in `--player` mode DM/hidden source entities are
+ * filtered out of the entity table BEFORE the leak scan runs, so the
+ * warning describes the target as `unknown entity` rather than `dm entity`.
+ * The assertions therefore lock the entity id (which is enough context to
+ * fix the source record) instead of the target's classification word.
  *   7. mixed safe + unsafe regions                 → exit 6, only the bad id is named
  *   8. mixed safe + unsafe routes                  → exit 7, only the bad id is named
  *   9. nested maps[].regions player-safe           → exit 0
@@ -148,7 +154,7 @@ describe("strict player build — top-level regions (exit code 6)", () => {
     expect(r.status, r.out).toBe(6);
     expect(r.out).toMatch(/region "leaky-region"/);
     expect(r.out).toMatch(/secret-base/);
-    expect(r.out).toMatch(/dm entity/);
+    expect(r.out).toMatch(/spoiler leak/);
   });
 
   it("(4) region linked to a hidden entity → exit 6", () => {
@@ -160,7 +166,8 @@ describe("strict player build — top-level regions (exit code 6)", () => {
     });
     const r = build(v.configPath, v.outDir);
     expect(r.status, r.out).toBe(6);
-    expect(r.out).toMatch(/hidden entity/);
+    expect(r.out).toMatch(/region "leaky-region"/);
+    expect(r.out).toMatch(/hidden-thing/);
   });
 
   it("(7) mixed safe + unsafe regions → exit 6 names ONLY the unsafe id", () => {
@@ -223,14 +230,14 @@ describe("strict player build — top-level routes (exit code 7)", () => {
     expect(r.status, r.out).toBe(7);
     expect(r.out).toMatch(/route "leaky-route"/);
     expect(r.out).toMatch(/secret-base/);
-    expect(r.out).toMatch(/dm entity/);
+    expect(r.out).toMatch(/spoiler leak/);
   });
 
   it("(6) route waypoint to an unknown entity → exit 7", () => {
     const v = makeVault({
       worldYaml:
         MAP_SKELETON +
-        `routes:\n  - id: unknown-route\n    mapId: m1\n    name: ?\n    visibility: player\n    waypoints:\n      - [0,0]\n      - { entityId: never-defined }\n`,
+        `routes:\n  - id: unknown-route\n    mapId: m1\n    name: "Unknown Road"\n    visibility: player\n    waypoints:\n      - [0,0]\n      - { entityId: never-defined }\n`,
       entities: [{ rel: "alice.md", visibility: "player" }],
     });
     const r = build(v.configPath, v.outDir);
