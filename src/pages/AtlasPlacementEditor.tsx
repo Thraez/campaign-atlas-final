@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { MapContainer, Marker, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, Marker, Polygon, ImageOverlay, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
@@ -11,15 +11,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
-const STORAGE_KEY = "atlas-placement-overrides-v1";
+// Bumped to v2: storage shape changed from { [entityId]: Override } to
+// { [`${mapId}:${entityId}`]: Override } so one entity can be placed on
+// multiple maps independently.
+const STORAGE_KEY = "atlas-placement-overrides-v2";
+const LEGACY_STORAGE_KEY = "atlas-placement-overrides-v1";
 
 type Override = { x: number; y: number } | null; // null = explicitly removed
 
 interface Overrides {
-  [entityId: string]: Override;
+  [mapEntityKey: string]: Override; // key = `${mapId}:${entityId}`
 }
+
+const overrideKey = (mapId: string, entityId: string) => `${mapId}:${entityId}`;
 
 function pinIcon(color: string, pulse = false): L.DivIcon {
   return L.divIcon({
