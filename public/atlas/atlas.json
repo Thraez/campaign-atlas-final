@@ -1,6 +1,6 @@
 {
-  "version": "2026-05-13T08-21-59-596Z",
-  "publishedAt": "2026-05-13T08:21:59.596Z",
+  "version": "2026-05-13T13-58-54-176Z",
+  "publishedAt": "2026-05-13T13:58:54.177Z",
   "worlds": [
     {
       "id": "astrath-deeprealm",
@@ -17,178 +17,12 @@
       "height": 100000,
       "oceanColor": "#18313f",
       "wrapX": false,
-      "scale": {
-        "unitsPerPixel": 0.05,
-        "unitLabel": "mi"
-      },
       "grid": {
         "kind": "hex",
         "size": 5000,
         "color": "rgba(255,255,255,0.06)",
         "enabled": false
       },
-      "layers": [],
-      "regions": [
-        {
-          "id": "ravens-vale-region",
-          "mapId": "astrath-deeprealm-overview",
-          "name": "Raven's Vale",
-          "entityId": "ravens-vale",
-          "color": "#7fb069",
-          "fillOpacity": 0.18,
-          "strokeOpacity": 0.85,
-          "points": [
-            [
-              80000,
-              35000
-            ],
-            [
-              120000,
-              32000
-            ],
-            [
-              128000,
-              55000
-            ],
-            [
-              95000,
-              62000
-            ],
-            [
-              78000,
-              50000
-            ]
-          ],
-          "visibility": "player"
-        },
-        {
-          "id": "thornhold-domain",
-          "mapId": "astrath-deeprealm-overview",
-          "name": "Thornhold Domain",
-          "entityId": "thornhold",
-          "color": "#f4c95d",
-          "fillOpacity": 0.14,
-          "strokeOpacity": 0.85,
-          "points": [
-            [
-              40000,
-              60000
-            ],
-            [
-              70000,
-              58000
-            ],
-            [
-              72000,
-              80000
-            ],
-            [
-              42000,
-              82000
-            ]
-          ],
-          "visibility": "player"
-        }
-      ],
-      "fog": {
-        "mapId": "astrath-deeprealm-overview",
-        "enabled": true,
-        "color": "rgba(8, 12, 20, 0.55)",
-        "reveals": [
-          [
-            [
-              40000,
-              30000
-            ],
-            [
-              140000,
-              30000
-            ],
-            [
-              140000,
-              85000
-            ],
-            [
-              40000,
-              85000
-            ]
-          ]
-        ]
-      },
-      "routes": [
-        {
-          "id": "kings-road",
-          "mapId": "astrath-deeprealm-overview",
-          "name": "The King's Road",
-          "mode": "horse",
-          "speed": 6,
-          "color": "#f4c95d",
-          "weight": 3,
-          "visibility": "player",
-          "waypoints": [
-            {
-              "entityId": "thornhold"
-            },
-            {
-              "entityId": "sunhaven"
-            }
-          ],
-          "resolvedPoints": [
-            [
-              100000,
-              50000
-            ],
-            [
-              40000,
-              45000
-            ]
-          ]
-        },
-        {
-          "id": "ravens-trail",
-          "mapId": "astrath-deeprealm-overview",
-          "name": "Raven's Trail",
-          "mode": "foot",
-          "speed": 3,
-          "color": "#7fb069",
-          "dashed": true,
-          "visibility": "player",
-          "waypoints": [
-            {
-              "entityId": "sunhaven"
-            },
-            {
-              "entityId": "ravens-vale"
-            },
-            {
-              "entityId": "the-old-keep"
-            }
-          ],
-          "resolvedPoints": [
-            [
-              40000,
-              45000
-            ],
-            [
-              70000,
-              30000
-            ],
-            [
-              130000,
-              60000
-            ]
-          ]
-        }
-      ]
-    },
-    {
-      "id": "astrath-deeprealm-northern-reaches",
-      "worldId": "astrath-deeprealm",
-      "name": "Northern Reaches",
-      "width": 80000,
-      "height": 60000,
-      "oceanColor": "#1c2a35",
-      "wrapX": false,
       "layers": [],
       "regions": [],
       "routes": []
@@ -228,8 +62,8 @@
         }
       ],
       "backlinks": [],
-      "dateRaw": "3 Longnight, 612 AS",
-      "dateValue": 112765,
+      "dateRaw": "612-6-3",
+      "dateValue": 223533,
       "dateYear": 612
     },
     {
@@ -265,8 +99,8 @@
         }
       ],
       "backlinks": [],
-      "dateRaw": "12 Greentide, 47 AS",
-      "dateValue": 8720,
+      "dateRaw": "47-3-12",
+      "dateValue": 17227,
       "dateYear": 47
     },
     {
@@ -307,7 +141,7 @@
           "title": "Founding of Thornhold"
         }
       ],
-      "dateRaw": "1 Frostmoon, 0 AS",
+      "dateRaw": "0-1-1",
       "dateValue": 1,
       "dateYear": 0
     },
@@ -530,37 +364,6 @@
     }
   ],
   "assets": [],
-  "calendar": {
-    "name": "Reckoning of the Twin Moons",
-    "epochName": "AS",
-    "daysPerWeek": 8,
-    "months": [
-      {
-        "name": "Frostmoon",
-        "days": 30
-      },
-      {
-        "name": "Thawing",
-        "days": 30
-      },
-      {
-        "name": "Greentide",
-        "days": 32
-      },
-      {
-        "name": "Highsun",
-        "days": 32
-      },
-      {
-        "name": "Goldfall",
-        "days": 30
-      },
-      {
-        "name": "Longnight",
-        "days": 30
-      }
-    ]
-  },
   "buildReport": {
     "scanned": 9,
     "included": 7,
