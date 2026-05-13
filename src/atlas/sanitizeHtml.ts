@@ -18,7 +18,7 @@
  *   - Run again at RENDER time as a defense-in-depth pass before any
  *     `dangerouslySetInnerHTML` call.
  */
-import DOMPurify from "isomorphic-dompurify";
+import DOMPurify, { type Config } from "isomorphic-dompurify";
 
 /** Tags allowed in atlas markdown output. */
 const ALLOWED_TAGS = [
@@ -51,7 +51,7 @@ const ALLOWED_ATTR = [
   "lang",
 ];
 
-const PURIFY_CONFIG = {
+const PURIFY_CONFIG: Config = {
   ALLOWED_TAGS: [...ALLOWED_TAGS],
   ALLOWED_ATTR,
   // No iframes/embeds/objects/forms/svg-foreignobject etc.
@@ -66,7 +66,7 @@ const PURIFY_CONFIG = {
   RETURN_DOM_FRAGMENT: false,
   // We don't use SVG/MathML for body content.
   USE_PROFILES: { html: true },
-} as const;
+};
 
 /**
  * Sanitize an HTML string for safe rendering in the atlas viewer.
