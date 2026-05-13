@@ -196,8 +196,9 @@ export function buildEntityFrontmatterPatch(patches: EntityFrontmatterPatch[]): 
     sections,
   };
 }
-
-
+// --------------------------------------------------------------------------
+// 2. WORLD YAML PATCH (maps + layers + grid + scale + ocean + wrapX)
+// --------------------------------------------------------------------------
 
 export interface BuildWorldMapPatchOpts {
   /** The merged, edited map (source of truth for the patch). */
