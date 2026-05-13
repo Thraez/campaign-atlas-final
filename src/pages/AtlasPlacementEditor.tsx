@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { MapContainer, Marker, Polygon, ImageOverlay, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, Marker, ImageOverlay, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
@@ -36,6 +36,8 @@ import { EntitiesTab } from "@/atlas/tabs/EntitiesTab";
 import { PublishCheckTab } from "@/atlas/tabs/PublishCheckTab";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { MapImportWizard } from "@/atlas/import/MapImportWizard";
+import { useRegionDraft } from "@/atlas/regions/useRegionDraft";
+import { RegionLayer } from "@/atlas/regions/RegionLayer";
 import {
   PIN_PRESETS,
   defaultPresetForType,
@@ -169,6 +171,14 @@ export default function AtlasPlacementEditor() {
   };
 
   const layerEditor = useMapLayers(activeMap);
+
+  // Region draft state — shared between RegionsTab (form) and the map (RegionLayer).
+  const entityIdSet = useMemo(() => new Set((project?.entities ?? []).map((e) => e.id)), [project]);
+  const dmEntityIdSet = useMemo(
+    () => new Set((project?.entities ?? []).filter((e) => e.visibility === "dm" || e.visibility === "hidden").map((e) => e.id)),
+    [project]
+  );
+  const regionDraft = useRegionDraft(activeMap, { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet });
 
   /** Per-tab filter state (placed/unplaced/visibility/type/tag). */
   const [stateFilter, setStateFilter] = useState<"all" | "placed" | "unplaced">("all");
@@ -458,7 +468,7 @@ export default function AtlasPlacementEditor() {
             minZoom={-6}
             maxZoom={4}
             attributionControl={false}
-            style={{ width: "100%", height: "100%", background: activeMap.oceanColor ?? "#18313f", cursor: pendingId ? "crosshair" : undefined }}
+            style={{ width: "100%", height: "100%", background: activeMap.oceanColor ?? "#18313f", cursor: (pendingId || regionDraft.drawing) ? "crosshair" : undefined }}
           >
             <FlyTo target={flyTo} />
             <MapClickCapture onClick={onMapClick} />
@@ -478,25 +488,8 @@ export default function AtlasPlacementEditor() {
               />
             ))}
 
-            {/* Region polygons rendered lightly so they don't dominate the editor */}
-            {showRegions && (activeMap.regions ?? []).map((region) => {
-              const positions = region.points.map(([x, y]) => [activeMap.height - y, x] as [number, number]);
-              const color = region.color ?? "#7fb069";
-              return (
-                <Polygon
-                  key={region.id}
-                  positions={positions}
-                  pathOptions={{
-                    color,
-                    weight: 1,
-                    fillColor: color,
-                    fillOpacity: 0.08,
-                    opacity: 0.5,
-                    interactive: false,
-                  }}
-                />
-              );
-            })}
+            {/* Regions render ABOVE base layers but BELOW routes/pins/labels/handles. */}
+            {showRegions && <RegionLayer map={activeMap} api={regionDraft} visible={showRegions} />}
 
             {placed.map((e) => {
               const eff = effectivePlacement(e.id);
@@ -681,10 +674,17 @@ export default function AtlasPlacementEditor() {
               <RegionsTab
                 project={project}
                 map={activeMap}
+                api={regionDraft}
                 blockingCount={regionIssues.blocking}
                 warningCount={regionIssues.warning}
                 lastExportAt={tabExportAt.regions ?? null}
                 onExported={() => markTabExport("regions")}
+                onFitTo={(r) => {
+                  if (!r.points.length) return;
+                  const cx = r.points.reduce((s, p) => s + p[0], 0) / r.points.length;
+                  const cy = r.points.reduce((s, p) => s + p[1], 0) / r.points.length;
+                  setFlyTo({ lat: activeMap.height - cy, lng: cx });
+                }}
               />
             </TabsContent>
 

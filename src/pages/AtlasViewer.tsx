@@ -456,25 +456,6 @@ function WrappedWorld({ dx, map, placements, entityById, showFog, showGrid, onOp
         );
       })}
 
-      {showFog && map.fog?.enabled && (
-        <Polygon
-          positions={(() => {
-            const outer: L.LatLngExpression[] = [
-              [0, dx], [0, map.width + dx], [H, map.width + dx], [H, dx],
-            ];
-            const holes: L.LatLngExpression[][] = map.fog!.reveals.map((poly) =>
-              poly.map(([x, y]) => [H - y, x + dx] as [number, number])
-            );
-            return [outer, ...holes];
-          })()}
-          pathOptions={{
-            color: "transparent",
-            fillColor: map.fog.color ?? "rgba(8,12,20,0.55)",
-            fillOpacity: 1, weight: 0, interactive: false, fillRule: "evenodd",
-          } as L.PathOptions}
-        />
-      )}
-
       {(map.routes ?? []).map((route) => {
         const pts = (route.resolvedPoints ?? []).map(([x, y]) => [H - y, x + dx] as [number, number]);
         if (pts.length < 2) return null;
@@ -503,6 +484,25 @@ function WrappedWorld({ dx, map, placements, entityById, showFog, showGrid, onOp
           </Polyline>
         );
       })}
+
+      {showFog && map.fog?.enabled && (
+        <Polygon
+          positions={(() => {
+            const outer: L.LatLngExpression[] = [
+              [0, dx], [0, map.width + dx], [H, map.width + dx], [H, dx],
+            ];
+            const holes: L.LatLngExpression[][] = map.fog!.reveals.map((poly) =>
+              poly.map(([x, y]) => [H - y, x + dx] as [number, number])
+            );
+            return [outer, ...holes];
+          })()}
+          pathOptions={{
+            color: "transparent",
+            fillColor: map.fog.color ?? "rgba(8,12,20,0.55)",
+            fillOpacity: 1, weight: 0, interactive: false, fillRule: "evenodd",
+          } as L.PathOptions}
+        />
+      )}
 
       {map.grid && (showGrid ?? map.grid.enabled !== false) && gridLines(map, map.grid).map((line, i) => (
         <Polyline
