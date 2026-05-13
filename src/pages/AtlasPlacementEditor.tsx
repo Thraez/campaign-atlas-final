@@ -172,6 +172,14 @@ export default function AtlasPlacementEditor() {
 
   const layerEditor = useMapLayers(activeMap);
 
+  // Region draft state — shared between RegionsTab (form) and the map (RegionLayer).
+  const entityIdSet = useMemo(() => new Set((project?.entities ?? []).map((e) => e.id)), [project]);
+  const dmEntityIdSet = useMemo(
+    () => new Set((project?.entities ?? []).filter((e) => e.visibility === "dm" || e.visibility === "hidden").map((e) => e.id)),
+    [project]
+  );
+  const regionDraft = useRegionDraft(activeMap, { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet });
+
   /** Per-tab filter state (placed/unplaced/visibility/type/tag). */
   const [stateFilter, setStateFilter] = useState<"all" | "placed" | "unplaced">("all");
   const [visFilter, setVisFilter] = useState<"all" | "player" | "rumor" | "dm" | "hidden">("all");
