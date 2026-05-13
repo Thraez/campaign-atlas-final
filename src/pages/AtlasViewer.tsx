@@ -679,6 +679,8 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
   const placedIds = useMemo(() => new Set(placements.map((p) => p.entityId)), [placements]);
   const [activeType, setActiveType] = useState<string | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const allTypes = useMemo(() => {
     const m = new Map<string, number>();
@@ -719,6 +721,34 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
       .map(({ e }) => ({ e, snip: snippet(e.body, q) }));
   }, [query, index, activeType, activeTag]);
 
+  // Reset selection when filters or query change.
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [query, activeType, activeTag]);
+
+  // Scroll active item into view.
+  useEffect(() => {
+    if (activeIndex < 0) return;
+    const el = listRef.current?.querySelector(`[data-index="${activeIndex}"]`) as HTMLElement | null;
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }, [activeIndex]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (results.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => (i + 1) % results.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => (i <= 0 ? results.length - 1 : i - 1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const idx = activeIndex >= 0 ? activeIndex : 0;
+      const r = results[idx];
+      if (r) onPick(r.e.id, placedIds.has(r.e.id));
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm flex items-start justify-center pt-[10vh] px-4"
@@ -727,6 +757,7 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
       <div
         className="w-full max-w-2xl bg-card border border-border rounded-lg shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={handleKeyDown}
       >
         <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
           <Search className="h-4 w-4 text-muted-foreground" />
@@ -772,17 +803,22 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
           </div>
         )}
 
-        <div className="max-h-[60vh] overflow-y-auto">
+        <div ref={listRef} className="max-h-[60vh] overflow-y-auto">
           {results.length === 0 ? (
             <div className="p-6 text-sm text-muted-foreground text-center">No matches.</div>
           ) : (
-            results.map(({ e: r, snip }) => {
+            results.map(({ e: r, snip }, i) => {
               const placed = placedIds.has(r.id);
+              const active = i === activeIndex;
               return (
                 <button
                   key={r.id}
+                  data-index={i}
                   onClick={() => onPick(r.id, placed)}
-                  className="w-full text-left px-3 py-2 hover:bg-accent/40 border-b border-border/50 last:border-b-0"
+                  onMouseEnter={() => setActiveIndex(i)}
+                  className={`w-full text-left px-3 py-2 border-b border-border/50 last:border-b-0 ${
+                    active ? "bg-accent/60" : "hover:bg-accent/40"
+                  }`}
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm">{r.title}</span>
