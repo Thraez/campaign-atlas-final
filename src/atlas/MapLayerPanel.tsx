@@ -176,6 +176,18 @@ export function MapLayerPanel(props: Props) {
       }
     }
     downloadText(`map-layers-${map.id}.md`, lines.join("\n"), "text/markdown");
+    checklist.show({
+      title: "Layer patch exported",
+      description: "Your map layer YAML patch is ready. Follow the checklist to commit it.",
+      files: [`map-layers-${map.id}.md`],
+      steps: [
+        { label: "Open the downloaded Patch.md file", detail: "It contains the YAML snippet to paste into world.yaml." },
+        { label: "Paste under the matching map entry", detail: `In content/<world>/_atlas/world.yaml, find the map with id "${map.id}" and replace its layers section with the exported YAML.` },
+        ...(uploads.length ? [{ label: "Upload image files to GitHub", detail: `Upload ${uploads.length} image file(s) to their target paths (e.g., public/atlas/assets/maps/).` }] : []),
+        { label: "Commit changes to main", detail: "Push the updated world.yaml and any new images." },
+        { label: "GitHub Action publishes automatically", detail: "The publish-atlas.yml workflow will run and deploy to GitHub Pages." },
+      ],
+    });
   };
 
   return (
