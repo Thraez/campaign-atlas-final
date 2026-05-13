@@ -252,6 +252,9 @@ export default function AtlasPlacementEditor() {
 
   const [lastExportAt, setLastExportAt] = useState<number | null>(null);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  // Per-tab last-export timestamps so each tab header can show its own status.
+  const [tabExportAt, setTabExportAt] = useState<Record<string, number>>({});
+  const markTabExport = (tab: string) => setTabExportAt((s) => ({ ...s, [tab]: Date.now() }));
 
   const exportPatch = () => {
     if (!project || !activeMap) return;
@@ -264,10 +267,38 @@ export default function AtlasPlacementEditor() {
     if (result.warnings.length) toast.warning(result.warnings[0]);
     download(artifact.filename, artifact.content, artifact.mime);
     setLastExportAt(Date.now());
+    markTabExport("pins");
   };
 
   const dirtyCount = Object.keys(overrides).filter((k) => activeMap && k.startsWith(`${activeMap.id}:`)).length;
   const draftStatus = classifyDraftStatus({ dirtyCount, lastExportAt });
+
+  // Project-wide validation, scoped per tab so each tab badge shows its own counts.
+  const draftPlacementsForValidation = useMemo(() => buildDraftPlacements(), [buildDraftPlacements]);
+  const validation = useMemo(
+    () => project && activeMap
+      ? validateProject({
+          project,
+          draftPlacements: draftPlacementsForValidation,
+          draftMap: activeMap,
+          draftLocalLayers: layerEditor.localLayers,
+        })
+      : null,
+    [project, activeMap, draftPlacementsForValidation, layerEditor.localLayers]
+  );
+  const issuesByScope = (predicate: (i: import("@/atlas/yaml/validateProject").Issue) => boolean) => {
+    const list = validation?.issues.filter(predicate) ?? [];
+    return {
+      blocking: list.filter((i) => i.severity === "blocking").length,
+      warning: list.filter((i) => i.severity === "warning").length,
+    };
+  };
+  const pinIssues = issuesByScope((i) => i.code.includes("placement") || i.code === "out-of-bounds" || i.code === "invalid-coord");
+  const mapIssues = issuesByScope((i) => i.code === "duplicate-layer-id" || i.code === "empty-map" || i.code === "missing-asset");
+  const regionIssues = issuesByScope((i) => i.code.includes("region") || i.code === "spoiler-leak");
+  const routeIssues = issuesByScope((i) => i.code.includes("route"));
+  const entityIssues = issuesByScope((i) => i.code === "invalid-visibility" || i.code === "unknown-entity");
+
 
   if (error) {
     return (
