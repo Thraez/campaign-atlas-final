@@ -73,11 +73,10 @@ vi.mock("@/pages/NotFound.tsx", () => ({
 }));
 
 /** Tiny copy of the App route gate, importing the same dmTools module. */
-function renderEditorRoute() {
-  // Dynamic require so we get the freshly-stubbed env on each render.
-  const { isDmToolsEnabled } = require("@/atlas/dmTools") as typeof import("@/atlas/dmTools");
-  const Editor = require("@/pages/AtlasPlacementEditor.tsx").default as React.FC;
-  const NotFound = require("@/pages/NotFound.tsx").default as React.FC;
+async function renderEditorRoute() {
+  const { isDmToolsEnabled } = await import("@/atlas/dmTools");
+  const Editor = (await import("@/pages/AtlasPlacementEditor.tsx")).default;
+  const NotFound = (await import("@/pages/NotFound.tsx")).default;
   const Gate = () => (isDmToolsEnabled() ? <Editor /> : <NotFound />);
   render(
     <MemoryRouter initialEntries={["/atlas/edit"]}>
@@ -95,21 +94,21 @@ describe("/atlas/edit route gate", () => {
 
   it("production with flag missing → /atlas/edit renders NotFound, not editor", async () => {
     setEnv({ dev: false });
-    renderEditorRoute();
+    await renderEditorRoute();
     expect(screen.queryByTestId("editor-mounted")).toBeNull();
     expect(screen.getByTestId("not-found")).toBeInTheDocument();
   });
 
   it("production with VITE_ENABLE_DM_TOOLS=true → /atlas/edit renders the editor", async () => {
     setEnv({ dev: false, flag: "true" });
-    renderEditorRoute();
+    await renderEditorRoute();
     expect(screen.getByTestId("editor-mounted")).toBeInTheDocument();
     expect(screen.queryByTestId("not-found")).toBeNull();
   });
 
   it("dev default → /atlas/edit renders the editor", async () => {
     setEnv({ dev: true });
-    renderEditorRoute();
+    await renderEditorRoute();
     expect(screen.getByTestId("editor-mounted")).toBeInTheDocument();
   });
 });
