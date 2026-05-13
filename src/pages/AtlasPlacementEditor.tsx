@@ -36,6 +36,8 @@ import { EntitiesTab } from "@/atlas/tabs/EntitiesTab";
 import { PublishCheckTab } from "@/atlas/tabs/PublishCheckTab";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { MapImportWizard } from "@/atlas/import/MapImportWizard";
+import { useRegionDraft } from "@/atlas/regions/useRegionDraft";
+import { RegionLayer } from "@/atlas/regions/RegionLayer";
 import {
   PIN_PRESETS,
   defaultPresetForType,
