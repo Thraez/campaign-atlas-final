@@ -14,7 +14,6 @@
 import { useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChevronDown, ChevronRight, ShieldAlert, FileCode } from "lucide-react";
 
 export interface TabFrameProps {
@@ -80,8 +79,8 @@ export function TabFrame(props: TabFrameProps) {
           </span>
         </div>
       </div>
-      <ScrollArea className="flex-1">
-        <div className="p-3 space-y-3">{children}</div>
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div>{children}</div>
         {rawYamlPreview !== undefined && (
           <div className="border-t border-border bg-muted/30">
             <button
@@ -99,7 +98,7 @@ export function TabFrame(props: TabFrameProps) {
             )}
           </div>
         )}
-      </ScrollArea>
+      </div>
     </div>
   );
 }
