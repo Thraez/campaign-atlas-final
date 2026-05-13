@@ -652,7 +652,9 @@ async function main() {
   console.log(`Errors:                  ${errors.length}`);
   for (const e of errors) console.log(`  ✗ ${e}`);
   for (const w of warnings) console.log(`  ! ${w}`);
-  for (const m of missingAssetList) console.log(`  ✗ ${m}`);
+  for (const f of assetFindings) {
+    if (f.severity === "error") console.log(`  ${formatFinding(f)}`);
+  }
   console.log(`\nWrote ${path.relative(ROOT, path.join(outDir, "atlas.json"))}`);
   console.log(`Wrote ${path.relative(ROOT, path.join(outDir, "search-index.json"))}\n`);
 
