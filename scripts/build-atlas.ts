@@ -469,12 +469,16 @@ async function main() {
   console.log(`Maps:                    ${maps.length}`);
   console.log(`Regions:                 ${regions.length}`);
   console.log(`Routes:                  ${routes.length}`);
-  console.log(`Broken wikilinks:        ${r.brokenLinks}`);
+  console.log(`Unresolved wikilinks:    ${r.unresolvedLinks} (allowed — not-yet-created notes)`);
   console.log(`Duplicate slugs:         ${r.duplicateSlugs}`);
+  console.log(`Local assets:            ${localAssets}`);
+  console.log(`External assets:         ${externalAssets}`);
+  console.log(`Missing local assets:    ${missingAssets}`);
   console.log(`Warnings:                ${warnings.length}`);
   console.log(`Errors:                  ${errors.length}`);
   for (const e of errors) console.log(`  ✗ ${e}`);
   for (const w of warnings) console.log(`  ! ${w}`);
+  for (const m of missingAssetList) console.log(`  ✗ ${m}`);
   console.log(`\nWrote ${path.relative(ROOT, path.join(outDir, "atlas.json"))}`);
   console.log(`Wrote ${path.relative(ROOT, path.join(outDir, "search-index.json"))}\n`);
 
@@ -489,8 +493,16 @@ async function main() {
     console.error(`Strict player mode: ${invalidVisibilityCount} invalid visibility value(s). Failing build.`);
     process.exit(3);
   }
-  if (flags.strict && (warnings.length > 0 || r.brokenLinks > 0)) {
-    console.error("Strict mode: warnings present. Failing build.");
+  // Missing local assets in a strict player build must fail — players would
+  // see broken images. External URLs only warn.
+  if (flags.player && flags.strict && missingAssets > 0) {
+    console.error(`Strict player mode: ${missingAssets} missing local asset(s). Failing build.`);
+    process.exit(4);
+  }
+  // Strict mode (non-asset, non-link) still fails on duplicate slugs etc.
+  // Unresolved wikilinks are explicitly allowed and do NOT fail strict.
+  if (flags.strict && duplicateSlugs > 0) {
+    console.error("Strict mode: duplicate slugs present. Failing build.");
     process.exit(2);
   }
 }
