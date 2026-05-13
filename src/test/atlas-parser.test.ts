@@ -66,9 +66,6 @@ describe("tokenizeWikilinks", () => {
 });
 
 describe("renderLinkTokens — player safety", () => {
-  // Inline import to keep the top of the file unchanged.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { renderLinkTokens } = require("../../scripts/atlas/parseWikilinks");
   const links = [{ target: "Secret Vault", display: "the vault", resolvedId: undefined, broken: true }];
   const html = `before \u2063LINK[0]\u2063 after`;
 
