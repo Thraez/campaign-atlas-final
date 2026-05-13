@@ -239,6 +239,8 @@ async function main() {
       sourcePath: flags.player ? "" : rel,           // strip source paths from player output
       links: [],
       backlinks: [],
+      profile: compactProfile(parsed.atlas.profile),
+      relationships: parsed.atlas.relationships,
     };
 
     // Date / timeline support.
