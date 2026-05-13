@@ -67,11 +67,42 @@ export interface WorldConfig {
   warnings: string[];
 }
 
+export class WorldConfigError extends Error {}
+
 export function loadWorldConfig(contentRoot: string, worldId: string): WorldConfig | null {
   const file = path.join(contentRoot, worldId, "_atlas", "world.yaml");
   if (!fs.existsSync(file)) return null;
   const raw = fs.readFileSync(file, "utf8");
-  const data = (yaml.load(raw) ?? {}) as WorldYaml;
+  const rel = path.relative(process.cwd(), file).replace(/\\/g, "/");
+
+  // Hard-fail guard: the most common authoring mistake is pasting an exported
+  // patch's full markdown (with ```yaml fences) into world.yaml instead of just
+  // the YAML inside the fence. Catch it before yaml.load() throws something
+  // cryptic.
+  if (/^\s*```/m.test(raw)) {
+    throw new WorldConfigError(
+      `${rel}: contains markdown code fences (\`\`\`). world.yaml must be PURE YAML — paste only the YAML inside any patch fence, not the wrapper.`
+    );
+  }
+
+  let data: WorldYaml;
+  try {
+    data = (yaml.load(raw) ?? {}) as WorldYaml;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new WorldConfigError(`${rel}: invalid YAML — ${msg}`);
+  }
+
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    throw new WorldConfigError(`${rel}: top-level must be a YAML mapping (object).`);
+  }
+  if (data.maps !== undefined && !Array.isArray(data.maps)) {
+    throw new WorldConfigError(`${rel}: "maps" must be an array.`);
+  }
+  if (!data.maps || data.maps.length === 0) {
+    throw new WorldConfigError(`${rel}: no maps defined. Add at least one entry under "maps:".`);
+  }
+
   const warnings: string[] = [];
 
   const maps: MapDocument[] = (data.maps ?? []).map((m, i) => {
