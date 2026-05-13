@@ -1,6 +1,6 @@
 {
-  "version": "2026-05-13T06-50-41-188Z",
-  "publishedAt": "2026-05-13T06:50:41.188Z",
+  "version": "2026-05-13T06-51-04-659Z",
+  "publishedAt": "2026-05-13T06:51:04.660Z",
   "worlds": [
     {
       "id": "astrath-deeprealm",
@@ -115,7 +115,71 @@
           ]
         ]
       },
-      "routes": []
+      "routes": [
+        {
+          "id": "kings-road",
+          "mapId": "astrath-deeprealm-overview",
+          "name": "The King's Road",
+          "mode": "horse",
+          "speed": 6,
+          "color": "#f4c95d",
+          "weight": 3,
+          "visibility": "player",
+          "waypoints": [
+            {
+              "entityId": "thornhold"
+            },
+            {
+              "entityId": "sunhaven"
+            }
+          ],
+          "resolvedPoints": [
+            [
+              100000,
+              50000
+            ],
+            [
+              40000,
+              45000
+            ]
+          ]
+        },
+        {
+          "id": "ravens-trail",
+          "mapId": "astrath-deeprealm-overview",
+          "name": "Raven's Trail",
+          "mode": "foot",
+          "speed": 3,
+          "color": "#7fb069",
+          "dashed": true,
+          "visibility": "player",
+          "waypoints": [
+            {
+              "entityId": "sunhaven"
+            },
+            {
+              "entityId": "ravens-vale"
+            },
+            {
+              "entityId": "the-old-keep"
+            }
+          ],
+          "resolvedPoints": [
+            [
+              40000,
+              45000
+            ],
+            [
+              70000,
+              30000
+            ],
+            [
+              130000,
+              60000
+            ]
+          ]
+        }
+      ]
     },
     {
       "id": "astrath-deeprealm-northern-reaches",

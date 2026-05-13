@@ -62,3 +62,28 @@ fog:
     color: "rgba(8, 12, 20, 0.55)"
     reveals:
       - [[40000, 30000], [140000, 30000], [140000, 85000], [40000, 85000]]
+
+routes:
+  - id: kings-road
+    mapId: astrath-deeprealm-overview
+    name: The King's Road
+    mode: horse
+    speed: 6
+    color: "#f4c95d"
+    weight: 3
+    visibility: player
+    waypoints:
+      - thornhold
+      - sunhaven
+  - id: ravens-trail
+    mapId: astrath-deeprealm-overview
+    name: Raven's Trail
+    mode: foot
+    speed: 3
+    color: "#7fb069"
+    dashed: true
+    visibility: player
+    waypoints:
+      - sunhaven
+      - ravens-vale
+      - the-old-keep
