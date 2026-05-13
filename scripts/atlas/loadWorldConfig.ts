@@ -18,6 +18,7 @@ import type {
   Region,
   Route,
   RouteMode,
+  WorldCalendar,
 } from "../../src/atlas/content/schema";
 
 const VALID_VIS: EntityVisibility[] = ["player", "dm", "hidden", "rumor"];
