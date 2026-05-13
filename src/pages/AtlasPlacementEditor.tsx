@@ -253,8 +253,24 @@ export default function AtlasPlacementEditor() {
         </Link>
         <Badge variant="outline" className="ml-2 hidden sm:inline-flex">DM only</Badge>
         <div className="flex-1" />
+        {project.maps.length > 1 && (
+          <Select value={activeMap.id} onValueChange={(v) => { setActiveMapId(v); setPendingId(null); }}>
+            <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {project.maps.map((m) => (
+                <SelectItem key={m.id} value={m.id} className="text-xs">{m.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        <Button variant={showLayers ? "secondary" : "ghost"} size="sm" onClick={() => setShowLayers((v) => !v)} title="Toggle map layers">
+          Layers
+        </Button>
+        <Button variant={showRegions ? "secondary" : "ghost"} size="sm" onClick={() => setShowRegions((v) => !v)} title="Toggle region overlays">
+          Regions
+        </Button>
         <span className="text-xs text-muted-foreground hidden md:inline">
-          {dirtyCount > 0 ? `${dirtyCount} unsaved change${dirtyCount === 1 ? "" : "s"}` : "All saved to JSON ↓"}
+          {dirtyCount > 0 ? `${dirtyCount} unsaved on ${activeMap.name}` : "All saved to JSON ↓"}
         </span>
         <Button variant="ghost" size="sm" onClick={() => { setOverrides({}); toast.info("Cleared overrides"); }} title="Discard local changes">
           <RotateCcw className="h-4 w-4" />
