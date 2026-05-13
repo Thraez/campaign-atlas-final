@@ -8,11 +8,16 @@ export interface LocalLayer extends MapLayer {
    *  "url"    = external/URL or local path the user typed,
    *  "edit"   = a copy/override of a layer that already exists in world.yaml. */
   origin: "upload" | "url" | "edit";
+  name?: string;
+  locked?: boolean;
   /** For uploads: original filename + suggested target path on disk. */
   filename?: string;
   targetPath?: string;
   /** True for object URLs we own and need to revoke. */
   isObjectUrl?: boolean;
+  /** Cached image bytes (data URL) so a refresh of /atlas/edit can still preview
+   *  the upload — object URLs do NOT survive a reload. */
+  dataUrl?: string;
 }
 
 const STORAGE_KEY = "atlas-local-map-layers-v1";
