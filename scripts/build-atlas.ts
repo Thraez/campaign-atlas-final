@@ -346,6 +346,7 @@ async function main() {
     entities: pending.map((p) => p.entity),
     placements,
     assets: [],
+    calendar: worldCfg?.calendar,
     buildReport: {
       scanned: files.length + scanInfo.excludedFiles,
       included: pending.length,
@@ -361,6 +362,19 @@ async function main() {
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "atlas.json"), JSON.stringify(project, null, 2));
 
+  // Strip markdown syntax for the search index body field. Keeps it small enough
+  // for client-side full-text scan without shipping a wasm search engine.
+  const stripMd = (s: string) =>
+    s
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/!\[[^\]]*]\([^)]*\)/g, " ")
+      .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?]]/g, (_m, t, d) => d || t)
+      .replace(/\[([^\]]*)]\([^)]*\)/g, "$1")
+      .replace(/[*_`>#~]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+
   const searchIndex = pending.map(({ entity }) => ({
     id: entity.id,
     title: entity.title,
@@ -369,6 +383,10 @@ async function main() {
     tags: entity.tags,
     summary: entity.summary,
     excerpt: entity.body.replace(/\s+/g, " ").trim().slice(0, 240),
+    body: stripMd(entity.body).slice(0, 4000),
+    dateRaw: entity.dateRaw,
+    dateValue: entity.dateValue,
+    dateYear: entity.dateYear,
   }));
   fs.writeFileSync(path.join(outDir, "search-index.json"), JSON.stringify(searchIndex, null, 2));
 
