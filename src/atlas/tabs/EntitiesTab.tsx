@@ -1,14 +1,24 @@
 /**
  * Entities tab — edit atlas frontmatter for any entity in the project.
  *
- * Surfaces visibility, summary, aliases, images for one entity at a time.
- * Drafts are accumulated per-entity and exported together via the unified
- * entity-frontmatter patch builder. The DM never has to touch raw YAML — but
- * the generated block is always available in the advanced preview.
+ * Surfaces visibility, summary, aliases, images, profile, and relationships
+ * for one entity at a time. Drafts are accumulated per-entity and exported
+ * together via the unified entity-frontmatter patch builder. The DM never has
+ * to touch raw YAML — but the generated block is always available in the
+ * advanced preview.
  */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Plus, Trash2, AlertTriangle, ShieldAlert } from "lucide-react";
 import type { AtlasProject, Entity, EntityVisibility } from "@/atlas/content/schema";
+import type { EntityProfile, EntityRelationship } from "@/atlas/profiles/profileTypes";
+import {
+  PLAYER_PROFILE_FIELDS,
+  PLAYER_PROFILE_LIST_FIELDS,
+  RELATIONSHIP_TYPES,
+  dmFieldsForType,
+} from "@/atlas/profiles/profileFields";
+import { compactProfile, filterRelationshipsForPlayer } from "@/atlas/profiles/profileBuild";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +43,8 @@ interface FrontmatterDraft {
   aliases?: string[];
   images?: string[];
   type?: string;
+  profile?: EntityProfile;
+  relationships?: EntityRelationship[];
 }
 
 export function EntitiesTab({ project, blockingCount, warningCount, lastExportAt, onExported }: Props) {
@@ -55,9 +67,19 @@ export function EntitiesTab({ project, blockingCount, warningCount, lastExportAt
 
   const dirtyCount = Object.keys(drafts).length;
 
+  // Single source of truth for "entity id → visibility" — used by both the
+  // patch preview and the in-UI relationship-leak warnings, so the editor
+  // can never disagree with the build script's spoiler-check.
+  const entityVisibility = useMemo(() => {
+    const m = new Map<string, EntityVisibility>();
+    for (const e of project.entities) m.set(e.id, e.visibility);
+    return m;
+  }, [project.entities]);
+
   const patches: EntityFrontmatterPatch[] = useMemo(() => {
     return Object.entries(drafts).map(([id, d]) => {
       const e = project.entities.find((x) => x.id === id)!;
+      const profile = compactProfile(d.profile ?? e.profile);
       return {
         sourcePath: e.sourcePath,
         title: e.title,
@@ -68,6 +90,10 @@ export function EntitiesTab({ project, blockingCount, warningCount, lastExportAt
           summary: d.summary ?? e.summary,
           aliases: d.aliases ?? e.aliases,
           images: d.images ?? e.images,
+          profile,
+          relationships: (d.relationships ?? e.relationships)?.length
+            ? d.relationships ?? e.relationships
+            : undefined,
         },
       };
     });
@@ -110,7 +136,15 @@ export function EntitiesTab({ project, blockingCount, warningCount, lastExportAt
           </SelectContent>
         </Select>
       </div>
-      {selected && <EntityForm key={selected.id} {...merged(selected)} setDraft={(p) => setDraft(selected.id, p)} />}
+      {selected && (
+        <EntityForm
+          key={selected.id}
+          {...merged(selected)}
+          entityVisibility={entityVisibility}
+          allEntities={project.entities}
+          setDraft={(p) => setDraft(selected.id, p)}
+        />
+      )}
       {dirtyCount > 0 && (
         <Button size="sm" variant="ghost" onClick={() => setDrafts({})} className="text-xs">
           Discard all local changes ({dirtyCount})
@@ -124,14 +158,34 @@ function EntityForm({
   entity,
   draft,
   setDraft,
+  entityVisibility,
+  allEntities,
 }: {
   entity: Entity;
   draft: FrontmatterDraft;
   setDraft: (p: Partial<FrontmatterDraft>) => void;
+  entityVisibility: Map<string, EntityVisibility>;
+  allEntities: Entity[];
 }) {
   const v = (k: keyof FrontmatterDraft, fallback: unknown) => (draft[k] ?? fallback) as never;
+  const effectiveType = (draft.type ?? entity.type) as string;
+  const effectiveProfile: EntityProfile = draft.profile ?? entity.profile ?? {};
+  const effectiveRelationships: EntityRelationship[] = draft.relationships ?? entity.relationships ?? [];
+
+  const setProfile = (next: EntityProfile) => setDraft({ profile: next });
+  const setPlayer = (key: string, value: string | string[]) => {
+    const player = { ...(effectiveProfile.player ?? {}) } as Record<string, unknown>;
+    player[key] = value;
+    setProfile({ ...effectiveProfile, player: player as EntityProfile["player"] });
+  };
+  const setDm = (key: string, value: string) => {
+    const dm = { ...(effectiveProfile.dm ?? {}) };
+    dm[key] = value;
+    setProfile({ ...effectiveProfile, dm });
+  };
+
   return (
-    <div className="space-y-2 rounded-md border border-border p-2 bg-card/50">
+    <div className="space-y-3 rounded-md border border-border p-2 bg-card/50">
       <div className="text-[10px] text-muted-foreground font-mono">{entity.sourcePath}</div>
       <div className="grid grid-cols-2 gap-2">
         <div>
@@ -154,7 +208,7 @@ function EntityForm({
       <div>
         <Label className="text-[10px]">Summary</Label>
         <Textarea
-          rows={3}
+          rows={2}
           value={v("summary", entity.summary ?? "")}
           onChange={(e) => setDraft({ summary: e.target.value })}
           className="text-xs"
@@ -177,6 +231,296 @@ function EntityForm({
           className="text-xs font-mono"
         />
       </div>
+
+      <ProfileSection
+        type={effectiveType}
+        profile={effectiveProfile}
+        onSetPlayer={setPlayer}
+        onSetDm={setDm}
+      />
+
+      <RelationshipSection
+        ownerId={entity.id}
+        relationships={effectiveRelationships}
+        onChange={(rels) => setDraft({ relationships: rels })}
+        entityVisibility={entityVisibility}
+        allEntities={allEntities}
+      />
+    </div>
+  );
+}
+
+function ProfileSection({
+  type,
+  profile,
+  onSetPlayer,
+  onSetDm,
+}: {
+  type: string;
+  profile: EntityProfile;
+  onSetPlayer: (key: string, value: string | string[]) => void;
+  onSetDm: (key: string, value: string) => void;
+}) {
+  const dmFields = dmFieldsForType(type);
+  const player = profile.player ?? {};
+  const dm = profile.dm ?? {};
+  return (
+    <div className="space-y-2 rounded-md border border-border/60 p-2">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Profile · {type}
+      </div>
+
+      <div className="space-y-2">
+        <div className="text-[10px] uppercase text-muted-foreground">Player-visible</div>
+        {PLAYER_PROFILE_FIELDS.map((f) => (
+          <div key={f.key}>
+            <Label className="text-[10px]">{f.label}</Label>
+            <Textarea
+              rows={2}
+              placeholder={f.placeholder}
+              value={(player as Record<string, string>)[f.key] ?? ""}
+              onChange={(e) => onSetPlayer(f.key, e.target.value)}
+              className="text-xs"
+            />
+          </div>
+        ))}
+        {PLAYER_PROFILE_LIST_FIELDS.map((f) => (
+          <ListField
+            key={f.key}
+            label={f.label}
+            placeholder={f.placeholder}
+            values={(player as Record<string, string[]>)[f.key] ?? []}
+            onChange={(vals) => onSetPlayer(f.key, vals)}
+          />
+        ))}
+      </div>
+
+      <div className="space-y-2 pt-1 border-t border-border/40">
+        <div className="text-[10px] uppercase text-muted-foreground flex items-center gap-1">
+          <ShieldAlert className="h-3 w-3" /> DM-only — never sent to player builds
+        </div>
+        {dmFields.map((f) => (
+          <div key={f.key}>
+            <Label className="text-[10px]">{f.label}</Label>
+            <Textarea
+              rows={2}
+              value={dm[f.key] ?? ""}
+              onChange={(e) => onSetDm(f.key, e.target.value)}
+              className="text-xs"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ListField({
+  label,
+  placeholder,
+  values,
+  onChange,
+}: {
+  label: string;
+  placeholder?: string;
+  values: string[];
+  onChange: (next: string[]) => void;
+}) {
+  return (
+    <div>
+      <Label className="text-[10px]">{label}</Label>
+      <div className="space-y-1">
+        {values.map((val, i) => (
+          <div key={i} className="flex gap-1">
+            <Input
+              value={val}
+              placeholder={placeholder}
+              onChange={(e) => {
+                const next = values.slice();
+                next[i] = e.target.value;
+                onChange(next);
+              }}
+              className="h-7 text-xs"
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7 p-0"
+              onClick={() => onChange(values.filter((_, j) => j !== i))}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
+        ))}
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 text-[10px]"
+          onClick={() => onChange([...values, ""])}
+        >
+          <Plus className="h-3 w-3 mr-1" /> Add
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function RelationshipSection({
+  ownerId,
+  relationships,
+  onChange,
+  entityVisibility,
+  allEntities,
+}: {
+  ownerId: string;
+  relationships: EntityRelationship[];
+  onChange: (next: EntityRelationship[]) => void;
+  entityVisibility: Map<string, EntityVisibility>;
+  allEntities: Entity[];
+}) {
+  const [search, setSearch] = useState("");
+  const matches = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return allEntities
+      .filter((e) => e.id !== ownerId)
+      .filter((e) => e.title.toLowerCase().includes(q) || e.id.toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [search, allEntities, ownerId]);
+
+  // Run the same player-build filter the build script will run, so spoiler
+  // leaks are surfaced inline in the editor — no need to wait for a build.
+  const playerCheck = useMemo(
+    () => filterRelationshipsForPlayer(relationships, { entityVisibility }),
+    [relationships, entityVisibility]
+  );
+  const leakIds = new Set(playerCheck.droppedByLeak.map((r) => r.entity));
+  const unresolvedIds = new Set(playerCheck.unresolved.map((r) => r.entity));
+
+  const update = (idx: number, patch: Partial<EntityRelationship>) => {
+    const next = relationships.slice();
+    next[idx] = { ...next[idx], ...patch };
+    onChange(next);
+  };
+  const remove = (idx: number) => onChange(relationships.filter((_, i) => i !== idx));
+  const add = (entityId: string) => {
+    const next: EntityRelationship = { entity: entityId, type: "allied_with", visibility: "dm" };
+    onChange([...relationships, next]);
+    setSearch("");
+  };
+
+  return (
+    <div className="space-y-2 rounded-md border border-border/60 p-2">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Relationships
+      </div>
+
+      <div>
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search entity to link…"
+          className="h-7 text-xs"
+        />
+        {matches.length > 0 && (
+          <div className="mt-1 space-y-1 rounded border border-border/50 bg-background p-1">
+            {matches.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => add(m.id)}
+                className="block w-full text-left text-xs px-2 py-1 rounded hover:bg-accent"
+              >
+                {m.title} <span className="text-muted-foreground">· {m.type} · {m.visibility}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {relationships.length === 0 && (
+        <div className="text-[11px] text-muted-foreground italic">No relationships yet.</div>
+      )}
+
+      <div className="space-y-2">
+        {relationships.map((r, i) => {
+          const target = allEntities.find((e) => e.id === r.entity);
+          const isLeak = leakIds.has(r.entity) && !unresolvedIds.has(r.entity);
+          const isUnresolved = unresolvedIds.has(r.entity);
+          return (
+            <div key={i} className="space-y-1 rounded border border-border/40 p-2">
+              <div className="flex items-center gap-1">
+                <div className="flex-1 text-xs font-medium">
+                  {target?.title ?? r.entity}
+                  <span className="text-muted-foreground ml-1">· {target?.visibility ?? "?"}</span>
+                </div>
+                {r.visibility !== "player" && r.visibility !== "rumor" && (
+                  <span className="text-[9px] uppercase rounded px-1 py-0.5 bg-destructive/15 text-destructive">DM</span>
+                )}
+                <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => remove(i)}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+              {isUnresolved && (
+                <div className="flex items-center gap-1 text-[10px] text-amber-600">
+                  <AlertTriangle className="h-3 w-3" /> Unresolved entity id "{r.entity}".
+                </div>
+              )}
+              {isLeak && (
+                <div className="flex items-center gap-1 text-[10px] text-destructive">
+                  <ShieldAlert className="h-3 w-3" /> Player-visible relationship points at a DM-only entity — will be
+                  stripped from player builds (strict mode fails).
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-1">
+                <div>
+                  <Label className="text-[10px]">Type</Label>
+                  <Input
+                    list="rel-types"
+                    value={r.type}
+                    onChange={(e) => update(i, { type: e.target.value })}
+                    className="h-7 text-xs"
+                  />
+                </div>
+                <div>
+                  <Label className="text-[10px]">Visibility</Label>
+                  <Select value={r.visibility} onValueChange={(val) => update(i, { visibility: val as EntityVisibility })}>
+                    <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="player" className="text-xs">player</SelectItem>
+                      <SelectItem value="rumor" className="text-xs">rumor</SelectItem>
+                      <SelectItem value="dm" className="text-xs">dm</SelectItem>
+                      <SelectItem value="hidden" className="text-xs">hidden</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label className="text-[10px]">Label (optional)</Label>
+                <Input
+                  value={r.label ?? ""}
+                  onChange={(e) => update(i, { label: e.target.value || undefined })}
+                  className="h-7 text-xs"
+                />
+              </div>
+              <div>
+                <Label className="text-[10px]">Description (optional)</Label>
+                <Textarea
+                  rows={2}
+                  value={r.description ?? ""}
+                  onChange={(e) => update(i, { description: e.target.value || undefined })}
+                  className="text-xs"
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <datalist id="rel-types">
+        {RELATIONSHIP_TYPES.map((t) => (
+          <option key={t} value={t} />
+        ))}
+      </datalist>
     </div>
   );
 }
