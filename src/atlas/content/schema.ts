@@ -81,6 +81,7 @@ export interface Route {
   visibility: EntityVisibility;
   // Each waypoint is either explicit coords or an entity id (resolved at build time).
   waypoints: Array<Point | { entityId: string }>;
+  description?: string;
   // Resolved at build time:
   resolvedPoints?: Point[];
 }

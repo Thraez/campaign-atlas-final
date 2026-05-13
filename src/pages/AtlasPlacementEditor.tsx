@@ -38,6 +38,10 @@ import { validateProject } from "@/atlas/yaml/validateProject";
 import { MapImportWizard } from "@/atlas/import/MapImportWizard";
 import { useRegionDraft } from "@/atlas/regions/useRegionDraft";
 import { RegionLayer } from "@/atlas/regions/RegionLayer";
+import { useRouteDraft } from "@/atlas/routes/useRouteDraft";
+import { RouteLayer } from "@/atlas/routes/RouteLayer";
+import { useFogDraft } from "@/atlas/fog/useFogDraft";
+import { FogLayer } from "@/atlas/fog/FogLayer";
 import {
   PIN_PRESETS,
   defaultPresetForType,
@@ -179,6 +183,9 @@ export default function AtlasPlacementEditor() {
     [project]
   );
   const regionDraft = useRegionDraft(activeMap, { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet });
+  const routeDraft = useRouteDraft(project, activeMap, { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet });
+  const fogDraft = useFogDraft(activeMap);
+  const [showFogPreview, setShowFogPreview] = useState(true);
 
   /** Per-tab filter state (placed/unplaced/visibility/type/tag). */
   const [stateFilter, setStateFilter] = useState<"all" | "placed" | "unplaced">("all");
@@ -488,8 +495,10 @@ export default function AtlasPlacementEditor() {
               />
             ))}
 
-            {/* Regions render ABOVE base layers but BELOW routes/pins/labels/handles. */}
+            {/* Z-order: layers → regions → routes → fog → pins → handles. */}
             {showRegions && <RegionLayer map={activeMap} api={regionDraft} visible={showRegions} />}
+            <RouteLayer map={activeMap} api={routeDraft} />
+            <FogLayer map={activeMap} api={fogDraft} preview={showFogPreview} />
 
             {placed.map((e) => {
               const eff = effectivePlacement(e.id);
@@ -692,16 +701,29 @@ export default function AtlasPlacementEditor() {
               <RoutesTab
                 project={project}
                 map={activeMap}
+                api={routeDraft}
                 blockingCount={routeIssues.blocking}
                 warningCount={routeIssues.warning}
                 lastExportAt={tabExportAt.routes ?? null}
                 onExported={() => markTabExport("routes")}
+                onFitTo={(pts) => {
+                  if (!pts.length) return;
+                  const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+                  const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+                  setFlyTo({ lat: activeMap.height - cy, lng: cx });
+                }}
               />
             </TabsContent>
 
             <TabsContent value="fog" className="flex-1 flex flex-col min-h-0 m-0">
               <FogTab
                 map={activeMap}
+                project={project}
+                api={fogDraft}
+                regionApi={regionDraft}
+                routeApi={routeDraft}
+                showFogPreview={showFogPreview}
+                setShowFogPreview={setShowFogPreview}
                 blockingCount={mapIssues.blocking}
                 warningCount={mapIssues.warning}
                 lastExportAt={tabExportAt.fog ?? null}
