@@ -143,3 +143,72 @@ function parsePinStyle(v: unknown, sourcePath: string, idx: number, warnings: st
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }
+
+function parseProfile(v: unknown, sourcePath: string, warnings: string[]): EntityProfile | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== "object" || Array.isArray(v)) {
+    warnings.push(`${sourcePath}: atlas.profile must be an object — ignored`);
+    return undefined;
+  }
+  const r = v as Record<string, unknown>;
+  const out: EntityProfile = {};
+  if (r.player && typeof r.player === "object" && !Array.isArray(r.player)) {
+    const p = r.player as Record<string, unknown>;
+    const player: EntityProfile["player"] = {};
+    if (typeof p.known_for === "string") player.known_for = p.known_for;
+    const traits = toStringArray(p.visible_traits);
+    if (traits.length) player.visible_traits = traits;
+    const rumors = toStringArray(p.rumors);
+    if (rumors.length) player.rumors = rumors;
+    if (Object.keys(player).length > 0) out.player = player;
+  }
+  if (r.dm && typeof r.dm === "object" && !Array.isArray(r.dm)) {
+    const d = r.dm as Record<string, unknown>;
+    const dm: Record<string, string> = {};
+    for (const [k, val] of Object.entries(d)) {
+      if (typeof val === "string" && val.trim() !== "") dm[k] = val;
+    }
+    if (Object.keys(dm).length > 0) out.dm = dm;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function parseRelationships(v: unknown, sourcePath: string, warnings: string[]): EntityRelationship[] | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (!Array.isArray(v)) {
+    warnings.push(`${sourcePath}: atlas.relationships must be an array — ignored`);
+    return undefined;
+  }
+  const out: EntityRelationship[] = [];
+  for (let i = 0; i < v.length; i++) {
+    const r = v[i] as Record<string, unknown> | null;
+    if (!r || typeof r !== "object") {
+      warnings.push(`${sourcePath}: atlas.relationships[${i}] is not an object — skipped`);
+      continue;
+    }
+    if (typeof r.entity !== "string" || !r.entity.trim()) {
+      warnings.push(`${sourcePath}: atlas.relationships[${i}] missing entity id — skipped`);
+      continue;
+    }
+    if (typeof r.type !== "string" || !r.type.trim()) {
+      warnings.push(`${sourcePath}: atlas.relationships[${i}] missing type — skipped`);
+      continue;
+    }
+    let visibility: EntityVisibility = "dm";
+    if (typeof r.visibility === "string") {
+      if (VALID_VIS.includes(r.visibility as EntityVisibility)) {
+        visibility = r.visibility as EntityVisibility;
+      } else {
+        warnings.push(`${sourcePath}: atlas.relationships[${i}] invalid visibility "${r.visibility}" — defaulted to "dm"`);
+      }
+    }
+    out.push({
+      entity: r.entity.trim(),
+      type: r.type.trim(),
+      label: typeof r.label === "string" ? r.label : undefined,
+      description: typeof r.description === "string" ? r.description : undefined,
+      visibility,
+    });
+  }
+  return out.length > 0 ? out : undefined;
+}
