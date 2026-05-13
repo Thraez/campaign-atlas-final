@@ -441,7 +441,9 @@ export default function AtlasPlacementEditor() {
                 onAddUrl={layerEditor.addUrl}
                 onEditBuiltin={layerEditor.editBuiltinLayer}
                 onUpdate={layerEditor.updateLayer}
+                onDuplicate={layerEditor.duplicateLayer}
                 onRemove={layerEditor.removeLayer}
+                onClearAll={layerEditor.clearAll}
                 onSetMapSize={(w, h) => setMapSizeOverride((s) => ({ ...s, [activeMap.id]: { w, h } }))}
               />
             </TabsContent>
