@@ -253,6 +253,7 @@ export default function AtlasPlacementEditor() {
 
   const [lastExportAt, setLastExportAt] = useState<number | null>(null);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [mapImportOpen, setMapImportOpen] = useState(false);
   // Per-tab last-export timestamps so each tab header can show its own status.
   const [tabExportAt, setTabExportAt] = useState<Record<string, number>>({});
   const markTabExport = (tab: string) => setTabExportAt((s) => ({ ...s, [tab]: Date.now() }));
