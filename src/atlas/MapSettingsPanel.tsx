@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { FileCode, RotateCcw, Grid3x3, Globe2, Droplets } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { GridKind, GridOverlay, MapDocument } from "@/atlas/content/schema";
+import { ExportChecklistDialog, useExportChecklist } from "./ExportChecklistDialog";
 
 interface Props {
   map: MapDocument;
@@ -28,6 +29,7 @@ function downloadText(name: string, content: string, mime = "text/markdown") {
 const DEFAULT_GRID: GridOverlay = { kind: "square", size: 256, color: "rgba(255,255,255,0.08)", enabled: true };
 
 export function MapSettingsPanel({ map, baseMap, onPatch, onReset }: Props) {
+  const checklist = useExportChecklist();
   const dirtyKeys = useMemo<string[]>(() => {
     const keys: string[] = [];
     if (map.width !== baseMap.width || map.height !== baseMap.height) keys.push("size");
@@ -66,6 +68,17 @@ export function MapSettingsPanel({ map, baseMap, onPatch, onReset }: Props) {
     }
     lines.push("```");
     downloadText(`map-settings-${map.id}.md`, lines.join("\n"));
+    checklist.show({
+      title: "Map settings patch exported",
+      description: "Your map settings YAML patch is ready. Follow the checklist to commit it.",
+      files: [`map-settings-${map.id}.md`],
+      steps: [
+        { label: "Open the downloaded Patch.md file", detail: "It contains the YAML snippet to paste into world.yaml." },
+        { label: "Paste under the matching map entry", detail: `In content/<world>/_atlas/world.yaml, find the map with id "${map.id}" and replace its settings with the exported YAML.` },
+        { label: "Commit changes to main", detail: "Push the updated world.yaml." },
+        { label: "GitHub Action publishes automatically", detail: "The publish-atlas.yml workflow will run and deploy to GitHub Pages." },
+      ],
+    });
   };
 
   return (
@@ -192,6 +205,14 @@ export function MapSettingsPanel({ map, baseMap, onPatch, onReset }: Props) {
           </div>
         </section>
       </div>
+      <ExportChecklistDialog
+        open={checklist.open}
+        onOpenChange={checklist.setOpen}
+        title={checklist.state.title}
+        description={checklist.state.description}
+        files={checklist.state.files}
+        steps={checklist.state.steps}
+      />
     </div>
   );
 }

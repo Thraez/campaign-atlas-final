@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import type { LocalLayer } from "@/atlas/useMapLayers";
+import { ExportChecklistDialog, useExportChecklist } from "./ExportChecklistDialog";
 
 interface Props {
   map: MapDocument;
@@ -47,6 +48,7 @@ export function MapLayerPanel(props: Props) {
   const [urlDraft, setUrlDraft] = useState("");
   const [lockAspect, setLockAspect] = useState(true);
   const [locked, setLocked] = useState(false);
+  const checklist = useExportChecklist();
 
   const selected = mergedLayers.find((l) => l.id === selectedId) ?? null;
   const localSelected = localLayers.find((l) => l.id === selectedId) ?? null;
@@ -117,6 +119,17 @@ export function MapLayerPanel(props: Props) {
     a.click();
     URL.revokeObjectURL(a.href);
     toast.success(`Bundled ${uploads.length} file${uploads.length === 1 ? "" : "s"}`);
+    checklist.show({
+      title: "Asset bundle exported",
+      description: "Your uploaded images are ready. Follow the checklist to commit them.",
+      files: [`atlas-assets-${map.id}.zip`],
+      steps: [
+        { label: "Upload files from the zip to GitHub", detail: `In your repo, go to public/atlas/assets/maps/ and upload ${uploads.length} image file(s). Or unzip the bundle at the repo root.` },
+        { label: "Apply the world.yaml patch", detail: "Open the downloaded Patch.md and paste the YAML under the matching map entry in content/<world>/_atlas/world.yaml." },
+        { label: "Commit changes to main", detail: "Push the updated world.yaml and new images." },
+        { label: "GitHub Action publishes automatically", detail: "The publish-atlas.yml workflow will run and deploy to GitHub Pages." },
+      ],
+    });
   };
 
   const exportPatch = () => {
@@ -163,6 +176,18 @@ export function MapLayerPanel(props: Props) {
       }
     }
     downloadText(`map-layers-${map.id}.md`, lines.join("\n"), "text/markdown");
+    checklist.show({
+      title: "Layer patch exported",
+      description: "Your map layer YAML patch is ready. Follow the checklist to commit it.",
+      files: [`map-layers-${map.id}.md`],
+      steps: [
+        { label: "Open the downloaded Patch.md file", detail: "It contains the YAML snippet to paste into world.yaml." },
+        { label: "Paste under the matching map entry", detail: `In content/<world>/_atlas/world.yaml, find the map with id "${map.id}" and replace its layers section with the exported YAML.` },
+        ...(uploads.length ? [{ label: "Upload image files to GitHub", detail: `Upload ${uploads.length} image file(s) to their target paths (e.g., public/atlas/assets/maps/).` }] : []),
+        { label: "Commit changes to main", detail: "Push the updated world.yaml and any new images." },
+        { label: "GitHub Action publishes automatically", detail: "The publish-atlas.yml workflow will run and deploy to GitHub Pages." },
+      ],
+    });
   };
 
   return (
@@ -388,6 +413,14 @@ export function MapLayerPanel(props: Props) {
           </div>
         )}
       </ScrollArea>
+      <ExportChecklistDialog
+        open={checklist.open}
+        onOpenChange={checklist.setOpen}
+        title={checklist.state.title}
+        description={checklist.state.description}
+        files={checklist.state.files}
+        steps={checklist.state.steps}
+      />
     </div>
   );
 }

@@ -183,6 +183,59 @@ Commit the markdown changes; the GitHub Action will publish the player atlas wit
 
 ---
 
+## Updating maps through GitHub web (no CLI)
+
+You can edit maps, layers, and settings entirely through the GitHub website without installing anything locally.
+
+### Step 1 — Open the placement editor in Lovable
+
+1. Open your Lovable project preview.
+2. Navigate to `/atlas/edit`.
+3. Switch to the **Layers** tab to upload images or adjust layer positions.
+4. Switch to the **Map** tab to change canvas size, ocean color, grid, or wrapX.
+
+### Step 2 — Export your changes
+
+- Click **Patch** (Layers tab) to download a `map-layers-<id>.md` file with the new layer YAML.
+- Click **Patch** (Map tab) to download a `map-settings-<id>.md` file with the new map settings YAML.
+- If you uploaded new images, click **Zip** to download an `atlas-assets-<id>.zip` containing the files at their intended repo paths (`public/atlas/assets/maps/`).
+
+A checklist dialog will appear after each export guiding you through the next steps.
+
+### Step 3 — Apply the patch on GitHub
+
+1. Go to your GitHub repository.
+2. Navigate to `content/<world>/_atlas/world.yaml`.
+3. Click the pencil icon to edit.
+4. Find the map entry with the matching `id` and replace the `layers`, `width`, `height`, `oceanColor`, `wrapX`, or `grid` sections with the exported YAML.
+5. Click **Commit changes…** and choose **Commit directly to the `main` branch**.
+
+### Step 4 — Upload assets (if you added images)
+
+1. In your GitHub repo, navigate to `public/atlas/assets/maps/`.
+2. Click **Add file → Upload files**.
+3. Drag the images from your exported zip (or individually) into the upload area.
+4. Click **Commit changes…** and commit to `main`.
+
+### Step 5 — Wait for publish
+
+The `publish-atlas.yml` GitHub Action will automatically run on the commit and deploy the updated atlas to GitHub Pages. You can monitor progress in the **Actions** tab.
+
+---
+
+## Updating maps through Lovable
+
+If you are already working inside Lovable, you can ask Lovable to apply the patch for you.
+
+1. Export the patch from `/atlas/edit` as described above.
+2. Open the downloaded `.md` file and copy the YAML block inside the triple-backticks.
+3. Paste the YAML into the Lovable chat and say: *"Apply this patch to content/<world>/_atlas/world.yaml under the map entry with id <map-id>."*
+4. Lovable will rewrite the file. Review the diff, then commit.
+
+**Note:** Lovable can edit text files directly but may not be able to upload binary image files. If you added new images, you will still need to upload them manually through GitHub web (see above) or commit them locally.
+
+---
+
 ## Maps, regions, and fog (`world.yaml`)
 
 Per-world map definitions live in `content/<world>/_atlas/world.yaml`. This is where you define multiple base maps, image layers stacked on each map, polygon regions linked to wiki entries, and fog-of-war reveal areas.
@@ -285,6 +338,8 @@ Implemented:
 Next:
 
 - **Batch 10 — UX/workflow stabilization**: `/` is now a clear landing page; the original in-browser editor moved to `/legacy-editor` (clearly labeled, kept for back-compat). `/atlas/edit` got a new **Layers** tab with multi-file image upload (object-URL preview), URL-add with external-asset warning, numeric x/y/width/height/opacity/zIndex inputs, lock-aspect, ±100/±1000/±10000 nudge, 50–150% scale presets, Center / Fit map / Map=layer / Expand / Reset, and a **map layer YAML patch** export with an asset commit checklist. Wikilinks to not-yet-created notes (`unresolvedLinks`) no longer fail strict player builds and never leak DM-only target names. Build now reports `localAssets`, `externalAssets`, `missingAssets`; missing local assets fail strict player builds, external URLs only warn. Save model is documented in-product (local browser draft → exported YAML/asset patch → committed to GitHub → player-safe published atlas).
+
+- **Batch 11 — GitHub-web-friendly workflow**: Export checklist dialogs guide DMs through committing patches via GitHub web or Lovable. Added `public/atlas/assets/maps/` directory structure. README now documents the full no-CLI workflow: edit in `/atlas/edit`, export patch + asset zip, apply through GitHub web or ask Lovable, commit to main, and let the GitHub Action publish automatically.
 
 Skipped intentionally for this batch (not in acceptance criteria, deferred): wrapX globe-style rendering, a dedicated minimap on `/atlas`, and the bundled `.zip` asset export — the YAML patch + filename checklist covers the publishing path today.
 
