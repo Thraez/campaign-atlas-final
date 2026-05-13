@@ -86,7 +86,7 @@ describe("validateProject", () => {
 
   it("flags out-of-bounds placements", () => {
     const r = validateProject({ project, draftPlacements: [{ entityId: "town", mapId: "m1", x: 99999, y: 0 }] });
-    expect(r.issues.some((i) => i.code === "out-of-bounds")).toBe(true);
+    expect(r.issues.some((i) => i.code === "pin-out-of-bounds")).toBe(true);
   });
 
   it("flags unknown map id as blocking", () => {
