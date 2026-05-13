@@ -607,7 +607,11 @@ const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function Entity
 
           {entity.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-2">
-              {entity.tags.map((t) => <Badge key={t} variant="outline">{t}</Badge>)}
+              {entity.tags.map((t) => (
+                <Link key={t} to={`/atlas/tag/${encodeURIComponent(t)}`}>
+                  <Badge variant="outline" className="hover:bg-accent cursor-pointer">#{t}</Badge>
+                </Link>
+              ))}
             </div>
           )}
 
