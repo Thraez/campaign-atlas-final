@@ -1,18 +1,31 @@
+import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Landing from "./pages/Landing.tsx";
-import Index from "./pages/Index.tsx";
-import Auth from "./pages/Auth.tsx";
-import AtlasViewer from "./pages/AtlasViewer.tsx";
-import AtlasPlacementEditor from "./pages/AtlasPlacementEditor.tsx";
-import AtlasTimeline from "./pages/AtlasTimeline.tsx";
-import AtlasBrowse from "./pages/AtlasBrowse.tsx";
-import NotFound from "./pages/NotFound.tsx";
+
+// Lazy-load heavy/secondary routes to keep the landing bundle small.
+const Index = lazy(() => import("./pages/Index.tsx"));
+const Auth = lazy(() => import("./pages/Auth.tsx"));
+const AtlasViewer = lazy(() => import("./pages/AtlasViewer.tsx"));
+const AtlasPlacementEditor = lazy(() => import("./pages/AtlasPlacementEditor.tsx"));
+const AtlasTimeline = lazy(() => import("./pages/AtlasTimeline.tsx"));
+const AtlasBrowse = lazy(() => import("./pages/AtlasBrowse.tsx"));
+const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 const queryClient = new QueryClient();
+
+const RouteFallback = () => (
+  <div
+    role="status"
+    aria-live="polite"
+    className="h-screen w-screen flex items-center justify-center bg-background text-muted-foreground text-sm"
+  >
+    Loading…
+  </div>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -20,19 +33,21 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/+$/, "") || "/"}>
-        <Routes>
-        <Route path="/" element={<Landing />} />
-          <Route path="/legacy-editor" element={<Index />} />
-          <Route path="/atlas" element={<AtlasViewer />} />
-          <Route path="/atlas/edit" element={<AtlasPlacementEditor />} />
-          <Route path="/atlas/timeline" element={<AtlasTimeline />} />
-          <Route path="/atlas/browse" element={<AtlasBrowse mode="browse" />} />
-          <Route path="/atlas/tag/:tag" element={<AtlasBrowse mode="tag" />} />
-          <Route path="/atlas/type/:type" element={<AtlasBrowse mode="type" />} />
-          <Route path="/auth" element={<Auth />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/legacy-editor" element={<Index />} />
+            <Route path="/atlas" element={<AtlasViewer />} />
+            <Route path="/atlas/edit" element={<AtlasPlacementEditor />} />
+            <Route path="/atlas/timeline" element={<AtlasTimeline />} />
+            <Route path="/atlas/browse" element={<AtlasBrowse mode="browse" />} />
+            <Route path="/atlas/tag/:tag" element={<AtlasBrowse mode="tag" />} />
+            <Route path="/atlas/type/:type" element={<AtlasBrowse mode="type" />} />
+            <Route path="/auth" element={<Auth />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
