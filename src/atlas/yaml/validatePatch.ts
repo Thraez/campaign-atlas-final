@@ -97,6 +97,60 @@ export function validatePatchYaml(content: string, kind: PatchKind): ValidationR
     }
   }
 
+  if (kind === "entity-frontmatter") {
+    const VALID_VIS = new Set(["player", "dm", "hidden", "rumor"]);
+    const blocks = parsed.filter(
+      (d): d is Record<string, unknown> => !!d && typeof d === "object" && !Array.isArray(d)
+    );
+    if (blocks.length === 0) {
+      errors.push("Entity-frontmatter patch must contain at least one frontmatter block.");
+    }
+    for (const block of blocks) {
+      const atlas = (block as { atlas?: unknown }).atlas;
+      if (atlas === undefined) {
+        // Top-level title-only blocks are tolerated (some imports stage title before atlas), but warn.
+        warnings.push("Frontmatter block has no `atlas:` section.");
+        continue;
+      }
+      if (!atlas || typeof atlas !== "object" || Array.isArray(atlas)) {
+        errors.push("`atlas:` must be a mapping (object).");
+        continue;
+      }
+      const a = atlas as Record<string, unknown>;
+      if (a.visibility !== undefined && (typeof a.visibility !== "string" || !VALID_VIS.has(a.visibility))) {
+        errors.push(`atlas.visibility must be one of player|dm|hidden|rumor (got "${String(a.visibility)}").`);
+      }
+      if (a.type !== undefined && typeof a.type !== "string") {
+        errors.push("atlas.type must be a string.");
+      }
+      if (a.summary !== undefined && typeof a.summary !== "string") {
+        warnings.push("atlas.summary should be a string.");
+      }
+      if (a.aliases !== undefined && !Array.isArray(a.aliases)) {
+        errors.push("atlas.aliases must be an array.");
+      }
+      if (a.images !== undefined && !Array.isArray(a.images)) {
+        errors.push("atlas.images must be an array.");
+      }
+      if (a.placements !== undefined) {
+        if (!Array.isArray(a.placements)) {
+          errors.push("atlas.placements must be an array.");
+        } else {
+          for (const p of a.placements as Array<Record<string, unknown>>) {
+            if (typeof p?.mapId !== "string") warnings.push("atlas.placements[].mapId should be a string.");
+            if (typeof p?.x !== "number" || typeof p?.y !== "number") {
+              errors.push("atlas.placements[] entries must have numeric x and y.");
+              break;
+            }
+          }
+        }
+      }
+      if (a.relationships !== undefined && !Array.isArray(a.relationships)) {
+        errors.push("atlas.relationships must be an array.");
+      }
+    }
+  }
+
   return { ok: errors.length === 0, errors, warnings };
 }
 
