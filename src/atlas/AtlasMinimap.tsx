@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
+import { normalizeAtlasAssetUrl } from "@/atlas/url";
 
 interface Props {
   map: MapDocument;
