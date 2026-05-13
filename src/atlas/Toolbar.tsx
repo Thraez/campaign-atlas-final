@@ -1,9 +1,10 @@
 import { useAtlas } from "@/atlas/store";
 import { Button } from "@/components/ui/button";
-import { MousePointer2, MapPin, Ruler, Eye, EyeOff, Download, Upload, Save, LogOut, Hexagon, Route as RouteIcon, CloudFog, Link2 } from "lucide-react";
+import { MousePointer2, MapPin, Ruler, Eye, EyeOff, Download, Upload, Save, LogOut, Hexagon, Route as RouteIcon, CloudFog, Link2, Compass } from "lucide-react";
 import { toast } from "sonner";
 import { defaultAtlas } from "@/atlas/types";
 import { useRef } from "react";
+import { Link } from "react-router-dom";
 
 interface Props {
   onSaveCloud?: () => void;
@@ -70,6 +71,9 @@ export function Toolbar({ onSaveCloud, onSignOut, signedIn }: Props) {
         <ToolBtn id="measure" icon={Ruler} label="Measure" />
       </div>
       <div className="flex-1" />
+      <Button asChild size="sm" variant="ghost" className="atlas-tool-button gap-1" title="Open player atlas">
+        <Link to="/atlas"><Compass className="h-4 w-4" /><span className="hidden md:inline">Player Atlas</span></Link>
+      </Button>
       <Button size="sm" variant="ghost" className="atlas-tool-button" onClick={() => setView(view === "dm" ? "player" : "dm")} title="Toggle view">
         {view === "dm" ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
         <span className="ml-1 text-xs uppercase tracking-wider">{view}</span>
