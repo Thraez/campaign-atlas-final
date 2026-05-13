@@ -468,7 +468,7 @@ export default function AtlasPlacementEditor() {
             minZoom={-6}
             maxZoom={4}
             attributionControl={false}
-            style={{ width: "100%", height: "100%", background: activeMap.oceanColor ?? "#18313f", cursor: pendingId ? "crosshair" : undefined }}
+            style={{ width: "100%", height: "100%", background: activeMap.oceanColor ?? "#18313f", cursor: (pendingId || regionDraft.drawing) ? "crosshair" : undefined }}
           >
             <FlyTo target={flyTo} />
             <MapClickCapture onClick={onMapClick} />
