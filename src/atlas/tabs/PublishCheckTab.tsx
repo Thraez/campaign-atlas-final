@@ -33,7 +33,6 @@ import {
   FileDown,
   Package,
 } from "lucide-react";
-import { toast } from "sonner";
 
 interface Props {
   project: AtlasProject;
