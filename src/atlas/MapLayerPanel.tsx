@@ -267,6 +267,9 @@ export function MapLayerPanel(props: Props) {
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Transform</span>
               <div className="flex items-center gap-1">
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onDuplicate(selected.id)} title="Duplicate">
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setLocked((v) => !v)} title={locked ? "Unlock" : "Lock"}>
                   {locked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
                 </Button>
