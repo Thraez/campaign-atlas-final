@@ -530,6 +530,90 @@ function WrappedWorld({ dx, map, placements, entityById, showFog, showGrid, onOp
   );
 }
 
+/** Renders pin markers with preset-derived shape/color, and computes which
+ *  labels are permanently visible based on per-pin priority + labelMinZoom +
+ *  a screen-space collision pass (higher priority wins). */
+function PlacementMarkers({
+  dx, H, placements, entityById, onOpenEntity,
+}: {
+  dx: number; H: number;
+  placements: MapPlacement[];
+  entityById: Map<string, Entity>;
+  onOpenEntity: (id: string, fly?: boolean) => void;
+}) {
+  const map = useMap();
+  const [zoom, setZoom] = useState(map.getZoom());
+  useEffect(() => {
+    const h = () => setZoom(map.getZoom());
+    map.on("zoomend", h);
+    return () => { map.off("zoomend", h); };
+  }, [map]);
+
+  // Resolve preset + decide label visibility (permanent / hover / none).
+  // Order by priority desc; suppress lower-priority permanent labels that fall
+  // within ~70 px of a higher-priority one already shown at this zoom.
+  const enriched = placements
+    .map((p) => {
+      const ent = entityById.get(p.entityId);
+      if (!ent) return null;
+      const style = resolvePinStyle(ent.type, p.pin as import("@/atlas/pins/presets").PinOverride | undefined);
+      return { p, ent, style };
+    })
+    .filter((x): x is { p: MapPlacement; ent: Entity; style: PinPreset } => !!x)
+    .sort((a, b) => b.style.priority - a.style.priority);
+
+  const labelDecisions = new Map<string, "always" | "hover" | "none">();
+  const taken: { x: number; y: number }[] = [];
+  for (const { p, style } of enriched) {
+    let mode: "always" | "hover" | "none";
+    if (style.labelMode === "never") mode = "none";
+    else if (style.labelMode === "hover") mode = "hover";
+    else if (style.labelMode === "always") mode = "always";
+    else mode = zoom >= style.labelMinZoom ? "always" : "hover";
+    if (mode === "always") {
+      const pt = map.latLngToContainerPoint([H - p.y, p.x + dx]);
+      const collides = taken.some((t) => Math.hypot(t.x - pt.x, t.y - pt.y) < 70);
+      if (collides) mode = "hover";
+      else taken.push(pt);
+    }
+    labelDecisions.set(`${p.id}-${dx}`, mode);
+  }
+
+  return (
+    <>
+      {enriched.map(({ p, ent, style }) => {
+        const dim = ent.visibility === "rumor";
+        const labelMode = labelDecisions.get(`${p.id}-${dx}`) ?? "none";
+        const labelText = p.label ?? ent.title;
+        return (
+          <Marker
+            key={`${p.id}-${dx}`}
+            position={[H - p.y, p.x + dx]}
+            icon={pinIconForStyle(style, { dim })}
+            eventHandlers={{ click: () => onOpenEntity(p.entityId, false) }}
+          >
+            {labelMode !== "none" && (
+              <Tooltip
+                permanent={labelMode === "always"}
+                direction="top"
+                offset={[0, -12]}
+                opacity={dim ? 0.7 : 0.95}
+                className={`atlas-pin-label atlas-pin-label--${ent.visibility}`}
+              >
+                {labelText}
+              </Tooltip>
+            )}
+            <Popup>
+              <div className="text-sm font-medium">{ent.title}</div>
+              {ent.summary && <div className="text-xs opacity-70">{ent.summary}</div>}
+            </Popup>
+          </Marker>
+        );
+      })}
+    </>
+  );
+}
+
 interface EntityPanelProps {
   entity: Entity | null;
   placements: MapPlacement[];
