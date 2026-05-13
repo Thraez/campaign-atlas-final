@@ -1,12 +1,14 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, Link as LinkIcon, Trash2, Maximize2, Minimize2, Crosshair, RotateCcw, Lock, Unlock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, FileCode } from "lucide-react";
+import JSZip from "jszip";
+import { Upload, Link as LinkIcon, Trash2, Maximize2, Minimize2, Crosshair, RotateCcw, Lock, Unlock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, FileCode, Copy, Eraser, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 
@@ -16,11 +18,13 @@ interface Props {
   localLayers: LocalLayer[];
   selectedId: string | null;
   setSelectedId: (id: string | null) => void;
-  onAddFiles: (files: File[]) => void;
-  onAddUrl: (src: string) => void;
+  onAddFiles: (files: File[]) => void | Promise<void>;
+  onAddUrl: (src: string) => void | Promise<void>;
   onEditBuiltin: (id: string) => void;
   onUpdate: (id: string, patch: Partial<MapLayer>) => void;
+  onDuplicate: (id: string) => void;
   onRemove: (id: string) => void;
+  onClearAll: () => void;
   onSetMapSize?: (w: number, h: number) => void;
 }
 
