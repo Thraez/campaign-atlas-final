@@ -154,6 +154,8 @@ export interface EntityFrontmatterPatch {
     aliases?: string[];
     images?: string[];
     tags?: string[];
+    profile?: import("@/atlas/profiles/profileTypes").EntityProfile;
+    relationships?: import("@/atlas/profiles/profileTypes").EntityRelationship[];
   };
 }
 
