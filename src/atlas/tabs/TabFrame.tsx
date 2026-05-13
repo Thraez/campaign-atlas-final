@@ -49,7 +49,7 @@ export function TabFrame(props: TabFrameProps) {
   const exportedAgo = lastExportAt ? formatAgo(Date.now() - lastExportAt) : null;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0" style={{ outline: '2px solid blue' }}>
+    <div className="flex-1 flex flex-col min-h-0">
       <div className="px-3 py-2 border-b border-border space-y-1.5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold">{title}</h2>
@@ -79,8 +79,8 @@ export function TabFrame(props: TabFrameProps) {
           </span>
         </div>
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto" style={{ outline: '2px solid red' }}>
-        <div style={{ outline: '2px solid lime' }}>{children}</div>
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="p-3 space-y-3">{children}</div>
         {rawYamlPreview !== undefined && (
           <div className="border-t border-border bg-muted/30">
             <button
