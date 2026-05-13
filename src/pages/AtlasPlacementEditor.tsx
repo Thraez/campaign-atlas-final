@@ -3,7 +3,7 @@ import { MapContainer, Marker, Polygon, ImageOverlay, useMap, useMapEvents } fro
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode } from "lucide-react";
+import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode, Layers as LayersIcon, MapPin as PinIcon } from "lucide-react";
 import { toast } from "sonner";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity, MapDocument } from "@/atlas/content/schema";
@@ -12,6 +12,9 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useMapLayers } from "@/atlas/useMapLayers";
+import { MapLayerPanel } from "@/atlas/MapLayerPanel";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 // Bumped to v2: storage shape changed from { [entityId]: Override } to
