@@ -315,116 +315,22 @@ export default function AtlasViewer() {
           >
             <MapController flyTo={flyTarget} />
 
-            {/* Image base layers */}
-            {[...activeMap.layers].sort((a, b) => a.zIndex - b.zIndex).map((layer) => (
-              <ImageOverlay
-                key={layer.id}
-                url={normalizeAtlasAssetUrl(layer.src)}
-                bounds={[
-                  [activeMap.height - (layer.y + layer.height), layer.x],
-                  [activeMap.height - layer.y, layer.x + layer.width],
-                ] as L.LatLngBoundsLiteral}
-                opacity={layer.opacity}
+            {/* Horizontal wrap: render copies at -W, 0, +W when wrapX enabled */}
+            {(activeMap.wrapX ? [-activeMap.width, 0, activeMap.width] : [0]).map((dx) => (
+              <WrappedWorld
+                key={`wrap-${dx}`}
+                dx={dx}
+                map={activeMap}
+                placements={placementsOnMap}
+                entityById={entityById}
+                showFog={showFog}
+                showGrid={showGrid}
+                onOpenEntity={openEntity}
               />
             ))}
 
-            {/* Region polygons */}
-            {(activeMap.regions ?? []).map((region) => {
-              const ent = region.entityId ? entityById.get(region.entityId) : undefined;
-              const color = region.color ?? (ent ? (ICON_BY_TYPE[ent.type] ?? ICON_BY_TYPE.default) : "#7fb069");
-              const positions = region.points.map(([x, y]) => [activeMap.height - y, x] as [number, number]);
-              return (
-                <Polygon
-                  key={region.id}
-                  positions={positions}
-                  pathOptions={{
-                    color,
-                    weight: 1.5,
-                    fillColor: color,
-                    fillOpacity: region.fillOpacity ?? 0.18,
-                    opacity: region.strokeOpacity ?? 0.85,
-                  }}
-                  eventHandlers={region.entityId ? { click: () => openEntity(region.entityId!, false) } : undefined}
-                >
-                  <Popup>
-                    <div className="text-sm font-medium">{region.name}</div>
-                    {ent?.summary && <div className="text-xs opacity-70">{ent.summary}</div>}
-                  </Popup>
-                </Polygon>
-              );
-            })}
-
-            {/* Fog of war: full-map polygon with reveal holes */}
-            {showFog && activeMap.fog?.enabled && (
-              <Polygon
-                positions={fogPositions(activeMap, activeMap.fog.reveals)}
-                pathOptions={{
-                  color: "transparent",
-                  fillColor: activeMap.fog.color ?? "rgba(8,12,20,0.55)",
-                  fillOpacity: 1,
-                  weight: 0,
-                  interactive: false,
-                  fillRule: "evenodd",
-                } as L.PathOptions}
-              />
-            )}
-
-            {/* Routes */}
-            {(activeMap.routes ?? []).map((route) => {
-              const pts = (route.resolvedPoints ?? []).map(([x, y]) => [activeMap.height - y, x] as [number, number]);
-              if (pts.length < 2) return null;
-              const color = route.color ?? "#cfd6dc";
-              const distPx = routeDistancePx(route.resolvedPoints ?? []);
-              const scale: MapScale | undefined = activeMap.scale;
-              const distLabel = scale ? `${(distPx * scale.unitsPerPixel).toFixed(1)} ${scale.unitLabel}` : `${Math.round(distPx)} px`;
-              const travel = scale && route.speed
-                ? formatTravelTime((distPx * scale.unitsPerPixel) / route.speed)
-                : null;
-              const modeLabel = route.mode ? ROUTE_MODE_LABEL[route.mode] : "";
-              return (
-                <Polyline
-                  key={route.id}
-                  positions={pts}
-                  pathOptions={{
-                    color,
-                    weight: route.weight ?? 3,
-                    opacity: 0.9,
-                    dashArray: route.dashed ? "8 6" : undefined,
-                    lineCap: "round",
-                    lineJoin: "round",
-                  }}
-                >
-                  <Tooltip sticky direction="top" opacity={0.95}>
-                    <div className="text-xs">
-                      <div className="font-medium">{route.name}</div>
-                      <div className="opacity-80">
-                        {distLabel}{travel ? ` · ${travel} ${modeLabel}` : ""}
-                      </div>
-                    </div>
-                  </Tooltip>
-                </Polyline>
-              );
-            })}
-
-            {/* Grid overlay */}
-            {activeMap.grid && (showGrid ?? activeMap.grid.enabled !== false) && (
-              <>
-                {gridLines(activeMap, activeMap.grid).map((line, i) => (
-                  <Polyline
-                    key={`grid-${i}`}
-                    positions={line}
-                    pathOptions={{
-                      color: activeMap.grid!.color ?? "rgba(255,255,255,0.08)",
-                      weight: 1,
-                      opacity: 1,
-                      interactive: false,
-                    }}
-                  />
-                ))}
-              </>
-            )}
-
-            {placementsOnMap.map((p) => {
+            {/* (markers handled inside WrappedWorld for wrap support) */}
+            {false && placementsOnMap.map((p) => {
               const ent = entityById.get(p.entityId);
               if (!ent) return null;
               const color = ICON_BY_TYPE[ent.type] ?? ICON_BY_TYPE.default;
