@@ -24,7 +24,6 @@ import { DraftStatusBadge } from "@/atlas/yaml/StatusBadge";
 import {
   buildPlacementJson,
   buildPlacementPatch,
-  buildWorldMapPatch,
   type PlacementOverride,
 } from "@/atlas/yaml/buildPatches";
 import { ExportChangesModal } from "@/atlas/ExportChangesModal";
