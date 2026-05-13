@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "atlas:build": "tsx scripts/build-atlas.ts",
     "atlas:build:player": "tsx scripts/build-atlas.ts --player --strict",
-    "atlas:publish": "npm run atlas:build:player && vite build"
+    "atlas:publish": "npm run atlas:build:player && vite build",
+    "atlas:apply-placements": "tsx scripts/apply-placements.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
