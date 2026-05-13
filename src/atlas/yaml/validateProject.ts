@@ -571,31 +571,3 @@ function _legacy_endmarker(opts: ValidateProjectOpts) {
   return { issues, counts, passedChecks: [] };
 }
 /* eslint-enable @typescript-eslint/no-unused-vars */
-/*
-  // legacy returns (preserved during refactor — replaced by structured meta above)
-  const counts = {
-    blocking: issues.filter((i) => i.severity === "blocking").length,
-    warning: issues.filter((i) => i.severity === "warning").length,
-    suggestion: issues.filter((i) => i.severity === "suggestion").length,
-  };
-
-  if (counts.blocking === 0) passedChecks.push("No blocking issues");
-  if (counts.warning === 0) passedChecks.push("No warnings");
-
-  return { issues, counts, passedChecks };
-*/
-      }
-    }
-  }
-
-  const counts = {
-    blocking: issues.filter((i) => i.severity === "blocking").length,
-    warning: issues.filter((i) => i.severity === "warning").length,
-    suggestion: issues.filter((i) => i.severity === "suggestion").length,
-  };
-
-  if (counts.blocking === 0) passedChecks.push("No blocking issues");
-  if (counts.warning === 0) passedChecks.push("No warnings");
-
-  return { issues, counts, passedChecks };
-}
