@@ -47,6 +47,8 @@ tags: [city, mining]
 
 Unknown `visibility` values produce a build warning and fall back to `dm`.
 
+**Images** listed in `atlas.images` appear as thumbnails in the side panel; click any thumbnail to open a lightbox. Paths are relative to `public/` (e.g. `assets/images/thornhold.webp`).
+
 ### Wikilinks
 
 Standard Obsidian wikilinks are supported in entry bodies:
