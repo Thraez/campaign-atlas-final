@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import { ExportChecklistDialog, useExportChecklist } from "./ExportChecklistDialog";
+import { normalizeAtlasAssetUrl } from "./url";
 
 interface Props {
   map: MapDocument;
