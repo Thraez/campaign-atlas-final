@@ -195,6 +195,18 @@ async function main() {
       links: [],
       backlinks: [],
     };
+
+    // Date / timeline support.
+    const parsedDate = parseAtlasDate(parsed.atlas.date, worldCfg?.calendar);
+    if (parsedDate) {
+      entity.dateRaw = parsedDate.label;
+      entity.dateValue = parsed.atlas.dateValue ?? parsedDate.value;
+      entity.dateYear = parsedDate.year;
+    } else if (typeof parsed.atlas.dateValue === "number") {
+      entity.dateValue = parsed.atlas.dateValue;
+      entity.dateRaw = parsed.atlas.date;
+    }
+
     const fmAtlas = (parsed.data.atlas as Record<string, unknown>) ?? {};
     const cx = typeof fmAtlas.x === "number" ? fmAtlas.x : undefined;
     const cy = typeof fmAtlas.y === "number" ? fmAtlas.y : undefined;
