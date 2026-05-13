@@ -29,6 +29,7 @@ function downloadText(name: string, content: string, mime = "text/markdown") {
 const DEFAULT_GRID: GridOverlay = { kind: "square", size: 256, color: "rgba(255,255,255,0.08)", enabled: true };
 
 export function MapSettingsPanel({ map, baseMap, onPatch, onReset }: Props) {
+  const checklist = useExportChecklist();
   const dirtyKeys = useMemo<string[]>(() => {
     const keys: string[] = [];
     if (map.width !== baseMap.width || map.height !== baseMap.height) keys.push("size");
