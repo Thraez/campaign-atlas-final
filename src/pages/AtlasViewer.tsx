@@ -550,8 +550,7 @@ const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function Entity
     );
   }
 
-  const imageUrl = (src: string) =>
-    src.startsWith("http://") || src.startsWith("https://") ? src : (import.meta.env.BASE_URL || "/") + src;
+  const imageUrl = (src: string) => normalizeAtlasAssetUrl(src);
 
   return (
     <div className="flex flex-col h-full">
