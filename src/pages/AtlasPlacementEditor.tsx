@@ -183,6 +183,9 @@ export default function AtlasPlacementEditor() {
     [project]
   );
   const regionDraft = useRegionDraft(activeMap, { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet });
+  const routeDraft = useRouteDraft(project, activeMap, { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet });
+  const fogDraft = useFogDraft(activeMap);
+  const [showFogPreview, setShowFogPreview] = useState(true);
 
   /** Per-tab filter state (placed/unplaced/visibility/type/tag). */
   const [stateFilter, setStateFilter] = useState<"all" | "placed" | "unplaced">("all");
