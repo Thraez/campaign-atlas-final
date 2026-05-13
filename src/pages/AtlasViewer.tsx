@@ -9,7 +9,11 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Search, X, MapPin, ArrowLeft, Compass, Eye, EyeOff, Grid3x3, CalendarClock } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  Search, X, MapPin, ArrowLeft, Compass, Eye, EyeOff, Grid3x3, CalendarClock,
+  Link2, Copy, Check, Image as ImageIcon,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
