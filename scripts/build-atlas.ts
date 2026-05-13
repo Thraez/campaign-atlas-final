@@ -35,10 +35,9 @@ interface Config {
 }
 
 const ROOT = process.cwd();
-const CONFIG_PATH = path.join(ROOT, "atlas.config.json");
 
-function loadConfig(): Config {
-  const raw = fs.readFileSync(CONFIG_PATH, "utf8");
+function loadConfig(configPath: string): Config {
+  const raw = fs.readFileSync(configPath, "utf8");
   return JSON.parse(raw) as Config;
 }
 
@@ -111,6 +110,7 @@ interface CliFlags {
   player: boolean;
   strict: boolean;
   outDir?: string;
+  configPath?: string;
 }
 
 function parseFlags(): CliFlags {
@@ -122,6 +122,8 @@ function parseFlags(): CliFlags {
     else if (a === "--strict") flags.strict = true;
     else if (a === "--out") flags.outDir = args[++i];
     else if (a.startsWith("--out=")) flags.outDir = a.slice(6);
+    else if (a === "--config") flags.configPath = args[++i];
+    else if (a.startsWith("--config=")) flags.configPath = a.slice(9);
   }
   return flags;
 }
@@ -130,8 +132,9 @@ const PLAYER_VISIBLE = new Set(["player", "rumor"]);
 
 async function main() {
   const flags = parseFlags();
-  const cfg = loadConfig();
-  const contentDir = path.join(ROOT, cfg.contentRoot);
+  const configPath = path.resolve(ROOT, flags.configPath ?? "atlas.config.json");
+  const cfg = loadConfig(configPath);
+  const contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
   const scanInfo = { excludedFiles: 0 };
   const files = walk(contentDir, contentDir, cfg.include ?? [], cfg.exclude ?? [], scanInfo);
 
@@ -152,7 +155,14 @@ async function main() {
   let externalAssets = 0;
   let missingAssets = 0;
 
-  type Pending = { entity: Entity; rawBody: string; coords?: { x: number; y: number } };
+  type Pending = {
+    entity: Entity;
+    rawBody: string;
+    /** Explicit multi-map placements from atlas.placements[]. */
+    placements: Array<{ mapId?: string; x: number; y: number }>;
+    /** Legacy atlas.x / atlas.y, used only if `placements` is empty. */
+    legacy?: { x: number; y: number };
+  };
   const pending: Pending[] = [];
   const slugSeen = new Map<string, string>();
 
@@ -233,8 +243,9 @@ async function main() {
     const fmAtlas = (parsed.data.atlas as Record<string, unknown>) ?? {};
     const cx = typeof fmAtlas.x === "number" ? fmAtlas.x : undefined;
     const cy = typeof fmAtlas.y === "number" ? fmAtlas.y : undefined;
-    const coords = cx !== undefined && cy !== undefined ? { x: cx, y: cy } : undefined;
-    pending.push({ entity, rawBody: noDm, coords });
+    const legacy = cx !== undefined && cy !== undefined ? { x: cx, y: cy } : undefined;
+    const explicitPlacements = parsed.atlas.placements ?? [];
+    pending.push({ entity, rawBody: noDm, placements: explicitPlacements, legacy });
   }
 
   // Wikilink name index
@@ -293,23 +304,35 @@ async function main() {
 
   // Default placements to first map if no specific mapId on entity.
   const primaryMapId = maps[0]?.id ?? fallbackMapId;
+  const validMapIds = new Set(maps.map((m) => m.id));
   const placements: MapPlacement[] = [];
   for (const item of pending) {
-    if (!item.coords) continue;
-    const { entity, coords } = item;
+    const { entity } = item;
+    // Build the effective list: explicit placements win; legacy x/y only as fallback.
+    const list = item.placements.length > 0
+      ? item.placements
+      : (item.legacy ? [{ mapId: undefined, x: item.legacy.x, y: item.legacy.y }] : []);
+    if (list.length === 0) continue;
     if (flags.player && !PLAYER_VISIBLE.has(entity.visibility)) {
-      secretPlacementsExcluded += 1;
+      secretPlacementsExcluded += list.length;
       continue;
     }
-    placements.push({
-      id: `${entity.id}@${primaryMapId}`,
-      entityId: entity.id,
-      mapId: primaryMapId,
-      x: coords.x,
-      y: coords.y,
-      label: entity.title,
-      visibility: entity.visibility,
-    });
+    for (const p of list) {
+      const mapId = p.mapId ?? primaryMapId;
+      if (!validMapIds.has(mapId)) {
+        warnings.push(`entity "${entity.id}": placement references unknown mapId "${mapId}" — skipped`);
+        continue;
+      }
+      placements.push({
+        id: `${entity.id}@${mapId}`,
+        entityId: entity.id,
+        mapId,
+        x: p.x,
+        y: p.y,
+        label: entity.title,
+        visibility: entity.visibility,
+      });
+    }
   }
 
   // Resolve route waypoints (entity ids → coordinates) and filter for player.

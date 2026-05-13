@@ -11,8 +11,8 @@
     "summary": "The Old Keep falls in a single night to a shadow that came down from the high passes.",
     "excerpt": "On the third night of Longnight, 612 AS, the watchfires of the [[The Old Keep|Old Keep]] went dark. Riders from [[Raven's Vale]] found the gates open and the courtyards empty by morning. Whatever passed that night left no bodies, only frost",
     "body": "on the third night of longnight, 612 as, the watchfires of the old keep went dark. riders from raven's vale found the gates open and the courtyards empty by morning. whatever passed that night left no bodies, only frost. the keep has stood abandoned ever since.",
-    "dateRaw": "3 Longnight, 612 AS",
-    "dateValue": 112765,
+    "dateRaw": "612-6-3",
+    "dateValue": 223533,
     "dateYear": 612
   },
   {
@@ -27,8 +27,8 @@
     "summary": "Lord Garron raises the red walls of Thornhold above the iron veins of the Spinegrey range.",
     "excerpt": "Forty-seven years after the [[The Sundering|Sundering]], settlers from the eastern ports broke the first stones of [[Thornhold]] from the cliffside. The foundation feast lasted nine days, ending with the lighting of the Forge of Garron — st",
     "body": "forty-seven years after the sundering, settlers from the eastern ports broke the first stones of thornhold from the cliffside. the foundation feast lasted nine days, ending with the lighting of the forge of garron — still tended today.",
-    "dateRaw": "12 Greentide, 47 AS",
-    "dateValue": 8720,
+    "dateRaw": "47-3-12",
+    "dateValue": 17227,
     "dateYear": 47
   },
   {
@@ -43,7 +43,7 @@
     "summary": "The cataclysm that split the old continent and ended the Third Age. The new calendar reckons years from the day the sky cracked.",
     "excerpt": "When the Twin Moons collided in the night sky, the firmament tore and the seas boiled. Half of the old continent slid beneath the waves; what remained became the Astrath Deeprealm. Survivors founded the great cities of [[Thornhold]] and [[S",
     "body": "when the twin moons collided in the night sky, the firmament tore and the seas boiled. half of the old continent slid beneath the waves; what remained became the astrath deeprealm. survivors founded the great cities of thornhold and sunhaven in the years that followed. this event marks year 0 of the after sundering calendar.",
-    "dateRaw": "1 Frostmoon, 0 AS",
+    "dateRaw": "0-1-1",
     "dateValue": 1,
     "dateYear": 0
   },

@@ -232,7 +232,8 @@ export default function AtlasPlacementEditor() {
     const lines: string[] = [
       `# Placement patch — ${activeMap.name}`,
       "",
-      "Paste each snippet into the corresponding entity's frontmatter, under `atlas:`.",
+      "Paste each snippet into the corresponding entity's frontmatter, replacing any",
+      "existing `atlas.placements` (or legacy `atlas.x` / `atlas.y`) with the version below.",
       "Or run: `npm run atlas:apply-placements -- placements.json`",
       "",
     ];
@@ -242,8 +243,10 @@ export default function AtlasPlacementEditor() {
       lines.push(`## ${e.title}  \`${e.sourcePath || e.id}\``);
       lines.push("```yaml");
       lines.push("atlas:");
-      lines.push(`  x: ${c.x}`);
-      lines.push(`  y: ${c.y}`);
+      lines.push("  placements:");
+      lines.push(`    - mapId: ${activeMap.id}`);
+      lines.push(`      x: ${c.x}`);
+      lines.push(`      y: ${c.y}`);
       lines.push("```");
       lines.push("");
     }

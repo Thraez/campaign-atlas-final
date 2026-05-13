@@ -4,7 +4,25 @@ A static, GitHub Pages–hosted interactive fantasy atlas and wiki for D&D world
 
 **Architecture rule:** Obsidian markdown is the source of truth. The app does not own canon lore. A build script reads selected markdown files, parses YAML frontmatter and Obsidian wikilinks, and generates static atlas data that the React app loads.
 
-> Status: Foundation (Batch 1) — content pipeline + schema. Map editor and player-safe publishing land in later batches.
+> **Status — current reality**
+>
+> Implemented and shipping: source-generated atlas (markdown vault → `atlas.json`),
+> player-safe `--player --strict` build, GitHub Pages auto-publish workflow, multi-map
+> worlds with regions / fog / routes / grid / scale, `/atlas` viewer with pins,
+> side-panel, search palette, timeline, browse / tag / type pages, `/atlas/edit` patch
+> workflow (pins, layers, map settings, asset zip), wikilink resolution with player-safe
+> rendering, calendar-aware dates, minimap, **offline PWA (production only)**, and
+> **print / PDF player handouts**.
+>
+> **Remaining work (next):**
+>
+> - First real-world map image dropped into `public/atlas/assets/maps/` and wired into
+>   `world.yaml` (a tiny SVG placeholder ships in the repo for now — see _Sample
+>   placeholder map_ below).
+> - Real-device PWA QA pass (see _PWA QA checklist_).
+> - Migrate or retire the legacy editor at `/legacy-editor` (kept for back-compat,
+>   no new features).
+> - Possibly: globe / spherical projection mode (not planned yet).
 
 ---
 
@@ -39,11 +57,25 @@ atlas:
   aliases: [Thorn Hold, The Red City]
   images: [assets/images/thornhold.webp]
   summary: A red-stone mining city.
-  x: 100000                         # optional bootstrap placement coords
+  x: 100000                         # legacy single-map coords (still supported)
   y: 50000
+  # Multi-map alternative — wins over x/y when both present:
+  # placements:
+  #   - mapId: astrath-deeprealm-overview
+  #     x: 100000
+  #     y: 50000
+  #   - mapId: astrath-deeprealm-northern-reaches
+  #     x: 30000
+  #     y: 20000
 tags: [city, mining]
 ---
 ```
+
+`atlas.placements[]` lets one entity appear on multiple maps. Each entry needs an
+`x` and `y`; `mapId` defaults to the world's first map. Legacy `atlas.x` / `atlas.y`
+remain valid and are emitted as a single placement on the default map. The
+`/atlas/edit` exporter and `npm run atlas:apply-placements` both round-trip into
+`atlas.placements`, preserving entries on other maps.
 
 Unknown `visibility` values produce a build warning and fall back to `dm`.
 
@@ -442,3 +474,65 @@ gallery, and tags. Map chrome, toolbars, and the side panel are excluded.
 
 Tip: hitting **Ctrl+P / Cmd+P** anywhere in `/atlas` also prints the currently
 open entity (a fallback print stylesheet hides the rest of the UI).
+
+---
+
+## Sample placeholder map
+
+A tiny SVG placeholder ships at `public/atlas/assets/maps/sample-overview.svg`
+so a fresh clone has something to render. To enable it, uncomment the
+`sample-overview` layer block in `content/astrath-deeprealm/_atlas/world.yaml`.
+
+Replace it with a real raster (`.webp` / `.png` / `.jpg`) when you have one —
+just drop the file into `public/atlas/assets/maps/` and update `src:` in
+`world.yaml`. Keep the placeholder in the repo or delete it; nothing depends
+on it.
+
+---
+
+## PWA QA checklist (manual)
+
+Run these against the **published** GitHub Pages URL (not the Lovable preview —
+the service worker is intentionally disabled there).
+
+1. **First online visit**
+   - Open `/atlas` in a fresh browser profile while online.
+   - Confirm the map loads and `/atlas/atlas.json` plus `/atlas/search-index.json`
+     return `200` in the Network tab.
+   - DevTools → Application → Service Workers shows the SW as **activated**.
+   - Application → Cache Storage shows the atlas precache populated.
+
+2. **Airplane mode reload**
+   - Switch device to airplane mode.
+   - Hard-refresh `/atlas`. App shell + atlas data + local map images must still
+     render. Search palette must work.
+   - Open an entity that uses a **local** image — it should appear.
+   - Open an entity that uses an **external** URL image — it may show a broken
+     image (expected; see caveat below).
+
+3. **Update prompt after a new deploy**
+   - Push a content/code change. Wait for the GitHub Action to publish.
+   - Re-open `/atlas`. The "Atlas update available" banner should appear within
+     a few seconds. Click **Refresh** and confirm the new content is live.
+
+4. **Manual cache controls**
+   - Toolbar cloud icon → **Reload latest atlas** triggers an SW update check.
+   - Toolbar cloud icon → **Clear offline cache** wipes all caches and reloads.
+     After this, step 1 should reproduce a clean first-visit state.
+
+5. **External-image offline caveat**
+   - Layers / images referenced by `https://…` are only opportunistically
+     cached. They are not guaranteed offline. Commit images locally for
+     reliable offline use.
+
+6. **Lovable preview SW disabled**
+   - Open the Lovable editor preview (`*.lovable.app` / `*.lovableproject.com`).
+   - DevTools → Application → Service Workers shows **no service worker** for
+     the preview origin. This is intentional and required to avoid stale
+     caches inside the editor.
+
+7. **Install / Add to Home Screen**
+   - Desktop Chrome / Edge: install icon in the address bar opens the app in a
+     standalone window.
+   - iOS Safari → Share → **Add to Home Screen** installs an icon that opens
+     directly into `/atlas`.

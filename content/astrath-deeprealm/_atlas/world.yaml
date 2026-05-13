@@ -1,10 +1,10 @@
-# Map settings patch — Overview
+# World definition for Astrath Deeprealm.
+# This file is parsed by scripts/build-atlas.ts via loadWorldConfig().
+# Keep it as valid YAML; comments (#) are fine, code fences (```) are not.
 
-Paste under the matching map entry in `content/<world>/_atlas/world.yaml`.
-
-```yaml
 maps:
   - id: astrath-deeprealm-overview
+    name: Overview
     width: 200000
     height: 100000
     oceanColor: "#18313f"
@@ -14,4 +14,15 @@ maps:
       size: 5000
       color: "rgba(255,255,255,0.06)"
       enabled: false
-```
+    layers: []
+      # ----- Sample placeholder layer (commented out by default) -----
+      # Uncomment to render the bundled sample SVG. Replace with a real raster
+      # (.webp / .png / .jpg) under public/atlas/assets/maps/ when you have one.
+      # - id: sample-overview
+      #   src: /atlas/assets/maps/sample-overview.svg
+      #   x: 0
+      #   y: 0
+      #   width: 200000
+      #   height: 100000
+      #   opacity: 1
+      #   zIndex: 1
