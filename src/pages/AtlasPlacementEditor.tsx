@@ -3,7 +3,7 @@ import { MapContainer, Marker, Polygon, ImageOverlay, useMap, useMapEvents } fro
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode, Layers as LayersIcon, MapPin as PinIcon, Settings2 } from "lucide-react";
+import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode, Layers as LayersIcon, MapPin as PinIcon, Settings2, Package, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity, MapDocument } from "@/atlas/content/schema";
@@ -21,6 +21,13 @@ import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { validatePatchYaml } from "@/atlas/yaml/validatePatch";
 import { classifyDraftStatus } from "@/atlas/yaml/canon";
 import { DraftStatusBadge } from "@/atlas/yaml/StatusBadge";
+import {
+  buildPlacementJson,
+  buildPlacementPatch,
+  type PlacementOverride,
+} from "@/atlas/yaml/buildPatches";
+import { ExportChangesModal } from "@/atlas/ExportChangesModal";
+import { ImportPanel } from "@/atlas/import/ImportPanel";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 // Bumped to v2: storage shape changed from { [entityId]: Override } to
@@ -219,61 +226,36 @@ export default function AtlasPlacementEditor() {
     setFlyTo({ lat: activeMap.height - c.y, lng: c.x });
   };
 
-  const exportJson = () => {
-    if (!project || !activeMap) return;
-    const merged: Array<{ entityId: string; sourcePath: string; mapId: string; x: number; y: number }> = [];
+  /** Build current draft placements (effective coords for every entity on activeMap). */
+  const buildDraftPlacements = useCallback(() => {
+    if (!project || !activeMap) return [];
+    const out: PlacementOverride[] = [];
     for (const e of project.entities) {
       const c = effectiveCoord(e.id);
-      if (!c) continue;
-      merged.push({ entityId: e.id, sourcePath: e.sourcePath, mapId: activeMap.id, x: c.x, y: c.y });
+      if (c) out.push({ entityId: e.id, mapId: activeMap.id, x: c.x, y: c.y });
     }
-    download(`placements-${activeMap.id}.json`, JSON.stringify(merged, null, 2), "application/json");
+    return out;
+  }, [project, activeMap, effectiveCoord]);
+
+  const exportJson = () => {
+    if (!project || !activeMap) return;
+    const artifact = buildPlacementJson({ project, mapId: activeMap.id, placements: buildDraftPlacements() });
+    download(artifact.filename, artifact.content, artifact.mime);
   };
 
   const [lastExportAt, setLastExportAt] = useState<number | null>(null);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   const exportPatch = () => {
     if (!project || !activeMap) return;
-    const lines: string[] = [
-      `# Placement patch — ${activeMap.name} (${activeMap.id})`,
-      `# Generated ${new Date().toISOString()}`,
-      `#`,
-      `# CANON MODEL:`,
-      `#   YAML / Markdown frontmatter is the source of truth.`,
-      `#   This file is a TOOL-GENERATED PATCH against that canon.`,
-      `#   Generated runtime files (atlas.json, search-index.json) are derived`,
-      `#   and must never be edited by hand.`,
-      `#`,
-      `# HOW TO APPLY:`,
-      `# This file contains one YAML snippet per entity. For each "# entity:"`,
-      `# section below, open the listed markdown file and REPLACE its existing`,
-      `# atlas.placements (or legacy atlas.x / atlas.y) with the snippet shown.`,
-      `# Do NOT paste these snippets into world.yaml — they belong in the`,
-      `# entity's frontmatter, not the world config.`,
-      `#`,
-      `# Or run: npm run atlas:apply-placements -- placements-${activeMap.id}.json`,
-      ``,
-    ];
-    for (const e of project.entities) {
-      const c = effectiveCoord(e.id);
-      if (!c) continue;
-      lines.push(`# entity: ${e.title}`);
-      lines.push(`# file:   ${e.sourcePath || e.id}`);
-      lines.push(`atlas:`);
-      lines.push(`  placements:`);
-      lines.push(`    - mapId: ${activeMap.id}`);
-      lines.push(`      x: ${c.x}`);
-      lines.push(`      y: ${c.y}`);
-      lines.push(``);
-    }
-    const content = lines.join("\n");
-    const result = validatePatchYaml(content, "placement");
+    const artifact = buildPlacementPatch({ project, mapId: activeMap.id, placements: buildDraftPlacements() });
+    const result = validatePatchYaml(artifact.content, "placement");
     if (!result.ok) {
       toast.error(`Patch validation failed: ${result.errors[0]}`);
       return;
     }
     if (result.warnings.length) toast.warning(result.warnings[0]);
-    download(`placements-patch-${activeMap.id}.yaml`, content, "text/yaml");
+    download(artifact.filename, artifact.content, artifact.mime);
     setLastExportAt(Date.now());
   };
 
@@ -340,11 +322,14 @@ export default function AtlasPlacementEditor() {
         <Button variant="ghost" size="sm" onClick={() => { setOverrides({}); toast.info("Cleared overrides"); }} title="Discard local changes">
           <RotateCcw className="h-4 w-4" />
         </Button>
-        <Button variant="secondary" size="sm" onClick={exportPatch} className="gap-1">
-          <FileCode className="h-4 w-4" /><span className="hidden md:inline">Patch.yaml</span>
+        <Button variant="default" size="sm" onClick={() => setExportModalOpen(true)} className="gap-1" title="Open the unified export modal">
+          <Package className="h-4 w-4" /><span className="hidden md:inline">Export DM Changes</span>
         </Button>
-        <Button variant="default" size="sm" onClick={exportJson} className="gap-1">
-          <Download className="h-4 w-4" /><span className="hidden md:inline">placements.json</span>
+        <Button variant="ghost" size="sm" onClick={exportPatch} className="gap-1" title="Quick: download placements .yaml">
+          <FileCode className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={exportJson} className="gap-1" title="Quick: download placements .json">
+          <Download className="h-4 w-4" />
         </Button>
         <Button asChild variant="ghost" size="sm">
           <Link to="/atlas">View as player →</Link>
@@ -433,10 +418,11 @@ export default function AtlasPlacementEditor() {
 
         <aside className="w-[380px] hidden md:flex flex-col border-l border-border bg-card">
           <Tabs defaultValue="pins" className="flex-1 flex flex-col min-h-0">
-            <TabsList className="grid grid-cols-3 mx-3 mt-3">
+            <TabsList className="grid grid-cols-4 mx-3 mt-3">
               <TabsTrigger value="pins" className="gap-1.5"><PinIcon className="h-3.5 w-3.5" />Pins</TabsTrigger>
               <TabsTrigger value="layers" className="gap-1.5"><LayersIcon className="h-3.5 w-3.5" />Layers</TabsTrigger>
               <TabsTrigger value="map" className="gap-1.5"><Settings2 className="h-3.5 w-3.5" />Map</TabsTrigger>
+              <TabsTrigger value="import" className="gap-1.5"><FolderOpen className="h-3.5 w-3.5" />Import</TabsTrigger>
             </TabsList>
             <TabsContent value="pins" className="flex-1 flex flex-col min-h-0 m-0">
               <div className="p-3 border-b border-border">
@@ -498,10 +484,22 @@ export default function AtlasPlacementEditor() {
             <TabsContent value="map" className="flex-1 flex flex-col min-h-0 m-0">
               {baseMap && <MapSettingsPanel map={activeMap} baseMap={baseMap} onPatch={patchMap} onReset={resetMap} />}
             </TabsContent>
+            <TabsContent value="import" className="flex-1 flex flex-col min-h-0 m-0">
+              <ImportPanel knownEntityNames={new Set(project.entities.flatMap((e) => [e.id.toLowerCase(), e.title.toLowerCase(), ...e.aliases.map((a) => a.toLowerCase())]))} />
+            </TabsContent>
           </Tabs>
         </aside>
       </div>
       <style>{`@keyframes atlas-pulse { 0%,100% { filter: drop-shadow(0 0 0 hsl(var(--primary))); } 50% { filter: drop-shadow(0 0 6px hsl(var(--primary))); } }`}</style>
+      <ExportChangesModal
+        open={exportModalOpen}
+        onOpenChange={(o) => { setExportModalOpen(o); if (!o) setLastExportAt(Date.now()); }}
+        project={project}
+        activeMap={activeMap}
+        draftPlacements={buildDraftPlacements()}
+        mergedLayers={layerEditor.mergedLayers}
+        localLayers={layerEditor.localLayers}
+      />
     </div>
   );
 }
