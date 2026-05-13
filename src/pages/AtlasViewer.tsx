@@ -349,7 +349,7 @@ export default function AtlasViewer() {
 
             <AtlasMinimap map={activeMap} layers={activeMap.layers} />
           </MapContainer>
-        </div>
+        </main>
 
         {/* Desktop side panel */}
         <aside className="hidden md:flex w-[420px] border-l border-border bg-card flex-col">
