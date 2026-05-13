@@ -674,10 +674,17 @@ export default function AtlasPlacementEditor() {
               <RegionsTab
                 project={project}
                 map={activeMap}
+                api={regionDraft}
                 blockingCount={regionIssues.blocking}
                 warningCount={regionIssues.warning}
                 lastExportAt={tabExportAt.regions ?? null}
                 onExported={() => markTabExport("regions")}
+                onFitTo={(r) => {
+                  if (!r.points.length) return;
+                  const cx = r.points.reduce((s, p) => s + p[0], 0) / r.points.length;
+                  const cy = r.points.reduce((s, p) => s + p[1], 0) / r.points.length;
+                  setFlyTo({ lat: activeMap.height - cy, lng: cx });
+                }}
               />
             </TabsContent>
 
