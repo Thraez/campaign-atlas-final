@@ -12,6 +12,8 @@ export interface AtlasFrontmatter {
   id?: string;
   tags?: string[];
   canon?: string;
+  date?: string;        // human-readable, e.g. "1247-03-12" or "Spring 1247"
+  dateValue?: number;   // optional explicit numeric override for sorting
 }
 
 export interface ParsedFile {
