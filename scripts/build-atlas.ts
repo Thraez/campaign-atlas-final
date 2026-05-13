@@ -369,13 +369,32 @@ async function main() {
 
   // Resolve route waypoints (entity ids → coordinates) and filter for player.
   let routesExcluded = 0;
-  const placementByEntity = new Map<string, MapPlacement>();
-  placements.forEach((p) => placementByEntity.set(p.entityId, p));
+  // Routes must resolve waypoints using a placement on the SAME map. Using a
+  // global entityId→placement map silently let a route on map B resolve via a
+  // pin on map A (regional-map spoiler bug).
+  const placementByMapEntity = new Map<string, MapPlacement>();
+  placements.forEach((p) => placementByMapEntity.set(`${p.mapId}:${p.entityId}`, p));
+  let regionLeaks = 0;
+  let routeLeaks = 0;
+  let routeWaypointMisses = 0;
   const routes: Route[] = [];
   for (const r of worldCfg?.routes ?? []) {
     if (flags.player && !PLAYER_VISIBLE.has(r.visibility)) {
       routesExcluded += 1;
       continue;
+    }
+    // Spoiler-leak: player-visible route mentions a DM/hidden/unknown entity.
+    if (PLAYER_VISIBLE.has(r.visibility)) {
+      for (const w of r.waypoints) {
+        if (Array.isArray(w)) continue;
+        const targetVis = entityVisibility.get(w.entityId);
+        if (!targetVis || !PLAYER_VISIBLE.has(targetVis)) {
+          routeLeaks += 1;
+          warnings.push(
+            `route "${r.id}": player-visible route routes through ${targetVis ? `${targetVis} entity` : "unknown entity"} "${w.entityId}" — spoiler leak`
+          );
+        }
+      }
     }
     const resolved: Point[] = [];
     let dropped = false;
@@ -383,9 +402,10 @@ async function main() {
       if (Array.isArray(w)) {
         resolved.push([w[0], w[1]]);
       } else {
-        const p = placementByEntity.get(w.entityId);
+        const p = placementByMapEntity.get(`${r.mapId}:${w.entityId}`);
         if (!p) {
-          warnings.push(`route "${r.id}": waypoint entity "${w.entityId}" has no placement on any map — route skipped`);
+          routeWaypointMisses += 1;
+          warnings.push(`route "${r.id}": waypoint entity "${w.entityId}" has no placement on map "${r.mapId}" — route skipped`);
           dropped = true;
           break;
         }
@@ -422,6 +442,19 @@ async function main() {
   // LEAKS and warn here (and fail strict-player builds).
   const entityVisibility = new Map<string, import("../src/atlas/content/schema").EntityVisibility>();
   for (const { entity } of pending) entityVisibility.set(entity.id, entity.visibility);
+
+  // Region leak detection: player-visible region linked to DM/hidden/unknown entity.
+  for (const r of regions) {
+    if (!PLAYER_VISIBLE.has(r.visibility) || !r.entityId) continue;
+    const targetVis = entityVisibility.get(r.entityId);
+    if (!targetVis || !PLAYER_VISIBLE.has(targetVis)) {
+      regionLeaks += 1;
+      warnings.push(
+        `region "${r.id}": player-visible region links to ${targetVis ? `${targetVis} entity` : "unknown entity"} "${r.entityId}" — spoiler leak`
+      );
+    }
+  }
+
   let strippedDmProfiles = 0;
   let strippedDmRelationships = 0;
   let relationshipLeaks = 0;
