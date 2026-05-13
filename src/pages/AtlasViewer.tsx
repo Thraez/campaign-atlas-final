@@ -278,91 +278,82 @@ interface EntityPanelProps {
   onShowOnMap: (p: MapPlacement) => void;
 }
 
-const EntityPanel = (() => {
-  const Cmp = (
-    { entity, placements, entityById, onOpenEntity, onClose, onShowOnMap }: EntityPanelProps,
-    ref: React.Ref<HTMLDivElement>
-  ) => {
-    if (!entity) {
-      return (
-        <div className="flex-1 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
-          <div className="space-y-2">
-            <MapPin className="h-6 w-6 mx-auto opacity-50" />
-            <p>Select a pin or search for a place to read its lore.</p>
-          </div>
-        </div>
-      );
-    }
+const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function EntityPanel(
+  { entity, placements, onOpenEntity, onClose, onShowOnMap },
+  ref
+) {
+  if (!entity) {
     return (
-      <div className="flex flex-col h-full">
-        <div className="flex items-start justify-between gap-2 px-4 py-3 border-b border-border">
-          <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{entity.type}</div>
-            <h2 className="font-display text-xl text-foreground truncate">{entity.title}</h2>
-            {entity.aliases.length > 0 && (
-              <div className="text-xs text-muted-foreground mt-0.5">
-                aka {entity.aliases.join(", ")}
-              </div>
-            )}
-          </div>
-          <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4" /></Button>
+      <div className="flex-1 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
+        <div className="space-y-2">
+          <MapPin className="h-6 w-6 mx-auto opacity-50" />
+          <p>Select a pin or search for a place to read its lore.</p>
         </div>
-
-        <ScrollArea className="flex-1">
-          <div className="p-4 space-y-4">
-            {entity.summary && (
-              <p className="text-sm italic text-muted-foreground border-l-2 border-primary pl-3">{entity.summary}</p>
-            )}
-
-            {placements.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {placements.map((p) => (
-                  <Button key={p.id} size="sm" variant="secondary" className="gap-1" onClick={() => onShowOnMap(p)}>
-                    <MapPin className="h-3.5 w-3.5" /> Show on map
-                  </Button>
-                ))}
-              </div>
-            )}
-
-            <div
-              ref={ref}
-              className="atlas-prose prose prose-sm max-w-none dark:prose-invert"
-              dangerouslySetInnerHTML={{ __html: entity.bodyHtml }}
-            />
-
-            {entity.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-2">
-                {entity.tags.map((t) => <Badge key={t} variant="outline">{t}</Badge>)}
-              </div>
-            )}
-
-            {entity.backlinks.length > 0 && (
-              <div className="pt-3 border-t border-border">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Mentioned in</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {entity.backlinks.map((b) => (
-                    <button
-                      key={b.id}
-                      className="text-xs px-2 py-1 rounded bg-muted hover:bg-accent transition"
-                      onClick={() => onOpenEntity(b.id)}
-                    >
-                      {b.title}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </ScrollArea>
       </div>
     );
-  };
-  Cmp.displayName = "EntityPanel";
-  // forwardRef wrap
-  return Object.assign(
-    (props: EntityPanelProps & { ref?: React.Ref<HTMLDivElement> }) => Cmp(props, props.ref ?? null),
+  }
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-start justify-between gap-2 px-4 py-3 border-b border-border">
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{entity.type}</div>
+          <h2 className="font-display text-xl text-foreground truncate">{entity.title}</h2>
+          {entity.aliases.length > 0 && (
+            <div className="text-xs text-muted-foreground mt-0.5">aka {entity.aliases.join(", ")}</div>
+          )}
+        </div>
+        <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4" /></Button>
+      </div>
+
+      <ScrollArea className="flex-1">
+        <div className="p-4 space-y-4">
+          {entity.summary && (
+            <p className="text-sm italic text-muted-foreground border-l-2 border-primary pl-3">{entity.summary}</p>
+          )}
+
+          {placements.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {placements.map((p) => (
+                <Button key={p.id} size="sm" variant="secondary" className="gap-1" onClick={() => onShowOnMap(p)}>
+                  <MapPin className="h-3.5 w-3.5" /> Show on map
+                </Button>
+              ))}
+            </div>
+          )}
+
+          <div
+            ref={ref}
+            className="atlas-prose prose prose-sm max-w-none dark:prose-invert"
+            dangerouslySetInnerHTML={{ __html: entity.bodyHtml }}
+          />
+
+          {entity.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-2">
+              {entity.tags.map((t) => <Badge key={t} variant="outline">{t}</Badge>)}
+            </div>
+          )}
+
+          {entity.backlinks.length > 0 && (
+            <div className="pt-3 border-t border-border">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Mentioned in</div>
+              <div className="flex flex-wrap gap-1.5">
+                {entity.backlinks.map((b) => (
+                  <button
+                    key={b.id}
+                    className="text-xs px-2 py-1 rounded bg-muted hover:bg-accent transition"
+                    onClick={() => onOpenEntity(b.id)}
+                  >
+                    {b.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
   );
-})() as React.FC<EntityPanelProps & { ref?: React.Ref<HTMLDivElement> }>;
+});
 
 interface SearchProps {
   query: string;
