@@ -13,11 +13,14 @@ import { parseFrontmatter } from "./atlas/parseFrontmatter";
 import { stripDmBlocks } from "./atlas/stripDmBlocks";
 import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
 import { slugify } from "./atlas/slugify";
+import { loadWorldConfig } from "./atlas/loadWorldConfig";
 import type {
   AtlasProject,
   Entity,
+  MapDocument,
   MapPlacement,
-  ResolvedLink,
+  Region,
+  FogOverlay,
 } from "../src/atlas/content/schema";
 
 interface Config {
@@ -225,8 +228,37 @@ async function main() {
   }
 
   const worldId = cfg.defaultWorld;
-  const mapId = `${worldId}-overview`;
+  const fallbackMapId = `${worldId}-overview`;
 
+  // Load optional world.yaml (maps, regions, fog).
+  const worldCfg = loadWorldConfig(contentDir, worldId);
+  if (worldCfg) warnings.push(...worldCfg.warnings);
+
+  let maps: MapDocument[] = worldCfg?.maps?.length
+    ? worldCfg.maps
+    : [{ id: fallbackMapId, worldId, name: "Overview", width: 200000, height: 100000, layers: [], oceanColor: "#18313f", wrapX: true }];
+
+  let regions: Region[] = worldCfg?.regions ?? [];
+  let fogs: FogOverlay[] = worldCfg?.fogs ?? [];
+  let regionsExcluded = 0;
+
+  if (flags.player) {
+    regions = regions.filter((r) => {
+      const keep = PLAYER_VISIBLE.has(r.visibility);
+      if (!keep) regionsExcluded += 1;
+      return keep;
+    });
+  }
+
+  // Attach regions + fog to their owning maps.
+  maps = maps.map((m) => ({
+    ...m,
+    regions: regions.filter((r) => r.mapId === m.id),
+    fog: fogs.find((f) => f.mapId === m.id),
+  }));
+
+  // Default placements to first map if no specific mapId on entity.
+  const primaryMapId = maps[0]?.id ?? fallbackMapId;
   const placements: MapPlacement[] = [];
   for (const item of pending) {
     if (!item.coords) continue;
@@ -236,9 +268,9 @@ async function main() {
       continue;
     }
     placements.push({
-      id: `${entity.id}@${mapId}`,
+      id: `${entity.id}@${primaryMapId}`,
       entityId: entity.id,
-      mapId,
+      mapId: primaryMapId,
       x: coords.x,
       y: coords.y,
       label: entity.title,
@@ -249,8 +281,8 @@ async function main() {
   const project: AtlasProject = {
     version: new Date().toISOString().replace(/[:.]/g, "-"),
     publishedAt: new Date().toISOString(),
-    worlds: [{ id: worldId, name: "Astrath Deeprealm", defaultMapId: mapId }],
-    maps: [{ id: mapId, worldId, name: "Overview", width: 200000, height: 100000, layers: [], oceanColor: "#18313f", wrapX: true }],
+    worlds: [{ id: worldId, name: "Astrath Deeprealm", defaultMapId: primaryMapId }],
+    maps,
     entities: pending.map((p) => p.entity),
     placements,
     assets: [],
@@ -288,6 +320,9 @@ async function main() {
   console.log(`Excluded by visibility:  ${visibilityExcluded}`);
   console.log(`Stripped DM blocks:      ${r.strippedDmBlocks}`);
   console.log(`Excluded secret pins:    ${secretPlacementsExcluded}`);
+  console.log(`Excluded secret regions: ${regionsExcluded}`);
+  console.log(`Maps:                    ${maps.length}`);
+  console.log(`Regions:                 ${regions.length}`);
   console.log(`Broken wikilinks:        ${r.brokenLinks}`);
   console.log(`Duplicate slugs:         ${r.duplicateSlugs}`);
   console.log(`Warnings:                ${warnings.length}`);

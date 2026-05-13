@@ -1,6 +1,6 @@
 {
-  "version": "2026-05-13T06-41-53-507Z",
-  "publishedAt": "2026-05-13T06:41:53.507Z",
+  "version": "2026-05-13T06-46-56-793Z",
+  "publishedAt": "2026-05-13T06:46:56.793Z",
   "worlds": [
     {
       "id": "astrath-deeprealm",
@@ -15,9 +15,107 @@
       "name": "Overview",
       "width": 200000,
       "height": 100000,
-      "layers": [],
       "oceanColor": "#18313f",
-      "wrapX": true
+      "wrapX": false,
+      "layers": [],
+      "regions": [
+        {
+          "id": "ravens-vale-region",
+          "mapId": "astrath-deeprealm-overview",
+          "name": "Raven's Vale",
+          "entityId": "ravens-vale",
+          "color": "#7fb069",
+          "fillOpacity": 0.18,
+          "strokeOpacity": 0.85,
+          "points": [
+            [
+              80000,
+              35000
+            ],
+            [
+              120000,
+              32000
+            ],
+            [
+              128000,
+              55000
+            ],
+            [
+              95000,
+              62000
+            ],
+            [
+              78000,
+              50000
+            ]
+          ],
+          "visibility": "player"
+        },
+        {
+          "id": "thornhold-domain",
+          "mapId": "astrath-deeprealm-overview",
+          "name": "Thornhold Domain",
+          "entityId": "thornhold",
+          "color": "#f4c95d",
+          "fillOpacity": 0.14,
+          "strokeOpacity": 0.85,
+          "points": [
+            [
+              40000,
+              60000
+            ],
+            [
+              70000,
+              58000
+            ],
+            [
+              72000,
+              80000
+            ],
+            [
+              42000,
+              82000
+            ]
+          ],
+          "visibility": "player"
+        }
+      ],
+      "fog": {
+        "mapId": "astrath-deeprealm-overview",
+        "enabled": true,
+        "color": "rgba(8, 12, 20, 0.55)",
+        "reveals": [
+          [
+            [
+              40000,
+              30000
+            ],
+            [
+              140000,
+              30000
+            ],
+            [
+              140000,
+              85000
+            ],
+            [
+              40000,
+              85000
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "id": "astrath-deeprealm-northern-reaches",
+      "worldId": "astrath-deeprealm",
+      "name": "Northern Reaches",
+      "width": 80000,
+      "height": 60000,
+      "oceanColor": "#1c2a35",
+      "wrapX": false,
+      "layers": [],
+      "regions": []
     }
   ],
   "entities": [

@@ -177,6 +177,53 @@ Commit the markdown changes; the GitHub Action will publish the player atlas wit
 
 ---
 
+## Maps, regions, and fog (`world.yaml`)
+
+Per-world map definitions live in `content/<world>/_atlas/world.yaml`. This is where you define multiple base maps, image layers stacked on each map, polygon regions linked to wiki entries, and fog-of-war reveal areas.
+
+```yaml
+maps:
+  - id: astrath-deeprealm-overview
+    name: Overview
+    width: 200000
+    height: 100000
+    oceanColor: "#18313f"
+    layers:
+      - id: continent
+        src: /atlas/assets/continent.webp
+        x: 0
+        y: 0
+        width: 200000
+        height: 100000
+        opacity: 1
+
+regions:
+  - id: ravens-vale-region
+    mapId: astrath-deeprealm-overview
+    name: Raven's Vale
+    entityId: ravens-vale          # clicking the polygon opens this entity
+    color: "#7fb069"
+    visibility: player              # dm-only regions are stripped in player builds
+    points: [[80000,35000],[120000,32000],[128000,55000],[95000,62000],[78000,50000]]
+
+fog:
+  - mapId: astrath-deeprealm-overview
+    enabled: true
+    color: "rgba(8,12,20,0.55)"
+    reveals:
+      - [[40000,30000],[140000,30000],[140000,85000],[40000,85000]]
+```
+
+In the player viewer:
+
+- A **map switcher** appears in the header when more than one map is defined.
+- **Regions** are clickable polygons that fly to and open their linked entity.
+- **Fog** is a dark mask covering the whole map with the listed reveal polygons cut out (SVG `evenodd` fill rule). Toggle it via the eye button in the header.
+
+Coordinates use each map's pixel space with origin `(0, 0)` at the top-left.
+
+---
+
 ## Roadmap
 
 Implemented:
@@ -185,8 +232,9 @@ Implemented:
 - **Batch 2 — Map MVP**: `/atlas` viewer with Leaflet map, placements as pins, side panel with rendered markdown + backlinks, ⌘K search, mobile bottom-sheet. (US-0301, 0302, 0303, 0304, 0305, 0306, 1201)
 - **Batch 3 — Safe publishing**: `--player` strict build with physical exclusion of dm/hidden content, GitHub Action, GitHub Pages deploy, "Updated" date in viewer. (US-0105, 0106, 0201, 0202, 0203, 0204, 0701)
 - **Batch 4 — Creator convenience**: `/atlas/edit` placement editor with drag-to-place pins, `placements.json` export, `apply-placements` CLI to round-trip back into markdown frontmatter, copy-paste YAML patch. (US-0601, 0602, 0603, 0604, 1303)
+- **Batch 5 — Layered maps & regions**: multi-map worlds, image layers, polygon regions linked to entities, fog of war with reveal areas, header map switcher and fog toggle. (US-0801, 0802, 0803, 0804, 0805)
 
 Next:
 
-- **Batch 5 — Layered maps & regions**: multiple base layers per world, region polygons, fog reveals on the player atlas.
+- **Batch 6 — Connections & travel**: routes between settlements, distance/scale, travel-time tooltips, hex/grid overlay options.
 

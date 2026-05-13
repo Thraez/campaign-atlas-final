@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState, useCallback, forwardRef } from "react";
-import { MapContainer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, Marker, Popup, Polygon, ImageOverlay, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { loadAtlasContent, loadSearchIndex, type SearchIndexEntry } from "@/atlas/content/loader";
-import type { AtlasProject, Entity, MapDocument, MapPlacement } from "@/atlas/content/schema";
+import type { AtlasProject, Entity, MapDocument, MapPlacement, Region, Point } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Search, X, MapPin, ArrowLeft, Compass } from "lucide-react";
+import { Search, X, MapPin, ArrowLeft, Compass, Eye, EyeOff } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
@@ -50,6 +51,18 @@ function MapController({ flyTo }: { flyTo: { x: number; y: number; height: numbe
   return null;
 }
 
+// Build a multi-polygon for fog: outer ring covers the whole map, each
+// reveal becomes an inner ring (hole) using Leaflet's array-of-rings format.
+function fogPositions(map: MapDocument, reveals: Point[][]): L.LatLngExpression[][] {
+  const outer: L.LatLngExpression[] = [
+    [0, 0], [0, map.width], [map.height, map.width], [map.height, 0],
+  ];
+  const holes: L.LatLngExpression[][] = reveals.map((poly) =>
+    poly.map(([x, y]) => [map.height - y, x] as [number, number])
+  );
+  return [outer, ...holes];
+}
+
 interface ViewerState {
   project: AtlasProject;
   index: SearchIndexEntry[];
@@ -64,6 +77,7 @@ export default function AtlasViewer() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  const [showFog, setShowFog] = useState(true);
 
   useEffect(() => {
     Promise.all([loadAtlasContent(true), loadSearchIndex()])
@@ -166,6 +180,21 @@ export default function AtlasViewer() {
           <Compass className="h-5 w-5" /> <span className="hidden sm:inline">Astrath Atlas</span>
         </Link>
         <div className="flex-1" />
+        {data.project.maps.length > 1 && (
+          <Select value={activeMap.id} onValueChange={setActiveMapId}>
+            <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {data.project.maps.map((m) => (
+                <SelectItem key={m.id} value={m.id} className="text-xs">{m.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {activeMap.fog?.enabled && (
+          <Button variant="ghost" size="sm" onClick={() => setShowFog((v) => !v)} title={showFog ? "Hide fog" : "Show fog"}>
+            {showFog ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+          </Button>
+        )}
         <Button variant="secondary" size="sm" onClick={() => setSearchOpen(true)} className="gap-2">
           <Search className="h-4 w-4" />
           <span className="hidden sm:inline">Search</span>
@@ -192,6 +221,61 @@ export default function AtlasViewer() {
             style={{ width: "100%", height: "100%", background: activeMap.oceanColor ?? "#18313f" }}
           >
             <MapController flyTo={flyTarget} />
+
+            {/* Image base layers */}
+            {[...activeMap.layers].sort((a, b) => a.zIndex - b.zIndex).map((layer) => (
+              <ImageOverlay
+                key={layer.id}
+                url={layer.src}
+                bounds={[
+                  [activeMap.height - (layer.y + layer.height), layer.x],
+                  [activeMap.height - layer.y, layer.x + layer.width],
+                ] as L.LatLngBoundsLiteral}
+                opacity={layer.opacity}
+              />
+            ))}
+
+            {/* Region polygons */}
+            {(activeMap.regions ?? []).map((region) => {
+              const ent = region.entityId ? entityById.get(region.entityId) : undefined;
+              const color = region.color ?? (ent ? (ICON_BY_TYPE[ent.type] ?? ICON_BY_TYPE.default) : "#7fb069");
+              const positions = region.points.map(([x, y]) => [activeMap.height - y, x] as [number, number]);
+              return (
+                <Polygon
+                  key={region.id}
+                  positions={positions}
+                  pathOptions={{
+                    color,
+                    weight: 1.5,
+                    fillColor: color,
+                    fillOpacity: region.fillOpacity ?? 0.18,
+                    opacity: region.strokeOpacity ?? 0.85,
+                  }}
+                  eventHandlers={region.entityId ? { click: () => openEntity(region.entityId!, false) } : undefined}
+                >
+                  <Popup>
+                    <div className="text-sm font-medium">{region.name}</div>
+                    {ent?.summary && <div className="text-xs opacity-70">{ent.summary}</div>}
+                  </Popup>
+                </Polygon>
+              );
+            })}
+
+            {/* Fog of war: full-map polygon with reveal holes */}
+            {showFog && activeMap.fog?.enabled && (
+              <Polygon
+                positions={fogPositions(activeMap, activeMap.fog.reveals)}
+                pathOptions={{
+                  color: "transparent",
+                  fillColor: activeMap.fog.color ?? "rgba(8,12,20,0.55)",
+                  fillOpacity: 1,
+                  weight: 0,
+                  interactive: false,
+                  fillRule: "evenodd",
+                } as L.PathOptions}
+              />
+            )}
+
             {placementsOnMap.map((p) => {
               const ent = entityById.get(p.entityId);
               if (!ent) return null;
