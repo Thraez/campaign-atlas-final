@@ -13,6 +13,7 @@ import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import { ExportChecklistDialog, useExportChecklist } from "./ExportChecklistDialog";
 import { normalizeAtlasAssetUrl } from "./url";
+import { validatePatchYaml } from "./yaml/validatePatch";
 
 interface Props {
   map: MapDocument;
