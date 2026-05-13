@@ -50,9 +50,6 @@ interface WorldYaml {
     visibility?: string;
     waypoints: Array<Point | { entityId: string } | string>;
   }>;
-}
-
-  routes?: WorldYaml["routes"] extends infer T ? T : never;
   calendar?: {
     name?: string;
     epochName?: string;
