@@ -18,6 +18,9 @@ import { MapLayerPanel } from "@/atlas/MapLayerPanel";
 import { MapSettingsPanel } from "@/atlas/MapSettingsPanel";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
+import { validatePatchYaml } from "@/atlas/yaml/validatePatch";
+import { classifyDraftStatus } from "@/atlas/yaml/canon";
+import { DraftStatusBadge } from "@/atlas/yaml/StatusBadge";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 // Bumped to v2: storage shape changed from { [entityId]: Override } to
@@ -227,11 +230,19 @@ export default function AtlasPlacementEditor() {
     download(`placements-${activeMap.id}.json`, JSON.stringify(merged, null, 2), "application/json");
   };
 
+  const [lastExportAt, setLastExportAt] = useState<number | null>(null);
+
   const exportPatch = () => {
     if (!project || !activeMap) return;
     const lines: string[] = [
       `# Placement patch — ${activeMap.name} (${activeMap.id})`,
       `# Generated ${new Date().toISOString()}`,
+      `#`,
+      `# CANON MODEL:`,
+      `#   YAML / Markdown frontmatter is the source of truth.`,
+      `#   This file is a TOOL-GENERATED PATCH against that canon.`,
+      `#   Generated runtime files (atlas.json, search-index.json) are derived`,
+      `#   and must never be edited by hand.`,
       `#`,
       `# HOW TO APPLY:`,
       `# This file contains one YAML snippet per entity. For each "# entity:"`,
@@ -255,10 +266,19 @@ export default function AtlasPlacementEditor() {
       lines.push(`      y: ${c.y}`);
       lines.push(``);
     }
-    download(`placements-patch-${activeMap.id}.yaml`, lines.join("\n"), "text/yaml");
+    const content = lines.join("\n");
+    const result = validatePatchYaml(content, "placement");
+    if (!result.ok) {
+      toast.error(`Patch validation failed: ${result.errors[0]}`);
+      return;
+    }
+    if (result.warnings.length) toast.warning(result.warnings[0]);
+    download(`placements-patch-${activeMap.id}.yaml`, content, "text/yaml");
+    setLastExportAt(Date.now());
   };
 
   const dirtyCount = Object.keys(overrides).filter((k) => activeMap && k.startsWith(`${activeMap.id}:`)).length;
+  const draftStatus = classifyDraftStatus({ dirtyCount, lastExportAt });
 
   if (error) {
     return (
@@ -281,8 +301,14 @@ export default function AtlasPlacementEditor() {
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
       <div className="px-3 py-1.5 text-[11px] bg-primary/10 text-foreground border-b border-primary/20 flex items-center justify-between gap-2">
-        <span title="Local browser draft → exported YAML/asset patch → committed to GitHub → player-safe published atlas">
-          Edits here are <strong>local draft changes</strong>. Export patches and commit them to GitHub to publish.
+        <span
+          className="flex items-center gap-2 min-w-0"
+          title="YAML canon (committed) → local draft (this browser) → exported patch → committed to GitHub → generated runtime atlas.json"
+        >
+          <DraftStatusBadge status={draftStatus} />
+          <span className="truncate">
+            <strong>YAML is canon.</strong> Edits here are local drafts — export a patch and commit it to publish.
+          </span>
         </span>
         <Link to="/" className="text-primary hover:underline shrink-0">← Back</Link>
       </div>
@@ -309,7 +335,7 @@ export default function AtlasPlacementEditor() {
           Regions
         </Button>
         <span className="text-xs text-muted-foreground hidden md:inline">
-          {dirtyCount > 0 ? `${dirtyCount} unsaved on ${activeMap.name}` : "All saved to JSON ↓"}
+          {dirtyCount > 0 ? `${dirtyCount} unsaved on ${activeMap.name}` : "Matches YAML canon"}
         </span>
         <Button variant="ghost" size="sm" onClick={() => { setOverrides({}); toast.info("Cleared overrides"); }} title="Discard local changes">
           <RotateCcw className="h-4 w-4" />

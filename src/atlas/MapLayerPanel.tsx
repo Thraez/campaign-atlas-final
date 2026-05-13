@@ -13,6 +13,7 @@ import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import { ExportChecklistDialog, useExportChecklist } from "./ExportChecklistDialog";
 import { normalizeAtlasAssetUrl } from "./url";
+import { validatePatchYaml } from "./yaml/validatePatch";
 
 interface Props {
   map: MapDocument;
@@ -179,7 +180,14 @@ export function MapLayerPanel(props: Props) {
         lines.push(`#   - Save ${u.filename} → ${u.targetPath}`);
       }
     }
-    downloadText(`map-layers-${map.id}.yaml`, lines.join("\n"), "text/yaml");
+    const content = lines.join("\n");
+    const result = validatePatchYaml(content, "map");
+    if (!result.ok) {
+      toast.error(`Patch validation failed: ${result.errors[0]}`);
+      return;
+    }
+    if (result.warnings.length) toast.warning(result.warnings[0]);
+    downloadText(`map-layers-${map.id}.yaml`, content, "text/yaml");
     checklist.show({
       title: "Layer patch exported",
       description: "Your map layer YAML patch is ready. Follow the checklist to commit it.",
