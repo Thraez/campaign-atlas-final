@@ -15,6 +15,11 @@ import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
 import { slugify } from "./atlas/slugify";
 import { loadWorldConfig } from "./atlas/loadWorldConfig";
 import { parseAtlasDate } from "./atlas/calendarDate";
+import {
+  stripDmProfile,
+  filterRelationshipsForPlayer,
+  compactProfile,
+} from "../src/atlas/profiles/profileBuild";
 import type {
   AtlasProject,
   Entity,
