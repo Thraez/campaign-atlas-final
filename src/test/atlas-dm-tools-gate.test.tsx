@@ -13,9 +13,9 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import React, { Suspense } from "react";
 
 function setEnv({ dev, flag }: { dev: boolean; flag?: string }) {
+  vi.unstubAllEnvs();
   vi.stubEnv("DEV", dev);
-  if (flag === undefined) vi.stubEnv("VITE_ENABLE_DM_TOOLS", "");
-  else vi.stubEnv("VITE_ENABLE_DM_TOOLS", flag);
+  if (flag !== undefined) vi.stubEnv("VITE_ENABLE_DM_TOOLS", flag);
 }
 
 async function loadGate() {
