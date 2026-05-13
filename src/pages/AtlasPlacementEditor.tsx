@@ -426,12 +426,13 @@ export default function AtlasPlacementEditor() {
 
             {placed.map((e) => {
               const c = effectiveCoord(e.id)!;
-              const color = TYPE_COLOR[e.type] ?? TYPE_COLOR.default;
+              const ov = overrides[overrideKey(activeMap.id, e.id)] as OverrideValue | undefined;
+              const style = resolvePinStyle(e.type, ov?.pin ?? canonPinFor(project, activeMap.id, e.id));
               return (
                 <Marker
                   key={e.id}
                   position={[activeMap.height - c.y, c.x]}
-                  icon={pinIcon(color, pendingId === e.id)}
+                  icon={pinDivIcon(style.color, style.shape, { pulse: pendingId === e.id })}
                   draggable
                   eventHandlers={{
                     dragend: (ev) => {
