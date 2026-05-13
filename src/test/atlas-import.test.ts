@@ -73,8 +73,10 @@ describe("buildEntityFrontmatterPatch", () => {
     // Each '---' frontmatter block is parseable on its own.
     const v = validatePatchYaml(a.content.replace(/---/g, ""), "placement");
     // Doesn't have to pass placement-specific shape, just no fences / parse errors.
+    // The body (non-comment lines) must not contain markdown code fences.
+    const body = a.content.split("\n").filter((l) => !l.trim().startsWith("#")).join("\n");
     expect(a.content).toMatch(/atlas:/);
-    expect(a.content).not.toMatch(/```/);
+    expect(body).not.toMatch(/```/);
     expect(v.errors.filter((e) => /code fence/i.test(e))).toHaveLength(0);
   });
 });
