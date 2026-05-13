@@ -478,25 +478,8 @@ export default function AtlasPlacementEditor() {
               />
             ))}
 
-            {/* Region polygons rendered lightly so they don't dominate the editor */}
-            {showRegions && (activeMap.regions ?? []).map((region) => {
-              const positions = region.points.map(([x, y]) => [activeMap.height - y, x] as [number, number]);
-              const color = region.color ?? "#7fb069";
-              return (
-                <Polygon
-                  key={region.id}
-                  positions={positions}
-                  pathOptions={{
-                    color,
-                    weight: 1,
-                    fillColor: color,
-                    fillOpacity: 0.08,
-                    opacity: 0.5,
-                    interactive: false,
-                  }}
-                />
-              );
-            })}
+            {/* Regions render ABOVE base layers but BELOW routes/pins/labels/handles. */}
+            {showRegions && <RegionLayer map={activeMap} api={regionDraft} visible={showRegions} />}
 
             {placed.map((e) => {
               const eff = effectivePlacement(e.id);
