@@ -27,6 +27,7 @@ import {
   type PlacementOverride,
 } from "@/atlas/yaml/buildPatches";
 import { ExportChangesModal } from "@/atlas/ExportChangesModal";
+import { ImportPanel } from "@/atlas/import/ImportPanel";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 // Bumped to v2: storage shape changed from { [entityId]: Override } to
