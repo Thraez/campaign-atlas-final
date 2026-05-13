@@ -107,9 +107,8 @@ export default defineConfig(({ mode }) => ({
           // External http(s) images (e.g. pinimg) are NOT promised offline,
           // but we cache opportunistically so repeat online visits are fast.
           {
-            urlPattern: ({ url, request }) =>
-              request.destination === "image" &&
-              url.origin !== self.location.origin,
+            urlPattern: ({ url, request, sameOrigin }) =>
+              request.destination === "image" && !sameOrigin,
             handler: "StaleWhileRevalidate",
             options: {
               cacheName: "external-images",
