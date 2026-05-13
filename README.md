@@ -57,7 +57,7 @@ Standard Obsidian wikilinks are supported in entry bodies:
 - `[[Thornhold|the Red City]]` — custom display text
 - Aliases resolve too (`[[Thorn Hold]]` finds Thornhold)
 
-Broken wikilinks are reported by the build and rendered as `<span class="atlas-broken-link">` so they don't crash the UI.
+Wikilinks pointing at notes that don't exist yet are **allowed** — they usually mean "I haven't written that one yet". The build counts them as `unresolvedLinks` (back-compat alias: `brokenLinks`) and renders them as subtle non-clickable text. They never fail a strict player build. Duplicate slugs and invalid `visibility` values still fail strict. In player builds, the raw target name is omitted from the rendered HTML so DM-only entity titles can't leak via tooltips.
 
 ### DM-only blocks
 
