@@ -80,12 +80,14 @@ A small sample vault ships under `content/astrath-deeprealm/` so the build is ru
 Two build modes:
 
 ```bash
-npm run atlas:build           # DM build — full atlas (all visibilities, source paths, frontmatter)
-npm run atlas:build:player    # Player-safe + strict — physically removes secrets
+npm run atlas:build           # DM build — full atlas, %% comments preserved, written to .local-atlas/ (gitignored)
+npm run atlas:build:player    # Player-safe + strict — physically removes secrets, written to public/atlas/
 npm run atlas:publish         # Player build + Vite build (used by GitHub Action)
 ```
 
-Outputs to `public/atlas/`:
+Output safety: only the **player** build writes to `public/atlas/` (the folder served by Vite and committed to GitHub). DM builds go to `.local-atlas/` so spoiler-bearing JSON can never accidentally ship. Override with `--out` when needed.
+
+Outputs:
 
 - `atlas.json` — worlds, maps, entities, placements, build report
 - `search-index.json` — lightweight index for search UI
@@ -96,8 +98,10 @@ Hiding in the UI is not enough — anything shipped to GitHub Pages is inspectab
 
 - Drops entities with `visibility: dm` or `hidden`
 - Drops entities with `atlas.publish: false`
-- Drops their map placements
-- Strips `%% ... %%` DM blocks from remaining bodies
+- Drops their map placements, regions, and routes
+- Strips `%% ... %%` DM blocks from remaining bodies (DM build keeps them)
+- Treats invalid `atlas.visibility` values as `dm` (and `--strict` fails the build outright)
+
 - Strips raw `frontmatter` and `sourcePath` from each entity
 - Renders broken wikilinks as plain text (so excluded targets' names don't leak via `title=` attributes)
 
