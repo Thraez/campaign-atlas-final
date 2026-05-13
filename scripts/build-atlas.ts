@@ -575,6 +575,10 @@ async function main() {
   console.log(`Local assets:            ${localAssets}`);
   console.log(`External assets:         ${externalAssets}`);
   console.log(`Missing local assets:    ${missingAssets}`);
+  console.log(`Stripped DM profiles:    ${strippedDmProfiles}`);
+  console.log(`Stripped DM rels:        ${strippedDmRelationships}`);
+  console.log(`Relationship leaks:      ${relationshipLeaks}`);
+  console.log(`Unresolved relationships:${unresolvedRelationships}`);
   console.log(`Warnings:                ${warnings.length}`);
   console.log(`Errors:                  ${errors.length}`);
   for (const e of errors) console.log(`  ✗ ${e}`);
