@@ -5,4 +5,4 @@ atlas:
   visibility: hidden
 ---
 
-Hidden body.
+Hidden body containing SECRET_NEVER_PUBLISH_001 and DM_ONLY_SENTINEL_DO_NOT_SHIP.
