@@ -75,7 +75,12 @@ beforeAll(() => {
       "--out",
       outDir,
     ],
-    { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" }
+    {
+      cwd: ROOT,
+      stdio: ["ignore", "pipe", "pipe"],
+      encoding: "utf8",
+      env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
+    }
   );
 });
 
@@ -155,7 +160,12 @@ describe("player atlas trust gate", () => {
         "--out",
         dmOut,
       ],
-      { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" }
+    {
+      cwd: ROOT,
+      stdio: ["ignore", "pipe", "pipe"],
+      encoding: "utf8",
+      env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
+    }
     );
     const text = fs.readFileSync(path.join(dmOut, "atlas.json"), "utf8");
     for (const s of SENTINELS) expect(text).toContain(s);
