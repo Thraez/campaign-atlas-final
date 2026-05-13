@@ -7,6 +7,12 @@ export type CanonStatus = "canon" | "draft" | "rumor" | "deprecated" | "archived
 
 export interface AtlasProject {
   version: string;
+  /**
+   * world.yaml schema version this atlas was built against. Mirrors
+   * `CURRENT_ATLAS_SCHEMA_VERSION` from scripts/atlas/schemaVersion.ts at
+   * build time so player runtimes can detect incompatible artifacts.
+   */
+  schemaVersion?: number;
   publishedAt: string; // ISO timestamp
   changelog?: string;
   worlds: World[];
