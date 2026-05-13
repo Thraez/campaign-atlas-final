@@ -7,7 +7,7 @@
  * draft changes; export goes through buildPatches/dumpYaml as usual.
  */
 import { useCallback, useMemo, useState } from "react";
-import type { EntityVisibility, MapDocument, Point, Region } from "@/atlas/content/schema";
+import type { MapDocument, Point, Region } from "@/atlas/content/schema";
 
 export interface RegionDraft {
   /** Per-id partial overrides applied to existing canon regions. */
