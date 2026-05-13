@@ -149,6 +149,10 @@ export interface Entity {
   dateRaw?: string;
   dateValue?: number;
   dateYear?: number;
+  /** DM/player profile fields. In player builds, only `profile.player` survives. */
+  profile?: import("@/atlas/profiles/profileTypes").EntityProfile;
+  /** Entity-to-entity relationships. Filtered by visibility in player builds. */
+  relationships?: import("@/atlas/profiles/profileTypes").EntityRelationship[];
 }
 
 /** Per-placement pin styling overrides. Stored under atlas.placements[].pin in YAML.
