@@ -7,6 +7,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import yaml from "js-yaml";
+import {
+  CURRENT_ATLAS_SCHEMA_VERSION,
+  resolveAndMigrate,
+  SchemaVersionError,
+} from "./schemaVersion";
 import type {
   EntityVisibility,
   FogOverlay,
@@ -31,6 +36,7 @@ export interface RawRoute extends Omit<Route, "waypoints" | "resolvedPoints"> {
 }
 
 interface WorldYaml {
+  schemaVersion?: number;
   maps?: Array<Partial<MapDocument> & {
     layers?: Array<Partial<MapLayer> & { src: string; id: string }>;
     scale?: MapScale;
@@ -79,6 +85,7 @@ export interface WorldConfig {
   fogs: FogOverlay[];
   routes: RawRoute[];
   calendar?: WorldCalendar;
+  schemaVersion: number;
   warnings: string[];
 }
 
@@ -111,14 +118,29 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
   if (data === null || typeof data !== "object" || Array.isArray(data)) {
     throw new WorldConfigError(`${rel}: top-level must be a YAML mapping (object).`);
   }
+
+  const warnings: string[] = [];
+
+  // Schema version gate. Run before any other shape checks so a clearly-
+  // wrong version fails fast with an actionable message.
+  let resolvedVersion: number;
+  try {
+    const resolved = resolveAndMigrate(data as Record<string, unknown>, rel, warnings);
+    data = resolved.data as WorldYaml;
+    resolvedVersion = resolved.version;
+  } catch (e) {
+    if (e instanceof SchemaVersionError) {
+      throw new WorldConfigError(e.message);
+    }
+    throw e;
+  }
+
   if (data.maps !== undefined && !Array.isArray(data.maps)) {
     throw new WorldConfigError(`${rel}: "maps" must be an array.`);
   }
   if (!data.maps || data.maps.length === 0) {
     throw new WorldConfigError(`${rel}: no maps defined. Add at least one entry under "maps:".`);
   }
-
-  const warnings: string[] = [];
 
   const maps: MapDocument[] = (data.maps ?? []).map((m, i) => {
     const id = m.id ?? `${worldId}-map-${i}`;
@@ -288,7 +310,7 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
     }
   }
 
-  return { maps, regions, fogs, routes, calendar, warnings };
+  return { maps, regions, fogs, routes, calendar, schemaVersion: resolvedVersion, warnings };
 }
 
 function sanitizeScale(s: MapScale | undefined, warnings: string[], where: string): MapScale | undefined {
