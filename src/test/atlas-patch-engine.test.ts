@@ -86,7 +86,7 @@ describe("validateProject", () => {
 
   it("flags out-of-bounds placements", () => {
     const r = validateProject({ project, draftPlacements: [{ entityId: "town", mapId: "m1", x: 99999, y: 0 }] });
-    expect(r.issues.some((i) => i.code === "out-of-bounds")).toBe(true);
+    expect(r.issues.some((i) => i.code === "pin-out-of-bounds")).toBe(true);
   });
 
   it("flags unknown map id as blocking", () => {
@@ -106,7 +106,7 @@ describe("validateProject", () => {
       maps: [{ ...map, regions: [{ id: "r1", mapId: "m1", name: "Leak", visibility: "player" as const, points: [[0,0],[1,0],[1,1]] as [number,number][], entityId: "lair" }] }],
     };
     const r = validateProject({ project: leaky, draftPlacements: [] });
-    expect(r.issues.some((i) => i.code === "spoiler-leak")).toBe(true);
+    expect(r.issues.some((i) => i.code.startsWith("spoiler-leak"))).toBe(true);
   });
 
   it("flags region with too few points", () => {

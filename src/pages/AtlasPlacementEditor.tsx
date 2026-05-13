@@ -374,9 +374,10 @@ export default function AtlasPlacementEditor() {
           draftPlacements: draftPlacementsForValidation,
           draftMap: activeMap,
           draftLocalLayers: layerEditor.localLayers,
+          lastExportAt,
         })
       : null,
-    [project, activeMap, draftPlacementsForValidation, layerEditor.localLayers]
+    [project, activeMap, draftPlacementsForValidation, layerEditor.localLayers, lastExportAt]
   );
   const issuesByScope = (predicate: (i: import("@/atlas/yaml/validateProject").Issue) => boolean) => {
     const list = validation?.issues.filter(predicate) ?? [];
@@ -385,9 +386,9 @@ export default function AtlasPlacementEditor() {
       warning: list.filter((i) => i.severity === "warning").length,
     };
   };
-  const pinIssues = issuesByScope((i) => i.code.includes("placement") || i.code === "out-of-bounds" || i.code === "invalid-coord");
-  const mapIssues = issuesByScope((i) => i.code === "duplicate-layer-id" || i.code === "empty-map" || i.code === "missing-asset");
-  const regionIssues = issuesByScope((i) => i.code.includes("region") || i.code === "spoiler-leak");
+  const pinIssues = issuesByScope((i) => i.code.includes("placement") || i.code === "pin-out-of-bounds" || i.code === "invalid-coord");
+  const mapIssues = issuesByScope((i) => i.code === "duplicate-layer-id" || i.code === "empty-map" || i.code === "missing-asset" || i.code === "external-asset" || i.code === "invalid-layer-size" || i.code === "missing-layer-src" || i.code === "route-no-scale");
+  const regionIssues = issuesByScope((i) => i.code.includes("region") || i.code === "spoiler-leak-region");
   const routeIssues = issuesByScope((i) => i.code.includes("route"));
   const entityIssues = issuesByScope((i) => i.code === "invalid-visibility" || i.code === "unknown-entity");
 
@@ -752,6 +753,13 @@ export default function AtlasPlacementEditor() {
                 draftPlacements={draftPlacementsForValidation}
                 draftLocalLayers={layerEditor.localLayers}
                 lastExportAt={lastExportAt}
+                onGoToMap={(mid) => { setActiveMapId(mid); toast.info(`Switched to ${project.maps.find((m) => m.id === mid)?.name ?? mid}`); }}
+                onGoToEntity={(eid) => {
+                  const c = effectiveCoord(eid);
+                  if (c && activeMap) setFlyTo({ lat: activeMap.height - c.y, lng: c.x });
+                  setFilter(project.entities.find((e) => e.id === eid)?.title ?? "");
+                }}
+                onExportAll={() => setExportModalOpen(true)}
               />
             </TabsContent>
           </Tabs>
