@@ -252,13 +252,6 @@ async function main() {
     });
   }
 
-  // Attach regions + fog to their owning maps.
-  maps = maps.map((m) => ({
-    ...m,
-    regions: regions.filter((r) => r.mapId === m.id),
-    fog: fogs.find((f) => f.mapId === m.id),
-  }));
-
   // Default placements to first map if no specific mapId on entity.
   const primaryMapId = maps[0]?.id ?? fallbackMapId;
   const placements: MapPlacement[] = [];
@@ -372,8 +365,10 @@ async function main() {
   console.log(`Stripped DM blocks:      ${r.strippedDmBlocks}`);
   console.log(`Excluded secret pins:    ${secretPlacementsExcluded}`);
   console.log(`Excluded secret regions: ${regionsExcluded}`);
+  console.log(`Excluded secret routes:  ${routesExcluded}`);
   console.log(`Maps:                    ${maps.length}`);
   console.log(`Regions:                 ${regions.length}`);
+  console.log(`Routes:                  ${routes.length}`);
   console.log(`Broken wikilinks:        ${r.brokenLinks}`);
   console.log(`Duplicate slugs:         ${r.duplicateSlugs}`);
   console.log(`Warnings:                ${warnings.length}`);
