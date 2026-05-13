@@ -22,7 +22,7 @@ maps:
       enabled: false
     layers:
       - id: overview-map
-        src: /atlas/assets/maps/map.jpg
+        src: atlas/assets/maps/map.jpg
         x: 0
         y: 0
         width: 200000
