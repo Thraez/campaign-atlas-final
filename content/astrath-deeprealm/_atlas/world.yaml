@@ -1,6 +1,9 @@
-# World definition for Astrath Deeprealm.
-# This file is parsed by scripts/build-atlas.ts via loadWorldConfig().
-# Keep it as valid YAML; comments (#) are fine, code fences (```) are not.
+# Astrath Deeprealm — map / region / fog / route / calendar config.
+#
+# Parsed by scripts/build-atlas.ts via loadWorldConfig().
+# IMPORTANT: This file must be PURE YAML. Do NOT paste markdown code fences
+# (```yaml) from exported patch files into this file — only paste the YAML
+# inside the fence. A build-time check will fail loudly if fences slip in.
 
 maps:
   - id: astrath-deeprealm-overview
@@ -9,20 +12,101 @@ maps:
     height: 100000
     oceanColor: "#18313f"
     wrapX: false
+    scale:
+      unitsPerPixel: 0.05
+      unitLabel: mi
     grid:
       kind: hex
       size: 5000
       color: "rgba(255,255,255,0.06)"
       enabled: false
+    layers:
+      - id: overview-map
+        src: /atlas/assets/maps/map.jpg
+        x: 0
+        y: 0
+        width: 200000
+        height: 100000
+        opacity: 1
+        zIndex: 1
+
+  - id: astrath-deeprealm-northern-reaches
+    name: Northern Reaches
+    width: 80000
+    height: 60000
+    oceanColor: "#1c2a35"
+    wrapX: false
     layers: []
-      # ----- Sample placeholder layer (commented out by default) -----
-      # Uncomment to render the bundled sample SVG. Replace with a real raster
-      # (.webp / .png / .jpg) under public/atlas/assets/maps/ when you have one.
-      # - id: sample-overview
-      #   src: /atlas/assets/maps/sample-overview.svg
-      #   x: 0
-      #   y: 0
-      #   width: 200000
-      #   height: 100000
-      #   opacity: 1
-      #   zIndex: 1
+
+regions:
+  - id: ravens-vale-region
+    mapId: astrath-deeprealm-overview
+    name: Raven's Vale
+    entityId: ravens-vale
+    color: "#7fb069"
+    fillOpacity: 0.18
+    visibility: player
+    points:
+      - [80000, 35000]
+      - [120000, 32000]
+      - [128000, 55000]
+      - [95000, 62000]
+      - [78000, 50000]
+
+  - id: thornhold-domain
+    mapId: astrath-deeprealm-overview
+    name: Thornhold Domain
+    entityId: thornhold
+    color: "#f4c95d"
+    fillOpacity: 0.14
+    visibility: player
+    points:
+      - [40000, 60000]
+      - [70000, 58000]
+      - [72000, 80000]
+      - [42000, 82000]
+
+fog:
+  - mapId: astrath-deeprealm-overview
+    enabled: true
+    color: "rgba(8, 12, 20, 0.55)"
+    reveals:
+      - [[40000, 30000], [140000, 30000], [140000, 85000], [40000, 85000]]
+
+routes:
+  - id: kings-road
+    mapId: astrath-deeprealm-overview
+    name: The King's Road
+    mode: horse
+    speed: 6
+    color: "#f4c95d"
+    weight: 3
+    visibility: player
+    waypoints:
+      - thornhold
+      - sunhaven
+
+  - id: ravens-trail
+    mapId: astrath-deeprealm-overview
+    name: Raven's Trail
+    mode: foot
+    speed: 3
+    color: "#7fb069"
+    dashed: true
+    visibility: player
+    waypoints:
+      - sunhaven
+      - ravens-vale
+      - the-old-keep
+
+calendar:
+  name: Reckoning of the Twin Moons
+  epochName: AS
+  daysPerWeek: 8
+  months:
+    - { name: Frostmoon, days: 30 }
+    - { name: Thawing,   days: 30 }
+    - { name: Greentide, days: 32 }
+    - { name: Highsun,   days: 32 }
+    - { name: Goldfall,  days: 30 }
+    - { name: Longnight, days: 30 }
