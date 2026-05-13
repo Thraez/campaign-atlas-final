@@ -219,61 +219,36 @@ export default function AtlasPlacementEditor() {
     setFlyTo({ lat: activeMap.height - c.y, lng: c.x });
   };
 
-  const exportJson = () => {
-    if (!project || !activeMap) return;
-    const merged: Array<{ entityId: string; sourcePath: string; mapId: string; x: number; y: number }> = [];
+  /** Build current draft placements (effective coords for every entity on activeMap). */
+  const buildDraftPlacements = useCallback(() => {
+    if (!project || !activeMap) return [];
+    const out: PlacementOverride[] = [];
     for (const e of project.entities) {
       const c = effectiveCoord(e.id);
-      if (!c) continue;
-      merged.push({ entityId: e.id, sourcePath: e.sourcePath, mapId: activeMap.id, x: c.x, y: c.y });
+      if (c) out.push({ entityId: e.id, mapId: activeMap.id, x: c.x, y: c.y });
     }
-    download(`placements-${activeMap.id}.json`, JSON.stringify(merged, null, 2), "application/json");
+    return out;
+  }, [project, activeMap, effectiveCoord]);
+
+  const exportJson = () => {
+    if (!project || !activeMap) return;
+    const artifact = buildPlacementJson({ project, mapId: activeMap.id, placements: buildDraftPlacements() });
+    download(artifact.filename, artifact.content, artifact.mime);
   };
 
   const [lastExportAt, setLastExportAt] = useState<number | null>(null);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   const exportPatch = () => {
     if (!project || !activeMap) return;
-    const lines: string[] = [
-      `# Placement patch — ${activeMap.name} (${activeMap.id})`,
-      `# Generated ${new Date().toISOString()}`,
-      `#`,
-      `# CANON MODEL:`,
-      `#   YAML / Markdown frontmatter is the source of truth.`,
-      `#   This file is a TOOL-GENERATED PATCH against that canon.`,
-      `#   Generated runtime files (atlas.json, search-index.json) are derived`,
-      `#   and must never be edited by hand.`,
-      `#`,
-      `# HOW TO APPLY:`,
-      `# This file contains one YAML snippet per entity. For each "# entity:"`,
-      `# section below, open the listed markdown file and REPLACE its existing`,
-      `# atlas.placements (or legacy atlas.x / atlas.y) with the snippet shown.`,
-      `# Do NOT paste these snippets into world.yaml — they belong in the`,
-      `# entity's frontmatter, not the world config.`,
-      `#`,
-      `# Or run: npm run atlas:apply-placements -- placements-${activeMap.id}.json`,
-      ``,
-    ];
-    for (const e of project.entities) {
-      const c = effectiveCoord(e.id);
-      if (!c) continue;
-      lines.push(`# entity: ${e.title}`);
-      lines.push(`# file:   ${e.sourcePath || e.id}`);
-      lines.push(`atlas:`);
-      lines.push(`  placements:`);
-      lines.push(`    - mapId: ${activeMap.id}`);
-      lines.push(`      x: ${c.x}`);
-      lines.push(`      y: ${c.y}`);
-      lines.push(``);
-    }
-    const content = lines.join("\n");
-    const result = validatePatchYaml(content, "placement");
+    const artifact = buildPlacementPatch({ project, mapId: activeMap.id, placements: buildDraftPlacements() });
+    const result = validatePatchYaml(artifact.content, "placement");
     if (!result.ok) {
       toast.error(`Patch validation failed: ${result.errors[0]}`);
       return;
     }
     if (result.warnings.length) toast.warning(result.warnings[0]);
-    download(`placements-patch-${activeMap.id}.yaml`, content, "text/yaml");
+    download(artifact.filename, artifact.content, artifact.mime);
     setLastExportAt(Date.now());
   };
 
