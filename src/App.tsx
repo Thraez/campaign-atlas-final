@@ -8,6 +8,7 @@ import Auth from "./pages/Auth.tsx";
 import AtlasViewer from "./pages/AtlasViewer.tsx";
 import AtlasPlacementEditor from "./pages/AtlasPlacementEditor.tsx";
 import AtlasTimeline from "./pages/AtlasTimeline.tsx";
+import AtlasBrowse from "./pages/AtlasBrowse.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
