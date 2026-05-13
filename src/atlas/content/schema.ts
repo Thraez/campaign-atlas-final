@@ -129,7 +129,7 @@ export interface ResolvedLink {
 export interface Entity {
   id: string;            // stable slug
   title: string;
-  type: string;          // settlement, region, npc, faction, ...
+  type: string;          // settlement, region, npc, faction, event, ...
   world?: string;
   visibility: EntityVisibility;
   canon?: CanonStatus;
@@ -143,6 +143,11 @@ export interface Entity {
   sourcePath: string;
   links: ResolvedLink[];
   backlinks: { id: string; title: string }[];
+  // Timeline support (Batch 7). dateRaw is human-readable; dateValue is a
+  // sortable integer derived from the world calendar (or ISO date fallback).
+  dateRaw?: string;
+  dateValue?: number;
+  dateYear?: number;
 }
 
 export interface MapPlacement {
