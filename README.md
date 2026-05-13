@@ -380,3 +380,53 @@ layers:
 For new content entries, browse the matching folder under `content/astrath-deeprealm/` (settlements, regions, npcs, …), click **Add file → Create new file**, and commit a markdown file with frontmatter as documented above. Files in `_drafts/` and `_dm/` are excluded from the player build by `atlas.config.json`.
 
 
+
+## Offline support (PWA)
+
+The published player atlas (`/atlas`) is an installable Progressive Web App with offline support.
+
+### How it works
+
+- A service worker is registered **only in production builds** (i.e. on the published GitHub Pages site).
+  It is intentionally **disabled in dev mode** (`npm run dev`) and in the **Lovable editor preview**
+  (iframes / `*.lovableproject.com` / `id-preview--*.lovable.app` hosts) to avoid stale caches.
+- On first online visit to `/atlas`, the service worker caches:
+  - the HTML app shell + built JS/CSS
+  - `/atlas/atlas.json` and `/atlas/search-index.json`
+  - all local atlas assets under `/atlas/assets/` (maps, images, icons, portraits, handouts)
+- Subsequent visits work fully offline.
+
+### Installability
+
+Modern browsers will offer "Install app" / "Add to Home Screen" once the manifest + SW are detected.
+The app launches in standalone mode, opens directly at `/atlas`, and uses the bundled compass icon.
+
+### Updates
+
+When a new build is published, the new service worker installs in the background. The next time
+you open the app you'll see a small banner:
+
+> Atlas update available. Refresh to load the newest version.
+
+Click **Refresh** to activate the new version. You will not be silently trapped on stale data.
+
+### Manual cache controls
+
+In the `/atlas` toolbar there is a cloud icon. It opens a small menu with:
+
+- **Reload latest atlas** — checks the server for a newer service worker / atlas build.
+- **Clear offline cache** — wipes all caches managed by the service worker (use this if something
+  feels stuck).
+
+### Caveats
+
+- **First visit must be online.** If you open `/atlas` for the very first time without internet,
+  you'll see "Atlas not available offline yet — open it once while online to cache it."
+- **External image URLs are not guaranteed offline.** Layers that point at `https://i.pinimg.com/...`
+  or other off-site URLs are cached opportunistically (so repeat online visits are fast) but may
+  not load when fully offline. For reliable offline maps, commit images to
+  `public/atlas/assets/maps/` and reference them with `/atlas/assets/maps/<file>` paths.
+- **`/atlas/edit` is a local-only DM tool.** The shell may load offline because it shares the same
+  bundle, but it does not push to GitHub or persist DM data anywhere outside your browser.
+- **DM builds are never cached as the player atlas.** Only the player-safe `public/atlas/atlas.json`
+  produced by `npm run atlas:publish` is treated as the offline source of truth.
