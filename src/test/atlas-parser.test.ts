@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { parseFrontmatter } from "../../scripts/atlas/parseFrontmatter";
 import { stripDmBlocks } from "../../scripts/atlas/stripDmBlocks";
-import { tokenizeWikilinks } from "../../scripts/atlas/parseWikilinks";
+import { tokenizeWikilinks, renderLinkTokens } from "../../scripts/atlas/parseWikilinks";
 
 describe("parseFrontmatter visibility safety", () => {
   it("invalid visibility falls back to dm, not player", () => {
@@ -53,8 +53,9 @@ describe("tokenizeWikilinks", () => {
     expect(out.links[0].broken).toBe(false);
   });
 
-  it("flags broken wikilinks", () => {
+  it("flags unresolved wikilinks but does not throw", () => {
     const out = tokenizeWikilinks("see [[Atlantis]]", { resolveByName });
+    // Unresolved = "note not yet created" — allowed, just flagged.
     expect(out.links[0].broken).toBe(true);
   });
 
@@ -63,3 +64,21 @@ describe("tokenizeWikilinks", () => {
     expect(out.links[0].display).toBe("the keep");
   });
 });
+
+describe("renderLinkTokens — player safety", () => {
+  const links = [{ target: "Secret Vault", display: "the vault", resolvedId: undefined, broken: true }];
+  const html = `before \u2063LINK[0]\u2063 after`;
+
+  it("player build does NOT leak the raw target name in title=", () => {
+    const out = renderLinkTokens(html, links, { hideBroken: true });
+    expect(out).not.toMatch(/Secret Vault/);
+    expect(out).toMatch(/the vault/);
+    expect(out).toMatch(/atlas-unresolved/);
+  });
+
+  it("DM build still shows target in tooltip for authoring help", () => {
+    const out = renderLinkTokens(html, links, { hideBroken: false });
+    expect(out).toMatch(/Secret Vault/);
+  });
+});
+

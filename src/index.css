@@ -254,10 +254,11 @@
   border-bottom-style: solid;
   background: hsl(var(--primary) / 0.08);
 }
-.atlas-prose .atlas-broken-link {
-  color: hsl(var(--destructive));
-  border-bottom: 1px dotted hsl(var(--destructive) / 0.6);
-  cursor: help;
+.atlas-prose .atlas-broken-link,
+.atlas-prose .atlas-unresolved {
+  color: hsl(var(--muted-foreground));
+  border-bottom: 1px dotted hsl(var(--muted-foreground) / 0.5);
+  cursor: default;
 }
 .atlas-prose blockquote {
   border-left: 3px solid hsl(var(--primary) / 0.6);

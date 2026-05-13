@@ -72,11 +72,18 @@ const Index = () => {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
+      <div className="px-3 py-1.5 text-xs bg-amber-500/15 text-amber-200 border-b border-amber-500/30 flex items-center justify-between gap-2">
+        <span>
+          <strong>Legacy editor.</strong> This saves the legacy local atlas JSON, <em>not</em> the Obsidian/GitHub generated atlas under <code>/atlas</code>.
+          Cloud save is experimental.
+        </span>
+        <a className="text-primary hover:underline shrink-0" href="/">← Back to landing</a>
+      </div>
       <Toolbar onSaveCloud={saveCloud} onSignOut={signOut} signedIn={signedIn} />
       {!signedIn && (
         <div className="px-3 py-1.5 text-xs bg-accent/20 text-foreground border-b border-border flex items-center justify-between">
-          <span>Working locally — your atlas is autosaved in this browser.</span>
-          <button className="text-primary hover:underline" onClick={() => nav("/auth")}>Sign in to save to cloud →</button>
+          <span>Working locally — your atlas is autosaved in this browser (legacy editor only).</span>
+          <button className="text-primary hover:underline" onClick={() => nav("/auth")}>Sign in to save legacy cloud copy →</button>
         </div>
       )}
       <div className="flex-1 flex relative">

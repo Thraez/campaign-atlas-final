@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import Landing from "./pages/Landing.tsx";
 import Index from "./pages/Index.tsx";
 import Auth from "./pages/Auth.tsx";
 import AtlasViewer from "./pages/AtlasViewer.tsx";
@@ -20,7 +21,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/+$/, "") || "/"}>
         <Routes>
-        <Route path="/" element={<Index />} />
+        <Route path="/" element={<Landing />} />
+          <Route path="/legacy-editor" element={<Index />} />
           <Route path="/atlas" element={<AtlasViewer />} />
           <Route path="/atlas/edit" element={<AtlasPlacementEditor />} />
           <Route path="/atlas/timeline" element={<AtlasTimeline />} />

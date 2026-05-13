@@ -144,10 +144,13 @@ async function main() {
   let strippedDmBlocks = 0;
   let detectedDmBlocks = 0;
   let duplicateSlugs = 0;
-  let brokenLinks = 0;
+  let unresolvedLinks = 0;
   let visibilityExcluded = 0;
   let secretPlacementsExcluded = 0;
   let invalidVisibilityCount = 0;
+  let localAssets = 0;
+  let externalAssets = 0;
+  let missingAssets = 0;
 
   type Pending = { entity: Entity; rawBody: string; coords?: { x: number; y: number } };
   const pending: Pending[] = [];
@@ -249,8 +252,8 @@ async function main() {
     entity.links = links;
     for (const l of links) {
       if (l.broken) {
-        brokenLinks += 1;
-        warnings.push(`${entity.sourcePath || entity.id}: broken wikilink "${l.target}"`);
+        // Unresolved wikilinks are normal "not created yet" — count, don't warn.
+        unresolvedLinks += 1;
       } else if (l.resolvedId) {
         if (!backlinkMap.has(l.resolvedId)) backlinkMap.set(l.resolvedId, new Map());
         backlinkMap.get(l.resolvedId)!.set(entity.id, entity.title);
@@ -358,6 +361,40 @@ async function main() {
     routes: routes.filter((r) => r.mapId === m.id),
   }));
 
+  // -------- Asset validation --------
+  // Walk every entity image and every map layer src. We separate:
+  //   - external URLs (http(s)/data) — warned but allowed
+  //   - local paths    — must exist under public/ (or the configured outputDir's parent)
+  const PUBLIC_DIR = path.join(ROOT, "public");
+  const missingAssetList: string[] = [];
+  const externalAssetList: string[] = [];
+
+  const checkAsset = (raw: string, owner: string) => {
+    if (!raw) return;
+    const isExternal = /^(https?:|data:|blob:)/i.test(raw);
+    if (isExternal) {
+      externalAssets += 1;
+      externalAssetList.push(`${owner}: ${raw}`);
+      warnings.push(`${owner}: external asset "${raw}" — not bundled with the player build`);
+      return;
+    }
+    localAssets += 1;
+    // Local: try public/<path> with leading slash stripped.
+    const rel = raw.replace(/^\/+/, "");
+    const abs = path.join(PUBLIC_DIR, rel);
+    if (!fs.existsSync(abs)) {
+      missingAssets += 1;
+      missingAssetList.push(`${owner}: missing local asset "${raw}" (looked in public/${rel})`);
+    }
+  };
+
+  for (const { entity } of pending) {
+    for (const img of entity.images) checkAsset(img, `entity ${entity.id}`);
+  }
+  for (const m of maps) {
+    for (const layer of m.layers ?? []) checkAsset(layer.src, `map ${m.id} layer ${layer.id}`);
+  }
+
   const project: AtlasProject = {
     version: new Date().toISOString().replace(/[:.]/g, "-"),
     publishedAt: new Date().toISOString(),
@@ -372,9 +409,13 @@ async function main() {
       included: pending.length,
       excluded: scanInfo.excludedFiles + visibilityExcluded,
       warnings,
-      brokenLinks,
+      brokenLinks: unresolvedLinks,        // back-compat alias
+      unresolvedLinks,
       duplicateSlugs,
       strippedDmBlocks,
+      localAssets,
+      externalAssets,
+      missingAssets,
     },
   };
 
@@ -428,12 +469,16 @@ async function main() {
   console.log(`Maps:                    ${maps.length}`);
   console.log(`Regions:                 ${regions.length}`);
   console.log(`Routes:                  ${routes.length}`);
-  console.log(`Broken wikilinks:        ${r.brokenLinks}`);
+  console.log(`Unresolved wikilinks:    ${r.unresolvedLinks} (allowed — not-yet-created notes)`);
   console.log(`Duplicate slugs:         ${r.duplicateSlugs}`);
+  console.log(`Local assets:            ${localAssets}`);
+  console.log(`External assets:         ${externalAssets}`);
+  console.log(`Missing local assets:    ${missingAssets}`);
   console.log(`Warnings:                ${warnings.length}`);
   console.log(`Errors:                  ${errors.length}`);
   for (const e of errors) console.log(`  ✗ ${e}`);
   for (const w of warnings) console.log(`  ! ${w}`);
+  for (const m of missingAssetList) console.log(`  ✗ ${m}`);
   console.log(`\nWrote ${path.relative(ROOT, path.join(outDir, "atlas.json"))}`);
   console.log(`Wrote ${path.relative(ROOT, path.join(outDir, "search-index.json"))}\n`);
 
@@ -448,8 +493,16 @@ async function main() {
     console.error(`Strict player mode: ${invalidVisibilityCount} invalid visibility value(s). Failing build.`);
     process.exit(3);
   }
-  if (flags.strict && (warnings.length > 0 || r.brokenLinks > 0)) {
-    console.error("Strict mode: warnings present. Failing build.");
+  // Missing local assets in a strict player build must fail — players would
+  // see broken images. External URLs only warn.
+  if (flags.player && flags.strict && missingAssets > 0) {
+    console.error(`Strict player mode: ${missingAssets} missing local asset(s). Failing build.`);
+    process.exit(4);
+  }
+  // Strict mode (non-asset, non-link) still fails on duplicate slugs etc.
+  // Unresolved wikilinks are explicitly allowed and do NOT fail strict.
+  if (flags.strict && duplicateSlugs > 0) {
+    console.error("Strict mode: duplicate slugs present. Failing build.");
     process.exit(2);
   }
 }

@@ -172,7 +172,13 @@ export interface BuildReport {
   included: number;
   excluded: number;
   warnings: string[];
+  /** Renamed to unresolvedLinks. Kept for back-compat. */
   brokenLinks: number;
+  /** Wikilinks pointing at notes that don't exist yet — allowed, not an error. */
+  unresolvedLinks: number;
   duplicateSlugs: number;
   strippedDmBlocks: number;
+  localAssets?: number;
+  externalAssets?: number;
+  missingAssets?: number;
 }

@@ -57,7 +57,7 @@ Standard Obsidian wikilinks are supported in entry bodies:
 - `[[Thornhold|the Red City]]` — custom display text
 - Aliases resolve too (`[[Thorn Hold]]` finds Thornhold)
 
-Broken wikilinks are reported by the build and rendered as `<span class="atlas-broken-link">` so they don't crash the UI.
+Wikilinks pointing at notes that don't exist yet are **allowed** — they usually mean "I haven't written that one yet". The build counts them as `unresolvedLinks` (back-compat alias: `brokenLinks`) and renders them as subtle non-clickable text. They never fail a strict player build. Duplicate slugs and invalid `visibility` values still fail strict. In player builds, the raw target name is omitted from the rendered HTML so DM-only entity titles can't leak via tooltips.
 
 ### DM-only blocks
 
@@ -284,5 +284,7 @@ Implemented:
 
 Next:
 
-- **Batch 10 — TBD**: roughly one batch likely remains from the original out-of-scope list (globe view or AI-assisted lore drafting). Open to direction here.
+- **Batch 10 — UX/workflow stabilization**: `/` is now a clear landing page; the original in-browser editor moved to `/legacy-editor` (clearly labeled, kept for back-compat). `/atlas/edit` got a new **Layers** tab with multi-file image upload (object-URL preview), URL-add with external-asset warning, numeric x/y/width/height/opacity/zIndex inputs, lock-aspect, ±100/±1000/±10000 nudge, 50–150% scale presets, Center / Fit map / Map=layer / Expand / Reset, and a **map layer YAML patch** export with an asset commit checklist. Wikilinks to not-yet-created notes (`unresolvedLinks`) no longer fail strict player builds and never leak DM-only target names. Build now reports `localAssets`, `externalAssets`, `missingAssets`; missing local assets fail strict player builds, external URLs only warn. Save model is documented in-product (local browser draft → exported YAML/asset patch → committed to GitHub → player-safe published atlas).
+
+Skipped intentionally for this batch (not in acceptance criteria, deferred): wrapX globe-style rendering, a dedicated minimap on `/atlas`, and the bundled `.zip` asset export — the YAML patch + filename checklist covers the publishing path today.
 

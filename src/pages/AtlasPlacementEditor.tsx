@@ -3,7 +3,7 @@ import { MapContainer, Marker, Polygon, ImageOverlay, useMap, useMapEvents } fro
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode } from "lucide-react";
+import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode, Layers as LayersIcon, MapPin as PinIcon } from "lucide-react";
 import { toast } from "sonner";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity, MapDocument } from "@/atlas/content/schema";
@@ -12,6 +12,9 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useMapLayers } from "@/atlas/useMapLayers";
+import { MapLayerPanel } from "@/atlas/MapLayerPanel";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 // Bumped to v2: storage shape changed from { [entityId]: Override } to
@@ -123,10 +126,20 @@ export default function AtlasPlacementEditor() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
   }, [overrides]);
 
-  const activeMap: MapDocument | undefined = useMemo(
+  // Optional in-session map size override (from "Map = layer" / "Expand" buttons).
+  const [mapSizeOverride, setMapSizeOverride] = useState<Record<string, { w: number; h: number }>>({});
+
+  const baseMap: MapDocument | undefined = useMemo(
     () => project?.maps.find((m) => m.id === activeMapId),
     [project, activeMapId]
   );
+  const activeMap: MapDocument | undefined = useMemo(() => {
+    if (!baseMap) return undefined;
+    const o = mapSizeOverride[baseMap.id];
+    return o ? { ...baseMap, width: o.w, height: o.h } : baseMap;
+  }, [baseMap, mapSizeOverride]);
+
+  const layerEditor = useMapLayers(activeMap);
 
   // Resolve effective coords for an entity on the active map: per-map override
   // wins, else first existing placement on activeMap.
@@ -247,6 +260,12 @@ export default function AtlasPlacementEditor() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
+      <div className="px-3 py-1.5 text-[11px] bg-primary/10 text-foreground border-b border-primary/20 flex items-center justify-between gap-2">
+        <span title="Local browser draft → exported YAML/asset patch → committed to GitHub → player-safe published atlas">
+          Edits here are <strong>local draft changes</strong>. Export patches and commit them to GitHub to publish.
+        </span>
+        <Link to="/" className="text-primary hover:underline shrink-0">← Back</Link>
+      </div>
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
         <Link to="/" className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2">
           <Compass className="h-5 w-5" /> <span className="hidden sm:inline">Placement Editor</span>
@@ -300,8 +319,8 @@ export default function AtlasPlacementEditor() {
             <FlyTo target={flyTo} />
             <MapClickCapture onClick={onMapClick} />
 
-            {/* Map base image layers (same as the player viewer) */}
-            {showLayers && [...activeMap.layers].sort((a, b) => a.zIndex - b.zIndex).map((layer) => (
+            {/* Map base image layers — built-in + locally edited/uploaded. */}
+            {showLayers && layerEditor.mergedLayers.map((layer) => (
               <ImageOverlay
                 key={layer.id}
                 url={layer.src}
@@ -310,6 +329,8 @@ export default function AtlasPlacementEditor() {
                   [activeMap.height - layer.y, layer.x + layer.width],
                 ] as L.LatLngBoundsLiteral}
                 opacity={layer.opacity}
+                eventHandlers={{ click: () => layerEditor.setSelectedId(layer.id) }}
+                interactive={true}
               />
             ))}
 
@@ -363,45 +384,68 @@ export default function AtlasPlacementEditor() {
           )}
         </div>
 
-        <aside className="w-[360px] hidden md:flex flex-col border-l border-border bg-card">
-          <div className="p-3 border-b border-border">
-            <Input placeholder="Filter entities…" value={filter} onChange={(e) => setFilter(e.target.value)} />
-          </div>
-          <ScrollArea className="flex-1">
-            <Section title={`Unplaced (${unplaced.length})`}>
-              {unplaced.map((e) => (
-                <EntityRow
-                  key={e.id}
-                  entity={e}
-                  state="unplaced"
-                  isPending={pendingId === e.id}
-                  onPlace={() => setPendingId(e.id)}
-                />
-              ))}
-              {unplaced.length === 0 && <Empty text="All entities have a coordinate." />}
-            </Section>
-            <Section title={`Placed (${placed.length})`}>
-              {placed.map((e) => {
-                const c = effectiveCoord(e.id)!;
-                const overridden = overrideKey(activeMap.id, e.id) in overrides;
-                return (
-                  <EntityRow
-                    key={e.id}
-                    entity={e}
-                    state="placed"
-                    coord={c}
-                    overridden={overridden}
-                    isPending={pendingId === e.id}
-                    onGoTo={() => goTo(e.id)}
-                    onMove={() => setPendingId(e.id)}
-                    onRemove={() => removeCoord(e.id)}
-                    onReset={overridden ? () => clearOverride(e.id) : undefined}
-                  />
-                );
-              })}
-              {placed.length === 0 && <Empty text="Pick something on the left to place." />}
-            </Section>
-          </ScrollArea>
+        <aside className="w-[380px] hidden md:flex flex-col border-l border-border bg-card">
+          <Tabs defaultValue="pins" className="flex-1 flex flex-col min-h-0">
+            <TabsList className="grid grid-cols-2 mx-3 mt-3">
+              <TabsTrigger value="pins" className="gap-1.5"><PinIcon className="h-3.5 w-3.5" />Pins</TabsTrigger>
+              <TabsTrigger value="layers" className="gap-1.5"><LayersIcon className="h-3.5 w-3.5" />Layers</TabsTrigger>
+            </TabsList>
+            <TabsContent value="pins" className="flex-1 flex flex-col min-h-0 m-0">
+              <div className="p-3 border-b border-border">
+                <Input placeholder="Filter entities…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+              </div>
+              <ScrollArea className="flex-1">
+                <Section title={`Unplaced (${unplaced.length})`}>
+                  {unplaced.map((e) => (
+                    <EntityRow
+                      key={e.id}
+                      entity={e}
+                      state="unplaced"
+                      isPending={pendingId === e.id}
+                      onPlace={() => setPendingId(e.id)}
+                    />
+                  ))}
+                  {unplaced.length === 0 && <Empty text="All entities have a coordinate." />}
+                </Section>
+                <Section title={`Placed (${placed.length})`}>
+                  {placed.map((e) => {
+                    const c = effectiveCoord(e.id)!;
+                    const overridden = overrideKey(activeMap.id, e.id) in overrides;
+                    return (
+                      <EntityRow
+                        key={e.id}
+                        entity={e}
+                        state="placed"
+                        coord={c}
+                        overridden={overridden}
+                        isPending={pendingId === e.id}
+                        onGoTo={() => goTo(e.id)}
+                        onMove={() => setPendingId(e.id)}
+                        onRemove={() => removeCoord(e.id)}
+                        onReset={overridden ? () => clearOverride(e.id) : undefined}
+                      />
+                    );
+                  })}
+                  {placed.length === 0 && <Empty text="Pick something on the left to place." />}
+                </Section>
+              </ScrollArea>
+            </TabsContent>
+            <TabsContent value="layers" className="flex-1 flex flex-col min-h-0 m-0">
+              <MapLayerPanel
+                map={activeMap}
+                mergedLayers={layerEditor.mergedLayers}
+                localLayers={layerEditor.localLayers}
+                selectedId={layerEditor.selectedId}
+                setSelectedId={layerEditor.setSelectedId}
+                onAddFiles={layerEditor.addUploaded}
+                onAddUrl={layerEditor.addUrl}
+                onEditBuiltin={layerEditor.editBuiltinLayer}
+                onUpdate={layerEditor.updateLayer}
+                onRemove={layerEditor.removeLayer}
+                onSetMapSize={(w, h) => setMapSizeOverride((s) => ({ ...s, [activeMap.id]: { w, h } }))}
+              />
+            </TabsContent>
+          </Tabs>
         </aside>
       </div>
       <style>{`@keyframes atlas-pulse { 0%,100% { filter: drop-shadow(0 0 0 hsl(var(--primary))); } 50% { filter: drop-shadow(0 0 6px hsl(var(--primary))); } }`}</style>
