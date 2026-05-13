@@ -48,6 +48,7 @@ export function MapLayerPanel(props: Props) {
   const [urlDraft, setUrlDraft] = useState("");
   const [lockAspect, setLockAspect] = useState(true);
   const [locked, setLocked] = useState(false);
+  const checklist = useExportChecklist();
 
   const selected = mergedLayers.find((l) => l.id === selectedId) ?? null;
   const localSelected = localLayers.find((l) => l.id === selectedId) ?? null;
