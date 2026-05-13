@@ -93,7 +93,7 @@ export function safeFilename(raw: string): string {
 export function idFromFilename(raw: string): string {
   const dot = raw.lastIndexOf(".");
   const stem = (dot >= 0 ? raw.slice(0, dot) : raw).toLowerCase();
-  return stem.replace(/\s+/g, "-").replace(ID_SAFE, "").replace(/-+/g, "-").replace(/^-|-$/g, "") || "image";
+  return stem.replace(/[\s_]+/g, "-").replace(ID_SAFE, "").replace(/-+/g, "-").replace(/^-|-$/g, "") || "image";
 }
 
 export function nameFromFilename(raw: string): string {
