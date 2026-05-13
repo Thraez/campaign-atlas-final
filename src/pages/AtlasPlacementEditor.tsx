@@ -378,45 +378,68 @@ export default function AtlasPlacementEditor() {
           )}
         </div>
 
-        <aside className="w-[360px] hidden md:flex flex-col border-l border-border bg-card">
-          <div className="p-3 border-b border-border">
-            <Input placeholder="Filter entities…" value={filter} onChange={(e) => setFilter(e.target.value)} />
-          </div>
-          <ScrollArea className="flex-1">
-            <Section title={`Unplaced (${unplaced.length})`}>
-              {unplaced.map((e) => (
-                <EntityRow
-                  key={e.id}
-                  entity={e}
-                  state="unplaced"
-                  isPending={pendingId === e.id}
-                  onPlace={() => setPendingId(e.id)}
-                />
-              ))}
-              {unplaced.length === 0 && <Empty text="All entities have a coordinate." />}
-            </Section>
-            <Section title={`Placed (${placed.length})`}>
-              {placed.map((e) => {
-                const c = effectiveCoord(e.id)!;
-                const overridden = overrideKey(activeMap.id, e.id) in overrides;
-                return (
-                  <EntityRow
-                    key={e.id}
-                    entity={e}
-                    state="placed"
-                    coord={c}
-                    overridden={overridden}
-                    isPending={pendingId === e.id}
-                    onGoTo={() => goTo(e.id)}
-                    onMove={() => setPendingId(e.id)}
-                    onRemove={() => removeCoord(e.id)}
-                    onReset={overridden ? () => clearOverride(e.id) : undefined}
-                  />
-                );
-              })}
-              {placed.length === 0 && <Empty text="Pick something on the left to place." />}
-            </Section>
-          </ScrollArea>
+        <aside className="w-[380px] hidden md:flex flex-col border-l border-border bg-card">
+          <Tabs defaultValue="pins" className="flex-1 flex flex-col min-h-0">
+            <TabsList className="grid grid-cols-2 mx-3 mt-3">
+              <TabsTrigger value="pins" className="gap-1.5"><PinIcon className="h-3.5 w-3.5" />Pins</TabsTrigger>
+              <TabsTrigger value="layers" className="gap-1.5"><LayersIcon className="h-3.5 w-3.5" />Layers</TabsTrigger>
+            </TabsList>
+            <TabsContent value="pins" className="flex-1 flex flex-col min-h-0 m-0">
+              <div className="p-3 border-b border-border">
+                <Input placeholder="Filter entities…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+              </div>
+              <ScrollArea className="flex-1">
+                <Section title={`Unplaced (${unplaced.length})`}>
+                  {unplaced.map((e) => (
+                    <EntityRow
+                      key={e.id}
+                      entity={e}
+                      state="unplaced"
+                      isPending={pendingId === e.id}
+                      onPlace={() => setPendingId(e.id)}
+                    />
+                  ))}
+                  {unplaced.length === 0 && <Empty text="All entities have a coordinate." />}
+                </Section>
+                <Section title={`Placed (${placed.length})`}>
+                  {placed.map((e) => {
+                    const c = effectiveCoord(e.id)!;
+                    const overridden = overrideKey(activeMap.id, e.id) in overrides;
+                    return (
+                      <EntityRow
+                        key={e.id}
+                        entity={e}
+                        state="placed"
+                        coord={c}
+                        overridden={overridden}
+                        isPending={pendingId === e.id}
+                        onGoTo={() => goTo(e.id)}
+                        onMove={() => setPendingId(e.id)}
+                        onRemove={() => removeCoord(e.id)}
+                        onReset={overridden ? () => clearOverride(e.id) : undefined}
+                      />
+                    );
+                  })}
+                  {placed.length === 0 && <Empty text="Pick something on the left to place." />}
+                </Section>
+              </ScrollArea>
+            </TabsContent>
+            <TabsContent value="layers" className="flex-1 flex flex-col min-h-0 m-0">
+              <MapLayerPanel
+                map={activeMap}
+                mergedLayers={layerEditor.mergedLayers}
+                localLayers={layerEditor.localLayers}
+                selectedId={layerEditor.selectedId}
+                setSelectedId={layerEditor.setSelectedId}
+                onAddFiles={layerEditor.addUploaded}
+                onAddUrl={layerEditor.addUrl}
+                onEditBuiltin={layerEditor.editBuiltinLayer}
+                onUpdate={layerEditor.updateLayer}
+                onRemove={layerEditor.removeLayer}
+                onSetMapSize={(w, h) => setMapSizeOverride((s) => ({ ...s, [activeMap.id]: { w, h } }))}
+              />
+            </TabsContent>
+          </Tabs>
         </aside>
       </div>
       <style>{`@keyframes atlas-pulse { 0%,100% { filter: drop-shadow(0 0 0 hsl(var(--primary))); } 50% { filter: drop-shadow(0 0 6px hsl(var(--primary))); } }`}</style>
