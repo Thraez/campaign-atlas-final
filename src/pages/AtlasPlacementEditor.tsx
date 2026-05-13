@@ -230,27 +230,32 @@ export default function AtlasPlacementEditor() {
   const exportPatch = () => {
     if (!project || !activeMap) return;
     const lines: string[] = [
-      `# Placement patch — ${activeMap.name}`,
-      "",
-      "Paste each snippet into the corresponding entity's frontmatter, replacing any",
-      "existing `atlas.placements` (or legacy `atlas.x` / `atlas.y`) with the version below.",
-      "Or run: `npm run atlas:apply-placements -- placements.json`",
-      "",
+      `# Placement patch — ${activeMap.name} (${activeMap.id})`,
+      `# Generated ${new Date().toISOString()}`,
+      `#`,
+      `# HOW TO APPLY:`,
+      `# This file contains one YAML snippet per entity. For each "# entity:"`,
+      `# section below, open the listed markdown file and REPLACE its existing`,
+      `# atlas.placements (or legacy atlas.x / atlas.y) with the snippet shown.`,
+      `# Do NOT paste these snippets into world.yaml — they belong in the`,
+      `# entity's frontmatter, not the world config.`,
+      `#`,
+      `# Or run: npm run atlas:apply-placements -- placements-${activeMap.id}.json`,
+      ``,
     ];
     for (const e of project.entities) {
       const c = effectiveCoord(e.id);
       if (!c) continue;
-      lines.push(`## ${e.title}  \`${e.sourcePath || e.id}\``);
-      lines.push("```yaml");
-      lines.push("atlas:");
-      lines.push("  placements:");
+      lines.push(`# entity: ${e.title}`);
+      lines.push(`# file:   ${e.sourcePath || e.id}`);
+      lines.push(`atlas:`);
+      lines.push(`  placements:`);
       lines.push(`    - mapId: ${activeMap.id}`);
       lines.push(`      x: ${c.x}`);
       lines.push(`      y: ${c.y}`);
-      lines.push("```");
-      lines.push("");
+      lines.push(``);
     }
-    download(`placements-patch-${activeMap.id}.md`, lines.join("\n"), "text/markdown");
+    download(`placements-patch-${activeMap.id}.yaml`, lines.join("\n"), "text/yaml");
   };
 
   const dirtyCount = Object.keys(overrides).filter((k) => activeMap && k.startsWith(`${activeMap.id}:`)).length;
