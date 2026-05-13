@@ -313,8 +313,8 @@ export default function AtlasPlacementEditor() {
             <FlyTo target={flyTo} />
             <MapClickCapture onClick={onMapClick} />
 
-            {/* Map base image layers (same as the player viewer) */}
-            {showLayers && [...activeMap.layers].sort((a, b) => a.zIndex - b.zIndex).map((layer) => (
+            {/* Map base image layers — built-in + locally edited/uploaded. */}
+            {showLayers && layerEditor.mergedLayers.map((layer) => (
               <ImageOverlay
                 key={layer.id}
                 url={layer.src}
@@ -323,6 +323,8 @@ export default function AtlasPlacementEditor() {
                   [activeMap.height - layer.y, layer.x + layer.width],
                 ] as L.LatLngBoundsLiteral}
                 opacity={layer.opacity}
+                eventHandlers={{ click: () => layerEditor.setSelectedId(layer.id) }}
+                interactive={true}
               />
             ))}
 
