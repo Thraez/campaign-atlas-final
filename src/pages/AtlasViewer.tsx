@@ -223,15 +223,24 @@ export default function AtlasViewer() {
   }, []);
 
   if (error) {
+    const offline = typeof navigator !== "undefined" && !navigator.onLine;
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-background text-foreground p-6 text-center">
         <div className="max-w-md space-y-3">
-          <h1 className="font-display text-2xl text-primary">Atlas not built yet</h1>
-          <p className="text-sm text-muted-foreground">{error}</p>
-          <p className="text-xs text-muted-foreground">
-            Run <code className="px-1.5 py-0.5 rounded bg-muted">npm run atlas:build</code> to generate <code>public/atlas/atlas.json</code>.
+          <h1 className="font-display text-2xl text-primary">
+            {offline ? "Atlas not available offline yet" : "Atlas not built yet"}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {offline
+              ? "Open the atlas once while online to cache it for offline use."
+              : error}
           </p>
-          <Button asChild variant="secondary"><Link to="/"><ArrowLeft className="h-4 w-4 mr-1" />Back to editor</Link></Button>
+          {!offline && (
+            <p className="text-xs text-muted-foreground">
+              Run <code className="px-1.5 py-0.5 rounded bg-muted">npm run atlas:build</code> to generate <code>public/atlas/atlas.json</code>.
+            </p>
+          )}
+          <Button asChild variant="secondary"><Link to="/"><ArrowLeft className="h-4 w-4 mr-1" />Back to home</Link></Button>
         </div>
       </div>
     );
