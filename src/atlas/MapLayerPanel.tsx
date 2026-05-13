@@ -14,6 +14,7 @@ import type { LocalLayer } from "@/atlas/useMapLayers";
 import { ExportChecklistDialog, useExportChecklist } from "./ExportChecklistDialog";
 import { normalizeAtlasAssetUrl } from "./url";
 import { validatePatchYaml } from "./yaml/validatePatch";
+import { buildWorldMapPatch } from "./yaml/buildPatches";
 
 interface Props {
   map: MapDocument;
