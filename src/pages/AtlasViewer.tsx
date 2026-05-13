@@ -343,7 +343,61 @@ export default function AtlasViewer() {
               />
             )}
 
-            {placementsOnMap.map((p) => {
+            {/* Routes */}
+            {(activeMap.routes ?? []).map((route) => {
+              const pts = (route.resolvedPoints ?? []).map(([x, y]) => [activeMap.height - y, x] as [number, number]);
+              if (pts.length < 2) return null;
+              const color = route.color ?? "#cfd6dc";
+              const distPx = routeDistancePx(route.resolvedPoints ?? []);
+              const scale: MapScale | undefined = activeMap.scale;
+              const distLabel = scale ? `${(distPx * scale.unitsPerPixel).toFixed(1)} ${scale.unitLabel}` : `${Math.round(distPx)} px`;
+              const travel = scale && route.speed
+                ? formatTravelTime((distPx * scale.unitsPerPixel) / route.speed)
+                : null;
+              const modeLabel = route.mode ? ROUTE_MODE_LABEL[route.mode] : "";
+              return (
+                <Polyline
+                  key={route.id}
+                  positions={pts}
+                  pathOptions={{
+                    color,
+                    weight: route.weight ?? 3,
+                    opacity: 0.9,
+                    dashArray: route.dashed ? "8 6" : undefined,
+                    lineCap: "round",
+                    lineJoin: "round",
+                  }}
+                >
+                  <Tooltip sticky direction="top" opacity={0.95}>
+                    <div className="text-xs">
+                      <div className="font-medium">{route.name}</div>
+                      <div className="opacity-80">
+                        {distLabel}{travel ? ` · ${travel} ${modeLabel}` : ""}
+                      </div>
+                    </div>
+                  </Tooltip>
+                </Polyline>
+              );
+            })}
+
+            {/* Grid overlay */}
+            {activeMap.grid && (showGrid ?? activeMap.grid.enabled !== false) && (
+              <>
+                {gridLines(activeMap, activeMap.grid).map((line, i) => (
+                  <Polyline
+                    key={`grid-${i}`}
+                    positions={line}
+                    pathOptions={{
+                      color: activeMap.grid!.color ?? "rgba(255,255,255,0.08)",
+                      weight: 1,
+                      opacity: 1,
+                      interactive: false,
+                    }}
+                  />
+                ))}
+              </>
+            )}
+
               const ent = entityById.get(p.entityId);
               if (!ent) return null;
               const color = ICON_BY_TYPE[ent.type] ?? ICON_BY_TYPE.default;
