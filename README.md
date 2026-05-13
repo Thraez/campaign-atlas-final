@@ -156,6 +156,27 @@ Runtime loading lives in `src/atlas/content/loader.ts` — `loadAtlasContent()` 
 
 ---
 
+## Placement editor (DM-only)
+
+Visit `/atlas/edit` to drag pins onto the map for any entity in the built atlas. The page is local-only — your edits are stored in browser localStorage and never written to the repo until you export them.
+
+Workflow:
+
+1. `npm run atlas:build` — generate the DM `atlas.json` (so the editor knows which entities exist).
+2. Open `/atlas/edit`. Use **Crosshair** on an unplaced entity, click the map; or drag any existing pin to nudge it.
+3. **placements.json** — download the merged set of pins.
+4. Apply them back into your markdown frontmatter:
+   ```bash
+   npm run atlas:apply-placements -- placements.json
+   npm run atlas:build
+   ```
+   This rewrites each entity's frontmatter with `atlas.x` / `atlas.y`.
+5. Or, if you prefer to copy-paste manually, use **Patch.md** instead — it gives you per-entity YAML snippets.
+
+Commit the markdown changes; the GitHub Action will publish the player atlas with the new pin coordinates.
+
+---
+
 ## Roadmap
 
 Implemented:
@@ -163,8 +184,9 @@ Implemented:
 - **Batch 1 — Foundation**: schema, frontmatter parser, wikilinks, build script, sample vault, README. (US-0001, 0101, 0102, 0103, 0104, 1502, 1503)
 - **Batch 2 — Map MVP**: `/atlas` viewer with Leaflet map, placements as pins, side panel with rendered markdown + backlinks, ⌘K search, mobile bottom-sheet. (US-0301, 0302, 0303, 0304, 0305, 0306, 1201)
 - **Batch 3 — Safe publishing**: `--player` strict build with physical exclusion of dm/hidden content, GitHub Action, GitHub Pages deploy, "Updated" date in viewer. (US-0105, 0106, 0201, 0202, 0203, 0204, 0701)
+- **Batch 4 — Creator convenience**: `/atlas/edit` placement editor with drag-to-place pins, `placements.json` export, `apply-placements` CLI to round-trip back into markdown frontmatter, copy-paste YAML patch. (US-0601, 0602, 0603, 0604, 1303)
 
 Next:
 
-- **Batch 4 — Creator convenience**: visual edit mode, drag-to-place pins, export placements back to YAML, markdown export. (US-0601, 0602, 0603, 0604, 1303)
+- **Batch 5 — Layered maps & regions**: multiple base layers per world, region polygons, fog reveals on the player atlas.
 
