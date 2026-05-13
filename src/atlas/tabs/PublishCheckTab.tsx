@@ -21,7 +21,7 @@ import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TabFrame } from "./TabFrame";
-import { download } from "./download";
+import { downloadText } from "./download";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -74,8 +74,7 @@ export function PublishCheckTab({
   const downloadReport = () => {
     const md = buildPublishReport(report);
     const filename = `atlas-publish-check-${new Date().toISOString().slice(0, 10)}.md`;
-    download(filename, md, "text/markdown");
-    toast.success("Publish report downloaded");
+    downloadText(filename, md, "text/markdown");
   };
 
   return (
