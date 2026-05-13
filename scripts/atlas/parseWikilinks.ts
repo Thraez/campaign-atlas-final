@@ -35,7 +35,13 @@ export function tokenizeWikilinks(
 }
 
 // Second pass (after HTML render): replace tokens with anchor tags.
-export function renderLinkTokens(html: string, links: ResolvedLink[]): string {
+// In player builds, broken links must not leak the original target text — pass
+// `{ hideBroken: true }` to render them as plain display text instead.
+export function renderLinkTokens(
+  html: string,
+  links: ResolvedLink[],
+  opts: { hideBroken?: boolean } = {}
+): string {
   const re = new RegExp(
     `${TOKEN_OPEN.replace(/[\u2063\[\]]/g, (c) => "\\" + c)}(\\d+)${TOKEN_CLOSE.replace(/[\u2063\[\]]/g, (c) => "\\" + c)}`,
     "g"
@@ -45,6 +51,7 @@ export function renderLinkTokens(html: string, links: ResolvedLink[]): string {
     if (!link) return "";
     const text = escapeHtml(link.display);
     if (link.broken || !link.resolvedId) {
+      if (opts.hideBroken) return text;
       return `<span class="atlas-broken-link" title="Broken link: ${escapeHtml(link.target)}">${text}</span>`;
     }
     return `<a class="atlas-wikilink" data-entity-id="${escapeHtml(link.resolvedId)}" href="#/entity/${encodeURIComponent(link.resolvedId)}">${text}</a>`;

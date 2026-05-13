@@ -75,26 +75,65 @@ A small sample vault ships under `content/astrath-deeprealm/` so the build is ru
 
 ## Build pipeline
 
+Two build modes:
+
 ```bash
-npm run atlas:build
+npm run atlas:build           # DM build — full atlas (all visibilities, source paths, frontmatter)
+npm run atlas:build:player    # Player-safe + strict — physically removes secrets
+npm run atlas:publish         # Player build + Vite build (used by GitHub Action)
 ```
 
 Outputs to `public/atlas/`:
 
-- `atlas.json` — full project (worlds, maps, entities, placements, build report)
+- `atlas.json` — worlds, maps, entities, placements, build report
 - `search-index.json` — lightweight index for search UI
 
-The build script (`scripts/build-atlas.ts`):
+### What the player build physically removes
 
-1. Reads `atlas.config.json` for content root + include/exclude rules.
-2. Walks the content tree, parses frontmatter via `gray-matter`.
-3. Strips `%% ... %%` DM blocks.
-4. Tokenizes `[[wikilinks]]`, resolves them against titles + aliases.
-5. Renders markdown to HTML via `marked`, then re-injects link anchors.
-6. Computes backlinks.
-7. Writes atlas + search index.
+Hiding in the UI is not enough — anything shipped to GitHub Pages is inspectable. The `--player` build:
 
-The build prints a report: scanned, included, excluded, stripped DM blocks, broken links, duplicate slugs, and full warning list. The build does not fail on validation warnings (Batch 3 will add an opt-in strict mode for CI deploys).
+- Drops entities with `visibility: dm` or `hidden`
+- Drops entities with `atlas.publish: false`
+- Drops their map placements
+- Strips `%% ... %%` DM blocks from remaining bodies
+- Strips raw `frontmatter` and `sourcePath` from each entity
+- Renders broken wikilinks as plain text (so excluded targets' names don't leak via `title=` attributes)
+
+### Strict mode
+
+`--strict` exits non-zero on any warning (broken links, invalid visibility, etc). Used by the publish workflow so a typo doesn't quietly ship.
+
+### Build report
+
+Every build prints a report to stdout: scanned, included, excluded by folder, excluded by visibility, stripped DM blocks, excluded secret pins, broken wikilinks, duplicate slugs, warnings, errors. Errors always fail the build; warnings only fail in strict mode.
+
+---
+
+## Deploying to GitHub Pages
+
+A workflow lives at `.github/workflows/publish-atlas.yml`. It runs on every push to `main` and on manual dispatch.
+
+One-time setup in your GitHub repo:
+
+1. **Settings → Pages → Source**: select **GitHub Actions**.
+2. **Settings → Actions → General → Workflow permissions**: **Read and write**.
+3. Push to `main` (or trigger the workflow manually from the Actions tab).
+
+The workflow:
+
+- Installs deps with `npm ci`
+- Runs `npm run atlas:build:player` (strict)
+- Runs `vite build` with `ATLAS_BASE=/<repo-name>/` so asset URLs work under the project subpath
+- Uploads `dist/` and deploys to GitHub Pages
+
+For a user/organization site (`https://<user>.github.io/`), edit the workflow's `ATLAS_BASE` to `"/"`.
+
+Local production preview:
+
+```bash
+npm run atlas:publish
+npx vite preview
+```
 
 ---
 
@@ -119,12 +158,13 @@ Runtime loading lives in `src/atlas/content/loader.ts` — `loadAtlasContent()` 
 
 ## Roadmap
 
-Implemented (Batch 1): US-0001, US-0101, US-0102, US-0103, US-0104, US-1502, US-1503.
+Implemented:
 
-Next batches:
+- **Batch 1 — Foundation**: schema, frontmatter parser, wikilinks, build script, sample vault, README. (US-0001, 0101, 0102, 0103, 0104, 1502, 1503)
+- **Batch 2 — Map MVP**: `/atlas` viewer with Leaflet map, placements as pins, side panel with rendered markdown + backlinks, ⌘K search, mobile bottom-sheet. (US-0301, 0302, 0303, 0304, 0305, 0306, 1201)
+- **Batch 3 — Safe publishing**: `--player` strict build with physical exclusion of dm/hidden content, GitHub Action, GitHub Pages deploy, "Updated" date in viewer. (US-0105, 0106, 0201, 0202, 0203, 0204, 0701)
 
-- **Batch 2 — Map MVP**: render maps + placements from atlas.json, side panel, search, mobile.
-- **Batch 3 — Safe publishing**: physical exclusion of DM/hidden content, GitHub Action, GitHub Pages deploy.
-- **Batch 4 — Creator convenience**: visual edit mode, placement export back to YAML.
+Next:
 
-See the full backlog in project notes.
+- **Batch 4 — Creator convenience**: visual edit mode, drag-to-place pins, export placements back to YAML, markdown export. (US-0601, 0602, 0603, 0604, 1303)
+

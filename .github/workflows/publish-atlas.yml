@@ -1,0 +1,71 @@
+# Build the player-safe atlas and deploy to GitHub Pages.
+#
+# Triggers:
+#   - push to main (auto-publish on every commit to canon)
+#   - manual dispatch (with optional changelog input)
+#
+# Required repo settings:
+#   Settings → Pages → Source: GitHub Actions
+#   Settings → Actions → Workflow permissions: Read and write
+#
+# If this is a project site (URL = https://<user>.github.io/<repo>/), the
+# workflow auto-passes the repo name as ATLAS_BASE so Vite emits correct asset
+# URLs. For a user/organization site, change ATLAS_BASE to "/".
+
+name: Publish Atlas
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      changelog:
+        description: "Optional changelog note for this publish"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build player-safe atlas (strict)
+        run: npm run atlas:build:player
+
+      - name: Build site
+        env:
+          ATLAS_BASE: /${{ github.event.repository.name }}/
+        run: npm run build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

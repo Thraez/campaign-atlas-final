@@ -91,22 +91,43 @@ function relImage(p: string): string {
   return p.replace(/^\/+/, "");
 }
 
+interface CliFlags {
+  player: boolean;
+  strict: boolean;
+  outDir?: string;
+}
+
+function parseFlags(): CliFlags {
+  const args = process.argv.slice(2);
+  const flags: CliFlags = { player: false, strict: false };
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--player") flags.player = true;
+    else if (a === "--strict") flags.strict = true;
+    else if (a === "--out") flags.outDir = args[++i];
+    else if (a.startsWith("--out=")) flags.outDir = a.slice(6);
+  }
+  return flags;
+}
+
+const PLAYER_VISIBLE = new Set(["player", "rumor"]);
+
 async function main() {
+  const flags = parseFlags();
   const cfg = loadConfig();
   const contentDir = path.join(ROOT, cfg.contentRoot);
   const scanInfo = { excludedFiles: 0 };
   const files = walk(contentDir, cfg.exclude, scanInfo);
 
   const warnings: string[] = [];
+  const errors: string[] = [];
   let strippedDmBlocks = 0;
   let duplicateSlugs = 0;
   let brokenLinks = 0;
+  let visibilityExcluded = 0;
+  let secretPlacementsExcluded = 0;
 
-  // First pass: parse frontmatter + body, build entity skeletons
-  type Pending = {
-    entity: Entity;
-    rawBody: string;
-  };
+  type Pending = { entity: Entity; rawBody: string; coords?: { x: number; y: number } };
   const pending: Pending[] = [];
   const slugSeen = new Map<string, string>();
 
@@ -118,19 +139,30 @@ async function main() {
 
     const title = deriveTitle(file, (parsed.data.title as string) ?? undefined);
     if (!title) {
-      warnings.push(`${rel}: missing title`);
+      errors.push(`${rel}: missing title`);
       continue;
     }
 
     const id = parsed.atlas.id || slugify(title);
     if (slugSeen.has(id)) {
       duplicateSlugs += 1;
-      warnings.push(
-        `${rel}: duplicate slug "${id}" also produced by ${slugSeen.get(id)} — skipping`
-      );
+      errors.push(`${rel}: duplicate slug "${id}" also produced by ${slugSeen.get(id)} — skipping`);
       continue;
     }
     slugSeen.set(id, rel);
+
+    const visibility = parsed.atlas.visibility ?? (parsed.atlas.publish === false ? "dm" : "player");
+
+    // Player-safe build: physically exclude dm + hidden entities (not just hide in UI).
+    if (flags.player && !PLAYER_VISIBLE.has(visibility)) {
+      visibilityExcluded += 1;
+      continue;
+    }
+    // Player-safe build: also exclude entries explicitly marked publish: false
+    if (flags.player && parsed.atlas.publish === false) {
+      visibilityExcluded += 1;
+      continue;
+    }
 
     const { text: noDm, count } = stripDmBlocks(parsed.body);
     strippedDmBlocks += count;
@@ -140,7 +172,7 @@ async function main() {
       title,
       type: parsed.atlas.type ?? "note",
       world: parsed.atlas.world ?? cfg.defaultWorld,
-      visibility: parsed.atlas.visibility ?? (parsed.atlas.publish === false ? "dm" : "player"),
+      visibility,
       canon: (parsed.atlas.canon as Entity["canon"]) ?? "canon",
       aliases: parsed.atlas.aliases ?? [],
       tags: parsed.atlas.tags ?? [],
@@ -148,15 +180,19 @@ async function main() {
       images: (parsed.atlas.images ?? []).map(relImage),
       body: noDm,
       bodyHtml: "",
-      frontmatter: parsed.data,
-      sourcePath: rel,
+      frontmatter: flags.player ? {} : parsed.data, // strip frontmatter from player output
+      sourcePath: flags.player ? "" : rel,           // strip source paths from player output
       links: [],
       backlinks: [],
     };
-    pending.push({ entity, rawBody: noDm });
+    const fmAtlas = (parsed.data.atlas as Record<string, unknown>) ?? {};
+    const cx = typeof fmAtlas.x === "number" ? fmAtlas.x : undefined;
+    const cy = typeof fmAtlas.y === "number" ? fmAtlas.y : undefined;
+    const coords = cx !== undefined && cy !== undefined ? { x: cx, y: cy } : undefined;
+    pending.push({ entity, rawBody: noDm, coords });
   }
 
-  // Build name index for wikilink resolution
+  // Wikilink name index
   const nameIndex = new Map<string, string>();
   for (const { entity } of pending) {
     nameIndex.set(entity.title.toLowerCase(), entity.id);
@@ -164,9 +200,7 @@ async function main() {
   }
   const resolveByName = (n: string) => nameIndex.get(n.trim().toLowerCase());
 
-  // Second pass: tokenize wikilinks, render markdown, restore links, build backlinks
-  const backlinkMap = new Map<string, Map<string, string>>(); // targetId -> (sourceId -> sourceTitle)
-
+  const backlinkMap = new Map<string, Map<string, string>>();
   for (const item of pending) {
     const { entity, rawBody } = item;
     const { tokenized, links } = tokenizeWikilinks(rawBody, { resolveByName });
@@ -174,73 +208,56 @@ async function main() {
     for (const l of links) {
       if (l.broken) {
         brokenLinks += 1;
-        warnings.push(`${entity.sourcePath}: broken wikilink "${l.target}"`);
+        warnings.push(`${entity.sourcePath || entity.id}: broken wikilink "${l.target}"`);
       } else if (l.resolvedId) {
         if (!backlinkMap.has(l.resolvedId)) backlinkMap.set(l.resolvedId, new Map());
         backlinkMap.get(l.resolvedId)!.set(entity.id, entity.title);
       }
     }
     const html = marked.parse(tokenized, { async: false }) as string;
-    entity.bodyHtml = renderLinkTokens(html, links);
+    // In player builds, broken link tokens (which now include links to excluded
+    // dm entities) must NOT leak the target name. Render as plain display text.
+    entity.bodyHtml = renderLinkTokens(html, links, { hideBroken: flags.player });
   }
   for (const { entity } of pending) {
-    const map = backlinkMap.get(entity.id);
-    if (map) {
-      entity.backlinks = Array.from(map.entries())
-        .filter(([id]) => id !== entity.id)
-        .map(([id, title]) => ({ id, title }));
-    }
+    const m = backlinkMap.get(entity.id);
+    if (m) entity.backlinks = Array.from(m.entries()).filter(([id]) => id !== entity.id).map(([id, title]) => ({ id, title }));
   }
 
-  // Seed default world + map document so the published atlas has context.
-  // Map dimensions match the existing in-app default (Tidemarrow-sized) — Batch 2
-  // will replace this with proper map documents read from content.
   const worldId = cfg.defaultWorld;
   const mapId = `${worldId}-overview`;
 
-  // Bootstrap map placements from frontmatter atlas.x / atlas.y if present.
-  // (Visual placement editor will populate these in a later batch.)
   const placements: MapPlacement[] = [];
-  for (const { entity } of pending) {
-    const fmAtlas = (entity.frontmatter.atlas as Record<string, unknown>) ?? {};
-    const x = typeof fmAtlas.x === "number" ? fmAtlas.x : undefined;
-    const y = typeof fmAtlas.y === "number" ? fmAtlas.y : undefined;
-    if (x !== undefined && y !== undefined) {
-      placements.push({
-        id: `${entity.id}@${mapId}`,
-        entityId: entity.id,
-        mapId,
-        x,
-        y,
-        label: entity.title,
-        visibility: entity.visibility,
-      });
+  for (const item of pending) {
+    if (!item.coords) continue;
+    const { entity, coords } = item;
+    if (flags.player && !PLAYER_VISIBLE.has(entity.visibility)) {
+      secretPlacementsExcluded += 1;
+      continue;
     }
+    placements.push({
+      id: `${entity.id}@${mapId}`,
+      entityId: entity.id,
+      mapId,
+      x: coords.x,
+      y: coords.y,
+      label: entity.title,
+      visibility: entity.visibility,
+    });
   }
 
   const project: AtlasProject = {
     version: new Date().toISOString().replace(/[:.]/g, "-"),
     publishedAt: new Date().toISOString(),
     worlds: [{ id: worldId, name: "Astrath Deeprealm", defaultMapId: mapId }],
-    maps: [
-      {
-        id: mapId,
-        worldId,
-        name: "Overview",
-        width: 200000,
-        height: 100000,
-        layers: [],
-        oceanColor: "#18313f",
-        wrapX: true,
-      },
-    ],
+    maps: [{ id: mapId, worldId, name: "Overview", width: 200000, height: 100000, layers: [], oceanColor: "#18313f", wrapX: true }],
     entities: pending.map((p) => p.entity),
     placements,
     assets: [],
     buildReport: {
       scanned: files.length + scanInfo.excludedFiles,
       included: pending.length,
-      excluded: scanInfo.excludedFiles,
+      excluded: scanInfo.excludedFiles + visibilityExcluded,
       warnings,
       brokenLinks,
       duplicateSlugs,
@@ -248,7 +265,7 @@ async function main() {
     },
   };
 
-  const outDir = path.join(ROOT, cfg.outputDir);
+  const outDir = path.resolve(ROOT, flags.outDir ?? cfg.outputDir);
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "atlas.json"), JSON.stringify(project, null, 2));
 
@@ -261,24 +278,33 @@ async function main() {
     summary: entity.summary,
     excerpt: entity.body.replace(/\s+/g, " ").trim().slice(0, 240),
   }));
-  fs.writeFileSync(
-    path.join(outDir, "search-index.json"),
-    JSON.stringify(searchIndex, null, 2)
-  );
+  fs.writeFileSync(path.join(outDir, "search-index.json"), JSON.stringify(searchIndex, null, 2));
 
-  // Report
   const r = project.buildReport!;
-  console.log("\n=== Atlas build report ===");
-  console.log(`Scanned:           ${r.scanned}`);
-  console.log(`Included entities: ${r.included}`);
-  console.log(`Excluded files:    ${r.excluded}`);
-  console.log(`Stripped DM blocks: ${r.strippedDmBlocks}`);
-  console.log(`Broken wikilinks:  ${r.brokenLinks}`);
-  console.log(`Duplicate slugs:   ${r.duplicateSlugs}`);
-  console.log(`Warnings:          ${r.warnings.length}`);
-  for (const w of r.warnings) console.log(`  ! ${w}`);
+  console.log(`\n=== Atlas build report (${flags.player ? "PLAYER" : "DM"}${flags.strict ? ", strict" : ""}) ===`);
+  console.log(`Scanned:                 ${r.scanned}`);
+  console.log(`Included entities:       ${r.included}`);
+  console.log(`Excluded by folder:      ${scanInfo.excludedFiles}`);
+  console.log(`Excluded by visibility:  ${visibilityExcluded}`);
+  console.log(`Stripped DM blocks:      ${r.strippedDmBlocks}`);
+  console.log(`Excluded secret pins:    ${secretPlacementsExcluded}`);
+  console.log(`Broken wikilinks:        ${r.brokenLinks}`);
+  console.log(`Duplicate slugs:         ${r.duplicateSlugs}`);
+  console.log(`Warnings:                ${warnings.length}`);
+  console.log(`Errors:                  ${errors.length}`);
+  for (const e of errors) console.log(`  ✗ ${e}`);
+  for (const w of warnings) console.log(`  ! ${w}`);
   console.log(`\nWrote ${path.relative(ROOT, path.join(outDir, "atlas.json"))}`);
   console.log(`Wrote ${path.relative(ROOT, path.join(outDir, "search-index.json"))}\n`);
+
+  if (errors.length > 0) {
+    console.error("Build failed: validation errors above.");
+    process.exit(1);
+  }
+  if (flags.strict && (warnings.length > 0 || r.brokenLinks > 0)) {
+    console.error("Strict mode: warnings present. Failing build.");
+    process.exit(2);
+  }
 }
 
 main().catch((e) => {
