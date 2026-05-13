@@ -315,7 +315,7 @@ export default function AtlasPlacementEditor() {
           <RotateCcw className="h-4 w-4" />
         </Button>
         <Button variant="secondary" size="sm" onClick={exportPatch} className="gap-1">
-          <FileCode className="h-4 w-4" /><span className="hidden md:inline">Patch.md</span>
+          <FileCode className="h-4 w-4" /><span className="hidden md:inline">Patch.yaml</span>
         </Button>
         <Button variant="default" size="sm" onClick={exportJson} className="gap-1">
           <Download className="h-4 w-4" /><span className="hidden md:inline">placements.json</span>
