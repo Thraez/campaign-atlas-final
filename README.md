@@ -4,7 +4,25 @@ A static, GitHub Pages–hosted interactive fantasy atlas and wiki for D&D world
 
 **Architecture rule:** Obsidian markdown is the source of truth. The app does not own canon lore. A build script reads selected markdown files, parses YAML frontmatter and Obsidian wikilinks, and generates static atlas data that the React app loads.
 
-> Status: Foundation (Batch 1) — content pipeline + schema. Map editor and player-safe publishing land in later batches.
+> **Status — current reality**
+>
+> Implemented and shipping: source-generated atlas (markdown vault → `atlas.json`),
+> player-safe `--player --strict` build, GitHub Pages auto-publish workflow, multi-map
+> worlds with regions / fog / routes / grid / scale, `/atlas` viewer with pins,
+> side-panel, search palette, timeline, browse / tag / type pages, `/atlas/edit` patch
+> workflow (pins, layers, map settings, asset zip), wikilink resolution with player-safe
+> rendering, calendar-aware dates, minimap, **offline PWA (production only)**, and
+> **print / PDF player handouts**.
+>
+> **Remaining work (next):**
+>
+> - First real-world map image dropped into `public/atlas/assets/maps/` and wired into
+>   `world.yaml` (a tiny SVG placeholder ships in the repo for now — see _Sample
+>   placeholder map_ below).
+> - Real-device PWA QA pass (see _PWA QA checklist_).
+> - Migrate or retire the legacy editor at `/legacy-editor` (kept for back-compat,
+>   no new features).
+> - Possibly: globe / spherical projection mode (not planned yet).
 
 ---
 
@@ -39,11 +57,25 @@ atlas:
   aliases: [Thorn Hold, The Red City]
   images: [assets/images/thornhold.webp]
   summary: A red-stone mining city.
-  x: 100000                         # optional bootstrap placement coords
+  x: 100000                         # legacy single-map coords (still supported)
   y: 50000
+  # Multi-map alternative — wins over x/y when both present:
+  # placements:
+  #   - mapId: astrath-deeprealm-overview
+  #     x: 100000
+  #     y: 50000
+  #   - mapId: astrath-deeprealm-northern-reaches
+  #     x: 30000
+  #     y: 20000
 tags: [city, mining]
 ---
 ```
+
+`atlas.placements[]` lets one entity appear on multiple maps. Each entry needs an
+`x` and `y`; `mapId` defaults to the world's first map. Legacy `atlas.x` / `atlas.y`
+remain valid and are emitted as a single placement on the default map. The
+`/atlas/edit` exporter and `npm run atlas:apply-placements` both round-trip into
+`atlas.placements`, preserving entries on other maps.
 
 Unknown `visibility` values produce a build warning and fall back to `dm`.
 
