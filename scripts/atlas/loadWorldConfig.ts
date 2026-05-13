@@ -35,6 +35,21 @@ interface WorldYaml {
     layers?: Array<Partial<MapLayer> & { src: string; id: string }>;
     scale?: MapScale;
     grid?: GridOverlay;
+    /** Editor-friendly nested geometry. mapId may be omitted (inferred from parent). */
+    regions?: Array<Partial<Region> & { id: string; name: string; points: Point[]; mapId?: string }>;
+    routes?: Array<{
+      id: string;
+      mapId?: string;
+      name: string;
+      mode?: string;
+      speed?: number;
+      color?: string;
+      weight?: number;
+      dashed?: boolean;
+      visibility?: string;
+      waypoints: Array<Point | { entityId: string } | string>;
+    }>;
+    fog?: Partial<FogOverlay> & { mapId?: string; reveals?: Point[][]; enabled?: boolean };
   }>;
   regions?: Array<Partial<Region> & { id: string; mapId: string; name: string; points: Point[] }>;
   fog?: Array<Partial<FogOverlay> & { mapId: string; reveals?: Point[][]; enabled?: boolean }>;
@@ -134,14 +149,36 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
     };
   });
 
-  const regions: Region[] = (data.regions ?? []).map((r) => {
+  // Collect regions from BOTH formats:
+  //   • top-level `regions:` (legacy, canonical)
+  //   • nested `maps[].regions:` (Creator Cockpit exports)
+  // Nested entries inherit `mapId` from the parent map. If a nested entry
+  // explicitly sets a different mapId, we warn (likely a paste mistake).
+  type RawRegion = Partial<Region> & { id: string; name: string; points: Point[]; mapId?: string };
+  const rawRegions: RawRegion[] = [];
+  for (const r of (data.regions ?? [])) rawRegions.push(r as RawRegion);
+  for (const m of (data.maps ?? [])) {
+    const parentId = m.id ?? "";
+    for (const r of (m.regions ?? [])) {
+      if (r.mapId && parentId && r.mapId !== parentId) {
+        warnings.push(`region "${r.id}" nested under map "${parentId}" but declares mapId "${r.mapId}" — using "${parentId}"`);
+      }
+      rawRegions.push({ ...r, mapId: parentId || r.mapId });
+    }
+  }
+  const seenRegionIds = new Set<string>();
+  const regions: Region[] = rawRegions.map((r) => {
+    if (seenRegionIds.has(r.id)) {
+      warnings.push(`duplicate region id "${r.id}" — keeping first definition`);
+    }
+    seenRegionIds.add(r.id);
     const visibility = normalizeVis(r.visibility, warnings, `region "${r.id}"`);
     if (!Array.isArray(r.points) || r.points.length < 3) {
       warnings.push(`region "${r.id}" has fewer than 3 points — skipping`);
     }
     return {
       id: r.id,
-      mapId: r.mapId,
+      mapId: r.mapId ?? "",
       name: r.name,
       entityId: r.entityId,
       color: r.color,
@@ -150,16 +187,62 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
       points: (r.points ?? []) as Point[],
       visibility,
     };
-  }).filter((r) => r.points.length >= 3);
+  })
+    // Drop duplicates (keep first) and invalid geometry.
+    .filter((r, idx, arr) => arr.findIndex((x) => x.id === r.id) === idx)
+    .filter((r) => r.points.length >= 3);
 
-  const fogs: FogOverlay[] = (data.fog ?? []).map((f) => ({
-    mapId: f.mapId,
-    enabled: f.enabled !== false,
-    color: f.color ?? "rgba(8, 12, 20, 0.55)",
-    reveals: (f.reveals ?? []) as Point[][],
-  }));
+  // Fog: top-level array + nested per-map block. Warn on duplicate mapId.
+  const rawFogs: Array<Partial<FogOverlay> & { mapId: string; reveals?: Point[][]; enabled?: boolean }> = [];
+  for (const f of (data.fog ?? [])) rawFogs.push(f);
+  for (const m of (data.maps ?? [])) {
+    if (!m.fog) continue;
+    const parentId = m.id ?? "";
+    const f = m.fog;
+    if (f.mapId && parentId && f.mapId !== parentId) {
+      warnings.push(`fog nested under map "${parentId}" but declares mapId "${f.mapId}" — using "${parentId}"`);
+    }
+    rawFogs.push({ ...f, mapId: parentId || (f.mapId ?? "") });
+  }
+  const seenFogMaps = new Set<string>();
+  const fogs: FogOverlay[] = rawFogs.flatMap((f) => {
+    if (seenFogMaps.has(f.mapId)) {
+      warnings.push(`fog defined twice for map "${f.mapId}" — keeping first definition`);
+      return [];
+    }
+    seenFogMaps.add(f.mapId);
+    return [{
+      mapId: f.mapId,
+      enabled: f.enabled !== false,
+      color: f.color ?? "rgba(8, 12, 20, 0.55)",
+      reveals: (f.reveals ?? []) as Point[][],
+    }];
+  });
 
-  const routes: RawRoute[] = (data.routes ?? []).map((r) => {
+  // Routes: top-level + nested under maps[].routes.
+  type RawRouteSpec = {
+    id: string; mapId?: string; name: string; mode?: string; speed?: number;
+    color?: string; weight?: number; dashed?: boolean; visibility?: string;
+    waypoints: Array<Point | { entityId: string } | string>;
+  };
+  const rawRoutes: RawRouteSpec[] = [];
+  for (const r of (data.routes ?? [])) rawRoutes.push(r);
+  for (const m of (data.maps ?? [])) {
+    const parentId = m.id ?? "";
+    for (const r of (m.routes ?? [])) {
+      if (r.mapId && parentId && r.mapId !== parentId) {
+        warnings.push(`route "${r.id}" nested under map "${parentId}" but declares mapId "${r.mapId}" — using "${parentId}"`);
+      }
+      rawRoutes.push({ ...r, mapId: parentId || r.mapId });
+    }
+  }
+  const seenRouteIds = new Set<string>();
+  const routes: RawRoute[] = rawRoutes.flatMap((r) => {
+    if (seenRouteIds.has(r.id)) {
+      warnings.push(`duplicate route id "${r.id}" — keeping first definition`);
+      return [];
+    }
+    seenRouteIds.add(r.id);
     const visibility = normalizeVis(r.visibility, warnings, `route "${r.id}"`);
     let mode: RouteMode | undefined;
     if (r.mode) {
@@ -174,9 +257,9 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
       return null as unknown as WaypointSpec;
     }).filter(Boolean) as WaypointSpec[];
 
-    return {
+    return [{
       id: r.id,
-      mapId: r.mapId,
+      mapId: r.mapId ?? "",
       name: r.name,
       mode,
       speed: typeof r.speed === "number" ? r.speed : undefined,
@@ -185,7 +268,7 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
       dashed: r.dashed,
       visibility,
       waypoints,
-    };
+    }];
   });
 
   let calendar: WorldCalendar | undefined;
