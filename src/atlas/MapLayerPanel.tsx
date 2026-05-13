@@ -178,6 +178,28 @@ export function MapLayerPanel(props: Props) {
           <Button size="sm" variant="default" className="gap-1.5" onClick={exportPatch} title="Download world.yaml patch">
             <FileCode className="h-3.5 w-3.5" /> Patch
           </Button>
+          <Button size="sm" variant="default" className="gap-1.5" onClick={exportZip} title="Download .zip of uploaded assets">
+            <Package className="h-3.5 w-3.5" /> Zip
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" title="Clear local draft assets">
+                <Eraser className="h-3.5 w-3.5" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear local draft assets?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Removes every uploaded image preview and local layer override from this browser, across every map. Already-published assets in <code>public/atlas/</code> are not touched.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => { onClearAll(); toast.info("Local draft layers cleared."); }}>Clear drafts</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
         <input
           ref={fileInput}
