@@ -508,10 +508,31 @@ interface EntityPanelProps {
   onShowOnMap: (p: MapPlacement) => void;
 }
 
+function CopyLinkButton({ entityId }: { entityId: string }) {
+  const [copied, setCopied] = useState(false);
+  const handle = useCallback(async () => {
+    try {
+      const base = window.location.origin + (import.meta.env.BASE_URL || "/").replace(/\/+$/, "");
+      await navigator.clipboard.writeText(`${base}/atlas?entity=${encodeURIComponent(entityId)}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // ignore
+    }
+  }, [entityId]);
+  return (
+    <Button variant="ghost" size="icon" onClick={handle} title="Copy share link">
+      {copied ? <Check className="h-4 w-4 text-green-500" /> : <Link2 className="h-4 w-4" />}
+    </Button>
+  );
+}
+
 const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function EntityPanel(
   { entity, placements, onOpenEntity, onClose, onShowOnMap },
   ref
 ) {
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+
   if (!entity) {
     return (
       <div className="flex-1 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
@@ -522,6 +543,10 @@ const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function Entity
       </div>
     );
   }
+
+  const imageUrl = (src: string) =>
+    src.startsWith("http://") || src.startsWith("https://") ? src : (import.meta.env.BASE_URL || "/") + src;
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-start justify-between gap-2 px-4 py-3 border-b border-border">
@@ -532,13 +557,36 @@ const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function Entity
             <div className="text-xs text-muted-foreground mt-0.5">aka {entity.aliases.join(", ")}</div>
           )}
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4" /></Button>
+        <div className="flex items-center">
+          <CopyLinkButton entityId={entity.id} />
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4" /></Button>
+        </div>
       </div>
 
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-4">
           {entity.summary && (
             <p className="text-sm italic text-muted-foreground border-l-2 border-primary pl-3">{entity.summary}</p>
+          )}
+
+          {entity.images.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {entity.images.map((src, i) => (
+                <button
+                  key={`${src}-${i}`}
+                  onClick={() => setLightboxSrc(imageUrl(src))}
+                  className="flex-shrink-0 rounded border border-border overflow-hidden hover:border-primary transition focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <img
+                    src={imageUrl(src)}
+                    alt={`${entity.title} image ${i + 1}`}
+                    className="h-24 w-24 object-cover block"
+                    loading="lazy"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                </button>
+              ))}
+            </div>
           )}
 
           {placements.length > 0 && (
@@ -581,6 +629,21 @@ const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function Entity
           )}
         </div>
       </ScrollArea>
+
+      {/* Lightbox */}
+      <Dialog open={!!lightboxSrc} onOpenChange={(open) => !open && setLightboxSrc(null)}>
+        <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 bg-black/90 border-none overflow-hidden">
+          <DialogTitle className="sr-only">{entity.title} image</DialogTitle>
+          {lightboxSrc && (
+            <img
+              src={lightboxSrc}
+              alt={`${entity.title}`}
+              className="max-w-full max-h-[85vh] object-contain mx-auto"
+              onClick={() => setLightboxSrc(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });
