@@ -31,9 +31,44 @@ export interface MapDocument {
   height: number;
   layers: MapLayer[];
   regions?: Region[];
+  routes?: Route[];
   fog?: FogOverlay;
+  scale?: MapScale;
+  grid?: GridOverlay;
   oceanColor?: string;
   wrapX?: boolean;
+}
+
+export interface MapScale {
+  unitsPerPixel: number;        // e.g. 0.05 means 1 px = 0.05 miles
+  unitLabel: string;            // "mi" | "km" | "leagues" | ...
+}
+
+export type GridKind = "square" | "hex";
+
+export interface GridOverlay {
+  kind: GridKind;
+  size: number;                 // cell size in map pixels
+  color?: string;               // CSS color, default rgba(255,255,255,0.08)
+  enabled?: boolean;            // default true
+}
+
+export type RouteMode = "foot" | "horse" | "ship" | "cart" | "fly" | "custom";
+
+export interface Route {
+  id: string;
+  mapId: string;
+  name: string;
+  mode?: RouteMode;
+  speed?: number;               // units per hour (uses MapScale unitLabel)
+  color?: string;
+  weight?: number;              // px stroke
+  dashed?: boolean;
+  visibility: EntityVisibility;
+  // Each waypoint is either explicit coords or an entity id (resolved at build time).
+  waypoints: Array<Point | { entityId: string }>;
+  // Resolved at build time:
+  resolvedPoints?: Point[];
 }
 
 export type Point = [number, number]; // [x, y] in map coordinates (top-left origin)
