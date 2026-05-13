@@ -109,7 +109,7 @@ export function RegionLayer({ map, api, visible = true }: Props) {
               api.movePoint(selected.id, i, [Math.round(ll.lng), Math.round(H - ll.lat)]);
             },
             contextmenu: (ev) => {
-              L.DomEvent.preventDefault(ev);
+              L.DomEvent.preventDefault(ev.originalEvent);
               api.deletePoint(selected.id, i);
             },
           }}
