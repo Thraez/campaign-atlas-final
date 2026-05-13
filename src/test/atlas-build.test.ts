@@ -56,6 +56,7 @@ function read(outDir: string) {
   return atlas as {
     entities: Array<{ id: string; visibility: string; body: string }>;
     placements: Array<{ entityId: string; mapId: string; x: number; y: number }>;
+    maps: Array<{ id: string; layers: Array<{ id: string; src: string }> }>;
     buildReport: {
       warnings: string[];
       duplicateSlugs: number;
@@ -64,6 +65,29 @@ function read(outDir: string) {
       externalAssets?: number;
     };
   };
+}
+
+function writeWorldVault(dir: string, worldYaml: string) {
+  fs.mkdirSync(path.join(dir, "content/test-world/_atlas"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "content/test-world/notes"), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, "atlas.config.json"),
+    JSON.stringify({
+      contentRoot: "content",
+      outputDir: "out",
+      defaultWorld: "test-world",
+      include: ["**/*.md"],
+      exclude: [],
+    })
+  );
+  fs.writeFileSync(
+    path.join(dir, "content/test-world/_atlas/world.yaml"),
+    worldYaml
+  );
+  fs.writeFileSync(
+    path.join(dir, "content/test-world/notes/Stub.md"),
+    `---\ntitle: Stub\natlas:\n  visibility: player\n---\nbody\n`
+  );
 }
 
 describe.sequential("atlas build pipeline", () => {
@@ -241,5 +265,91 @@ describe.sequential("atlas build pipeline", () => {
     ]);
     expect(result.status).not.toBe(0);
     expect(result.stdout + result.stderr).toMatch(/duplicate slug/i);
+  });
+
+  it("valid world.yaml with one layer outputs that layer into atlas.json", () => {
+    const dir = path.join(tmpRoot, "valid-world");
+    writeWorldVault(
+      dir,
+      `maps:\n  - id: test-world-overview\n    name: Overview\n    width: 1000\n    height: 500\n    layers:\n      - id: base\n        src: /atlas/assets/maps/map.jpg\n        x: 0\n        y: 0\n        width: 1000\n        height: 500\n        opacity: 1\n        zIndex: 1\n`
+    );
+    const result = run([
+      "--config",
+      path.join(dir, "atlas.config.json"),
+      "--out",
+      path.join(tmpRoot, "valid-world-out"),
+    ]);
+    expect(result.status, result.stderr + result.stdout).toBe(0);
+    const atlas = read(path.join(tmpRoot, "valid-world-out"));
+    const map = atlas.maps.find((m) => m.id === "test-world-overview");
+    expect(map).toBeDefined();
+    expect(map!.layers).toHaveLength(1);
+    expect(map!.layers[0].src).toMatch(/map\.jpg$/);
+  });
+
+  it("world.yaml containing markdown fences FAILS the build", () => {
+    const dir = path.join(tmpRoot, "fence-world");
+    writeWorldVault(
+      dir,
+      "```yaml\nmaps:\n  - id: test-world-overview\n    name: Overview\n    width: 1000\n    height: 500\n    layers: []\n```\n"
+    );
+    const result = run([
+      "--config",
+      path.join(dir, "atlas.config.json"),
+      "--out",
+      path.join(tmpRoot, "fence-out"),
+    ]);
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toMatch(/markdown code fence/i);
+  });
+
+  it("world.yaml with no maps FAILS the build", () => {
+    const dir = path.join(tmpRoot, "nomaps-world");
+    writeWorldVault(dir, "maps: []\n");
+    const result = run([
+      "--config",
+      path.join(dir, "atlas.config.json"),
+      "--out",
+      path.join(tmpRoot, "nomaps-out"),
+    ]);
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toMatch(/no maps defined/i);
+  });
+
+  it("missing local layer asset FAILS strict player build", () => {
+    const dir = path.join(tmpRoot, "missing-layer");
+    writeWorldVault(
+      dir,
+      `maps:\n  - id: test-world-overview\n    name: Overview\n    width: 1000\n    height: 500\n    layers:\n      - id: base\n        src: /atlas/assets/maps/does-not-exist-anywhere.png\n        x: 0\n        y: 0\n        width: 1000\n        height: 500\n        opacity: 1\n        zIndex: 1\n`
+    );
+    const result = run([
+      "--player",
+      "--strict",
+      "--config",
+      path.join(dir, "atlas.config.json"),
+      "--out",
+      path.join(tmpRoot, "missing-layer-out"),
+    ]);
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toMatch(/missing local asset/i);
+  });
+
+  it("external layer URL warns but does not fail", () => {
+    const dir = path.join(tmpRoot, "ext-layer");
+    writeWorldVault(
+      dir,
+      `maps:\n  - id: test-world-overview\n    name: Overview\n    width: 1000\n    height: 500\n    layers:\n      - id: base\n        src: https://example.com/map.png\n        x: 0\n        y: 0\n        width: 1000\n        height: 500\n        opacity: 1\n        zIndex: 1\n`
+    );
+    const result = run([
+      "--player",
+      "--strict",
+      "--config",
+      path.join(dir, "atlas.config.json"),
+      "--out",
+      path.join(tmpRoot, "ext-layer-out"),
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    const atlas = read(path.join(tmpRoot, "ext-layer-out"));
+    expect(atlas.buildReport.warnings.join("\n")).toMatch(/external asset/i);
   });
 });

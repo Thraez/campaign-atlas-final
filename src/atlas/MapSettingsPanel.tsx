@@ -48,11 +48,15 @@ export function MapSettingsPanel({ map, baseMap, onPatch, onReset }: Props) {
 
   const exportPatch = () => {
     const lines: string[] = [];
-    lines.push(`# Map settings patch — ${map.name}`);
-    lines.push("");
-    lines.push("Paste under the matching map entry in `content/<world>/_atlas/world.yaml`.");
-    lines.push("");
-    lines.push("```yaml");
+    lines.push(`# Map settings patch — ${map.name} (${map.id})`);
+    lines.push(`# Generated ${new Date().toISOString()}`);
+    lines.push(`#`);
+    lines.push(`# HOW TO APPLY:`);
+    lines.push(`# Open content/<world>/_atlas/world.yaml and find the entry under "maps:"`);
+    lines.push(`# whose id is "${map.id}". REPLACE its settings (width/height/oceanColor/`);
+    lines.push(`# wrapX/grid) with the YAML below. Keep the existing layers: section.`);
+    lines.push(`# DO NOT paste the # comments, and DO NOT wrap in markdown fences.`);
+    lines.push(``);
     lines.push(`maps:`);
     lines.push(`  - id: ${map.id}`);
     lines.push(`    width: ${map.width}`);
@@ -66,15 +70,14 @@ export function MapSettingsPanel({ map, baseMap, onPatch, onReset }: Props) {
       if (map.grid.color) lines.push(`      color: "${map.grid.color}"`);
       lines.push(`      enabled: ${map.grid.enabled !== false}`);
     }
-    lines.push("```");
-    downloadText(`map-settings-${map.id}.md`, lines.join("\n"));
+    downloadText(`map-settings-${map.id}.yaml`, lines.join("\n"), "text/yaml");
     checklist.show({
       title: "Map settings patch exported",
       description: "Your map settings YAML patch is ready. Follow the checklist to commit it.",
-      files: [`map-settings-${map.id}.md`],
+      files: [`map-settings-${map.id}.yaml`],
       steps: [
-        { label: "Open the downloaded Patch.md file", detail: "It contains the YAML snippet to paste into world.yaml." },
-        { label: "Paste under the matching map entry", detail: `In content/<world>/_atlas/world.yaml, find the map with id "${map.id}" and replace its settings with the exported YAML.` },
+        { label: "Open the downloaded .yaml file", detail: "It is pure YAML — only non-comment lines belong in world.yaml." },
+        { label: "Paste under the matching map entry", detail: `In content/<world>/_atlas/world.yaml, find the map with id "${map.id}" and replace its settings with the YAML below the comment header. Do not paste markdown code fences.` },
         { label: "Commit changes to main", detail: "Push the updated world.yaml." },
         { label: "GitHub Action publishes automatically", detail: "The publish-atlas.yml workflow will run and deploy to GitHub Pages." },
       ],
