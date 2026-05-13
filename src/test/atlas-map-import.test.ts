@@ -78,12 +78,25 @@ describe("mapImport helpers", () => {
     expect(plan.maps[0].layers.map((l) => l.id)).toEqual(["base", "over"]);
   });
 
-  it("validateImportPlan flags duplicate map ids as blocking", () => {
+  it("buildImportPlan dedupes maps with the same id and merges layers", () => {
     const a = makeImage({ id: "a", originalFilename: "same.png" });
     const b = makeImage({ id: "b", originalFilename: "same.png" });
+    // Force distinct layer ids so the merge is visible (per-image otherwise collapses).
+    b.assignment.layerId = "same-2";
+    const plan = buildImportPlan({ images: [a, b], mode: "per-image", defaultWorldId: "astrath" });
+    expect(plan.maps).toHaveLength(1);
+    expect(plan.maps[0].layers.map((l) => l.id).sort()).toEqual(["same", "same-2"]);
+  });
+
+  it("validateImportPlan flags duplicate layer ids as blocking", () => {
+    const a = makeImage({ id: "a", originalFilename: "alpha.png" });
+    const b = makeImage({ id: "b", originalFilename: "beta.png" });
+    // Force same layer id on the same target map.
+    b.assignment.mapId = a.assignment.mapId;
+    b.assignment.layerId = a.assignment.layerId;
     const plan = buildImportPlan({ images: [a, b], mode: "per-image", defaultWorldId: "astrath" });
     const issues = validateImportPlan(plan, [a, b]);
-    expect(issues.some((i) => i.severity === "blocking" && /Duplicate map/.test(i.message))).toBe(true);
+    expect(issues.some((i) => i.severity === "blocking" && /Duplicate layer/.test(i.message))).toBe(true);
   });
 
   it("validateImportPlan rejects unsafe asset paths", () => {
@@ -119,11 +132,13 @@ describe("mapImport helpers", () => {
     expect(yaml).toContain("layers:");
   });
 
-  it("buildPatchFile starts with patch header comments and is fence-free", () => {
+  it("buildPatchFile starts with patch header and contains no actual fenced YAML block", () => {
     const img = makeImage();
     const plan = buildImportPlan({ images: [img], mode: "per-image", defaultWorldId: "astrath" });
     const patch = buildPatchFile(plan);
     expect(patch).toMatch(/^# Map import patch/);
-    expect(patch).not.toMatch(/```/);
+    // A real fence would start a line with ```; the header only mentions the
+    // string inside a comment, never as a leading fence.
+    expect(patch.split("\n").some((l) => /^\s*```/.test(l))).toBe(false);
   });
 });
