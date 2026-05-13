@@ -361,6 +361,40 @@ async function main() {
     routes: routes.filter((r) => r.mapId === m.id),
   }));
 
+  // -------- Asset validation --------
+  // Walk every entity image and every map layer src. We separate:
+  //   - external URLs (http(s)/data) — warned but allowed
+  //   - local paths    — must exist under public/ (or the configured outputDir's parent)
+  const PUBLIC_DIR = path.join(ROOT, "public");
+  const missingAssetList: string[] = [];
+  const externalAssetList: string[] = [];
+
+  const checkAsset = (raw: string, owner: string) => {
+    if (!raw) return;
+    const isExternal = /^(https?:|data:|blob:)/i.test(raw);
+    if (isExternal) {
+      externalAssets += 1;
+      externalAssetList.push(`${owner}: ${raw}`);
+      warnings.push(`${owner}: external asset "${raw}" — not bundled with the player build`);
+      return;
+    }
+    localAssets += 1;
+    // Local: try public/<path> with leading slash stripped.
+    const rel = raw.replace(/^\/+/, "");
+    const abs = path.join(PUBLIC_DIR, rel);
+    if (!fs.existsSync(abs)) {
+      missingAssets += 1;
+      missingAssetList.push(`${owner}: missing local asset "${raw}" (looked in public/${rel})`);
+    }
+  };
+
+  for (const { entity } of pending) {
+    for (const img of entity.images) checkAsset(img, `entity ${entity.id}`);
+  }
+  for (const m of maps) {
+    for (const layer of m.layers ?? []) checkAsset(layer.src, `map ${m.id} layer ${layer.id}`);
+  }
+
   const project: AtlasProject = {
     version: new Date().toISOString().replace(/[:.]/g, "-"),
     publishedAt: new Date().toISOString(),
@@ -375,9 +409,13 @@ async function main() {
       included: pending.length,
       excluded: scanInfo.excludedFiles + visibilityExcluded,
       warnings,
-      brokenLinks,
+      brokenLinks: unresolvedLinks,        // back-compat alias
+      unresolvedLinks,
       duplicateSlugs,
       strippedDmBlocks,
+      localAssets,
+      externalAssets,
+      missingAssets,
     },
   };
 
