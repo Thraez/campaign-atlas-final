@@ -1,14 +1,15 @@
 import { Link } from "react-router-dom";
 import { Compass, Map, MapPin, BookOpen, CalendarClock, FlaskConical } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { isDmToolsEnabled } from "@/atlas/dmTools";
 
-const tiles = [
+const allTiles = [
   { to: "/atlas", title: "Player Atlas", icon: Map,
     desc: "The published, player-safe map and wiki. DM-only entries are physically removed before publish.",
     cta: "Open the atlas →" },
   { to: "/atlas/edit", title: "DM Placement & Map Editor", icon: MapPin,
     desc: "Place pins on maps, manage map image layers, and export YAML patches you can commit to GitHub.",
-    cta: "Open editor →", badge: "DM" },
+    cta: "Open editor →", badge: "DM", dmOnly: true },
   { to: "/atlas/browse", title: "Browse", icon: BookOpen,
     desc: "Alphabetical directory plus tag and type landing pages.",
     cta: "Browse entries →" },
@@ -17,10 +18,12 @@ const tiles = [
     cta: "Open timeline →" },
   { to: "/legacy-editor", title: "Legacy Local Editor", icon: FlaskConical,
     desc: "The original in-browser atlas editor with optional cloud save. Kept for back-compat — not the source of truth.",
-    cta: "Open legacy editor →", badge: "Legacy" },
+    cta: "Open legacy editor →", badge: "Legacy", dmOnly: true },
 ];
 
 export default function Landing() {
+  const dmOn = isDmToolsEnabled();
+  const tiles = allTiles.filter((t) => !t.dmOnly || dmOn);
   return (
     <div className="min-h-screen w-full bg-background text-foreground">
       <header className="border-b border-border">
