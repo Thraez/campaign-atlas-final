@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { FileCode, RotateCcw, Grid3x3, Globe2, Droplets } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { GridKind, GridOverlay, MapDocument } from "@/atlas/content/schema";
+import { ExportChecklistDialog, useExportChecklist } from "./ExportChecklistDialog";
 
 interface Props {
   map: MapDocument;
