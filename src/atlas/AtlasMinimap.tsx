@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
+import { normalizeAtlasAssetUrl } from "@/atlas/url";
 
 interface Props {
   map: MapDocument;
@@ -83,7 +84,7 @@ export function AtlasMinimap({ map, layers, width = 180, className }: Props) {
       {[...layers].sort((a, b) => a.zIndex - b.zIndex).map((layer) => (
         <img
           key={layer.id}
-          src={layer.src}
+          src={normalizeAtlasAssetUrl(layer.src)}
           alt=""
           draggable={false}
           style={{

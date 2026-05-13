@@ -17,6 +17,7 @@ import {
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
+import { normalizeAtlasAssetUrl } from "@/atlas/url";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
@@ -318,7 +319,7 @@ export default function AtlasViewer() {
             {[...activeMap.layers].sort((a, b) => a.zIndex - b.zIndex).map((layer) => (
               <ImageOverlay
                 key={layer.id}
-                url={layer.src}
+                url={normalizeAtlasAssetUrl(layer.src)}
                 bounds={[
                   [activeMap.height - (layer.y + layer.height), layer.x],
                   [activeMap.height - layer.y, layer.x + layer.width],
@@ -549,8 +550,7 @@ const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function Entity
     );
   }
 
-  const imageUrl = (src: string) =>
-    src.startsWith("http://") || src.startsWith("https://") ? src : (import.meta.env.BASE_URL || "/") + src;
+  const imageUrl = (src: string) => normalizeAtlasAssetUrl(src);
 
   return (
     <div className="flex flex-col h-full">

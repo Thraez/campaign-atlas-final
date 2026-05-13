@@ -337,9 +337,46 @@ Implemented:
 
 Next:
 
-- **Batch 10 — UX/workflow stabilization**: `/` is now a clear landing page; the original in-browser editor moved to `/legacy-editor` (clearly labeled, kept for back-compat). `/atlas/edit` got a new **Layers** tab with multi-file image upload (object-URL preview), URL-add with external-asset warning, numeric x/y/width/height/opacity/zIndex inputs, lock-aspect, ±100/±1000/±10000 nudge, 50–150% scale presets, Center / Fit map / Map=layer / Expand / Reset, and a **map layer YAML patch** export with an asset commit checklist. Wikilinks to not-yet-created notes (`unresolvedLinks`) no longer fail strict player builds and never leak DM-only target names. Build now reports `localAssets`, `externalAssets`, `missingAssets`; missing local assets fail strict player builds, external URLs only warn. Save model is documented in-product (local browser draft → exported YAML/asset patch → committed to GitHub → player-safe published atlas).
+- **Batch 10 — UX/workflow stabilization**: `/` is a clear landing page; the original in-browser editor moved to `/legacy-editor` (clearly labeled, kept for back-compat). `/atlas/edit` got a **Layers** tab with multi-file image upload (object-URL preview), URL-add with external-asset warning, numeric x/y/width/height/opacity/zIndex inputs, lock-aspect, ±100/±1000/±10000 nudge, 50–150% scale presets, Center / Fit map / Map=layer / Expand / Reset, and a **map layer YAML patch** export with an asset commit checklist. Wikilinks to not-yet-created notes never fail strict player builds and never leak DM-only target names.
 
-- **Batch 11 — GitHub-web-friendly workflow**: Export checklist dialogs guide DMs through committing patches via GitHub web or Lovable. Added `public/atlas/assets/maps/` directory structure. README now documents the full no-CLI workflow: edit in `/atlas/edit`, export patch + asset zip, apply through GitHub web or ask Lovable, commit to main, and let the GitHub Action publish automatically.
+- **Batch 11 — GitHub-web-friendly workflow**: export checklist dialogs guide DMs through committing patches via GitHub web or Lovable. README documents the full no-CLI workflow.
 
-Skipped intentionally for this batch (not in acceptance criteria, deferred): wrapX globe-style rendering, a dedicated minimap on `/atlas`, and the bundled `.zip` asset export — the YAML patch + filename checklist covers the publishing path today.
+- **Batch 12 — Hardening for GitHub-web editing**: `.gitkeep` placeholders for every asset and content folder so they are visible and editable in the GitHub website (`public/atlas/assets/{maps,images,icons,portraits,locations,handouts}` and `content/<world>/{_atlas,_drafts,_dm,settlements,regions,ruins,events,factions,npcs,items}`). New `normalizeAtlasAssetUrl` helper resolves layer/image paths against `import.meta.env.BASE_URL` so `/atlas/assets/...` references render correctly under GitHub Pages project subpaths (e.g. `https://user.github.io/repo-name/`). Used by the player viewer, placement editor, minimap, and layer panel thumbnails. YAML patches still emit human-friendly absolute paths. Added a commented sample `layers:` block to `world.yaml`. Routes are unchanged: `/` landing, `/atlas` player atlas, `/atlas/edit` DM editor (layers + map settings + minimap, patch + zip export), `/legacy-editor` legacy experimental editor.
+
+## Website-only quickstart (no CLI)
+
+You can edit maps and content entirely from the GitHub website.
+
+**A. Upload a map image**
+
+1. Open your repo on GitHub.
+2. Navigate to `public/atlas/assets/maps/`.
+3. Click **Add file → Upload files** and drag your image (e.g. `overview-map.webp`).
+4. Click **Commit changes…** → commit to `main`.
+
+**B. Edit the map config**
+
+1. Open `content/astrath-deeprealm/_atlas/world.yaml`.
+2. Click the pencil icon to edit.
+
+**C. Add the layer** under the matching map:
+
+```yaml
+layers:
+  - id: overview-map
+    src: /atlas/assets/maps/overview-map.webp
+    x: 0
+    y: 0
+    width: 200000
+    height: 100000
+    opacity: 1
+    zIndex: 1
+```
+
+**D. Commit to `main`.**
+
+**E. The `publish-atlas.yml` GitHub Action runs automatically** and deploys the updated atlas to GitHub Pages. Check the **Actions** tab for progress.
+
+For new content entries, browse the matching folder under `content/astrath-deeprealm/` (settlements, regions, npcs, …), click **Add file → Create new file**, and commit a markdown file with frontmatter as documented above. Files in `_drafts/` and `_dm/` are excluded from the player build by `atlas.config.json`.
+
 

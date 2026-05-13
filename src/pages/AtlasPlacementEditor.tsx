@@ -17,6 +17,7 @@ import { useMapLayers } from "@/atlas/useMapLayers";
 import { MapLayerPanel } from "@/atlas/MapLayerPanel";
 import { MapSettingsPanel } from "@/atlas/MapSettingsPanel";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
+import { normalizeAtlasAssetUrl } from "@/atlas/url";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 // Bumped to v2: storage shape changed from { [entityId]: Override } to
@@ -334,7 +335,7 @@ export default function AtlasPlacementEditor() {
             {showLayers && layerEditor.mergedLayers.map((layer) => (
               <ImageOverlay
                 key={layer.id}
-                url={layer.src}
+                url={normalizeAtlasAssetUrl(layer.src)}
                 bounds={[
                   [activeMap.height - (layer.y + layer.height), layer.x],
                   [activeMap.height - layer.y, layer.x + layer.width],
