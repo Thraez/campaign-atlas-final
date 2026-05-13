@@ -43,6 +43,25 @@ function safeFilename(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+function readImageSize(src: string): Promise<{ w: number; h: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => reject(new Error("image load failed"));
+    img.src = src;
+  });
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error ?? new Error("read failed"));
+    r.readAsDataURL(file);
+  });
+}
+
 export function useMapLayers(map: MapDocument | undefined) {
   const [byMap, setByMap] = useState<Stored>(() => loadStored());
   const [selectedId, setSelectedId] = useState<string | null>(null);
