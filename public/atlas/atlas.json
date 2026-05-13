@@ -1,6 +1,6 @@
 {
-  "version": "2026-05-13T06-21-40-710Z",
-  "publishedAt": "2026-05-13T06:21:40.711Z",
+  "version": "2026-05-13T06-29-43-616Z",
+  "publishedAt": "2026-05-13T06:29:43.616Z",
   "worlds": [
     {
       "id": "astrath-deeprealm",
@@ -22,55 +22,6 @@
   ],
   "entities": [
     {
-      "id": "deeproot-cavern",
-      "title": "Deeproot Cavern",
-      "type": "dungeon",
-      "world": "astrath-deeprealm",
-      "visibility": "dm",
-      "canon": "canon",
-      "aliases": [],
-      "tags": [
-        "dungeon",
-        "secret"
-      ],
-      "summary": "DM-only — the true source of Thornhold's resonance crystal.",
-      "images": [],
-      "body": "\n# Deeproot Cavern (DM)\n\nBeneath [[Raven's Vale]] lies a network of crystalline tunnels. The lord-mayor\nof [[Thornhold]] has been quietly extracting resonance crystal here for two\ndecades. The deeper galleries are rumored to house something older.\n",
-      "bodyHtml": "<h1>Deeproot Cavern (DM)</h1>\n<p>Beneath <a class=\"atlas-wikilink\" data-entity-id=\"ravens-vale\" href=\"#/entity/ravens-vale\">Raven's Vale</a> lies a network of crystalline tunnels. The lord-mayor\nof <a class=\"atlas-wikilink\" data-entity-id=\"thornhold\" href=\"#/entity/thornhold\">Thornhold</a> has been quietly extracting resonance crystal here for two\ndecades. The deeper galleries are rumored to house something older.</p>\n",
-      "frontmatter": {
-        "title": "Deeproot Cavern",
-        "atlas": {
-          "publish": false,
-          "type": "dungeon",
-          "world": "astrath-deeprealm",
-          "visibility": "dm",
-          "summary": "DM-only — the true source of Thornhold's resonance crystal.",
-          "x": 90000,
-          "y": 70000
-        },
-        "tags": [
-          "dungeon",
-          "secret"
-        ]
-      },
-      "sourcePath": "content/astrath-deeprealm/dungeons/Deeproot-Cavern.md",
-      "links": [
-        {
-          "target": "Raven's Vale",
-          "display": "Raven's Vale",
-          "resolvedId": "ravens-vale",
-          "broken": false
-        },
-        {
-          "target": "Thornhold",
-          "display": "Thornhold",
-          "resolvedId": "thornhold",
-          "broken": false
-        }
-      ],
-      "backlinks": []
-    },
-    {
       "id": "ravens-vale",
       "title": "Raven's Vale",
       "type": "region",
@@ -86,23 +37,8 @@
       "images": [],
       "body": "\n# Raven's Vale\n\nA long, mist-choked valley running south from [[Thornhold]]. Locals say the\nravens that nest here can speak the names of those soon to die — a rumor most\ntravelers prefer not to test.\n",
       "bodyHtml": "<h1>Raven&#39;s Vale</h1>\n<p>A long, mist-choked valley running south from <a class=\"atlas-wikilink\" data-entity-id=\"thornhold\" href=\"#/entity/thornhold\">Thornhold</a>. Locals say the\nravens that nest here can speak the names of those soon to die — a rumor most\ntravelers prefer not to test.</p>\n",
-      "frontmatter": {
-        "title": "Raven's Vale",
-        "atlas": {
-          "publish": true,
-          "type": "region",
-          "world": "astrath-deeprealm",
-          "visibility": "player",
-          "summary": "A misty valley beneath Thornhold's bluffs.",
-          "x": 70000,
-          "y": 30000
-        },
-        "tags": [
-          "region",
-          "wilderness"
-        ]
-      },
-      "sourcePath": "content/astrath-deeprealm/regions/Ravens-Vale.md",
+      "frontmatter": {},
+      "sourcePath": "",
       "links": [
         {
           "target": "Thornhold",
@@ -112,10 +48,6 @@
         }
       ],
       "backlinks": [
-        {
-          "id": "deeproot-cavern",
-          "title": "Deeproot Cavern"
-        },
         {
           "id": "thornhold",
           "title": "Thornhold"
@@ -137,24 +69,9 @@
       "summary": "A crumbling fortress whispered of in taverns.",
       "images": [],
       "body": "\n# The Old Keep\n\nFew travelers have laid eyes on the keep and returned with a clear story.\nThose who have speak of [[A Lost King]] — though no record of such a ruler exists\nin the chronicles of [[Sunhaven]].\n",
-      "bodyHtml": "<h1>The Old Keep</h1>\n<p>Few travelers have laid eyes on the keep and returned with a clear story.\nThose who have speak of <span class=\"atlas-broken-link\" title=\"Broken link: A Lost King\">A Lost King</span> — though no record of such a ruler exists\nin the chronicles of <a class=\"atlas-wikilink\" data-entity-id=\"sunhaven\" href=\"#/entity/sunhaven\">Sunhaven</a>.</p>\n",
-      "frontmatter": {
-        "title": "The Old Keep",
-        "atlas": {
-          "publish": true,
-          "type": "ruin",
-          "world": "astrath-deeprealm",
-          "visibility": "rumor",
-          "summary": "A crumbling fortress whispered of in taverns.",
-          "x": 130000,
-          "y": 60000
-        },
-        "tags": [
-          "ruin",
-          "mystery"
-        ]
-      },
-      "sourcePath": "content/astrath-deeprealm/ruins/The-Old-Keep.md",
+      "bodyHtml": "<h1>The Old Keep</h1>\n<p>Few travelers have laid eyes on the keep and returned with a clear story.\nThose who have speak of A Lost King — though no record of such a ruler exists\nin the chronicles of <a class=\"atlas-wikilink\" data-entity-id=\"sunhaven\" href=\"#/entity/sunhaven\">Sunhaven</a>.</p>\n",
+      "frontmatter": {},
+      "sourcePath": "",
       "links": [
         {
           "target": "A Lost King",
@@ -190,22 +107,8 @@
       "images": [],
       "body": "\n# Sunhaven\n\nSunhaven is the seat of the realm and Astrath's largest port. Its merchants trade\nregularly with [[Thornhold]] and host pilgrims bound for [[The Old Keep]].\n\n> \"All roads in the west bend toward Sunhaven.\"\n",
       "bodyHtml": "<h1>Sunhaven</h1>\n<p>Sunhaven is the seat of the realm and Astrath&#39;s largest port. Its merchants trade\nregularly with <a class=\"atlas-wikilink\" data-entity-id=\"thornhold\" href=\"#/entity/thornhold\">Thornhold</a> and host pilgrims bound for <a class=\"atlas-wikilink\" data-entity-id=\"the-old-keep\" href=\"#/entity/the-old-keep\">The Old Keep</a>.</p>\n<blockquote>\n<p>&quot;All roads in the west bend toward Sunhaven.&quot;</p>\n</blockquote>\n",
-      "frontmatter": {
-        "title": "Sunhaven",
-        "atlas": {
-          "publish": true,
-          "type": "settlement",
-          "world": "astrath-deeprealm",
-          "visibility": "player",
-          "summary": "The shining capital on the western shore.",
-          "x": 40000,
-          "y": 45000
-        },
-        "tags": [
-          "capital"
-        ]
-      },
-      "sourcePath": "content/astrath-deeprealm/settlements/Sunhaven.md",
+      "frontmatter": {},
+      "sourcePath": "",
       "links": [
         {
           "target": "Thornhold",
@@ -250,27 +153,8 @@
       "images": [],
       "body": "\n# Thornhold\n\nThornhold is a fortified mining city perched above the [[Raven's Vale]].\nIt trades iron and rare resonance crystal with [[Sunhaven]] along the King's Road.\n\n## History\n\nFounded after the Sundering, Thornhold's walls were raised from the same red\nstone that gives the city its name. Travelers know it by its alias *The Red City*.\n\n## Notable places\n\n- The Iron Gate\n- Old Market\n- Foundry District\n",
       "bodyHtml": "<h1>Thornhold</h1>\n<p>Thornhold is a fortified mining city perched above the <a class=\"atlas-wikilink\" data-entity-id=\"ravens-vale\" href=\"#/entity/ravens-vale\">Raven's Vale</a>.\nIt trades iron and rare resonance crystal with <a class=\"atlas-wikilink\" data-entity-id=\"sunhaven\" href=\"#/entity/sunhaven\">Sunhaven</a> along the King&#39;s Road.</p>\n<h2>History</h2>\n<p>Founded after the Sundering, Thornhold&#39;s walls were raised from the same red\nstone that gives the city its name. Travelers know it by its alias <em>The Red City</em>.</p>\n<h2>Notable places</h2>\n<ul>\n<li>The Iron Gate</li>\n<li>Old Market</li>\n<li>Foundry District</li>\n</ul>\n",
-      "frontmatter": {
-        "title": "Thornhold",
-        "atlas": {
-          "publish": true,
-          "type": "settlement",
-          "world": "astrath-deeprealm",
-          "visibility": "player",
-          "aliases": [
-            "Thorn Hold",
-            "The Red City"
-          ],
-          "summary": "A red-stone mining city carved into the southern bluffs.",
-          "x": 100000,
-          "y": 50000
-        },
-        "tags": [
-          "city",
-          "mining"
-        ]
-      },
-      "sourcePath": "content/astrath-deeprealm/settlements/Thornhold.md",
+      "frontmatter": {},
+      "sourcePath": "",
       "links": [
         {
           "target": "Raven's Vale",
@@ -287,10 +171,6 @@
       ],
       "backlinks": [
         {
-          "id": "deeproot-cavern",
-          "title": "Deeproot Cavern"
-        },
-        {
           "id": "ravens-vale",
           "title": "Raven's Vale"
         },
@@ -301,63 +181,17 @@
       ]
     }
   ],
-  "placements": [
-    {
-      "id": "deeproot-cavern@astrath-deeprealm-overview",
-      "entityId": "deeproot-cavern",
-      "mapId": "astrath-deeprealm-overview",
-      "x": 90000,
-      "y": 70000,
-      "label": "Deeproot Cavern",
-      "visibility": "dm"
-    },
-    {
-      "id": "ravens-vale@astrath-deeprealm-overview",
-      "entityId": "ravens-vale",
-      "mapId": "astrath-deeprealm-overview",
-      "x": 70000,
-      "y": 30000,
-      "label": "Raven's Vale",
-      "visibility": "player"
-    },
-    {
-      "id": "the-old-keep@astrath-deeprealm-overview",
-      "entityId": "the-old-keep",
-      "mapId": "astrath-deeprealm-overview",
-      "x": 130000,
-      "y": 60000,
-      "label": "The Old Keep",
-      "visibility": "rumor"
-    },
-    {
-      "id": "sunhaven@astrath-deeprealm-overview",
-      "entityId": "sunhaven",
-      "mapId": "astrath-deeprealm-overview",
-      "x": 40000,
-      "y": 45000,
-      "label": "Sunhaven",
-      "visibility": "player"
-    },
-    {
-      "id": "thornhold@astrath-deeprealm-overview",
-      "entityId": "thornhold",
-      "mapId": "astrath-deeprealm-overview",
-      "x": 100000,
-      "y": 50000,
-      "label": "Thornhold",
-      "visibility": "player"
-    }
-  ],
+  "placements": [],
   "assets": [],
   "buildReport": {
     "scanned": 6,
-    "included": 5,
-    "excluded": 1,
+    "included": 4,
+    "excluded": 2,
     "warnings": [
-      "content/astrath-deeprealm/ruins/The-Old-Keep.md: broken wikilink \"A Lost King\""
+      "the-old-keep: broken wikilink \"A Lost King\""
     ],
     "brokenLinks": 1,
     "duplicateSlugs": 0,
-    "strippedDmBlocks": 2
+    "strippedDmBlocks": 1
   }
 }

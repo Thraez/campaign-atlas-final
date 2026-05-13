@@ -1,17 +1,5 @@
 [
   {
-    "id": "deeproot-cavern",
-    "title": "Deeproot Cavern",
-    "type": "dungeon",
-    "aliases": [],
-    "tags": [
-      "dungeon",
-      "secret"
-    ],
-    "summary": "DM-only — the true source of Thornhold's resonance crystal.",
-    "excerpt": "# Deeproot Cavern (DM) Beneath [[Raven's Vale]] lies a network of crystalline tunnels. The lord-mayor of [[Thornhold]] has been quietly extracting resonance crystal here for two decades. The deeper galleries are rumored to house something o"
-  },
-  {
     "id": "ravens-vale",
     "title": "Raven's Vale",
     "type": "region",
