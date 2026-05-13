@@ -1,6 +1,7 @@
 {
-  "version": "2026-05-13T23-38-38-711Z",
-  "publishedAt": "2026-05-13T23:38:38.711Z",
+  "version": "2026-05-13T23-46-51-556Z",
+  "schemaVersion": 1,
+  "publishedAt": "2026-05-13T23:46:51.556Z",
   "worlds": [
     {
       "id": "astrath-deeprealm",
@@ -576,7 +577,9 @@
     "scanned": 9,
     "included": 7,
     "excluded": 2,
-    "warnings": [],
+    "warnings": [
+      "content/astrath-deeprealm/_atlas/world.yaml: no schemaVersion declared — treating as legacy v1. Add \"schemaVersion: 1\" at the top of world.yaml to silence this warning."
+    ],
     "brokenLinks": 1,
     "unresolvedLinks": 1,
     "duplicateSlugs": 0,
