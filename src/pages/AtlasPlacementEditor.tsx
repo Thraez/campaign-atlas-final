@@ -383,7 +383,7 @@ export default function AtlasPlacementEditor() {
             <Section title={`Placed (${placed.length})`}>
               {placed.map((e) => {
                 const c = effectiveCoord(e.id)!;
-                const overridden = e.id in overrides;
+                const overridden = overrideKey(activeMap.id, e.id) in overrides;
                 return (
                   <EntityRow
                     key={e.id}
