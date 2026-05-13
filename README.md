@@ -8,21 +8,37 @@ A static, GitHub Pages–hosted interactive fantasy atlas and wiki for D&D world
 >
 > Implemented and shipping: source-generated atlas (markdown vault → `atlas.json`),
 > player-safe `--player --strict` build, GitHub Pages auto-publish workflow, multi-map
-> worlds with regions / fog / routes / grid / scale, `/atlas` viewer with pins,
-> side-panel, search palette, timeline, browse / tag / type pages, `/atlas/edit` patch
-> workflow (pins, layers, map settings, asset zip), wikilink resolution with player-safe
-> rendering, calendar-aware dates, minimap, **offline PWA (production only)**, and
-> **print / PDF player handouts**.
->
-> **Remaining work (next):**
->
-> - First real-world map image dropped into `public/atlas/assets/maps/` and wired into
->   `world.yaml` (a tiny SVG placeholder ships in the repo for now — see _Sample
->   placeholder map_ below).
-> - Real-device PWA QA pass (see _PWA QA checklist_).
-> - Migrate or retire the legacy editor at `/legacy-editor` (kept for back-compat,
->   no new features).
-> - Possibly: globe / spherical projection mode (not planned yet).
+> worlds with regions / fog / routes / grid / scale, real overview map (`map.jpg`)
+> wired into `world.yaml`, `/atlas` viewer with pins, side-panel, search palette,
+> timeline, browse / tag / type pages, `/atlas/edit` patch workflow (pins, layers,
+> map settings, asset zip — all exporting `.yaml` patches with paste-safe headers),
+> wikilink resolution with player-safe rendering, calendar-aware dates, minimap,
+> **offline PWA (production only)**, **print / PDF player handouts**, and a
+> Vitest suite covering the build's spoiler-protection + `world.yaml` validation
+> invariants.
+
+## ⚠️ Most common mistake
+
+**Do not paste an entire exported patch file into `world.yaml`.** Patches now
+download as `.yaml` files with `#` comment headers explaining where the YAML
+goes. `world.yaml` itself must be **pure YAML** — no markdown code fences
+(<code>```yaml</code>), no patch instructions, no `## entity:` headers. The
+build now fails loudly if `world.yaml` contains a markdown fence so you can
+catch the mistake before deploy.
+
+Quick example of a valid layer entry pointing at the bundled `map.jpg`:
+
+```yaml
+layers:
+  - id: overview-map
+    src: /atlas/assets/maps/map.jpg
+    x: 0
+    y: 0
+    width: 200000
+    height: 100000
+    opacity: 1
+    zIndex: 1
+```
 
 ---
 
