@@ -343,7 +343,11 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
     // Player-visible relationships pointing at DM-only entities leak too.
     if (playerVisibleVis.has(e.visibility) && Array.isArray(e.relationships)) {
       for (const rel of e.relationships) {
-        const targetId = (rel as { targetId?: string }).targetId;
+        // Schema field is `entity` (the target slug). Older code used `targetId`
+        // — accept both for back-compat with any in-flight YAML.
+        const targetId =
+          (rel as { entity?: string }).entity ??
+          (rel as { targetId?: string }).targetId;
         const relVis = (rel as { visibility?: string }).visibility ?? "player";
         if (!targetId) continue;
         if (!entityIds.has(targetId)) {

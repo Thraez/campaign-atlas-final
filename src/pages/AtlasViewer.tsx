@@ -20,6 +20,7 @@ import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { printEntityHandout } from "@/atlas/printHandout";
+import { isDmToolsEnabled } from "@/atlas/dmTools";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
@@ -299,9 +300,11 @@ export default function AtlasViewer() {
         <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
           <Link to="/atlas/timeline" title="Timeline of dated entries"><CalendarClock className="h-4 w-4 mr-1" aria-hidden="true" />Timeline</Link>
         </Button>
-        <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
-          <Link to="/atlas/edit" title="DM placement editor">Edit pins</Link>
-        </Button>
+        {isDmToolsEnabled() && (
+          <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+            <Link to="/atlas/edit" title="DM placement editor">Edit pins</Link>
+          </Button>
+        )}
         <OfflineMenu />
         <span className="hidden md:block text-[11px] text-muted-foreground ml-2">
           Updated {new Date(data.project.publishedAt).toLocaleDateString()}

@@ -51,11 +51,50 @@ describe("validateProject — Publish Check", () => {
   it("flags player relationship to DM-only entity as blocking spoiler-leak", () => {
     const dm = entity({ id: "boss", visibility: "dm" });
     const pub = entity({
-      id: "guard", relationships: [{ targetId: "boss", type: "serves", visibility: "player" } as never],
+      id: "guard", relationships: [{ entity: "boss", type: "serves", visibility: "player" }],
     });
     const p = baseProject({ entities: [dm, pub] });
     const r = validateProject({ project: p, draftPlacements: [] });
     expect(r.issues.some((i) => i.code === "spoiler-leak-relationship")).toBe(true);
+  });
+
+  it("passes player relationship to player-visible target", () => {
+    const a = entity({ id: "a", visibility: "player" });
+    const b = entity({
+      id: "b", visibility: "player",
+      relationships: [{ entity: "a", type: "ally", visibility: "player" }],
+    });
+    const r = validateProject({ project: baseProject({ entities: [a, b] }), draftPlacements: [] });
+    expect(r.issues.some((i) => i.code === "spoiler-leak-relationship")).toBe(false);
+  });
+
+  it("blocks rumor relationship to hidden target", () => {
+    const hidden = entity({ id: "h", visibility: "hidden" });
+    const pub = entity({
+      id: "p", visibility: "rumor",
+      relationships: [{ entity: "h", type: "knows-of", visibility: "rumor" }],
+    });
+    const r = validateProject({ project: baseProject({ entities: [hidden, pub] }), draftPlacements: [] });
+    expect(r.issues.some((i) => i.code === "spoiler-leak-relationship")).toBe(true);
+  });
+
+  it("allows DM-only relationship to DM-only target", () => {
+    const a = entity({ id: "a", visibility: "dm" });
+    const b = entity({
+      id: "b", visibility: "dm",
+      relationships: [{ entity: "a", type: "controls", visibility: "dm" }],
+    });
+    const r = validateProject({ project: baseProject({ entities: [a, b] }), draftPlacements: [] });
+    expect(r.issues.some((i) => i.code === "spoiler-leak-relationship")).toBe(false);
+  });
+
+  it("warns on unresolved relationship target", () => {
+    const e = entity({
+      id: "x", visibility: "player",
+      relationships: [{ entity: "ghost", type: "remembers", visibility: "player" }],
+    });
+    const r = validateProject({ project: baseProject({ entities: [e] }), draftPlacements: [] });
+    expect(r.issues.some((i) => i.code === "relationship-unresolved")).toBe(true);
   });
 
   it("warns on external map asset URLs", () => {
