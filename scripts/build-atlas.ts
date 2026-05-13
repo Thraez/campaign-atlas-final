@@ -675,6 +675,12 @@ async function main() {
     console.error(`Strict player mode: ${missingAssets} missing local asset(s). Failing build.`);
     process.exit(4);
   }
+  // Unsupported asset extensions are unrenderable in browsers — block strict
+  // player builds before they ship 404s or broken images.
+  if (flags.player && flags.strict && badExtensionCount > 0) {
+    console.error(`Strict player mode: ${badExtensionCount} asset(s) with unsupported extension. Failing build.`);
+    process.exit(9);
+  }
   // Strict mode (non-asset, non-link) still fails on duplicate slugs etc.
   // Unresolved wikilinks are explicitly allowed and do NOT fail strict.
   if (flags.strict && duplicateSlugs > 0) {
