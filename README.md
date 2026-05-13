@@ -224,6 +224,44 @@ Coordinates use each map's pixel space with origin `(0, 0)` at the top-left.
 
 ---
 
+## Timeline & in-world calendar
+
+Define a calendar in `content/<world>/_atlas/world.yaml`:
+
+```yaml
+calendar:
+  name: Reckoning of the Twin Moons
+  epochName: AS                # appended to year labels, e.g. "612 AS"
+  daysPerWeek: 8
+  months:
+    - { name: Frostmoon, days: 30 }
+    - { name: Thawing,   days: 30 }
+    - { name: Greentide, days: 32 }
+```
+
+Add `atlas.date` to any entry's frontmatter:
+
+```yaml
+---
+title: Founding of Thornhold
+atlas:
+  publish: true
+  type: event
+  date: "47-3-12"        # YYYY-MM-DD in the world calendar
+  summary: Lord Garron raises the red walls...
+---
+```
+
+`YYYY`, `YYYY-MM`, and `YYYY-MM-DD` are all accepted; missing parts default to the start of the year / month. The build resolves each date against the calendar to produce a sortable integer (`dateValue`) and a pretty label (`dateRaw`).
+
+Open `/atlas/timeline` to see entries grouped by year. Each card links to `/atlas?entity=<id>`, which deep-links to that entry's pin and side panel in the map viewer.
+
+## Search
+
+The header search palette (⌘K / Ctrl+K) does full-text matching across titles, aliases, tags, summaries, and the markdown body, with highlighted snippets around the first hit. Filter chips above the results scope by entry **type** (settlement, event, region, …) and by the most common **tags**.
+
+---
+
 ## Roadmap
 
 Implemented:
