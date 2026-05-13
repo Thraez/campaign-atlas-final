@@ -242,4 +242,4 @@ describe("atlas build pipeline", () => {
     expect(result.status).not.toBe(0);
     expect(result.stdout + result.stderr).toMatch(/duplicate slug/i);
   });
-}, { timeout: 60_000 });
+});
