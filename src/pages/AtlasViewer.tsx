@@ -252,6 +252,16 @@ export default function AtlasViewer() {
             {showFog ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
           </Button>
         )}
+        {activeMap.grid && (
+          <Button
+            variant={(showGrid ?? activeMap.grid.enabled !== false) ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setShowGrid((v) => !(v ?? activeMap.grid!.enabled !== false))}
+            title="Toggle grid"
+          >
+            <Grid3x3 className="h-4 w-4" />
+          </Button>
+        )}
         <Button variant="secondary" size="sm" onClick={() => setSearchOpen(true)} className="gap-2">
           <Search className="h-4 w-4" />
           <span className="hidden sm:inline">Search</span>
