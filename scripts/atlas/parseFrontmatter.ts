@@ -1,6 +1,12 @@
 import matter from "gray-matter";
 import type { EntityVisibility } from "../../src/atlas/content/schema";
 
+export interface AtlasPlacementSpec {
+  mapId?: string;
+  x: number;
+  y: number;
+}
+
 export interface AtlasFrontmatter {
   publish?: boolean;
   type?: string;
@@ -12,8 +18,10 @@ export interface AtlasFrontmatter {
   id?: string;
   tags?: string[];
   canon?: string;
-  date?: string;        // human-readable, e.g. "1247-03-12" or "Spring 1247"
-  dateValue?: number;   // optional explicit numeric override for sorting
+  date?: string;
+  dateValue?: number;
+  /** Multi-map placements. Wins over legacy x/y when present. */
+  placements?: AtlasPlacementSpec[];
 }
 
 export interface ParsedFile {
@@ -45,6 +53,7 @@ export function parseFrontmatter(raw: string, sourcePath: string): ParsedFile {
     date: typeof atlasRaw.date === "string" ? atlasRaw.date
         : (atlasRaw.date instanceof Date ? atlasRaw.date.toISOString().slice(0, 10) : undefined),
     dateValue: typeof atlasRaw.dateValue === "number" ? atlasRaw.dateValue : undefined,
+    placements: parsePlacements(atlasRaw.placements, sourcePath, warnings),
   };
 
   if (typeof atlasRaw.visibility === "string") {
@@ -68,4 +77,30 @@ function toStringArray(v: unknown): string[] {
   if (Array.isArray(v)) return v.filter((x) => typeof x === "string") as string[];
   if (typeof v === "string") return [v];
   return [];
+}
+
+function parsePlacements(v: unknown, sourcePath: string, warnings: string[]): AtlasPlacementSpec[] | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (!Array.isArray(v)) {
+    warnings.push(`${sourcePath}: atlas.placements must be an array — ignored`);
+    return undefined;
+  }
+  const out: AtlasPlacementSpec[] = [];
+  for (let i = 0; i < v.length; i++) {
+    const p = v[i] as Record<string, unknown> | null;
+    if (!p || typeof p !== "object") {
+      warnings.push(`${sourcePath}: atlas.placements[${i}] is not an object — skipped`);
+      continue;
+    }
+    if (typeof p.x !== "number" || typeof p.y !== "number") {
+      warnings.push(`${sourcePath}: atlas.placements[${i}] missing numeric x/y — skipped`);
+      continue;
+    }
+    out.push({
+      mapId: typeof p.mapId === "string" ? p.mapId : undefined,
+      x: p.x,
+      y: p.y,
+    });
+  }
+  return out.length > 0 ? out : undefined;
 }
