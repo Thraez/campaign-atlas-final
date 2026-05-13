@@ -8,11 +8,16 @@ export interface LocalLayer extends MapLayer {
    *  "url"    = external/URL or local path the user typed,
    *  "edit"   = a copy/override of a layer that already exists in world.yaml. */
   origin: "upload" | "url" | "edit";
+  name?: string;
+  locked?: boolean;
   /** For uploads: original filename + suggested target path on disk. */
   filename?: string;
   targetPath?: string;
   /** True for object URLs we own and need to revoke. */
   isObjectUrl?: boolean;
+  /** Cached image bytes (data URL) so a refresh of /atlas/edit can still preview
+   *  the upload — object URLs do NOT survive a reload. */
+  dataUrl?: string;
 }
 
 const STORAGE_KEY = "atlas-local-map-layers-v1";
@@ -26,7 +31,13 @@ function loadStored(): Stored {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
-    return JSON.parse(raw) as Stored;
+    const parsed = JSON.parse(raw) as Stored;
+    // For uploads, we persist a dataUrl rather than the (now-dead) object URL.
+    // Restore src from dataUrl so previews survive a page reload.
+    for (const m of Object.keys(parsed)) {
+      parsed[m] = parsed[m].map((l) => l.dataUrl ? { ...l, src: l.dataUrl, isObjectUrl: false } : l);
+    }
+    return parsed;
   } catch { return {}; }
 }
 
@@ -38,19 +49,48 @@ function safeFilename(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+function readImageSize(src: string): Promise<{ w: number; h: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => reject(new Error("image load failed"));
+    img.src = src;
+  });
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error ?? new Error("read failed"));
+    r.readAsDataURL(file);
+  });
+}
+
 export function useMapLayers(map: MapDocument | undefined) {
   const [byMap, setByMap] = useState<Stored>(() => loadStored());
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Persist (without object URLs — those don't survive a reload anyway).
+  // Persist. Uploads now carry a dataUrl (set when the user uploaded the file)
+  // so previews survive a reload. Object URLs are still stripped — they're dead
+  // after refresh anyway, dataUrl takes their place.
   useEffect(() => {
     const persisted: Stored = {};
     for (const [m, layers] of Object.entries(byMap)) {
-      persisted[m] = layers
-        .filter((l) => !l.isObjectUrl)
-        .map((l) => ({ ...l }));
+      persisted[m] = layers.map((l) => {
+        const copy = { ...l };
+        if (copy.isObjectUrl) {
+          // src is an object URL — replace with dataUrl (if we have one) so the
+          // entry can survive a reload, or strip src entirely if we don't.
+          if (copy.dataUrl) copy.src = copy.dataUrl;
+          else return null;
+        }
+        return copy;
+      }).filter(Boolean) as LocalLayer[];
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted)); }
+    catch { /* quota — skip */ }
   }, [byMap]);
 
   const localLayers = useMemo<LocalLayer[]>(
@@ -71,47 +111,69 @@ export function useMapLayers(map: MapDocument | undefined) {
     setByMap((s) => ({ ...s, [map.id]: updater(s[map.id] ?? []) }));
   }, [map]);
 
-  const addUploaded = useCallback((files: File[]) => {
+  const addUploaded = useCallback(async (files: File[]) => {
     if (!map) return;
-    const additions: LocalLayer[] = files.map((file, i) => {
+    const additions: LocalLayer[] = await Promise.all(files.map(async (file, i) => {
       const url = URL.createObjectURL(file);
       const id = `upload-${Date.now()}-${i}-${safeFilename(file.name).slice(0, 24)}`;
       const sf = safeFilename(file.name);
+      // Sniff natural size so the layer doesn't default to "stretch over the whole map".
+      const dims = await readImageSize(url).catch(() => null);
+      const dataUrl = await fileToDataUrl(file).catch(() => undefined);
       return {
         id,
         src: url,
         x: 0,
         y: 0,
-        width: map.width,
-        height: map.height,
+        width: dims?.w ?? map.width,
+        height: dims?.h ?? map.height,
         opacity: 1,
         zIndex: (map.layers.length + i + 1) * 10,
         origin: "upload",
+        name: file.name,
         filename: file.name,
         targetPath: `public/atlas/assets/maps/${sf}`,
         isObjectUrl: true,
+        dataUrl,
       };
-    });
+    }));
     setLayers((prev) => [...prev, ...additions]);
     if (additions[0]) setSelectedId(additions[0].id);
   }, [map, setLayers]);
 
-  const addUrl = useCallback((src: string) => {
+  const addUrl = useCallback(async (src: string) => {
     if (!map || !src.trim()) return;
+    const trimmed = src.trim();
     const id = `url-${Date.now()}`;
+    const dims = await readImageSize(trimmed).catch(() => null);
     setLayers((prev) => [...prev, {
       id,
-      src: src.trim(),
+      src: trimmed,
       x: 0,
       y: 0,
-      width: map.width,
-      height: map.height,
+      width: dims?.w ?? map.width,
+      height: dims?.h ?? map.height,
       opacity: 1,
       zIndex: (map.layers.length + prev.length + 1) * 10,
-      origin: /^(https?:|data:)/i.test(src.trim()) ? "url" : "url",
+      origin: "url",
+      name: trimmed.split("/").pop() ?? trimmed,
     }]);
     setSelectedId(id);
+    if (!dims) {
+      // Caller (UI) can show a toast; we still add the layer so the user can fix the URL.
+    }
   }, [map, setLayers]);
+
+  const duplicateLayer = useCallback((id: string) => {
+    if (!map) return;
+    const src = (byMap[map.id] ?? []).find((l) => l.id === id)
+      ?? (map.layers.find((l) => l.id === id) ? { ...map.layers.find((l) => l.id === id)!, origin: "edit" as const } : null);
+    if (!src) return;
+    const newId = `${src.id}-copy-${Date.now().toString(36).slice(-4)}`;
+    const dup: LocalLayer = { ...src, id: newId, x: src.x + 200, y: src.y + 200, zIndex: src.zIndex + 1, origin: "upload" === src.origin ? "upload" : (src as LocalLayer).origin ?? "edit" };
+    setLayers((prev) => [...prev, dup]);
+    setSelectedId(newId);
+  }, [map, byMap, setLayers]);
 
   const editBuiltinLayer = useCallback((layerId: string) => {
     if (!map) return;
@@ -145,6 +207,13 @@ export function useMapLayers(map: MapDocument | undefined) {
     setSelectedId(null);
   }, [setLayers]);
 
+  const clearAll = useCallback(() => {
+    Object.values(byMap).forEach((arr) => arr.forEach((l) => l.isObjectUrl && URL.revokeObjectURL(l.src)));
+    setByMap({});
+    setSelectedId(null);
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* noop */ }
+  }, [byMap]);
+
   return {
     localLayers,
     mergedLayers,
@@ -154,7 +223,9 @@ export function useMapLayers(map: MapDocument | undefined) {
     addUrl,
     editBuiltinLayer,
     updateLayer,
+    duplicateLayer,
     removeLayer,
     clearForMap,
+    clearAll,
   };
 }

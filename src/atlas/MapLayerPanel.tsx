@@ -1,12 +1,14 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, Link as LinkIcon, Trash2, Maximize2, Minimize2, Crosshair, RotateCcw, Lock, Unlock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, FileCode } from "lucide-react";
+import JSZip from "jszip";
+import { Upload, Link as LinkIcon, Trash2, Maximize2, Minimize2, Crosshair, RotateCcw, Lock, Unlock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, FileCode, Copy, Eraser, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 
@@ -16,11 +18,13 @@ interface Props {
   localLayers: LocalLayer[];
   selectedId: string | null;
   setSelectedId: (id: string | null) => void;
-  onAddFiles: (files: File[]) => void;
-  onAddUrl: (src: string) => void;
+  onAddFiles: (files: File[]) => void | Promise<void>;
+  onAddUrl: (src: string) => void | Promise<void>;
   onEditBuiltin: (id: string) => void;
   onUpdate: (id: string, patch: Partial<MapLayer>) => void;
+  onDuplicate: (id: string) => void;
   onRemove: (id: string) => void;
+  onClearAll: () => void;
   onSetMapSize?: (w: number, h: number) => void;
 }
 
@@ -38,7 +42,7 @@ function downloadText(name: string, content: string, mime = "text/plain") {
 }
 
 export function MapLayerPanel(props: Props) {
-  const { map, mergedLayers, localLayers, selectedId, setSelectedId, onAddFiles, onAddUrl, onEditBuiltin, onUpdate, onRemove, onSetMapSize } = props;
+  const { map, mergedLayers, localLayers, selectedId, setSelectedId, onAddFiles, onAddUrl, onEditBuiltin, onUpdate, onDuplicate, onRemove, onClearAll, onSetMapSize } = props;
   const fileInput = useRef<HTMLInputElement>(null);
   const [urlDraft, setUrlDraft] = useState("");
   const [lockAspect, setLockAspect] = useState(true);
@@ -78,6 +82,41 @@ export function MapLayerPanel(props: Props) {
     const w = selected.width * factor;
     const h = lockAspect ? w / aspect : selected.height * factor;
     setSize(w, h);
+  };
+
+  const fitWidth = () => selected && setSize(map.width, lockAspect ? map.width / aspect : selected.height);
+  const fitHeight = () => selected && setSize(lockAspect ? map.height * aspect : selected.width, map.height);
+
+  const exportZip = async () => {
+    const uploads = localLayers.filter((l) => l.origin === "upload" && l.dataUrl);
+    if (uploads.length === 0) {
+      toast.info("No uploaded files to bundle (only data-URL uploads can be zipped).");
+      return;
+    }
+    const zip = new JSZip();
+    for (const u of uploads) {
+      const targetPath = (u.targetPath ?? `public/atlas/assets/maps/${u.id}`).replace(/^\/+/, "");
+      const m = u.dataUrl!.match(/^data:[^;]+;base64,(.*)$/);
+      if (!m) continue;
+      zip.file(targetPath, m[1], { base64: true });
+    }
+    zip.file("README.txt", [
+      "AstrathDeeprealm Atlas — uploaded asset bundle",
+      "",
+      "Unzip from the repository root so files land at the listed paths,",
+      "then commit alongside your world.yaml patch and run:",
+      "  npm run atlas:build:player",
+      "",
+      "Files:",
+      ...uploads.map((u) => `  - ${(u.targetPath ?? "").replace(/^\/+/, "")}`),
+    ].join("\n"));
+    const blob = await zip.generateAsync({ type: "blob" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `atlas-assets-${map.id}.zip`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast.success(`Bundled ${uploads.length} file${uploads.length === 1 ? "" : "s"}`);
   };
 
   const exportPatch = () => {
@@ -139,6 +178,28 @@ export function MapLayerPanel(props: Props) {
           <Button size="sm" variant="default" className="gap-1.5" onClick={exportPatch} title="Download world.yaml patch">
             <FileCode className="h-3.5 w-3.5" /> Patch
           </Button>
+          <Button size="sm" variant="default" className="gap-1.5" onClick={exportZip} title="Download .zip of uploaded assets">
+            <Package className="h-3.5 w-3.5" /> Zip
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" title="Clear local draft assets">
+                <Eraser className="h-3.5 w-3.5" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear local draft assets?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Removes every uploaded image preview and local layer override from this browser, across every map. Already-published assets in <code>public/atlas/</code> are not touched.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => { onClearAll(); toast.info("Local draft layers cleared."); }}>Clear drafts</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
         <input
           ref={fileInput}
@@ -206,6 +267,9 @@ export function MapLayerPanel(props: Props) {
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Transform</span>
               <div className="flex items-center gap-1">
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onDuplicate(selected.id)} title="Duplicate">
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setLocked((v) => !v)} title={locked ? "Unlock" : "Lock"}>
                   {locked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
                 </Button>
@@ -269,8 +333,32 @@ export function MapLayerPanel(props: Props) {
                     {Math.round(s * 100)}%
                   </Button>
                 ))}
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={fitWidth}>Fit W</Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={fitHeight}>Fit H</Button>
               </div>
             </div>
+
+            {localSelected && (
+              <div className="space-y-2 border-t border-border pt-2">
+                <div>
+                  <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Name</Label>
+                  <Input value={localSelected.name ?? ""} onChange={(e) => onUpdate(selected.id, { name: e.target.value } as Partial<MapLayer>)} className="h-7 text-xs" />
+                </div>
+                {localSelected.origin === "upload" && (
+                  <div>
+                    <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Target publish path</Label>
+                    <Input
+                      value={localSelected.targetPath ?? ""}
+                      onChange={(e) => onUpdate(selected.id, { targetPath: e.target.value } as Partial<MapLayer>)}
+                      className="h-7 text-xs font-mono"
+                    />
+                  </div>
+                )}
+                {localSelected.origin === "url" && /^https?:/i.test(localSelected.src) && (
+                  <p className="text-[10px] text-amber-300/90">External image — may break in published builds.</p>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-1.5 pt-1">
               <Button size="sm" variant="secondary" className="text-xs" onClick={() => patch({ x: (map.width - selected.width) / 2, y: (map.height - selected.height) / 2 })}>
