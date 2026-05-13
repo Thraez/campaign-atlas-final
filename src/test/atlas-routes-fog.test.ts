@@ -23,7 +23,7 @@ const project: AtlasProject = {
     { id: "thornhold", title: "Thornhold", type: "settlement", visibility: "player", aliases: [], tags: [], summary: "", body: "", contentPath: "" } as never,
     { id: "lair", title: "Lair", type: "dungeon", visibility: "dm", aliases: [], tags: [], summary: "", body: "", contentPath: "" } as never,
   ],
-  placements: [{ entityId: "thornhold", mapId: "world", x: 500, y: 500 }],
+  placements: [{ id: "p1", entityId: "thornhold", mapId: "world", x: 500, y: 500, visibility: "player" }],
   assets: [],
 };
 
