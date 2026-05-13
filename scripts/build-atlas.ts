@@ -144,10 +144,13 @@ async function main() {
   let strippedDmBlocks = 0;
   let detectedDmBlocks = 0;
   let duplicateSlugs = 0;
-  let brokenLinks = 0;
+  let unresolvedLinks = 0;
   let visibilityExcluded = 0;
   let secretPlacementsExcluded = 0;
   let invalidVisibilityCount = 0;
+  let localAssets = 0;
+  let externalAssets = 0;
+  let missingAssets = 0;
 
   type Pending = { entity: Entity; rawBody: string; coords?: { x: number; y: number } };
   const pending: Pending[] = [];
@@ -249,8 +252,8 @@ async function main() {
     entity.links = links;
     for (const l of links) {
       if (l.broken) {
-        brokenLinks += 1;
-        warnings.push(`${entity.sourcePath || entity.id}: broken wikilink "${l.target}"`);
+        // Unresolved wikilinks are normal "not created yet" — count, don't warn.
+        unresolvedLinks += 1;
       } else if (l.resolvedId) {
         if (!backlinkMap.has(l.resolvedId)) backlinkMap.set(l.resolvedId, new Map());
         backlinkMap.get(l.resolvedId)!.set(entity.id, entity.title);
