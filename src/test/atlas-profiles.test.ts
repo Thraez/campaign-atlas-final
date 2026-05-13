@@ -15,8 +15,7 @@ describe("profile DM strip", () => {
       dm: { wants: "save daughter", secret: "ferried cultists" },
     });
     expect(stripped?.player?.known_for).toBe("ferries travelers");
-    // @ts-expect-error player builds must not have a dm half
-    expect(stripped?.dm).toBeUndefined();
+    expect((stripped as { dm?: unknown })?.dm).toBeUndefined();
   });
 
   it("compactProfile drops empty halves", () => {
