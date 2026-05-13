@@ -97,15 +97,17 @@ export default function AtlasPlacementEditor() {
   const [error, setError] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Overrides>(() => {
     try {
-      const v2 = localStorage.getItem(STORAGE_KEY);
-      if (v2) return JSON.parse(v2);
-      // One-time migration from v1 (entityId-keyed) using a single-map assumption.
-      const v1raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+      const v3 = localStorage.getItem(STORAGE_KEY);
+      if (v3) return JSON.parse(v3);
+      // Forward-migration: v2 entries are already keyed by `${mapId}:${entityId}`
+      // and only carry x/y — directly compatible with the v3 shape.
+      const v2raw = localStorage.getItem(LEGACY_STORAGE_KEY_V2);
+      if (v2raw) return JSON.parse(v2raw);
+      // v1 was entityId-keyed; defer mapId resolution until project loads.
+      const v1raw = localStorage.getItem(LEGACY_STORAGE_KEY_V1);
       if (!v1raw) return {};
       const v1 = JSON.parse(v1raw) as Record<string, Override>;
       const migrated: Overrides = {};
-      // We don't yet know the mapId here — defer until project loads.
-      // Stash under a sentinel; resolved on project load.
       Object.entries(v1).forEach(([eid, val]) => { migrated[`__legacy__:${eid}`] = val; });
       return migrated;
     } catch { return {}; }
