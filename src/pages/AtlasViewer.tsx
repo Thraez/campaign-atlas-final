@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState, useCallback, forwardRef } from "react";
-import { MapContainer, Marker, Popup, Polygon, ImageOverlay, useMap } from "react-leaflet";
+import { MapContainer, Marker, Popup, Polygon, Polyline, ImageOverlay, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { loadAtlasContent, loadSearchIndex, type SearchIndexEntry } from "@/atlas/content/loader";
-import type { AtlasProject, Entity, MapDocument, MapPlacement, Region, Point } from "@/atlas/content/schema";
+import type { AtlasProject, Entity, MapDocument, MapPlacement, Point, Route, GridOverlay, MapScale } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Search, X, MapPin, ArrowLeft, Compass, Eye, EyeOff } from "lucide-react";
+import { Search, X, MapPin, ArrowLeft, Compass, Eye, EyeOff, Grid3x3 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -78,6 +78,7 @@ export default function AtlasViewer() {
   const [query, setQuery] = useState("");
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const [showFog, setShowFog] = useState(true);
+  const [showGrid, setShowGrid] = useState<boolean | null>(null); // null = use map default
 
   useEffect(() => {
     Promise.all([loadAtlasContent(true), loadSearchIndex()])
