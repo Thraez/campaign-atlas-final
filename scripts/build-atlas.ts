@@ -122,6 +122,8 @@ function parseFlags(): CliFlags {
     else if (a === "--strict") flags.strict = true;
     else if (a === "--out") flags.outDir = args[++i];
     else if (a.startsWith("--out=")) flags.outDir = a.slice(6);
+    else if (a === "--config") flags.configPath = args[++i];
+    else if (a.startsWith("--config=")) flags.configPath = a.slice(9);
   }
   return flags;
 }
@@ -130,8 +132,8 @@ const PLAYER_VISIBLE = new Set(["player", "rumor"]);
 
 async function main() {
   const flags = parseFlags();
-  const cfg = loadConfig();
-  const contentDir = path.join(ROOT, cfg.contentRoot);
+  const cfg = loadConfig(path.resolve(ROOT, flags.configPath ?? "atlas.config.json"));
+  const contentDir = path.resolve(ROOT, cfg.contentRoot);
   const scanInfo = { excludedFiles: 0 };
   const files = walk(contentDir, contentDir, cfg.include ?? [], cfg.exclude ?? [], scanInfo);
 
