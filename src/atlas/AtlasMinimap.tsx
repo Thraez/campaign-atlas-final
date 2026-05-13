@@ -85,7 +85,7 @@ export function AtlasMinimap({ map, layers, width = 180, className }: Props) {
         <img
           key={layer.id}
           src={normalizeAtlasAssetUrl(layer.src)}
-          alt=""
+          alt="" loading="lazy" decoding="async"
           draggable={false}
           style={{
             position: "absolute",
