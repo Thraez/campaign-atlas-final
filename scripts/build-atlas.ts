@@ -610,6 +610,12 @@ async function main() {
     console.error("Strict mode: duplicate slugs present. Failing build.");
     process.exit(2);
   }
+  // Strict + player must never ship a relationship that points at a DM-only
+  // entity — that's a direct spoiler leak via the public relationship graph.
+  if (flags.player && flags.strict && relationshipLeaks > 0) {
+    console.error(`Strict player mode: ${relationshipLeaks} relationship leak(s) to DM-only entities. Failing build.`);
+    process.exit(5);
+  }
 }
 
 main().catch((e) => {
