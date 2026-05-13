@@ -126,10 +126,20 @@ export default function AtlasPlacementEditor() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
   }, [overrides]);
 
-  const activeMap: MapDocument | undefined = useMemo(
+  // Optional in-session map size override (from "Map = layer" / "Expand" buttons).
+  const [mapSizeOverride, setMapSizeOverride] = useState<Record<string, { w: number; h: number }>>({});
+
+  const baseMap: MapDocument | undefined = useMemo(
     () => project?.maps.find((m) => m.id === activeMapId),
     [project, activeMapId]
   );
+  const activeMap: MapDocument | undefined = useMemo(() => {
+    if (!baseMap) return undefined;
+    const o = mapSizeOverride[baseMap.id];
+    return o ? { ...baseMap, width: o.w, height: o.h } : baseMap;
+  }, [baseMap, mapSizeOverride]);
+
+  const layerEditor = useMapLayers(activeMap);
 
   // Resolve effective coords for an entity on the active map: per-map override
   // wins, else first existing placement on activeMap.
