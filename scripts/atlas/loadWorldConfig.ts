@@ -18,6 +18,7 @@ import type {
   Region,
   Route,
   RouteMode,
+  WorldCalendar,
 } from "../../src/atlas/content/schema";
 
 const VALID_VIS: EntityVisibility[] = ["player", "dm", "hidden", "rumor"];
@@ -49,6 +50,12 @@ interface WorldYaml {
     visibility?: string;
     waypoints: Array<Point | { entityId: string } | string>;
   }>;
+  calendar?: {
+    name?: string;
+    epochName?: string;
+    daysPerWeek?: number;
+    months?: Array<{ name: string; days: number }>;
+  };
 }
 
 export interface WorldConfig {
@@ -56,6 +63,7 @@ export interface WorldConfig {
   regions: Region[];
   fogs: FogOverlay[];
   routes: RawRoute[];
+  calendar?: WorldCalendar;
   warnings: string[];
 }
 
@@ -149,7 +157,24 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
     };
   });
 
-  return { maps, regions, fogs, routes, warnings };
+  let calendar: WorldCalendar | undefined;
+  if (data.calendar) {
+    const months = (data.calendar.months ?? []).filter(
+      (m) => m && typeof m.name === "string" && typeof m.days === "number" && m.days > 0
+    );
+    if (months.length === 0) {
+      warnings.push(`calendar: no valid months defined — calendar ignored`);
+    } else {
+      calendar = {
+        name: data.calendar.name,
+        epochName: data.calendar.epochName,
+        daysPerWeek: typeof data.calendar.daysPerWeek === "number" ? data.calendar.daysPerWeek : undefined,
+        months,
+      };
+    }
+  }
+
+  return { maps, regions, fogs, routes, calendar, warnings };
 }
 
 function sanitizeScale(s: MapScale | undefined, warnings: string[], where: string): MapScale | undefined {

@@ -14,7 +14,21 @@ export interface AtlasProject {
   entities: Entity[];
   placements: MapPlacement[];
   assets: AssetRef[];
+  calendar?: WorldCalendar;
   buildReport?: BuildReport;
+}
+
+// In-world calendar for the timeline. Months sum to the year length.
+export interface CalendarMonth {
+  name: string;
+  days: number;
+}
+
+export interface WorldCalendar {
+  name?: string;
+  epochName?: string;          // e.g. "After Sundering" -> rendered as "1247 AS"
+  daysPerWeek?: number;
+  months: CalendarMonth[];
 }
 
 export interface World {
@@ -115,7 +129,7 @@ export interface ResolvedLink {
 export interface Entity {
   id: string;            // stable slug
   title: string;
-  type: string;          // settlement, region, npc, faction, ...
+  type: string;          // settlement, region, npc, faction, event, ...
   world?: string;
   visibility: EntityVisibility;
   canon?: CanonStatus;
@@ -129,6 +143,11 @@ export interface Entity {
   sourcePath: string;
   links: ResolvedLink[];
   backlinks: { id: string; title: string }[];
+  // Timeline support (Batch 7). dateRaw is human-readable; dateValue is a
+  // sortable integer derived from the world calendar (or ISO date fallback).
+  dateRaw?: string;
+  dateValue?: number;
+  dateYear?: number;
 }
 
 export interface MapPlacement {

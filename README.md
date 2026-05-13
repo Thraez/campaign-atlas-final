@@ -224,6 +224,44 @@ Coordinates use each map's pixel space with origin `(0, 0)` at the top-left.
 
 ---
 
+## Timeline & in-world calendar
+
+Define a calendar in `content/<world>/_atlas/world.yaml`:
+
+```yaml
+calendar:
+  name: Reckoning of the Twin Moons
+  epochName: AS                # appended to year labels, e.g. "612 AS"
+  daysPerWeek: 8
+  months:
+    - { name: Frostmoon, days: 30 }
+    - { name: Thawing,   days: 30 }
+    - { name: Greentide, days: 32 }
+```
+
+Add `atlas.date` to any entry's frontmatter:
+
+```yaml
+---
+title: Founding of Thornhold
+atlas:
+  publish: true
+  type: event
+  date: "47-3-12"        # YYYY-MM-DD in the world calendar
+  summary: Lord Garron raises the red walls...
+---
+```
+
+`YYYY`, `YYYY-MM`, and `YYYY-MM-DD` are all accepted; missing parts default to the start of the year / month. The build resolves each date against the calendar to produce a sortable integer (`dateValue`) and a pretty label (`dateRaw`).
+
+Open `/atlas/timeline` to see entries grouped by year. Each card links to `/atlas?entity=<id>`, which deep-links to that entry's pin and side panel in the map viewer.
+
+## Search
+
+The header search palette (⌘K / Ctrl+K) does full-text matching across titles, aliases, tags, summaries, and the markdown body, with highlighted snippets around the first hit. Filter chips above the results scope by entry **type** (settlement, event, region, …) and by the most common **tags**.
+
+---
+
 ## Roadmap
 
 Implemented:
@@ -234,8 +272,9 @@ Implemented:
 - **Batch 4 — Creator convenience**: `/atlas/edit` placement editor with drag-to-place pins, `placements.json` export, `apply-placements` CLI to round-trip back into markdown frontmatter, copy-paste YAML patch. (US-0601, 0602, 0603, 0604, 1303)
 - **Batch 5 — Layered maps & regions**: multi-map worlds, image layers, polygon regions linked to entities, fog of war with reveal areas, header map switcher and fog toggle. (US-0801, 0802, 0803, 0804, 0805)
 - **Batch 6 — Connections & travel**: routes with entity-id waypoint resolution, per-map scale and travel-mode speeds, distance + travel-time hover tooltips, optional hex/square grid overlay with viewer toggle. See `world.yaml` (`scale`, `grid`, `routes`). (US-0901, 0902, 0903, 0904, 1001)
+- **Batch 7 — Search depth & timeline**: full-text search across body with highlighted snippets, type and tag filter chips, in-world calendar in `world.yaml`, `atlas.date` frontmatter on any entry, `/atlas/timeline` page sorted and grouped by year, deep-link from timeline back into the map via `/atlas?entity=<id>`.
 
 Next:
 
-- **Batch 7 — Search depth & timeline**: full-text search across body, tag/type filters, optional in-world calendar timeline.
+- **Batch 8 — TBD**: per the project's user-story backlog.
 

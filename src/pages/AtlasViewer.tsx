@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Search, X, MapPin, ArrowLeft, Compass, Eye, EyeOff, Grid3x3 } from "lucide-react";
+import { Search, X, MapPin, ArrowLeft, Compass, Eye, EyeOff, Grid3x3, CalendarClock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -141,6 +141,20 @@ export default function AtlasViewer() {
       .then(([project, index]) => {
         setData({ project, index });
         setActiveMapId(project.worlds[0]?.defaultMapId ?? project.maps[0]?.id ?? null);
+        const params = new URLSearchParams(window.location.search);
+        const want = params.get("entity");
+        if (want) {
+          setOpenId(want);
+          setMobilePanelOpen(true);
+          const placement = project.placements.find((p) => p.entityId === want);
+          if (placement) {
+            const m = project.maps.find((mm) => mm.id === placement.mapId);
+            if (m) {
+              setActiveMapId(m.id);
+              setFlyTarget({ x: placement.x, y: placement.y, height: m.height });
+            }
+          }
+        }
       })
       .catch((e: Error) => setError(e.message));
   }, []);
@@ -266,6 +280,9 @@ export default function AtlasViewer() {
           <Search className="h-4 w-4" />
           <span className="hidden sm:inline">Search</span>
           <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded bg-muted border border-border">⌘K</kbd>
+        </Button>
+        <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+          <Link to="/atlas/timeline" title="Timeline of dated entries"><CalendarClock className="h-4 w-4 mr-1" />Timeline</Link>
         </Button>
         <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
           <Link to="/atlas/edit" title="DM placement editor">Edit pins</Link>
@@ -574,28 +591,66 @@ interface SearchProps {
   onClose: () => void;
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c] as string));
+}
+
+// Build a 140-char snippet around the first match of `q` in `body`.
+function snippet(body: string | undefined, q: string): string | null {
+  if (!body || !q) return null;
+  const lower = body;
+  const idx = lower.indexOf(q);
+  if (idx < 0) return null;
+  const start = Math.max(0, idx - 50);
+  const end = Math.min(body.length, idx + q.length + 90);
+  const slice = (start > 0 ? "…" : "") + body.slice(start, end) + (end < body.length ? "…" : "");
+  const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+  return escapeHtml(slice).replace(re, (m) => `<mark class="bg-primary/30 text-foreground rounded-sm px-0.5">${escapeHtml(m)}</mark>`);
+}
+
 function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: SearchProps) {
   const placedIds = useMemo(() => new Set(placements.map((p) => p.entityId)), [placements]);
+  const [activeType, setActiveType] = useState<string | null>(null);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+
+  const allTypes = useMemo(() => {
+    const m = new Map<string, number>();
+    index.forEach((e) => m.set(e.type, (m.get(e.type) ?? 0) + 1));
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
+  }, [index]);
+
+  const allTags = useMemo(() => {
+    const m = new Map<string, number>();
+    index.forEach((e) => e.tags.forEach((t) => m.set(t, (m.get(t) ?? 0) + 1)));
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  }, [index]);
+
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return index.slice(0, 30);
+    let pool = index;
+    if (activeType) pool = pool.filter((e) => e.type === activeType);
+    if (activeTag) pool = pool.filter((e) => e.tags.includes(activeTag));
+    if (!q) return pool.slice(0, 40).map((e) => ({ e, snip: null as string | null }));
+
     const score = (e: SearchIndexEntry): number => {
       let s = 0;
-      if (e.title.toLowerCase().includes(q)) s += 10;
-      if (e.title.toLowerCase().startsWith(q)) s += 10;
+      const t = e.title.toLowerCase();
+      if (t === q) s += 30;
+      if (t.startsWith(q)) s += 14;
+      if (t.includes(q)) s += 10;
       if (e.aliases.some((a) => a.toLowerCase().includes(q))) s += 6;
-      if (e.tags.some((t) => t.toLowerCase().includes(q))) s += 3;
+      if (e.tags.some((tt) => tt.toLowerCase().includes(q))) s += 3;
       if ((e.summary ?? "").toLowerCase().includes(q)) s += 2;
-      if ((e.excerpt ?? "").toLowerCase().includes(q)) s += 1;
+      if ((e.body ?? "").includes(q)) s += 1;
       return s;
     };
-    return index
+    return pool
       .map((e) => ({ e, s: score(e) }))
       .filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s)
-      .slice(0, 30)
-      .map((x) => x.e);
-  }, [query, index]);
+      .slice(0, 40)
+      .map(({ e }) => ({ e, snip: snippet(e.body, q) }));
+  }, [query, index, activeType, activeTag]);
 
   return (
     <div
@@ -603,24 +658,58 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl bg-card border border-border rounded-lg shadow-2xl overflow-hidden"
+        className="w-full max-w-2xl bg-card border border-border rounded-lg shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
           <Search className="h-4 w-4 text-muted-foreground" />
           <Input
             autoFocus
-            placeholder="Search places, regions, NPCs…"
+            placeholder="Search titles, lore body, tags…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="border-0 focus-visible:ring-0 p-0 h-auto"
           />
+          <Link to="/atlas/timeline" onClick={onClose} className="text-[11px] text-muted-foreground hover:text-foreground whitespace-nowrap">
+            Timeline →
+          </Link>
         </div>
+
+        {(allTypes.length > 1 || allTags.length > 0) && (
+          <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-border/50 bg-muted/20">
+            <button
+              onClick={() => setActiveType(null)}
+              className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === null ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+            >
+              all
+            </button>
+            {allTypes.map(([t, n]) => (
+              <button
+                key={t}
+                onClick={() => setActiveType(activeType === t ? null : t)}
+                className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+              >
+                {t} <span className="opacity-60">{n}</span>
+              </button>
+            ))}
+            {allTags.length > 0 && <span className="w-full h-0" />}
+            {allTags.map(([t, n]) => (
+              <button
+                key={t}
+                onClick={() => setActiveTag(activeTag === t ? null : t)}
+                className={`text-[10px] px-2 py-0.5 rounded ${activeTag === t ? "bg-secondary text-secondary-foreground" : "bg-muted/60 hover:bg-accent"}`}
+              >
+                #{t} <span className="opacity-60">{n}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="max-h-[60vh] overflow-y-auto">
           {results.length === 0 ? (
             <div className="p-6 text-sm text-muted-foreground text-center">No matches.</div>
           ) : (
-            results.map((r) => {
+            results.map(({ e: r, snip }) => {
               const placed = placedIds.has(r.id);
               return (
                 <button
@@ -631,9 +720,14 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm">{r.title}</span>
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{r.type}</span>
+                    {r.dateRaw && <span className="text-[10px] text-muted-foreground">· {r.dateRaw}</span>}
                     {placed && <MapPin className="h-3 w-3 text-primary ml-auto" />}
                   </div>
-                  {r.summary && <div className="text-xs text-muted-foreground line-clamp-1">{r.summary}</div>}
+                  {snip ? (
+                    <div className="text-xs text-muted-foreground line-clamp-2" dangerouslySetInnerHTML={{ __html: snip }} />
+                  ) : (
+                    r.summary && <div className="text-xs text-muted-foreground line-clamp-1">{r.summary}</div>
+                  )}
                 </button>
               );
             })

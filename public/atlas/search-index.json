@@ -9,7 +9,56 @@
       "secret"
     ],
     "summary": "DM-only — the true source of Thornhold's resonance crystal.",
-    "excerpt": "# Deeproot Cavern (DM) Beneath [[Raven's Vale]] lies a network of crystalline tunnels. The lord-mayor of [[Thornhold]] has been quietly extracting resonance crystal here for two decades. The deeper galleries are rumored to house something o"
+    "excerpt": "# Deeproot Cavern (DM) Beneath [[Raven's Vale]] lies a network of crystalline tunnels. The lord-mayor of [[Thornhold]] has been quietly extracting resonance crystal here for two decades. The deeper galleries are rumored to house something o",
+    "body": "deeproot cavern (dm) beneath raven's vale lies a network of crystalline tunnels. the lord-mayor of thornhold has been quietly extracting resonance crystal here for two decades. the deeper galleries are rumored to house something older."
+  },
+  {
+    "id": "fall-of-the-old-keep",
+    "title": "Fall of the Old Keep",
+    "type": "event",
+    "aliases": [],
+    "tags": [
+      "calamity",
+      "ruins"
+    ],
+    "summary": "The Old Keep falls in a single night to a shadow that came down from the high passes.",
+    "excerpt": "On the third night of Longnight, 612 AS, the watchfires of the [[The Old Keep|Old Keep]] went dark. Riders from [[Raven's Vale]] found the gates open and the courtyards empty by morning. Whatever passed that night left no bodies, only frost",
+    "body": "on the third night of longnight, 612 as, the watchfires of the old keep went dark. riders from raven's vale found the gates open and the courtyards empty by morning. whatever passed that night left no bodies, only frost. the keep has stood abandoned ever since.",
+    "dateRaw": "3 Longnight, 612 AS",
+    "dateValue": 112765,
+    "dateYear": 612
+  },
+  {
+    "id": "founding-of-thornhold",
+    "title": "Founding of Thornhold",
+    "type": "event",
+    "aliases": [],
+    "tags": [
+      "founding",
+      "thornhold"
+    ],
+    "summary": "Lord Garron raises the red walls of Thornhold above the iron veins of the Spinegrey range.",
+    "excerpt": "Forty-seven years after the [[The Sundering|Sundering]], settlers from the eastern ports broke the first stones of [[Thornhold]] from the cliffside. The foundation feast lasted nine days, ending with the lighting of the Forge of Garron — st",
+    "body": "forty-seven years after the sundering, settlers from the eastern ports broke the first stones of thornhold from the cliffside. the foundation feast lasted nine days, ending with the lighting of the forge of garron — still tended today.",
+    "dateRaw": "12 Greentide, 47 AS",
+    "dateValue": 8720,
+    "dateYear": 47
+  },
+  {
+    "id": "the-sundering",
+    "title": "The Sundering",
+    "type": "event",
+    "aliases": [],
+    "tags": [
+      "cataclysm",
+      "founding"
+    ],
+    "summary": "The cataclysm that split the old continent and ended the Third Age. The new calendar reckons years from the day the sky cracked.",
+    "excerpt": "When the Twin Moons collided in the night sky, the firmament tore and the seas boiled. Half of the old continent slid beneath the waves; what remained became the Astrath Deeprealm. Survivors founded the great cities of [[Thornhold]] and [[S",
+    "body": "when the twin moons collided in the night sky, the firmament tore and the seas boiled. half of the old continent slid beneath the waves; what remained became the astrath deeprealm. survivors founded the great cities of thornhold and sunhaven in the years that followed. this event marks year 0 of the after sundering calendar.",
+    "dateRaw": "1 Frostmoon, 0 AS",
+    "dateValue": 1,
+    "dateYear": 0
   },
   {
     "id": "ravens-vale",
@@ -21,7 +70,8 @@
       "wilderness"
     ],
     "summary": "A misty valley beneath Thornhold's bluffs.",
-    "excerpt": "# Raven's Vale A long, mist-choked valley running south from [[Thornhold]]. Locals say the ravens that nest here can speak the names of those soon to die — a rumor most travelers prefer not to test."
+    "excerpt": "# Raven's Vale A long, mist-choked valley running south from [[Thornhold]]. Locals say the ravens that nest here can speak the names of those soon to die — a rumor most travelers prefer not to test.",
+    "body": "raven's vale a long, mist-choked valley running south from thornhold. locals say the ravens that nest here can speak the names of those soon to die — a rumor most travelers prefer not to test."
   },
   {
     "id": "the-old-keep",
@@ -33,7 +83,8 @@
       "mystery"
     ],
     "summary": "A crumbling fortress whispered of in taverns.",
-    "excerpt": "# The Old Keep Few travelers have laid eyes on the keep and returned with a clear story. Those who have speak of [[A Lost King]] — though no record of such a ruler exists in the chronicles of [[Sunhaven]]."
+    "excerpt": "# The Old Keep Few travelers have laid eyes on the keep and returned with a clear story. Those who have speak of [[A Lost King]] — though no record of such a ruler exists in the chronicles of [[Sunhaven]].",
+    "body": "the old keep few travelers have laid eyes on the keep and returned with a clear story. those who have speak of a lost king — though no record of such a ruler exists in the chronicles of sunhaven."
   },
   {
     "id": "sunhaven",
@@ -44,7 +95,8 @@
       "capital"
     ],
     "summary": "The shining capital on the western shore.",
-    "excerpt": "# Sunhaven Sunhaven is the seat of the realm and Astrath's largest port. Its merchants trade regularly with [[Thornhold]] and host pilgrims bound for [[The Old Keep]]. > \"All roads in the west bend toward Sunhaven.\""
+    "excerpt": "# Sunhaven Sunhaven is the seat of the realm and Astrath's largest port. Its merchants trade regularly with [[Thornhold]] and host pilgrims bound for [[The Old Keep]]. > \"All roads in the west bend toward Sunhaven.\"",
+    "body": "sunhaven sunhaven is the seat of the realm and astrath's largest port. its merchants trade regularly with thornhold and host pilgrims bound for the old keep. \"all roads in the west bend toward sunhaven.\""
   },
   {
     "id": "thornhold",
@@ -59,6 +111,7 @@
       "mining"
     ],
     "summary": "A red-stone mining city carved into the southern bluffs.",
-    "excerpt": "# Thornhold Thornhold is a fortified mining city perched above the [[Raven's Vale]]. It trades iron and rare resonance crystal with [[Sunhaven]] along the King's Road. ## History Founded after the Sundering, Thornhold's walls were raised fr"
+    "excerpt": "# Thornhold Thornhold is a fortified mining city perched above the [[Raven's Vale]]. It trades iron and rare resonance crystal with [[Sunhaven]] along the King's Road. ## History Founded after the Sundering, Thornhold's walls were raised fr",
+    "body": "thornhold thornhold is a fortified mining city perched above the raven's vale. it trades iron and rare resonance crystal with sunhaven along the king's road. history founded after the sundering, thornhold's walls were raised from the same red stone that gives the city its name. travelers know it by its alias the red city . notable places - the iron gate - old market - foundry district"
   }
 ]

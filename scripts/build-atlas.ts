@@ -14,6 +14,7 @@ import { stripDmBlocks } from "./atlas/stripDmBlocks";
 import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
 import { slugify } from "./atlas/slugify";
 import { loadWorldConfig } from "./atlas/loadWorldConfig";
+import { parseAtlasDate } from "./atlas/calendarDate";
 import type {
   AtlasProject,
   Entity,
@@ -124,6 +125,10 @@ async function main() {
   const scanInfo = { excludedFiles: 0 };
   const files = walk(contentDir, cfg.exclude, scanInfo);
 
+  // Load world config up-front so entity parsing can resolve dates against
+  // the in-world calendar.
+  const worldCfg = loadWorldConfig(contentDir, cfg.defaultWorld);
+
   const warnings: string[] = [];
   const errors: string[] = [];
   let strippedDmBlocks = 0;
@@ -190,6 +195,18 @@ async function main() {
       links: [],
       backlinks: [],
     };
+
+    // Date / timeline support.
+    const parsedDate = parseAtlasDate(parsed.atlas.date, worldCfg?.calendar);
+    if (parsedDate) {
+      entity.dateRaw = parsedDate.label;
+      entity.dateValue = parsed.atlas.dateValue ?? parsedDate.value;
+      entity.dateYear = parsedDate.year;
+    } else if (typeof parsed.atlas.dateValue === "number") {
+      entity.dateValue = parsed.atlas.dateValue;
+      entity.dateRaw = parsed.atlas.date;
+    }
+
     const fmAtlas = (parsed.data.atlas as Record<string, unknown>) ?? {};
     const cx = typeof fmAtlas.x === "number" ? fmAtlas.x : undefined;
     const cy = typeof fmAtlas.y === "number" ? fmAtlas.y : undefined;
@@ -232,8 +249,7 @@ async function main() {
   const worldId = cfg.defaultWorld;
   const fallbackMapId = `${worldId}-overview`;
 
-  // Load optional world.yaml (maps, regions, fog).
-  const worldCfg = loadWorldConfig(contentDir, worldId);
+  // worldCfg was loaded earlier (so entity dates can resolve against the calendar).
   if (worldCfg) warnings.push(...worldCfg.warnings);
 
   let maps: MapDocument[] = worldCfg?.maps?.length
@@ -330,6 +346,7 @@ async function main() {
     entities: pending.map((p) => p.entity),
     placements,
     assets: [],
+    calendar: worldCfg?.calendar,
     buildReport: {
       scanned: files.length + scanInfo.excludedFiles,
       included: pending.length,
@@ -345,6 +362,19 @@ async function main() {
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "atlas.json"), JSON.stringify(project, null, 2));
 
+  // Strip markdown syntax for the search index body field. Keeps it small enough
+  // for client-side full-text scan without shipping a wasm search engine.
+  const stripMd = (s: string) =>
+    s
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/!\[[^\]]*]\([^)]*\)/g, " ")
+      .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?]]/g, (_m, t, d) => d || t)
+      .replace(/\[([^\]]*)]\([^)]*\)/g, "$1")
+      .replace(/[*_`>#~]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+
   const searchIndex = pending.map(({ entity }) => ({
     id: entity.id,
     title: entity.title,
@@ -353,6 +383,10 @@ async function main() {
     tags: entity.tags,
     summary: entity.summary,
     excerpt: entity.body.replace(/\s+/g, " ").trim().slice(0, 240),
+    body: stripMd(entity.body).slice(0, 4000),
+    dateRaw: entity.dateRaw,
+    dateValue: entity.dateValue,
+    dateYear: entity.dateYear,
   }));
   fs.writeFileSync(path.join(outDir, "search-index.json"), JSON.stringify(searchIndex, null, 2));
 
