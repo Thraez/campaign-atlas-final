@@ -72,15 +72,25 @@ export function useMapLayers(map: MapDocument | undefined) {
   const [byMap, setByMap] = useState<Stored>(() => loadStored());
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Persist (without object URLs — those don't survive a reload anyway).
+  // Persist. Uploads now carry a dataUrl (set when the user uploaded the file)
+  // so previews survive a reload. Object URLs are still stripped — they're dead
+  // after refresh anyway, dataUrl takes their place.
   useEffect(() => {
     const persisted: Stored = {};
     for (const [m, layers] of Object.entries(byMap)) {
-      persisted[m] = layers
-        .filter((l) => !l.isObjectUrl)
-        .map((l) => ({ ...l }));
+      persisted[m] = layers.map((l) => {
+        const copy = { ...l };
+        if (copy.isObjectUrl) {
+          // src is an object URL — replace with dataUrl (if we have one) so the
+          // entry can survive a reload, or strip src entirely if we don't.
+          if (copy.dataUrl) copy.src = copy.dataUrl;
+          else return null;
+        }
+        return copy;
+      }).filter(Boolean) as LocalLayer[];
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted)); }
+    catch { /* quota — skip */ }
   }, [byMap]);
 
   const localLayers = useMemo<LocalLayer[]>(
