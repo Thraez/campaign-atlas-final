@@ -157,7 +157,24 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
     };
   });
 
-  return { maps, regions, fogs, routes, warnings };
+  let calendar: WorldCalendar | undefined;
+  if (data.calendar) {
+    const months = (data.calendar.months ?? []).filter(
+      (m) => m && typeof m.name === "string" && typeof m.days === "number" && m.days > 0
+    );
+    if (months.length === 0) {
+      warnings.push(`calendar: no valid months defined — calendar ignored`);
+    } else {
+      calendar = {
+        name: data.calendar.name,
+        epochName: data.calendar.epochName,
+        daysPerWeek: typeof data.calendar.daysPerWeek === "number" ? data.calendar.daysPerWeek : undefined,
+        months,
+      };
+    }
+  }
+
+  return { maps, regions, fogs, routes, calendar, warnings };
 }
 
 function sanitizeScale(s: MapScale | undefined, warnings: string[], where: string): MapScale | undefined {
