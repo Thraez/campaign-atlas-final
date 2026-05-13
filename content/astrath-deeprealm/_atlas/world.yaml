@@ -1,6 +1,13 @@
 # Astrath Deeprealm — map / region / fog / route / calendar config.
 #
+# CANON: This file is YAML SOURCE OF TRUTH. The DM normally does NOT edit it
+# by hand — visual edits in /atlas/edit generate a YAML patch which is pasted
+# here and committed. Manual edits are allowed but must remain valid YAML.
+#
 # Parsed by scripts/build-atlas.ts via loadWorldConfig().
+# Generated runtime files (public/atlas/atlas.json, search-index.json) are
+# DERIVED from this file + entity markdown — never treat them as canon.
+#
 # IMPORTANT: This file must be PURE YAML. Do NOT paste markdown code fences
 # (```yaml) from exported patch files into this file — only paste the YAML
 # inside the fence. A build-time check will fail loudly if fences slip in.
