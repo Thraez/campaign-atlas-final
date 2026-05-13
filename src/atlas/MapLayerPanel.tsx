@@ -333,8 +333,32 @@ export function MapLayerPanel(props: Props) {
                     {Math.round(s * 100)}%
                   </Button>
                 ))}
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={fitWidth}>Fit W</Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={fitHeight}>Fit H</Button>
               </div>
             </div>
+
+            {localSelected && (
+              <div className="space-y-2 border-t border-border pt-2">
+                <div>
+                  <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Name</Label>
+                  <Input value={localSelected.name ?? ""} onChange={(e) => onUpdate(selected.id, { name: e.target.value } as Partial<MapLayer>)} className="h-7 text-xs" />
+                </div>
+                {localSelected.origin === "upload" && (
+                  <div>
+                    <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Target publish path</Label>
+                    <Input
+                      value={localSelected.targetPath ?? ""}
+                      onChange={(e) => onUpdate(selected.id, { targetPath: e.target.value } as Partial<MapLayer>)}
+                      className="h-7 text-xs font-mono"
+                    />
+                  </div>
+                )}
+                {localSelected.origin === "url" && /^https?:/i.test(localSelected.src) && (
+                  <p className="text-[10px] text-amber-300/90">External image — may break in published builds.</p>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-1.5 pt-1">
               <Button size="sm" variant="secondary" className="text-xs" onClick={() => patch({ x: (map.width - selected.width) / 2, y: (map.height - selected.height) / 2 })}>
