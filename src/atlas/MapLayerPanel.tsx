@@ -413,6 +413,14 @@ export function MapLayerPanel(props: Props) {
           </div>
         )}
       </ScrollArea>
+      <ExportChecklistDialog
+        open={checklist.open}
+        onOpenChange={checklist.setOpen}
+        title={checklist.state.title}
+        description={checklist.state.description}
+        files={checklist.state.files}
+        steps={checklist.state.steps}
+      />
     </div>
   );
 }
