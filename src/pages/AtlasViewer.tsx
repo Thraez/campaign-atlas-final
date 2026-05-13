@@ -393,6 +393,140 @@ export default function AtlasViewer() {
   );
 }
 
+interface WrappedWorldProps {
+  dx: number;
+  map: MapDocument;
+  placements: MapPlacement[];
+  entityById: Map<string, Entity>;
+  showFog: boolean;
+  showGrid: boolean | null;
+  onOpenEntity: (id: string, fly?: boolean) => void;
+}
+
+function WrappedWorld({ dx, map, placements, entityById, showFog, showGrid, onOpenEntity }: WrappedWorldProps) {
+  const H = map.height;
+  return (
+    <>
+      {[...map.layers].sort((a, b) => a.zIndex - b.zIndex).map((layer) => (
+        <ImageOverlay
+          key={`${layer.id}-${dx}`}
+          url={normalizeAtlasAssetUrl(layer.src)}
+          bounds={[
+            [H - (layer.y + layer.height), layer.x + dx],
+            [H - layer.y, layer.x + layer.width + dx],
+          ] as L.LatLngBoundsLiteral}
+          opacity={layer.opacity}
+        />
+      ))}
+
+      {(map.regions ?? []).map((region) => {
+        const ent = region.entityId ? entityById.get(region.entityId) : undefined;
+        const color = region.color ?? (ent ? (ICON_BY_TYPE[ent.type] ?? ICON_BY_TYPE.default) : "#7fb069");
+        const positions = region.points.map(([x, y]) => [H - y, x + dx] as [number, number]);
+        return (
+          <Polygon
+            key={`${region.id}-${dx}`}
+            positions={positions}
+            pathOptions={{
+              color, weight: 1.5, fillColor: color,
+              fillOpacity: region.fillOpacity ?? 0.18,
+              opacity: region.strokeOpacity ?? 0.85,
+            }}
+            eventHandlers={region.entityId ? { click: () => onOpenEntity(region.entityId!, false) } : undefined}
+          >
+            <Popup>
+              <div className="text-sm font-medium">{region.name}</div>
+              {ent?.summary && <div className="text-xs opacity-70">{ent.summary}</div>}
+            </Popup>
+          </Polygon>
+        );
+      })}
+
+      {showFog && map.fog?.enabled && (
+        <Polygon
+          positions={(() => {
+            const outer: L.LatLngExpression[] = [
+              [0, dx], [0, map.width + dx], [H, map.width + dx], [H, dx],
+            ];
+            const holes: L.LatLngExpression[][] = map.fog!.reveals.map((poly) =>
+              poly.map(([x, y]) => [H - y, x + dx] as [number, number])
+            );
+            return [outer, ...holes];
+          })()}
+          pathOptions={{
+            color: "transparent",
+            fillColor: map.fog.color ?? "rgba(8,12,20,0.55)",
+            fillOpacity: 1, weight: 0, interactive: false, fillRule: "evenodd",
+          } as L.PathOptions}
+        />
+      )}
+
+      {(map.routes ?? []).map((route) => {
+        const pts = (route.resolvedPoints ?? []).map(([x, y]) => [H - y, x + dx] as [number, number]);
+        if (pts.length < 2) return null;
+        const color = route.color ?? "#cfd6dc";
+        const distPx = routeDistancePx(route.resolvedPoints ?? []);
+        const scale: MapScale | undefined = map.scale;
+        const distLabel = scale ? `${(distPx * scale.unitsPerPixel).toFixed(1)} ${scale.unitLabel}` : `${Math.round(distPx)} px`;
+        const travel = scale && route.speed ? formatTravelTime((distPx * scale.unitsPerPixel) / route.speed) : null;
+        const modeLabel = route.mode ? ROUTE_MODE_LABEL[route.mode] : "";
+        return (
+          <Polyline
+            key={`${route.id}-${dx}`}
+            positions={pts}
+            pathOptions={{
+              color, weight: route.weight ?? 3, opacity: 0.9,
+              dashArray: route.dashed ? "8 6" : undefined,
+              lineCap: "round", lineJoin: "round",
+            }}
+          >
+            <Tooltip sticky direction="top" opacity={0.95}>
+              <div className="text-xs">
+                <div className="font-medium">{route.name}</div>
+                <div className="opacity-80">{distLabel}{travel ? ` · ${travel} ${modeLabel}` : ""}</div>
+              </div>
+            </Tooltip>
+          </Polyline>
+        );
+      })}
+
+      {map.grid && (showGrid ?? map.grid.enabled !== false) && gridLines(map, map.grid).map((line, i) => (
+        <Polyline
+          key={`grid-${dx}-${i}`}
+          positions={line.map((p) => {
+            const [lat, lng] = p as [number, number];
+            return [lat, lng + dx] as [number, number];
+          })}
+          pathOptions={{
+            color: map.grid!.color ?? "rgba(255,255,255,0.08)",
+            weight: 1, opacity: 1, interactive: false,
+          }}
+        />
+      ))}
+
+      {placements.map((p) => {
+        const ent = entityById.get(p.entityId);
+        if (!ent) return null;
+        const color = ICON_BY_TYPE[ent.type] ?? ICON_BY_TYPE.default;
+        const dim = ent.visibility === "rumor";
+        return (
+          <Marker
+            key={`${p.id}-${dx}`}
+            position={[H - p.y, p.x + dx]}
+            icon={pinIcon(color, dim)}
+            eventHandlers={{ click: () => onOpenEntity(p.entityId, false) }}
+          >
+            <Popup>
+              <div className="text-sm font-medium">{ent.title}</div>
+              {ent.summary && <div className="text-xs opacity-70">{ent.summary}</div>}
+            </Popup>
+          </Marker>
+        );
+      })}
+    </>
+  );
+}
+
 interface EntityPanelProps {
   entity: Entity | null;
   placements: MapPlacement[];
