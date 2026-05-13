@@ -171,6 +171,9 @@ export default function AtlasViewer() {
           <span className="hidden sm:inline">Search</span>
           <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded bg-muted border border-border">⌘K</kbd>
         </Button>
+        <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+          <Link to="/atlas/edit" title="DM placement editor">Edit pins</Link>
+        </Button>
         <span className="hidden md:block text-[11px] text-muted-foreground ml-2">
           Updated {new Date(data.project.publishedAt).toLocaleDateString()}
         </span>
