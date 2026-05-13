@@ -183,6 +183,59 @@ Commit the markdown changes; the GitHub Action will publish the player atlas wit
 
 ---
 
+## Updating maps through GitHub web (no CLI)
+
+You can edit maps, layers, and settings entirely through the GitHub website without installing anything locally.
+
+### Step 1 — Open the placement editor in Lovable
+
+1. Open your Lovable project preview.
+2. Navigate to `/atlas/edit`.
+3. Switch to the **Layers** tab to upload images or adjust layer positions.
+4. Switch to the **Map** tab to change canvas size, ocean color, grid, or wrapX.
+
+### Step 2 — Export your changes
+
+- Click **Patch** (Layers tab) to download a `map-layers-<id>.md` file with the new layer YAML.
+- Click **Patch** (Map tab) to download a `map-settings-<id>.md` file with the new map settings YAML.
+- If you uploaded new images, click **Zip** to download an `atlas-assets-<id>.zip` containing the files at their intended repo paths (`public/atlas/assets/maps/`).
+
+A checklist dialog will appear after each export guiding you through the next steps.
+
+### Step 3 — Apply the patch on GitHub
+
+1. Go to your GitHub repository.
+2. Navigate to `content/<world>/_atlas/world.yaml`.
+3. Click the pencil icon to edit.
+4. Find the map entry with the matching `id` and replace the `layers`, `width`, `height`, `oceanColor`, `wrapX`, or `grid` sections with the exported YAML.
+5. Click **Commit changes…** and choose **Commit directly to the `main` branch**.
+
+### Step 4 — Upload assets (if you added images)
+
+1. In your GitHub repo, navigate to `public/atlas/assets/maps/`.
+2. Click **Add file → Upload files**.
+3. Drag the images from your exported zip (or individually) into the upload area.
+4. Click **Commit changes…** and commit to `main`.
+
+### Step 5 — Wait for publish
+
+The `publish-atlas.yml` GitHub Action will automatically run on the commit and deploy the updated atlas to GitHub Pages. You can monitor progress in the **Actions** tab.
+
+---
+
+## Updating maps through Lovable
+
+If you are already working inside Lovable, you can ask Lovable to apply the patch for you.
+
+1. Export the patch from `/atlas/edit` as described above.
+2. Open the downloaded `.md` file and copy the YAML block inside the triple-backticks.
+3. Paste the YAML into the Lovable chat and say: *"Apply this patch to content/<world>/_atlas/world.yaml under the map entry with id <map-id>."*
+4. Lovable will rewrite the file. Review the diff, then commit.
+
+**Note:** Lovable can edit text files directly but may not be able to upload binary image files. If you added new images, you will still need to upload them manually through GitHub web (see above) or commit them locally.
+
+---
+
 ## Maps, regions, and fog (`world.yaml`)
 
 Per-world map definitions live in `content/<world>/_atlas/world.yaml`. This is where you define multiple base maps, image layers stacked on each map, polygon regions linked to wiki entries, and fog-of-war reveal areas.
