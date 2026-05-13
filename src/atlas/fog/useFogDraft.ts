@@ -168,6 +168,3 @@ export function fogToYamlObject(f: FogOverlay): Record<string, unknown> {
   if (f.color) out.color = f.color;
   return out;
 }
-
-// Avoid unused-import warning for the shared Waypoint type.
-export type _W = Waypoint;
