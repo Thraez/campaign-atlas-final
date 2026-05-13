@@ -8,16 +8,15 @@ maps:
     width: 200000
     height: 100000
     oceanColor: "#18313f"
+    scale:
+      unitsPerPixel: 0.05      # 1 px = 0.05 mi
+      unitLabel: mi
+    grid:
+      kind: hex
+      size: 5000
+      color: "rgba(255,255,255,0.06)"
+      enabled: false           # off by default; toggle in viewer
     layers: []
-    # Example image layer (drop a file into public/atlas/assets/ to enable):
-    # layers:
-    #   - id: continent
-    #     src: /atlas/assets/continent.webp
-    #     x: 0
-    #     y: 0
-    #     width: 200000
-    #     height: 100000
-    #     opacity: 1
 
   - id: astrath-deeprealm-northern-reaches
     name: Northern Reaches
