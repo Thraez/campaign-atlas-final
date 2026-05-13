@@ -42,6 +42,9 @@ export function parseFrontmatter(raw: string, sourcePath: string): ParsedFile {
     id: typeof atlasRaw.id === "string" ? atlasRaw.id : undefined,
     tags: toStringArray(atlasRaw.tags ?? data.tags),
     canon: typeof atlasRaw.canon === "string" ? atlasRaw.canon : undefined,
+    date: typeof atlasRaw.date === "string" ? atlasRaw.date
+        : (atlasRaw.date instanceof Date ? atlasRaw.date.toISOString().slice(0, 10) : undefined),
+    dateValue: typeof atlasRaw.dateValue === "number" ? atlasRaw.dateValue : undefined,
   };
 
   if (typeof atlasRaw.visibility === "string") {
