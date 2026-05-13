@@ -133,7 +133,7 @@ async function main() {
   const cfg = loadConfig();
   const contentDir = path.join(ROOT, cfg.contentRoot);
   const scanInfo = { excludedFiles: 0 };
-  const files = walk(contentDir, cfg.exclude, scanInfo);
+  const files = walk(contentDir, contentDir, cfg.include ?? [], cfg.exclude ?? [], scanInfo);
 
   // Load world config up-front so entity parsing can resolve dates against
   // the in-world calendar.
@@ -142,10 +142,12 @@ async function main() {
   const warnings: string[] = [];
   const errors: string[] = [];
   let strippedDmBlocks = 0;
+  let detectedDmBlocks = 0;
   let duplicateSlugs = 0;
   let brokenLinks = 0;
   let visibilityExcluded = 0;
   let secretPlacementsExcluded = 0;
+  let invalidVisibilityCount = 0;
 
   type Pending = { entity: Entity; rawBody: string; coords?: { x: number; y: number } };
   const pending: Pending[] = [];
@@ -155,6 +157,10 @@ async function main() {
     const rel = path.relative(ROOT, file).replace(/\\/g, "/");
     const raw = fs.readFileSync(file, "utf8");
     const parsed = parseFrontmatter(raw, rel);
+    // Detect parser warnings about invalid visibility (used for strict-player gate)
+    for (const w of parsed.warnings) {
+      if (w.includes("invalid atlas.visibility")) invalidVisibilityCount += 1;
+    }
     warnings.push(...parsed.warnings);
 
     const title = deriveTitle(file, (parsed.data.title as string) ?? undefined);
@@ -184,8 +190,12 @@ async function main() {
       continue;
     }
 
-    const { text: noDm, count } = stripDmBlocks(parsed.body);
-    strippedDmBlocks += count;
+    // DM blocks are stripped only in player builds. DM builds preserve %% ... %%
+    // so the editor can still use Obsidian comments freely.
+    const { text: noDmStripped, count: cStripped } = stripDmBlocks(parsed.body);
+    detectedDmBlocks += cStripped;
+    const noDm = flags.player ? noDmStripped : parsed.body;
+    if (flags.player) strippedDmBlocks += cStripped;
 
     const entity: Entity = {
       id,
