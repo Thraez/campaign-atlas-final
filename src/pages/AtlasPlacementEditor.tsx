@@ -516,7 +516,12 @@ export default function AtlasPlacementEditor() {
             </TabsContent>
 
             <TabsContent value="maps" className="flex-1 flex flex-col min-h-0 m-0">
-              {/* Maps tab combines layers + map settings — same canon target (world.yaml > maps[]). */}
+              {/* Maps tab combines layers + map settings + batch import — same canon target (world.yaml > maps[]). */}
+              <div className="px-3 pt-2">
+                <Button size="sm" variant="outline" className="w-full gap-1 h-8 text-xs" onClick={() => setMapImportOpen(true)}>
+                  <Upload className="h-3.5 w-3.5" /> Import Maps (batch wizard)
+                </Button>
+              </div>
               <Tabs defaultValue="layers" className="flex-1 flex flex-col min-h-0">
                 <TabsList className="mx-3 mt-2 grid grid-cols-2">
                   <TabsTrigger value="layers" className="text-[11px]"><LayersIcon className="h-3.5 w-3.5 mr-1" />Layers</TabsTrigger>
