@@ -112,6 +112,9 @@ export default function AtlasTimeline() {
           )}
         </div>
         <Button asChild variant="ghost" size="sm">
+          <Link to="/atlas/browse">Browse</Link>
+        </Button>
+        <Button asChild variant="ghost" size="sm">
           <Link to="/atlas"><ArrowLeft className="h-4 w-4 mr-1" />Map</Link>
         </Button>
       </header>
