@@ -28,6 +28,10 @@ interface Placement {
   mapId: string;
   x: number;
   y: number;
+  /** Optional per-placement label override (preserved across round-trip). */
+  label?: string;
+  /** Optional per-placement pin styling override (preserved across round-trip). */
+  pin?: Record<string, unknown>;
 }
 
 const ROOT = process.cwd();
@@ -84,7 +88,12 @@ for (const [sourcePath, entries] of grouped) {
   );
   const next = [
     ...preserved,
-    ...entries.map((e) => ({ mapId: e.mapId, x: e.x, y: e.y })),
+    ...entries.map((e) => {
+      const o: Record<string, unknown> = { mapId: e.mapId, x: e.x, y: e.y };
+      if (e.label) o.label = e.label;
+      if (e.pin && Object.keys(e.pin).length > 0) o.pin = e.pin;
+      return o;
+    }),
   ].sort((a, b) => String(a.mapId).localeCompare(String(b.mapId)));
 
   // Determine if anything actually changed.
@@ -92,7 +101,13 @@ for (const [sourcePath, entries] of grouped) {
     existing.length === next.length &&
     existing.every((e, i) => {
       const n = next[i];
-      return e.mapId === n.mapId && e.x === n.x && e.y === n.y;
+      return (
+        e.mapId === n.mapId &&
+        e.x === n.x &&
+        e.y === n.y &&
+        (e.label ?? undefined) === (n.label ?? undefined) &&
+        JSON.stringify(e.pin ?? null) === JSON.stringify(n.pin ?? null)
+      );
     });
 
   if (same && atlas.x === undefined && atlas.y === undefined) {

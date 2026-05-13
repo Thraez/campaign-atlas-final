@@ -45,6 +45,65 @@ describe("buildPlacementPatch", () => {
   });
 });
 
+describe("buildPlacementJson label/pin round-trip", () => {
+  it("preserves label and pin overrides in JSON output", async () => {
+    const { buildPlacementJson } = await import("@/atlas/yaml/buildPatches");
+    const placements: PlacementOverride[] = [{
+      entityId: "town", mapId: "m1", x: 10, y: 20,
+      label: "Custom Town Name",
+      pin: { color: "#ff0000", shape: "star" },
+    }];
+    const a = buildPlacementJson({ project, mapId: "m1", placements });
+    const parsed = JSON.parse(a.content) as Array<Record<string, unknown>>;
+    expect(parsed[0].label).toBe("Custom Town Name");
+    expect(parsed[0].pin).toEqual({ color: "#ff0000", shape: "star" });
+  });
+
+  it("omits label when it equals entity title (clean output)", async () => {
+    const { buildPlacementJson } = await import("@/atlas/yaml/buildPatches");
+    const a = buildPlacementJson({
+      project, mapId: "m1",
+      placements: [{ entityId: "town", mapId: "m1", x: 1, y: 2, label: "Town" }],
+    });
+    expect(JSON.parse(a.content)[0].label).toBeUndefined();
+  });
+});
+
+describe("buildWorldMapPatch nested geometry preservation", () => {
+  it("echoes existing regions/routes/fog when not overridden", async () => {
+    const { buildWorldMapPatch } = await import("@/atlas/yaml/buildPatches");
+    const mapWithGeom: MapDocument = {
+      ...map,
+      regions: [{ id: "r1", mapId: "m1", name: "R", visibility: "player", points: [[0,0],[1,0],[1,1]] }],
+      routes: [{ id: "rt1", mapId: "m1", name: "RT", visibility: "player", waypoints: [[0,0],[10,10]] }],
+      fog: { mapId: "m1", enabled: true, reveals: [[[0,0],[1,0],[1,1]]] },
+    };
+    const a = buildWorldMapPatch({ map: mapWithGeom, mergedLayers: mapWithGeom.layers, localLayers: [] });
+    expect(a.content).toMatch(/regions:/);
+    expect(a.content).toMatch(/routes:/);
+    expect(a.content).toMatch(/fog:/);
+  });
+});
+
+describe("validatePatchYaml entity-frontmatter", () => {
+  it("accepts a valid frontmatter block", async () => {
+    const yaml = `# file: x.md\n---\ntitle: X\natlas:\n  visibility: player\n  type: settlement\n  summary: hello\n---\n`;
+    const r = validatePatchYaml(yaml, "entity-frontmatter");
+    expect(r.ok).toBe(true);
+  });
+  it("rejects an invalid visibility value", async () => {
+    const yaml = `---\natlas:\n  visibility: secret\n---\n`;
+    const r = validatePatchYaml(yaml, "entity-frontmatter");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/visibility/);
+  });
+  it("rejects markdown fences", async () => {
+    const yaml = "```yaml\natlas:\n  visibility: player\n```\n";
+    const r = validatePatchYaml(yaml, "entity-frontmatter");
+    expect(r.ok).toBe(false);
+  });
+});
+
 describe("buildWorldMapPatch", () => {
   it("emits a maps[] entry with deduped layer ids", () => {
     const a = buildWorldMapPatch({ map, mergedLayers: map.layers, localLayers: [] });
