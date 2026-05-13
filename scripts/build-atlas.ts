@@ -378,7 +378,11 @@ async function main() {
     },
   };
 
-  const outDir = path.resolve(ROOT, flags.outDir ?? cfg.outputDir);
+  // Output safety: player builds go to public/atlas (committed/served).
+  // DM builds go to a gitignored .local-atlas folder by default to avoid
+  // accidentally shipping spoilers via the committed atlas.json.
+  const defaultOut = flags.player ? cfg.outputDir : ".local-atlas";
+  const outDir = path.resolve(ROOT, flags.outDir ?? defaultOut);
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "atlas.json"), JSON.stringify(project, null, 2));
 
@@ -416,10 +420,11 @@ async function main() {
   console.log(`Included entities:       ${r.included}`);
   console.log(`Excluded by folder:      ${scanInfo.excludedFiles}`);
   console.log(`Excluded by visibility:  ${visibilityExcluded}`);
-  console.log(`Stripped DM blocks:      ${r.strippedDmBlocks}`);
+  console.log(`Stripped DM blocks:      ${r.strippedDmBlocks}${flags.player ? "" : ` (DM build keeps ${detectedDmBlocks} block${detectedDmBlocks === 1 ? "" : "s"} in body)`}`);
   console.log(`Excluded secret pins:    ${secretPlacementsExcluded}`);
   console.log(`Excluded secret regions: ${regionsExcluded}`);
   console.log(`Excluded secret routes:  ${routesExcluded}`);
+  console.log(`Invalid visibility (→dm):${invalidVisibilityCount}`);
   console.log(`Maps:                    ${maps.length}`);
   console.log(`Regions:                 ${regions.length}`);
   console.log(`Routes:                  ${routes.length}`);
@@ -435,6 +440,13 @@ async function main() {
   if (errors.length > 0) {
     console.error("Build failed: validation errors above.");
     process.exit(1);
+  }
+  // Strict + player must NEVER ship a build with invalid visibility values,
+  // because the parser silently coerces them to "dm" and the spoiler risk
+  // demands authoring discipline.
+  if (flags.player && flags.strict && invalidVisibilityCount > 0) {
+    console.error(`Strict player mode: ${invalidVisibilityCount} invalid visibility value(s). Failing build.`);
+    process.exit(3);
   }
   if (flags.strict && (warnings.length > 0 || r.brokenLinks > 0)) {
     console.error("Strict mode: warnings present. Failing build.");
