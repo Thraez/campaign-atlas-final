@@ -3,7 +3,7 @@ import { MapContainer, Marker, Polygon, ImageOverlay, useMap, useMapEvents } fro
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode, Layers as LayersIcon, MapPin as PinIcon } from "lucide-react";
+import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode, Layers as LayersIcon, MapPin as PinIcon, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity, MapDocument } from "@/atlas/content/schema";
@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useMapLayers } from "@/atlas/useMapLayers";
 import { MapLayerPanel } from "@/atlas/MapLayerPanel";
+import { MapSettingsPanel } from "@/atlas/MapSettingsPanel";
+import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 // Bumped to v2: storage shape changed from { [entityId]: Override } to
@@ -126,8 +128,8 @@ export default function AtlasPlacementEditor() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
   }, [overrides]);
 
-  // Optional in-session map size override (from "Map = layer" / "Expand" buttons).
-  const [mapSizeOverride, setMapSizeOverride] = useState<Record<string, { w: number; h: number }>>({});
+  // Optional in-session, per-map settings override (size + ocean + wrapX + grid).
+  const [mapOverride, setMapOverride] = useState<Record<string, Partial<MapDocument>>>({});
 
   const baseMap: MapDocument | undefined = useMemo(
     () => project?.maps.find((m) => m.id === activeMapId),
@@ -135,9 +137,18 @@ export default function AtlasPlacementEditor() {
   );
   const activeMap: MapDocument | undefined = useMemo(() => {
     if (!baseMap) return undefined;
-    const o = mapSizeOverride[baseMap.id];
-    return o ? { ...baseMap, width: o.w, height: o.h } : baseMap;
-  }, [baseMap, mapSizeOverride]);
+    const o = mapOverride[baseMap.id];
+    return o ? { ...baseMap, ...o } : baseMap;
+  }, [baseMap, mapOverride]);
+
+  const patchMap = (patch: Partial<MapDocument>) => {
+    if (!baseMap) return;
+    setMapOverride((s) => ({ ...s, [baseMap.id]: { ...(s[baseMap.id] ?? {}), ...patch } }));
+  };
+  const resetMap = () => {
+    if (!baseMap) return;
+    setMapOverride((s) => { const n = { ...s }; delete n[baseMap.id]; return n; });
+  };
 
   const layerEditor = useMapLayers(activeMap);
 
@@ -373,6 +384,7 @@ export default function AtlasPlacementEditor() {
                 />
               );
             })}
+            <AtlasMinimap map={activeMap} layers={layerEditor.mergedLayers} />
           </MapContainer>
 
           {pendingId && (
@@ -386,9 +398,10 @@ export default function AtlasPlacementEditor() {
 
         <aside className="w-[380px] hidden md:flex flex-col border-l border-border bg-card">
           <Tabs defaultValue="pins" className="flex-1 flex flex-col min-h-0">
-            <TabsList className="grid grid-cols-2 mx-3 mt-3">
+            <TabsList className="grid grid-cols-3 mx-3 mt-3">
               <TabsTrigger value="pins" className="gap-1.5"><PinIcon className="h-3.5 w-3.5" />Pins</TabsTrigger>
               <TabsTrigger value="layers" className="gap-1.5"><LayersIcon className="h-3.5 w-3.5" />Layers</TabsTrigger>
+              <TabsTrigger value="map" className="gap-1.5"><Settings2 className="h-3.5 w-3.5" />Map</TabsTrigger>
             </TabsList>
             <TabsContent value="pins" className="flex-1 flex flex-col min-h-0 m-0">
               <div className="p-3 border-b border-border">
@@ -444,8 +457,11 @@ export default function AtlasPlacementEditor() {
                 onDuplicate={layerEditor.duplicateLayer}
                 onRemove={layerEditor.removeLayer}
                 onClearAll={layerEditor.clearAll}
-                onSetMapSize={(w, h) => setMapSizeOverride((s) => ({ ...s, [activeMap.id]: { w, h } }))}
+                onSetMapSize={(w, h) => patchMap({ width: w, height: h })}
               />
+            </TabsContent>
+            <TabsContent value="map" className="flex-1 flex flex-col min-h-0 m-0">
+              {baseMap && <MapSettingsPanel map={activeMap} baseMap={baseMap} onPatch={patchMap} onReset={resetMap} />}
             </TabsContent>
           </Tabs>
         </aside>

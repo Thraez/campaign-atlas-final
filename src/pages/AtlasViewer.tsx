@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
@@ -441,6 +442,7 @@ export default function AtlasViewer() {
                 </Marker>
               );
             })}
+            <AtlasMinimap map={activeMap} layers={activeMap.layers} />
           </MapContainer>
         </div>
 
