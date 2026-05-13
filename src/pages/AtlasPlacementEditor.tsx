@@ -36,15 +36,29 @@ import { EntitiesTab } from "@/atlas/tabs/EntitiesTab";
 import { PublishCheckTab } from "@/atlas/tabs/PublishCheckTab";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { MapImportWizard } from "@/atlas/import/MapImportWizard";
+import {
+  PIN_PRESETS,
+  defaultPresetForType,
+  diffPinOverride,
+  pinSvg,
+  resolvePinStyle,
+  type PinOverride,
+  type PinPresetId,
+} from "@/atlas/pins/presets";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
-// Bumped to v2: storage shape changed from { [entityId]: Override } to
-// { [`${mapId}:${entityId}`]: Override } so one entity can be placed on
-// multiple maps independently.
-const STORAGE_KEY = "atlas-placement-overrides-v2";
-const LEGACY_STORAGE_KEY = "atlas-placement-overrides-v1";
+// Bumped to v3: storage shape now carries label + pin override per placement.
+// v1/v2 entries (just x/y) are still readable — extra fields are simply absent.
+const STORAGE_KEY = "atlas-placement-overrides-v3";
+const LEGACY_STORAGE_KEY_V1 = "atlas-placement-overrides-v1";
+const LEGACY_STORAGE_KEY_V2 = "atlas-placement-overrides-v2";
 
-type Override = { x: number; y: number } | null; // null = explicitly removed
+/** Local-draft override shape. `null` = explicitly removed from this map. */
+type OverrideValue = { x: number; y: number; label?: string; pin?: PinOverride };
+type Override = OverrideValue | null;
 
 interface Overrides {
   [mapEntityKey: string]: Override; // key = `${mapId}:${entityId}`
@@ -52,31 +66,14 @@ interface Overrides {
 
 const overrideKey = (mapId: string, entityId: string) => `${mapId}:${entityId}`;
 
-function pinIcon(color: string, pulse = false): L.DivIcon {
+function pinDivIcon(color: string, shape: import("@/atlas/pins/presets").PinShape, opts?: { pulse?: boolean }): L.DivIcon {
   return L.divIcon({
     className: "atlas-edit-pin",
-    html: `<div style="
-      width:20px;height:20px;border-radius:50% 50% 50% 0;
-      transform:rotate(-45deg);background:${color};
-      border:2px solid #0a0a0acc;box-shadow:0 2px 8px #000a;
-      ${pulse ? "animation: atlas-pulse 1.2s ease-in-out infinite;" : ""}
-    "></div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 18],
+    html: pinSvg({ color, shape }, { pulse: opts?.pulse }),
+    iconSize: [22, 22],
+    iconAnchor: [11, 20],
   });
 }
-
-const TYPE_COLOR: Record<string, string> = {
-  settlement: "#f4c95d",
-  capital: "#f0a830",
-  region: "#7fb069",
-  ruin: "#b07d62",
-  dungeon: "#8e5cd9",
-  npc: "#5cb8d9",
-  faction: "#d95c8e",
-  mystery: "#a070ff",
-  default: "#cfd6dc",
-};
 
 function MapClickCapture({ onClick }: { onClick: (x: number, y: number) => void }) {
   useMapEvents({
