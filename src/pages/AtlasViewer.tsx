@@ -398,6 +398,7 @@ export default function AtlasViewer() {
               </>
             )}
 
+            {placementsOnMap.map((p) => {
               const ent = entityById.get(p.entityId);
               if (!ent) return null;
               const color = ICON_BY_TYPE[ent.type] ?? ICON_BY_TYPE.default;
