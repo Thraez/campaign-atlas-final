@@ -620,6 +620,12 @@ export default function AtlasPlacementEditor() {
         mergedLayers={layerEditor.mergedLayers}
         localLayers={layerEditor.localLayers}
       />
+      <MapImportWizard
+        open={mapImportOpen}
+        onOpenChange={setMapImportOpen}
+        currentMap={activeMap}
+        defaultWorldId={activeMap.worldId}
+      />
     </div>
   );
 }
