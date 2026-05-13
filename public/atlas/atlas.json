@@ -1,6 +1,6 @@
 {
-  "version": "2026-05-13T06-41-53-507Z",
-  "publishedAt": "2026-05-13T06:41:53.507Z",
+  "version": "2026-05-13T06-44-51-881Z",
+  "publishedAt": "2026-05-13T06:44:51.881Z",
   "worlds": [
     {
       "id": "astrath-deeprealm",
@@ -17,7 +17,8 @@
       "height": 100000,
       "layers": [],
       "oceanColor": "#18313f",
-      "wrapX": true
+      "wrapX": true,
+      "regions": []
     }
   ],
   "entities": [
