@@ -290,6 +290,23 @@ async function main() {
     ? worldCfg.maps
     : [{ id: fallbackMapId, worldId, name: "Overview", width: 200000, height: 100000, layers: [], oceanColor: "#18313f", wrapX: true }];
 
+  // Soft warning: if the maps assets directory has uploaded image files but
+  // every map has empty layers, the user almost certainly forgot to wire them
+  // into world.yaml. This catches the "uploaded map.jpg but it never shows up"
+  // failure mode.
+  try {
+    const mapsAssetsDir = path.join(ROOT, "public/atlas/assets/maps");
+    const allEmpty = maps.every((m) => !m.layers || m.layers.length === 0);
+    if (allEmpty && fs.existsSync(mapsAssetsDir)) {
+      const imgs = fs.readdirSync(mapsAssetsDir).filter((f) => /\.(png|jpe?g|webp|gif|svg)$/i.test(f));
+      if (imgs.length > 0) {
+        warnings.push(
+          `world.yaml: every map has layers: [] but ${imgs.length} image file(s) are present in public/atlas/assets/maps/ (${imgs.slice(0, 3).join(", ")}${imgs.length > 3 ? ", …" : ""}). Add a layers: entry referencing them.`
+        );
+      }
+    }
+  } catch { /* ignore */ }
+
   let regions: Region[] = worldCfg?.regions ?? [];
   let fogs: FogOverlay[] = worldCfg?.fogs ?? [];
   let regionsExcluded = 0;
