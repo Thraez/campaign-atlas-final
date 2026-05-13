@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { defaultAtlas } from "@/atlas/types";
 import { useRef } from "react";
 import { Link } from "react-router-dom";
+import { isDmToolsEnabled } from "@/atlas/dmTools";
 
 interface Props {
   onSaveCloud?: () => void;
@@ -20,6 +21,7 @@ export function Toolbar({ onSaveCloud, onSignOut, signedIn }: Props) {
   const atlas = useAtlas((s) => s.atlas);
   const setAtlas = useAtlas((s) => s.setAtlas);
   const fileRef = useRef<HTMLInputElement>(null);
+  const dmTools = isDmToolsEnabled();
 
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(atlas, null, 2)], { type: "application/json" });
@@ -71,9 +73,11 @@ export function Toolbar({ onSaveCloud, onSignOut, signedIn }: Props) {
         <ToolBtn id="measure" icon={Ruler} label="Measure" />
       </div>
       <div className="flex-1" />
-      <Button asChild size="sm" variant="ghost" className="atlas-tool-button gap-1" title="Drag-and-drop placement editor for the markdown atlas">
-        <Link to="/atlas/edit"><MapPin className="h-4 w-4" /><span className="hidden md:inline">Placements</span></Link>
-      </Button>
+      {dmTools && (
+        <Button asChild size="sm" variant="ghost" className="atlas-tool-button gap-1" title="Drag-and-drop placement editor for the markdown atlas">
+          <Link to="/atlas/edit"><MapPin className="h-4 w-4" /><span className="hidden md:inline">Placements</span></Link>
+        </Button>
+      )}
       <Button asChild size="sm" variant="ghost" className="atlas-tool-button gap-1" title="Open player atlas">
         <Link to="/atlas"><Compass className="h-4 w-4" /><span className="hidden md:inline">Player Atlas</span></Link>
       </Button>
