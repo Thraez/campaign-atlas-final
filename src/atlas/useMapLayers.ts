@@ -31,7 +31,13 @@ function loadStored(): Stored {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
-    return JSON.parse(raw) as Stored;
+    const parsed = JSON.parse(raw) as Stored;
+    // For uploads, we persist a dataUrl rather than the (now-dead) object URL.
+    // Restore src from dataUrl so previews survive a page reload.
+    for (const m of Object.keys(parsed)) {
+      parsed[m] = parsed[m].map((l) => l.dataUrl ? { ...l, src: l.dataUrl, isObjectUrl: false } : l);
+    }
+    return parsed;
   } catch { return {}; }
 }
 
