@@ -79,8 +79,8 @@ export function TabFrame(props: TabFrameProps) {
           </span>
         </div>
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        <div>{children}</div>
+      <div className="flex-1 min-h-0 overflow-y-auto" style={{ outline: '2px solid red' }}>
+        <div style={{ outline: '2px solid lime' }}>{children}</div>
         {rawYamlPreview !== undefined && (
           <div className="border-t border-border bg-muted/30">
             <button
