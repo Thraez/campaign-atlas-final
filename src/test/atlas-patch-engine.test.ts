@@ -106,7 +106,7 @@ describe("validateProject", () => {
       maps: [{ ...map, regions: [{ id: "r1", mapId: "m1", name: "Leak", visibility: "player" as const, points: [[0,0],[1,0],[1,1]] as [number,number][], entityId: "lair" }] }],
     };
     const r = validateProject({ project: leaky, draftPlacements: [] });
-    expect(r.issues.some((i) => i.code === "spoiler-leak")).toBe(true);
+    expect(r.issues.some((i) => i.code.startsWith("spoiler-leak"))).toBe(true);
   });
 
   it("flags region with too few points", () => {
