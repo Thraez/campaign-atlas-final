@@ -189,9 +189,9 @@ export function ImportPanel({ knownEntityNames }: { knownEntityNames?: Set<strin
       return;
     }
     const artifact = buildEntityFrontmatterPatch(patches);
-    const validation = validatePatchYaml(artifact.content, "placement"); // reuse parser check
-    if (validation.errors.some((e) => /code fence/i.test(e))) {
-      toast.error("Generated patch contained markdown fences (bug). Aborted.");
+    const validation = validatePatchYaml(artifact.content, "entity-frontmatter");
+    if (!validation.ok) {
+      toast.error(`Patch validation failed: ${validation.errors[0]}`);
       return;
     }
     downloadText(artifact.filename.replace(".yaml", `-${label}.yaml`), artifact.content, artifact.mime);
