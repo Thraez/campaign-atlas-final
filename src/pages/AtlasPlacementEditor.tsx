@@ -547,7 +547,7 @@ export default function AtlasPlacementEditor() {
               <TabsTrigger value="publish" className="gap-1 text-[11px] py-1.5"><ShieldCheck className="h-3.5 w-3.5" />Publish</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="pins" className="flex-1 flex flex-col min-h-0 m-0">
+            <TabsContent value="pins" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
               <TabFrame
                 title="Pins"
                 builtFromYamlCount={project.placements.filter((p) => p.mapId === activeMap.id).length}
@@ -645,7 +645,7 @@ export default function AtlasPlacementEditor() {
               </TabFrame>
             </TabsContent>
 
-            <TabsContent value="maps" className="flex-1 flex flex-col min-h-0 m-0">
+            <TabsContent value="maps" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
               {/* Maps tab combines layers + map settings + batch import — same canon target (world.yaml > maps[]). */}
               <div className="px-3 pt-2">
                 <Button size="sm" variant="outline" className="w-full gap-1 h-8 text-xs" onClick={() => setMapImportOpen(true)}>
@@ -657,7 +657,7 @@ export default function AtlasPlacementEditor() {
                   <TabsTrigger value="layers" className="text-[11px]"><LayersIcon className="h-3.5 w-3.5 mr-1" />Layers</TabsTrigger>
                   <TabsTrigger value="settings" className="text-[11px]"><Settings2 className="h-3.5 w-3.5 mr-1" />Settings</TabsTrigger>
                 </TabsList>
-                <TabsContent value="layers" className="flex-1 flex flex-col min-h-0 m-0">
+                <TabsContent value="layers" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
                   <MapLayerPanel
                     map={activeMap}
                     mergedLayers={layerEditor.mergedLayers}
@@ -674,13 +674,13 @@ export default function AtlasPlacementEditor() {
                     onSetMapSize={(w, h) => patchMap({ width: w, height: h })}
                   />
                 </TabsContent>
-                <TabsContent value="settings" className="flex-1 flex flex-col min-h-0 m-0">
+                <TabsContent value="settings" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
                   {baseMap && <MapSettingsPanel map={activeMap} baseMap={baseMap} onPatch={patchMap} onReset={resetMap} />}
                 </TabsContent>
               </Tabs>
             </TabsContent>
 
-            <TabsContent value="regions" className="flex-1 flex flex-col min-h-0 m-0">
+            <TabsContent value="regions" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
               <RegionsTab
                 project={project}
                 map={activeMap}
@@ -698,7 +698,7 @@ export default function AtlasPlacementEditor() {
               />
             </TabsContent>
 
-            <TabsContent value="routes" className="flex-1 flex flex-col min-h-0 m-0">
+            <TabsContent value="routes" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
               <RoutesTab
                 project={project}
                 map={activeMap}
@@ -716,7 +716,7 @@ export default function AtlasPlacementEditor() {
               />
             </TabsContent>
 
-            <TabsContent value="fog" className="flex-1 flex flex-col min-h-0 m-0">
+            <TabsContent value="fog" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
               <FogTab
                 map={activeMap}
                 project={project}
@@ -732,7 +732,7 @@ export default function AtlasPlacementEditor() {
               />
             </TabsContent>
 
-            <TabsContent value="entities" className="flex-1 flex flex-col min-h-0 m-0">
+            <TabsContent value="entities" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
               <EntitiesTab
                 project={project}
                 blockingCount={entityIssues.blocking}
@@ -742,11 +742,11 @@ export default function AtlasPlacementEditor() {
               />
             </TabsContent>
 
-            <TabsContent value="import" className="flex-1 flex flex-col min-h-0 m-0">
+            <TabsContent value="import" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
               <ImportPanel knownEntityNames={new Set(project.entities.flatMap((e) => [e.id.toLowerCase(), e.title.toLowerCase(), ...e.aliases.map((a) => a.toLowerCase())]))} />
             </TabsContent>
 
-            <TabsContent value="publish" className="flex-1 flex flex-col min-h-0 m-0">
+            <TabsContent value="publish" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
               <PublishCheckTab
                 project={project}
                 draftMap={activeMap}
