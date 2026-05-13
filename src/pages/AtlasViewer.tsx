@@ -518,25 +518,14 @@ function WrappedWorld({ dx, map, placements, entityById, showFog, showGrid, onOp
         />
       ))}
 
-      {placements.map((p) => {
-        const ent = entityById.get(p.entityId);
-        if (!ent) return null;
-        const color = ICON_BY_TYPE[ent.type] ?? ICON_BY_TYPE.default;
-        const dim = ent.visibility === "rumor";
-        return (
-          <Marker
-            key={`${p.id}-${dx}`}
-            position={[H - p.y, p.x + dx]}
-            icon={pinIcon(color, dim)}
-            eventHandlers={{ click: () => onOpenEntity(p.entityId, false) }}
-          >
-            <Popup>
-              <div className="text-sm font-medium">{ent.title}</div>
-              {ent.summary && <div className="text-xs opacity-70">{ent.summary}</div>}
-            </Popup>
-          </Marker>
-        );
-      })}
+      <PlacementMarkers
+        dx={dx}
+        H={H}
+        placements={placements}
+        entityById={entityById}
+        onOpenEntity={onOpenEntity}
+      />
+
     </>
   );
 }
