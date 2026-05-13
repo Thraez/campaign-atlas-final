@@ -8,7 +8,6 @@
  */
 import { useCallback, useMemo, useState } from "react";
 import type { FogOverlay, MapDocument, Point, Region, Route } from "@/atlas/content/schema";
-import type { Waypoint } from "@/atlas/routes/useRouteDraft";
 
 export interface FogIssue {
   severity: "blocking" | "warning";
