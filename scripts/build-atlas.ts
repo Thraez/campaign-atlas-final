@@ -416,6 +416,52 @@ async function main() {
     routes: routes.filter((r) => r.mapId === m.id),
   }));
 
+  // -------- Profile + relationship player-strip --------
+  // The DM half of `profile` and DM-only relationships must NEVER reach a
+  // player build. Relationships pointing at DM-only entities are SPOILER
+  // LEAKS and warn here (and fail strict-player builds).
+  const entityVisibility = new Map<string, import("../src/atlas/content/schema").EntityVisibility>();
+  for (const { entity } of pending) entityVisibility.set(entity.id, entity.visibility);
+  let strippedDmProfiles = 0;
+  let strippedDmRelationships = 0;
+  let relationshipLeaks = 0;
+  let unresolvedRelationships = 0;
+  for (const { entity } of pending) {
+    if (flags.player) {
+      if (entity.profile?.dm) strippedDmProfiles += 1;
+      entity.profile = stripDmProfile(entity.profile);
+    }
+    if (!entity.relationships?.length) continue;
+    if (flags.player) {
+      const res = filterRelationshipsForPlayer(entity.relationships, { entityVisibility });
+      strippedDmRelationships += res.droppedByVisibility.length;
+      relationshipLeaks += res.droppedByLeak.length;
+      unresolvedRelationships += res.unresolved.length;
+      for (const r of res.droppedByLeak) {
+        warnings.push(
+          `entity "${entity.id}": relationship → "${r.entity}" (visibility=${r.visibility}) ` +
+          `would leak a DM-only target — dropped from player build`
+        );
+      }
+      for (const r of res.unresolved) {
+        warnings.push(
+          `entity "${entity.id}": relationship → "${r.entity}" points at unknown entity — dropped`
+        );
+      }
+      entity.relationships = res.kept.length > 0 ? res.kept : undefined;
+    } else {
+      // DM build: only check for unresolved targets so the editor can flag them.
+      for (const r of entity.relationships) {
+        if (!entityVisibility.has(r.entity)) {
+          unresolvedRelationships += 1;
+          warnings.push(
+            `entity "${entity.id}": relationship → "${r.entity}" points at unknown entity`
+          );
+        }
+      }
+    }
+  }
+
   // -------- Asset validation --------
   // Walk every entity image and every map layer src. We separate:
   //   - external URLs (http(s)/data) — warned but allowed
