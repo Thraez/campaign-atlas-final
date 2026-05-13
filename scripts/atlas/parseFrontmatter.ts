@@ -1,5 +1,6 @@
 import matter from "gray-matter";
 import type { EntityVisibility, PinPlacementStyle } from "../../src/atlas/content/schema";
+import type { EntityProfile, EntityRelationship } from "../../src/atlas/profiles/profileTypes";
 
 export interface AtlasPlacementSpec {
   mapId?: string;
