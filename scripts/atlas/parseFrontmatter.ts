@@ -51,8 +51,11 @@ export function parseFrontmatter(raw: string, sourcePath: string): ParsedFile {
     if (VALID_VIS.includes(atlasRaw.visibility as EntityVisibility)) {
       atlas.visibility = atlasRaw.visibility as EntityVisibility;
     } else {
+      // Fail-safe: spoiler protection beats convenience. Invalid visibility
+      // values must NOT silently fall through to the player default.
+      atlas.visibility = "dm";
       warnings.push(
-        `${sourcePath}: invalid atlas.visibility "${atlasRaw.visibility}" — defaulting to "dm"`
+        `${sourcePath}: invalid atlas.visibility "${atlasRaw.visibility}" — defaulted to "dm"`
       );
     }
   }
