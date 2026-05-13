@@ -24,29 +24,14 @@ import { printEntityHandout } from "@/atlas/printHandout";
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 
-const ICON_BY_TYPE: Record<string, string> = {
-  settlement: "#f4c95d",
-  capital: "#f0a830",
-  region: "#7fb069",
-  ruin: "#b07d62",
-  dungeon: "#8e5cd9",
-  npc: "#5cb8d9",
-  faction: "#d95c8e",
-  mystery: "#a070ff",
-  default: "#cfd6dc",
-};
+import { resolvePinStyle, pinSvg, type PinPreset } from "@/atlas/pins/presets";
 
-function pinIcon(color: string, dim = false): L.DivIcon {
+function pinIconForStyle(style: PinPreset, opts?: { dim?: boolean }): L.DivIcon {
   return L.divIcon({
     className: "atlas-viewer-pin",
-    html: `<div style="
-      width:18px;height:18px;border-radius:50% 50% 50% 0;
-      transform:rotate(-45deg);background:${color};
-      border:2px solid #1b1b1bcc;box-shadow:0 2px 6px #0008;
-      opacity:${dim ? 0.55 : 1};
-    "></div>`,
-    iconSize: [18, 18],
-    iconAnchor: [9, 16],
+    html: pinSvg({ color: style.color, shape: style.shape }, { dim: opts?.dim }),
+    iconSize: [22, 22],
+    iconAnchor: [11, 20],
   });
 }
 
@@ -450,7 +435,7 @@ function WrappedWorld({ dx, map, placements, entityById, showFog, showGrid, onOp
 
       {(map.regions ?? []).map((region) => {
         const ent = region.entityId ? entityById.get(region.entityId) : undefined;
-        const color = region.color ?? (ent ? (ICON_BY_TYPE[ent.type] ?? ICON_BY_TYPE.default) : "#7fb069");
+        const color = region.color ?? (ent ? resolvePinStyle(ent.type).color : "#7fb069");
         const positions = region.points.map(([x, y]) => [H - y, x + dx] as [number, number]);
         return (
           <Polygon
@@ -533,18 +518,91 @@ function WrappedWorld({ dx, map, placements, entityById, showFog, showGrid, onOp
         />
       ))}
 
-      {placements.map((p) => {
-        const ent = entityById.get(p.entityId);
-        if (!ent) return null;
-        const color = ICON_BY_TYPE[ent.type] ?? ICON_BY_TYPE.default;
+      <PlacementMarkers
+        dx={dx}
+        H={H}
+        placements={placements}
+        entityById={entityById}
+        onOpenEntity={onOpenEntity}
+      />
+
+    </>
+  );
+}
+
+/** Renders pin markers with preset-derived shape/color, and computes which
+ *  labels are permanently visible based on per-pin priority + labelMinZoom +
+ *  a screen-space collision pass (higher priority wins). */
+function PlacementMarkers({
+  dx, H, placements, entityById, onOpenEntity,
+}: {
+  dx: number; H: number;
+  placements: MapPlacement[];
+  entityById: Map<string, Entity>;
+  onOpenEntity: (id: string, fly?: boolean) => void;
+}) {
+  const map = useMap();
+  const [zoom, setZoom] = useState(map.getZoom());
+  useEffect(() => {
+    const h = () => setZoom(map.getZoom());
+    map.on("zoomend", h);
+    return () => { map.off("zoomend", h); };
+  }, [map]);
+
+  // Resolve preset + decide label visibility (permanent / hover / none).
+  // Order by priority desc; suppress lower-priority permanent labels that fall
+  // within ~70 px of a higher-priority one already shown at this zoom.
+  const enriched = placements
+    .map((p) => {
+      const ent = entityById.get(p.entityId);
+      if (!ent) return null;
+      const style = resolvePinStyle(ent.type, p.pin as import("@/atlas/pins/presets").PinOverride | undefined);
+      return { p, ent, style };
+    })
+    .filter((x): x is { p: MapPlacement; ent: Entity; style: PinPreset } => !!x)
+    .sort((a, b) => b.style.priority - a.style.priority);
+
+  const labelDecisions = new Map<string, "always" | "hover" | "none">();
+  const taken: { x: number; y: number }[] = [];
+  for (const { p, style } of enriched) {
+    let mode: "always" | "hover" | "none";
+    if (style.labelMode === "never") mode = "none";
+    else if (style.labelMode === "hover") mode = "hover";
+    else if (style.labelMode === "always") mode = "always";
+    else mode = zoom >= style.labelMinZoom ? "always" : "hover";
+    if (mode === "always") {
+      const pt = map.latLngToContainerPoint([H - p.y, p.x + dx]);
+      const collides = taken.some((t) => Math.hypot(t.x - pt.x, t.y - pt.y) < 70);
+      if (collides) mode = "hover";
+      else taken.push(pt);
+    }
+    labelDecisions.set(`${p.id}-${dx}`, mode);
+  }
+
+  return (
+    <>
+      {enriched.map(({ p, ent, style }) => {
         const dim = ent.visibility === "rumor";
+        const labelMode = labelDecisions.get(`${p.id}-${dx}`) ?? "none";
+        const labelText = p.label ?? ent.title;
         return (
           <Marker
             key={`${p.id}-${dx}`}
             position={[H - p.y, p.x + dx]}
-            icon={pinIcon(color, dim)}
+            icon={pinIconForStyle(style, { dim })}
             eventHandlers={{ click: () => onOpenEntity(p.entityId, false) }}
           >
+            {labelMode !== "none" && (
+              <Tooltip
+                permanent={labelMode === "always"}
+                direction="top"
+                offset={[0, -12]}
+                opacity={dim ? 0.7 : 0.95}
+                className={`atlas-pin-label atlas-pin-label--${ent.visibility}`}
+              >
+                {labelText}
+              </Tooltip>
+            )}
             <Popup>
               <div className="text-sm font-medium">{ent.title}</div>
               {ent.summary && <div className="text-xs opacity-70">{ent.summary}</div>}

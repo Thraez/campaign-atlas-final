@@ -36,15 +36,29 @@ import { EntitiesTab } from "@/atlas/tabs/EntitiesTab";
 import { PublishCheckTab } from "@/atlas/tabs/PublishCheckTab";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { MapImportWizard } from "@/atlas/import/MapImportWizard";
+import {
+  PIN_PRESETS,
+  defaultPresetForType,
+  diffPinOverride,
+  pinSvg,
+  resolvePinStyle,
+  type PinOverride,
+  type PinPresetId,
+} from "@/atlas/pins/presets";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
-// Bumped to v2: storage shape changed from { [entityId]: Override } to
-// { [`${mapId}:${entityId}`]: Override } so one entity can be placed on
-// multiple maps independently.
-const STORAGE_KEY = "atlas-placement-overrides-v2";
-const LEGACY_STORAGE_KEY = "atlas-placement-overrides-v1";
+// Bumped to v3: storage shape now carries label + pin override per placement.
+// v1/v2 entries (just x/y) are still readable — extra fields are simply absent.
+const STORAGE_KEY = "atlas-placement-overrides-v3";
+const LEGACY_STORAGE_KEY_V1 = "atlas-placement-overrides-v1";
+const LEGACY_STORAGE_KEY_V2 = "atlas-placement-overrides-v2";
 
-type Override = { x: number; y: number } | null; // null = explicitly removed
+/** Local-draft override shape. `null` = explicitly removed from this map. */
+type OverrideValue = { x: number; y: number; label?: string; pin?: PinOverride };
+type Override = OverrideValue | null;
 
 interface Overrides {
   [mapEntityKey: string]: Override; // key = `${mapId}:${entityId}`
@@ -52,31 +66,14 @@ interface Overrides {
 
 const overrideKey = (mapId: string, entityId: string) => `${mapId}:${entityId}`;
 
-function pinIcon(color: string, pulse = false): L.DivIcon {
+function pinDivIcon(color: string, shape: import("@/atlas/pins/presets").PinShape, opts?: { pulse?: boolean }): L.DivIcon {
   return L.divIcon({
     className: "atlas-edit-pin",
-    html: `<div style="
-      width:20px;height:20px;border-radius:50% 50% 50% 0;
-      transform:rotate(-45deg);background:${color};
-      border:2px solid #0a0a0acc;box-shadow:0 2px 8px #000a;
-      ${pulse ? "animation: atlas-pulse 1.2s ease-in-out infinite;" : ""}
-    "></div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 18],
+    html: pinSvg({ color, shape }, { pulse: opts?.pulse }),
+    iconSize: [22, 22],
+    iconAnchor: [11, 20],
   });
 }
-
-const TYPE_COLOR: Record<string, string> = {
-  settlement: "#f4c95d",
-  capital: "#f0a830",
-  region: "#7fb069",
-  ruin: "#b07d62",
-  dungeon: "#8e5cd9",
-  npc: "#5cb8d9",
-  faction: "#d95c8e",
-  mystery: "#a070ff",
-  default: "#cfd6dc",
-};
 
 function MapClickCapture({ onClick }: { onClick: (x: number, y: number) => void }) {
   useMapEvents({
@@ -100,15 +97,17 @@ export default function AtlasPlacementEditor() {
   const [error, setError] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Overrides>(() => {
     try {
-      const v2 = localStorage.getItem(STORAGE_KEY);
-      if (v2) return JSON.parse(v2);
-      // One-time migration from v1 (entityId-keyed) using a single-map assumption.
-      const v1raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+      const v3 = localStorage.getItem(STORAGE_KEY);
+      if (v3) return JSON.parse(v3);
+      // Forward-migration: v2 entries are already keyed by `${mapId}:${entityId}`
+      // and only carry x/y — directly compatible with the v3 shape.
+      const v2raw = localStorage.getItem(LEGACY_STORAGE_KEY_V2);
+      if (v2raw) return JSON.parse(v2raw);
+      // v1 was entityId-keyed; defer mapId resolution until project loads.
+      const v1raw = localStorage.getItem(LEGACY_STORAGE_KEY_V1);
       if (!v1raw) return {};
       const v1 = JSON.parse(v1raw) as Record<string, Override>;
       const migrated: Overrides = {};
-      // We don't yet know the mapId here — defer until project loads.
-      // Stash under a sentinel; resolved on project load.
       Object.entries(v1).forEach(([eid, val]) => { migrated[`__legacy__:${eid}`] = val; });
       return migrated;
     } catch { return {}; }
@@ -137,7 +136,7 @@ export default function AtlasPlacementEditor() {
             out[k] = v;
           }
         }
-        if (migrated) localStorage.removeItem(LEGACY_STORAGE_KEY);
+        if (migrated) localStorage.removeItem(LEGACY_STORAGE_KEY_V1);
         return migrated ? out : o;
       });
     }).catch((e: Error) => setError(e.message));
@@ -171,16 +170,37 @@ export default function AtlasPlacementEditor() {
 
   const layerEditor = useMapLayers(activeMap);
 
-  // Resolve effective coords for an entity on the active map: per-map override
-  // wins, else first existing placement on activeMap.
-  const effectiveCoord = useCallback((entityId: string): { x: number; y: number } | null => {
+  /** Per-tab filter state (placed/unplaced/visibility/type/tag). */
+  const [stateFilter, setStateFilter] = useState<"all" | "placed" | "unplaced">("all");
+  const [visFilter, setVisFilter] = useState<"all" | "player" | "rumor" | "dm" | "hidden">("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [tagFilter, setTagFilter] = useState<string>("all");
+  /** When true, finishing a placement automatically queues the next unplaced entity. */
+  const [chainPlaceMode, setChainPlaceMode] = useState(false);
+
+  /** Read-only canon placement (built YAML value) for an entity on a map. */
+  const canonPlacement = useCallback((mapId: string, entityId: string) => {
+    if (!project) return null;
+    return project.placements.find((p) => p.entityId === entityId && p.mapId === mapId) ?? null;
+  }, [project]);
+
+  /** Resolve effective placement values on the active map: local override wins, else canon. */
+  const effectivePlacement = useCallback((entityId: string): OverrideValue | null => {
     if (!activeMap) return null;
     const k = overrideKey(activeMap.id, entityId);
-    if (k in overrides) return overrides[k];
-    if (!project) return null;
-    const p = project.placements.find((pl) => pl.entityId === entityId && pl.mapId === activeMap.id);
-    return p ? { x: p.x, y: p.y } : null;
-  }, [overrides, project, activeMap]);
+    if (k in overrides) {
+      const v = overrides[k];
+      return v;
+    }
+    const p = canonPlacement(activeMap.id, entityId);
+    if (!p) return null;
+    return { x: p.x, y: p.y, label: p.label, pin: p.pin as PinOverride | undefined };
+  }, [overrides, canonPlacement, activeMap]);
+
+  const effectiveCoord = useCallback((entityId: string): { x: number; y: number } | null => {
+    const e = effectivePlacement(entityId);
+    return e ? { x: e.x, y: e.y } : null;
+  }, [effectivePlacement]);
 
   const entitiesForWorld = useMemo(() => {
     if (!project || !activeMap) return [] as Entity[];
@@ -188,22 +208,56 @@ export default function AtlasPlacementEditor() {
     return project.entities.filter((e) => !e.world || e.world === worldId);
   }, [project, activeMap]);
 
+  const allTypes = useMemo(
+    () => Array.from(new Set(entitiesForWorld.map((e) => e.type))).sort(),
+    [entitiesForWorld]
+  );
+  const allTags = useMemo(
+    () => Array.from(new Set(entitiesForWorld.flatMap((e) => e.tags ?? []))).sort(),
+    [entitiesForWorld]
+  );
+
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    if (!q) return entitiesForWorld;
-    return entitiesForWorld.filter((e) =>
-      e.title.toLowerCase().includes(q) ||
-      e.type.toLowerCase().includes(q) ||
-      e.aliases.some((a) => a.toLowerCase().includes(q))
-    );
-  }, [entitiesForWorld, filter]);
+    return entitiesForWorld.filter((e) => {
+      if (q && !(e.title.toLowerCase().includes(q) || e.type.toLowerCase().includes(q) || e.aliases.some((a) => a.toLowerCase().includes(q)))) return false;
+      if (visFilter !== "all" && e.visibility !== visFilter) return false;
+      if (typeFilter !== "all" && e.type !== typeFilter) return false;
+      if (tagFilter !== "all" && !(e.tags ?? []).includes(tagFilter)) return false;
+      const hasCoord = !!effectiveCoord(e.id);
+      if (stateFilter === "placed" && !hasCoord) return false;
+      if (stateFilter === "unplaced" && hasCoord) return false;
+      return true;
+    });
+  }, [entitiesForWorld, filter, visFilter, typeFilter, tagFilter, stateFilter, effectiveCoord]);
 
   const placed = filtered.filter((e) => effectiveCoord(e.id));
   const unplaced = filtered.filter((e) => !effectiveCoord(e.id));
 
-  const setCoord = (entityId: string, coord: { x: number; y: number }) => {
+  /** Merge a partial override into the local draft. */
+  const mutateOverride = useCallback((entityId: string, patch: Partial<OverrideValue>) => {
     if (!activeMap) return;
-    setOverrides((o) => ({ ...o, [overrideKey(activeMap.id, entityId)]: coord }));
+    setOverrides((o) => {
+      const k = overrideKey(activeMap.id, entityId);
+      const current = (k in o ? o[k] : null) ?? canonPlacement(activeMap.id, entityId);
+      if (!current) return o;
+      const merged: OverrideValue = {
+        x: patch.x ?? current.x,
+        y: patch.y ?? current.y,
+        label: patch.label !== undefined ? patch.label : (current as OverrideValue).label,
+        pin: patch.pin !== undefined ? patch.pin : (current as OverrideValue).pin,
+      };
+      return { ...o, [k]: merged };
+    });
+  }, [activeMap, canonPlacement]);
+
+  const setCoord = (entityId: string, coord: { x: number; y: number }) => mutateOverride(entityId, coord);
+  const setLabel = (entityId: string, label: string | undefined) => mutateOverride(entityId, { label });
+  const setPinOverride = (entityId: string, pin: PinOverride | undefined) => mutateOverride(entityId, { pin });
+  const nudge = (entityId: string, dx: number, dy: number) => {
+    const c = effectiveCoord(entityId);
+    if (!c) return;
+    mutateOverride(entityId, { x: c.x + dx, y: c.y + dy });
   };
   const removeCoord = (entityId: string) => {
     if (!activeMap) return;
@@ -212,11 +266,16 @@ export default function AtlasPlacementEditor() {
   const clearOverride = (entityId: string) => {
     if (!activeMap) return;
     const k = overrideKey(activeMap.id, entityId);
+    setOverrides((o) => { const next = { ...o }; delete next[k]; return next; });
+  };
+  /** Duplicate a placement to another map: writes the same coords as a draft. */
+  const duplicateToMap = (entityId: string, targetMapId: string) => {
     setOverrides((o) => {
-      const next = { ...o };
-      delete next[k];
-      return next;
+      const src = effectivePlacement(entityId);
+      if (!src) return o;
+      return { ...o, [overrideKey(targetMapId, entityId)]: { x: src.x, y: src.y, label: src.label, pin: src.pin } };
     });
+    toast.success(`Duplicated to ${project?.maps.find((m) => m.id === targetMapId)?.name ?? targetMapId}`);
   };
 
   const onMapClick = (lng: number, lat: number) => {
@@ -225,7 +284,13 @@ export default function AtlasPlacementEditor() {
     const y = Math.round(activeMap.height - lat);
     setCoord(pendingId, { x, y });
     toast.success(`Placed "${project?.entities.find((e) => e.id === pendingId)?.title}" at ${x},${y} on ${activeMap.name}`);
-    setPendingId(null);
+    if (chainPlaceMode) {
+      const next = unplaced.find((e) => e.id !== pendingId);
+      setPendingId(next?.id ?? null);
+      if (!next) toast.info("All entities placed.");
+    } else {
+      setPendingId(null);
+    }
   };
 
   const goTo = (entityId: string) => {
@@ -234,16 +299,24 @@ export default function AtlasPlacementEditor() {
     setFlyTo({ lat: activeMap.height - c.y, lng: c.x });
   };
 
-  /** Build current draft placements (effective coords for every entity on activeMap). */
+  /** Build current draft placements for the active map, including label + pin diffs. */
   const buildDraftPlacements = useCallback(() => {
     if (!project || !activeMap) return [];
     const out: PlacementOverride[] = [];
     for (const e of project.entities) {
-      const c = effectiveCoord(e.id);
-      if (c) out.push({ entityId: e.id, mapId: activeMap.id, x: c.x, y: c.y });
+      const eff = effectivePlacement(e.id);
+      if (!eff) continue;
+      out.push({
+        entityId: e.id,
+        mapId: activeMap.id,
+        x: eff.x,
+        y: eff.y,
+        label: eff.label && eff.label !== e.title ? eff.label : undefined,
+        pin: eff.pin,
+      });
     }
     return out;
-  }, [project, activeMap, effectiveCoord]);
+  }, [project, activeMap, effectivePlacement]);
 
   const exportJson = () => {
     if (!project || !activeMap) return;
@@ -426,13 +499,14 @@ export default function AtlasPlacementEditor() {
             })}
 
             {placed.map((e) => {
-              const c = effectiveCoord(e.id)!;
-              const color = TYPE_COLOR[e.type] ?? TYPE_COLOR.default;
+              const eff = effectivePlacement(e.id);
+              if (!eff) return null;
+              const style = resolvePinStyle(e.type, eff.pin);
               return (
                 <Marker
                   key={e.id}
-                  position={[activeMap.height - c.y, c.x]}
-                  icon={pinIcon(color, pendingId === e.id)}
+                  position={[activeMap.height - eff.y, eff.x]}
+                  icon={pinDivIcon(style.color, style.shape, { pulse: pendingId === e.id })}
                   draggable
                   eventHandlers={{
                     dragend: (ev) => {
@@ -483,35 +557,86 @@ export default function AtlasPlacementEditor() {
                 exportDisabled={dirtyCount === 0}
               >
                 <div className="-m-3">
-                  <div className="p-3 border-b border-border">
+                  <div className="p-3 border-b border-border space-y-2">
                     <Input placeholder="Filter entities…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+                    <div className="flex flex-wrap gap-1">
+                      {(["all","unplaced","placed"] as const).map((s) => (
+                        <Button key={s} size="sm" variant={stateFilter === s ? "secondary" : "ghost"} className="h-6 px-2 text-[10px] uppercase" onClick={() => setStateFilter(s)}>{s}</Button>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 text-[10px]">
+                      <Select value={visFilter} onValueChange={(v) => setVisFilter(v as typeof visFilter)}>
+                        <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1"><SelectValue placeholder="visibility" /></SelectTrigger>
+                        <SelectContent>
+                          {["all","player","rumor","dm","hidden"].map((v) => <SelectItem key={v} value={v} className="text-xs">{v}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Select value={typeFilter} onValueChange={setTypeFilter}>
+                        <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1"><SelectValue placeholder="type" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">all types</SelectItem>
+                          {allTypes.map((t) => <SelectItem key={t} value={t} className="text-xs">{t}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {allTags.length > 0 && (
+                        <Select value={tagFilter} onValueChange={setTagFilter}>
+                          <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1"><SelectValue placeholder="tag" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all" className="text-xs">all tags</SelectItem>
+                            {allTags.map((t) => <SelectItem key={t} value={t} className="text-xs">#{t}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      <Button
+                        size="sm"
+                        variant={chainPlaceMode ? "default" : "outline"}
+                        className="h-6 px-2 text-[10px]"
+                        onClick={() => {
+                          const next = !chainPlaceMode;
+                          setChainPlaceMode(next);
+                          if (next && !pendingId && unplaced[0]) setPendingId(unplaced[0].id);
+                        }}
+                        title="Auto-advance to the next unplaced entity after each click"
+                      >
+                        Place next
+                      </Button>
+                    </div>
                   </div>
                   <Section title={`Unplaced (${unplaced.length})`}>
                     {unplaced.map((e) => (
                       <EntityRow key={e.id} entity={e} state="unplaced" isPending={pendingId === e.id} onPlace={() => setPendingId(e.id)} />
                     ))}
-                    {unplaced.length === 0 && <Empty text="All entities have a coordinate." />}
+                    {unplaced.length === 0 && <Empty text="No unplaced entities match these filters." />}
                   </Section>
                   <Section title={`Placed (${placed.length})`}>
                     {placed.map((e) => {
-                      const c = effectiveCoord(e.id)!;
+                      const eff = effectivePlacement(e.id)!;
                       const overridden = overrideKey(activeMap.id, e.id) in overrides;
+                      const otherMaps = project.maps.filter((m) => m.id !== activeMap.id).map((m) => ({ id: m.id, name: m.name }));
                       return (
                         <EntityRow
                           key={e.id}
                           entity={e}
                           state="placed"
-                          coord={c}
+                          coord={{ x: eff.x, y: eff.y }}
+                          label={eff.label}
+                          pinOverride={eff.pin}
                           overridden={overridden}
                           isPending={pendingId === e.id}
+                          otherMaps={otherMaps}
                           onGoTo={() => goTo(e.id)}
                           onMove={() => setPendingId(e.id)}
                           onRemove={() => removeCoord(e.id)}
                           onReset={overridden ? () => clearOverride(e.id) : undefined}
+                          onNudge={(dx, dy) => nudge(e.id, dx, dy)}
+                          onChangeXY={(x, y) => setCoord(e.id, { x, y })}
+                          onChangeLabel={(l) => setLabel(e.id, l)}
+                          onChangePin={(p) => setPinOverride(e.id, p)}
+                          onDuplicateToMap={(mid) => duplicateToMap(e.id, mid)}
                         />
                       );
                     })}
-                    {placed.length === 0 && <Empty text="Pick something on the left to place." />}
+                    {placed.length === 0 && <Empty text="No placed entities match these filters." />}
                   </Section>
                 </div>
               </TabFrame>
@@ -649,21 +774,38 @@ interface RowProps {
   coord?: { x: number; y: number };
   overridden?: boolean;
   isPending?: boolean;
+  pinOverride?: PinOverride;
+  label?: string;
+  /** Other maps the entity could be duplicated to (excludes the active one). */
+  otherMaps?: { id: string; name: string }[];
   onPlace?: () => void;
   onMove?: () => void;
   onGoTo?: () => void;
   onRemove?: () => void;
   onReset?: () => void;
+  onNudge?: (dx: number, dy: number) => void;
+  onChangeXY?: (x: number, y: number) => void;
+  onChangeLabel?: (label: string | undefined) => void;
+  onChangePin?: (pin: PinOverride | undefined) => void;
+  onDuplicateToMap?: (mapId: string) => void;
 }
 
-function EntityRow({ entity, state, coord, overridden, isPending, onPlace, onMove, onGoTo, onRemove, onReset }: RowProps) {
-  const color = TYPE_COLOR[entity.type] ?? TYPE_COLOR.default;
+function EntityRow({
+  entity, state, coord, overridden, isPending, pinOverride, label, otherMaps,
+  onPlace, onMove, onGoTo, onRemove, onReset, onNudge, onChangeXY, onChangeLabel, onChangePin, onDuplicateToMap,
+}: RowProps) {
+  const style = resolvePinStyle(entity.type, pinOverride);
   return (
     <div className={`group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/40 ${isPending ? "ring-1 ring-primary bg-accent/30" : ""}`}>
-      <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: color }} />
+      <span
+        className="shrink-0"
+        aria-hidden
+        // Inline preset-color preview keeps the row visually in sync with the map pin.
+        dangerouslySetInnerHTML={{ __html: pinSvg({ color: style.color, shape: style.shape }) }}
+      />
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium truncate flex items-center gap-1.5">
-          {entity.title}
+          {label || entity.title}
           {overridden && <Badge variant="secondary" className="h-4 text-[9px] px-1">edited</Badge>}
         </div>
         <div className="text-[10px] text-muted-foreground truncate">
@@ -675,13 +817,158 @@ function EntityRow({ entity, state, coord, overridden, isPending, onPlace, onMov
           <Crosshair className="h-3.5 w-3.5" />
         </Button>
       )}
-      {state === "placed" && (
+      {state === "placed" && coord && (
         <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition">
           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={onGoTo} title="Fly to"><Target className="h-3.5 w-3.5" /></Button>
           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={onMove} title="Re-place"><MapPin className="h-3.5 w-3.5" /></Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Style + advanced">
+                <Settings2 className="h-3.5 w-3.5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 space-y-3">
+              <PinStyleEditor
+                entityType={entity.type}
+                value={pinOverride}
+                onChange={(v) => onChangePin?.(v)}
+              />
+              <div className="space-y-1">
+                <Label className="text-[11px]">Label override</Label>
+                <Input
+                  className="h-8 text-xs"
+                  value={label ?? ""}
+                  placeholder={entity.title}
+                  onChange={(e) => onChangeLabel?.(e.target.value || undefined)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-[11px]">x</Label>
+                  <Input
+                    type="number"
+                    className="h-8 text-xs"
+                    value={coord.x}
+                    onChange={(e) => onChangeXY?.(Number(e.target.value) || 0, coord.y)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-[11px]">y</Label>
+                  <Input
+                    type="number"
+                    className="h-8 text-xs"
+                    value={coord.y}
+                    onChange={(e) => onChangeXY?.(coord.x, Number(e.target.value) || 0)}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label className="text-[11px]">Nudge</Label>
+                <div className="grid grid-cols-3 gap-1 w-28">
+                  <span />
+                  <Button size="sm" variant="outline" className="h-6 text-xs p-0" onClick={() => onNudge?.(0, 100)}>↑</Button>
+                  <span />
+                  <Button size="sm" variant="outline" className="h-6 text-xs p-0" onClick={() => onNudge?.(-100, 0)}>←</Button>
+                  <Button size="sm" variant="outline" className="h-6 text-xs p-0" onClick={() => onNudge?.(0, -100)}>↓</Button>
+                  <Button size="sm" variant="outline" className="h-6 text-xs p-0" onClick={() => onNudge?.(100, 0)}>→</Button>
+                </div>
+              </div>
+              {otherMaps && otherMaps.length > 0 && onDuplicateToMap && (
+                <div className="space-y-1 pt-1 border-t border-border">
+                  <Label className="text-[11px]">Duplicate to map</Label>
+                  <Select onValueChange={(v) => onDuplicateToMap(v)}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Choose map…" /></SelectTrigger>
+                    <SelectContent>
+                      {otherMaps.map((m) => (
+                        <SelectItem key={m.id} value={m.id} className="text-xs">{m.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
           {onReset && <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={onReset} title="Discard local edit"><RotateCcw className="h-3.5 w-3.5" /></Button>}
           <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={onRemove} title="Remove placement"><Trash2 className="h-3.5 w-3.5" /></Button>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Visual preset/color/shape/label-mode editor. Outputs a minimal PinOverride
+ *  (only fields that differ from the entity-type preset) — we never persist
+ *  preset defaults, so frontmatter stays clean. */
+function PinStyleEditor({
+  entityType,
+  value,
+  onChange,
+}: {
+  entityType: string;
+  value: PinOverride | undefined;
+  onChange: (v: PinOverride | undefined) => void;
+}) {
+  const presetId = (value?.preset ?? defaultPresetForType(entityType)) as PinPresetId;
+  const preset = PIN_PRESETS[presetId];
+  const merged = resolvePinStyle(entityType, value);
+
+  const update = (patch: Partial<typeof merged> & { preset?: PinPresetId }) => {
+    onChange(diffPinOverride(entityType, { ...merged, ...patch }));
+  };
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <Label className="text-[11px]">Pin preset</Label>
+        <Select value={presetId} onValueChange={(v) => update({ preset: v as PinPresetId })}>
+          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent className="max-h-72">
+            {(Object.keys(PIN_PRESETS) as PinPresetId[]).map((id) => (
+              <SelectItem key={id} value={id} className="text-xs">{PIN_PRESETS[id].label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label className="text-[11px]">Color</Label>
+          <Input type="color" className="h-8 p-1" value={merged.color} onChange={(e) => update({ color: e.target.value })} />
+        </div>
+        <div>
+          <Label className="text-[11px]">Shape</Label>
+          <Select value={merged.shape} onValueChange={(v) => update({ shape: v as typeof merged.shape })}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {["teardrop","circle","square","diamond","shield","star"].map((s) => (
+                <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div>
+        <Label className="text-[11px]">Label mode</Label>
+        <Select value={merged.labelMode} onValueChange={(v) => update({ labelMode: v as typeof merged.labelMode })}>
+          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {["auto","always","hover","never"].map((m) => (
+              <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <div className="flex justify-between"><Label className="text-[11px]">Priority</Label><span className="text-[10px] text-muted-foreground">{merged.priority}</span></div>
+        <Slider min={0} max={10} step={1} value={[merged.priority]} onValueChange={([v]) => update({ priority: v })} />
+      </div>
+      <div>
+        <div className="flex justify-between"><Label className="text-[11px]">Min zoom</Label><span className="text-[10px] text-muted-foreground">{merged.labelMinZoom}</span></div>
+        <Slider min={-6} max={4} step={1} value={[merged.labelMinZoom]} onValueChange={([v]) => update({ labelMinZoom: v })} />
+      </div>
+      {value && Object.keys(value).length > 0 && (
+        <Button size="sm" variant="ghost" className="h-7 text-xs w-full" onClick={() => onChange(undefined)}>
+          Reset to "{preset.label}" preset
+        </Button>
       )}
     </div>
   );

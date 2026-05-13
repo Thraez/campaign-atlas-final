@@ -61,6 +61,10 @@ export interface PlacementOverride {
   mapId: string;
   x: number;
   y: number;
+  /** Optional label override (defaults to entity.title at render time). */
+  label?: string;
+  /** Optional pin styling — only diff vs. the type preset is emitted. */
+  pin?: import("@/atlas/pins/presets").PinOverride;
 }
 
 export interface BuildPlacementPatchOpts {
@@ -80,9 +84,10 @@ export function buildPlacementPatch(opts: BuildPlacementPatchOpts): PatchArtifac
   for (const p of placements) {
     const entity = project.entities.find((e) => e.id === p.entityId);
     if (!entity) continue;
-    const yamlBlock = dumpYaml({
-      atlas: { placements: [{ mapId: p.mapId, x: p.x, y: p.y }] },
-    });
+    const placement: Record<string, unknown> = { mapId: p.mapId, x: p.x, y: p.y };
+    if (p.label && p.label !== entity.title) placement.label = p.label;
+    if (p.pin && Object.keys(p.pin).length > 0) placement.pin = p.pin;
+    const yamlBlock = dumpYaml({ atlas: { placements: [placement] } });
     sections.push({ label: `${entity.title} → ${entity.sourcePath || entity.id}`, yaml: yamlBlock });
     bodyParts.push(`# entity: ${entity.title}`);
     bodyParts.push(`# file:   ${entity.sourcePath || entity.id}`);

@@ -353,8 +353,9 @@ async function main() {
         mapId,
         x: p.x,
         y: p.y,
-        label: entity.title,
+        label: (p as { label?: string }).label ?? entity.title,
         visibility: entity.visibility,
+        pin: (p as { pin?: import("../src/atlas/content/schema").PinPlacementStyle }).pin,
       });
     }
   }

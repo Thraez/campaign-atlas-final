@@ -150,6 +150,20 @@ export interface Entity {
   dateYear?: number;
 }
 
+/** Per-placement pin styling overrides. Stored under atlas.placements[].pin in YAML.
+ *  All keys are OPTIONAL — anything left unset inherits from the type-derived preset
+ *  (see src/atlas/pins/presets.ts). The preset is the source of truth; YAML only
+ *  stores what the DM explicitly changed, so frontmatter stays terse. */
+export interface PinPlacementStyle {
+  preset?: string;
+  color?: string;
+  icon?: string;
+  shape?: "teardrop" | "circle" | "square" | "diamond" | "shield" | "star";
+  labelMode?: "auto" | "always" | "never" | "hover";
+  labelMinZoom?: number;
+  priority?: number;
+}
+
 export interface MapPlacement {
   id: string;
   entityId: string;
@@ -159,6 +173,8 @@ export interface MapPlacement {
   icon?: string;
   label?: string;
   visibility: EntityVisibility;
+  /** Optional pin-styling overrides; renderer falls back to entity.type preset. */
+  pin?: PinPlacementStyle;
 }
 
 export interface AssetRef {
