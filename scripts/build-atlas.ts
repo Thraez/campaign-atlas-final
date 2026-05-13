@@ -301,23 +301,35 @@ async function main() {
 
   // Default placements to first map if no specific mapId on entity.
   const primaryMapId = maps[0]?.id ?? fallbackMapId;
+  const validMapIds = new Set(maps.map((m) => m.id));
   const placements: MapPlacement[] = [];
   for (const item of pending) {
-    if (!item.coords) continue;
-    const { entity, coords } = item;
+    const { entity } = item;
+    // Build the effective list: explicit placements win; legacy x/y only as fallback.
+    const list = item.placements.length > 0
+      ? item.placements
+      : (item.legacy ? [{ mapId: undefined, x: item.legacy.x, y: item.legacy.y }] : []);
+    if (list.length === 0) continue;
     if (flags.player && !PLAYER_VISIBLE.has(entity.visibility)) {
-      secretPlacementsExcluded += 1;
+      secretPlacementsExcluded += list.length;
       continue;
     }
-    placements.push({
-      id: `${entity.id}@${primaryMapId}`,
-      entityId: entity.id,
-      mapId: primaryMapId,
-      x: coords.x,
-      y: coords.y,
-      label: entity.title,
-      visibility: entity.visibility,
-    });
+    for (const p of list) {
+      const mapId = p.mapId ?? primaryMapId;
+      if (!validMapIds.has(mapId)) {
+        warnings.push(`entity "${entity.id}": placement references unknown mapId "${mapId}" — skipped`);
+        continue;
+      }
+      placements.push({
+        id: `${entity.id}@${mapId}`,
+        entityId: entity.id,
+        mapId,
+        x: p.x,
+        y: p.y,
+        label: entity.title,
+        visibility: entity.visibility,
+      });
+    }
   }
 
   // Resolve route waypoints (entity ids → coordinates) and filter for player.
