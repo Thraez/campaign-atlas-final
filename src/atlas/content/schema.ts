@@ -14,7 +14,21 @@ export interface AtlasProject {
   entities: Entity[];
   placements: MapPlacement[];
   assets: AssetRef[];
+  calendar?: WorldCalendar;
   buildReport?: BuildReport;
+}
+
+// In-world calendar for the timeline. Months sum to the year length.
+export interface CalendarMonth {
+  name: string;
+  days: number;
+}
+
+export interface WorldCalendar {
+  name?: string;
+  epochName?: string;          // e.g. "After Sundering" -> rendered as "1247 AS"
+  daysPerWeek?: number;
+  months: CalendarMonth[];
 }
 
 export interface World {
