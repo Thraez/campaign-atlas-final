@@ -230,11 +230,19 @@ export default function AtlasPlacementEditor() {
     download(`placements-${activeMap.id}.json`, JSON.stringify(merged, null, 2), "application/json");
   };
 
+  const [lastExportAt, setLastExportAt] = useState<number | null>(null);
+
   const exportPatch = () => {
     if (!project || !activeMap) return;
     const lines: string[] = [
       `# Placement patch — ${activeMap.name} (${activeMap.id})`,
       `# Generated ${new Date().toISOString()}`,
+      `#`,
+      `# CANON MODEL:`,
+      `#   YAML / Markdown frontmatter is the source of truth.`,
+      `#   This file is a TOOL-GENERATED PATCH against that canon.`,
+      `#   Generated runtime files (atlas.json, search-index.json) are derived`,
+      `#   and must never be edited by hand.`,
       `#`,
       `# HOW TO APPLY:`,
       `# This file contains one YAML snippet per entity. For each "# entity:"`,
@@ -258,10 +266,19 @@ export default function AtlasPlacementEditor() {
       lines.push(`      y: ${c.y}`);
       lines.push(``);
     }
-    download(`placements-patch-${activeMap.id}.yaml`, lines.join("\n"), "text/yaml");
+    const content = lines.join("\n");
+    const result = validatePatchYaml(content, "placement");
+    if (!result.ok) {
+      toast.error(`Patch validation failed: ${result.errors[0]}`);
+      return;
+    }
+    if (result.warnings.length) toast.warning(result.warnings[0]);
+    download(`placements-patch-${activeMap.id}.yaml`, content, "text/yaml");
+    setLastExportAt(Date.now());
   };
 
   const dirtyCount = Object.keys(overrides).filter((k) => activeMap && k.startsWith(`${activeMap.id}:`)).length;
+  const draftStatus = classifyDraftStatus({ dirtyCount, lastExportAt });
 
   if (error) {
     return (
