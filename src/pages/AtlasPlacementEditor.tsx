@@ -299,6 +299,40 @@ export default function AtlasPlacementEditor() {
           >
             <FlyTo target={flyTo} />
             <MapClickCapture onClick={onMapClick} />
+
+            {/* Map base image layers (same as the player viewer) */}
+            {showLayers && [...activeMap.layers].sort((a, b) => a.zIndex - b.zIndex).map((layer) => (
+              <ImageOverlay
+                key={layer.id}
+                url={layer.src}
+                bounds={[
+                  [activeMap.height - (layer.y + layer.height), layer.x],
+                  [activeMap.height - layer.y, layer.x + layer.width],
+                ] as L.LatLngBoundsLiteral}
+                opacity={layer.opacity}
+              />
+            ))}
+
+            {/* Region polygons rendered lightly so they don't dominate the editor */}
+            {showRegions && (activeMap.regions ?? []).map((region) => {
+              const positions = region.points.map(([x, y]) => [activeMap.height - y, x] as [number, number]);
+              const color = region.color ?? "#7fb069";
+              return (
+                <Polygon
+                  key={region.id}
+                  positions={positions}
+                  pathOptions={{
+                    color,
+                    weight: 1,
+                    fillColor: color,
+                    fillOpacity: 0.08,
+                    opacity: 0.5,
+                    interactive: false,
+                  }}
+                />
+              );
+            })}
+
             {placed.map((e) => {
               const c = effectiveCoord(e.id)!;
               const color = TYPE_COLOR[e.type] ?? TYPE_COLOR.default;
