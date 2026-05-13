@@ -495,8 +495,10 @@ export default function AtlasPlacementEditor() {
               />
             ))}
 
-            {/* Regions render ABOVE base layers but BELOW routes/pins/labels/handles. */}
+            {/* Z-order: layers → regions → routes → fog → pins → handles. */}
             {showRegions && <RegionLayer map={activeMap} api={regionDraft} visible={showRegions} />}
+            <RouteLayer map={activeMap} api={routeDraft} />
+            <FogLayer map={activeMap} api={fogDraft} preview={showFogPreview} />
 
             {placed.map((e) => {
               const eff = effectivePlacement(e.id);
