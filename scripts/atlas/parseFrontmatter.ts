@@ -104,7 +104,37 @@ function parsePlacements(v: unknown, sourcePath: string, warnings: string[]): At
       mapId: typeof p.mapId === "string" ? p.mapId : undefined,
       x: p.x,
       y: p.y,
+      label: typeof p.label === "string" ? p.label : undefined,
+      pin: parsePinStyle(p.pin, sourcePath, i, warnings),
     });
   }
   return out.length > 0 ? out : undefined;
+}
+
+const VALID_SHAPES = new Set(["teardrop", "circle", "square", "diamond", "shield", "star"]);
+const VALID_LABEL_MODES = new Set(["auto", "always", "never", "hover"]);
+
+function parsePinStyle(v: unknown, sourcePath: string, idx: number, warnings: string[]): PinPlacementStyle | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== "object") {
+    warnings.push(`${sourcePath}: atlas.placements[${idx}].pin must be an object — ignored`);
+    return undefined;
+  }
+  const r = v as Record<string, unknown>;
+  const out: PinPlacementStyle = {};
+  if (typeof r.preset === "string") out.preset = r.preset;
+  if (typeof r.color === "string") out.color = r.color;
+  if (typeof r.icon === "string") out.icon = r.icon;
+  if (typeof r.shape === "string" && VALID_SHAPES.has(r.shape)) out.shape = r.shape as PinPlacementStyle["shape"];
+  if (typeof r.labelMode === "string" && VALID_LABEL_MODES.has(r.labelMode)) out.labelMode = r.labelMode as PinPlacementStyle["labelMode"];
+  if (typeof r.labelMinZoom === "number") out.labelMinZoom = r.labelMinZoom;
+  if (typeof r.priority === "number") {
+    if (r.priority < 0 || r.priority > 10) {
+      warnings.push(`${sourcePath}: atlas.placements[${idx}].pin.priority out of range 0..10 — clamped`);
+      out.priority = Math.max(0, Math.min(10, r.priority));
+    } else {
+      out.priority = r.priority;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
