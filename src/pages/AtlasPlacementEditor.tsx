@@ -260,6 +260,12 @@ export default function AtlasPlacementEditor() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
+      <div className="px-3 py-1.5 text-[11px] bg-primary/10 text-foreground border-b border-primary/20 flex items-center justify-between gap-2">
+        <span title="Local browser draft → exported YAML/asset patch → committed to GitHub → player-safe published atlas">
+          Edits here are <strong>local draft changes</strong>. Export patches and commit them to GitHub to publish.
+        </span>
+        <Link to="/" className="text-primary hover:underline shrink-0">← Back</Link>
+      </div>
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
         <Link to="/" className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2">
           <Compass className="h-5 w-5" /> <span className="hidden sm:inline">Placement Editor</span>
