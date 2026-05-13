@@ -16,6 +16,12 @@ import { slugify } from "./atlas/slugify";
 import { loadWorldConfig } from "./atlas/loadWorldConfig";
 import { CURRENT_ATLAS_SCHEMA_VERSION } from "./atlas/schemaVersion";
 import { sanitizeAtlasHtml } from "../src/atlas/sanitizeHtml";
+import {
+  validateAsset,
+  formatFinding,
+  type AssetFinding,
+  type SvgPolicy,
+} from "./atlas/validateAsset";
 import { parseAtlasDate } from "./atlas/calendarDate";
 import { scanDmContent, reportDmInSource } from "./atlas/detectDmInSource";
 import {
@@ -519,37 +525,40 @@ async function main() {
   }
 
   // -------- Asset validation --------
-  // Walk every entity image and every map layer src. We separate:
-  //   - external URLs (http(s)/data) — warned but allowed
-  //   - local paths    — must exist under public/ (or the configured outputDir's parent)
+  // Walk every entity image and every map layer src through the centralized
+  // validator (scripts/atlas/validateAsset.ts). Each finding includes the
+  // referring owner id, the offending path, and an actionable suggestion.
   const PUBLIC_DIR = path.join(ROOT, "public");
-  const missingAssetList: string[] = [];
-  const externalAssetList: string[] = [];
+  const assetFindings: AssetFinding[] = [];
+  // SVG policy is centralized in validateAsset.ts; expose hook here for future
+  // per-project overrides via atlas.config.json.
+  const svgPolicy: SvgPolicy | undefined = undefined;
 
-  const checkAsset = (raw: string, owner: string) => {
+  const runAssetCheck = (raw: string, owner: string) => {
     if (!raw) return;
-    const isExternal = /^(https?:|data:|blob:)/i.test(raw);
-    if (isExternal) {
-      externalAssets += 1;
-      externalAssetList.push(`${owner}: ${raw}`);
-      warnings.push(`${owner}: external asset "${raw}" — not bundled with the player build`);
-      return;
-    }
-    localAssets += 1;
-    // Local: try public/<path> with leading slash stripped.
-    const rel = raw.replace(/^\/+/, "");
-    const abs = path.join(PUBLIC_DIR, rel);
-    if (!fs.existsSync(abs)) {
-      missingAssets += 1;
-      missingAssetList.push(`${owner}: missing local asset "${raw}" (looked in public/${rel})`);
+    if (/^(https?:|data:|blob:)/i.test(raw)) externalAssets += 1;
+    else localAssets += 1;
+    const found = validateAsset(raw, owner, { publicDir: PUBLIC_DIR, svgPolicy });
+    for (const f of found) {
+      assetFindings.push(f);
+      if (f.category === "missing") missingAssets += 1;
     }
   };
 
   for (const { entity } of pending) {
-    for (const img of entity.images) checkAsset(img, `entity ${entity.id}`);
+    for (const img of entity.images) runAssetCheck(img, `entity ${entity.id}`);
   }
   for (const m of maps) {
-    for (const layer of m.layers ?? []) checkAsset(layer.src, `map ${m.id} layer ${layer.id}`);
+    for (const layer of m.layers ?? []) runAssetCheck(layer.src, `map ${m.id} layer ${layer.id}`);
+  }
+
+  // Strict-player gate for unsupported extensions: ship-blocking because the
+  // browser will refuse to render the file. Counted separately from missing
+  // assets (which already have exit code 4).
+  const badExtensionCount = assetFindings.filter((f) => f.category === "bad-extension").length;
+  // Non-fatal categories surface as warnings in the standard build log.
+  for (const f of assetFindings) {
+    if (f.severity === "warning") warnings.push(`${f.owner}: ${f.message} — ${f.suggestion}`);
   }
 
   const project: AtlasProject = {
@@ -643,7 +652,9 @@ async function main() {
   console.log(`Errors:                  ${errors.length}`);
   for (const e of errors) console.log(`  ✗ ${e}`);
   for (const w of warnings) console.log(`  ! ${w}`);
-  for (const m of missingAssetList) console.log(`  ✗ ${m}`);
+  for (const f of assetFindings) {
+    if (f.severity === "error") console.log(`  ${formatFinding(f)}`);
+  }
   console.log(`\nWrote ${path.relative(ROOT, path.join(outDir, "atlas.json"))}`);
   console.log(`Wrote ${path.relative(ROOT, path.join(outDir, "search-index.json"))}\n`);
 
@@ -663,6 +674,12 @@ async function main() {
   if (flags.player && flags.strict && missingAssets > 0) {
     console.error(`Strict player mode: ${missingAssets} missing local asset(s). Failing build.`);
     process.exit(4);
+  }
+  // Unsupported asset extensions are unrenderable in browsers — block strict
+  // player builds before they ship 404s or broken images.
+  if (flags.player && flags.strict && badExtensionCount > 0) {
+    console.error(`Strict player mode: ${badExtensionCount} asset(s) with unsupported extension. Failing build.`);
+    process.exit(9);
   }
   // Strict mode (non-asset, non-link) still fails on duplicate slugs etc.
   // Unresolved wikilinks are explicitly allowed and do NOT fail strict.
