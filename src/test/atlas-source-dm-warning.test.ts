@@ -98,27 +98,19 @@ describe("build-atlas player gate", () => {
   const FIXTURE = path.resolve(__dirname, "fixtures/atlas-build");
 
   function runPlayer(ack: boolean): { status: number; combined: string } {
+    // Redirect stderr→stdout so we capture the warning text regardless of
+    // which stream the script printed it to.
+    const env = ack
+      ? { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" }
+      : { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "" };
     try {
       const stdout = execFileSync(
-        "npx",
+        "bash",
         [
-          "tsx",
-          SCRIPT,
-          "--player",
-          "--strict",
-          "--config",
-          path.join(FIXTURE, "atlas.config.json"),
-          "--out",
-          path.join(tmp, "out"),
+          "-c",
+          `npx tsx ${JSON.stringify(SCRIPT)} --player --strict --config ${JSON.stringify(path.join(FIXTURE, "atlas.config.json"))} --out ${JSON.stringify(path.join(tmp, "out"))} 2>&1`,
         ],
-        {
-          cwd: ROOT,
-          encoding: "utf8",
-          stdio: ["ignore", "pipe", "pipe"],
-          env: ack
-            ? { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" }
-            : { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "" },
-        }
+        { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env }
       );
       return { status: 0, combined: String(stdout) };
     } catch (e) {
