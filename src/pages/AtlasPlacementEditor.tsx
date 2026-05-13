@@ -384,6 +384,7 @@ export default function AtlasPlacementEditor() {
                 />
               );
             })}
+            <AtlasMinimap map={activeMap} layers={layerEditor.mergedLayers} />
           </MapContainer>
 
           {pendingId && (
