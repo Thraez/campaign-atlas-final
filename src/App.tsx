@@ -22,6 +22,7 @@ const App = () => (
         <Route path="/" element={<Index />} />
           <Route path="/atlas" element={<AtlasViewer />} />
           <Route path="/atlas/edit" element={<AtlasPlacementEditor />} />
+          <Route path="/atlas/timeline" element={<AtlasTimeline />} />
           <Route path="/auth" element={<Auth />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
