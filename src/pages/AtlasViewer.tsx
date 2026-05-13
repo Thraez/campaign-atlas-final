@@ -21,6 +21,7 @@ import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { printEntityHandout } from "@/atlas/printHandout";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
+import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
@@ -728,7 +729,7 @@ const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function Entity
           <div
             ref={ref}
             className="atlas-prose prose prose-sm max-w-none dark:prose-invert"
-            dangerouslySetInnerHTML={{ __html: entity.bodyHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(entity.bodyHtml) }}
           />
 
           {entity.tags.length > 0 && (
@@ -957,7 +958,10 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
                     {placed && <MapPin className="h-3 w-3 text-primary ml-auto" />}
                   </div>
                   {snip ? (
-                    <div className="text-xs text-muted-foreground line-clamp-2" dangerouslySetInnerHTML={{ __html: snip }} />
+                    <div
+                      className="text-xs text-muted-foreground line-clamp-2"
+                      dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(snip) }}
+                    />
                   ) : (
                     r.summary && <div className="text-xs text-muted-foreground line-clamp-1">{r.summary}</div>
                   )}

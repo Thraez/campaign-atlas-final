@@ -15,6 +15,7 @@ import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
 import { slugify } from "./atlas/slugify";
 import { loadWorldConfig } from "./atlas/loadWorldConfig";
 import { CURRENT_ATLAS_SCHEMA_VERSION } from "./atlas/schemaVersion";
+import { sanitizeAtlasHtml } from "../src/atlas/sanitizeHtml";
 import { parseAtlasDate } from "./atlas/calendarDate";
 import { scanDmContent, reportDmInSource } from "./atlas/detectDmInSource";
 import {
@@ -301,7 +302,12 @@ async function main() {
     const html = marked.parse(tokenized, { async: false }) as string;
     // In player builds, broken link tokens (which now include links to excluded
     // dm entities) must NOT leak the target name. Render as plain display text.
-    entity.bodyHtml = renderLinkTokens(html, links, { hideBroken: flags.player });
+    // Sanitize rendered markdown HTML BEFORE shipping it in atlas.json.
+    // This is defense-in-depth against HTML/script injection in lore content;
+    // it does NOT replace player-safe DM stripping (which has already run
+    // upstream on the raw markdown).
+    const linked = renderLinkTokens(html, links, { hideBroken: flags.player });
+    entity.bodyHtml = sanitizeAtlasHtml(linked);
   }
   for (const { entity } of pending) {
     const m = backlinkMap.get(entity.id);
