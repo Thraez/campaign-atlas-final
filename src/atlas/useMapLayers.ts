@@ -76,47 +76,69 @@ export function useMapLayers(map: MapDocument | undefined) {
     setByMap((s) => ({ ...s, [map.id]: updater(s[map.id] ?? []) }));
   }, [map]);
 
-  const addUploaded = useCallback((files: File[]) => {
+  const addUploaded = useCallback(async (files: File[]) => {
     if (!map) return;
-    const additions: LocalLayer[] = files.map((file, i) => {
+    const additions: LocalLayer[] = await Promise.all(files.map(async (file, i) => {
       const url = URL.createObjectURL(file);
       const id = `upload-${Date.now()}-${i}-${safeFilename(file.name).slice(0, 24)}`;
       const sf = safeFilename(file.name);
+      // Sniff natural size so the layer doesn't default to "stretch over the whole map".
+      const dims = await readImageSize(url).catch(() => null);
+      const dataUrl = await fileToDataUrl(file).catch(() => undefined);
       return {
         id,
         src: url,
         x: 0,
         y: 0,
-        width: map.width,
-        height: map.height,
+        width: dims?.w ?? map.width,
+        height: dims?.h ?? map.height,
         opacity: 1,
         zIndex: (map.layers.length + i + 1) * 10,
         origin: "upload",
+        name: file.name,
         filename: file.name,
         targetPath: `public/atlas/assets/maps/${sf}`,
         isObjectUrl: true,
+        dataUrl,
       };
-    });
+    }));
     setLayers((prev) => [...prev, ...additions]);
     if (additions[0]) setSelectedId(additions[0].id);
   }, [map, setLayers]);
 
-  const addUrl = useCallback((src: string) => {
+  const addUrl = useCallback(async (src: string) => {
     if (!map || !src.trim()) return;
+    const trimmed = src.trim();
     const id = `url-${Date.now()}`;
+    const dims = await readImageSize(trimmed).catch(() => null);
     setLayers((prev) => [...prev, {
       id,
-      src: src.trim(),
+      src: trimmed,
       x: 0,
       y: 0,
-      width: map.width,
-      height: map.height,
+      width: dims?.w ?? map.width,
+      height: dims?.h ?? map.height,
       opacity: 1,
       zIndex: (map.layers.length + prev.length + 1) * 10,
-      origin: /^(https?:|data:)/i.test(src.trim()) ? "url" : "url",
+      origin: "url",
+      name: trimmed.split("/").pop() ?? trimmed,
     }]);
     setSelectedId(id);
+    if (!dims) {
+      // Caller (UI) can show a toast; we still add the layer so the user can fix the URL.
+    }
   }, [map, setLayers]);
+
+  const duplicateLayer = useCallback((id: string) => {
+    if (!map) return;
+    const src = (byMap[map.id] ?? []).find((l) => l.id === id)
+      ?? (map.layers.find((l) => l.id === id) ? { ...map.layers.find((l) => l.id === id)!, origin: "edit" as const } : null);
+    if (!src) return;
+    const newId = `${src.id}-copy-${Date.now().toString(36).slice(-4)}`;
+    const dup: LocalLayer = { ...src, id: newId, x: src.x + 200, y: src.y + 200, zIndex: src.zIndex + 1, origin: "upload" === src.origin ? "upload" : (src as LocalLayer).origin ?? "edit" };
+    setLayers((prev) => [...prev, dup]);
+    setSelectedId(newId);
+  }, [map, byMap, setLayers]);
 
   const editBuiltinLayer = useCallback((layerId: string) => {
     if (!map) return;
