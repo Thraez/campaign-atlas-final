@@ -7,11 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import yaml from "js-yaml";
-import {
-  CURRENT_ATLAS_SCHEMA_VERSION,
-  resolveAndMigrate,
-  SchemaVersionError,
-} from "./schemaVersion";
+import { resolveAndMigrate, SchemaVersionError } from "./schemaVersion";
 import type {
   EntityVisibility,
   FogOverlay,
