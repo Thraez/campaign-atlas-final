@@ -322,11 +322,14 @@ export default function AtlasPlacementEditor() {
         <Button variant="ghost" size="sm" onClick={() => { setOverrides({}); toast.info("Cleared overrides"); }} title="Discard local changes">
           <RotateCcw className="h-4 w-4" />
         </Button>
-        <Button variant="secondary" size="sm" onClick={exportPatch} className="gap-1">
-          <FileCode className="h-4 w-4" /><span className="hidden md:inline">Patch.yaml</span>
+        <Button variant="default" size="sm" onClick={() => setExportModalOpen(true)} className="gap-1" title="Open the unified export modal">
+          <Package className="h-4 w-4" /><span className="hidden md:inline">Export DM Changes</span>
         </Button>
-        <Button variant="default" size="sm" onClick={exportJson} className="gap-1">
-          <Download className="h-4 w-4" /><span className="hidden md:inline">placements.json</span>
+        <Button variant="ghost" size="sm" onClick={exportPatch} className="gap-1" title="Quick: download placements .yaml">
+          <FileCode className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={exportJson} className="gap-1" title="Quick: download placements .json">
+          <Download className="h-4 w-4" />
         </Button>
         <Button asChild variant="ghost" size="sm">
           <Link to="/atlas">View as player →</Link>
