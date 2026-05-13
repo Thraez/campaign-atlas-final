@@ -207,6 +207,13 @@ export function useMapLayers(map: MapDocument | undefined) {
     setSelectedId(null);
   }, [setLayers]);
 
+  const clearAll = useCallback(() => {
+    Object.values(byMap).forEach((arr) => arr.forEach((l) => l.isObjectUrl && URL.revokeObjectURL(l.src)));
+    setByMap({});
+    setSelectedId(null);
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* noop */ }
+  }, [byMap]);
+
   return {
     localLayers,
     mergedLayers,
@@ -216,7 +223,9 @@ export function useMapLayers(map: MapDocument | undefined) {
     addUrl,
     editBuiltinLayer,
     updateLayer,
+    duplicateLayer,
     removeLayer,
     clearForMap,
+    clearAll,
   };
 }
