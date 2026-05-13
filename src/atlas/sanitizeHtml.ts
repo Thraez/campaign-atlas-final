@@ -51,7 +51,7 @@ const ALLOWED_ATTR = [
   "lang",
 ];
 
-const PURIFY_CONFIG: DOMPurify.Config = {
+const PURIFY_CONFIG = {
   ALLOWED_TAGS: [...ALLOWED_TAGS],
   ALLOWED_ATTR,
   // No iframes/embeds/objects/forms/svg-foreignobject etc.
@@ -66,7 +66,7 @@ const PURIFY_CONFIG: DOMPurify.Config = {
   RETURN_DOM_FRAGMENT: false,
   // We don't use SVG/MathML for body content.
   USE_PROFILES: { html: true },
-};
+} as const;
 
 /**
  * Sanitize an HTML string for safe rendering in the atlas viewer.
