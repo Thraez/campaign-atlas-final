@@ -127,7 +127,7 @@ async function main() {
   let visibilityExcluded = 0;
   let secretPlacementsExcluded = 0;
 
-  type Pending = { entity: Entity; rawBody: string };
+  type Pending = { entity: Entity; rawBody: string; coords?: { x: number; y: number } };
   const pending: Pending[] = [];
   const slugSeen = new Map<string, string>();
 
@@ -185,7 +185,11 @@ async function main() {
       links: [],
       backlinks: [],
     };
-    pending.push({ entity, rawBody: noDm });
+    const fmAtlas = (parsed.data.atlas as Record<string, unknown>) ?? {};
+    const cx = typeof fmAtlas.x === "number" ? fmAtlas.x : undefined;
+    const cy = typeof fmAtlas.y === "number" ? fmAtlas.y : undefined;
+    const coords = cx !== undefined && cy !== undefined ? { x: cx, y: cy } : undefined;
+    pending.push({ entity, rawBody: noDm, coords });
   }
 
   // Wikilink name index
@@ -224,11 +228,9 @@ async function main() {
   const mapId = `${worldId}-overview`;
 
   const placements: MapPlacement[] = [];
-  for (const { entity } of pending) {
-    const fmAtlas = (entity.frontmatter.atlas as Record<string, unknown>) ?? {};
-    const x = typeof fmAtlas.x === "number" ? fmAtlas.x : undefined;
-    const y = typeof fmAtlas.y === "number" ? fmAtlas.y : undefined;
-    if (x === undefined || y === undefined) continue;
+  for (const item of pending) {
+    if (!item.coords) continue;
+    const { entity, coords } = item;
     if (flags.player && !PLAYER_VISIBLE.has(entity.visibility)) {
       secretPlacementsExcluded += 1;
       continue;
@@ -237,8 +239,8 @@ async function main() {
       id: `${entity.id}@${mapId}`,
       entityId: entity.id,
       mapId,
-      x,
-      y,
+      x: coords.x,
+      y: coords.y,
       label: entity.title,
       visibility: entity.visibility,
     });
