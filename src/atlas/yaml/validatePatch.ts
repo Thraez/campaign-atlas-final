@@ -49,7 +49,11 @@ export function validatePatchYaml(content: string, kind: PatchKind): ValidationR
   let parsed: unknown[] = [];
   for (const chunk of chunks) {
     try {
-      parsed.push(yaml.load(chunk));
+      // Frontmatter blocks commonly use `---` document delimiters; loadAll
+      // accepts both single- and multi-document streams without throwing on
+      // the "expected a single document" case.
+      const docs = yaml.loadAll(chunk);
+      for (const d of docs) if (d !== undefined && d !== null) parsed.push(d);
     } catch (e) {
       if (!firstError) firstError = e instanceof Error ? e.message : String(e);
     }
