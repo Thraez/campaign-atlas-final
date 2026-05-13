@@ -51,6 +51,18 @@ function MapController({ flyTo }: { flyTo: { x: number; y: number; height: numbe
   return null;
 }
 
+// Build a multi-polygon for fog: outer ring covers the whole map, each
+// reveal becomes an inner ring (hole) using Leaflet's array-of-rings format.
+function fogPositions(map: MapDocument, reveals: Point[][]): L.LatLngExpression[][] {
+  const outer: L.LatLngExpression[] = [
+    [0, 0], [0, map.width], [map.height, map.width], [map.height, 0],
+  ];
+  const holes: L.LatLngExpression[][] = reveals.map((poly) =>
+    poly.map(([x, y]) => [map.height - y, x] as [number, number])
+  );
+  return [outer, ...holes];
+}
+
 interface ViewerState {
   project: AtlasProject;
   index: SearchIndexEntry[];
@@ -259,9 +271,8 @@ export default function AtlasViewer() {
                   fillOpacity: 1,
                   weight: 0,
                   interactive: false,
-                  // @ts-expect-error - leaflet supports the SVG fill-rule prop
                   fillRule: "evenodd",
-                }}
+                } as L.PathOptions}
               />
             )}
 
