@@ -19,7 +19,7 @@
 
 import yaml from "js-yaml";
 
-export type PatchKind = "map" | "placement" | "settings";
+export type PatchKind = "map" | "placement" | "settings" | "world-map" | "entity-frontmatter";
 
 export interface ValidationResult {
   ok: boolean;
@@ -56,7 +56,7 @@ export function validatePatchYaml(content: string, kind: PatchKind): ValidationR
   }
   if (firstError) errors.push(`YAML parse error: ${firstError}`);
 
-  if (kind === "map" || kind === "settings") {
+  if (kind === "map" || kind === "settings" || kind === "world-map") {
     const mapsDoc = parsed.find((d): d is { maps: unknown } =>
       !!d && typeof d === "object" && Array.isArray((d as { maps?: unknown }).maps)
     );

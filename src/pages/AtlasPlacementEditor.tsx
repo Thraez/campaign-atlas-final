@@ -3,7 +3,7 @@ import { MapContainer, Marker, Polygon, ImageOverlay, useMap, useMapEvents } fro
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode, Layers as LayersIcon, MapPin as PinIcon, Settings2, Package, FolderOpen } from "lucide-react";
+import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode, Layers as LayersIcon, MapPin as PinIcon, Settings2, Package, FolderOpen, Shapes, Route as RouteIcon, CloudFog, BookOpen, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity, MapDocument } from "@/atlas/content/schema";
@@ -28,6 +28,13 @@ import {
 } from "@/atlas/yaml/buildPatches";
 import { ExportChangesModal } from "@/atlas/ExportChangesModal";
 import { ImportPanel } from "@/atlas/import/ImportPanel";
+import { TabFrame } from "@/atlas/tabs/TabFrame";
+import { RegionsTab } from "@/atlas/tabs/RegionsTab";
+import { RoutesTab } from "@/atlas/tabs/RoutesTab";
+import { FogTab } from "@/atlas/tabs/FogTab";
+import { EntitiesTab } from "@/atlas/tabs/EntitiesTab";
+import { PublishCheckTab } from "@/atlas/tabs/PublishCheckTab";
+import { validateProject } from "@/atlas/yaml/validateProject";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 // Bumped to v2: storage shape changed from { [entityId]: Override } to
@@ -245,6 +252,9 @@ export default function AtlasPlacementEditor() {
 
   const [lastExportAt, setLastExportAt] = useState<number | null>(null);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  // Per-tab last-export timestamps so each tab header can show its own status.
+  const [tabExportAt, setTabExportAt] = useState<Record<string, number>>({});
+  const markTabExport = (tab: string) => setTabExportAt((s) => ({ ...s, [tab]: Date.now() }));
 
   const exportPatch = () => {
     if (!project || !activeMap) return;
@@ -257,10 +267,38 @@ export default function AtlasPlacementEditor() {
     if (result.warnings.length) toast.warning(result.warnings[0]);
     download(artifact.filename, artifact.content, artifact.mime);
     setLastExportAt(Date.now());
+    markTabExport("pins");
   };
 
   const dirtyCount = Object.keys(overrides).filter((k) => activeMap && k.startsWith(`${activeMap.id}:`)).length;
   const draftStatus = classifyDraftStatus({ dirtyCount, lastExportAt });
+
+  // Project-wide validation, scoped per tab so each tab badge shows its own counts.
+  const draftPlacementsForValidation = useMemo(() => buildDraftPlacements(), [buildDraftPlacements]);
+  const validation = useMemo(
+    () => project && activeMap
+      ? validateProject({
+          project,
+          draftPlacements: draftPlacementsForValidation,
+          draftMap: activeMap,
+          draftLocalLayers: layerEditor.localLayers,
+        })
+      : null,
+    [project, activeMap, draftPlacementsForValidation, layerEditor.localLayers]
+  );
+  const issuesByScope = (predicate: (i: import("@/atlas/yaml/validateProject").Issue) => boolean) => {
+    const list = validation?.issues.filter(predicate) ?? [];
+    return {
+      blocking: list.filter((i) => i.severity === "blocking").length,
+      warning: list.filter((i) => i.severity === "warning").length,
+    };
+  };
+  const pinIssues = issuesByScope((i) => i.code.includes("placement") || i.code === "out-of-bounds" || i.code === "invalid-coord");
+  const mapIssues = issuesByScope((i) => i.code === "duplicate-layer-id" || i.code === "empty-map" || i.code === "missing-asset");
+  const regionIssues = issuesByScope((i) => i.code.includes("region") || i.code === "spoiler-leak");
+  const routeIssues = issuesByScope((i) => i.code.includes("route"));
+  const entityIssues = issuesByScope((i) => i.code === "invalid-visibility" || i.code === "unknown-entity");
+
 
   if (error) {
     return (
@@ -416,76 +454,151 @@ export default function AtlasPlacementEditor() {
           )}
         </div>
 
-        <aside className="w-[380px] hidden md:flex flex-col border-l border-border bg-card">
+        <aside className="w-[420px] hidden md:flex flex-col border-l border-border bg-card">
           <Tabs defaultValue="pins" className="flex-1 flex flex-col min-h-0">
-            <TabsList className="grid grid-cols-4 mx-3 mt-3">
-              <TabsTrigger value="pins" className="gap-1.5"><PinIcon className="h-3.5 w-3.5" />Pins</TabsTrigger>
-              <TabsTrigger value="layers" className="gap-1.5"><LayersIcon className="h-3.5 w-3.5" />Layers</TabsTrigger>
-              <TabsTrigger value="map" className="gap-1.5"><Settings2 className="h-3.5 w-3.5" />Map</TabsTrigger>
-              <TabsTrigger value="import" className="gap-1.5"><FolderOpen className="h-3.5 w-3.5" />Import</TabsTrigger>
+            {/* 8-tab Creator Cockpit. Two rows of compact icon-only triggers. */}
+            <TabsList className="grid grid-cols-4 mx-3 mt-3 h-auto gap-y-1 p-1">
+              <TabsTrigger value="pins" className="gap-1 text-[11px] py-1.5"><PinIcon className="h-3.5 w-3.5" />Pins</TabsTrigger>
+              <TabsTrigger value="maps" className="gap-1 text-[11px] py-1.5"><LayersIcon className="h-3.5 w-3.5" />Maps</TabsTrigger>
+              <TabsTrigger value="regions" className="gap-1 text-[11px] py-1.5"><Shapes className="h-3.5 w-3.5" />Regions</TabsTrigger>
+              <TabsTrigger value="routes" className="gap-1 text-[11px] py-1.5"><RouteIcon className="h-3.5 w-3.5" />Routes</TabsTrigger>
+              <TabsTrigger value="fog" className="gap-1 text-[11px] py-1.5"><CloudFog className="h-3.5 w-3.5" />Fog</TabsTrigger>
+              <TabsTrigger value="entities" className="gap-1 text-[11px] py-1.5"><BookOpen className="h-3.5 w-3.5" />Entities</TabsTrigger>
+              <TabsTrigger value="import" className="gap-1 text-[11px] py-1.5"><FolderOpen className="h-3.5 w-3.5" />Import</TabsTrigger>
+              <TabsTrigger value="publish" className="gap-1 text-[11px] py-1.5"><ShieldCheck className="h-3.5 w-3.5" />Publish</TabsTrigger>
             </TabsList>
+
             <TabsContent value="pins" className="flex-1 flex flex-col min-h-0 m-0">
-              <div className="p-3 border-b border-border">
-                <Input placeholder="Filter entities…" value={filter} onChange={(e) => setFilter(e.target.value)} />
-              </div>
-              <ScrollArea className="flex-1">
-                <Section title={`Unplaced (${unplaced.length})`}>
-                  {unplaced.map((e) => (
-                    <EntityRow
-                      key={e.id}
-                      entity={e}
-                      state="unplaced"
-                      isPending={pendingId === e.id}
-                      onPlace={() => setPendingId(e.id)}
-                    />
-                  ))}
-                  {unplaced.length === 0 && <Empty text="All entities have a coordinate." />}
-                </Section>
-                <Section title={`Placed (${placed.length})`}>
-                  {placed.map((e) => {
-                    const c = effectiveCoord(e.id)!;
-                    const overridden = overrideKey(activeMap.id, e.id) in overrides;
-                    return (
-                      <EntityRow
-                        key={e.id}
-                        entity={e}
-                        state="placed"
-                        coord={c}
-                        overridden={overridden}
-                        isPending={pendingId === e.id}
-                        onGoTo={() => goTo(e.id)}
-                        onMove={() => setPendingId(e.id)}
-                        onRemove={() => removeCoord(e.id)}
-                        onReset={overridden ? () => clearOverride(e.id) : undefined}
-                      />
-                    );
-                  })}
-                  {placed.length === 0 && <Empty text="Pick something on the left to place." />}
-                </Section>
-              </ScrollArea>
+              <TabFrame
+                title="Pins"
+                builtFromYamlCount={project.placements.filter((p) => p.mapId === activeMap.id).length}
+                localDraftCount={dirtyCount}
+                blockingCount={pinIssues.blocking}
+                warningCount={pinIssues.warning}
+                lastExportAt={tabExportAt.pins ?? null}
+                onExport={exportPatch}
+                exportLabel="Export pins"
+                exportDisabled={dirtyCount === 0}
+              >
+                <div className="-m-3">
+                  <div className="p-3 border-b border-border">
+                    <Input placeholder="Filter entities…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+                  </div>
+                  <Section title={`Unplaced (${unplaced.length})`}>
+                    {unplaced.map((e) => (
+                      <EntityRow key={e.id} entity={e} state="unplaced" isPending={pendingId === e.id} onPlace={() => setPendingId(e.id)} />
+                    ))}
+                    {unplaced.length === 0 && <Empty text="All entities have a coordinate." />}
+                  </Section>
+                  <Section title={`Placed (${placed.length})`}>
+                    {placed.map((e) => {
+                      const c = effectiveCoord(e.id)!;
+                      const overridden = overrideKey(activeMap.id, e.id) in overrides;
+                      return (
+                        <EntityRow
+                          key={e.id}
+                          entity={e}
+                          state="placed"
+                          coord={c}
+                          overridden={overridden}
+                          isPending={pendingId === e.id}
+                          onGoTo={() => goTo(e.id)}
+                          onMove={() => setPendingId(e.id)}
+                          onRemove={() => removeCoord(e.id)}
+                          onReset={overridden ? () => clearOverride(e.id) : undefined}
+                        />
+                      );
+                    })}
+                    {placed.length === 0 && <Empty text="Pick something on the left to place." />}
+                  </Section>
+                </div>
+              </TabFrame>
             </TabsContent>
-            <TabsContent value="layers" className="flex-1 flex flex-col min-h-0 m-0">
-              <MapLayerPanel
+
+            <TabsContent value="maps" className="flex-1 flex flex-col min-h-0 m-0">
+              {/* Maps tab combines layers + map settings — same canon target (world.yaml > maps[]). */}
+              <Tabs defaultValue="layers" className="flex-1 flex flex-col min-h-0">
+                <TabsList className="mx-3 mt-2 grid grid-cols-2">
+                  <TabsTrigger value="layers" className="text-[11px]"><LayersIcon className="h-3.5 w-3.5 mr-1" />Layers</TabsTrigger>
+                  <TabsTrigger value="settings" className="text-[11px]"><Settings2 className="h-3.5 w-3.5 mr-1" />Settings</TabsTrigger>
+                </TabsList>
+                <TabsContent value="layers" className="flex-1 flex flex-col min-h-0 m-0">
+                  <MapLayerPanel
+                    map={activeMap}
+                    mergedLayers={layerEditor.mergedLayers}
+                    localLayers={layerEditor.localLayers}
+                    selectedId={layerEditor.selectedId}
+                    setSelectedId={layerEditor.setSelectedId}
+                    onAddFiles={layerEditor.addUploaded}
+                    onAddUrl={layerEditor.addUrl}
+                    onEditBuiltin={layerEditor.editBuiltinLayer}
+                    onUpdate={layerEditor.updateLayer}
+                    onDuplicate={layerEditor.duplicateLayer}
+                    onRemove={layerEditor.removeLayer}
+                    onClearAll={layerEditor.clearAll}
+                    onSetMapSize={(w, h) => patchMap({ width: w, height: h })}
+                  />
+                </TabsContent>
+                <TabsContent value="settings" className="flex-1 flex flex-col min-h-0 m-0">
+                  {baseMap && <MapSettingsPanel map={activeMap} baseMap={baseMap} onPatch={patchMap} onReset={resetMap} />}
+                </TabsContent>
+              </Tabs>
+            </TabsContent>
+
+            <TabsContent value="regions" className="flex-1 flex flex-col min-h-0 m-0">
+              <RegionsTab
+                project={project}
                 map={activeMap}
-                mergedLayers={layerEditor.mergedLayers}
-                localLayers={layerEditor.localLayers}
-                selectedId={layerEditor.selectedId}
-                setSelectedId={layerEditor.setSelectedId}
-                onAddFiles={layerEditor.addUploaded}
-                onAddUrl={layerEditor.addUrl}
-                onEditBuiltin={layerEditor.editBuiltinLayer}
-                onUpdate={layerEditor.updateLayer}
-                onDuplicate={layerEditor.duplicateLayer}
-                onRemove={layerEditor.removeLayer}
-                onClearAll={layerEditor.clearAll}
-                onSetMapSize={(w, h) => patchMap({ width: w, height: h })}
+                blockingCount={regionIssues.blocking}
+                warningCount={regionIssues.warning}
+                lastExportAt={tabExportAt.regions ?? null}
+                onExported={() => markTabExport("regions")}
               />
             </TabsContent>
-            <TabsContent value="map" className="flex-1 flex flex-col min-h-0 m-0">
-              {baseMap && <MapSettingsPanel map={activeMap} baseMap={baseMap} onPatch={patchMap} onReset={resetMap} />}
+
+            <TabsContent value="routes" className="flex-1 flex flex-col min-h-0 m-0">
+              <RoutesTab
+                project={project}
+                map={activeMap}
+                blockingCount={routeIssues.blocking}
+                warningCount={routeIssues.warning}
+                lastExportAt={tabExportAt.routes ?? null}
+                onExported={() => markTabExport("routes")}
+              />
             </TabsContent>
+
+            <TabsContent value="fog" className="flex-1 flex flex-col min-h-0 m-0">
+              <FogTab
+                map={activeMap}
+                blockingCount={mapIssues.blocking}
+                warningCount={mapIssues.warning}
+                lastExportAt={tabExportAt.fog ?? null}
+                onExported={() => markTabExport("fog")}
+              />
+            </TabsContent>
+
+            <TabsContent value="entities" className="flex-1 flex flex-col min-h-0 m-0">
+              <EntitiesTab
+                project={project}
+                blockingCount={entityIssues.blocking}
+                warningCount={entityIssues.warning}
+                lastExportAt={tabExportAt.entities ?? null}
+                onExported={() => markTabExport("entities")}
+              />
+            </TabsContent>
+
             <TabsContent value="import" className="flex-1 flex flex-col min-h-0 m-0">
               <ImportPanel knownEntityNames={new Set(project.entities.flatMap((e) => [e.id.toLowerCase(), e.title.toLowerCase(), ...e.aliases.map((a) => a.toLowerCase())]))} />
+            </TabsContent>
+
+            <TabsContent value="publish" className="flex-1 flex flex-col min-h-0 m-0">
+              <PublishCheckTab
+                project={project}
+                draftMap={activeMap}
+                draftPlacements={draftPlacementsForValidation}
+                draftLocalLayers={layerEditor.localLayers}
+                lastExportAt={lastExportAt}
+              />
             </TabsContent>
           </Tabs>
         </aside>
