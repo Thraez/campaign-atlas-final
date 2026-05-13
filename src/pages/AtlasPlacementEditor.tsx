@@ -487,6 +487,15 @@ export default function AtlasPlacementEditor() {
         </aside>
       </div>
       <style>{`@keyframes atlas-pulse { 0%,100% { filter: drop-shadow(0 0 0 hsl(var(--primary))); } 50% { filter: drop-shadow(0 0 6px hsl(var(--primary))); } }`}</style>
+      <ExportChangesModal
+        open={exportModalOpen}
+        onOpenChange={(o) => { setExportModalOpen(o); if (!o) setLastExportAt(Date.now()); }}
+        project={project}
+        activeMap={activeMap}
+        draftPlacements={buildDraftPlacements()}
+        mergedLayers={layerEditor.mergedLayers}
+        localLayers={layerEditor.localLayers}
+      />
     </div>
   );
 }
