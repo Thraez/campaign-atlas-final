@@ -75,17 +75,47 @@ export default function AtlasPlacementEditor() {
   const [project, setProject] = useState<AtlasProject | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Overrides>(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return {}; }
+    try {
+      const v2 = localStorage.getItem(STORAGE_KEY);
+      if (v2) return JSON.parse(v2);
+      // One-time migration from v1 (entityId-keyed) using a single-map assumption.
+      const v1raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (!v1raw) return {};
+      const v1 = JSON.parse(v1raw) as Record<string, Override>;
+      const migrated: Overrides = {};
+      // We don't yet know the mapId here — defer until project loads.
+      // Stash under a sentinel; resolved on project load.
+      Object.entries(v1).forEach(([eid, val]) => { migrated[`__legacy__:${eid}`] = val; });
+      return migrated;
+    } catch { return {}; }
   });
   const [activeMapId, setActiveMapId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null); // entity awaiting click-to-place
   const [filter, setFilter] = useState("");
   const [flyTo, setFlyTo] = useState<{ lat: number; lng: number } | null>(null);
+  const [showLayers, setShowLayers] = useState(true);
+  const [showRegions, setShowRegions] = useState(true);
 
   useEffect(() => {
     loadAtlasContent(true).then((p) => {
       setProject(p);
-      setActiveMapId(p.worlds[0]?.defaultMapId ?? p.maps[0]?.id ?? null);
+      const defaultMap = p.worlds[0]?.defaultMapId ?? p.maps[0]?.id ?? null;
+      setActiveMapId(defaultMap);
+      // Finish v1 → v2 migration now that we know the default mapId.
+      setOverrides((o) => {
+        const out: Overrides = {};
+        let migrated = false;
+        for (const [k, v] of Object.entries(o)) {
+          if (k.startsWith("__legacy__:") && defaultMap) {
+            out[overrideKey(defaultMap, k.slice("__legacy__:".length))] = v;
+            migrated = true;
+          } else {
+            out[k] = v;
+          }
+        }
+        if (migrated) localStorage.removeItem(LEGACY_STORAGE_KEY);
+        return migrated ? out : o;
+      });
     }).catch((e: Error) => setError(e.message));
   }, []);
 
@@ -98,10 +128,13 @@ export default function AtlasPlacementEditor() {
     [project, activeMapId]
   );
 
-  // Resolve effective coords for an entity: override wins, else first existing placement on activeMap.
+  // Resolve effective coords for an entity on the active map: per-map override
+  // wins, else first existing placement on activeMap.
   const effectiveCoord = useCallback((entityId: string): { x: number; y: number } | null => {
-    if (entityId in overrides) return overrides[entityId];
-    if (!project || !activeMap) return null;
+    if (!activeMap) return null;
+    const k = overrideKey(activeMap.id, entityId);
+    if (k in overrides) return overrides[k];
+    if (!project) return null;
     const p = project.placements.find((pl) => pl.entityId === entityId && pl.mapId === activeMap.id);
     return p ? { x: p.x, y: p.y } : null;
   }, [overrides, project, activeMap]);
@@ -126,15 +159,19 @@ export default function AtlasPlacementEditor() {
   const unplaced = filtered.filter((e) => !effectiveCoord(e.id));
 
   const setCoord = (entityId: string, coord: { x: number; y: number }) => {
-    setOverrides((o) => ({ ...o, [entityId]: coord }));
+    if (!activeMap) return;
+    setOverrides((o) => ({ ...o, [overrideKey(activeMap.id, entityId)]: coord }));
   };
   const removeCoord = (entityId: string) => {
-    setOverrides((o) => ({ ...o, [entityId]: null }));
+    if (!activeMap) return;
+    setOverrides((o) => ({ ...o, [overrideKey(activeMap.id, entityId)]: null }));
   };
   const clearOverride = (entityId: string) => {
+    if (!activeMap) return;
+    const k = overrideKey(activeMap.id, entityId);
     setOverrides((o) => {
       const next = { ...o };
-      delete next[entityId];
+      delete next[k];
       return next;
     });
   };
@@ -144,7 +181,7 @@ export default function AtlasPlacementEditor() {
     const x = Math.round(lng);
     const y = Math.round(activeMap.height - lat);
     setCoord(pendingId, { x, y });
-    toast.success(`Placed "${project?.entities.find((e) => e.id === pendingId)?.title}" at ${x},${y}`);
+    toast.success(`Placed "${project?.entities.find((e) => e.id === pendingId)?.title}" at ${x},${y} on ${activeMap.name}`);
     setPendingId(null);
   };
 
@@ -162,13 +199,13 @@ export default function AtlasPlacementEditor() {
       if (!c) continue;
       merged.push({ entityId: e.id, sourcePath: e.sourcePath, mapId: activeMap.id, x: c.x, y: c.y });
     }
-    download("placements.json", JSON.stringify(merged, null, 2), "application/json");
+    download(`placements-${activeMap.id}.json`, JSON.stringify(merged, null, 2), "application/json");
   };
 
   const exportPatch = () => {
-    if (!project) return;
+    if (!project || !activeMap) return;
     const lines: string[] = [
-      "# Placement patch",
+      `# Placement patch — ${activeMap.name}`,
       "",
       "Paste each snippet into the corresponding entity's frontmatter, under `atlas:`.",
       "Or run: `npm run atlas:apply-placements -- placements.json`",
@@ -185,10 +222,10 @@ export default function AtlasPlacementEditor() {
       lines.push("```");
       lines.push("");
     }
-    download("placements-patch.md", lines.join("\n"), "text/markdown");
+    download(`placements-patch-${activeMap.id}.md`, lines.join("\n"), "text/markdown");
   };
 
-  const dirtyCount = Object.keys(overrides).length;
+  const dirtyCount = Object.keys(overrides).filter((k) => activeMap && k.startsWith(`${activeMap.id}:`)).length;
 
   if (error) {
     return (
