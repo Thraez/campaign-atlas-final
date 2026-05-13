@@ -65,6 +65,7 @@ export default function AtlasViewer() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  const [showFog, setShowFog] = useState(true);
 
   useEffect(() => {
     Promise.all([loadAtlasContent(true), loadSearchIndex()])
