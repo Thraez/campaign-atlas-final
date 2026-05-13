@@ -141,6 +141,20 @@ export default function AtlasViewer() {
       .then(([project, index]) => {
         setData({ project, index });
         setActiveMapId(project.worlds[0]?.defaultMapId ?? project.maps[0]?.id ?? null);
+        const params = new URLSearchParams(window.location.search);
+        const want = params.get("entity");
+        if (want) {
+          setOpenId(want);
+          setMobilePanelOpen(true);
+          const placement = project.placements.find((p) => p.entityId === want);
+          if (placement) {
+            const m = project.maps.find((mm) => mm.id === placement.mapId);
+            if (m) {
+              setActiveMapId(m.id);
+              setFlyTarget({ x: placement.x, y: placement.y, height: m.height });
+            }
+          }
+        }
       })
       .catch((e: Error) => setError(e.message));
   }, []);
