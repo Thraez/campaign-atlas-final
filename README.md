@@ -234,8 +234,9 @@ Implemented:
 - **Batch 4 — Creator convenience**: `/atlas/edit` placement editor with drag-to-place pins, `placements.json` export, `apply-placements` CLI to round-trip back into markdown frontmatter, copy-paste YAML patch. (US-0601, 0602, 0603, 0604, 1303)
 - **Batch 5 — Layered maps & regions**: multi-map worlds, image layers, polygon regions linked to entities, fog of war with reveal areas, header map switcher and fog toggle. (US-0801, 0802, 0803, 0804, 0805)
 - **Batch 6 — Connections & travel**: routes with entity-id waypoint resolution, per-map scale and travel-mode speeds, distance + travel-time hover tooltips, optional hex/square grid overlay with viewer toggle. See `world.yaml` (`scale`, `grid`, `routes`). (US-0901, 0902, 0903, 0904, 1001)
+- **Batch 7 — Search depth & timeline**: full-text search across body with highlighted snippets, type and tag filter chips, in-world calendar in `world.yaml`, `atlas.date` frontmatter on any entry, `/atlas/timeline` page sorted and grouped by year, deep-link from timeline back into the map via `/atlas?entity=<id>`.
 
 Next:
 
-- **Batch 7 — Search depth & timeline**: full-text search across body, tag/type filters, optional in-world calendar timeline.
+- **Batch 8 — TBD**: per the project's user-story backlog.
 
