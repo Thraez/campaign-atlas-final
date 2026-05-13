@@ -123,7 +123,19 @@ export function buildPlacementJson(opts: BuildPlacementPatchOpts): PatchArtifact
   const merged = placements
     .map((p) => {
       const e = project.entities.find((x) => x.id === p.entityId);
-      return e ? { entityId: e.id, sourcePath: e.sourcePath, mapId: p.mapId, x: p.x, y: p.y } : null;
+      if (!e) return null;
+      const out: Record<string, unknown> = {
+        entityId: e.id,
+        sourcePath: e.sourcePath,
+        mapId: p.mapId,
+        x: p.x,
+        y: p.y,
+      };
+      // Preserve label + pin so JSON round-tripping doesn't silently drop the
+      // editor's overrides when re-applied via `atlas:apply-placements`.
+      if (p.label && p.label !== e.title) out.label = p.label;
+      if (p.pin && Object.keys(p.pin).length > 0) out.pin = p.pin;
+      return out;
     })
     .filter(Boolean);
   return {
