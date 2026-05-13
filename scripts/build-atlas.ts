@@ -249,8 +249,7 @@ async function main() {
   const worldId = cfg.defaultWorld;
   const fallbackMapId = `${worldId}-overview`;
 
-  // Load optional world.yaml (maps, regions, fog).
-  const worldCfg = loadWorldConfig(contentDir, worldId);
+  // worldCfg was loaded earlier (so entity dates can resolve against the calendar).
   if (worldCfg) warnings.push(...worldCfg.warnings);
 
   let maps: MapDocument[] = worldCfg?.maps?.length
