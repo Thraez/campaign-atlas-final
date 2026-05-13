@@ -191,6 +191,79 @@ npx vite preview
 
 ---
 
+## Source-repository privacy
+
+The player build (`npm run atlas:build:player`) physically strips DM-only
+entities, hidden notes, `%%` blocks, profile DM halves, DM relationships,
+and DM regions/routes from the deployed `atlas.json`. The shipped
+**artifact** is player-safe.
+
+**The shipped artifact's safety has nothing to do with the source repo's
+safety.** If your source repository is public on GitHub, players can still
+open `content/<world>/_dm/Plot.md` (or any file with `visibility: dm` /
+`visibility: hidden`) directly on github.com and read raw spoilers.
+
+### Recommended setups
+
+1. **Private source, public artifact** — keep the markdown vault repo
+   private and deploy the stripped `dist/` somewhere public (GitHub
+   Pages from a separate repo, S3/CloudFront, Netlify, etc).
+2. **Split repos** — a private "DM repo" that holds the full vault, and
+   a public "player-artifact repo" that only ever receives the output of
+   `npm run atlas:publish`.
+3. **GitHub Pages from artifacts only** — never push the vault to the
+   same public repo that hosts Pages.
+
+### Build-time DM-in-source warning
+
+Each build scans the content tree locally (no network, no GitHub API) for:
+
+- `_dm/` folders that contain real files
+- markdown with `atlas.visibility: dm`
+- markdown with `atlas.visibility: hidden`
+
+If any DM material is present, the build prints a `SOURCE-REPO WARNING`
+block listing the offending paths (capped at 10 per category). DM and dev
+builds treat this as a warning. **Player builds (`--player`) refuse to
+run** unless you explicitly acknowledge the risk by setting:
+
+```bash
+ATLAS_ACK_DM_IN_SOURCE=true npm run atlas:build:player
+```
+
+### What `ATLAS_ACK_DM_IN_SOURCE=true` means
+
+You are asserting that you have personally verified your source
+repository's visibility is appropriate for the DM content it contains —
+typically that the repo is private, or that you intentionally accept the
+spoiler exposure. The flag does not weaken any other safety check; it
+only silences the privacy gate.
+
+Safe to use when:
+
+- The source repo is private.
+- The DM content sits in a separate private repo and only the artifact
+  repo runs this build.
+- You have decided the "DM" content in question is not actually a
+  spoiler for your players.
+
+### Why the build does not auto-detect public-repo visibility
+
+Calling the GitHub API at build time would be:
+
+- **Fragile** — depends on auth tokens, rate limits, network access, and
+  the build running inside an actual GitHub repo.
+- **Misleading** — a "repo is private" green check today says nothing
+  about who has forked it, who had read access yesterday, or whether
+  you'll ever flip it public tomorrow.
+- **Not a substitute for human judgement** — only the author knows
+  whether the content really is sensitive.
+
+Detecting DM content locally and forcing a one-time human acknowledgement
+is deterministic, offline, and cannot be silenced by a flaky API call.
+
+---
+
 ## Schema overview
 
 Defined in `src/atlas/content/schema.ts`. The important rule:
