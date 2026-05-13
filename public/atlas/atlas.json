@@ -1,6 +1,6 @@
 {
-  "version": "2026-05-13T06-46-56-793Z",
-  "publishedAt": "2026-05-13T06:46:56.793Z",
+  "version": "2026-05-13T06-50-41-188Z",
+  "publishedAt": "2026-05-13T06:50:41.188Z",
   "worlds": [
     {
       "id": "astrath-deeprealm",
@@ -17,6 +17,16 @@
       "height": 100000,
       "oceanColor": "#18313f",
       "wrapX": false,
+      "scale": {
+        "unitsPerPixel": 0.05,
+        "unitLabel": "mi"
+      },
+      "grid": {
+        "kind": "hex",
+        "size": 5000,
+        "color": "rgba(255,255,255,0.06)",
+        "enabled": false
+      },
       "layers": [],
       "regions": [
         {
@@ -104,7 +114,8 @@
             ]
           ]
         ]
-      }
+      },
+      "routes": []
     },
     {
       "id": "astrath-deeprealm-northern-reaches",
@@ -115,7 +126,8 @@
       "oceanColor": "#1c2a35",
       "wrapX": false,
       "layers": [],
-      "regions": []
+      "regions": [],
+      "routes": []
     }
   ],
   "entities": [
