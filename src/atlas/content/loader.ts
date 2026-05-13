@@ -21,6 +21,10 @@ export interface SearchIndexEntry {
   tags: string[];
   summary?: string;
   excerpt?: string;
+  body?: string;        // lowercased plain-text body for full-text search
+  dateRaw?: string;
+  dateValue?: number;
+  dateYear?: number;
 }
 
 export async function loadSearchIndex(): Promise<SearchIndexEntry[]> {
