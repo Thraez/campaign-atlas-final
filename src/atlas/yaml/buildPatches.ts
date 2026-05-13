@@ -12,6 +12,7 @@
 
 import type {
   AtlasProject,
+  EntityVisibility,
   MapDocument,
   MapLayer,
   Region,
