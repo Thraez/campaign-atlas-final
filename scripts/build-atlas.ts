@@ -21,6 +21,8 @@ import type {
   MapPlacement,
   Region,
   FogOverlay,
+  Route,
+  Point,
 } from "../src/atlas/content/schema";
 
 interface Config {
