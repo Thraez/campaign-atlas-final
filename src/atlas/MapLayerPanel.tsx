@@ -272,7 +272,7 @@ export function MapLayerPanel(props: Props) {
                 className={`w-full text-left rounded-md px-2 py-1.5 text-xs flex items-center gap-2 ${isSel ? "bg-primary/15 border border-primary/40" : "hover:bg-accent/40 border border-transparent"}`}
               >
                 <div className="h-8 w-8 rounded bg-muted overflow-hidden shrink-0 flex items-center justify-center">
-                  <img src={l.src} alt="" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  <img src={normalizeAtlasAssetUrl(l.src)} alt="" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">{l.id}</div>
