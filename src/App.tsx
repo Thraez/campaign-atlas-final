@@ -8,6 +8,7 @@ import Auth from "./pages/Auth.tsx";
 import AtlasViewer from "./pages/AtlasViewer.tsx";
 import AtlasPlacementEditor from "./pages/AtlasPlacementEditor.tsx";
 import AtlasTimeline from "./pages/AtlasTimeline.tsx";
+import AtlasBrowse from "./pages/AtlasBrowse.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,9 @@ const App = () => (
           <Route path="/atlas" element={<AtlasViewer />} />
           <Route path="/atlas/edit" element={<AtlasPlacementEditor />} />
           <Route path="/atlas/timeline" element={<AtlasTimeline />} />
+          <Route path="/atlas/browse" element={<AtlasBrowse mode="browse" />} />
+          <Route path="/atlas/tag/:tag" element={<AtlasBrowse mode="tag" />} />
+          <Route path="/atlas/type/:type" element={<AtlasBrowse mode="type" />} />
           <Route path="/auth" element={<Auth />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

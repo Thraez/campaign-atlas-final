@@ -12,7 +12,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   Search, X, MapPin, ArrowLeft, Compass, Eye, EyeOff, Grid3x3, CalendarClock,
-  Link2, Copy, Check, Image as ImageIcon,
+  Link2, Check, LayoutGrid,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -284,6 +284,9 @@ export default function AtlasViewer() {
           <Search className="h-4 w-4" />
           <span className="hidden sm:inline">Search</span>
           <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded bg-muted border border-border">⌘K</kbd>
+        </Button>
+        <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+          <Link to="/atlas/browse" title="Browse all entries"><LayoutGrid className="h-4 w-4 mr-1" />Browse</Link>
         </Button>
         <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
           <Link to="/atlas/timeline" title="Timeline of dated entries"><CalendarClock className="h-4 w-4 mr-1" />Timeline</Link>
@@ -607,7 +610,11 @@ const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function Entity
 
           {entity.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-2">
-              {entity.tags.map((t) => <Badge key={t} variant="outline">{t}</Badge>)}
+              {entity.tags.map((t) => (
+                <Link key={t} to={`/atlas/tag/${encodeURIComponent(t)}`}>
+                  <Badge variant="outline" className="hover:bg-accent cursor-pointer">#{t}</Badge>
+                </Link>
+              ))}
             </div>
           )}
 

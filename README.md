@@ -276,8 +276,9 @@ Implemented:
 - **Batch 6 — Connections & travel**: routes with entity-id waypoint resolution, per-map scale and travel-mode speeds, distance + travel-time hover tooltips, optional hex/square grid overlay with viewer toggle. See `world.yaml` (`scale`, `grid`, `routes`). (US-0901, 0902, 0903, 0904, 1001)
 - **Batch 7 — Search depth & timeline**: full-text search across body with highlighted snippets, type and tag filter chips, in-world calendar in `world.yaml`, `atlas.date` frontmatter on any entry, `/atlas/timeline` page sorted and grouped by year, deep-link from timeline back into the map via `/atlas?entity=<id>`.
 - **Batch 8 — Media & viewer polish**: entity `images` rendered as thumbnails in the side panel with a click-to-lightbox Dialog, copy-share-link button per entity, keyboard navigation (↑↓Enter) in the search palette.
+- **Batch 9 — Browse & taxonomy**: `/atlas/browse` alphabetical directory of every entry, `/atlas/tag/:tag` and `/atlas/type/:type` landing pages, clickable tag and type chips throughout the side panel, timeline, and directory.
 
 Next:
 
-- **Batch 9 — TBD**: per the project's user-story backlog.
+- **Batch 10 — TBD**: roughly one batch likely remains from the original out-of-scope list (globe view or AI-assisted lore drafting). Open to direction here.
 
