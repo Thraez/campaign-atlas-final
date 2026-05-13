@@ -555,19 +555,3 @@ export const CATEGORY_LABELS: Record<IssueCategory, string> = {
   draft: "Drafts & Export",
 };
 
-function _unused() {
-  // intentional no-op to keep helper exports clean for tree-shaking
-  return null;
-}
-/* eslint-disable @typescript-eslint/no-unused-vars */
-function _legacy_endmarker(opts: ValidateProjectOpts) {
-  const { project, draftPlacements, draftLocalLayers = [] } = opts;
-  const issues: Issue[] = [];
-  const counts = {
-    blocking: 0,
-    warning: 0,
-    suggestion: 0,
-  };
-  return { issues, counts, passedChecks: [] };
-}
-/* eslint-enable @typescript-eslint/no-unused-vars */
