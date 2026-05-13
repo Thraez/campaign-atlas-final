@@ -14,6 +14,7 @@ import { stripDmBlocks } from "./atlas/stripDmBlocks";
 import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
 import { slugify } from "./atlas/slugify";
 import { loadWorldConfig } from "./atlas/loadWorldConfig";
+import { CURRENT_ATLAS_SCHEMA_VERSION } from "./atlas/schemaVersion";
 import { parseAtlasDate } from "./atlas/calendarDate";
 import { scanDmContent, reportDmInSource } from "./atlas/detectDmInSource";
 import {
