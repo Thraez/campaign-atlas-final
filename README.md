@@ -430,3 +430,15 @@ In the `/atlas` toolbar there is a cloud icon. It opens a small menu with:
   bundle, but it does not push to GitHub or persist DM data anywhere outside your browser.
 - **DM builds are never cached as the player atlas.** Only the player-safe `public/atlas/atlas.json`
   produced by `npm run atlas:publish` is treated as the offline source of truth.
+
+## Player handouts (Print / PDF)
+
+Each entity in `/atlas` has a printer icon next to its title. Click it to open a
+clean, single-page handout in a new tab — the browser's print dialog pops up
+automatically and you can choose **Save as PDF** to share the handout with players.
+
+The handout includes the entity's title, type, summary, hero image, body text,
+gallery, and tags. Map chrome, toolbars, and the side panel are excluded.
+
+Tip: hitting **Ctrl+P / Cmd+P** anywhere in `/atlas` also prints the currently
+open entity (a fallback print stylesheet hides the rest of the UI).

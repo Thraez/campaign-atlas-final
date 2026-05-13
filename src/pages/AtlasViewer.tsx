@@ -12,13 +12,14 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   Search, X, MapPin, ArrowLeft, Compass, Eye, EyeOff, Grid3x3, CalendarClock,
-  Link2, Check, LayoutGrid,
+  Link2, Check, LayoutGrid, Printer,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
+import { printEntityHandout } from "@/atlas/printHandout";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
@@ -613,8 +614,17 @@ const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function Entity
           )}
         </div>
         <div className="flex items-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => printEntityHandout(entity)}
+            title="Download as printable handout (PDF)"
+            aria-label="Download handout as PDF"
+          >
+            <Printer className="h-4 w-4" aria-hidden="true" />
+          </Button>
           <CopyLinkButton entityId={entity.id} />
-          <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close panel"><X className="h-4 w-4" aria-hidden="true" /></Button>
         </div>
       </div>
 
