@@ -30,8 +30,31 @@ export interface MapDocument {
   width: number;
   height: number;
   layers: MapLayer[];
+  regions?: Region[];
+  fog?: FogOverlay;
   oceanColor?: string;
   wrapX?: boolean;
+}
+
+export type Point = [number, number]; // [x, y] in map coordinates (top-left origin)
+
+export interface Region {
+  id: string;
+  mapId: string;
+  name: string;
+  entityId?: string;     // optional link to a wiki entity
+  color?: string;        // CSS color, defaults derived from entity type
+  fillOpacity?: number;
+  strokeOpacity?: number;
+  points: Point[];       // simple polygon (no holes)
+  visibility: EntityVisibility;
+}
+
+export interface FogOverlay {
+  mapId: string;
+  enabled: boolean;
+  color?: string;        // default rgba(0,0,0,0.55)
+  reveals: Point[][];    // each polygon is a "hole" the players can see through
 }
 
 export interface MapLayer {
