@@ -125,6 +125,10 @@ async function main() {
   const scanInfo = { excludedFiles: 0 };
   const files = walk(contentDir, cfg.exclude, scanInfo);
 
+  // Load world config up-front so entity parsing can resolve dates against
+  // the in-world calendar.
+  const worldCfg = loadWorldConfig(contentDir, cfg.defaultWorld);
+
   const warnings: string[] = [];
   const errors: string[] = [];
   let strippedDmBlocks = 0;
