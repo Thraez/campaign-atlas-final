@@ -301,8 +301,14 @@ export default function AtlasPlacementEditor() {
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
       <div className="px-3 py-1.5 text-[11px] bg-primary/10 text-foreground border-b border-primary/20 flex items-center justify-between gap-2">
-        <span title="Local browser draft → exported YAML/asset patch → committed to GitHub → player-safe published atlas">
-          Edits here are <strong>local draft changes</strong>. Export patches and commit them to GitHub to publish.
+        <span
+          className="flex items-center gap-2 min-w-0"
+          title="YAML canon (committed) → local draft (this browser) → exported patch → committed to GitHub → generated runtime atlas.json"
+        >
+          <DraftStatusBadge status={draftStatus} />
+          <span className="truncate">
+            <strong>YAML is canon.</strong> Edits here are local drafts — export a patch and commit it to publish.
+          </span>
         </span>
         <Link to="/" className="text-primary hover:underline shrink-0">← Back</Link>
       </div>
@@ -329,7 +335,7 @@ export default function AtlasPlacementEditor() {
           Regions
         </Button>
         <span className="text-xs text-muted-foreground hidden md:inline">
-          {dirtyCount > 0 ? `${dirtyCount} unsaved on ${activeMap.name}` : "All saved to JSON ↓"}
+          {dirtyCount > 0 ? `${dirtyCount} unsaved on ${activeMap.name}` : "Matches YAML canon"}
         </span>
         <Button variant="ghost" size="sm" onClick={() => { setOverrides({}); toast.info("Cleared overrides"); }} title="Discard local changes">
           <RotateCcw className="h-4 w-4" />
