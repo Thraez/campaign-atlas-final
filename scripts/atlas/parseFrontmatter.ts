@@ -1,10 +1,14 @@
 import matter from "gray-matter";
-import type { EntityVisibility } from "../../src/atlas/content/schema";
+import type { EntityVisibility, PinPlacementStyle } from "../../src/atlas/content/schema";
 
 export interface AtlasPlacementSpec {
   mapId?: string;
   x: number;
   y: number;
+  /** Optional per-placement label override (defaults to entity.title). */
+  label?: string;
+  /** Optional per-placement pin styling override (preset/color/icon/...). */
+  pin?: PinPlacementStyle;
 }
 
 export interface AtlasFrontmatter {
