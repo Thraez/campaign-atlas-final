@@ -8,6 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { GridKind, GridOverlay, MapDocument } from "@/atlas/content/schema";
 import { ExportChecklistDialog, useExportChecklist } from "./ExportChecklistDialog";
+import { validatePatchYaml } from "./yaml/validatePatch";
 
 interface Props {
   map: MapDocument;
