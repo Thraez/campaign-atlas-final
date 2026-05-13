@@ -614,6 +614,9 @@ async function main() {
   console.log(`Stripped DM profiles:    ${strippedDmProfiles}`);
   console.log(`Stripped DM rels:        ${strippedDmRelationships}`);
   console.log(`Relationship leaks:      ${relationshipLeaks}`);
+  console.log(`Region leaks:            ${regionLeaks}`);
+  console.log(`Route leaks:             ${routeLeaks}`);
+  console.log(`Route waypoint misses:   ${routeWaypointMisses}`);
   console.log(`Unresolved relationships:${unresolvedRelationships}`);
   console.log(`Warnings:                ${warnings.length}`);
   console.log(`Errors:                  ${errors.length}`);
@@ -651,6 +654,16 @@ async function main() {
   if (flags.player && flags.strict && relationshipLeaks > 0) {
     console.error(`Strict player mode: ${relationshipLeaks} relationship leak(s) to DM-only entities. Failing build.`);
     process.exit(5);
+  }
+  // Strict + player must never ship player-visible region/route geometry that
+  // names DM-only or unknown entities — these leak DM map prep to players.
+  if (flags.player && flags.strict && regionLeaks > 0) {
+    console.error(`Strict player mode: ${regionLeaks} region leak(s) to DM-only/unknown entities. Failing build.`);
+    process.exit(6);
+  }
+  if (flags.player && flags.strict && routeLeaks > 0) {
+    console.error(`Strict player mode: ${routeLeaks} route leak(s) to DM-only/unknown entities. Failing build.`);
+    process.exit(7);
   }
 }
 
