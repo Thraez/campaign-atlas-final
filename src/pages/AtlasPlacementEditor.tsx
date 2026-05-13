@@ -701,16 +701,29 @@ export default function AtlasPlacementEditor() {
               <RoutesTab
                 project={project}
                 map={activeMap}
+                api={routeDraft}
                 blockingCount={routeIssues.blocking}
                 warningCount={routeIssues.warning}
                 lastExportAt={tabExportAt.routes ?? null}
                 onExported={() => markTabExport("routes")}
+                onFitTo={(pts) => {
+                  if (!pts.length) return;
+                  const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+                  const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+                  setFlyTo({ lat: activeMap.height - cy, lng: cx });
+                }}
               />
             </TabsContent>
 
             <TabsContent value="fog" className="flex-1 flex flex-col min-h-0 m-0">
               <FogTab
                 map={activeMap}
+                project={project}
+                api={fogDraft}
+                regionApi={regionDraft}
+                routeApi={routeDraft}
+                showFogPreview={showFogPreview}
+                setShowFogPreview={setShowFogPreview}
                 blockingCount={mapIssues.blocking}
                 warningCount={mapIssues.warning}
                 lastExportAt={tabExportAt.fog ?? null}
