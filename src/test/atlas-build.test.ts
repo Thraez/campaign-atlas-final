@@ -66,7 +66,7 @@ function read(outDir: string) {
   };
 }
 
-describe("atlas build pipeline", () => {
+describe.sequential("atlas build pipeline", () => {
   it("PLAYER build excludes dm + hidden entities and strips DM blocks", () => {
     const out = path.join(tmpRoot, "player");
     const result = run([
