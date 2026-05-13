@@ -38,6 +38,10 @@ import { validateProject } from "@/atlas/yaml/validateProject";
 import { MapImportWizard } from "@/atlas/import/MapImportWizard";
 import { useRegionDraft } from "@/atlas/regions/useRegionDraft";
 import { RegionLayer } from "@/atlas/regions/RegionLayer";
+import { useRouteDraft } from "@/atlas/routes/useRouteDraft";
+import { RouteLayer } from "@/atlas/routes/RouteLayer";
+import { useFogDraft } from "@/atlas/fog/useFogDraft";
+import { FogLayer } from "@/atlas/fog/FogLayer";
 import {
   PIN_PRESETS,
   defaultPresetForType,
