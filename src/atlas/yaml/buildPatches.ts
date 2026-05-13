@@ -13,6 +13,7 @@
 import type {
   AtlasProject,
   EntityVisibility,
+  FogOverlay,
   MapDocument,
   MapLayer,
   Region,
@@ -229,6 +230,7 @@ export interface BuildWorldMapPatchOpts {
   /** Optional regions/routes/fog overrides — passed through if present. */
   regions?: Region[];
   routes?: Route[];
+  fog?: FogOverlay;
 }
 
 export function buildWorldMapPatch(opts: BuildWorldMapPatchOpts): PatchArtifact {
@@ -288,8 +290,17 @@ export function buildWorldMapPatch(opts: BuildWorldMapPatchOpts): PatchArtifact 
   if (map.scale) mapEntry.scale = map.scale;
   if (map.grid) mapEntry.grid = map.grid;
   mapEntry.layers = layerObjs;
-  if (opts.regions?.length) mapEntry.regions = opts.regions;
-  if (opts.routes?.length) mapEntry.routes = opts.routes;
+  // Geometry preservation: a map-level patch REPLACES the matching maps[] entry
+  // in world.yaml. If we don't echo back regions/routes/fog, applying this
+  // patch would drop all nested geometry the DM authored elsewhere. Prefer the
+  // explicit override (passed by ExportChangesModal), then fall back to what
+  // the loader already attached to map.regions/.routes/.fog.
+  const regions = opts.regions ?? map.regions;
+  const routes = opts.routes ?? map.routes;
+  const fog = opts.fog ?? map.fog;
+  if (regions?.length) mapEntry.regions = regions;
+  if (routes?.length) mapEntry.routes = routes;
+  if (fog && (fog.enabled || (fog.reveals?.length ?? 0) > 0)) mapEntry.fog = fog;
 
   const yamlBlock = dumpYaml({ maps: [mapEntry] });
 
