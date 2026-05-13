@@ -71,7 +71,14 @@ export function MapSettingsPanel({ map, baseMap, onPatch, onReset }: Props) {
       if (map.grid.color) lines.push(`      color: "${map.grid.color}"`);
       lines.push(`      enabled: ${map.grid.enabled !== false}`);
     }
-    downloadText(`map-settings-${map.id}.yaml`, lines.join("\n"), "text/yaml");
+    const content = lines.join("\n");
+    const result = validatePatchYaml(content, "settings");
+    if (!result.ok) {
+      toast.error(`Patch validation failed: ${result.errors[0]}`);
+      return;
+    }
+    if (result.warnings.length) toast.warning(result.warnings[0]);
+    downloadText(`map-settings-${map.id}.yaml`, content, "text/yaml");
     checklist.show({
       title: "Map settings patch exported",
       description: "Your map settings YAML patch is ready. Follow the checklist to commit it.",
