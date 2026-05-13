@@ -329,26 +329,8 @@ export default function AtlasViewer() {
               />
             ))}
 
-            {/* (markers handled inside WrappedWorld for wrap support) */}
-            {false && placementsOnMap.map((p) => {
-              const ent = entityById.get(p.entityId);
-              if (!ent) return null;
-              const color = ICON_BY_TYPE[ent.type] ?? ICON_BY_TYPE.default;
-              const dim = ent.visibility === "rumor";
-              return (
-                <Marker
-                  key={p.id}
-                  position={[activeMap.height - p.y, p.x]}
-                  icon={pinIcon(color, dim)}
-                  eventHandlers={{ click: () => openEntity(p.entityId, false) }}
-                >
-                  <Popup>
-                    <div className="text-sm font-medium">{ent.title}</div>
-                    {ent.summary && <div className="text-xs opacity-70">{ent.summary}</div>}
-                  </Popup>
-                </Marker>
-              );
-            })}
+            {/* (markers, layers, regions, routes, fog, grid handled inside WrappedWorld) */}
+
             <AtlasMinimap map={activeMap} layers={activeMap.layers} />
           </MapContainer>
         </div>
