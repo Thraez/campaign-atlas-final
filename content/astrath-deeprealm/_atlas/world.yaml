@@ -87,3 +87,17 @@ routes:
       - sunhaven
       - ravens-vale
       - the-old-keep
+
+# In-world calendar used by the timeline (/atlas/timeline) to sort and label
+# `atlas.date` values. Months sum to the year length.
+calendar:
+  name: Reckoning of the Twin Moons
+  epochName: AS          # "After Sundering"
+  daysPerWeek: 8
+  months:
+    - { name: Frostmoon, days: 30 }
+    - { name: Thawing,   days: 30 }
+    - { name: Greentide, days: 32 }
+    - { name: Highsun,   days: 32 }
+    - { name: Goldfall,  days: 30 }
+    - { name: Longnight, days: 30 }
