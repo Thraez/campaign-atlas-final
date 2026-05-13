@@ -42,7 +42,7 @@ function downloadText(name: string, content: string, mime = "text/plain") {
 }
 
 export function MapLayerPanel(props: Props) {
-  const { map, mergedLayers, localLayers, selectedId, setSelectedId, onAddFiles, onAddUrl, onEditBuiltin, onUpdate, onRemove, onSetMapSize } = props;
+  const { map, mergedLayers, localLayers, selectedId, setSelectedId, onAddFiles, onAddUrl, onEditBuiltin, onUpdate, onDuplicate, onRemove, onClearAll, onSetMapSize } = props;
   const fileInput = useRef<HTMLInputElement>(null);
   const [urlDraft, setUrlDraft] = useState("");
   const [lockAspect, setLockAspect] = useState(true);
@@ -82,6 +82,41 @@ export function MapLayerPanel(props: Props) {
     const w = selected.width * factor;
     const h = lockAspect ? w / aspect : selected.height * factor;
     setSize(w, h);
+  };
+
+  const fitWidth = () => selected && setSize(map.width, lockAspect ? map.width / aspect : selected.height);
+  const fitHeight = () => selected && setSize(lockAspect ? map.height * aspect : selected.width, map.height);
+
+  const exportZip = async () => {
+    const uploads = localLayers.filter((l) => l.origin === "upload" && l.dataUrl);
+    if (uploads.length === 0) {
+      toast.info("No uploaded files to bundle (only data-URL uploads can be zipped).");
+      return;
+    }
+    const zip = new JSZip();
+    for (const u of uploads) {
+      const targetPath = (u.targetPath ?? `public/atlas/assets/maps/${u.id}`).replace(/^\/+/, "");
+      const m = u.dataUrl!.match(/^data:[^;]+;base64,(.*)$/);
+      if (!m) continue;
+      zip.file(targetPath, m[1], { base64: true });
+    }
+    zip.file("README.txt", [
+      "AstrathDeeprealm Atlas — uploaded asset bundle",
+      "",
+      "Unzip from the repository root so files land at the listed paths,",
+      "then commit alongside your world.yaml patch and run:",
+      "  npm run atlas:build:player",
+      "",
+      "Files:",
+      ...uploads.map((u) => `  - ${(u.targetPath ?? "").replace(/^\/+/, "")}`),
+    ].join("\n"));
+    const blob = await zip.generateAsync({ type: "blob" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `atlas-assets-${map.id}.zip`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast.success(`Bundled ${uploads.length} file${uploads.length === 1 ? "" : "s"}`);
   };
 
   const exportPatch = () => {
