@@ -24,6 +24,9 @@ const App = () => (
           <Route path="/atlas" element={<AtlasViewer />} />
           <Route path="/atlas/edit" element={<AtlasPlacementEditor />} />
           <Route path="/atlas/timeline" element={<AtlasTimeline />} />
+          <Route path="/atlas/browse" element={<AtlasBrowse mode="browse" />} />
+          <Route path="/atlas/tag/:tag" element={<AtlasBrowse mode="tag" />} />
+          <Route path="/atlas/type/:type" element={<AtlasBrowse mode="type" />} />
           <Route path="/auth" element={<Auth />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
