@@ -5,6 +5,9 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // For GitHub Pages project sites, set ATLAS_BASE=/<repo>/ at build time.
+  // Defaults to "/" for local dev and Lovable preview.
+  base: process.env.ATLAS_BASE || "/",
   server: {
     host: "::",
     port: 8080,
