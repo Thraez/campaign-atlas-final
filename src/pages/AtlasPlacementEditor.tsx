@@ -559,7 +559,7 @@ export default function AtlasPlacementEditor() {
                 exportLabel="Export pins"
                 exportDisabled={dirtyCount === 0}
               >
-                <div className="-m-3">
+                <div>
                   <div className="p-3 border-b border-border space-y-2">
                     <Input placeholder="Filter entities…" value={filter} onChange={(e) => setFilter(e.target.value)} />
                     <div className="flex flex-wrap gap-1">
