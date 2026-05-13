@@ -1,0 +1,64 @@
+[
+  {
+    "id": "deeproot-cavern",
+    "title": "Deeproot Cavern",
+    "type": "dungeon",
+    "aliases": [],
+    "tags": [
+      "dungeon",
+      "secret"
+    ],
+    "summary": "DM-only — the true source of Thornhold's resonance crystal.",
+    "excerpt": "# Deeproot Cavern (DM) Beneath [[Raven's Vale]] lies a network of crystalline tunnels. The lord-mayor of [[Thornhold]] has been quietly extracting resonance crystal here for two decades. The deeper galleries are rumored to house something o"
+  },
+  {
+    "id": "ravens-vale",
+    "title": "Raven's Vale",
+    "type": "region",
+    "aliases": [],
+    "tags": [
+      "region",
+      "wilderness"
+    ],
+    "summary": "A misty valley beneath Thornhold's bluffs.",
+    "excerpt": "# Raven's Vale A long, mist-choked valley running south from [[Thornhold]]. Locals say the ravens that nest here can speak the names of those soon to die — a rumor most travelers prefer not to test."
+  },
+  {
+    "id": "the-old-keep",
+    "title": "The Old Keep",
+    "type": "ruin",
+    "aliases": [],
+    "tags": [
+      "ruin",
+      "mystery"
+    ],
+    "summary": "A crumbling fortress whispered of in taverns.",
+    "excerpt": "# The Old Keep Few travelers have laid eyes on the keep and returned with a clear story. Those who have speak of [[A Lost King]] — though no record of such a ruler exists in the chronicles of [[Sunhaven]]."
+  },
+  {
+    "id": "sunhaven",
+    "title": "Sunhaven",
+    "type": "settlement",
+    "aliases": [],
+    "tags": [
+      "capital"
+    ],
+    "summary": "The shining capital on the western shore.",
+    "excerpt": "# Sunhaven Sunhaven is the seat of the realm and Astrath's largest port. Its merchants trade regularly with [[Thornhold]] and host pilgrims bound for [[The Old Keep]]. > \"All roads in the west bend toward Sunhaven.\""
+  },
+  {
+    "id": "thornhold",
+    "title": "Thornhold",
+    "type": "settlement",
+    "aliases": [
+      "Thorn Hold",
+      "The Red City"
+    ],
+    "tags": [
+      "city",
+      "mining"
+    ],
+    "summary": "A red-stone mining city carved into the southern bluffs.",
+    "excerpt": "# Thornhold Thornhold is a fortified mining city perched above the [[Raven's Vale]]. It trades iron and rare resonance crystal with [[Sunhaven]] along the King's Road. ## History Founded after the Sundering, Thornhold's walls were raised fr"
+  }
+]
