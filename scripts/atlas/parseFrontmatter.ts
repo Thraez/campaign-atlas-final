@@ -27,6 +27,8 @@ export interface AtlasFrontmatter {
   dateValue?: number;
   /** Multi-map placements. Wins over legacy x/y when present. */
   placements?: AtlasPlacementSpec[];
+  profile?: EntityProfile;
+  relationships?: EntityRelationship[];
 }
 
 export interface ParsedFile {
