@@ -119,6 +119,17 @@ export function MapLayerPanel(props: Props) {
     a.click();
     URL.revokeObjectURL(a.href);
     toast.success(`Bundled ${uploads.length} file${uploads.length === 1 ? "" : "s"}`);
+    checklist.show({
+      title: "Asset bundle exported",
+      description: "Your uploaded images are ready. Follow the checklist to commit them.",
+      files: [`atlas-assets-${map.id}.zip`],
+      steps: [
+        { label: "Upload files from the zip to GitHub", detail: `In your repo, go to public/atlas/assets/maps/ and upload ${uploads.length} image file(s). Or unzip the bundle at the repo root.` },
+        { label: "Apply the world.yaml patch", detail: "Open the downloaded Patch.md and paste the YAML under the matching map entry in content/<world>/_atlas/world.yaml." },
+        { label: "Commit changes to main", detail: "Push the updated world.yaml and new images." },
+        { label: "GitHub Action publishes automatically", detail: "The publish-atlas.yml workflow will run and deploy to GitHub Pages." },
+      ],
+    });
   };
 
   const exportPatch = () => {
