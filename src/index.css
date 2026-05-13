@@ -273,3 +273,38 @@
 }
 .atlas-prose ul { list-style: disc; padding-left: 1.25rem; }
 .atlas-prose p { margin: 0.5em 0; line-height: 1.55; }
+
+/* Accessibility: respect users who prefer reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Disable Leaflet's pan/zoom animations */
+  .leaflet-fade-anim .leaflet-tile,
+  .leaflet-zoom-anim .leaflet-zoom-animated {
+    transition: none !important;
+  }
+}
+
+/* Skip-to-main link, only visible on keyboard focus. */
+.skip-to-main {
+  position: absolute;
+  left: 8px;
+  top: -40px;
+  z-index: 9999;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+.skip-to-main:focus {
+  top: 8px;
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
