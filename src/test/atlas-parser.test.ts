@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { parseFrontmatter } from "../../scripts/atlas/parseFrontmatter";
 import { stripDmBlocks } from "../../scripts/atlas/stripDmBlocks";
-import { tokenizeWikilinks } from "../../scripts/atlas/parseWikilinks";
+import { tokenizeWikilinks, renderLinkTokens } from "../../scripts/atlas/parseWikilinks";
 
 describe("parseFrontmatter visibility safety", () => {
   it("invalid visibility falls back to dm, not player", () => {
