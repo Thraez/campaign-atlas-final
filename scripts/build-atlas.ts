@@ -14,6 +14,7 @@ import { stripDmBlocks } from "./atlas/stripDmBlocks";
 import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
 import { slugify } from "./atlas/slugify";
 import { loadWorldConfig } from "./atlas/loadWorldConfig";
+import { parseAtlasDate } from "./atlas/calendarDate";
 import type {
   AtlasProject,
   Entity,
