@@ -170,16 +170,37 @@ export default function AtlasPlacementEditor() {
 
   const layerEditor = useMapLayers(activeMap);
 
-  // Resolve effective coords for an entity on the active map: per-map override
-  // wins, else first existing placement on activeMap.
-  const effectiveCoord = useCallback((entityId: string): { x: number; y: number } | null => {
+  /** Per-tab filter state (placed/unplaced/visibility/type/tag). */
+  const [stateFilter, setStateFilter] = useState<"all" | "placed" | "unplaced">("all");
+  const [visFilter, setVisFilter] = useState<"all" | "player" | "rumor" | "dm" | "hidden">("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [tagFilter, setTagFilter] = useState<string>("all");
+  /** When true, finishing a placement automatically queues the next unplaced entity. */
+  const [chainPlaceMode, setChainPlaceMode] = useState(false);
+
+  /** Read-only canon placement (built YAML value) for an entity on a map. */
+  const canonPlacement = useCallback((mapId: string, entityId: string) => {
+    if (!project) return null;
+    return project.placements.find((p) => p.entityId === entityId && p.mapId === mapId) ?? null;
+  }, [project]);
+
+  /** Resolve effective placement values on the active map: local override wins, else canon. */
+  const effectivePlacement = useCallback((entityId: string): OverrideValue | null => {
     if (!activeMap) return null;
     const k = overrideKey(activeMap.id, entityId);
-    if (k in overrides) return overrides[k];
-    if (!project) return null;
-    const p = project.placements.find((pl) => pl.entityId === entityId && pl.mapId === activeMap.id);
-    return p ? { x: p.x, y: p.y } : null;
-  }, [overrides, project, activeMap]);
+    if (k in overrides) {
+      const v = overrides[k];
+      return v;
+    }
+    const p = canonPlacement(activeMap.id, entityId);
+    if (!p) return null;
+    return { x: p.x, y: p.y, label: p.label, pin: p.pin as PinOverride | undefined };
+  }, [overrides, canonPlacement, activeMap]);
+
+  const effectiveCoord = useCallback((entityId: string): { x: number; y: number } | null => {
+    const e = effectivePlacement(entityId);
+    return e ? { x: e.x, y: e.y } : null;
+  }, [effectivePlacement]);
 
   const entitiesForWorld = useMemo(() => {
     if (!project || !activeMap) return [] as Entity[];
@@ -187,22 +208,56 @@ export default function AtlasPlacementEditor() {
     return project.entities.filter((e) => !e.world || e.world === worldId);
   }, [project, activeMap]);
 
+  const allTypes = useMemo(
+    () => Array.from(new Set(entitiesForWorld.map((e) => e.type))).sort(),
+    [entitiesForWorld]
+  );
+  const allTags = useMemo(
+    () => Array.from(new Set(entitiesForWorld.flatMap((e) => e.tags ?? []))).sort(),
+    [entitiesForWorld]
+  );
+
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    if (!q) return entitiesForWorld;
-    return entitiesForWorld.filter((e) =>
-      e.title.toLowerCase().includes(q) ||
-      e.type.toLowerCase().includes(q) ||
-      e.aliases.some((a) => a.toLowerCase().includes(q))
-    );
-  }, [entitiesForWorld, filter]);
+    return entitiesForWorld.filter((e) => {
+      if (q && !(e.title.toLowerCase().includes(q) || e.type.toLowerCase().includes(q) || e.aliases.some((a) => a.toLowerCase().includes(q)))) return false;
+      if (visFilter !== "all" && e.visibility !== visFilter) return false;
+      if (typeFilter !== "all" && e.type !== typeFilter) return false;
+      if (tagFilter !== "all" && !(e.tags ?? []).includes(tagFilter)) return false;
+      const hasCoord = !!effectiveCoord(e.id);
+      if (stateFilter === "placed" && !hasCoord) return false;
+      if (stateFilter === "unplaced" && hasCoord) return false;
+      return true;
+    });
+  }, [entitiesForWorld, filter, visFilter, typeFilter, tagFilter, stateFilter, effectiveCoord]);
 
   const placed = filtered.filter((e) => effectiveCoord(e.id));
   const unplaced = filtered.filter((e) => !effectiveCoord(e.id));
 
-  const setCoord = (entityId: string, coord: { x: number; y: number }) => {
+  /** Merge a partial override into the local draft. */
+  const mutateOverride = useCallback((entityId: string, patch: Partial<OverrideValue>) => {
     if (!activeMap) return;
-    setOverrides((o) => ({ ...o, [overrideKey(activeMap.id, entityId)]: coord }));
+    setOverrides((o) => {
+      const k = overrideKey(activeMap.id, entityId);
+      const current = (k in o ? o[k] : null) ?? canonPlacement(activeMap.id, entityId);
+      if (!current) return o;
+      const merged: OverrideValue = {
+        x: patch.x ?? current.x,
+        y: patch.y ?? current.y,
+        label: patch.label !== undefined ? patch.label : (current as OverrideValue).label,
+        pin: patch.pin !== undefined ? patch.pin : (current as OverrideValue).pin,
+      };
+      return { ...o, [k]: merged };
+    });
+  }, [activeMap, canonPlacement]);
+
+  const setCoord = (entityId: string, coord: { x: number; y: number }) => mutateOverride(entityId, coord);
+  const setLabel = (entityId: string, label: string | undefined) => mutateOverride(entityId, { label });
+  const setPinOverride = (entityId: string, pin: PinOverride | undefined) => mutateOverride(entityId, { pin });
+  const nudge = (entityId: string, dx: number, dy: number) => {
+    const c = effectiveCoord(entityId);
+    if (!c) return;
+    mutateOverride(entityId, { x: c.x + dx, y: c.y + dy });
   };
   const removeCoord = (entityId: string) => {
     if (!activeMap) return;
@@ -211,11 +266,16 @@ export default function AtlasPlacementEditor() {
   const clearOverride = (entityId: string) => {
     if (!activeMap) return;
     const k = overrideKey(activeMap.id, entityId);
+    setOverrides((o) => { const next = { ...o }; delete next[k]; return next; });
+  };
+  /** Duplicate a placement to another map: writes the same coords as a draft. */
+  const duplicateToMap = (entityId: string, targetMapId: string) => {
     setOverrides((o) => {
-      const next = { ...o };
-      delete next[k];
-      return next;
+      const src = effectivePlacement(entityId);
+      if (!src) return o;
+      return { ...o, [overrideKey(targetMapId, entityId)]: { x: src.x, y: src.y, label: src.label, pin: src.pin } };
     });
+    toast.success(`Duplicated to ${project?.maps.find((m) => m.id === targetMapId)?.name ?? targetMapId}`);
   };
 
   const onMapClick = (lng: number, lat: number) => {
@@ -224,7 +284,13 @@ export default function AtlasPlacementEditor() {
     const y = Math.round(activeMap.height - lat);
     setCoord(pendingId, { x, y });
     toast.success(`Placed "${project?.entities.find((e) => e.id === pendingId)?.title}" at ${x},${y} on ${activeMap.name}`);
-    setPendingId(null);
+    if (chainPlaceMode) {
+      const next = unplaced.find((e) => e.id !== pendingId);
+      setPendingId(next?.id ?? null);
+      if (!next) toast.info("All entities placed.");
+    } else {
+      setPendingId(null);
+    }
   };
 
   const goTo = (entityId: string) => {
@@ -233,16 +299,24 @@ export default function AtlasPlacementEditor() {
     setFlyTo({ lat: activeMap.height - c.y, lng: c.x });
   };
 
-  /** Build current draft placements (effective coords for every entity on activeMap). */
+  /** Build current draft placements for the active map, including label + pin diffs. */
   const buildDraftPlacements = useCallback(() => {
     if (!project || !activeMap) return [];
     const out: PlacementOverride[] = [];
     for (const e of project.entities) {
-      const c = effectiveCoord(e.id);
-      if (c) out.push({ entityId: e.id, mapId: activeMap.id, x: c.x, y: c.y });
+      const eff = effectivePlacement(e.id);
+      if (!eff) continue;
+      out.push({
+        entityId: e.id,
+        mapId: activeMap.id,
+        x: eff.x,
+        y: eff.y,
+        label: eff.label && eff.label !== e.title ? eff.label : undefined,
+        pin: eff.pin,
+      });
     }
     return out;
-  }, [project, activeMap, effectiveCoord]);
+  }, [project, activeMap, effectivePlacement]);
 
   const exportJson = () => {
     if (!project || !activeMap) return;
