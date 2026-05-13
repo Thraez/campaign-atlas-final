@@ -548,6 +548,7 @@ async function main() {
 
   const project: AtlasProject = {
     version: new Date().toISOString().replace(/[:.]/g, "-"),
+    schemaVersion: worldCfg?.schemaVersion ?? CURRENT_ATLAS_SCHEMA_VERSION,
     publishedAt: new Date().toISOString(),
     worlds: [{ id: worldId, name: "Astrath Deeprealm", defaultMapId: primaryMapId }],
     maps,
