@@ -52,11 +52,21 @@ interface WorldYaml {
   }>;
 }
 
+  routes?: WorldYaml["routes"] extends infer T ? T : never;
+  calendar?: {
+    name?: string;
+    epochName?: string;
+    daysPerWeek?: number;
+    months?: Array<{ name: string; days: number }>;
+  };
+}
+
 export interface WorldConfig {
   maps: MapDocument[];
   regions: Region[];
   fogs: FogOverlay[];
   routes: RawRoute[];
+  calendar?: WorldCalendar;
   warnings: string[];
 }
 
