@@ -1,6 +1,6 @@
 {
-  "version": "2026-05-13T07-49-20-940Z",
-  "publishedAt": "2026-05-13T07:49:20.940Z",
+  "version": "2026-05-13T08-16-49-249Z",
+  "publishedAt": "2026-05-13T08:16:49.250Z",
   "worlds": [
     {
       "id": "astrath-deeprealm",
@@ -363,7 +363,7 @@
       "summary": "A crumbling fortress whispered of in taverns.",
       "images": [],
       "body": "\n# The Old Keep\n\nFew travelers have laid eyes on the keep and returned with a clear story.\nThose who have speak of [[A Lost King]] — though no record of such a ruler exists\nin the chronicles of [[Sunhaven]].\n",
-      "bodyHtml": "<h1>The Old Keep</h1>\n<p>Few travelers have laid eyes on the keep and returned with a clear story.\nThose who have speak of A Lost King — though no record of such a ruler exists\nin the chronicles of <a class=\"atlas-wikilink\" data-entity-id=\"sunhaven\" href=\"#/entity/sunhaven\">Sunhaven</a>.</p>\n",
+      "bodyHtml": "<h1>The Old Keep</h1>\n<p>Few travelers have laid eyes on the keep and returned with a clear story.\nThose who have speak of <span class=\"atlas-unresolved\">A Lost King</span> — though no record of such a ruler exists\nin the chronicles of <a class=\"atlas-wikilink\" data-entity-id=\"sunhaven\" href=\"#/entity/sunhaven\">Sunhaven</a>.</p>\n",
       "frontmatter": {},
       "sourcePath": "",
       "links": [
@@ -565,11 +565,13 @@
     "scanned": 9,
     "included": 7,
     "excluded": 2,
-    "warnings": [
-      "the-old-keep: broken wikilink \"A Lost King\""
-    ],
+    "warnings": [],
     "brokenLinks": 1,
+    "unresolvedLinks": 1,
     "duplicateSlugs": 0,
-    "strippedDmBlocks": 1
+    "strippedDmBlocks": 1,
+    "localAssets": 0,
+    "externalAssets": 0,
+    "missingAssets": 0
   }
 }
