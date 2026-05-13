@@ -8,16 +8,15 @@ maps:
     width: 200000
     height: 100000
     oceanColor: "#18313f"
+    scale:
+      unitsPerPixel: 0.05      # 1 px = 0.05 mi
+      unitLabel: mi
+    grid:
+      kind: hex
+      size: 5000
+      color: "rgba(255,255,255,0.06)"
+      enabled: false           # off by default; toggle in viewer
     layers: []
-    # Example image layer (drop a file into public/atlas/assets/ to enable):
-    # layers:
-    #   - id: continent
-    #     src: /atlas/assets/continent.webp
-    #     x: 0
-    #     y: 0
-    #     width: 200000
-    #     height: 100000
-    #     opacity: 1
 
   - id: astrath-deeprealm-northern-reaches
     name: Northern Reaches
@@ -63,3 +62,28 @@ fog:
     color: "rgba(8, 12, 20, 0.55)"
     reveals:
       - [[40000, 30000], [140000, 30000], [140000, 85000], [40000, 85000]]
+
+routes:
+  - id: kings-road
+    mapId: astrath-deeprealm-overview
+    name: The King's Road
+    mode: horse
+    speed: 6
+    color: "#f4c95d"
+    weight: 3
+    visibility: player
+    waypoints:
+      - thornhold
+      - sunhaven
+  - id: ravens-trail
+    mapId: astrath-deeprealm-overview
+    name: Raven's Trail
+    mode: foot
+    speed: 3
+    color: "#7fb069"
+    dashed: true
+    visibility: player
+    waypoints:
+      - sunhaven
+      - ravens-vale
+      - the-old-keep

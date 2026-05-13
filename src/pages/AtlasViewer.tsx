@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState, useCallback, forwardRef } from "react";
-import { MapContainer, Marker, Popup, Polygon, ImageOverlay, useMap } from "react-leaflet";
+import { MapContainer, Marker, Popup, Polygon, Polyline, ImageOverlay, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { loadAtlasContent, loadSearchIndex, type SearchIndexEntry } from "@/atlas/content/loader";
-import type { AtlasProject, Entity, MapDocument, MapPlacement, Region, Point } from "@/atlas/content/schema";
+import type { AtlasProject, Entity, MapDocument, MapPlacement, Point, Route, GridOverlay, MapScale } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Search, X, MapPin, ArrowLeft, Compass, Eye, EyeOff } from "lucide-react";
+import { Search, X, MapPin, ArrowLeft, Compass, Eye, EyeOff, Grid3x3 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -63,6 +63,62 @@ function fogPositions(map: MapDocument, reveals: Point[][]): L.LatLngExpression[
   return [outer, ...holes];
 }
 
+const ROUTE_MODE_LABEL: Record<string, string> = {
+  foot: "on foot", horse: "on horseback", ship: "by ship", cart: "by cart", fly: "flying", custom: "",
+};
+
+function routeDistancePx(points: Point[]): number {
+  let d = 0;
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i][0] - points[i - 1][0];
+    const dy = points[i][1] - points[i - 1][1];
+    d += Math.hypot(dx, dy);
+  }
+  return d;
+}
+
+function formatTravelTime(hours: number): string {
+  if (hours < 1) return `${Math.round(hours * 60)} min`;
+  if (hours < 24) return `${hours.toFixed(hours < 4 ? 1 : 0)} h`;
+  const days = hours / 24;
+  return `${days.toFixed(days < 4 ? 1 : 0)} days`;
+}
+
+function gridLines(map: MapDocument, grid: GridOverlay): L.LatLngExpression[][] {
+  const lines: L.LatLngExpression[][] = [];
+  if (grid.kind === "square") {
+    for (let x = 0; x <= map.width; x += grid.size) {
+      lines.push([[0, x], [map.height, x]]);
+    }
+    for (let y = 0; y <= map.height; y += grid.size) {
+      lines.push([[y, 0], [y, map.width]]);
+    }
+    return lines;
+  }
+  // pointy-top hex grid
+  const r = grid.size;
+  const w = Math.sqrt(3) * r;
+  const h = 2 * r;
+  const dy = (3 / 4) * h;
+  for (let row = 0, py = 0; py <= map.height + h; row++, py = row * dy) {
+    const offset = row % 2 === 0 ? 0 : w / 2;
+    for (let px = -offset; px <= map.width + w; px += w) {
+      const cx = px + w / 2;
+      const cy = py;
+      const verts: [number, number][] = [];
+      for (let i = 0; i < 6; i++) {
+        const ang = (Math.PI / 3) * i - Math.PI / 2;
+        const vx = cx + r * Math.cos(ang);
+        const vy = cy + r * Math.sin(ang);
+        verts.push([map.height - vy, vx]);
+      }
+      verts.push(verts[0]);
+      lines.push(verts);
+    }
+  }
+  return lines;
+}
+
 interface ViewerState {
   project: AtlasProject;
   index: SearchIndexEntry[];
@@ -78,6 +134,7 @@ export default function AtlasViewer() {
   const [query, setQuery] = useState("");
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const [showFog, setShowFog] = useState(true);
+  const [showGrid, setShowGrid] = useState<boolean | null>(null); // null = use map default
 
   useEffect(() => {
     Promise.all([loadAtlasContent(true), loadSearchIndex()])
@@ -195,6 +252,16 @@ export default function AtlasViewer() {
             {showFog ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
           </Button>
         )}
+        {activeMap.grid && (
+          <Button
+            variant={(showGrid ?? activeMap.grid.enabled !== false) ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setShowGrid((v) => !(v ?? activeMap.grid!.enabled !== false))}
+            title="Toggle grid"
+          >
+            <Grid3x3 className="h-4 w-4" />
+          </Button>
+        )}
         <Button variant="secondary" size="sm" onClick={() => setSearchOpen(true)} className="gap-2">
           <Search className="h-4 w-4" />
           <span className="hidden sm:inline">Search</span>
@@ -274,6 +341,61 @@ export default function AtlasViewer() {
                   fillRule: "evenodd",
                 } as L.PathOptions}
               />
+            )}
+
+            {/* Routes */}
+            {(activeMap.routes ?? []).map((route) => {
+              const pts = (route.resolvedPoints ?? []).map(([x, y]) => [activeMap.height - y, x] as [number, number]);
+              if (pts.length < 2) return null;
+              const color = route.color ?? "#cfd6dc";
+              const distPx = routeDistancePx(route.resolvedPoints ?? []);
+              const scale: MapScale | undefined = activeMap.scale;
+              const distLabel = scale ? `${(distPx * scale.unitsPerPixel).toFixed(1)} ${scale.unitLabel}` : `${Math.round(distPx)} px`;
+              const travel = scale && route.speed
+                ? formatTravelTime((distPx * scale.unitsPerPixel) / route.speed)
+                : null;
+              const modeLabel = route.mode ? ROUTE_MODE_LABEL[route.mode] : "";
+              return (
+                <Polyline
+                  key={route.id}
+                  positions={pts}
+                  pathOptions={{
+                    color,
+                    weight: route.weight ?? 3,
+                    opacity: 0.9,
+                    dashArray: route.dashed ? "8 6" : undefined,
+                    lineCap: "round",
+                    lineJoin: "round",
+                  }}
+                >
+                  <Tooltip sticky direction="top" opacity={0.95}>
+                    <div className="text-xs">
+                      <div className="font-medium">{route.name}</div>
+                      <div className="opacity-80">
+                        {distLabel}{travel ? ` · ${travel} ${modeLabel}` : ""}
+                      </div>
+                    </div>
+                  </Tooltip>
+                </Polyline>
+              );
+            })}
+
+            {/* Grid overlay */}
+            {activeMap.grid && (showGrid ?? activeMap.grid.enabled !== false) && (
+              <>
+                {gridLines(activeMap, activeMap.grid).map((line, i) => (
+                  <Polyline
+                    key={`grid-${i}`}
+                    positions={line}
+                    pathOptions={{
+                      color: activeMap.grid!.color ?? "rgba(255,255,255,0.08)",
+                      weight: 1,
+                      opacity: 1,
+                      interactive: false,
+                    }}
+                  />
+                ))}
+              </>
             )}
 
             {placementsOnMap.map((p) => {
