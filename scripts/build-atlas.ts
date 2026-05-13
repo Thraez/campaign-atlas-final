@@ -16,6 +16,12 @@ import { slugify } from "./atlas/slugify";
 import { loadWorldConfig } from "./atlas/loadWorldConfig";
 import { CURRENT_ATLAS_SCHEMA_VERSION } from "./atlas/schemaVersion";
 import { sanitizeAtlasHtml } from "../src/atlas/sanitizeHtml";
+import {
+  validateAsset,
+  formatFinding,
+  type AssetFinding,
+  type SvgPolicy,
+} from "./atlas/validateAsset";
 import { parseAtlasDate } from "./atlas/calendarDate";
 import { scanDmContent, reportDmInSource } from "./atlas/detectDmInSource";
 import {
