@@ -15,6 +15,7 @@ import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
 import { slugify } from "./atlas/slugify";
 import { loadWorldConfig } from "./atlas/loadWorldConfig";
 import { parseAtlasDate } from "./atlas/calendarDate";
+import { scanDmContent, reportDmInSource } from "./atlas/detectDmInSource";
 import {
   stripDmProfile,
   filterRelationshipsForPlayer,
@@ -140,6 +141,18 @@ async function main() {
   const configPath = path.resolve(ROOT, flags.configPath ?? "atlas.config.json");
   const cfg = loadConfig(configPath);
   const contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
+
+  // Source-repo privacy gate. The player BUILD strips DM content from the
+  // shipped artifact, but a public source repo can still leak the raw
+  // markdown. We scan locally (no network, no GitHub API) and require a
+  // human acknowledgement for player builds.
+  const dmScan = scanDmContent(contentDir);
+  const ok = reportDmInSource(dmScan, {
+    enforceAck: flags.player,
+    repoRoot: ROOT,
+  });
+  if (!ok) process.exit(8);
+
   const scanInfo = { excludedFiles: 0 };
   const files = walk(contentDir, contentDir, cfg.include ?? [], cfg.exclude ?? [], scanInfo);
 
