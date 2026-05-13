@@ -417,10 +417,11 @@ export default function AtlasPlacementEditor() {
 
         <aside className="w-[380px] hidden md:flex flex-col border-l border-border bg-card">
           <Tabs defaultValue="pins" className="flex-1 flex flex-col min-h-0">
-            <TabsList className="grid grid-cols-3 mx-3 mt-3">
+            <TabsList className="grid grid-cols-4 mx-3 mt-3">
               <TabsTrigger value="pins" className="gap-1.5"><PinIcon className="h-3.5 w-3.5" />Pins</TabsTrigger>
               <TabsTrigger value="layers" className="gap-1.5"><LayersIcon className="h-3.5 w-3.5" />Layers</TabsTrigger>
               <TabsTrigger value="map" className="gap-1.5"><Settings2 className="h-3.5 w-3.5" />Map</TabsTrigger>
+              <TabsTrigger value="import" className="gap-1.5"><FolderOpen className="h-3.5 w-3.5" />Import</TabsTrigger>
             </TabsList>
             <TabsContent value="pins" className="flex-1 flex flex-col min-h-0 m-0">
               <div className="p-3 border-b border-border">
