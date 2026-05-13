@@ -752,6 +752,13 @@ export default function AtlasPlacementEditor() {
                 draftPlacements={draftPlacementsForValidation}
                 draftLocalLayers={layerEditor.localLayers}
                 lastExportAt={lastExportAt}
+                onGoToMap={(mid) => { setActiveMapId(mid); toast.info(`Switched to ${project.maps.find((m) => m.id === mid)?.name ?? mid}`); }}
+                onGoToEntity={(eid) => {
+                  const c = effectiveCoord(eid);
+                  if (c && activeMap) setFlyTo({ lat: activeMap.height - c.y, lng: c.x });
+                  setFilter(project.entities.find((e) => e.id === eid)?.title ?? "");
+                }}
+                onExportAll={() => setExportModalOpen(true)}
               />
             </TabsContent>
           </Tabs>
