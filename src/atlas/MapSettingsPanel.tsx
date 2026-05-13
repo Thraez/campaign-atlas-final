@@ -205,6 +205,14 @@ export function MapSettingsPanel({ map, baseMap, onPatch, onReset }: Props) {
           </div>
         </section>
       </div>
+      <ExportChecklistDialog
+        open={checklist.open}
+        onOpenChange={checklist.setOpen}
+        title={checklist.state.title}
+        description={checklist.state.description}
+        files={checklist.state.files}
+        steps={checklist.state.steps}
+      />
     </div>
   );
 }
