@@ -56,6 +56,7 @@ function read(outDir: string) {
   return atlas as {
     entities: Array<{ id: string; visibility: string; body: string }>;
     placements: Array<{ entityId: string; mapId: string; x: number; y: number }>;
+    maps: Array<{ id: string; layers: Array<{ id: string; src: string }> }>;
     buildReport: {
       warnings: string[];
       duplicateSlugs: number;
@@ -64,6 +65,29 @@ function read(outDir: string) {
       externalAssets?: number;
     };
   };
+}
+
+function writeWorldVault(dir: string, worldYaml: string) {
+  fs.mkdirSync(path.join(dir, "content/test-world/_atlas"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "content/test-world/notes"), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, "atlas.config.json"),
+    JSON.stringify({
+      contentRoot: "content",
+      outputDir: "out",
+      defaultWorld: "test-world",
+      include: ["**/*.md"],
+      exclude: [],
+    })
+  );
+  fs.writeFileSync(
+    path.join(dir, "content/test-world/_atlas/world.yaml"),
+    worldYaml
+  );
+  fs.writeFileSync(
+    path.join(dir, "content/test-world/notes/Stub.md"),
+    `---\ntitle: Stub\natlas:\n  visibility: player\n---\nbody\n`
+  );
 }
 
 describe.sequential("atlas build pipeline", () => {
