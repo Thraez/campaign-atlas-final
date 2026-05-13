@@ -281,6 +281,28 @@ AtlasProject
 
 Runtime loading lives in `src/atlas/content/loader.ts` — `loadAtlasContent()` fetches `/atlas/atlas.json`. (Wiring the loader into the existing map UI lands in Batch 2.)
 
+### `schemaVersion`
+
+`world.yaml` may declare an integer `schemaVersion` at the top. The current
+supported value is exported as `CURRENT_ATLAS_SCHEMA_VERSION` from
+`scripts/atlas/schemaVersion.ts` (currently `1`). The generated
+`public/atlas/atlas.json` mirrors this field.
+
+Loader behavior:
+
+- **Missing** — treated as legacy v1, the build emits a one-line warning
+  recommending you add `schemaVersion: 1` explicitly. Existing content
+  continues to work without changes.
+- **Supported** (`<= CURRENT_ATLAS_SCHEMA_VERSION`) — loads normally; older
+  versions are migrated forward by `MIGRATIONS` in `schemaVersion.ts`.
+- **Future** (`> CURRENT_ATLAS_SCHEMA_VERSION`) — build fails with a clear
+  error. Update the build script before opening that world.
+
+When a future breaking change to `world.yaml` is introduced, bump
+`CURRENT_ATLAS_SCHEMA_VERSION`, register a `MIGRATIONS[N]` entry that
+normalizes v_N input to v_(N+1), and add a test under
+`src/test/atlas-schema-version.test.ts`.
+
 ---
 
 ## Placement editor (DM-only)
