@@ -297,6 +297,11 @@ async function main() {
   const worldId = cfg.defaultWorld;
   const fallbackMapId = `${worldId}-overview`;
 
+  // Build entity → visibility map up-front so route/region leak detection
+  // (which runs before the relationship pass) can use it too.
+  const entityVisibility = new Map<string, import("../src/atlas/content/schema").EntityVisibility>();
+  for (const { entity } of pending) entityVisibility.set(entity.id, entity.visibility);
+
   // worldCfg was loaded earlier (so entity dates can resolve against the calendar).
   if (worldCfg) warnings.push(...worldCfg.warnings);
 
@@ -440,9 +445,7 @@ async function main() {
   // The DM half of `profile` and DM-only relationships must NEVER reach a
   // player build. Relationships pointing at DM-only entities are SPOILER
   // LEAKS and warn here (and fail strict-player builds).
-  const entityVisibility = new Map<string, import("../src/atlas/content/schema").EntityVisibility>();
-  for (const { entity } of pending) entityVisibility.set(entity.id, entity.visibility);
-
+  //
   // Region leak detection: player-visible region linked to DM/hidden/unknown entity.
   for (const r of regions) {
     if (!PLAYER_VISIBLE.has(r.visibility) || !r.entityId) continue;
