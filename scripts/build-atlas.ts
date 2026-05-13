@@ -132,8 +132,9 @@ const PLAYER_VISIBLE = new Set(["player", "rumor"]);
 
 async function main() {
   const flags = parseFlags();
-  const cfg = loadConfig(path.resolve(ROOT, flags.configPath ?? "atlas.config.json"));
-  const contentDir = path.resolve(ROOT, cfg.contentRoot);
+  const configPath = path.resolve(ROOT, flags.configPath ?? "atlas.config.json");
+  const cfg = loadConfig(configPath);
+  const contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
   const scanInfo = { excludedFiles: 0 };
   const files = walk(contentDir, contentDir, cfg.include ?? [], cfg.exclude ?? [], scanInfo);
 
