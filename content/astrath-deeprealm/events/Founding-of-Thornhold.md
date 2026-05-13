@@ -9,7 +9,7 @@ atlas:
   tags: [founding, thornhold]
 ---
 
-Forty-seven years after the [[Sundering|Sundering]], settlers from the eastern
+Forty-seven years after the [[The Sundering|Sundering]], settlers from the eastern
 ports broke the first stones of [[Thornhold]] from the cliffside. The
 foundation feast lasted nine days, ending with the lighting of the Forge of
 Garron — still tended today.
