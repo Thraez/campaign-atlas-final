@@ -3,7 +3,7 @@ import { MapContainer, Marker, Polygon, ImageOverlay, useMap, useMapEvents } fro
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode, Layers as LayersIcon, MapPin as PinIcon, Settings2, Package, FolderOpen, Shapes, Route as RouteIcon, CloudFog, BookOpen, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode, Layers as LayersIcon, MapPin as PinIcon, Settings2, Package, FolderOpen, Shapes, Route as RouteIcon, CloudFog, BookOpen, ShieldCheck, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity, MapDocument } from "@/atlas/content/schema";
@@ -35,6 +35,7 @@ import { FogTab } from "@/atlas/tabs/FogTab";
 import { EntitiesTab } from "@/atlas/tabs/EntitiesTab";
 import { PublishCheckTab } from "@/atlas/tabs/PublishCheckTab";
 import { validateProject } from "@/atlas/yaml/validateProject";
+import { MapImportWizard } from "@/atlas/import/MapImportWizard";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 // Bumped to v2: storage shape changed from { [entityId]: Override } to
@@ -252,6 +253,7 @@ export default function AtlasPlacementEditor() {
 
   const [lastExportAt, setLastExportAt] = useState<number | null>(null);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [mapImportOpen, setMapImportOpen] = useState(false);
   // Per-tab last-export timestamps so each tab header can show its own status.
   const [tabExportAt, setTabExportAt] = useState<Record<string, number>>({});
   const markTabExport = (tab: string) => setTabExportAt((s) => ({ ...s, [tab]: Date.now() }));
@@ -516,7 +518,12 @@ export default function AtlasPlacementEditor() {
             </TabsContent>
 
             <TabsContent value="maps" className="flex-1 flex flex-col min-h-0 m-0">
-              {/* Maps tab combines layers + map settings — same canon target (world.yaml > maps[]). */}
+              {/* Maps tab combines layers + map settings + batch import — same canon target (world.yaml > maps[]). */}
+              <div className="px-3 pt-2">
+                <Button size="sm" variant="outline" className="w-full gap-1 h-8 text-xs" onClick={() => setMapImportOpen(true)}>
+                  <Upload className="h-3.5 w-3.5" /> Import Maps (batch wizard)
+                </Button>
+              </div>
               <Tabs defaultValue="layers" className="flex-1 flex flex-col min-h-0">
                 <TabsList className="mx-3 mt-2 grid grid-cols-2">
                   <TabsTrigger value="layers" className="text-[11px]"><LayersIcon className="h-3.5 w-3.5 mr-1" />Layers</TabsTrigger>
@@ -612,6 +619,12 @@ export default function AtlasPlacementEditor() {
         draftPlacements={buildDraftPlacements()}
         mergedLayers={layerEditor.mergedLayers}
         localLayers={layerEditor.localLayers}
+      />
+      <MapImportWizard
+        open={mapImportOpen}
+        onOpenChange={setMapImportOpen}
+        currentMap={activeMap}
+        defaultWorldId={activeMap.worldId}
       />
     </div>
   );
