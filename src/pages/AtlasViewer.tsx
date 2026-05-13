@@ -252,14 +252,15 @@ export default function AtlasViewer() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
+      <a href="#atlas-main" className="skip-to-main">Skip to map</a>
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
         <Link to="/" className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2">
-          <Compass className="h-5 w-5" /> <span className="hidden sm:inline">Astrath Atlas</span>
+          <Compass className="h-5 w-5" aria-hidden="true" /> <span className="hidden sm:inline">Astrath Atlas</span>
         </Link>
         <div className="flex-1" />
         {data.project.maps.length > 1 && (
           <Select value={activeMap.id} onValueChange={setActiveMapId}>
-            <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 w-[180px] text-xs" aria-label="Choose map"><SelectValue /></SelectTrigger>
             <SelectContent>
               {data.project.maps.map((m) => (
                 <SelectItem key={m.id} value={m.id} className="text-xs">{m.name}</SelectItem>
@@ -268,8 +269,15 @@ export default function AtlasViewer() {
           </Select>
         )}
         {activeMap.fog?.enabled && (
-          <Button variant="ghost" size="sm" onClick={() => setShowFog((v) => !v)} title={showFog ? "Hide fog" : "Show fog"}>
-            {showFog ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowFog((v) => !v)}
+            title={showFog ? "Hide fog" : "Show fog"}
+            aria-label={showFog ? "Hide fog of war" : "Show fog of war"}
+            aria-pressed={showFog}
+          >
+            {showFog ? <Eye className="h-4 w-4" aria-hidden="true" /> : <EyeOff className="h-4 w-4" aria-hidden="true" />}
           </Button>
         )}
         {activeMap.grid && (
@@ -278,20 +286,22 @@ export default function AtlasViewer() {
             size="sm"
             onClick={() => setShowGrid((v) => !(v ?? activeMap.grid!.enabled !== false))}
             title="Toggle grid"
+            aria-label="Toggle grid overlay"
+            aria-pressed={showGrid ?? activeMap.grid.enabled !== false}
           >
-            <Grid3x3 className="h-4 w-4" />
+            <Grid3x3 className="h-4 w-4" aria-hidden="true" />
           </Button>
         )}
-        <Button variant="secondary" size="sm" onClick={() => setSearchOpen(true)} className="gap-2">
-          <Search className="h-4 w-4" />
+        <Button variant="secondary" size="sm" onClick={() => setSearchOpen(true)} className="gap-2" aria-label="Search atlas (Ctrl+K)">
+          <Search className="h-4 w-4" aria-hidden="true" />
           <span className="hidden sm:inline">Search</span>
           <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded bg-muted border border-border">⌘K</kbd>
         </Button>
         <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
-          <Link to="/atlas/browse" title="Browse all entries"><LayoutGrid className="h-4 w-4 mr-1" />Browse</Link>
+          <Link to="/atlas/browse" title="Browse all entries"><LayoutGrid className="h-4 w-4 mr-1" aria-hidden="true" />Browse</Link>
         </Button>
         <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
-          <Link to="/atlas/timeline" title="Timeline of dated entries"><CalendarClock className="h-4 w-4 mr-1" />Timeline</Link>
+          <Link to="/atlas/timeline" title="Timeline of dated entries"><CalendarClock className="h-4 w-4 mr-1" aria-hidden="true" />Timeline</Link>
         </Button>
         <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
           <Link to="/atlas/edit" title="DM placement editor">Edit pins</Link>
@@ -302,7 +312,11 @@ export default function AtlasViewer() {
       </header>
 
       <div className="flex-1 flex relative min-h-0">
-        <div className="flex-1 relative min-h-0">
+        <main
+          id="atlas-main"
+          className="flex-1 relative min-h-0"
+          aria-label={`Interactive map: ${activeMap.name}. Use arrow keys to pan, plus and minus to zoom.`}
+        >
           <MapContainer
             crs={FlatCRS}
             center={[activeMap.height / 2, activeMap.width / 2]}
@@ -310,6 +324,8 @@ export default function AtlasViewer() {
             minZoom={-6}
             maxZoom={4}
             zoomControl
+            keyboard
+            keyboardPanDelta={80}
             attributionControl={false}
             style={{ width: "100%", height: "100%", background: activeMap.oceanColor ?? "#18313f" }}
           >
