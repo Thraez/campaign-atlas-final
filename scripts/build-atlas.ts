@@ -35,10 +35,9 @@ interface Config {
 }
 
 const ROOT = process.cwd();
-const CONFIG_PATH = path.join(ROOT, "atlas.config.json");
 
-function loadConfig(): Config {
-  const raw = fs.readFileSync(CONFIG_PATH, "utf8");
+function loadConfig(configPath: string): Config {
+  const raw = fs.readFileSync(configPath, "utf8");
   return JSON.parse(raw) as Config;
 }
 
@@ -111,6 +110,7 @@ interface CliFlags {
   player: boolean;
   strict: boolean;
   outDir?: string;
+  configPath?: string;
 }
 
 function parseFlags(): CliFlags {
