@@ -25,6 +25,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import type { AtlasProject, MapDocument } from "@/atlas/content/schema";
+import type { Region, Route, FogOverlay } from "@/atlas/content/schema";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import {
   buildAssetManifest,
@@ -46,6 +47,14 @@ interface Props {
   draftPlacements: PlacementOverride[];
   mergedLayers: MapDocument["layers"];
   localLayers: LocalLayer[];
+  /** Effective regions/routes/fog from their respective draft hooks. */
+  draftRegions?: Region[];
+  draftRoutes?: Route[];
+  draftFog?: FogOverlay;
+  /** Dirty flags so the summary can call out which draft types have local changes. */
+  regionsDirty?: boolean;
+  routesDirty?: boolean;
+  fogDirty?: boolean;
 }
 
 function downloadBlob(filename: string, blob: Blob) {
@@ -76,6 +85,12 @@ export function ExportChangesModal({
   draftPlacements,
   mergedLayers,
   localLayers,
+  draftRegions,
+  draftRoutes,
+  draftFog,
+  regionsDirty,
+  routesDirty,
+  fogDirty,
 }: Props) {
   const [showRaw, setShowRaw] = useState(false);
 
@@ -83,12 +98,19 @@ export function ExportChangesModal({
     const a: { placement: PatchArtifact; placementJson: PatchArtifact; world: PatchArtifact; manifest: PatchArtifact } = {
       placement: buildPlacementPatch({ project, mapId: activeMap.id, placements: draftPlacements }),
       placementJson: buildPlacementJson({ project, mapId: activeMap.id, placements: draftPlacements }),
-      world: buildWorldMapPatch({ map: activeMap, mergedLayers, localLayers }),
+      world: buildWorldMapPatch({
+        map: activeMap,
+        mergedLayers,
+        localLayers,
+        regions: draftRegions,
+        routes: draftRoutes,
+        fog: draftFog,
+      }),
       manifest: buildAssetManifest([]),
     };
     a.manifest = buildAssetManifest(a.world.assets ?? []);
     return a;
-  }, [project, activeMap, draftPlacements, mergedLayers, localLayers]);
+  }, [project, activeMap, draftPlacements, mergedLayers, localLayers, draftRegions, draftRoutes, draftFog]);
 
   const validation = useMemo(
     () =>
@@ -187,6 +209,20 @@ export function ExportChangesModal({
             {/* SUMMARY */}
             <section className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Summary of changes</div>
+              <div className="flex flex-wrap gap-1.5">
+                <Badge variant={draftPlacements.length ? "default" : "outline"} className="text-[10px]">
+                  Pins: {draftPlacements.length}
+                </Badge>
+                <Badge variant={regionsDirty ? "default" : "outline"} className="text-[10px]">
+                  Regions: {draftRegions?.length ?? 0}{regionsDirty ? " ●" : ""}
+                </Badge>
+                <Badge variant={routesDirty ? "default" : "outline"} className="text-[10px]">
+                  Routes: {draftRoutes?.length ?? 0}{routesDirty ? " ●" : ""}
+                </Badge>
+                <Badge variant={fogDirty ? "default" : "outline"} className="text-[10px]">
+                  Fog: {draftFog?.reveals?.length ?? 0}{fogDirty ? " ●" : ""}
+                </Badge>
+              </div>
               <ul className="space-y-1">
                 {[artifacts.placement, artifacts.world, artifacts.manifest].flatMap((a) =>
                   a.summary.map((s, i) => (
