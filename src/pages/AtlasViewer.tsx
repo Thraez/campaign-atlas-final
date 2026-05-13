@@ -17,6 +17,7 @@ import {
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
+import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
