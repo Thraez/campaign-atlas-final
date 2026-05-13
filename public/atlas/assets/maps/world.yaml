@@ -1,0 +1,36 @@
+# Map layer patch — Overview
+
+Paste under the matching map entry in `content/<world>/_atlas/world.yaml`.
+Uploaded local images must also be saved to the listed `targetPath` and committed.
+
+```yaml
+maps:
+  - id: astrath-deeprealm-overview
+    name: Overview
+    width: 200000
+    height: 100000
+    oceanColor: #18313f
+    wrapX: false
+    layers:
+      - id: upload-1778661405429-0-map.jpg
+        src: /atlas/assets/maps/map.jpg
+        x: 0
+        y: 0
+        width: 28296
+        height: 37727
+        opacity: 1
+        zIndex: 10
+        # ⤷ uploaded locally — save file to public/atlas/assets/maps/map.jpg
+      - id: url-1778661427267
+        src: https://i.pinimg.com/1200x/23/8b/63/238b63bd194745b0c9fd8a7c33471c62.jpg
+        x: 81250
+        y: 40625
+        width: 37500
+        height: 18750
+        opacity: 1
+        zIndex: 20
+```
+
+## Asset checklist
+
+- [ ] Save `map.jpg` → `public/atlas/assets/maps/map.jpg`
