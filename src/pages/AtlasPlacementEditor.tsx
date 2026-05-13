@@ -18,6 +18,9 @@ import { MapLayerPanel } from "@/atlas/MapLayerPanel";
 import { MapSettingsPanel } from "@/atlas/MapSettingsPanel";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
+import { validatePatchYaml } from "@/atlas/yaml/validatePatch";
+import { classifyDraftStatus } from "@/atlas/yaml/canon";
+import { DraftStatusBadge } from "@/atlas/yaml/StatusBadge";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 // Bumped to v2: storage shape changed from { [entityId]: Override } to
