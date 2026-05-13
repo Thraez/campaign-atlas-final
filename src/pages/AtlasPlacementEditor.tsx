@@ -335,7 +335,7 @@ export default function AtlasPlacementEditor() {
             {showLayers && layerEditor.mergedLayers.map((layer) => (
               <ImageOverlay
                 key={layer.id}
-                url={layer.src}
+                url={normalizeAtlasAssetUrl(layer.src)}
                 bounds={[
                   [activeMap.height - (layer.y + layer.height), layer.x],
                   [activeMap.height - layer.y, layer.x + layer.width],
