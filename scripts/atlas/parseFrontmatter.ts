@@ -61,6 +61,8 @@ export function parseFrontmatter(raw: string, sourcePath: string): ParsedFile {
         : (atlasRaw.date instanceof Date ? atlasRaw.date.toISOString().slice(0, 10) : undefined),
     dateValue: typeof atlasRaw.dateValue === "number" ? atlasRaw.dateValue : undefined,
     placements: parsePlacements(atlasRaw.placements, sourcePath, warnings),
+    profile: parseProfile(atlasRaw.profile, sourcePath, warnings),
+    relationships: parseRelationships(atlasRaw.relationships, sourcePath, warnings),
   };
 
   if (typeof atlasRaw.visibility === "string") {
