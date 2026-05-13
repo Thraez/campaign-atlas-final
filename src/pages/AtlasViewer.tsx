@@ -316,10 +316,12 @@ export default function AtlasViewer() {
         <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
           <Link to="/atlas/edit" title="DM placement editor">Edit pins</Link>
         </Button>
+        <OfflineMenu />
         <span className="hidden md:block text-[11px] text-muted-foreground ml-2">
           Updated {new Date(data.project.publishedAt).toLocaleDateString()}
         </span>
       </header>
+      <OfflineStatus />
 
       <div className="flex-1 flex relative min-h-0">
         <main
