@@ -24,29 +24,14 @@ import { printEntityHandout } from "@/atlas/printHandout";
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 
-const ICON_BY_TYPE: Record<string, string> = {
-  settlement: "#f4c95d",
-  capital: "#f0a830",
-  region: "#7fb069",
-  ruin: "#b07d62",
-  dungeon: "#8e5cd9",
-  npc: "#5cb8d9",
-  faction: "#d95c8e",
-  mystery: "#a070ff",
-  default: "#cfd6dc",
-};
+import { resolvePinStyle, pinSvg, type PinPreset } from "@/atlas/pins/presets";
 
-function pinIcon(color: string, dim = false): L.DivIcon {
+function pinIconForStyle(style: PinPreset, opts?: { dim?: boolean }): L.DivIcon {
   return L.divIcon({
     className: "atlas-viewer-pin",
-    html: `<div style="
-      width:18px;height:18px;border-radius:50% 50% 50% 0;
-      transform:rotate(-45deg);background:${color};
-      border:2px solid #1b1b1bcc;box-shadow:0 2px 6px #0008;
-      opacity:${dim ? 0.55 : 1};
-    "></div>`,
-    iconSize: [18, 18],
-    iconAnchor: [9, 16],
+    html: pinSvg({ color: style.color, shape: style.shape }, { dim: opts?.dim }),
+    iconSize: [22, 22],
+    iconAnchor: [11, 20],
   });
 }
 
