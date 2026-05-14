@@ -18,7 +18,8 @@
     "atlas:publish": "npm run atlas:build:player && npm run build && npm run atlas:check-secrets dist && npm run atlas:check-secrets public/atlas && npm run atlas:check-shape public/atlas/atlas.json && npm run atlas:check-derived dist && npm run atlas:check-derived public/atlas",
     "atlas:check-secrets": "tsx scripts/check-no-secrets.ts",
     "atlas:check-derived": "tsx scripts/check-derived-secrets.ts",
-    "atlas:check-shape": "tsx scripts/check-artifact-shape.ts"
+    "atlas:check-shape": "tsx scripts/check-artifact-shape.ts",
+    "atlas:audit-assets": "tsx scripts/atlas/audit-assets.ts"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.14",

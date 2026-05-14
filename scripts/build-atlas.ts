@@ -9,8 +9,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { marked } from "marked";
-import { parseFrontmatter } from "./atlas/parseFrontmatter";
-import { stripDmBlocks } from "./atlas/stripDmBlocks";
+import { parseFrontmatter, type ParsedFile } from "./atlas/parseFrontmatter";
+import { stripDmBlocks, stripDmFromShippingString } from "./atlas/stripDmBlocks";
 import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
 import { slugify } from "./atlas/slugify";
 import { loadWorldConfig } from "./atlas/loadWorldConfig";
@@ -60,7 +60,7 @@ function walk(
   contentRoot: string,
   include: string[],
   exclude: string[],
-  scanned: { excludedFiles: number }
+  scanned: { excludedFiles: number; excludedPaths: string[] }
 ): string[] {
   const out: string[] = [];
   if (!fs.existsSync(dir)) return out;
@@ -68,8 +68,14 @@ function walk(
     const full = path.join(dir, entry.name);
     const contentRel = path.relative(contentRoot, full).replace(/\\/g, "/");
     if (matchAny(contentRel, exclude)) {
-      if (entry.isDirectory()) scanned.excludedFiles += countMd(full);
-      else if (entry.name.endsWith(".md")) scanned.excludedFiles += 1;
+      if (entry.isDirectory()) {
+        const all = listMd(full);
+        scanned.excludedFiles += all.length;
+        scanned.excludedPaths.push(...all);
+      } else if (entry.name.endsWith(".md")) {
+        scanned.excludedFiles += 1;
+        scanned.excludedPaths.push(full);
+      }
       continue;
     }
     if (entry.isDirectory()) {
@@ -78,6 +84,7 @@ function walk(
       // include globs only filter files (not dirs); empty list = include all.
       if (include.length > 0 && !matchAny(contentRel, include)) {
         scanned.excludedFiles += 1;
+        scanned.excludedPaths.push(full);
         continue;
       }
       out.push(full);
@@ -86,14 +93,14 @@ function walk(
   return out;
 }
 
-function countMd(dir: string): number {
-  let n = 0;
+function listMd(dir: string): string[] {
+  const out: string[] = [];
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const f = path.join(dir, e.name);
-    if (e.isDirectory()) n += countMd(f);
-    else if (e.name.endsWith(".md")) n += 1;
+    if (e.isDirectory()) out.push(...listMd(f));
+    else if (e.name.endsWith(".md")) out.push(f);
   }
-  return n;
+  return out;
 }
 
 function matchAny(target: string, globs: string[]): boolean {
@@ -118,6 +125,26 @@ function deriveTitle(file: string, fmTitle?: unknown): string {
 function relImage(p: string): string {
   // Normalize "assets/..." paths to public output
   return p.replace(/^\/+/, "");
+}
+
+/**
+ * Redact every occurrence of every secret name in a list of warning strings.
+ * Names shorter than 3 characters are skipped to avoid pathological replaces
+ * (e.g. an alias of "AI" would map every "ai" inside other words to "…").
+ * Long names are tried first so a longer alias takes precedence over an id
+ * that happens to be a substring of it.
+ */
+function scrubSecretNames(warnings: string[], secretNames: Set<string>): string[] {
+  if (secretNames.size === 0) return warnings.slice();
+  const names = Array.from(secretNames)
+    .filter((n) => typeof n === "string" && n.length >= 3)
+    .sort((a, b) => b.length - a.length);
+  if (names.length === 0) return warnings.slice();
+  return warnings.map((w) => {
+    let out = w;
+    for (const n of names) out = out.split(n).join("…");
+    return out;
+  });
 }
 
 interface CliFlags {
@@ -148,7 +175,7 @@ async function main() {
   const cfg = loadConfig(configPath);
   const contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
 
-  const scanInfo = { excludedFiles: 0 };
+  const scanInfo = { excludedFiles: 0, excludedPaths: [] as string[] };
   const files = walk(contentDir, contentDir, cfg.include ?? [], cfg.exclude ?? [], scanInfo);
 
   // Load world config up-front so entity parsing can resolve dates against
@@ -179,18 +206,32 @@ async function main() {
     entity: Entity;
     rawBody: string;
     /** Explicit multi-map placements from atlas.placements[]. */
-    placements: Array<{ mapId?: string; x: number; y: number }>;
+    placements: Array<{ mapId?: string; x: number; y: number; label?: string; pin?: import("../src/atlas/content/schema").PinPlacementStyle }>;
     /** Legacy atlas.x / atlas.y, used only if `placements` is empty. */
     legacy?: { x: number; y: number };
   };
   const pending: Pending[] = [];
   const slugSeen = new Map<string, string>();
 
+  // PASS 1: parse every file regardless of visibility, so that we can build a
+  // full name index for cross-reference leak detection. A `[[Vampire Lord]]`
+  // wikilink in a public entry that resolves to a DM-only entity is a spoiler
+  // leak even if the target entity is later excluded from the player build —
+  // the display TEXT inside the link still ships and reveals the name.
+  type AllParsed = {
+    file: string;
+    rel: string;
+    parsed: ParsedFile;
+    title: string;
+    id: string;
+    visibility: import("../src/atlas/content/schema").EntityVisibility;
+    isSecret: boolean;
+  };
+  const allParsed: AllParsed[] = [];
   for (const file of files) {
     const rel = path.relative(ROOT, file).replace(/\\/g, "/");
     const raw = fs.readFileSync(file, "utf8");
     const parsed = parseFrontmatter(raw, rel);
-    // Detect parser warnings about invalid visibility (used for strict-player gate)
     for (const w of parsed.warnings) {
       if (w.includes("invalid atlas.visibility")) invalidVisibilityCount += 1;
     }
@@ -201,7 +242,6 @@ async function main() {
       errors.push(`${rel}: missing title`);
       continue;
     }
-
     const id = parsed.atlas.id || slugify(title);
     if (slugSeen.has(id)) {
       duplicateSlugs += 1;
@@ -211,55 +251,150 @@ async function main() {
     slugSeen.set(id, rel);
 
     const visibility = parsed.atlas.visibility ?? (parsed.atlas.publish === false ? "dm" : "player");
+    const isSecret = !PLAYER_VISIBLE.has(visibility) || parsed.atlas.publish === false;
+    allParsed.push({ file, rel, parsed, title, id, visibility, isSecret });
+  }
 
-    // Player-safe build: physically exclude dm + hidden entities (not just hide in UI).
-    if (flags.player && !PLAYER_VISIBLE.has(visibility)) {
+  // Cross-reference index: title + aliases → id, covering EVERY parsed entity
+  // (player-visible and DM/hidden). Used for wikilink resolution so we can
+  // detect cross-ref leaks (a public-entry link to a DM-only target).
+  const crossRefNameIndex = new Map<string, string>();
+  const allEntityVisibility = new Map<string, import("../src/atlas/content/schema").EntityVisibility>();
+  const secretEntityIds = new Set<string>();
+  // Every literal string (title / id / alias) belonging to a non-player
+  // entity. Used to scrub warning text before it ships in a player build.
+  const secretNames = new Set<string>();
+  for (const p of allParsed) {
+    crossRefNameIndex.set(p.title.toLowerCase(), p.id);
+    for (const a of p.parsed.atlas.aliases ?? []) {
+      crossRefNameIndex.set(a.toLowerCase(), p.id);
+    }
+    allEntityVisibility.set(p.id, p.visibility);
+    if (p.isSecret) {
+      secretEntityIds.add(p.id);
+      secretNames.add(p.title);
+      secretNames.add(p.id);
+      for (const a of p.parsed.atlas.aliases ?? []) secretNames.add(a);
+    }
+  }
+
+  // Also parse identity-only from folder-excluded files (e.g. `_dm/`,
+  // `_drafts/`). These files are NEVER read into entities and never ship, but
+  // a public-entry wikilink to their title would still leak the display text
+  // unless we treat them as secret targets in the cross-ref index.
+  const excludedIdSeen = new Set<string>();
+  for (const file of scanInfo.excludedPaths) {
+    const rel = path.relative(ROOT, file).replace(/\\/g, "/");
+    let raw: string;
+    try { raw = fs.readFileSync(file, "utf8"); } catch { continue; }
+    const parsed = parseFrontmatter(raw, rel);
+    const title = deriveTitle(file, (parsed.data.title as string) ?? undefined);
+    if (!title) continue;
+    const id = parsed.atlas.id || slugify(title);
+    if (slugSeen.has(id) || excludedIdSeen.has(id)) continue;
+    excludedIdSeen.add(id);
+    crossRefNameIndex.set(title.toLowerCase(), id);
+    for (const a of parsed.atlas.aliases ?? []) {
+      crossRefNameIndex.set(a.toLowerCase(), id);
+    }
+    // Folder-excluded files have no published visibility, but for cross-ref
+    // purposes they're DM-equivalent: anything wikilinking to them from a
+    // public entry is a spoiler leak.
+    const vis = parsed.atlas.visibility ?? "dm";
+    allEntityVisibility.set(id, vis);
+    secretEntityIds.add(id);
+    secretNames.add(title);
+    secretNames.add(id);
+    for (const a of parsed.atlas.aliases ?? []) secretNames.add(a);
+  }
+
+  // PASS 2: build entities for pending, filtering out secrets in player mode
+  // and applying shipping-field DM-block stripping defensively.
+  let crossRefLeaks = 0;
+  for (const item of allParsed) {
+    const { parsed, title, id, visibility, isSecret, rel } = item;
+    if (flags.player && isSecret) {
       visibilityExcluded += 1;
       continue;
     }
-    // Player-safe build: also exclude entries explicitly marked publish: false
-    if (flags.player && parsed.atlas.publish === false) {
-      visibilityExcluded += 1;
-      continue;
-    }
 
-    // DM blocks are stripped only in player builds. DM builds preserve %% ... %%
-    // so the editor can still use Obsidian comments freely.
-    const { text: noDmStripped, count: cStripped } = stripDmBlocks(parsed.body);
+    // Body DM-block stripping (player builds only). Unbalanced %% is a build
+    // error in either mode — it indicates an unclosed comment block, which
+    // can silently leak everything after it.
+    const { text: noDmStripped, count: cStripped, unbalanced } = stripDmBlocks(parsed.body);
     detectedDmBlocks += cStripped;
+    if (unbalanced) {
+      errors.push(`${rel}: body has an unbalanced %% delimiter — likely an unclosed DM block. Add the closing %% (or remove the stray one).`);
+    }
     const noDm = flags.player ? noDmStripped : parsed.body;
     if (flags.player) strippedDmBlocks += cStripped;
 
+    // Shipping-field sanitization: every string that lands in atlas.json must
+    // be free of %% blocks in player builds. The body is already handled
+    // above; this covers summary, aliases, tags, profile player fields, etc.
+    const stripField = flags.player
+      ? (s: string | undefined) => stripDmFromShippingString(s)
+      : (s: string | undefined) => s;
+    const stripArr = flags.player
+      ? (arr: string[]) =>
+          arr
+            .map((x) => stripDmFromShippingString(x) ?? "")
+            .filter((x) => x.length > 0)
+      : (arr: string[]) => arr;
+
     const entity: Entity = {
       id,
-      title,
+      title: stripField(title) ?? title,
       type: parsed.atlas.type ?? "note",
       world: parsed.atlas.world ?? cfg.defaultWorld,
       visibility,
       canon: (parsed.atlas.canon as Entity["canon"]) ?? "canon",
-      aliases: parsed.atlas.aliases ?? [],
-      tags: parsed.atlas.tags ?? [],
-      summary: parsed.atlas.summary,
+      aliases: stripArr(parsed.atlas.aliases ?? []),
+      tags: stripArr(parsed.atlas.tags ?? []),
+      summary: stripField(parsed.atlas.summary),
       images: (parsed.atlas.images ?? []).map(relImage),
       body: noDm,
       bodyHtml: "",
-      frontmatter: flags.player ? {} : parsed.data, // strip frontmatter from player output
-      sourcePath: flags.player ? "" : rel,           // strip source paths from player output
+      frontmatter: flags.player ? {} : parsed.data,
+      sourcePath: flags.player ? "" : rel,
       links: [],
       backlinks: [],
       profile: compactProfile(parsed.atlas.profile),
       relationships: parsed.atlas.relationships,
     };
 
+    // Sanitize profile.player shipping strings (profile.dm is dropped later).
+    if (flags.player && entity.profile?.player) {
+      const pp = entity.profile.player;
+      if (pp.known_for) pp.known_for = stripDmFromShippingString(pp.known_for);
+      if (pp.visible_traits) {
+        pp.visible_traits = pp.visible_traits
+          .map((s: string) => stripDmFromShippingString(s) ?? "")
+          .filter((s: string) => s.length > 0);
+      }
+      if (pp.rumors) {
+        pp.rumors = pp.rumors
+          .map((s: string) => stripDmFromShippingString(s) ?? "")
+          .filter((s: string) => s.length > 0);
+      }
+    }
+    // Sanitize relationship.label / description for player builds.
+    if (flags.player && entity.relationships) {
+      for (const r of entity.relationships) {
+        if (r.label) r.label = stripDmFromShippingString(r.label);
+        if (r.description) r.description = stripDmFromShippingString(r.description);
+      }
+    }
+
     // Date / timeline support.
     const parsedDate = parseAtlasDate(parsed.atlas.date, worldCfg?.calendar);
     if (parsedDate) {
-      entity.dateRaw = parsedDate.label;
+      entity.dateRaw = stripField(parsedDate.label);
       entity.dateValue = parsed.atlas.dateValue ?? parsedDate.value;
       entity.dateYear = parsedDate.year;
     } else if (typeof parsed.atlas.dateValue === "number") {
       entity.dateValue = parsed.atlas.dateValue;
-      entity.dateRaw = parsed.atlas.date;
+      entity.dateRaw = stripField(parsed.atlas.date);
     }
 
     const fmAtlas = (parsed.data.atlas as Record<string, unknown>) ?? {};
@@ -270,13 +405,9 @@ async function main() {
     pending.push({ entity, rawBody: noDm, placements: explicitPlacements, legacy });
   }
 
-  // Wikilink name index
-  const nameIndex = new Map<string, string>();
-  for (const { entity } of pending) {
-    nameIndex.set(entity.title.toLowerCase(), entity.id);
-    for (const a of entity.aliases) nameIndex.set(a.toLowerCase(), entity.id);
-  }
-  const resolveByName = (n: string) => nameIndex.get(n.trim().toLowerCase());
+  // Wikilink resolution uses the FULL cross-reference index (including
+  // DM/hidden entities) so we can detect public-entry → DM-target leaks.
+  const resolveByName = (n: string) => crossRefNameIndex.get(n.trim().toLowerCase());
 
   const backlinkMap = new Map<string, Map<string, string>>();
   for (const item of pending) {
@@ -284,6 +415,33 @@ async function main() {
     const { tokenized, links } = tokenizeWikilinks(rawBody, { resolveByName });
     entity.links = links;
     for (const l of links) {
+      // Cross-reference spoiler leak detection (player builds only). The link
+      // resolved to a real entity, but that entity is excluded from the player
+      // build — keeping the link would ship the display text (often the
+      // secret's name). Redact display, drop href, mark broken, count it.
+      if (flags.player && l.resolvedId && secretEntityIds.has(l.resolvedId)) {
+        crossRefLeaks += 1;
+        const targetVis = allEntityVisibility.get(l.resolvedId) ?? "dm";
+        warnings.push(
+          `entity "${entity.id}": wikilink "${l.target}" resolves to ${targetVis} entity "${l.resolvedId}" — spoiler leak, redacted from player output`
+        );
+        // Redact body markdown: replace the raw `[[target(|display)?]]`
+        // syntax with "…" so the secret name doesn't leak through atlas.json
+        // entity.body or the search index (which both ship the raw body).
+        if (l.target) {
+          const escTarget = l.target.replace(/[.+*?^${}()|[\]\\]/g, "\\$&");
+          entity.body = entity.body.replace(
+            new RegExp(`\\[\\[${escTarget}(?:\\|[^\\]]+)?\\]\\]`, "g"),
+            "…"
+          );
+        }
+        l.resolvedId = undefined;
+        l.display = "…";
+        // Redact target too — entity.links ships verbatim, and the raw target
+        // text is usually the secret's name.
+        l.target = "";
+        l.broken = true;
+      }
       if (l.broken) {
         // Unresolved wikilinks are normal "not created yet" — count, don't warn.
         unresolvedLinks += 1;
@@ -340,15 +498,23 @@ async function main() {
   } catch { /* ignore */ }
 
   let regions: Region[] = worldCfg?.regions ?? [];
-  let fogs: FogOverlay[] = worldCfg?.fogs ?? [];
+  const fogs: FogOverlay[] = worldCfg?.fogs ?? [];
   let regionsExcluded = 0;
 
   if (flags.player) {
-    regions = regions.filter((r) => {
-      const keep = PLAYER_VISIBLE.has(r.visibility);
-      if (!keep) regionsExcluded += 1;
-      return keep;
-    });
+    regions = regions
+      .filter((r) => {
+        const keep = PLAYER_VISIBLE.has(r.visibility);
+        if (!keep) regionsExcluded += 1;
+        return keep;
+      })
+      // Region names ship to players; strip any %% blocks the DM left behind.
+      .map((r) => ({ ...r, name: stripDmFromShippingString(r.name) ?? r.name }));
+    // Map names ship to players too; sanitize before attaching overlays below.
+    maps = maps.map((m) => ({
+      ...m,
+      name: stripDmFromShippingString(m.name) ?? m.name,
+    }));
   }
 
   // Default placements to first map if no specific mapId on entity.
@@ -372,13 +538,15 @@ async function main() {
         warnings.push(`entity "${entity.id}": placement references unknown mapId "${mapId}" — skipped`);
         continue;
       }
+      const rawLabel = (p as { label?: string }).label;
+      const cleanLabel = flags.player ? stripDmFromShippingString(rawLabel) : rawLabel;
       placements.push({
         id: `${entity.id}@${mapId}`,
         entityId: entity.id,
         mapId,
         x: p.x,
         y: p.y,
-        label: (p as { label?: string }).label ?? entity.title,
+        label: cleanLabel ?? entity.title,
         visibility: entity.visibility,
         pin: (p as { pin?: import("../src/atlas/content/schema").PinPlacementStyle }).pin,
       });
@@ -431,10 +599,12 @@ async function main() {
       }
     }
     if (dropped || resolved.length < 2) continue;
+    // Route names ship to players; strip any %% blocks the DM left behind.
+    const routeName = flags.player ? (stripDmFromShippingString(r.name) ?? r.name) : r.name;
     routes.push({
       id: r.id,
       mapId: r.mapId,
-      name: r.name,
+      name: routeName,
       mode: r.mode,
       speed: r.speed,
       color: r.color,
@@ -562,7 +732,12 @@ async function main() {
       scanned: files.length + scanInfo.excludedFiles,
       included: pending.length,
       excluded: scanInfo.excludedFiles + visibilityExcluded,
-      warnings,
+      // Warning text routinely names DM entities (cross-ref leak messages,
+      // relationship leak messages, unresolved-target messages, etc.). Player
+      // builds get the same diagnostic warnings, but every secret entity's
+      // title/id/alias is scrubbed to "…" so a leak message about a hidden
+      // entity doesn't itself leak the secret's name.
+      warnings: flags.player ? scrubSecretNames(warnings, secretNames) : warnings,
       brokenLinks: unresolvedLinks,        // back-compat alias
       unresolvedLinks,
       duplicateSlugs,
@@ -634,6 +809,7 @@ async function main() {
   console.log(`Region leaks:            ${regionLeaks}`);
   console.log(`Route leaks:             ${routeLeaks}`);
   console.log(`Route waypoint misses:   ${routeWaypointMisses}`);
+  console.log(`Cross-ref leaks:         ${crossRefLeaks}`);
   console.log(`Unresolved relationships:${unresolvedRelationships}`);
   console.log(`Warnings:                ${warnings.length}`);
   console.log(`Errors:                  ${errors.length}`);
@@ -689,6 +865,14 @@ async function main() {
   if (flags.player && flags.strict && routeLeaks > 0) {
     console.error(`Strict player mode: ${routeLeaks} route leak(s) to DM-only/unknown entities. Failing build.`);
     process.exit(7);
+  }
+  // Strict + player must never ship a wikilink from a public entry to a
+  // DM/hidden entity — the display TEXT inside the link reveals the secret
+  // name even after we redact the href. Build fails so the DM rewrites the
+  // sentence.
+  if (flags.player && flags.strict && crossRefLeaks > 0) {
+    console.error(`Strict player mode: ${crossRefLeaks} cross-reference leak(s): wikilinks from player-visible entries to DM/hidden entities. Failing build.`);
+    process.exit(8);
   }
 }
 

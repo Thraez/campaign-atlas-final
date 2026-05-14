@@ -10,6 +10,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import {
+  loadNote,
+  saveNote,
+  deleteNote,
+  exportNotesJson,
+  importNotesJson,
+} from "@/atlas/notes/playerNotes";
 import {
   Search, X, MapPin, ArrowLeft, Compass, Eye, EyeOff, Grid3x3, CalendarClock,
   Link2, Check, LayoutGrid, Printer,
@@ -646,6 +655,142 @@ function CopyLinkButton({ entityId }: { entityId: string }) {
   );
 }
 
+function formatRelative(iso: string): string {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "just now";
+  const diff = Date.now() - t;
+  if (diff < 60_000) return "just now";
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} min ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} hr ago`;
+  return new Date(t).toLocaleDateString();
+}
+
+function NotesPanel({ entityId, entityTitle }: { entityId: string; entityTitle: string }) {
+  const initial = useMemo(() => loadNote(entityId), [entityId]);
+  const [text, setText] = useState(initial?.text ?? "");
+  const [savedAt, setSavedAt] = useState<string | null>(initial?.updatedAt ?? null);
+  const [open, setOpen] = useState(!!initial?.text);
+  const debounceRef = useRef<number | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  // Reset state when the user navigates to a different entity.
+  useEffect(() => {
+    const fresh = loadNote(entityId);
+    setText(fresh?.text ?? "");
+    setSavedAt(fresh?.updatedAt ?? null);
+    setOpen(!!fresh?.text);
+  }, [entityId]);
+
+  // Debounced autosave.
+  useEffect(() => {
+    if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => {
+      saveNote(entityId, text);
+      if (text === "") {
+        setSavedAt(null);
+      } else {
+        setSavedAt(new Date().toISOString());
+      }
+    }, 800) as unknown as number;
+    return () => {
+      if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
+    };
+  }, [entityId, text]);
+
+  const handleClear = useCallback(() => {
+    if (text && !window.confirm(`Delete your note for "${entityTitle}"? This cannot be undone.`)) return;
+    setText("");
+    deleteNote(entityId);
+    setSavedAt(null);
+  }, [entityId, entityTitle, text]);
+
+  const handleExport = useCallback(() => {
+    const json = exportNotesJson();
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `atlas-player-notes-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleImport = useCallback((file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = importNotesJson(String(reader.result ?? ""));
+      if (result.imported > 0) {
+        toast.success(`Imported ${result.imported} note(s)`);
+        const fresh = loadNote(entityId);
+        setText(fresh?.text ?? "");
+        setSavedAt(fresh?.updatedAt ?? null);
+      } else if (result.errors.length > 0) {
+        toast.error(`Import failed: ${result.errors[0]}`);
+      } else {
+        toast.message("No notes to import");
+      }
+    };
+    reader.readAsText(file);
+  }, [entityId]);
+
+  return (
+    <div className="pt-3 border-t border-border">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span>My notes {savedAt && <span className="normal-case text-[10px] text-muted-foreground/70 ml-1">— saved {formatRelative(savedAt)}</span>}</span>
+        <span aria-hidden="true">{open ? "−" : "+"}</span>
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          <Textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Private notes for this entry. Stored only in your browser."
+            rows={6}
+            className="text-sm"
+            aria-label={`Private notes for ${entityTitle}`}
+          />
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-[10px] text-muted-foreground">
+              Stored locally in this browser. Never uploaded.
+            </p>
+            <div className="flex gap-1.5">
+              <Button size="sm" variant="ghost" onClick={handleExport} title="Export all your notes as JSON">
+                Export
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => importInputRef.current?.click()} title="Import notes from JSON">
+                Import
+              </Button>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleImport(f);
+                  e.target.value = "";
+                }}
+              />
+              {text.length > 0 && (
+                <Button size="sm" variant="ghost" onClick={handleClear} title="Clear this note">
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function EntityPanel(
   { entity, placements, onOpenEntity, onClose, onShowOnMap },
   ref
@@ -731,6 +876,8 @@ const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function Entity
             className="atlas-prose prose prose-sm max-w-none dark:prose-invert"
             dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(entity.bodyHtml) }}
           />
+
+          <NotesPanel entityId={entity.id} entityTitle={entity.title} />
 
           {entity.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-2">
