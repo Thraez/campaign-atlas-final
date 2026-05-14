@@ -5,10 +5,21 @@ import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  // Editor build gate. The /atlas/edit route and AtlasPlacementEditor are
+  // included only in development, the explicit "editor" mode, or when the
+  // INCLUDE_EDITOR env var is "true". Production player builds tree-shake
+  // the editor entirely (see src/App.tsx).
+  const includeEditor =
+    mode === "development" ||
+    mode === "editor" ||
+    process.env.INCLUDE_EDITOR === "true";
+
+  return {
   // For GitHub Pages project sites, set ATLAS_BASE=/<repo>/ at build time.
   // Defaults to "/" for local dev and Lovable preview.
   base: process.env.ATLAS_BASE || "/",
+  define: { __INCLUDE_EDITOR__: JSON.stringify(includeEditor) },
   server: {
     host: "::",
     port: 8080,
@@ -126,4 +137,5 @@ export default defineConfig(({ mode }) => ({
     },
     dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query", "@tanstack/query-core"],
   },
-}));
+  };
+});
