@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -96,5 +96,53 @@ describe("handleSaveRequest", () => {
     expect(r.status).toBe(200);
     const buf = fs.readFileSync(path.join(tmp, "content/world/notes/u.md"));
     expect(new TextDecoder("utf-8").decode(buf)).toBe(text);
+  });
+
+  describe("afterWrite (rebuild)", () => {
+    it("runs the afterWrite hook only after files are written successfully", async () => {
+      const seenAtHook: { ok: boolean } = { ok: false };
+      const afterWrite = async () => {
+        // File must already be on disk by the time the hook fires.
+        seenAtHook.ok = fs.existsSync(path.join(tmp, "content/world/notes/r.md"));
+        return { ok: true, durationMs: 1 };
+      };
+      const r = await handleSaveRequest(
+        { changes: [{ path: "content/world/notes/r.md", contents: "x" }] },
+        tmp,
+        { afterWrite },
+      );
+      expect(r.status).toBe(200);
+      expect(seenAtHook.ok).toBe(true);
+      const payload = (r as { payload: { build?: { ok: boolean } } }).payload;
+      expect(payload.build).toEqual({ ok: true, durationMs: 1 });
+    });
+
+    it("does NOT run afterWrite when validation fails", async () => {
+      const afterWrite = vi.fn();
+      const r = await handleSaveRequest(
+        { changes: [{ path: "src/App.tsx", contents: "x" }] },
+        tmp,
+        { afterWrite },
+      );
+      expect(r.status).toBe(400);
+      expect(afterWrite).not.toHaveBeenCalled();
+    });
+
+    it("returns a failed-build result without throwing when afterWrite rejects", async () => {
+      const afterWrite = async () => {
+        throw new Error("build crashed");
+      };
+      const r = await handleSaveRequest(
+        { changes: [{ path: "content/world/notes/r.md", contents: "x" }] },
+        tmp,
+        { afterWrite },
+      );
+      expect(r.status).toBe(200);
+      const payload = (r as { payload: { build?: { ok: boolean; stderr?: string } } }).payload;
+      expect(payload.build?.ok).toBe(false);
+      expect(payload.build?.stderr).toContain("build crashed");
+      // File was still written — the user has data on disk.
+      expect(fs.existsSync(path.join(tmp, "content/world/notes/r.md"))).toBe(true);
+    });
   });
 });

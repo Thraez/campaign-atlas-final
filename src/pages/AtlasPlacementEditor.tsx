@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { MapContainer, Marker, ImageOverlay, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode, Layers as LayersIcon, MapPin as PinIcon, Settings2, Package, FolderOpen, Shapes, Route as RouteIcon, CloudFog, BookOpen, ShieldCheck, Upload, Save as SaveIcon } from "lucide-react";
+import { ArrowLeft, Compass, Crosshair, RotateCcw, MapPin, Target, Trash2, Layers as LayersIcon, MapPin as PinIcon, Settings2, Package, FolderOpen, Shapes, Route as RouteIcon, CloudFog, BookOpen, ShieldCheck, Upload, Save as SaveIcon } from "lucide-react";
 import { toast } from "sonner";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity, MapDocument } from "@/atlas/content/schema";
@@ -30,6 +30,10 @@ import {
 import { ExportChangesModal } from "@/atlas/ExportChangesModal";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
 import type { FileChange } from "@/atlas/save/localFsSave";
+import {
+  buildCanonicalPlacementChanges,
+  CanonicalSaveError,
+} from "@/atlas/save/canonicalPlacementSave";
 import { ImportPanel } from "@/atlas/import/ImportPanel";
 import { TabFrame } from "@/atlas/tabs/TabFrame";
 import { RegionsTab } from "@/atlas/tabs/RegionsTab";
@@ -171,6 +175,17 @@ export default function AtlasPlacementEditor() {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
+  }, [overrides]);
+
+  // Stamp a local edit timestamp on every override mutation AFTER mount.
+  // The first render (hydration from localStorage) doesn't count as an edit.
+  const overridesMountedRef = useRef(false);
+  useEffect(() => {
+    if (!overridesMountedRef.current) {
+      overridesMountedRef.current = true;
+      return;
+    }
+    setLastLocalEditAt(Date.now());
   }, [overrides]);
 
   // Optional in-session, per-map settings override (size + ocean + wrapX + grid).
@@ -367,6 +382,11 @@ export default function AtlasPlacementEditor() {
   const [mapImportOpen, setMapImportOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<FileChange[]>([]);
+  // Timestamp of the most recent local edit, and of the most recent successful
+  // canonical save. When editAt > saveAt, the unsaved-changes banner shows.
+  const [lastLocalEditAt, setLastLocalEditAt] = useState<number | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   // Per-tab last-export timestamps so each tab header can show its own status.
   const [tabExportAt, setTabExportAt] = useState<Record<string, number>>({});
   const markTabExport = (tab: string) => setTabExportAt((s) => ({ ...s, [tab]: Date.now() }));
@@ -386,34 +406,63 @@ export default function AtlasPlacementEditor() {
   };
 
   /**
-   * Save: build the SAME placement patch artifact Export Patch produces, then
-   * route it through saveAtlasPatchToLocalFs (dev-only Vite plugin → disk).
-   * No GitHub API. Target path lives under the world's _atlas folder so the
-   * source-path allowlist accepts it.
+   * Save: rewrite the canonical entity .md frontmatter for every drafted
+   * placement, route it through /__atlas/save (dev-only Vite plugin → disk),
+   * and trigger an atlas rebuild so the player view picks up the changes
+   * without leaving the browser.
+   *
+   * No GitHub API. The dev plugin's allowlist only accepts content/**\/*.md
+   * and content/**\/_atlas/*.yaml so even a buggy client cannot widen the
+   * surface.
    */
-  const onSaveClick = () => {
+  const onSaveClick = async () => {
     if (!project || !activeMap) return;
     const drafts = buildDraftPlacements();
     if (drafts.length === 0) {
       toast.info("No changes to save");
       return;
     }
-    const artifact = buildPlacementPatch({ project, mapId: activeMap.id, placements: drafts });
-    const result = validatePatchYaml(artifact.content, "placement");
-    if (!result.ok) {
-      toast.error(`Patch validation failed: ${result.errors[0]}`);
-      return;
+    setSaveError(null);
+    const entitiesById = new Map(project.entities.map((e) => [e.id, e]));
+    try {
+      const changes = await buildCanonicalPlacementChanges(drafts, entitiesById);
+      if (changes.length === 0) {
+        toast.info("No canonical changes to write");
+        return;
+      }
+      setPendingChanges(changes);
+      setSaveModalOpen(true);
+    } catch (err) {
+      const msg = err instanceof CanonicalSaveError
+        ? err.message
+        : err instanceof Error ? err.message : String(err);
+      setSaveError(msg);
+      toast.error(`Could not prepare save: ${msg}`);
     }
-    const change: FileChange = {
-      path: `content/${activeMap.worldId}/_atlas/${artifact.filename}`,
-      contents: artifact.content,
-    };
-    setPendingChanges([change]);
-    setSaveModalOpen(true);
   };
 
   const dirtyCount = Object.keys(overrides).filter((k) => activeMap && k.startsWith(`${activeMap.id}:`)).length;
   const draftStatus = classifyDraftStatus({ dirtyCount, lastExportAt });
+  // Unsaved-changes signal: there are local overrides AND there was an edit
+  // since the last successful save. Avoids nagging when overrides are just
+  // hydrated from a prior session that was already saved.
+  const hasUnsavedChanges =
+    dirtyCount > 0 &&
+    lastLocalEditAt !== null &&
+    (lastSavedAt === null || lastLocalEditAt > lastSavedAt);
+
+  // Browser-level guard: warn before tab close / reload if there are
+  // unsaved drafts. The custom message is browser-controlled in modern
+  // browsers (just shows a generic prompt) — the point is the prompt.
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // Project-wide validation, scoped per tab so each tab badge shows its own counts.
   const draftPlacementsForValidation = useMemo(() => buildDraftPlacements(), [buildDraftPlacements]);
@@ -463,14 +512,27 @@ export default function AtlasPlacementEditor() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
+      {hasUnsavedChanges && (
+        <div className="px-3 py-1.5 text-[11px] bg-amber-500/15 text-amber-100 border-b border-amber-500/30 flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2 min-w-0">
+            <span aria-hidden>●</span>
+            <span className="truncate">
+              <strong>{dirtyCount} unsaved change{dirtyCount === 1 ? "" : "s"}</strong> on this map — kept only in your browser until you click Save.
+            </span>
+          </span>
+          <Button size="sm" variant="default" className="h-6 px-2 text-[10px]" onClick={onSaveClick}>
+            Save now
+          </Button>
+        </div>
+      )}
       <div className="px-3 py-1.5 text-[11px] bg-primary/10 text-foreground border-b border-primary/20 flex items-center justify-between gap-2">
         <span
           className="flex items-center gap-2 min-w-0"
-          title="YAML canon (committed) → local draft (this browser) → exported patch → committed to GitHub → generated runtime atlas.json"
+          title="YAML canon (committed) → local draft (this browser) → Save (dev plugin writes canon + rebuilds atlas) → git commit"
         >
           <DraftStatusBadge status={draftStatus} />
           <span className="truncate">
-            <strong>YAML is canon.</strong> Edits here are local drafts — export a patch and commit it to publish.
+            <strong>YAML is canon.</strong> Save writes directly to your entity .md files and rebuilds the atlas — commit with git when ready.
           </span>
         </span>
         <Link to="/" className="text-primary hover:underline shrink-0">← Back</Link>
@@ -503,24 +565,24 @@ export default function AtlasPlacementEditor() {
         <Button variant="ghost" size="sm" onClick={() => { setOverrides({}); toast.info("Cleared overrides"); }} title="Discard local changes">
           <RotateCcw className="h-4 w-4" />
         </Button>
-        <Button variant="default" size="sm" onClick={() => setExportModalOpen(true)} className="gap-1" title="Open the unified export modal">
-          <Package className="h-4 w-4" /><span className="hidden md:inline">Export DM Changes</span>
-        </Button>
         <Button
           variant="default"
           size="sm"
           onClick={onSaveClick}
           disabled={saveModalOpen}
           className="gap-1"
-          title="Write changes to your local repository (then commit with git)."
+          title="Write canonical .md frontmatter and rebuild the atlas. Commit with git when ready."
         >
           <SaveIcon className="h-4 w-4" /><span className="hidden md:inline">Save</span>
         </Button>
-        <Button variant="ghost" size="sm" onClick={exportPatch} className="gap-1" title="Quick: download placements .yaml">
-          <FileCode className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="sm" onClick={exportJson} className="gap-1" title="Quick: download placements .json">
-          <Download className="h-4 w-4" />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setExportModalOpen(true)}
+          className="gap-1 text-muted-foreground"
+          title="Offline export — advanced. Generate YAML/JSON patch files for manual merge or apply-placements. Not needed for normal workflow."
+        >
+          <Package className="h-4 w-4" /><span className="hidden lg:inline text-[11px]">Offline export</span>
         </Button>
         <Button asChild variant="ghost" size="sm">
           <Link to="/atlas">View as player →</Link>
@@ -850,6 +912,33 @@ export default function AtlasPlacementEditor() {
       <DiffPreviewModal
         open={saveModalOpen}
         changes={pendingChanges}
+        rebuildAfterSave={true}
+        onSaved={(result) => {
+          setLastSavedAt(Date.now());
+          // Clear local overrides for the active map — they now live in canon.
+          const writtenPaths = new Set(result.paths);
+          const writtenEntityIds = new Set(
+            project.entities
+              .filter((e) => writtenPaths.has(e.sourcePath))
+              .map((e) => e.id),
+          );
+          setOverrides((o) => {
+            const next = { ...o };
+            for (const k of Object.keys(next)) {
+              const [mid, eid] = k.split(":");
+              if (mid === activeMap.id && writtenEntityIds.has(eid)) {
+                delete next[k];
+              }
+            }
+            return next;
+          });
+          // Refresh canon (only meaningful if rebuild succeeded).
+          if (result.build?.ok !== false) {
+            loadAtlasContent(true).then((p) => {
+              setProject(p);
+            }).catch(() => { /* keep current; user can reload manually */ });
+          }
+        }}
         onClose={() => setSaveModalOpen(false)}
       />
     </div>

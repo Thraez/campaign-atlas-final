@@ -24,6 +24,10 @@ export interface DiffPreviewModalProps {
   changes: FileChange[];
   /** Optional map of path → current on-disk text, for diff line counts. */
   previousContents?: Record<string, string>;
+  /** When true, ask the dev plugin to run `atlas:build` after writes. */
+  rebuildAfterSave?: boolean;
+  /** Called after a successful save+rebuild (or just save if rebuild is off). */
+  onSaved?: (result: LocalSaveResult) => void;
   onClose: () => void;
 }
 
@@ -66,7 +70,7 @@ function diffLines(prev: string, next: string): DiffStat {
   return { added, removed, unified: lines.join("\n") };
 }
 
-export function DiffPreviewModal({ open, changes, previousContents, onClose }: DiffPreviewModalProps) {
+export function DiffPreviewModal({ open, changes, previousContents, rebuildAfterSave, onSaved, onClose }: DiffPreviewModalProps) {
   const [phase, setPhase] = useState<Phase>({ kind: "review" });
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
 
@@ -87,8 +91,9 @@ export function DiffPreviewModal({ open, changes, previousContents, onClose }: D
   const runSave = async () => {
     setPhase({ kind: "saving" });
     try {
-      const result = await saveAtlasPatchToLocalFs(changes);
+      const result = await saveAtlasPatchToLocalFs(changes, undefined, { rebuild: !!rebuildAfterSave });
       setPhase({ kind: "success", result });
+      onSaved?.(result);
     } catch (err: unknown) {
       if (err instanceof DisallowedPathError) {
         setPhase({ kind: "disallowed", path: err.path });
@@ -112,7 +117,11 @@ export function DiffPreviewModal({ open, changes, previousContents, onClose }: D
             <DialogHeader>
               <DialogTitle>Wrote {phase.result.written} file{phase.result.written === 1 ? "" : "s"}.</DialogTitle>
               <DialogDescription>
-                Run <code className="font-mono">git status</code> in your terminal to see the changes. Commit with git when ready.
+                {phase.result.build
+                  ? phase.result.build.ok
+                    ? `Atlas rebuilt in ${phase.result.build.durationMs} ms. Reload /atlas to see the changes.`
+                    : "Files saved, but the atlas rebuild failed — see details below."
+                  : "Run npm run atlas:build to regenerate atlas.json, then reload /atlas."}
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="flex-1 pr-3 -mr-3">
@@ -121,6 +130,11 @@ export function DiffPreviewModal({ open, changes, previousContents, onClose }: D
                   <li key={p}>{p}</li>
                 ))}
               </ul>
+              {phase.result.build && !phase.result.build.ok && phase.result.build.stderr && (
+                <pre className="mt-3 text-[10px] font-mono whitespace-pre-wrap bg-destructive/10 border border-destructive/30 rounded p-2 max-h-48 overflow-auto">
+                  {phase.result.build.stderr}
+                </pre>
+              )}
             </ScrollArea>
             <div className="flex justify-end pt-2">
               <Button onClick={onClose}>Done</Button>

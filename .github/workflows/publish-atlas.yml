@@ -61,6 +61,14 @@ jobs:
           npm run atlas:check-secrets public/atlas
           npm run atlas:check-shape public/atlas/atlas.json
 
+      - name: Scan built artifact for derived-secret leaks
+        # Names/aliases of dm/hidden entities derived from the source vault
+        # must not appear in the player artifact. Catches the gap that static
+        # sentinels can't: real campaign secret names introduced by the DM.
+        run: |
+          npm run atlas:check-derived dist
+          npm run atlas:check-derived public/atlas
+
       - name: Add SPA 404 fallback
         # GitHub Pages serves 404.html for any unknown path. Cloning index.html
         # lets React Router handle deep links and refreshes on /atlas/*.

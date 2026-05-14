@@ -63,10 +63,38 @@ describe("DiffPreviewModal", () => {
     render(<DiffPreviewModal open changes={sampleChanges} onClose={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: "Save to disk" }));
     await waitFor(() => screen.getByText(/Wrote 1 file\./));
-    expect(mockedSave).toHaveBeenCalledWith(sampleChanges);
-    expect(screen.getByText(/git status/)).toBeTruthy();
+    expect(mockedSave).toHaveBeenCalledWith(sampleChanges, undefined, { rebuild: false });
     expect(screen.getByText("content/world/_atlas/placements-patch-m1.yaml")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
+  });
+
+  it("rebuildAfterSave forwards rebuild:true to saveAtlasPatchToLocalFs and surfaces build result", async () => {
+    mockedSave.mockResolvedValue({
+      written: 1,
+      paths: ["content/world/notes/x.md"],
+      build: { ok: true, durationMs: 1234 },
+    });
+    render(<DiffPreviewModal open changes={sampleChanges} rebuildAfterSave onClose={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Save to disk" }));
+    await waitFor(() => screen.getByText(/Wrote 1 file\./));
+    expect(mockedSave).toHaveBeenCalledWith(sampleChanges, undefined, { rebuild: true });
+    expect(screen.getByText(/Atlas rebuilt in 1234 ms/)).toBeTruthy();
+  });
+
+  it("onSaved fires after a successful save", async () => {
+    mockedSave.mockResolvedValue({
+      written: 1,
+      paths: ["content/world/notes/x.md"],
+    });
+    const onSaved = vi.fn();
+    render(<DiffPreviewModal open changes={sampleChanges} onSaved={onSaved} onClose={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Save to disk" }));
+    await waitFor(() => screen.getByText(/Wrote 1 file\./));
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    expect(onSaved).toHaveBeenCalledWith({
+      written: 1,
+      paths: ["content/world/notes/x.md"],
+    });
   });
 
   it("DisallowedPathError renders allowlist message and offending path", async () => {
