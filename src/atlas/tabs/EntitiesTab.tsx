@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DmMaskingTextarea } from "@/atlas/DmMaskingTextarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TabFrame } from "./TabFrame";
 import { buildEntityFrontmatterPatch, type EntityFrontmatterPatch } from "@/atlas/yaml/buildPatches";
@@ -207,10 +208,10 @@ function EntityForm({
       </div>
       <div>
         <Label className="text-[10px]">Summary</Label>
-        <Textarea
+        <DmMaskingTextarea
           rows={2}
           value={v("summary", entity.summary ?? "")}
-          onChange={(e) => setDraft({ summary: e.target.value })}
+          onChange={(next) => setDraft({ summary: next })}
           className="text-xs"
         />
       </div>
@@ -275,11 +276,11 @@ function ProfileSection({
         {PLAYER_PROFILE_FIELDS.map((f) => (
           <div key={f.key}>
             <Label className="text-[10px]">{f.label}</Label>
-            <Textarea
+            <DmMaskingTextarea
               rows={2}
               placeholder={f.placeholder}
               value={(player as Record<string, string>)[f.key] ?? ""}
-              onChange={(e) => onSetPlayer(f.key, e.target.value)}
+              onChange={(next) => onSetPlayer(f.key, next)}
               className="text-xs"
             />
           </div>

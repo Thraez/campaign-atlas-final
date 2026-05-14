@@ -38,11 +38,15 @@ const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 import { resolvePinStyle, pinSvg, type PinPreset } from "@/atlas/pins/presets";
 
 function pinIconForStyle(style: PinPreset, opts?: { dim?: boolean }): L.DivIcon {
+  // iconSize defines the hit area Leaflet uses for click/touch dispatch. The
+  // visual SVG is smaller (~22px) but we expose a 44x44 hit area so mobile
+  // touch targets meet WCAG 2.5.5 (Target Size, Level AAA). The SVG centers
+  // visually inside the box via the `atlas-viewer-pin` CSS rule.
   return L.divIcon({
     className: "atlas-viewer-pin",
     html: pinSvg({ color: style.color, shape: style.shape }, { dim: opts?.dim }),
-    iconSize: [22, 22],
-    iconAnchor: [11, 20],
+    iconSize: [44, 44],
+    iconAnchor: [22, 36],
   });
 }
 
@@ -244,10 +248,41 @@ export default function AtlasViewer() {
     );
   }
 
-  if (!data || !activeMap) {
+  if (!data) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-background text-muted-foreground">
         Loading atlas…
+      </div>
+    );
+  }
+
+  // Atlas loaded but no map to render — either world.yaml has zero maps or
+  // every map was filtered out. Give the user useful guidance instead of an
+  // indefinite loading spinner.
+  if (!activeMap) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-background text-foreground p-6 text-center">
+        <div className="max-w-md space-y-3">
+          <Compass className="h-10 w-10 mx-auto text-primary opacity-70" aria-hidden="true" />
+          <h1 className="font-display text-2xl text-primary">Atlas has no maps yet</h1>
+          <p className="text-sm text-muted-foreground">
+            The atlas published, but no map is configured for this world. Add at least one
+            map block to <code className="px-1 py-0.5 rounded bg-muted">content/&lt;world&gt;/_atlas/world.yaml</code>
+            and run <code className="px-1 py-0.5 rounded bg-muted">npm run atlas:build</code> to regenerate.
+          </p>
+          {data.project.entities.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {data.project.entities.length} entities are present — they're searchable via the search palette
+              even without a map.
+            </p>
+          )}
+          <div className="flex justify-center gap-2 pt-2">
+            <Button onClick={() => setSearchOpen(true)} variant="default" className="gap-2">
+              <Search className="h-4 w-4" /> Search entities (Ctrl+K)
+            </Button>
+            <Button asChild variant="secondary"><Link to="/"><ArrowLeft className="h-4 w-4 mr-1" />Home</Link></Button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -814,7 +849,18 @@ const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function Entity
     <div className="flex flex-col h-full">
       <div className="flex items-start justify-between gap-2 px-4 py-3 border-b border-border">
         <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{entity.type}</div>
+          <div className="flex items-center gap-1.5">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{entity.type}</div>
+            {entity.visibility === "rumor" && (
+              <Badge
+                variant="outline"
+                className="text-[9px] uppercase tracking-wider border-amber-500/40 text-amber-500 px-1.5 py-0 h-4"
+                title="Rumored — players have heard of this, but it is not confirmed canon."
+              >
+                Rumored — uncertain
+              </Badge>
+            )}
+          </div>
           <h2 className="font-display text-xl text-foreground truncate">{entity.title}</h2>
           {entity.aliases.length > 0 && (
             <div className="text-xs text-muted-foreground mt-0.5">aka {entity.aliases.join(", ")}</div>
@@ -844,19 +890,12 @@ const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function Entity
           {entity.images.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
               {entity.images.map((src, i) => (
-                <button
+                <ImageThumb
                   key={`${src}-${i}`}
+                  src={imageUrl(src)}
+                  alt={`${entity.title} image ${i + 1}`}
                   onClick={() => setLightboxSrc(imageUrl(src))}
-                  className="flex-shrink-0 rounded border border-border overflow-hidden hover:border-primary transition focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <img
-                    src={imageUrl(src)}
-                    alt={`${entity.title} image ${i + 1}`}
-                    className="h-24 w-24 object-cover block"
-                    loading="lazy"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                  />
-                </button>
+                />
               ))}
             </div>
           )}
@@ -936,6 +975,77 @@ interface SearchProps {
   onClose: () => void;
 }
 
+/**
+ * Hook: fetch `.last-published.json` (the publish-baseline snapshot written by
+ * the `atlas:snapshot` script) and compute the set of entity ids that exist in
+ * the CURRENT atlas but did NOT exist in the previous published one — i.e.
+ * "recently revealed" since the last publish. Returns null while loading or
+ * if the baseline doesn't exist (in which case the filter is unavailable).
+ */
+function useRecentlyRevealedIds(): Set<string> | null {
+  const [ids, setIds] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    const base = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "/");
+    Promise.all([
+      fetch(`${base}atlas/atlas.json`, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)),
+      fetch(`${base}atlas/.last-published.json`, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([current, baseline]) => {
+        if (!mounted) return;
+        if (!current || !baseline) {
+          setIds(null);
+          return;
+        }
+        const baseIds = new Set<string>((baseline.entities ?? []).map((e: { id: string }) => e.id));
+        const out = new Set<string>();
+        for (const e of (current.entities ?? []) as Array<{ id: string }>) {
+          if (!baseIds.has(e.id)) out.add(e.id);
+        }
+        setIds(out);
+      })
+      .catch(() => {
+        if (mounted) setIds(null);
+      });
+    return () => { mounted = false; };
+  }, []);
+  return ids;
+}
+
+/**
+ * Image thumbnail with broken-image placeholder.
+ * Replaces the previous `style.display = none` hide-on-error, which silently
+ * suppressed broken thumbnails. A visible placeholder tells the DM "this
+ * image is referenced but missing" instead of "this entity has no images."
+ */
+function ImageThumb({ src, alt, onClick }: { src: string; alt: string; onClick: () => void }) {
+  const [broken, setBroken] = useState(false);
+  if (broken) {
+    return (
+      <div
+        className="flex-shrink-0 rounded border border-dashed border-border bg-muted/30 h-24 w-24 flex items-center justify-center text-[10px] text-muted-foreground text-center px-1.5 leading-tight"
+        title={`Image failed to load: ${src}`}
+      >
+        Image missing
+      </div>
+    );
+  }
+  return (
+    <button
+      onClick={onClick}
+      className="flex-shrink-0 rounded border border-border overflow-hidden hover:border-primary transition focus:outline-none focus:ring-2 focus:ring-primary"
+    >
+      <img
+        src={src}
+        alt={alt}
+        className="h-24 w-24 object-cover block"
+        loading="lazy"
+        onError={() => setBroken(true)}
+      />
+    </button>
+  );
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c] as string));
 }
@@ -958,6 +1068,11 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
   const [activeType, setActiveType] = useState<string | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(-1);
+  /** "This map only" — restricts results to entities placed on the current map. */
+  const [thisMapOnly, setThisMapOnly] = useState(false);
+  /** "Recently revealed" — entities not present in the previous publish snapshot. */
+  const [recentOnly, setRecentOnly] = useState(false);
+  const recentlyRevealed = useRecentlyRevealedIds();
   const listRef = useRef<HTMLDivElement>(null);
 
   const allTypes = useMemo(() => {
@@ -977,6 +1092,8 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
     let pool = index;
     if (activeType) pool = pool.filter((e) => e.type === activeType);
     if (activeTag) pool = pool.filter((e) => e.tags.includes(activeTag));
+    if (thisMapOnly) pool = pool.filter((e) => placedIds.has(e.id));
+    if (recentOnly && recentlyRevealed) pool = pool.filter((e) => recentlyRevealed.has(e.id));
     if (!q) return pool.slice(0, 40).map((e) => ({ e, snip: null as string | null }));
 
     const score = (e: SearchIndexEntry): number => {
@@ -997,12 +1114,12 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
       .sort((a, b) => b.s - a.s)
       .slice(0, 40)
       .map(({ e }) => ({ e, snip: snippet(e.body, q) }));
-  }, [query, index, activeType, activeTag]);
+  }, [query, index, activeType, activeTag, thisMapOnly, placedIds, recentOnly, recentlyRevealed]);
 
   // Reset selection when filters or query change.
   useEffect(() => {
     setActiveIndex(-1);
-  }, [query, activeType, activeTag]);
+  }, [query, activeType, activeTag, thisMapOnly, recentOnly]);
 
   // Scroll active item into view.
   useEffect(() => {
@@ -1051,8 +1168,28 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
           </Link>
         </div>
 
+        <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-border/50 bg-muted/20">
+          <button
+            onClick={() => setThisMapOnly((v) => !v)}
+            className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded inline-flex items-center gap-1 ${thisMapOnly ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+            title={thisMapOnly ? "Showing only entities placed on the current map" : "Search within all maps"}
+            aria-pressed={thisMapOnly}
+          >
+            <MapPin className="h-3 w-3" /> {thisMapOnly ? "this map" : "all maps"}
+          </button>
+          {recentlyRevealed && recentlyRevealed.size > 0 && (
+            <button
+              onClick={() => setRecentOnly((v) => !v)}
+              className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded inline-flex items-center gap-1 ${recentOnly ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+              title={`${recentlyRevealed.size} entities revealed since the last publish`}
+              aria-pressed={recentOnly}
+            >
+              <CalendarClock className="h-3 w-3" /> recent ({recentlyRevealed.size})
+            </button>
+          )}
+          <span className="w-full h-0" />
         {(allTypes.length > 1 || allTags.length > 0) && (
-          <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-border/50 bg-muted/20">
+          <>
             <button
               onClick={() => setActiveType(null)}
               className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === null ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
@@ -1078,8 +1215,9 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
                 #{t} <span className="opacity-60">{n}</span>
               </button>
             ))}
-          </div>
+          </>
         )}
+        </div>
 
         <div ref={listRef} className="max-h-[60vh] overflow-y-auto">
           {results.length === 0 ? (

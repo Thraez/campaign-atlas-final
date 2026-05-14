@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { TabFrame } from "./TabFrame";
 import { downloadText } from "./download";
 import { BuildReportPanel } from "@/atlas/publish/BuildReportPanel";
+import { PublishedDiffPanel } from "@/atlas/publish/PublishedDiffPanel";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -126,6 +127,13 @@ export function PublishCheckTab({
         <Button size="sm" variant="outline" onClick={downloadReport} className="h-7 gap-1 text-xs">
           <FileDown className="h-3.5 w-3.5" /> Download report
         </Button>
+      </div>
+
+      {/* Diff vs last published — fetches .last-published.json snapshot
+          written by `npm run atlas:snapshot` and compares to the loaded
+          atlas.json. Answers "what will players see that's new?" */}
+      <div className="pt-1">
+        <PublishedDiffPanel current={project} />
       </div>
 
       {/* Build/CI report (loaded from public/atlas/atlas.json buildReport).

@@ -140,21 +140,42 @@ export function ImportPanel({ knownEntityNames }: { knownEntityNames?: Set<strin
     return out;
   }, [filtered, overrides]);
 
+  // Per-file flags computed from cross-file state. Surfaced in the UI as
+  // warning badges so the DM sees the problem before exporting a patch.
+  const dupSet = useMemo(() => {
+    // 1. Pre-existing canon collision: this file's slug already maps to a
+    //    known entity (id, title, or alias) in the loaded project.
+    // 2. Within-batch collision: two files in this import would produce the
+    //    same slug (build would later reject with `duplicate slug`).
+    const dups = new Set<string>();
+    const slugCount = new Map<string, number>();
+    for (const f of files) slugCount.set(f.suggestedId.toLowerCase(), (slugCount.get(f.suggestedId.toLowerCase()) ?? 0) + 1);
+    for (const f of files) {
+      const slug = f.suggestedId.toLowerCase();
+      const collidesWithCanon = knownEntityNames?.has(slug) || knownEntityNames?.has(f.title.toLowerCase());
+      const collidesWithinBatch = (slugCount.get(slug) ?? 0) > 1;
+      if (collidesWithCanon || collidesWithinBatch) dups.add(f.relPath);
+    }
+    return dups;
+  }, [files, knownEntityNames]);
+
   const summary = useMemo(() => {
     let withFm = 0,
       missingFm = 0,
       missingAttachments = 0,
       brokenLinks = 0,
-      playerWarnings = 0;
+      playerWarnings = 0,
+      duplicates = 0;
     for (const f of files) {
       if (f.hasFrontmatter) withFm++;
       else missingFm++;
       missingAttachments += f.attachments.filter((a) => !a.resolved && !a.rawSrc.startsWith("/")).length;
       brokenLinks += f.wikilinks.filter((w) => w.broken).length;
       if (effectiveLevel(f) === "player-published" && f.warnings.length > 0) playerWarnings++;
+      if (dupSet.has(f.relPath)) duplicates++;
     }
-    return { withFm, missingFm, missingAttachments, brokenLinks, playerWarnings };
-  }, [files, overrides]);
+    return { withFm, missingFm, missingAttachments, brokenLinks, playerWarnings, duplicates };
+  }, [files, overrides, dupSet]);
 
   /** Build EntityFrontmatterPatch[] for the chosen files. */
   const collectPatches = (relPaths: Iterable<string>, opts: { safeOnly?: boolean } = {}): EntityFrontmatterPatch[] => {
@@ -253,7 +274,15 @@ export function ImportPanel({ knownEntityNames }: { knownEntityNames?: Set<strin
               <Stat label="Missing frontmatter" value={summary.missingFm} tone={summary.missingFm ? "warn" : undefined} />
               <Stat label="Unresolved wikilinks" value={summary.brokenLinks} tone={summary.brokenLinks ? "warn" : undefined} />
               <Stat label="Missing attachments" value={summary.missingAttachments} tone={summary.missingAttachments ? "warn" : undefined} />
+              <Stat label="Duplicate titles" value={summary.duplicates} tone={summary.duplicates ? "warn" : undefined} />
             </div>
+            {summary.duplicates > 0 && (
+              <div className="rounded border border-amber-500/40 bg-amber-500/5 text-[10px] p-2 text-amber-100">
+                <strong>{summary.duplicates} file{summary.duplicates === 1 ? "" : "s"}</strong> would
+                collide with an existing entity slug (or with another file in this batch). The build
+                will fail with "duplicate slug" — rename, set <code>atlas.id</code>, or skip.
+              </div>
+            )}
             <Input placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} className="h-7 text-xs" />
             <div className="flex gap-1.5">
               <Button size="sm" variant="default" className="flex-1 gap-1.5" onClick={exportSelected} disabled={selected.size === 0}>

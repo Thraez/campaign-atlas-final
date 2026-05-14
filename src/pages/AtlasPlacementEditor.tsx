@@ -167,6 +167,52 @@ export default function AtlasPlacementEditor() {
     }).catch((e: Error) => setError(e.message));
   }, []);
 
+  // Save-conflict detector: poll atlas.json every 30s while the editor is
+  // mounted. If `publishedAt` has changed since load, a rebuild happened
+  // externally (Obsidian + `npm run atlas:build`, another save plugin
+  // invocation, etc.). Surface a toast so the DM can `Reload canon` before
+  // their next save overwrites someone else's edits.
+  const [externalRebuildAt, setExternalRebuildAt] = useState<string | null>(null);
+  useEffect(() => {
+    if (!project) return;
+    const loadedAt = project.publishedAt;
+    let timer: number | undefined;
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const fresh = await loadAtlasContent(true);
+        if (cancelled) return;
+        if (fresh.publishedAt && fresh.publishedAt !== loadedAt && fresh.publishedAt !== externalRebuildAt) {
+          setExternalRebuildAt(fresh.publishedAt);
+          toast.warning("Canon rebuilt externally", {
+            description: "Atlas was regenerated since you opened the editor. Reload to see the new canon before saving.",
+            duration: 8000,
+          });
+        }
+      } catch { /* network blip; retry next tick */ }
+      timer = window.setTimeout(tick, 30_000);
+    };
+    timer = window.setTimeout(tick, 30_000);
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+    // Re-arm only on initial project load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.publishedAt]);
+
+  const reloadCanon = useCallback(async () => {
+    try {
+      const fresh = await loadAtlasContent(true);
+      setProject(fresh);
+      setExternalRebuildAt(null);
+      toast.success("Canon reloaded from disk");
+    } catch (e) {
+      toast.error(`Reload failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, []);
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
   }, [overrides]);
@@ -486,6 +532,23 @@ export default function AtlasPlacementEditor() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
+      {externalRebuildAt && (
+        <div className="px-3 py-1.5 text-[11px] bg-orange-500/15 text-orange-100 border-b border-orange-500/30 flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2 min-w-0">
+            <span aria-hidden>⚠</span>
+            <span className="truncate">
+              <strong>Canon rebuilt externally</strong> — atlas.json changed on disk since you opened the editor.
+              {hasUnsavedChanges
+                ? " Save your local changes first, or "
+                : " "}
+              reload to see the latest canon before editing.
+            </span>
+          </span>
+          <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={reloadCanon}>
+            Reload canon
+          </Button>
+        </div>
+      )}
       {hasUnsavedChanges && (
         <div className="px-3 py-1.5 text-[11px] bg-amber-500/15 text-amber-100 border-b border-amber-500/30 flex items-center justify-between gap-2">
           <span className="flex items-center gap-2 min-w-0">
