@@ -726,6 +726,32 @@ pins outside bounds
 route/region/fog problems
 local draft changes not exported
 ---
+## Save workflow (local repo)
+
+The editor writes directly to your local repository via the Vite dev server. There is no GitHub API, no token, no PR — you control git fully.
+
+Daily flow:
+
+1. `cd C:\path\to\campaign-atlas-final`
+2. `npm run dev`
+3. Open `http://localhost:8080/atlas/edit`
+4. Edit pins, regions, routes, fog, layers visually.
+5. Click **Save**; review the diff; click **Save to disk**.
+6. Files are now modified on disk. Run `git status` to see what changed.
+7. `git add <paths>`, `git commit -m "..."`, `git push`.
+8. The publish workflow runs on push; check the Actions tab.
+
+Safety guards (always in place):
+
+- The save endpoint at `/__atlas/save` only exists during `npm run dev`. Production builds physically do not contain it — the Vite plugin uses `apply: "serve"`, and a post-build sentinel scan verifies the endpoint string is absent from `dist/`.
+- The endpoint refuses to write any path outside the source allowlist: `content/**/_atlas/*.yaml`, `content/**/_atlas/*.yml`, and `content/**/*.md`. Even a buggy or malicious payload cannot touch `package.json`, `public/atlas/`, `.github/`, or any generated file.
+- The editor route `/atlas/edit` is also excluded from production builds via `__INCLUDE_EDITOR__` gating.
+
+Scope: the Save button reuses the same payload as Export Patch. For data Export Patch doesn't handle (e.g., creating brand-new markdown lore files), edit those files directly in your editor of choice and commit them yourself, or use the existing Obsidian import flow.
+
+Fallback: Export Patch is still available. It downloads a `.yaml` patch file you can paste anywhere (GitHub web edit, Lovable chat, etc.). Use it when you're editing from a machine that doesn't have the repo cloned, or when you want a portable patch file for review.
+
+---
 DM tools flag
 The public player atlas should not advertise editor entry points.
 DM tools are controlled by:
