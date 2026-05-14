@@ -29,7 +29,7 @@ describe("handleSaveRequest", () => {
       tmp,
     );
     expect(r.status).toBe(400);
-    expect(r.payload.error).toBe("DisallowedPath");
+    expect((r.payload as { error?: string }).error).toBe("DisallowedPath");
     expect(fs.existsSync(path.join(tmp, "src/App.tsx"))).toBe(false);
   });
 
@@ -45,7 +45,7 @@ describe("handleSaveRequest", () => {
       tmp,
     );
     expect(r.status).toBe(400);
-    expect(r.payload.error).toBe("DisallowedPath");
+    expect((r.payload as { error?: string }).error).toBe("DisallowedPath");
     expect(fs.existsSync(path.join(tmp, "content/world/notes/a.md"))).toBe(false);
     expect(fs.existsSync(path.join(tmp, "content/world/notes/b.md"))).toBe(false);
     expect(fs.existsSync(path.join(tmp, "package.json"))).toBe(false);
@@ -58,20 +58,20 @@ describe("handleSaveRequest", () => {
       tmp,
     );
     expect(r.status).toBe(400);
-    expect(r.payload.error).toBe("OversizedContent");
+    expect((r.payload as { error?: string }).error).toBe("OversizedContent");
     expect(fs.existsSync(path.join(tmp, "content/world/notes/big.md"))).toBe(false);
   });
 
   it("rejects malformed body", async () => {
     const r = await handleSaveRequest({ nope: true }, tmp);
     expect(r.status).toBe(400);
-    expect(r.payload.error).toBe("InvalidBody");
+    expect((r.payload as { error?: string }).error).toBe("InvalidBody");
   });
 
   it("rejects empty changes array", async () => {
     const r = await handleSaveRequest({ changes: [] }, tmp);
     expect(r.status).toBe(400);
-    expect(r.payload.error).toBe("InvalidBody");
+    expect((r.payload as { error?: string }).error).toBe("InvalidBody");
   });
 
   it("creates missing parent directories", async () => {
