@@ -73,6 +73,24 @@ interface Overrides {
 
 const overrideKey = (mapId: string, entityId: string) => `${mapId}:${entityId}`;
 
+/**
+ * Boundary-validate an overrides JSON string from localStorage. Malformed
+ * entries (corrupt browser storage, hand-edited DevTools) are dropped per
+ * key rather than crashing the editor. Returns an empty object on total
+ * failure.
+ */
+function safeParseOverrides(raw: string): Overrides {
+  let json: unknown;
+  try { json = JSON.parse(raw); } catch { return {}; }
+  const parsed = overridesSchema.safeParse(json);
+  if (!parsed.success) return {};
+  const out: Overrides = {};
+  for (const [k, v] of Object.entries(parsed.data)) {
+    out[k] = v as Override;
+  }
+  return out;
+}
+
 function pinDivIcon(color: string, shape: import("@/atlas/pins/presets").PinShape, opts?: { pulse?: boolean }): L.DivIcon {
   return L.divIcon({
     className: "atlas-edit-pin",
