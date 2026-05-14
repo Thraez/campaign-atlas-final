@@ -4,6 +4,11 @@ import path from "path";
 
 export default defineConfig({
   plugins: [react()],
+  // Mirror the build-time flag from vite.config.ts so editor-gated code
+  // (src/App.tsx, src/pages/Landing.tsx, etc.) compiles under tests.
+  // Tests run as if the editor build is enabled; per-test gate behavior is
+  // exercised via runtime mocks of isDmToolsEnabled().
+  define: { __INCLUDE_EDITOR__: "true" },
   test: {
     environment: "jsdom",
     globals: true,
