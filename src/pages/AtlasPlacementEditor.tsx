@@ -3,7 +3,7 @@ import { MapContainer, Marker, ImageOverlay, useMap, useMapEvents } from "react-
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode, Layers as LayersIcon, MapPin as PinIcon, Settings2, Package, FolderOpen, Shapes, Route as RouteIcon, CloudFog, BookOpen, ShieldCheck, Upload } from "lucide-react";
+import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode, Layers as LayersIcon, MapPin as PinIcon, Settings2, Package, FolderOpen, Shapes, Route as RouteIcon, CloudFog, BookOpen, ShieldCheck, Upload, Save as SaveIcon } from "lucide-react";
 import { toast } from "sonner";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity, MapDocument } from "@/atlas/content/schema";
@@ -28,6 +28,8 @@ import {
   type PlacementOverride,
 } from "@/atlas/yaml/buildPatches";
 import { ExportChangesModal } from "@/atlas/ExportChangesModal";
+import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
+import type { FileChange } from "@/atlas/save/localFsSave";
 import { ImportPanel } from "@/atlas/import/ImportPanel";
 import { TabFrame } from "@/atlas/tabs/TabFrame";
 import { RegionsTab } from "@/atlas/tabs/RegionsTab";
