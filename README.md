@@ -55,6 +55,7 @@ Do not store secrets in the published player build. Anything shipped to GitHub P
 Most common mistake
 Do not paste an entire exported patch file into `world.yaml`.
 Exported patch files may contain comment headers explaining where a block goes. `world.yaml` itself must be pure YAML.
+Also note: `/atlas/edit` no longer exists on the published player site. The editor route lives in `npm run dev` only — the player production build physically excludes it.
 Do not paste:
 ```markdown
 ```yaml
