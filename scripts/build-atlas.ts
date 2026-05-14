@@ -23,7 +23,6 @@ import {
   type SvgPolicy,
 } from "./atlas/validateAsset";
 import { parseAtlasDate } from "./atlas/calendarDate";
-import { scanDmContent, reportDmInSource } from "./atlas/detectDmInSource";
 import { PLAYER_VISIBLE } from "./atlas/visibility";
 import {
   stripDmProfile,
