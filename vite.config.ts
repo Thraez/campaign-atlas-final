@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
+import { atlasSavePlugin } from "./scripts/vite-plugin-atlas-save";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -30,6 +31,9 @@ export default defineConfig(({ mode }) => {
   plugins: [
     react(),
     mode === "development" && componentTagger(),
+    // Dev-only middleware that writes allowlisted source files to disk.
+    // Auto-disabled in build modes via apply: "serve".
+    atlasSavePlugin(),
     // Production-only PWA. devOptions.enabled = false so the service
     // worker is NEVER active during `vite dev` or in the Lovable editor
     // preview — registration is also iframe/host-guarded in src/main.tsx.
