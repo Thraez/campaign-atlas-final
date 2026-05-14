@@ -535,6 +535,44 @@ public/atlas/search-index.json
 ```
 These are runtime files, not canon.
 ---
+## Build modes
+
+The Vite app ships in two physical shapes. The editor route, the `AtlasPlacementEditor` component, and the dev-only local-save endpoint are tree-shaken out of the player bundle.
+
+- `npm run dev` — full editor + local Save endpoint, used for daily authoring.
+- `npm run build` — player-safe production build; excludes editor code AND the local-save endpoint (Vite tree-shaking via `__INCLUDE_EDITOR__` + the save plugin's `apply: "serve"`).
+- `npm run build:player` — alias for `npm run build`.
+- `npm run build:editor` — full editor in a built artifact. Rarely needed; prefer `npm run dev`.
+- `npm run atlas:check-secrets <dir>` — sentinel scan over any directory. Catches DM-content sentinels and editor-code fingerprints (e.g. `/__atlas/save`, `saveAtlasPatchToLocalFs`, `AtlasPlacementEditor`, `/atlas/edit`).
+- `npm run atlas:check-shape <atlas.json>` — structural assertions over the player atlas.json.
+- `npm run atlas:publish` — full publish chain: build player atlas → vite build → both sentinel scans → shape scan.
+
+---
+## Verifying the player build is clean
+
+After `npm run build`, the editor strings must not appear anywhere in `dist/`. Pick the shell that matches your environment:
+
+PowerShell:
+```
+npm run build
+Select-String -Path "dist\**\*.*" -Pattern "AtlasPlacementEditor","/__atlas/save","saveAtlasPatchToLocalFs","/atlas/edit" -SimpleMatch
+```
+
+CMD (findstr):
+```
+npm run build
+findstr /S /M /C:"AtlasPlacementEditor" /C:"/__atlas/save" /C:"saveAtlasPatchToLocalFs" /C:"/atlas/edit" dist\*
+```
+
+Git Bash / Unix:
+```
+npm run build
+grep -r "AtlasPlacementEditor\|/__atlas/save\|saveAtlasPatchToLocalFs\|/atlas/edit" dist/
+```
+
+Expected: zero matches. `npm run atlas:check-secrets dist` runs the same scan with a non-zero exit code on any leak.
+
+---
 GitHub Pages deployment
 The workflow file is:
 ```text
@@ -556,6 +594,23 @@ upload dist/
 deploy to GitHub Pages
 ```
 For a user or organization root site, set `ATLAS_BASE=/`.
+---
+## ⚠️ Where do your secrets live? (source-repo privacy)
+
+The player-safe build protects the **published artifact** at `https://<you>.github.io/<repo>/`. It does NOT protect the **source repository**.
+
+If your repo on github.com is public, every file under `content/` — including `_dm/`, `_drafts/`, and any note with `visibility: dm` — is browsable on GitHub itself, regardless of how clean the player atlas is.
+
+Three options:
+
+1. **Private source repo + public Pages (recommended).** Make the repo private; on paid plans Pages still publishes a public site from a private repo, or use option 3.
+2. **Public repo, scrubbed source.** Move DM-only notes outside the repo.
+3. **Split repos:** private source builds and pushes generated `dist/` to a separate public Pages repo.
+
+The sentinel scan catches leaks in the published artifact. It cannot catch the case where a DM commits `content/_dm/Secret.md` to a public source repo. That's a repository-privacy decision.
+
+Sanity check: open `https://github.com/<you>/<repo>/tree/main/content` in an incognito tab. Whatever you see there is what every player can see too.
+
 ---
 Player viewer
 Open:
