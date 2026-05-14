@@ -21,12 +21,15 @@ interface RunResult {
   stderr: string;
 }
 
+const IS_WIN = process.platform === "win32";
+
 function run(args: string[], opts: ExecFileSyncOptions = {}): RunResult {
   try {
-    const stdout = execFileSync("npx", ["tsx", SCRIPT, ...args], {
+    const stdout = execFileSync(IS_WIN ? "npx.cmd" : "npx", ["tsx", SCRIPT, ...args], {
       cwd: ROOT,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
+      shell: IS_WIN,
       env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
       ...opts,
     });
