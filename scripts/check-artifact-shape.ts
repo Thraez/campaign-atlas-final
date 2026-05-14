@@ -70,7 +70,7 @@ export function scanArtifactShape(atlas: unknown): ShapeResult {
     if (e.frontmatter && typeof e.frontmatter === "object" && Object.keys(e.frontmatter as object).length > 0) {
       violations.push({ entityId: id, field: "frontmatter", message: "frontmatter is non-empty (raw YAML leak)" });
     }
-    const profile = e.profile as { dm?: unknown } | undefined;
+    const profile = e.profile as { dm?: unknown; player?: Record<string, unknown> } | undefined;
     if (profile && profile.dm !== undefined) {
       violations.push({ entityId: id, field: "profile.dm", message: "profile.dm is defined in player artifact" });
     }
@@ -79,23 +79,58 @@ export function scanArtifactShape(atlas: unknown): ShapeResult {
     checkStringField(violations, id, "summary", e.summary);
     checkStringField(violations, id, "title", e.title);
     checkStringField(violations, id, "dateRaw", e.dateRaw);
+    // Aliases + tags: each element ships individually, so each is scanned.
+    if (Array.isArray(e.aliases)) {
+      for (const a of e.aliases as unknown[]) checkStringField(violations, id, "alias", a);
+    }
+    if (Array.isArray(e.tags)) {
+      for (const t of e.tags as unknown[]) checkStringField(violations, id, "tag", t);
+    }
+    // profile.player half (profile.dm absence is already a separate rule).
+    if (profile?.player) {
+      const pp = profile.player;
+      checkStringField(violations, id, "profile.player.known_for", pp.known_for);
+      if (Array.isArray(pp.visible_traits)) {
+        for (const t of pp.visible_traits as unknown[]) {
+          checkStringField(violations, id, "profile.player.visible_traits", t);
+        }
+      }
+      if (Array.isArray(pp.rumors)) {
+        for (const t of pp.rumors as unknown[]) {
+          checkStringField(violations, id, "profile.player.rumors", t);
+        }
+      }
+    }
+    // Relationships: label + description ship if the relationship survives the
+    // player filter, so they need DM-block scanning too.
+    if (Array.isArray(e.relationships)) {
+      for (const r of e.relationships as Record<string, unknown>[]) {
+        checkStringField(violations, id, "relationship.label", r.label);
+        checkStringField(violations, id, "relationship.description", r.description);
+      }
+    }
   }
 
   const placements = Array.isArray(a.placements) ? (a.placements as Record<string, unknown>[]) : [];
   for (const p of placements) {
     const vis = p.visibility as string | undefined;
+    const entityId = typeof p.entityId === "string" ? p.entityId : undefined;
     if (!vis || !PLAYER_VISIBLE.has(vis as never)) {
       violations.push({
-        entityId: typeof p.entityId === "string" ? p.entityId : undefined,
+        entityId,
         field: "placement.visibility",
         message: `placement visibility "${vis}" not in PLAYER_VISIBLE`,
       });
     }
+    // Placement labels ship and may carry stray %% blocks from raw frontmatter.
+    checkStringField(violations, entityId ?? "<placement>", "placement.label", p.label);
   }
 
   const maps = Array.isArray(a.maps) ? (a.maps as Record<string, unknown>[]) : [];
   for (const m of maps) {
     const mapId = typeof m.id === "string" ? m.id : "<unknown>";
+    // Map names ship in the world atlas.
+    checkStringField(violations, mapId, "map.name", m.name);
     const regions = Array.isArray(m.regions) ? (m.regions as Record<string, unknown>[]) : [];
     for (const r of regions) {
       const vis = r.visibility as string | undefined;
@@ -105,6 +140,7 @@ export function scanArtifactShape(atlas: unknown): ShapeResult {
           message: `region visibility "${vis}" not in PLAYER_VISIBLE`,
         });
       }
+      checkStringField(violations, mapId, `region[${r.id ?? "?"}].name`, r.name);
     }
     const routes = Array.isArray(m.routes) ? (m.routes as Record<string, unknown>[]) : [];
     for (const r of routes) {
@@ -115,6 +151,7 @@ export function scanArtifactShape(atlas: unknown): ShapeResult {
           message: `route visibility "${vis}" not in PLAYER_VISIBLE`,
         });
       }
+      checkStringField(violations, mapId, `route[${r.id ?? "?"}].name`, r.name);
     }
   }
 

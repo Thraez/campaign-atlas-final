@@ -1,0 +1,76 @@
+# Mistmoor — example seed world.
+#
+# This is a copy-pasteable starter world. Copy this folder to
+# `content/mistmoor/` and edit `atlas.config.json` so `defaultWorld` is
+# `mistmoor`, then run `npm run atlas:build`.
+#
+# This file is YAML SOURCE OF TRUTH for the world's maps, regions, routes,
+# fog, grid, scale, and calendar. The DM normally edits placements via the
+# visual editor (`/atlas/edit`) and pastes the generated patches here.
+#
+# IMPORTANT: keep this file as pure YAML. Do NOT paste markdown code fences
+# (```yaml) into it — the build will reject them.
+
+schemaVersion: 1
+
+maps:
+  - id: mistmoor-overview
+    name: Overview
+    width: 2000
+    height: 1500
+    oceanColor: "#1a3a5c"
+    wrapX: false
+    grid:
+      kind: square
+      size: 100
+      enabled: true
+    # Drop your own map image into `public/atlas/assets/maps/` and add it as
+    # a layer here, e.g.:
+    #   layers:
+    #     - id: overview-map
+    #       src: atlas/assets/maps/mistmoor.jpg
+    #       x: 0
+    #       y: 0
+    #       width: 2000
+    #       height: 1500
+    #       opacity: 1
+    #       zIndex: 1
+    layers: []
+
+# Add regions when you draw them in the editor. Example shape:
+#   - id: the-pinewood
+#     mapId: mistmoor-overview
+#     name: The Pinewood
+#     visibility: player
+#     color: "#2d4a2b"
+#     fillOpacity: 0.25
+#     points:
+#       - [400, 500]
+#       - [900, 450]
+#       - [950, 900]
+#       - [450, 950]
+regions: []
+
+# Add routes when you want to draw travel paths. Example shape:
+#   - id: kings-road
+#     mapId: mistmoor-overview
+#     name: King's Road
+#     mode: horse
+#     visibility: player
+#     waypoints:
+#       - [200, 1200]
+#       - { entityId: pinemoot }
+#       - [1800, 300]
+routes: []
+
+fog: []
+
+calendar:
+  name: Calendar of the Hollow Year
+  epochName: AE
+  daysPerWeek: 7
+  months:
+    - { name: Frostfall, days: 90 }
+    - { name: Greenrise, days: 92 }
+    - { name: Highsun,   days: 92 }
+    - { name: Emberfade, days: 91 }
