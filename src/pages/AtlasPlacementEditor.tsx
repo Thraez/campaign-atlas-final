@@ -3,7 +3,7 @@ import { MapContainer, Marker, ImageOverlay, useMap, useMapEvents } from "react-
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode, Layers as LayersIcon, MapPin as PinIcon, Settings2, Package, FolderOpen, Shapes, Route as RouteIcon, CloudFog, BookOpen, ShieldCheck, Upload } from "lucide-react";
+import { ArrowLeft, Compass, Crosshair, Download, RotateCcw, MapPin, Target, Trash2, FileCode, Layers as LayersIcon, MapPin as PinIcon, Settings2, Package, FolderOpen, Shapes, Route as RouteIcon, CloudFog, BookOpen, ShieldCheck, Upload, Save as SaveIcon } from "lucide-react";
 import { toast } from "sonner";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity, MapDocument } from "@/atlas/content/schema";
@@ -28,6 +28,8 @@ import {
   type PlacementOverride,
 } from "@/atlas/yaml/buildPatches";
 import { ExportChangesModal } from "@/atlas/ExportChangesModal";
+import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
+import type { FileChange } from "@/atlas/save/localFsSave";
 import { ImportPanel } from "@/atlas/import/ImportPanel";
 import { TabFrame } from "@/atlas/tabs/TabFrame";
 import { RegionsTab } from "@/atlas/tabs/RegionsTab";
@@ -363,6 +365,8 @@ export default function AtlasPlacementEditor() {
   const [lastExportAt, setLastExportAt] = useState<number | null>(null);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [mapImportOpen, setMapImportOpen] = useState(false);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [pendingChanges, setPendingChanges] = useState<FileChange[]>([]);
   // Per-tab last-export timestamps so each tab header can show its own status.
   const [tabExportAt, setTabExportAt] = useState<Record<string, number>>({});
   const markTabExport = (tab: string) => setTabExportAt((s) => ({ ...s, [tab]: Date.now() }));
@@ -379,6 +383,33 @@ export default function AtlasPlacementEditor() {
     download(artifact.filename, artifact.content, artifact.mime);
     setLastExportAt(Date.now());
     markTabExport("pins");
+  };
+
+  /**
+   * Save: build the SAME placement patch artifact Export Patch produces, then
+   * route it through saveAtlasPatchToLocalFs (dev-only Vite plugin → disk).
+   * No GitHub API. Target path lives under the world's _atlas folder so the
+   * source-path allowlist accepts it.
+   */
+  const onSaveClick = () => {
+    if (!project || !activeMap) return;
+    const drafts = buildDraftPlacements();
+    if (drafts.length === 0) {
+      toast.info("No changes to save");
+      return;
+    }
+    const artifact = buildPlacementPatch({ project, mapId: activeMap.id, placements: drafts });
+    const result = validatePatchYaml(artifact.content, "placement");
+    if (!result.ok) {
+      toast.error(`Patch validation failed: ${result.errors[0]}`);
+      return;
+    }
+    const change: FileChange = {
+      path: `content/${activeMap.worldId}/_atlas/${artifact.filename}`,
+      contents: artifact.content,
+    };
+    setPendingChanges([change]);
+    setSaveModalOpen(true);
   };
 
   const dirtyCount = Object.keys(overrides).filter((k) => activeMap && k.startsWith(`${activeMap.id}:`)).length;
@@ -474,6 +505,16 @@ export default function AtlasPlacementEditor() {
         </Button>
         <Button variant="default" size="sm" onClick={() => setExportModalOpen(true)} className="gap-1" title="Open the unified export modal">
           <Package className="h-4 w-4" /><span className="hidden md:inline">Export DM Changes</span>
+        </Button>
+        <Button
+          variant="default"
+          size="sm"
+          onClick={onSaveClick}
+          disabled={saveModalOpen}
+          className="gap-1"
+          title="Write changes to your local repository (then commit with git)."
+        >
+          <SaveIcon className="h-4 w-4" /><span className="hidden md:inline">Save</span>
         </Button>
         <Button variant="ghost" size="sm" onClick={exportPatch} className="gap-1" title="Quick: download placements .yaml">
           <FileCode className="h-4 w-4" />
@@ -805,6 +846,11 @@ export default function AtlasPlacementEditor() {
         onOpenChange={setMapImportOpen}
         currentMap={activeMap}
         defaultWorldId={activeMap.worldId}
+      />
+      <DiffPreviewModal
+        open={saveModalOpen}
+        changes={pendingChanges}
+        onClose={() => setSaveModalOpen(false)}
       />
     </div>
   );
