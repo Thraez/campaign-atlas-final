@@ -1,0 +1,47 @@
+# Entity placement patch — Overview
+# Generated 2026-05-14T02:57:23.833Z
+# Subject: atlas.placements on 4 entities
+#
+# CANON MODEL:
+#   YAML / Markdown frontmatter is the source of truth.
+#   This file is a TOOL-GENERATED PATCH against that canon — never edit
+#   public/atlas/atlas.json or search-index.json by hand (those are derived).
+#
+# HOW TO APPLY:
+#   Paste the YAML below into the matching entity .md frontmatter (one block per entity below).
+#   Do NOT paste the leading "#" comment lines.
+#   Do NOT wrap in markdown code fences (```yaml).
+#
+# Each block REPLACES the entity's existing atlas.placements (or legacy atlas.x / atlas.y).
+# Or run: npm run atlas:apply-placements -- placements-astrath-deeprealm-overview.json
+# entity: Raven's Vale
+# file:   ravens-vale
+atlas:
+  placements:
+    - mapId: astrath-deeprealm-overview
+      x: 70000
+      "y": 30000
+
+# entity: The Old Keep
+# file:   the-old-keep
+atlas:
+  placements:
+    - mapId: astrath-deeprealm-overview
+      x: 130000
+      "y": 60000
+
+# entity: Sunhaven
+# file:   sunhaven
+atlas:
+  placements:
+    - mapId: astrath-deeprealm-overview
+      x: 40000
+      "y": 45000
+
+# entity: Thornhold
+# file:   thornhold
+atlas:
+  placements:
+    - mapId: astrath-deeprealm-overview
+      x: 80000
+      "y": 35104
