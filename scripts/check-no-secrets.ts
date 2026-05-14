@@ -30,10 +30,8 @@ export const DM_CONTENT_SENTINELS = [
 ] as const;
 
 export const EDITOR_CODE_FINGERPRINTS = [
-  "api.github.com",
-  "application/vnd.github",
-  "Save to GitHub",
-  "Fine-grained PAT",
+  "/__atlas/save",
+  "saveAtlasPatchToLocalFs",
   "AtlasPlacementEditor",
   "/atlas/edit",
 ] as const;
