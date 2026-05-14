@@ -24,6 +24,7 @@ import {
 } from "./atlas/validateAsset";
 import { parseAtlasDate } from "./atlas/calendarDate";
 import { scanDmContent, reportDmInSource } from "./atlas/detectDmInSource";
+import { PLAYER_VISIBLE } from "./atlas/visibility";
 import {
   stripDmProfile,
   filterRelationshipsForPlayer,
@@ -141,8 +142,6 @@ function parseFlags(): CliFlags {
   }
   return flags;
 }
-
-const PLAYER_VISIBLE = new Set(["player", "rumor"]);
 
 async function main() {
   const flags = parseFlags();
