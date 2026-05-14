@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "build:player": "vite build --mode production",
+    "build:editor": "vite build --mode editor",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
