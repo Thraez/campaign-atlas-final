@@ -6,7 +6,7 @@ import { defaultAtlas } from "@/atlas/types";
 import { useRef } from "react";
 import { Link } from "react-router-dom";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
-import { atlasImportSchema, safeParseInput } from "@/atlas/schemas/imports";
+import { atlasImportSchema, formatZodError } from "@/atlas/schemas/imports";
 
 interface Props {
   onSaveCloud?: () => void;
@@ -46,12 +46,12 @@ export function Toolbar({ onSaveCloud, onSignOut, signedIn }: Props) {
         toast.error(`Invalid atlas JSON: ${(e as Error).message}`);
         return;
       }
-      const parsed = safeParseInput(atlasImportSchema, raw);
-      if (!parsed.ok) {
-        toast.error(`Invalid atlas JSON: ${parsed.error}`);
+      const parsed = atlasImportSchema.safeParse(raw);
+      if (!parsed.success) {
+        toast.error(`Invalid atlas JSON: ${formatZodError(parsed.error)}`);
         return;
       }
-      setAtlas({ ...defaultAtlas(), ...parsed.data });
+      setAtlas({ ...defaultAtlas(), ...(parsed.data as Partial<ReturnType<typeof defaultAtlas>>) });
       toast.success("Atlas imported");
     };
     reader.readAsText(file);
