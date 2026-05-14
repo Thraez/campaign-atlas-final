@@ -20,13 +20,15 @@ const FIXTURE = path.resolve(__dirname, "fixtures/sentinel-vault");
 
 interface RunResult { status: number; stdout: string; stderr: string; }
 
+const IS_WIN = process.platform === "win32";
+
 function run(script: string, args: string[], opts: ExecFileSyncOptions = {}): RunResult {
   try {
-    const stdout = execFileSync("npx", ["tsx", script, ...args], {
+    const stdout = execFileSync(IS_WIN ? "npx.cmd" : "npx", ["tsx", script, ...args], {
       cwd: ROOT,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
+      shell: IS_WIN,
       ...opts,
     });
     return { status: 0, stdout: String(stdout), stderr: "" };
