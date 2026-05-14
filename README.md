@@ -525,8 +525,10 @@ Scripts:
 Script	Purpose
 `npm run atlas:build`	DM build to `.local-atlas/`. Keeps DM content.
 `npm run atlas:build:player`	Strict player build to `public/atlas/`.
-`npm run atlas:publish`	Player build plus Vite production build.
-`npm run atlas:apply-placements`	Applies exported placement JSON back into markdown frontmatter.
+`npm run atlas:publish`	Player build plus Vite production build + all safety scans.
+`npm run atlas:check-secrets`	Scan a built artifact for sentinel-string DM leaks.
+`npm run atlas:check-derived`	Scan a built artifact for verbatim hidden/dm entity name leaks.
+`npm run atlas:check-shape`	Structural check on `atlas.json` (visibility / sourcePath / frontmatter / DM block).
 `npm test`	Runs Vitest test suite.
 Generated files:
 ```text
@@ -764,23 +766,14 @@ Production mode defaults DM tools off.
 Set `VITE_ENABLE_DM_TOOLS=true` or `VITE_ENABLE_DM_TOOLS=1` to show editor links.
 The `/atlas/edit` route stays mounted, but visible links to it are hidden in production unless explicitly enabled.
 ---
-Unified export workflow
-The editor stores draft changes in browser local state until you export.
-Use Export DM Changes to create a patch package.
-Possible export artifacts include:
-```text
-world-map-<map-id>.yaml
-routes-patch-<map-id>.yaml
-regions-patch-<map-id>.yaml
-fog-patch-<map-id>.yaml
-entity-frontmatter-patch-<n>.yaml
-placements-<map-id>.json
-asset-manifest.yaml
-atlas-assets-<map-id>.zip
-publish-report.md
-```
-YAML patches include human-readable comment headers. These headers explain where each patch should go.
-Do not paste the comment header into the middle of `world.yaml` unless it is valid YAML comment syntax. Never paste markdown fences into `world.yaml`.
+Save workflow (canonical, default)
+Pin placement edits in `/atlas/edit` are kept in browser localStorage until you click **Save**. Save then:
+1. Reads the current `.md` for each affected entity (dev-only `/__atlas/read` endpoint).
+2. Patches `atlas.placements[]` in the frontmatter, preserving placements on other maps.
+3. Writes the new `.md` back through `/__atlas/save` (dev-only, allowlist-guarded).
+4. Triggers `npm run atlas:build`, so `public/atlas/atlas.json` regenerates immediately.
+The player view at `/atlas` shows your changes on reload. Commit with `git` when you're ready to publish.
+Per-tab exports for **Regions**, **Routes**, **Fog**, **Map layers**, and **Entity frontmatter** still produce YAML patch snippets you paste into `world.yaml` (or an `.md` frontmatter). These survive because the canonical save path currently only covers placements — extending it to cover the rest is a follow-up.
 ---
 GitHub web workflow, no CLI
 You can update maps and content from the GitHub website.
@@ -795,31 +788,7 @@ Navigate to `content/astrath-deeprealm/_atlas/world.yaml`.
 Click the pencil icon.
 Edit the relevant map, layer, region, route, or fog section.
 Commit to `main`.
-Use the Creator Cockpit with GitHub web
-Open the project preview or local app.
-Open `/atlas/edit`.
-Make visual changes.
-Export the relevant YAML patch or full DM changes package.
-Open the target file in GitHub.
-Paste the YAML into the correct place.
-Upload any asset zip contents to the specified asset paths.
-Commit to `main`.
-Wait for the GitHub Action to publish.
----
-Lovable workflow
-If working through Lovable:
-Open `/atlas/edit`.
-Make visual changes.
-Export the patch.
-Paste the patch into Lovable and say:
-```text
-Apply this patch to content/<world>/_atlas/world.yaml under the map entry with id <map-id>.
-```
-For entity frontmatter patches, say:
-```text
-Apply this frontmatter patch to the listed markdown files.
-```
-Lovable can edit text files directly, but binary image uploads may still need to be handled through GitHub web or a local commit.
+The GitHub Action publishes on every push to `main`.
 ---
 Asset paths
 Local atlas assets should live under:

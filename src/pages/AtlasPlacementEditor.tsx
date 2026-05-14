@@ -3,7 +3,7 @@ import { MapContainer, Marker, ImageOverlay, useMap, useMapEvents } from "react-
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Compass, Crosshair, RotateCcw, MapPin, Target, Trash2, Layers as LayersIcon, MapPin as PinIcon, Settings2, Package, FolderOpen, Shapes, Route as RouteIcon, CloudFog, BookOpen, ShieldCheck, Upload, Save as SaveIcon } from "lucide-react";
+import { ArrowLeft, Compass, Crosshair, RotateCcw, MapPin, Target, Trash2, Layers as LayersIcon, MapPin as PinIcon, Settings2, FolderOpen, Shapes, Route as RouteIcon, CloudFog, BookOpen, ShieldCheck, Upload, Save as SaveIcon } from "lucide-react";
 import { toast } from "sonner";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity, MapDocument } from "@/atlas/content/schema";
@@ -18,16 +18,10 @@ import { MapLayerPanel } from "@/atlas/MapLayerPanel";
 import { MapSettingsPanel } from "@/atlas/MapSettingsPanel";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
-import { validatePatchYaml } from "@/atlas/yaml/validatePatch";
 import { overridesSchema } from "@/atlas/schemas/imports";
 import { classifyDraftStatus } from "@/atlas/yaml/canon";
 import { DraftStatusBadge } from "@/atlas/yaml/StatusBadge";
-import {
-  buildPlacementJson,
-  buildPlacementPatch,
-  type PlacementOverride,
-} from "@/atlas/yaml/buildPatches";
-import { ExportChangesModal } from "@/atlas/ExportChangesModal";
+import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
 import type { FileChange } from "@/atlas/save/localFsSave";
 import {
@@ -371,14 +365,6 @@ export default function AtlasPlacementEditor() {
     return out;
   }, [project, activeMap, effectivePlacement]);
 
-  const exportJson = () => {
-    if (!project || !activeMap) return;
-    const artifact = buildPlacementJson({ project, mapId: activeMap.id, placements: buildDraftPlacements() });
-    download(artifact.filename, artifact.content, artifact.mime);
-  };
-
-  const [lastExportAt, setLastExportAt] = useState<number | null>(null);
-  const [exportModalOpen, setExportModalOpen] = useState(false);
   const [mapImportOpen, setMapImportOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<FileChange[]>([]);
@@ -388,22 +374,10 @@ export default function AtlasPlacementEditor() {
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   // Per-tab last-export timestamps so each tab header can show its own status.
+  // Tabs that still write YAML patches (Regions/Routes/Fog/Entities/MapLayers)
+  // use this; the Pins tab no longer exports — Save covers that path now.
   const [tabExportAt, setTabExportAt] = useState<Record<string, number>>({});
   const markTabExport = (tab: string) => setTabExportAt((s) => ({ ...s, [tab]: Date.now() }));
-
-  const exportPatch = () => {
-    if (!project || !activeMap) return;
-    const artifact = buildPlacementPatch({ project, mapId: activeMap.id, placements: buildDraftPlacements() });
-    const result = validatePatchYaml(artifact.content, "placement");
-    if (!result.ok) {
-      toast.error(`Patch validation failed: ${result.errors[0]}`);
-      return;
-    }
-    if (result.warnings.length) toast.warning(result.warnings[0]);
-    download(artifact.filename, artifact.content, artifact.mime);
-    setLastExportAt(Date.now());
-    markTabExport("pins");
-  };
 
   /**
    * Save: rewrite the canonical entity .md frontmatter for every drafted
@@ -442,7 +416,7 @@ export default function AtlasPlacementEditor() {
   };
 
   const dirtyCount = Object.keys(overrides).filter((k) => activeMap && k.startsWith(`${activeMap.id}:`)).length;
-  const draftStatus = classifyDraftStatus({ dirtyCount, lastExportAt });
+  const draftStatus = classifyDraftStatus({ dirtyCount, lastExportAt: null });
   // Unsaved-changes signal: there are local overrides AND there was an edit
   // since the last successful save. Avoids nagging when overrides are just
   // hydrated from a prior session that was already saved.
@@ -473,10 +447,10 @@ export default function AtlasPlacementEditor() {
           draftPlacements: draftPlacementsForValidation,
           draftMap: activeMap,
           draftLocalLayers: layerEditor.localLayers,
-          lastExportAt,
+          lastExportAt: null,
         })
       : null,
-    [project, activeMap, draftPlacementsForValidation, layerEditor.localLayers, lastExportAt]
+    [project, activeMap, draftPlacementsForValidation, layerEditor.localLayers]
   );
   const issuesByScope = (predicate: (i: import("@/atlas/yaml/validateProject").Issue) => boolean) => {
     const list = validation?.issues.filter(predicate) ?? [];
@@ -575,15 +549,6 @@ export default function AtlasPlacementEditor() {
         >
           <SaveIcon className="h-4 w-4" /><span className="hidden md:inline">Save</span>
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setExportModalOpen(true)}
-          className="gap-1 text-muted-foreground"
-          title="Offline export — advanced. Generate YAML/JSON patch files for manual merge or apply-placements. Not needed for normal workflow."
-        >
-          <Package className="h-4 w-4" /><span className="hidden lg:inline text-[11px]">Offline export</span>
-        </Button>
         <Button asChild variant="ghost" size="sm">
           <Link to="/atlas">View as player →</Link>
         </Button>
@@ -676,10 +641,6 @@ export default function AtlasPlacementEditor() {
                 localDraftCount={dirtyCount}
                 blockingCount={pinIssues.blocking}
                 warningCount={pinIssues.warning}
-                lastExportAt={tabExportAt.pins ?? null}
-                onExport={exportPatch}
-                exportLabel="Export pins"
-                exportDisabled={dirtyCount === 0}
               >
                 <div>
                   <div className="p-3 border-b border-border space-y-2">
@@ -874,35 +835,19 @@ export default function AtlasPlacementEditor() {
                 draftMap={activeMap}
                 draftPlacements={draftPlacementsForValidation}
                 draftLocalLayers={layerEditor.localLayers}
-                lastExportAt={lastExportAt}
+                lastExportAt={null}
                 onGoToMap={(mid) => { setActiveMapId(mid); toast.info(`Switched to ${project.maps.find((m) => m.id === mid)?.name ?? mid}`); }}
                 onGoToEntity={(eid) => {
                   const c = effectiveCoord(eid);
                   if (c && activeMap) setFlyTo({ lat: activeMap.height - c.y, lng: c.x });
                   setFilter(project.entities.find((e) => e.id === eid)?.title ?? "");
                 }}
-                onExportAll={() => setExportModalOpen(true)}
               />
             </TabsContent>
           </Tabs>
         </aside>
       </div>
       <style>{`@keyframes atlas-pulse { 0%,100% { filter: drop-shadow(0 0 0 hsl(var(--primary))); } 50% { filter: drop-shadow(0 0 6px hsl(var(--primary))); } }`}</style>
-      <ExportChangesModal
-        open={exportModalOpen}
-        onOpenChange={(o) => { setExportModalOpen(o); if (!o) setLastExportAt(Date.now()); }}
-        project={project}
-        activeMap={activeMap}
-        draftPlacements={buildDraftPlacements()}
-        mergedLayers={layerEditor.mergedLayers}
-        localLayers={layerEditor.localLayers}
-        draftRegions={regionDraft.effective}
-        draftRoutes={routeDraft.effective}
-        draftFog={fogDraft.fog}
-        regionsDirty={regionDraft.dirty}
-        routesDirty={routeDraft.dirty}
-        fogDirty={fogDraft.dirty}
-      />
       <MapImportWizard
         open={mapImportOpen}
         onOpenChange={setMapImportOpen}
@@ -1164,12 +1109,3 @@ function PinStyleEditor({
   );
 }
 
-function download(filename: string, content: string, mime: string) {
-  const blob = new Blob([content], { type: mime });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(a.href);
-  toast.success(`Downloaded ${filename}`);
-}

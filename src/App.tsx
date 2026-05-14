@@ -7,8 +7,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Landing from "./pages/Landing.tsx";
 
 // Lazy-load heavy/secondary routes to keep the landing bundle small.
-const Index = lazy(() => import("./pages/Index.tsx"));
-const Auth = lazy(() => import("./pages/Auth.tsx"));
 const AtlasViewer = lazy(() => import("./pages/AtlasViewer.tsx"));
 // Editor route is build-gated. In player production builds __INCLUDE_EDITOR__
 // is replaced with `false` at build time, so this `import()` is dead-coded
@@ -48,7 +46,6 @@ const App = () => (
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/" element={<Landing />} />
-            <Route path="/legacy-editor" element={<Index />} />
             <Route path="/atlas" element={<AtlasViewer />} />
             {AtlasPlacementEditor && (
               <Route path="/atlas/edit" element={<AtlasEditorRoute />} />
@@ -57,7 +54,6 @@ const App = () => (
             <Route path="/atlas/browse" element={<AtlasBrowse mode="browse" />} />
             <Route path="/atlas/tag/:tag" element={<AtlasBrowse mode="tag" />} />
             <Route path="/atlas/type/:type" element={<AtlasBrowse mode="type" />} />
-            <Route path="/auth" element={<Auth />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

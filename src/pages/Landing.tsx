@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Compass, Map, MapPin, BookOpen, CalendarClock, FlaskConical } from "lucide-react";
+import { Compass, Map, MapPin, BookOpen, CalendarClock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 
@@ -12,7 +12,7 @@ const allTiles = [
   // href) is dead-coded out of the bundle entirely.
   ...(__INCLUDE_EDITOR__
     ? [{ to: "/atlas/edit", title: "DM Placement & Map Editor", icon: MapPin,
-        desc: "Place pins on maps, manage map image layers, and export YAML patches you can commit to GitHub.",
+        desc: "Place pins on maps, manage map image layers, and save canonical .md frontmatter back to your local repo.",
         cta: "Open editor →", badge: "DM", dmOnly: true } as const]
     : []),
   { to: "/atlas/browse", title: "Browse", icon: BookOpen,
@@ -21,9 +21,6 @@ const allTiles = [
   { to: "/atlas/timeline", title: "Timeline", icon: CalendarClock,
     desc: "In-world calendar timeline of every dated entry.",
     cta: "Open timeline →" },
-  { to: "/legacy-editor", title: "Legacy Local Editor", icon: FlaskConical,
-    desc: "The original in-browser atlas editor with optional cloud save. Kept for back-compat — not the source of truth.",
-    cta: "Open legacy editor →", badge: "Legacy", dmOnly: true },
 ];
 
 export default function Landing() {
@@ -75,9 +72,11 @@ export default function Landing() {
           <h2 className="font-display text-xl">How saving actually works</h2>
           <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-5">
             {__INCLUDE_EDITOR__ && (
-              <li><strong>Local browser draft</strong> — placement and layer edits in <code>/atlas/edit</code> are autosaved to your browser. Nothing leaves your machine until you export.</li>
+              <>
+                <li><strong>Local browser draft</strong> — pin placement edits in <code>/atlas/edit</code> are kept in your browser until you click Save.</li>
+                <li><strong>Save</strong> writes canonical entity <code>.md</code> frontmatter directly to <code>content/</code> in your local repo and rebuilds <code>public/atlas/atlas.json</code> — the player view updates without leaving the browser.</li>
+              </>
             )}
-            <li><strong>Exported YAML patch</strong> — placements and map layers are exported as YAML/JSON snippets you paste into <code>content/&lt;world&gt;/_atlas/world.yaml</code> or run through <code>npm run atlas:apply-placements</code>.</li>
             <li><strong>Asset bundle</strong> — uploaded images live as previews in your browser. To publish them, save the file into <code>public/atlas/assets/maps/</code> and commit it.</li>
             <li><strong>Player-safe published atlas</strong> — <code>npm run atlas:publish</code> runs the player build (strict) and Vite build. The GitHub Action does this on every push to <code>main</code>.</li>
           </ul>

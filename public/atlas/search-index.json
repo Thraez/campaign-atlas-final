@@ -46,59 +46,5 @@
     "dateRaw": "1 Frostmoon, 0 AS",
     "dateValue": 1,
     "dateYear": 0
-  },
-  {
-    "id": "ravens-vale",
-    "title": "Raven's Vale",
-    "type": "region",
-    "aliases": [],
-    "tags": [
-      "region",
-      "wilderness"
-    ],
-    "summary": "A misty valley beneath Thornhold's bluffs.",
-    "excerpt": "# Raven's Vale A long, mist-choked valley running south from [[Thornhold]]. Locals say the ravens that nest here can speak the names of those soon to die — a rumor most travelers prefer not to test.",
-    "body": "raven's vale a long, mist-choked valley running south from thornhold. locals say the ravens that nest here can speak the names of those soon to die — a rumor most travelers prefer not to test."
-  },
-  {
-    "id": "the-old-keep",
-    "title": "The Old Keep",
-    "type": "ruin",
-    "aliases": [],
-    "tags": [
-      "ruin",
-      "mystery"
-    ],
-    "summary": "A crumbling fortress whispered of in taverns.",
-    "excerpt": "# The Old Keep Few travelers have laid eyes on the keep and returned with a clear story. Those who have speak of [[A Lost King]] — though no record of such a ruler exists in the chronicles of [[Sunhaven]].",
-    "body": "the old keep few travelers have laid eyes on the keep and returned with a clear story. those who have speak of a lost king — though no record of such a ruler exists in the chronicles of sunhaven."
-  },
-  {
-    "id": "sunhaven",
-    "title": "Sunhaven",
-    "type": "settlement",
-    "aliases": [],
-    "tags": [
-      "capital"
-    ],
-    "summary": "The shining capital on the western shore.",
-    "excerpt": "# Sunhaven Sunhaven is the seat of the realm and Astrath's largest port. Its merchants trade regularly with [[Thornhold]] and host pilgrims bound for [[The Old Keep]]. > \"All roads in the west bend toward Sunhaven.\"",
-    "body": "sunhaven sunhaven is the seat of the realm and astrath's largest port. its merchants trade regularly with thornhold and host pilgrims bound for the old keep. \"all roads in the west bend toward sunhaven.\""
-  },
-  {
-    "id": "thornhold",
-    "title": "Thornhold",
-    "type": "settlement",
-    "aliases": [
-      "Thorn Hold",
-      "The Red City"
-    ],
-    "tags": [
-      "city",
-      "mining"
-    ],
-    "summary": "A red-stone mining city carved into the southern bluffs.",
-    "excerpt": "# Thornhold Thornhold is a fortified mining city perched above the [[Raven's Vale]]. It trades iron and rare resonance crystal with [[Sunhaven]] along the King's Road. ## History Founded after the Sundering, Thornhold's walls were raised fr",
-    "body": "thornhold thornhold is a fortified mining city perched above the raven's vale. it trades iron and rare resonance crystal with sunhaven along the king's road. history founded after the sundering, thornhold's walls were raised from the same red stone that gives the city its name. travelers know it by its alias the red city . notable places - the iron gate - old market - foundry district"
   }
 ]

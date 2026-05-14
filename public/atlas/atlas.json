@@ -1,7 +1,7 @@
 {
-  "version": "2026-05-14T02-54-08-111Z",
+  "version": "2026-05-14T14-38-08-252Z",
   "schemaVersion": 1,
-  "publishedAt": "2026-05-14T02:54:08.111Z",
+  "publishedAt": "2026-05-14T14:38:08.252Z",
   "worlds": [
     {
       "id": "astrath-deeprealm",
@@ -40,158 +40,8 @@
           "zIndex": 1
         }
       ],
-      "regions": [
-        {
-          "id": "ravens-vale-region",
-          "mapId": "astrath-deeprealm-overview",
-          "name": "Raven's Vale",
-          "entityId": "ravens-vale",
-          "color": "#7fb069",
-          "fillOpacity": 0.18,
-          "strokeOpacity": 0.85,
-          "points": [
-            [
-              80000,
-              35000
-            ],
-            [
-              120000,
-              32000
-            ],
-            [
-              128000,
-              55000
-            ],
-            [
-              95000,
-              62000
-            ],
-            [
-              78000,
-              50000
-            ]
-          ],
-          "visibility": "player"
-        },
-        {
-          "id": "thornhold-domain",
-          "mapId": "astrath-deeprealm-overview",
-          "name": "Thornhold Domain",
-          "entityId": "thornhold",
-          "color": "#f4c95d",
-          "fillOpacity": 0.14,
-          "strokeOpacity": 0.85,
-          "points": [
-            [
-              40000,
-              60000
-            ],
-            [
-              70000,
-              58000
-            ],
-            [
-              72000,
-              80000
-            ],
-            [
-              42000,
-              82000
-            ]
-          ],
-          "visibility": "player"
-        }
-      ],
-      "fog": {
-        "mapId": "astrath-deeprealm-overview",
-        "enabled": true,
-        "color": "rgba(8, 12, 20, 0.55)",
-        "reveals": [
-          [
-            [
-              40000,
-              30000
-            ],
-            [
-              140000,
-              30000
-            ],
-            [
-              140000,
-              85000
-            ],
-            [
-              40000,
-              85000
-            ]
-          ]
-        ]
-      },
-      "routes": [
-        {
-          "id": "kings-road",
-          "mapId": "astrath-deeprealm-overview",
-          "name": "The King's Road",
-          "mode": "horse",
-          "speed": 6,
-          "color": "#f4c95d",
-          "weight": 3,
-          "visibility": "player",
-          "waypoints": [
-            {
-              "entityId": "thornhold"
-            },
-            {
-              "entityId": "sunhaven"
-            }
-          ],
-          "resolvedPoints": [
-            [
-              100000,
-              50000
-            ],
-            [
-              40000,
-              45000
-            ]
-          ]
-        },
-        {
-          "id": "ravens-trail",
-          "mapId": "astrath-deeprealm-overview",
-          "name": "Raven's Trail",
-          "mode": "foot",
-          "speed": 3,
-          "color": "#7fb069",
-          "dashed": true,
-          "visibility": "player",
-          "waypoints": [
-            {
-              "entityId": "sunhaven"
-            },
-            {
-              "entityId": "ravens-vale"
-            },
-            {
-              "entityId": "the-old-keep"
-            }
-          ],
-          "resolvedPoints": [
-            [
-              40000,
-              45000
-            ],
-            [
-              70000,
-              30000
-            ],
-            [
-              130000,
-              60000
-            ]
-          ]
-        }
-      ]
+      "regions": [],
+      "routes": []
     },
     {
       "id": "astrath-deeprealm-northern-reaches",
@@ -222,21 +72,19 @@
       "summary": "The Old Keep falls in a single night to a shadow that came down from the high passes.",
       "images": [],
       "body": "\r\nOn the third night of Longnight, 612 AS, the watchfires of the [[The Old Keep|Old Keep]]\r\nwent dark. Riders from [[Raven's Vale]] found the gates open and the courtyards\r\nempty by morning. Whatever passed that night left no bodies, only frost.\r\n\r\nThe keep has stood abandoned ever since.\r\n",
-      "bodyHtml": "<p>On the third night of Longnight, 612 AS, the watchfires of the <a class=\"atlas-wikilink\" data-entity-id=\"the-old-keep\" href=\"#/entity/the-old-keep\">Old Keep</a>\nwent dark. Riders from <a class=\"atlas-wikilink\" data-entity-id=\"ravens-vale\" href=\"#/entity/ravens-vale\">Raven's Vale</a> found the gates open and the courtyards\nempty by morning. Whatever passed that night left no bodies, only frost.</p>\n<p>The keep has stood abandoned ever since.</p>\n",
+      "bodyHtml": "<p>On the third night of Longnight, 612 AS, the watchfires of the <span class=\"atlas-unresolved\">Old Keep</span>\nwent dark. Riders from <span class=\"atlas-unresolved\">Raven's Vale</span> found the gates open and the courtyards\nempty by morning. Whatever passed that night left no bodies, only frost.</p>\n<p>The keep has stood abandoned ever since.</p>\n",
       "frontmatter": {},
       "sourcePath": "",
       "links": [
         {
           "target": "The Old Keep",
           "display": "Old Keep",
-          "resolvedId": "the-old-keep",
-          "broken": false
+          "broken": true
         },
         {
           "target": "Raven's Vale",
           "display": "Raven's Vale",
-          "resolvedId": "ravens-vale",
-          "broken": false
+          "broken": true
         }
       ],
       "backlinks": [],
@@ -259,7 +107,7 @@
       "summary": "Lord Garron raises the red walls of Thornhold above the iron veins of the Spinegrey range.",
       "images": [],
       "body": "\r\nForty-seven years after the [[The Sundering|Sundering]], settlers from the eastern\r\nports broke the first stones of [[Thornhold]] from the cliffside. The\r\nfoundation feast lasted nine days, ending with the lighting of the Forge of\r\nGarron — still tended today.\r\n",
-      "bodyHtml": "<p>Forty-seven years after the <a class=\"atlas-wikilink\" data-entity-id=\"the-sundering\" href=\"#/entity/the-sundering\">Sundering</a>, settlers from the eastern\nports broke the first stones of <a class=\"atlas-wikilink\" data-entity-id=\"thornhold\" href=\"#/entity/thornhold\">Thornhold</a> from the cliffside. The\nfoundation feast lasted nine days, ending with the lighting of the Forge of\nGarron — still tended today.</p>\n",
+      "bodyHtml": "<p>Forty-seven years after the <a class=\"atlas-wikilink\" data-entity-id=\"the-sundering\" href=\"#/entity/the-sundering\">Sundering</a>, settlers from the eastern\nports broke the first stones of <span class=\"atlas-unresolved\">Thornhold</span> from the cliffside. The\nfoundation feast lasted nine days, ending with the lighting of the Forge of\nGarron — still tended today.</p>\n",
       "frontmatter": {},
       "sourcePath": "",
       "links": [
@@ -272,8 +120,7 @@
         {
           "target": "Thornhold",
           "display": "Thornhold",
-          "resolvedId": "thornhold",
-          "broken": false
+          "broken": true
         }
       ],
       "backlinks": [],
@@ -296,21 +143,19 @@
       "summary": "The cataclysm that split the old continent and ended the Third Age. The new calendar reckons years from the day the sky cracked.",
       "images": [],
       "body": "\r\nWhen the Twin Moons collided in the night sky, the firmament tore and the seas\r\nboiled. Half of the old continent slid beneath the waves; what remained\r\nbecame the Astrath Deeprealm. Survivors founded the great cities of\r\n[[Thornhold]] and [[Sunhaven]] in the years that followed.\r\n\r\nThis event marks year **0** of the *After Sundering* calendar.\r\n",
-      "bodyHtml": "<p>When the Twin Moons collided in the night sky, the firmament tore and the seas\nboiled. Half of the old continent slid beneath the waves; what remained\nbecame the Astrath Deeprealm. Survivors founded the great cities of\n<a class=\"atlas-wikilink\" data-entity-id=\"thornhold\" href=\"#/entity/thornhold\">Thornhold</a> and <a class=\"atlas-wikilink\" data-entity-id=\"sunhaven\" href=\"#/entity/sunhaven\">Sunhaven</a> in the years that followed.</p>\n<p>This event marks year <strong>0</strong> of the <em>After Sundering</em> calendar.</p>\n",
+      "bodyHtml": "<p>When the Twin Moons collided in the night sky, the firmament tore and the seas\nboiled. Half of the old continent slid beneath the waves; what remained\nbecame the Astrath Deeprealm. Survivors founded the great cities of\n<span class=\"atlas-unresolved\">Thornhold</span> and <span class=\"atlas-unresolved\">Sunhaven</span> in the years that followed.</p>\n<p>This event marks year <strong>0</strong> of the <em>After Sundering</em> calendar.</p>\n",
       "frontmatter": {},
       "sourcePath": "",
       "links": [
         {
           "target": "Thornhold",
           "display": "Thornhold",
-          "resolvedId": "thornhold",
-          "broken": false
+          "broken": true
         },
         {
           "target": "Sunhaven",
           "display": "Sunhaven",
-          "resolvedId": "sunhaven",
-          "broken": false
+          "broken": true
         }
       ],
       "backlinks": [
@@ -322,225 +167,9 @@
       "dateRaw": "1 Frostmoon, 0 AS",
       "dateValue": 1,
       "dateYear": 0
-    },
-    {
-      "id": "ravens-vale",
-      "title": "Raven's Vale",
-      "type": "region",
-      "world": "astrath-deeprealm",
-      "visibility": "player",
-      "canon": "canon",
-      "aliases": [],
-      "tags": [
-        "region",
-        "wilderness"
-      ],
-      "summary": "A misty valley beneath Thornhold's bluffs.",
-      "images": [],
-      "body": "\r\n# Raven's Vale\r\n\r\nA long, mist-choked valley running south from [[Thornhold]]. Locals say the\r\nravens that nest here can speak the names of those soon to die — a rumor most\r\ntravelers prefer not to test.\r\n",
-      "bodyHtml": "<h1>Raven's Vale</h1>\n<p>A long, mist-choked valley running south from <a class=\"atlas-wikilink\" data-entity-id=\"thornhold\" href=\"#/entity/thornhold\">Thornhold</a>. Locals say the\nravens that nest here can speak the names of those soon to die — a rumor most\ntravelers prefer not to test.</p>\n",
-      "frontmatter": {},
-      "sourcePath": "",
-      "links": [
-        {
-          "target": "Thornhold",
-          "display": "Thornhold",
-          "resolvedId": "thornhold",
-          "broken": false
-        }
-      ],
-      "backlinks": [
-        {
-          "id": "fall-of-the-old-keep",
-          "title": "Fall of the Old Keep"
-        },
-        {
-          "id": "thornhold",
-          "title": "Thornhold"
-        }
-      ]
-    },
-    {
-      "id": "the-old-keep",
-      "title": "The Old Keep",
-      "type": "ruin",
-      "world": "astrath-deeprealm",
-      "visibility": "rumor",
-      "canon": "canon",
-      "aliases": [],
-      "tags": [
-        "ruin",
-        "mystery"
-      ],
-      "summary": "A crumbling fortress whispered of in taverns.",
-      "images": [],
-      "body": "\r\n# The Old Keep\r\n\r\nFew travelers have laid eyes on the keep and returned with a clear story.\r\nThose who have speak of [[A Lost King]] — though no record of such a ruler exists\r\nin the chronicles of [[Sunhaven]].\r\n",
-      "bodyHtml": "<h1>The Old Keep</h1>\n<p>Few travelers have laid eyes on the keep and returned with a clear story.\nThose who have speak of <span class=\"atlas-unresolved\">A Lost King</span> — though no record of such a ruler exists\nin the chronicles of <a class=\"atlas-wikilink\" data-entity-id=\"sunhaven\" href=\"#/entity/sunhaven\">Sunhaven</a>.</p>\n",
-      "frontmatter": {},
-      "sourcePath": "",
-      "links": [
-        {
-          "target": "A Lost King",
-          "display": "A Lost King",
-          "broken": true
-        },
-        {
-          "target": "Sunhaven",
-          "display": "Sunhaven",
-          "resolvedId": "sunhaven",
-          "broken": false
-        }
-      ],
-      "backlinks": [
-        {
-          "id": "fall-of-the-old-keep",
-          "title": "Fall of the Old Keep"
-        },
-        {
-          "id": "sunhaven",
-          "title": "Sunhaven"
-        }
-      ]
-    },
-    {
-      "id": "sunhaven",
-      "title": "Sunhaven",
-      "type": "settlement",
-      "world": "astrath-deeprealm",
-      "visibility": "player",
-      "canon": "canon",
-      "aliases": [],
-      "tags": [
-        "capital"
-      ],
-      "summary": "The shining capital on the western shore.",
-      "images": [],
-      "body": "\r\n# Sunhaven\r\n\r\nSunhaven is the seat of the realm and Astrath's largest port. Its merchants trade\r\nregularly with [[Thornhold]] and host pilgrims bound for [[The Old Keep]].\r\n\r\n> \"All roads in the west bend toward Sunhaven.\"\r\n",
-      "bodyHtml": "<h1>Sunhaven</h1>\n<p>Sunhaven is the seat of the realm and Astrath's largest port. Its merchants trade\nregularly with <a class=\"atlas-wikilink\" data-entity-id=\"thornhold\" href=\"#/entity/thornhold\">Thornhold</a> and host pilgrims bound for <a class=\"atlas-wikilink\" data-entity-id=\"the-old-keep\" href=\"#/entity/the-old-keep\">The Old Keep</a>.</p>\n<blockquote>\n<p>\"All roads in the west bend toward Sunhaven.\"</p>\n</blockquote>\n",
-      "frontmatter": {},
-      "sourcePath": "",
-      "links": [
-        {
-          "target": "Thornhold",
-          "display": "Thornhold",
-          "resolvedId": "thornhold",
-          "broken": false
-        },
-        {
-          "target": "The Old Keep",
-          "display": "The Old Keep",
-          "resolvedId": "the-old-keep",
-          "broken": false
-        }
-      ],
-      "backlinks": [
-        {
-          "id": "the-sundering",
-          "title": "The Sundering"
-        },
-        {
-          "id": "the-old-keep",
-          "title": "The Old Keep"
-        },
-        {
-          "id": "thornhold",
-          "title": "Thornhold"
-        }
-      ]
-    },
-    {
-      "id": "thornhold",
-      "title": "Thornhold",
-      "type": "settlement",
-      "world": "astrath-deeprealm",
-      "visibility": "player",
-      "canon": "canon",
-      "aliases": [
-        "Thorn Hold",
-        "The Red City"
-      ],
-      "tags": [
-        "city",
-        "mining"
-      ],
-      "summary": "A red-stone mining city carved into the southern bluffs.",
-      "images": [],
-      "body": "\r\n# Thornhold\r\n\r\nThornhold is a fortified mining city perched above the [[Raven's Vale]].\r\nIt trades iron and rare resonance crystal with [[Sunhaven]] along the King's Road.\r\n\r\n\r\n\r\n## History\r\n\r\nFounded after the Sundering, Thornhold's walls were raised from the same red\r\nstone that gives the city its name. Travelers know it by its alias *The Red City*.\r\n\r\n## Notable places\r\n\r\n- The Iron Gate\r\n- Old Market\r\n- Foundry District\r\n",
-      "bodyHtml": "<h1>Thornhold</h1>\n<p>Thornhold is a fortified mining city perched above the <a class=\"atlas-wikilink\" data-entity-id=\"ravens-vale\" href=\"#/entity/ravens-vale\">Raven's Vale</a>.\nIt trades iron and rare resonance crystal with <a class=\"atlas-wikilink\" data-entity-id=\"sunhaven\" href=\"#/entity/sunhaven\">Sunhaven</a> along the King's Road.</p>\n<h2>History</h2>\n<p>Founded after the Sundering, Thornhold's walls were raised from the same red\nstone that gives the city its name. Travelers know it by its alias <em>The Red City</em>.</p>\n<h2>Notable places</h2>\n<ul>\n<li>The Iron Gate</li>\n<li>Old Market</li>\n<li>Foundry District</li>\n</ul>\n",
-      "frontmatter": {},
-      "sourcePath": "",
-      "links": [
-        {
-          "target": "Raven's Vale",
-          "display": "Raven's Vale",
-          "resolvedId": "ravens-vale",
-          "broken": false
-        },
-        {
-          "target": "Sunhaven",
-          "display": "Sunhaven",
-          "resolvedId": "sunhaven",
-          "broken": false
-        }
-      ],
-      "backlinks": [
-        {
-          "id": "founding-of-thornhold",
-          "title": "Founding of Thornhold"
-        },
-        {
-          "id": "the-sundering",
-          "title": "The Sundering"
-        },
-        {
-          "id": "ravens-vale",
-          "title": "Raven's Vale"
-        },
-        {
-          "id": "sunhaven",
-          "title": "Sunhaven"
-        }
-      ]
     }
   ],
-  "placements": [
-    {
-      "id": "ravens-vale@astrath-deeprealm-overview",
-      "entityId": "ravens-vale",
-      "mapId": "astrath-deeprealm-overview",
-      "x": 70000,
-      "y": 30000,
-      "label": "Raven's Vale",
-      "visibility": "player"
-    },
-    {
-      "id": "the-old-keep@astrath-deeprealm-overview",
-      "entityId": "the-old-keep",
-      "mapId": "astrath-deeprealm-overview",
-      "x": 130000,
-      "y": 60000,
-      "label": "The Old Keep",
-      "visibility": "rumor"
-    },
-    {
-      "id": "sunhaven@astrath-deeprealm-overview",
-      "entityId": "sunhaven",
-      "mapId": "astrath-deeprealm-overview",
-      "x": 40000,
-      "y": 45000,
-      "label": "Sunhaven",
-      "visibility": "player"
-    },
-    {
-      "id": "thornhold@astrath-deeprealm-overview",
-      "entityId": "thornhold",
-      "mapId": "astrath-deeprealm-overview",
-      "x": 100000,
-      "y": 50000,
-      "label": "Thornhold",
-      "visibility": "player"
-    }
-  ],
+  "placements": [],
   "assets": [],
   "calendar": {
     "name": "Reckoning of the Twin Moons",
@@ -574,16 +203,14 @@
     ]
   },
   "buildReport": {
-    "scanned": 9,
-    "included": 7,
-    "excluded": 2,
-    "warnings": [
-      "content/astrath-deeprealm/_atlas/world.yaml: no schemaVersion declared — treating as legacy v1. Add \"schemaVersion: 1\" at the top of world.yaml to silence this warning."
-    ],
-    "brokenLinks": 1,
-    "unresolvedLinks": 1,
+    "scanned": 4,
+    "included": 3,
+    "excluded": 1,
+    "warnings": [],
+    "brokenLinks": 5,
+    "unresolvedLinks": 5,
     "duplicateSlugs": 0,
-    "strippedDmBlocks": 1,
+    "strippedDmBlocks": 0,
     "localAssets": 1,
     "externalAssets": 0,
     "missingAssets": 0

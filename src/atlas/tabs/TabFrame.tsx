@@ -74,9 +74,11 @@ export function TabFrame(props: TabFrameProps) {
           {warningCount > 0 && (
             <Badge variant="secondary">{warningCount} warning</Badge>
           )}
-          <span className="text-muted-foreground ml-auto">
-            {exportedAgo ? `Exported ${exportedAgo} ago` : "No export yet"}
-          </span>
+          {onExport && (
+            <span className="text-muted-foreground ml-auto">
+              {exportedAgo ? `Exported ${exportedAgo} ago` : "No export yet"}
+            </span>
+          )}
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto">

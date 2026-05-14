@@ -23,10 +23,8 @@ import type { LocalLayer } from "@/atlas/useMapLayers";
 import { dumpYaml, patchHeader } from "./dump";
 
 export type PatchKindId =
-  | "placement"
   | "world-map"
   | "entity-frontmatter"
-  | "asset-manifest"
   | "publish-report";
 
 export interface PatchArtifact {
@@ -54,7 +52,10 @@ export interface AssetManifestEntry {
 }
 
 // --------------------------------------------------------------------------
-// 1. ENTITY FRONTMATTER PATCHES (placements, images, summary, type, …)
+// 1. ENTITY FRONTMATTER PATCHES — placement patches deleted with the offline
+// export modal; the editor's Save flow now writes canonical .md frontmatter
+// directly via canonicalPlacementSave.ts. The remaining
+// buildEntityFrontmatterPatch is still used by the import wizard.
 // --------------------------------------------------------------------------
 
 export interface PlacementOverride {
@@ -66,86 +67,6 @@ export interface PlacementOverride {
   label?: string;
   /** Optional pin styling — only diff vs. the type preset is emitted. */
   pin?: import("@/atlas/pins/presets").PinOverride;
-}
-
-export interface BuildPlacementPatchOpts {
-  project: AtlasProject;
-  mapId: string;
-  /** Final effective coords per entity for this map (drafts already merged). */
-  placements: PlacementOverride[];
-}
-
-export function buildPlacementPatch(opts: BuildPlacementPatchOpts): PatchArtifact {
-  const { project, mapId, placements } = opts;
-  const map = project.maps.find((m) => m.id === mapId);
-  const mapName = map?.name ?? mapId;
-  const sections: Array<{ label: string; yaml: string }> = [];
-  const bodyParts: string[] = [];
-
-  for (const p of placements) {
-    const entity = project.entities.find((e) => e.id === p.entityId);
-    if (!entity) continue;
-    const placement: Record<string, unknown> = { mapId: p.mapId, x: p.x, y: p.y };
-    if (p.label && p.label !== entity.title) placement.label = p.label;
-    if (p.pin && Object.keys(p.pin).length > 0) placement.pin = p.pin;
-    const yamlBlock = dumpYaml({ atlas: { placements: [placement] } });
-    sections.push({ label: `${entity.title} → ${entity.sourcePath || entity.id}`, yaml: yamlBlock });
-    bodyParts.push(`# entity: ${entity.title}`);
-    bodyParts.push(`# file:   ${entity.sourcePath || entity.id}`);
-    bodyParts.push(yamlBlock.trimEnd());
-    bodyParts.push("");
-  }
-
-  const header = patchHeader({
-    title: `Entity placement patch — ${mapName}`,
-    subject: `atlas.placements on ${placements.length} entit${placements.length === 1 ? "y" : "ies"}`,
-    applyTo: "the matching entity .md frontmatter (one block per entity below)",
-    notes: [
-      "Each block REPLACES the entity's existing atlas.placements (or legacy atlas.x / atlas.y).",
-      `Or run: npm run atlas:apply-placements -- placements-${mapId}.json`,
-    ],
-  });
-
-  return {
-    kind: "placement",
-    filename: `placements-patch-${mapId}.yaml`,
-    mime: "text/yaml",
-    content: header + bodyParts.join("\n"),
-    summary: [
-      `${placements.length} entity placement${placements.length === 1 ? "" : "s"} on "${mapName}"`,
-    ],
-    sections,
-  };
-}
-
-/** Companion JSON used by `atlas:apply-placements`. */
-export function buildPlacementJson(opts: BuildPlacementPatchOpts): PatchArtifact {
-  const { project, mapId, placements } = opts;
-  const merged = placements
-    .map((p) => {
-      const e = project.entities.find((x) => x.id === p.entityId);
-      if (!e) return null;
-      const out: Record<string, unknown> = {
-        entityId: e.id,
-        sourcePath: e.sourcePath,
-        mapId: p.mapId,
-        x: p.x,
-        y: p.y,
-      };
-      // Preserve label + pin so JSON round-tripping doesn't silently drop the
-      // editor's overrides when re-applied via `atlas:apply-placements`.
-      if (p.label && p.label !== e.title) out.label = p.label;
-      if (p.pin && Object.keys(p.pin).length > 0) out.pin = p.pin;
-      return out;
-    })
-    .filter(Boolean);
-  return {
-    kind: "placement",
-    filename: `placements-${mapId}.json`,
-    mime: "application/json",
-    content: JSON.stringify(merged, null, 2),
-    summary: [`${merged.length} placement${merged.length === 1 ? "" : "s"} (machine-readable)`],
-  };
 }
 
 // --------------------------------------------------------------------------
@@ -334,49 +255,7 @@ export function buildWorldMapPatch(opts: BuildWorldMapPatchOpts): PatchArtifact 
 }
 
 // --------------------------------------------------------------------------
-// 3. ASSET PATCH MANIFEST
-// --------------------------------------------------------------------------
-
-export function buildAssetManifest(entries: AssetManifestEntry[]): PatchArtifact {
-  const lines: string[] = [
-    "# Asset manifest",
-    `# Generated ${new Date().toISOString()}`,
-    "#",
-    "# Files referenced by the world.yaml patch above. Browser uploads must be",
-    "# added to the repo at the listed targetPath; external URLs work but won't",
-    "# survive offline player builds; missing assets will fail the build.",
-    "",
-  ];
-  const grouped: Record<string, AssetManifestEntry[]> = { upload: [], external: [], missing: [], local: [] };
-  for (const a of entries) grouped[a.source].push(a);
-
-  for (const [k, arr] of Object.entries(grouped)) {
-    if (!arr.length) continue;
-    lines.push(`${k}:`);
-    for (const a of arr) {
-      lines.push(`  - filename: "${a.filename}"`);
-      lines.push(`    targetPath: "${a.targetPath}"`);
-      if (a.warning) lines.push(`    warning: "${a.warning.replace(/"/g, '\\"')}"`);
-    }
-    lines.push("");
-  }
-
-  return {
-    kind: "asset-manifest",
-    filename: "asset-manifest.yaml",
-    mime: "text/yaml",
-    content: lines.join("\n"),
-    summary: [
-      `${grouped.upload.length} upload(s) needed in repo`,
-      `${grouped.external.length} external URL(s)`,
-      `${grouped.missing.length} missing asset(s)`,
-    ].filter((l) => !l.startsWith("0 ")),
-    assets: entries,
-  };
-}
-
-// --------------------------------------------------------------------------
-// 4. PUBLISH REPORT
+// 3. PUBLISH REPORT
 // --------------------------------------------------------------------------
 
 export function buildPublishReport(opts: {
