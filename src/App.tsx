@@ -14,6 +14,15 @@ const AtlasPlacementEditor = lazy(() => import("./pages/AtlasPlacementEditor.tsx
 const AtlasTimeline = lazy(() => import("./pages/AtlasTimeline.tsx"));
 const AtlasBrowse = lazy(() => import("./pages/AtlasBrowse.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
+import { isDmToolsEnabled } from "@/atlas/dmTools";
+
+// Route-level gate. The /atlas/edit route is the editor entry point; in
+// production player builds (VITE_ENABLE_DM_TOOLS unset / not "true") we
+// must not just hide the link — the route itself must render NotFound so
+// players cannot reach the editor by typing the URL or following a stale
+// link.
+const AtlasEditorRoute = () =>
+  isDmToolsEnabled() ? <AtlasPlacementEditor /> : <NotFound />;
 
 const queryClient = new QueryClient();
 
@@ -38,7 +47,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/legacy-editor" element={<Index />} />
             <Route path="/atlas" element={<AtlasViewer />} />
-            <Route path="/atlas/edit" element={<AtlasPlacementEditor />} />
+            <Route path="/atlas/edit" element={<AtlasEditorRoute />} />
             <Route path="/atlas/timeline" element={<AtlasTimeline />} />
             <Route path="/atlas/browse" element={<AtlasBrowse mode="browse" />} />
             <Route path="/atlas/tag/:tag" element={<AtlasBrowse mode="tag" />} />

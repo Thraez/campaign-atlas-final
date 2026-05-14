@@ -27,6 +27,7 @@ function run(args: string[], opts: ExecFileSyncOptions = {}): RunResult {
       cwd: ROOT,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
       ...opts,
     });
     return { status: 0, stdout: String(stdout), stderr: "" };

@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TabFrame } from "./TabFrame";
 import { downloadText } from "./download";
+import { BuildReportPanel } from "@/atlas/publish/BuildReportPanel";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -125,6 +126,20 @@ export function PublishCheckTab({
         <Button size="sm" variant="outline" onClick={downloadReport} className="h-7 gap-1 text-xs">
           <FileDown className="h-3.5 w-3.5" /> Download report
         </Button>
+      </div>
+
+      {/* Build/CI report (loaded from public/atlas/atlas.json buildReport).
+          Reflects what the last shipped build flagged — the in-memory
+          validator above covers the live editor draft. */}
+      <div className="space-y-1.5 pt-1">
+        <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+          Last build report
+        </div>
+        <BuildReportPanel
+          report={project.buildReport}
+          atlasVersion={project.version}
+          publishedAt={project.publishedAt}
+        />
       </div>
 
       {/* Categorized issue list */}

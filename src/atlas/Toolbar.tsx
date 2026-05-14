@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { defaultAtlas } from "@/atlas/types";
 import { useRef } from "react";
 import { Link } from "react-router-dom";
+import { isDmToolsEnabled } from "@/atlas/dmTools";
+import { atlasImportSchema, formatZodError } from "@/atlas/schemas/imports";
 
 interface Props {
   onSaveCloud?: () => void;
@@ -20,6 +22,7 @@ export function Toolbar({ onSaveCloud, onSignOut, signedIn }: Props) {
   const atlas = useAtlas((s) => s.atlas);
   const setAtlas = useAtlas((s) => s.setAtlas);
   const fileRef = useRef<HTMLInputElement>(null);
+  const dmTools = isDmToolsEnabled();
 
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(atlas, null, 2)], { type: "application/json" });
@@ -33,14 +36,23 @@ export function Toolbar({ onSaveCloud, onSignOut, signedIn }: Props) {
   const importJson = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
+      // Boundary validation: legacy atlas JSON files may come from old
+      // exports or hand-edited disks. Reject malformed input with a useful
+      // error before it reaches reducers / renderers.
+      let raw: unknown;
       try {
-        const parsed = JSON.parse(String(reader.result));
-        if (!parsed.world || !parsed.pins) throw new Error("Missing required fields");
-        setAtlas({ ...defaultAtlas(), ...parsed });
-        toast.success("Atlas imported");
-      } catch (e: any) {
-        toast.error("Invalid atlas JSON: " + e.message);
+        raw = JSON.parse(String(reader.result));
+      } catch (e) {
+        toast.error(`Invalid atlas JSON: ${(e as Error).message}`);
+        return;
       }
+      const parsed = atlasImportSchema.safeParse(raw);
+      if (!parsed.success) {
+        toast.error(`Invalid atlas JSON: ${formatZodError(parsed.error)}`);
+        return;
+      }
+      setAtlas({ ...defaultAtlas(), ...(parsed.data as unknown as Partial<ReturnType<typeof defaultAtlas>>) });
+      toast.success("Atlas imported");
     };
     reader.readAsText(file);
   };
@@ -71,9 +83,11 @@ export function Toolbar({ onSaveCloud, onSignOut, signedIn }: Props) {
         <ToolBtn id="measure" icon={Ruler} label="Measure" />
       </div>
       <div className="flex-1" />
-      <Button asChild size="sm" variant="ghost" className="atlas-tool-button gap-1" title="Drag-and-drop placement editor for the markdown atlas">
-        <Link to="/atlas/edit"><MapPin className="h-4 w-4" /><span className="hidden md:inline">Placements</span></Link>
-      </Button>
+      {dmTools && (
+        <Button asChild size="sm" variant="ghost" className="atlas-tool-button gap-1" title="Drag-and-drop placement editor for the markdown atlas">
+          <Link to="/atlas/edit"><MapPin className="h-4 w-4" /><span className="hidden md:inline">Placements</span></Link>
+        </Button>
+      )}
       <Button asChild size="sm" variant="ghost" className="atlas-tool-button gap-1" title="Open player atlas">
         <Link to="/atlas"><Compass className="h-4 w-4" /><span className="hidden md:inline">Player Atlas</span></Link>
       </Button>
