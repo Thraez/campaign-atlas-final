@@ -10,19 +10,22 @@ import Landing from "./pages/Landing.tsx";
 const Index = lazy(() => import("./pages/Index.tsx"));
 const Auth = lazy(() => import("./pages/Auth.tsx"));
 const AtlasViewer = lazy(() => import("./pages/AtlasViewer.tsx"));
-const AtlasPlacementEditor = lazy(() => import("./pages/AtlasPlacementEditor.tsx"));
+// Editor route is build-gated. In player production builds __INCLUDE_EDITOR__
+// is replaced with `false` at build time, so this `import()` is dead-coded
+// and AtlasPlacementEditor.tsx never enters the player bundle.
+const AtlasPlacementEditor = __INCLUDE_EDITOR__
+  ? lazy(() => import("./pages/AtlasPlacementEditor.tsx"))
+  : null;
 const AtlasTimeline = lazy(() => import("./pages/AtlasTimeline.tsx"));
 const AtlasBrowse = lazy(() => import("./pages/AtlasBrowse.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 
-// Route-level gate. The /atlas/edit route is the editor entry point; in
-// production player builds (VITE_ENABLE_DM_TOOLS unset / not "true") we
-// must not just hide the link — the route itself must render NotFound so
-// players cannot reach the editor by typing the URL or following a stale
-// link.
+// Route-level gate. In editor builds, the route additionally honors the
+// runtime DM-tools flag so a deployed editor build can still suppress
+// the editor for non-DMs; in player builds the route isn't mounted at all.
 const AtlasEditorRoute = () =>
-  isDmToolsEnabled() ? <AtlasPlacementEditor /> : <NotFound />;
+  AtlasPlacementEditor && isDmToolsEnabled() ? <AtlasPlacementEditor /> : <NotFound />;
 
 const queryClient = new QueryClient();
 
@@ -47,7 +50,9 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/legacy-editor" element={<Index />} />
             <Route path="/atlas" element={<AtlasViewer />} />
-            <Route path="/atlas/edit" element={<AtlasEditorRoute />} />
+            {AtlasPlacementEditor && (
+              <Route path="/atlas/edit" element={<AtlasEditorRoute />} />
+            )}
             <Route path="/atlas/timeline" element={<AtlasTimeline />} />
             <Route path="/atlas/browse" element={<AtlasBrowse mode="browse" />} />
             <Route path="/atlas/tag/:tag" element={<AtlasBrowse mode="tag" />} />
