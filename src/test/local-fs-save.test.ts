@@ -89,6 +89,39 @@ describe("saveAtlasPatchToLocalFs", () => {
     ).rejects.toBeInstanceOf(LocalSaveError);
   });
 
+  it("sends rebuild:true when opts.rebuild is set", async () => {
+    let captured = "";
+    const fetchFn = vi.fn(async (_url: string, init?: RequestInit) => {
+      captured = String(init?.body);
+      return jsonResponse(200, { written: 1, paths: ["content/world/notes/ok.md"], build: { ok: true, durationMs: 42 } });
+    });
+    const result = await saveAtlasPatchToLocalFs(
+      [{ path: "content/world/notes/ok.md", contents: "x" }],
+      { fetchFn: fetchFn as unknown as typeof fetch },
+      { rebuild: true },
+    );
+    expect(JSON.parse(captured)).toEqual({
+      changes: [{ path: "content/world/notes/ok.md", contents: "x" }],
+      rebuild: true,
+    });
+    expect(result.build).toEqual({ ok: true, durationMs: 42 });
+  });
+
+  it("does NOT send rebuild flag when opts is omitted", async () => {
+    let captured = "";
+    const fetchFn = vi.fn(async (_url: string, init?: RequestInit) => {
+      captured = String(init?.body);
+      return jsonResponse(200, { written: 1, paths: ["content/world/notes/ok.md"] });
+    });
+    await saveAtlasPatchToLocalFs(
+      [{ path: "content/world/notes/ok.md", contents: "x" }],
+      { fetchFn: fetchFn as unknown as typeof fetch },
+    );
+    expect(JSON.parse(captured)).toEqual({
+      changes: [{ path: "content/world/notes/ok.md", contents: "x" }],
+    });
+  });
+
   it("preserves non-ASCII contents in body byte-for-byte", async () => {
     const text = "Genn's Door – äöü 你好";
     let captured = "";

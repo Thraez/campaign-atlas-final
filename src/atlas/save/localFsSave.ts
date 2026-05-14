@@ -16,9 +16,17 @@ export interface FileChange {
   contents: string;
 }
 
+export interface LocalSaveBuildInfo {
+  ok: boolean;
+  durationMs: number;
+  stderr?: string;
+}
+
 export interface LocalSaveResult {
   written: number;
   paths: string[];
+  /** Present when the save endpoint was asked to rebuild the atlas. */
+  build?: LocalSaveBuildInfo;
 }
 
 export class DisallowedPathError extends Error {
@@ -50,9 +58,15 @@ function utf8ByteLength(s: string): number {
   return Buffer.byteLength(s, "utf8");
 }
 
+export interface SaveOpts {
+  /** Ask the dev plugin to run the atlas build after writes. Dev-only. */
+  rebuild?: boolean;
+}
+
 export async function saveAtlasPatchToLocalFs(
   changes: FileChange[],
   deps?: LocalSaveDeps,
+  opts?: SaveOpts,
 ): Promise<LocalSaveResult> {
   if (!Array.isArray(changes) || changes.length === 0) {
     throw new LocalSaveError("No changes to save");
@@ -70,10 +84,12 @@ export async function saveAtlasPatchToLocalFs(
   }
 
   const fetchFn = deps?.fetchFn ?? fetch;
+  const body: Record<string, unknown> = { changes };
+  if (opts?.rebuild) body.rebuild = true;
   const res = await fetchFn(ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ changes }),
+    body: JSON.stringify(body),
   });
 
   let parsed: unknown = undefined;
