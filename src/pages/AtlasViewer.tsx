@@ -496,6 +496,11 @@ function WrappedWorld({ dx, map, placements, entityById, showFog, showGrid, onOp
             }}
             eventHandlers={region.entityId ? { click: () => onOpenEntity(region.entityId!, false) } : undefined}
           >
+            {/* Hover label so users don't rely on fill color alone to identify
+                a region (WCAG 1.4.1). Click still opens the full popup. */}
+            <Tooltip sticky direction="top" opacity={0.95}>
+              <div className="text-xs font-medium">{region.name}</div>
+            </Tooltip>
             <Popup>
               <div className="text-sm font-medium">{region.name}</div>
               {ent?.summary && <div className="text-xs opacity-70">{ent.summary}</div>}

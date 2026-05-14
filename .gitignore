@@ -29,3 +29,7 @@ dist-ssr
 # Atlas backups (zip snapshots from `npm run atlas:backup`)
 backups/
 
+# Claude Code worktrees (live inside the main checkout but each has its own
+# .git pointer; never stage them from the main repo).
+.claude/worktrees/
+

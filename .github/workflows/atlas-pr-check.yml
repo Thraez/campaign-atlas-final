@@ -1,0 +1,50 @@
+# PR safety scans for the campaign atlas.
+#
+# Runs on every pull request against main to catch DM/secret leaks before
+# they merge. The full publish + deploy flow lives in publish-atlas.yml and
+# still runs on push-to-main; this workflow only builds and scans, never
+# deploys.
+
+name: Atlas PR Check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build player-safe atlas (strict)
+        run: npm run atlas:build:player
+
+      - name: Build site
+        env:
+          ATLAS_BASE: /${{ github.event.repository.name }}/
+        run: npm run build
+
+      - name: Scan built artifact for sentinel and shape leaks
+        run: |
+          npm run atlas:check-secrets dist
+          npm run atlas:check-secrets public/atlas
+          npm run atlas:check-shape public/atlas/atlas.json
+
+      - name: Scan built artifact for derived-secret leaks
+        # Names/aliases of dm/hidden entities derived from the source vault
+        # must not appear in the player artifact.
+        run: |
+          npm run atlas:check-derived dist
+          npm run atlas:check-derived public/atlas
