@@ -16,7 +16,7 @@
     "atlas:build": "tsx scripts/build-atlas.ts",
     "atlas:build:player": "tsx scripts/build-atlas.ts --player --strict",
     "atlas:snapshot": "tsx scripts/atlas/snapshot-baseline.ts",
-    "atlas:publish": "npm run atlas:snapshot && npm run atlas:build:player && npm run build && npm run atlas:check-secrets dist && npm run atlas:check-secrets public/atlas && npm run atlas:check-shape public/atlas/atlas.json && npm run atlas:check-derived dist && npm run atlas:check-derived public/atlas",
+    "atlas:publish": "npm run atlas:snapshot && npm run atlas:build:player && npm run build && npm run atlas:check-secrets dist && npm run atlas:check-secrets public/atlas && npm run atlas:check-shape public/atlas/atlas.json && npm run atlas:check-derived dist && npm run atlas:check-derived public/atlas && npm run atlas:audit-assets",
     "atlas:check-secrets": "tsx scripts/check-no-secrets.ts",
     "atlas:check-derived": "tsx scripts/check-derived-secrets.ts",
     "atlas:check-shape": "tsx scripts/check-artifact-shape.ts",
