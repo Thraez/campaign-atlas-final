@@ -62,6 +62,20 @@
   h1, h2, h3, h4 { font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif; letter-spacing: 0; }
 }
 
+/* Player-viewer pin (atlas-viewer-pin class on Leaflet DivIcon).
+   The hit area is 44x44 (WCAG 2.5.5 touch target). The SVG inside is
+   smaller (~22px); we center it so the visible pin sits at the geographic
+   point, while the hit area is friendly to fat fingers on mobile. */
+.atlas-viewer-pin {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: auto;
+}
+.atlas-viewer-pin > svg {
+  pointer-events: none;
+}
+
 /* Leaflet overrides for fantasy theme */
 .leaflet-container {
   background: hsl(var(--ocean));

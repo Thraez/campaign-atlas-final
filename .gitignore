@@ -26,3 +26,6 @@ dist-ssr
 # Atlas DM-only build output (contains spoilers; never commit)
 .local-atlas/
 
+# Atlas backups (zip snapshots from `npm run atlas:backup`)
+backups/
+

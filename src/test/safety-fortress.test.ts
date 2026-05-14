@@ -290,7 +290,7 @@ describe("safety fortress: end-to-end spoiler leak gates", () => {
       outDir,
     ]);
     expect(res.status).toBe(1);
-    expect(`${res.stdout}${res.stderr}`).toMatch(/unbalanced %%/i);
+    expect(`${res.stdout}${res.stderr}`).toMatch(/unbalanced (DM delimiter|%%)/i);
   });
 
   it("DM build leaves DM secrets in body but does NOT ship %% in summary/labels", () => {

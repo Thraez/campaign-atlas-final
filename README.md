@@ -1,5 +1,18 @@
 AstrathDeeprealm Atlas
 A static, GitHub Pages hosted interactive fantasy atlas and wiki for D&D worlds.
+
+For most readers, start with the focused docs in [docs/](docs/):
+
+- [docs/QUICK_START.md](docs/QUICK_START.md) — zero to published in 10 minutes.
+- [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md) — what this is and who it's for.
+- [docs/VISIBILITY_AND_PLAYER_SAFETY.md](docs/VISIBILITY_AND_PLAYER_SAFETY.md) — how DM content stays hidden.
+- [docs/WORKFLOWS.md](docs/WORKFLOWS.md) — daily session-prep loop, save plugin, rollback.
+- [docs/IMPORT_EXPORT.md](docs/IMPORT_EXPORT.md) — bringing in an Obsidian vault, backups.
+- [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) — Obsidian feature support, constraints.
+- [docs/NON_GOALS.md](docs/NON_GOALS.md) — what we won't build.
+
+The rest of this file is the long-form design doc. It covers the same ground as the focused docs in greater depth.
+
 Architecture rule: Obsidian markdown and YAML are the source of truth. The app does not own canon lore. The app reads selected markdown files, parses YAML frontmatter and Obsidian wikilinks, reads `world.yaml`, then generates static atlas data for the React viewer.
 The intended workflow is:
 ```text

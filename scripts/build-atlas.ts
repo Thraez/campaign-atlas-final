@@ -324,7 +324,7 @@ async function main() {
     const { text: noDmStripped, count: cStripped, unbalanced } = stripDmBlocks(parsed.body);
     detectedDmBlocks += cStripped;
     if (unbalanced) {
-      errors.push(`${rel}: body has an unbalanced %% delimiter — likely an unclosed DM block. Add the closing %% (or remove the stray one).`);
+      errors.push(`${rel}: body has an unbalanced DM delimiter — likely an unclosed %%...%% block or an unclosed :::dm...::: callout. Add the closing fence (or remove the stray opener).`);
     }
     const noDm = flags.player ? noDmStripped : parsed.body;
     if (flags.player) strippedDmBlocks += cStripped;
