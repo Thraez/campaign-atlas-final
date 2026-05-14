@@ -1,3 +1,4 @@
+schemaVersion: 1
 maps:
   - id: sentinel-world-overview
     name: Overview
