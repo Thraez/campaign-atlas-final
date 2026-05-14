@@ -7,7 +7,7 @@
  *
  * No GitHub API, no auth — guarded disk writes only.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -71,7 +71,7 @@ export function DiffPreviewModal({ open, changes, previousContents, onClose }: D
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
 
   // Reset internal phase whenever the modal is reopened.
-  useMemo(() => {
+  useEffect(() => {
     if (open) {
       setPhase({ kind: "review" });
       setExpanded({});
