@@ -301,7 +301,7 @@ export default function AtlasViewer() {
         <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
           <Link to="/atlas/timeline" title="Timeline of dated entries"><CalendarClock className="h-4 w-4 mr-1" aria-hidden="true" />Timeline</Link>
         </Button>
-        {isDmToolsEnabled() && (
+        {__INCLUDE_EDITOR__ && isDmToolsEnabled() && (
           <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
             <Link to="/atlas/edit" title="DM placement editor">Edit pins</Link>
           </Button>

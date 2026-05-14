@@ -83,7 +83,7 @@ export function Toolbar({ onSaveCloud, onSignOut, signedIn }: Props) {
         <ToolBtn id="measure" icon={Ruler} label="Measure" />
       </div>
       <div className="flex-1" />
-      {dmTools && (
+      {__INCLUDE_EDITOR__ && dmTools && (
         <Button asChild size="sm" variant="ghost" className="atlas-tool-button gap-1" title="Drag-and-drop placement editor for the markdown atlas">
           <Link to="/atlas/edit"><MapPin className="h-4 w-4" /><span className="hidden md:inline">Placements</span></Link>
         </Button>

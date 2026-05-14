@@ -7,9 +7,14 @@ const allTiles = [
   { to: "/atlas", title: "Player Atlas", icon: Map,
     desc: "The published, player-safe map and wiki. DM-only entries are physically removed before publish.",
     cta: "Open the atlas →" },
-  { to: "/atlas/edit", title: "DM Placement & Map Editor", icon: MapPin,
-    desc: "Place pins on maps, manage map image layers, and export YAML patches you can commit to GitHub.",
-    cta: "Open editor →", badge: "DM", dmOnly: true },
+  // Editor tile is build-gated. In player production builds __INCLUDE_EDITOR__
+  // is replaced with `false`, so this entry (and the literal "/atlas/edit"
+  // href) is dead-coded out of the bundle entirely.
+  ...(__INCLUDE_EDITOR__
+    ? [{ to: "/atlas/edit", title: "DM Placement & Map Editor", icon: MapPin,
+        desc: "Place pins on maps, manage map image layers, and export YAML patches you can commit to GitHub.",
+        cta: "Open editor →", badge: "DM", dmOnly: true } as const]
+    : []),
   { to: "/atlas/browse", title: "Browse", icon: BookOpen,
     desc: "Alphabetical directory plus tag and type landing pages.",
     cta: "Browse entries →" },
@@ -69,7 +74,9 @@ export default function Landing() {
         <section className="space-y-3 border-t border-border pt-6">
           <h2 className="font-display text-xl">How saving actually works</h2>
           <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-5">
-            <li><strong>Local browser draft</strong> — placement and layer edits in <code>/atlas/edit</code> are autosaved to your browser. Nothing leaves your machine until you export.</li>
+            {__INCLUDE_EDITOR__ && (
+              <li><strong>Local browser draft</strong> — placement and layer edits in <code>/atlas/edit</code> are autosaved to your browser. Nothing leaves your machine until you export.</li>
+            )}
             <li><strong>Exported YAML patch</strong> — placements and map layers are exported as YAML/JSON snippets you paste into <code>content/&lt;world&gt;/_atlas/world.yaml</code> or run through <code>npm run atlas:apply-placements</code>.</li>
             <li><strong>Asset bundle</strong> — uploaded images live as previews in your browser. To publish them, save the file into <code>public/atlas/assets/maps/</code> and commit it.</li>
             <li><strong>Player-safe published atlas</strong> — <code>npm run atlas:publish</code> runs the player build (strict) and Vite build. The GitHub Action does this on every push to <code>main</code>.</li>
