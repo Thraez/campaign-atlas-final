@@ -1,11 +1,6 @@
 import { describe, it, expect } from "vitest";
 import yaml from "js-yaml";
-import {
-  buildPlacementPatch,
-  buildWorldMapPatch,
-  buildAssetManifest,
-  type PlacementOverride,
-} from "@/atlas/yaml/buildPatches";
+import { buildWorldMapPatch } from "@/atlas/yaml/buildPatches";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { validatePatchYaml } from "@/atlas/yaml/validatePatch";
 import type { AtlasProject, MapDocument, Entity } from "@/atlas/content/schema";
@@ -34,40 +29,10 @@ const project: AtlasProject = {
   assets: [],
 };
 
-describe("buildPlacementPatch", () => {
-  it("produces parseable YAML with one entity block per placement", () => {
-    const placements: PlacementOverride[] = [{ entityId: "town", mapId: "m1", x: 100, y: 200 }];
-    const a = buildPlacementPatch({ project, mapId: "m1", placements });
-    expect(a.filename).toBe("placements-patch-m1.yaml");
-    const validation = validatePatchYaml(a.content, "placement");
-    expect(validation.ok).toBe(true);
-    expect(a.summary[0]).toMatch(/1 entity placement/);
-  });
-});
-
-describe("buildPlacementJson label/pin round-trip", () => {
-  it("preserves label and pin overrides in JSON output", async () => {
-    const { buildPlacementJson } = await import("@/atlas/yaml/buildPatches");
-    const placements: PlacementOverride[] = [{
-      entityId: "town", mapId: "m1", x: 10, y: 20,
-      label: "Custom Town Name",
-      pin: { color: "#ff0000", shape: "star" },
-    }];
-    const a = buildPlacementJson({ project, mapId: "m1", placements });
-    const parsed = JSON.parse(a.content) as Array<Record<string, unknown>>;
-    expect(parsed[0].label).toBe("Custom Town Name");
-    expect(parsed[0].pin).toEqual({ color: "#ff0000", shape: "star" });
-  });
-
-  it("omits label when it equals entity title (clean output)", async () => {
-    const { buildPlacementJson } = await import("@/atlas/yaml/buildPatches");
-    const a = buildPlacementJson({
-      project, mapId: "m1",
-      placements: [{ entityId: "town", mapId: "m1", x: 1, y: 2, label: "Town" }],
-    });
-    expect(JSON.parse(a.content)[0].label).toBeUndefined();
-  });
-});
+// buildPlacementPatch / buildPlacementJson / buildAssetManifest were removed
+// when the offline-export modal was deleted. The canonical save flow in
+// src/atlas/save/canonicalPlacementSave.ts owns this path now (see
+// src/test/canonical-placement-save.test.ts for its round-trip coverage).
 
 describe("buildWorldMapPatch nested geometry preservation", () => {
   it("echoes existing regions/routes/fog when not overridden", async () => {
@@ -123,17 +88,6 @@ describe("buildWorldMapPatch", () => {
     const ext = [{ ...map.layers[0], src: "https://cdn.example.com/x.jpg" }];
     const a = buildWorldMapPatch({ map, mergedLayers: ext, localLayers: [] });
     expect(a.assets?.some((x) => x.source === "external")).toBe(true);
-  });
-});
-
-describe("buildAssetManifest", () => {
-  it("groups by source", () => {
-    const m = buildAssetManifest([
-      { filename: "a.jpg", targetPath: "public/a.jpg", source: "upload" },
-      { filename: "b.jpg", targetPath: "https://x/b.jpg", source: "external" },
-    ]);
-    expect(m.content).toMatch(/upload:/);
-    expect(m.content).toMatch(/external:/);
   });
 });
 

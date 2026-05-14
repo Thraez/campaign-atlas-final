@@ -18,8 +18,7 @@
     "atlas:publish": "npm run atlas:build:player && npm run build && npm run atlas:check-secrets dist && npm run atlas:check-secrets public/atlas && npm run atlas:check-shape public/atlas/atlas.json && npm run atlas:check-derived dist && npm run atlas:check-derived public/atlas",
     "atlas:check-secrets": "tsx scripts/check-no-secrets.ts",
     "atlas:check-derived": "tsx scripts/check-derived-secrets.ts",
-    "atlas:check-shape": "tsx scripts/check-artifact-shape.ts",
-    "atlas:apply-placements": "tsx scripts/apply-placements.ts"
+    "atlas:check-shape": "tsx scripts/check-artifact-shape.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -50,7 +49,6 @@
     "@radix-ui/react-toggle": "^1.1.9",
     "@radix-ui/react-toggle-group": "^1.1.10",
     "@radix-ui/react-tooltip": "^1.2.7",
-    "@supabase/supabase-js": "^2.105.3",
     "@tanstack/react-query": "^5.83.0",
     "@types/leaflet": "^1.9.21",
     "class-variance-authority": "^0.7.1",

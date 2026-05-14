@@ -12,6 +12,8 @@
 # (```yaml) from exported patch files into this file — only paste the YAML
 # inside the fence. A build-time check will fail loudly if fences slip in.
 
+schemaVersion: 1
+
 maps:
   - id: astrath-deeprealm-overview
     name: Overview
@@ -45,66 +47,12 @@ maps:
     wrapX: false
     layers: []
 
-regions:
-  - id: ravens-vale-region
-    mapId: astrath-deeprealm-overview
-    name: Raven's Vale
-    entityId: ravens-vale
-    color: "#7fb069"
-    fillOpacity: 0.18
-    visibility: player
-    points:
-      - [80000, 35000]
-      - [120000, 32000]
-      - [128000, 55000]
-      - [95000, 62000]
-      - [78000, 50000]
-
-  - id: thornhold-domain
-    mapId: astrath-deeprealm-overview
-    name: Thornhold Domain
-    entityId: thornhold
-    color: "#f4c95d"
-    fillOpacity: 0.14
-    visibility: player
-    points:
-      - [40000, 60000]
-      - [70000, 58000]
-      - [72000, 80000]
-      - [42000, 82000]
-
-fog:
-  - mapId: astrath-deeprealm-overview
-    enabled: true
-    color: "rgba(8, 12, 20, 0.55)"
-    reveals:
-      - [[40000, 30000], [140000, 30000], [140000, 85000], [40000, 85000]]
-
-routes:
-  - id: kings-road
-    mapId: astrath-deeprealm-overview
-    name: The King's Road
-    mode: horse
-    speed: 6
-    color: "#f4c95d"
-    weight: 3
-    visibility: player
-    waypoints:
-      - thornhold
-      - sunhaven
-
-  - id: ravens-trail
-    mapId: astrath-deeprealm-overview
-    name: Raven's Trail
-    mode: foot
-    speed: 3
-    color: "#7fb069"
-    dashed: true
-    visibility: player
-    waypoints:
-      - sunhaven
-      - ravens-vale
-      - the-old-keep
+# Regions, routes, and fog were tied to the deleted placeholder entities
+# (thornhold / sunhaven / ravens-vale / the-old-keep). Add new entries here
+# when real content lands.
+regions: []
+routes: []
+fog: []
 
 calendar:
   name: Reckoning of the Twin Moons
