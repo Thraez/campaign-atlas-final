@@ -1,20 +1,15 @@
-# World map patch — Overview (astrath-deeprealm-overview)
-# Generated 2026-05-14T20:41:50.646Z
-# Subject: world.yaml > maps[id=astrath-deeprealm-overview]
+# Astrath Deeprealm — map / region / fog / route / calendar config.
 #
-# CANON MODEL:
-#   YAML / Markdown frontmatter is the source of truth.
-#   This file is a TOOL-GENERATED PATCH against that canon — never edit
-#   public/atlas/atlas.json or search-index.json by hand (those are derived).
+# CANON: YAML / Markdown frontmatter is the source of truth. Generated
+# artifacts (public/atlas/atlas.json, search-index.json) are DERIVED — never
+# edit them by hand. Visual edits in /atlas/edit emit a YAML patch that is
+# pasted here and committed.
 #
-# HOW TO APPLY:
-#   Paste the YAML below into content/<world>/_atlas/world.yaml (replace the matching map entry).
-#   Do NOT paste the leading "#" comment lines.
-#   Do NOT wrap in markdown code fences (```yaml).
-#
-# Preserves your unrelated maps[]/regions[]/routes[]/fog[]/calendar sections —
-# only this map's entry is replaced.
-# Asset checklist: 6 upload(s) — see asset manifest.
+# IMPORTANT: This file must be PURE YAML. Do NOT paste markdown code fences
+# (```yaml) from exported patch files.
+
+schemaVersion: 1
+
 maps:
   - id: astrath-deeprealm-overview
     name: Overview
@@ -31,16 +26,8 @@ maps:
       color: rgba(255,255,255,0.06)
       enabled: false
     layers:
-      - id: overview-map
-        src: atlas/assets/maps/map.jpg
-        x: 0
-        "y": 0
-        width: 1563
-        height: 782
-        opacity: 1
-        zIndex: 1
       - id: upload-1778790358938-0-chatgpt-image-may-4-2026
-        src: /atlas/assets/maps/chatgpt-image-may-4-2026-09_15_31-pm-4-.png
+        src: atlas/assets/maps/chatgpt-image-may-4-2026-09_15_31-pm-4-.png
         x: 100000
         "y": 0
         width: 31250
@@ -48,7 +35,7 @@ maps:
         opacity: 1
         zIndex: 20
       - id: upload-1778790368852-0-chatgpt-image-may-4-2026
-        src: /atlas/assets/maps/chatgpt-image-may-4-2026-09_15_32-pm-5-.png
+        src: atlas/assets/maps/chatgpt-image-may-4-2026-09_15_32-pm-5-.png
         x: 10000
         "y": 83000
         width: 24700
@@ -56,7 +43,7 @@ maps:
         opacity: 1
         zIndex: 20
       - id: upload-1778790373361-0-chatgpt-image-may-4-2026
-        src: /atlas/assets/maps/chatgpt-image-may-4-2026-09_15_32-pm-6-.png
+        src: atlas/assets/maps/chatgpt-image-may-4-2026-09_15_32-pm-6-.png
         x: 5000
         "y": 40000
         width: 37116
@@ -64,7 +51,7 @@ maps:
         opacity: 1
         zIndex: 20
       - id: upload-1778790377488-0-chatgpt-image-may-4-2026
-        src: /atlas/assets/maps/chatgpt-image-may-4-2026-09_15_30-pm-1-.png
+        src: atlas/assets/maps/chatgpt-image-may-4-2026-09_15_30-pm-1-.png
         x: 159276
         "y": 9457
         width: 41756
@@ -72,7 +59,7 @@ maps:
         opacity: 1
         zIndex: 20
       - id: upload-1778790382442-0-chatgpt-image-may-4-2026
-        src: /atlas/assets/maps/chatgpt-image-may-4-2026-09_15_30-pm-2-.png
+        src: atlas/assets/maps/chatgpt-image-may-4-2026-09_15_30-pm-2-.png
         x: 140000
         "y": 60000
         width: 55050
@@ -80,7 +67,7 @@ maps:
         opacity: 1
         zIndex: 20
       - id: upload-1778790407722-0-chatgpt-image-may-4-2026
-        src: /atlas/assets/maps/chatgpt-image-may-4-2026-09_15_31-pm-3-.png
+        src: atlas/assets/maps/chatgpt-image-may-4-2026-09_15_31-pm-3-.png
         x: 77981
         "y": 33482
         width: 61930

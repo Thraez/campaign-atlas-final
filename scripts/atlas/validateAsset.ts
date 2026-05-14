@@ -24,9 +24,9 @@
 import fs from "node:fs";
 import path from "node:path";
 
-/** Per-file size budget for shipped image assets. 2 MB is a generous default
- *  for hand-painted maps; raise per project if needed. */
-export const ASSET_SIZE_BUDGET_BYTES = 2 * 1024 * 1024;
+/** Per-file size budget for shipped image assets. 5 MB suits zoomable
+ *  hand-painted atlas maps where detail matters; raise per project if needed. */
+export const ASSET_SIZE_BUDGET_BYTES = 5 * 1024 * 1024;
 
 /** Image extensions safe to ship to a static host. */
 export const ALLOWED_IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".webp"] as const;
