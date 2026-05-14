@@ -51,7 +51,7 @@ export function Toolbar({ onSaveCloud, onSignOut, signedIn }: Props) {
         toast.error(`Invalid atlas JSON: ${formatZodError(parsed.error)}`);
         return;
       }
-      setAtlas({ ...defaultAtlas(), ...(parsed.data as Partial<ReturnType<typeof defaultAtlas>>) });
+      setAtlas({ ...defaultAtlas(), ...(parsed.data as unknown as Partial<ReturnType<typeof defaultAtlas>>) });
       toast.success("Atlas imported");
     };
     reader.readAsText(file);
