@@ -19,6 +19,7 @@ import { MapSettingsPanel } from "@/atlas/MapSettingsPanel";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { validatePatchYaml } from "@/atlas/yaml/validatePatch";
+import { overridesSchema } from "@/atlas/schemas/imports";
 import { classifyDraftStatus } from "@/atlas/yaml/canon";
 import { DraftStatusBadge } from "@/atlas/yaml/StatusBadge";
 import {
@@ -72,6 +73,24 @@ interface Overrides {
 
 const overrideKey = (mapId: string, entityId: string) => `${mapId}:${entityId}`;
 
+/**
+ * Boundary-validate an overrides JSON string from localStorage. Malformed
+ * entries (corrupt browser storage, hand-edited DevTools) are dropped per
+ * key rather than crashing the editor. Returns an empty object on total
+ * failure.
+ */
+function safeParseOverrides(raw: string): Overrides {
+  let json: unknown;
+  try { json = JSON.parse(raw); } catch { return {}; }
+  const parsed = overridesSchema.safeParse(json);
+  if (!parsed.success) return {};
+  const out: Overrides = {};
+  for (const [k, v] of Object.entries(parsed.data)) {
+    out[k] = v as Override;
+  }
+  return out;
+}
+
 function pinDivIcon(color: string, shape: import("@/atlas/pins/presets").PinShape, opts?: { pulse?: boolean }): L.DivIcon {
   return L.divIcon({
     className: "atlas-edit-pin",
@@ -104,15 +123,15 @@ export default function AtlasPlacementEditor() {
   const [overrides, setOverrides] = useState<Overrides>(() => {
     try {
       const v3 = localStorage.getItem(STORAGE_KEY);
-      if (v3) return JSON.parse(v3);
+      if (v3) return safeParseOverrides(v3);
       // Forward-migration: v2 entries are already keyed by `${mapId}:${entityId}`
       // and only carry x/y — directly compatible with the v3 shape.
       const v2raw = localStorage.getItem(LEGACY_STORAGE_KEY_V2);
-      if (v2raw) return JSON.parse(v2raw);
+      if (v2raw) return safeParseOverrides(v2raw);
       // v1 was entityId-keyed; defer mapId resolution until project loads.
       const v1raw = localStorage.getItem(LEGACY_STORAGE_KEY_V1);
       if (!v1raw) return {};
-      const v1 = JSON.parse(v1raw) as Record<string, Override>;
+      const v1 = safeParseOverrides(v1raw);
       const migrated: Overrides = {};
       Object.entries(v1).forEach(([eid, val]) => { migrated[`__legacy__:${eid}`] = val; });
       return migrated;
