@@ -38,6 +38,9 @@ const ROOT = path.resolve(__dirname, "../..");
 const FIXTURE = path.resolve(__dirname, "fixtures/atlas-build");
 const SCRIPT = path.resolve(ROOT, "scripts/build-atlas.ts");
 
+const IS_WIN = process.platform === "win32";
+const NPX = IS_WIN ? "npx.cmd" : "npx";
+
 /** Sentinel strings only present in DM-only fixture entities. */
 const SENTINELS = ["SECRET_NEVER_PUBLISH_001", "DM_ONLY_SENTINEL_DO_NOT_SHIP"];
 
@@ -64,7 +67,7 @@ beforeAll(() => {
   // Build the player atlas from the shared fixture vault. Use --strict so
   // ANY weakening of the upstream gates also surfaces here.
   execFileSync(
-    "npx",
+    NPX,
     [
       "tsx",
       SCRIPT,
@@ -79,6 +82,7 @@ beforeAll(() => {
       cwd: ROOT,
       stdio: ["ignore", "pipe", "pipe"],
       encoding: "utf8",
+      shell: IS_WIN,
       env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
     }
   );
@@ -151,7 +155,7 @@ describe("player atlas trust gate", () => {
     // assertion above is a false negative.
     const dmOut = path.join(tmpRoot, "dm-control");
     execFileSync(
-      "npx",
+      NPX,
       [
         "tsx",
         SCRIPT,
@@ -164,6 +168,7 @@ describe("player atlas trust gate", () => {
       cwd: ROOT,
       stdio: ["ignore", "pipe", "pipe"],
       encoding: "utf8",
+      shell: IS_WIN,
       env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
     }
     );
