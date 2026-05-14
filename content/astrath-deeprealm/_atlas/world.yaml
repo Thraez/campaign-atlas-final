@@ -1,24 +1,25 @@
-# Astrath Deeprealm — map / region / fog / route / calendar config.
+# World map patch — Overview (astrath-deeprealm-overview)
+# Generated 2026-05-14T20:41:50.646Z
+# Subject: world.yaml > maps[id=astrath-deeprealm-overview]
 #
-# CANON: This file is YAML SOURCE OF TRUTH. The DM normally does NOT edit it
-# by hand — visual edits in /atlas/edit generate a YAML patch which is pasted
-# here and committed. Manual edits are allowed but must remain valid YAML.
+# CANON MODEL:
+#   YAML / Markdown frontmatter is the source of truth.
+#   This file is a TOOL-GENERATED PATCH against that canon — never edit
+#   public/atlas/atlas.json or search-index.json by hand (those are derived).
 #
-# Parsed by scripts/build-atlas.ts via loadWorldConfig().
-# Generated runtime files (public/atlas/atlas.json, search-index.json) are
-# DERIVED from this file + entity markdown — never treat them as canon.
+# HOW TO APPLY:
+#   Paste the YAML below into content/<world>/_atlas/world.yaml (replace the matching map entry).
+#   Do NOT paste the leading "#" comment lines.
+#   Do NOT wrap in markdown code fences (```yaml).
 #
-# IMPORTANT: This file must be PURE YAML. Do NOT paste markdown code fences
-# (```yaml) from exported patch files into this file — only paste the YAML
-# inside the fence. A build-time check will fail loudly if fences slip in.
-
-schemaVersion: 1
-
+# Preserves your unrelated maps[]/regions[]/routes[]/fog[]/calendar sections —
+# only this map's entry is replaced.
+# Asset checklist: 6 upload(s) — see asset manifest.
 maps:
   - id: astrath-deeprealm-overview
     name: Overview
     width: 200000
-    height: 100000
+    height: 150000
     oceanColor: "#18313f"
     wrapX: false
     scale:
@@ -27,41 +28,62 @@ maps:
     grid:
       kind: hex
       size: 5000
-      color: "rgba(255,255,255,0.06)"
+      color: rgba(255,255,255,0.06)
       enabled: false
     layers:
       - id: overview-map
         src: atlas/assets/maps/map.jpg
         x: 0
-        y: 0
-        width: 200000
-        height: 100000
+        "y": 0
+        width: 1563
+        height: 782
         opacity: 1
         zIndex: 1
-
-  - id: astrath-deeprealm-northern-reaches
-    name: Northern Reaches
-    width: 80000
-    height: 60000
-    oceanColor: "#1c2a35"
-    wrapX: false
-    layers: []
-
-# Regions, routes, and fog were tied to the deleted placeholder entities
-# (thornhold / sunhaven / ravens-vale / the-old-keep). Add new entries here
-# when real content lands.
-regions: []
-routes: []
-fog: []
-
-calendar:
-  name: Reckoning of the Twin Moons
-  epochName: AS
-  daysPerWeek: 8
-  months:
-    - { name: Frostmoon, days: 30 }
-    - { name: Thawing,   days: 30 }
-    - { name: Greentide, days: 32 }
-    - { name: Highsun,   days: 32 }
-    - { name: Goldfall,  days: 30 }
-    - { name: Longnight, days: 30 }
+      - id: upload-1778790358938-0-chatgpt-image-may-4-2026
+        src: /atlas/assets/maps/chatgpt-image-may-4-2026-09_15_31-pm-4-.png
+        x: 100000
+        "y": 0
+        width: 31250
+        height: 15625
+        opacity: 1
+        zIndex: 20
+      - id: upload-1778790368852-0-chatgpt-image-may-4-2026
+        src: /atlas/assets/maps/chatgpt-image-may-4-2026-09_15_32-pm-5-.png
+        x: 10000
+        "y": 83000
+        width: 24700
+        height: 18544
+        opacity: 1
+        zIndex: 20
+      - id: upload-1778790373361-0-chatgpt-image-may-4-2026
+        src: /atlas/assets/maps/chatgpt-image-may-4-2026-09_15_32-pm-6-.png
+        x: 5000
+        "y": 40000
+        width: 37116
+        height: 27842
+        opacity: 1
+        zIndex: 20
+      - id: upload-1778790377488-0-chatgpt-image-may-4-2026
+        src: /atlas/assets/maps/chatgpt-image-may-4-2026-09_15_30-pm-1-.png
+        x: 159276
+        "y": 9457
+        width: 41756
+        height: 31322
+        opacity: 1
+        zIndex: 20
+      - id: upload-1778790382442-0-chatgpt-image-may-4-2026
+        src: /atlas/assets/maps/chatgpt-image-may-4-2026-09_15_30-pm-2-.png
+        x: 140000
+        "y": 60000
+        width: 55050
+        height: 41294
+        opacity: 1
+        zIndex: 20
+      - id: upload-1778790407722-0-chatgpt-image-may-4-2026
+        src: /atlas/assets/maps/chatgpt-image-may-4-2026-09_15_31-pm-3-.png
+        x: 77981
+        "y": 33482
+        width: 61930
+        height: 46458
+        opacity: 1
+        zIndex: 20
