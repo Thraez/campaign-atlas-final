@@ -1018,3 +1018,11 @@ Session prep collections
 Cleaner handout packet export
 Better mobile polish for DM editor
 More automated docs/tests around profile and relationship edge cases
+
+Batch 13 — Editor build split + local Save workflow:
+- Build split: player vs editor bundles via `__INCLUDE_EDITOR__` tree-shaking; `/atlas/edit` and `AtlasPlacementEditor` excluded from `npm run build`.
+- Sentinel scan (`atlas:check-secrets`) for DM content + editor-code leaks in `dist/`.
+- Shape scan (`atlas:check-shape`) over the player `atlas.json` for structural safety properties.
+- Source-path allowlist module shared between client and server (`content/**/_atlas/*.yaml|yml`, `content/**/*.md`).
+- Vite save plugin (`apply: "serve"`) exposing `/__atlas/save` only in dev.
+- Save button + DiffPreviewModal in the editor: review, write to disk, then commit with git.
