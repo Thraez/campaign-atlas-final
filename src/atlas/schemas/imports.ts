@@ -97,10 +97,14 @@ export function formatZodError(err: z.ZodError): string {
  * Safe-parse helper that returns a discriminated result. UI callers can
  * branch on `.ok` and surface `.error` directly to the user.
  */
+export type SafeParseResult<T> =
+  | { ok: true; data: T; error?: undefined }
+  | { ok: false; data?: undefined; error: string };
+
 export function safeParseInput<T>(
   schema: z.ZodType<T>,
   raw: unknown
-): { ok: true; data: T } | { ok: false; error: string } {
+): SafeParseResult<T> {
   const result = schema.safeParse(raw);
   if (result.success) return { ok: true, data: result.data };
   return { ok: false, error: formatZodError(result.error) };
