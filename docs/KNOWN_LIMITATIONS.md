@@ -87,6 +87,22 @@ The atlas reads Obsidian-flavored markdown. Most Obsidian features work; a few d
 | Pinch-zoom + pan | shipped |
 | Search palette is keyboard-first | by design — works on mobile via the search button, but the keyboard shortcut path is desktop-oriented. |
 
+## Accessibility — color-only cues audit
+
+WCAG 1.4.1 says color must not be the *only* way to convey information. The map renders a few classes of overlay; here is where each currently stands.
+
+| Layer | Color used? | Other cues |
+|---|---|---|
+| Pins | yes (fill) | shape varies by preset (teardrop, circle, square, diamond, shield, star) — independent of color. ✓ |
+| Regions | yes (fill + stroke) | name surfaced via hover Tooltip (and click Popup). ✓ — added in the Batch H audit. No fill pattern yet. |
+| Routes | yes (stroke) | optional `dashed: true` adds a dash pattern; `weight` is per-route; mode/distance shown via hover Tooltip. Partial — two solid routes are still distinguished by color only at a glance. |
+| Fog | single color (binary) | not a differentiation issue — fog is on or off. ✓ |
+| Grid | single color | not a differentiation issue. ✓ |
+
+**Recommendation for authors:** when two routes share a map and are similar in length, set one to `dashed: true` or vary `weight` so the distinction is not color-only. The build does not enforce this — it's a content-side choice.
+
+**Not yet addressed:** region fill patterns (stripes/dots) are not supported. If two adjacent regions ship the same fill color, only the hover tooltip distinguishes them. Adding a `pattern:` field to regions would be the future fix; it has not been needed in current canon.
+
 ## Authentication and hosting
 
 | Limitation | Status |
