@@ -1,0 +1,8 @@
+maps:
+  - id: sentinel-world-overview
+    name: Overview
+    width: 1000
+    height: 500
+    oceanColor: "#18313f"
+    wrapX: false
+    layers: []

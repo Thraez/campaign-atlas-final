@@ -1,0 +1,7 @@
+{
+  "contentRoot": "content",
+  "outputDir": "out",
+  "defaultWorld": "sentinel-world",
+  "include": ["**/*.md"],
+  "exclude": ["**/_drafts/**", "**/_dm/**"]
+}
