@@ -76,7 +76,9 @@ describe("DiffPreviewModal", () => {
     await waitFor(() => screen.getByText("Path not in allowlist."));
     expect(screen.getByText(/not in the source allowlist/)).toBeTruthy();
     expect(screen.getByText("package.json")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
+    const closeBtns = screen.getAllByRole("button", { name: "Close" });
+    // Dialog has a built-in sr-only "Close" — ours is the visible one.
+    expect(closeBtns.length).toBeGreaterThanOrEqual(1);
   });
 
   it("LocalSaveError renders message + Try again retries the save", async () => {
