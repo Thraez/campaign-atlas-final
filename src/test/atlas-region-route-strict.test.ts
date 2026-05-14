@@ -37,13 +37,16 @@
  *       player-visible record reveals a DM target.)
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { execFileSync } from "node:child_process";
+import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 const ROOT = path.resolve(__dirname, "../..");
-const SCRIPT = path.resolve(ROOT, "scripts/build-atlas.ts");
+const SCRIPT = "scripts/build-atlas.ts"; // relative to ROOT (cwd)
+
+const IS_WIN = process.platform === "win32";
+const NPX = IS_WIN ? "npx.cmd" : "npx";
 
 let tmp: string;
 
@@ -90,21 +93,16 @@ function makeVault(opts: {
 
 function runBuild(args: string[]): { status: number; out: string } {
   try {
-    const stdout = execFileSync(
-      "bash",
-      [
-        "-c",
-        `npx tsx ${JSON.stringify(SCRIPT)} ${args.map((a) => JSON.stringify(a)).join(" ")} 2>&1`,
-      ],
-      {
-        cwd: ROOT,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-        // Auto-ack the source-DM privacy gate; this suite is testing
-        // region/route gating, not the privacy gate.
-        env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
-      }
-    );
+    const opts: ExecFileSyncOptions = {
+      cwd: ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: IS_WIN,
+      // Auto-ack the source-DM privacy gate; this suite is testing
+      // region/route gating, not the privacy gate.
+      env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
+    };
+    const stdout = execFileSync(NPX, ["tsx", SCRIPT, ...args], opts);
     return { status: 0, out: String(stdout) };
   } catch (e) {
     const err = e as { status?: number; stdout?: Buffer; stderr?: Buffer };
