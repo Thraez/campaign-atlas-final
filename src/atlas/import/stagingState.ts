@@ -17,27 +17,7 @@
  *     and require an explicit re-check to overwrite.
  */
 
-import yaml from "js-yaml";
-
-/**
- * Minimal browser-safe frontmatter parser. `gray-matter` references Node's
- * Buffer in its toBuffer path and crashes in the browser; we only need to
- * read `atlas.type` / `atlas.id` / `path` from the YAML head and don't care
- * about excerpts, custom delimiters, or stringification — so a regex split +
- * js-yaml is enough and avoids the polyfill question.
- */
-function readFrontmatter(raw: string): { data: Record<string, unknown> } {
-  // Frontmatter must be the very first thing in the file. Tolerate a BOM.
-  const stripped = raw.replace(/^\uFEFF/, "");
-  const m = stripped.match(/^---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/);
-  if (!m) return { data: {} };
-  const parsed = yaml.load(m[1]);
-  const data =
-    parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : {};
-  return { data };
-}
+import { parseFrontmatter } from "./frontmatter";
 
 export const ALLOWED_FOLDERS = [
   "places",
@@ -146,14 +126,14 @@ export interface StagingRow {
   content: string;
 }
 
-function parseFrontmatter(raw: string): {
+function extractStagingFields(raw: string): {
   type: string;
   id: string | undefined;
   frontmatterPath: string | undefined;
   parseError: string | undefined;
 } {
   try {
-    const fm = readFrontmatter(raw);
+    const fm = parseFrontmatter(raw);
     const data = fm.data;
     const atlas = (data.atlas ?? {}) as Record<string, unknown>;
     const type = typeof atlas.type === "string" && atlas.type.length > 0 ? atlas.type : "imports";
@@ -177,7 +157,7 @@ function nextRowId(filename: string): string {
 }
 
 export function buildStagingRow(input: RawImportFile, ctx: StagingContext): StagingRow {
-  const { type, id, frontmatterPath, parseError } = parseFrontmatter(input.raw);
+  const { type, id, frontmatterPath, parseError } = extractStagingFields(input.raw);
   const stem = id ?? filenameStem(input.filename);
   const folder = inferTargetFolder(type);
   const targetPath = computeTargetPath(ctx.worldId, folder, stem);

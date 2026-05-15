@@ -8,8 +8,8 @@
  *    later be committed to the vault and re-built without surprises.
  */
 
-import matter from "gray-matter";
 import type { EntityVisibility } from "@/atlas/content/schema";
+import { parseFrontmatter } from "./frontmatter";
 import { inferTypeFromPath, isIgnoredPath } from "./inferType";
 
 export type ImportLevel =
@@ -165,8 +165,8 @@ export function parseObsidianFile(
   let frontmatterError: string | undefined;
   let hasFrontmatter = false;
   try {
-    const fm = matter(raw);
-    data = (fm.data ?? {}) as Record<string, unknown>;
+    const fm = parseFrontmatter(raw);
+    data = fm.data;
     body = fm.content;
     hasFrontmatter = Object.keys(data).length > 0;
   } catch (e) {

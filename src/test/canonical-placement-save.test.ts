@@ -11,7 +11,7 @@
  *   - missing sourcePath is a typed error, not a silent drop
  */
 import { describe, it, expect, vi } from "vitest";
-import matter from "gray-matter";
+import { parseFrontmatter, stringifyFrontmatter } from "@/atlas/import/frontmatter";
 import {
   buildCanonicalPlacementChanges,
   mergePlacementsIntoFrontmatter,
@@ -159,7 +159,7 @@ describe("buildCanonicalPlacementChanges round-trip", () => {
   });
 
   it("reads current .md, merges placements, and returns FileChange for each entity", async () => {
-    const original = matter.stringify("Body text with [[wikilink]] left alone.\n", {
+    const original = stringifyFrontmatter("Body text with [[wikilink]] left alone.\n", {
       title: "Thornhold",
       tags: ["city"],
       atlas: {
@@ -191,7 +191,7 @@ describe("buildCanonicalPlacementChanges round-trip", () => {
     // so the Save endpoint can detect "the file changed under us".
     expect(changes[0].baseHash).toMatch(/^sha256:[0-9a-f]{64}$/);
 
-    const parsed = matter(changes[0].content);
+    const parsed = parseFrontmatter(changes[0].content);
     expect(parsed.content).toBe("Body text with [[wikilink]] left alone.\n");
     expect(parsed.data.title).toBe("Thornhold");
     expect(parsed.data.tags).toEqual(["city"]);
@@ -209,7 +209,7 @@ describe("buildCanonicalPlacementChanges round-trip", () => {
   });
 
   it("groups drafts for the same entity into a single .md write", async () => {
-    const original = matter.stringify("Body.\n", { atlas: {} });
+    const original = stringifyFrontmatter("Body.\n", { atlas: {} });
     const ent = makeEntity();
     const fetchFn = vi.fn(async () => jsonResponse(200, { contents: original }));
     const changes = await buildCanonicalPlacementChanges(
@@ -222,7 +222,7 @@ describe("buildCanonicalPlacementChanges round-trip", () => {
     );
     expect(changes).toHaveLength(1);
     expect(fetchFn).toHaveBeenCalledTimes(1);
-    const atlas = (matter(changes[0].content).data.atlas) as Record<string, unknown>;
+    const atlas = (parseFrontmatter(changes[0].content).data.atlas) as Record<string, unknown>;
     const placements = atlas.placements as Array<{ mapId: string }>;
     expect(placements.map((p) => p.mapId).sort()).toEqual(["city", "overview"]);
   });
