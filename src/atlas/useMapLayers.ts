@@ -267,6 +267,19 @@ export function useMapLayers(map: MapDocument | undefined, undoStack?: UndoStack
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* noop */ }
   }, [mutateByMap]);
 
+  /**
+   * Phase 1B B0 — full-state snapshot, for the save-boundary undo entry.
+   * The editor captures this before the post-save cleanup so undo across
+   * a save restores the dirty local-layer drafts.
+   */
+  const snapshot = useCallback((): Stored => byMapRef.current, []);
+
+  /** Restore a snapshot WITHOUT recording an undo entry. The save-boundary
+   *  entry orchestrates its own undo/redo pair; this is its setter. */
+  const applySnapshot = useCallback((snap: Stored) => {
+    applyByMap(snap);
+  }, [applyByMap]);
+
   return {
     localLayers,
     mergedLayers,
@@ -280,5 +293,7 @@ export function useMapLayers(map: MapDocument | undefined, undoStack?: UndoStack
     removeLayer,
     clearForMap,
     clearAll,
+    snapshot,
+    applySnapshot,
   };
 }

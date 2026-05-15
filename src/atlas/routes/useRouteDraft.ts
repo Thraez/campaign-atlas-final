@@ -51,6 +51,9 @@ export interface RouteDraftAPI {
   duplicate: (id: string) => string | null;
   remove: (id: string) => void;
   reset: () => void;
+  /** Phase 1B B0 — full-state snapshot for the save-boundary undo entry. */
+  snapshot: () => RouteDraft;
+  applySnapshot: (snap: RouteDraft) => void;
   issues: RouteIssue[];
   /** Resolve a waypoint to absolute [x,y] using project placements. Null when unresolved. */
   resolveWaypoint: (w: Waypoint) => Point | null;
@@ -274,13 +277,18 @@ export function useRouteDraft(
     return out;
   }, [effective, map, opts.entityIds, opts.dmEntityIds, placementByEntity]);
 
+  const snapshot = useCallback((): RouteDraft => draftRef.current, []);
+  const applySnapshot = useCallback((snap: RouteDraft) => { applyDraft(snap); }, [applyDraft]);
+
   return {
     draft, effective, dirty, dirtyCount,
     selectedId, setSelectedId,
     drawing, draftWaypoints,
     startDraw, cancelDraw, addDraftPoint, addDraftEntity, removeLastDraftPoint, finishDraw,
     patch, moveWaypoint, setWaypointEntity, removeWaypoint, insertWaypointAfter,
-    duplicate, remove, reset, issues,
+    duplicate, remove, reset,
+    snapshot, applySnapshot,
+    issues,
     resolveWaypoint, resolveRoute,
   };
 }

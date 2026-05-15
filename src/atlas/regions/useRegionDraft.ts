@@ -52,6 +52,10 @@ export interface RegionDraftAPI {
   duplicate: (id: string) => string | null;
   remove: (id: string) => void;
   reset: () => void;
+  /** Phase 1B B0 — full-state snapshot for the save-boundary undo entry. */
+  snapshot: () => RegionDraft;
+  /** Restore a snapshot bypassing undo recording. */
+  applySnapshot: (snap: RegionDraft) => void;
   issues: RegionIssue[];
 }
 
@@ -257,13 +261,18 @@ export function useRegionDraft(
     return out;
   }, [effective, map, opts.entityIds, opts.dmEntityIds]);
 
+  const snapshot = useCallback((): RegionDraft => draftRef.current, []);
+  const applySnapshot = useCallback((snap: RegionDraft) => { applyDraft(snap); }, [applyDraft]);
+
   return {
     draft, effective, dirty, dirtyCount,
     selectedId, setSelectedId,
     drawing, draftPoints,
     startDraw, cancelDraw, addDraftPoint, removeLastDraftPoint, finishDraw,
     patch, movePoint, insertPointAfter, deletePoint, translate,
-    duplicate, remove, reset, issues,
+    duplicate, remove, reset,
+    snapshot, applySnapshot,
+    issues,
   };
 }
 

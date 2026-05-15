@@ -1,10 +1,14 @@
-#!/usr/bin/env tsx
 /**
  * Build script: scans the content/ vault, parses Obsidian markdown,
  * resolves wikilinks, strips DM blocks, and writes
  * public/atlas/atlas.json + public/atlas/search-index.json.
  *
- * Run with: npm run atlas:build
+ * Run with: npm run atlas:build (which invokes via `tsx scripts/build-atlas.ts`).
+ *
+ * The leading `#!/usr/bin/env tsx` shebang was removed when A10 made this
+ * file an ESM import target for the dev save plugin — vite/esbuild's
+ * module loader trips on shebangs in imported files. Direct script
+ * invocation now goes through `tsx`, never relying on file-execute bits.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -48,7 +52,10 @@ interface Config {
   exclude: string[];
 }
 
-const ROOT = process.cwd();
+// Resolved per-invocation inside runBuildCore so programmatic callers
+// (the dev save plugin, tests) get the cwd that was active when they
+// called, not the cwd that happened to be set when this module was first
+// imported.
 
 function loadConfig(configPath: string): Config {
   const raw = fs.readFileSync(configPath, "utf8");
@@ -147,16 +154,41 @@ function scrubSecretNames(warnings: string[], secretNames: Set<string>): string[
   });
 }
 
-interface CliFlags {
+export interface BuildFlags {
   player: boolean;
   strict: boolean;
   outDir?: string;
   configPath?: string;
 }
 
-function parseFlags(): CliFlags {
+/**
+ * Thrown when the build encounters a validation failure that the CLI would
+ * have signaled via `process.exit(code)`. Carries the same exit code so
+ * the CLI shim can preserve its exit-status contract, while programmatic
+ * callers (the dev save plugin) can catch it and report structured
+ * failure without losing the process.
+ */
+export class BuildError extends Error {
+  code: number;
+  constructor(code: number, message: string) {
+    super(message);
+    this.name = "BuildError";
+    this.code = code;
+  }
+}
+
+export interface BuildResult {
+  ok: boolean;
+  /** CLI exit code (0 on success, 1-9 on various failure modes). */
+  exitCode: number;
+  durationMs: number;
+  /** Short error message — only set when ok is false. */
+  error?: string;
+}
+
+function parseFlags(): BuildFlags {
   const args = process.argv.slice(2);
-  const flags: CliFlags = { player: false, strict: false };
+  const flags: BuildFlags = { player: false, strict: false };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--player") flags.player = true;
@@ -169,8 +201,30 @@ function parseFlags(): CliFlags {
   return flags;
 }
 
-async function main() {
-  const flags = parseFlags();
+/**
+ * Programmatic entry. Same behavior as invoking `npx tsx scripts/build-atlas.ts`
+ * with the equivalent flags, but never calls `process.exit` directly.
+ * Validation failures throw `BuildError(code, message)`; the top-level
+ * CLI shim translates those into process.exit. The dev save plugin uses
+ * this directly so an in-flight save can rebuild atlas.json without
+ * spawning a child process.
+ */
+export async function runBuild(flags: BuildFlags = { player: false, strict: false }): Promise<BuildResult> {
+  const started = Date.now();
+  try {
+    await runBuildCore(flags);
+    return { ok: true, exitCode: 0, durationMs: Date.now() - started };
+  } catch (e) {
+    if (e instanceof BuildError) {
+      return { ok: false, exitCode: e.code, durationMs: Date.now() - started, error: e.message };
+    }
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, exitCode: 1, durationMs: Date.now() - started, error: msg };
+  }
+}
+
+async function runBuildCore(flags: BuildFlags) {
+  const ROOT = process.cwd();
   const configPath = path.resolve(ROOT, flags.configPath ?? "atlas.config.json");
   const cfg = loadConfig(configPath);
   const contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
@@ -186,7 +240,7 @@ async function main() {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`\n✗ ${msg}\n`);
-    process.exit(1);
+    throw new BuildError(1, msg);
   }
 
   const warnings: string[] = [];
@@ -823,60 +877,91 @@ async function main() {
 
   if (errors.length > 0) {
     console.error("Build failed: validation errors above.");
-    process.exit(1);
+    throw new BuildError(1, "validation errors");
   }
   // Strict + player must NEVER ship a build with invalid visibility values,
   // because the parser silently coerces them to "dm" and the spoiler risk
   // demands authoring discipline.
   if (flags.player && flags.strict && invalidVisibilityCount > 0) {
-    console.error(`Strict player mode: ${invalidVisibilityCount} invalid visibility value(s). Failing build.`);
-    process.exit(3);
+    const msg = `Strict player mode: ${invalidVisibilityCount} invalid visibility value(s). Failing build.`;
+    console.error(msg);
+    throw new BuildError(3, msg);
   }
   // Missing local assets in a strict player build must fail — players would
   // see broken images. External URLs only warn.
   if (flags.player && flags.strict && missingAssets > 0) {
-    console.error(`Strict player mode: ${missingAssets} missing local asset(s). Failing build.`);
-    process.exit(4);
+    const msg = `Strict player mode: ${missingAssets} missing local asset(s). Failing build.`;
+    console.error(msg);
+    throw new BuildError(4, msg);
   }
   // Unsupported asset extensions are unrenderable in browsers — block strict
   // player builds before they ship 404s or broken images.
   if (flags.player && flags.strict && badExtensionCount > 0) {
-    console.error(`Strict player mode: ${badExtensionCount} asset(s) with unsupported extension. Failing build.`);
-    process.exit(9);
+    const msg = `Strict player mode: ${badExtensionCount} asset(s) with unsupported extension. Failing build.`;
+    console.error(msg);
+    throw new BuildError(9, msg);
   }
   // Strict mode (non-asset, non-link) still fails on duplicate slugs etc.
   // Unresolved wikilinks are explicitly allowed and do NOT fail strict.
   if (flags.strict && duplicateSlugs > 0) {
-    console.error("Strict mode: duplicate slugs present. Failing build.");
-    process.exit(2);
+    const msg = "Strict mode: duplicate slugs present. Failing build.";
+    console.error(msg);
+    throw new BuildError(2, msg);
   }
   // Strict + player must never ship a relationship that points at a DM-only
   // entity — that's a direct spoiler leak via the public relationship graph.
   if (flags.player && flags.strict && relationshipLeaks > 0) {
-    console.error(`Strict player mode: ${relationshipLeaks} relationship leak(s) to DM-only entities. Failing build.`);
-    process.exit(5);
+    const msg = `Strict player mode: ${relationshipLeaks} relationship leak(s) to DM-only entities. Failing build.`;
+    console.error(msg);
+    throw new BuildError(5, msg);
   }
   // Strict + player must never ship player-visible region/route geometry that
   // names DM-only or unknown entities — these leak DM map prep to players.
   if (flags.player && flags.strict && regionLeaks > 0) {
-    console.error(`Strict player mode: ${regionLeaks} region leak(s) to DM-only/unknown entities. Failing build.`);
-    process.exit(6);
+    const msg = `Strict player mode: ${regionLeaks} region leak(s) to DM-only/unknown entities. Failing build.`;
+    console.error(msg);
+    throw new BuildError(6, msg);
   }
   if (flags.player && flags.strict && routeLeaks > 0) {
-    console.error(`Strict player mode: ${routeLeaks} route leak(s) to DM-only/unknown entities. Failing build.`);
-    process.exit(7);
+    const msg = `Strict player mode: ${routeLeaks} route leak(s) to DM-only/unknown entities. Failing build.`;
+    console.error(msg);
+    throw new BuildError(7, msg);
   }
   // Strict + player must never ship a wikilink from a public entry to a
   // DM/hidden entity — the display TEXT inside the link reveals the secret
   // name even after we redact the href. Build fails so the DM rewrites the
   // sentence.
   if (flags.player && flags.strict && crossRefLeaks > 0) {
-    console.error(`Strict player mode: ${crossRefLeaks} cross-reference leak(s): wikilinks from player-visible entries to DM/hidden entities. Failing build.`);
-    process.exit(8);
+    const msg = `Strict player mode: ${crossRefLeaks} cross-reference leak(s): wikilinks from player-visible entries to DM/hidden entities. Failing build.`;
+    console.error(msg);
+    throw new BuildError(8, msg);
   }
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+/**
+ * Detect whether this module is the process entry point. tsx invokes the
+ * script with `process.argv[1]` set to its absolute path; ESM gives us
+ * `import.meta.url` as a file:// URL. Both are normalized for comparison so
+ * the CLI shim only runs when invoked directly, never on programmatic
+ * import from the dev save plugin or a test file.
+ */
+function isMainModule(): boolean {
+  if (typeof process === "undefined" || !process.argv?.[1]) return false;
+  try {
+    const argvUrl = new URL(`file://${path.resolve(process.argv[1])}`).href;
+    return import.meta.url === argvUrl;
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
+  const flags = parseFlags();
+  runBuild(flags).then((result) => {
+    if (!result.ok) process.exit(result.exitCode);
+  }).catch((e: unknown) => {
+    // runBuild itself shouldn't throw, but belt + suspenders.
+    console.error(e);
+    process.exit(1);
+  });
+}
