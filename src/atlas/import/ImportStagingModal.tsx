@@ -8,7 +8,7 @@
  */
 
 import { useMemo } from "react";
-import { AlertTriangle, CheckCircle, FileWarning } from "lucide-react";
+import { AlertTriangle, FileWarning } from "lucide-react";
 import {
   Dialog,
   DialogContent,
