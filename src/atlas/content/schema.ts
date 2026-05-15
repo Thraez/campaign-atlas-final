@@ -143,6 +143,7 @@ export interface Entity {
   aliases: string[];
   tags: string[];
   summary?: string;
+  race?: string;
   images: string[];
   body: string;          // raw markdown (with DM blocks stripped for player builds in later batch)
   bodyHtml: string;      // rendered HTML with internal-link tokens

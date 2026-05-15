@@ -29,6 +29,7 @@ export interface AtlasFrontmatter {
   placements?: AtlasPlacementSpec[];
   profile?: EntityProfile;
   relationships?: EntityRelationship[];
+  race?: string;
 }
 
 export interface ParsedFile {
@@ -48,12 +49,12 @@ export function parseFrontmatter(raw: string, sourcePath: string): ParsedFile {
 
   const atlas: AtlasFrontmatter = {
     publish: typeof atlasRaw.publish === "boolean" ? atlasRaw.publish : undefined,
-    type: typeof atlasRaw.type === "string" ? atlasRaw.type : undefined,
+    type: pickString(atlasRaw.type, data.type),
     world: typeof atlasRaw.world === "string" ? atlasRaw.world : undefined,
     visibility: undefined,
-    aliases: toStringArray(atlasRaw.aliases),
+    aliases: toStringArray(atlasRaw.aliases ?? data.aliases),
     images: toStringArray(atlasRaw.images),
-    summary: typeof atlasRaw.summary === "string" ? atlasRaw.summary : undefined,
+    summary: pickString(atlasRaw.summary, data.summary),
     id: typeof atlasRaw.id === "string" ? atlasRaw.id : undefined,
     tags: toStringArray(atlasRaw.tags ?? data.tags),
     canon: typeof atlasRaw.canon === "string" ? atlasRaw.canon : undefined,
@@ -63,6 +64,7 @@ export function parseFrontmatter(raw: string, sourcePath: string): ParsedFile {
     placements: parsePlacements(atlasRaw.placements, sourcePath, warnings),
     profile: parseProfile(atlasRaw.profile, sourcePath, warnings),
     relationships: parseRelationships(atlasRaw.relationships, sourcePath, warnings),
+    race: pickString(atlasRaw.race, data.race),
   };
 
   if (typeof atlasRaw.visibility === "string") {
@@ -86,6 +88,15 @@ function toStringArray(v: unknown): string[] {
   if (Array.isArray(v)) return v.filter((x) => typeof x === "string") as string[];
   if (typeof v === "string") return [v];
   return [];
+}
+
+// First non-empty string among candidates. Used to let vault files keep flat
+// top-level keys (summary, type, race, ...) without requiring atlas.* nesting.
+function pickString(...candidates: unknown[]): string | undefined {
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim() !== "") return c;
+  }
+  return undefined;
 }
 
 function parsePlacements(v: unknown, sourcePath: string, warnings: string[]): AtlasPlacementSpec[] | undefined {

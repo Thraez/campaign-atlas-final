@@ -3,6 +3,74 @@ import { parseFrontmatter } from "../../scripts/atlas/parseFrontmatter";
 import { stripDmBlocks, stripDmFromShippingString } from "../../scripts/atlas/stripDmBlocks";
 import { tokenizeWikilinks, renderLinkTokens } from "../../scripts/atlas/parseWikilinks";
 
+describe("parseFrontmatter flat-field fallbacks (Obsidian vault compat)", () => {
+  it("reads flat top-level summary when atlas.summary is absent", () => {
+    const raw = `---\nsummary: "A flat-field summary"\n---\nbody`;
+    const p = parseFrontmatter(raw, "x.md");
+    expect(p.atlas.summary).toBe("A flat-field summary");
+  });
+
+  it("reads flat top-level aliases when atlas.aliases is absent", () => {
+    const raw = `---\naliases: ["Kellan", "Kellan Brecht"]\n---\n`;
+    const p = parseFrontmatter(raw, "x.md");
+    expect(p.atlas.aliases).toEqual(["Kellan", "Kellan Brecht"]);
+  });
+
+  it("reads flat top-level type when atlas.type is absent", () => {
+    const raw = `---\ntype: region\n---\n`;
+    const p = parseFrontmatter(raw, "x.md");
+    expect(p.atlas.type).toBe("region");
+  });
+
+  it("reads flat top-level race when atlas.race is absent", () => {
+    const raw = `---\nrace: "high elf"\n---\n`;
+    const p = parseFrontmatter(raw, "x.md");
+    expect(p.atlas.race).toBe("high elf");
+  });
+
+  it("prefers atlas.summary over flat summary when both present", () => {
+    const raw = `---\nsummary: "flat one"\natlas:\n  summary: "namespaced one"\n---\n`;
+    const p = parseFrontmatter(raw, "x.md");
+    expect(p.atlas.summary).toBe("namespaced one");
+  });
+
+  it("prefers atlas.aliases over flat aliases when both present", () => {
+    const raw = `---\naliases: ["flat"]\natlas:\n  aliases: ["namespaced"]\n---\n`;
+    const p = parseFrontmatter(raw, "x.md");
+    expect(p.atlas.aliases).toEqual(["namespaced"]);
+  });
+
+  it("does NOT surface flat fields outside the allowlist", () => {
+    // Sentinel against scope creep: the rest of the DM's flat fields are
+    // documentation-only and must stay invisible to the build pipeline.
+    const raw = [
+      "---",
+      'role: Main',
+      'voice: [precise, technical]',
+      'mannerism: ["fidgets"]',
+      'catchphrase: "yes"',
+      'appearance: ["lean"]',
+      'occupation: ["scholar"]',
+      'faction: ["Collegium"]',
+      'connections: ["Harwick"]',
+      'status: [alive]',
+      "---",
+      "",
+    ].join("\n");
+    const p = parseFrontmatter(raw, "x.md");
+    // None of these flat fields should appear under atlas.*
+    expect((p.atlas as Record<string, unknown>).role).toBeUndefined();
+    expect((p.atlas as Record<string, unknown>).voice).toBeUndefined();
+    expect((p.atlas as Record<string, unknown>).mannerism).toBeUndefined();
+    expect((p.atlas as Record<string, unknown>).catchphrase).toBeUndefined();
+    expect((p.atlas as Record<string, unknown>).appearance).toBeUndefined();
+    expect((p.atlas as Record<string, unknown>).occupation).toBeUndefined();
+    expect((p.atlas as Record<string, unknown>).faction).toBeUndefined();
+    expect((p.atlas as Record<string, unknown>).connections).toBeUndefined();
+    expect((p.atlas as Record<string, unknown>).status).toBeUndefined();
+  });
+});
+
 describe("parseFrontmatter visibility safety", () => {
   it("invalid visibility falls back to dm, not player", () => {
     const raw = `---\natlas:\n  visibility: private\n---\nbody`;

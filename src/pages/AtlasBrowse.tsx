@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
+import { playerTypeLabel } from "@/atlas/content/typeLabel";
 
 type Mode = "browse" | "tag" | "type";
 
@@ -71,7 +72,7 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
 
   const heading =
     mode === "tag" ? `#${facetDecoded}` :
-    mode === "type" ? facetDecoded :
+    mode === "type" ? (playerTypeLabel(facetDecoded) || facetDecoded) :
     "Browse";
 
   const headingIcon =
@@ -132,15 +133,19 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
           >
             all <span className="opacity-60">{entries.length}</span>
           </button>
-          {allTypes.map(([t, n]) => (
-            <button
-              key={t}
-              onClick={() => setActiveType(activeType === t ? null : t)}
-              className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
-            >
-              {t} <span className="opacity-60">{n}</span>
-            </button>
-          ))}
+          {allTypes.map(([t, n]) => {
+            const label = playerTypeLabel(t);
+            if (!label) return null;
+            return (
+              <button
+                key={t}
+                onClick={() => setActiveType(activeType === t ? null : t)}
+                className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+              >
+                {label} <span className="opacity-60">{n}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -168,13 +173,15 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
                       >
                         <div className="flex items-baseline gap-2">
                           <span className="font-medium text-sm truncate">{e.title}</span>
-                          <Link
-                            to={`/atlas/type/${encodeURIComponent(e.type)}`}
-                            onClick={(ev) => ev.stopPropagation()}
-                            className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
-                          >
-                            {e.type}
-                          </Link>
+                          {playerTypeLabel(e.type) && (
+                            <Link
+                              to={`/atlas/type/${encodeURIComponent(e.type)}`}
+                              onClick={(ev) => ev.stopPropagation()}
+                              className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                            >
+                              {playerTypeLabel(e.type)}
+                            </Link>
+                          )}
                           {placedIds.has(e.id) && (
                             <MapPin className="h-3 w-3 text-primary ml-auto flex-shrink-0" />
                           )}

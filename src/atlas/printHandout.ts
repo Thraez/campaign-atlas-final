@@ -8,6 +8,7 @@
  * builder is pure (no DOM, no window) so it can be unit tested.
  */
 import type { Entity } from "./content/schema";
+import { playerTypeLabel } from "./content/typeLabel";
 import { normalizeAtlasAssetUrl } from "./url";
 
 const escapeHtml = (s: string): string =>
@@ -70,7 +71,11 @@ function renderEntitySection(entity: Entity, withPageBreak: boolean): string {
 
   return `<article class="${cls}">
     <header class="handout-head">
-      <div class="kicker">${escapeHtml(entity.type)}</div>
+      ${(() => {
+        const label = playerTypeLabel(entity.type);
+        const kicker = [label, entity.race].filter(Boolean).join(" · ");
+        return kicker ? `<div class="kicker">${escapeHtml(kicker)}</div>` : "";
+      })()}
       <h1 class="handout-title">${escapeHtml(entity.title)}</h1>
       ${aliases}
     </header>
