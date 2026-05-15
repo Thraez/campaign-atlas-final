@@ -18,9 +18,9 @@
  * Each FileChange carries the `baseHash` of the .md file at read time so
  * the Save endpoint can detect "the file changed under us" before writing.
  */
-import matter from "gray-matter";
 import type { Entity } from "@/atlas/content/schema";
 import type { PinOverride } from "@/atlas/pins/presets";
+import { parseFrontmatter, stringifyFrontmatter } from "@/atlas/import/frontmatter";
 import type { FileChange } from "./localFsSave";
 import { hashContent } from "./localFsSave";
 import { isWritableSourcePath } from "./sourcePathAllowlist";
@@ -149,12 +149,9 @@ export async function buildCanonicalPlacementChanges(
 
     const currentRaw = await readSourceFile(sourcePath, fetchFn);
     const baseHash = await hashContent(currentRaw);
-    const parsed = matter(currentRaw);
-    const nextData = mergePlacementsIntoFrontmatter(
-      (parsed.data ?? {}) as Record<string, unknown>,
-      entityDrafts,
-    );
-    const nextRaw = matter.stringify(parsed.content, nextData);
+    const parsed = parseFrontmatter(currentRaw);
+    const nextData = mergePlacementsIntoFrontmatter(parsed.data, entityDrafts);
+    const nextRaw = stringifyFrontmatter(parsed.content, nextData);
     changes.push({ path: sourcePath, content: nextRaw, kind: "entity-md", baseHash });
   }
 
