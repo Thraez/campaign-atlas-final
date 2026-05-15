@@ -3,12 +3,12 @@
  *
  * Thin controlled-component shell over stagingState. The DM picks/drops .md
  * files, reviews this table, and clicks Import. Every row's include /
- * conflict / allowlist state is driven by the pure logic in stagingState.ts
+ * allowlist state is driven by the pure logic in stagingState.ts
  * so the modal never makes its own decisions.
  */
 
 import { useMemo } from "react";
-import { AlertTriangle, FileWarning } from "lucide-react";
+import { AlertTriangle, CheckCircle, FileWarning } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -114,9 +114,11 @@ export function ImportStagingModal({
                 const blocked = !!row.parseError || !row.pathAllowed;
                 const rowClass = blocked
                   ? "bg-red-500/10 text-red-200"
-                  : row.conflict
-                    ? "bg-amber-500/5"
-                    : "";
+                  : row.rowKind === "update"
+                    ? "bg-sky-500/5"
+                    : row.rowKind === "path-collision"
+                      ? "bg-amber-500/5"
+                      : "";
                 return (
                   <tr
                     key={row.id}
@@ -198,17 +200,28 @@ export function ImportStagingModal({
                             Outside allowlist
                           </Badge>
                         )}
-                        {row.pathAllowed && row.conflict && !row.included && (
-                          <Badge className="bg-amber-500/20 text-amber-200 border-amber-500/40 text-[10px] gap-1">
-                            <AlertTriangle className="h-3 w-3" />
-                            Will overwrite — explicit confirm required
+                        {/* update: entity already exists — will overwrite in place */}
+                        {row.rowKind === "update" && !blocked && (
+                          <Badge className="bg-sky-500/20 text-sky-200 border-sky-500/40 text-[10px] gap-1">
+                            Update — backup kept
                           </Badge>
                         )}
-                        {row.pathAllowed && row.conflict && row.included && (
+
+                        {/* path-collision: a different entity occupies the computed path */}
+                        {row.rowKind === "path-collision" && !blocked && !row.included && (
+                          <Badge className="bg-amber-500/20 text-amber-200 border-amber-500/40 text-[10px] gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            File exists — check to overwrite
+                          </Badge>
+                        )}
+                        {row.rowKind === "path-collision" && !blocked && row.included && (
                           <Badge className="bg-amber-500/20 text-amber-200 border-amber-500/40 text-[10px] gap-1">
                             Will overwrite — existing file backed up
                           </Badge>
                         )}
+
+                        {/* create: new entity, no conflicts */}
+                        {/* (no badge needed for the happy path) */}
                         {row.parseError && (
                           <span className="text-[10px] text-muted-foreground">
                             {row.parseError}
