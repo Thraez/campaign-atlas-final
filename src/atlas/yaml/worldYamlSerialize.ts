@@ -44,9 +44,15 @@ const DEFAULT_HEADER = `# World atlas — map / region / fog / route / calendar 
  * the trailing blank that separates the block from the first YAML key.
  */
 export function captureLeadingCommentBlock(existing: string): string {
+  // Strip a leading UTF-8 BOM before scanning. A BOM (U+FEFF) at byte 0 makes
+  // the first character non-comment/non-blank, so the scan returns "" and
+  // the entire leading-comment block silently disappears on the next save.
+  // See the matching fix in import/frontmatter.ts:38 — same class of bug.
+  // Use an escape (not the literal char) so the source file is BOM-free.
+  const stripped = existing.charCodeAt(0) === 0xFEFF ? existing.slice(1) : existing;
   // Normalise to `\n` line endings while capturing so we can re-emit with the
   // same convention.
-  const lines = existing.split(/\r?\n/);
+  const lines = stripped.split(/\r?\n/);
   const out: string[] = [];
   let i = 0;
   for (; i < lines.length; i++) {

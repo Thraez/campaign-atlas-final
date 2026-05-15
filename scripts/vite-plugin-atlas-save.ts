@@ -369,7 +369,7 @@ export async function handleSaveRequest(
   // Side benefit: we capture each file's pre-write content here so the
   // backup pass (A7) can write it to `.atlas-backups/<ts>/...` without a
   // second read.
-  const preWrite: Array<{ payload: FilePayload; existing: Buffer | null; bytesToWrite: Buffer }> = [];
+  const preWrite: Array<{ payload: FilePayload; existing: Buffer | null; bytesToWrite: Buffer; skip?: boolean }> = [];
   for (const f of list) {
     const abs = path.resolve(repoRoot, f.path);
     let existingBytes: Buffer | null = null;
@@ -389,17 +389,32 @@ export async function handleSaveRequest(
     const bytesToWrite = decoded.get(f.path) ?? Buffer.from(f.content, "utf8");
 
     const exists = existingBytes !== null;
+    let skip = false;
     if (f.baseHash === null) {
       if (exists) {
-        return {
-          status: 409,
-          payload: {
-            error: "Conflict",
-            reason: "already-exists",
-            failedPath: f.path,
-            currentHash: hashOf(f.kind, existingBytes as Buffer),
-          },
-        };
+        // For asset-binary, a "create-only" write that finds an existing file
+        // with byte-identical content is treated as a no-op success rather
+        // than a conflict. Uploads are restored from localStorage on every
+        // editor reload (so the preview survives a refresh), so without this
+        // every Save after the first one would 409 on its own assets and
+        // roll back the entire atomic batch — taking world.yaml + entity-md
+        // changes down with it. Text kinds keep the strict create-only
+        // contract: an existing entity-md or world-yaml with no baseHash
+        // really is a stale draft and the editor should reconcile.
+        const currentHash = hashOf(f.kind, existingBytes as Buffer);
+        if (f.kind === "asset-binary" && hashOf(f.kind, bytesToWrite) === currentHash) {
+          skip = true;
+        } else {
+          return {
+            status: 409,
+            payload: {
+              error: "Conflict",
+              reason: "already-exists",
+              failedPath: f.path,
+              currentHash,
+            },
+          };
+        }
       }
     } else {
       if (!exists) {
@@ -421,7 +436,7 @@ export async function handleSaveRequest(
         };
       }
     }
-    preWrite.push({ payload: f, existing: existingBytes, bytesToWrite });
+    preWrite.push({ payload: f, existing: existingBytes, bytesToWrite, skip });
   }
 
   // ---------- Backup pass (A7) ----------
@@ -431,8 +446,8 @@ export async function handleSaveRequest(
   // never end up with new content on disk but no rollback target. Backups
   // are written as raw bytes so binary assets round-trip cleanly.
   const ts = backupTimestamp();
-  for (const { payload: f, existing } of preWrite) {
-    if (existing === null) continue;
+  for (const { payload: f, existing, skip } of preWrite) {
+    if (existing === null || skip) continue;
     const backupAbs = path.resolve(repoRoot, BACKUP_DIR, ts, f.path);
     try {
       await fs.mkdir(path.dirname(backupAbs), { recursive: true });
@@ -457,6 +472,12 @@ export async function handleSaveRequest(
   for (let i = 0; i < preWrite.length; i++) {
     const entry = preWrite[i];
     const f = entry.payload;
+    if (entry.skip) {
+      // Asset bytes already on disk — record the hash for the response so the
+      // client sees the path as "saved" but no disk activity occurred.
+      written.push({ path: f.path, hash: hashOf(f.kind, entry.bytesToWrite) });
+      continue;
+    }
     const abs = path.resolve(repoRoot, f.path);
     const tmpAbs = abs + ".tmp";
     try {
@@ -475,6 +496,8 @@ export async function handleSaveRequest(
       let rolledBack = 0;
       for (let j = 0; j < i; j++) {
         const prior = preWrite[j];
+        // Skipped entries never touched disk — nothing to roll back.
+        if (prior.skip) continue;
         const priorAbs = path.resolve(repoRoot, prior.payload.path);
         try {
           if (prior.existing !== null) {
@@ -507,8 +530,8 @@ export async function handleSaveRequest(
   // After writes succeed, prune so each backed-up path keeps only the most
   // recent BACKUP_RETENTION timestamps. Best-effort; failure here doesn't
   // fail the save.
-  for (const { payload: f, existing } of preWrite) {
-    if (existing === null) continue;
+  for (const { payload: f, existing, skip } of preWrite) {
+    if (existing === null || skip) continue;
     try {
       await pruneBackups(repoRoot, f.path);
     } catch {

@@ -30,6 +30,7 @@ import { ImageOverlay, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
+import { clampLayerToCanvas } from "@/atlas/layerGeometry";
 
 interface Props {
   layer: MapLayer;
@@ -125,8 +126,12 @@ export function MapLayerEditableOverlay({
       const ll = lmap.mouseEventToLatLng(e);
       const dLng = ll.lng - startLatLng.lng;
       const dLat = ll.lat - startLatLng.lat;
-      const nx = Math.round(startX + dLng);
-      const ny = Math.round(startY - dLat);
+      const clamped = clampLayerToCanvas(
+        { x: startX + dLng, y: startY - dLat, width: layer.width, height: layer.height },
+        mapDoc,
+      );
+      const nx = Math.round(clamped.x);
+      const ny = Math.round(clamped.y);
       startLatLng = null;
       if (nx === startX && ny === startY) return; // ignore microscopic drags
       onCommit({ x: nx, y: ny });
@@ -156,7 +161,7 @@ export function MapLayerEditableOverlay({
       document.removeEventListener("keydown", onKey);
       lmap.dragging.enable();
     };
-  }, [editMode, isSelected, lmap, mapDoc.height, layer.x, layer.y, layer.width, layer.height, onCommit]);
+  }, [editMode, isSelected, lmap, mapDoc, layer.x, layer.y, layer.width, layer.height, onCommit]);
 
   // -----------------------------------------------------------------------
   // B2 — corner handle positions (in Leaflet lat/lng).
@@ -343,13 +348,14 @@ function ResizeHandle({ corner, position, layer, mapDoc, lockAspect, overlayRef,
       lmap.dragging.enable();
       if (!startMouse) return;
       const current = marker.getLatLng();
-      const { x, y, width, height } = computeFromDrag(current);
+      const raw = computeFromDrag(current);
       startMouse = null;
+      const clamped = clampLayerToCanvas(raw, mapDoc);
       // Snap to integers — atlas coords are whole-map-units.
-      const rx = Math.round(x);
-      const ry = Math.round(y);
-      const rw = Math.max(1, Math.round(width));
-      const rh = Math.max(1, Math.round(height));
+      const rx = Math.round(clamped.x);
+      const ry = Math.round(clamped.y);
+      const rw = Math.max(1, Math.round(clamped.width));
+      const rh = Math.max(1, Math.round(clamped.height));
       if (rx === startX && ry === startY && rw === startW && rh === startH) return;
       onCommit({ x: rx, y: ry, width: rw, height: rh });
     };
@@ -375,7 +381,7 @@ function ResizeHandle({ corner, position, layer, mapDoc, lockAspect, overlayRef,
       marker.off("dragend", onDragEnd);
       document.removeEventListener("keydown", onKey);
     };
-  }, [corner, layer.x, layer.y, layer.width, layer.height, lmap, lockAspect, mapDoc.height, onCommit, overlayRef, position]);
+  }, [corner, layer.x, layer.y, layer.width, layer.height, lmap, lockAspect, mapDoc, onCommit, overlayRef, position]);
 
   return (
     <Marker

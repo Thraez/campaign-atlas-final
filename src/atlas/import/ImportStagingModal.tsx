@@ -81,6 +81,20 @@ export function ImportStagingModal({
     () => rows.filter((r) => r.parseError || !r.pathAllowed).length,
     [rows],
   );
+  // A row is "conflicting-but-fixable" if its target already exists on disk
+  // but the path and parse are otherwise fine. These default to !included
+  // (overwrite requires explicit opt-in), so an import where ALL rows are in
+  // this bucket would leave the user with a disabled button and no obvious
+  // recourse. A single click on "Select all overwrites" flips them all on at
+  // once so the bulk-overwrite case stops being 55 checkbox clicks.
+  const conflictRows = useMemo(
+    () => rows.filter((r) => r.pathAllowed && !r.parseError && r.conflict),
+    [rows],
+  );
+  const uncheckedConflictCount = useMemo(
+    () => conflictRows.filter((r) => !r.included).length,
+    [conflictRows],
+  );
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
@@ -223,10 +237,36 @@ export function ImportStagingModal({
           </table>
         </ScrollArea>
 
-        <div className="text-[11px] text-muted-foreground">
-          {blockedCount > 0
-            ? `${blockedCount} row${blockedCount === 1 ? "" : "s"} blocked — fix the source file or target path to include.`
-            : null}
+        <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+          <div className="space-y-0.5">
+            {blockedCount > 0 && (
+              <div>
+                {blockedCount} row{blockedCount === 1 ? "" : "s"} blocked —
+                fix the source file or target path to include.
+              </div>
+            )}
+            {uncheckedConflictCount > 0 && (
+              <div className="text-amber-300">
+                {uncheckedConflictCount} target{uncheckedConflictCount === 1 ? "" : "s"}{" "}
+                already exist on disk — re-check to overwrite (the existing file is backed up).
+              </div>
+            )}
+          </div>
+          {uncheckedConflictCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-[11px] h-7 shrink-0"
+              onClick={() => {
+                for (const r of conflictRows) {
+                  if (!r.included) onPatchRow(r.id, { included: true });
+                }
+              }}
+              disabled={isImporting}
+            >
+              Select all overwrites
+            </Button>
+          )}
         </div>
 
         <DialogFooter>

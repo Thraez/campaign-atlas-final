@@ -23,6 +23,15 @@ describe("captureLeadingCommentBlock", () => {
     expect(captureLeadingCommentBlock(existing)).toBe("# top\n# next\n\n");
   });
 
+  it("strips a leading UTF-8 BOM before scanning the comment block", () => {
+    // A BOM at byte 0 used to make the regex /^\s*#/ miss the first line, so
+    // the scan returned "" and the entire 9-line astrath-deeprealm header
+    // disappeared on the very next save. Same class of bug as the
+    // import/frontmatter.ts fix in commit 476d67f.
+    const existing = "﻿# header line 1\n# header line 2\n\nschemaVersion: 1\nmaps: []\n";
+    expect(captureLeadingCommentBlock(existing)).toBe("# header line 1\n# header line 2\n\n");
+  });
+
   it("captures the full 9-line astrath-deeprealm header exactly", () => {
     const existing =
       "# Astrath Deeprealm — map / region / fog / route / calendar config.\n" +
@@ -68,6 +77,26 @@ describe("serializeWorldYaml", () => {
     expect(out).toContain("# World atlas");
     expect(out).toContain("# CANON: YAML / Markdown frontmatter is the source of truth.");
     expect(out.endsWith(newBody)).toBe(true);
+  });
+
+  it("round-trips a BOM-prefixed existing file with the blank-line separator intact", () => {
+    // The Astrath Deeprealm world.yaml regression: file was saved by an editor
+    // that prepended a UTF-8 BOM. Subsequent editor saves dropped the entire
+    // comment block AND the blank-line separator before schemaVersion. The
+    // captureLeadingCommentBlock BOM strip closes that loop.
+    const existing =
+      "﻿# Astrath Deeprealm — config\n" +
+      "#\n" +
+      "# CANON: source of truth\n" +
+      "\n" +
+      "schemaVersion: 1\nmaps: []\n";
+    const newBody = "schemaVersion: 1\nmaps:\n  - id: overview\n";
+    const out = serializeWorldYaml(newBody, existing);
+    // Comments survive (without the BOM, which would be illegal mid-file).
+    expect(out.startsWith("# Astrath Deeprealm — config\n#\n# CANON: source of truth\n\n")).toBe(true);
+    // And the blank-line separator between comments and YAML body is still
+    // there — the YAML body starts on the line AFTER a blank line.
+    expect(out).toMatch(/# CANON: source of truth\n\nschemaVersion: 1/);
   });
 
   it("inline mid-file comments are NOT preserved (documented limitation)", () => {

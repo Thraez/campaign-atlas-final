@@ -13,8 +13,10 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   saveAtlasPatchToLocalFs,
+  ConflictError,
   DisallowedPathError,
   LocalSaveError,
+  SaveBusyError,
   type FileChange,
   type LocalSaveResult,
 } from "./localFsSave";
@@ -117,6 +119,28 @@ export function DiffPreviewModal({ open, changes, previousContents, rebuildAfter
     } catch (err: unknown) {
       if (err instanceof DisallowedPathError) {
         setPhase({ kind: "disallowed", path: err.path });
+      } else if (err instanceof ConflictError) {
+        // Conflict failures used to surface as the bare error message
+        // ("Save conflict (already-exists) on ..."), which the user reads as
+        // a generic "unable to save" without seeing the specific path that
+        // blocked the batch. Spell out the path and the reason so the next
+        // action is obvious — and remind the user that no files were written
+        // because the batch is atomic.
+        const reasonText =
+          err.reason === "already-exists"
+            ? "A file with that path already exists on disk and the editor wanted to create it fresh."
+            : err.reason === "stale-base"
+              ? "The file changed outside the editor since the draft was loaded."
+              : "The file is missing on disk but the editor expected to overwrite it.";
+        setPhase({
+          kind: "error",
+          message: `Conflict on ${err.failedPath} (${err.reason}). ${reasonText} Nothing was written — the batch was rolled back.`,
+        });
+      } else if (err instanceof SaveBusyError) {
+        setPhase({
+          kind: "error",
+          message: "Another save is already in flight — wait a moment and click Try again.",
+        });
       } else if (err instanceof LocalSaveError) {
         setPhase({ kind: "error", message: err.message });
       } else {

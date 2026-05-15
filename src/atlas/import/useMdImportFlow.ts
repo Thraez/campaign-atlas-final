@@ -113,17 +113,33 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
       await onImported();
     } catch (err) {
       if (err instanceof ConflictError) {
-        toast.error(`Import conflict on ${err.failedPath}`, {
-          description:
-            err.reason === "already-exists"
-              ? "A file with that target appeared on disk after staging — reload before retrying."
-              : "File changed outside the editor. Reload before retrying.",
+        // ConflictError on the import path means the on-disk state diverged
+        // from what staging saw. For "already-exists" the most common cause
+        // is a file with the same target path that wasn't yet in atlas.json
+        // (e.g. imports/ items the build pipeline hasn't ingested yet) —
+        // staging doesn't see it as a conflict, but the create-only write
+        // does. Tell the user what to do: re-open the modal and re-check the
+        // conflict row to opt into overwriting.
+        const summary =
+          err.reason === "already-exists"
+            ? "Target file exists on disk but wasn't in the project. Re-open the modal and check 'Select all overwrites', or rename the target."
+            : err.reason === "stale-base"
+              ? "File changed outside the editor between staging and commit. Reload canon and retry."
+              : "File disappeared between staging and commit. Reload canon and retry.";
+        toast.error(`Import conflict: ${err.failedPath}`, {
+          description: summary,
           duration: 12_000,
         });
       } else if (err instanceof SaveBusyError) {
         toast.error("Another save is already in flight — try again in a moment");
       } else if (err instanceof ImportCommitError) {
-        toast.error(`Could not prepare import: ${err.message}`);
+        toast.error(`Could not prepare import: ${err.message}`, {
+          description:
+            err.message === "No rows selected for import"
+              ? "Every row is either blocked (parse error / outside allowlist) or an unchecked conflict. Resolve the per-row issues in the staging modal first."
+              : undefined,
+          duration: 10_000,
+        });
       } else {
         const msg = err instanceof Error ? err.message : String(err);
         toast.error(`Import failed: ${msg}`);
