@@ -45,6 +45,10 @@ export interface FogDraftAPI {
   revealAroundRoute: (r: Route, points: Point[], padding: number) => void;
   revealAroundPin: (center: Point, radius: number) => void;
   reset: () => void;
+  /** Phase 1B B0 — full-state snapshot for the save-boundary undo entry.
+   *  null = "no local override" (fog state is purely canon). */
+  snapshot: () => FogOverlay | null;
+  applySnapshot: (snap: FogOverlay | null) => void;
   issues: FogIssue[];
 }
 
@@ -176,13 +180,18 @@ export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackA
     return out;
   }, [fog, map]);
 
+  const snapshot = useCallback((): FogOverlay | null => overrideRef.current, []);
+  const applySnapshot = useCallback((snap: FogOverlay | null) => { applyOverride(snap); }, [applyOverride]);
+
   return {
     fog, dirty, setEnabled, setColor,
     tool, setTool, draftPoints, addDraftPoint, removeLastDraftPoint, cancelDraft,
     finishDraftPolygon, finishDraftCircle,
     removeReveal, clearReveals,
     revealRegion, revealAroundRoute, revealAroundPin,
-    reset, issues,
+    reset,
+    snapshot, applySnapshot,
+    issues,
   };
 }
 

@@ -1318,34 +1318,96 @@ export default function AtlasPlacementEditor() {
         rebuildAfterSave={true}
         onSaved={(result) => {
           setLastSavedAt(Date.now());
-          // Clear local pin overrides for the active map — they now live in canon.
+          // Phase 1B B0 — capture pre-save snapshots so the save-boundary
+          // undo entry below can restore the dirty local state when the DM
+          // hits Cmd+Z across a save. Snapshots reflect the state RIGHT
+          // BEFORE this cleanup runs.
+          const preSave = {
+            overrides: overridesRef.current,
+            mapOverride: mapOverrideRef.current,
+            regionDraft: regionDraft.snapshot(),
+            routeDraft: routeDraft.snapshot(),
+            fogDraft: fogDraft.snapshot(),
+            layerByMap: layerEditor.snapshot(),
+          };
+
+          // Clear local pin overrides for the active map — they now live in
+          // canon. Bypass-undo path (raw setOverrides + ref sync) because
+          // the save-boundary entry handles undo recording for the whole
+          // cleanup as one atomic step.
           const writtenPaths = new Set(result.paths);
           const writtenEntityIds = new Set(
             project.entities
               .filter((e) => writtenPaths.has(e.sourcePath))
               .map((e) => e.id),
           );
-          setOverrides((o) => {
-            const next = { ...o };
-            for (const k of Object.keys(next)) {
-              const [mid, eid] = k.split(":");
-              if (mid === activeMap.id && writtenEntityIds.has(eid)) {
-                delete next[k];
-              }
+          const nextOverrides: Overrides = { ...preSave.overrides };
+          for (const k of Object.keys(nextOverrides)) {
+            const [mid, eid] = k.split(":");
+            if (mid === activeMap.id && writtenEntityIds.has(eid)) {
+              delete nextOverrides[k];
             }
-            return next;
-          });
+          }
+          overridesRef.current = nextOverrides;
+          setOverrides(nextOverrides);
+
           // A13: if world.yaml was part of the batch, clear the per-tab drafts
           // and refresh the baseline so the next dirty cycle starts fresh.
-          const worldYamlWritten = activeWorldId && writtenPaths.has(worldYamlPath(activeWorldId));
+          // All clears go through the *non-undoable* applySnapshot path so
+          // the only undo entry we add for this save is the single
+          // save-boundary entry below.
+          const worldYamlWritten = !!(activeWorldId && writtenPaths.has(worldYamlPath(activeWorldId)));
+          let nextMapOverride = preSave.mapOverride;
+          let nextLayerByMap = preSave.layerByMap;
+          const cleanRegionDraft = { edits: {}, added: [], deleted: [] };
+          const cleanRouteDraft = { edits: {}, added: [], deleted: [] };
           if (worldYamlWritten) {
-            regionDraft.reset();
-            routeDraft.reset();
-            fogDraft.reset();
-            layerEditor.clearForMap();
-            resetMap();
+            regionDraft.applySnapshot(cleanRegionDraft);
+            routeDraft.applySnapshot(cleanRouteDraft);
+            fogDraft.applySnapshot(null);
+            nextLayerByMap = { ...preSave.layerByMap, [activeMap.id]: [] };
+            layerEditor.applySnapshot(nextLayerByMap);
+            nextMapOverride = { ...preSave.mapOverride };
+            delete nextMapOverride[activeMap.id];
+            mapOverrideRef.current = nextMapOverride;
+            setMapOverride(nextMapOverride);
             void worldYamlBaseline.refresh();
           }
+
+          // Push the save-boundary undo entry. Undoing restores ALL the
+          // pre-save state in one shot — pin overrides, region/route/fog
+          // drafts, layer geometry overrides, map metadata. The chip flips
+          // Saved → Unsaved (because dirty signals come back) without
+          // touching disk. Per spec §I: "puts the editor back into the
+          // prior in-memory state and flips the chip back to Unsaved."
+          undoStack.push({
+            label: "save (cleared local drafts)",
+            undo: () => {
+              overridesRef.current = preSave.overrides;
+              setOverrides(preSave.overrides);
+              if (worldYamlWritten) {
+                mapOverrideRef.current = preSave.mapOverride;
+                setMapOverride(preSave.mapOverride);
+                regionDraft.applySnapshot(preSave.regionDraft);
+                routeDraft.applySnapshot(preSave.routeDraft);
+                fogDraft.applySnapshot(preSave.fogDraft);
+                layerEditor.applySnapshot(preSave.layerByMap);
+              }
+            },
+            redo: () => {
+              overridesRef.current = nextOverrides;
+              setOverrides(nextOverrides);
+              if (worldYamlWritten) {
+                mapOverrideRef.current = nextMapOverride;
+                setMapOverride(nextMapOverride);
+                regionDraft.applySnapshot(cleanRegionDraft);
+                routeDraft.applySnapshot(cleanRouteDraft);
+                fogDraft.applySnapshot(null);
+                layerEditor.applySnapshot(nextLayerByMap);
+              }
+            },
+          });
+
           // Refresh canon (only meaningful if rebuild succeeded).
           if (result.build?.ok !== false) {
             loadAtlasContent(true).then((p) => {

@@ -22,17 +22,17 @@
  * are layered in by subsequent sub-tasks (A5-A11).
  *
  * The save endpoint optionally rebuilds the atlas (`rebuild: true`) by
- * spawning `tsx scripts/build-atlas.ts` after writes. A simple in-flight
- * mutex coalesces concurrent saves so two near-simultaneous rebuilds don't
- * race to clobber public/atlas/atlas.json.
+ * invoking the in-process `runBuild()` exported from `scripts/build-atlas.ts`
+ * (A10). A simple in-flight mutex coalesces concurrent saves so two
+ * near-simultaneous rebuilds don't race to clobber public/atlas/atlas.json.
  */
 import type { Plugin } from "vite";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import matter from "gray-matter";
 import yaml from "js-yaml";
 import { isWritableAssetPath, isWritableSourcePath } from "../src/atlas/save/sourcePathAllowlist";
+import { runBuild, type BuildResult as InProcessBuildResult } from "./build-atlas";
 
 const MAX_FILE_BYTES = 1024 * 1024;
 // Asset uploads arrive as base64 data URLs; this cap covers ~5.5 MB of binary
@@ -596,40 +596,62 @@ async function readAtlasPublishedAt(repoRoot: string): Promise<string | null> {
   }
 }
 
-/** Run the atlas build script and return a structured result. */
-function runAtlasBuild(repoRoot: string): Promise<BuildResult> {
-  const started = Date.now();
-  return new Promise<BuildResult>((resolve) => {
-    const isWin = process.platform === "win32";
-    const npx = isWin ? "npx.cmd" : "npx";
-    const child = spawn(npx, ["tsx", "scripts/build-atlas.ts"], {
-      cwd: repoRoot,
-      shell: isWin,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let stderr = "";
-    let stdout = "";
-    child.stdout?.on("data", (b) => { stdout += String(b); });
-    child.stderr?.on("data", (b) => { stderr += String(b); });
-    const timer = setTimeout(() => {
-      child.kill("SIGTERM");
-    }, BUILD_TIMEOUT_MS);
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      const durationMs = Date.now() - started;
-      resolve({
-        ok: code === 0,
-        durationMs,
-        // Surface a short tail of stderr/stdout so the UI can show a hint
-        // without overwhelming. Truncate to avoid huge JSON responses.
-        stderr: code === 0 ? undefined : (stderr || stdout).slice(-2000),
-      });
-    });
-    child.on("error", (e) => {
-      clearTimeout(timer);
-      resolve({ ok: false, durationMs: Date.now() - started, stderr: e.message });
-    });
+/**
+ * A10: programmatic atlas rebuild via the in-process `runBuild()` export.
+ *
+ * Replaces the previous `spawn("npx tsx scripts/build-atlas.ts")` path so
+ * a save no longer pays process-spawn + tsx-startup cost on every write
+ * (~600ms steady-state, 2-3s on cold cache). The trade-off is that
+ * `runBuild()` runs inside the Vite dev server's process — it must not
+ * call `process.exit`. The CLI shim still does, but `runBuild()` itself
+ * throws `BuildError` instead, which we translate into the same BuildResult
+ * shape the endpoint already returns.
+ *
+ * `repoRoot` is currently informational only — `build-atlas.ts` resolves
+ * paths against `process.cwd()`. The Vite dev server's cwd is the repo
+ * root, so this is fine in practice; if that ever changes, the build
+ * script will need a cwd override.
+ */
+async function runAtlasBuild(repoRoot: string): Promise<BuildResult> {
+  // Currently informational — see comment above.
+  void repoRoot;
+  const timeoutMs = BUILD_TIMEOUT_MS;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<BuildResult>((resolve) => {
+    timer = setTimeout(() => {
+      resolve({ ok: false, durationMs: timeoutMs, stderr: `atlas build timed out after ${timeoutMs}ms` });
+    }, timeoutMs);
   });
+  try {
+    // Default flags = dev rebuild (non-player, non-strict). Same as a bare
+    // `npm run atlas:build` invocation, which is what the spawn version did.
+    const result: BuildResult | InProcessBuildResult = await Promise.race([runBuild(), timeout]);
+    if (timer) clearTimeout(timer);
+    if (result.ok) {
+      return { ok: true, durationMs: result.durationMs };
+    }
+    // Truncate just like the spawn path did so a huge build log doesn't
+    // blow up the JSON response body. The two shapes have different error
+    // field names — `error` for runBuild, `stderr` for the local timeout.
+    const errStr = "error" in result && result.error
+      ? result.error
+      : "stderr" in result ? result.stderr ?? "" : "";
+    return {
+      ok: false,
+      durationMs: result.durationMs,
+      stderr: errStr ? errStr.slice(-2000) : undefined,
+    };
+  } catch (e) {
+    if (timer) clearTimeout(timer);
+    // runBuild() catches BuildError internally, so reaching here is unusual
+    // — surface it as a generic failure rather than letting the endpoint
+    // 500 with an unhandled rejection.
+    return {
+      ok: false,
+      durationMs: 0,
+      stderr: e instanceof Error ? e.message : String(e),
+    };
+  }
 }
 
 /** Allowlist-guarded reader for GET /__atlas/read?path=... */
