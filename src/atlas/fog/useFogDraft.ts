@@ -6,8 +6,9 @@
  * approximations so the player runtime needs no changes. We track the
  * editing intent (kind/center/radius) only in-memory for UX.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FogOverlay, MapDocument, Point, Region, Route } from "@/atlas/content/schema";
+import type { UndoStackAPI } from "@/atlas/useUndoStack";
 
 export interface FogIssue {
   severity: "blocking" | "warning";
@@ -71,7 +72,7 @@ const DEFAULT_FOG = (mapId: string): FogOverlay => ({
   mapId, enabled: false, color: DEFAULT_COLOR, reveals: [],
 });
 
-export function useFogDraft(map: MapDocument | undefined): FogDraftAPI {
+export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackAPI): FogDraftAPI {
   const base: FogOverlay = useMemo(
     () => map?.fog ?? (map ? DEFAULT_FOG(map.id) : DEFAULT_FOG("")),
     [map]
@@ -83,9 +84,34 @@ export function useFogDraft(map: MapDocument | undefined): FogDraftAPI {
   const [tool, setTool] = useState<FogTool>(null);
   const [draftPoints, setDraftPoints] = useState<Point[]>([]);
 
+  const overrideRef = useRef(override);
+  useEffect(() => { overrideRef.current = override; }, [override]);
+
+  const applyOverride = useCallback((next: FogOverlay | null) => {
+    overrideRef.current = next;
+    setOverride(next);
+  }, []);
+
+  /**
+   * Apply a partial change to the fog overlay and (optionally) record an
+   * undo entry. Records the snapshot pair (prior override, next override)
+   * so Cmd+Z reverts both the visible flag and any reveal change at once.
+   */
   const mutate = useCallback((p: Partial<FogOverlay>) => {
-    setOverride((cur) => ({ ...(cur ?? base), ...p }));
-  }, [base]);
+    const before = overrideRef.current;
+    const cur = before ?? base;
+    const next: FogOverlay = { ...cur, ...p };
+    // No real change → no-op.
+    if (before && (Object.keys(p) as (keyof FogOverlay)[]).every((k) => before[k] === next[k])) return;
+    applyOverride(next);
+    if (undoStack) {
+      undoStack.push({
+        undo: () => applyOverride(before),
+        redo: () => applyOverride(next),
+        label: "fog",
+      });
+    }
+  }, [base, applyOverride, undoStack]);
 
   const setEnabled = useCallback((v: boolean) => mutate({ enabled: v }), [mutate]);
   const setColor = useCallback((v: string | undefined) => mutate({ color: v }), [mutate]);
@@ -134,7 +160,8 @@ export function useFogDraft(map: MapDocument | undefined): FogDraftAPI {
     addReveal(circlePolygon(center[0], center[1], radius));
   }, [addReveal]);
 
-  const reset = useCallback(() => { setOverride(null); cancelDraft(); }, [cancelDraft]);
+  // reset() bypasses the undo stack — see comment in useRegionDraft.ts.
+  const reset = useCallback(() => { applyOverride(null); cancelDraft(); }, [applyOverride, cancelDraft]);
 
   const issues = useMemo<FogIssue[]>(() => {
     const out: FogIssue[] = [];

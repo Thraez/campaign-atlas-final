@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { MapContainer, Marker, ImageOverlay, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Compass, Crosshair, RotateCcw, MapPin, Target, Trash2, Layers as LayersIcon, MapPin as PinIcon, Settings2, FolderOpen, Shapes, Route as RouteIcon, CloudFog, BookOpen, ShieldCheck, Upload, Save as SaveIcon } from "lucide-react";
+import { ArrowLeft, Compass, Crosshair, RotateCcw, MapPin, Target, Trash2, Layers as LayersIcon, MapPin as PinIcon, Settings2, FolderOpen, Shapes, Route as RouteIcon, CloudFog, BookOpen, ShieldCheck, Upload, Save as SaveIcon, Undo2, Redo2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity, MapDocument, MapLayer } from "@/atlas/content/schema";
@@ -15,9 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useMapLayers } from "@/atlas/useMapLayers";
 import { MapLayerPanel } from "@/atlas/MapLayerPanel";
+import { MapLayerEditableOverlay } from "@/atlas/MapLayerEditableOverlay";
 import { MapSettingsPanel } from "@/atlas/MapSettingsPanel";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
-import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { overridesSchema } from "@/atlas/schemas/imports";
 import { classifyDraftStatus } from "@/atlas/yaml/canon";
 import { DraftStatusBadge } from "@/atlas/yaml/StatusBadge";
@@ -58,6 +58,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
+import { useUndoStack } from "@/atlas/useUndoStack";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 // Bumped to v3: storage shape now carries label + pin override per placement.
@@ -146,6 +147,10 @@ export default function AtlasPlacementEditor() {
   const [flyTo, setFlyTo] = useState<{ lat: number; lng: number } | null>(null);
   const [showLayers, setShowLayers] = useState(true);
   const [showRegions, setShowRegions] = useState(true);
+  // Phase 1B B1/B2: toggle exposed by the Maps → Layers panel header. When
+  // true, the selected layer is draggable and corner handles appear.
+  const [editGeometry, setEditGeometry] = useState(false);
+  const [lockAspectRatio, setLockAspectRatio] = useState(true);
 
   useEffect(() => {
     loadAtlasContent(true).then((p) => {
@@ -246,14 +251,26 @@ export default function AtlasPlacementEditor() {
 
   const patchMap = (patch: Partial<MapDocument>) => {
     if (!baseMap) return;
-    setMapOverride((s) => ({ ...s, [baseMap.id]: { ...(s[baseMap.id] ?? {}), ...patch } }));
+    setMapOverrideUndoable(
+      (s) => ({ ...s, [baseMap.id]: { ...(s[baseMap.id] ?? {}), ...patch } }),
+      `map metadata ${baseMap.id}`,
+    );
   };
   const resetMap = () => {
     if (!baseMap) return;
-    setMapOverride((s) => { const n = { ...s }; delete n[baseMap.id]; return n; });
+    setMapOverrideUndoable(
+      (s) => { const n = { ...s }; delete n[baseMap.id]; return n; },
+      `reset map metadata ${baseMap.id}`,
+    );
   };
 
-  const layerEditor = useMapLayers(activeMap);
+  // Phase 1B — session undo stack. In-memory only; cleared on tab close.
+  // Passed into useMapLayers + each draft hook so every per-tab mutation
+  // records its inverse. Pin overrides + mapOverride mutations go through
+  // setOverridesUndoable / setMapOverrideUndoable below.
+  const undoStack = useUndoStack();
+
+  const layerEditor = useMapLayers(activeMap, undoStack);
 
   // A13: baseline world.yaml content + hash for the active world. Pinned at
   // editor-load (and refreshed after each successful Save) so the unified
@@ -268,10 +285,65 @@ export default function AtlasPlacementEditor() {
     () => new Set((project?.entities ?? []).filter((e) => e.visibility === "dm" || e.visibility === "hidden").map((e) => e.id)),
     [project]
   );
-  const regionDraft = useRegionDraft(activeMap, { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet });
-  const routeDraft = useRouteDraft(project, activeMap, { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet });
-  const fogDraft = useFogDraft(activeMap);
+  const regionDraft = useRegionDraft(activeMap, { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet }, undoStack);
+  const routeDraft = useRouteDraft(project, activeMap, { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet }, undoStack);
+  const fogDraft = useFogDraft(activeMap, undoStack);
   const [showFogPreview, setShowFogPreview] = useState(true);
+
+  // Synchronous mirrors of overrides + mapOverride. Mutation helpers below
+  // read these to compute (before, after) snapshots without waiting for
+  // React batching to settle.
+  const overridesRef = useRef(overrides);
+  useEffect(() => { overridesRef.current = overrides; }, [overrides]);
+  const mapOverrideRef = useRef(mapOverride);
+  useEffect(() => { mapOverrideRef.current = mapOverride; }, [mapOverride]);
+
+  /** Undo-recording setter for pin overrides. Skip-recording mode is just
+   *  raw setOverrides; use that for post-save cleanup. */
+  const setOverridesUndoable = useCallback(
+    (compute: (prev: Overrides) => Overrides, label: string) => {
+      const before = overridesRef.current;
+      const after = compute(before);
+      if (after === before) return;
+      overridesRef.current = after;
+      setOverrides(after);
+      undoStack.push({
+        undo: () => {
+          overridesRef.current = before;
+          setOverrides(before);
+        },
+        redo: () => {
+          overridesRef.current = after;
+          setOverrides(after);
+        },
+        label,
+      });
+    },
+    [undoStack],
+  );
+
+  /** Undo-recording setter for map metadata. */
+  const setMapOverrideUndoable = useCallback(
+    (compute: (prev: Record<string, Partial<MapDocument>>) => Record<string, Partial<MapDocument>>, label: string) => {
+      const before = mapOverrideRef.current;
+      const after = compute(before);
+      if (after === before) return;
+      mapOverrideRef.current = after;
+      setMapOverride(after);
+      undoStack.push({
+        undo: () => {
+          mapOverrideRef.current = before;
+          setMapOverride(before);
+        },
+        redo: () => {
+          mapOverrideRef.current = after;
+          setMapOverride(after);
+        },
+        label,
+      });
+    },
+    [undoStack],
+  );
 
   /** Per-tab filter state (placed/unplaced/visibility/type/tag). */
   const [stateFilter, setStateFilter] = useState<"all" | "placed" | "unplaced">("all");
@@ -337,10 +409,10 @@ export default function AtlasPlacementEditor() {
   const placed = filtered.filter((e) => effectiveCoord(e.id));
   const unplaced = filtered.filter((e) => !effectiveCoord(e.id));
 
-  /** Merge a partial override into the local draft. */
-  const mutateOverride = useCallback((entityId: string, patch: Partial<OverrideValue>) => {
+  /** Merge a partial override into the local draft. Undoable. */
+  const mutateOverride = useCallback((entityId: string, patch: Partial<OverrideValue>, label?: string) => {
     if (!activeMap) return;
-    setOverrides((o) => {
+    setOverridesUndoable((o) => {
       const k = overrideKey(activeMap.id, entityId);
       const current = (k in o ? o[k] : null) ?? canonPlacement(activeMap.id, entityId);
       if (!current) return o;
@@ -351,33 +423,40 @@ export default function AtlasPlacementEditor() {
         pin: patch.pin !== undefined ? patch.pin : (current as OverrideValue).pin,
       };
       return { ...o, [k]: merged };
-    });
-  }, [activeMap, canonPlacement]);
+    }, label ?? `pin ${entityId}`);
+  }, [activeMap, canonPlacement, setOverridesUndoable]);
 
-  const setCoord = (entityId: string, coord: { x: number; y: number }) => mutateOverride(entityId, coord);
-  const setLabel = (entityId: string, label: string | undefined) => mutateOverride(entityId, { label });
-  const setPinOverride = (entityId: string, pin: PinOverride | undefined) => mutateOverride(entityId, { pin });
+  const setCoord = (entityId: string, coord: { x: number; y: number }) => mutateOverride(entityId, coord, `move pin ${entityId}`);
+  const setLabel = (entityId: string, label: string | undefined) => mutateOverride(entityId, { label }, `label pin ${entityId}`);
+  const setPinOverride = (entityId: string, pin: PinOverride | undefined) => mutateOverride(entityId, { pin }, `style pin ${entityId}`);
   const nudge = (entityId: string, dx: number, dy: number) => {
     const c = effectiveCoord(entityId);
     if (!c) return;
-    mutateOverride(entityId, { x: c.x + dx, y: c.y + dy });
+    mutateOverride(entityId, { x: c.x + dx, y: c.y + dy }, `nudge pin ${entityId}`);
   };
   const removeCoord = (entityId: string) => {
     if (!activeMap) return;
-    setOverrides((o) => ({ ...o, [overrideKey(activeMap.id, entityId)]: null }));
+    setOverridesUndoable(
+      (o) => ({ ...o, [overrideKey(activeMap.id, entityId)]: null }),
+      `remove pin ${entityId}`,
+    );
   };
   const clearOverride = (entityId: string) => {
     if (!activeMap) return;
     const k = overrideKey(activeMap.id, entityId);
-    setOverrides((o) => { const next = { ...o }; delete next[k]; return next; });
+    setOverridesUndoable(
+      (o) => { const next = { ...o }; delete next[k]; return next; },
+      `discard local pin edit ${entityId}`,
+    );
   };
-  /** Duplicate a placement to another map: writes the same coords as a draft. */
+  /** Duplicate a placement to another map: writes the same coords as a draft. Undoable. */
   const duplicateToMap = (entityId: string, targetMapId: string) => {
-    setOverrides((o) => {
-      const src = effectivePlacement(entityId);
-      if (!src) return o;
-      return { ...o, [overrideKey(targetMapId, entityId)]: { x: src.x, y: src.y, label: src.label, pin: src.pin } };
-    });
+    const src = effectivePlacement(entityId);
+    if (!src) return;
+    setOverridesUndoable(
+      (o) => ({ ...o, [overrideKey(targetMapId, entityId)]: { x: src.x, y: src.y, label: src.label, pin: src.pin } }),
+      `duplicate pin ${entityId} → ${targetMapId}`,
+    );
     toast.success(`Duplicated to ${project?.maps.find((m) => m.id === targetMapId)?.name ?? targetMapId}`);
   };
 
@@ -648,6 +727,52 @@ export default function AtlasPlacementEditor() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- onSaveClick is stable enough; tracking it here would re-arm the timer on every render
   }, [hasUnsavedChanges, lastLocalEditAt]);
 
+  // Phase 1B B4: Esc cancels in-progress pin placement (the "Click on the
+  // map to place X" banner has its own button; this just covers the same
+  // exit via the keyboard).
+  useEffect(() => {
+    if (!pendingId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setPendingId(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pendingId]);
+
+  // Phase 1B B0: keyboard shortcuts for Undo / Redo.
+  //   Cmd/Ctrl+Z       → undo
+  //   Cmd/Ctrl+Shift+Z → redo
+  //   Ctrl+Y           → redo (Windows alternate)
+  // Skips when focus is in an editable surface (input, textarea, select,
+  // contenteditable) so typing isn't hijacked.
+  useEffect(() => {
+    const isEditableTarget = (t: EventTarget | null): boolean => {
+      if (!(t instanceof HTMLElement)) return false;
+      const tag = t.tagName.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return true;
+      if (t.isContentEditable) return true;
+      return false;
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (isEditableTarget(e.target)) return;
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undoStack.undo();
+      } else if ((k === "z" && e.shiftKey) || k === "y") {
+        e.preventDefault();
+        undoStack.redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undoStack]);
+
   // Browser-level guard: warn before tab close / reload if there are
   // unsaved drafts. The custom message is browser-controlled in modern
   // browsers (just shows a generic prompt) — the point is the prompt.
@@ -806,9 +931,42 @@ export default function AtlasPlacementEditor() {
           failedMessage={saveError ?? undefined}
           onForceSave={onSaveClick}
         />
-        <Button variant="ghost" size="sm" onClick={() => { setOverrides({}); toast.info("Cleared overrides"); }} title="Discard local changes">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => undoStack.undo()}
+          disabled={!undoStack.canUndo}
+          title="Undo (Ctrl/Cmd+Z)"
+          aria-label="Undo"
+        >
+          <Undo2 className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => undoStack.redo()}
+          disabled={!undoStack.canRedo}
+          title="Redo (Ctrl/Cmd+Shift+Z)"
+          aria-label="Redo"
+        >
+          <Redo2 className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setOverridesUndoable(() => ({}), "clear local pin overrides");
+            toast.info("Cleared overrides");
+          }}
+          title="Discard all local pin overrides"
+        >
           <RotateCcw className="h-4 w-4" />
         </Button>
+        <PlacePinPopover
+          unplaced={unplaced}
+          activeMapName={activeMap.name}
+          onPick={(id) => setPendingId(id)}
+        />
         <Button
           variant="default"
           size="sm"
@@ -838,20 +996,32 @@ export default function AtlasPlacementEditor() {
             <FlyTo target={flyTo} />
             <MapClickCapture onClick={onMapClick} />
 
-            {/* Map base image layers — built-in + locally edited/uploaded. */}
-            {showLayers && layerEditor.mergedLayers.map((layer) => (
-              <ImageOverlay
-                key={layer.id}
-                url={normalizeAtlasAssetUrl(layer.src)}
-                bounds={[
-                  [activeMap.height - (layer.y + layer.height), layer.x],
-                  [activeMap.height - layer.y, layer.x + layer.width],
-                ] as L.LatLngBoundsLiteral}
-                opacity={layer.opacity}
-                eventHandlers={{ click: () => layerEditor.setSelectedId(layer.id) }}
-                interactive={true}
-              />
-            ))}
+            {/* Map base image layers — built-in + locally edited/uploaded.
+                In edit-geometry mode + when this layer is selected, the
+                overlay grows drag handles and the body becomes draggable.
+                The component handles its own undo recording by calling
+                layerEditor.updateLayer via onCommit. */}
+            {showLayers && layerEditor.mergedLayers.map((layer) => {
+              const isSelected = layerEditor.selectedId === layer.id;
+              return (
+                <MapLayerEditableOverlay
+                  key={layer.id}
+                  layer={layer}
+                  mapDoc={activeMap}
+                  editMode={editGeometry}
+                  isSelected={isSelected}
+                  lockAspect={lockAspectRatio}
+                  onSelect={() => layerEditor.setSelectedId(layer.id)}
+                  onCommit={(patch) => {
+                    // Promote built-in to a local "edit" before mutating,
+                    // matching MapLayerPanel.patch() behavior.
+                    const isLocal = layerEditor.localLayers.some((l) => l.id === layer.id);
+                    if (!isLocal) layerEditor.editBuiltinLayer(layer.id);
+                    layerEditor.updateLayer(layer.id, patch);
+                  }}
+                />
+              );
+            })}
 
             {/* Z-order: layers → regions → routes → fog → pins → handles. */}
             {showRegions && <RegionLayer map={activeMap} api={regionDraft} visible={showRegions} />}
@@ -884,8 +1054,17 @@ export default function AtlasPlacementEditor() {
           {pendingId && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs shadow-lg flex items-center gap-2">
               <Crosshair className="h-3.5 w-3.5" />
-              Click on the map to place "{project.entities.find((e) => e.id === pendingId)?.title}"
-              <button className="ml-2 underline" onClick={() => setPendingId(null)}>cancel</button>
+              <span>Click on the map to place "{project.entities.find((e) => e.id === pendingId)?.title}"</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="ml-1 h-5 px-1.5 text-[10px] gap-1 text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
+                onClick={() => setPendingId(null)}
+                title="Cancel placement (Esc)"
+              >
+                <X className="h-3 w-3" />
+                Cancel
+              </Button>
             </div>
           )}
         </div>
@@ -1025,6 +1204,10 @@ export default function AtlasPlacementEditor() {
                     onRemove={layerEditor.removeLayer}
                     onClearAll={layerEditor.clearAll}
                     onSetMapSize={(w, h) => patchMap({ width: w, height: h })}
+                    editGeometry={editGeometry}
+                    setEditGeometry={setEditGeometry}
+                    lockAspect={lockAspectRatio}
+                    setLockAspect={setLockAspectRatio}
                   />
                 </TabsContent>
                 <TabsContent value="settings" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
@@ -1173,6 +1356,111 @@ export default function AtlasPlacementEditor() {
         onClose={() => setSaveModalOpen(false)}
       />
     </div>
+  );
+}
+
+/**
+ * Phase 1B B4 — toolbar popover that lists every unplaced entity on the
+ * active map. Picking one routes through the same `setPendingId` flow as
+ * the per-row "Place" button, so the existing crosshair banner + click
+ * handler take over from there.
+ *
+ * The popover is filtered by a small search box at the top — placing 50
+ * unplaced entities through a flat list would be unusable. The list cap
+ * (40 visible rows) keeps the popover scroll-free in the common case
+ * without paginating.
+ */
+function PlacePinPopover({
+  unplaced,
+  activeMapName,
+  onPick,
+}: {
+  unplaced: Entity[];
+  activeMapName: string;
+  onPick: (entityId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState("");
+  const VISIBLE_CAP = 40;
+  const q = filter.trim().toLowerCase();
+  const filtered = q
+    ? unplaced.filter((e) =>
+        e.title.toLowerCase().includes(q)
+        || e.type.toLowerCase().includes(q)
+        || e.aliases.some((a) => a.toLowerCase().includes(q))
+      )
+    : unplaced;
+  const overflow = filtered.length - VISIBLE_CAP;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1"
+          disabled={unplaced.length === 0}
+          title={
+            unplaced.length === 0
+              ? "All entities are placed on this map"
+              : `Pick one of ${unplaced.length} unplaced entit${unplaced.length === 1 ? "y" : "ies"} to drop on ${activeMapName}`
+          }
+        >
+          <Plus className="h-4 w-4" />
+          <span className="hidden md:inline">Place Pin</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 p-0">
+        <div className="p-2 border-b border-border">
+          <Input
+            autoFocus
+            placeholder={`Search ${unplaced.length} unplaced entit${unplaced.length === 1 ? "y" : "ies"}…`}
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="h-8 text-xs"
+          />
+        </div>
+        <ScrollArea className="max-h-72">
+          <div className="p-1">
+            {filtered.length === 0 && (
+              <div className="px-2 py-3 text-xs text-muted-foreground italic">
+                {unplaced.length === 0 ? "Nothing to place" : "No matches"}
+              </div>
+            )}
+            {filtered.slice(0, VISIBLE_CAP).map((e) => {
+              const style = resolvePinStyle(e.type);
+              return (
+                <button
+                  key={e.id}
+                  type="button"
+                  className="w-full text-left flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/40"
+                  onClick={() => {
+                    onPick(e.id);
+                    setOpen(false);
+                    setFilter("");
+                  }}
+                >
+                  <span
+                    className="shrink-0"
+                    aria-hidden
+                    dangerouslySetInnerHTML={{ __html: pinSvg({ color: style.color, shape: style.shape }) }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium truncate">{e.title}</div>
+                    <div className="text-[10px] text-muted-foreground truncate">{e.type}</div>
+                  </div>
+                </button>
+              );
+            })}
+            {overflow > 0 && (
+              <div className="px-2 py-1.5 text-[10px] text-muted-foreground italic">
+                +{overflow} more — refine your search.
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
   );
 }
 

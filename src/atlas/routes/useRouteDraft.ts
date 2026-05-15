@@ -6,8 +6,9 @@
  * for the active map so the live polyline preview matches what the player
  * runtime would render.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AtlasProject, MapDocument, Point, Route, RouteMode } from "@/atlas/content/schema";
+import type { UndoStackAPI } from "@/atlas/useUndoStack";
 
 export type Waypoint = Point | { entityId: string };
 
@@ -71,12 +72,35 @@ function uniqueId(base: string, taken: Set<string>): string {
 export function useRouteDraft(
   project: AtlasProject | null,
   map: MapDocument | undefined,
-  opts: { entityIds?: Set<string>; dmEntityIds?: Set<string> } = {}
+  opts: { entityIds?: Set<string>; dmEntityIds?: Set<string> } = {},
+  undoStack?: UndoStackAPI,
 ): RouteDraftAPI {
   const [draft, setDraft] = useState<RouteDraft>(EMPTY);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [draftWaypoints, setDraftWaypoints] = useState<Waypoint[]>([]);
+
+  const draftRef = useRef(draft);
+  useEffect(() => { draftRef.current = draft; }, [draft]);
+
+  const applyDraft = useCallback((next: RouteDraft) => {
+    draftRef.current = next;
+    setDraft(next);
+  }, []);
+
+  const mutateDraft = useCallback((compute: (prev: RouteDraft) => RouteDraft, label: string) => {
+    const before = draftRef.current;
+    const after = compute(before);
+    if (after === before) return;
+    applyDraft(after);
+    if (undoStack) {
+      undoStack.push({
+        undo: () => applyDraft(before),
+        redo: () => applyDraft(after),
+        label,
+      });
+    }
+  }, [applyDraft, undoStack]);
 
   const baseRoutes = map?.routes ?? [];
 
@@ -144,15 +168,15 @@ export function useRouteDraft(
       weight: 3,
       dashed: false,
     };
-    setDraft((d) => ({ ...d, added: [...d.added, route] }));
+    mutateDraft((d) => ({ ...d, added: [...d.added, route] }), `add route ${id}`);
     setDrawing(false);
     setDraftWaypoints([]);
     setSelectedId(id);
     return id;
-  }, [draftWaypoints, map, effective.length, projectIds]);
+  }, [draftWaypoints, map, effective.length, projectIds, mutateDraft]);
 
   const patch = useCallback((id: string, partial: Partial<Route>) => {
-    setDraft((d) => {
+    mutateDraft((d) => {
       const addedIdx = d.added.findIndex((r) => r.id === id);
       if (addedIdx >= 0) {
         const added = d.added.slice();
@@ -160,8 +184,8 @@ export function useRouteDraft(
         return { ...d, added };
       }
       return { ...d, edits: { ...d.edits, [id]: { ...(d.edits[id] ?? {}), ...partial } } };
-    });
-  }, []);
+    }, `patch route ${id}`);
+  }, [mutateDraft]);
 
   const getEffective = useCallback((id: string): Route | null => effective.find((r) => r.id === id) ?? null, [effective]);
 
@@ -199,22 +223,23 @@ export function useRouteDraft(
         Array.isArray(w) ? ([w[0] + offset[0], w[1] + offset[1]] as Point) : { ...w }
       ),
     };
-    setDraft((d) => ({ ...d, added: [...d.added, copy] }));
+    mutateDraft((d) => ({ ...d, added: [...d.added, copy] }), `duplicate route ${id}`);
     setSelectedId(newId);
     return newId;
-  }, [getEffective, map, projectIds]);
+  }, [getEffective, map, projectIds, mutateDraft]);
 
   const remove = useCallback((id: string) => {
-    setDraft((d) => {
+    mutateDraft((d) => {
       const addedIdx = d.added.findIndex((r) => r.id === id);
       if (addedIdx >= 0) return { ...d, added: d.added.filter((r) => r.id !== id) };
       const { [id]: _drop, ...restEdits } = d.edits; void _drop;
       return { ...d, edits: restEdits, deleted: d.deleted.includes(id) ? d.deleted : [...d.deleted, id] };
-    });
+    }, `remove route ${id}`);
     setSelectedId((s) => (s === id ? null : s));
-  }, []);
+  }, [mutateDraft]);
 
-  const reset = useCallback(() => { setDraft(EMPTY); setSelectedId(null); cancelDraw(); }, [cancelDraw]);
+  // reset() bypasses the undo stack — see comment in useRegionDraft.ts.
+  const reset = useCallback(() => { applyDraft(EMPTY); setSelectedId(null); cancelDraw(); }, [applyDraft, cancelDraw]);
 
   const issues = useMemo<RouteIssue[]>(() => {
     const out: RouteIssue[] = [];
