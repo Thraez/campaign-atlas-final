@@ -826,7 +826,12 @@ async function runBuildCore(flags: BuildFlags) {
     version: new Date().toISOString().replace(/[:.]/g, "-"),
     schemaVersion: worldCfg?.schemaVersion ?? CURRENT_ATLAS_SCHEMA_VERSION,
     publishedAt: new Date().toISOString(),
-    worlds: [{ id: worldId, name: "Astrath Deeprealm", defaultMapId: primaryMapId }],
+    worlds: [{
+      id: worldId,
+      name: "Astrath Deeprealm",
+      defaultMapId: primaryMapId,
+      ...(flags.player ? {} : { importFolders: worldCfg?.importConfig ?? { folders: {}, defaultFolder: "imports" } }),
+    }],
     maps,
     entities: pending.map((p) => p.entity),
     placements,
