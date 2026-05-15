@@ -1,287 +1,169 @@
 # DM Editor UX Overhaul — Phase 1C Handover (2026-05-15)
 
-Hands a fresh Claude conversation everything needed to ship Phase 1C — the only Phase 1 chunk that remains. Read this end-to-end before touching anything. If anything here contradicts the design spec, the spec wins.
+Phase 1C of the multi-phase DM editor overhaul shipped. This document hands a
+fresh conversation everything it needs to verify what landed, pick up the
+small backlog of items that need browser eyeballs (or that surfaced *because*
+of Phase 1C), and decide what (if anything) comes next.
+
+If anything here contradicts the design spec
+`docs/superpowers/specs/2026-05-15-dm-editor-ux-fixes-design.md`, the spec
+wins.
 
 ---
 
-## 0. Where to start
+## 0. State of the work
 
-Read these in order:
+**Branch:** `claude/agitated-payne-e21dc1` — PR #11 (open).
 
-1. **Design spec** — `docs/superpowers/specs/2026-05-15-dm-editor-ux-fixes-design.md` (sections H and §"Verification approach"). Authoritative description of every Phase 1C sub-task.
-2. **Implementation plan** — `C:\Users\pvpro\.claude\plans\sunny-brewing-cray.md` (the Phase 1C section). Lives outside the repo because it's the harness's plan file.
-3. **Earlier handovers** — `docs/superpowers/specs/2026-05-15-dm-editor-phase1a-handover.md` is still useful for the Save endpoint contract and the file/folder map.
-4. **PRs already merged** — #7 (A1–A12), #8 (A13), #9 (Phase 1B + A10 + B0 save-boundary undo).
-5. **CLAUDE.md** at repo root — the hard rules the project enforces (don't edit generated artifacts; player builds must not contain DM content; editor code gated by `__INCLUDE_EDITOR__`).
+**Commits on the branch:**
 
----
-
-## 1. State of the work
-
-### Landed (everything except Phase 1C)
-
-Status as of 2026-05-15:
-
-| Phase | What | Where |
-|---|---|---|
-| **1A.1–1A.12** | Gray-screen fix, responsive nav, unified Save endpoint with backups + 409 + 423 + 207 | PR #7 (`f6e1ccc`, `0dfe42b`) |
-| **1A.13** | One-click Save writes pins + world.yaml + uploaded asset binaries in a single batch | PR #8 (`97286e4`) |
-| **1B.B0** | Session undo/redo stack — `useUndoStack`, wired into pins / map metadata / layers / region / route / fog drafts | PR #9 (`f0afdd8`) |
-| **1B.B0 save boundary** | Single undo entry across save restores all pre-save dirty state in one Cmd+Z | PR #9 (`c152643`) |
-| **1B.B1** | "Edit geometry" toggle + drag-to-move on selected layer | PR #9 (`f0afdd8`) |
-| **1B.B2** | Corner resize handles, Shift = aspect lock, Alt = center-anchored | PR #9 (`f0afdd8`) |
-| **1B.B3** | Center-anchored scale presets (50/75/.../FitW/FitH no longer drift the layer) | PR #9 (`f0afdd8`) |
-| **1B.B4** | "+ Place Pin" toolbar popover with filterable unplaced-entity list | PR #9 (`f0afdd8`) |
-| **A10** | `runBuild()` exported from `scripts/build-atlas.ts`; the dev save plugin now imports and awaits it instead of spawning `tsx scripts/build-atlas.ts` | PR #9 (`c152643`) |
-
-### What works now (verifiable in the dev editor)
-
-- Save chip, 5-min nudge, backup machinery, 409 stale-base + 423 Locked + 207 partial-rebuild.
-- Single Save writes pins + world.yaml + uploaded asset binaries atomically.
-- Cmd+Z / Cmd+Shift+Z (and Ctrl+Y) undoes any editor mutation; toolbar Undo / Redo buttons with disabled states.
-- Save boundary itself is a single undo entry — Cmd+Z after a save restores all the dirty drafts in one keystroke, chip flips Saved → Unsaved.
-- "Edit geometry" toggle in Maps → Layers panel. Selected layer body is draggable; map dragging is disabled mid-drag; Esc cancels.
-- Four corner handles when in edit-geometry + selected; Shift locks aspect; Alt scales from center; Esc cancels in-progress resize.
-- Scale presets keep layer center fixed.
-- "+ Place Pin" toolbar popover lists unplaced entities, filterable, picks into the existing crosshair flow.
-- Atlas rebuild after save runs in-process (~600ms-3s faster than the old `spawn(tsx ...)` path).
-
-### Still TODO — Phase 1C only
-
-- **C1** — entry points: toolbar "Import .md files…" + drag-and-drop overlay on `/atlas/edit`.
-- **C2** — staging modal with folder allowlist + conflict-default-unchecked semantics.
-- **C3** — commit through unified `/__atlas/save` as one batch.
-- **C4** — paste-markdown dialog (single-file fast path).
-
-Everything beyond Phase 1 (Phase 2 drag-pins/persistent-undo/autosave, Phase 3 publish-from-editor) is out of scope per the design spec; don't pull them in without explicit user direction.
-
----
-
-## 2. Critical files and where logic lives
-
-### Files you'll likely create
-
-| Path | Purpose |
+| SHA | Subject |
 |---|---|
-| `src/atlas/import/StagingModal.tsx` | The Radix `<Dialog>` for C2. Lists pending files; lets the DM curate type, target path, conflict opt-in; commits via unified Save. |
-| `src/atlas/import/EditorImportDropZone.tsx` *(or inline into AtlasPlacementEditor)* | Full-area drag-and-drop overlay on `/atlas/edit` for C1. Files dropped here open the staging modal. |
-| `src/atlas/import/PasteMarkdownDialog.tsx` | C4 standalone dialog: title + type + body → one .md file. Commits via unified Save (no staging needed). |
-| `src/test/staging-modal.test.tsx` | Coverage for C2 inference + path-allowlist + conflict-default-unchecked. |
-| `src/test/paste-markdown.test.tsx` | Coverage for C4 happy path + path-allowlist guard. |
+| `a7f205a` | Phase 1C: .md import staging modal + DnD overlay + paste-markdown dialog |
+| `610fe12` | Phase 1C runtime fix: replace gray-matter with js-yaml in stagingState |
 
-### Files you'll touch but not rewrite
-
-| Path | What to change |
-|---|---|
-| `src/atlas/tabs/EntitiesTab.tsx` | Add the C1 toolbar button (`<input type="file" multiple accept=".md">`) and the C4 "Paste markdown" button. |
-| `src/pages/AtlasPlacementEditor.tsx` | Mount the drag-drop overlay on the route shell; thread import-staging state into the editor; pass project + activeWorldId into StagingModal so it can build target paths. |
-
-### Existing infrastructure to REUSE — do not reinvent
-
-| Path | What it gives you |
-|---|---|
-| `src/atlas/import/parseObsidian.ts` | `parseObsidianFile()`, gray-matter parsing, wikilink extraction, summary generation. Designed for the existing ImportPanel but works on individual .md files too. |
-| `src/atlas/import/inferType.ts` | `inferTypeFromPath(relPath)` + `IGNORED_FOLDERS`. Returns "place", "person", "faction", etc. |
-| `src/atlas/save/localFsSave.ts` | `saveAtlasPatchToLocalFs(batch)` — the unified Save client. Already takes `FileChange[]` with `kind: "entity-md"`, `baseHash`, `content`. Use this as your commit endpoint. |
-| `src/atlas/save/canonicalPlacementSave.ts` | `mergePlacementsIntoFrontmatter()` — pattern for building the entity-md content. Not directly reusable for import (no existing placements) but useful as a reference. |
-| `src/atlas/save/sourcePathAllowlist.ts` | `isWritableSourcePath()`. Run every staging row's target path through this on the client side too — the server enforces it, but UX is better if invalid rows turn red before the user clicks Commit. |
-| `src/atlas/save/DiffPreviewModal.tsx` | The post-Save toast + write-result UI. Phase 1C does NOT need to render this — the unified Save endpoint already drives it via the existing wiring. Just make sure your batch goes through the same `onSaveClick`-style flow. |
-| `src/components/ui/dialog.tsx` | Radix Dialog wrapper. Use this for C2 and C4 modals. |
-| `src/components/ui/scroll-area.tsx` | For long lists in the staging modal. |
-| `src/atlas/import/ImportPanel.tsx` | The pre-existing Obsidian-vault import tab. Keep it intact — it's a power-user tool that emits YAML patches. C1–C4 add the "drop a couple files quickly" path; both can coexist. |
-| `gray-matter` (npm) | Already a dependency. Use `matter.parse()` to read frontmatter from staged files. |
+**Tests:** 518/518 pass (`npm test`).
+**Type-check:** `tsc --noEmit` clean.
+**Lint:** clean for every file touched by this PR.
+**Player build:** `npm run build` produces a clean bundle; `atlas:check-secrets` + `atlas:check-derived` both clean against `dist/`.
 
 ---
 
-## 3. The four sub-tasks in detail
+## 1. What Phase 1C added
 
-### C1 — Entry points
+8 new files + 2 touched. Everything lives behind the editor gate
+(`__INCLUDE_EDITOR__`) — the player build tree-shakes it out.
 
-**Toolbar button (preferred path).** In `src/atlas/tabs/EntitiesTab.tsx`, add a button labeled *"Import .md files…"* near the existing Entities header. Clicking opens a native file picker:
+| File | Role |
+|---|---|
+| `src/atlas/import/stagingState.ts` | Pure state primitive — inference rules, target-path computation, allowlist gate, conflict detection, patch-applier. Uses **js-yaml** for frontmatter (gray-matter crashes in the browser; see §3). |
+| `src/atlas/import/ImportStagingModal.tsx` | Radix Dialog table — include checkbox / type select / target path / conflict chip per row. |
+| `src/atlas/import/buildImportChanges.ts` | Staged rows → `FileChange[]` for the unified Save endpoint. Reads on-disk hash for overwrite rows via `/__atlas/read`. |
+| `src/atlas/import/useMdImportFlow.ts` | Orchestrator hook — modal state, file parsing, commit through unified Save, canon reload after success. |
+| `src/atlas/import/useMdDropZone.ts` | Window-level DnD watcher. Folder DnD is explicitly rejected. |
+| `src/atlas/import/PasteMarkdownDialog.tsx` | C4 single-file capture — title + type + body → routes through the same staging pipeline. DM-only visibility by default. |
+| `src/pages/AtlasPlacementEditor.tsx` (touched) | Mounts the hooks; renders the modal + paste dialog + DnD overlay. |
+| `src/atlas/tabs/EntitiesTab.tsx` (touched) | "Import .md files…" picker button + "Paste markdown" trigger. |
 
-```tsx
-<input type="file" multiple accept=".md" hidden ref={fileInputRef}
-  onChange={(e) => {
-    const files = Array.from(e.target.files ?? []);
-    if (files.length) onStartStaging(files);
-    e.target.value = "";
-  }} />
+**Tests (33 new):** `import-staging-state.test.ts` (24), `import-staging-modal.test.tsx` (5), `build-import-changes.test.ts` (4).
+
+---
+
+## 2. Browser verification — what was confirmed
+
+Manual verification driven through the Claude_Preview MCP at 1440×900 on Windows + dev server:
+
+| Check | Result |
+|---|---|
+| Entities tab shows **Import .md files…** + **Paste markdown** buttons | ✓ |
+| **Paste markdown** dialog opens with title + type select + body fields | ✓ |
+| Submitting Paste opens the staging modal with the synthesized row | ✓ |
+| Default row state: `included=true`, target path uses inferred folder | ✓ |
+| Clicking **Import 1 file** writes the .md to `content/<world>/imports/<slug>.md` with frontmatter intact and visibility=dm | ✓ |
+| Editing target path to `content/<world>/_atlas/world.yaml` flips the row red with **Outside allowlist** badge, disables the checkbox, disables the **Import** button | ✓ |
+| Cancel closes both dialogs cleanly | ✓ |
+
+Bug found + fixed during verification: **gray-matter crashes in the browser** with "Buffer is not defined". Swapped the staging parser for a regex split + js-yaml. See §3.
+
+---
+
+## 3. Known limitations + open items
+
+### 3.1 Pre-existing: dev-save rebuild lands in `.local-atlas/`, not `public/atlas/`
+
+`scripts/vite-plugin-atlas-save.ts` (line ~605) spawns `npx tsx scripts/build-atlas.ts` for the post-save rebuild. The build script's default output is **`.local-atlas/atlas.json`** (gitignored DM build) — only `--player` writes to `public/atlas/atlas.json`. `loadAtlasContent()` fetches `/atlas/atlas.json` which Vite serves from `public/`.
+
+**Consequence for Phase 1C:** after a `.md` import, `reloadCanon()` re-fetches `public/atlas/atlas.json` which doesn't include the new entity. So the staging modal's **client-side conflict detection** can't see DM-only files the DM imported earlier in the same session. The endpoint's `baseHash` check still 409s on a real stale-base overwrite — but the UI won't warn until the request returns.
+
+This is **pre-existing**, predates Phase 1C, and applies to Phase 1A pin saves too (those work because the entities being updated are already in the player canon). Phase 1C is the first feature that *surfaces* the gap because it creates DM-default new entities.
+
+**Possible fix:** make the dev plugin's rebuild step run the player build alongside, OR have `loadAtlasContent` fetch from `.local-atlas/` when running under `__INCLUDE_EDITOR__`. Either is a 1-day change; not scoped to Phase 1C.
+
+### 3.2 Pre-existing: gray-matter is still imported by `parseObsidian.ts` and `canonicalPlacementSave.ts`
+
+Phase 1C only fixed gray-matter in **stagingState.ts**. The other two call sites still `import matter from "gray-matter"`:
+
+- `src/atlas/import/parseObsidian.ts` — used by the existing **Import tab** (full-vault import wizard). If a DM uses that flow, it'll hit the same `Buffer is not defined` crash. The Import tab predates Phase 1C and was apparently never exercised through this path.
+- `src/atlas/save/canonicalPlacementSave.ts` — used by the unified Save flow when pin placements need to be written. Phase 1A landed and the PR claims this works; either the path is also broken at runtime and no one's noticed, or there's some indirection that avoids the toBuffer codepath. **Worth a quick browser test** before relying on Phase 1A save.
+
+**If you decide to fix this holistically:** either install `buffer` and shim it via a Vite plugin/define, or write a tiny `parseFrontmatter` + `stringifyFrontmatter` helper based on js-yaml and replace all three call sites. The js-yaml approach is what stagingState already does.
+
+### 3.3 Spec §H gates that still need browser eyeballs
+
+Unit tests cover the logic; these are the visual / interaction checks that can't be driven from vitest:
+
+- [ ] **File-picker happy path** — click *Import .md files…* in the Entities tab, pick 3 `.md` files; staging modal opens with three rows. Uncheck one, click Import 2. Confirm the two land on disk; the third doesn't.
+- [ ] **DnD overlay** — drag 3 `.md` files over `/atlas/edit` (not via the toolbar). Confirm the *"Drop .md files to stage for import"* overlay appears; releasing opens the staging modal.
+- [ ] **DnD reject** — drag a non-`.md` (e.g. a `.png`). Confirm the **Only .md files supported** toast and that the modal does NOT open.
+- [ ] **Frontmatter `path` tooltip** — paste an import whose YAML head sets `path: somewhere/else.md`. Hover the "source suggested path" link in the row; confirm the tooltip shows the ignored path.
+- [ ] **Conflict overwrite + backup** — once §3.1 is resolved (or in a session that doesn't reload between), import a file whose target conflicts. Confirm the row defaults unchecked, re-checking flips the chip, committing produces a backup in `.atlas-backups/<ts>/...`.
+
+I drove the first set (Paste happy path + allowlist + cancel) through Claude_Preview but didn't have a clean way to script real DnD events through the MCP.
+
+---
+
+## 4. Recommended first move for the next conversation
+
+1. **Browser-smoke the four manual gates in §3.3.** Editor at 1440×900, dev server `npm run dev`, use real `.md` files in a `/tmp/` scratch folder.
+2. **Decide on the §3.1 dev-rebuild gap.** Either:
+   - File it for a separate PR (probably the right call — it's an orthogonal concern affecting Phase 1A too), OR
+   - Fix it inline: easiest is to have `vite-plugin-atlas-save.ts` run `tsx scripts/build-atlas.ts --player` in addition to the DM build, then keep `loadAtlasContent` pointed at `public/atlas/`. Costs an extra ~1s per save.
+3. **§3.2 gray-matter cleanup** is worth doing once verified. Same fix pattern as `stagingState.ts` — replace `import matter from "gray-matter"` with a regex + `yaml.load` for the parse side, and synthesize the output by hand for the stringify side.
+
+---
+
+## 5. Out of scope (still, as in the original spec)
+
+Don't pull these in without explicit user direction:
+
+- **Phase 2** (separate spec): pin drag on map, right-click context menus, marquee select, cross-session persistent undo, snap-to-grid, opt-in true autosave, layers-panel polish.
+- **Phase 3** (separate spec): "Publish to live site" button — git commit + push from the editor.
+- **Playwright suite** — user direction; revisit later.
+- **Landing-page redesign, Timeline visual axis, Browse type-filter chips, Player-mode build audit.**
+
+---
+
+## 6. Key contracts (unchanged from Phase 1A — included for reference)
+
+### Allowed import target folders
+
+Hard-coded in `stagingState.ts`:
+
+```
+content/<world>/{places,people,factions,items,events,regions,imports}/<slug>.md
 ```
 
-The native picker is the recommended UX because the OS lets the DM cmd-click exactly the files they want.
+Anything else is `pathAllowed: false` and the row is uncheckable + red.
 
-**Drag-and-drop overlay.** Wrap the `/atlas/edit` route shell in a drop zone (or add a sibling overlay element in `AtlasPlacementEditor.tsx`). On dragenter, show a full-area overlay: *"Drop .md files to stage for import"*. Reject non-.md files with a Sonner toast: *"Only .md files supported"*.
+### Type → folder mapping
 
-**Folder drag-and-drop is explicitly out of scope.** `webkitdirectory` and `DataTransferItem` folder traversal are too fragile across browsers and offer marginal UX gain over the file picker. Document this if a DM asks.
+```
+settlement, ruin, dungeon, location, map_note → places
+npc                                            → people
+faction                                        → factions
+item                                           → items
+event                                          → events
+region                                         → regions
+* (anything else, including missing)           → imports
+```
 
-Both paths funnel into the same staging modal — files are NEVER written to disk before the DM clicks Import.
-
-### C2 — Staging modal
-
-Radix `<Dialog>`. Each row:
-
-| ☑ | Filename | Inferred type | Target path | Notes |
-|---|---|---|---|---|
-| ☑ | `thornhold.md` | `place` (from frontmatter) | `content/<worldId>/places/thornhold.md` | — |
-| ☑ | `garron.md` | — → `imports` | `content/<worldId>/imports/garron.md` | No `type` in frontmatter |
-| ☐ | `conflict.md` | `place` | `content/<worldId>/places/conflict.md` | **Will overwrite — explicit confirm required** |
-
-#### Per-row logic
-
-1. **Parse frontmatter via `gray-matter`** — pull `title`, `id`, `type`. Don't fail the row if frontmatter is missing; just fall back.
-2. **Infer the type**: prefer frontmatter `type` → otherwise null → maps to the `imports/` folder.
-3. **Compute target path**: `content/<active-world-id>/<type-folder>/<id-or-filename-stem>.md`. The `<type-folder>` is the pluralized type (`place` → `places`, etc.); fall back to `imports/` when type is unknown.
-4. **Validate via `isWritableSourcePath()`** — show the row in red and disable its checkbox if the path is outside `content/<active-world-id>/{places,people,factions,items,events,regions,imports}/**`.
-5. **Check for existing file** — issue a GET `/__atlas/read?path=<targetPath>` (already supported by the dev plugin). On 200, set `existing: true`, default the row UNCHECKED, show "Will overwrite — explicit confirm required". On 404, set `existing: false` and default checked. Compute `baseHash` from the existing content for conflict-safe saves.
-6. **Surface frontmatter `path` as a tooltip suggestion only** — never use it as the target. Spoiler-safety: an imported file could otherwise steer itself into `_atlas/world.yaml` or another world's folder.
-
-#### Editing a row
-
-- **Type dropdown** → updates the target path live (re-folders the file).
-- **Target path input** → free-form, but immediately re-validated against the allowlist.
-- **Include checkbox** → if path is outside the allowlist, this is disabled.
-
-#### Footer
-
-- Cancel: discard everything; no files touched.
-- Import N file(s): builds a `FileChange[]` for only the checked rows, with `kind: "entity-md"`, `baseHash` set to the captured hash for overwrites or `null` for new files, then routes through `saveAtlasPatchToLocalFs()`.
-
-### C3 — Commit through unified Save
-
-The unified Save endpoint (`POST /__atlas/save`) already handles every contract you need:
-
-- 409 `already-exists` if the row was new (`baseHash: null`) but the file appeared between staging-check and commit.
-- 409 `stale-base` if an overwrite row's hash changed since staging.
-- 400 `duplicate-path` if two rows in the same batch resolve to the same target (you should pre-check this on the client to avoid a wasted round-trip).
-- Backups under `.atlas-backups/<ts>/` for every overwrite.
-- 207 partial-write if a mid-batch rename fails, with rollback.
-- 207 rebuild-failed if the post-write atlas rebuild fails.
-
-After a successful commit:
-- Toast: *"Imported N entities. Atlas rebuilt in {ms}ms."*
-- The editor's existing `onSaved` handler (in `AtlasPlacementEditor.tsx`) will re-load `atlas.json` and surface the new entities. Phase 1C should NOT duplicate that flow — call into the same code path.
-
-### C4 — Paste markdown dialog
-
-Standalone Radix Dialog in the Entities tab. Inputs:
-
-- **Title** (required) — used as the entity `title` in frontmatter.
-- **Type dropdown** (defaults to `place`) — drives the target folder.
-- **Body textarea** — the markdown body. Frontmatter is auto-built; the DM doesn't have to type `---` blocks.
-
-Submit:
-
-1. Build the frontmatter: `{ title, type, visibility: "dm" }` (DM-default — explicit publish is a separate edit).
-2. Compute `target_path = content/<active-world-id>/<type-folder>/<slug(title)>.md`.
-3. `FileChange = { path: target_path, content: matter.stringify(body, frontmatter), kind: "entity-md", baseHash: null }`.
-4. Route through unified Save. On 409 `already-exists`, surface a "File already exists — pick a different title" toast.
-
-No staging modal needed for C4 — intent is unambiguous (one file, DM typed everything).
-
----
-
-## 4. The unified Save payload contract (reference)
+### Save payload (one entry per imported row)
 
 ```jsonc
-POST /__atlas/save
 {
-  "files": [
-    {
-      "path": "content/astrath-deeprealm/places/thornhold.md",
-      "content": "---\n...\n",
-      "kind": "entity-md",
-      "baseHash": "sha256:abc…"  // null for create-only
-    }
-  ],
-  "rebuild": true
+  "path": "content/<world>/<folder>/<slug>.md",
+  "content": "---\n…full file body…\n",
+  "kind": "entity-md",
+  "baseHash": null         // or "sha256:<hex>" for explicit overwrites
 }
 ```
 
-Response codes:
+The endpoint enforces 200 / 207 / 400 / 409 / 423 / 500 exactly as documented in the design spec §C.
 
-- **200** — full success. `{ saved, paths, files: [{path, hash}], rebuilt: true, publishedAt, build }`.
-- **207** — writes succeeded but either rebuild failed (`rebuilt: false`, `rebuildError`) OR mid-batch write failure and rollback (`partialWrite: true`, `rolledBack`).
-- **400** — `InvalidBody`, `DisallowedPath`, `OversizedContent`, `InvalidContent` (parse-back failed), `duplicate-path`.
-- **409** — `Conflict` `{reason, failedPath, currentHash}`. Reason is one of `stale-base | missing-base | already-exists`.
-- **423** — `Locked` (another save in flight).
-- **500** — internal errors.
+### Frontmatter `path` is IGNORED
 
-Path allowlist on the server: `content/**/*.md`, `content/**/_atlas/*.yaml`, and `public/atlas/assets/maps/**/*.{png,jpg,jpeg,webp,gif}`. Anything else returns 400 `DisallowedPath`. For Phase 1C you only emit `entity-md` (.md under `content/<world>/`) so the allowlist surface is narrow.
+Per spec §H — the source file's own `path:` field is exposed only as a tooltip on the staging row. The target on disk is always the computed `content/<world>/<folder>/<slug>.md`. This is what stops a malicious or sloppy file from steering itself into `_atlas/world.yaml` or another world.
 
----
+### Conflict default
 
-## 5. Key decisions (so the next conversation doesn't relitigate)
-
-1. **Frontmatter `path` is ignored as a target source** — surfaced only as a tooltip suggestion. Prevents an imported file from steering itself into `_atlas/world.yaml`, another world's folder, or a DM-only folder.
-2. **Target paths are restricted to `content/<active-world-id>/{places,people,factions,items,events,regions,imports}/**`**. Rows outside this allowlist are red and uncheckable.
-3. **Conflict rows default UNCHECKED** with a "Will overwrite — explicit confirm required" chip. Re-checking opts in.
-4. **Folder drag-and-drop is NOT supported.** `webkitdirectory` / folder traversal is too fragile. Use the file picker for multi-file imports.
-5. **`.md` import is NOT undoable through the editor's undo stack.** The undo stack is in-memory and doesn't represent file-system mutations. Backups under `.atlas-backups/<ts>/` cover rollback if the DM imports the wrong file.
-6. **DM-visibility default for new files** — paste-markdown uses `visibility: "dm"`. The DM must explicitly publish via a follow-up edit. This is intentional spoiler-safety; don't change it.
-7. **The existing `ImportPanel` stays.** It's a power-user Obsidian-vault migration tool. C1–C4 are the "drop a few files quickly" path. Both should coexist.
-8. **Use unified Save for commit** — never write through the legacy ImportPanel patch-download flow. The unified Save endpoint owns backups, rebuilds, and 409/207 semantics; bypassing it loses all of that.
-
----
-
-## 6. How to run and verify
-
-From the worktree:
-
-```
-npm run dev                            # vite, port 8080 — full editor + save endpoint
-npm test                                # vitest (currently 491/491)
-npm run test:watch                      # vitest in watch mode
-npm run lint                            # eslint (only pre-existing baseRegions/baseRoutes warnings)
-npx tsc --noEmit                        # typecheck
-npm run atlas:build                     # rebuild .local-atlas/atlas.json (dev)
-npm run atlas:check-secrets <dir>       # secret-leak scan
-npm run atlas:publish                   # full player build + all scans
-```
-
-The dev plugin's endpoints (gated by `apply: "serve"`):
-
-- `GET /__atlas/read?path=content/...` — reads an allowlisted file. Returns `{ path, contents }` on 200, `{ error, path }` on 4xx.
-- `POST /__atlas/save` — the unified Save endpoint described above.
-
-To inspect backups during testing:
-
-```
-ls .atlas-backups/                                       # timestamp dirs
-ls .atlas-backups/<ts>/content/astrath-deeprealm/        # backed-up tree
-```
-
-To trigger 409 stale-base manually: edit any entity .md outside the editor while the editor is open, then save in the editor — toast should turn red with a Reload CTA.
-
----
-
-## 7. Phase 1C verification gates (must pass before merging)
-
-From the design spec §H "Verification" + §"Verification approach":
-
-1. Toolbar "Import .md files…" → pick three .md files → staging modal lists all three with inferred types + target paths under approved folders. Uncheck one → click "Import 2 file(s)" → only those two land on disk; the third is not written.
-2. Drag three individual .md files onto the editor route shell. All three appear in the staging modal. DM curates the selection. Only selected files import.
-3. Drag a binary (e.g. .png) → toast: *"Only .md files supported"*; staging modal does NOT open.
-4. Import a .md whose frontmatter has `path: somewhere/else.md` → staging row uses the inferred default; the file's frontmatter `path` is surfaced as a tooltip only.
-5. Try to edit a row's target path to something outside the allowlist (e.g. `content/<world>/_atlas/world.yaml`) → row turns red, checkbox is disabled until the DM fixes the path.
-6. Import a .md whose target conflicts with an existing entity → staging row defaults UNCHECKED with "explicit confirm required". Re-check explicitly → import → `.atlas-backups/<ts>/...` has the prior version.
-7. Paste-markdown dialog → title + body + type → submit → file at expected path, atlas rebuilds, entity appears in the editor.
-8. Verify the post-import toast + chip behaviour matches the rest of the unified Save flow (Saved + relative time, 5-min nudge if dirty edits remain, etc.).
-9. Full happy path from spec §"Verification approach" still works end-to-end.
-
-Stage gate before merging: `npm test` green, `npx tsc --noEmit` clean, `npm run lint` 0 new errors, `npm run build` succeeds, `npm run atlas:check-secrets dist` clean.
-
----
-
-## 8. Recommended first move for the next conversation
-
-1. Read this doc, then `2026-05-15-dm-editor-ux-fixes-design.md` §H, then the plan file's Phase 1C section.
-2. `git fetch && git checkout main && git pull` to get the latest. Phase 1B + A10 + B0 polish merged via PR #9 (or the branch `claude/charming-hoover-af639c` if it hasn't merged yet — check first).
-3. Start a worktree on a new branch for Phase 1C.
-4. Run `npm test` and `npm run lint` to confirm baseline is green.
-5. Build C2's StagingModal FIRST — it's the keystone. C1's two entry points and C4's paste dialog all feed into (or wrap) the same primitive: a `FileChange[]` going through `saveAtlasPatchToLocalFs()`.
-   - Write the staging-modal tests first (TDD). Test path inference, allowlist guard, conflict-default-unchecked.
-   - Then build the modal UI.
-   - Then build the two C1 entry points (toolbar button + drop zone).
-   - Then build C4 last — it's the smallest piece.
-
-Good luck. The Save endpoint is solid; Phase 1C should be straightforward UI work with disciplined target-path validation.
+A row whose target already exists on disk defaults `included: false` with a *"Will overwrite — explicit confirm required"* chip. Re-checking the checkbox is the only way to opt in; the chip then reads *"Will overwrite — existing file backed up"*.
