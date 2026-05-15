@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 
 type Mode = "browse" | "tag" | "type";
 
@@ -103,6 +104,7 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
+        <AtlasNavMenu publishedAt={project.publishedAt} />
         <Link to="/atlas" className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2">
           <Compass className="h-5 w-5" /> <span className="hidden sm:inline">Astrath Atlas</span>
         </Link>
