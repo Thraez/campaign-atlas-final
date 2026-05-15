@@ -62,7 +62,7 @@ export async function buildImportChanges(
   const changes: FileChange[] = [];
   for (const row of eligible) {
     let baseHash: string | null = null;
-    if (row.conflict) {
+    if (row.rowKind === "update" || row.rowKind === "path-collision") {
       const currentRaw = await readSourceFile(row.targetPath, fetchFn);
       baseHash = await hashContent(currentRaw);
     }
