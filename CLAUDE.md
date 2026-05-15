@@ -54,4 +54,11 @@ Default: **Sonnet 4.6**. Switch up or down based on signals.
 - For >3 parallel codebase lookups: Explore subagent.
 - For multi-file implementation with clear shape: Plan agent → write handover → execute on Sonnet in a fresh session.
 - When spawning agents, pass `model: "haiku"` for lookup/search work and `model: "sonnet"` for execution. Reserve Opus subagents for synthesis only.
+
+**Mid-session handoff signal (when running on Opus):**
+- When finishing a planning, design, or architectural-review phase — *before* starting execution — stop, summarize the agreed approach as a short handover (goal, files to touch, success criteria), and explicitly say:
+  > "Planning is done. Suggest switching to `/model sonnet` and replying `continue` to execute. Staying on Opus is fine if you'd rather not switch."
+- Same signal when exiting Plan Mode with an approved plan: the plan *is* the handover; the moment after approval is the switch point.
+- Do **not** propose a mid-session switch during execution unless verification has failed twice in the same area and a redesign is needed (in which case: switch *back up* to Opus).
+- If the user says "continue" after a handoff signal, treat the prior summary as the spec. Don't re-derive the plan; execute it.
 <!-- MODEL-SELECTION-TRIAL END -->
