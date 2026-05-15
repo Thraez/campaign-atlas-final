@@ -44,6 +44,12 @@ interface DiffStat {
   unified: string;
 }
 
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function diffLines(prev: string, next: string): DiffStat {
   const a = prev === "" ? [] : prev.split("\n");
   const b = next === "" ? [] : next.split("\n");
@@ -84,7 +90,21 @@ export function DiffPreviewModal({ open, changes, previousContents, rebuildAfter
 
   const stats = useMemo(
     () =>
-      changes.map((c) => diffLines(previousContents?.[c.path] ?? "", c.content)),
+      changes.map((c) => {
+        if (c.kind === "asset-binary") {
+          // Base64 dataUrls have no meaningful line diff. Show the decoded
+          // size so the DM understands what's about to land on disk.
+          const m = /^data:[^;,]+;base64,(.*)$/.exec(c.content);
+          const b64 = m ? m[1] : c.content;
+          const approxBytes = Math.floor((b64.length * 3) / 4);
+          return {
+            added: 0,
+            removed: 0,
+            unified: `(binary asset, ~${formatBytes(approxBytes)})`,
+          };
+        }
+        return diffLines(previousContents?.[c.path] ?? "", c.content);
+      }),
     [changes, previousContents],
   );
 

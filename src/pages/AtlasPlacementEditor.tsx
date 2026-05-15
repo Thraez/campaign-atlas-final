@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Compass, Crosshair, RotateCcw, MapPin, Target, Trash2, Layers as LayersIcon, MapPin as PinIcon, Settings2, FolderOpen, Shapes, Route as RouteIcon, CloudFog, BookOpen, ShieldCheck, Upload, Save as SaveIcon } from "lucide-react";
 import { toast } from "sonner";
 import { loadAtlasContent } from "@/atlas/content/loader";
-import type { AtlasProject, Entity, MapDocument } from "@/atlas/content/schema";
+import type { AtlasProject, Entity, MapDocument, MapLayer } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -29,6 +29,8 @@ import {
   buildCanonicalPlacementChanges,
   CanonicalSaveError,
 } from "@/atlas/save/canonicalPlacementSave";
+import { useWorldYamlBaseline, worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
+import { buildFullWorldYaml } from "@/atlas/yaml/buildFullWorldYaml";
 import { ImportPanel } from "@/atlas/import/ImportPanel";
 import { TabFrame } from "@/atlas/tabs/TabFrame";
 import { RegionsTab } from "@/atlas/tabs/RegionsTab";
@@ -253,6 +255,13 @@ export default function AtlasPlacementEditor() {
 
   const layerEditor = useMapLayers(activeMap);
 
+  // A13: baseline world.yaml content + hash for the active world. Pinned at
+  // editor-load (and refreshed after each successful Save) so the unified
+  // Save endpoint can detect on-disk divergence with baseHash and so
+  // buildFullWorldYaml can preserve the leading comment block.
+  const activeWorldId = activeMap?.worldId ?? null;
+  const worldYamlBaseline = useWorldYamlBaseline(activeWorldId);
+
   // Region draft state — shared between RegionsTab (form) and the map (RegionLayer).
   const entityIdSet = useMemo(() => new Set((project?.entities ?? []).map((e) => e.id)), [project]);
   const dmEntityIdSet = useMemo(
@@ -426,11 +435,100 @@ export default function AtlasPlacementEditor() {
   const [tabExportAt, setTabExportAt] = useState<Record<string, number>>({});
   const markTabExport = (tab: string) => setTabExportAt((s) => ({ ...s, [tab]: Date.now() }));
 
+  // A13 dirty signals: collapse per-tab editor state into a single
+  // "world.yaml is dirty" boolean. Each per-tab draft hook already exposes a
+  // .dirty flag; layers/map-metadata don't, so we derive those from state
+  // existence. The post-save clean-up at onSaved clears each of these.
+  const mapMetadataDirty = !!(baseMap && mapOverride[baseMap.id] && Object.keys(mapOverride[baseMap.id]).length > 0);
+  const layersDirty = layerEditor.localLayers.length > 0;
+  const worldYamlDirty =
+    mapMetadataDirty ||
+    layersDirty ||
+    regionDraft.dirty ||
+    routeDraft.dirty ||
+    fogDraft.dirty;
+
+  /**
+   * Compose the full world.yaml content for the active world by overlaying
+   * the editor's per-tab draft state onto the canonical project.maps array.
+   * Other maps in the world stay byte-identical to canon. The active map
+   * gets its mapOverride applied with the merged layers and the effective
+   * region / route / fog drafts.
+   *
+   * Upload-origin layers (binaries dragged into the browser) get their `src`
+   * rewritten to the eventual on-disk path (e.g. `atlas/assets/maps/foo.png`)
+   * so the YAML never carries a blob: URL. Their binaries ride along in the
+   * save batch as separate `asset-binary` FileChange entries — the build
+   * the endpoint runs after writes can then resolve every layer src.
+   *
+   * Returns null when there's no active world (editor still loading) or
+   * when a baseline fetch error prevents a safe write.
+   */
+  const buildWorldYamlContent = useCallback((): string | null => {
+    if (!project || !activeMap) return null;
+    const remappedLayers: MapLayer[] = layerEditor.mergedLayers.map((l) => {
+      const local = layerEditor.localLayers.find((ll) => ll.id === l.id);
+      if (!local || local.origin !== "upload") return l;
+      // upload: rewrite src to the canonical "atlas/assets/maps/<file>" form
+      // (strip the public/ prefix). The actual binary is written by the
+      // asset-binary FileChange we add in onSaveClick.
+      const target = local.targetPath ?? `public/atlas/assets/maps/${l.id}.png`;
+      const src = target.replace(/^public\//, "");
+      return { ...l, src };
+    });
+    const updatedMaps: MapDocument[] = project.maps.map((m) => {
+      if (m.id !== activeMap.id) return m;
+      return {
+        ...activeMap,
+        layers: remappedLayers,
+        regions: regionDraft.effective,
+        routes: routeDraft.effective,
+        fog: fogDraft.fog,
+      };
+    });
+    return buildFullWorldYaml({
+      maps: updatedMaps,
+      calendar: project.calendar,
+      schemaVersion: project.schemaVersion,
+      existing: worldYamlBaseline.raw,
+    });
+  }, [project, activeMap, layerEditor.mergedLayers, layerEditor.localLayers, regionDraft.effective, routeDraft.effective, fogDraft.fog, worldYamlBaseline.raw]);
+
+  /**
+   * Build the asset-binary FileChange entries for every upload-origin layer
+   * on the active map. Each carries the upload's dataUrl (which the layer
+   * captured when the file was dragged in) plus its targetPath under
+   * public/atlas/assets/maps/. Uploads with no dataUrl (rare — quota
+   * pressure clears it from localStorage on reload) are skipped silently;
+   * the world.yaml emission still references them so the DM sees the
+   * mismatch in the diff modal.
+   */
+  const buildAssetBinaryChanges = useCallback((): FileChange[] => {
+    const changes: FileChange[] = [];
+    for (const local of layerEditor.localLayers) {
+      if (local.origin !== "upload") continue;
+      if (!local.dataUrl) continue;
+      const target = local.targetPath ?? `public/atlas/assets/maps/${local.id}.png`;
+      changes.push({
+        path: target,
+        content: local.dataUrl,
+        kind: "asset-binary",
+        // null = create-only. If the DM has uploaded a file that collides
+        // with an existing asset on disk, the endpoint returns 409
+        // already-exists and the toast surfaces the path.
+        baseHash: null,
+      });
+    }
+    return changes;
+  }, [layerEditor.localLayers]);
+
   /**
    * Save: rewrite the canonical entity .md frontmatter for every drafted
    * placement, route it through /__atlas/save (dev-only Vite plugin → disk),
    * and trigger an atlas rebuild so the player view picks up the changes
-   * without leaving the browser.
+   * without leaving the browser. A13: also writes world.yaml in the same
+   * batch when any of the map / region / route / fog / layer tabs has a
+   * dirty draft.
    *
    * No GitHub API. The dev plugin's allowlist only accepts content/**\/*.md
    * and content/**\/_atlas/*.yaml so even a buggy client cannot widen the
@@ -439,19 +537,61 @@ export default function AtlasPlacementEditor() {
   const onSaveClick = async () => {
     if (!project || !activeMap) return;
     const drafts = buildDraftPlacements();
-    if (drafts.length === 0) {
+    if (drafts.length === 0 && !worldYamlDirty) {
       toast.info("No changes to save");
       return;
     }
     setSaveError(null);
     const entitiesById = new Map(project.entities.map((e) => [e.id, e]));
     try {
-      const changes = await buildCanonicalPlacementChanges(drafts, entitiesById);
-      if (changes.length === 0) {
+      const entityChanges = drafts.length > 0
+        ? await buildCanonicalPlacementChanges(drafts, entitiesById)
+        : [];
+      const fileChanges: FileChange[] = [...entityChanges];
+
+      if (worldYamlDirty && activeWorldId) {
+        if (worldYamlBaseline.loading) {
+          toast.error("Still loading world.yaml baseline — try again in a moment.");
+          return;
+        }
+        if (worldYamlBaseline.error) {
+          toast.error(`Cannot save world.yaml: ${worldYamlBaseline.error}`);
+          return;
+        }
+        const content = buildWorldYamlContent();
+        if (!content) {
+          toast.error("Cannot build world.yaml content");
+          return;
+        }
+        // Asset-binary entries land in the same batch — bytes hit disk first,
+        // then world.yaml references them. The endpoint's atomic temp+rename
+        // means even a mid-batch failure rolls them back together.
+        const assetChanges = buildAssetBinaryChanges();
+        // Surface uploads that have lost their dataUrl (localStorage quota
+        // pressure clears it on reload). The world.yaml will reference them
+        // but the binary won't land — the next build will flag missing assets.
+        const droppedUploads = layerEditor.localLayers.filter((l) => l.origin === "upload" && !l.dataUrl).length;
+        if (droppedUploads > 0) {
+          toast.warning(`${droppedUploads} uploaded image${droppedUploads === 1 ? "" : "s"} have no in-memory bytes`, {
+            description: "Likely cleared by localStorage quota. Re-upload before saving.",
+            duration: 8000,
+          });
+        }
+        fileChanges.push(...assetChanges);
+        fileChanges.push({
+          path: worldYamlPath(activeWorldId),
+          content,
+          kind: "world-yaml",
+          // null when world.yaml doesn't yet exist (fresh world → create-only write).
+          baseHash: worldYamlBaseline.hash,
+        });
+      }
+
+      if (fileChanges.length === 0) {
         toast.info("No canonical changes to write");
         return;
       }
-      setPendingChanges(changes);
+      setPendingChanges(fileChanges);
       setSaveModalOpen(true);
     } catch (err) {
       const msg = err instanceof CanonicalSaveError
@@ -464,13 +604,16 @@ export default function AtlasPlacementEditor() {
 
   const dirtyCount = Object.keys(overrides).filter((k) => activeMap && k.startsWith(`${activeMap.id}:`)).length;
   const draftStatus = classifyDraftStatus({ dirtyCount, lastExportAt: null });
-  // Unsaved-changes signal: there are local overrides AND there was an edit
-  // since the last successful save. Avoids nagging when overrides are just
-  // hydrated from a prior session that was already saved.
-  const hasUnsavedChanges =
+  // Unsaved-changes signal: there are local pin overrides OR a dirty
+  // world.yaml signal. The pin-side gate also waits for an edit since the
+  // last successful save so a hydrated-but-clean session doesn't nag; the
+  // world.yaml gate fires immediately because the draft hooks already
+  // resolve to a "fresh state" on mount.
+  const pinSideUnsaved =
     dirtyCount > 0 &&
     lastLocalEditAt !== null &&
     (lastSavedAt === null || lastLocalEditAt > lastSavedAt);
+  const hasUnsavedChanges = pinSideUnsaved || worldYamlDirty;
 
   // A12c: 5-minute idle nudge. Fires once when the editor has had dirty
   // state for at least 5 minutes since the last save, with at least one
@@ -588,7 +731,7 @@ export default function AtlasPlacementEditor() {
           <span className="flex items-center gap-2 min-w-0">
             <span aria-hidden>●</span>
             <span className="truncate">
-              <strong>{dirtyCount} unsaved change{dirtyCount === 1 ? "" : "s"}</strong> on this map — kept only in your browser until you click Save.
+              <strong>{dirtyFileSummary({ entityCount: dirtyCount, worldYamlDirty })}</strong> on this map — kept only in your browser until you click Save.
             </span>
           </span>
           <Button size="sm" variant="default" className="h-6 px-2 text-[10px]" onClick={onSaveClick}>
@@ -615,7 +758,25 @@ export default function AtlasPlacementEditor() {
         <Badge variant="outline" className="ml-2 hidden sm:inline-flex">DM only</Badge>
         <div className="flex-1" />
         {project.maps.length > 1 && (
-          <Select value={activeMap.id} onValueChange={(v) => { setActiveMapId(v); setPendingId(null); }}>
+          <Select value={activeMap.id} onValueChange={(v) => {
+            if (v === activeMap.id) return;
+            // A13 guard: regionDraft / routeDraft / fogDraft state survives the
+            // hook re-mount but doesn't apply cleanly to the new map, so switching
+            // effectively orphans in-progress drafts. Pin overrides and local
+            // layers are keyed by mapId and DO survive. Surface the risk before
+            // discarding anything.
+            if (hasUnsavedChanges) {
+              const proceed = window.confirm(
+                "You have unsaved changes on this map. Switching will discard in-progress region / route / fog drafts (pin and layer edits are kept per-map).\n\nContinue without saving?"
+              );
+              if (!proceed) return;
+            }
+            regionDraft.reset();
+            routeDraft.reset();
+            fogDraft.reset();
+            setActiveMapId(v);
+            setPendingId(null);
+          }}>
             <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               {project.maps.map((m) => (
@@ -641,7 +802,7 @@ export default function AtlasPlacementEditor() {
                   : "saved"
           }
           savedAt={lastSavedAt ? new Date(lastSavedAt).toISOString() : null}
-          dirtySummary={dirtyFileSummary({ entityCount: dirtyCount, worldYamlDirty: false })}
+          dirtySummary={dirtyFileSummary({ entityCount: dirtyCount, worldYamlDirty })}
           failedMessage={saveError ?? undefined}
           onForceSave={onSaveClick}
         />
@@ -966,10 +1127,15 @@ export default function AtlasPlacementEditor() {
       <DiffPreviewModal
         open={saveModalOpen}
         changes={pendingChanges}
+        previousContents={
+          worldYamlBaseline.raw !== null && activeWorldId
+            ? { [worldYamlPath(activeWorldId)]: worldYamlBaseline.raw }
+            : undefined
+        }
         rebuildAfterSave={true}
         onSaved={(result) => {
           setLastSavedAt(Date.now());
-          // Clear local overrides for the active map — they now live in canon.
+          // Clear local pin overrides for the active map — they now live in canon.
           const writtenPaths = new Set(result.paths);
           const writtenEntityIds = new Set(
             project.entities
@@ -986,6 +1152,17 @@ export default function AtlasPlacementEditor() {
             }
             return next;
           });
+          // A13: if world.yaml was part of the batch, clear the per-tab drafts
+          // and refresh the baseline so the next dirty cycle starts fresh.
+          const worldYamlWritten = activeWorldId && writtenPaths.has(worldYamlPath(activeWorldId));
+          if (worldYamlWritten) {
+            regionDraft.reset();
+            routeDraft.reset();
+            fogDraft.reset();
+            layerEditor.clearForMap();
+            resetMap();
+            void worldYamlBaseline.refresh();
+          }
           // Refresh canon (only meaningful if rebuild succeeded).
           if (result.build?.ok !== false) {
             loadAtlasContent(true).then((p) => {
