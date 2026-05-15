@@ -186,8 +186,12 @@ describe("buildCanonicalPlacementChanges round-trip", () => {
 
     expect(changes).toHaveLength(1);
     expect(changes[0].path).toBe(ent.sourcePath);
+    expect(changes[0].kind).toBe("entity-md");
+    // The baseHash is the SHA-256 of the file as the editor read it — needed
+    // so the Save endpoint can detect "the file changed under us".
+    expect(changes[0].baseHash).toMatch(/^sha256:[0-9a-f]{64}$/);
 
-    const parsed = matter(changes[0].contents);
+    const parsed = matter(changes[0].content);
     expect(parsed.content).toBe("Body text with [[wikilink]] left alone.\n");
     expect(parsed.data.title).toBe("Thornhold");
     expect(parsed.data.tags).toEqual(["city"]);
@@ -218,7 +222,7 @@ describe("buildCanonicalPlacementChanges round-trip", () => {
     );
     expect(changes).toHaveLength(1);
     expect(fetchFn).toHaveBeenCalledTimes(1);
-    const atlas = (matter(changes[0].contents).data.atlas) as Record<string, unknown>;
+    const atlas = (matter(changes[0].content).data.atlas) as Record<string, unknown>;
     const placements = atlas.placements as Array<{ mapId: string }>;
     expect(placements.map((p) => p.mapId).sort()).toEqual(["city", "overview"]);
   });

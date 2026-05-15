@@ -31,6 +31,9 @@ import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { printEntityHandout } from "@/atlas/printHandout";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
+import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
+import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
@@ -140,9 +143,23 @@ export default function AtlasViewer() {
   const [flyTarget, setFlyTarget] = useState<{ x: number; y: number; height: number } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // The bottom sheet renders the entity panel at *every* viewport below the
+  // desktop-aside breakpoint (1024px) — not just mobile. Otherwise tablets
+  // sit in a dead zone where neither the aside nor the sheet is mounted.
+  const hasDesktopAside = useHasDesktopAside();
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const [showFog, setShowFog] = useState(true);
   const [showGrid, setShowGrid] = useState<boolean | null>(null); // null = use map default
+  // Aside expanded/collapsed state, persisted across reloads so a DM who
+  // prefers the full-width map keeps it that way.
+  const [asideExpanded, setAsideExpanded] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return window.localStorage.getItem("atlas.viewer.asidePinned") !== "false";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("atlas.viewer.asidePinned", String(asideExpanded));
+  }, [asideExpanded]);
 
   useEffect(() => {
     Promise.all([loadAtlasContent(true), loadSearchIndex()])
@@ -153,7 +170,8 @@ export default function AtlasViewer() {
         const want = params.get("entity");
         if (want) {
           setOpenId(want);
-          setMobilePanelOpen(true);
+          // Sheet only matters when the aside isn't mounted.
+          if (!hasDesktopAside) setMobilePanelOpen(true);
           const placement = project.placements.find((p) => p.entityId === want);
           if (placement) {
             const m = project.maps.find((mm) => mm.id === placement.mapId);
@@ -165,6 +183,7 @@ export default function AtlasViewer() {
         }
       })
       .catch((e: Error) => setError(e.message));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally runs once; URL-driven entity open should respect the viewport at load time
   }, []);
 
   const activeMap: MapDocument | undefined = useMemo(
@@ -184,13 +203,16 @@ export default function AtlasViewer() {
   const openEntity = useCallback(
     (id: string, fly = true) => {
       setOpenId(id);
-      setMobilePanelOpen(true);
+      // Only open the bottom sheet on viewports where the desktop aside
+      // isn't rendered; otherwise the Radix overlay covers the screen
+      // while the panel is the user-visible target (the gray-screen bug).
+      if (!hasDesktopAside) setMobilePanelOpen(true);
       if (fly && data && activeMap) {
         const placement = data.project.placements.find((p) => p.entityId === id && p.mapId === activeMap.id);
         if (placement) setFlyTarget({ x: placement.x, y: placement.y, height: activeMap.height });
       }
     },
-    [data, activeMap]
+    [data, activeMap, hasDesktopAside]
   );
 
   // Intercept wikilink clicks inside rendered HTML
@@ -296,6 +318,7 @@ export default function AtlasViewer() {
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
       <a href="#atlas-main" className="skip-to-main">Skip to map</a>
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
+        <AtlasNavMenu publishedAt={data.project.publishedAt} />
         <Link to="/" className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2">
           <Compass className="h-5 w-5" aria-hidden="true" /> <span className="hidden sm:inline">Astrath Atlas</span>
         </Link>
@@ -339,19 +362,19 @@ export default function AtlasViewer() {
           <span className="hidden sm:inline">Search</span>
           <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded bg-muted border border-border">⌘K</kbd>
         </Button>
-        <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+        <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
           <Link to="/atlas/browse" title="Browse all entries"><LayoutGrid className="h-4 w-4 mr-1" aria-hidden="true" />Browse</Link>
         </Button>
-        <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+        <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
           <Link to="/atlas/timeline" title="Timeline of dated entries"><CalendarClock className="h-4 w-4 mr-1" aria-hidden="true" />Timeline</Link>
         </Button>
         {__INCLUDE_EDITOR__ && isDmToolsEnabled() && (
-          <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+          <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
             <Link to="/atlas/edit" title="DM placement editor">Edit pins</Link>
           </Button>
         )}
         <OfflineMenu />
-        <span className="hidden md:block text-[11px] text-muted-foreground ml-2">
+        <span className="hidden lg:block text-[11px] text-muted-foreground ml-2">
           Updated {new Date(data.project.publishedAt).toLocaleDateString()}
         </span>
       </header>
@@ -397,43 +420,73 @@ export default function AtlasViewer() {
           </MapContainer>
         </main>
 
-        {/* Desktop side panel */}
-        <aside className="hidden md:flex w-[420px] border-l border-border bg-card flex-col">
-          <EntityPanel
-            ref={panelRef}
-            entity={openEntity_}
-            placements={openPlacements}
-            entityById={entityById}
-            onOpenEntity={openEntity}
-            onClose={() => setOpenId(null)}
-            onShowOnMap={(p) => {
-              setActiveMapId(p.mapId);
-              const m = data.project.maps.find((mm) => mm.id === p.mapId);
-              if (m) setFlyTarget({ x: p.x, y: p.y, height: m.height });
-            }}
-          />
-        </aside>
+        {/* Desktop side panel — only mounts at lg+. Below that, the entity
+            bottom sheet handles entity viewing instead. The aside can be
+            collapsed to a 28px re-expand strip via the chevron in its
+            header; state is persisted in localStorage. */}
+        {asideExpanded ? (
+          <aside className="hidden lg:flex w-[400px] border-l border-border bg-card flex-col relative">
+            <button
+              type="button"
+              onClick={() => setAsideExpanded(false)}
+              className="absolute top-2 -left-3 z-10 h-6 w-6 rounded-full bg-card border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="Collapse side panel"
+              title="Collapse side panel"
+            >
+              <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+            <EntityPanel
+              ref={panelRef}
+              entity={openEntity_}
+              placements={openPlacements}
+              entityById={entityById}
+              onOpenEntity={openEntity}
+              onClose={() => setOpenId(null)}
+              onShowOnMap={(p) => {
+                setActiveMapId(p.mapId);
+                const m = data.project.maps.find((mm) => mm.id === p.mapId);
+                if (m) setFlyTarget({ x: p.x, y: p.y, height: m.height });
+              }}
+            />
+          </aside>
+        ) : (
+          <aside className="hidden lg:flex w-7 border-l border-border bg-card items-start justify-center pt-2">
+            <button
+              type="button"
+              onClick={() => setAsideExpanded(true)}
+              className="h-6 w-6 rounded-full bg-card border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="Expand side panel"
+              title="Expand side panel"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          </aside>
+        )}
       </div>
 
-      {/* Mobile bottom sheet */}
-      <Sheet open={mobilePanelOpen && !!openEntity_} onOpenChange={setMobilePanelOpen}>
-        <SheetContent side="bottom" className="h-[80vh] p-0 md:hidden">
-          <EntityPanel
-            ref={panelRef}
-            entity={openEntity_}
-            placements={openPlacements}
-            entityById={entityById}
-            onOpenEntity={openEntity}
-            onClose={() => setMobilePanelOpen(false)}
-            onShowOnMap={(p) => {
-              setActiveMapId(p.mapId);
-              const m = data.project.maps.find((mm) => mm.id === p.mapId);
-              if (m) setFlyTarget({ x: p.x, y: p.y, height: m.height });
-              setMobilePanelOpen(false);
-            }}
-          />
-        </SheetContent>
-      </Sheet>
+      {/* Entity bottom sheet — used at every viewport below the desktop aside
+          breakpoint (1024px), including tablets. The Sheet (and its Radix
+          overlay) only mounts here, so on desktop nothing dims the screen. */}
+      {!hasDesktopAside && (
+        <Sheet open={mobilePanelOpen && !!openEntity_} onOpenChange={setMobilePanelOpen}>
+          <SheetContent side="bottom" className="h-[80vh] p-0">
+            <EntityPanel
+              ref={panelRef}
+              entity={openEntity_}
+              placements={openPlacements}
+              entityById={entityById}
+              onOpenEntity={openEntity}
+              onClose={() => setMobilePanelOpen(false)}
+              onShowOnMap={(p) => {
+                setActiveMapId(p.mapId);
+                const m = data.project.maps.find((mm) => mm.id === p.mapId);
+                if (m) setFlyTarget({ x: p.x, y: p.y, height: m.height });
+                setMobilePanelOpen(false);
+              }}
+            />
+          </SheetContent>
+        </Sheet>
+      )}
 
       {/* Search palette */}
       {searchOpen && (

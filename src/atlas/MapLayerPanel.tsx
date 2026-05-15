@@ -35,6 +35,33 @@ interface Props {
 const NUDGE_STEPS = [100, 1000, 10000];
 const SCALE_STEPS = [0.5, 0.75, 1, 1.25, 1.5];
 
+/**
+ * Produce a human-friendly display name for a layer.
+ *
+ * The MapLayer schema has no `name` field on its own, so historically the
+ * layer list showed the raw id (e.g. `upload-1778790358938-0-chatgpt-image-may-4-2026`).
+ * That made imported maps look like nothing the DM had typed. This helper
+ * prefers, in order:
+ *   1. A user-typed name on the LocalLayer override.
+ *   2. The original filename captured at upload time.
+ *   3. The basename of the layer's `src`, with separators turned into spaces.
+ * Falls back to the layer id only if everything else is missing.
+ */
+function layerDisplayName(layer: MapLayer, local?: { name?: string; filename?: string }): string {
+  if (local?.name && local.name.trim()) return local.name.trim();
+  if (local?.filename && local.filename.trim()) return stripExt(local.filename.trim());
+  const fromSrc = stripExt(basename(layer.src));
+  return fromSrc || layer.id;
+}
+
+function basename(p: string): string {
+  return p.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
+}
+
+function stripExt(name: string): string {
+  return name.replace(/\.[a-zA-Z0-9]+$/, "").replace(/[-_]+/g, " ").trim();
+}
+
 function downloadText(name: string, content: string, mime = "text/plain") {
   const blob = new Blob([content], { type: mime });
   const a = document.createElement("a");
@@ -168,6 +195,17 @@ export function MapLayerPanel(props: Props) {
   return (
     <div className="flex flex-col h-full">
       <div className="p-3 border-b border-border space-y-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <div className="min-w-0">
+            <div className="font-display text-sm truncate" title={map.name}>{map.name}</div>
+            <div className="text-[10px] text-muted-foreground truncate" title={map.id}>
+              id: <code>{map.id}</code>
+            </div>
+          </div>
+          <div className="text-[10px] text-muted-foreground shrink-0">
+            {map.width}×{map.height}
+          </div>
+        </div>
         <div className="text-xs text-muted-foreground">
           Edits here are <strong>local browser drafts</strong>. Export the patch and commit the YAML + asset files to publish.
         </div>
@@ -249,7 +287,8 @@ export function MapLayerPanel(props: Props) {
                   <img src={normalizeAtlasAssetUrl(l.src)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium">{l.id}</div>
+                  <div className="truncate font-medium" title={layerDisplayName(l, local)}>{layerDisplayName(l, local)}</div>
+                  <div className="text-[10px] text-muted-foreground truncate font-mono" title={l.id}>{l.id}</div>
                   <div className="text-[10px] text-muted-foreground truncate">
                     {local?.origin === "upload" && <Badge variant="secondary" className="h-3.5 px-1 text-[9px] mr-1">local preview</Badge>}
                     {local?.origin === "url" && <Badge variant="outline" className="h-3.5 px-1 text-[9px] mr-1">url</Badge>}
