@@ -32,9 +32,13 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import matter from "gray-matter";
 import yaml from "js-yaml";
-import { isWritableSourcePath } from "../src/atlas/save/sourcePathAllowlist";
+import { isWritableAssetPath, isWritableSourcePath } from "../src/atlas/save/sourcePathAllowlist";
 
 const MAX_FILE_BYTES = 1024 * 1024;
+// Asset uploads arrive as base64 data URLs; this cap covers ~5.5 MB of binary
+// after the base64 inflation (matches the build's per-asset audit cap).
+const MAX_ASSET_DATAURL_BYTES = 8 * 1024 * 1024;
+const MAX_ASSET_BINARY_BYTES = 6 * 1024 * 1024;
 const BUILD_TIMEOUT_MS = 60_000;
 const BACKUP_DIR = ".atlas-backups";
 const BACKUP_RETENTION = 3;
@@ -101,10 +105,11 @@ async function pruneBackups(repoRoot: string, relPath: string): Promise<void> {
   }
 }
 
-export type FileKind = "entity-md" | "world-yaml";
+export type FileKind = "entity-md" | "world-yaml" | "asset-binary";
 
 export interface FilePayload {
   path: string;
+  /** UTF-8 text body for text kinds; a `data:<mime>;base64,…` URL for asset-binary. */
   content: string;
   kind: FileKind;
   baseHash: string | null;
@@ -170,8 +175,10 @@ export type HandlerResult =
     };
 
 function isFileKind(v: unknown): v is FileKind {
-  return v === "entity-md" || v === "world-yaml";
+  return v === "entity-md" || v === "world-yaml" || v === "asset-binary";
 }
+
+const DATA_URL_RE = /^data:[^;,]+;base64,([^]*)$/;
 
 function isFilePayload(v: unknown): v is FilePayload {
   if (!v || typeof v !== "object") return false;
@@ -201,6 +208,12 @@ function defaultHash(content: string): string {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const nodeCrypto = require("node:crypto") as typeof import("node:crypto");
   return "sha256:" + nodeCrypto.createHash("sha256").update(content, "utf8").digest("hex");
+}
+
+function hashBytes(buf: Buffer): string {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const nodeCrypto = require("node:crypto") as typeof import("node:crypto");
+  return "sha256:" + nodeCrypto.createHash("sha256").update(buf).digest("hex");
 }
 
 export async function handleSaveRequest(
@@ -243,21 +256,32 @@ export async function handleSaveRequest(
     };
   }
 
+  // Path allowlist — dispatch per kind. asset-binary lands under
+  // public/atlas/assets/maps/<file>.<image-ext>; text kinds under content/.
   for (const f of list) {
-    if (!isWritableSourcePath(f.path)) {
+    const allowed = f.kind === "asset-binary"
+      ? isWritableAssetPath(f.path)
+      : isWritableSourcePath(f.path);
+    if (!allowed) {
       return { status: 400, payload: { error: "DisallowedPath", path: f.path } };
     }
   }
+
+  // Size caps — asset-binary uses a larger cap to accommodate base64 inflation.
   for (const f of list) {
     const bytes = Buffer.byteLength(f.content, "utf8");
-    if (bytes > MAX_FILE_BYTES) {
+    const cap = f.kind === "asset-binary" ? MAX_ASSET_DATAURL_BYTES : MAX_FILE_BYTES;
+    if (bytes > cap) {
       return { status: 400, payload: { error: "OversizedContent", path: f.path, bytes } };
     }
   }
 
-  // A6: parse-back validation. Per kind, ensure the content the editor is
-  // about to commit is well-formed before any disk write. A malformed YAML
-  // patch must not reach `world.yaml` — that would break the next build.
+  // A6 / asset-decode: parse-back validation. For text kinds, the content
+  // must parse cleanly as its declared kind so the next build won't choke.
+  // For asset-binary, decode the data URL up front — a malformed dataUrl
+  // fails fast before any disk activity, and the decoded bytes are reused
+  // below as the write payload.
+  const decoded = new Map<string, Buffer>();
   for (const f of list) {
     if (f.kind === "entity-md") {
       try {
@@ -287,10 +311,51 @@ export async function handleSaveRequest(
           },
         };
       }
+    } else if (f.kind === "asset-binary") {
+      const m = DATA_URL_RE.exec(f.content);
+      if (!m) {
+        return {
+          status: 400,
+          payload: {
+            error: "InvalidContent",
+            reason: "asset-decode-failed",
+            failedPath: f.path,
+            detail: "content is not a base64 data URL",
+          },
+        };
+      }
+      let buf: Buffer;
+      try {
+        buf = Buffer.from(m[1], "base64");
+      } catch (e) {
+        return {
+          status: 400,
+          payload: {
+            error: "InvalidContent",
+            reason: "asset-decode-failed",
+            failedPath: f.path,
+            detail: (e as Error).message,
+          },
+        };
+      }
+      if (buf.length > MAX_ASSET_BINARY_BYTES) {
+        return {
+          status: 400,
+          payload: { error: "OversizedContent", path: f.path, bytes: buf.length },
+        };
+      }
+      decoded.set(f.path, buf);
     }
   }
 
   const hash = opts?.hashFn ?? defaultHash;
+  // Hash dispatch: text kinds use the (injectable) text hash to keep the
+  // existing test surface stable; asset-binary always uses the byte-level
+  // sha256 since dataUrl wrappers shouldn't affect identity.
+  const hashOf = (kind: FileKind, bytes: Buffer): string => {
+    if (kind === "asset-binary") return hashBytes(bytes);
+    return hash(bytes.toString("utf8"));
+  };
 
   // ---------- Conflict check (A5: baseHash semantics) ----------
   // Before any write, verify that every file's on-disk state matches what
@@ -304,12 +369,12 @@ export async function handleSaveRequest(
   // Side benefit: we capture each file's pre-write content here so the
   // backup pass (A7) can write it to `.atlas-backups/<ts>/...` without a
   // second read.
-  const preWrite: Array<{ payload: FilePayload; existing: string | null }> = [];
+  const preWrite: Array<{ payload: FilePayload; existing: Buffer | null; bytesToWrite: Buffer }> = [];
   for (const f of list) {
     const abs = path.resolve(repoRoot, f.path);
-    let currentContent: string | null = null;
+    let existingBytes: Buffer | null = null;
     try {
-      currentContent = await fs.readFile(abs, "utf8");
+      existingBytes = await fs.readFile(abs);
     } catch (e) {
       const err = e as NodeJS.ErrnoException;
       if (err.code !== "ENOENT") {
@@ -318,10 +383,12 @@ export async function handleSaveRequest(
           payload: { error: "ReadFailed", path: f.path, detail: err.message },
         };
       }
-      // file is absent; currentContent stays null
+      // file is absent; existingBytes stays null
     }
 
-    const exists = currentContent !== null;
+    const bytesToWrite = decoded.get(f.path) ?? Buffer.from(f.content, "utf8");
+
+    const exists = existingBytes !== null;
     if (f.baseHash === null) {
       if (exists) {
         return {
@@ -330,7 +397,7 @@ export async function handleSaveRequest(
             error: "Conflict",
             reason: "already-exists",
             failedPath: f.path,
-            currentHash: hash(currentContent as string),
+            currentHash: hashOf(f.kind, existingBytes as Buffer),
           },
         };
       }
@@ -341,7 +408,7 @@ export async function handleSaveRequest(
           payload: { error: "Conflict", reason: "missing-base", failedPath: f.path },
         };
       }
-      const currentHash = hash(currentContent as string);
+      const currentHash = hashOf(f.kind, existingBytes as Buffer);
       if (currentHash !== f.baseHash) {
         return {
           status: 409,
@@ -354,21 +421,22 @@ export async function handleSaveRequest(
         };
       }
     }
-    preWrite.push({ payload: f, existing: currentContent });
+    preWrite.push({ payload: f, existing: existingBytes, bytesToWrite });
   }
 
   // ---------- Backup pass (A7) ----------
   // One timestamp per batch — keeps a rollback set coherent. Only files
   // that already exist get backed up; net-new creates have nothing to save.
   // If a backup write fails, abort BEFORE touching any source file so we
-  // never end up with new content on disk but no rollback target.
+  // never end up with new content on disk but no rollback target. Backups
+  // are written as raw bytes so binary assets round-trip cleanly.
   const ts = backupTimestamp();
   for (const { payload: f, existing } of preWrite) {
     if (existing === null) continue;
     const backupAbs = path.resolve(repoRoot, BACKUP_DIR, ts, f.path);
     try {
       await fs.mkdir(path.dirname(backupAbs), { recursive: true });
-      await fs.writeFile(backupAbs, existing, "utf8");
+      await fs.writeFile(backupAbs, existing);
     } catch (e) {
       return {
         status: 500,
@@ -393,9 +461,9 @@ export async function handleSaveRequest(
     const tmpAbs = abs + ".tmp";
     try {
       await fs.mkdir(path.dirname(abs), { recursive: true });
-      await fs.writeFile(tmpAbs, f.content, "utf8");
+      await fs.writeFile(tmpAbs, entry.bytesToWrite);
       await fs.rename(tmpAbs, abs);
-      written.push({ path: f.path, hash: hash(f.content) });
+      written.push({ path: f.path, hash: hashOf(f.kind, entry.bytesToWrite) });
     } catch (e) {
       // Try to clean the orphan tmp file, then roll back every previously
       // succeeded write in this batch.
@@ -410,8 +478,8 @@ export async function handleSaveRequest(
         const priorAbs = path.resolve(repoRoot, prior.payload.path);
         try {
           if (prior.existing !== null) {
-            // Existing file → restore its backed-up content.
-            await fs.writeFile(priorAbs, prior.existing, "utf8");
+            // Existing file → restore its backed-up bytes (binary-safe).
+            await fs.writeFile(priorAbs, prior.existing);
           } else {
             // Net-new file → delete it.
             await fs.unlink(priorAbs);

@@ -24,20 +24,31 @@
  * apply: "serve" so the endpoint physically does not exist in production
  * builds.
  */
-import { isWritableSourcePath } from "./sourcePathAllowlist";
+import { isWritableAssetPath, isWritableSourcePath } from "./sourcePathAllowlist";
 
-export type FileKind = "entity-md" | "world-yaml";
+export type FileKind = "entity-md" | "world-yaml" | "asset-binary";
 
 export interface FileChange {
   path: string;
+  /**
+   * For `entity-md` and `world-yaml` this is the UTF-8 text body. For
+   * `asset-binary` it's a `data:<mime>;base64,<payload>` URL — the server
+   * decodes it before writing the raw bytes to disk.
+   */
   content: string;
   kind: FileKind;
   /**
    * `"sha256:<hex>"` hash of the file's content as the editor loaded it,
    * or `null` for a create-only write (target must not exist).
+   *
+   * For `asset-binary`, the hash is over the **decoded bytes**, not the
+   * data URL wrapper — keeps the hash stable across whitespace / quoting
+   * changes in the dataUrl prefix.
    */
   baseHash: string | null;
 }
+
+const DATA_URL_PREFIX = /^data:[^;,]+;base64,/;
 
 export interface LocalSaveBuildInfo {
   ok: boolean;
@@ -117,6 +128,9 @@ export interface LocalSaveDeps {
 }
 
 const MAX_FILE_BYTES = 1024 * 1024;
+// Asset binaries are sent as base64 dataUrls — 8 MB of UTF-8 covers ~5.5 MB
+// of decoded binary, comfortably above the build's per-asset audit cap.
+const MAX_ASSET_DATAURL_BYTES = 8 * 1024 * 1024;
 const ENDPOINT = "/__atlas/save";
 
 function utf8ByteLength(s: string): number {
@@ -144,17 +158,29 @@ export async function saveAtlasPatchToLocalFs(
     if (!f || typeof f.path !== "string" || typeof f.content !== "string") {
       throw new LocalSaveError("Invalid change entry");
     }
-    if (f.kind !== "entity-md" && f.kind !== "world-yaml") {
+    if (f.kind !== "entity-md" && f.kind !== "world-yaml" && f.kind !== "asset-binary") {
       throw new LocalSaveError(`Invalid kind for ${f.path}: ${String(f.kind)}`);
     }
     if (f.baseHash !== null && (typeof f.baseHash !== "string" || !f.baseHash.startsWith("sha256:"))) {
       throw new LocalSaveError(`Invalid baseHash for ${f.path}`);
     }
-    if (!isWritableSourcePath(f.path)) {
-      throw new DisallowedPathError(f.path);
-    }
-    if (utf8ByteLength(f.content) > MAX_FILE_BYTES) {
-      throw new LocalSaveError(`File too large: ${f.path}`);
+    if (f.kind === "asset-binary") {
+      if (!isWritableAssetPath(f.path)) {
+        throw new DisallowedPathError(f.path);
+      }
+      if (!DATA_URL_PREFIX.test(f.content)) {
+        throw new LocalSaveError(`Asset content must be a base64 data URL: ${f.path}`);
+      }
+      if (utf8ByteLength(f.content) > MAX_ASSET_DATAURL_BYTES) {
+        throw new LocalSaveError(`Asset too large: ${f.path}`);
+      }
+    } else {
+      if (!isWritableSourcePath(f.path)) {
+        throw new DisallowedPathError(f.path);
+      }
+      if (utf8ByteLength(f.content) > MAX_FILE_BYTES) {
+        throw new LocalSaveError(`File too large: ${f.path}`);
+      }
     }
   }
 

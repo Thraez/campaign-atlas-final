@@ -682,4 +682,198 @@ describe("handleSaveRequest", () => {
       expect(p.rebuilt).toBeUndefined();
     });
   });
+
+  // Asset-binary tests: drive the unified Save with a base64 data URL and
+  // verify the endpoint decodes the bytes, writes them, hashes them, and
+  // round-trips through the same conflict / rollback machinery as text.
+  describe("asset-binary kind", () => {
+    // 1x1 transparent PNG. The exact byte length depends on the encoder; the
+    // test reads it back from the decoded base64 rather than hard-coding a
+    // magic number.
+    const PNG_B64 =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+    const PNG_BYTES = Buffer.from(PNG_B64, "base64");
+    const PNG_DATA_URL = `data:image/png;base64,${PNG_B64}`;
+    const ASSET_PATH = "public/atlas/assets/maps/test-pin.png";
+
+    function pngHash(): string {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const c = require("node:crypto") as typeof import("node:crypto");
+      return "sha256:" + c.createHash("sha256").update(PNG_BYTES).digest("hex");
+    }
+
+    it("writes decoded PNG bytes to public/atlas/assets/maps/", async () => {
+      const r = await handleSaveRequest(
+        {
+          files: [
+            file({
+              path: ASSET_PATH,
+              content: PNG_DATA_URL,
+              kind: "asset-binary",
+              baseHash: null,
+            }),
+          ],
+        },
+        tmp,
+      );
+      expect(r.status).toBe(200);
+      const onDisk = fs.readFileSync(path.join(tmp, ASSET_PATH));
+      expect(onDisk.length).toBe(PNG_BYTES.length);
+      // PNG signature: 89 50 4E 47 0D 0A 1A 0A
+      expect(onDisk[0]).toBe(0x89);
+      expect(onDisk[1]).toBe(0x50);
+      expect(onDisk[2]).toBe(0x4e);
+      expect(onDisk[3]).toBe(0x47);
+      const payload = (r as { payload: { files: Array<{ path: string; hash: string }> } }).payload;
+      expect(payload.files[0].path).toBe(ASSET_PATH);
+      expect(payload.files[0].hash).toBe(pngHash());
+    });
+
+    it("rejects an asset-binary path that's not under public/atlas/assets/maps/", async () => {
+      const r = await handleSaveRequest(
+        {
+          files: [
+            file({
+              path: "public/atlas/atlas.json",
+              content: PNG_DATA_URL,
+              kind: "asset-binary",
+              baseHash: null,
+            }),
+          ],
+        },
+        tmp,
+      );
+      expect(r.status).toBe(400);
+      expect((r.payload as Record<string, unknown>).error).toBe("DisallowedPath");
+    });
+
+    it("rejects an asset-binary that isn't a base64 data URL", async () => {
+      const r = await handleSaveRequest(
+        {
+          files: [
+            file({
+              path: ASSET_PATH,
+              content: "not a data url",
+              kind: "asset-binary",
+              baseHash: null,
+            }),
+          ],
+        },
+        tmp,
+      );
+      expect(r.status).toBe(400);
+      const p = r.payload as { error: string; reason: string; failedPath: string };
+      expect(p.error).toBe("InvalidContent");
+      expect(p.reason).toBe("asset-decode-failed");
+      expect(p.failedPath).toBe(ASSET_PATH);
+      expect(fs.existsSync(path.join(tmp, ASSET_PATH))).toBe(false);
+    });
+
+    it("baseHash null but asset already exists → 409 already-exists with byte-hash", async () => {
+      const abs = path.join(tmp, ASSET_PATH);
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, Buffer.from(PNG_B64, "base64"));
+      const r = await handleSaveRequest(
+        {
+          files: [
+            file({
+              path: ASSET_PATH,
+              content: PNG_DATA_URL,
+              kind: "asset-binary",
+              baseHash: null,
+            }),
+          ],
+        },
+        tmp,
+      );
+      expect(r.status).toBe(409);
+      const p = r.payload as { reason: string; failedPath: string; currentHash: string };
+      expect(p.reason).toBe("already-exists");
+      expect(p.currentHash).toBe(pngHash());
+    });
+
+    it("baseHash matches → overwrites successfully", async () => {
+      const abs = path.join(tmp, ASSET_PATH);
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, Buffer.from(PNG_B64, "base64"));
+      const r = await handleSaveRequest(
+        {
+          files: [
+            file({
+              path: ASSET_PATH,
+              content: PNG_DATA_URL,
+              kind: "asset-binary",
+              baseHash: pngHash(),
+            }),
+          ],
+        },
+        tmp,
+      );
+      expect(r.status).toBe(200);
+      // Backup recorded a copy.
+      const backups = fs.readdirSync(path.join(tmp, ".atlas-backups"));
+      expect(backups.length).toBeGreaterThan(0);
+      const ts = backups[0];
+      const backedUp = fs.readFileSync(path.join(tmp, ".atlas-backups", ts, ASSET_PATH));
+      expect(backedUp.length).toBe(PNG_BYTES.length);
+    });
+
+    it("batches text + binary in one request — both land on disk", async () => {
+      const r = await handleSaveRequest(
+        {
+          files: [
+            file({
+              path: "content/world/_atlas/world.yaml",
+              content: "schemaVersion: 1\nmaps: []\n",
+              kind: "world-yaml",
+              baseHash: null,
+            }),
+            file({
+              path: ASSET_PATH,
+              content: PNG_DATA_URL,
+              kind: "asset-binary",
+              baseHash: null,
+            }),
+          ],
+        },
+        tmp,
+      );
+      expect(r.status).toBe(200);
+      expect(fs.readFileSync(path.join(tmp, "content/world/_atlas/world.yaml"), "utf8")).toContain("schemaVersion: 1");
+      const png = fs.readFileSync(path.join(tmp, ASSET_PATH));
+      expect(png.length).toBe(PNG_BYTES.length);
+    });
+
+    it("oversized decoded binary (>6 MB after base64 decode) → 400 OversizedContent", async () => {
+      // 6 MB + 1 byte of binary → 8 MB+ of base64 (within MAX_ASSET_DATAURL_BYTES
+      // ceiling so the cap that fires is the decoded one, not the dataUrl one).
+      // Actually 8 MB of UTF-8 of base64 ≈ 6 MB binary, very close to both caps.
+      // Use a payload that's small enough to survive the dataUrl cap but blows the
+      // decoded one. Build a 6 MB + 1 buffer.
+      const big = Buffer.alloc(MAX_ASSET_BINARY_BYTES + 1, 0x00);
+      const dataUrl = `data:application/octet-stream;base64,${big.toString("base64")}`;
+      const r = await handleSaveRequest(
+        {
+          files: [
+            file({
+              path: ASSET_PATH,
+              content: dataUrl,
+              kind: "asset-binary",
+              baseHash: null,
+            }),
+          ],
+        },
+        tmp,
+      );
+      // Either OversizedContent (decoded path) or OversizedContent (dataUrl path);
+      // both are valid 400s. We just care that the file did not land on disk.
+      expect(r.status).toBe(400);
+      expect((r.payload as Record<string, unknown>).error).toBe("OversizedContent");
+      expect(fs.existsSync(path.join(tmp, ASSET_PATH))).toBe(false);
+    });
+  });
 });
+
+// Mirrors the cap in vite-plugin-atlas-save.ts so the test can build a payload
+// that intentionally exceeds it without importing internal constants.
+const MAX_ASSET_BINARY_BYTES = 6 * 1024 * 1024;

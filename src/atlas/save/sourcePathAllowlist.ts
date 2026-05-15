@@ -1,14 +1,17 @@
 /**
  * Path allowlist for the dev-only local FS save endpoint.
  *
- * Only narrowly-scoped source files are writable. This module is the single
- * source of truth used by both the browser-side caller and the Vite plugin
- * server, so a malicious or buggy client cannot widen the surface.
+ * Only narrowly-scoped source files and map assets are writable. This module
+ * is the single source of truth used by both the browser-side caller and the
+ * Vite plugin server, so a malicious or buggy client cannot widen the surface.
  *
- * Allowed shapes (case-sensitive):
+ * Source-path branch (`isWritableSourcePath`):
  *   content/<segments>/_atlas/<file>.yaml
  *   content/<segments>/_atlas/<file>.yml
  *   content/<segments>/<file>.md
+ *
+ * Asset-path branch (`isWritableAssetPath`):
+ *   public/atlas/assets/maps/<file>.<png|jpg|jpeg|webp|gif>
  *
  * <segments> is one or more path segments. Traversal (".."), absolute paths,
  * leading "./", empty segments, and any other extension are rejected.
@@ -57,5 +60,28 @@ export function isWritableSourcePath(input: string): boolean {
   for (let i = 1; i < parts.length - 1; i++) {
     if (parts[i] === "_atlas") return false;
   }
+  return true;
+}
+
+/**
+ * Asset-path allowlist for map image uploads. Used by the unified Save when
+ * a layer's `origin === "upload"` carries a `data:` URL that needs to land
+ * on disk so the next atlas build can reference it.
+ *
+ * Locked to `public/atlas/assets/maps/<file>.<image-ext>` — the same shape
+ * the build script's asset-audit pass walks and the same prefix that map
+ * layer `src:` values resolve against at runtime.
+ */
+export function isWritableAssetPath(input: string): boolean {
+  if (typeof input !== "string" || input.length === 0) return false;
+  if (input.startsWith("/") || input.startsWith("./") || input.startsWith("\\")) return false;
+  if (input.includes("\\")) return false;
+  const parts = input.split("/");
+  if (hasBadSegments(parts)) return false;
+  // Exact prefix: public/atlas/assets/maps/<file>.<ext>
+  if (parts.length !== 5) return false;
+  if (parts[0] !== "public" || parts[1] !== "atlas" || parts[2] !== "assets" || parts[3] !== "maps") return false;
+  const last = parts[4];
+  if (!/^[A-Za-z0-9_\-. ]+\.(png|jpg|jpeg|webp|gif)$/.test(last)) return false;
   return true;
 }
