@@ -32,6 +32,10 @@ import {
 import { useWorldYamlBaseline, worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
 import { buildFullWorldYaml } from "@/atlas/yaml/buildFullWorldYaml";
 import { ImportPanel } from "@/atlas/import/ImportPanel";
+import { ImportStagingModal } from "@/atlas/import/ImportStagingModal";
+import { PasteMarkdownDialog } from "@/atlas/import/PasteMarkdownDialog";
+import { useMdImportFlow } from "@/atlas/import/useMdImportFlow";
+import { useMdDropZone } from "@/atlas/import/useMdDropZone";
 import { TabFrame } from "@/atlas/tabs/TabFrame";
 import { RegionsTab } from "@/atlas/tabs/RegionsTab";
 import { RoutesTab } from "@/atlas/tabs/RoutesTab";
@@ -220,6 +224,29 @@ export default function AtlasPlacementEditor() {
       toast.error(`Reload failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }, []);
+
+  // Phase 1C: md-import orchestration. existingPaths is the set of on-disk
+  // entity .md paths the staging modal checks against for conflicts. We
+  // scope it to entities currently in the project — anything newly imported
+  // after a successful save shows up after reloadCanon().
+  const importExistingPaths = useMemo(() => {
+    const s = new Set<string>();
+    if (!project) return s;
+    for (const e of project.entities) {
+      if (e.sourcePath) s.add(e.sourcePath);
+    }
+    return s;
+  }, [project]);
+  const importFlow = useMdImportFlow({
+    worldId: project?.maps.find((m) => m.id === activeMapId)?.worldId ?? "",
+    existingPaths: importExistingPaths,
+    onImported: reloadCanon,
+  });
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const { isDragging: isDraggingMd } = useMdDropZone({
+    onDrop: importFlow.openWithFiles,
+    enabled: !importFlow.open && !pasteOpen,
+  });
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
@@ -1275,6 +1302,8 @@ export default function AtlasPlacementEditor() {
                 warningCount={entityIssues.warning}
                 lastExportAt={tabExportAt.entities ?? null}
                 onExported={() => markTabExport("entities")}
+                onImportMdFiles={importFlow.openWithFiles}
+                onPasteMarkdown={() => setPasteOpen(true)}
               />
             </TabsContent>
 
@@ -1355,6 +1384,29 @@ export default function AtlasPlacementEditor() {
         }}
         onClose={() => setSaveModalOpen(false)}
       />
+      <ImportStagingModal
+        open={importFlow.open}
+        rows={importFlow.rows}
+        isImporting={importFlow.isImporting}
+        onPatchRow={importFlow.patchRow}
+        onCancel={importFlow.cancel}
+        onCommit={importFlow.commit}
+      />
+      <PasteMarkdownDialog
+        open={pasteOpen}
+        onOpenChange={setPasteOpen}
+        onSubmit={({ filename, raw }) => importFlow.openWithInputs([{ filename, raw }])}
+      />
+      {isDraggingMd && (
+        <div
+          aria-hidden
+          className="fixed inset-0 z-[200] pointer-events-none flex items-center justify-center bg-primary/15 backdrop-blur-sm"
+        >
+          <div className="rounded-lg border-2 border-dashed border-primary bg-background/90 px-6 py-4 text-sm font-medium text-primary shadow-lg">
+            Drop .md files to stage for import
+          </div>
+        </div>
+      )}
     </div>
   );
 }
