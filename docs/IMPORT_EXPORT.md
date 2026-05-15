@@ -12,6 +12,32 @@ The atlas's content layer (`content/`) **is already an Obsidian-compatible vault
 
 This is the lowest-friction path. If you have an existing vault you want to fold in, just copy its folder under `content/<your-world>/` and add an `_atlas/world.yaml`.
 
+### Frontmatter the build actually reads
+
+The parser supports two forms for the same data: a **flat top-level form** (what most Obsidian vaults already use) and a **namespaced `atlas.*` form** (what the visual editor writes). Use whichever you prefer in any given file — the build accepts both. The namespaced form wins when both are present.
+
+| Flat key (Obsidian-natural) | Namespaced equivalent | What the build does with it |
+|---|---|---|
+| `tags: [npc, scholar]` | `atlas.tags` | Search index, tag pages, filters |
+| `aliases: ["Kell", "Kellan"]` | `atlas.aliases` | Wikilink resolution (`[[Kell]]` → entity) |
+| `type: region` | `atlas.type` | Pin icon / preset (npc, region, settlement, …) |
+| `summary: "..."` | `atlas.summary` | Shown in entity card and search results |
+| `race: "high elf"` | `atlas.race` | Rendered next to type on NPC cards |
+
+Fields **only** read under `atlas.*` (no flat-form fallback): `visibility`, `publish`, `id`, `canon`, `date`, `dateValue`, `world`, `images`, `placements`, `profile`, `relationships`. These are atlas-mode concepts; the visual editor manages them and they're rare to hand-author.
+
+**Everything else in your frontmatter is ignored by the build** — including common Obsidian fields like `role`, `status`, `campaign`, `occupation`, `faction`, `voice`, `appearance`, `mannerism`, `catchphrase`, `connections`. They stay in your file as DM-only documentation; the build never reads, ships, or strips them. If you want richer structured DM data the app understands, use `atlas.profile.dm` and `atlas.relationships[]` (see the visual editor's Entities tab).
+
+### What players actually see
+
+Two sanitizations run on the player build so frontmatter that's useful for DM organization doesn't read as jargon in the player atlas:
+
+- **`type` is translated for display.** The raw value (e.g. `npc`) stays in the data — it's still the URL slug for `/atlas/type/...` and the filter key — but the entity card, search results, browse chips, and timeline badge render it as a player-friendly label. `npc` and `person` become "Person"; `note` is hidden entirely; everything else is shown capitalized (`region` → "Region", `deity` → "Deity"). For NPCs, the kicker becomes `Person · {race}` if `race` is set.
+- **Meta tags are stripped in player builds.** Tags that name an entity category (`npc`, `region`, `settlement`, `faction`, `stub`, `draft`, `wip`, `todo`, etc. — the full list is `META_TAGS` in `scripts/build-atlas.ts`) are dropped from `entity.tags` in player builds only. DM builds keep them so you can filter the editor by `#npc`. Real descriptive tags (`scholar`, `tidemarrow`, `chase-target`) ship through unchanged.
+- **Aliases that duplicate the title are dropped** in both modes — the vault convention of listing the title inside `aliases:` is fine on disk, but rendering "aka {title}" alongside the title itself looks like a bug.
+
+If you want a category-name tag to ship to players (say you really do want a `#faction` tag in the player atlas), it can be reintroduced under a non-meta synonym in the source — or the `META_TAGS` set can be edited.
+
 ### When to use the import wizard
 
 The wizard at `/atlas/edit` → **Import** tab is for:

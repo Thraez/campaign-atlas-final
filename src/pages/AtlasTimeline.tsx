@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
+import { playerTypeLabel } from "@/atlas/content/typeLabel";
 
 interface YearGroup {
   year: number;
@@ -130,15 +131,19 @@ export default function AtlasTimeline() {
           >
             all
           </button>
-          {allTypes.map(([t, n]) => (
-            <button
-              key={t}
-              onClick={() => setActiveType(activeType === t ? null : t)}
-              className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
-            >
-              {t} <span className="opacity-60">{n}</span>
-            </button>
-          ))}
+          {allTypes.map(([t, n]) => {
+            const label = playerTypeLabel(t);
+            if (!label) return null;
+            return (
+              <button
+                key={t}
+                onClick={() => setActiveType(activeType === t ? null : t)}
+                className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+              >
+                {label} <span className="opacity-60">{n}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -173,7 +178,9 @@ export default function AtlasTimeline() {
                         <div className="flex items-baseline gap-2 flex-wrap">
                           <span className="text-xs text-muted-foreground tabular-nums">{e.dateRaw}</span>
                           <span className="font-medium text-sm">{e.title}</span>
-                          <Badge variant="outline" className="text-[10px] uppercase">{e.type}</Badge>
+                          {playerTypeLabel(e.type) && (
+                            <Badge variant="outline" className="text-[10px] uppercase">{playerTypeLabel(e.type)}</Badge>
+                          )}
                         </div>
                         {e.summary && (
                           <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{e.summary}</p>

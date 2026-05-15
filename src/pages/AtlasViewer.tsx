@@ -26,6 +26,7 @@ import {
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
+import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { printEntityHandout } from "@/atlas/printHandout";
@@ -908,7 +909,13 @@ const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function Entity
       <div className="flex items-start justify-between gap-2 px-4 py-3 border-b border-border">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{entity.type}</div>
+            {(() => {
+              const typeLabel = playerTypeLabel(entity.type);
+              const kicker = [typeLabel, entity.race].filter(Boolean).join(" · ");
+              return kicker ? (
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{kicker}</div>
+              ) : null;
+            })()}
             {entity.visibility === "rumor" && (
               <Badge
                 variant="outline"
@@ -1254,15 +1261,19 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
             >
               all
             </button>
-            {allTypes.map(([t, n]) => (
-              <button
-                key={t}
-                onClick={() => setActiveType(activeType === t ? null : t)}
-                className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
-              >
-                {t} <span className="opacity-60">{n}</span>
-              </button>
-            ))}
+            {allTypes.map(([t, n]) => {
+              const label = playerTypeLabel(t);
+              if (!label) return null;
+              return (
+                <button
+                  key={t}
+                  onClick={() => setActiveType(activeType === t ? null : t)}
+                  className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+                >
+                  {label} <span className="opacity-60">{n}</span>
+                </button>
+              );
+            })}
             {allTags.length > 0 && <span className="w-full h-0" />}
             {allTags.map(([t, n]) => (
               <button
@@ -1296,7 +1307,9 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm">{r.title}</span>
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{r.type}</span>
+                    {playerTypeLabel(r.type) && (
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{playerTypeLabel(r.type)}</span>
+                    )}
                     {r.dateRaw && <span className="text-[10px] text-muted-foreground">· {r.dateRaw}</span>}
                     {placed && <MapPin className="h-3 w-3 text-primary ml-auto" />}
                   </div>

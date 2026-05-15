@@ -52,6 +52,39 @@ interface Config {
   exclude: string[];
 }
 
+// Tags that are organizational/meta for the DM but read as jargon to players
+// ("#npc", "#stub"). Stripped from `entity.tags` in player builds only — DM
+// builds keep them so the DM can still filter the editor by these.
+const META_TAGS = new Set([
+  "npc",
+  "person",
+  "region",
+  "settlement",
+  "city",
+  "town",
+  "village",
+  "faction",
+  "organization",
+  "guild",
+  "deity",
+  "god",
+  "event",
+  "item",
+  "artifact",
+  "note",
+  "location",
+  "ruin",
+  "dungeon",
+  "cave",
+  "temple",
+  "shop",
+  "port",
+  "stub",
+  "draft",
+  "wip",
+  "todo",
+]);
+
 // Resolved per-invocation inside runBuildCore so programmatic callers
 // (the dev save plugin, tests) get the cwd that was active when they
 // called, not the cwd that happened to be set when this module was first
@@ -396,6 +429,22 @@ async function runBuildCore(flags: BuildFlags) {
             .filter((x) => x.length > 0)
       : (arr: string[]) => arr;
 
+    // Player builds only: strip meta tags ("#npc", "#stub") that read as
+    // jargon to players. DM builds keep them — they're useful for editor
+    // filtering. Comparison is case-insensitive.
+    const scrubTags = flags.player
+      ? (arr: string[]) => arr.filter((t) => !META_TAGS.has(t.toLowerCase()))
+      : (arr: string[]) => arr;
+
+    // Drop aliases that duplicate the title (case-insensitive). The vault
+    // convention of `aliases: [TitleString, ...]` is common and harmless on
+    // disk, but rendering "aka {title}" alongside the title itself looks like
+    // a bug. Always apply — duplicate aliases are never useful anywhere.
+    const dedupAliases = (arr: string[], t: string) => {
+      const tl = t.toLowerCase();
+      return arr.filter((a) => a.trim().toLowerCase() !== tl);
+    };
+
     const entity: Entity = {
       id,
       title: stripField(title) ?? title,
@@ -403,9 +452,10 @@ async function runBuildCore(flags: BuildFlags) {
       world: parsed.atlas.world ?? cfg.defaultWorld,
       visibility,
       canon: (parsed.atlas.canon as Entity["canon"]) ?? "canon",
-      aliases: stripArr(parsed.atlas.aliases ?? []),
-      tags: stripArr(parsed.atlas.tags ?? []),
+      aliases: dedupAliases(stripArr(parsed.atlas.aliases ?? []), title),
+      tags: scrubTags(stripArr(parsed.atlas.tags ?? [])),
       summary: stripField(parsed.atlas.summary),
+      race: stripField(parsed.atlas.race),
       images: (parsed.atlas.images ?? []).map(relImage),
       body: noDm,
       bodyHtml: "",
