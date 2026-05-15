@@ -685,6 +685,34 @@ export function atlasSavePlugin(): Plugin {
     name: "atlas-save",
     apply: "serve",
     configureServer(server) {
+      // In dev, serve the DM build (.local-atlas/atlas.json) at /atlas/atlas.json
+      // when it exists. Without this, the editor fetches public/atlas/atlas.json
+      // — the *player* build that strips DM/hidden entities, so any DM-only
+      // entity the editor just imported is invisible to reloadCanon and to the
+      // client-side conflict-detection pass in the staging modal. When the DM
+      // file isn't there yet (fresh checkout), the middleware passes the
+      // request through to Vite's default public/ serving so the player atlas
+      // still loads.
+      const repoRoot = server.config.root;
+      const serveLocalAtlas = (publicRelPath: string) =>
+        (req: import("http").IncomingMessage, res: import("http").ServerResponse, next: () => void) => {
+          if (req.method !== "GET") return next();
+          const url = new URL(req.url ?? "/", "http://localhost");
+          if (url.pathname !== publicRelPath) return next();
+          const localPath = path.resolve(repoRoot, ".local-atlas", path.posix.basename(publicRelPath));
+          fs.readFile(localPath, "utf8").then(
+            (body) => {
+              res.statusCode = 200;
+              res.setHeader("Content-Type", "application/json");
+              res.setHeader("Cache-Control", "no-store");
+              res.end(body);
+            },
+            () => next(),
+          );
+        };
+      server.middlewares.use(serveLocalAtlas("/atlas/atlas.json"));
+      server.middlewares.use(serveLocalAtlas("/atlas/search-index.json"));
+
       // GET /__atlas/read?path=content/...
       server.middlewares.use("/__atlas/read", (req, res, next) => {
         if (req.method !== "GET") return next();
