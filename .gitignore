@@ -29,6 +29,11 @@ dist-ssr
 # Atlas backups (zip snapshots from `npm run atlas:backup`)
 backups/
 
+# Editor save-endpoint per-file backups (Phase 1A unified Save). Written by
+# scripts/vite-plugin-atlas-save.ts before any overwrite, retained 3 deep
+# per file path. Never committed.
+.atlas-backups/
+
 # Claude Code worktrees (live inside the main checkout but each has its own
 # .git pointer; never stage them from the main repo).
 .claude/worktrees/

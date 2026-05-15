@@ -24,6 +24,7 @@ import { DraftStatusBadge } from "@/atlas/yaml/StatusBadge";
 import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
 import type { FileChange } from "@/atlas/save/localFsSave";
+import { SaveStatusChip, dirtyFileSummary } from "@/atlas/SaveStatusChip";
 import {
   buildCanonicalPlacementChanges,
   CanonicalSaveError,
@@ -471,6 +472,39 @@ export default function AtlasPlacementEditor() {
     lastLocalEditAt !== null &&
     (lastSavedAt === null || lastLocalEditAt > lastSavedAt);
 
+  // A12c: 5-minute idle nudge. Fires once when the editor has had dirty
+  // state for at least 5 minutes since the last save, with at least one
+  // edit in that window. "Remind me later" re-arms.
+  const NUDGE_DELAY_MS = 5 * 60_000;
+  useEffect(() => {
+    if (!hasUnsavedChanges || lastLocalEditAt === null) return;
+    let cancelled = false;
+    const id = window.setTimeout(() => {
+      if (cancelled) return;
+      const toastId = toast.message("You have unsaved changes", {
+        description: `Last edit ${Math.round((Date.now() - lastLocalEditAt) / 60_000)} minutes ago.`,
+        duration: 30_000,
+        action: {
+          label: "Save now",
+          onClick: () => {
+            toast.dismiss(toastId);
+            onSaveClick();
+          },
+        },
+        cancel: {
+          label: "Remind me later",
+          // Re-arm by bumping the edit timestamp so the effect re-fires.
+          onClick: () => setLastLocalEditAt(Date.now()),
+        },
+      });
+    }, NUDGE_DELAY_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- onSaveClick is stable enough; tracking it here would re-arm the timer on every render
+  }, [hasUnsavedChanges, lastLocalEditAt]);
+
   // Browser-level guard: warn before tab close / reload if there are
   // unsaved drafts. The custom message is browser-controlled in modern
   // browsers (just shows a generic prompt) — the point is the prompt.
@@ -596,9 +630,21 @@ export default function AtlasPlacementEditor() {
         <Button variant={showRegions ? "secondary" : "ghost"} size="sm" onClick={() => setShowRegions((v) => !v)} title="Toggle region overlays">
           Regions
         </Button>
-        <span className="text-xs text-muted-foreground hidden md:inline">
-          {dirtyCount > 0 ? `${dirtyCount} unsaved on ${activeMap.name}` : "Matches YAML canon"}
-        </span>
+        <SaveStatusChip
+          status={
+            saveError
+              ? "failed"
+              : saveModalOpen
+                ? "saving"
+                : hasUnsavedChanges
+                  ? "unsaved"
+                  : "saved"
+          }
+          savedAt={lastSavedAt ? new Date(lastSavedAt).toISOString() : null}
+          dirtySummary={dirtyFileSummary({ entityCount: dirtyCount, worldYamlDirty: false })}
+          failedMessage={saveError ?? undefined}
+          onForceSave={onSaveClick}
+        />
         <Button variant="ghost" size="sm" onClick={() => { setOverrides({}); toast.info("Cleared overrides"); }} title="Discard local changes">
           <RotateCcw className="h-4 w-4" />
         </Button>

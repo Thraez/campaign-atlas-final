@@ -14,11 +14,15 @@
  *   - placements on maps that ARE in this draft are replaced
  *   - legacy atlas.x / atlas.y are removed once a placements[] is written
  *     (single source of truth)
+ *
+ * Each FileChange carries the `baseHash` of the .md file at read time so
+ * the Save endpoint can detect "the file changed under us" before writing.
  */
 import matter from "gray-matter";
 import type { Entity } from "@/atlas/content/schema";
 import type { PinOverride } from "@/atlas/pins/presets";
 import type { FileChange } from "./localFsSave";
+import { hashContent } from "./localFsSave";
 import { isWritableSourcePath } from "./sourcePathAllowlist";
 
 export interface PlacementDraft {
@@ -102,7 +106,10 @@ export function mergePlacementsIntoFrontmatter(
 /**
  * Build FileChange[] for the supplied placement drafts. One entry per
  * affected entity .md file. Existing placements on maps not in the draft
- * set are preserved.
+ * set are preserved. Each FileChange's `baseHash` is the SHA-256 of the
+ * .md content at read time — the Save endpoint uses it to refuse writes
+ * when the source file has changed under the editor (see A5 conflict
+ * protection in the Phase 1A plan).
  *
  * @throws CanonicalSaveError if any entity has no sourcePath (e.g. the
  *   editor was loaded against a player build, which strips it).
@@ -141,13 +148,14 @@ export async function buildCanonicalPlacementChanges(
     }
 
     const currentRaw = await readSourceFile(sourcePath, fetchFn);
+    const baseHash = await hashContent(currentRaw);
     const parsed = matter(currentRaw);
     const nextData = mergePlacementsIntoFrontmatter(
       (parsed.data ?? {}) as Record<string, unknown>,
       entityDrafts,
     );
     const nextRaw = matter.stringify(parsed.content, nextData);
-    changes.push({ path: sourcePath, contents: nextRaw });
+    changes.push({ path: sourcePath, content: nextRaw, kind: "entity-md", baseHash });
   }
 
   return changes;

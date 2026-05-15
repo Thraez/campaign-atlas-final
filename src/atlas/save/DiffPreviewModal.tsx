@@ -84,7 +84,7 @@ export function DiffPreviewModal({ open, changes, previousContents, rebuildAfter
 
   const stats = useMemo(
     () =>
-      changes.map((c) => diffLines(previousContents?.[c.path] ?? "", c.contents)),
+      changes.map((c) => diffLines(previousContents?.[c.path] ?? "", c.content)),
     [changes, previousContents],
   );
 
@@ -115,7 +115,7 @@ export function DiffPreviewModal({ open, changes, previousContents, rebuildAfter
         {phase.kind === "success" ? (
           <>
             <DialogHeader>
-              <DialogTitle>Wrote {phase.result.written} file{phase.result.written === 1 ? "" : "s"}.</DialogTitle>
+              <DialogTitle>Wrote {phase.result.saved} file{phase.result.saved === 1 ? "" : "s"}.</DialogTitle>
               <DialogDescription>
                 {phase.result.build
                   ? phase.result.build.ok

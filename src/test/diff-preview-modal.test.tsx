@@ -31,7 +31,12 @@ import {
 const mockedSave = saveAtlasPatchToLocalFs as unknown as ReturnType<typeof vi.fn>;
 
 const sampleChanges: FileChange[] = [
-  { path: "content/world/_atlas/placements-patch-m1.yaml", contents: "a: 1\nb: 2\n" },
+  {
+    path: "content/world/_atlas/placements-patch-m1.yaml",
+    content: "a: 1\nb: 2\n",
+    kind: "world-yaml",
+    baseHash: null,
+  },
 ];
 
 beforeEach(() => {
@@ -57,7 +62,7 @@ describe("DiffPreviewModal", () => {
 
   it("Save to disk calls saveAtlasPatchToLocalFs with exact changes; success shows file count + git status hint", async () => {
     mockedSave.mockResolvedValue({
-      written: 1,
+      saved: 1,
       paths: ["content/world/_atlas/placements-patch-m1.yaml"],
     });
     render(<DiffPreviewModal open changes={sampleChanges} onClose={() => {}} />);
@@ -70,7 +75,7 @@ describe("DiffPreviewModal", () => {
 
   it("rebuildAfterSave forwards rebuild:true to saveAtlasPatchToLocalFs and surfaces build result", async () => {
     mockedSave.mockResolvedValue({
-      written: 1,
+      saved: 1,
       paths: ["content/world/notes/x.md"],
       build: { ok: true, durationMs: 1234 },
     });
@@ -83,7 +88,7 @@ describe("DiffPreviewModal", () => {
 
   it("onSaved fires after a successful save", async () => {
     mockedSave.mockResolvedValue({
-      written: 1,
+      saved: 1,
       paths: ["content/world/notes/x.md"],
     });
     const onSaved = vi.fn();
@@ -92,7 +97,7 @@ describe("DiffPreviewModal", () => {
     await waitFor(() => screen.getByText(/Wrote 1 file\./));
     expect(onSaved).toHaveBeenCalledTimes(1);
     expect(onSaved).toHaveBeenCalledWith({
-      written: 1,
+      saved: 1,
       paths: ["content/world/notes/x.md"],
     });
   });
@@ -116,14 +121,14 @@ describe("DiffPreviewModal", () => {
     await waitFor(() => screen.getByText("Save failed."));
     expect(screen.getByText("disk full")).toBeTruthy();
     expect(mockedSave).toHaveBeenCalledTimes(1);
-    mockedSave.mockResolvedValueOnce({ written: 1, paths: [sampleChanges[0].path] });
+    mockedSave.mockResolvedValueOnce({ saved: 1, paths: [sampleChanges[0].path] });
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => screen.getByText(/Wrote 1 file\./));
     expect(mockedSave).toHaveBeenCalledTimes(2);
   });
 
   it("Save button is disabled and shows loading while save is pending", async () => {
-    let resolveSave: (v: { written: number; paths: string[] }) => void = () => {};
+    let resolveSave: (v: { saved: number; paths: string[]; files: Array<{ path: string; hash: string }> }) => void = () => {};
     mockedSave.mockImplementation(
       () => new Promise((res) => { resolveSave = res; }),
     );
@@ -134,7 +139,7 @@ describe("DiffPreviewModal", () => {
     expect(loading.disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled).toBe(false);
     await act(async () => {
-      resolveSave({ written: 1, paths: [sampleChanges[0].path] });
+      resolveSave({ saved: 1, paths: [sampleChanges[0].path], files: [{ path: sampleChanges[0].path, hash: "sha256:abc" }] });
     });
     await waitFor(() => screen.getByText(/Wrote 1 file\./));
   });
