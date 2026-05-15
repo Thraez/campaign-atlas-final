@@ -7,9 +7,9 @@
  * to touch raw YAML — but the generated block is always available in the
  * advanced preview.
  */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, AlertTriangle, ShieldAlert, Printer } from "lucide-react";
+import { Plus, Trash2, AlertTriangle, ShieldAlert, Printer, FileUp, ClipboardPaste } from "lucide-react";
 import type { AtlasProject, Entity, EntityVisibility } from "@/atlas/content/schema";
 import type { EntityProfile, EntityRelationship } from "@/atlas/profiles/profileTypes";
 import {
@@ -37,6 +37,10 @@ interface Props {
   warningCount?: number;
   lastExportAt: number | null;
   onExported: () => void;
+  /** Phase 1C: open the staging modal with the picked files. */
+  onImportMdFiles?: (files: File[]) => void;
+  /** Phase 1C: open the paste-markdown dialog. */
+  onPasteMarkdown?: () => void;
 }
 
 interface FrontmatterDraft {
@@ -49,9 +53,18 @@ interface FrontmatterDraft {
   relationships?: EntityRelationship[];
 }
 
-export function EntitiesTab({ project, blockingCount, warningCount, lastExportAt, onExported }: Props) {
+export function EntitiesTab({
+  project,
+  blockingCount,
+  warningCount,
+  lastExportAt,
+  onExported,
+  onImportMdFiles,
+  onPasteMarkdown,
+}: Props) {
   const [drafts, setDrafts] = useState<Record<string, FrontmatterDraft>>({});
   const [selectedId, setSelectedId] = useState<string | null>(project.entities[0]?.id ?? null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const selected = useMemo(
     () => project.entities.find((e) => e.id === selectedId),
@@ -125,6 +138,50 @@ export function EntitiesTab({ project, blockingCount, warningCount, lastExportAt
       exportDisabled={dirtyCount === 0}
       rawYamlPreview={yamlPreview}
     >
+      {(onImportMdFiles || onPasteMarkdown) && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-card/50 px-2 py-2">
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Add entities
+          </span>
+          {onImportMdFiles && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".md"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  if (files.length > 0) onImportMdFiles(files);
+                  // Reset so picking the same file twice re-fires onChange.
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                size="sm"
+                variant="secondary"
+                className="gap-1 text-xs"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <FileUp className="h-3.5 w-3.5" />
+                Import .md files…
+              </Button>
+            </>
+          )}
+          {onPasteMarkdown && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-1 text-xs"
+              onClick={onPasteMarkdown}
+            >
+              <ClipboardPaste className="h-3.5 w-3.5" />
+              Paste markdown
+            </Button>
+          )}
+        </div>
+      )}
       <HandoutBundleSection entities={project.entities} />
       <div>
         <Label className="text-[10px]">Entity</Label>
