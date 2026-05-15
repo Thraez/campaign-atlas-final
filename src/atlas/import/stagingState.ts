@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Pure state primitive for the `.md` import staging modal.
  *
  * Builds a row per dropped/picked file, decides where each one should land on
@@ -34,7 +34,7 @@ function slugify(input: string): string {
   return input
     .toLowerCase()
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/['']/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
@@ -246,11 +246,12 @@ export function updateStagingRow(
   let nextRowKind: StagingRow["rowKind"];
   if (ctx.existingById.has(row.resolvedId) && !pathChangedByCaller) {
     nextRowKind = "update";
-  } else if (pathChangedByCaller) {
-    // Manual path edit: treat as create (or path-collision if occupied)
+  } else if (typeChanged || pathChangedByCaller) {
+    // Type or path changed: recompute from the new target path
     nextRowKind = ctx.existingPaths.has(nextPath) ? "path-collision" : "create";
   } else {
-    nextRowKind = ctx.existingPaths.has(nextPath) ? "path-collision" : "create";
+    // Nothing changed — preserve existing rowKind
+    nextRowKind = row.rowKind;
   }
 
   let nextIncluded: boolean;
