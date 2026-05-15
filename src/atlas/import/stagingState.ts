@@ -17,7 +17,27 @@
  *     and require an explicit re-check to overwrite.
  */
 
-import matter from "gray-matter";
+import yaml from "js-yaml";
+
+/**
+ * Minimal browser-safe frontmatter parser. `gray-matter` references Node's
+ * Buffer in its toBuffer path and crashes in the browser; we only need to
+ * read `atlas.type` / `atlas.id` / `path` from the YAML head and don't care
+ * about excerpts, custom delimiters, or stringification — so a regex split +
+ * js-yaml is enough and avoids the polyfill question.
+ */
+function readFrontmatter(raw: string): { data: Record<string, unknown> } {
+  // Frontmatter must be the very first thing in the file. Tolerate a BOM.
+  const stripped = raw.replace(/^﻿/, "");
+  const m = stripped.match(/^---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/);
+  if (!m) return { data: {} };
+  const parsed = yaml.load(m[1]);
+  const data =
+    parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  return { data };
+}
 
 export const ALLOWED_FOLDERS = [
   "places",
@@ -133,8 +153,8 @@ function parseFrontmatter(raw: string): {
   parseError: string | undefined;
 } {
   try {
-    const fm = matter(raw);
-    const data = (fm.data ?? {}) as Record<string, unknown>;
+    const fm = readFrontmatter(raw);
+    const data = fm.data;
     const atlas = (data.atlas ?? {}) as Record<string, unknown>;
     const type = typeof atlas.type === "string" && atlas.type.length > 0 ? atlas.type : "imports";
     const id = typeof atlas.id === "string" ? atlas.id : undefined;
