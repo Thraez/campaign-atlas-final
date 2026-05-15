@@ -136,10 +136,18 @@ export function useMapLayers(map: MapDocument | undefined, undoStack?: UndoStack
 
   const mergedLayers = useMemo<MapLayer[]>(() => {
     if (!map) return [];
-    // Local "edit" entries override built-in by id; "upload"/"url" are added.
-    const overriddenIds = new Set(localLayers.filter((l) => l.origin === "edit").map((l) => l.id));
-    const base = map.layers.filter((l) => !overriddenIds.has(l.id));
-    return [...base, ...localLayers].sort((a, b) => a.zIndex - b.zIndex);
+    // Local "edit" entries override built-in by id and MUST land at the same
+    // position in the array as the original built-in, otherwise a session of
+    // touch-up edits silently reorders the layers in world.yaml on save.
+    // "upload" / "url" additions come after the canon block in localLayers
+    // touch-order. Same-zIndex ties resolve to array order via the stable
+    // sort below, so preserving array order preserves visual stacking.
+    const editById = new Map(
+      localLayers.filter((l) => l.origin === "edit").map((l) => [l.id, l] as const),
+    );
+    const baseInOrder = map.layers.map((l) => editById.get(l.id) ?? l);
+    const additions = localLayers.filter((l) => l.origin !== "edit");
+    return [...baseInOrder, ...additions].sort((a, b) => a.zIndex - b.zIndex);
   }, [map, localLayers]);
 
   const addUploaded = useCallback(async (files: File[]) => {

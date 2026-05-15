@@ -769,10 +769,50 @@ describe("handleSaveRequest", () => {
       expect(fs.existsSync(path.join(tmp, ASSET_PATH))).toBe(false);
     });
 
-    it("baseHash null but asset already exists → 409 already-exists with byte-hash", async () => {
+    it("baseHash null + asset already exists with IDENTICAL bytes → 200 skip (no-op)", async () => {
+      // The editor restores upload-origin layers from localStorage on every
+      // reload — so the next Save sends the same asset-binary FileChange even
+      // though the file already landed on disk in a prior session. Before the
+      // skip behavior, this 409'd on every subsequent save and rolled back
+      // the entire atomic batch (world.yaml + entity-md changes alongside).
       const abs = path.join(tmp, ASSET_PATH);
       fs.mkdirSync(path.dirname(abs), { recursive: true });
-      fs.writeFileSync(abs, Buffer.from(PNG_B64, "base64"));
+      fs.writeFileSync(abs, PNG_BYTES);
+      const r = await handleSaveRequest(
+        {
+          files: [
+            file({
+              path: ASSET_PATH,
+              content: PNG_DATA_URL,
+              kind: "asset-binary",
+              baseHash: null,
+            }),
+          ],
+        },
+        tmp,
+      );
+      expect(r.status).toBe(200);
+      // File is unchanged on disk (we don't rewrite an identical file).
+      expect(fs.readFileSync(abs).equals(PNG_BYTES)).toBe(true);
+      // No backup created — there was nothing to back up.
+      expect(fs.existsSync(path.join(tmp, ".atlas-backups"))).toBe(false);
+      // Response still includes the path + hash so the client can update its
+      // baseline tracking.
+      const payload = (r as { payload: { files: Array<{ path: string; hash: string }> } }).payload;
+      expect(payload.files).toHaveLength(1);
+      expect(payload.files[0].path).toBe(ASSET_PATH);
+      expect(payload.files[0].hash).toBe(pngHash());
+    });
+
+    it("baseHash null + asset already exists with DIFFERENT bytes → 409 already-exists", async () => {
+      // The skip-if-identical contract is intentionally narrow: only when the
+      // bytes match. Different bytes still 409 so the editor can't silently
+      // clobber an asset that diverged on disk (e.g. someone replaced the
+      // file manually outside the editor).
+      const abs = path.join(tmp, ASSET_PATH);
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      const differentBytes = Buffer.from("not the same png at all");
+      fs.writeFileSync(abs, differentBytes);
       const r = await handleSaveRequest(
         {
           files: [
@@ -789,7 +829,58 @@ describe("handleSaveRequest", () => {
       expect(r.status).toBe(409);
       const p = r.payload as { reason: string; failedPath: string; currentHash: string };
       expect(p.reason).toBe("already-exists");
-      expect(p.currentHash).toBe(pngHash());
+      expect(p.failedPath).toBe(ASSET_PATH);
+      // The currentHash returned is the on-disk file's hash, not the payload's.
+      expect(p.currentHash).not.toBe(pngHash());
+      // On-disk file untouched.
+      expect(fs.readFileSync(abs).equals(differentBytes)).toBe(true);
+    });
+
+    it("entity-md + already-existing identical-bytes asset → entity-md still writes", async () => {
+      // The original bug: a save batch that included world.yaml + entity-md +
+      // already-on-disk asset uploads was rolled back ENTIRELY because the
+      // asset 409'd. Now the asset skip is silent, so the rest of the batch
+      // lands as expected.
+      const assetAbs = path.join(tmp, ASSET_PATH);
+      fs.mkdirSync(path.dirname(assetAbs), { recursive: true });
+      fs.writeFileSync(assetAbs, PNG_BYTES);
+      const mdPath = "content/world/notes/co-batch.md";
+      const r = await handleSaveRequest(
+        {
+          files: [
+            file({ path: mdPath, content: "---\ntitle: x\n---\nBody", kind: "entity-md", baseHash: null }),
+            file({
+              path: ASSET_PATH,
+              content: PNG_DATA_URL,
+              kind: "asset-binary",
+              baseHash: null,
+            }),
+          ],
+        },
+        tmp,
+      );
+      expect(r.status).toBe(200);
+      expect(fs.existsSync(path.join(tmp, mdPath))).toBe(true);
+      expect(fs.readFileSync(assetAbs).equals(PNG_BYTES)).toBe(true);
+    });
+
+    it("text kind with baseHash null still 409s on existing file (no asset-style skip)", async () => {
+      // Only asset-binary gets the skip-if-identical contract. world.yaml and
+      // entity-md with baseHash: null still mean "I expect to create this
+      // fresh" — an existing file is a real conflict and the editor should
+      // reconcile (e.g. by reloading canon to pick up the new baseline).
+      const mdPath = "content/world/notes/strict.md";
+      const abs = path.join(tmp, mdPath);
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, "existing body");
+      const r = await handleSaveRequest(
+        { files: [file({ path: mdPath, content: "existing body", kind: "entity-md", baseHash: null })] },
+        tmp,
+      );
+      expect(r.status).toBe(409);
+      const p = r.payload as { reason: string; failedPath: string };
+      expect(p.reason).toBe("already-exists");
+      expect(p.failedPath).toBe(mdPath);
     });
 
     it("baseHash matches → overwrites successfully", async () => {

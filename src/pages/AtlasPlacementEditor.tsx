@@ -436,13 +436,30 @@ export default function AtlasPlacementEditor() {
   const placed = filtered.filter((e) => effectiveCoord(e.id));
   const unplaced = filtered.filter((e) => !effectiveCoord(e.id));
 
-  /** Merge a partial override into the local draft. Undoable. */
+  /** Merge a partial override into the local draft. Undoable.
+   *
+   *  A "current" baseline is normally either a prior override or the canon
+   *  placement. For a brand-new pin (no canon, no prior override), the caller
+   *  must supply both x AND y in the patch — that's the create-from-scratch
+   *  contract. Label-only / nudge / pin-style updates still require a
+   *  baseline (and silently no-op without one, since they have nothing to
+   *  attach to). The earlier behaviour dropped create-from-scratch on the
+   *  floor while still firing the "Placed X" toast — see plan §2. */
   const mutateOverride = useCallback((entityId: string, patch: Partial<OverrideValue>, label?: string) => {
     if (!activeMap) return;
     setOverridesUndoable((o) => {
       const k = overrideKey(activeMap.id, entityId);
       const current = (k in o ? o[k] : null) ?? canonPlacement(activeMap.id, entityId);
-      if (!current) return o;
+      if (!current) {
+        if (typeof patch.x !== "number" || typeof patch.y !== "number") return o;
+        const fresh: OverrideValue = {
+          x: patch.x,
+          y: patch.y,
+          label: patch.label,
+          pin: patch.pin,
+        };
+        return { ...o, [k]: fresh };
+      }
       const merged: OverrideValue = {
         x: patch.x ?? current.x,
         y: patch.y ?? current.y,
