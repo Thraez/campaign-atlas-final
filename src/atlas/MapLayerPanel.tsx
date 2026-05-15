@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import JSZip from "jszip";
-import { Upload, Link as LinkIcon, Trash2, Maximize2, Minimize2, Crosshair, RotateCcw, Lock, Unlock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, FileCode, Copy, Eraser, Package } from "lucide-react";
+import { Upload, Link as LinkIcon, Trash2, Maximize2, Minimize2, Crosshair, RotateCcw, Lock, Unlock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, FileCode, Copy, Eraser, Package, Move } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ import { ExportChecklistDialog, useExportChecklist } from "./ExportChecklistDial
 import { normalizeAtlasAssetUrl } from "./url";
 import { validatePatchYaml } from "./yaml/validatePatch";
 import { buildWorldMapPatch } from "./yaml/buildPatches";
+import { centerAnchoredResize } from "./layerGeometry";
 
 interface Props {
   map: MapDocument;
@@ -30,6 +31,12 @@ interface Props {
   onRemove: (id: string) => void;
   onClearAll: () => void;
   onSetMapSize?: (w: number, h: number) => void;
+  // Phase 1B: editor-owned drag/resize state. When undefined, the panel
+  // falls back to an internal lockAspect toggle (legacy behavior).
+  editGeometry?: boolean;
+  setEditGeometry?: (v: boolean) => void;
+  lockAspect?: boolean;
+  setLockAspect?: (v: boolean) => void;
 }
 
 const NUDGE_STEPS = [100, 1000, 10000];
@@ -76,7 +83,13 @@ export function MapLayerPanel(props: Props) {
   const { map, mergedLayers, localLayers, selectedId, setSelectedId, onAddFiles, onAddUrl, onEditBuiltin, onUpdate, onDuplicate, onRemove, onClearAll, onSetMapSize } = props;
   const fileInput = useRef<HTMLInputElement>(null);
   const [urlDraft, setUrlDraft] = useState("");
-  const [lockAspect, setLockAspect] = useState(true);
+  // When the editor passes lockAspect/setLockAspect, mirror them; otherwise
+  // keep local state (legacy code paths that don't wire the props yet).
+  const [lockAspectInternal, setLockAspectInternal] = useState(true);
+  const lockAspect = props.lockAspect ?? lockAspectInternal;
+  const setLockAspect = props.setLockAspect ?? setLockAspectInternal;
+  const editGeometry = props.editGeometry ?? false;
+  const setEditGeometry = props.setEditGeometry;
   const [locked, setLocked] = useState(false);
   const checklist = useExportChecklist();
 
@@ -104,6 +117,16 @@ export function MapLayerPanel(props: Props) {
     patch({ width: Math.max(1, Math.round(w)), height: Math.max(1, Math.round(h)) });
   };
 
+  /**
+   * Phase 1B B3: center-anchored resize. Recomputes X/Y so the layer's
+   * geometric center stays fixed across the size change — preset buttons
+   * (50/75/100/.../Fit) no longer drift the layer toward the top-left.
+   */
+  const setSizeCenterAnchored = (w: number, h: number) => {
+    if (!selected) return;
+    patch(centerAnchoredResize(selected, w, h));
+  };
+
   const nudge = (dx: number, dy: number) => {
     if (!selected) return;
     patch({ x: selected.x + dx, y: selected.y + dy });
@@ -113,11 +136,11 @@ export function MapLayerPanel(props: Props) {
     if (!selected) return;
     const w = selected.width * factor;
     const h = lockAspect ? w / aspect : selected.height * factor;
-    setSize(w, h);
+    setSizeCenterAnchored(w, h);
   };
 
-  const fitWidth = () => selected && setSize(map.width, lockAspect ? map.width / aspect : selected.height);
-  const fitHeight = () => selected && setSize(lockAspect ? map.height * aspect : selected.width, map.height);
+  const fitWidth = () => selected && setSizeCenterAnchored(map.width, lockAspect ? map.width / aspect : selected.height);
+  const fitHeight = () => selected && setSizeCenterAnchored(lockAspect ? map.height * aspect : selected.width, map.height);
 
   const exportZip = async () => {
     const uploads = localLayers.filter((l) => l.origin === "upload" && l.dataUrl);
@@ -206,6 +229,17 @@ export function MapLayerPanel(props: Props) {
             {map.width}×{map.height}
           </div>
         </div>
+        {setEditGeometry && (
+          <Button
+            size="sm"
+            variant={editGeometry ? "default" : "outline"}
+            className="w-full gap-1.5 h-8 text-xs"
+            onClick={() => setEditGeometry(!editGeometry)}
+            title="When on, click a layer to select it, then drag the body or corner handles to reposition / resize. Hold Shift to lock aspect, Alt to scale from center. Esc cancels."
+          >
+            <Move className="h-3.5 w-3.5" /> Edit geometry {editGeometry ? "(on)" : "(off)"}
+          </Button>
+        )}
         <div className="text-xs text-muted-foreground">
           Edits here are <strong>local browser drafts</strong>. Export the patch and commit the YAML + asset files to publish.
         </div>

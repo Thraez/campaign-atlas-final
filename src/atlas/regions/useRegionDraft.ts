@@ -6,8 +6,9 @@
  * Persistence: regions remain in `world.yaml`. The hook only tracks LOCAL
  * draft changes; export goes through buildPatches/dumpYaml as usual.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MapDocument, Point, Region } from "@/atlas/content/schema";
+import type { UndoStackAPI } from "@/atlas/useUndoStack";
 
 export interface RegionDraft {
   /** Per-id partial overrides applied to existing canon regions. */
@@ -72,11 +73,44 @@ function centroid(points: Point[]): Point {
   return [sx / points.length, sy / points.length];
 }
 
-export function useRegionDraft(map: MapDocument | undefined, opts: { entityIds?: Set<string>; dmEntityIds?: Set<string> } = {}): RegionDraftAPI {
+export function useRegionDraft(
+  map: MapDocument | undefined,
+  opts: { entityIds?: Set<string>; dmEntityIds?: Set<string> } = {},
+  undoStack?: UndoStackAPI,
+): RegionDraftAPI {
   const [draft, setDraft] = useState<RegionDraft>(EMPTY);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [draftPoints, setDraftPoints] = useState<Point[]>([]);
+
+  // Synchronous mirror of `draft` so consecutive mutations and undo callbacks
+  // can read the latest state without waiting for React to flush.
+  const draftRef = useRef(draft);
+  useEffect(() => { draftRef.current = draft; }, [draft]);
+
+  const applyDraft = useCallback((next: RegionDraft) => {
+    draftRef.current = next;
+    setDraft(next);
+  }, []);
+
+  /**
+   * Mutate the region draft and (optionally) push an undo entry capturing the
+   * snapshot before/after. Use this in place of setDraft for any mutation
+   * that the DM should be able to Cmd+Z.
+   */
+  const mutateDraft = useCallback((compute: (prev: RegionDraft) => RegionDraft, label: string) => {
+    const before = draftRef.current;
+    const after = compute(before);
+    if (after === before) return;
+    applyDraft(after);
+    if (undoStack) {
+      undoStack.push({
+        undo: () => applyDraft(before),
+        redo: () => applyDraft(after),
+        label,
+      });
+    }
+  }, [applyDraft, undoStack]);
 
   const baseRegions = map?.regions ?? [];
 
@@ -92,7 +126,6 @@ export function useRegionDraft(map: MapDocument | undefined, opts: { entityIds?:
     return out;
   }, [baseRegions, draft, map]);
 
-  const allIds = useMemo(() => new Set(effective.map((r) => r.id)), [effective]);
   const projectIds = useMemo(() => new Set(baseRegions.map((r) => r.id).concat(draft.added.map((r) => r.id))), [baseRegions, draft.added]);
 
   const dirty = draft.added.length > 0 || draft.deleted.length > 0 || Object.keys(draft.edits).length > 0;
@@ -116,15 +149,15 @@ export function useRegionDraft(map: MapDocument | undefined, opts: { entityIds?:
       fillOpacity: 0.18,
       strokeOpacity: 0.85,
     };
-    setDraft((d) => ({ ...d, added: [...d.added, region] }));
+    mutateDraft((d) => ({ ...d, added: [...d.added, region] }), `add region ${id}`);
     setDrawing(false);
     setDraftPoints([]);
     setSelectedId(id);
     return id;
-  }, [draftPoints, map, effective.length, projectIds]);
+  }, [draftPoints, map, effective.length, projectIds, mutateDraft]);
 
   const patch = useCallback((id: string, partial: Partial<Region>) => {
-    setDraft((d) => {
+    mutateDraft((d) => {
       // Added region? mutate it in place.
       const addedIdx = d.added.findIndex((r) => r.id === id);
       if (addedIdx >= 0) {
@@ -133,8 +166,8 @@ export function useRegionDraft(map: MapDocument | undefined, opts: { entityIds?:
         return { ...d, added };
       }
       return { ...d, edits: { ...d.edits, [id]: { ...(d.edits[id] ?? {}), ...partial } } };
-    });
-  }, []);
+    }, `patch region ${id}`);
+  }, [mutateDraft]);
 
   const getEffective = useCallback((id: string): Region | null => effective.find((r) => r.id === id) ?? null, [effective]);
 
@@ -172,13 +205,13 @@ export function useRegionDraft(map: MapDocument | undefined, opts: { entityIds?:
       points: cur.points.map(([x, y]) => [x + offset[0], y + offset[1]] as Point),
     };
     void c;
-    setDraft((d) => ({ ...d, added: [...d.added, copy] }));
+    mutateDraft((d) => ({ ...d, added: [...d.added, copy] }), `duplicate region ${id}`);
     setSelectedId(newId);
     return newId;
-  }, [getEffective, map, projectIds]);
+  }, [getEffective, map, projectIds, mutateDraft]);
 
   const remove = useCallback((id: string) => {
-    setDraft((d) => {
+    mutateDraft((d) => {
       const addedIdx = d.added.findIndex((r) => r.id === id);
       if (addedIdx >= 0) {
         return { ...d, added: d.added.filter((r) => r.id !== id) };
@@ -186,11 +219,15 @@ export function useRegionDraft(map: MapDocument | undefined, opts: { entityIds?:
       const { [id]: _drop, ...restEdits } = d.edits;
       void _drop;
       return { ...d, edits: restEdits, deleted: d.deleted.includes(id) ? d.deleted : [...d.deleted, id] };
-    });
+    }, `remove region ${id}`);
     setSelectedId((s) => (s === id ? null : s));
-  }, []);
+  }, [mutateDraft]);
 
-  const reset = useCallback(() => { setDraft(EMPTY); setSelectedId(null); cancelDraw(); }, [cancelDraw]);
+  // reset() is NOT undoable — it's called both for save cleanup and map
+  // switching. For save cleanup, the editor pushes its own undo entry that
+  // captures pre-save drafts; for map switching, the user confirms loss
+  // explicitly. Either way, an undo here would surprise the DM more than help.
+  const reset = useCallback(() => { applyDraft(EMPTY); setSelectedId(null); cancelDraw(); }, [applyDraft, cancelDraw]);
 
   const issues = useMemo<RegionIssue[]>(() => {
     const out: RegionIssue[] = [];

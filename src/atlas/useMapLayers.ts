@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
+import type { UndoStackAPI } from "@/atlas/useUndoStack";
 
 /** A layer authored locally in the editor. Either a freshly uploaded image
  *  (object URL preview) or a URL/path the user typed. */
@@ -68,9 +69,44 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-export function useMapLayers(map: MapDocument | undefined) {
+/**
+ * Manages per-map local layer overrides (uploads, URL adds, edits of built-in
+ * layers). When an `undoStack` is supplied, every mutation pushes a
+ * snapshot-based undo entry so Cmd+Z reverts the geometry change.
+ *
+ * The hook keeps a synchronous `byMapRef` mirror of the latest state. Mutation
+ * helpers compute the next state explicitly (before/after) rather than using
+ * an updater function — this lets undo capture the exact pair without
+ * relying on React batching timing.
+ */
+export function useMapLayers(map: MapDocument | undefined, undoStack?: UndoStackAPI) {
   const [byMap, setByMap] = useState<Stored>(() => loadStored());
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const byMapRef = useRef(byMap);
+  useEffect(() => { byMapRef.current = byMap; }, [byMap]);
+
+  /** Bypass-undo setter used by undo/redo callbacks themselves. */
+  const applyByMap = useCallback((next: Stored) => {
+    byMapRef.current = next;
+    setByMap(next);
+  }, []);
+
+  /** Snapshot-driven mutation: computes the next state explicitly so undo can
+   *  pair before/after without depending on React state batching. */
+  const mutateByMap = useCallback((compute: (prev: Stored) => Stored, label: string) => {
+    const before = byMapRef.current;
+    const after = compute(before);
+    if (after === before) return;
+    applyByMap(after);
+    if (undoStack) {
+      undoStack.push({
+        undo: () => applyByMap(before),
+        redo: () => applyByMap(after),
+        label,
+      });
+    }
+  }, [applyByMap, undoStack]);
 
   // Persist. Uploads now carry a dataUrl (set when the user uploaded the file)
   // so previews survive a reload. Object URLs are still stripped — they're dead
@@ -106,11 +142,6 @@ export function useMapLayers(map: MapDocument | undefined) {
     return [...base, ...localLayers].sort((a, b) => a.zIndex - b.zIndex);
   }, [map, localLayers]);
 
-  const setLayers = useCallback((updater: (prev: LocalLayer[]) => LocalLayer[]) => {
-    if (!map) return;
-    setByMap((s) => ({ ...s, [map.id]: updater(s[map.id] ?? []) }));
-  }, [map]);
-
   const addUploaded = useCallback(async (files: File[]) => {
     if (!map) return;
     const additions: LocalLayer[] = await Promise.all(files.map(async (file, i) => {
@@ -137,16 +168,17 @@ export function useMapLayers(map: MapDocument | undefined) {
         dataUrl,
       };
     }));
-    setLayers((prev) => [...prev, ...additions]);
+    mutateByMap((s) => ({ ...s, [map.id]: [...(s[map.id] ?? []), ...additions] }), "add uploaded layers");
     if (additions[0]) setSelectedId(additions[0].id);
-  }, [map, setLayers]);
+  }, [map, mutateByMap]);
 
   const addUrl = useCallback(async (src: string) => {
     if (!map || !src.trim()) return;
     const trimmed = src.trim();
     const id = `url-${Date.now()}`;
     const dims = await readImageSize(trimmed).catch(() => null);
-    setLayers((prev) => [...prev, {
+    const existing = byMapRef.current[map.id] ?? [];
+    const additions: LocalLayer = {
       id,
       src: trimmed,
       x: 0,
@@ -154,65 +186,86 @@ export function useMapLayers(map: MapDocument | undefined) {
       width: dims?.w ?? map.width,
       height: dims?.h ?? map.height,
       opacity: 1,
-      zIndex: (map.layers.length + prev.length + 1) * 10,
+      zIndex: (map.layers.length + existing.length + 1) * 10,
       origin: "url",
       name: trimmed.split("/").pop() ?? trimmed,
-    }]);
+    };
+    mutateByMap((s) => ({ ...s, [map.id]: [...(s[map.id] ?? []), additions] }), "add URL layer");
     setSelectedId(id);
     if (!dims) {
       // Caller (UI) can show a toast; we still add the layer so the user can fix the URL.
     }
-  }, [map, setLayers]);
+  }, [map, mutateByMap]);
 
   const duplicateLayer = useCallback((id: string) => {
     if (!map) return;
-    const src = (byMap[map.id] ?? []).find((l) => l.id === id)
+    const src = (byMapRef.current[map.id] ?? []).find((l) => l.id === id)
       ?? (map.layers.find((l) => l.id === id) ? { ...map.layers.find((l) => l.id === id)!, origin: "edit" as const } : null);
     if (!src) return;
     const newId = `${src.id}-copy-${Date.now().toString(36).slice(-4)}`;
     const dup: LocalLayer = { ...src, id: newId, x: src.x + 200, y: src.y + 200, zIndex: src.zIndex + 1, origin: "upload" === src.origin ? "upload" : (src as LocalLayer).origin ?? "edit" };
-    setLayers((prev) => [...prev, dup]);
+    mutateByMap((s) => ({ ...s, [map.id]: [...(s[map.id] ?? []), dup] }), `duplicate layer ${id}`);
     setSelectedId(newId);
-  }, [map, byMap, setLayers]);
+  }, [map, mutateByMap]);
 
   const editBuiltinLayer = useCallback((layerId: string) => {
     if (!map) return;
     const builtin = map.layers.find((l) => l.id === layerId);
     if (!builtin) return;
-    setLayers((prev) => {
-      if (prev.some((l) => l.id === layerId)) return prev;
-      return [...prev, { ...builtin, origin: "edit" }];
-    });
+    mutateByMap((s) => {
+      const cur = s[map.id] ?? [];
+      if (cur.some((l) => l.id === layerId)) return s;
+      return { ...s, [map.id]: [...cur, { ...builtin, origin: "edit" }] };
+    }, `edit built-in layer ${layerId}`);
     setSelectedId(layerId);
-  }, [map, setLayers]);
+  }, [map, mutateByMap]);
 
   const updateLayer = useCallback((id: string, patch: Partial<MapLayer>) => {
-    setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
-  }, [setLayers]);
+    if (!map) return;
+    mutateByMap((s) => {
+      const cur = s[map.id] ?? [];
+      const next = cur.map((l) => (l.id === id ? { ...l, ...patch } : l));
+      // No-op if nothing actually changed — avoid recording empty undo entries
+      // when the user clicks a no-op nudge step.
+      if (next === cur || cur.every((l, i) => l === next[i])) return s;
+      return { ...s, [map.id]: next };
+    }, `update layer ${id}`);
+  }, [map, mutateByMap]);
 
   const removeLayer = useCallback((id: string) => {
-    setLayers((prev) => {
-      const target = prev.find((l) => l.id === id);
-      if (target?.isObjectUrl) URL.revokeObjectURL(target.src);
-      return prev.filter((l) => l.id !== id);
-    });
+    if (!map) return;
+    mutateByMap((s) => {
+      const cur = s[map.id] ?? [];
+      const target = cur.find((l) => l.id === id);
+      if (!target) return s;
+      if (target.isObjectUrl) URL.revokeObjectURL(target.src);
+      return { ...s, [map.id]: cur.filter((l) => l.id !== id) };
+    }, `remove layer ${id}`);
     setSelectedId((s) => (s === id ? null : s));
-  }, [setLayers]);
+  }, [map, mutateByMap]);
 
   const clearForMap = useCallback(() => {
-    setLayers((prev) => {
-      prev.forEach((l) => l.isObjectUrl && URL.revokeObjectURL(l.src));
-      return [];
-    });
+    if (!map) return;
+    mutateByMap((s) => {
+      const cur = s[map.id] ?? [];
+      if (cur.length === 0) return s;
+      cur.forEach((l) => l.isObjectUrl && URL.revokeObjectURL(l.src));
+      return { ...s, [map.id]: [] };
+    }, "clear local layers (this map)");
     setSelectedId(null);
-  }, [setLayers]);
+  }, [map, mutateByMap]);
 
   const clearAll = useCallback(() => {
-    Object.values(byMap).forEach((arr) => arr.forEach((l) => l.isObjectUrl && URL.revokeObjectURL(l.src)));
-    setByMap({});
+    mutateByMap((s) => {
+      const empty: Stored = {};
+      const hadAny = Object.keys(s).length > 0;
+      if (!hadAny) return s;
+      Object.values(s).forEach((arr) => arr.forEach((l) => l.isObjectUrl && URL.revokeObjectURL(l.src)));
+      return empty;
+    }, "clear all local layers");
     setSelectedId(null);
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* noop */ }
-  }, [byMap]);
+  }, [mutateByMap]);
 
   return {
     localLayers,
