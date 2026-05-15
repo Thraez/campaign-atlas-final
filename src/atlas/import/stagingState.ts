@@ -28,7 +28,7 @@ import yaml from "js-yaml";
  */
 function readFrontmatter(raw: string): { data: Record<string, unknown> } {
   // Frontmatter must be the very first thing in the file. Tolerate a BOM.
-  const stripped = raw.replace(/^﻿/, "");
+  const stripped = raw.replace(/^\uFEFF/, "");
   const m = stripped.match(/^---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/);
   if (!m) return { data: {} };
   const parsed = yaml.load(m[1]);
