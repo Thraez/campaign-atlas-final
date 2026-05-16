@@ -15,9 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { TabFrame } from "./TabFrame";
-import { dumpYaml, patchHeader } from "@/atlas/yaml/dump";
-import { validatePatchYaml } from "@/atlas/yaml/validatePatch";
-import { downloadText } from "./download";
+import { dumpYaml } from "@/atlas/yaml/dump";
 import { ROUTE_MODES, routeToYamlObject, type RouteDraftAPI } from "@/atlas/routes/useRouteDraft";
 
 interface Props {
@@ -26,14 +24,12 @@ interface Props {
   api: RouteDraftAPI;
   blockingCount?: number;
   warningCount?: number;
-  lastExportAt: number | null;
-  onExported: () => void;
   onFitTo?: (pts: Point[]) => void;
 }
 
 type WaypointMode = "coord" | "entity" | "mixed";
 
-export function RoutesTab({ project, map, api, blockingCount, warningCount, lastExportAt, onExported, onFitTo }: Props) {
+export function RoutesTab({ project, map, api, blockingCount, warningCount, onFitTo }: Props) {
   const { effective, draft, dirty, dirtyCount, selectedId, setSelectedId, drawing, draftWaypoints, startDraw, cancelDraw, addDraftEntity, removeLastDraftPoint, finishDraw, patch, removeWaypoint, setWaypointEntity, duplicate, remove, reset, issues, resolveRoute } = api;
   const [advancedYaml, setAdvancedYaml] = useState(false);
   const [waypointMode, setWaypointMode] = useState<WaypointMode>("coord");
@@ -60,25 +56,6 @@ export function RoutesTab({ project, map, api, blockingCount, warningCount, last
     return () => window.removeEventListener("keydown", onKey);
   }, [drawing, finishDraw, cancelDraw, removeLastDraftPoint]);
 
-  const exportPatch = () => {
-    if (!effective.length) { toast.warning("No routes to export."); return; }
-    const blocking = issues.filter((i) => i.severity === "blocking");
-    if (blocking.length) { toast.error(blocking[0].message); return; }
-    const content = patchHeader({
-      title: `Routes patch — ${map.name}`,
-      subject: `world.yaml > maps[id=${map.id}].routes`,
-      applyTo: `content/<world>/_atlas/world.yaml (replace this map's routes: list)`,
-      notes: [
-        "Replaces the entire routes: list for this map — preserves layers/regions/fog.",
-        dirtyCount > 0 ? `${dirtyCount} local change${dirtyCount === 1 ? "" : "s"} included.` : "",
-      ].filter(Boolean),
-    }) + yamlBlock;
-    const result = validatePatchYaml(content, "world-map");
-    if (!result.ok) { toast.error(result.errors[0]); return; }
-    downloadText(`routes-patch-${map.id}.yaml`, content, "text/yaml");
-    onExported();
-  };
-
   return (
     <TabFrame
       title="Routes"
@@ -86,9 +63,6 @@ export function RoutesTab({ project, map, api, blockingCount, warningCount, last
       localDraftCount={dirtyCount}
       blockingCount={blockingCount}
       warningCount={warningCount}
-      lastExportAt={lastExportAt}
-      onExport={exportPatch}
-      exportDisabled={effective.length === 0}
       rawYamlPreview={advancedYaml ? yamlBlock : undefined}
     >
       <div className="space-y-3">

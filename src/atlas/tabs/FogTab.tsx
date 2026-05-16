@@ -16,9 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TabFrame } from "./TabFrame";
-import { dumpYaml, patchHeader } from "@/atlas/yaml/dump";
-import { validatePatchYaml } from "@/atlas/yaml/validatePatch";
-import { downloadText } from "./download";
+import { dumpYaml } from "@/atlas/yaml/dump";
 import { fogToYamlObject, type FogDraftAPI } from "@/atlas/fog/useFogDraft";
 
 interface Props {
@@ -32,11 +30,9 @@ interface Props {
   setShowFogPreview: (v: boolean) => void;
   blockingCount?: number;
   warningCount?: number;
-  lastExportAt: number | null;
-  onExported: () => void;
 }
 
-export function FogTab({ map, project, api, regionApi, routeApi, showFogPreview, setShowFogPreview, blockingCount, warningCount, lastExportAt, onExported }: Props) {
+export function FogTab({ map, project, api, regionApi, routeApi, showFogPreview, setShowFogPreview, blockingCount, warningCount }: Props) {
   const { fog, dirty, setEnabled, setColor, tool, setTool, draftPoints, addDraftPoint: _addDraftPoint, removeLastDraftPoint, cancelDraft, finishDraftPolygon, finishDraftCircle, removeReveal, clearReveals, revealRegion, revealAroundRoute, revealAroundPin, reset, issues } = api;
   void _addDraftPoint;
   const [advancedYaml, setAdvancedYaml] = useState(false);
@@ -64,21 +60,6 @@ export function FogTab({ map, project, api, regionApi, routeApi, showFogPreview,
     return () => window.removeEventListener("keydown", onKey);
   }, [tool, finishDraftPolygon, finishDraftCircle, cancelDraft, removeLastDraftPoint, circleRadius]);
 
-  const exportPatch = () => {
-    const blocking = issues.filter((i) => i.severity === "blocking");
-    if (blocking.length) { toast.error(blocking[0].message); return; }
-    const content = patchHeader({
-      title: `Fog patch — ${map.name}`,
-      subject: `world.yaml > maps[id=${map.id}].fog`,
-      applyTo: `content/<world>/_atlas/world.yaml (replace this map's fog: block)`,
-      notes: ["Replaces the entire fog: block — preserves layers/regions/routes."],
-    }) + yamlBlock;
-    const result = validatePatchYaml(content, "world-map");
-    if (!result.ok) { toast.error(result.errors[0]); return; }
-    downloadText(`fog-patch-${map.id}.yaml`, content, "text/yaml");
-    onExported();
-  };
-
   const placementsByEntity = useMemo(() => {
     const m = new Map<string, [number, number]>();
     for (const p of project.placements) if (p.mapId === map.id) m.set(p.entityId, [p.x, p.y]);
@@ -92,8 +73,6 @@ export function FogTab({ map, project, api, regionApi, routeApi, showFogPreview,
       localDraftCount={dirty ? 1 : 0}
       blockingCount={blockingCount}
       warningCount={warningCount}
-      lastExportAt={lastExportAt}
-      onExport={exportPatch}
       rawYamlPreview={advancedYaml ? yamlBlock : undefined}
     >
       <div className="space-y-3">

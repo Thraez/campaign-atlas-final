@@ -29,6 +29,7 @@
 import type { Plugin } from "vite";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import matter from "gray-matter";
 import yaml from "js-yaml";
 import { isWritableAssetPath, isWritableSourcePath } from "../src/atlas/save/sourcePathAllowlist";
@@ -204,16 +205,11 @@ export interface HandleSaveOpts {
 }
 
 function defaultHash(content: string): string {
-  // Lazy require so the module loads cleanly in non-Node test environments.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const nodeCrypto = require("node:crypto") as typeof import("node:crypto");
-  return "sha256:" + nodeCrypto.createHash("sha256").update(content, "utf8").digest("hex");
+  return "sha256:" + createHash("sha256").update(content, "utf8").digest("hex");
 }
 
 function hashBytes(buf: Buffer): string {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const nodeCrypto = require("node:crypto") as typeof import("node:crypto");
-  return "sha256:" + nodeCrypto.createHash("sha256").update(buf).digest("hex");
+  return "sha256:" + createHash("sha256").update(buf).digest("hex");
 }
 
 export async function handleSaveRequest(

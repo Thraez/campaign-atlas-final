@@ -33,7 +33,6 @@ import {
   ChevronRight,
   ArrowRight,
   FileDown,
-  Package,
 } from "lucide-react";
 
 interface Props {
@@ -45,8 +44,6 @@ interface Props {
   /** Optional navigation hooks injected by the editor. */
   onGoToMap?: (mapId: string) => void;
   onGoToEntity?: (entityId: string) => void;
-  /** Open the unified Export DM Changes modal. */
-  onExportAll?: () => void;
 }
 
 const SEVERITY_META = {
@@ -63,7 +60,6 @@ export function PublishCheckTab({
   lastExportAt,
   onGoToMap,
   onGoToEntity,
-  onExportAll,
 }: Props) {
   const report = useMemo<ValidationReport>(
     () => validateProject({ project, draftPlacements, draftMap, draftLocalLayers, lastExportAt }),
@@ -85,7 +81,6 @@ export function PublishCheckTab({
       localDraftCount={draftPlacements.length + report.meta.pendingAssetCount}
       blockingCount={report.counts.blocking}
       warningCount={report.counts.warning}
-      lastExportAt={lastExportAt}
     >
       {/* Top status banner */}
       <div
@@ -113,17 +108,11 @@ export function PublishCheckTab({
         <div className="flex flex-wrap gap-x-4 gap-y-0.5">
           {report.meta.atlasVersion && <span>Atlas <code className="font-mono">{report.meta.atlasVersion}</code></span>}
           {report.meta.builtAt && <span>Built {new Date(report.meta.builtAt).toLocaleString()}</span>}
-          <span>{lastExportAt ? `Exported ${new Date(lastExportAt).toLocaleTimeString()}` : "No export yet"}</span>
         </div>
       </div>
 
       {/* Action bar */}
       <div className="flex flex-wrap gap-1.5">
-        {onExportAll && (
-          <Button size="sm" variant="default" onClick={onExportAll} className="h-7 gap-1 text-xs">
-            <Package className="h-3.5 w-3.5" /> Export all DM changes
-          </Button>
-        )}
         <Button size="sm" variant="outline" onClick={downloadReport} className="h-7 gap-1 text-xs">
           <FileDown className="h-3.5 w-3.5" /> Download report
         </Button>

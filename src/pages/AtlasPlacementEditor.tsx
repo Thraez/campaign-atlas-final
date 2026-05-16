@@ -25,10 +25,12 @@ import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
 import type { FileChange } from "@/atlas/save/localFsSave";
 import { SaveStatusChip, dirtyFileSummary } from "@/atlas/SaveStatusChip";
+import { CanonicalSaveError } from "@/atlas/save/canonicalPlacementSave";
 import {
-  buildCanonicalPlacementChanges,
-  CanonicalSaveError,
-} from "@/atlas/save/canonicalPlacementSave";
+  type FrontmatterDraft,
+  entityFrontmatterPatches,
+  buildCanonicalEntityChanges,
+} from "@/atlas/save/canonicalEntitySave";
 import { useWorldYamlBaseline, worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
 import { buildFullWorldYaml } from "@/atlas/yaml/buildFullWorldYaml";
 import { ImportPanel } from "@/atlas/import/ImportPanel";
@@ -519,6 +521,17 @@ export default function AtlasPlacementEditor() {
     }
   };
 
+  // Pin placement click-through for interactive map-image layers. The base
+  // image overlay is `interactive` (so it can be selected/edited), which
+  // means it swallows map clicks — without this, clicking the map to drop a
+  // pin never reaches `onMapClick`. Returns true when it placed (so the
+  // overlay stops propagation and the pin isn't placed twice).
+  const handleLayerBackgroundClick = (latlng: L.LatLng): boolean => {
+    if (!pendingId) return false;
+    onMapClick(latlng.lng, latlng.lat);
+    return true;
+  };
+
   const goTo = (entityId: string) => {
     const c = effectiveCoord(entityId);
     if (!c || !activeMap) return;
@@ -547,16 +560,14 @@ export default function AtlasPlacementEditor() {
   const [mapImportOpen, setMapImportOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<FileChange[]>([]);
+  // Entities-tab frontmatter drafts, lifted here so the unified Save writes
+  // them to disk (Export Patch removed). Keyed by entity id.
+  const [entityDrafts, setEntityDrafts] = useState<Record<string, FrontmatterDraft>>({});
   // Timestamp of the most recent local edit, and of the most recent successful
   // canonical save. When editAt > saveAt, the unsaved-changes banner shows.
   const [lastLocalEditAt, setLastLocalEditAt] = useState<number | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  // Per-tab last-export timestamps so each tab header can show its own status.
-  // Tabs that still write YAML patches (Regions/Routes/Fog/Entities/MapLayers)
-  // use this; the Pins tab no longer exports — Save covers that path now.
-  const [tabExportAt, setTabExportAt] = useState<Record<string, number>>({});
-  const markTabExport = (tab: string) => setTabExportAt((s) => ({ ...s, [tab]: Date.now() }));
 
   // A13 dirty signals: collapse per-tab editor state into a single
   // "world.yaml is dirty" boolean. Each per-tab draft hook already exposes a
@@ -660,16 +671,21 @@ export default function AtlasPlacementEditor() {
   const onSaveClick = async () => {
     if (!project || !activeMap) return;
     const drafts = buildDraftPlacements();
-    if (drafts.length === 0 && !worldYamlDirty) {
+    const fmPatches = entityFrontmatterPatches(entityDrafts, project.entities);
+    if (drafts.length === 0 && fmPatches.length === 0 && !worldYamlDirty) {
       toast.info("No changes to save");
       return;
     }
     setSaveError(null);
     const entitiesById = new Map(project.entities.map((e) => [e.id, e]));
     try {
-      const entityChanges = drafts.length > 0
-        ? await buildCanonicalPlacementChanges(drafts, entitiesById)
-        : [];
+      // One FileChange per entity .md path even when an entity is edited in
+      // BOTH the Pins tab (placements) and the Entities tab (frontmatter) —
+      // the save endpoint rejects duplicate paths.
+      const entityChanges = await buildCanonicalEntityChanges(
+        { placements: drafts, frontmatter: fmPatches },
+        entitiesById,
+      );
       const fileChanges: FileChange[] = [...entityChanges];
 
       if (worldYamlDirty && activeWorldId) {
@@ -736,7 +752,10 @@ export default function AtlasPlacementEditor() {
     dirtyCount > 0 &&
     lastLocalEditAt !== null &&
     (lastSavedAt === null || lastLocalEditAt > lastSavedAt);
-  const hasUnsavedChanges = pinSideUnsaved || worldYamlDirty;
+  // Entities-tab edits are dirty the moment a draft exists (like the
+  // world.yaml gate) — they fire immediately so the unsaved banner shows.
+  const entityDraftsDirty = Object.keys(entityDrafts).length > 0;
+  const hasUnsavedChanges = pinSideUnsaved || worldYamlDirty || entityDraftsDirty;
 
   // A12c: 5-minute idle nudge. Fires once when the editor has had dirty
   // state for at least 5 minutes since the last save, with at least one
@@ -1056,6 +1075,7 @@ export default function AtlasPlacementEditor() {
                   isSelected={isSelected}
                   lockAspect={lockAspectRatio}
                   onSelect={() => layerEditor.setSelectedId(layer.id)}
+                  onBackgroundClick={handleLayerBackgroundClick}
                   onCommit={(patch) => {
                     // Promote built-in to a local "edit" before mutating,
                     // matching MapLayerPanel.patch() behavior.
@@ -1087,7 +1107,15 @@ export default function AtlasPlacementEditor() {
                       const ll = (ev.target as L.Marker).getLatLng();
                       setCoord(e.id, { x: Math.round(ll.lng), y: Math.round(activeMap.height - ll.lat) });
                     },
-                    click: () => setPendingId(null),
+                    click: (ev) => {
+                      // While a placement is pending, clicking an existing
+                      // pin must drop the pending pin here — NOT silently
+                      // cancel the placement (the old behaviour, which made
+                      // every existing marker a dead zone for placement).
+                      if (!pendingId) return;
+                      const ll = (ev.target as L.Marker).getLatLng();
+                      onMapClick(ll.lng, ll.lat);
+                    },
                   }}
                 />
               );
@@ -1267,8 +1295,6 @@ export default function AtlasPlacementEditor() {
                 api={regionDraft}
                 blockingCount={regionIssues.blocking}
                 warningCount={regionIssues.warning}
-                lastExportAt={tabExportAt.regions ?? null}
-                onExported={() => markTabExport("regions")}
                 onFitTo={(r) => {
                   if (!r.points.length) return;
                   const cx = r.points.reduce((s, p) => s + p[0], 0) / r.points.length;
@@ -1285,8 +1311,6 @@ export default function AtlasPlacementEditor() {
                 api={routeDraft}
                 blockingCount={routeIssues.blocking}
                 warningCount={routeIssues.warning}
-                lastExportAt={tabExportAt.routes ?? null}
-                onExported={() => markTabExport("routes")}
                 onFitTo={(pts) => {
                   if (!pts.length) return;
                   const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
@@ -1307,8 +1331,6 @@ export default function AtlasPlacementEditor() {
                 setShowFogPreview={setShowFogPreview}
                 blockingCount={mapIssues.blocking}
                 warningCount={mapIssues.warning}
-                lastExportAt={tabExportAt.fog ?? null}
-                onExported={() => markTabExport("fog")}
               />
             </TabsContent>
 
@@ -1317,10 +1339,10 @@ export default function AtlasPlacementEditor() {
                 project={project}
                 blockingCount={entityIssues.blocking}
                 warningCount={entityIssues.warning}
-                lastExportAt={tabExportAt.entities ?? null}
-                onExported={() => markTabExport("entities")}
                 onImportMdFiles={importFlow.openWithFiles}
                 onPasteMarkdown={() => setPasteOpen(true)}
+                drafts={entityDrafts}
+                onDraftsChange={setEntityDrafts}
               />
             </TabsContent>
 
@@ -1387,6 +1409,15 @@ export default function AtlasPlacementEditor() {
               .filter((e) => writtenPaths.has(e.sourcePath))
               .map((e) => e.id),
           );
+          // Drafted Entities-tab edits for written files now live in canon —
+          // drop them so the tab and the unsaved banner reset.
+          if (writtenEntityIds.size > 0) {
+            setEntityDrafts((prev) => {
+              const next = { ...prev };
+              for (const id of writtenEntityIds) delete next[id];
+              return next;
+            });
+          }
           const nextOverrides: Overrides = { ...preSave.overrides };
           for (const k of Object.keys(nextOverrides)) {
             const [mid, eid] = k.split(":");

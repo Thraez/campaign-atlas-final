@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import * as nodeCrypto from "node:crypto";
 import { handleSaveRequest, type FilePayload } from "../../scripts/vite-plugin-atlas-save";
 
 let tmp: string;
@@ -35,6 +36,46 @@ describe("handleSaveRequest", () => {
     expect(payload.files).toHaveLength(1);
     expect(payload.files[0].path).toBe("content/world/notes/ok.md");
     expect(payload.files[0].hash).toMatch(/^sha256:[0-9a-f]{64}$/);
+  });
+
+  // Regression guard for the "Dynamic require of node:crypto is not
+  // supported" crash: a realistic multi-kind batch must hash every file
+  // through the real node:crypto createHash path (no dynamic require) and
+  // return sha256 hashes. If require() ever sneaks back into the bundled
+  // save plugin, this batch save throws instead of returning 200.
+  it("writes a mixed entity-md + world-yaml + asset-binary batch and hashes every file", async () => {
+    const pngDataUrl =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const r = await handleSaveRequest(
+      {
+        files: [
+          file({ path: "content/world/notes/hero.md", content: "---\natlas:\n  id: hero\n---\nBody\n" }),
+          file({
+            path: "content/world/_atlas/world.yaml",
+            content: "schemaVersion: 1\nmaps: []\n",
+            kind: "world-yaml",
+          }),
+          file({
+            path: "public/atlas/assets/maps/pin.png",
+            content: pngDataUrl,
+            kind: "asset-binary",
+          }),
+        ],
+      },
+      tmp,
+    );
+    expect(r.status).toBe(200);
+    const payload = (r as { payload: { files: Array<{ path: string; hash: string }> } }).payload;
+    expect(payload.files).toHaveLength(3);
+    // Every file hashed via the real createHash (text + byte paths) — the
+    // exact code path that crashed under the dynamic-require bug.
+    for (const f of payload.files) {
+      expect(f.hash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    }
+    expect(fs.readFileSync(path.join(tmp, "content/world/notes/hero.md"), "utf8")).toContain("id: hero");
+    expect(fs.existsSync(path.join(tmp, "content/world/_atlas/world.yaml"))).toBe(true);
+    const png = fs.readFileSync(path.join(tmp, "public/atlas/assets/maps/pin.png"));
+    expect(png.length).toBeGreaterThan(0);
   });
 
   it("rejects a disallowed path with no file written", async () => {
@@ -227,8 +268,7 @@ describe("handleSaveRequest", () => {
   describe("baseHash conflict semantics (A5)", () => {
     const sha256 = (s: string): string => {
       // Match the endpoint's defaultHash.
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const c = require("node:crypto") as typeof import("node:crypto");
+      const c = nodeCrypto;
       return "sha256:" + c.createHash("sha256").update(s, "utf8").digest("hex");
     };
 
@@ -372,8 +412,7 @@ describe("handleSaveRequest", () => {
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.writeFileSync(target, "v1");
       const sha256 = (s: string) => {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const c = require("node:crypto") as typeof import("node:crypto");
+        const c = nodeCrypto;
         return "sha256:" + c.createHash("sha256").update(s, "utf8").digest("hex");
       };
       const r = await handleSaveRequest(
@@ -414,8 +453,7 @@ describe("handleSaveRequest", () => {
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.writeFileSync(target, "v0");
       const sha256 = (s: string) => {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const c = require("node:crypto") as typeof import("node:crypto");
+        const c = nodeCrypto;
         return "sha256:" + c.createHash("sha256").update(s, "utf8").digest("hex");
       };
 
@@ -467,8 +505,7 @@ describe("handleSaveRequest", () => {
       fs.writeFileSync(ts1, "A0");
       fs.writeFileSync(ts2, "B0");
       const sha256 = (s: string) => {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const c = require("node:crypto") as typeof import("node:crypto");
+        const c = nodeCrypto;
         return "sha256:" + c.createHash("sha256").update(s, "utf8").digest("hex");
       };
       // Save A four times — should prune A's backups to last 3.
@@ -503,8 +540,7 @@ describe("handleSaveRequest", () => {
 
   describe("multi-file write with rollback (A9)", () => {
     const sha256 = (s: string) => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const c = require("node:crypto") as typeof import("node:crypto");
+      const c = nodeCrypto;
       return "sha256:" + c.createHash("sha256").update(s, "utf8").digest("hex");
     };
 
@@ -697,8 +733,7 @@ describe("handleSaveRequest", () => {
     const ASSET_PATH = "public/atlas/assets/maps/test-pin.png";
 
     function pngHash(): string {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const c = require("node:crypto") as typeof import("node:crypto");
+      const c = nodeCrypto;
       return "sha256:" + c.createHash("sha256").update(PNG_BYTES).digest("hex");
     }
 

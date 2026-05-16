@@ -47,7 +47,7 @@ export interface CanonicalSaveDeps {
 }
 
 /** Fetch the current on-disk contents of an allowlisted source file. */
-async function readSourceFile(
+export async function readSourceFile(
   relPath: string,
   fetchFn: typeof fetch,
 ): Promise<string> {

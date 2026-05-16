@@ -113,14 +113,15 @@ describe("validateProject — Publish Check", () => {
     expect(r.issues.some((i) => i.code === "region-out-of-bounds")).toBe(true);
   });
 
-  it("flags un-exported drafts", () => {
+  it("does not nag about un-exported drafts (Export Patch removed — Save writes drafts directly)", () => {
     const p = baseProject({ entities: [entity({ id: "town" })] });
     const r = validateProject({
       project: p,
       draftPlacements: [{ entityId: "town", mapId: "m1", x: 10, y: 10 }],
       lastExportAt: null,
     });
-    expect(r.issues.some((i) => i.code === "draft-not-exported")).toBe(true);
+    expect(r.issues.some((i) => i.code === "draft-not-exported")).toBe(false);
+    expect(r.issues.some((i) => i.code === "export-stale")).toBe(false);
   });
 
   it("buildPublishReport renders categorized markdown", () => {
