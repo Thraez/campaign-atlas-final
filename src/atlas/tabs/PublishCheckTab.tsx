@@ -40,7 +40,6 @@ interface Props {
   draftMap?: MapDocument;
   draftPlacements: PlacementOverride[];
   draftLocalLayers: LocalLayer[];
-  lastExportAt: number | null;
   /** Optional navigation hooks injected by the editor. */
   onGoToMap?: (mapId: string) => void;
   onGoToEntity?: (entityId: string) => void;
@@ -57,13 +56,12 @@ export function PublishCheckTab({
   draftMap,
   draftPlacements,
   draftLocalLayers,
-  lastExportAt,
   onGoToMap,
   onGoToEntity,
 }: Props) {
   const report = useMemo<ValidationReport>(
-    () => validateProject({ project, draftPlacements, draftMap, draftLocalLayers, lastExportAt }),
-    [project, draftPlacements, draftMap, draftLocalLayers, lastExportAt]
+    () => validateProject({ project, draftPlacements, draftMap, draftLocalLayers }),
+    [project, draftPlacements, draftMap, draftLocalLayers]
   );
 
   const ready = report.counts.blocking === 0;

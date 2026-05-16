@@ -47,7 +47,6 @@ export interface ValidationReport {
     mapCount: number;
     draftPlacementCount: number;
     pendingAssetCount: number;
-    lastExportAt: number | null;
   };
 }
 
@@ -57,14 +56,12 @@ export interface ValidateProjectOpts {
   draftPlacements: PlacementOverride[];
   draftMap?: MapDocument;
   draftLocalLayers?: LocalLayer[];
-  /** Last patch export timestamp (ms). Used to flag un-exported drafts. */
-  lastExportAt?: number | null;
 }
 
 export function validateProject(opts: ValidateProjectOpts): ValidationReport {
   const issues: Issue[] = [];
   const passedChecks: string[] = [];
-  const { project, draftPlacements, draftMap, draftLocalLayers = [], lastExportAt = null } = opts;
+  const { project, draftPlacements, draftMap, draftLocalLayers = [] } = opts;
 
   const mapIds = new Set(project.maps.map((m) => m.id));
   const entityIds = new Set(project.entities.map((e) => e.id));
@@ -462,8 +459,8 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
       severity: "suggestion",
       code: "uploaded-assets-pending",
       category: "draft",
-      message: `Uploaded map images are local-only until you download the asset zip`,
-      hint: "Use Export DM Changes → asset zip, then commit the files under public/atlas/assets/maps/.",
+      message: `Uploaded map images are local until you Save`,
+      hint: "Click Save — the image files are written alongside world.yaml.",
     });
   }
 
@@ -498,7 +495,6 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
       mapCount: project.maps.length,
       draftPlacementCount: draftPlacements.length,
       pendingAssetCount: draftLocalLayers.filter((l) => l.origin === "upload").length,
-      lastExportAt,
     },
   };
 }
