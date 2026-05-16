@@ -42,7 +42,9 @@ import { RegionsTab } from "@/atlas/tabs/RegionsTab";
 import { RoutesTab } from "@/atlas/tabs/RoutesTab";
 import { FogTab } from "@/atlas/tabs/FogTab";
 import { PublishCheckTab } from "@/atlas/tabs/PublishCheckTab";
-import { type CategoryId } from "@/atlas/content/entityCategory";
+import { type CategoryId, CATEGORIES, categoryForType } from "@/atlas/content/entityCategory";
+import { CommandPalette } from "@/atlas/shell/CommandPalette";
+import { buildPaletteIndex } from "@/atlas/shell/useCommandPalette";
 import { CategoryPanel } from "@/atlas/categories/CategoryPanel";
 import { EntityEditorPanel, type NewEntityDraft } from "@/atlas/categories/EntityEditorPanel";
 import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
@@ -895,6 +897,24 @@ export default function AtlasPlacementEditor() {
   const regionIssues = issuesByScope((i) => i.code.includes("region") || i.code === "spoiler-leak-region");
   const routeIssues = issuesByScope((i) => i.code.includes("route"));
 
+  const paletteIndex = useMemo(() => buildPaletteIndex({
+    entities: project?.entities ?? [],
+    maps: (project?.maps ?? []).map((m) => ({ id: m.id, name: m.name ?? m.id })),
+    commands: [
+      { id: "cmd.save", title: "Save", run: onSaveClick },
+      { id: "cmd.publish", title: "Publish player site", run: () => setActivePanel("publish") },
+      ...CATEGORIES.map((c) => ({
+        id: `cmd.new.${c.id}`, title: `New ${c.singular}`,
+        run: () => { setActivePanel(c.id); setCreatingIn(c.id as CategoryId); },
+      })),
+    ],
+    settings: [
+      { id: "set.map", title: "Map settings" },
+      { id: "set.world", title: "World details" },
+    ],
+    recent: [],
+  }), [project, onSaveClick]);
+
   if (error) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-background text-foreground p-6 text-center">
@@ -1547,6 +1567,18 @@ export default function AtlasPlacementEditor() {
         count={session.unsavedCount}
         onConfirm={() => { void session.discardAll(); }}
         onClose={() => setDiscardOpen(false)}
+      />
+      <CommandPalette
+        index={paletteIndex}
+        onChoose={(r) => {
+          if (r.run) { r.run(); return; }
+          if (r.kind === "entity") {
+            const ent = project.entities.find((e) => e.id === r.id);
+            setActivePanel(categoryForType(ent?.type));
+          }
+          if (r.kind === "map") setActiveMapId(r.id);
+          if (r.kind === "setting") setActivePanel(r.id === "set.world" ? "world" : "maps");
+        }}
       />
       <ImportStagingModal
         open={importFlow.open}
