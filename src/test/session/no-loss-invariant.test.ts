@@ -1,16 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { serializeSession, deserializeSession, type SessionState } from "@/atlas/session/sessionSnapshot";
+import { serializeSession, deserializeSession, sessionHasWork, type SessionState } from "@/atlas/session/sessionSnapshot";
 import { useRegionDraft } from "@/atlas/regions/useRegionDraft";
 import { useRouteDraft } from "@/atlas/routes/useRouteDraft";
 import { useFogDraft } from "@/atlas/fog/useFogDraft";
+import { useEntityEditDraft } from "@/atlas/categories/useEntityEditDraft";
 import type { MapDocument } from "@/atlas/content/schema";
 
 const mapA: MapDocument = { id: "A", worldId: "w", name: "A", width: 100, height: 100, layers: [], regions: [], routes: [] };
 const mapB: MapDocument = { ...mapA, id: "B", name: "B" };
 
 function emptyState(savedAt = 1): SessionState {
-  return { overrides: {}, mapOverrideByMap: {}, regionByMap: {}, routeByMap: {}, fogByMap: {}, layerByMap: {}, savedAt };
+  return { overrides: {}, mapOverrideByMap: {}, regionByMap: {}, routeByMap: {}, fogByMap: {}, layerByMap: {}, entityEdit: null, savedAt };
 }
 
 describe("no-loss invariant — per holder", () => {
@@ -65,6 +66,39 @@ describe("no-loss invariant — per holder", () => {
     const fresh = renderHook(() => useFogDraft(mapA, undefined));
     act(() => { fresh.result.current.applySnapshot(restored.fogByMap.A); });
     expect(fresh.result.current.snapshot()).toEqual(snap);
+  });
+
+  it("entityEdit draft survives serialize → deserialize (no-loss)", () => {
+    const entityEditRef = renderHook(() => useEntityEditDraft());
+    act(() => {
+      entityEditRef.result.current.load({
+        sourcePath: "content/npc/corven.md",
+        baseHash: "abc123",
+        fields: { id: "corven", type: "npc", visibility: "dm", summary: "A rogue merchant." },
+        body: "## Corven\nEdited body content.",
+      });
+    });
+    act(() => {
+      entityEditRef.result.current.setBody("## Corven\nDirty edited body content.");
+    });
+    const snap = entityEditRef.result.current.snapshot();
+    expect(snap).not.toBeNull();
+
+    const state = emptyState();
+    state.entityEdit = snap;
+
+    // Dirty state is recognized as work
+    expect(sessionHasWork(state)).toBe(true);
+
+    // Survives a round-trip
+    const restored = deserializeSession(serializeSession(state))!;
+    expect(restored).not.toBeNull();
+    expect(restored.entityEdit).toEqual(snap);
+    expect(sessionHasWork(restored)).toBe(true);
+
+    // discardAll equivalent: setting entityEdit to null clears work
+    const cleared = { ...state, entityEdit: null };
+    expect(sessionHasWork(cleared)).toBe(false);
   });
 
   it("switch-away-and-back is non-destructive (per-map slices)", () => {
