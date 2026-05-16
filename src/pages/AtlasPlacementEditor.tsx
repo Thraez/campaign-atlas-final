@@ -958,6 +958,17 @@ export default function AtlasPlacementEditor() {
           </Button>
         </div>
       )}
+      {/* Warn when player-mode atlas.json is loaded — sourcePaths are stripped, Save would fail. */}
+      {project.entities.length > 0 && project.entities.every((e) => !e.sourcePath) && (
+        <div className="px-3 py-2 text-[11px] bg-destructive/15 text-red-200 border-b border-destructive/40 flex items-center gap-2">
+          <span aria-hidden>🔴</span>
+          <span className="flex-1 min-w-0">
+            <strong>Player atlas loaded — Save won't work.</strong>{" "}
+            Run <code className="font-mono bg-black/30 px-1 rounded">npm run atlas:build</code> in your terminal,
+            then reload this page. The dev server must serve the DM atlas for saving to work.
+          </span>
+        </div>
+      )}
       {externalRebuildAt && (
         <div className="px-3 py-1.5 text-[11px] bg-orange-500/15 text-orange-100 border-b border-orange-500/30 flex items-center justify-between gap-2">
           <span className="flex items-center gap-2 min-w-0">
