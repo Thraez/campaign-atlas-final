@@ -34,6 +34,7 @@ Concrete failing case the user hit: **Corven, Edric, Soreth** import as Lore, ge
 - Visual/design-system polish, empty/loading/error visuals — that is **Part 4**.
 - Re-introducing Export/Patch/Zip or autosave (standing rules).
 - A bulk migration script. Re-import or in-app edit each repairs existing files; two easy paths already exist (YAGNI).
+- Bulk "apply this type to all rows" on import. Conscious deferral: the real case is a handful of files (the user hit this with 3); the staging modal already handles multi-row per-row edits. Revisit only if large-batch import becomes a real workflow.
 - Touch/mobile. Desktop + laptop, mouse + keyboard only.
 
 ## Confirmed product decisions
@@ -45,6 +46,8 @@ Concrete failing case the user hit: **Corven, Edric, Soreth** import as Lore, ge
 5. **Type is written to both `atlas.type` and the root `tags:` array** (deduped; existing tags preserved) so the file is self-describing in Obsidian and consistent on re-import.
 6. **Safe visibility default** — missing/invalid visibility ⇒ `dm`; `publish: true` ⇒ `player`. Nothing auto-publishes.
 7. **One Save.** Edit-save routes through the existing unified Save (`localFsSave` / `/__atlas/save`), Part 2 `baseHash` conflict detection, Part 3 atomic temp-write contract. No new save path, no second Save button.
+8. **Primary interaction = click the row.** Clicking an entity row in any category panel (including Lore) opens that entity in the edit panel — view and edit are the same surface, no separate "view" vs "edit" mode and no hunt for an edit icon. This is the direct fix for the user's literal complaint ("why can't I open up those lore entries"); recognition over recall (a row that does nothing on click is a dead-end).
+9. **In-progress edits obey the no-loss invariant.** Unsaved atlas/body edits in the panel are part of Part 2's unsaved/session model: they count toward the unsaved indicator, survive a reload (restore), and are only discardable through the one existing Discard. Switching entity or closing the panel with a dirty editor must not silently lose the edit — same guarantee Part 2 gives every other draft holder.
 
 ---
 
@@ -103,9 +106,9 @@ No script. Re-importing Corven/Edric/Soreth as **update** rows runs the same rew
 
 ## C. Slice 2 — Real edit panel for any entity
 
-### C.1 Reachability
+### C.1 Reachability & primary interaction
 
-Every category panel row (`src/atlas/categories/CategoryPanel.tsx`) — **including Lore and untyped** — gets an Edit action. A Ctrl-K command "Edit {entity}" is added to the Part 3 registry/palette. No entity is a dead-end.
+**Clicking an entity row** in any category panel (`src/atlas/categories/CategoryPanel.tsx`) — **including Lore and untyped** — opens that entity in the edit panel. Row click is the single primary affordance; there is no separate view/edit toggle and no edit-icon hunt (decision 8). A Ctrl-K command "Edit {entity}" is added to the Part 3 registry/palette as the keyboard path. No entity is a dead-end.
 
 ### C.2 Load
 
@@ -123,11 +126,15 @@ On open, `GET /__atlas/read?path=<entity.sourcePath>` (endpoint already exists; 
 
 Build exactly one `FileChange` via §A `rewriteFrontmatter` (atlas patch from the form) plus the edited body, routed through the existing unified Save: `saveAtlasPatchToLocalFs` → `/__atlas/save`, Part 2 `baseHash` conflict detection, Part 3 atomic temp-write + backup. No new save path. Changing `id` is permitted but surfaced in the existing `DiffPreviewModal` (it can relocate the file / change the slug); the diff preview already shows path + content changes.
 
+### C.5 No-loss for in-progress edits (decision 9)
+
+The edit panel is a Part 2 draft holder, not an island. Its dirty atlas/body state plugs into the existing `useEditorSession` snapshot/restore seam exactly as the other per-tab drafts do: it contributes to the unsaved count/`SaveStatus`, is persisted to the IndexedDB session and restored on reload, and is cleared only by a successful Save or the single existing Discard. Switching to another entity or dismissing the panel with unsaved edits does **not** silently drop them — the work stays in the session and the unsaved indicator stays honest. The Part 2 no-loss invariant test is extended to cover this holder so removal of the safeguard is impossible without a failing test.
+
 ## D. Slice 3 — Obsidian-faithful live preview
 
 ### D.1 Surface
 
-A live preview pane beside the body editor in the same panel. The Part 3 panel is already user-resizable with a ½ cap; add a **wide/focus** expand for the edit+preview case so body editing is not cramped (still within the existing single-panel shell — no new route).
+A live preview pane beside the body editor in the same panel. The Part 3 panel's ½-width cap is a *map-context* constraint (panels you glance at while keeping the map usable). Editing is a focused task, not a glance task, so the edit panel gets a **focus mode** that expands to roughly full width (well past the ½ map cap) giving editor + preview two comfortable columns; exiting focus mode returns to the normal docked width. Still the existing single-panel shell — no new route, no second surface. The ½ cap remains the default for all map-context panels; only the edit panel opts into focus width, and only while editing.
 
 ### D.2 Render contract (mirrors the build/player interpretation)
 
@@ -158,13 +165,14 @@ If a player-side entity/markdown renderer exists it is reused (bonus: begins the
 - D: preview hidden-set is byte-identical to `stripDmBlocks`; `![[img]]` resolves; `[[wikilink]]` styled, broken ones marked; "Show DM notes" toggle reveals only in preview.
 
 ### F.2 Regression
-- Part 2: `baseHash` conflict, Discard, SaveStatus still green with the new edit-save.
+- Part 2: `baseHash` conflict, Discard, SaveStatus still green with the new edit-save. The no-loss invariant test is **extended** to the edit panel: dirty atlas/body edits survive reload, count toward unsaved, and are cleared only by Save/Discard (C.5) — removal of the safeguard fails a test.
+- Row click opens the entity in the edit panel for every category including Lore (C.1); no row is inert.
 - Part 3: categories, registry, palette, panel single-instance + dismissal still green; new Edit action and Ctrl-K command surface via the registry.
 - Player build still tree-shakes the editor (`__INCLUDE_EDITOR__`); `npm run atlas:publish` secrets + derived scans clean; no `%%` content in player output.
 
 ### F.3 Full gate (each slice done only when all green)
 - `tsc` clean · `npm test` green incl. F.1–F.2 · `npm run lint` clean · `npm run atlas:publish` scans clean.
-- Browser smoke: import Corven → confirm type prompt appears → lands as **Character** with correct `atlas.id/type/visibility` and `tags` updated → open in edit panel → fix a body line → preview shows his image and hides his `%%` DM notes (toggle reveals) → Save → reload → change persisted, player build still clean.
+- Browser smoke: import Corven → confirm-type prompt appears → lands as **Character** with correct `atlas.id/type/visibility` and `tags` updated → **click his row** to open the edit panel → fix a body line → switch to another entity and back, edit still there (no-loss) → preview shows his image and hides his `%%` DM notes (toggle reveals) → Save → reload → change persisted, player build still clean.
 
 ## G. Risks & mitigations
 
