@@ -1,6 +1,4 @@
 import { describe, it, expect } from "vitest";
-import yaml from "js-yaml";
-import { buildWorldMapPatch } from "@/atlas/yaml/buildPatches";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { validatePatchYaml } from "@/atlas/yaml/validatePatch";
 import type { AtlasProject, MapDocument, Entity } from "@/atlas/content/schema";
@@ -34,22 +32,6 @@ const project: AtlasProject = {
 // src/atlas/save/canonicalPlacementSave.ts owns this path now (see
 // src/test/canonical-placement-save.test.ts for its round-trip coverage).
 
-describe("buildWorldMapPatch nested geometry preservation", () => {
-  it("echoes existing regions/routes/fog when not overridden", async () => {
-    const { buildWorldMapPatch } = await import("@/atlas/yaml/buildPatches");
-    const mapWithGeom: MapDocument = {
-      ...map,
-      regions: [{ id: "r1", mapId: "m1", name: "R", visibility: "player", points: [[0,0],[1,0],[1,1]] }],
-      routes: [{ id: "rt1", mapId: "m1", name: "RT", visibility: "player", waypoints: [[0,0],[10,10]] }],
-      fog: { mapId: "m1", enabled: true, reveals: [[[0,0],[1,0],[1,1]]] },
-    };
-    const a = buildWorldMapPatch({ map: mapWithGeom, mergedLayers: mapWithGeom.layers, localLayers: [] });
-    expect(a.content).toMatch(/regions:/);
-    expect(a.content).toMatch(/routes:/);
-    expect(a.content).toMatch(/fog:/);
-  });
-});
-
 describe("validatePatchYaml entity-frontmatter", () => {
   it("accepts a valid frontmatter block", async () => {
     const yaml = `# file: x.md\n---\ntitle: X\natlas:\n  visibility: player\n  type: settlement\n  summary: hello\n---\n`;
@@ -66,28 +48,6 @@ describe("validatePatchYaml entity-frontmatter", () => {
     const yaml = "```yaml\natlas:\n  visibility: player\n```\n";
     const r = validatePatchYaml(yaml, "entity-frontmatter");
     expect(r.ok).toBe(false);
-  });
-});
-
-describe("buildWorldMapPatch", () => {
-  it("emits a maps[] entry with deduped layer ids", () => {
-    const a = buildWorldMapPatch({ map, mergedLayers: map.layers, localLayers: [] });
-    const v = validatePatchYaml(a.content, "map");
-    expect(v.ok).toBe(true);
-    const parsed = yaml.load(a.content.split("\n").filter((l) => !l.startsWith("#")).join("\n")) as { maps: Array<{ id: string; layers: unknown[] }> };
-    expect(parsed.maps[0].id).toBe("m1");
-    expect(parsed.maps[0].layers).toHaveLength(1);
-  });
-
-  it("throws on duplicate layer ids", () => {
-    const dup = [...map.layers, { ...map.layers[0] }];
-    expect(() => buildWorldMapPatch({ map, mergedLayers: dup, localLayers: [] })).toThrow(/Duplicate layer id/);
-  });
-
-  it("flags external URL layers in the asset manifest", () => {
-    const ext = [{ ...map.layers[0], src: "https://cdn.example.com/x.jpg" }];
-    const a = buildWorldMapPatch({ map, mergedLayers: ext, localLayers: [] });
-    expect(a.assets?.some((x) => x.source === "external")).toBe(true);
   });
 });
 
