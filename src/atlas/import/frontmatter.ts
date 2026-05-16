@@ -65,6 +65,14 @@ export function stringifyFrontmatter(
   const hasKeys = data && Object.keys(data).length > 0;
   const body = content.endsWith("\n") ? content : `${content}\n`;
   if (!hasKeys) return body;
-  const yamlText = yaml.dump(data, { lineWidth: -1 });
+  const AMBIGUOUS = /^(?:true|false|null|~|-?\d+(?:\.\d+)?|\d{1,4}-\d{1,2}-\d{1,2}.*)$/i;
+  const hasAmbiguous = JSON.stringify(data).match(AMBIGUOUS) != null;
+  const yamlText = yaml.dump(data, {
+    lineWidth: -1,        // never fold → no '>' or '|' multiline scalars
+    noRefs: true,         // no YAML anchors/aliases
+    quotingType: '"',     // consistent double-quote style Obsidian accepts
+    forceQuotes: hasAmbiguous, // force-quote ALL strings when any ambiguous value present
+    sortKeys: false,      // preserve author key order
+  });
   return `---\n${yamlText}---\n${body}`;
 }
