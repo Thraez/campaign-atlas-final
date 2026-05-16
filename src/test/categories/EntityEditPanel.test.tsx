@@ -3,6 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useEntityEditDraft } from "@/atlas/categories/useEntityEditDraft";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { EntityEditPanel } from "@/atlas/categories/EntityEditPanel";
+import { EntityBodyPreview } from "@/atlas/categories/EntityBodyPreview";
 import { vi } from "vitest";
 
 describe("useEntityEditDraft", () => {
@@ -90,4 +91,13 @@ it("loads an entity, edits the body, saves via the shared rewrite", async () => 
   fireEvent.change(screen.getByLabelText(/body/i), { target: { value: "# Corven\n\nnew body\n" } });
   fireEvent.click(screen.getByRole("button", { name: /save/i }));
   await waitFor(() => expect(onSaved).toHaveBeenCalled());
+});
+
+it("EntityBodyPreview renders markdown and toggles DM notes", () => {
+  const body = "# H\n\n%%\nsecret\n%%\n\nvisible\n";
+  const { rerender } = render(<EntityBodyPreview body={body} showDmNotes={false} />);
+  expect(screen.getByText("visible")).toBeInTheDocument();
+  expect(screen.queryByText("secret")).not.toBeInTheDocument();
+  rerender(<EntityBodyPreview body={body} showDmNotes={true} />);
+  expect(screen.getByText(/secret/)).toBeInTheDocument();
 });
