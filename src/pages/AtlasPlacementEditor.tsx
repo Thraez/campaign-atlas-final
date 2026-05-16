@@ -73,6 +73,7 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { useUndoStack } from "@/atlas/useUndoStack";
 import { useEditorSession } from "@/atlas/session/useEditorSession";
+import { useEntityEditDraft } from "@/atlas/categories/useEntityEditDraft";
 import { EditorRail } from "@/atlas/shell/EditorRail";
 import { EditorPanelHost } from "@/atlas/shell/EditorPanelHost";
 import { buildRailItems } from "@/atlas/shell/railRegistry";
@@ -337,6 +338,7 @@ export default function AtlasPlacementEditor() {
   const regionDraft = useRegionDraft(activeMap, { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet }, undoStack);
   const routeDraft = useRouteDraft(project, activeMap, { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet }, undoStack);
   const fogDraft = useFogDraft(activeMap, undoStack);
+  const entityEditDraft = useEntityEditDraft();
   const [showFogPreview, setShowFogPreview] = useState(true);
 
   // Synchronous mirrors of overrides + mapOverride. Mutation helpers below
@@ -824,6 +826,10 @@ export default function AtlasPlacementEditor() {
       route: { snapshot: routeDraft.snapshot, applySnapshot: routeDraft.applySnapshot },
       fog: { snapshot: fogDraft.snapshot, applySnapshot: fogDraft.applySnapshot },
       layer: { snapshot: layerEditor.snapshot, applySnapshot: layerEditor.applySnapshot },
+      editorEntity: {
+        get: () => entityEditDraft.snapshot(),
+        set: (v) => entityEditDraft.applySnapshot(v as never),
+      },
     },
     perMapDirtyCount: () =>
       regionDraft.dirtyCount +
@@ -831,7 +837,8 @@ export default function AtlasPlacementEditor() {
       (fogDraft.dirty ? 1 : 0) +
       layerEditor.localLayers.length +
       (mapMetadataDirty ? 1 : 0) +
-      dirtyCount,
+      dirtyCount +
+      (entityEditDraft.isDirty() ? 1 : 0),
   });
 
   // Phase 1B B4: Esc cancels in-progress pin placement (the "Click on the
