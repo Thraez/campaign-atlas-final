@@ -63,6 +63,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { useUndoStack } from "@/atlas/useUndoStack";
+import { useEditorSession } from "@/atlas/session/useEditorSession";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 // Bumped to v3: storage shape now carries label + pin override per placement.
@@ -761,6 +762,32 @@ export default function AtlasPlacementEditor() {
   const entityDraftsDirty = Object.keys(entityDrafts).length > 0;
   const hasUnsavedChanges = pinSideUnsaved || worldYamlDirty || entityDraftsDirty;
 
+  const session = useEditorSession({
+    activeMapId: activeMap?.id ?? null,
+    undoStack,
+    holders: {
+      overrides: {
+        get: () => overridesRef.current as import("@/atlas/session/sessionSnapshot").Overrides,
+        set: (o) => { overridesRef.current = o as Overrides; setOverrides(o as Overrides); },
+      },
+      mapOverride: {
+        get: () => mapOverrideRef.current as Record<string, unknown>,
+        set: (m) => { mapOverrideRef.current = m as Record<string, Partial<MapDocument>>; setMapOverride(m as Record<string, Partial<MapDocument>>); },
+      },
+      region: { snapshot: regionDraft.snapshot, applySnapshot: regionDraft.applySnapshot },
+      route: { snapshot: routeDraft.snapshot, applySnapshot: routeDraft.applySnapshot },
+      fog: { snapshot: fogDraft.snapshot, applySnapshot: fogDraft.applySnapshot },
+      layer: { snapshot: layerEditor.snapshot, applySnapshot: layerEditor.applySnapshot },
+    },
+    perMapDirtyCount: () =>
+      regionDraft.dirtyCount +
+      routeDraft.dirtyCount +
+      (fogDraft.dirty ? 1 : 0) +
+      layerEditor.localLayers.length +
+      (mapMetadataDirty ? 1 : 0) +
+      dirtyCount,
+  });
+
   // A12c: 5-minute idle nudge. Fires once when the editor has had dirty
   // state for at least 5 minutes since the last save, with at least one
   // edit in that window. "Remind me later" re-arms.
@@ -840,19 +867,6 @@ export default function AtlasPlacementEditor() {
     return () => window.removeEventListener("keydown", onKey);
   }, [undoStack]);
 
-  // Browser-level guard: warn before tab close / reload if there are
-  // unsaved drafts. The custom message is browser-controlled in modern
-  // browsers (just shows a generic prompt) — the point is the prompt.
-  useEffect(() => {
-    if (!hasUnsavedChanges) return;
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [hasUnsavedChanges]);
-
   // Project-wide validation, scoped per tab so each tab badge shows its own counts.
   const draftPlacementsForValidation = useMemo(() => buildDraftPlacements(), [buildDraftPlacements]);
   const validation = useMemo(
@@ -900,6 +914,19 @@ export default function AtlasPlacementEditor() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
+      {session.restoredNotice && (
+        <div className="px-3 py-1.5 text-[11px] bg-blue-500/15 text-blue-100 border-b border-blue-500/30 flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2 min-w-0">
+            <span aria-hidden>↩</span>
+            <span className="truncate">
+              <strong>Unsaved edits restored</strong> — your last session&apos;s work was recovered automatically.
+            </span>
+          </span>
+          <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={session.dismissRestoredNotice}>
+            Dismiss
+          </Button>
+        </div>
+      )}
       {externalRebuildAt && (
         <div className="px-3 py-1.5 text-[11px] bg-orange-500/15 text-orange-100 border-b border-orange-500/30 flex items-center justify-between gap-2">
           <span className="flex items-center gap-2 min-w-0">
@@ -950,20 +977,7 @@ export default function AtlasPlacementEditor() {
         {project.maps.length > 1 && (
           <Select value={activeMap.id} onValueChange={(v) => {
             if (v === activeMap.id) return;
-            // A13 guard: regionDraft / routeDraft / fogDraft state survives the
-            // hook re-mount but doesn't apply cleanly to the new map, so switching
-            // effectively orphans in-progress drafts. Pin overrides and local
-            // layers are keyed by mapId and DO survive. Surface the risk before
-            // discarding anything.
-            if (hasUnsavedChanges) {
-              const proceed = window.confirm(
-                "You have unsaved changes on this map. Switching will discard in-progress region / route / fog drafts (pin and layer edits are kept per-map).\n\nContinue without saving?"
-              );
-              if (!proceed) return;
-            }
-            regionDraft.reset();
-            routeDraft.reset();
-            fogDraft.reset();
+            session.onMapWillChange(v);
             setActiveMapId(v);
             setPendingId(null);
           }}>

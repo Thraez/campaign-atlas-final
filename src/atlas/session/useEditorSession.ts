@@ -73,23 +73,25 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
   // ---- collect / apply the active map's holder slices ----
   const collectActiveInto = useCallback((s: SessionState, mapId: string | null) => {
     s.overrides = holders.overrides.get();
+    // layer.snapshot() returns the full byMap store — assign wholesale, not per-key
+    s.layerByMap = holders.layer.snapshot() as never;
+    const mo = holders.mapOverride.get();
+    s.mapOverrideByMap = mo as never;
     if (!mapId) return;
     s.regionByMap[mapId] = holders.region.snapshot() as never;
     s.routeByMap[mapId] = holders.route.snapshot() as never;
     s.fogByMap[mapId] = holders.fog.snapshot() as never;
-    s.layerByMap[mapId] = holders.layer.snapshot() as never;
-    const mo = holders.mapOverride.get();
-    s.mapOverrideByMap = mo as never;
   }, [holders]);
 
   const applyActiveFrom = useCallback((s: SessionState, mapId: string | null) => {
     holders.overrides.set(s.overrides);
     holders.mapOverride.set(s.mapOverrideByMap as never);
+    // layer.applySnapshot() expects the full byMap store
+    holders.layer.applySnapshot(s.layerByMap as never);
     if (!mapId) return;
     holders.region.applySnapshot((s.regionByMap[mapId] ?? { edits: {}, added: [], deleted: [] }) as never);
     holders.route.applySnapshot((s.routeByMap[mapId] ?? { edits: {}, added: [], deleted: [] }) as never);
     holders.fog.applySnapshot((s.fogByMap[mapId] ?? null) as never);
-    holders.layer.applySnapshot((s.layerByMap[mapId] ?? []) as never);
   }, [holders]);
 
   // ---- mount hydrate + restore detection ----
