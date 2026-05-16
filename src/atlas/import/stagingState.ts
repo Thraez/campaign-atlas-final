@@ -20,6 +20,8 @@
 
 import { parseFrontmatter } from "./frontmatter";
 import type { ImportFolderConfig } from "../content/schema";
+import { inferTypeFromTags } from "./inferTypeFromTags";
+import { inferTypeFromPath } from "./inferType";
 
 /**
  * Inferred entity-type (from frontmatter / fallback) → destination folder.
@@ -107,6 +109,9 @@ export interface StagingRow {
   parseError?: string;
   /** Full file body (text). Preserved verbatim through the commit. */
   content: string;
+  typeWasExplicit: boolean;
+  resolvedVisibility: string;
+  rawContent: string;
 }
 
 /**
@@ -118,9 +123,11 @@ function deriveTitle(filename: string, fmTitle: unknown): string {
   return filename.replace(/\.md$/i, "").replace(/[-_]+/g, " ").trim();
 }
 
-function extractStagingFields(raw: string): {
+function extractStagingFields(raw: string, relPath: string): {
   type: string;
+  typeWasExplicit: boolean;
   id: string | undefined;
+  visibility: string;
   fmTitle: string | undefined;
   frontmatterPath: string | undefined;
   parseError: string | undefined;
@@ -129,17 +136,32 @@ function extractStagingFields(raw: string): {
     const fm = parseFrontmatter(raw);
     const data = fm.data;
     const atlas = (data.atlas ?? {}) as Record<string, unknown>;
-    const type = typeof atlas.type === "string" && atlas.type.length > 0 ? atlas.type : "imports";
+
+    const explicit =
+      typeof atlas.type === "string" && atlas.type.trim().length > 0
+        ? atlas.type.trim()
+        : undefined;
+    const fromTags = explicit ? null : inferTypeFromTags(data.tags);
+    const fromFolder = explicit || fromTags ? null : inferTypeFromPath(relPath);
+    const type = explicit ?? fromTags ?? (fromFolder && fromFolder !== "note" ? fromFolder : "lore");
+
+    const visRaw = typeof atlas.visibility === "string" ? atlas.visibility : undefined;
+    const validVis = ["player", "dm", "hidden", "rumor"];
+    const visibility = visRaw && validVis.includes(visRaw)
+      ? visRaw
+      : atlas.publish === true ? "player" : "dm";
+
     const id = typeof atlas.id === "string" ? atlas.id : undefined;
     const fmTitle = typeof data.title === "string" ? data.title : undefined;
     const frontmatterPath = typeof data.path === "string" ? data.path : undefined;
-    return { type, id, fmTitle, frontmatterPath, parseError: undefined };
+    return {
+      type, typeWasExplicit: !!explicit, id, visibility,
+      fmTitle, frontmatterPath, parseError: undefined,
+    };
   } catch (e) {
     return {
-      type: "imports",
-      id: undefined,
-      fmTitle: undefined,
-      frontmatterPath: undefined,
+      type: "lore", typeWasExplicit: false, id: undefined, visibility: "dm",
+      fmTitle: undefined, frontmatterPath: undefined,
       parseError: e instanceof Error ? e.message : String(e),
     };
   }
@@ -152,7 +174,8 @@ function nextRowId(filename: string): string {
 }
 
 export function buildStagingRow(input: RawImportFile, ctx: StagingContext): StagingRow {
-  const { type, id, fmTitle, frontmatterPath, parseError } = extractStagingFields(input.raw);
+  const { type, typeWasExplicit, id, visibility, fmTitle, frontmatterPath, parseError } =
+    extractStagingFields(input.raw, input.filename);
 
   // Compute resolvedId matching build-atlas.ts logic exactly:
   // build uses: parsed.atlas.id || slugify(deriveTitle(file, fm.title))
@@ -192,6 +215,9 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     included,
     parseError,
     content: input.raw,
+    typeWasExplicit,
+    resolvedVisibility: visibility,
+    rawContent: input.raw,
   };
 }
 

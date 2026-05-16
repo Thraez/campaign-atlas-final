@@ -128,12 +128,12 @@ describe("buildStagingRow", () => {
     expect(row.included).toBe(true);
   });
 
-  it("falls back to imports/ when no atlas.type and uses filename stem", () => {
+  it("falls back to lore → imports/ when no atlas.type and uses filename stem", () => {
     const row = buildStagingRow(
       { filename: "Garron Notes.md", raw: "no frontmatter here" },
       makeCtx(),
     );
-    expect(row.inferredType).toBe("imports");
+    expect(row.inferredType).toBe("lore");
     expect(row.targetPath).toBe("content/astrath-deeprealm/imports/garron-notes.md");
     expect(row.included).toBe(true);
   });
@@ -205,6 +205,39 @@ describe("buildStagingRow", () => {
       makeCtx(),
     );
     expect(row.targetPath).toBe("content/astrath-deeprealm/npcs/my-custom-id.md");
+  });
+});
+
+describe("staging type precedence + resolved fields", () => {
+  const ctx = {
+    worldId: "w",
+    importConfig: { folders: { npc: "npcs" }, defaultFolder: "imports" },
+    allowedFolders: new Set(["npcs", "imports"]),
+    existingById: new Map<string, string>(),
+    existingPaths: new Set<string>(),
+  } as const;
+
+  it("infers npc from tags when atlas.type is absent and flags unconfirmed", () => {
+    const raw = `---\ntags:\n  - npc\n  - smuggler\n---\n# Corven\n`;
+    const row = buildStagingRow({ filename: "corven.md", raw }, ctx as never);
+    expect(row.inferredType).toBe("npc");
+    expect(row.typeWasExplicit).toBe(false);
+    expect(row.resolvedId).toBe("corven");
+    expect(row.resolvedVisibility).toBe("dm");
+    expect(row.rawContent).toBe(raw);
+  });
+  it("explicit atlas.type wins and is marked explicit", () => {
+    const raw = `---\natlas:\n  type: faction\n  visibility: player\ntags:\n  - npc\n---\n# X\n`;
+    const row = buildStagingRow({ filename: "x.md", raw }, ctx as never);
+    expect(row.inferredType).toBe("faction");
+    expect(row.typeWasExplicit).toBe(true);
+    expect(row.resolvedVisibility).toBe("player");
+  });
+  it("no signal → lore, unconfirmed", () => {
+    const raw = `---\ntags:\n  - stub\n---\n# Y\n`;
+    const row = buildStagingRow({ filename: "y.md", raw }, ctx as never);
+    expect(row.inferredType).toBe("lore");
+    expect(row.typeWasExplicit).toBe(false);
   });
 });
 
