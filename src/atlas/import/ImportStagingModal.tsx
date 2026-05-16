@@ -35,26 +35,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { StagingRow } from "./stagingState";
-
-/** DM-facing type choices — same list used elsewhere in the editor. */
-const TYPE_OPTIONS = [
-  "settlement",
-  "region",
-  "ruin",
-  "dungeon",
-  "location",
-  "map_note",
-  "npc",
-  "faction",
-  "event",
-  "item",
-  "imports",
-];
+import type { ImportFolderConfig } from "../content/schema";
 
 export interface ImportStagingModalProps {
   open: boolean;
   rows: StagingRow[];
   isImporting?: boolean;
+  /** Folder config for the active world; drives the type-selection dropdown. */
+  importConfig: ImportFolderConfig;
   /** Patch one row by id. Caller threads the patch through updateStagingRow. */
   onPatchRow: (
     id: string,
@@ -69,6 +57,7 @@ export function ImportStagingModal({
   open,
   rows,
   isImporting,
+  importConfig,
   onPatchRow,
   onCancel,
   onCommit,
@@ -88,13 +77,17 @@ export function ImportStagingModal({
   // recourse. A single click on "Select all overwrites" flips them all on at
   // once so the bulk-overwrite case stops being 55 checkbox clicks.
   const conflictRows = useMemo(
-    () => rows.filter((r) => r.pathAllowed && !r.parseError && r.conflict),
+    () => rows.filter((r) => r.pathAllowed && !r.parseError && r.rowKind === "path-collision"),
     [rows],
   );
   const uncheckedConflictCount = useMemo(
     () => conflictRows.filter((r) => !r.included).length,
     [conflictRows],
   );
+  const typeOptions = useMemo(() => {
+    const types = new Set([...Object.keys(importConfig.folders), importConfig.defaultFolder]);
+    return [...types].sort();
+  }, [importConfig]);
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
@@ -102,13 +95,11 @@ export function ImportStagingModal({
         <DialogHeader>
           <DialogTitle>Stage .md import</DialogTitle>
           <DialogDescription>
-            Review each file before committing. Target paths are restricted to
-            <code className="mx-1 px-1 py-0.5 rounded bg-muted text-[10px]">
-              content/&lt;world&gt;/{"{places,people,factions,items,events,regions,imports}"}/…
-            </code>
-            — rows outside that allowlist are red and can't be imported.
-            Existing files default to <strong>unchecked</strong>; re-check
-            explicitly to overwrite (the previous version is backed up).
+            Review each file before committing. Target paths must be inside your
+            world&apos;s configured import folders — rows outside the allowlist are
+            red and can&apos;t be imported. Existing files default to{" "}
+            <strong>unchecked</strong>; re-check explicitly to overwrite (the
+            previous version is backed up).
           </DialogDescription>
         </DialogHeader>
 
@@ -183,7 +174,7 @@ export function ImportStagingModal({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {TYPE_OPTIONS.map((t) => (
+                          {typeOptions.map((t) => (
                             <SelectItem key={t} value={t} className="text-[11px]">
                               {t}
                             </SelectItem>
