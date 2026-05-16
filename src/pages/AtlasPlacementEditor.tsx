@@ -50,6 +50,7 @@ import { WorldDetailsPanel } from "@/atlas/settings/WorldDetailsPanel";
 import { CategoryPanel } from "@/atlas/categories/CategoryPanel";
 import { PinStateBadge } from "@/atlas/pins/PinStateBadge";
 import { EntityEditorPanel, type NewEntityDraft } from "@/atlas/categories/EntityEditorPanel";
+import { EntityEditPanel } from "@/atlas/categories/EntityEditPanel";
 import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { MapImportWizard } from "@/atlas/import/MapImportWizard";
@@ -414,6 +415,8 @@ export default function AtlasPlacementEditor() {
   const [chainPlaceMode, setChainPlaceMode] = useState(false);
   /** Which category panel is in "create new entity" mode (null = browsing). */
   const [creatingIn, setCreatingIn] = useState<CategoryId | null>(null);
+  /** Entity currently open in the EntityEditPanel (null = none). */
+  const [editingEntityId, setEditingEntityId] = useState<string | null>(null);
 
   /** Read-only canon placement (built YAML value) for an entity on a map. */
   const canonPlacement = useCallback((mapId: string, entityId: string) => {
@@ -1121,75 +1124,97 @@ export default function AtlasPlacementEditor() {
 
       <div className="flex-1 flex relative min-h-0">
         {(() => {
+          const editingEntity = editingEntityId
+            ? project?.entities?.find((e) => e.id === editingEntityId)
+            : undefined;
+
+          const renderCategory = (cat: string, node: React.ReactNode): React.ReactNode => {
+            if (
+              editingEntity &&
+              categoryForType(editingEntity.type) === cat &&
+              editingEntity.sourcePath
+            ) {
+              return (
+                <EntityEditPanel
+                  sourcePath={editingEntity.sourcePath}
+                  draftApi={entityEditDraft}
+                  onClose={() => setEditingEntityId(null)}
+                  onSaved={() => { setEditingEntityId(null); void reloadCanon(); }}
+                />
+              );
+            }
+            return node;
+          };
+
           const panels: Record<string, React.ReactNode> = {
             // Six content categories — wired to CategoryPanel (browse) or
             // EntityEditorPanel (create). Phase 2 EntitiesTab stopgap removed.
             characters: creatingIn === "characters" ? (
               <EntityEditorPanel mode="create" category="characters"
                 onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
-            ) : (
+            ) : renderCategory("characters", (
               <CategoryPanel category="characters" entities={project.entities}
-                onOpen={() => { /* entity detail view: Phase 4 */ }}
+                onOpen={(id) => setEditingEntityId(id)}
                 onNew={() => setCreatingIn("characters")}
                 onImport={triggerMdImport}
                 hasPlacement={(id) => !!effectiveCoord(id)}
                 onShowOnMap={(id) => goTo(id)} />
-            ),
+            )),
             locations: creatingIn === "locations" ? (
               <EntityEditorPanel mode="create" category="locations"
                 onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
-            ) : (
+            ) : renderCategory("locations", (
               <CategoryPanel category="locations" entities={project.entities}
-                onOpen={() => { /* entity detail view: Phase 4 */ }}
+                onOpen={(id) => setEditingEntityId(id)}
                 onNew={() => setCreatingIn("locations")}
                 onImport={triggerMdImport}
                 hasPlacement={(id) => !!effectiveCoord(id)}
                 onShowOnMap={(id) => goTo(id)} />
-            ),
+            )),
             factions: creatingIn === "factions" ? (
               <EntityEditorPanel mode="create" category="factions"
                 onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
-            ) : (
+            ) : renderCategory("factions", (
               <CategoryPanel category="factions" entities={project.entities}
-                onOpen={() => { /* entity detail view: Phase 4 */ }}
+                onOpen={(id) => setEditingEntityId(id)}
                 onNew={() => setCreatingIn("factions")}
                 onImport={triggerMdImport}
                 hasPlacement={(id) => !!effectiveCoord(id)}
                 onShowOnMap={(id) => goTo(id)} />
-            ),
+            )),
             events: creatingIn === "events" ? (
               <EntityEditorPanel mode="create" category="events"
                 onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
-            ) : (
+            ) : renderCategory("events", (
               <CategoryPanel category="events" entities={project.entities}
-                onOpen={() => { /* entity detail view: Phase 4 */ }}
+                onOpen={(id) => setEditingEntityId(id)}
                 onNew={() => setCreatingIn("events")}
                 onImport={triggerMdImport}
                 hasPlacement={(id) => !!effectiveCoord(id)}
                 onShowOnMap={(id) => goTo(id)} />
-            ),
+            )),
             items: creatingIn === "items" ? (
               <EntityEditorPanel mode="create" category="items"
                 onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
-            ) : (
+            ) : renderCategory("items", (
               <CategoryPanel category="items" entities={project.entities}
-                onOpen={() => { /* entity detail view: Phase 4 */ }}
+                onOpen={(id) => setEditingEntityId(id)}
                 onNew={() => setCreatingIn("items")}
                 onImport={triggerMdImport}
                 hasPlacement={(id) => !!effectiveCoord(id)}
                 onShowOnMap={(id) => goTo(id)} />
-            ),
+            )),
             lore: creatingIn === "lore" ? (
               <EntityEditorPanel mode="create" category="lore"
                 onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
-            ) : (
+            ) : renderCategory("lore", (
               <CategoryPanel category="lore" entities={project.entities}
-                onOpen={() => { /* entity detail view: Phase 4 */ }}
+                onOpen={(id) => setEditingEntityId(id)}
                 onNew={() => setCreatingIn("lore")}
                 onImport={triggerMdImport}
                 hasPlacement={(id) => !!effectiveCoord(id)}
                 onShowOnMap={(id) => goTo(id)} />
-            ),
+            )),
             // Map tools — exact JSX from former TabsContent bodies
             pins: (
               <TabFrame
@@ -1663,6 +1688,7 @@ export default function AtlasPlacementEditor() {
           if (r.kind === "entity") {
             const ent = project.entities.find((e) => e.id === r.id);
             setActivePanel(categoryForType(ent?.type));
+            if (ent) setEditingEntityId(ent.id);
           }
           if (r.kind === "map") setActiveMapId(r.id);
           if (r.kind === "setting") setActivePanel(r.id === "set.world" ? "world" : "maps");
