@@ -46,7 +46,7 @@ export function validatePatchYaml(content: string, kind: PatchKind): ValidationR
   }
 
   let firstError: string | null = null;
-  let parsed: unknown[] = [];
+  const parsed: unknown[] = [];
   for (const chunk of chunks) {
     try {
       // Frontmatter blocks commonly use `---` document delimiters; loadAll
