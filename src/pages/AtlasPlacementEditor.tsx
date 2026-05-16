@@ -46,6 +46,7 @@ import { type CategoryId, CATEGORIES, categoryForType } from "@/atlas/content/en
 import { CommandPalette } from "@/atlas/shell/CommandPalette";
 import { buildPaletteIndex } from "@/atlas/shell/useCommandPalette";
 import { CategoryPanel } from "@/atlas/categories/CategoryPanel";
+import { PinStateBadge } from "@/atlas/pins/PinStateBadge";
 import { EntityEditorPanel, type NewEntityDraft } from "@/atlas/categories/EntityEditorPanel";
 import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
 import { validateProject } from "@/atlas/yaml/validateProject";
@@ -1074,7 +1075,9 @@ export default function AtlasPlacementEditor() {
               <CategoryPanel category="characters" entities={project.entities}
                 onOpen={() => { /* entity detail view: Phase 4 */ }}
                 onNew={() => setCreatingIn("characters")}
-                onImport={() => importFlow.openWithFiles([])} />
+                onImport={() => importFlow.openWithFiles([])}
+                hasPlacement={(id) => !!effectiveCoord(id)}
+                onShowOnMap={(id) => goTo(id)} />
             ),
             locations: creatingIn === "locations" ? (
               <EntityEditorPanel mode="create" category="locations"
@@ -1083,7 +1086,9 @@ export default function AtlasPlacementEditor() {
               <CategoryPanel category="locations" entities={project.entities}
                 onOpen={() => { /* entity detail view: Phase 4 */ }}
                 onNew={() => setCreatingIn("locations")}
-                onImport={() => importFlow.openWithFiles([])} />
+                onImport={() => importFlow.openWithFiles([])}
+                hasPlacement={(id) => !!effectiveCoord(id)}
+                onShowOnMap={(id) => goTo(id)} />
             ),
             factions: creatingIn === "factions" ? (
               <EntityEditorPanel mode="create" category="factions"
@@ -1092,7 +1097,9 @@ export default function AtlasPlacementEditor() {
               <CategoryPanel category="factions" entities={project.entities}
                 onOpen={() => { /* entity detail view: Phase 4 */ }}
                 onNew={() => setCreatingIn("factions")}
-                onImport={() => importFlow.openWithFiles([])} />
+                onImport={() => importFlow.openWithFiles([])}
+                hasPlacement={(id) => !!effectiveCoord(id)}
+                onShowOnMap={(id) => goTo(id)} />
             ),
             events: creatingIn === "events" ? (
               <EntityEditorPanel mode="create" category="events"
@@ -1101,7 +1108,9 @@ export default function AtlasPlacementEditor() {
               <CategoryPanel category="events" entities={project.entities}
                 onOpen={() => { /* entity detail view: Phase 4 */ }}
                 onNew={() => setCreatingIn("events")}
-                onImport={() => importFlow.openWithFiles([])} />
+                onImport={() => importFlow.openWithFiles([])}
+                hasPlacement={(id) => !!effectiveCoord(id)}
+                onShowOnMap={(id) => goTo(id)} />
             ),
             items: creatingIn === "items" ? (
               <EntityEditorPanel mode="create" category="items"
@@ -1110,7 +1119,9 @@ export default function AtlasPlacementEditor() {
               <CategoryPanel category="items" entities={project.entities}
                 onOpen={() => { /* entity detail view: Phase 4 */ }}
                 onNew={() => setCreatingIn("items")}
-                onImport={() => importFlow.openWithFiles([])} />
+                onImport={() => importFlow.openWithFiles([])}
+                hasPlacement={(id) => !!effectiveCoord(id)}
+                onShowOnMap={(id) => goTo(id)} />
             ),
             lore: creatingIn === "lore" ? (
               <EntityEditorPanel mode="create" category="lore"
@@ -1119,7 +1130,9 @@ export default function AtlasPlacementEditor() {
               <CategoryPanel category="lore" entities={project.entities}
                 onOpen={() => { /* entity detail view: Phase 4 */ }}
                 onNew={() => setCreatingIn("lore")}
-                onImport={() => importFlow.openWithFiles([])} />
+                onImport={() => importFlow.openWithFiles([])}
+                hasPlacement={(id) => !!effectiveCoord(id)}
+                onShowOnMap={(id) => goTo(id)} />
             ),
             // Map tools — exact JSX from former TabsContent bodies
             pins: (
@@ -1396,9 +1409,14 @@ export default function AtlasPlacementEditor() {
                       // pin must drop the pending pin here — NOT silently
                       // cancel the placement (the old behaviour, which made
                       // every existing marker a dead zone for placement).
-                      if (!pendingId) return;
-                      const ll = (ev.target as L.Marker).getLatLng();
-                      onMapClick(ll.lng, ll.lat);
+                      if (pendingId) {
+                        const ll = (ev.target as L.Marker).getLatLng();
+                        onMapClick(ll.lng, ll.lat);
+                        return;
+                      }
+                      // No pending placement — open this entity's category panel.
+                      const cat = categoryForType(e.type);
+                      setActivePanel(cat);
                     },
                   }}
                 />
@@ -1765,8 +1783,9 @@ function EntityRow({
           {label || entity.title}
           {overridden && <Badge variant="secondary" className="h-4 text-[9px] px-1">edited</Badge>}
         </div>
-        <div className="text-[10px] text-muted-foreground truncate">
+        <div className="text-[10px] text-muted-foreground truncate flex items-center gap-1.5">
           {entity.type}{coord ? ` · ${coord.x}, ${coord.y}` : ""}
+          <PinStateBadge placed={state === "placed"} />
         </div>
       </div>
       {state === "unplaced" && (
