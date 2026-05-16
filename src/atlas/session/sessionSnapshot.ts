@@ -15,6 +15,7 @@ import type { RouteDraft } from "@/atlas/routes/useRouteDraft";
 import type { FogOverlay } from "@/atlas/content/schema";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import type { PinOverride } from "@/atlas/pins/presets";
+import type { EntityEditSnapshot } from "@/atlas/categories/useEntityEditDraft";
 
 export const SESSION_SCHEMA_VERSION = 1;
 
@@ -32,6 +33,8 @@ export interface SessionState {
   layerByMap: Record<string, LocalLayer[]>;
   /** wall-clock ms of the last working-state change */
   savedAt: number;
+  /** global in-progress entity edit draft; null = no open edit */
+  entityEdit: EntityEditSnapshot;
 }
 
 interface Envelope {
@@ -57,6 +60,7 @@ export function deserializeSession(blob: unknown): SessionState | null {
     !s.routeByMap || !s.fogByMap || !s.layerByMap ||
     typeof s.savedAt !== "number"
   ) return null;
+  s.entityEdit = (s as Partial<SessionState>).entityEdit ?? null;
   return s as SessionState;
 }
 
@@ -68,5 +72,8 @@ export function sessionHasWork(s: SessionState): boolean {
   const anyRoute = Object.values(s.routeByMap).some((r) => r.added.length || r.deleted.length || Object.keys(r.edits).length);
   const anyFog = Object.values(s.fogByMap).some((f) => f != null);
   const anyLayer = Object.values(s.layerByMap).some((l) => l.length > 0);
-  return anyOverride || anyMap || anyRegion || anyRoute || anyFog || anyLayer;
+  const anyEntityEdit =
+    !!s.entityEdit &&
+    JSON.stringify({ fields: s.entityEdit.fields, body: s.entityEdit.body }) !== s.entityEdit.pristine;
+  return anyOverride || anyMap || anyRegion || anyRoute || anyFog || anyLayer || anyEntityEdit;
 }
