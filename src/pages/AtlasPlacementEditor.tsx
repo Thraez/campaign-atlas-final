@@ -1358,7 +1358,6 @@ export default function AtlasPlacementEditor() {
                 draftMap={activeMap}
                 draftPlacements={draftPlacementsForValidation}
                 draftLocalLayers={layerEditor.localLayers}
-                lastExportAt={null}
                 onGoToMap={(mid) => { setActiveMapId(mid); toast.info(`Switched to ${project.maps.find((m) => m.id === mid)?.name ?? mid}`); }}
                 onGoToEntity={(eid) => {
                   const c = effectiveCoord(eid);
