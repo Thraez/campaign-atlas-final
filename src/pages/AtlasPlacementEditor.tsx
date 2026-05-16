@@ -19,8 +19,6 @@ import { MapLayerEditableOverlay } from "@/atlas/MapLayerEditableOverlay";
 import { MapSettingsPanel } from "@/atlas/MapSettingsPanel";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { overridesSchema } from "@/atlas/schemas/imports";
-import { classifyDraftStatus } from "@/atlas/yaml/canon";
-import { DraftStatusBadge } from "@/atlas/yaml/StatusBadge";
 import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
 import type { FileChange } from "@/atlas/save/localFsSave";
@@ -749,7 +747,6 @@ export default function AtlasPlacementEditor() {
   };
 
   const dirtyCount = Object.keys(overrides).filter((k) => activeMap && k.startsWith(`${activeMap.id}:`)).length;
-  const draftStatus = classifyDraftStatus({ dirtyCount, lastExportAt: null });
   // Unsaved-changes signal: there are local pin overrides OR a dirty
   // world.yaml signal. The pin-side gate also waits for an edit since the
   // last successful save so a hydrated-but-clean session doesn't nag; the
@@ -939,7 +936,6 @@ export default function AtlasPlacementEditor() {
           className="flex items-center gap-2 min-w-0"
           title="YAML canon (committed) → local draft (this browser) → Save (dev plugin writes canon + rebuilds atlas) → git commit"
         >
-          <DraftStatusBadge status={draftStatus} />
           <span className="truncate">
             <strong>YAML is canon.</strong> Save writes directly to your entity .md files and rebuilds the atlas — commit with git when ready.
           </span>
