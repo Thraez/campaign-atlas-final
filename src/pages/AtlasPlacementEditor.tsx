@@ -41,7 +41,6 @@ import { TabFrame } from "@/atlas/tabs/TabFrame";
 import { RegionsTab } from "@/atlas/tabs/RegionsTab";
 import { RoutesTab } from "@/atlas/tabs/RoutesTab";
 import { FogTab } from "@/atlas/tabs/FogTab";
-import { EntitiesTab } from "@/atlas/tabs/EntitiesTab";
 import { PublishCheckTab } from "@/atlas/tabs/PublishCheckTab";
 import { type CategoryId } from "@/atlas/content/entityCategory";
 import { CategoryPanel } from "@/atlas/categories/CategoryPanel";
