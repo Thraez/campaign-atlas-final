@@ -182,3 +182,68 @@ maps:
     expect(cfg.regions[0].mapId).toBe("m1");
   });
 });
+
+describe("loadWorldConfig — import block", () => {
+  it("parses a valid import block into importConfig", () => {
+    writeWorldYaml(`${baseMap}
+import:
+  folders:
+    npc: npcs
+    settlement: settlements
+  defaultFolder: imports
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.importConfig).toEqual({
+      folders: { npc: "npcs", settlement: "settlements" },
+      defaultFolder: "imports",
+    });
+    // No import-related warnings (a schema-version advisory may appear for the
+    // unversioned baseMap fixture — filter it out before asserting).
+    expect(cfg.warnings.filter((w) => !w.includes("schemaVersion"))).toHaveLength(0);
+  });
+
+  it("drops invalid folder values and emits a warning per dropped entry", () => {
+    writeWorldYaml(`${baseMap}
+import:
+  folders:
+    bad1: ".."
+    bad2: "../../etc/passwd"
+    ok: "npcs"
+  defaultFolder: imports
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.importConfig.folders).toEqual({ ok: "npcs" });
+    expect(cfg.warnings.some((w) => w.includes('".."'))).toBe(true);
+    expect(cfg.warnings.some((w) => w.includes('"../../etc/passwd"'))).toBe(true);
+  });
+
+  it("rejects _atlas as a folder value and warns", () => {
+    writeWorldYaml(`${baseMap}
+import:
+  folders:
+    npc: _atlas
+  defaultFolder: imports
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.importConfig.folders).toEqual({});
+    expect(cfg.warnings.some((w) => w.includes('"_atlas"'))).toBe(true);
+  });
+
+  it("falls back to 'imports' when defaultFolder is invalid and warns", () => {
+    writeWorldYaml(`${baseMap}
+import:
+  defaultFolder: ".."
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.importConfig.defaultFolder).toBe("imports");
+    expect(cfg.warnings.some((w) => w.includes("defaultFolder"))).toBe(true);
+  });
+
+  it("absent import block yields { folders: {}, defaultFolder: 'imports' } with no warnings", () => {
+    writeWorldYaml(baseMap);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.importConfig).toEqual({ folders: {}, defaultFolder: "imports" });
+    // No import-related warnings (schema-version advisory filtered out).
+    expect(cfg.warnings.filter((w) => !w.includes("schemaVersion"))).toHaveLength(0);
+  });
+});
