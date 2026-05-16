@@ -63,8 +63,8 @@ export interface ImportedFile {
   warnings: string[];
 }
 
-const WIKILINK_RE = /\[\[([^\[\]\|\n]+?)(?:\|([^\[\]\n]+?))?\]\]/g;
-const EMBED_RE = /!\[\[([^\[\]\n]+?)\]\]/g;
+const WIKILINK_RE = /\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+?))?\]\]/g;
+const EMBED_RE = /!\[\[([^[\]\n]+?)\]\]/g;
 const MD_IMAGE_RE = /!\[[^\]]*\]\(([^)]+)\)/g;
 
 function safeFilenameToTitle(name: string): string {
@@ -96,7 +96,7 @@ export function generateAutoSummary(body: string, maxLen = 220): string | undefi
     .replace(/^\s*>.*$/gm, "")                 // blockquotes
     .replace(/^\s{0,3}#{1,6}\s.*$/gm, "")      // headings
     .replace(/^\s*[-*+]\s+/gm, "")             // list markers
-    .replace(/\[\[([^\]\|]+)(?:\|([^\]]+))?\]\]/g, (_m, t, d) => (d ?? t).trim())
+    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, t, d) => (d ?? t).trim())
     .replace(/\*\*?([^*]+)\*\*?/g, "$1");
 
   for (const block of cleaned.split(/\n{2,}/)) {

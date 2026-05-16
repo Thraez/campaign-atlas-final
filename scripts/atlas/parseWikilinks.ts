@@ -1,6 +1,6 @@
 import type { ResolvedLink } from "../../src/atlas/content/schema";
 
-const WIKILINK = /\[\[([^\[\]\|\n]+?)(?:\|([^\[\]\n]+?))?\]\]/g;
+const WIKILINK = /\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+?))?\]\]/g;
 
 export interface ResolveContext {
   // Map of normalized title/alias -> entity id
@@ -43,7 +43,7 @@ export function renderLinkTokens(
   opts: { hideBroken?: boolean } = {}
 ): string {
   const re = new RegExp(
-    `${TOKEN_OPEN.replace(/[\u2063\[\]]/g, (c) => "\\" + c)}(\\d+)${TOKEN_CLOSE.replace(/[\u2063\[\]]/g, (c) => "\\" + c)}`,
+    `${TOKEN_OPEN.replace(/[\u2063[\]]/g, (c) => "\\" + c)}(\\d+)${TOKEN_CLOSE.replace(/[\u2063[\]]/g, (c) => "\\" + c)}`,
     "g"
   );
   return html.replace(re, (_m, idxStr) => {
