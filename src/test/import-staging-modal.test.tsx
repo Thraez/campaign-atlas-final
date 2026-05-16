@@ -50,10 +50,12 @@ function makeCtx(overrides?: {
 function Harness({
   initial,
   ctx = makeCtx(),
+  importConfig = TEST_IMPORT_CONFIG,
   onCommit,
 }: {
   initial: StagingRow[];
   ctx?: StagingContext;
+  importConfig?: ImportFolderConfig;
   onCommit?: (committed: StagingRow[]) => void;
 }) {
   const [rows, setRows] = useState(initial);
@@ -61,6 +63,7 @@ function Harness({
     <ImportStagingModal
       open
       rows={rows}
+      importConfig={importConfig}
       onPatchRow={(id, patch) =>
         setRows((rs) =>
           rs.map((r) =>
@@ -157,5 +160,26 @@ describe("ImportStagingModal", () => {
     render(<Harness initial={rows} onCommit={onCommit} />);
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("'Select all overwrites' checks all unchecked path-collision rows at once", () => {
+    const existingPaths = new Set([
+      "content/astrath-deeprealm/settlements/a.md",
+      "content/astrath-deeprealm/settlements/b.md",
+    ]);
+    const ctx = makeCtx({ existingPaths });
+    const rows = buildStagingRows(
+      [
+        { filename: "a.md", raw: "---\natlas: { type: settlement, id: a }\n---\n" },
+        { filename: "b.md", raw: "---\natlas: { type: settlement, id: b }\n---\n" },
+      ],
+      ctx,
+    );
+    render(<Harness initial={rows} ctx={ctx} />);
+    expect((screen.getByLabelText("Include a.md") as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByLabelText("Include b.md") as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: /Select all overwrites/i }));
+    expect((screen.getByLabelText("Include a.md") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("Include b.md") as HTMLInputElement).checked).toBe(true);
   });
 });

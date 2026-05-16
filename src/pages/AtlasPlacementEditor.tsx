@@ -1468,6 +1468,7 @@ export default function AtlasPlacementEditor() {
         open={importFlow.open}
         rows={importFlow.rows}
         isImporting={importFlow.isImporting}
+        importConfig={importConfig}
         onPatchRow={importFlow.patchRow}
         onCancel={importFlow.cancel}
         onCommit={importFlow.commit}
