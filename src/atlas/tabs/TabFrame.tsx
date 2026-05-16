@@ -13,8 +13,7 @@
  */
 import { useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, ShieldAlert, FileCode } from "lucide-react";
+import { ChevronDown, ChevronRight, ShieldAlert } from "lucide-react";
 
 export interface TabFrameProps {
   title: string;
@@ -22,10 +21,6 @@ export interface TabFrameProps {
   localDraftCount: number;
   blockingCount?: number;
   warningCount?: number;
-  lastExportAt?: number | null;
-  onExport?: () => void;
-  exportLabel?: string;
-  exportDisabled?: boolean;
   rawYamlPreview?: string;
   children: ReactNode;
 }
@@ -37,27 +32,17 @@ export function TabFrame(props: TabFrameProps) {
     localDraftCount,
     blockingCount = 0,
     warningCount = 0,
-    lastExportAt,
-    onExport,
-    exportLabel = "Export patch",
-    exportDisabled,
     rawYamlPreview,
     children,
   } = props;
 
   const [showRaw, setShowRaw] = useState(false);
-  const exportedAgo = lastExportAt ? formatAgo(Date.now() - lastExportAt) : null;
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="px-3 py-2 border-b border-border space-y-1.5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold">{title}</h2>
-          {onExport && (
-            <Button size="sm" variant="default" onClick={onExport} disabled={exportDisabled} className="h-7 gap-1 text-xs">
-              <FileCode className="h-3.5 w-3.5" /> {exportLabel}
-            </Button>
-          )}
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
           <Badge variant="outline" title="Rows already committed in YAML canon">
@@ -73,11 +58,6 @@ export function TabFrame(props: TabFrameProps) {
           )}
           {warningCount > 0 && (
             <Badge variant="secondary">{warningCount} warning</Badge>
-          )}
-          {onExport && (
-            <span className="text-muted-foreground ml-auto">
-              {exportedAgo ? `Exported ${exportedAgo} ago` : "No export yet"}
-            </span>
           )}
         </div>
       </div>
@@ -103,13 +83,4 @@ export function TabFrame(props: TabFrameProps) {
       </div>
     </div>
   );
-}
-
-function formatAgo(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  return `${h}h`;
 }

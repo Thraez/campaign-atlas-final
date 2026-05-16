@@ -250,9 +250,10 @@ export async function hashContent(content: string): Promise<string> {
       .join("");
     return `sha256:${hex}`;
   }
-  // Node test fallback.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- runtime fallback for non-browser tests
-  const nodeCrypto = require("node:crypto") as typeof import("node:crypto");
-  const hex = nodeCrypto.createHash("sha256").update(bytes).digest("hex");
+  // Node test fallback (only reached when Web Crypto is unavailable, i.e.
+  // older Node test envs). Dynamic ESM import so this stays bundler-safe in
+  // the browser, where this branch is never taken.
+  const { createHash } = await import("node:crypto");
+  const hex = createHash("sha256").update(bytes).digest("hex");
   return `sha256:${hex}`;
 }

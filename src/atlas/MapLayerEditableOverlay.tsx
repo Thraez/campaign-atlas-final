@@ -41,6 +41,16 @@ interface Props {
   lockAspect?: boolean;
   onSelect: () => void;
   onCommit: (patch: Partial<MapLayer>) => void;
+  /**
+   * Click-through for pin placement. The image overlay is `interactive` (so
+   * it can be selected/edited), which means it absorbs map clicks. When a
+   * pin placement is pending the editor needs that click instead: this is
+   * called with the clicked lat/lng and returns `true` if it consumed the
+   * click (placement happened) — in which case we stop propagation so the
+   * map's own click handler doesn't double-fire. Returns `false` to fall
+   * back to normal layer selection.
+   */
+  onBackgroundClick?: (latlng: L.LatLng) => boolean;
 }
 
 type Corner = "nw" | "ne" | "sw" | "se";
@@ -57,7 +67,7 @@ function handleDivIcon(): L.DivIcon {
 }
 
 export function MapLayerEditableOverlay({
-  layer, mapDoc, editMode, isSelected, lockAspect, onSelect, onCommit,
+  layer, mapDoc, editMode, isSelected, lockAspect, onSelect, onCommit, onBackgroundClick,
 }: Props) {
   const lmap = useMap();
   const overlayRef = useRef<L.ImageOverlay | null>(null);
@@ -187,7 +197,18 @@ export function MapLayerEditableOverlay({
         bounds={bounds}
         opacity={layer.opacity}
         interactive={true}
-        eventHandlers={{ click: onSelect }}
+        eventHandlers={{
+          click: (e) => {
+            const me = e as L.LeafletMouseEvent;
+            if (onBackgroundClick && onBackgroundClick(me.latlng)) {
+              // Placement consumed the click — don't also let the map's
+              // click handler fire (would place / chain twice).
+              L.DomEvent.stopPropagation(me.originalEvent);
+              return;
+            }
+            onSelect();
+          },
+        }}
       />
       {editMode && isSelected && (
         <>

@@ -18,9 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { TabFrame } from "./TabFrame";
-import { dumpYaml, patchHeader } from "@/atlas/yaml/dump";
-import { validatePatchYaml } from "@/atlas/yaml/validatePatch";
-import { downloadText } from "./download";
+import { dumpYaml } from "@/atlas/yaml/dump";
 import type { RegionDraftAPI } from "@/atlas/regions/useRegionDraft";
 import { regionToYamlObject } from "@/atlas/regions/useRegionDraft";
 
@@ -30,13 +28,11 @@ interface Props {
   api: RegionDraftAPI;
   blockingCount?: number;
   warningCount?: number;
-  lastExportAt: number | null;
-  onExported: () => void;
   /** Center the map on a region. */
   onFitTo?: (r: Region) => void;
 }
 
-export function RegionsTab({ project, map, api, blockingCount, warningCount, lastExportAt, onExported, onFitTo }: Props) {
+export function RegionsTab({ project, map, api, blockingCount, warningCount, onFitTo }: Props) {
   const { effective, draft, dirty, dirtyCount, selectedId, setSelectedId, drawing, draftPoints, startDraw, cancelDraw, finishDraw, removeLastDraftPoint, patch, translate, duplicate, remove, reset, issues } = api;
   const [advancedYaml, setAdvancedYaml] = useState(false);
 
@@ -70,26 +66,6 @@ export function RegionsTab({ project, map, api, blockingCount, warningCount, las
     return () => window.removeEventListener("keydown", onKey);
   }, [drawing, finishDraw, cancelDraw, removeLastDraftPoint, selected, remove]);
 
-  const exportPatch = () => {
-    if (!effective.length) { toast.warning("No regions to export."); return; }
-    const blocking = issues.filter((i) => i.severity === "blocking");
-    if (blocking.length) { toast.error(blocking[0].message); return; }
-    const content =
-      patchHeader({
-        title: `Regions patch — ${map.name}`,
-        subject: `world.yaml > maps[id=${map.id}].regions`,
-        applyTo: `content/<world>/_atlas/world.yaml (replace this map's regions: list)`,
-        notes: [
-          "Replaces the entire regions: list for this map — preserves layers/routes/fog.",
-          dirtyCount > 0 ? `${dirtyCount} local change${dirtyCount === 1 ? "" : "s"} included.` : "",
-        ].filter(Boolean),
-      }) + yamlBlock;
-    const result = validatePatchYaml(content, "world-map");
-    if (!result.ok) { toast.error(result.errors[0]); return; }
-    downloadText(`regions-patch-${map.id}.yaml`, content, "text/yaml");
-    onExported();
-  };
-
   return (
     <TabFrame
       title="Regions"
@@ -97,9 +73,6 @@ export function RegionsTab({ project, map, api, blockingCount, warningCount, las
       localDraftCount={dirtyCount}
       blockingCount={blockingCount}
       warningCount={warningCount}
-      lastExportAt={lastExportAt}
-      onExport={exportPatch}
-      exportDisabled={effective.length === 0}
       rawYamlPreview={advancedYaml ? yamlBlock : undefined}
     >
       <div className="space-y-3">

@@ -1,14 +1,11 @@
-import { useMemo, useState } from "react";
-import { toast } from "sonner";
-import { FileCode, RotateCcw, Grid3x3, Globe2, Droplets } from "lucide-react";
+import { useMemo } from "react";
+import { RotateCcw, Grid3x3, Globe2, Droplets } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { GridKind, GridOverlay, MapDocument } from "@/atlas/content/schema";
-import { ExportChecklistDialog, useExportChecklist } from "./ExportChecklistDialog";
-import { validatePatchYaml } from "./yaml/validatePatch";
 
 interface Props {
   map: MapDocument;
@@ -17,20 +14,9 @@ interface Props {
   onReset: () => void;
 }
 
-function downloadText(name: string, content: string, mime = "text/markdown") {
-  const blob = new Blob([content], { type: mime });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(a.href);
-  toast.success(`Downloaded ${name}`);
-}
-
 const DEFAULT_GRID: GridOverlay = { kind: "square", size: 256, color: "rgba(255,255,255,0.08)", enabled: true };
 
 export function MapSettingsPanel({ map, baseMap, onPatch, onReset }: Props) {
-  const checklist = useExportChecklist();
   const dirtyKeys = useMemo<string[]>(() => {
     const keys: string[] = [];
     if (map.width !== baseMap.width || map.height !== baseMap.height) keys.push("size");
@@ -47,63 +33,15 @@ export function MapSettingsPanel({ map, baseMap, onPatch, onReset }: Props) {
     onPatch({ grid: { ...grid, ...patch } });
   };
 
-  const exportPatch = () => {
-    const lines: string[] = [];
-    lines.push(`# Map settings patch — ${map.name} (${map.id})`);
-    lines.push(`# Generated ${new Date().toISOString()}`);
-    lines.push(`#`);
-    lines.push(`# HOW TO APPLY:`);
-    lines.push(`# Open content/<world>/_atlas/world.yaml and find the entry under "maps:"`);
-    lines.push(`# whose id is "${map.id}". REPLACE its settings (width/height/oceanColor/`);
-    lines.push(`# wrapX/grid) with the YAML below. Keep the existing layers: section.`);
-    lines.push(`# DO NOT paste the # comments, and DO NOT wrap in markdown fences.`);
-    lines.push(``);
-    lines.push(`maps:`);
-    lines.push(`  - id: ${map.id}`);
-    lines.push(`    width: ${map.width}`);
-    lines.push(`    height: ${map.height}`);
-    if (map.oceanColor) lines.push(`    oceanColor: "${map.oceanColor}"`);
-    lines.push(`    wrapX: ${!!map.wrapX}`);
-    if (map.grid) {
-      lines.push(`    grid:`);
-      lines.push(`      kind: ${map.grid.kind}`);
-      lines.push(`      size: ${map.grid.size}`);
-      if (map.grid.color) lines.push(`      color: "${map.grid.color}"`);
-      lines.push(`      enabled: ${map.grid.enabled !== false}`);
-    }
-    const content = lines.join("\n");
-    const result = validatePatchYaml(content, "settings");
-    if (!result.ok) {
-      toast.error(`Patch validation failed: ${result.errors[0]}`);
-      return;
-    }
-    if (result.warnings.length) toast.warning(result.warnings[0]);
-    downloadText(`map-settings-${map.id}.yaml`, content, "text/yaml");
-    checklist.show({
-      title: "Map settings patch exported",
-      description: "Your map settings YAML patch is ready. Follow the checklist to commit it.",
-      files: [`map-settings-${map.id}.yaml`],
-      steps: [
-        { label: "Open the downloaded .yaml file", detail: "It is pure YAML — only non-comment lines belong in world.yaml." },
-        { label: "Paste under the matching map entry", detail: `In content/<world>/_atlas/world.yaml, find the map with id "${map.id}" and replace its settings with the YAML below the comment header. Do not paste markdown code fences.` },
-        { label: "Commit changes to main", detail: "Push the updated world.yaml." },
-        { label: "GitHub Action publishes automatically", detail: "The publish-atlas.yml workflow will run and deploy to GitHub Pages." },
-      ],
-    });
-  };
-
   return (
     <div className="flex flex-col h-full">
       <div className="p-3 border-b border-border space-y-2">
         <div className="text-xs text-muted-foreground">
-          Edits are <strong>local browser drafts</strong>. Export the patch and commit to <code>world.yaml</code> to publish.
+          Edits are <strong>local drafts</strong> until you click <strong>Save</strong> — Save writes them to <code>world.yaml</code> and rebuilds.
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="default" className="flex-1 gap-1.5" onClick={exportPatch}>
-            <FileCode className="h-3.5 w-3.5" /> Export patch
-          </Button>
-          <Button size="sm" variant="ghost" onClick={onReset} disabled={dirtyKeys.length === 0} title="Discard local edits">
-            <RotateCcw className="h-3.5 w-3.5" />
+          <Button size="sm" variant="ghost" onClick={onReset} disabled={dirtyKeys.length === 0} title="Discard local edits" className="gap-1.5">
+            <RotateCcw className="h-3.5 w-3.5" /> Discard local edits
           </Button>
         </div>
         {dirtyKeys.length > 0 && (
@@ -216,14 +154,6 @@ export function MapSettingsPanel({ map, baseMap, onPatch, onReset }: Props) {
           </div>
         </section>
       </div>
-      <ExportChecklistDialog
-        open={checklist.open}
-        onOpenChange={checklist.setOpen}
-        title={checklist.state.title}
-        description={checklist.state.description}
-        files={checklist.state.files}
-        steps={checklist.state.steps}
-      />
     </div>
   );
 }

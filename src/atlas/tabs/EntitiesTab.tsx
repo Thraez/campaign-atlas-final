@@ -18,7 +18,11 @@ import {
   RELATIONSHIP_TYPES,
   dmFieldsForType,
 } from "@/atlas/profiles/profileFields";
-import { compactProfile, filterRelationshipsForPlayer } from "@/atlas/profiles/profileBuild";
+import { filterRelationshipsForPlayer } from "@/atlas/profiles/profileBuild";
+import {
+  type FrontmatterDraft,
+  entityFrontmatterPatches,
+} from "@/atlas/save/canonicalEntitySave";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,43 +30,35 @@ import { Textarea } from "@/components/ui/textarea";
 import { DmMaskingTextarea } from "@/atlas/DmMaskingTextarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TabFrame } from "./TabFrame";
-import { buildEntityFrontmatterPatch, type EntityFrontmatterPatch } from "@/atlas/yaml/buildPatches";
-import { validatePatchYaml } from "@/atlas/yaml/validatePatch";
-import { downloadText } from "./download";
+import { buildEntityFrontmatterPatch } from "@/atlas/yaml/buildPatches";
 import { printEntityBundle } from "@/atlas/printHandout";
 
 interface Props {
   project: AtlasProject;
   blockingCount?: number;
   warningCount?: number;
-  lastExportAt: number | null;
-  onExported: () => void;
   /** Phase 1C: open the staging modal with the picked files. */
   onImportMdFiles?: (files: File[]) => void;
   /** Phase 1C: open the paste-markdown dialog. */
   onPasteMarkdown?: () => void;
-}
-
-interface FrontmatterDraft {
-  visibility?: EntityVisibility;
-  summary?: string;
-  aliases?: string[];
-  images?: string[];
-  type?: string;
-  profile?: EntityProfile;
-  relationships?: EntityRelationship[];
+  /**
+   * Controlled draft state — owned by AtlasPlacementEditor so the unified
+   * Save can write these edits to disk (no more Export Patch). Keyed by
+   * entity id.
+   */
+  drafts: Record<string, FrontmatterDraft>;
+  onDraftsChange: (next: Record<string, FrontmatterDraft>) => void;
 }
 
 export function EntitiesTab({
   project,
   blockingCount,
   warningCount,
-  lastExportAt,
-  onExported,
   onImportMdFiles,
   onPasteMarkdown,
+  drafts,
+  onDraftsChange,
 }: Props) {
-  const [drafts, setDrafts] = useState<Record<string, FrontmatterDraft>>({});
   const [selectedId, setSelectedId] = useState<string | null>(project.entities[0]?.id ?? null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -77,7 +73,7 @@ export function EntitiesTab({
   });
 
   const setDraft = (id: string, patch: Partial<FrontmatterDraft>) => {
-    setDrafts((d) => ({ ...d, [id]: { ...(d[id] ?? {}), ...patch } }));
+    onDraftsChange({ ...drafts, [id]: { ...(drafts[id] ?? {}), ...patch } });
   };
 
   const dirtyCount = Object.keys(drafts).length;
@@ -91,39 +87,12 @@ export function EntitiesTab({
     return m;
   }, [project.entities]);
 
-  const patches: EntityFrontmatterPatch[] = useMemo(() => {
-    return Object.entries(drafts).map(([id, d]) => {
-      const e = project.entities.find((x) => x.id === id)!;
-      const profile = compactProfile(d.profile ?? e.profile);
-      return {
-        sourcePath: e.sourcePath,
-        title: e.title,
-        atlas: {
-          id: e.id,
-          type: d.type ?? e.type,
-          visibility: d.visibility ?? e.visibility,
-          summary: d.summary ?? e.summary,
-          aliases: d.aliases ?? e.aliases,
-          images: d.images ?? e.images,
-          profile,
-          relationships: (d.relationships ?? e.relationships)?.length
-            ? d.relationships ?? e.relationships
-            : undefined,
-        },
-      };
-    });
-  }, [drafts, project.entities]);
+  const patches = useMemo(
+    () => entityFrontmatterPatches(drafts, project.entities),
+    [drafts, project.entities],
+  );
 
   const yamlPreview = useMemo(() => (patches.length ? buildEntityFrontmatterPatch(patches).content : ""), [patches]);
-
-  const exportPatch = () => {
-    if (!patches.length) { toast.warning("No entity edits to export."); return; }
-    const artifact = buildEntityFrontmatterPatch(patches);
-    const result = validatePatchYaml(artifact.content, "entity-frontmatter");
-    if (!result.ok) { toast.error(result.errors[0]); return; }
-    downloadText(artifact.filename, artifact.content, "text/yaml");
-    onExported();
-  };
 
   return (
     <TabFrame
@@ -132,10 +101,6 @@ export function EntitiesTab({
       localDraftCount={dirtyCount}
       blockingCount={blockingCount}
       warningCount={warningCount}
-      lastExportAt={lastExportAt}
-      onExport={exportPatch}
-      exportLabel={`Export ${dirtyCount} patch${dirtyCount === 1 ? "" : "es"}`}
-      exportDisabled={dirtyCount === 0}
       rawYamlPreview={yamlPreview}
     >
       {(onImportMdFiles || onPasteMarkdown) && (
@@ -206,7 +171,7 @@ export function EntitiesTab({
         />
       )}
       {dirtyCount > 0 && (
-        <Button size="sm" variant="ghost" onClick={() => setDrafts({})} className="text-xs">
+        <Button size="sm" variant="ghost" onClick={() => onDraftsChange({})} className="text-xs">
           Discard all local changes ({dirtyCount})
         </Button>
       )}

@@ -453,25 +453,10 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
     }
   }
 
-  // 7. Draft / export staleness
-  if (draftPlacements.length > 0) {
-    if (!lastExportAt) {
-      issues.push({
-        severity: "warning",
-        code: "draft-not-exported",
-        category: "draft",
-        message: `${draftPlacements.length} draft placement(s) have never been exported`,
-        hint: "Click Export DM Changes to download a YAML patch you can commit.",
-      });
-    } else if (Date.now() - lastExportAt > 1000 * 60 * 30) {
-      issues.push({
-        severity: "suggestion",
-        code: "export-stale",
-        category: "draft",
-        message: `Last export was over 30 minutes ago — drafts may be stale`,
-      });
-    }
-  }
+  // 7. (Removed) Draft/export staleness. The Export Patch flow was removed —
+  // the unified Save writes drafts straight to disk, so a "not exported"
+  // warning would point at a button that no longer exists. Surfacing unsaved
+  // draft state is the job of the save-status UI, not the validator.
   if (draftLocalLayers.some((l) => l.origin === "upload")) {
     issues.push({
       severity: "suggestion",

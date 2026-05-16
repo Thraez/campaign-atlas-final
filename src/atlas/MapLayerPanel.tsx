@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import JSZip from "jszip";
-import { Upload, Link as LinkIcon, Trash2, Maximize2, Minimize2, Crosshair, RotateCcw, Lock, Unlock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, FileCode, Copy, Eraser, Package, Move } from "lucide-react";
+import { Upload, Link as LinkIcon, Trash2, Maximize2, Minimize2, Crosshair, RotateCcw, Lock, Unlock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Copy, Eraser, Move } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,10 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import type { LocalLayer } from "@/atlas/useMapLayers";
-import { ExportChecklistDialog, useExportChecklist } from "./ExportChecklistDialog";
 import { normalizeAtlasAssetUrl } from "./url";
-import { validatePatchYaml } from "./yaml/validatePatch";
-import { buildWorldMapPatch } from "./yaml/buildPatches";
 import { centerAnchoredResize } from "./layerGeometry";
 
 interface Props {
@@ -69,16 +65,6 @@ function stripExt(name: string): string {
   return name.replace(/\.[a-zA-Z0-9]+$/, "").replace(/[-_]+/g, " ").trim();
 }
 
-function downloadText(name: string, content: string, mime = "text/plain") {
-  const blob = new Blob([content], { type: mime });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(a.href);
-  toast.success(`Downloaded ${name}`);
-}
-
 export function MapLayerPanel(props: Props) {
   const { map, mergedLayers, localLayers, selectedId, setSelectedId, onAddFiles, onAddUrl, onEditBuiltin, onUpdate, onDuplicate, onRemove, onClearAll, onSetMapSize } = props;
   const fileInput = useRef<HTMLInputElement>(null);
@@ -91,7 +77,6 @@ export function MapLayerPanel(props: Props) {
   const editGeometry = props.editGeometry ?? false;
   const setEditGeometry = props.setEditGeometry;
   const [locked, setLocked] = useState(false);
-  const checklist = useExportChecklist();
 
   const selected = mergedLayers.find((l) => l.id === selectedId) ?? null;
   const localSelected = localLayers.find((l) => l.id === selectedId) ?? null;
@@ -102,7 +87,7 @@ export function MapLayerPanel(props: Props) {
   const ensureEditable = (id: string) => {
     if (!localLayers.find((l) => l.id === id)) {
       onEditBuiltin(id);
-      toast.info("Editing built-in layer locally — export patch to commit.");
+      toast.info("Editing built-in layer locally — click Save to commit.");
     }
   };
 
@@ -142,79 +127,6 @@ export function MapLayerPanel(props: Props) {
   const fitWidth = () => selected && setSizeCenterAnchored(map.width, lockAspect ? map.width / aspect : selected.height);
   const fitHeight = () => selected && setSizeCenterAnchored(lockAspect ? map.height * aspect : selected.width, map.height);
 
-  const exportZip = async () => {
-    const uploads = localLayers.filter((l) => l.origin === "upload" && l.dataUrl);
-    if (uploads.length === 0) {
-      toast.info("No uploaded files to bundle (only data-URL uploads can be zipped).");
-      return;
-    }
-    const zip = new JSZip();
-    for (const u of uploads) {
-      const targetPath = (u.targetPath ?? `public/atlas/assets/maps/${u.id}`).replace(/^\/+/, "");
-      const m = u.dataUrl!.match(/^data:[^;]+;base64,(.*)$/);
-      if (!m) continue;
-      zip.file(targetPath, m[1], { base64: true });
-    }
-    zip.file("README.txt", [
-      "AstrathDeeprealm Atlas — uploaded asset bundle",
-      "",
-      "Unzip from the repository root so files land at the listed paths,",
-      "then commit alongside your world.yaml patch and run:",
-      "  npm run atlas:build:player",
-      "",
-      "Files:",
-      ...uploads.map((u) => `  - ${(u.targetPath ?? "").replace(/^\/+/, "")}`),
-    ].join("\n"));
-    const blob = await zip.generateAsync({ type: "blob" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `atlas-assets-${map.id}.zip`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    toast.success(`Bundled ${uploads.length} file${uploads.length === 1 ? "" : "s"}`);
-    checklist.show({
-      title: "Asset bundle exported",
-      description: "Your uploaded images are ready. Follow the checklist to commit them.",
-      files: [`atlas-assets-${map.id}.zip`],
-      steps: [
-        { label: "Upload files from the zip to GitHub", detail: `In your repo, go to public/atlas/assets/maps/ and upload ${uploads.length} image file(s). Or unzip the bundle at the repo root.` },
-        { label: "Apply the world.yaml patch", detail: "Open the downloaded Patch.md and paste the YAML under the matching map entry in content/<world>/_atlas/world.yaml." },
-        { label: "Commit changes to main", detail: "Push the updated world.yaml and new images." },
-        { label: "GitHub Action publishes automatically", detail: "The publish-atlas.yml workflow will run and deploy to GitHub Pages." },
-      ],
-    });
-  };
-
-  const exportPatch = () => {
-    let artifact;
-    try {
-      artifact = buildWorldMapPatch({ map, mergedLayers, localLayers });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
-      return;
-    }
-    const result = validatePatchYaml(artifact.content, "map");
-    if (!result.ok) {
-      toast.error(`Patch validation failed: ${result.errors[0]}`);
-      return;
-    }
-    if (result.warnings.length) toast.warning(result.warnings[0]);
-    downloadText(artifact.filename, artifact.content, artifact.mime);
-    const uploads = localLayers.filter((l) => l.origin === "upload");
-    checklist.show({
-      title: "Layer patch exported",
-      description: "Your map layer YAML patch is ready. Follow the checklist to commit it.",
-      files: [artifact.filename],
-      steps: [
-        { label: "Open the downloaded .yaml file", detail: "It is pure YAML — only the lines that are NOT '#' comments belong in world.yaml." },
-        { label: "Paste under the matching map entry", detail: `In content/<world>/_atlas/world.yaml, find the map with id "${map.id}" and replace its settings + layers section with the YAML lines below the comment header. Never paste markdown code fences.` },
-        ...(uploads.length ? [{ label: "Upload image files to GitHub", detail: `Upload ${uploads.length} image file(s) to their target paths (e.g., public/atlas/assets/maps/).` }] : []),
-        { label: "Commit changes to main", detail: "Push the updated world.yaml and any new images." },
-        { label: "GitHub Action publishes automatically", detail: "The publish-atlas.yml workflow will run and deploy to GitHub Pages." },
-      ],
-    });
-  };
-
   return (
     <div className="flex flex-col h-full">
       <div className="p-3 border-b border-border space-y-2">
@@ -241,17 +153,11 @@ export function MapLayerPanel(props: Props) {
           </Button>
         )}
         <div className="text-xs text-muted-foreground">
-          Edits here are <strong>local browser drafts</strong>. Export the patch and commit the YAML + asset files to publish.
+          Edits here are <strong>local drafts</strong> until you click <strong>Save</strong> — Save writes the layers (and any uploaded images) to disk and rebuilds.
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="secondary" className="flex-1 gap-1.5" onClick={() => fileInput.current?.click()}>
             <Upload className="h-3.5 w-3.5" /> Upload images
-          </Button>
-          <Button size="sm" variant="default" className="gap-1.5" onClick={exportPatch} title="Download world.yaml patch">
-            <FileCode className="h-3.5 w-3.5" /> Patch
-          </Button>
-          <Button size="sm" variant="default" className="gap-1.5" onClick={exportZip} title="Download .zip of uploaded assets">
-            <Package className="h-3.5 w-3.5" /> Zip
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -461,14 +367,6 @@ export function MapLayerPanel(props: Props) {
           </div>
         )}
       </ScrollArea>
-      <ExportChecklistDialog
-        open={checklist.open}
-        onOpenChange={checklist.setOpen}
-        title={checklist.state.title}
-        description={checklist.state.description}
-        files={checklist.state.files}
-        steps={checklist.state.steps}
-      />
     </div>
   );
 }
