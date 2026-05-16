@@ -63,3 +63,31 @@ it("loads an entity, edits the body, builds a save change through the shared rew
   fireEvent.click(screen.getByRole("button", { name: /save/i }));
   await waitFor(() => expect(onSaved).toHaveBeenCalled());
 });
+
+it("loads an entity, edits the body, saves via the shared rewrite", async () => {
+  const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    if (String(url).includes("/__atlas/read")) {
+      return new Response(JSON.stringify({ contents: RAW }), { status: 200 });
+    }
+    // /__atlas/save
+    const body = JSON.parse(String(init!.body));
+    expect(body.files[0].path).toBe("content/w/npcs/corven.md");
+    expect(body.files[0].content).toContain("new body");
+    expect(body.files[0].content).toContain("atlas:");
+    return new Response(JSON.stringify({ saved: 1, paths: body.files.map((f: {path:string}) => f.path) }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  const onSaved = vi.fn();
+  render(
+    <EntityEditPanel
+      sourcePath="content/w/npcs/corven.md"
+      onClose={() => {}}
+      onSaved={onSaved}
+    />,
+  );
+  await waitFor(() => expect(screen.getByLabelText(/body/i)).toBeTruthy());
+  fireEvent.change(screen.getByLabelText(/body/i), { target: { value: "# Corven\n\nnew body\n" } });
+  fireEvent.click(screen.getByRole("button", { name: /save/i }));
+  await waitFor(() => expect(onSaved).toHaveBeenCalled());
+});
