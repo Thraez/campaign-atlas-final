@@ -862,7 +862,6 @@ export default function AtlasPlacementEditor() {
           draftPlacements: draftPlacementsForValidation,
           draftMap: activeMap,
           draftLocalLayers: layerEditor.localLayers,
-          lastExportAt: null,
         })
       : null,
     [project, activeMap, draftPlacementsForValidation, layerEditor.localLayers]

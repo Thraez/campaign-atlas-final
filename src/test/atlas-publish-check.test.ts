@@ -118,7 +118,6 @@ describe("validateProject — Publish Check", () => {
     const r = validateProject({
       project: p,
       draftPlacements: [{ entityId: "town", mapId: "m1", x: 10, y: 10 }],
-      lastExportAt: null,
     });
     expect(r.issues.some((i) => i.code === "draft-not-exported")).toBe(false);
     expect(r.issues.some((i) => i.code === "export-stale")).toBe(false);
