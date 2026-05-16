@@ -38,3 +38,6 @@ backups/
 # .git pointer; never stage them from the main repo).
 .claude/worktrees/
 
+
+# Visual-companion brainstorm artifacts
+.superpowers/
