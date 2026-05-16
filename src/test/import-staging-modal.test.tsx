@@ -50,10 +50,12 @@ function makeCtx(overrides?: {
 function Harness({
   initial,
   ctx = makeCtx(),
+  importConfig = TEST_IMPORT_CONFIG,
   onCommit,
 }: {
   initial: StagingRow[];
   ctx?: StagingContext;
+  importConfig?: ImportFolderConfig;
   onCommit?: (committed: StagingRow[]) => void;
 }) {
   const [rows, setRows] = useState(initial);
@@ -61,6 +63,7 @@ function Harness({
     <ImportStagingModal
       open
       rows={rows}
+      importConfig={importConfig}
       onPatchRow={(id, patch) =>
         setRows((rs) =>
           rs.map((r) =>
