@@ -33,6 +33,9 @@ export interface EntityEditDraftAPI {
 export function useEntityEditDraft(): EntityEditDraftAPI {
   const [draft, setDraft] = useState<EntityEditDraft | null>(null);
   const ref = useRef<EntityEditDraft | null>(null);
+  // Mirror draft into ref synchronously so snapshot/isDirty closures always
+  // read the latest value without needing to be re-created on each render.
+  // eslint-disable-next-line react-hooks/refs
   ref.current = draft;
 
   const load = useCallback((init: Omit<EntityEditDraft, "pristine">) => {
