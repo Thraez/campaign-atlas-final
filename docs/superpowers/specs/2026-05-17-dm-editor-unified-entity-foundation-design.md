@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-17
 **Owner:** Thraez
-**Status:** Approved — pending spec review, then implementation plan
+**Status:** Approved (spec reviewed by owner 2026-05-17) — writing implementation plan
 **Program:** DM-editor product-quality overhaul. This is **Sub-project B**. Parts 1–3 and Sub-project A are merged. Sub-project B builds the shared entity-rendering spine so the DM editor and the player site stay visually and behaviourally consistent, maintainable, and extensible.
 
 **Queued work (durable handover record — keep in sync with memory `project_editor_overhaul.md` so nothing is lost across agent/session handovers):**
@@ -66,7 +66,7 @@ Three shared units, each with one purpose, a well-defined interface, and indepen
 Extracted verbatim from `AtlasViewer.tsx` (currently lines ~888–1031). Renders title, type label, aliases, summary, image gallery, "show on map", body HTML, tags, backlinks. Props stay exactly as they are today (`entity`, `placements`, `entityById`, `onOpenEntity`, `onClose`, `onShowOnMap`) plus one new optional `readerAffordances?: boolean` (default `true`) that gates *player-personal* UI only — private player notes and handout print — which are meaningless in the DM editor. Default `true` ⇒ the player site is byte-for-byte unchanged. No context/hooks consumed (already true today). The player site imports from the new path; this is a pure move.
 
 **A.2 `src/atlas/content/projectEntityForPlayer.ts` — the client player transform.**
-`projectEntityForPlayer(entity, entitiesById): Entity` mirrors the build's player transform from `scripts/build-atlas.ts`: strip `%%…%%` / `:::dm…:::` (reuse Sub-project A's shared `src/atlas/content/stripDmBlocks.ts`), redact wikilinks and relationships whose target is not player-visible (display text → the build's redaction marker, target cleared, marked broken), drop dm-only fields, rebuild `bodyHtml` via Sub-project A's shared renderer (`src/atlas/content/renderEntityMarkdown.ts`). Pure function; no I/O. This is the only logic that must stay in lockstep with the build, and §F.1's parity test makes drift impossible silently.
+`projectEntityForPlayer(entity, entitiesById): Entity` mirrors the build's player transform from `scripts/build-atlas.ts`: strip `%%…%%` / `:::dm…:::` (reuse Sub-project A's shared `src/atlas/content/stripDmBlocks.ts`), redact wikilinks and relationships whose target is not player-visible (display text → the build's redaction marker, target cleared, marked broken), drop dm-only fields, rebuild `bodyHtml` via Sub-project A's shared renderer (`src/atlas/content/renderEntityMarkdown.ts`). Pure function; no I/O. This is the only logic that must stay in lockstep with the build, and §G.1's parity test makes drift impossible silently.
 
 **A.3 `src/atlas/view/ViewModeProvider.tsx` — the global lens.**
 `useViewMode(): { mode: "player" | "dm"; setMode }`. React context at the editor root. The active mode is a **persisted UI preference** (localStorage), *not* Part 2 session "work" — a lens is not unsaved content, it must not inflate the unsaved-count or trip no-loss. A single chrome control toggles it. Every entity surface reads `mode`; `dm` ⇒ render the entity as-is (reveals `%%dm%%`, dm fields, no redaction); `player` ⇒ render `projectEntityForPlayer(entity, …)`. Built and wired in Slice **B4**.
@@ -77,7 +77,7 @@ Extracted verbatim from `AtlasViewer.tsx` (currently lines ~888–1031). Renders
 
 - Move `EntityPanel` to `src/atlas/entity/EntityPanel.tsx`; re-point `AtlasViewer.tsx` imports. Add `readerAffordances` (default `true`). Player site visually and behaviourally unchanged.
 - Create `projectEntityForPlayer` (A.2), reusing shared `stripDmBlocks` + `renderEntityMarkdown`; add the link/relationship redaction the build performs.
-- **Parity test (§F.1):** for every player-visible entity, the client projection equals the player `atlas.json` representation (DOM-normalised). Locks fidelity before anything consumes it.
+- **Parity test (§G.1):** for every player-visible entity, the client projection equals the player `atlas.json` representation (DOM-normalised). Locks fidelity before anything consumes it.
 - Independently shippable: ships as a pure refactor + a new unused-by-UI pure function with a guarding test. Zero user-visible change. Full gate.
 
 ## C. Slice B2 — Entity surface renders through the shared panel
