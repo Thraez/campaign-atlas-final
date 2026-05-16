@@ -3,7 +3,7 @@ import { MapContainer, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Compass, Crosshair, RotateCcw, MapPin, Target, Trash2, Layers as LayersIcon, Settings2, Upload, Save as SaveIcon, Undo2, Redo2, Plus, X } from "lucide-react";
+import { ArrowLeft, Compass, Crosshair, RotateCcw, MapPin, Target, Trash2, Layers as LayersIcon, Settings2, Upload, Save as SaveIcon, Undo2, Redo2, Plus, X, Menu as MenuIcon } from "lucide-react";
 import { toast } from "sonner";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity, ImportFolderConfig, MapDocument, MapLayer } from "@/atlas/content/schema";
@@ -45,6 +45,8 @@ import { PublishCheckTab } from "@/atlas/tabs/PublishCheckTab";
 import { type CategoryId, CATEGORIES, categoryForType } from "@/atlas/content/entityCategory";
 import { CommandPalette } from "@/atlas/shell/CommandPalette";
 import { buildPaletteIndex } from "@/atlas/shell/useCommandPalette";
+import { EditorMenu } from "@/atlas/shell/EditorMenu";
+import { WorldDetailsPanel } from "@/atlas/settings/WorldDetailsPanel";
 import { CategoryPanel } from "@/atlas/categories/CategoryPanel";
 import { PinStateBadge } from "@/atlas/pins/PinStateBadge";
 import { EntityEditorPanel, type NewEntityDraft } from "@/atlas/categories/EntityEditorPanel";
@@ -395,6 +397,9 @@ export default function AtlasPlacementEditor() {
   const selectPanel = (id: string) =>
     setActivePanel((cur) => (cur === id ? null : id));
   const dismissPanel = () => setActivePanel(null);
+
+  // ☰ menu open/close state
+  const [menuOpen, setMenuOpen] = useState(false);
 
   /** Per-tab filter state (placed/unplaced/visibility/type/tag). */
   const [stateFilter, setStateFilter] = useState<"all" | "placed" | "unplaced">("all");
@@ -1061,6 +1066,35 @@ export default function AtlasPlacementEditor() {
         <Button asChild variant="ghost" size="sm">
           <Link to="/atlas">View as player →</Link>
         </Button>
+        <div className="relative">
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Menu"
+            title="Menu"
+            onClick={() => setMenuOpen((v) => !v)}
+          >
+            <MenuIcon className="h-4 w-4" />
+          </Button>
+          {menuOpen && (
+            <>
+              {/* backdrop to close on outside click */}
+              <div
+                className="fixed inset-0 z-[49]"
+                aria-hidden
+                onClick={() => setMenuOpen(false)}
+              />
+              <div className="absolute right-0 top-full mt-1 z-50">
+                <EditorMenu
+                  open
+                  onWorldDetails={() => { setMenuOpen(false); setActivePanel("world"); }}
+                  onMapDetails={() => { setMenuOpen(false); setActivePanel("maps"); }}
+                  onHelp={() => { setMenuOpen(false); window.open("https://github.com", "_blank"); }}
+                />
+              </div>
+            </>
+          )}
+        </div>
       </header>
 
       <div className="flex-1 flex relative min-h-0">
@@ -1326,6 +1360,17 @@ export default function AtlasPlacementEditor() {
             ),
             import: (
               <ImportPanel knownEntityNames={new Set(project.entities.flatMap((e) => [e.id.toLowerCase(), e.title.toLowerCase(), ...e.aliases.map((a) => a.toLowerCase())]))} />
+            ),
+            // Menu-reachable panels (no rail icon — opened via ☰ menu or CommandPalette).
+            world: (
+              <WorldDetailsPanel
+                world={{ name: project.worlds?.[0]?.name ?? "" }}
+                onPatch={(p) => {
+                  // The world name is hardcoded in build-atlas.ts (not in world.yaml),
+                  // so there is no live write path here yet. Log for DM awareness.
+                  console.warn("WorldDetailsPanel.onPatch: world name patch not yet persisted", p);
+                }}
+              />
             ),
           };
           const counts: Record<string, number | undefined> = {
