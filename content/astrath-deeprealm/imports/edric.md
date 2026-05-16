@@ -1,18 +1,39 @@
 ---
 role: Main
-summary: "Harwick's Vein-Marked companion, riding ahead toward Stavall after the Ashbrook Manor sequence."
+summary: Harwick's Vein-Marked companion, riding ahead toward Stavall after the Ashbrook Manor sequence.
 aliases: []
-campaign: [C1]
-status: [alive, known]
-race: 
+campaign:
+  - C1
+status:
+  - alive
+  - known
+race: null
 occupation: []
 faction: []
 voice: []
-appearance: ["lean", "windburned", "sandy hair tied back", "tired sharp eyes", "blue vein-marks on neck"]
+appearance:
+  - lean
+  - windburned
+  - sandy hair tied back
+  - tired sharp eyes
+  - blue vein-marks on neck
 mannerism: []
-catchphrase: 
-connections: ["Harwick", "Ashbrook Manor", "Stavall", "Project Anima"]
-tags: [npc, stub, vein-marked, chase-target]
+catchphrase: null
+connections:
+  - Harwick
+  - Ashbrook Manor
+  - Stavall
+  - Project Anima
+tags:
+  - npc
+  - stub
+  - vein-marked
+  - chase-target
+atlas:
+  placements:
+    - mapId: astrath-deeprealm-overview
+      x: 110496
+      "y": 55473
 ---
 
 # Edric

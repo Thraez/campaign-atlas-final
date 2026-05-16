@@ -4,9 +4,15 @@ atlas:
   publish: true
   type: event
   visibility: player
-  date: "612-6-3"
+  date: 612-6-3
   summary: The Old Keep falls in a single night to a shadow that came down from the high passes.
-  tags: [calamity, ruins]
+  tags:
+    - calamity
+    - ruins
+  placements:
+    - mapId: astrath-deeprealm-overview
+      x: 100480
+      "y": 71464
 ---
 
 On the third night of Longnight, 612 AS, the watchfires of the [[The Old Keep|Old Keep]]

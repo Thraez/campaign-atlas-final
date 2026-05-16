@@ -1,18 +1,46 @@
 ---
 role: Story
-summary: "Legendary Tidemarrow underworld figure whose name and face have become tools for smugglers, proxies, and liars."
+summary: Legendary Tidemarrow underworld figure whose name and face have become tools for smugglers, proxies, and liars.
 aliases: []
-campaign: [C1]
-status: [legendary, missing]
+campaign:
+  - C1
+status:
+  - legendary
+  - missing
 race: human
-occupation: [smuggler, heistmaster, thief]
+occupation:
+  - smuggler
+  - heistmaster
+  - thief
 faction: []
-voice: [calm, low, unhurried]
-appearance: [ash-blond, "river-grey coat", "onyx signet", "eyebrow nick"]
-mannerism: [charismatic, bold, overconfident, scheming]
-catchphrase: 
-connections: [Underground, Smugglers]
-tags: [npc, smuggler, legend, criminal]
+voice:
+  - calm
+  - low
+  - unhurried
+appearance:
+  - ash-blond
+  - river-grey coat
+  - onyx signet
+  - eyebrow nick
+mannerism:
+  - charismatic
+  - bold
+  - overconfident
+  - scheming
+catchphrase: null
+connections:
+  - Underground
+  - Smugglers
+tags:
+  - npc
+  - smuggler
+  - legend
+  - criminal
+atlas:
+  placements:
+    - mapId: astrath-deeprealm-overview
+      x: 106368
+      "y": 53808
 ---
 
 

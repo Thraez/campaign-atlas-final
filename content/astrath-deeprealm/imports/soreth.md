@@ -3,6 +3,11 @@ aliases:
   - The Crown
   - The Fallen One
 updated: 2025-12-01T17:38
+atlas:
+  placements:
+    - mapId: astrath-deeprealm-overview
+      x: 107968
+      "y": 57459
 ---
 **Full Title:** Soreth, The Crown (formerly), The Fallen One (current)  
 **Role:** Hierarchy Enforcer (formerly), Corrupted Runner (current)  
