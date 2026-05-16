@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Compass, Crosshair, RotateCcw, MapPin, Target, Trash2, Layers as LayersIcon, MapPin as PinIcon, Settings2, FolderOpen, Shapes, Route as RouteIcon, CloudFog, BookOpen, ShieldCheck, Upload, Save as SaveIcon, Undo2, Redo2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { loadAtlasContent } from "@/atlas/content/loader";
-import type { AtlasProject, Entity, MapDocument, MapLayer } from "@/atlas/content/schema";
+import type { AtlasProject, Entity, ImportFolderConfig, MapDocument, MapLayer } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -225,21 +225,28 @@ export default function AtlasPlacementEditor() {
     }
   }, []);
 
-  // Phase 1C: md-import orchestration. existingPaths is the set of on-disk
-  // entity .md paths the staging modal checks against for conflicts. We
-  // scope it to entities currently in the project — anything newly imported
-  // after a successful save shows up after reloadCanon().
-  const importExistingPaths = useMemo(() => {
-    const s = new Set<string>();
-    if (!project) return s;
+  // Phase 1C: md-import orchestration. existingById maps entity id → sourcePath
+  // so the staging layer can detect same-id imports and route them to the
+  // existing file in-place (update), rather than creating a parallel copy.
+  const importExistingById = useMemo(() => {
+    const m = new Map<string, string>();
+    if (!project) return m;
     for (const e of project.entities) {
-      if (e.sourcePath) s.add(e.sourcePath);
+      if (e.id && e.sourcePath) m.set(e.id, e.sourcePath);
     }
-    return s;
+    return m;
   }, [project]);
+
+  const importWorldId = project?.maps.find((m) => m.id === activeMapId)?.worldId ?? "";
+  const importConfig = useMemo((): ImportFolderConfig => {
+    const world = project?.worlds.find((w) => w.id === importWorldId);
+    return world?.importFolders ?? { folders: {}, defaultFolder: "imports" };
+  }, [project, importWorldId]);
+
   const importFlow = useMdImportFlow({
-    worldId: project?.maps.find((m) => m.id === activeMapId)?.worldId ?? "",
-    existingPaths: importExistingPaths,
+    worldId: importWorldId,
+    importConfig,
+    existingById: importExistingById,
     onImported: reloadCanon,
   });
   const [pasteOpen, setPasteOpen] = useState(false);

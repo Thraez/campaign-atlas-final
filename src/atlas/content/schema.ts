@@ -37,10 +37,18 @@ export interface WorldCalendar {
   months: CalendarMonth[];
 }
 
+export interface ImportFolderConfig {
+  /** Maps entity `atlas.type` value → destination folder name (single safe path segment). */
+  folders: Record<string, string>;
+  /** Destination folder for unknown/typeless entities. */
+  defaultFolder: string;
+}
+
 export interface World {
   id: string;
   name: string;
   defaultMapId?: string;
+  importFolders?: ImportFolderConfig; // present in DM builds only; absent in player builds
 }
 
 export interface MapDocument {

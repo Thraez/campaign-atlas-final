@@ -74,3 +74,17 @@ maps:
         height: 46458
         opacity: 1
         zIndex: 20
+
+import:
+  folders:
+    npc: npcs
+    settlement: settlements
+    ruin: ruins
+    dungeon: ruins
+    location: places
+    map_note: places
+    faction: factions
+    event: events
+    region: regions
+    item: items
+  defaultFolder: imports

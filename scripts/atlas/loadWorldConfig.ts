@@ -12,6 +12,7 @@ import type {
   EntityVisibility,
   FogOverlay,
   GridOverlay,
+  ImportFolderConfig,
   MapDocument,
   MapLayer,
   MapScale,
@@ -73,6 +74,10 @@ interface WorldYaml {
     daysPerWeek?: number;
     months?: Array<{ name: string; days: number }>;
   };
+  import?: {
+    folders?: Record<string, unknown>;
+    defaultFolder?: unknown;
+  };
 }
 
 export interface WorldConfig {
@@ -83,6 +88,7 @@ export interface WorldConfig {
   calendar?: WorldCalendar;
   schemaVersion: number;
   warnings: string[];
+  importConfig: ImportFolderConfig; // always present — defaults applied here
 }
 
 export class WorldConfigError extends Error {}
@@ -306,7 +312,9 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
     }
   }
 
-  return { maps, regions, fogs, routes, calendar, schemaVersion: resolvedVersion, warnings };
+  const importConfig = sanitizeImportConfig(data.import, warnings);
+
+  return { maps, regions, fogs, routes, calendar, schemaVersion: resolvedVersion, warnings, importConfig };
 }
 
 function sanitizeScale(s: MapScale | undefined, warnings: string[], where: string): MapScale | undefined {
@@ -335,4 +343,45 @@ function normalizeVis(v: unknown, warnings: string[], where: string): EntityVisi
   if (typeof v === "string" && VALID_VIS.includes(v as EntityVisibility)) return v as EntityVisibility;
   if (v !== undefined) warnings.push(`${where}: invalid visibility "${v}", defaulting to "player"`);
   return "player";
+}
+
+const SAFE_SEGMENT = /^[A-Za-z0-9_\-. ]+$/;
+
+function sanitizeImportConfig(
+  raw: WorldYaml["import"],
+  warnings: string[]
+): ImportFolderConfig {
+  const folders: Record<string, string> = {};
+  for (const [type, val] of Object.entries(raw?.folders ?? {})) {
+    if (typeof type !== "string" || type.length === 0) continue;
+    const seg = typeof val === "string" ? val : null;
+    if (
+      seg !== null &&
+      seg !== "." &&
+      seg !== ".." &&
+      seg !== "_atlas" &&
+      SAFE_SEGMENT.test(seg)
+    ) {
+      folders[type] = seg;
+    } else {
+      warnings.push(
+        `world.yaml import.folders["${type}"]: invalid folder "${String(val)}" — ignored`
+      );
+    }
+  }
+  const defRaw = raw?.defaultFolder;
+  const defSeg =
+    typeof defRaw === "string" &&
+    defRaw !== "." &&
+    defRaw !== ".." &&
+    defRaw !== "_atlas" &&
+    SAFE_SEGMENT.test(defRaw)
+      ? defRaw
+      : null;
+  if (defRaw !== undefined && defSeg === null) {
+    warnings.push(
+      `world.yaml import.defaultFolder: invalid "${String(defRaw)}" — using "imports"`
+    );
+  }
+  return { folders, defaultFolder: defSeg ?? "imports" };
 }

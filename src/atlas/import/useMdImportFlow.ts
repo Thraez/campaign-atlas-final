@@ -19,12 +19,15 @@ import {
   ConflictError,
   SaveBusyError,
 } from "@/atlas/save/localFsSave";
+import type { ImportFolderConfig } from "../content/schema";
 
 export interface UseMdImportFlowArgs {
   /** Active world id; drives target-path allowlist. */
   worldId: string;
-  /** Set of currently-on-disk entity sourcePaths under content/<world>/. */
-  existingPaths: Set<string>;
+  /** Folder configuration for the active world; drives the allowed-folder set. */
+  importConfig: ImportFolderConfig;
+  /** Map of entity id → sourcePath for conflict detection (update vs create). */
+  existingById: ReadonlyMap<string, string>;
   /** Called after a successful import so the editor can reload canon. */
   onImported: () => void | Promise<void>;
 }
@@ -35,18 +38,19 @@ interface RawFileInput {
 }
 
 export function useMdImportFlow(args: UseMdImportFlowArgs) {
-  const { worldId, existingPaths, onImported } = args;
+  const { worldId, importConfig, existingById, onImported } = args;
   const [rows, setRows] = useState<StagingRow[]>([]);
   const [open, setOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
 
-  const ctx = useMemo(
-    () => ({ worldId, existingPaths }),
-    // existingPaths is a Set; consumers must pass a stable reference per render
-    // or memoize before calling. The size+iteration check below would be too
-    // expensive; relying on the caller is acceptable for this flow.
-    [worldId, existingPaths],
-  );
+  const ctx = useMemo(() => {
+    const allowedFolders = new Set([
+      ...Object.values(importConfig.folders),
+      importConfig.defaultFolder,
+    ]) as ReadonlySet<string>;
+    const existingPaths = new Set(existingById.values()) as ReadonlySet<string>;
+    return { worldId, importConfig, allowedFolders, existingById, existingPaths };
+  }, [worldId, importConfig, existingById]);
 
   const openWithInputs = useCallback(
     (inputs: RawFileInput[]) => {
