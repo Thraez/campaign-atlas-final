@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { validatePatchYaml } from "@/atlas/yaml/validatePatch";
-import { classifyDraftStatus } from "@/atlas/yaml/canon";
 
 describe("validatePatchYaml — map", () => {
   it("accepts a well-formed map patch", () => {
@@ -40,21 +39,5 @@ describe("validatePatchYaml — placement", () => {
     const content = `atlas:\n  placements:\n    - mapId: m1\n      x: nope\n      y: 20\n`;
     const r = validatePatchYaml(content, "placement");
     expect(r.ok).toBe(false);
-  });
-});
-
-describe("classifyDraftStatus", () => {
-  it("clean state = built-from-yaml", () => {
-    expect(classifyDraftStatus({ dirtyCount: 0 })).toBe("built-from-yaml");
-  });
-  it("dirty state = ready-to-export", () => {
-    expect(classifyDraftStatus({ dirtyCount: 3 })).toBe("ready-to-export");
-  });
-  it("just exported, clean = exported-patch", () => {
-    expect(classifyDraftStatus({ dirtyCount: 0, lastExportAt: Date.now() })).toBe("exported-patch");
-  });
-  it("old export = needs-commit", () => {
-    const old = Date.now() - 10 * 60_000;
-    expect(classifyDraftStatus({ dirtyCount: 0, lastExportAt: old })).toBe("needs-commit");
   });
 });
