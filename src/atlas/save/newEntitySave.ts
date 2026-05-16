@@ -33,12 +33,15 @@ export function buildNewEntityChange(input: NewEntityInput): FileChange {
   const type = (input.kind ?? DEFAULT_KIND[input.category]).trim();
   const slug = slugify(input.title);
   const path = `${input.worldRoot}/${meta.folder}/${slug}.md`;
-  const data: Record<string, unknown> = {
-    title: input.title,
+  // Use atlas: block so the build pipeline recognises id, visibility, and type
+  // correctly — the pipeline reads visibility ONLY from atlas.visibility (not root).
+  const atlas: Record<string, unknown> = {
+    id: slug,
     type,
     visibility: input.visibility,
   };
-  if (input.summary) data.summary = input.summary;
+  if (input.summary) atlas.summary = input.summary;
+  const data: Record<string, unknown> = { title: input.title, atlas };
   const content = stringifyFrontmatter(`\n# ${input.title}\n\n`, data);
   return { path, content, kind: "entity-md", baseHash: null };
 }

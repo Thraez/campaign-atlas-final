@@ -19,12 +19,13 @@ describe("buildNewEntityChange", () => {
       "content/astrath-deeprealm/npcs/captain-mire-vale.md",
     );
     const fm = parseFrontmatter(change.content);
-    expect(fm.data).toMatchObject({
-      title: "Captain Mire Vale",
-      type: "npc",
-      visibility: "dm",
-      summary: "Harbor-master with a debt.",
-    });
+    // title stays at root; atlas: block carries id, type, visibility, summary
+    expect(fm.data.title).toBe("Captain Mire Vale");
+    const atlas = fm.data.atlas as Record<string, unknown>;
+    expect(atlas.id).toBe("captain-mire-vale");
+    expect(atlas.type).toBe("npc");
+    expect(atlas.visibility).toBe("dm");
+    expect(atlas.summary).toBe("Harbor-master with a debt.");
     expect(fm.content.trim()).toContain("# Captain Mire Vale");
   });
 
@@ -33,7 +34,9 @@ describe("buildNewEntityChange", () => {
       worldRoot: "content/w", category: "factions",
       title: "The Tide Court", visibility: "player",
     });
-    expect(parseFrontmatter(change.content).data.type).toBe("faction");
+    const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
+    expect(atlas.type).toBe("faction");
+    expect(atlas.id).toBe("the-tide-court");
     expect(change.path).toBe("content/w/factions/the-tide-court.md");
   });
 });

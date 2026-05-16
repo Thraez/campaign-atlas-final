@@ -263,6 +263,8 @@ export default function AtlasPlacementEditor() {
     onImported: reloadCanon,
   });
   const [pasteOpen, setPasteOpen] = useState(false);
+  const mdFileInputRef = useRef<HTMLInputElement>(null);
+  const triggerMdImport = useCallback(() => { mdFileInputRef.current?.click(); }, []);
   const { isDragging: isDraggingMd } = useMdDropZone({
     onDrop: importFlow.openWithFiles,
     enabled: !importFlow.open && !pasteOpen,
@@ -909,6 +911,8 @@ export default function AtlasPlacementEditor() {
     commands: [
       { id: "cmd.save", title: "Save", run: onSaveClick },
       { id: "cmd.publish", title: "Publish player site", run: () => setActivePanel("publish") },
+      { id: "cmd.import", title: "Import .md files", run: triggerMdImport },
+      { id: "cmd.paste", title: "Paste markdown — quick capture", run: () => setPasteOpen(true) },
       ...CATEGORIES.map((c) => ({
         id: `cmd.new.${c.id}`, title: `New ${c.singular}`,
         run: () => { setActivePanel(c.id); setCreatingIn(c.id as CategoryId); },
@@ -1109,7 +1113,7 @@ export default function AtlasPlacementEditor() {
               <CategoryPanel category="characters" entities={project.entities}
                 onOpen={() => { /* entity detail view: Phase 4 */ }}
                 onNew={() => setCreatingIn("characters")}
-                onImport={() => importFlow.openWithFiles([])}
+                onImport={triggerMdImport}
                 hasPlacement={(id) => !!effectiveCoord(id)}
                 onShowOnMap={(id) => goTo(id)} />
             ),
@@ -1120,7 +1124,7 @@ export default function AtlasPlacementEditor() {
               <CategoryPanel category="locations" entities={project.entities}
                 onOpen={() => { /* entity detail view: Phase 4 */ }}
                 onNew={() => setCreatingIn("locations")}
-                onImport={() => importFlow.openWithFiles([])}
+                onImport={triggerMdImport}
                 hasPlacement={(id) => !!effectiveCoord(id)}
                 onShowOnMap={(id) => goTo(id)} />
             ),
@@ -1131,7 +1135,7 @@ export default function AtlasPlacementEditor() {
               <CategoryPanel category="factions" entities={project.entities}
                 onOpen={() => { /* entity detail view: Phase 4 */ }}
                 onNew={() => setCreatingIn("factions")}
-                onImport={() => importFlow.openWithFiles([])}
+                onImport={triggerMdImport}
                 hasPlacement={(id) => !!effectiveCoord(id)}
                 onShowOnMap={(id) => goTo(id)} />
             ),
@@ -1142,7 +1146,7 @@ export default function AtlasPlacementEditor() {
               <CategoryPanel category="events" entities={project.entities}
                 onOpen={() => { /* entity detail view: Phase 4 */ }}
                 onNew={() => setCreatingIn("events")}
-                onImport={() => importFlow.openWithFiles([])}
+                onImport={triggerMdImport}
                 hasPlacement={(id) => !!effectiveCoord(id)}
                 onShowOnMap={(id) => goTo(id)} />
             ),
@@ -1153,7 +1157,7 @@ export default function AtlasPlacementEditor() {
               <CategoryPanel category="items" entities={project.entities}
                 onOpen={() => { /* entity detail view: Phase 4 */ }}
                 onNew={() => setCreatingIn("items")}
-                onImport={() => importFlow.openWithFiles([])}
+                onImport={triggerMdImport}
                 hasPlacement={(id) => !!effectiveCoord(id)}
                 onShowOnMap={(id) => goTo(id)} />
             ),
@@ -1164,7 +1168,7 @@ export default function AtlasPlacementEditor() {
               <CategoryPanel category="lore" entities={project.entities}
                 onOpen={() => { /* entity detail view: Phase 4 */ }}
                 onNew={() => setCreatingIn("lore")}
-                onImport={() => importFlow.openWithFiles([])}
+                onImport={triggerMdImport}
                 hasPlacement={(id) => !!effectiveCoord(id)}
                 onShowOnMap={(id) => goTo(id)} />
             ),
@@ -1623,7 +1627,10 @@ export default function AtlasPlacementEditor() {
             }).catch(() => { /* keep current; user can reload manually */ });
           }
         }}
-        onClose={() => setSaveModalOpen(false)}
+        onClose={() => {
+          setSaveModalOpen(false);
+          setPendingChanges([]);
+        }}
       />
       <DiscardConfirmModal
         open={discardOpen}
@@ -1651,6 +1658,20 @@ export default function AtlasPlacementEditor() {
         onPatchRow={importFlow.patchRow}
         onCancel={importFlow.cancel}
         onCommit={importFlow.commit}
+      />
+      {/* Hidden file input for "Import .md" button in CategoryPanel */}
+      <input
+        ref={mdFileInputRef}
+        type="file"
+        accept=".md,text/markdown"
+        multiple
+        className="sr-only"
+        aria-hidden
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = "";
+          if (files.length > 0) void importFlow.openWithFiles(files);
+        }}
       />
       <PasteMarkdownDialog
         open={pasteOpen}
