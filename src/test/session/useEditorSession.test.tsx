@@ -18,7 +18,7 @@ function makeHolder(initial = 0) {
   };
 }
 
-function harness(activeMapId: string, holder: ReturnType<typeof makeHolder>) {
+function useHarness(activeMapId: string, holder: ReturnType<typeof makeHolder>) {
   return useEditorSession({
     activeMapId,
     undoStack: { clear: vi.fn() } as any,
@@ -48,7 +48,7 @@ describe("useEditorSession", () => {
 
   it("starts clean with no snapshot", async () => {
     const h = makeHolder();
-    const { result } = renderHook(() => harness("A", h));
+    const { result } = renderHook(() => useHarness("A", h));
     await waitFor(() => expect(result.current.hydrated).toBe(true));
     expect(result.current.status).toBe("clean");
     expect(result.current.unsavedCount).toBe(0);
@@ -57,7 +57,7 @@ describe("useEditorSession", () => {
 
   it("goes unsaved with a count when a holder reports dirt", async () => {
     const h = makeHolder();
-    const { result, rerender } = renderHook(() => harness("A", h));
+    const { result, rerender } = renderHook(() => useHarness("A", h));
     await waitFor(() => expect(result.current.hydrated).toBe(true));
     act(() => { h.bump(); h.bump(); });
     rerender();
@@ -68,7 +68,7 @@ describe("useEditorSession", () => {
   it("persists to IDB (debounced) and re-hydrates with a restore notice", async () => {
     vi.useFakeTimers();
     const h = makeHolder();
-    const first = renderHook(() => harness("A", h));
+    const first = renderHook(() => useHarness("A", h));
     await vi.waitFor(() => expect(first.result.current.hydrated).toBe(true));
     act(() => { h.bump(); first.rerender(); });
     await act(async () => { vi.advanceTimersByTime(500); await Promise.resolve(); });
@@ -78,7 +78,7 @@ describe("useEditorSession", () => {
     expect(stored).not.toBeNull();
 
     const h2 = makeHolder();
-    const second = renderHook(() => harness("A", h2));
+    const second = renderHook(() => useHarness("A", h2));
     await waitFor(() => expect(second.result.current.hydrated).toBe(true));
     expect(second.result.current.restoredNotice).not.toBeNull();
     expect(h2.value.n).toBe(1); // holder rehydrated from snapshot
@@ -86,7 +86,7 @@ describe("useEditorSession", () => {
 
   it("discardAll clears holders, IDB, undo, and returns to clean", async () => {
     const h = makeHolder();
-    const { result, rerender } = renderHook(() => harness("A", h));
+    const { result, rerender } = renderHook(() => useHarness("A", h));
     await waitFor(() => expect(result.current.hydrated).toBe(true));
     act(() => { h.bump(); rerender(); });
     await act(async () => { await result.current.discardAll(); });
@@ -97,7 +97,7 @@ describe("useEditorSession", () => {
 
   it("markSaving → markSaved drives status and resets the count baseline", async () => {
     const h = makeHolder();
-    const { result, rerender } = renderHook(() => harness("A", h));
+    const { result, rerender } = renderHook(() => useHarness("A", h));
     await waitFor(() => expect(result.current.hydrated).toBe(true));
     act(() => { h.bump(); rerender(); });
     act(() => { result.current.markSaving(); });
@@ -109,7 +109,7 @@ describe("useEditorSession", () => {
 
   it("markFailed surfaces the reason", async () => {
     const h = makeHolder();
-    const { result } = renderHook(() => harness("A", h));
+    const { result } = renderHook(() => useHarness("A", h));
     await waitFor(() => expect(result.current.hydrated).toBe(true));
     act(() => { result.current.markFailed("disk permission denied"); });
     expect(result.current.status).toBe("failed");
