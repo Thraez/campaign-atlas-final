@@ -22,7 +22,8 @@ import { overridesSchema } from "@/atlas/schemas/imports";
 import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
 import type { FileChange } from "@/atlas/save/localFsSave";
-import { SaveStatusChip, dirtyFileSummary } from "@/atlas/SaveStatusChip";
+import { SaveStatus } from "@/atlas/session/SaveStatus";
+import { DiscardConfirmModal } from "@/atlas/session/DiscardConfirmModal";
 import { CanonicalSaveError } from "@/atlas/save/canonicalPlacementSave";
 import {
   type FrontmatterDraft,
@@ -566,6 +567,7 @@ export default function AtlasPlacementEditor() {
   const [mapImportOpen, setMapImportOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<FileChange[]>([]);
+  const [discardOpen, setDiscardOpen] = useState(false);
   // Entities-tab frontmatter drafts, lifted here so the unified Save writes
   // them to disk (Export Patch removed). Keyed by entity id.
   const [entityDrafts, setEntityDrafts] = useState<Record<string, FrontmatterDraft>>({});
@@ -573,7 +575,6 @@ export default function AtlasPlacementEditor() {
   // canonical save. When editAt > saveAt, the unsaved-changes banner shows.
   const [lastLocalEditAt, setLastLocalEditAt] = useState<number | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
 
   // A13 dirty signals: collapse per-tab editor state into a single
   // "world.yaml is dirty" boolean. Each per-tab draft hook already exposes a
@@ -682,7 +683,6 @@ export default function AtlasPlacementEditor() {
       toast.info("No changes to save");
       return;
     }
-    setSaveError(null);
     const entitiesById = new Map(project.entities.map((e) => [e.id, e]));
     try {
       // One FileChange per entity .md path even when an entity is edited in
@@ -736,13 +736,14 @@ export default function AtlasPlacementEditor() {
         toast.info("No canonical changes to write");
         return;
       }
+      session.markSaving();
       setPendingChanges(fileChanges);
       setSaveModalOpen(true);
     } catch (err) {
       const msg = err instanceof CanonicalSaveError
         ? err.message
         : err instanceof Error ? err.message : String(err);
-      setSaveError(msg);
+      session.markFailed(msg);
       toast.error(`Could not prepare save: ${msg}`);
     }
   };
@@ -787,39 +788,6 @@ export default function AtlasPlacementEditor() {
       (mapMetadataDirty ? 1 : 0) +
       dirtyCount,
   });
-
-  // A12c: 5-minute idle nudge. Fires once when the editor has had dirty
-  // state for at least 5 minutes since the last save, with at least one
-  // edit in that window. "Remind me later" re-arms.
-  const NUDGE_DELAY_MS = 5 * 60_000;
-  useEffect(() => {
-    if (!hasUnsavedChanges || lastLocalEditAt === null) return;
-    let cancelled = false;
-    const id = window.setTimeout(() => {
-      if (cancelled) return;
-      const toastId = toast.message("You have unsaved changes", {
-        description: `Last edit ${Math.round((Date.now() - lastLocalEditAt) / 60_000)} minutes ago.`,
-        duration: 30_000,
-        action: {
-          label: "Save now",
-          onClick: () => {
-            toast.dismiss(toastId);
-            onSaveClick();
-          },
-        },
-        cancel: {
-          label: "Remind me later",
-          // Re-arm by bumping the edit timestamp so the effect re-fires.
-          onClick: () => setLastLocalEditAt(Date.now()),
-        },
-      });
-    }, NUDGE_DELAY_MS);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(id);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- onSaveClick is stable enough; tracking it here would re-arm the timer on every render
-  }, [hasUnsavedChanges, lastLocalEditAt]);
 
   // Phase 1B B4: Esc cancels in-progress pin placement (the "Click on the
   // map to place X" banner has its own button; this just covers the same
@@ -944,19 +912,6 @@ export default function AtlasPlacementEditor() {
           </Button>
         </div>
       )}
-      {hasUnsavedChanges && (
-        <div className="px-3 py-1.5 text-[11px] bg-amber-500/15 text-amber-100 border-b border-amber-500/30 flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2 min-w-0">
-            <span aria-hidden>●</span>
-            <span className="truncate">
-              <strong>{dirtyFileSummary({ entityCount: dirtyCount, worldYamlDirty })}</strong> on this map — kept only in your browser until you click Save.
-            </span>
-          </span>
-          <Button size="sm" variant="default" className="h-6 px-2 text-[10px]" onClick={onSaveClick}>
-            Save now
-          </Button>
-        </div>
-      )}
       <div className="px-3 py-1.5 text-[11px] bg-primary/10 text-foreground border-b border-primary/20 flex items-center justify-between gap-2">
         <span
           className="flex items-center gap-2 min-w-0"
@@ -995,20 +950,13 @@ export default function AtlasPlacementEditor() {
         <Button variant={showRegions ? "secondary" : "ghost"} size="sm" onClick={() => setShowRegions((v) => !v)} title="Toggle region overlays">
           Regions
         </Button>
-        <SaveStatusChip
-          status={
-            saveError
-              ? "failed"
-              : saveModalOpen
-                ? "saving"
-                : hasUnsavedChanges
-                  ? "unsaved"
-                  : "saved"
-          }
-          savedAt={lastSavedAt ? new Date(lastSavedAt).toISOString() : null}
-          dirtySummary={dirtyFileSummary({ entityCount: dirtyCount, worldYamlDirty })}
-          failedMessage={saveError ?? undefined}
-          onForceSave={onSaveClick}
+        <SaveStatus
+          status={session.status}
+          unsavedCount={session.unsavedCount}
+          savedAt={lastSavedAt}
+          failedReason={session.failedReason}
+          onSave={onSaveClick}
+          onDiscard={() => setDiscardOpen(true)}
         />
         <Button
           variant="ghost"
@@ -1400,6 +1348,7 @@ export default function AtlasPlacementEditor() {
         }
         rebuildAfterSave={true}
         onSaved={(result) => {
+          void session.markSaved();
           setLastSavedAt(Date.now());
           // Phase 1B B0 — capture pre-save snapshots so the save-boundary
           // undo entry below can restore the dirty local state when the DM
@@ -1508,6 +1457,12 @@ export default function AtlasPlacementEditor() {
           }
         }}
         onClose={() => setSaveModalOpen(false)}
+      />
+      <DiscardConfirmModal
+        open={discardOpen}
+        count={session.unsavedCount}
+        onConfirm={() => { void session.discardAll(); }}
+        onClose={() => setDiscardOpen(false)}
       />
       <ImportStagingModal
         open={importFlow.open}
