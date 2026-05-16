@@ -1,7 +1,7 @@
 {
-  "version": "2026-05-15T19-22-16-683Z",
+  "version": "2026-05-16T12-03-53-182Z",
   "schemaVersion": 1,
-  "publishedAt": "2026-05-15T19:22:16.683Z",
+  "publishedAt": "2026-05-16T12:03:53.182Z",
   "worlds": [
     {
       "id": "astrath-deeprealm",
@@ -205,19 +205,191 @@
       "dateRaw": "0-1-1",
       "dateValue": 1,
       "dateYear": 0
+    },
+    {
+      "id": "corven",
+      "title": "corven",
+      "type": "note",
+      "world": "astrath-deeprealm",
+      "visibility": "player",
+      "canon": "canon",
+      "aliases": [],
+      "tags": [
+        "smuggler",
+        "legend",
+        "criminal"
+      ],
+      "summary": "Legendary Tidemarrow underworld figure whose name and face have become tools for smugglers, proxies, and liars.",
+      "race": "human",
+      "images": [],
+      "body": "\n\n# Corven\n*A smuggler-king of the [[02_Regions/Tidemarrow]] underworld, whose face is on a hundred wanted posters and a hundred liars.*\n\nA legendary [[Underground]] figure whose name is woven into half the great heists of the past decades. He has not been seen in years, but his name still opens doors. Crews invoke him to recruit, to threaten, to close a deal. So many people have worn his face that the legend is no longer entirely under his control, if it ever was.\n\n![[Corven.png]]\n\n## Appearance\n\nThe stories agree on the shape of him: tall and wiry, late thirties to early forties, ash-blond hair parted right with a small cowlick at the crown. Clear blue eyes. Sharp cheekbones, defined jaw, thin nose, gentled by a faint mouth and a relaxed brow. A nick through the left eyebrow. He is most often described in a river-grey long coat with hidden pockets, the hem hanging unnaturally straight, and a signet ring set with a chipped dark stone. Faint scent of fennel and cedar.\n\nWanted posters and tavern stories have repeated these details so often that nobody is certain which were ever real. Most who claim to have met him also describe a calm voice, a slight smile, and the kind of stillness in a room that reads as confidence rather than caution.\n\n## Rumors and Legends\n\nSome say he never failed a heist that he himself led. Others say half the heists credited to him were never his work, only his name flown like a flag.\n\nHe has not been seen in years. Younger crews have begun insisting he is dead. Older ones laugh at younger crews. There are smugglers who claim he hand-picks proxies and hires them out, that the men robbing vaults under his name are paid impersonators and he is the silent partner. There are smugglers who claim he is plotting something none of his proxies could match, in some cellar in [[02_Regions/Tidemarrow]] no one has the eye for. There are smugglers who refuse to speak of him at all, which is a different kind of answer.\n\nNobody agrees on which is the truth, and the doubt itself is now part of the legend.\n\n",
+      "bodyHtml": "<h1>Corven</h1>\n<p><em>A smuggler-king of the <span class=\"atlas-unresolved\">02_Regions/Tidemarrow</span> underworld, whose face is on a hundred wanted posters and a hundred liars.</em></p>\n<p>A legendary <span class=\"atlas-unresolved\">Underground</span> figure whose name is woven into half the great heists of the past decades. He has not been seen in years, but his name still opens doors. Crews invoke him to recruit, to threaten, to close a deal. So many people have worn his face that the legend is no longer entirely under his control, if it ever was.</p>\n<p>!<span class=\"atlas-unresolved\">Corven.png</span></p>\n<h2>Appearance</h2>\n<p>The stories agree on the shape of him: tall and wiry, late thirties to early forties, ash-blond hair parted right with a small cowlick at the crown. Clear blue eyes. Sharp cheekbones, defined jaw, thin nose, gentled by a faint mouth and a relaxed brow. A nick through the left eyebrow. He is most often described in a river-grey long coat with hidden pockets, the hem hanging unnaturally straight, and a signet ring set with a chipped dark stone. Faint scent of fennel and cedar.</p>\n<p>Wanted posters and tavern stories have repeated these details so often that nobody is certain which were ever real. Most who claim to have met him also describe a calm voice, a slight smile, and the kind of stillness in a room that reads as confidence rather than caution.</p>\n<h2>Rumors and Legends</h2>\n<p>Some say he never failed a heist that he himself led. Others say half the heists credited to him were never his work, only his name flown like a flag.</p>\n<p>He has not been seen in years. Younger crews have begun insisting he is dead. Older ones laugh at younger crews. There are smugglers who claim he hand-picks proxies and hires them out, that the men robbing vaults under his name are paid impersonators and he is the silent partner. There are smugglers who claim he is plotting something none of his proxies could match, in some cellar in <span class=\"atlas-unresolved\">02_Regions/Tidemarrow</span> no one has the eye for. There are smugglers who refuse to speak of him at all, which is a different kind of answer.</p>\n<p>Nobody agrees on which is the truth, and the doubt itself is now part of the legend.</p>\n",
+      "frontmatter": {},
+      "sourcePath": "",
+      "links": [
+        {
+          "target": "02_Regions/Tidemarrow",
+          "display": "02_Regions/Tidemarrow",
+          "broken": true
+        },
+        {
+          "target": "Underground",
+          "display": "Underground",
+          "broken": true
+        },
+        {
+          "target": "Corven.png",
+          "display": "Corven.png",
+          "broken": true
+        },
+        {
+          "target": "02_Regions/Tidemarrow",
+          "display": "02_Regions/Tidemarrow",
+          "broken": true
+        }
+      ],
+      "backlinks": []
+    },
+    {
+      "id": "edric",
+      "title": "edric",
+      "type": "note",
+      "world": "astrath-deeprealm",
+      "visibility": "player",
+      "canon": "canon",
+      "aliases": [],
+      "tags": [
+        "vein-marked",
+        "chase-target"
+      ],
+      "summary": "Harwick's Vein-Marked companion, riding ahead toward Stavall after the Ashbrook Manor sequence.",
+      "images": [],
+      "body": "\n# Edric\n*Harwick's old companion, riding hard for Stavall.*\n\nEdric was the [[Vein-Marked]] companion of [[Harwick]], the previous owner of [[Ashbrook Manor]]. After the Ashbrook sequence, he rode ahead of the party toward [[Stavall]], setting a hard pace that suggests he knows where he is going.\n\n![[Edric.png]]\n## Appearance\nEdric is lean and windburned, with sandy hair tied back, tired sharp eyes, and faint blue vein-marks running up one side of his neck.\n\n",
+      "bodyHtml": "<h1>Edric</h1>\n<p><em>Harwick's old companion, riding hard for Stavall.</em></p>\n<p>Edric was the <span class=\"atlas-unresolved\">Vein-Marked</span> companion of <span class=\"atlas-unresolved\">Harwick</span>, the previous owner of <span class=\"atlas-unresolved\">Ashbrook Manor</span>. After the Ashbrook sequence, he rode ahead of the party toward <span class=\"atlas-unresolved\">Stavall</span>, setting a hard pace that suggests he knows where he is going.</p>\n<p>!<span class=\"atlas-unresolved\">Edric.png</span></p>\n<h2>Appearance</h2>\n<p>Edric is lean and windburned, with sandy hair tied back, tired sharp eyes, and faint blue vein-marks running up one side of his neck.</p>\n",
+      "frontmatter": {},
+      "sourcePath": "",
+      "links": [
+        {
+          "target": "Vein-Marked",
+          "display": "Vein-Marked",
+          "broken": true
+        },
+        {
+          "target": "Harwick",
+          "display": "Harwick",
+          "broken": true
+        },
+        {
+          "target": "Ashbrook Manor",
+          "display": "Ashbrook Manor",
+          "broken": true
+        },
+        {
+          "target": "Stavall",
+          "display": "Stavall",
+          "broken": true
+        },
+        {
+          "target": "Edric.png",
+          "display": "Edric.png",
+          "broken": true
+        }
+      ],
+      "backlinks": []
+    },
+    {
+      "id": "soreth",
+      "title": "soreth",
+      "type": "note",
+      "world": "astrath-deeprealm",
+      "visibility": "player",
+      "canon": "canon",
+      "aliases": [
+        "The Crown",
+        "The Fallen One"
+      ],
+      "tags": [],
+      "images": [],
+      "body": "**Full Title:** Soreth, The Crown (formerly), The Fallen One (current)  \n**Role:** Hierarchy Enforcer (formerly), Corrupted Runner (current)  \n**Type:** [[Sarim]] (Entropic, running wild)  \n**Organization:** Opposes [[Sarim|The Sarim]]  \n**Status:** Permanently corrupted, leads legions, believes righteous\n\n---\n\n_What was made to bind has come undone._\n\nSoreth was once called the Crown, an enforcer of order among [[Sarim]], chosen again and again to bear Entropy because their strength never wavered. They believed endurance proved worth. That holding the burden longer made them greater. When others broke, Soreth stood strong.\n\nThey bore the burden far past what was safe. Not out of duty, but pride. And when the burden became too much, they did not fall. They rose, warped, convinced, burning with purpose.\n\nThey returned home as something new. Not broken. Not lost. Transformed. They killed [[Nepheth]], the keeper of return. They shattered [[Nepheth|Nepheth's]] [[Anchors|Anchor]] and destroyed their Scales so no call would bring them back. Then they left. No redemption. No final word.\n\nSoreth has not stopped moving since.\n\nThey gather legions. They preach strength as salvation and call corruption a trial to be mastered. To mortals, they may seem radiant. To [[Gods]], persuasive. To their siblings, unrecognizable.\n\nAnd yet they were one of the Thirteen Sarim. They were trusted. Cared for.\n\nStill wearing the Crown. Still believing they are right.\n\nTheir [[Anchors|Anchor]] remains.\n\n_If they fall, they may return. If the [[Anchors|Anchor]] breaks, they are gone forever. [[Sarim|The Sarim]] wait, blade half-drawn._\n\n---\n\n## Known Actions & Reputation\n\n**What the world knows:**\n\n- Leads forces across multiple planes\n- Commands strange, silent legions of \"perfected\" beings\n- Preaches that strength and endurance prove worth\n- Claims the Sarim's preservation stifles necessary growth\n- Has evaded pursuit for centuries\n- Soreth is the creator of [[The Absolved]], purified entropic creatures like [[Scar-Spawn]], shaped into orderly beings.\n\n**Common rhetoric attributed to Soreth:**\n\n> \"The weak cling to return. The strong do not need it.\"\n\n> \"I preserve through strength, not obedience.\"\n\n> \"The system is broken. I will not let truth be forgotten.\"\n\n**What the Sarim say:**\n\n- Once one of the most trusted\n- Bore Entropy longer than any other to prove their strength\n- Something changed in them during Ezareth's absence\n- Killed Nepheth to \"break a broken system\"\n- The Resilient speak of Soreth as their greatest fear\n\n---\n\n",
+      "bodyHtml": "<p><strong>Full Title:</strong> Soreth, The Crown (formerly), The Fallen One (current)<br><strong>Role:</strong> Hierarchy Enforcer (formerly), Corrupted Runner (current)<br><strong>Type:</strong> <span class=\"atlas-unresolved\">Sarim</span> (Entropic, running wild)<br><strong>Organization:</strong> Opposes <span class=\"atlas-unresolved\">The Sarim</span><br><strong>Status:</strong> Permanently corrupted, leads legions, believes righteous</p>\n<hr>\n<p><em>What was made to bind has come undone.</em></p>\n<p>Soreth was once called the Crown, an enforcer of order among <span class=\"atlas-unresolved\">Sarim</span>, chosen again and again to bear Entropy because their strength never wavered. They believed endurance proved worth. That holding the burden longer made them greater. When others broke, Soreth stood strong.</p>\n<p>They bore the burden far past what was safe. Not out of duty, but pride. And when the burden became too much, they did not fall. They rose, warped, convinced, burning with purpose.</p>\n<p>They returned home as something new. Not broken. Not lost. Transformed. They killed <span class=\"atlas-unresolved\">Nepheth</span>, the keeper of return. They shattered <span class=\"atlas-unresolved\">Nepheth's</span> <span class=\"atlas-unresolved\">Anchor</span> and destroyed their Scales so no call would bring them back. Then they left. No redemption. No final word.</p>\n<p>Soreth has not stopped moving since.</p>\n<p>They gather legions. They preach strength as salvation and call corruption a trial to be mastered. To mortals, they may seem radiant. To <span class=\"atlas-unresolved\">Gods</span>, persuasive. To their siblings, unrecognizable.</p>\n<p>And yet they were one of the Thirteen Sarim. They were trusted. Cared for.</p>\n<p>Still wearing the Crown. Still believing they are right.</p>\n<p>Their <span class=\"atlas-unresolved\">Anchor</span> remains.</p>\n<p><em>If they fall, they may return. If the <span class=\"atlas-unresolved\">Anchor</span> breaks, they are gone forever. <span class=\"atlas-unresolved\">The Sarim</span> wait, blade half-drawn.</em></p>\n<hr>\n<h2>Known Actions &amp; Reputation</h2>\n<p><strong>What the world knows:</strong></p>\n<ul>\n<li>Leads forces across multiple planes</li>\n<li>Commands strange, silent legions of \"perfected\" beings</li>\n<li>Preaches that strength and endurance prove worth</li>\n<li>Claims the Sarim's preservation stifles necessary growth</li>\n<li>Has evaded pursuit for centuries</li>\n<li>Soreth is the creator of <span class=\"atlas-unresolved\">The Absolved</span>, purified entropic creatures like <span class=\"atlas-unresolved\">Scar-Spawn</span>, shaped into orderly beings.</li>\n</ul>\n<p><strong>Common rhetoric attributed to Soreth:</strong></p>\n<blockquote>\n<p>\"The weak cling to return. The strong do not need it.\"</p>\n</blockquote>\n<blockquote>\n<p>\"I preserve through strength, not obedience.\"</p>\n</blockquote>\n<blockquote>\n<p>\"The system is broken. I will not let truth be forgotten.\"</p>\n</blockquote>\n<p><strong>What the Sarim say:</strong></p>\n<ul>\n<li>Once one of the most trusted</li>\n<li>Bore Entropy longer than any other to prove their strength</li>\n<li>Something changed in them during Ezareth's absence</li>\n<li>Killed Nepheth to \"break a broken system\"</li>\n<li>The Resilient speak of Soreth as their greatest fear</li>\n</ul>\n<hr>\n",
+      "frontmatter": {},
+      "sourcePath": "",
+      "links": [
+        {
+          "target": "Sarim",
+          "display": "Sarim",
+          "broken": true
+        },
+        {
+          "target": "Sarim",
+          "display": "The Sarim",
+          "broken": true
+        },
+        {
+          "target": "Sarim",
+          "display": "Sarim",
+          "broken": true
+        },
+        {
+          "target": "Nepheth",
+          "display": "Nepheth",
+          "broken": true
+        },
+        {
+          "target": "Nepheth",
+          "display": "Nepheth's",
+          "broken": true
+        },
+        {
+          "target": "Anchors",
+          "display": "Anchor",
+          "broken": true
+        },
+        {
+          "target": "Gods",
+          "display": "Gods",
+          "broken": true
+        },
+        {
+          "target": "Anchors",
+          "display": "Anchor",
+          "broken": true
+        },
+        {
+          "target": "Anchors",
+          "display": "Anchor",
+          "broken": true
+        },
+        {
+          "target": "Sarim",
+          "display": "The Sarim",
+          "broken": true
+        },
+        {
+          "target": "The Absolved",
+          "display": "The Absolved",
+          "broken": true
+        },
+        {
+          "target": "Scar-Spawn",
+          "display": "Scar-Spawn",
+          "broken": true
+        }
+      ],
+      "backlinks": []
     }
   ],
   "placements": [],
   "assets": [],
   "buildReport": {
-    "scanned": 4,
-    "included": 3,
+    "scanned": 7,
+    "included": 6,
     "excluded": 1,
     "warnings": [],
-    "brokenLinks": 5,
-    "unresolvedLinks": 5,
+    "brokenLinks": 26,
+    "unresolvedLinks": 26,
     "duplicateSlugs": 0,
-    "strippedDmBlocks": 0,
+    "strippedDmBlocks": 4,
     "localAssets": 6,
     "externalAssets": 0,
     "missingAssets": 0

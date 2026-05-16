@@ -46,5 +46,44 @@
     "dateRaw": "0-1-1",
     "dateValue": 1,
     "dateYear": 0
+  },
+  {
+    "id": "corven",
+    "title": "corven",
+    "type": "note",
+    "aliases": [],
+    "tags": [
+      "smuggler",
+      "legend",
+      "criminal"
+    ],
+    "summary": "Legendary Tidemarrow underworld figure whose name and face have become tools for smugglers, proxies, and liars.",
+    "excerpt": "# Corven *A smuggler-king of the [[02_Regions/Tidemarrow]] underworld, whose face is on a hundred wanted posters and a hundred liars.* A legendary [[Underground]] figure whose name is woven into half the great heists of the past decades. He",
+    "body": "corven a smuggler-king of the 02 regions/tidemarrow underworld, whose face is on a hundred wanted posters and a hundred liars. a legendary underground figure whose name is woven into half the great heists of the past decades. he has not been seen in years, but his name still opens doors. crews invoke him to recruit, to threaten, to close a deal. so many people have worn his face that the legend is no longer entirely under his control, if it ever was. !corven.png appearance the stories agree on the shape of him: tall and wiry, late thirties to early forties, ash-blond hair parted right with a small cowlick at the crown. clear blue eyes. sharp cheekbones, defined jaw, thin nose, gentled by a faint mouth and a relaxed brow. a nick through the left eyebrow. he is most often described in a river-grey long coat with hidden pockets, the hem hanging unnaturally straight, and a signet ring set with a chipped dark stone. faint scent of fennel and cedar. wanted posters and tavern stories have repeated these details so often that nobody is certain which were ever real. most who claim to have met him also describe a calm voice, a slight smile, and the kind of stillness in a room that reads as confidence rather than caution. rumors and legends some say he never failed a heist that he himself led. others say half the heists credited to him were never his work, only his name flown like a flag. he has not been seen in years. younger crews have begun insisting he is dead. older ones laugh at younger crews. there are smugglers who claim he hand-picks proxies and hires them out, that the men robbing vaults under his name are paid impersonators and he is the silent partner. there are smugglers who claim he is plotting something none of his proxies could match, in some cellar in 02 regions/tidemarrow no one has the eye for. there are smugglers who refuse to speak of him at all, which is a different kind of answer. nobody agrees on which is the truth, and the doubt itself is now part of the legend."
+  },
+  {
+    "id": "edric",
+    "title": "edric",
+    "type": "note",
+    "aliases": [],
+    "tags": [
+      "vein-marked",
+      "chase-target"
+    ],
+    "summary": "Harwick's Vein-Marked companion, riding ahead toward Stavall after the Ashbrook Manor sequence.",
+    "excerpt": "# Edric *Harwick's old companion, riding hard for Stavall.* Edric was the [[Vein-Marked]] companion of [[Harwick]], the previous owner of [[Ashbrook Manor]]. After the Ashbrook sequence, he rode ahead of the party toward [[Stavall]], settin",
+    "body": "edric harwick's old companion, riding hard for stavall. edric was the vein-marked companion of harwick, the previous owner of ashbrook manor. after the ashbrook sequence, he rode ahead of the party toward stavall, setting a hard pace that suggests he knows where he is going. !edric.png appearance edric is lean and windburned, with sandy hair tied back, tired sharp eyes, and faint blue vein-marks running up one side of his neck."
+  },
+  {
+    "id": "soreth",
+    "title": "soreth",
+    "type": "note",
+    "aliases": [
+      "The Crown",
+      "The Fallen One"
+    ],
+    "tags": [],
+    "excerpt": "**Full Title:** Soreth, The Crown (formerly), The Fallen One (current) **Role:** Hierarchy Enforcer (formerly), Corrupted Runner (current) **Type:** [[Sarim]] (Entropic, running wild) **Organization:** Opposes [[Sarim|The Sarim]] **Status:*",
+    "body": "full title: soreth, the crown (formerly), the fallen one (current) role: hierarchy enforcer (formerly), corrupted runner (current) type: sarim (entropic, running wild) organization: opposes the sarim status: permanently corrupted, leads legions, believes righteous --- what was made to bind has come undone. soreth was once called the crown, an enforcer of order among sarim, chosen again and again to bear entropy because their strength never wavered. they believed endurance proved worth. that holding the burden longer made them greater. when others broke, soreth stood strong. they bore the burden far past what was safe. not out of duty, but pride. and when the burden became too much, they did not fall. they rose, warped, convinced, burning with purpose. they returned home as something new. not broken. not lost. transformed. they killed nepheth, the keeper of return. they shattered nepheth's anchor and destroyed their scales so no call would bring them back. then they left. no redemption. no final word. soreth has not stopped moving since. they gather legions. they preach strength as salvation and call corruption a trial to be mastered. to mortals, they may seem radiant. to gods, persuasive. to their siblings, unrecognizable. and yet they were one of the thirteen sarim. they were trusted. cared for. still wearing the crown. still believing they are right. their anchor remains. if they fall, they may return. if the anchor breaks, they are gone forever. the sarim wait, blade half-drawn. --- known actions & reputation what the world knows: - leads forces across multiple planes - commands strange, silent legions of \"perfected\" beings - preaches that strength and endurance prove worth - claims the sarim's preservation stifles necessary growth - has evaded pursuit for centuries - soreth is the creator of the absolved, purified entropic creatures like scar-spawn, shaped into orderly beings. common rhetoric attributed to soreth: \"the weak cling to return. the strong do not need it.\" \"i preserve through strength, not obedience.\" \"the system is broken. i will not let truth be forgotten.\" what the sarim say: - once one of the most trusted - bore entropy longer than any other to prove their strength - something changed in them during ezareth's absence - killed nepheth to \"break a broken system\" - the resilient speak of soreth as their greatest fear ---"
   }
 ]
