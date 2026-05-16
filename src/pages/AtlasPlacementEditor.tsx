@@ -65,6 +65,9 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { useUndoStack } from "@/atlas/useUndoStack";
 import { useEditorSession } from "@/atlas/session/useEditorSession";
+import { EditorRail } from "@/atlas/shell/EditorRail";
+import { EditorPanelHost } from "@/atlas/shell/EditorPanelHost";
+import { buildRailItems } from "@/atlas/shell/railRegistry";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 // Bumped to v3: storage shape now carries label + pin override per placement.
@@ -380,6 +383,12 @@ export default function AtlasPlacementEditor() {
     },
     [undoStack],
   );
+
+  // Shell state: which rail panel is open (null = closed).
+  const [activePanel, setActivePanel] = useState<string | null>(null);
+  const selectPanel = (id: string) =>
+    setActivePanel((cur) => (cur === id ? null : id));
+  const dismissPanel = () => setActivePanel(null);
 
   /** Per-tab filter state (placed/unplaced/visibility/type/tag). */
   const [stateFilter, setStateFilter] = useState<"all" | "placed" | "unplaced">("all");
@@ -1010,7 +1019,240 @@ export default function AtlasPlacementEditor() {
       </header>
 
       <div className="flex-1 flex relative min-h-0">
-        <div className="flex-1 relative min-h-0">
+        {(() => {
+          const panels: Record<string, React.ReactNode> = {
+            // Six content categories — Phase 3 will replace with CategoryPanel.
+            // For Phase 2, all six reuse EntitiesTab so nothing is lost.
+            characters: (
+              <EntitiesTab
+                project={project}
+                blockingCount={entityIssues.blocking}
+                warningCount={entityIssues.warning}
+                onImportMdFiles={importFlow.openWithFiles}
+                onPasteMarkdown={() => setPasteOpen(true)}
+                drafts={entityDrafts}
+                onDraftsChange={setEntityDrafts}
+              />
+            ),
+            locations: null,
+            factions: null,
+            events: null,
+            items: null,
+            lore: null,
+            // Map tools — exact JSX from former TabsContent bodies
+            pins: (
+              <TabFrame
+                title="Pins"
+                builtFromYamlCount={project.placements.filter((p) => p.mapId === activeMap.id).length}
+                localDraftCount={dirtyCount}
+                blockingCount={pinIssues.blocking}
+                warningCount={pinIssues.warning}
+              >
+                <div>
+                  <div className="p-3 border-b border-border space-y-2">
+                    <Input placeholder="Filter entities…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+                    <div className="flex flex-wrap gap-1">
+                      {(["all","unplaced","placed"] as const).map((s) => (
+                        <Button key={s} size="sm" variant={stateFilter === s ? "secondary" : "ghost"} className="h-6 px-2 text-[10px] uppercase" onClick={() => setStateFilter(s)}>{s}</Button>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 text-[10px]">
+                      <Select value={visFilter} onValueChange={(v) => setVisFilter(v as typeof visFilter)}>
+                        <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1"><SelectValue placeholder="visibility" /></SelectTrigger>
+                        <SelectContent>
+                          {["all","player","rumor","dm","hidden"].map((v) => <SelectItem key={v} value={v} className="text-xs">{v}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Select value={typeFilter} onValueChange={setTypeFilter}>
+                        <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1"><SelectValue placeholder="type" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">all types</SelectItem>
+                          {allTypes.map((t) => <SelectItem key={t} value={t} className="text-xs">{t}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {allTags.length > 0 && (
+                        <Select value={tagFilter} onValueChange={setTagFilter}>
+                          <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1"><SelectValue placeholder="tag" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all" className="text-xs">all tags</SelectItem>
+                            {allTags.map((t) => <SelectItem key={t} value={t} className="text-xs">#{t}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      <Button
+                        size="sm"
+                        variant={chainPlaceMode ? "default" : "outline"}
+                        className="h-6 px-2 text-[10px]"
+                        onClick={() => {
+                          const next = !chainPlaceMode;
+                          setChainPlaceMode(next);
+                          if (next && !pendingId && unplaced[0]) setPendingId(unplaced[0].id);
+                        }}
+                        title="Auto-advance to the next unplaced entity after each click"
+                      >
+                        Place next
+                      </Button>
+                    </div>
+                  </div>
+                  <Section title={`Unplaced (${unplaced.length})`}>
+                    {unplaced.map((e) => (
+                      <EntityRow key={e.id} entity={e} state="unplaced" isPending={pendingId === e.id} onPlace={() => setPendingId(e.id)} />
+                    ))}
+                    {unplaced.length === 0 && <Empty text="No unplaced entities match these filters." />}
+                  </Section>
+                  <Section title={`Placed (${placed.length})`}>
+                    {placed.map((e) => {
+                      const eff = effectivePlacement(e.id)!;
+                      const overridden = overrideKey(activeMap.id, e.id) in overrides;
+                      const otherMaps = project.maps.filter((m) => m.id !== activeMap.id).map((m) => ({ id: m.id, name: m.name }));
+                      return (
+                        <EntityRow
+                          key={e.id}
+                          entity={e}
+                          state="placed"
+                          coord={{ x: eff.x, y: eff.y }}
+                          label={eff.label}
+                          pinOverride={eff.pin}
+                          overridden={overridden}
+                          isPending={pendingId === e.id}
+                          otherMaps={otherMaps}
+                          onGoTo={() => goTo(e.id)}
+                          onMove={() => setPendingId(e.id)}
+                          onRemove={() => removeCoord(e.id)}
+                          onReset={overridden ? () => clearOverride(e.id) : undefined}
+                          onNudge={(dx, dy) => nudge(e.id, dx, dy)}
+                          onChangeXY={(x, y) => setCoord(e.id, { x, y })}
+                          onChangeLabel={(l) => setLabel(e.id, l)}
+                          onChangePin={(p) => setPinOverride(e.id, p)}
+                          onDuplicateToMap={(mid) => duplicateToMap(e.id, mid)}
+                        />
+                      );
+                    })}
+                    {placed.length === 0 && <Empty text="No placed entities match these filters." />}
+                  </Section>
+                </div>
+              </TabFrame>
+            ),
+            regions: (
+              <RegionsTab
+                project={project}
+                map={activeMap}
+                api={regionDraft}
+                blockingCount={regionIssues.blocking}
+                warningCount={regionIssues.warning}
+                onFitTo={(r) => {
+                  if (!r.points.length) return;
+                  const cx = r.points.reduce((s, p) => s + p[0], 0) / r.points.length;
+                  const cy = r.points.reduce((s, p) => s + p[1], 0) / r.points.length;
+                  setFlyTo({ lat: activeMap.height - cy, lng: cx });
+                }}
+              />
+            ),
+            routes: (
+              <RoutesTab
+                project={project}
+                map={activeMap}
+                api={routeDraft}
+                blockingCount={routeIssues.blocking}
+                warningCount={routeIssues.warning}
+                onFitTo={(pts) => {
+                  if (!pts.length) return;
+                  const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+                  const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+                  setFlyTo({ lat: activeMap.height - cy, lng: cx });
+                }}
+              />
+            ),
+            fog: (
+              <FogTab
+                map={activeMap}
+                project={project}
+                api={fogDraft}
+                regionApi={regionDraft}
+                routeApi={routeDraft}
+                showFogPreview={showFogPreview}
+                setShowFogPreview={setShowFogPreview}
+                blockingCount={mapIssues.blocking}
+                warningCount={mapIssues.warning}
+              />
+            ),
+            maps: (
+              <>
+                <div className="px-3 pt-2">
+                  <Button size="sm" variant="outline" className="w-full gap-1 h-8 text-xs" onClick={() => setMapImportOpen(true)}>
+                    <Upload className="h-3.5 w-3.5" /> Import Maps (batch wizard)
+                  </Button>
+                </div>
+                <Tabs defaultValue="layers" className="flex-1 flex flex-col min-h-0">
+                  <TabsList className="mx-3 mt-2 grid grid-cols-2">
+                    <TabsTrigger value="layers" className="text-[11px]"><LayersIcon className="h-3.5 w-3.5 mr-1" />Layers</TabsTrigger>
+                    <TabsTrigger value="settings" className="text-[11px]"><Settings2 className="h-3.5 w-3.5 mr-1" />Settings</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="layers" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
+                    <MapLayerPanel
+                      map={activeMap}
+                      mergedLayers={layerEditor.mergedLayers}
+                      localLayers={layerEditor.localLayers}
+                      selectedId={layerEditor.selectedId}
+                      setSelectedId={layerEditor.setSelectedId}
+                      onAddFiles={layerEditor.addUploaded}
+                      onAddUrl={layerEditor.addUrl}
+                      onEditBuiltin={layerEditor.editBuiltinLayer}
+                      onUpdate={layerEditor.updateLayer}
+                      onDuplicate={layerEditor.duplicateLayer}
+                      onRemove={layerEditor.removeLayer}
+                      onClearAll={layerEditor.clearAll}
+                      onSetMapSize={(w, h) => patchMap({ width: w, height: h })}
+                      editGeometry={editGeometry}
+                      setEditGeometry={setEditGeometry}
+                      lockAspect={lockAspectRatio}
+                      setLockAspect={setLockAspectRatio}
+                    />
+                  </TabsContent>
+                  <TabsContent value="settings" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
+                    {baseMap && <MapSettingsPanel map={activeMap} baseMap={baseMap} onPatch={patchMap} onReset={resetMap} />}
+                  </TabsContent>
+                </Tabs>
+              </>
+            ),
+            publish: (
+              <PublishCheckTab
+                project={project}
+                draftMap={activeMap}
+                draftPlacements={draftPlacementsForValidation}
+                draftLocalLayers={layerEditor.localLayers}
+                onGoToMap={(mid) => { setActiveMapId(mid); toast.info(`Switched to ${project.maps.find((m) => m.id === mid)?.name ?? mid}`); }}
+                onGoToEntity={(eid) => {
+                  const c = effectiveCoord(eid);
+                  if (c && activeMap) setFlyTo({ lat: activeMap.height - c.y, lng: c.x });
+                  setFilter(project.entities.find((e) => e.id === eid)?.title ?? "");
+                }}
+              />
+            ),
+            import: (
+              <ImportPanel knownEntityNames={new Set(project.entities.flatMap((e) => [e.id.toLowerCase(), e.title.toLowerCase(), ...e.aliases.map((a) => a.toLowerCase())]))} />
+            ),
+          };
+          // Phase-2 stopgap: category panels reuse characters panel
+          for (const k of ["locations", "factions", "events", "items", "lore"] as const) {
+            if (!panels[k]) panels[k] = panels.characters;
+          }
+          const counts: Record<string, number | undefined> = {
+            pins: unplaced.length > 0 ? unplaced.length : undefined,
+          };
+          const railItems = buildRailItems({ panels, counts });
+          const active = railItems.find((i) => i.id === activePanel);
+          return (
+            <>
+              <EditorRail
+                items={railItems}
+                activeId={activePanel}
+                onSelect={(id) => {
+                  if (id === "save") { void onSaveClick(); return; }
+                  selectPanel(id);
+                }}
+              />
+              <div className="relative flex-1 min-h-0">
           <MapContainer
             crs={FlatCRS}
             center={[activeMap.height / 2, activeMap.width / 2]}
@@ -1103,233 +1345,17 @@ export default function AtlasPlacementEditor() {
               </Button>
             </div>
           )}
+          <EditorPanelHost
+            activeId={activePanel}
+            title={active?.label ?? ""}
+            onDismiss={dismissPanel}
+          >
+            {active?.panel}
+          </EditorPanelHost>
         </div>
-
-        <aside className="w-[420px] hidden md:flex flex-col border-l border-border bg-card">
-          <Tabs defaultValue="pins" className="flex-1 flex flex-col min-h-0">
-            {/* 8-tab Creator Cockpit. Two rows of compact icon-only triggers. */}
-            <TabsList className="grid grid-cols-4 mx-3 mt-3 h-auto gap-y-1 p-1">
-              <TabsTrigger value="pins" className="gap-1 text-[11px] py-1.5"><PinIcon className="h-3.5 w-3.5" />Pins</TabsTrigger>
-              <TabsTrigger value="maps" className="gap-1 text-[11px] py-1.5"><LayersIcon className="h-3.5 w-3.5" />Maps</TabsTrigger>
-              <TabsTrigger value="regions" className="gap-1 text-[11px] py-1.5"><Shapes className="h-3.5 w-3.5" />Regions</TabsTrigger>
-              <TabsTrigger value="routes" className="gap-1 text-[11px] py-1.5"><RouteIcon className="h-3.5 w-3.5" />Routes</TabsTrigger>
-              <TabsTrigger value="fog" className="gap-1 text-[11px] py-1.5"><CloudFog className="h-3.5 w-3.5" />Fog</TabsTrigger>
-              <TabsTrigger value="entities" className="gap-1 text-[11px] py-1.5"><BookOpen className="h-3.5 w-3.5" />Entities</TabsTrigger>
-              <TabsTrigger value="import" className="gap-1 text-[11px] py-1.5"><FolderOpen className="h-3.5 w-3.5" />Import</TabsTrigger>
-              <TabsTrigger value="publish" className="gap-1 text-[11px] py-1.5"><ShieldCheck className="h-3.5 w-3.5" />Publish</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="pins" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
-              <TabFrame
-                title="Pins"
-                builtFromYamlCount={project.placements.filter((p) => p.mapId === activeMap.id).length}
-                localDraftCount={dirtyCount}
-                blockingCount={pinIssues.blocking}
-                warningCount={pinIssues.warning}
-              >
-                <div>
-                  <div className="p-3 border-b border-border space-y-2">
-                    <Input placeholder="Filter entities…" value={filter} onChange={(e) => setFilter(e.target.value)} />
-                    <div className="flex flex-wrap gap-1">
-                      {(["all","unplaced","placed"] as const).map((s) => (
-                        <Button key={s} size="sm" variant={stateFilter === s ? "secondary" : "ghost"} className="h-6 px-2 text-[10px] uppercase" onClick={() => setStateFilter(s)}>{s}</Button>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 text-[10px]">
-                      <Select value={visFilter} onValueChange={(v) => setVisFilter(v as typeof visFilter)}>
-                        <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1"><SelectValue placeholder="visibility" /></SelectTrigger>
-                        <SelectContent>
-                          {["all","player","rumor","dm","hidden"].map((v) => <SelectItem key={v} value={v} className="text-xs">{v}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <Select value={typeFilter} onValueChange={setTypeFilter}>
-                        <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1"><SelectValue placeholder="type" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all" className="text-xs">all types</SelectItem>
-                          {allTypes.map((t) => <SelectItem key={t} value={t} className="text-xs">{t}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      {allTags.length > 0 && (
-                        <Select value={tagFilter} onValueChange={setTagFilter}>
-                          <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1"><SelectValue placeholder="tag" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all" className="text-xs">all tags</SelectItem>
-                            {allTags.map((t) => <SelectItem key={t} value={t} className="text-xs">#{t}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      )}
-                      <Button
-                        size="sm"
-                        variant={chainPlaceMode ? "default" : "outline"}
-                        className="h-6 px-2 text-[10px]"
-                        onClick={() => {
-                          const next = !chainPlaceMode;
-                          setChainPlaceMode(next);
-                          if (next && !pendingId && unplaced[0]) setPendingId(unplaced[0].id);
-                        }}
-                        title="Auto-advance to the next unplaced entity after each click"
-                      >
-                        Place next
-                      </Button>
-                    </div>
-                  </div>
-                  <Section title={`Unplaced (${unplaced.length})`}>
-                    {unplaced.map((e) => (
-                      <EntityRow key={e.id} entity={e} state="unplaced" isPending={pendingId === e.id} onPlace={() => setPendingId(e.id)} />
-                    ))}
-                    {unplaced.length === 0 && <Empty text="No unplaced entities match these filters." />}
-                  </Section>
-                  <Section title={`Placed (${placed.length})`}>
-                    {placed.map((e) => {
-                      const eff = effectivePlacement(e.id)!;
-                      const overridden = overrideKey(activeMap.id, e.id) in overrides;
-                      const otherMaps = project.maps.filter((m) => m.id !== activeMap.id).map((m) => ({ id: m.id, name: m.name }));
-                      return (
-                        <EntityRow
-                          key={e.id}
-                          entity={e}
-                          state="placed"
-                          coord={{ x: eff.x, y: eff.y }}
-                          label={eff.label}
-                          pinOverride={eff.pin}
-                          overridden={overridden}
-                          isPending={pendingId === e.id}
-                          otherMaps={otherMaps}
-                          onGoTo={() => goTo(e.id)}
-                          onMove={() => setPendingId(e.id)}
-                          onRemove={() => removeCoord(e.id)}
-                          onReset={overridden ? () => clearOverride(e.id) : undefined}
-                          onNudge={(dx, dy) => nudge(e.id, dx, dy)}
-                          onChangeXY={(x, y) => setCoord(e.id, { x, y })}
-                          onChangeLabel={(l) => setLabel(e.id, l)}
-                          onChangePin={(p) => setPinOverride(e.id, p)}
-                          onDuplicateToMap={(mid) => duplicateToMap(e.id, mid)}
-                        />
-                      );
-                    })}
-                    {placed.length === 0 && <Empty text="No placed entities match these filters." />}
-                  </Section>
-                </div>
-              </TabFrame>
-            </TabsContent>
-
-            <TabsContent value="maps" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
-              {/* Maps tab combines layers + map settings + batch import — same canon target (world.yaml > maps[]). */}
-              <div className="px-3 pt-2">
-                <Button size="sm" variant="outline" className="w-full gap-1 h-8 text-xs" onClick={() => setMapImportOpen(true)}>
-                  <Upload className="h-3.5 w-3.5" /> Import Maps (batch wizard)
-                </Button>
-              </div>
-              <Tabs defaultValue="layers" className="flex-1 flex flex-col min-h-0">
-                <TabsList className="mx-3 mt-2 grid grid-cols-2">
-                  <TabsTrigger value="layers" className="text-[11px]"><LayersIcon className="h-3.5 w-3.5 mr-1" />Layers</TabsTrigger>
-                  <TabsTrigger value="settings" className="text-[11px]"><Settings2 className="h-3.5 w-3.5 mr-1" />Settings</TabsTrigger>
-                </TabsList>
-                <TabsContent value="layers" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
-                  <MapLayerPanel
-                    map={activeMap}
-                    mergedLayers={layerEditor.mergedLayers}
-                    localLayers={layerEditor.localLayers}
-                    selectedId={layerEditor.selectedId}
-                    setSelectedId={layerEditor.setSelectedId}
-                    onAddFiles={layerEditor.addUploaded}
-                    onAddUrl={layerEditor.addUrl}
-                    onEditBuiltin={layerEditor.editBuiltinLayer}
-                    onUpdate={layerEditor.updateLayer}
-                    onDuplicate={layerEditor.duplicateLayer}
-                    onRemove={layerEditor.removeLayer}
-                    onClearAll={layerEditor.clearAll}
-                    onSetMapSize={(w, h) => patchMap({ width: w, height: h })}
-                    editGeometry={editGeometry}
-                    setEditGeometry={setEditGeometry}
-                    lockAspect={lockAspectRatio}
-                    setLockAspect={setLockAspectRatio}
-                  />
-                </TabsContent>
-                <TabsContent value="settings" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
-                  {baseMap && <MapSettingsPanel map={activeMap} baseMap={baseMap} onPatch={patchMap} onReset={resetMap} />}
-                </TabsContent>
-              </Tabs>
-            </TabsContent>
-
-            <TabsContent value="regions" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
-              <RegionsTab
-                project={project}
-                map={activeMap}
-                api={regionDraft}
-                blockingCount={regionIssues.blocking}
-                warningCount={regionIssues.warning}
-                onFitTo={(r) => {
-                  if (!r.points.length) return;
-                  const cx = r.points.reduce((s, p) => s + p[0], 0) / r.points.length;
-                  const cy = r.points.reduce((s, p) => s + p[1], 0) / r.points.length;
-                  setFlyTo({ lat: activeMap.height - cy, lng: cx });
-                }}
-              />
-            </TabsContent>
-
-            <TabsContent value="routes" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
-              <RoutesTab
-                project={project}
-                map={activeMap}
-                api={routeDraft}
-                blockingCount={routeIssues.blocking}
-                warningCount={routeIssues.warning}
-                onFitTo={(pts) => {
-                  if (!pts.length) return;
-                  const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
-                  const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
-                  setFlyTo({ lat: activeMap.height - cy, lng: cx });
-                }}
-              />
-            </TabsContent>
-
-            <TabsContent value="fog" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
-              <FogTab
-                map={activeMap}
-                project={project}
-                api={fogDraft}
-                regionApi={regionDraft}
-                routeApi={routeDraft}
-                showFogPreview={showFogPreview}
-                setShowFogPreview={setShowFogPreview}
-                blockingCount={mapIssues.blocking}
-                warningCount={mapIssues.warning}
-              />
-            </TabsContent>
-
-            <TabsContent value="entities" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
-              <EntitiesTab
-                project={project}
-                blockingCount={entityIssues.blocking}
-                warningCount={entityIssues.warning}
-                onImportMdFiles={importFlow.openWithFiles}
-                onPasteMarkdown={() => setPasteOpen(true)}
-                drafts={entityDrafts}
-                onDraftsChange={setEntityDrafts}
-              />
-            </TabsContent>
-
-            <TabsContent value="import" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
-              <ImportPanel knownEntityNames={new Set(project.entities.flatMap((e) => [e.id.toLowerCase(), e.title.toLowerCase(), ...e.aliases.map((a) => a.toLowerCase())]))} />
-            </TabsContent>
-
-            <TabsContent value="publish" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
-              <PublishCheckTab
-                project={project}
-                draftMap={activeMap}
-                draftPlacements={draftPlacementsForValidation}
-                draftLocalLayers={layerEditor.localLayers}
-                onGoToMap={(mid) => { setActiveMapId(mid); toast.info(`Switched to ${project.maps.find((m) => m.id === mid)?.name ?? mid}`); }}
-                onGoToEntity={(eid) => {
-                  const c = effectiveCoord(eid);
-                  if (c && activeMap) setFlyTo({ lat: activeMap.height - c.y, lng: c.x });
-                  setFilter(project.entities.find((e) => e.id === eid)?.title ?? "");
-                }}
-              />
-            </TabsContent>
-          </Tabs>
-        </aside>
+              </>
+          );
+        })()}
       </div>
       <style>{`@keyframes atlas-pulse { 0%,100% { filter: drop-shadow(0 0 0 hsl(var(--primary))); } 50% { filter: drop-shadow(0 0 6px hsl(var(--primary))); } }`}</style>
       <MapImportWizard
