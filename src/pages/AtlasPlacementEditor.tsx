@@ -43,6 +43,10 @@ import { RoutesTab } from "@/atlas/tabs/RoutesTab";
 import { FogTab } from "@/atlas/tabs/FogTab";
 import { EntitiesTab } from "@/atlas/tabs/EntitiesTab";
 import { PublishCheckTab } from "@/atlas/tabs/PublishCheckTab";
+import { type CategoryId } from "@/atlas/content/entityCategory";
+import { CategoryPanel } from "@/atlas/categories/CategoryPanel";
+import { EntityEditorPanel, type NewEntityDraft } from "@/atlas/categories/EntityEditorPanel";
+import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { MapImportWizard } from "@/atlas/import/MapImportWizard";
 import { useRegionDraft } from "@/atlas/regions/useRegionDraft";
@@ -397,6 +401,8 @@ export default function AtlasPlacementEditor() {
   const [tagFilter, setTagFilter] = useState<string>("all");
   /** When true, finishing a placement automatically queues the next unplaced entity. */
   const [chainPlaceMode, setChainPlaceMode] = useState(false);
+  /** Which category panel is in "create new entity" mode (null = browsing). */
+  const [creatingIn, setCreatingIn] = useState<CategoryId | null>(null);
 
   /** Read-only canon placement (built YAML value) for an entity on a map. */
   const canonPlacement = useCallback((mapId: string, entityId: string) => {
@@ -757,6 +763,27 @@ export default function AtlasPlacementEditor() {
     }
   };
 
+  /**
+   * Create handler for the EntityEditorPanel. Builds a FileChange for the new
+   * entity .md file and routes it straight through the unified Save modal.
+   * worldRoot is derived from the active world's id (e.g. content/astrath-deeprealm).
+   */
+  const onCreateEntity = useCallback((draft: NewEntityDraft) => {
+    const activeWorld = project?.worlds.find((w) => w.id === importWorldId);
+    const worldRoot = activeWorld ? `content/${activeWorld.id}` : "content";
+    const change = buildNewEntityChange({
+      worldRoot,
+      category: draft.category,
+      title: draft.title,
+      summary: draft.summary,
+      visibility: draft.visibility,
+      kind: draft.kind,
+    });
+    setPendingChanges((cur) => [...cur, change]);
+    setSaveModalOpen(true);
+    setCreatingIn(null);
+  }, [project, importWorldId]);
+
   const dirtyCount = Object.keys(overrides).filter((k) => activeMap && k.startsWith(`${activeMap.id}:`)).length;
   // Unsaved-changes signal: there are local pin overrides OR a dirty
   // world.yaml signal. The pin-side gate also waits for an edit since the
@@ -1021,24 +1048,62 @@ export default function AtlasPlacementEditor() {
       <div className="flex-1 flex relative min-h-0">
         {(() => {
           const panels: Record<string, React.ReactNode> = {
-            // Six content categories — Phase 3 will replace with CategoryPanel.
-            // For Phase 2, all six reuse EntitiesTab so nothing is lost.
-            characters: (
-              <EntitiesTab
-                project={project}
-                blockingCount={entityIssues.blocking}
-                warningCount={entityIssues.warning}
-                onImportMdFiles={importFlow.openWithFiles}
-                onPasteMarkdown={() => setPasteOpen(true)}
-                drafts={entityDrafts}
-                onDraftsChange={setEntityDrafts}
-              />
+            // Six content categories — wired to CategoryPanel (browse) or
+            // EntityEditorPanel (create). Phase 2 EntitiesTab stopgap removed.
+            characters: creatingIn === "characters" ? (
+              <EntityEditorPanel mode="create" category="characters"
+                onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
+            ) : (
+              <CategoryPanel category="characters" entities={project.entities}
+                onOpen={() => { /* entity detail view: Phase 4 */ }}
+                onNew={() => setCreatingIn("characters")}
+                onImport={() => importFlow.openWithFiles([])} />
             ),
-            locations: null,
-            factions: null,
-            events: null,
-            items: null,
-            lore: null,
+            locations: creatingIn === "locations" ? (
+              <EntityEditorPanel mode="create" category="locations"
+                onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
+            ) : (
+              <CategoryPanel category="locations" entities={project.entities}
+                onOpen={() => { /* entity detail view: Phase 4 */ }}
+                onNew={() => setCreatingIn("locations")}
+                onImport={() => importFlow.openWithFiles([])} />
+            ),
+            factions: creatingIn === "factions" ? (
+              <EntityEditorPanel mode="create" category="factions"
+                onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
+            ) : (
+              <CategoryPanel category="factions" entities={project.entities}
+                onOpen={() => { /* entity detail view: Phase 4 */ }}
+                onNew={() => setCreatingIn("factions")}
+                onImport={() => importFlow.openWithFiles([])} />
+            ),
+            events: creatingIn === "events" ? (
+              <EntityEditorPanel mode="create" category="events"
+                onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
+            ) : (
+              <CategoryPanel category="events" entities={project.entities}
+                onOpen={() => { /* entity detail view: Phase 4 */ }}
+                onNew={() => setCreatingIn("events")}
+                onImport={() => importFlow.openWithFiles([])} />
+            ),
+            items: creatingIn === "items" ? (
+              <EntityEditorPanel mode="create" category="items"
+                onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
+            ) : (
+              <CategoryPanel category="items" entities={project.entities}
+                onOpen={() => { /* entity detail view: Phase 4 */ }}
+                onNew={() => setCreatingIn("items")}
+                onImport={() => importFlow.openWithFiles([])} />
+            ),
+            lore: creatingIn === "lore" ? (
+              <EntityEditorPanel mode="create" category="lore"
+                onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
+            ) : (
+              <CategoryPanel category="lore" entities={project.entities}
+                onOpen={() => { /* entity detail view: Phase 4 */ }}
+                onNew={() => setCreatingIn("lore")}
+                onImport={() => importFlow.openWithFiles([])} />
+            ),
             // Map tools — exact JSX from former TabsContent bodies
             pins: (
               <TabFrame
@@ -1233,10 +1298,6 @@ export default function AtlasPlacementEditor() {
               <ImportPanel knownEntityNames={new Set(project.entities.flatMap((e) => [e.id.toLowerCase(), e.title.toLowerCase(), ...e.aliases.map((a) => a.toLowerCase())]))} />
             ),
           };
-          // Phase-2 stopgap: category panels reuse characters panel
-          for (const k of ["locations", "factions", "events", "items", "lore"] as const) {
-            if (!panels[k]) panels[k] = panels.characters;
-          }
           const counts: Record<string, number | undefined> = {
             pins: unplaced.length > 0 ? unplaced.length : undefined,
           };
