@@ -15,6 +15,7 @@
  */
 import { hashContent, type FileChange } from "@/atlas/save/localFsSave";
 import { isWritableSourcePath } from "@/atlas/save/sourcePathAllowlist";
+import { rewriteFrontmatter } from "@/atlas/content/frontmatterRewrite";
 import type { StagingRow } from "./stagingState";
 
 export class ImportCommitError extends Error {
@@ -66,9 +67,15 @@ export async function buildImportChanges(
       const currentRaw = await readSourceFile(row.targetPath, fetchFn);
       baseHash = await hashContent(currentRaw);
     }
+    const content = rewriteFrontmatter(row.rawContent, {
+      id: row.resolvedId,
+      type: row.inferredType,
+      visibility: row.resolvedVisibility,
+      tagsAdd: row.inferredType ? [row.inferredType] : [],
+    });
     changes.push({
       path: row.targetPath,
-      content: row.content,
+      content,
       kind: "entity-md",
       baseHash,
     });

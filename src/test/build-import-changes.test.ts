@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { buildImportChanges, ImportCommitError } from "@/atlas/import/buildImportChanges";
+import { parseFrontmatter } from "@/atlas/import/frontmatter";
 import {
   buildStagingRows,
   updateStagingRow,
@@ -134,5 +135,28 @@ describe("buildImportChanges", () => {
     await expect(
       buildImportChanges([opted], { fetchFn }),
     ).rejects.toBeInstanceOf(ImportCommitError);
+  });
+});
+
+describe("buildImportChanges persists inferred atlas fields", () => {
+  it("rewrites frontmatter (not verbatim) for a create row with no atlas.type", async () => {
+    const raw = `---\ntags:\n  - npc\n---\n# Corven\n\nbody\n`;
+    const row = {
+      id: "r1", filename: "corven.md",
+      inferredType: "npc", typeWasExplicit: false,
+      resolvedId: "corven", resolvedVisibility: "dm",
+      rawContent: raw, content: raw,
+      targetPath: "content/w/npcs/corven.md",
+      pathAllowed: true, rowKind: "create" as const,
+      included: true, frontmatterPath: undefined,
+    };
+    const [change] = await buildImportChanges([row as never]);
+    expect(change.content).not.toBe(raw);            // not verbatim
+    const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
+    expect(atlas.type).toBe("npc");
+    expect(atlas.id).toBe("corven");
+    expect(atlas.visibility).toBe("dm");
+    expect(parseFrontmatter(change.content).data.tags).toContain("npc");
+    expect(change.baseHash).toBeNull();              // create-only
   });
 });
