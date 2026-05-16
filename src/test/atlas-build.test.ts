@@ -356,4 +356,49 @@ describe.sequential("atlas build pipeline", () => {
     const atlas = read(path.join(tmpRoot, "ext-layer-out"));
     expect(atlas.buildReport.warnings.join("\n")).toMatch(/external asset/i);
   });
+
+  it("emits importFolders in DM build and omits it from --player build", () => {
+    const vaultDir = path.join(tmpRoot, "import-folders-vault");
+    writeWorldVault(
+      vaultDir,
+      `
+maps:
+  - id: m1
+    name: Main
+    width: 1000
+    height: 1000
+import:
+  folders:
+    npc: npcs
+  defaultFolder: imports
+`,
+    );
+
+    // DM build
+    const dmOut = path.join(tmpRoot, "import-folders-dm");
+    const dm = run(["--config", path.join(vaultDir, "atlas.config.json"), "--out", dmOut]);
+    expect(dm.status, dm.stderr).toBe(0);
+    const dmAtlas = JSON.parse(
+      fs.readFileSync(path.join(dmOut, "atlas.json"), "utf8"),
+    ) as { worlds: Array<{ importFolders?: unknown }> };
+    expect(dmAtlas.worlds[0].importFolders).toEqual({
+      folders: { npc: "npcs" },
+      defaultFolder: "imports",
+    });
+
+    // Player build
+    const playerOut = path.join(tmpRoot, "import-folders-player");
+    const player = run([
+      "--player",
+      "--config",
+      path.join(vaultDir, "atlas.config.json"),
+      "--out",
+      playerOut,
+    ]);
+    expect(player.status, player.stderr).toBe(0);
+    const playerAtlas = JSON.parse(
+      fs.readFileSync(path.join(playerOut, "atlas.json"), "utf8"),
+    ) as { worlds: Array<{ importFolders?: unknown }> };
+    expect(playerAtlas.worlds[0].importFolders).toBeUndefined();
+  });
 });
