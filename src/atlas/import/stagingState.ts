@@ -229,6 +229,7 @@ export interface StagingRowPatch {
   included?: boolean;
   inferredType?: string;
   targetPath?: string;
+  resolvedVisibility?: string;
 }
 
 /**
@@ -296,5 +297,6 @@ export function updateStagingRow(
     pathAllowed,
     rowKind: nextRowKind,
     included: nextIncluded,
+    resolvedVisibility: patch.resolvedVisibility ?? row.resolvedVisibility,
   };
 }

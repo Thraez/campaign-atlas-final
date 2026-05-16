@@ -46,7 +46,7 @@ export interface ImportStagingModalProps {
   /** Patch one row by id. Caller threads the patch through updateStagingRow. */
   onPatchRow: (
     id: string,
-    patch: { included?: boolean; inferredType?: string; targetPath?: string },
+    patch: { included?: boolean; inferredType?: string; targetPath?: string; resolvedVisibility?: string },
   ) => void;
   onCancel: () => void;
   /** Commit only the included, non-blocked rows. */
@@ -110,6 +110,7 @@ export function ImportStagingModal({
                 <th className="text-left py-1.5 pr-2 w-6"></th>
                 <th className="text-left py-1.5 pr-2">Filename</th>
                 <th className="text-left py-1.5 pr-2 w-32">Inferred type</th>
+                <th className="text-left py-1.5 pr-2 w-24">Visibility</th>
                 <th className="text-left py-1.5 pr-2">Target path</th>
                 <th className="text-left py-1.5 pr-2 w-44">Notes</th>
               </tr>
@@ -178,6 +179,34 @@ export function ImportStagingModal({
                             <SelectItem key={t} value={t} className="text-[11px]">
                               {t}
                             </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="mt-1 flex items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground font-mono break-all">
+                          <span className="opacity-60">id:</span>{" "}
+                          <span>{row.resolvedId}</span>
+                        </span>
+                        {!row.typeWasExplicit && !row.parseError && (
+                          <Badge className="bg-amber-500/20 text-amber-200 border-amber-500/40 text-[10px]">
+                            confirm type
+                          </Badge>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2 pr-2">
+                      <Select
+                        value={row.resolvedVisibility || "dm"}
+                        onValueChange={(v) => onPatchRow(row.id, { resolvedVisibility: v })}
+                        disabled={!!row.parseError}
+                      >
+                        <SelectTrigger className="h-7 text-[11px]"
+                          aria-label={`Visibility for ${row.filename}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {["player", "dm", "hidden", "rumor"].map((v) => (
+                            <SelectItem key={v} value={v} className="text-[11px]">{v}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

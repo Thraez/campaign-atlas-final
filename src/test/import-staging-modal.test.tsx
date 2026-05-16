@@ -182,4 +182,22 @@ describe("ImportStagingModal", () => {
     expect((screen.getByLabelText("Include a.md") as HTMLInputElement).checked).toBe(true);
     expect((screen.getByLabelText("Include b.md") as HTMLInputElement).checked).toBe(true);
   });
+
+  it("flags rows whose type was not explicit and shows resolved visibility", () => {
+    const row = {
+      id: "r1", filename: "corven.md", inferredType: "npc",
+      typeWasExplicit: false, resolvedId: "corven", resolvedVisibility: "dm",
+      rawContent: "", content: "", targetPath: "content/w/npcs/corven.md",
+      pathAllowed: true, rowKind: "create", included: true,
+    };
+    render(
+      <ImportStagingModal
+        open rows={[row as never]} importConfig={{ folders: { npc: "npcs" }, defaultFolder: "imports" }}
+        onPatchRow={() => {}} onCancel={() => {}} onCommit={() => {}}
+      />,
+    );
+    expect(screen.getByText(/confirm type/i)).toBeInTheDocument();
+    expect(screen.getByText("corven")).toBeInTheDocument();        // resolved id
+    expect(screen.getByLabelText(/visibility for corven\.md/i)).toBeInTheDocument();
+  });
 });
