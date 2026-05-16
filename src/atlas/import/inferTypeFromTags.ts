@@ -1,3 +1,11 @@
+/**
+ * Tag-keyword → entity-type inference. The DM's Obsidian notes carry their
+ * own taxonomy in `tags:` (e.g. `tags: [npc, smuggler]`). When `atlas.type`
+ * is absent this is the strongest signal — stronger than folder, because the
+ * DM wrote it deliberately. First recognised tag in array order wins.
+ *
+ * Returns null when nothing is recognised (caller falls back to folder → lore).
+ */
 const TAG_TYPE_MAP: Record<string, string> = {
   npc: "npc", character: "npc", person: "npc",
   faction: "faction", guild: "faction", organization: "faction", organisation: "faction",
