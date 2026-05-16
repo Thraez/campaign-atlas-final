@@ -894,8 +894,6 @@ export default function AtlasPlacementEditor() {
   const mapIssues = issuesByScope((i) => i.code === "duplicate-layer-id" || i.code === "empty-map" || i.code === "missing-asset" || i.code === "external-asset" || i.code === "invalid-layer-size" || i.code === "missing-layer-src" || i.code === "route-no-scale");
   const regionIssues = issuesByScope((i) => i.code.includes("region") || i.code === "spoiler-leak-region");
   const routeIssues = issuesByScope((i) => i.code.includes("route"));
-  const entityIssues = issuesByScope((i) => i.code === "invalid-visibility" || i.code === "unknown-entity");
-
 
   if (error) {
     return (
