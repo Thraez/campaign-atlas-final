@@ -3,7 +3,7 @@ import { MapContainer, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Compass, Crosshair, RotateCcw, MapPin, Target, Trash2, Layers as LayersIcon, MapPin as PinIcon, Settings2, FolderOpen, Shapes, Route as RouteIcon, CloudFog, BookOpen, ShieldCheck, Upload, Save as SaveIcon, Undo2, Redo2, Plus, X } from "lucide-react";
+import { ArrowLeft, Compass, Crosshair, RotateCcw, MapPin, Target, Trash2, Layers as LayersIcon, Settings2, Upload, Save as SaveIcon, Undo2, Redo2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity, ImportFolderConfig, MapDocument, MapLayer } from "@/atlas/content/schema";
