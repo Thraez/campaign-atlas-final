@@ -88,7 +88,7 @@ export function ImportStagingModal({
   // recourse. A single click on "Select all overwrites" flips them all on at
   // once so the bulk-overwrite case stops being 55 checkbox clicks.
   const conflictRows = useMemo(
-    () => rows.filter((r) => r.pathAllowed && !r.parseError && r.conflict),
+    () => rows.filter((r) => r.pathAllowed && !r.parseError && r.rowKind === "path-collision"),
     [rows],
   );
   const uncheckedConflictCount = useMemo(

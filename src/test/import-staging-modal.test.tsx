@@ -158,4 +158,25 @@ describe("ImportStagingModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onCommit).not.toHaveBeenCalled();
   });
+
+  it("'Select all overwrites' checks all unchecked path-collision rows at once", () => {
+    const existingPaths = new Set([
+      "content/astrath-deeprealm/settlements/a.md",
+      "content/astrath-deeprealm/settlements/b.md",
+    ]);
+    const ctx = makeCtx({ existingPaths });
+    const rows = buildStagingRows(
+      [
+        { filename: "a.md", raw: "---\natlas: { type: settlement, id: a }\n---\n" },
+        { filename: "b.md", raw: "---\natlas: { type: settlement, id: b }\n---\n" },
+      ],
+      ctx,
+    );
+    render(<Harness initial={rows} ctx={ctx} />);
+    expect((screen.getByLabelText("Include a.md") as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByLabelText("Include b.md") as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: /Select all overwrites/i }));
+    expect((screen.getByLabelText("Include a.md") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("Include b.md") as HTMLInputElement).checked).toBe(true);
+  });
 });
