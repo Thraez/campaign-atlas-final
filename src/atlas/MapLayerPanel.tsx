@@ -142,15 +142,18 @@ export function MapLayerPanel(props: Props) {
           </div>
         </div>
         {setEditGeometry && (
-          <Button
-            size="sm"
-            variant={editGeometry ? "default" : "outline"}
-            className="w-full gap-1.5 h-8 text-xs"
-            onClick={() => setEditGeometry(!editGeometry)}
-            title="When on, click a layer to select it, then drag the body or corner handles to reposition / resize. Hold Shift to lock aspect, Alt to scale from center. Esc cancels."
-          >
-            <Move className="h-3.5 w-3.5" /> Edit geometry {editGeometry ? "(on)" : "(off)"}
-          </Button>
+          <div className="space-y-1">
+            <Button
+              size="sm"
+              variant={editGeometry ? "default" : "outline"}
+              className="w-full gap-1.5 h-8 text-xs"
+              onClick={() => setEditGeometry(!editGeometry)}
+              title="When on, click a layer to select it, then drag the body or corner handles to reposition / resize. Hold Shift to lock aspect, Alt to scale from center. Esc cancels."
+            >
+              <Move className="h-3.5 w-3.5" /> Adjust map image {editGeometry ? "(on)" : "(off)"}
+            </Button>
+            <p className="text-[10px] text-muted-foreground">Off: click the map to place pins. On: drag/resize the map image.</p>
+          </div>
         )}
         <div className="text-xs text-muted-foreground">
           Edits here are <strong>local drafts</strong> until you click <strong>Save</strong> — Save writes the layers (and any uploaded images) to disk and rebuilds.
