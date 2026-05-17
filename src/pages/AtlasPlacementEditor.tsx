@@ -80,6 +80,7 @@ import { useEntityEditDraft } from "@/atlas/categories/useEntityEditDraft";
 import { EditorRail } from "@/atlas/shell/EditorRail";
 import { EditorPanelHost } from "@/atlas/shell/EditorPanelHost";
 import { buildRailItems } from "@/atlas/shell/railRegistry";
+import { ViewModeProvider, useViewMode } from "@/atlas/view/ViewModeProvider";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 // Bumped to v3: storage shape now carries label + pin override per placement.
@@ -140,6 +141,20 @@ function FlyTo({ target }: { target: { lat: number; lng: number } | null }) {
     if (target) map.flyTo([target.lat, target.lng], Math.max(map.getZoom(), -1), { duration: 0.5 });
   }, [target, map]);
   return null;
+}
+
+function ViewModeToggle() {
+  const { mode, setMode } = useViewMode();
+  return (
+    <div className="inline-flex rounded border overflow-hidden text-xs" role="group" aria-label="View mode">
+      <button type="button"
+        className={mode === "dm" ? "px-2 py-1 bg-primary text-primary-foreground" : "px-2 py-1"}
+        aria-pressed={mode === "dm"} onClick={() => setMode("dm")}>DM view</button>
+      <button type="button"
+        className={mode === "player" ? "px-2 py-1 bg-primary text-primary-foreground" : "px-2 py-1"}
+        aria-pressed={mode === "player"} onClick={() => setMode("player")}>Player view</button>
+    </div>
+  );
 }
 
 export default function AtlasPlacementEditor() {
@@ -960,6 +975,7 @@ export default function AtlasPlacementEditor() {
   }
 
   return (
+    <ViewModeProvider>
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
       {session.restoredNotice && (
         <div className="px-3 py-1.5 text-[11px] bg-blue-500/15 text-blue-100 border-b border-blue-500/30 flex items-center justify-between gap-2">
@@ -1019,6 +1035,7 @@ export default function AtlasPlacementEditor() {
         </Link>
         <Badge variant="outline" className="ml-2 hidden sm:inline-flex">DM only</Badge>
         <div className="flex-1" />
+        <ViewModeToggle />
         {project.maps.length > 1 && (
           <Select value={activeMap.id} onValueChange={(v) => {
             if (v === activeMap.id) return;
@@ -1750,6 +1767,7 @@ export default function AtlasPlacementEditor() {
         </div>
       )}
     </div>
+    </ViewModeProvider>
   );
 }
 
