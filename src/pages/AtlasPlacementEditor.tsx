@@ -64,6 +64,7 @@ import { useRouteDraft } from "@/atlas/routes/useRouteDraft";
 import { RouteLayer } from "@/atlas/routes/RouteLayer";
 import { useFogDraft } from "@/atlas/fog/useFogDraft";
 import { FogLayer } from "@/atlas/fog/FogLayer";
+import { projectMapForPlayer } from "@/atlas/content/projectMapForPlayer";
 import {
   PIN_PRESETS,
   defaultPresetForType,
@@ -502,6 +503,45 @@ function AtlasPlacementEditorInner() {
 
   const placed = filtered.filter((e) => effectiveCoord(e.id));
   const unplaced = filtered.filter((e) => !effectiveCoord(e.id));
+
+  /**
+   * Ray-casting point-in-polygon: returns true if (px, py) is inside poly.
+   * Uses the standard even-odd rule. Coordinates are map-space (x right, y up).
+   */
+  function pointInPolygon(px: number, py: number, poly: [number, number][]): boolean {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i];
+      const [xj, yj] = poly[j];
+      const intersects = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+      if (intersects) inside = !inside;
+    }
+    return inside;
+  }
+
+  /** In player lens: filter placed entities through projectMapForPlayer. */
+  const placedForLens = useMemo(() => {
+    if (mode !== "player" || !activeMap) return placed;
+    const fog = fogDraft.fog;
+    const isFogged = (x: number, y: number): boolean => {
+      if (!fog.enabled) return false;
+      // A point is fogged if it is NOT inside any reveal polygon.
+      return !fog.reveals.some((poly) => pointInPolygon(x, y, poly as [number, number][]));
+    };
+    const coords = placed.map((e) => {
+      const c = effectivePlacement(e.id)!;
+      return { entityId: e.id, x: c.x, y: c.y };
+    });
+    const { placements } = projectMapForPlayer({
+      placements: coords,
+      regions: [],
+      routes: [],
+      entitiesById,
+      isFogged,
+    });
+    const keep = new Set(placements.map((p) => p.entityId));
+    return placed.filter((e) => keep.has(e.id));
+  }, [mode, placed, entitiesById, activeMap, fogDraft.fog, effectivePlacement]);
 
   /** Merge a partial override into the local draft. Undoable.
    *
@@ -1522,9 +1562,9 @@ function AtlasPlacementEditorInner() {
             {/* Z-order: layers → regions → routes → fog → pins → handles. */}
             {showRegions && <RegionLayer map={activeMap} api={regionDraft} visible={showRegions} />}
             <RouteLayer map={activeMap} api={routeDraft} />
-            <FogLayer map={activeMap} api={fogDraft} preview={showFogPreview} />
+            <FogLayer map={activeMap} api={fogDraft} preview={showFogPreview} playerMode={mode === "player"} />
 
-            {placed.map((e) => {
+            {placedForLens.map((e) => {
               const eff = effectivePlacement(e.id);
               if (!eff) return null;
               const style = resolvePinStyle(e.type, eff.pin);

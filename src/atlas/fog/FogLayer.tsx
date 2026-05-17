@@ -18,6 +18,12 @@ interface Props {
   api: FogDraftAPI;
   /** When false, hides the dim layer (still allows reveal authoring). */
   preview?: boolean;
+  /**
+   * When true, renders the fog as a fully opaque "undiscovered" backdrop
+   * (player view). When false (default), renders as the translucent DM
+   * planning overlay.
+   */
+  playerMode?: boolean;
 }
 
 function DrawingClicks({ api, map, onCircleAnchor }: { api: FogDraftAPI; map: MapDocument; onCircleAnchor: (p: Point) => void }) {
@@ -40,7 +46,7 @@ function DrawingClicks({ api, map, onCircleAnchor }: { api: FogDraftAPI; map: Ma
   return null;
 }
 
-export function FogLayer({ map, api, preview = true }: Props) {
+export function FogLayer({ map, api, preview = true, playerMode = false }: Props) {
   const H = map.height;
   const xy2ll = (x: number, y: number): [number, number] => [H - y, x];
   const [_circleAnchor, setCircleAnchor] = useState<Point | null>(null);
@@ -63,13 +69,13 @@ export function FogLayer({ map, api, preview = true }: Props) {
     <>
       <DrawingClicks api={api} map={map} onCircleAnchor={setCircleAnchor} />
 
-      {preview && fog.enabled && (
+      {(preview || playerMode) && fog.enabled && (
         <Polygon
           positions={fogPositions}
           pathOptions={{
             color: "transparent",
-            fillColor: fog.color ?? "rgba(0,0,0,0.55)",
-            fillOpacity: 1,
+            fillColor: playerMode ? "#1a1a2e" : (fog.color ?? "rgba(0,0,0,0.55)"),
+            fillOpacity: playerMode ? 1 : 1,
             weight: 0,
             interactive: false,
             fillRule: "evenodd",
