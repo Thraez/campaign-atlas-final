@@ -81,6 +81,7 @@ import { EditorRail } from "@/atlas/shell/EditorRail";
 import { EditorPanelHost } from "@/atlas/shell/EditorPanelHost";
 import { buildRailItems } from "@/atlas/shell/railRegistry";
 import { ViewModeProvider, useViewMode } from "@/atlas/view/ViewModeProvider";
+import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 // Bumped to v3: storage shape now carries label + pin override per placement.
@@ -316,6 +317,11 @@ export default function AtlasPlacementEditor() {
     const o = mapOverride[baseMap.id];
     return o ? { ...baseMap, ...o } : baseMap;
   }, [baseMap, mapOverride]);
+
+  // Lens-aware display list — used only for CategoryPanel rendering.
+  // Save/import/edit operations always use project.entities directly.
+  const { mode } = useViewMode();
+  const displayEntities = filterEntitiesForLens(project?.entities ?? [], mode);
 
   const patchMap = (patch: Partial<MapDocument>) => {
     if (!baseMap) return;
@@ -1183,7 +1189,7 @@ export default function AtlasPlacementEditor() {
               <EntityEditorPanel mode="create" category="characters"
                 onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
             ) : renderCategory("characters", (
-              <CategoryPanel category="characters" entities={project.entities}
+              <CategoryPanel category="characters" entities={displayEntities}
                 onOpen={(id) => setEditingEntityId(id)}
                 onNew={() => setCreatingIn("characters")}
                 onImport={triggerMdImport}
@@ -1194,7 +1200,7 @@ export default function AtlasPlacementEditor() {
               <EntityEditorPanel mode="create" category="locations"
                 onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
             ) : renderCategory("locations", (
-              <CategoryPanel category="locations" entities={project.entities}
+              <CategoryPanel category="locations" entities={displayEntities}
                 onOpen={(id) => setEditingEntityId(id)}
                 onNew={() => setCreatingIn("locations")}
                 onImport={triggerMdImport}
@@ -1205,7 +1211,7 @@ export default function AtlasPlacementEditor() {
               <EntityEditorPanel mode="create" category="factions"
                 onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
             ) : renderCategory("factions", (
-              <CategoryPanel category="factions" entities={project.entities}
+              <CategoryPanel category="factions" entities={displayEntities}
                 onOpen={(id) => setEditingEntityId(id)}
                 onNew={() => setCreatingIn("factions")}
                 onImport={triggerMdImport}
@@ -1216,7 +1222,7 @@ export default function AtlasPlacementEditor() {
               <EntityEditorPanel mode="create" category="events"
                 onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
             ) : renderCategory("events", (
-              <CategoryPanel category="events" entities={project.entities}
+              <CategoryPanel category="events" entities={displayEntities}
                 onOpen={(id) => setEditingEntityId(id)}
                 onNew={() => setCreatingIn("events")}
                 onImport={triggerMdImport}
@@ -1227,7 +1233,7 @@ export default function AtlasPlacementEditor() {
               <EntityEditorPanel mode="create" category="items"
                 onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
             ) : renderCategory("items", (
-              <CategoryPanel category="items" entities={project.entities}
+              <CategoryPanel category="items" entities={displayEntities}
                 onOpen={(id) => setEditingEntityId(id)}
                 onNew={() => setCreatingIn("items")}
                 onImport={triggerMdImport}
@@ -1238,7 +1244,7 @@ export default function AtlasPlacementEditor() {
               <EntityEditorPanel mode="create" category="lore"
                 onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
             ) : renderCategory("lore", (
-              <CategoryPanel category="lore" entities={project.entities}
+              <CategoryPanel category="lore" entities={displayEntities}
                 onOpen={(id) => setEditingEntityId(id)}
                 onNew={() => setCreatingIn("lore")}
                 onImport={triggerMdImport}
