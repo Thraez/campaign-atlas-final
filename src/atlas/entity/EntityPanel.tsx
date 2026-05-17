@@ -23,6 +23,7 @@ import type { Entity, MapPlacement } from "@/atlas/content/schema";
 export interface EntityPanelProps {
   entity: Entity | null;
   placements: MapPlacement[];
+  /** Entity lookup map — used by downstream slices for cross-entity link resolution. */
   entityById: Map<string, Entity>;
   onOpenEntity: (id: string) => void;
   onClose: () => void;

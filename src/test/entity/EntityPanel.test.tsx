@@ -34,10 +34,11 @@ describe("EntityPanel (shared)", () => {
   it("hides player-personal notes + handout when readerAffordances=false", () => {
     renderPanel(false);
     expect(screen.queryByLabelText(/handout as PDF/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^Notes$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/my notes/i)).not.toBeInTheDocument(); // was: /^Notes$/i
   });
   it("shows them by default (player site unchanged)", () => {
     renderPanel(true);
     expect(screen.getByLabelText(/handout as PDF/i)).toBeInTheDocument();
+    expect(screen.getByText(/my notes/i)).toBeInTheDocument();
   });
 });
