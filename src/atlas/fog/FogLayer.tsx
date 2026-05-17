@@ -75,7 +75,10 @@ export function FogLayer({ map, api, preview = true, playerMode = false }: Props
           pathOptions={{
             color: "transparent",
             fillColor: playerMode ? "#1a1a2e" : (fog.color ?? "rgba(0,0,0,0.55)"),
-            fillOpacity: playerMode ? 1 : 1,
+            // fillOpacity stays 1 in both modes. DM semi-transparency comes from
+            // the rgba alpha in fog.color (e.g. "rgba(0,0,0,0.55)"), not from this
+            // property. SVG composites fill × fillOpacity, so 0.55 × 1 = 0.55.
+            fillOpacity: 1,
             weight: 0,
             interactive: false,
             fillRule: "evenodd",
