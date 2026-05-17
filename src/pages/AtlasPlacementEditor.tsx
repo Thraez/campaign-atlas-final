@@ -54,6 +54,7 @@ import { EntityEditPanel } from "@/atlas/categories/EntityEditPanel";
 import { EntitySurface } from "@/atlas/entity/EntitySurface";
 import { resolvePinClickIntent } from "@/atlas/editor/pinClickIntent";
 import { resolveEntityCloseIntent } from "@/atlas/editor/entityCloseIntent";
+import { mapClickToAtlasCoord } from "@/atlas/editor/mapClickCoord";
 import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { MapImportWizard } from "@/atlas/import/MapImportWizard";
@@ -572,8 +573,7 @@ function AtlasPlacementEditorInner() {
 
   const onMapClick = (lng: number, lat: number) => {
     if (!pendingId || !activeMap) return;
-    const x = Math.round(lng);
-    const y = Math.round(activeMap.height - lat);
+    const { x, y } = mapClickToAtlasCoord(lng, lat, activeMap.height);
     setCoord(pendingId, { x, y });
     toast.success(`Placed "${project?.entities.find((e) => e.id === pendingId)?.title}" at ${x},${y} on ${activeMap.name}`);
     if (chainPlaceMode) {
