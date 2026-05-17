@@ -10,7 +10,7 @@ import type { EntityVisibility } from "@/atlas/content/schema";
 import { stripDmBlocks, stripDmFromShippingString } from "@/atlas/content/stripDmBlocks";
 import { tokenizeWikilinks, renderLinkTokens } from "@/atlas/content/parseWikilinks";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
-import { compactProfile, stripDmProfile } from "@/atlas/profiles/profileBuild";
+import { compactProfile, stripDmProfile, filterRelationshipsForPlayer } from "@/atlas/profiles/profileBuild";
 
 const PLAYER_VISIBLE = new Set<EntityVisibility>(["player", "rumor"]);
 
@@ -113,18 +113,12 @@ export function projectEntityForPlayer(entity: Entity, ctx: ProjectionContext): 
 
   const title = strip(entity.title) ?? entity.title;
 
-  // 6. Relationships filtered for player: drop any that point at a secret entity.
-  // Accepts both the canonical `entity` field and the legacy `targetId` back-compat field
-  // (older YAML may use either; validateProject.ts accepts both the same way).
+  // 6. Relationships filtered for player via the canonical shared implementation.
+  // filterRelationshipsForPlayer enforces both r.visibility and target entity visibility.
   let relationships = entity.relationships;
   if (relationships && relationships.length > 0) {
-    const kept = relationships.filter((r) => {
-      // Resolve target id from canonical field first, then legacy back-compat field.
-      const targetId =
-        (r as { entity?: string }).entity ??
-        (r as unknown as { targetId?: string }).targetId;
-      if (!targetId) return false;
-      return !ctx.secretIds.has(targetId);
+    const { kept } = filterRelationshipsForPlayer(relationships, {
+      entityVisibility: ctx.entityVisibility,
     });
     relationships = kept.length > 0 ? kept : undefined;
   }

@@ -42,8 +42,8 @@ describe("projectEntityForPlayer", () => {
     const e = ent({ id: "edric", title: "Edric", visibility: "player",
       tags: ["npc", "smuggler", "Edric"], aliases: ["Edric", "The Knife"],
       relationships: [
-        { kind: "ally", targetId: "soreth", label: "secret backer" } as never,
-        { kind: "rival", targetId: "edric2", label: "open rival" } as never,
+        { type: "ally", entity: "soreth", label: "secret backer", visibility: "player" },
+        { type: "rival", entity: "edric2", label: "open rival", visibility: "player" },
       ] });
     const e2 = ent({ id: "edric2", title: "Edric Two", visibility: "player" });
     const all = new Map([[hidden.id, hidden], [e.id, e], [e2.id, e2]]);
@@ -51,7 +51,7 @@ describe("projectEntityForPlayer", () => {
     expect(p.tags).not.toContain("npc");          // META tag scrubbed
     expect(p.tags).toContain("smuggler");
     expect(p.aliases).not.toContain("Edric");     // title-alias deduped
-    expect((p.relationships ?? []).some((r) => r.targetId === "soreth")).toBe(false);
-    expect((p.relationships ?? []).some((r) => r.targetId === "edric2")).toBe(true);
+    expect((p.relationships ?? []).some((r) => r.entity === "soreth")).toBe(false);
+    expect((p.relationships ?? []).some((r) => r.entity === "edric2")).toBe(true);
   });
 });
