@@ -30,6 +30,15 @@ export function EntityEditPanel({
         const raw = await readSourceFile(sourcePath, fetch);
         if (!alive) return;
         rawRef.current = raw;
+        // No-loss: if a live draft for THIS sourcePath already exists (the user
+        // was editing, left Edit, and came back), keep it. Only seed the draft
+        // from disk on a genuine first open. rawRef is still refreshed above so
+        // Save preserves untouched frontmatter.
+        const existing = api.snapshot();
+        if (existing && existing.sourcePath === sourcePath) {
+          setPhase("ready");
+          return;
+        }
         const fm = parseFrontmatter(raw);
         const atlas = ((fm.data.atlas as Record<string, unknown>) ?? {});
         const baseHash = await hashContent(raw);
@@ -91,7 +100,7 @@ export function EntityEditPanel({
     }
   };
 
-  if (phase === "loading") return <div className="p-4 text-xs">Loading…</div>;
+  if (phase === "loading" || !api.draft) return <div className="p-4 text-xs">Loading…</div>;
   if (phase === "saved") return <div className="p-4 text-xs">Saved.</div>;
   if (phase === "error")
     return (
