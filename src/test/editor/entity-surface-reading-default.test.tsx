@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { EntitySurface } from "@/atlas/entity/EntitySurface";
+import { ViewModeProvider } from "@/atlas/view/ViewModeProvider";
 import type { Entity } from "@/atlas/content/schema";
 
 const corven = {
@@ -14,12 +15,14 @@ describe("entity surface opens in Reading, Edit toggles", () => {
   it("shows Reading (projected bio) first, with an Edit affordance", () => {
     render(
       <MemoryRouter>
-        <EntitySurface
-          entity={corven}
-          entitiesById={new Map([[corven.id, corven]])}
-          renderEdit={() => <div data-testid="edit-form">EDIT FORM</div>}
-          onClose={() => {}}
-        />
+        <ViewModeProvider>
+          <EntitySurface
+            entity={corven}
+            entitiesById={new Map([[corven.id, corven]])}
+            renderEdit={() => <div data-testid="edit-form">EDIT FORM</div>}
+            onClose={() => {}}
+          />
+        </ViewModeProvider>
       </MemoryRouter>,
     );
     expect(screen.getAllByText("Corven").length).toBeGreaterThan(0);
