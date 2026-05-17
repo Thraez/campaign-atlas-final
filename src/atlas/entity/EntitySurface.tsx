@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Entity, MapPlacement } from "@/atlas/content/schema";
+import type { Entity } from "@/atlas/content/schema";
 import { EntityPanes } from "@/atlas/entity/EntityPanes";
 
 export function EntitySurface({
@@ -9,9 +9,6 @@ export function EntitySurface({
   entitiesById: Map<string, Entity>;
   renderEdit: () => React.ReactNode;
   onClose: () => void;
-  placements?: MapPlacement[];
-  onOpenEntity?: (id: string) => void;
-  onShowOnMap?: (p: MapPlacement) => void;
 }) {
   const [editing, setEditing] = useState(false);
   return (
