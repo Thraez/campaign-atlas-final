@@ -39,4 +39,15 @@ describe("CategoryPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /New Item/i }));
     expect(onNew).toHaveBeenCalled();
   });
+
+  it("double-clicking a row opens the entity (interaction parity)", () => {
+    const onOpen = vi.fn();
+    render(
+      <CategoryPanel category="characters" entities={entities}
+        onOpen={onOpen} onNew={vi.fn()} onImport={vi.fn()} />,
+    );
+    const row = screen.getByText("Alda");
+    fireEvent.doubleClick(row);
+    expect(onOpen).toHaveBeenCalledWith("a");
+  });
 });

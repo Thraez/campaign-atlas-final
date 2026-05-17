@@ -59,6 +59,7 @@ export function CategoryPanel({
                   data-testid="entity-row"
                   type="button"
                   onClick={() => onOpen(e.id)}
+                  onDoubleClick={() => onOpen(e.id)}
                   className="flex-1 text-left px-3 py-2 text-xs min-w-0"
                 >
                   <span className="truncate block">{e.title}</span>
