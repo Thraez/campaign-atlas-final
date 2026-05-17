@@ -22,7 +22,7 @@ D&D world atlas: Obsidian markdown → build pipeline → `atlas.json` → dual-
 - The source of truth for design is `README.md` (long). Skim its TOC before architectural changes.
 - For changes to the build pipeline, the scan scripts under `scripts/` define the contracts the output must satisfy.
 
-<!-- MODEL-SELECTION-TRIAL START (added 2026-05-15 — delete this block to revert) -->
+<!-- TRIAL: MODEL-SELECTION START (added 2026-05-15 — delete this section alone to revert just model selection) -->
 ## Model selection — trial rules
 
 Default: **Sonnet 4.6**. Switch up or down based on signals.
@@ -54,6 +54,10 @@ Default: **Sonnet 4.6**. Switch up or down based on signals.
 - For >3 parallel codebase lookups: Explore subagent.
 - For multi-file implementation with clear shape: Plan agent → write handover → execute on Sonnet in a fresh session.
 - When spawning agents, pass `model: "haiku"` for lookup/search work and `model: "sonnet"` for execution. Reserve Opus subagents for synthesis only.
+<!-- TRIAL: MODEL-SELECTION END -->
+
+<!-- TRIAL: HANDOVER START (added 2026-05-17 — delete this section alone to revert just the handover protocol) -->
+## Handover protocol — trial rules
 
 **Mid-session handoff signal (when running on Opus):**
 - When finishing a planning, design, or architectural-review phase — *before* starting execution — stop and **write the handover to `<project-memory>/handovers/ACTIVE.md`** (goal, context, files to touch, success criteria, open questions, branch/PR). Then say:
@@ -65,4 +69,12 @@ Default: **Sonnet 4.6**. Switch up or down based on signals.
 **Handover discovery (every session, any model):**
 - At session start, before planning or clarifying questions, read the project auto-memory `handovers/ACTIVE.md`. If it holds a pending handover, that is the spec — confirm scope with the user, then execute; don't re-derive.
 - Never commit handover docs into the repo as the primary copy — they get lost on unmerged branches. Auto-memory is the source of truth. Full protocol: project memory `handover_protocol.md`.
-<!-- MODEL-SELECTION-TRIAL END -->
+<!-- TRIAL: HANDOVER END -->
+
+<!-- TRIAL: BRANCH-CLEANUP START (added 2026-05-17 — delete this section alone to revert just the cleanup rule) -->
+## Branch cleanup safety — trial invariant
+
+- **Never delete a branch unless its tip is first tagged `archive/<name>` and that tag is pushed to origin**, and it is not checked out in any worktree. The pushed tag — not any detection heuristic — is the safety net.
+- **Auto-delete only branches provably empty past their fork point. Anything with commits: tag it, list it, wait for explicit user confirmation — never auto-delete.**
+- **GitHub "merged" status is informational only — never a deletion criterion.** Applies to manual sweeps and the `clean_gone` / auto-delete-on-merge routine alike. Exact commands + rationale: project memory `safe_cleanup_protocol.md`.
+<!-- TRIAL: BRANCH-CLEANUP END -->
