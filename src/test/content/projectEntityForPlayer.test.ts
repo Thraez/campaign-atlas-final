@@ -37,6 +37,18 @@ describe("projectEntityForPlayer", () => {
     expect(p.body).toContain("…");
     expect(p.bodyHtml).not.toContain("Soreth");
   });
+  it("scrubs %%dm%% from profile player fields", () => {
+    const e = ent({ id: "x", title: "X", visibility: "player",
+      profile: {
+        player: { known_for: "%%secret%% brave", visible_traits: ["%%hidden%%", "loyal"], rumors: [] },
+        dm: undefined,
+      } as never });
+    const ctx = buildProjectionContext(new Map([[e.id, e]]));
+    const p = projectEntityForPlayer(e, ctx);
+    expect(p.profile?.player?.known_for).not.toContain("%%");
+    expect(p.profile?.player?.visible_traits).not.toContain("%%hidden%%");
+    expect(p.profile?.player?.visible_traits).toContain("loyal");
+  });
   it("scrubs meta tags and dedups the title-alias, drops dm relationships", () => {
     const hidden = ent({ id: "soreth", title: "Soreth", visibility: "dm" });
     const e = ent({ id: "edric", title: "Edric", visibility: "player",

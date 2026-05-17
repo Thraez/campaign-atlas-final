@@ -120,7 +120,29 @@ export function projectEntityForPlayer(entity: Entity, ctx: ProjectionContext): 
     const { kept } = filterRelationshipsForPlayer(relationships, {
       entityVisibility: ctx.entityVisibility,
     });
+    // Scrub DM inline strings from relationship text fields (mirrors build-atlas.ts ~488-491).
+    for (const r of kept) {
+      if (r.label) r.label = stripDmFromShippingString(r.label) ?? r.label;
+      if (r.description) r.description = stripDmFromShippingString(r.description) ?? r.description;
+    }
     relationships = kept.length > 0 ? kept : undefined;
+  }
+
+  // 7. Scrub DM inline strings from profile.player fields (mirrors build-atlas.ts ~471-484).
+  const compacted = compactProfile(entity.profile);
+  if (compacted?.player) {
+    const pp = compacted.player;
+    if (pp.known_for) pp.known_for = stripDmFromShippingString(pp.known_for) ?? undefined;
+    if (pp.visible_traits) {
+      pp.visible_traits = pp.visible_traits
+        .map((s) => stripDmFromShippingString(s) ?? "")
+        .filter((s) => s.length > 0);
+    }
+    if (pp.rumors) {
+      pp.rumors = pp.rumors
+        .map((s) => stripDmFromShippingString(s) ?? "")
+        .filter((s) => s.length > 0);
+    }
   }
 
   return {
@@ -135,7 +157,7 @@ export function projectEntityForPlayer(entity: Entity, ctx: ProjectionContext): 
     frontmatter: {},
     sourcePath: "",
     links,
-    profile: stripDmProfile(compactProfile(entity.profile)),
+    profile: stripDmProfile(compacted),
     relationships,
   };
 }
