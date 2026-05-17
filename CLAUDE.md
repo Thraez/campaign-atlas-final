@@ -56,9 +56,13 @@ Default: **Sonnet 4.6**. Switch up or down based on signals.
 - When spawning agents, pass `model: "haiku"` for lookup/search work and `model: "sonnet"` for execution. Reserve Opus subagents for synthesis only.
 
 **Mid-session handoff signal (when running on Opus):**
-- When finishing a planning, design, or architectural-review phase — *before* starting execution — stop, summarize the agreed approach as a short handover (goal, files to touch, success criteria), and explicitly say:
-  > "Planning is done. Suggest switching to `/model sonnet` and replying `continue` to execute. Staying on Opus is fine if you'd rather not switch."
-- Same signal when exiting Plan Mode with an approved plan: the plan *is* the handover; the moment after approval is the switch point.
+- When finishing a planning, design, or architectural-review phase — *before* starting execution — stop and **write the handover to `<project-memory>/handovers/ACTIVE.md`** (goal, context, files to touch, success criteria, open questions, branch/PR). Then say:
+  > "Planning is done and the handover is saved. Suggest switching to `/model sonnet` and replying `continue` to execute. Staying on Opus is fine if you'd rather not switch."
+- Same signal when exiting Plan Mode with an approved plan: write the approved plan to `ACTIVE.md` — it *is* the handover — then prompt the switch.
 - Do **not** propose a mid-session switch during execution unless verification has failed twice in the same area and a redesign is needed (in which case: switch *back up* to Opus).
-- If the user says "continue" after a handoff signal, treat the prior summary as the spec. Don't re-derive the plan; execute it.
+- If the user says "continue" after a handoff signal, treat `ACTIVE.md` as the spec. Don't re-derive the plan; execute it. When the work is done, archive the handover per the protocol.
+
+**Handover discovery (every session, any model):**
+- At session start, before planning or clarifying questions, read the project auto-memory `handovers/ACTIVE.md`. If it holds a pending handover, that is the spec — confirm scope with the user, then execute; don't re-derive.
+- Never commit handover docs into the repo as the primary copy — they get lost on unmerged branches. Auto-memory is the source of truth. Full protocol: project memory `handover_protocol.md`.
 <!-- MODEL-SELECTION-TRIAL END -->
