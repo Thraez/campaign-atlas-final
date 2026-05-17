@@ -53,6 +53,7 @@ import { EntityEditorPanel, type NewEntityDraft } from "@/atlas/categories/Entit
 import { EntityEditPanel } from "@/atlas/categories/EntityEditPanel";
 import { EntitySurface } from "@/atlas/entity/EntitySurface";
 import { resolvePinClickIntent } from "@/atlas/editor/pinClickIntent";
+import { resolveEntityCloseIntent } from "@/atlas/editor/entityCloseIntent";
 import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { MapImportWizard } from "@/atlas/import/MapImportWizard";
@@ -1166,7 +1167,14 @@ function AtlasPlacementEditorInner() {
                 <EntitySurface
                   entity={editingEntity}
                   entitiesById={entitiesById}
-                  onClose={() => setEditingEntityId(null)}
+                  onClose={() => {
+                    const intent = resolveEntityCloseIntent({ dirty: entityEditDraft.isDirty() });
+                    if (intent.kind === "confirm-discard") {
+                      if (!window.confirm("Discard your unsaved changes to this entity?")) return;
+                      entityEditDraft.clear();
+                    }
+                    setEditingEntityId(null);
+                  }}
                   renderEdit={() => (
                     <EntityEditPanel
                       sourcePath={editingEntity.sourcePath!}
