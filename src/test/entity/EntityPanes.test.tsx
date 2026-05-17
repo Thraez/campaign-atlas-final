@@ -26,13 +26,16 @@ const renderPanes = (mode: "reading" | "editing") =>
   );
 
 describe("EntityPanes", () => {
-  it("reading mode: DM pane visible by default (secret shown), Player pane appears after expand", () => {
+  it("reading mode: DM pane visible by default (secret shown), Player pane hidden then visible after expand", () => {
     renderPanes("reading");
     expect(screen.getByText(/SECRET-XYZ/)).toBeInTheDocument();
-    expect(screen.queryByTestId("entity-pane-player")).not.toBeInTheDocument();
+    // Player pane is always mounted (persistent-DOM) but hidden initially.
+    const playerBefore = screen.getByTestId("entity-pane-player");
+    expect(playerBefore).toBeInTheDocument();
+    expect(playerBefore).not.toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /add player view|expand player/i }));
     const player = screen.getByTestId("entity-pane-player");
-    expect(player).toBeInTheDocument();
+    expect(player).toBeVisible();
     expect(player.textContent ?? "").not.toContain("SECRET-XYZ");
   });
 
@@ -43,6 +46,17 @@ describe("EntityPanes", () => {
     fireEvent.click(screen.getByRole("button", { name: /add dm view|expand dm/i }));
     expect(screen.getByTestId("entity-pane-dm")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /add player view|expand player/i }));
-    expect(screen.getByTestId("entity-pane-player")).toBeInTheDocument();
+    expect(screen.getByTestId("entity-pane-player")).toBeVisible();
+  });
+
+  it("floor: a pane keeps its own scrollTop across collapse/expand of another pane", () => {
+    renderPanes("reading");
+    fireEvent.click(screen.getByRole("button", { name: /add player view|expand player/i }));
+    const dm = screen.getByTestId("entity-pane-dm");
+    Object.defineProperty(dm, "scrollHeight", { value: 1000, configurable: true });
+    dm.scrollTop = 240;
+    // Collapse the player pane — DM must NOT reset to 0 (no unmount).
+    fireEvent.click(screen.getByRole("button", { name: /－ player view|remove player/i }));
+    expect(dm.scrollTop).toBe(240);
   });
 });

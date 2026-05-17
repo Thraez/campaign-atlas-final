@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { marked } from "marked";
 import type { Entity } from "@/atlas/content/schema";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
 import { projectEntityForPlayer, buildProjectionContext } from "@/atlas/content/projectEntityForPlayer";
 import { tokenizeWikilinks, renderLinkTokens } from "@/atlas/content/parseWikilinks";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
+import { buildAnchors, mapScroll } from "@/atlas/entity/paneScrollSync";
 
 type Mode = "reading" | "editing";
 
@@ -39,6 +40,59 @@ export function EntityPanes({
     [entity, entitiesById],
   );
 
+  // --- Anchor-sync refs and helpers ---
+  const dmRef = useRef<HTMLElement>(null);
+  const playerRef = useRef<HTMLElement>(null);
+  const syncing = useRef(false);
+
+  const dmAnchors = useMemo(() => buildAnchors(entity.body ?? ""), [entity.body]);
+  const playerAnchors = useMemo(() => buildAnchors(playerEntity.body ?? ""), [playerEntity.body]);
+
+  const tagHeadings = (html: string, anchors: ReturnType<typeof buildAnchors>): string => {
+    let i = 0;
+    return html.replace(/<(h[1-6])>/g, (_full, tag) => {
+      const a = anchors[i++];
+      return a ? `<${tag} data-anchor-id="${a.id}">` : `<${tag}>`;
+    });
+  };
+
+  const topAnchorId = (el: HTMLElement | null, anchors: ReturnType<typeof buildAnchors>): string | null => {
+    if (!el) return null;
+    for (const a of anchors) {
+      const h = el.querySelector(`[data-anchor-id="${CSS.escape(a.id)}"]`) as HTMLElement | null;
+      if (h && h.offsetTop - el.scrollTop <= 4) return a.id;
+    }
+    return anchors[0]?.id ?? null;
+  };
+
+  const scrollToAnchor = (el: HTMLElement | null, id: string) => {
+    if (!el) return;
+    const h = el.querySelector(`[data-anchor-id="${CSS.escape(id)}"]`) as HTMLElement | null;
+    if (h) el.scrollTop = h.offsetTop;
+  };
+
+  const onDmScroll = () => {
+    if (syncing.current) return;
+    const fromId = topAnchorId(dmRef.current, dmAnchors);
+    if (!fromId) return;
+    const toId = mapScroll({ from: dmAnchors, to: playerAnchors, fromAnchorId: fromId });
+    if (!toId) return;
+    syncing.current = true;
+    scrollToAnchor(playerRef.current, toId);
+    requestAnimationFrame(() => { syncing.current = false; });
+  };
+
+  const onPlayerScroll = () => {
+    if (syncing.current) return;
+    const fromId = topAnchorId(playerRef.current, playerAnchors);
+    if (!fromId) return;
+    const toId = mapScroll({ from: playerAnchors, to: dmAnchors, fromAnchorId: fromId });
+    if (!toId) return;
+    syncing.current = true;
+    scrollToAnchor(dmRef.current, toId);
+    requestAnimationFrame(() => { syncing.current = false; });
+  };
+
   return (
     <div className="flex h-full w-full">
       {mode === "editing" && (
@@ -49,29 +103,36 @@ export function EntityPanes({
 
       {(mode === "reading" || showDm) && (
         <section
+          ref={dmRef as React.Ref<HTMLElement>}
           data-testid="entity-pane-dm"
           className="flex-1 min-w-0 overflow-auto border-r"
+          onScroll={onDmScroll}
         >
           <div
             className="prose prose-invert max-w-none p-3 text-sm"
-            dangerouslySetInnerHTML={{ __html: dmHtml }}
+            dangerouslySetInnerHTML={{ __html: tagHeadings(dmHtml, dmAnchors) }}
           />
         </section>
       )}
 
-      {showPlayer && (
-        <section data-testid="entity-pane-player" className="flex-1 min-w-0 overflow-auto">
-          <EntityPanel
-            entity={playerEntity}
-            placements={[]}
-            entityById={entitiesById}
-            onOpenEntity={() => {}}
-            onClose={() => {}}
-            onShowOnMap={() => {}}
-            readerAffordances={false}
-          />
-        </section>
-      )}
+      {/* Player pane: always mounted (persistent-DOM); hidden via display:none when collapsed. */}
+      <section
+        ref={playerRef as React.Ref<HTMLElement>}
+        data-testid="entity-pane-player"
+        className="flex-1 min-w-0 overflow-auto"
+        style={{ display: showPlayer ? undefined : "none" }}
+        onScroll={onPlayerScroll}
+      >
+        <EntityPanel
+          entity={playerEntity}
+          placements={[]}
+          entityById={entitiesById}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+          readerAffordances={false}
+        />
+      </section>
 
       <div className="flex flex-col gap-1 p-1 border-l bg-muted/30">
         {mode === "editing" && !showDm && (
