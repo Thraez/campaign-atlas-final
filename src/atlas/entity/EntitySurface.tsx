@@ -25,7 +25,6 @@ export function EntitySurface({
           <button type="button" className="h-7 px-2 rounded border"
             onClick={() => setEditing(true)}>Edit</button>
         )}
-        <button type="button" className="h-7 px-2 rounded border" onClick={onClose}>Close</button>
       </div>
       <div className="flex-1 overflow-hidden">
         {editing ? renderEdit() : (
@@ -34,6 +33,7 @@ export function EntitySurface({
             entitiesById={entitiesById}
             placements={placements}
             onOpenEntity={onOpenEntity}
+            onClose={onClose}
             onShowOnMap={onShowOnMap}
           />
         )}

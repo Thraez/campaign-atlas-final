@@ -32,4 +32,24 @@ describe("entity surface opens in Reading, Edit toggles", () => {
     fireEvent.click(screen.getByRole("button", { name: /reading|done|back/i }));
     expect(screen.queryByTestId("edit-form")).not.toBeInTheDocument();
   });
+
+  it("the panel X closes the surface (regression: X was a dead no-op)", () => {
+    const onClose = vi.fn();
+    render(
+      <MemoryRouter>
+        <ViewModeProvider>
+          <EntitySurface
+            entity={corven}
+            entitiesById={new Map([[corven.id, corven]])}
+            renderEdit={() => <div data-testid="edit-form">EDIT FORM</div>}
+            onClose={onClose}
+          />
+        </ViewModeProvider>
+      </MemoryRouter>,
+    );
+    // Reading mode: the only close affordance is the panel's top-right X.
+    expect(screen.queryByRole("button", { name: /^close$/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /close panel/i }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });
