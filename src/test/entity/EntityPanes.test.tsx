@@ -42,9 +42,10 @@ describe("EntityPanes", () => {
   it("editing mode: Edit pane visible by default; DM then Player expand in order", () => {
     renderPanes("editing");
     expect(screen.getByTestId("edit")).toBeInTheDocument();
-    expect(screen.queryByTestId("entity-pane-dm")).not.toBeInTheDocument();
+    // DM pane is always mounted (persistent-DOM); hidden via display:none when collapsed.
+    expect(screen.getByTestId("entity-pane-dm")).not.toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /add dm view|expand dm/i }));
-    expect(screen.getByTestId("entity-pane-dm")).toBeInTheDocument();
+    expect(screen.getByTestId("entity-pane-dm")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /add player view|expand player/i }));
     expect(screen.getByTestId("entity-pane-player")).toBeVisible();
   });

@@ -58,11 +58,17 @@ export function EntityPanes({
 
   const topAnchorId = (el: HTMLElement | null, anchors: ReturnType<typeof buildAnchors>): string | null => {
     if (!el) return null;
+    let best: string | null = null;
     for (const a of anchors) {
       const h = el.querySelector(`[data-anchor-id="${CSS.escape(a.id)}"]`) as HTMLElement | null;
-      if (h && h.offsetTop - el.scrollTop <= 4) return a.id;
+      if (!h) continue;
+      if (h.offsetTop - el.scrollTop <= 4) {
+        best = a.id;
+      } else {
+        break;
+      }
     }
-    return anchors[0]?.id ?? null;
+    return best;
   };
 
   const scrollToAnchor = (el: HTMLElement | null, id: string) => {
@@ -101,19 +107,18 @@ export function EntityPanes({
         </section>
       )}
 
-      {(mode === "reading" || showDm) && (
-        <section
-          ref={dmRef as React.Ref<HTMLElement>}
-          data-testid="entity-pane-dm"
-          className="flex-1 min-w-0 overflow-auto border-r"
-          onScroll={onDmScroll}
-        >
-          <div
-            className="prose prose-invert max-w-none p-3 text-sm"
-            dangerouslySetInnerHTML={{ __html: tagHeadings(dmHtml, dmAnchors) }}
-          />
-        </section>
-      )}
+      <section
+        ref={dmRef as React.Ref<HTMLElement>}
+        data-testid="entity-pane-dm"
+        className="flex-1 min-w-0 overflow-auto border-r"
+        style={{ display: (mode === "reading" || showDm) ? undefined : "none" }}
+        onScroll={onDmScroll}
+      >
+        <div
+          className="prose prose-invert max-w-none p-3 text-sm"
+          dangerouslySetInnerHTML={{ __html: tagHeadings(dmHtml, dmAnchors) }}
+        />
+      </section>
 
       {/* Player pane: always mounted (persistent-DOM); hidden via display:none when collapsed. */}
       <section
