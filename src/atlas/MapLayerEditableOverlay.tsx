@@ -32,6 +32,10 @@ import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { clampLayerToCanvas } from "@/atlas/layerGeometry";
 
+export function overlayInteractive(editMode: boolean): boolean {
+  return editMode;
+}
+
 interface Props {
   layer: MapLayer;
   mapDoc: MapDocument;
@@ -196,13 +200,12 @@ export function MapLayerEditableOverlay({
         url={normalizeAtlasAssetUrl(layer.src)}
         bounds={bounds}
         opacity={layer.opacity}
-        interactive={true}
+        interactive={overlayInteractive(editMode)}
         eventHandlers={{
           click: (e) => {
+            if (!editMode) return;
             const me = e as L.LeafletMouseEvent;
             if (onBackgroundClick && onBackgroundClick(me.latlng)) {
-              // Placement consumed the click — don't also let the map's
-              // click handler fire (would place / chain twice).
               L.DomEvent.stopPropagation(me.originalEvent);
               return;
             }
