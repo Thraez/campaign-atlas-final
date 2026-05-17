@@ -52,6 +52,7 @@ import { PinStateBadge } from "@/atlas/pins/PinStateBadge";
 import { EntityEditorPanel, type NewEntityDraft } from "@/atlas/categories/EntityEditorPanel";
 import { EntityEditPanel } from "@/atlas/categories/EntityEditPanel";
 import { EntitySurface } from "@/atlas/entity/EntitySurface";
+import { resolvePinClickIntent } from "@/atlas/editor/pinClickIntent";
 import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { MapImportWizard } from "@/atlas/import/MapImportWizard";
@@ -1509,18 +1510,22 @@ export default function AtlasPlacementEditor() {
                       setCoord(e.id, { x: Math.round(ll.lng), y: Math.round(activeMap.height - ll.lat) });
                     },
                     click: (ev) => {
-                      // While a placement is pending, clicking an existing
-                      // pin must drop the pending pin here — NOT silently
-                      // cancel the placement (the old behaviour, which made
-                      // every existing marker a dead zone for placement).
-                      if (pendingId) {
+                      const intent = resolvePinClickIntent({ pending: !!pendingId, entityId: e.id });
+                      if (intent.kind === "place-anchor") {
                         const ll = (ev.target as L.Marker).getLatLng();
                         onMapClick(ll.lng, ll.lat);
                         return;
                       }
-                      // No pending placement — open this entity's category panel.
-                      const cat = categoryForType(e.type);
-                      setActivePanel(cat);
+                      // Open the entity in Reading via EntitySurface (player parity).
+                      // setActivePanel must come first so the panel host is open
+                      // before renderCategory checks which category is active.
+                      setActivePanel(categoryForType(e.type));
+                      setEditingEntityId(intent.entityId);
+                    },
+                    dblclick: () => {
+                      if (pendingId) return;
+                      setActivePanel(categoryForType(e.type));
+                      setEditingEntityId(e.id);
                     },
                   }}
                 />
