@@ -3,7 +3,6 @@ import { renderHook, act } from "@testing-library/react";
 import { useEntityEditDraft } from "@/atlas/categories/useEntityEditDraft";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { EntityEditPanel } from "@/atlas/categories/EntityEditPanel";
-import { EntityBodyPreview } from "@/atlas/categories/EntityBodyPreview";
 import { vi } from "vitest";
 
 describe("useEntityEditDraft", () => {
@@ -93,11 +92,23 @@ it("loads an entity, edits the body, saves via the shared rewrite", async () => 
   await waitFor(() => expect(onSaved).toHaveBeenCalled());
 });
 
-it("EntityBodyPreview renders markdown and toggles DM notes", () => {
-  const body = "# H\n\n%%\nsecret\n%%\n\nvisible\n";
-  const { rerender } = render(<EntityBodyPreview body={body} showDmNotes={false} />);
-  expect(screen.getByText("visible")).toBeInTheDocument();
-  expect(screen.queryByText("secret")).not.toBeInTheDocument();
-  rerender(<EntityBodyPreview body={body} showDmNotes={true} />);
-  expect(screen.getByText(/secret/)).toBeInTheDocument();
+it("edit panel has no embedded preview or DM-notes toggle (superseded by global lens)", async () => {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (String(url).includes("/__atlas/read")) {
+      return new Response(JSON.stringify({ contents: RAW }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ saved: 1, paths: [] }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(
+    <EntityEditPanel
+      sourcePath="content/w/npcs/corven.md"
+      onClose={() => {}}
+      onSaved={() => {}}
+    />,
+  );
+  await waitFor(() => screen.getByDisplayValue(/old body/i));
+  expect(screen.queryByText(/show dm notes/i)).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /focus mode/i })).not.toBeInTheDocument();
 });

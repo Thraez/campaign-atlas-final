@@ -3,7 +3,6 @@ import { parseFrontmatter, stringifyFrontmatter } from "@/atlas/import/frontmatt
 import { useEntityEditDraft, type EntityEditDraftAPI } from "./useEntityEditDraft";
 import { saveAtlasPatchToLocalFs, hashContent, type FileChange } from "@/atlas/save/localFsSave";
 import { readSourceFile } from "@/atlas/save/canonicalPlacementSave";
-import { EntityBodyPreview } from "./EntityBodyPreview";
 
 export function EntityEditPanel({
   sourcePath,
@@ -20,8 +19,6 @@ export function EntityEditPanel({
   const api = draftApi ?? internal;
   const [phase, setPhase] = useState<"loading" | "ready" | "saving" | "saved" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
-  const [showDmNotes, setShowDmNotes] = useState(false);
-  const [focus, setFocus] = useState(false);
   // Keep the original raw file so we can preserve all existing frontmatter fields on save.
   const rawRef = useRef<string>("");
 
@@ -142,33 +139,16 @@ export function EntityEditPanel({
             onChange={(e) => api.setField("summary", e.target.value)}
           />
         </label>
-        {focus ? (
-          <div className="grid grid-cols-2 gap-3" style={{ height: "60vh" }}>
-            <label className="flex flex-col">
-              <span className="block mb-1">Body (markdown)</span>
-              <textarea aria-label="Body"
-                className="flex-1 px-2 py-1 rounded border bg-background font-mono text-[11px] resize-none"
-                value={d.body} onChange={(e) => api.setBody(e.target.value)} />
-            </label>
-            <div className="flex flex-col">
-              <span className="block mb-1 text-xs">Preview</span>
-              <div className="flex-1 overflow-auto border rounded">
-                <EntityBodyPreview body={d.body} showDmNotes={showDmNotes} />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <label className="block">
-            <span className="block mb-1">Body (markdown)</span>
-            <textarea
-              aria-label="Body"
-              rows={16}
-              className="w-full px-2 py-1 rounded border bg-background font-mono text-[11px]"
-              value={d.body}
-              onChange={(e) => api.setBody(e.target.value)}
-            />
-          </label>
-        )}
+        <label className="block">
+          <span className="block mb-1">Body (markdown)</span>
+          <textarea
+            aria-label="Body"
+            rows={16}
+            className="w-full px-2 py-1 rounded border bg-background font-mono text-[11px]"
+            value={d.body}
+            onChange={(e) => api.setBody(e.target.value)}
+          />
+        </label>
       </div>
       <div className="p-2 border-t flex gap-2 items-center">
         <button type="button" className="h-8 px-3 text-xs rounded border" onClick={onClose}>
@@ -181,15 +161,6 @@ export function EntityEditPanel({
           onClick={onSave}
         >
           {phase === "saving" ? "Saving…" : "Save"}
-        </button>
-        <label className="flex items-center gap-1 text-[11px] ml-auto">
-          <input type="checkbox" checked={showDmNotes}
-            onChange={(e) => setShowDmNotes(e.target.checked)} />
-          Show DM notes
-        </label>
-        <button type="button" className="h-8 px-3 text-xs rounded border"
-          onClick={() => setFocus((f) => !f)}>
-          {focus ? "Exit focus" : "Focus mode"}
         </button>
       </div>
     </div>
