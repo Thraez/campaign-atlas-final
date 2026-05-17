@@ -52,4 +52,24 @@ describe("entity surface opens in Reading, Edit toggles", () => {
     fireEvent.click(screen.getByRole("button", { name: /close panel/i }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it("surface hosts the pane pipeline: Edit toggles the Edit pane, panes persist", () => {
+    render(
+      <MemoryRouter>
+        <ViewModeProvider>
+          <EntitySurface
+            entity={corven}
+            entitiesById={new Map([[corven.id, corven]])}
+            renderEdit={() => <div data-testid="edit-form">EDIT FORM</div>}
+            onClose={() => {}}
+          />
+        </ViewModeProvider>
+      </MemoryRouter>,
+    );
+    // Reading default: DM pane present, no edit form.
+    expect(screen.getByTestId("entity-pane-dm")).toBeInTheDocument();
+    expect(screen.queryByTestId("edit-form")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /edit/i }));
+    expect(screen.getByTestId("edit-form")).toBeInTheDocument();
+  });
 });
