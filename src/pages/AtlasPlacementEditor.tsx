@@ -51,6 +51,7 @@ import { CategoryPanel } from "@/atlas/categories/CategoryPanel";
 import { PinStateBadge } from "@/atlas/pins/PinStateBadge";
 import { EntityEditorPanel, type NewEntityDraft } from "@/atlas/categories/EntityEditorPanel";
 import { EntityEditPanel } from "@/atlas/categories/EntityEditPanel";
+import { EntitySurface } from "@/atlas/entity/EntitySurface";
 import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { MapImportWizard } from "@/atlas/import/MapImportWizard";
@@ -340,6 +341,10 @@ export default function AtlasPlacementEditor() {
   const routeDraft = useRouteDraft(project, activeMap, { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet }, undoStack);
   const fogDraft = useFogDraft(activeMap, undoStack);
   const entityEditDraft = useEntityEditDraft();
+  const entitiesById = useMemo(
+    () => new Map((project?.entities ?? []).map((e) => [e.id, e])),
+    [project],
+  );
   const [showFogPreview, setShowFogPreview] = useState(true);
 
   // Synchronous mirrors of overrides + mapOverride. Mutation helpers below
@@ -1135,11 +1140,18 @@ export default function AtlasPlacementEditor() {
               editingEntity.sourcePath
             ) {
               return (
-                <EntityEditPanel
-                  sourcePath={editingEntity.sourcePath}
-                  draftApi={entityEditDraft}
+                <EntitySurface
+                  entity={editingEntity}
+                  entitiesById={entitiesById}
                   onClose={() => setEditingEntityId(null)}
-                  onSaved={() => { setEditingEntityId(null); void reloadCanon(); }}
+                  renderEdit={() => (
+                    <EntityEditPanel
+                      sourcePath={editingEntity.sourcePath!}
+                      draftApi={entityEditDraft}
+                      onClose={() => setEditingEntityId(null)}
+                      onSaved={() => { setEditingEntityId(null); void reloadCanon(); }}
+                    />
+                  )}
                 />
               );
             }
