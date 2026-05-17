@@ -158,7 +158,7 @@ function ViewModeToggle() {
   );
 }
 
-export default function AtlasPlacementEditor() {
+function AtlasPlacementEditorInner() {
   const [project, setProject] = useState<AtlasProject | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Overrides>(() => {
@@ -981,7 +981,6 @@ export default function AtlasPlacementEditor() {
   }
 
   return (
-    <ViewModeProvider>
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
       {session.restoredNotice && (
         <div className="px-3 py-1.5 text-[11px] bg-blue-500/15 text-blue-100 border-b border-blue-500/30 flex items-center justify-between gap-2">
@@ -1773,6 +1772,13 @@ export default function AtlasPlacementEditor() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AtlasPlacementEditor() {
+  return (
+    <ViewModeProvider>
+      <AtlasPlacementEditorInner />
     </ViewModeProvider>
   );
 }
