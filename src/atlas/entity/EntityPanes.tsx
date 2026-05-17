@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { marked } from "marked";
 import type { Entity } from "@/atlas/content/schema";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
@@ -98,6 +98,16 @@ export function EntityPanes({
     scrollToAnchor(dmRef.current, toId);
     requestAnimationFrame(() => { syncing.current = false; });
   };
+
+  // EntityPanel renders bodyHtml as bare DOM — inject data-anchor-id so scrollToAnchor can find headings.
+  useEffect(() => {
+    const el = playerRef.current;
+    if (!el) return;
+    el.querySelectorAll("h1,h2,h3,h4,h5,h6").forEach((h, i) => {
+      const a = playerAnchors[i];
+      if (a) h.setAttribute("data-anchor-id", a.id);
+    });
+  }, [playerAnchors]);
 
   return (
     <div className="flex h-full w-full">

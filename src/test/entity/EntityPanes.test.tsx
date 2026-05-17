@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ViewModeProvider } from "@/atlas/view/ViewModeProvider";
 import { EntityPanes } from "@/atlas/entity/EntityPanes";
@@ -9,6 +9,11 @@ const corven = {
   id: "corven", title: "Corven", type: "npc", visibility: "dm",
   aliases: [], tags: [], images: [], body: "Public line.\n\n%%\nSECRET-XYZ\n%%\n",
   bodyHtml: "", frontmatter: {}, sourcePath: "p/c.md", links: [], backlinks: [],
+} as Entity;
+
+const withHeadings = {
+  ...corven,
+  body: "# Intro\n\nPublic intro.\n\n# History\n\nMore public.\n%%\nSECRET\n%%\n",
 } as Entity;
 
 const renderPanes = (mode: "reading" | "editing") =>
@@ -48,6 +53,26 @@ describe("EntityPanes", () => {
     expect(screen.getByTestId("entity-pane-dm")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /add player view|expand player/i }));
     expect(screen.getByTestId("entity-pane-player")).toBeVisible();
+  });
+
+  it("player pane headings get data-anchor-id after mount (enables scroll-sync)", async () => {
+    render(
+      <MemoryRouter>
+        <ViewModeProvider>
+          <EntityPanes
+            entity={withHeadings}
+            entitiesById={new Map([[withHeadings.id, withHeadings]])}
+            mode="reading"
+            renderEdit={() => null}
+          />
+        </ViewModeProvider>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /add player view/i }));
+    const playerPane = screen.getByTestId("entity-pane-player");
+    await waitFor(() => {
+      expect(playerPane.querySelectorAll("[data-anchor-id]").length).toBeGreaterThan(0);
+    });
   });
 
   it("floor: a pane keeps its own scrollTop across collapse/expand of another pane", () => {
