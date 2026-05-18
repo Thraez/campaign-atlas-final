@@ -1,6 +1,5 @@
-import { marked } from "marked";
+import { renderMarkdownBodyToSafeHtml } from "@/atlas/content/markdownCore";
 import { stripDmBlocks } from "@/atlas/content/stripDmBlocks";
-import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 
 export interface RenderOpts {
   showDmNotes: boolean;
@@ -29,6 +28,5 @@ export function renderEntityMarkdown(body: string, opts: RenderOpts): string {
     return `<span class="atlas-wikilink" data-link="${target.trim()}">${label}</span>`;
   });
 
-  const html = marked.parse(text, { async: false }) as string;
-  return sanitizeAtlasHtml(html);
+  return renderMarkdownBodyToSafeHtml(text);
 }
