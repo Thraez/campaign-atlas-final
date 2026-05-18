@@ -12,7 +12,7 @@
  * Secrecy is NOT handled here: `stripDmBlocks`/`%%` runs in the caller BEFORE
  * this module sees the text, so DM-only content never reaches the renderer.
  */
-import { Marked } from "marked";
+import { Marked, type Token } from "marked";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 
 const CALLOUT_BLOCK =
@@ -37,7 +37,7 @@ function calloutExtension() {
       const m = src.match(/^ {0,3}> ?\[!/m);
       return m ? m.index : undefined;
     },
-    tokenizer(this: { lexer: { blockTokens: (s: string) => unknown[] } }, src: string) {
+    tokenizer(this: { lexer: { blockTokens: (s: string) => Token[] } }, src: string) {
       const m = CALLOUT_BLOCK.exec(src);
       if (!m || m.index !== 0) return undefined;
       const [raw, typeRaw, fold, titleRaw, bodyRaw] = m;
@@ -61,8 +61,8 @@ function calloutExtension() {
       };
     },
     renderer(
-      this: { parser: { parse: (t: unknown[]) => string } },
-      token: { calloutType: string; open: boolean; title: string; tokens: unknown[] },
+      this: { parser: { parse: (t: Token[]) => string } },
+      token: { calloutType: string; open: boolean; title: string; tokens: Token[] },
     ) {
       const inner = this.parser.parse(token.tokens);
       const openAttr = token.open ? " open" : "";
