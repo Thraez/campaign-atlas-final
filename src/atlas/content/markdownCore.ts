@@ -13,7 +13,7 @@
  * this module sees the text, so DM-only content never reaches the renderer.
  */
 import { Marked, type Token } from "marked";
-import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
+import { sanitizeAtlasHtml } from "../sanitizeHtml";
 
 const CALLOUT_BLOCK =
   /^ {0,3}> ?\[!(\w+)\]([+-]?)(.*)(?:\n|$)((?:^ {0,3}> ?.*(?:\n|$))*)/m;

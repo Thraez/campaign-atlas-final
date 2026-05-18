@@ -12,7 +12,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { marked } from "marked";
+import { markdownToHtml } from "../src/atlas/content/markdownCore";
 import { parseFrontmatter, type ParsedFile } from "./atlas/parseFrontmatter";
 import { stripDmBlocks, stripDmFromShippingString } from "./atlas/stripDmBlocks";
 import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
@@ -554,7 +554,7 @@ async function runBuildCore(flags: BuildFlags) {
         backlinkMap.get(l.resolvedId)!.set(entity.id, entity.title);
       }
     }
-    const html = marked.parse(tokenized, { async: false }) as string;
+    const html = markdownToHtml(tokenized);
     // In player builds, broken link tokens (which now include links to excluded
     // dm entities) must NOT leak the target name. Render as plain display text.
     // Sanitize rendered markdown HTML BEFORE shipping it in atlas.json.

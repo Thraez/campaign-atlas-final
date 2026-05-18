@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { marked } from "marked";
+import { markdownToHtml } from "@/atlas/content/markdownCore";
 import type { Entity, MapPlacement } from "@/atlas/content/schema";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
 import { projectEntityForPlayer, buildProjectionContext } from "@/atlas/content/projectEntityForPlayer";
@@ -34,7 +34,7 @@ export function EntityReadingView({
     const { tokenized, links } = tokenizeWikilinks(entity.body ?? "", {
       resolveByName: (n) => byName.get(n.trim().toLowerCase()),
     });
-    const html = marked.parse(tokenized, { async: false }) as string;
+    const html = markdownToHtml(tokenized);
     const bodyHtml = sanitizeAtlasHtml(renderLinkTokens(html, links, {}));
     return { ...entity, bodyHtml };
   }, [entity, entitiesById, mode]);
