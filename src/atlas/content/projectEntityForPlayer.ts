@@ -4,7 +4,7 @@
  * Reuses every shared unit the build uses; replicates only the build's tiny
  * inline locals (scrubTags / dedupAliases / META_TAGS), guarded by the parity test.
  */
-import { marked } from "marked";
+import { markdownToHtml } from "@/atlas/content/markdownCore";
 import type { Entity } from "@/atlas/content/schema";
 import type { EntityVisibility } from "@/atlas/content/schema";
 import { stripDmBlocks, stripDmFromShippingString } from "@/atlas/content/stripDmBlocks";
@@ -97,7 +97,7 @@ export function projectEntityForPlayer(entity: Entity, ctx: ProjectionContext): 
   }
 
   // 4. Render bodyHtml
-  const html = marked.parse(tokenized, { async: false }) as string;
+  const html = markdownToHtml(tokenized);
   const linked = renderLinkTokens(html, links, { hideBroken: true });
   const bodyHtml = sanitizeAtlasHtml(linked);
 

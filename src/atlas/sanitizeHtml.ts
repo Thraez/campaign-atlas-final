@@ -25,6 +25,7 @@ const ALLOWED_TAGS = [
   // Block + headings
   "h1", "h2", "h3", "h4", "h5", "h6",
   "p", "blockquote", "pre", "hr", "br",
+  "details", "summary",
   // Inline emphasis
   "em", "strong", "i", "b", "u", "s", "del", "ins", "small", "sub", "sup", "mark",
   // Links
@@ -45,7 +46,8 @@ const ALLOWED_TAGS = [
 const ALLOWED_ATTR = [
   "href", "title", "name", "id",
   "src", "alt", "width", "height", "loading",
-  "class", "data-link", "data-id", "data-broken", "data-display",
+  "class", "data-link", "data-id", "data-broken", "data-display", "data-callout",
+  "open",
   "colspan", "rowspan", "scope", "align",
   "target", "rel",
   "lang",
