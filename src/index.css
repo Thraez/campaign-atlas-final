@@ -288,6 +288,41 @@
 .atlas-prose ul { list-style: disc; padding-left: 1.25rem; }
 .atlas-prose p { margin: 0.5em 0; line-height: 1.55; }
 
+/* Atlas viewer: Obsidian callout styling */
+.atlas-callout {
+  border-left: 3px solid hsl(var(--accent));
+  background: hsl(var(--muted) / 0.4);
+  border-radius: 6px;
+  padding: 0.5rem 0.85rem;
+  margin: 0.75rem 0;
+}
+.atlas-callout > summary {
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  color: hsl(var(--accent));
+}
+.atlas-callout > summary::-webkit-details-marker { display: none; }
+.atlas-callout > summary::before { content: "▸ "; }
+.atlas-callout[open] > summary::before { content: "▾ "; }
+.atlas-callout-warning, .atlas-callout-caution, .atlas-callout-attention,
+.atlas-callout-important {
+  border-left-color: hsl(var(--primary));
+}
+.atlas-callout-warning > summary, .atlas-callout-caution > summary,
+.atlas-callout-attention > summary, .atlas-callout-important > summary {
+  color: hsl(var(--primary));
+}
+.atlas-callout-danger, .atlas-callout-error, .atlas-callout-failure,
+.atlas-callout-fail, .atlas-callout-bug, .atlas-callout-missing {
+  border-left-color: hsl(var(--destructive));
+}
+.atlas-callout-danger > summary, .atlas-callout-error > summary,
+.atlas-callout-failure > summary, .atlas-callout-fail > summary,
+.atlas-callout-bug > summary, .atlas-callout-missing > summary {
+  color: hsl(var(--destructive));
+}
+
 /* Accessibility: respect users who prefer reduced motion. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
