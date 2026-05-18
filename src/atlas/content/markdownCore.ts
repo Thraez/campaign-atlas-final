@@ -67,9 +67,13 @@ function calloutExtension() {
       const inner = this.parser.parse(token.tokens);
       const openAttr = token.open ? " open" : "";
       const t = token.calloutType.replace(/[^a-z0-9-]/g, "");
+      const title = token.title
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
       return (
         `<details class="atlas-callout atlas-callout-${t}" data-callout="${t}"${openAttr}>` +
-        `<summary>${token.title}</summary>${inner}</details>`
+        `<summary>${title}</summary>${inner}</details>`
       );
     },
   };
