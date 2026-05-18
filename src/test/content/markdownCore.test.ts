@@ -14,8 +14,15 @@ describe("markdownCore", () => {
     expect(html).not.toContain("<script>");
   });
 
+  it("does not convert bare newlines to <br> (breaks:false)", () => {
+    const html = markdownToHtml("first line\nsecond line");
+    expect(html).not.toContain("<br>");
+  });
+
   it("is deterministic (same input → same output, the parity guarantee)", () => {
     const md = "# Title\n\n- one\n- two";
-    expect(markdownToHtml(md)).toBe(markdownToHtml(md));
+    const first = markdownToHtml(md);
+    const second = markdownToHtml(md);
+    expect(first).toBe(second);
   });
 });
