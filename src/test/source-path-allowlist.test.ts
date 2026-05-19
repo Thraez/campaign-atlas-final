@@ -84,4 +84,30 @@ describe("isWritableAssetPath", () => {
   for (const p of blocked) {
     it(`blocks ${JSON.stringify(p)}`, () => expect(isWritableAssetPath(p)).toBe(false));
   }
+
+  // images/ sub-directory — same rules as maps/ but under images/
+  const allowedImages = [
+    "public/atlas/assets/images/portrait-aldric.png",
+    "public/atlas/assets/images/scene.webp",
+    "public/atlas/assets/images/item_sword.jpg",
+    "public/atlas/assets/images/banner.jpeg",
+    "public/atlas/assets/images/anim.gif",
+  ];
+  for (const p of allowedImages) {
+    it(`allows ${p}`, () => expect(isWritableAssetPath(p)).toBe(true));
+  }
+
+  const blockedImages = [
+    // subdirectory under images/ not allowed
+    "public/atlas/assets/images/sub/x.png",
+    // wrong extension
+    "public/atlas/assets/images/x.svg",
+    // traversal
+    "public/atlas/assets/images/../atlas.json",
+    // uppercase extension rejected
+    "public/atlas/assets/images/X.PNG",
+  ];
+  for (const p of blockedImages) {
+    it(`blocks ${JSON.stringify(p)}`, () => expect(isWritableAssetPath(p)).toBe(false));
+  }
 });

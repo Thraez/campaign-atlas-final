@@ -673,6 +673,35 @@ async function runAtlasBuild(repoRoot: string): Promise<BuildResult> {
   }
 }
 
+/**
+ * Lists image files in `public/atlas/assets/images/`.
+ * Returns filenames only (not full paths), sorted alphabetically.
+ * Returns an empty array if the directory doesn't exist yet.
+ * Dev-server only (apply: "serve") — never reaches the player build.
+ *
+ * Security note: images in this directory are public static assets.
+ * There is no per-image DM/player visibility distinction, and none is
+ * added here. Do not add a secret-image scan for this path.
+ */
+export async function handleAssetsImagesRequest(repoRoot: string): Promise<
+  | { status: 200; images: string[] }
+  | { status: 500; error: string }
+> {
+  const dir = path.resolve(repoRoot, "public", "atlas", "assets", "images");
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const images = entries
+      .filter((e) => e.isFile() && /\.(png|jpg|jpeg|webp|gif)$/i.test(e.name))
+      .map((e) => e.name)
+      .sort();
+    return { status: 200, images };
+  } catch (e) {
+    const err = e as NodeJS.ErrnoException;
+    if (err.code === "ENOENT") return { status: 200, images: [] };
+    return { status: 500, error: err.message };
+  }
+}
+
 /** Allowlist-guarded reader for GET /__atlas/read?path=... */
 async function readAllowlistedFile(repoRoot: string, relPath: string): Promise<
   | { ok: true; contents: string }
@@ -745,6 +774,20 @@ export function atlasSavePlugin(): Plugin {
           } else {
             res.statusCode = result.status;
             res.end(JSON.stringify({ error: result.error, path: relPath }));
+          }
+        });
+      });
+
+      // GET /__atlas/assets/images — list of image filenames in public/atlas/assets/images/
+      server.middlewares.use("/__atlas/assets/images", (req, res, next) => {
+        if (req.method !== "GET") return next();
+        handleAssetsImagesRequest(server.config.root).then((result) => {
+          res.statusCode = result.status;
+          res.setHeader("Content-Type", "application/json");
+          if (result.status === 200) {
+            res.end(JSON.stringify({ images: (result as { status: 200; images: string[] }).images }));
+          } else {
+            res.end(JSON.stringify({ error: (result as { status: 500; error: string }).error }));
           }
         });
       });

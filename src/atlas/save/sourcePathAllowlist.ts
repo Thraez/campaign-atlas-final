@@ -12,6 +12,7 @@
  *
  * Asset-path branch (`isWritableAssetPath`):
  *   public/atlas/assets/maps/<file>.<png|jpg|jpeg|webp|gif>
+ *   public/atlas/assets/images/<file>.<png|jpg|jpeg|webp|gif>
  *
  * <segments> is one or more path segments. Traversal (".."), absolute paths,
  * leading "./", empty segments, and any other extension are rejected.
@@ -64,13 +65,17 @@ export function isWritableSourcePath(input: string): boolean {
 }
 
 /**
- * Asset-path allowlist for map image uploads. Used by the unified Save when
- * a layer's `origin === "upload"` carries a `data:` URL that needs to land
+ * Asset-path allowlist for image uploads (map tiles and entity images).
+ * Used by the unified Save when a file carrying a `data:` URL needs to land
  * on disk so the next atlas build can reference it.
  *
- * Locked to `public/atlas/assets/maps/<file>.<image-ext>` — the same shape
- * the build script's asset-audit pass walks and the same prefix that map
- * layer `src:` values resolve against at runtime.
+ * Allowed prefixes (both same 5-part shape, same extension rules):
+ *   public/atlas/assets/maps/<file>.<image-ext>
+ *   public/atlas/assets/images/<file>.<image-ext>
+ *
+ * Note: images/ is intentionally NOT secret-scanned. All files in
+ * public/atlas/assets/ are served as static public assets; there is no
+ * per-image visibility or DM/player distinction.
  */
 export function isWritableAssetPath(input: string): boolean {
   if (typeof input !== "string" || input.length === 0) return false;
@@ -78,9 +83,10 @@ export function isWritableAssetPath(input: string): boolean {
   if (input.includes("\\")) return false;
   const parts = input.split("/");
   if (hasBadSegments(parts)) return false;
-  // Exact prefix: public/atlas/assets/maps/<file>.<ext>
+  // Exact 5-part prefix: public/atlas/assets/{maps|images}/<file>.<ext>
   if (parts.length !== 5) return false;
-  if (parts[0] !== "public" || parts[1] !== "atlas" || parts[2] !== "assets" || parts[3] !== "maps") return false;
+  if (parts[0] !== "public" || parts[1] !== "atlas" || parts[2] !== "assets") return false;
+  if (parts[3] !== "maps" && parts[3] !== "images") return false;
   const last = parts[4];
   if (!/^[A-Za-z0-9_\-. ]+\.(png|jpg|jpeg|webp|gif)$/.test(last)) return false;
   return true;
