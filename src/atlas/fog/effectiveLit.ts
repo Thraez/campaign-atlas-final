@@ -25,4 +25,18 @@ export function isLit(x: number, y: number, fog: FogOverlay): boolean {
   return !inConceal;
 }
 
+/** Returns reveal and conceal polygon sets filtered to >=3 points.
+ *  Used by the build-time mask rasterizer (redactFogMap) to prepare
+ *  geometry for rasterization. No polygon clipping here — the mask
+ *  is built by rasterizing reveals opaque, then punching conceals transparent. */
+export function effectivePolygons(fog: FogOverlay): {
+  reveals: Point[][]; conceals: Point[][];
+} {
+  const ok = (p: Point[]) => p.length >= 3;
+  return {
+    reveals: fog.reveals.filter(ok),
+    conceals: (fog.conceals ?? []).filter(ok),
+  };
+}
+
 export { pointInPolygon };
