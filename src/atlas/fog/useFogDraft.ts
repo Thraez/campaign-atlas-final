@@ -20,7 +20,7 @@ export interface FogIssue {
 const DEFAULT_COLOR = "rgba(0,0,0,0.55)";
 const CIRCLE_SEGMENTS = 36;
 
-export type FogTool = "polygon" | "circle" | null;
+export type FogTool = "polygon" | "circle" | "fog-polygon" | "fog-circle" | null;
 
 export interface FogDraftAPI {
   fog: FogOverlay;
@@ -40,6 +40,10 @@ export interface FogDraftAPI {
   finishDraftCircle: (radius: number) => boolean;
   removeReveal: (index: number) => void;
   clearReveals: () => void;
+  // Conceal authoring
+  setFeatherPx: (n: number) => void;
+  removeConceal: (index: number) => void;
+  clearConceals: () => void;
   // Convenience reveals from existing geometry
   revealRegion: (r: Region) => void;
   revealAroundRoute: (r: Route, points: Point[], padding: number) => void;
@@ -128,28 +132,48 @@ export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackA
     mutate({ reveals: [...fog.reveals, poly] });
   }, [mutate, fog.reveals]);
 
+  const addConceal = useCallback((poly: Point[]) => {
+    mutate({ conceals: [...(fog.conceals ?? []), poly] });
+  }, [mutate, fog.conceals]);
+
   const finishDraftPolygon = useCallback((): boolean => {
     if (draftPoints.length < 3) { return false; }
-    addReveal(draftPoints);
+    if (tool === "fog-polygon") {
+      addConceal(draftPoints);
+    } else {
+      addReveal(draftPoints);
+    }
     setDraftPoints([]);
     setTool(null);
     return true;
-  }, [draftPoints, addReveal]);
+  }, [draftPoints, tool, addReveal, addConceal]);
 
   const finishDraftCircle = useCallback((radius: number): boolean => {
     if (draftPoints.length < 1 || radius <= 0) return false;
     const [cx, cy] = draftPoints[0];
-    addReveal(circlePolygon(cx, cy, radius));
+    if (tool === "fog-circle") {
+      addConceal(circlePolygon(cx, cy, radius));
+    } else {
+      addReveal(circlePolygon(cx, cy, radius));
+    }
     setDraftPoints([]);
     setTool(null);
     return true;
-  }, [draftPoints, addReveal]);
+  }, [draftPoints, tool, addReveal, addConceal]);
 
   const removeReveal = useCallback((index: number) => {
     mutate({ reveals: fog.reveals.filter((_, i) => i !== index) });
   }, [mutate, fog.reveals]);
 
   const clearReveals = useCallback(() => mutate({ reveals: [] }), [mutate]);
+
+  const setFeatherPx = useCallback((n: number) => mutate({ featherPx: n }), [mutate]);
+
+  const removeConceal = useCallback((index: number) => {
+    mutate({ conceals: (fog.conceals ?? []).filter((_, i) => i !== index) });
+  }, [mutate, fog.conceals]);
+
+  const clearConceals = useCallback(() => mutate({ conceals: [] }), [mutate]);
 
   const revealRegion = useCallback((r: Region) => {
     if (r.points.length >= 3) addReveal(r.points);
@@ -188,6 +212,7 @@ export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackA
     tool, setTool, draftPoints, addDraftPoint, removeLastDraftPoint, cancelDraft,
     finishDraftPolygon, finishDraftCircle,
     removeReveal, clearReveals,
+    setFeatherPx, removeConceal, clearConceals,
     revealRegion, revealAroundRoute, revealAroundPin,
     reset,
     snapshot, applySnapshot,
@@ -202,5 +227,7 @@ export function fogToYamlObject(f: FogOverlay): Record<string, unknown> {
     reveals: f.reveals.map((poly) => poly.map(([x, y]) => [Math.round(x), Math.round(y)])),
   };
   if (f.color) out.color = f.color;
+  if (f.conceals?.length) out.conceals = f.conceals.map((poly) => poly.map(([x, y]) => [Math.round(x), Math.round(y)]));
+  if (f.featherPx !== undefined) out.featherPx = Math.round(f.featherPx);
   return out;
 }

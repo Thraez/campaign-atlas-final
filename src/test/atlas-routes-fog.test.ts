@@ -120,4 +120,24 @@ describe("useFogDraft", () => {
     const y = fogToYamlObject({ mapId: "world", enabled: true, color: "#000", reveals: [[[1.4,2.6],[3,3],[5,5]]] });
     expect(y).toEqual({ mapId: "world", enabled: true, color: "#000", reveals: [[[1,3],[3,3],[5,5]]] });
   });
+
+  it("draws a conceal polygon into conceals", () => {
+    const { result } = renderHook(() => useFogDraft(map));
+    act(() => result.current.setTool("fog-polygon"));
+    act(() => result.current.addDraftPoint([1,1]));
+    act(() => result.current.addDraftPoint([10,1]));
+    act(() => result.current.addDraftPoint([5,10]));
+    let ok = false;
+    act(() => { ok = result.current.finishDraftPolygon(); });
+    expect(ok).toBe(true);
+    expect(result.current.fog.conceals?.length).toBe(1);
+    expect(result.current.fog.reveals.length).toBe(1); // base map's existing reveal untouched
+  });
+
+  it("setFeatherPx records on the overlay and is dirty", () => {
+    const { result } = renderHook(() => useFogDraft(map));
+    act(() => result.current.setFeatherPx(24));
+    expect(result.current.dirty).toBe(true);
+    expect(result.current.fog.featherPx).toBe(24);
+  });
 });
