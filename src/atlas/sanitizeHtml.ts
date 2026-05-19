@@ -25,7 +25,7 @@ const ALLOWED_TAGS = [
   // Block + headings
   "h1", "h2", "h3", "h4", "h5", "h6",
   "p", "blockquote", "pre", "hr", "br",
-  "details", "summary",
+  "details", "summary", "section",
   // Inline emphasis
   "em", "strong", "i", "b", "u", "s", "del", "ins", "small", "sub", "sup", "mark",
   // Links

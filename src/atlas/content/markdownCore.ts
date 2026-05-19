@@ -106,8 +106,153 @@ function calloutExtension() {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Footnote extension  [^id]: def  +  [^id] ref
+//
+// State is module-level and reset per parse via hooks.preprocess.
+// Safe because marked runs synchronously (async: false).
+// ---------------------------------------------------------------------------
+
+let _fnRefOrder = new Map<string, number>();
+let _fnDefs = new Map<string, string>();
+let _fnCounter = 0;
+
+const FN_DEF_RE = /^\[\^([^\]]+)\]: *(.*)/;
+const FN_REF_RE = /^\[\^([^\]\s]+)\](?!:)/;
+
+function footnoteDefExtension() {
+  return {
+    name: "footnote-def",
+    level: "block" as const,
+    start(src: string) {
+      return src.match(/^\[\^[^\]]+\]:/m)?.index;
+    },
+    tokenizer(
+      this: { lexer: { inlineTokens: (s: string) => Token[] } },
+      src: string,
+    ) {
+      const m = src.match(FN_DEF_RE);
+      if (!m || m.index !== 0) return undefined;
+      return {
+        type: "footnote-def",
+        raw: m[0],
+        id: m[1],
+        tokens: this.lexer.inlineTokens(m[2].trim()),
+      };
+    },
+    renderer(
+      this: { parser: { parseInline: (t: Token[]) => string } },
+      token: { id: string; tokens: Token[] },
+    ) {
+      _fnDefs.set(token.id, this.parser.parseInline(token.tokens));
+      return "";
+    },
+  };
+}
+
+function footnoteRefExtension() {
+  return {
+    name: "footnote-ref",
+    level: "inline" as const,
+    start(src: string) {
+      return src.indexOf("[^");
+    },
+    tokenizer(src: string) {
+      const m = src.match(FN_REF_RE);
+      if (!m) return undefined;
+      return { type: "footnote-ref", raw: m[0], id: m[1] };
+    },
+    renderer(token: { id: string }) {
+      const n = _fnRefOrder.get(token.id);
+      if (n === undefined) return "";
+      return `<sup><a id="fnref-${token.id}" href="#fn-${token.id}" class="footnote-ref">[${n}]</a></sup>`;
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Marked instance
+// ---------------------------------------------------------------------------
+
 const marked = new Marked({ async: false, gfm: true, breaks: false });
 marked.use({ extensions: [calloutExtension(), highlightExtension()] });
+
+marked.use({
+  extensions: [footnoteDefExtension(), footnoteRefExtension()],
+
+  walkTokens(token: Token) {
+    if ((token as { type: string }).type === "footnote-ref") {
+      const id = (token as unknown as { id: string }).id;
+      if (!_fnRefOrder.has(id)) {
+        _fnCounter++;
+        _fnRefOrder.set(id, _fnCounter);
+      }
+    }
+  },
+
+  hooks: {
+    preprocess(src: string) {
+      _fnRefOrder = new Map();
+      _fnDefs = new Map();
+      _fnCounter = 0;
+      return src;
+    },
+    postprocess(html: string) {
+      if (_fnDefs.size === 0) return html;
+      const orderedIds = [..._fnRefOrder.keys()].filter((id) => _fnDefs.has(id));
+      const extraIds = [..._fnDefs.keys()].filter((id) => !_fnRefOrder.has(id));
+      const items = [...orderedIds, ...extraIds]
+        .map((id) => {
+          const content = _fnDefs.get(id)!;
+          const backref = `<a href="#fnref-${id}" class="footnote-backref">↩</a>`;
+          return `<li id="fn-${id}"><p>${content} ${backref}</p></li>`;
+        })
+        .join("\n");
+      return `${html}<section class="footnotes"><ol>\n${items}\n</ol></section>\n`;
+    },
+  },
+});
+
+// Task-list: class-based rendering instead of <input type="checkbox">.
+// marked v18 emits a "checkbox" token inside each task listitem.
+// Suppress it here; CSS ::before provides the visual indicator.
+marked.use({
+  renderer: {
+    checkbox(): string {
+      return "";
+    },
+    listitem(
+      this: { parser: { parse: (t: Token[], top?: boolean) => string } },
+      token: { task: boolean; checked?: boolean; loose: boolean; tokens: Token[] },
+    ): string | false {
+      if (!token.task) return false;
+      const cls = token.checked
+        ? "atlas-task-item atlas-task-done"
+        : "atlas-task-item";
+      const body = this.parser.parse(token.tokens, !!token.loose);
+      return `<li class="${cls}">${body}</li>\n`;
+    },
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/**
+ * Remove [^id] references whose definitions are absent from the text.
+ * Call after DM-block strip on player-path text so footnote defs stripped
+ * with their %% block don't leave dangling superscripts in player output.
+ */
+export function dropOrphanFootnoteRefs(md: string): string {
+  const defined = new Set<string>();
+  for (const m of md.matchAll(/^\[\^([^\]]+)\]:/gm)) {
+    defined.add(m[1]);
+  }
+  return md.replace(/\[\^([^\]\s]+)\](?!:)/g, (match, id) =>
+    defined.has(id) ? match : "",
+  );
+}
 
 /** Marked-only render. Callers that inject post-render tokens (wikilinks)
  *  use this and sanitize themselves AFTER their post-pass. */
