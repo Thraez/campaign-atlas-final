@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import * as nodeCrypto from "node:crypto";
-import { handleSaveRequest, type FilePayload } from "../../scripts/vite-plugin-atlas-save";
+import { handleSaveRequest, handleAssetsImagesRequest, type FilePayload } from "../../scripts/vite-plugin-atlas-save";
 
 let tmp: string;
 beforeEach(() => {
@@ -997,6 +997,53 @@ describe("handleSaveRequest", () => {
       expect((r.payload as Record<string, unknown>).error).toBe("OversizedContent");
       expect(fs.existsSync(path.join(tmp, ASSET_PATH))).toBe(false);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleAssetsImagesRequest
+// ---------------------------------------------------------------------------
+
+describe("handleAssetsImagesRequest", () => {
+  it("returns empty array when images directory does not exist", async () => {
+    const r = await handleAssetsImagesRequest(tmp);
+    expect(r.status).toBe(200);
+    expect((r as { status: 200; images: string[] }).images).toEqual([]);
+  });
+
+  it("lists image files from public/atlas/assets/images/", async () => {
+    const dir = path.join(tmp, "public", "atlas", "assets", "images");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "portrait.png"), "fake");
+    fs.writeFileSync(path.join(dir, "scene.webp"), "fake");
+    fs.writeFileSync(path.join(dir, "readme.txt"), "not an image");
+    const r = await handleAssetsImagesRequest(tmp);
+    expect(r.status).toBe(200);
+    const { images } = r as { status: 200; images: string[] };
+    expect(images).toContain("portrait.png");
+    expect(images).toContain("scene.webp");
+    expect(images).not.toContain("readme.txt");
+  });
+
+  it("returns filenames only, sorted, not full paths", async () => {
+    const dir = path.join(tmp, "public", "atlas", "assets", "images");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "zzz.jpg"), "x");
+    fs.writeFileSync(path.join(dir, "aaa.png"), "x");
+    const r = await handleAssetsImagesRequest(tmp);
+    const { images } = r as { status: 200; images: string[] };
+    expect(images).toEqual(["aaa.png", "zzz.jpg"]);
+    // no path separators in entries
+    expect(images.every((f) => !f.includes("/") && !f.includes("\\"))).toBe(true);
+  });
+
+  it("excludes subdirectories from the listing", async () => {
+    const dir = path.join(tmp, "public", "atlas", "assets", "images");
+    fs.mkdirSync(path.join(dir, "sub"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "ok.png"), "x");
+    const r = await handleAssetsImagesRequest(tmp);
+    const { images } = r as { status: 200; images: string[] };
+    expect(images).toEqual(["ok.png"]);
   });
 });
 
