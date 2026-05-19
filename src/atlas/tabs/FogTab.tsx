@@ -33,7 +33,7 @@ interface Props {
 }
 
 export function FogTab({ map, project, api, regionApi, routeApi, showFogPreview, setShowFogPreview, blockingCount, warningCount }: Props) {
-  const { fog, dirty, setEnabled, setColor, tool, setTool, draftPoints, addDraftPoint: _addDraftPoint, removeLastDraftPoint, cancelDraft, finishDraftPolygon, finishDraftCircle, removeReveal, clearReveals, revealRegion, revealAroundRoute, revealAroundPin, reset, issues } = api;
+  const { fog, dirty, setEnabled, setColor, tool, setTool, draftPoints, addDraftPoint: _addDraftPoint, removeLastDraftPoint, cancelDraft, finishDraftPolygon, finishDraftCircle, removeReveal, clearReveals, setFeatherPx, removeConceal, clearConceals, revealRegion, revealAroundRoute, revealAroundPin, reset, issues } = api;
   void _addDraftPoint;
   const [advancedYaml, setAdvancedYaml] = useState(false);
   const [circleRadius, setCircleRadius] = useState(500);
@@ -52,6 +52,13 @@ export function FogTab({ map, project, api, regionApi, routeApi, showFogPreview,
         else if (e.key === "Escape") { e.preventDefault(); cancelDraft(); }
         else if (e.key === "Backspace") { e.preventDefault(); removeLastDraftPoint(); }
       } else if (tool === "circle") {
+        if (e.key === "Enter") { e.preventDefault(); if (!finishDraftCircle(circleRadius)) toast.warning("Click a center first."); }
+        else if (e.key === "Escape") { e.preventDefault(); cancelDraft(); }
+      } else if (tool === "fog-polygon") {
+        if (e.key === "Enter") { e.preventDefault(); if (!finishDraftPolygon()) toast.warning("Need at least 3 points."); }
+        else if (e.key === "Escape") { e.preventDefault(); cancelDraft(); }
+        else if (e.key === "Backspace") { e.preventDefault(); removeLastDraftPoint(); }
+      } else if (tool === "fog-circle") {
         if (e.key === "Enter") { e.preventDefault(); if (!finishDraftCircle(circleRadius)) toast.warning("Click a center first."); }
         else if (e.key === "Escape") { e.preventDefault(); cancelDraft(); }
       }
@@ -185,6 +192,56 @@ export function FogTab({ map, project, api, regionApi, routeApi, showFogPreview,
           </div>
         </div>
 
+        {/* Draw fog */}
+        <div className="rounded-md border border-border p-2 space-y-2 bg-card/50">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Draw fog</div>
+          <div className="flex flex-wrap gap-1.5">
+            <Button size="sm" variant={tool === "fog-polygon" ? "default" : "outline"} className="h-7 text-xs gap-1"
+              onClick={() => tool === "fog-polygon" ? cancelDraft() : setTool("fog-polygon")}>
+              <Pen className="h-3.5 w-3.5" /> Polygon
+            </Button>
+            <Button size="sm" variant={tool === "fog-circle" ? "default" : "outline"} className="h-7 text-xs gap-1"
+              onClick={() => tool === "fog-circle" ? cancelDraft() : setTool("fog-circle")}>
+              <CircleIcon className="h-3.5 w-3.5" /> Circle
+            </Button>
+          </div>
+          {tool === "fog-polygon" && (
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground italic">Click on the map to add fog. Enter finishes, Esc cancels. ({draftPoints.length} pts)</p>
+              <div className="flex gap-1">
+                <Button size="sm" variant="default" className="h-6 text-xs" onClick={() => { if (!finishDraftPolygon()) toast.warning("Need at least 3 points."); }}>Finish</Button>
+                <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={cancelDraft}>Cancel</Button>
+              </div>
+            </div>
+          )}
+          {tool === "fog-circle" && (
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground italic">Click a center on the map. ({draftPoints.length === 0 ? "no anchor" : "anchor set"})</p>
+              <div className="grid grid-cols-2 gap-1 items-end">
+                <div>
+                  <Label className="text-[10px]">Radius (px)</Label>
+                  <Input type="number" value={circleRadius} onChange={(e) => setCircleRadius(Number(e.target.value) || 0)} className="h-6 text-xs" />
+                </div>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="default" className="h-6 text-xs flex-1" onClick={() => { if (!finishDraftCircle(circleRadius)) toast.warning("Click a center first."); }}>Add</Button>
+                  <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={cancelDraft}>Cancel</Button>
+                </div>
+              </div>
+            </div>
+          )}
+          <div>
+            <Label htmlFor="fog-feather-px" className="text-[10px]">Soft edge (px)</Label>
+            <Input
+              id="fog-feather-px"
+              type="number"
+              value={fog.featherPx ?? 16}
+              onChange={(e) => setFeatherPx(Number(e.target.value) || 0)}
+              className="h-7 text-xs"
+              min={0}
+            />
+          </div>
+        </div>
+
         {/* Validation chips */}
         {issues.length > 0 && (
           <div className="space-y-1">
@@ -210,6 +267,22 @@ export function FogTab({ map, project, api, regionApi, routeApi, showFogPreview,
             </div>
           ))}
         </div>
+
+        {/* Fog shapes list */}
+        {(fog.conceals?.length ?? 0) > 0 && (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px]">Fog shapes ({fog.conceals!.length})</Label>
+              <Button size="sm" variant="ghost" className="h-6 text-[10px] text-destructive" onClick={() => { if (confirm("Clear all fog shapes?")) clearConceals(); }}>Clear all</Button>
+            </div>
+            {fog.conceals!.map((poly, i) => (
+              <div key={i} className="flex items-center gap-1 px-2 py-1 rounded border border-border bg-card/30">
+                <span className="text-[10px] flex-1">Fog #{i + 1} · {poly.length} pts</span>
+                <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-destructive" onClick={() => removeConceal(i)}><Trash2 className="h-3 w-3" /></Button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {dirty && (
           <Button size="sm" variant="ghost" onClick={reset} className="h-7 text-xs gap-1">
