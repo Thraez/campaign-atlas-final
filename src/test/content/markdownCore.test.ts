@@ -16,9 +16,19 @@ describe("markdownCore", () => {
     expect(html).not.toContain("<script>");
   });
 
-  it("does not convert bare newlines to <br> (breaks:false)", () => {
+  // Phase 3 parity: Obsidian reading view (default "Strict line breaks" OFF)
+  // renders a single newline inside a paragraph as a hard line break.
+  it("converts a single newline to <br> (Obsidian reading-view parity)", () => {
     const html = markdownToHtml("first line\nsecond line");
-    expect(html).not.toContain("<br>");
+    expect(html).toContain("<br>");
+    expect(html).toContain("first line");
+    expect(html).toContain("second line");
+  });
+
+  it("a blank line still separates paragraphs (not a <br>)", () => {
+    const html = markdownToHtml("para one\n\npara two");
+    expect(html).toContain("<p>para one</p>");
+    expect(html).toContain("<p>para two</p>");
   });
 
   it("is deterministic (same input → same output, the parity guarantee)", () => {
@@ -26,6 +36,42 @@ describe("markdownCore", () => {
     const first = markdownToHtml(md);
     const second = markdownToHtml(md);
     expect(first).toBe(second);
+  });
+});
+
+describe("line-break parity does not regress block constructs", () => {
+  it("multi-line list stays a list, not <br>-joined", () => {
+    const html = markdownToHtml("- one\n- two\n- three");
+    expect(html).toContain("<li>one</li>");
+    expect(html).toContain("<li>two</li>");
+    expect(html).toContain("<li>three</li>");
+  });
+
+  it("GFM table still parses with adjacent single newlines", () => {
+    const html = markdownToHtml("| a | b |\n|---|---|\n| 1 | 2 |");
+    expect(html).toContain("<table>");
+    expect(html).not.toContain("<br>");
+  });
+
+  it("callout body still renders inside <details>", () => {
+    const html = markdownToHtml("> [!note] Title\n> first\n> second");
+    expect(html).toContain('<details class="atlas-callout');
+    expect(html).toContain("first");
+    expect(html).toContain("second");
+  });
+
+  it("footnote ref + def still number and link", () => {
+    const html = markdownToHtml("text[^a]\n\n[^a]: the note");
+    expect(html).toContain('href="#fn-a"');
+    expect(html).toContain('id="fn-a"');
+    expect(html).toContain("the note");
+  });
+
+  it("task list still renders class-based items", () => {
+    const html = markdownToHtml("- [ ] open\n- [x] done");
+    expect(html).not.toContain("<input");
+    expect(html).toContain("atlas-task-item");
+    expect(html).toContain("atlas-task-done");
   });
 });
 

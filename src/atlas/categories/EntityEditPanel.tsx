@@ -13,6 +13,8 @@ import {
   type EntitySuggestion,
 } from "@/atlas/editor/wikilinkAutocomplete";
 import { WikilinkPopover } from "@/atlas/editor/WikilinkPopover";
+import { FormatToolbar } from "@/atlas/editor/FormatToolbar";
+import { applyToolbarAction, type ToolbarActionId } from "@/atlas/editor/toolbarActions";
 
 export function EntityEditPanel({
   sourcePath,
@@ -153,6 +155,24 @@ export function EntityEditPanel({
     });
   };
 
+  const handleToolbarAction = (id: ToolbarActionId, calloutType?: string) => {
+    if (!api.draft || !textareaRef.current) return;
+    const ta = textareaRef.current;
+    const result = applyToolbarAction(
+      id,
+      api.draft.body,
+      ta.selectionStart,
+      ta.selectionEnd,
+      calloutType,
+    );
+    api.setBody(result.value);
+    setAcCtx(null);
+    requestAnimationFrame(() => {
+      textareaRef.current?.setSelectionRange(result.selStart, result.selEnd);
+      textareaRef.current?.focus();
+    });
+  };
+
   const handleImageImport = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -258,6 +278,7 @@ export function EntityEditPanel({
         </label>
         <div className="block">
           <span className="block mb-1 text-xs">Body (markdown)</span>
+          <FormatToolbar onAction={handleToolbarAction} />
           <div className="relative">
             <textarea
               ref={textareaRef}

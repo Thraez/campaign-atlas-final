@@ -174,7 +174,9 @@ function footnoteRefExtension() {
 // Marked instance
 // ---------------------------------------------------------------------------
 
-const marked = new Marked({ async: false, gfm: true, breaks: false });
+// breaks:true — Obsidian reading view (default "Strict line breaks" OFF)
+// renders a single newline as a hard line break. Parity requires the same.
+const marked = new Marked({ async: false, gfm: true, breaks: true });
 marked.use({ extensions: [calloutExtension(), highlightExtension()] });
 
 marked.use({
