@@ -39,4 +39,26 @@ describe("projectMapForPlayer", () => {
     expect(r.regions.map((x: { id: string }) => x.id)).toEqual(["r1"]);
     expect(r.routes.map((x: { id: string }) => x.id)).toEqual(["t1"]);
   });
+
+  it("drops a route with any point in fog", () => {
+    const routes = [{ id:"t1", visibility:"player",
+      resolvedPoints:[[10,10],[90,90]] }] as never[]; // (90,90) is fogged
+    const r = projectMapForPlayer({ placements:[], regions:[], routes,
+      entitiesById, isFogged });
+    expect(r.routes.length).toBe(0);
+  });
+  it("keeps a route entirely in the lit area", () => {
+    const routes = [{ id:"t2", visibility:"player",
+      resolvedPoints:[[10,10],[20,20]] }] as never[];
+    const r = projectMapForPlayer({ placements:[], regions:[], routes,
+      entitiesById, isFogged });
+    expect(r.routes.map((x: { id: string }) => x.id)).toEqual(["t2"]);
+  });
+  it("drops a region with any vertex in fog", () => {
+    const regions = [{ id:"r1", visibility:"player",
+      points:[[10,10],[90,90],[10,90]] }] as never[];
+    const r = projectMapForPlayer({ placements:[], regions, routes:[],
+      entitiesById, isFogged });
+    expect(r.regions.length).toBe(0);
+  });
 });
