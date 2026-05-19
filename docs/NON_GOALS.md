@@ -4,6 +4,8 @@ This atlas has a small, deliberate spine: Obsidian-canon markdown → build pipe
 
 This document lists what we have decided **not** to build. If a feature request matches one of these, push back — the cost of saying yes here is a permanent surface-area tax on every later change.
 
+> For the **markdown-rendering** boundary (which Obsidian-core constructs render at parity vs. which are explicit non-goals — embeds, math, mermaid, `#tag` pills, community plugins, WYSIWYG), see [docs/MARKDOWN_PARITY.md](MARKDOWN_PARITY.md).
+
 ## Hard nos
 
 | Idea | Why we don't build it |

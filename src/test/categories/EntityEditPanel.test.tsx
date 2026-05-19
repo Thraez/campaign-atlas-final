@@ -92,6 +92,36 @@ it("loads an entity, edits the body, saves via the shared rewrite", async () => 
   await waitFor(() => expect(onSaved).toHaveBeenCalled());
 });
 
+it("formatting toolbar wraps the textarea selection and updates the body", async () => {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (String(url).includes("/__atlas/read")) {
+      return new Response(JSON.stringify({ contents: RAW }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ saved: 1, paths: [] }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(
+    <EntityEditPanel
+      sourcePath="content/w/npcs/corven.md"
+      onClose={() => {}}
+      onSaved={() => {}}
+    />,
+  );
+  await waitFor(() => screen.getByDisplayValue(/old body/i));
+  const ta = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
+  // Select the word "Corven" wherever it sits in the loaded body.
+  const start = ta.value.indexOf("Corven");
+  ta.focus();
+  ta.setSelectionRange(start, start + "Corven".length);
+  fireEvent.click(screen.getByRole("button", { name: "Bold" }));
+  await waitFor(() =>
+    expect((screen.getByLabelText(/body/i) as HTMLTextAreaElement).value).toContain(
+      "**Corven**",
+    ),
+  );
+});
+
 it("edit panel has no embedded preview or DM-notes toggle (superseded by global lens)", async () => {
   const fetchMock = vi.fn(async (url: string) => {
     if (String(url).includes("/__atlas/read")) {
