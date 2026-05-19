@@ -35,3 +35,50 @@ A [[Tidemarrow|home]] city.
     expect(html).not.toContain("[[Tidemarrow|home]]");
   });
 });
+
+describe("renderEntityMarkdown anchor-wikilinks", () => {
+  it("[[Target#Section]] uses entity name as data-link, full text as label", () => {
+    const html = renderEntityMarkdown("[[Tidemarrow#History]]", { showDmNotes: false });
+    expect(html).toContain('data-link="Tidemarrow"');
+    expect(html).toContain("Tidemarrow#History");
+    expect(html).not.toContain('data-link="Tidemarrow#History"');
+  });
+
+  it("[[Target#Section|alias]] uses entity name as data-link, alias as label", () => {
+    const html = renderEntityMarkdown("[[Tidemarrow#History|the old port]]", { showDmNotes: false });
+    expect(html).toContain('data-link="Tidemarrow"');
+    expect(html).toContain("the old port");
+    expect(html).not.toContain('data-link="Tidemarrow#History"');
+  });
+
+  it("[[Target]] without anchor unchanged: data-link is the full target", () => {
+    const html = renderEntityMarkdown("[[Tidemarrow]]", { showDmNotes: false });
+    expect(html).toContain('data-link="Tidemarrow"');
+    expect(html).toContain("Tidemarrow");
+  });
+});
+
+describe("renderEntityMarkdown highlight secrecy", () => {
+  const bodyWithSecret = [
+    "Public text.",
+    "",
+    "%%",
+    "==secret highlight==",
+    "%%",
+    "",
+    "==visible highlight==",
+  ].join("\n");
+
+  it("player render strips highlight inside %% block", () => {
+    const html = renderEntityMarkdown(bodyWithSecret, { showDmNotes: false });
+    expect(html).toContain("Public text.");
+    expect(html).not.toContain("secret highlight");
+    expect(html).not.toContain('<mark>secret highlight</mark>');
+    expect(html).toContain("<mark>visible highlight</mark>");
+  });
+
+  it("DM render keeps highlight inside %% block", () => {
+    const html = renderEntityMarkdown(bodyWithSecret, { showDmNotes: true });
+    expect(html).toContain("secret highlight");
+  });
+});

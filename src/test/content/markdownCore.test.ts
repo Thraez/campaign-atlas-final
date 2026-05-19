@@ -40,3 +40,26 @@ describe("markdownCore parity-lock", () => {
     expect(panePath).toBe(corePath);
   });
 });
+
+describe("highlight extension", () => {
+  it("==text== emits <mark>", () => {
+    const html = markdownToHtml("==hello==");
+    expect(html).toContain("<mark>hello</mark>");
+  });
+
+  it("inline markdown inside highlight is rendered", () => {
+    const html = markdownToHtml("==**bold** text==");
+    expect(html).toContain("<mark>");
+    expect(html).toContain("<strong>bold</strong>");
+  });
+
+  it("<mark> survives renderMarkdownBodyToSafeHtml sanitizer", () => {
+    const html = renderMarkdownBodyToSafeHtml("==keep==");
+    expect(html).toContain("<mark>keep</mark>");
+  });
+
+  it("unclosed == does not emit mark", () => {
+    const html = markdownToHtml("==no close");
+    expect(html).not.toContain("<mark>");
+  });
+});

@@ -21,11 +21,14 @@ export function renderEntityMarkdown(body: string, opts: RenderOpts): string {
     return `![${clean}](${resolveAsset(clean)})`;
   });
 
-  // [[target|alias]] → styled non-navigating reference (alias or target text).
-  // data-link is in the sanitizer's ALLOWED_ATTR list; data-target is not.
+  // [[target#anchor|alias]] → styled non-navigating reference.
+  // data-link holds the entity name only (no anchor) so navigation resolves the
+  // entity regardless of whether the anchor exists in the rendered view.
   text = text.replace(WIKILINK_RE, (_m, target: string, alias?: string) => {
+    const hashIdx = target.indexOf("#");
+    const entityName = (hashIdx >= 0 ? target.slice(0, hashIdx) : target).trim();
     const label = (alias ?? target).trim();
-    return `<span class="atlas-wikilink" data-link="${target.trim()}">${label}</span>`;
+    return `<span class="atlas-wikilink" data-link="${entityName}">${label}</span>`;
   });
 
   return renderMarkdownBodyToSafeHtml(text);
