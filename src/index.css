@@ -323,6 +323,45 @@
   color: hsl(var(--destructive));
 }
 
+/* Atlas viewer: Obsidian footnote styling */
+.atlas-prose .footnotes {
+  margin-top: 2rem;
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 0.75rem;
+  font-size: 0.85em;
+  color: hsl(var(--muted-foreground));
+}
+.atlas-prose .footnotes ol {
+  padding-left: 1.5rem;
+}
+.atlas-prose .footnotes li {
+  margin-bottom: 0.25rem;
+}
+.atlas-prose a.footnote-ref {
+  color: hsl(var(--accent));
+  text-decoration: none;
+  font-size: 0.75em;
+}
+.atlas-prose a.footnote-backref {
+  color: hsl(var(--muted-foreground));
+  text-decoration: none;
+  margin-left: 0.25rem;
+}
+
+/* Atlas viewer: Obsidian task-list styling (non-interactive) */
+.atlas-prose li.atlas-task-item {
+  list-style: none;
+  padding-left: 0.1rem;
+}
+.atlas-prose li.atlas-task-item::before {
+  content: "☐ ";
+  color: hsl(var(--muted-foreground));
+}
+.atlas-prose li.atlas-task-item.atlas-task-done::before {
+  content: "☑ ";
+  color: hsl(var(--accent));
+}
+
 /* Accessibility: respect users who prefer reduced motion. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

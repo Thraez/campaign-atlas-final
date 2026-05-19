@@ -63,3 +63,31 @@ describe("highlight extension", () => {
     expect(html).not.toContain("<mark>");
   });
 });
+
+describe("task-list styling", () => {
+  it("- [ ] and - [x] render without <input>", () => {
+    const html = markdownToHtml("- [ ] open task\n- [x] done task");
+    expect(html).not.toContain("<input");
+    expect(html).toContain("atlas-task-item");
+    expect(html).toContain("atlas-task-done");
+  });
+
+  it("open task has atlas-task-item but not atlas-task-done", () => {
+    const html = markdownToHtml("- [ ] open");
+    expect(html).toContain("atlas-task-item");
+    expect(html).not.toContain("atlas-task-done");
+  });
+
+  it("task list survives sanitizer (no <input>, classes kept)", () => {
+    const html = renderMarkdownBodyToSafeHtml("- [ ] open\n- [x] done");
+    expect(html).not.toContain("<input");
+    expect(html).toContain("atlas-task-item");
+    expect(html).toContain("atlas-task-done");
+  });
+
+  it("non-task list items are unaffected", () => {
+    const html = markdownToHtml("- plain item\n- [ ] task");
+    expect(html).toContain("<li>plain item</li>");
+    expect(html).toContain("atlas-task-item");
+  });
+});

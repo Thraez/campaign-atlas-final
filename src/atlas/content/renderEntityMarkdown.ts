@@ -1,4 +1,4 @@
-import { renderMarkdownBodyToSafeHtml } from "@/atlas/content/markdownCore";
+import { dropOrphanFootnoteRefs, renderMarkdownBodyToSafeHtml } from "@/atlas/content/markdownCore";
 import { stripDmBlocks } from "@/atlas/content/stripDmBlocks";
 
 export interface RenderOpts {
@@ -13,7 +13,9 @@ export function renderEntityMarkdown(body: string, opts: RenderOpts): string {
   const resolveAsset =
     opts.resolveAsset ?? ((n: string) => `/atlas/assets/images/${n}`);
 
-  let text = opts.showDmNotes ? body : stripDmBlocks(body).text;
+  let text = opts.showDmNotes
+    ? body
+    : dropOrphanFootnoteRefs(stripDmBlocks(body).text);
 
   // ![[image.ext]] → markdown image (resolved), before wikilink pass.
   text = text.replace(EMBED_RE, (_m, name: string) => {
