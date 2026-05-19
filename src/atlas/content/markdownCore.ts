@@ -29,6 +29,33 @@ const CALLOUT_TITLES: Record<string, string> = {
   abstract: "Abstract", summary: "Abstract", tldr: "Abstract", todo: "Todo",
 };
 
+function highlightExtension() {
+  const HIGHLIGHT_RE = /^==([^=\n]+?)==/;
+  return {
+    name: "highlight",
+    level: "inline" as const,
+    start(src: string) {
+      return src.indexOf("==");
+    },
+    tokenizer(this: { lexer: { inlineTokens: (s: string) => Token[] } }, src: string) {
+      const m = HIGHLIGHT_RE.exec(src);
+      if (!m) return undefined;
+      return {
+        type: "highlight",
+        raw: m[0],
+        text: m[1],
+        tokens: this.lexer.inlineTokens(m[1]),
+      };
+    },
+    renderer(
+      this: { parser: { parseInline: (t: Token[]) => string } },
+      token: { text: string; tokens: Token[] },
+    ) {
+      return `<mark>${this.parser.parseInline(token.tokens)}</mark>`;
+    },
+  };
+}
+
 function calloutExtension() {
   return {
     name: "callout",
@@ -80,7 +107,7 @@ function calloutExtension() {
 }
 
 const marked = new Marked({ async: false, gfm: true, breaks: false });
-marked.use({ extensions: [calloutExtension()] });
+marked.use({ extensions: [calloutExtension(), highlightExtension()] });
 
 /** Marked-only render. Callers that inject post-render tokens (wikilinks)
  *  use this and sanitize themselves AFTER their post-pass. */
