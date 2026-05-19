@@ -119,6 +119,8 @@ export interface FogOverlay {
   enabled: boolean;
   color?: string;        // default rgba(0,0,0,0.55)
   reveals: Point[][];    // each polygon is a "hole" the players can see through
+  conceals?: Point[][];  // "fog" polygons; subtract from reveals
+  featherPx?: number;    // soft-edge band width, default applied by consumers
 }
 
 export interface MapLayer {
