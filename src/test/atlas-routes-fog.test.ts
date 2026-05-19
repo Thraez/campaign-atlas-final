@@ -141,3 +141,26 @@ describe("useFogDraft", () => {
     expect(result.current.fog.featherPx).toBe(24);
   });
 });
+
+import { isLit } from "@/atlas/fog/effectiveLit";
+import type { FogOverlay } from "@/atlas/content/schema";
+
+describe("isFogged build integration — isLit wired correctly", () => {
+  const sq = (x0: number, y0: number, x1: number, y1: number) =>
+    [[x0, y0], [x1, y0], [x1, y1], [x0, y1]] as [number, number][];
+
+  const fog: FogOverlay = { mapId: "m", enabled: true, reveals: [sq(0, 0, 50, 50)] };
+  const isFogged = (x: number, y: number) => !!fog?.enabled && !isLit(x, y, fog);
+
+  it("point inside reveal → not fogged", () => {
+    expect(isFogged(25, 25)).toBe(false);
+  });
+  it("point outside reveal → fogged", () => {
+    expect(isFogged(75, 75)).toBe(true);
+  });
+  it("disabled fog → nothing fogged", () => {
+    const f2: FogOverlay = { mapId: "m", enabled: false, reveals: [] };
+    const iF2 = (x: number, y: number) => !!f2?.enabled && !isLit(x, y, f2);
+    expect(iF2(999, 999)).toBe(false);
+  });
+});

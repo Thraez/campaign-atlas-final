@@ -28,6 +28,7 @@ import {
 } from "./atlas/validateAsset";
 import { parseAtlasDate } from "./atlas/calendarDate";
 import { PLAYER_VISIBLE } from "./atlas/visibility";
+import { isLit } from "../src/atlas/fog/effectiveLit";
 import {
   stripDmProfile,
   filterRelationshipsForPlayer,
@@ -605,6 +606,13 @@ async function runBuildCore(flags: BuildFlags) {
   const fogs: FogOverlay[] = worldCfg?.fogs ?? [];
   let regionsExcluded = 0;
 
+  // Build a per-mapId fog checker for player builds.
+  const fogByMapId = new Map(fogs.map((f) => [f.mapId, f]));
+  const isFoggedOnMap = (mapId: string, x: number, y: number): boolean => {
+    const fog = fogByMapId.get(mapId);
+    return !!fog?.enabled && !isLit(x, y, fog);
+  };
+
   if (flags.player) {
     regions = regions
       .filter((r) => {
@@ -613,7 +621,11 @@ async function runBuildCore(flags: BuildFlags) {
         return keep;
       })
       // Region names ship to players; strip any %% blocks the DM left behind.
-      .map((r) => ({ ...r, name: stripDmFromShippingString(r.name) ?? r.name }));
+      .map((r) => ({ ...r, name: stripDmFromShippingString(r.name) ?? r.name }))
+      .filter((r) => {
+        if (!r.mapId || !r.points?.length) return true;
+        return !r.points.some(([x, y]) => isFoggedOnMap(r.mapId!, x, y));
+      });
     // Map names ship to players too; sanitize before attaching overlays below.
     maps = maps.map((m) => ({
       ...m,
@@ -640,6 +652,10 @@ async function runBuildCore(flags: BuildFlags) {
       const mapId = p.mapId ?? primaryMapId;
       if (!validMapIds.has(mapId)) {
         warnings.push(`entity "${entity.id}": placement references unknown mapId "${mapId}" — skipped`);
+        continue;
+      }
+      if (flags.player && isFoggedOnMap(mapId, p.x, p.y)) {
+        secretPlacementsExcluded += 1;
         continue;
       }
       const rawLabel = (p as { label?: string }).label;
@@ -703,6 +719,10 @@ async function runBuildCore(flags: BuildFlags) {
       }
     }
     if (dropped || resolved.length < 2) continue;
+    if (flags.player && resolved.some(([x, y]) => isFoggedOnMap(r.mapId, x, y))) {
+      routesExcluded += 1;
+      continue;
+    }
     // Route names ship to players; strip any %% blocks the DM left behind.
     const routeName = flags.player ? (stripDmFromShippingString(r.name) ?? r.name) : r.name;
     routes.push({
