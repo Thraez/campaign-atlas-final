@@ -28,6 +28,8 @@ import {
 } from "./atlas/validateAsset";
 import { parseAtlasDate } from "./atlas/calendarDate";
 import { PLAYER_VISIBLE } from "./atlas/visibility";
+import { isLit } from "../src/atlas/fog/effectiveLit";
+import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
 import {
   stripDmProfile,
   filterRelationshipsForPlayer,
@@ -605,6 +607,13 @@ async function runBuildCore(flags: BuildFlags) {
   const fogs: FogOverlay[] = worldCfg?.fogs ?? [];
   let regionsExcluded = 0;
 
+  // Build a per-mapId fog checker for player builds.
+  const fogByMapId = new Map(fogs.map((f) => [f.mapId, f]));
+  const isFoggedOnMap = (mapId: string, x: number, y: number): boolean => {
+    const fog = fogByMapId.get(mapId);
+    return !!fog?.enabled && !isLit(x, y, fog);
+  };
+
   if (flags.player) {
     regions = regions
       .filter((r) => {
@@ -613,7 +622,11 @@ async function runBuildCore(flags: BuildFlags) {
         return keep;
       })
       // Region names ship to players; strip any %% blocks the DM left behind.
-      .map((r) => ({ ...r, name: stripDmFromShippingString(r.name) ?? r.name }));
+      .map((r) => ({ ...r, name: stripDmFromShippingString(r.name) ?? r.name }))
+      .filter((r) => {
+        if (!r.mapId || !r.points?.length) return true;
+        return !r.points.some(([x, y]) => isFoggedOnMap(r.mapId!, x, y));
+      });
     // Map names ship to players too; sanitize before attaching overlays below.
     maps = maps.map((m) => ({
       ...m,
@@ -640,6 +653,10 @@ async function runBuildCore(flags: BuildFlags) {
       const mapId = p.mapId ?? primaryMapId;
       if (!validMapIds.has(mapId)) {
         warnings.push(`entity "${entity.id}": placement references unknown mapId "${mapId}" — skipped`);
+        continue;
+      }
+      if (flags.player && isFoggedOnMap(mapId, p.x, p.y)) {
+        secretPlacementsExcluded += 1;
         continue;
       }
       const rawLabel = (p as { label?: string }).label;
@@ -703,6 +720,10 @@ async function runBuildCore(flags: BuildFlags) {
       }
     }
     if (dropped || resolved.length < 2) continue;
+    if (flags.player && resolved.some(([x, y]) => isFoggedOnMap(r.mapId, x, y))) {
+      routesExcluded += 1;
+      continue;
+    }
     // Route names ship to players; strip any %% blocks the DM left behind.
     const routeName = flags.player ? (stripDmFromShippingString(r.name) ?? r.name) : r.name;
     routes.push({
@@ -727,6 +748,59 @@ async function runBuildCore(flags: BuildFlags) {
     fog: fogs.find((f) => f.mapId === m.id),
     routes: routes.filter((r) => r.mapId === m.id),
   }));
+
+  // -------- Player-mode fog redaction --------
+  // For each fog-enabled map, redact every raster layer to a feathered alpha
+  // mask PNG, write <name>.fog.png next to the source, rewrite the layer src
+  // in the player atlas, and strip fog geometry so reveal polygons never ship.
+  // (See docs/superpowers/specs/2026-05-19-fog-player-mechanic-design.md.)
+  if (flags.player) {
+    const redactedMaps: typeof maps = [];
+    for (const m of maps) {
+      if (!m.fog?.enabled) { redactedMaps.push(m); continue; }
+
+      const fog = m.fog;
+      const newLayers: typeof m.layers = [];
+      for (const layer of m.layers ?? []) {
+        if (layer.tileSrc) {
+          throw new FogRedactionError(
+            `Map "${m.id}" layer "${layer.id}" is tiled (tileSrc set) — fog is not supported for tiled layers. ` +
+            `Either remove fog.enabled on this map or convert the layer to a raster image.`
+          );
+        }
+        const srcPath = path.resolve(ROOT, "public", layer.src);
+        if (!fs.existsSync(srcPath)) {
+          warnings.push(
+            `map "${m.id}" layer "${layer.id}": source image missing at ${path.relative(ROOT, srcPath)} — skipped fog redaction (layer will not render)`
+          );
+          continue;
+        }
+        const imageBuffer = fs.readFileSync(srcPath);
+        const redacted = await redactLayer(
+          imageBuffer,
+          { width: m.width, height: m.height },
+          fog,
+          { x: layer.x, y: layer.y, width: layer.width, height: layer.height }
+        );
+        // Output path: insert ".fog" before the extension. Strip any query/hash.
+        const cleanSrc = layer.src.replace(/[?#].*$/, "");
+        const ext = path.extname(cleanSrc); // ".png", ".jpg", etc.
+        const srcAbs = path.resolve(ROOT, "public", cleanSrc);
+        const base = srcAbs.slice(0, -ext.length);
+        const outPath = `${base}.fog.png`;
+        fs.writeFileSync(outPath, redacted);
+        // Rewrite the layer src to the redacted file (relative to public/, forward slashes).
+        const newSrcRel = path.relative(path.resolve(ROOT, "public"), outPath).split(path.sep).join("/");
+        newLayers.push({ ...layer, src: newSrcRel });
+      }
+      // Strip fog geometry — only mapId + enabled remain in the player atlas.
+      // The cast intentionally drops reveals/conceals/featherPx/color so the
+      // player atlas never ships reveal polygon coordinates.
+      const playerFog = { mapId: fog.mapId, enabled: true } as FogOverlay;
+      redactedMaps.push({ ...m, layers: newLayers, fog: playerFog });
+    }
+    maps = redactedMaps;
+  }
 
   // -------- Profile + relationship player-strip --------
   // The DM half of `profile` and DM-only relationships must NEVER reach a

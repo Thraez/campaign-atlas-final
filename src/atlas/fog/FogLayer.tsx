@@ -32,9 +32,9 @@ function DrawingClicks({ api, map, onCircleAnchor }: { api: FogDraftAPI; map: Ma
       if (!api.tool) return;
       const x = Math.round(e.latlng.lng);
       const y = Math.round(map.height - e.latlng.lat);
-      if (api.tool === "polygon") {
+      if (api.tool === "polygon" || api.tool === "fog-polygon") {
         api.addDraftPoint([x, y]);
-      } else if (api.tool === "circle") {
+      } else if (api.tool === "circle" || api.tool === "fog-circle") {
         // First click sets center; the panel handles radius separately.
         if (api.draftPoints.length === 0) {
           api.addDraftPoint([x, y]);
@@ -54,16 +54,19 @@ export function FogLayer({ map, api, preview = true, playerMode = false }: Props
 
   const fog = api.fog;
 
-  // Outer rectangle + reveal holes — same shape the player runtime renders.
+  // Outer rectangle + reveal holes + conceal re-fills (evenodd: outer→fog, reveals→clear, conceals→fog again).
   const fogPositions = useMemo<L.LatLngExpression[][]>(() => {
     const outer: L.LatLngExpression[] = [
       [0, 0], [0, map.width], [H, map.width], [H, 0],
     ];
-    const holes: L.LatLngExpression[][] = fog.reveals.map((poly) =>
+    const reveals: L.LatLngExpression[][] = fog.reveals.map((poly) =>
       poly.map(([x, y]) => xy2ll(x, y))
     );
-    return [outer, ...holes];
-  }, [fog.reveals, map.width, H]);
+    const conceals: L.LatLngExpression[][] = (fog.conceals ?? []).map((poly) =>
+      poly.map(([x, y]) => xy2ll(x, y))
+    );
+    return [outer, ...reveals, ...conceals];
+  }, [fog.reveals, fog.conceals, H, map.width]);
 
   return (
     <>
@@ -95,31 +98,54 @@ export function FogLayer({ map, api, preview = true, playerMode = false }: Props
         />
       ))}
 
-      {/* Draft polygon preview. */}
-      {api.tool === "polygon" && api.draftPoints.length > 0 && (
+      {/* Outline existing conceals so DM can see re-fogged areas even when fog is off. */}
+      {(fog.conceals ?? []).map((poly, i) => (
+        <Polyline
+          key={`conceal-outline-${i}`}
+          positions={poly.map(([x, y]) => xy2ll(x, y)).concat([xy2ll(poly[0][0], poly[0][1])])}
+          pathOptions={{ color: "hsl(var(--destructive))", weight: 1, opacity: 0.6, dashArray: "3,3", interactive: false }}
+        />
+      ))}
+
+      {/* Draft polygon preview (reveal = primary color, conceal = destructive color). */}
+      {(api.tool === "polygon" || api.tool === "fog-polygon") && api.draftPoints.length > 0 && (
         <>
           {api.draftPoints.length >= 3 ? (
             <Polygon
               positions={api.draftPoints.map(([x, y]) => xy2ll(x, y))}
-              pathOptions={{ color: "hsl(var(--primary))", dashArray: "4,4", fillOpacity: 0.12, weight: 2 }}
+              pathOptions={{
+                color: api.tool === "fog-polygon" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
+                dashArray: "4,4", fillOpacity: 0.12, weight: 2
+              }}
             />
           ) : (
             <Polyline
               positions={api.draftPoints.map(([x, y]) => xy2ll(x, y))}
-              pathOptions={{ color: "hsl(var(--primary))", dashArray: "4,4", weight: 2 }}
+              pathOptions={{
+                color: api.tool === "fog-polygon" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
+                dashArray: "4,4", weight: 2
+              }}
             />
           )}
           {api.draftPoints.map((p, i) => (
             <CircleMarker key={`draft-${i}`} center={xy2ll(p[0], p[1])} radius={4}
-              pathOptions={{ color: "hsl(var(--primary))", fillColor: "hsl(var(--primary))", fillOpacity: 1 }} />
+              pathOptions={{
+                color: api.tool === "fog-polygon" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
+                fillColor: api.tool === "fog-polygon" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
+                fillOpacity: 1
+              }} />
           ))}
         </>
       )}
 
-      {/* Circle anchor preview. */}
-      {api.tool === "circle" && api.draftPoints.length === 1 && (
+      {/* Circle anchor preview (reveal = primary color, conceal = destructive color). */}
+      {(api.tool === "circle" || api.tool === "fog-circle") && api.draftPoints.length === 1 && (
         <CircleMarker center={xy2ll(api.draftPoints[0][0], api.draftPoints[0][1])} radius={5}
-          pathOptions={{ color: "hsl(var(--primary))", fillColor: "hsl(var(--primary))", fillOpacity: 1 }} />
+          pathOptions={{
+            color: api.tool === "fog-circle" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
+            fillColor: api.tool === "fog-circle" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
+            fillOpacity: 1
+          }} />
       )}
     </>
   );

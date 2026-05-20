@@ -357,9 +357,12 @@ routes:
 fog:
   - mapId: astrath-deeprealm-overview
     enabled: true
-    color: "rgba(8, 12, 20, 0.55)"
+    color: "rgba(8, 12, 20, 0.55)"  # DM-side preview tint; player build paints map.oceanColor instead
+    featherPx: 16                    # soft-edge band width on the player build
     reveals:
       - [[40000, 30000], [140000, 30000], [140000, 85000], [40000, 85000]]
+    conceals:                        # "draw fog" polygons that subtract from the reveals
+      - [[80000, 50000], [100000, 50000], [100000, 70000], [80000, 70000]]
 ```
 The Creator Cockpit exports the newer map-nested format:
 ```yaml
@@ -394,9 +397,12 @@ maps:
           - sunhaven
     fog:
       enabled: true
-      color: "rgba(8, 12, 20, 0.55)"
+      color: "rgba(8, 12, 20, 0.55)"  # DM-side preview tint; player build paints map.oceanColor instead
+      featherPx: 16                    # soft-edge band width on the player build
       reveals:
         - [[40000, 30000], [140000, 30000], [140000, 85000], [40000, 85000]]
+      conceals:                        # "draw fog" polygons that subtract from the reveals
+        - [[80000, 50000], [100000, 50000], [100000, 70000], [80000, 70000]]
 ```
 For nested `maps[].regions`, `maps[].routes`, and `maps[].fog`, `mapId` is inferred from the parent map.
 If a nested entry declares a different `mapId`, the build warns and uses the parent map id.
@@ -453,7 +459,7 @@ Entity waypoints resolve through map placements. If a route uses a player-visibl
 Routes show distance and travel-time tooltips when the map has a `scale`.
 ---
 Fog
-Fog covers a map except where reveal polygons cut holes.
+Fog covers a map except where reveal polygons cut holes. The Fog tab also lets you draw conceal polygons ("draw fog") that subtract from the revealed area, and set a soft-edge width.
 ```yaml
 fog:
   - mapId: astrath-deeprealm-overview
@@ -464,6 +470,24 @@ fog:
 ```
 In the player viewer, fog can be toggled with the eye button in the header.
 In the editor, the Fog tab can author reveal polygons, reveal around pins, reveal around routes, and reveal selected regions.
+
+### Fog is enforced in player builds
+
+When `fog.enabled` is true on a map, the player build does three things:
+
+1. The map's image layers are rasterized through a feathered alpha mask
+   (`featherPx` wide, default 16). Fogged pixels are transparent; the
+   player viewer paints `map.oceanColor` behind them.
+2. The player `atlas.json` carries only `{ mapId, enabled: true }` for
+   that map — `reveals`, `conceals`, `featherPx`, and `color` are stripped.
+3. Pins, routes, and regions inside fog are removed from the player build.
+
+An independent `npm run atlas:check-fog` scan re-derives the boundary from
+the source `world.yaml` and fails the build if any layer image, geometry
+field, in-fog content, or alpha pixel leaked. It runs as part of
+`npm run atlas:publish`.
+
+Full spec: `docs/superpowers/specs/2026-05-19-fog-player-mechanic-design.md`.
 ---
 Calendar and timeline
 Define a calendar in `world.yaml`:
