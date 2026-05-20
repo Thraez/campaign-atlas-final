@@ -3,6 +3,7 @@ import type { ToolbarActionId } from "./toolbarActions";
 
 interface FormatToolbarProps {
   onAction: (id: ToolbarActionId, calloutType?: string) => void;
+  onInsertImage?: () => void;
 }
 
 /**
@@ -40,7 +41,7 @@ const CALLOUT_TYPES = [
 const BTN =
   "h-7 px-2 rounded border bg-background hover:bg-muted text-xs whitespace-nowrap";
 
-export function FormatToolbar({ onAction }: FormatToolbarProps) {
+export function FormatToolbar({ onAction, onInsertImage }: FormatToolbarProps) {
   const [moreOpen, setMoreOpen] = useState(false);
 
   const fire = (id: ToolbarActionId, calloutType?: string) => {
@@ -62,6 +63,15 @@ export function FormatToolbar({ onAction }: FormatToolbarProps) {
             {a.label}
           </button>
         ))}
+        {onInsertImage && (
+          <button
+            type="button"
+            className={BTN}
+            onClick={onInsertImage}
+          >
+            Image
+          </button>
+        )}
         <button
           type="button"
           className={BTN}

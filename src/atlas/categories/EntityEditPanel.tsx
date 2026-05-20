@@ -14,6 +14,7 @@ import {
 } from "@/atlas/editor/wikilinkAutocomplete";
 import { WikilinkPopover } from "@/atlas/editor/WikilinkPopover";
 import { FormatToolbar } from "@/atlas/editor/FormatToolbar";
+import { ImagePickerPanel } from "@/atlas/editor/ImagePickerPanel";
 import { applyToolbarAction, type ToolbarActionId } from "@/atlas/editor/toolbarActions";
 
 export function EntityEditPanel({
@@ -42,6 +43,7 @@ export function EntityEditPanel({
     Array<{ id: string; title: string; type: string; aliases: string[] }>
   >([]);
   const [images, setImages] = useState<string[]>([]);
+  const [showImagePicker, setShowImagePicker] = useState(false);
 
   // Load entity list once (cached by loadAtlasContent)
   useEffect(() => {
@@ -192,6 +194,22 @@ export function EntityEditPanel({
     reader.readAsDataURL(file);
   };
 
+  const handlePickerSelect = (name: string) => {
+    const ta = textareaRef.current;
+    const pos = ta ? ta.selectionStart : (api.draft?.body.length ?? 0);
+    const insert = `![[${name}]]`;
+    const body = api.draft?.body ?? "";
+    api.setBody(body.slice(0, pos) + insert + body.slice(pos));
+    setShowImagePicker(false);
+    requestAnimationFrame(() => {
+      if (ta) {
+        const end = pos + insert.length;
+        ta.setSelectionRange(end, end);
+        ta.focus();
+      }
+    });
+  };
+
   const handleBodyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     api.setBody(e.target.value);
     const ctx = getAutocompleteContext(e.target.value, e.target.selectionStart);
@@ -278,7 +296,18 @@ export function EntityEditPanel({
         </label>
         <div className="block">
           <span className="block mb-1 text-xs">Body (markdown)</span>
-          <FormatToolbar onAction={handleToolbarAction} />
+          <FormatToolbar
+            onAction={handleToolbarAction}
+            onInsertImage={() => setShowImagePicker((o) => !o)}
+          />
+          {showImagePicker && (
+            <ImagePickerPanel
+              images={images}
+              onSelect={handlePickerSelect}
+              onImport={handleImageImport}
+              onClose={() => setShowImagePicker(false)}
+            />
+          )}
           <div className="relative">
             <textarea
               ref={textareaRef}
