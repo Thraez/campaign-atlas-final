@@ -46,7 +46,7 @@ Seven tabs. Each is a focused tool.
 | **Maps** | Add image layers, set opacity/zindex, define scale, grid, ocean color. |
 | **Regions** | Draw polygon regions, color them, set per-region visibility. |
 | **Routes** | Draw waypoint-based routes (foot/horse/ship/fly), with travel-time speed. |
-| **Fog** | Paint fog-of-war reveals over a map. |
+| **Fog** | Paint reveals + draw fog (conceals) over a map; set a soft-edge width. When fog is enabled on a map, the player build redacts that map's image layers behind a feathered alpha mask, strips the fog geometry from the player atlas, and excludes any pins/routes/regions that fall in fog. The player viewer paints the map's ocean color behind the redacted image. |
 | **Entities** | Edit entity frontmatter, profile, relationships. One-click `:::dm` insert for field-level visibility. |
 | **Import** | Drop in a folder of markdown, classify into ignored/wiki-only/placeable/published, get patches. |
 | **Publish Check** | Pre-flight dashboard: counts, warnings, last-publish diff, strict-build summary. |

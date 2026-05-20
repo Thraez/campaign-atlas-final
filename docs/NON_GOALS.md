@@ -15,7 +15,7 @@ This document lists what we have decided **not** to build. If a feature request 
 | **Hosted DM editor with auth** | Defer until a real second user exists. The local + GitHub Pages model is solid. If we ever build it: GitHub fine-grained PAT in localStorage, save-as-PR-only, never direct-commit. |
 | **Server-backed player notes** | Player notes are deliberately local-only (browser storage, optional export). No accounts, no sync, no privacy surface. |
 | **AI-generated lore** | We are a tool, not a generator. The DM's voice is the product. |
-| **Per-party fog / multiple view profiles** | Useful in ~5% of campaigns; complexity tax on 100% of users. Use separate worlds if you need separate canon. |
+| **Per-party fog / multiple view profiles** _(deferred)_ | Base fog is a per-map enforced player secret. Per-party variants would multiply state across parties, sessions, and entities — useful in ~5% of campaigns; complexity tax on 100% of users. Revisit once the base mechanic has lived through a campaign. See `docs/superpowers/specs/2026-05-19-fog-player-mechanic-design.md`. |
 | **Full GIS-style multi-map alignment** | Maps link hierarchically (overview → city → dungeon), not by world coordinates. A unified spatial canvas is a bigger commitment than the world content needs. |
 | **Combat-tracker-shaped player suggestion approval workflow** | Player-submitted suggestions are a separate product. Don't bolt one on. |
 | **Travel-time crunch beyond route speed** | We render `MapScale` and route speed. Dragon-vs-horse-vs-weather calculators belong elsewhere. |
