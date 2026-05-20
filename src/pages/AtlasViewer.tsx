@@ -3,12 +3,12 @@ import { MapContainer, Marker, Popup, Polygon, Polyline, ImageOverlay, Tooltip, 
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { loadAtlasContent, loadSearchIndex, type SearchIndexEntry } from "@/atlas/content/loader";
-import type { AtlasProject, Entity, MapDocument, MapPlacement, Point, Route, GridOverlay, MapScale } from "@/atlas/content/schema";
+import type { AtlasProject, Entity, MapDocument, MapPlacement, Point, GridOverlay, MapScale } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
-  Search, X, MapPin, ArrowLeft, Compass, Eye, EyeOff, Grid3x3, CalendarClock,
+  Search, X, MapPin, ArrowLeft, Compass, Grid3x3, CalendarClock,
   LayoutGrid,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -49,18 +49,6 @@ function MapController({ flyTo }: { flyTo: { x: number; y: number; height: numbe
     map.flyTo([flyTo.height - flyTo.y, flyTo.x], Math.max(map.getZoom(), -1), { duration: 0.6 });
   }, [flyTo, map]);
   return null;
-}
-
-// Build a multi-polygon for fog: outer ring covers the whole map, each
-// reveal becomes an inner ring (hole) using Leaflet's array-of-rings format.
-function fogPositions(map: MapDocument, reveals: Point[][]): L.LatLngExpression[][] {
-  const outer: L.LatLngExpression[] = [
-    [0, 0], [0, map.width], [map.height, map.width], [map.height, 0],
-  ];
-  const holes: L.LatLngExpression[][] = reveals.map((poly) =>
-    poly.map(([x, y]) => [map.height - y, x] as [number, number])
-  );
-  return [outer, ...holes];
 }
 
 const ROUTE_MODE_LABEL: Record<string, string> = {
@@ -137,7 +125,6 @@ export default function AtlasViewer() {
   // sit in a dead zone where neither the aside nor the sheet is mounted.
   const hasDesktopAside = useHasDesktopAside();
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
-  const [showFog, setShowFog] = useState(true);
   const [showGrid, setShowGrid] = useState<boolean | null>(null); // null = use map default
   // Aside expanded/collapsed state, persisted across reloads so a DM who
   // prefers the full-width map keeps it that way.
@@ -322,18 +309,6 @@ export default function AtlasViewer() {
             </SelectContent>
           </Select>
         )}
-        {activeMap.fog?.enabled && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowFog((v) => !v)}
-            title={showFog ? "Hide fog" : "Show fog"}
-            aria-label={showFog ? "Hide fog of war" : "Show fog of war"}
-            aria-pressed={showFog}
-          >
-            {showFog ? <Eye className="h-4 w-4" aria-hidden="true" /> : <EyeOff className="h-4 w-4" aria-hidden="true" />}
-          </Button>
-        )}
         {activeMap.grid && (
           <Button
             variant={(showGrid ?? activeMap.grid.enabled !== false) ? "secondary" : "ghost"}
@@ -397,7 +372,6 @@ export default function AtlasViewer() {
                 map={activeMap}
                 placements={placementsOnMap}
                 entityById={entityById}
-                showFog={showFog}
                 showGrid={showGrid}
                 onOpenEntity={openEntity}
               />
@@ -502,12 +476,11 @@ interface WrappedWorldProps {
   map: MapDocument;
   placements: MapPlacement[];
   entityById: Map<string, Entity>;
-  showFog: boolean;
   showGrid: boolean | null;
   onOpenEntity: (id: string, fly?: boolean) => void;
 }
 
-function WrappedWorld({ dx, map, placements, entityById, showFog, showGrid, onOpenEntity }: WrappedWorldProps) {
+function WrappedWorld({ dx, map, placements, entityById, showGrid, onOpenEntity }: WrappedWorldProps) {
   const H = map.height;
   return (
     <>
@@ -579,25 +552,6 @@ function WrappedWorld({ dx, map, placements, entityById, showFog, showGrid, onOp
           </Polyline>
         );
       })}
-
-      {showFog && map.fog?.enabled && (
-        <Polygon
-          positions={(() => {
-            const outer: L.LatLngExpression[] = [
-              [0, dx], [0, map.width + dx], [H, map.width + dx], [H, dx],
-            ];
-            const holes: L.LatLngExpression[][] = map.fog!.reveals.map((poly) =>
-              poly.map(([x, y]) => [H - y, x + dx] as [number, number])
-            );
-            return [outer, ...holes];
-          })()}
-          pathOptions={{
-            color: "transparent",
-            fillColor: map.fog.color ?? "rgba(8,12,20,0.55)",
-            fillOpacity: 1, weight: 0, interactive: false, fillRule: "evenodd",
-          } as L.PathOptions}
-        />
-      )}
 
       {map.grid && (showGrid ?? map.grid.enabled !== false) && gridLines(map, map.grid).map((line, i) => (
         <Polyline
