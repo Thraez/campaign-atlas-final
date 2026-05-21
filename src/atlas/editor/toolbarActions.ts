@@ -18,9 +18,66 @@ export type ToolbarActionId =
   | "quote"
   | "task"
   | "callout"
-  | "table";
+  | "table"
+  | "template:npc"
+  | "template:location"
+  | "template:secrets"
+  | "template:readaloud";
 
 const TABLE_SKELETON = "| Column | Column |\n| --- | --- |\n| Cell | Cell |";
+
+// Entry templates — plain Obsidian markdown so they round-trip to a vault.
+// Shapes follow Lazy Dungeon Master / WotC published-adventure structure.
+const TEMPLATE_NPC = [
+  "## NPC Name",
+  "",
+  "**Appearance:** ",
+  "",
+  "**Trait / Mannerism:** ",
+  "",
+  "**Goal:** ",
+  "",
+  "**Secret:** ",
+  "",
+  "### Notes",
+  "",
+].join("\n");
+
+const TEMPLATE_LOCATION = [
+  "## Location Name",
+  "",
+  "**Description:** ",
+  "",
+  "**Atmosphere:** ",
+  "",
+  "**Key features:**",
+  "- ",
+  "",
+  "### Secrets & discoveries",
+  "",
+  "- ",
+  "",
+  "### NPCs present",
+  "",
+].join("\n");
+
+const TEMPLATE_SECRETS = [
+  "## Secrets & Clues",
+  "",
+  "- ",
+  "- ",
+  "- ",
+  "- ",
+  "- ",
+  "- ",
+  "- ",
+  "- ",
+  "- ",
+  "- ",
+].join("\n");
+
+// Renders as a visually distinct callout block — matches how WotC marks read-aloud text.
+const TEMPLATE_READALOUD = "> [!quote] Read aloud\n> ";
 
 export function applyToolbarAction(
   id: ToolbarActionId,
@@ -54,5 +111,13 @@ export function applyToolbarAction(
       return insertBlock(value, selStart, `> [!${calloutType}] Title\n> text`);
     case "table":
       return insertBlock(value, selStart, TABLE_SKELETON);
+    case "template:npc":
+      return insertBlock(value, selStart, TEMPLATE_NPC);
+    case "template:location":
+      return insertBlock(value, selStart, TEMPLATE_LOCATION);
+    case "template:secrets":
+      return insertBlock(value, selStart, TEMPLATE_SECRETS);
+    case "template:readaloud":
+      return insertBlock(value, selStart, TEMPLATE_READALOUD);
   }
 }

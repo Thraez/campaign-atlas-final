@@ -90,3 +90,47 @@ describe("block insert actions", () => {
     expect(original).toBe("abc");
   });
 });
+
+describe("entry template inserts", () => {
+  it("template:npc inserts an NPC skeleton with required headings", () => {
+    const r = applyToolbarAction("template:npc", "", 0, 0);
+    expect(r.value).toContain("## NPC Name");
+    expect(r.value).toContain("**Appearance:**");
+    expect(r.value).toContain("**Goal:**");
+    expect(r.value).toContain("**Secret:**");
+    expect(r.value).toContain("### Notes");
+  });
+
+  it("template:location inserts a location skeleton with required sections", () => {
+    const r = applyToolbarAction("template:location", "", 0, 0);
+    expect(r.value).toContain("## Location Name");
+    expect(r.value).toContain("**Description:**");
+    expect(r.value).toContain("**Key features:**");
+    expect(r.value).toContain("### Secrets & discoveries");
+    expect(r.value).toContain("### NPCs present");
+  });
+
+  it("template:secrets inserts a flat bullet list under a Secrets & Clues heading", () => {
+    const r = applyToolbarAction("template:secrets", "", 0, 0);
+    expect(r.value).toContain("## Secrets & Clues");
+    const bullets = (r.value.match(/^- /gm) ?? []).length;
+    expect(bullets).toBeGreaterThanOrEqual(10);
+  });
+
+  it("template:readaloud inserts a quote callout", () => {
+    const r = applyToolbarAction("template:readaloud", "", 0, 0);
+    expect(r.value).toContain("> [!quote] Read aloud");
+  });
+
+  it("templates insert after existing content, not at the top", () => {
+    const r = applyToolbarAction("template:npc", "intro text", 10, 10);
+    expect(r.value.startsWith("intro text")).toBe(true);
+    expect(r.value).toContain("## NPC Name");
+  });
+
+  it("all four template actions produce valid output (no throw)", () => {
+    for (const id of ["template:npc", "template:location", "template:secrets", "template:readaloud"] as const) {
+      expect(() => applyToolbarAction(id, "body", 4, 4)).not.toThrow();
+    }
+  });
+});

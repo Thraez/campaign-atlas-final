@@ -10,8 +10,7 @@ interface FormatToolbarProps {
  * Progressive-disclosure formatting toolbar above the body textarea.
  * Purely presentational: every click delegates to `onAction`, which the
  * parent (EntityEditPanel) maps through `applyToolbarAction` against the
- * live textarea selection. No WYSIWYG, no entry templates (skipped by
- * product decision — markdown text stays the single source of truth).
+ * live textarea selection.
  */
 
 const ALWAYS: Array<{ id: ToolbarActionId; label: string }> = [
@@ -32,6 +31,13 @@ const MORE: Array<{ id: ToolbarActionId; label: string }> = [
   { id: "codeblock", label: "Code block" },
 ];
 
+const TEMPLATES: Array<{ id: ToolbarActionId; label: string }> = [
+  { id: "template:npc", label: "NPC entry" },
+  { id: "template:location", label: "Location entry" },
+  { id: "template:secrets", label: "Secrets & Clues" },
+  { id: "template:readaloud", label: "Read-aloud box" },
+];
+
 // Obsidian-core callout types the DM reaches for most.
 const CALLOUT_TYPES = [
   "note", "info", "tip", "success", "question",
@@ -43,10 +49,22 @@ const BTN =
 
 export function FormatToolbar({ onAction, onInsertImage }: FormatToolbarProps) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   const fire = (id: ToolbarActionId, calloutType?: string) => {
     if (calloutType === undefined) onAction(id);
     else onAction(id, calloutType);
+    setMoreOpen(false);
+    setTemplatesOpen(false);
+  };
+
+  const toggleMore = () => {
+    setMoreOpen((o) => !o);
+    setTemplatesOpen(false);
+  };
+
+  const toggleTemplates = () => {
+    setTemplatesOpen((o) => !o);
     setMoreOpen(false);
   };
 
@@ -75,12 +93,39 @@ export function FormatToolbar({ onAction, onInsertImage }: FormatToolbarProps) {
         <button
           type="button"
           className={BTN}
+          aria-expanded={templatesOpen}
+          onClick={toggleTemplates}
+        >
+          Templates ▾
+        </button>
+        <button
+          type="button"
+          className={BTN}
           aria-expanded={moreOpen}
-          onClick={() => setMoreOpen((o) => !o)}
+          onClick={toggleMore}
         >
           More ▾
         </button>
       </div>
+
+      {templatesOpen && (
+        <div
+          className="absolute z-50 left-0 mt-1 rounded border bg-background shadow-lg text-xs p-1 flex flex-col gap-0.5 min-w-44"
+          role="menu"
+          aria-label="Entry templates"
+        >
+          {TEMPLATES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className="text-left px-2 py-1 rounded hover:bg-muted"
+              onClick={() => fire(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {moreOpen && (
         <div
