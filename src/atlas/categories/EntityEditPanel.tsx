@@ -194,6 +194,12 @@ export function EntityEditPanel({
     reader.readAsDataURL(file);
   };
 
+  const handleImageDelete = (name: string) => {
+    fetch(`/__atlas/assets/images?name=${encodeURIComponent(name)}`, { method: "DELETE" })
+      .then((r) => { if (r.ok) setImages((prev) => prev.filter((n) => n !== name)); })
+      .catch(() => {/* silently ignore */});
+  };
+
   const handlePickerSelect = (name: string) => {
     const ta = textareaRef.current;
     const pos = ta ? ta.selectionStart : (api.draft?.body.length ?? 0);
@@ -305,6 +311,7 @@ export function EntityEditPanel({
               images={images}
               onSelect={handlePickerSelect}
               onImport={handleImageImport}
+              onDelete={handleImageDelete}
               onClose={() => setShowImagePicker(false)}
             />
           )}
