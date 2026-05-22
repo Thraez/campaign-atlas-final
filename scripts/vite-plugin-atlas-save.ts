@@ -702,6 +702,34 @@ export async function handleAssetsImagesRequest(repoRoot: string): Promise<
   }
 }
 
+/**
+ * Deletes a single image file from `public/atlas/assets/images/`.
+ * `name` must be a bare filename (no path separators). Validated against the
+ * existing asset allowlist before deletion.
+ * Dev-server only — never reaches the player build.
+ */
+export async function handleDeleteImageRequest(
+  repoRoot: string,
+  name: string,
+): Promise<{ status: 200; deleted: string } | { status: 400; error: string } | { status: 404; error: string } | { status: 500; error: string }> {
+  if (!name || name.includes("/") || name.includes("\\") || name.includes("..")) {
+    return { status: 400, error: "Invalid image name" };
+  }
+  const relPath = `public/atlas/assets/images/${name}`;
+  if (!isWritableAssetPath(relPath)) {
+    return { status: 400, error: "Path not allowed" };
+  }
+  const fullPath = path.resolve(repoRoot, relPath);
+  try {
+    await fs.unlink(fullPath);
+    return { status: 200, deleted: name };
+  } catch (e) {
+    const err = e as NodeJS.ErrnoException;
+    if (err.code === "ENOENT") return { status: 404, error: "Not found" };
+    return { status: 500, error: err.message };
+  }
+}
+
 /** Allowlist-guarded reader for GET /__atlas/read?path=... */
 async function readAllowlistedFile(repoRoot: string, relPath: string): Promise<
   | { ok: true; contents: string }
@@ -779,17 +807,31 @@ export function atlasSavePlugin(): Plugin {
       });
 
       // GET /__atlas/assets/images — list of image filenames in public/atlas/assets/images/
+      // DELETE /__atlas/assets/images?name=<filename> — remove an image from the library
       server.middlewares.use("/__atlas/assets/images", (req, res, next) => {
-        if (req.method !== "GET") return next();
-        handleAssetsImagesRequest(server.config.root).then((result) => {
-          res.statusCode = result.status;
-          res.setHeader("Content-Type", "application/json");
-          if (result.status === 200) {
-            res.end(JSON.stringify({ images: (result as { status: 200; images: string[] }).images }));
-          } else {
-            res.end(JSON.stringify({ error: (result as { status: 500; error: string }).error }));
-          }
-        });
+        if (req.method === "GET") {
+          handleAssetsImagesRequest(server.config.root).then((result) => {
+            res.statusCode = result.status;
+            res.setHeader("Content-Type", "application/json");
+            if (result.status === 200) {
+              res.end(JSON.stringify({ images: (result as { status: 200; images: string[] }).images }));
+            } else {
+              res.end(JSON.stringify({ error: (result as { status: 500; error: string }).error }));
+            }
+          });
+          return;
+        }
+        if (req.method === "DELETE") {
+          const url = new URL(req.url ?? "", "http://localhost");
+          const name = url.searchParams.get("name") ?? "";
+          handleDeleteImageRequest(server.config.root, name).then((result) => {
+            res.statusCode = result.status;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify(result));
+          });
+          return;
+        }
+        next();
       });
 
       // POST /__atlas/save  { files, rebuild?: boolean }
