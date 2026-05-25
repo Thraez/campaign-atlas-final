@@ -1,7 +1,7 @@
 {
-  "version": "2026-05-19T08-24-43-153Z",
+  "version": "2026-05-22T09-03-48-834Z",
   "schemaVersion": 1,
-  "publishedAt": "2026-05-19T08:24:43.153Z",
+  "publishedAt": "2026-05-22T09:03:48.834Z",
   "worlds": [
     {
       "id": "astrath-deeprealm",
@@ -110,7 +110,7 @@
       "summary": "The Old Keep falls in a single night to a shadow that came down from the high passes.",
       "images": [],
       "body": "\r\nOn the third night of Longnight, 612 AS, the watchfires of the [[The Old Keep|Old Keep]]\r\nwent dark. Riders from [[Raven's Vale]] found the gates open and the courtyards\r\nempty by morning. Whatever passed that night left no bodies, only frost.\r\n\r\nThe keep has stood abandoned ever since.\r\n",
-      "bodyHtml": "<p>On the third night of Longnight, 612 AS, the watchfires of the <span class=\"atlas-unresolved\">Old Keep</span>\nwent dark. Riders from <span class=\"atlas-unresolved\">Raven's Vale</span> found the gates open and the courtyards\nempty by morning. Whatever passed that night left no bodies, only frost.</p>\n<p>The keep has stood abandoned ever since.</p>\n",
+      "bodyHtml": "<p>On the third night of Longnight, 612 AS, the watchfires of the <span class=\"atlas-unresolved\">Old Keep</span><br>went dark. Riders from <span class=\"atlas-unresolved\">Raven's Vale</span> found the gates open and the courtyards<br>empty by morning. Whatever passed that night left no bodies, only frost.</p>\n<p>The keep has stood abandoned ever since.</p>\n",
       "frontmatter": {},
       "sourcePath": "",
       "links": [
@@ -145,7 +145,7 @@
       "summary": "Lord Garron raises the red walls of Thornhold above the iron veins of the Spinegrey range.",
       "images": [],
       "body": "\r\nForty-seven years after the [[The Sundering|Sundering]], settlers from the eastern\r\nports broke the first stones of [[Thornhold]] from the cliffside. The\r\nfoundation feast lasted nine days, ending with the lighting of the Forge of\r\nGarron — still tended today.\r\n",
-      "bodyHtml": "<p>Forty-seven years after the <a class=\"atlas-wikilink\" data-entity-id=\"the-sundering\" href=\"#/entity/the-sundering\">Sundering</a>, settlers from the eastern\nports broke the first stones of <span class=\"atlas-unresolved\">Thornhold</span> from the cliffside. The\nfoundation feast lasted nine days, ending with the lighting of the Forge of\nGarron — still tended today.</p>\n",
+      "bodyHtml": "<p>Forty-seven years after the <a class=\"atlas-wikilink\" data-entity-id=\"the-sundering\" href=\"#/entity/the-sundering\">Sundering</a>, settlers from the eastern<br>ports broke the first stones of <span class=\"atlas-unresolved\">Thornhold</span> from the cliffside. The<br>foundation feast lasted nine days, ending with the lighting of the Forge of<br>Garron — still tended today.</p>\n",
       "frontmatter": {},
       "sourcePath": "",
       "links": [
@@ -181,7 +181,7 @@
       "summary": "The cataclysm that split the old continent and ended the Third Age. The new calendar reckons years from the day the sky cracked.",
       "images": [],
       "body": "\r\nWhen the Twin Moons collided in the night sky, the firmament tore and the seas\r\nboiled. Half of the old continent slid beneath the waves; what remained\r\nbecame the Astrath Deeprealm. Survivors founded the great cities of\r\n[[Thornhold]] and [[Sunhaven]] in the years that followed.\r\n\r\nThis event marks year **0** of the *After Sundering* calendar.\r\n",
-      "bodyHtml": "<p>When the Twin Moons collided in the night sky, the firmament tore and the seas\nboiled. Half of the old continent slid beneath the waves; what remained\nbecame the Astrath Deeprealm. Survivors founded the great cities of\n<span class=\"atlas-unresolved\">Thornhold</span> and <span class=\"atlas-unresolved\">Sunhaven</span> in the years that followed.</p>\n<p>This event marks year <strong>0</strong> of the <em>After Sundering</em> calendar.</p>\n",
+      "bodyHtml": "<p>When the Twin Moons collided in the night sky, the firmament tore and the seas<br>boiled. Half of the old continent slid beneath the waves; what remained<br>became the Astrath Deeprealm. Survivors founded the great cities of<br><span class=\"atlas-unresolved\">Thornhold</span> and <span class=\"atlas-unresolved\">Sunhaven</span> in the years that followed.</p>\n<p>This event marks year <strong>0</strong> of the <em>After Sundering</em> calendar.</p>\n",
       "frontmatter": {},
       "sourcePath": "",
       "links": [
