@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import * as nodeCrypto from "node:crypto";
-import { handleSaveRequest, handleAssetsImagesRequest, type FilePayload } from "../../scripts/vite-plugin-atlas-save";
+import { handleSaveRequest, handleAssetsImagesRequest, handleDeleteImageRequest, type FilePayload } from "../../scripts/vite-plugin-atlas-save";
 
 let tmp: string;
 beforeEach(() => {
@@ -1044,6 +1044,55 @@ describe("handleAssetsImagesRequest", () => {
     const r = await handleAssetsImagesRequest(tmp);
     const { images } = r as { status: 200; images: string[] };
     expect(images).toEqual(["ok.png"]);
+  });
+
+  it("excludes files with uppercase extensions (case-sensitive match only)", async () => {
+    const dir = path.join(tmp, "public", "atlas", "assets", "images");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "portrait.PNG"), "fake");
+    fs.writeFileSync(path.join(dir, "scene.webp"), "fake");
+    const r = await handleAssetsImagesRequest(tmp);
+    const { images } = r as { status: 200; images: string[] };
+    expect(images).not.toContain("portrait.PNG");
+    expect(images).toContain("scene.webp");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleDeleteImageRequest
+// ---------------------------------------------------------------------------
+
+describe("handleDeleteImageRequest", () => {
+  const imageDir = () => path.join(tmp, "public", "atlas", "assets", "images");
+
+  it("returns 400 for empty name", async () => {
+    const r = await handleDeleteImageRequest(tmp, "");
+    expect(r.status).toBe(400);
+  });
+
+  it("returns 400 for path traversal attempt (../)", async () => {
+    const r = await handleDeleteImageRequest(tmp, "../secret.png");
+    expect(r.status).toBe(400);
+  });
+
+  it("returns 400 for non-allowlisted extension", async () => {
+    const r = await handleDeleteImageRequest(tmp, "notes.txt");
+    expect(r.status).toBe(400);
+  });
+
+  it("returns 404 when the image file does not exist", async () => {
+    const r = await handleDeleteImageRequest(tmp, "missing.png");
+    expect(r.status).toBe(404);
+  });
+
+  it("deletes the file and returns 200 on happy path", async () => {
+    const dir = imageDir();
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "to-delete.png"), "fake-image");
+    const r = await handleDeleteImageRequest(tmp, "to-delete.png");
+    expect(r.status).toBe(200);
+    expect((r as { status: 200; deleted: string }).deleted).toBe("to-delete.png");
+    expect(fs.existsSync(path.join(dir, "to-delete.png"))).toBe(false);
   });
 });
 

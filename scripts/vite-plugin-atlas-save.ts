@@ -788,7 +788,7 @@ export async function handleAssetsImagesRequest(repoRoot: string): Promise<
   try {
     const entries = await fs.readdir(dir, { withFileTypes: true });
     const images = entries
-      .filter((e) => e.isFile() && /\.(png|jpg|jpeg|webp|gif)$/i.test(e.name))
+      .filter((e) => e.isFile() && /\.(png|jpg|jpeg|webp|gif)$/.test(e.name))
       .map((e) => e.name)
       .sort();
     return { status: 200, images };
@@ -853,6 +853,11 @@ export function atlasSavePlugin(): Plugin {
   // either waits or surfaces a clear "already saving" toast. Two builds
   // racing to write public/atlas/atlas.json was previously prevented by
   // the coalesce; we still need that guarantee here.
+  //
+  // Scope: this mutex covers POST /__atlas/save only. A DELETE /__atlas/assets/images
+  // racing a save of the same image is theoretically possible but benign in
+  // practice — both ops succeed or the later one wins. The mutex is not
+  // extended to DELETE to avoid blocking the image picker during long rebuilds.
   let saveInFlight = false;
   return {
     name: "atlas-save",

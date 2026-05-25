@@ -14,6 +14,10 @@
  *   public/atlas/assets/maps/<file>.<png|jpg|jpeg|webp|gif>
  *   public/atlas/assets/images/<file>.<png|jpg|jpeg|webp|gif>
  *
+ * Note: .gif is intentionally included — animated portraits and tokens are a
+ * valid DM use case. The list regex in vite-plugin-atlas-save.ts is kept
+ * case-sensitive (no /i flag) to match this allowlist exactly.
+ *
  * <segments> is one or more path segments. Traversal (".."), absolute paths,
  * leading "./", empty segments, and any other extension are rejected.
  */
