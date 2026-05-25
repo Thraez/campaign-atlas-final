@@ -5,8 +5,24 @@
  * merge frontmatter against the latest canon before writing back.
  *
  * apply: "serve" — physically excluded from production builds. No GitHub
- * API, no PAT, no auth. Vite's default localhost binding is the only access
- * control.
+ * API, no PAT, no auth.
+ *
+ * Access control: every `/__atlas/*` middleware (and the `.local-atlas`
+ * overlay that serves the DM build) is gated by `isAllowedDevRequest`,
+ * which requires:
+ *   - the `Host` header to resolve to a loopback name (localhost,
+ *     127.0.0.1, or [::1]), AND
+ *   - for write methods (POST/DELETE/PUT/PATCH), the `Origin` header to
+ *     also resolve to a loopback origin, AND
+ *   - for the same write methods, the `Origin` header to be present at
+ *     all (a missing Origin on a write = curl / non-browser context, and
+ *     the editor never sends one).
+ *
+ * This is defense-in-depth for the case where the dev server is bound to
+ * a non-loopback interface (`server.host` widened beyond default). It
+ * does NOT replace careful binding: if you can't reach the port from the
+ * network, an attacker on that network can't either, and that is the
+ * primary control. The Vite default for this project is loopback.
  *
  * Payload contract (Phase 1A unified Save):
  *   POST /__atlas/save  application/json
@@ -104,6 +120,87 @@ async function pruneBackups(repoRoot: string, relPath: string): Promise<void> {
       dir = path.dirname(dir);
     }
   }
+}
+
+/**
+ * Returns true if `host` (the value of an HTTP `Host` header) names a
+ * loopback address. Accepts an optional `:port` suffix and bracketed
+ * IPv6 forms. Case-insensitive on hostname.
+ *
+ *   isLoopbackHostHeader("localhost:8080") === true
+ *   isLoopbackHostHeader("127.0.0.1")      === true
+ *   isLoopbackHostHeader("[::1]:8080")     === true
+ *   isLoopbackHostHeader("192.168.1.1")    === false
+ */
+export function isLoopbackHostHeader(host: string | undefined): boolean {
+  if (!host) return false;
+  // Split off the port. IPv6 hosts are bracketed, so split on the LAST
+  // colon outside brackets.
+  const lower = host.toLowerCase();
+  let hostname: string;
+  if (lower.startsWith("[")) {
+    const close = lower.indexOf("]");
+    if (close < 0) return false;
+    hostname = lower.slice(0, close + 1);
+  } else {
+    const colon = lower.indexOf(":");
+    hostname = colon >= 0 ? lower.slice(0, colon) : lower;
+  }
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+}
+
+/**
+ * Returns true if `origin` (the value of an HTTP `Origin` header) is an
+ * http(s) URL whose hostname is loopback. Anything non-parseable, any
+ * non-http scheme, or any non-loopback host returns false.
+ */
+export function isLoopbackOrigin(origin: string | undefined): boolean {
+  if (!origin) return false;
+  let u: URL;
+  try {
+    u = new URL(origin);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+  // Node's URL keeps the brackets on IPv6 hostnames ("[::1]"); some
+  // implementations strip them ("::1"). Accept both forms.
+  const h = u.hostname.toLowerCase();
+  return h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]";
+}
+
+export interface DevRequestHeaders {
+  host?: string;
+  origin?: string;
+  method?: string;
+}
+
+const WRITE_METHODS = new Set(["POST", "PUT", "DELETE", "PATCH"]);
+
+/**
+ * Access policy for every `/__atlas/*` endpoint and the `.local-atlas`
+ * overlay. See the file-header comment for the full rationale.
+ *
+ *   - Host must always be loopback.
+ *   - For write methods, Origin must be present AND loopback.
+ *   - For GET/HEAD, missing Origin is acceptable (address-bar navigation,
+ *     same-origin <img>/<script>); if Origin is present it must be loopback.
+ */
+export function isAllowedDevRequest(headers: DevRequestHeaders): boolean {
+  if (!isLoopbackHostHeader(headers.host)) return false;
+  const method = (headers.method ?? "GET").toUpperCase();
+  if (WRITE_METHODS.has(method)) {
+    // Browser fetch/XHR always sends Origin on writes. Missing Origin =
+    // non-browser caller (curl, scripted request) = reject.
+    if (headers.origin === undefined || headers.origin === "") return false;
+    return isLoopbackOrigin(headers.origin);
+  }
+  // Safe methods: if Origin is supplied, it must still be loopback (defends
+  // against cross-origin fetch where the browser DOES send Origin).
+  if (headers.origin !== undefined && headers.origin !== "") {
+    return isLoopbackOrigin(headers.origin);
+  }
+  return true;
 }
 
 export type FileKind = "entity-md" | "world-yaml" | "asset-binary";
@@ -775,6 +872,15 @@ export function atlasSavePlugin(): Plugin {
           if (req.method !== "GET") return next();
           const url = new URL(req.url ?? "/", "http://localhost");
           if (url.pathname !== publicRelPath) return next();
+          // .local-atlas/atlas.json holds the DM build (hidden entities
+          // visible). Gate it the same way as /__atlas/* so a LAN attacker
+          // or cross-origin fetch can't pull DM canon by hitting this URL.
+          if (!isAllowedDevRequest({ host: req.headers.host, origin: req.headers.origin, method: req.method })) {
+            // Fall through to Vite's static serving (public/atlas/atlas.json,
+            // the *player* build) rather than 403 — preserves the player
+            // preview workflow over LAN without leaking DM canon.
+            return next();
+          }
           const localPath = path.resolve(repoRoot, ".local-atlas", path.posix.basename(publicRelPath));
           fs.readFile(localPath, "utf8").then(
             (body) => {
@@ -792,6 +898,12 @@ export function atlasSavePlugin(): Plugin {
       // GET /__atlas/read?path=content/...
       server.middlewares.use("/__atlas/read", (req, res, next) => {
         if (req.method !== "GET") return next();
+        if (!isAllowedDevRequest({ host: req.headers.host, origin: req.headers.origin, method: req.method })) {
+          res.statusCode = 403;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
+          return;
+        }
         const url = new URL(req.url ?? "/", "http://localhost");
         const relPath = url.searchParams.get("path") ?? "";
         readAllowlistedFile(server.config.root, relPath).then((result) => {
@@ -809,6 +921,13 @@ export function atlasSavePlugin(): Plugin {
       // GET /__atlas/assets/images — list of image filenames in public/atlas/assets/images/
       // DELETE /__atlas/assets/images?name=<filename> — remove an image from the library
       server.middlewares.use("/__atlas/assets/images", (req, res, next) => {
+        if (req.method !== "GET" && req.method !== "DELETE") return next();
+        if (!isAllowedDevRequest({ host: req.headers.host, origin: req.headers.origin, method: req.method })) {
+          res.statusCode = 403;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
+          return;
+        }
         if (req.method === "GET") {
           handleAssetsImagesRequest(server.config.root).then((result) => {
             res.statusCode = result.status;
@@ -837,6 +956,12 @@ export function atlasSavePlugin(): Plugin {
       // POST /__atlas/save  { files, rebuild?: boolean }
       server.middlewares.use("/__atlas/save", (req, res, next) => {
         if (req.method !== "POST") return next();
+        if (!isAllowedDevRequest({ host: req.headers.host, origin: req.headers.origin, method: req.method })) {
+          res.statusCode = 403;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
+          return;
+        }
         // A11: reject concurrent saves with 423 Locked.
         if (saveInFlight) {
           res.statusCode = 423;
