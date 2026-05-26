@@ -847,14 +847,31 @@ export async function handleDeleteImageRequest(
     return { status: 400, error: "Path not allowed" };
   }
   const fullPath = path.resolve(repoRoot, relPath);
+  let existing: Buffer;
   try {
-    await fs.unlink(fullPath);
-    return { status: 200, deleted: name };
+    existing = await fs.readFile(fullPath);
   } catch (e) {
     const err = e as NodeJS.ErrnoException;
     if (err.code === "ENOENT") return { status: 404, error: "Not found" };
     return { status: 500, error: err.message };
   }
+  const ts = backupTimestamp();
+  const backupAbs = path.resolve(repoRoot, BACKUP_DIR, ts, relPath);
+  try {
+    await fs.mkdir(path.dirname(backupAbs), { recursive: true });
+    await fs.writeFile(backupAbs, existing);
+  } catch (e) {
+    return { status: 500, error: (e as Error).message };
+  }
+  try {
+    await fs.unlink(fullPath);
+  } catch (e) {
+    const err = e as NodeJS.ErrnoException;
+    if (err.code === "ENOENT") return { status: 404, error: "Not found" };
+    return { status: 500, error: err.message };
+  }
+  try { await pruneBackups(repoRoot, relPath); } catch { /* non-fatal */ }
+  return { status: 200, deleted: name };
 }
 
 /** Allowlist-guarded reader for GET /__atlas/read?path=... */

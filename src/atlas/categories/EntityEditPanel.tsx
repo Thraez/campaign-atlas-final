@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { parseFrontmatter, stringifyFrontmatter } from "@/atlas/import/frontmatter";
 import { useEntityEditDraft, type EntityEditDraftAPI } from "./useEntityEditDraft";
 import { saveAtlasPatchToLocalFs, hashContent, type FileChange } from "@/atlas/save/localFsSave";
+import { slugify } from "@/atlas/save/newEntitySave";
 import { readSourceFile } from "@/atlas/save/canonicalPlacementSave";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import {
@@ -179,25 +180,37 @@ export function EntityEditPanel({
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
-      const imgPath = `public/atlas/assets/images/${file.name}`;
+      const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase() : "";
+      const stem = file.name.slice(0, file.name.length - ext.length);
+      const safeName = (slugify(stem) || "image") + ext;
+      const imgPath = `public/atlas/assets/images/${safeName}`;
       saveAtlasPatchToLocalFs(
         [{ path: imgPath, content: dataUrl, kind: "asset-binary", baseHash: null }],
       )
         .then(() => {
           setImages((prev) =>
-            prev.includes(file.name) ? prev : [...prev, file.name].sort(),
+            prev.includes(safeName) ? prev : [...prev, safeName].sort(),
           );
-          applySelection(file.name);
+          applySelection(safeName);
         })
-        .catch(() => {/* silently ignore upload errors */});
+        .catch((e: unknown) => alert("Image upload failed: " + (e instanceof Error ? e.message : String(e))));
     };
     reader.readAsDataURL(file);
   };
 
   const handleImageDelete = (name: string) => {
     fetch(`/__atlas/assets/images?name=${encodeURIComponent(name)}`, { method: "DELETE" })
-      .then((r) => { if (r.ok) setImages((prev) => prev.filter((n) => n !== name)); })
-      .catch(() => {/* silently ignore */});
+      .then((r) => {
+        if (r.ok) {
+          setImages((prev) => prev.filter((n) => n !== name));
+        } else {
+          r.json().then(
+            (body: unknown) => alert("Delete failed: " + ((body as { error?: string })?.error ?? r.status)),
+            () => alert(`Delete failed: ${r.status}`),
+          );
+        }
+      })
+      .catch((e: unknown) => alert("Delete failed: " + (e instanceof Error ? e.message : String(e))));
   };
 
   const handlePickerSelect = (name: string) => {
