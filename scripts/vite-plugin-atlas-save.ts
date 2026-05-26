@@ -48,6 +48,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import matter from "gray-matter";
 import yaml from "js-yaml";
+import sharp from "sharp";
 import { isWritableAssetPath, isWritableSourcePath } from "../src/atlas/save/sourcePathAllowlist";
 import { runBuild, type BuildResult as InProcessBuildResult } from "./build-atlas";
 
@@ -437,7 +438,36 @@ export async function handleSaveRequest(
           payload: { error: "OversizedContent", path: f.path, bytes: buf.length },
         };
       }
-      decoded.set(f.path, buf);
+      // Strip all EXIF/IPTC/XMP/ICC metadata via sharp re-encode.
+      // No withMetadata() call → sharp drops all metadata by default.
+      // { animated: true } preserves GIF/WebP animation frames.
+      let stripped: Buffer;
+      try {
+        const mime = f.content.slice(5, f.content.indexOf(";base64,"));
+        const s = sharp(buf, { animated: true });
+        if (mime === "image/png") stripped = await s.png().toBuffer();
+        else if (mime === "image/jpeg" || mime === "image/jpg") stripped = await s.jpeg({ quality: 85, mozjpeg: true }).toBuffer();
+        else if (mime === "image/webp") stripped = await s.webp({ quality: 85 }).toBuffer();
+        else if (mime === "image/gif") stripped = await s.gif().toBuffer();
+        else stripped = await s.toBuffer();
+      } catch (e) {
+        return {
+          status: 400,
+          payload: {
+            error: "InvalidContent",
+            reason: "image-decode-failed",
+            failedPath: f.path,
+            detail: (e as Error).message,
+          },
+        };
+      }
+      if (stripped.length > MAX_ASSET_BINARY_BYTES) {
+        return {
+          status: 400,
+          payload: { error: "OversizedContent", path: f.path, bytes: stripped.length },
+        };
+      }
+      decoded.set(f.path, stripped);
     }
   }
 
