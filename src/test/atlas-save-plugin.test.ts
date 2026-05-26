@@ -1099,7 +1099,7 @@ describe("handleDeleteImageRequest", () => {
     expect(r.status).toBe(404);
   });
 
-  it("deletes the file and returns 200 on happy path", async () => {
+  it("deletes the file and returns 200 on happy path, and creates a backup", async () => {
     const dir = imageDir();
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, "to-delete.png"), "fake-image");
@@ -1107,6 +1107,40 @@ describe("handleDeleteImageRequest", () => {
     expect(r.status).toBe(200);
     expect((r as { status: 200; deleted: string }).deleted).toBe("to-delete.png");
     expect(fs.existsSync(path.join(dir, "to-delete.png"))).toBe(false);
+    // Backup should exist under .atlas-backups/<ts>/public/atlas/assets/images/
+    const backupRoot = path.join(tmp, ".atlas-backups");
+    const timestamps = fs.readdirSync(backupRoot);
+    expect(timestamps).toHaveLength(1);
+    const backupFile = path.join(backupRoot, timestamps[0], "public", "atlas", "assets", "images", "to-delete.png");
+    expect(fs.existsSync(backupFile)).toBe(true);
+    expect(fs.readFileSync(backupFile, "utf8")).toBe("fake-image");
+  });
+
+  it("backup contains the original bytes", async () => {
+    const dir = imageDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const originalBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]); // PNG magic bytes
+    fs.writeFileSync(path.join(dir, "original.png"), originalBytes);
+    await handleDeleteImageRequest(tmp, "original.png");
+    const backupRoot = path.join(tmp, ".atlas-backups");
+    const ts = fs.readdirSync(backupRoot)[0];
+    const backupBytes = fs.readFileSync(
+      path.join(backupRoot, ts, "public", "atlas", "assets", "images", "original.png"),
+    );
+    expect(backupBytes).toEqual(originalBytes);
+  });
+
+  it("second delete of the same name returns 404 (backup from first delete is unaffected)", async () => {
+    const dir = imageDir();
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "once.png"), "data");
+    await handleDeleteImageRequest(tmp, "once.png");
+    const r2 = await handleDeleteImageRequest(tmp, "once.png");
+    expect(r2.status).toBe(404);
+    // First backup still intact
+    const backupRoot = path.join(tmp, ".atlas-backups");
+    const timestamps = fs.readdirSync(backupRoot);
+    expect(timestamps).toHaveLength(1);
   });
 });
 
