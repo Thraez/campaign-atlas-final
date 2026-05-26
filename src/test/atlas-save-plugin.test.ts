@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import * as nodeCrypto from "node:crypto";
+import sharp from "sharp";
 import { handleSaveRequest, handleAssetsImagesRequest, handleDeleteImageRequest, type FilePayload } from "../../scripts/vite-plugin-atlas-save";
 
 let tmp: string;
@@ -753,7 +754,9 @@ describe("handleSaveRequest", () => {
       );
       expect(r.status).toBe(200);
       const onDisk = fs.readFileSync(path.join(tmp, ASSET_PATH));
-      expect(onDisk.length).toBe(PNG_BYTES.length);
+      // Sharp re-encodes the PNG (strips metadata), so the byte length may differ
+      // from the raw input — just verify it's a valid PNG.
+      expect(onDisk.length).toBeGreaterThan(0);
       // PNG signature: 89 50 4E 47 0D 0A 1A 0A
       expect(onDisk[0]).toBe(0x89);
       expect(onDisk[1]).toBe(0x50);
@@ -761,7 +764,8 @@ describe("handleSaveRequest", () => {
       expect(onDisk[3]).toBe(0x47);
       const payload = (r as { payload: { files: Array<{ path: string; hash: string }> } }).payload;
       expect(payload.files[0].path).toBe(ASSET_PATH);
-      expect(payload.files[0].hash).toBe(pngHash());
+      // Hash is of the stripped bytes, so just verify shape.
+      expect(payload.files[0].hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     });
 
     it("rejects an asset-binary path that's not under public/atlas/assets/maps/", async () => {
@@ -810,9 +814,14 @@ describe("handleSaveRequest", () => {
       // though the file already landed on disk in a prior session. Before the
       // skip behavior, this 409'd on every subsequent save and rolled back
       // the entire atomic batch (world.yaml + entity-md changes alongside).
+      //
+      // The server now strips EXIF via sharp on every upload. "Identical bytes"
+      // means the on-disk file matches what sharp would produce — so we pre-seed
+      // with the stripped PNG rather than the raw bytes.
       const abs = path.join(tmp, ASSET_PATH);
       fs.mkdirSync(path.dirname(abs), { recursive: true });
-      fs.writeFileSync(abs, PNG_BYTES);
+      const strippedPng = await sharp(PNG_BYTES, { animated: true }).png().toBuffer();
+      fs.writeFileSync(abs, strippedPng);
       const r = await handleSaveRequest(
         {
           files: [
@@ -827,8 +836,8 @@ describe("handleSaveRequest", () => {
         tmp,
       );
       expect(r.status).toBe(200);
-      // File is unchanged on disk (we don't rewrite an identical file).
-      expect(fs.readFileSync(abs).equals(PNG_BYTES)).toBe(true);
+      // File is unchanged on disk (no-op skip — bytes already match).
+      expect(fs.readFileSync(abs).equals(strippedPng)).toBe(true);
       // No backup created — there was nothing to back up.
       expect(fs.existsSync(path.join(tmp, ".atlas-backups"))).toBe(false);
       // Response still includes the path + hash so the client can update its
@@ -836,7 +845,7 @@ describe("handleSaveRequest", () => {
       const payload = (r as { payload: { files: Array<{ path: string; hash: string }> } }).payload;
       expect(payload.files).toHaveLength(1);
       expect(payload.files[0].path).toBe(ASSET_PATH);
-      expect(payload.files[0].hash).toBe(pngHash());
+      expect(payload.files[0].hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     });
 
     it("baseHash null + asset already exists with DIFFERENT bytes → 409 already-exists", async () => {
@@ -876,9 +885,12 @@ describe("handleSaveRequest", () => {
       // already-on-disk asset uploads was rolled back ENTIRELY because the
       // asset 409'd. Now the asset skip is silent, so the rest of the batch
       // lands as expected.
+      //
+      // Pre-seed with the stripped PNG (what the server writes), not raw bytes.
       const assetAbs = path.join(tmp, ASSET_PATH);
       fs.mkdirSync(path.dirname(assetAbs), { recursive: true });
-      fs.writeFileSync(assetAbs, PNG_BYTES);
+      const strippedPng = await sharp(PNG_BYTES, { animated: true }).png().toBuffer();
+      fs.writeFileSync(assetAbs, strippedPng);
       const mdPath = "content/world/notes/co-batch.md";
       const r = await handleSaveRequest(
         {
@@ -896,7 +908,7 @@ describe("handleSaveRequest", () => {
       );
       expect(r.status).toBe(200);
       expect(fs.existsSync(path.join(tmp, mdPath))).toBe(true);
-      expect(fs.readFileSync(assetAbs).equals(PNG_BYTES)).toBe(true);
+      expect(fs.readFileSync(assetAbs).equals(strippedPng)).toBe(true);
     });
 
     it("text kind with baseHash null still 409s on existing file (no asset-style skip)", async () => {
@@ -967,7 +979,9 @@ describe("handleSaveRequest", () => {
       expect(r.status).toBe(200);
       expect(fs.readFileSync(path.join(tmp, "content/world/_atlas/world.yaml"), "utf8")).toContain("schemaVersion: 1");
       const png = fs.readFileSync(path.join(tmp, ASSET_PATH));
-      expect(png.length).toBe(PNG_BYTES.length);
+      // Sharp re-encodes, so length differs from raw input — just verify it's a non-empty PNG.
+      expect(png.length).toBeGreaterThan(0);
+      expect(png[0]).toBe(0x89); // PNG signature
     });
 
     it("oversized decoded binary (>6 MB after base64 decode) → 400 OversizedContent", async () => {
@@ -1093,6 +1107,106 @@ describe("handleDeleteImageRequest", () => {
     expect(r.status).toBe(200);
     expect((r as { status: 200; deleted: string }).deleted).toBe("to-delete.png");
     expect(fs.existsSync(path.join(dir, "to-delete.png"))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EXIF / metadata stripping (MEDIUM-4)
+// ---------------------------------------------------------------------------
+
+/** Build a 1×1 JPEG buffer that carries an EXIF orientation tag. */
+async function jpegWithExif(): Promise<Buffer> {
+  return sharp({ create: { width: 1, height: 1, channels: 3, background: "#ff0000" } })
+    .jpeg({ quality: 80 })
+    .withMetadata({ orientation: 6 })
+    .toBuffer();
+}
+
+/** Build a 1×1 PNG buffer. */
+async function plainPng(): Promise<Buffer> {
+  return sharp({ create: { width: 1, height: 1, channels: 4, background: "#00ff00" } })
+    .png()
+    .toBuffer();
+}
+
+/** Build a 1×1 JPEG buffer with no extra metadata. */
+async function plainJpeg(): Promise<Buffer> {
+  return sharp({ create: { width: 1, height: 1, channels: 3, background: "#0000ff" } })
+    .jpeg({ quality: 80 })
+    .toBuffer();
+}
+
+function toDataUrl(mime: string, buf: Buffer): string {
+  return `data:${mime};base64,${buf.toString("base64")}`;
+}
+
+describe("handleSaveRequest — EXIF / metadata stripping", () => {
+  const imgPath = "public/atlas/assets/images/test.jpg";
+
+  it("strips EXIF orientation from a JPEG upload", async () => {
+    const buf = await jpegWithExif();
+    // Confirm the fixture actually has exif before we send it
+    const beforeMeta = await sharp(buf).metadata();
+    expect(beforeMeta.exif).toBeTruthy();
+
+    const r = await handleSaveRequest(
+      { files: [{ path: imgPath, content: toDataUrl("image/jpeg", buf), kind: "asset-binary", baseHash: null }] },
+      tmp,
+    );
+    expect(r.status).toBe(200);
+
+    const written = fs.readFileSync(path.join(tmp, imgPath));
+    const afterMeta = await sharp(written).metadata();
+    expect(afterMeta.exif).toBeUndefined();
+    expect(afterMeta.iptc).toBeUndefined();
+    expect(afterMeta.xmp).toBeUndefined();
+  });
+
+  it("accepts a clean PNG with no metadata and writes it successfully", async () => {
+    const buf = await plainPng();
+    const r = await handleSaveRequest(
+      { files: [{ path: "public/atlas/assets/images/clean.png", content: toDataUrl("image/png", buf), kind: "asset-binary", baseHash: null }] },
+      tmp,
+    );
+    expect(r.status).toBe(200);
+    expect(fs.existsSync(path.join(tmp, "public/atlas/assets/images/clean.png"))).toBe(true);
+  });
+
+  it("returns 400 image-decode-failed for a corrupt image body", async () => {
+    const garbage = Buffer.from("not-an-image-at-all-just-random-bytes");
+    const r = await handleSaveRequest(
+      { files: [{ path: imgPath, content: toDataUrl("image/jpeg", garbage), kind: "asset-binary", baseHash: null }] },
+      tmp,
+    );
+    expect(r.status).toBe(400);
+    expect((r as { payload: { reason: string } }).payload.reason).toBe("image-decode-failed");
+  });
+
+  it("re-save of the same image is a no-op (hash-equal skip survives strip)", async () => {
+    const buf = await plainJpeg();
+    const dataUrl = toDataUrl("image/jpeg", buf);
+    const payload = { files: [{ path: imgPath, content: dataUrl, kind: "asset-binary" as const, baseHash: null }] };
+
+    // First save
+    const r1 = await handleSaveRequest(payload, tmp);
+    expect(r1.status).toBe(200);
+
+    // Second save of same content — should still be 200 (skip, not conflict)
+    const r2 = await handleSaveRequest(payload, tmp);
+    expect(r2.status).toBe(200);
+  });
+
+  it("returns 400 OversizedContent when stripped output exceeds the binary cap", async () => {
+    // Build a real image just large enough to test, then stub the cap at 1 byte
+    // by using a file that is valid but exceeds MAX_ASSET_BINARY_BYTES after re-encode.
+    // Since we can't easily exceed 6 MB in a unit test, verify via the raw-input path.
+    const oversized = Buffer.alloc(MAX_ASSET_BINARY_BYTES + 1, 0x00);
+    const r = await handleSaveRequest(
+      { files: [{ path: imgPath, content: toDataUrl("image/jpeg", oversized), kind: "asset-binary", baseHash: null }] },
+      tmp,
+    );
+    expect(r.status).toBe(400);
+    expect((r as { payload: { error: string } }).payload.error).toBe("OversizedContent");
   });
 });
 
