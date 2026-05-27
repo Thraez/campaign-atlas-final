@@ -38,6 +38,7 @@ function useHarness(activeMapId: string, holder: ReturnType<typeof makeHolder>) 
       route: { snapshot: () => ({ edits: {}, added: [], deleted: [] }), applySnapshot: () => {} },
       fog: { snapshot: () => null, applySnapshot: () => {} },
       layer: { snapshot: () => [], applySnapshot: () => {} },
+      editorEntity: { get: () => null, set: () => {} },
     },
     perMapDirtyCount: () => holder.value.n,
   });
@@ -71,7 +72,7 @@ describe("useEditorSession", () => {
     const first = renderHook(() => useHarness("A", h));
     await vi.waitFor(() => expect(first.result.current.hydrated).toBe(true));
     act(() => { h.bump(); first.rerender(); });
-    await act(async () => { vi.advanceTimersByTime(500); await Promise.resolve(); });
+    await act(async () => { await vi.runAllTimersAsync(); });
     vi.useRealTimers();
 
     const stored = await idbGet<unknown>(SESSION_IDB_KEY);
