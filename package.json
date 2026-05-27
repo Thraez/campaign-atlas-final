@@ -23,7 +23,11 @@
     "atlas:check-fog": "tsx scripts/check-fog-safety.ts",
     "atlas:check-shape": "tsx scripts/check-artifact-shape.ts",
     "atlas:audit-assets": "tsx scripts/atlas/audit-assets.ts",
-    "atlas:backup": "tsx scripts/atlas/backup.ts"
+    "atlas:backup": "tsx scripts/atlas/backup.ts",
+    "prepare": "simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npx tsc --noEmit && npx eslint . && npx vitest run --changed"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.14",
@@ -80,6 +84,7 @@
     "marked": "^18.0.3",
     "postcss": "^8.5.6",
     "sharp": "^0.34.5",
+    "simple-git-hooks": "^2.13.1",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.21.0",
     "typescript": "^5.8.3",
