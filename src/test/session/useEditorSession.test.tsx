@@ -38,6 +38,7 @@ function useHarness(activeMapId: string, holder: ReturnType<typeof makeHolder>) 
       route: { snapshot: () => ({ edits: {}, added: [], deleted: [] }), applySnapshot: () => {} },
       fog: { snapshot: () => null, applySnapshot: () => {} },
       layer: { snapshot: () => [], applySnapshot: () => {} },
+      editorEntity: { get: () => null, set: () => {} },
     },
     perMapDirtyCount: () => holder.value.n,
   });
