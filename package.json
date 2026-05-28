@@ -1,5 +1,5 @@
 {
-  "name": "vite_react_shadcn_ts",
+  "name": "campaign-atlas-final",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -27,7 +27,7 @@
     "prepare": "simple-git-hooks"
   },
   "simple-git-hooks": {
-    "pre-commit": "npx tsc --noEmit && npx eslint . && npx vitest run --changed"
+    "pre-commit": "sh scripts/pre-commit.sh"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.14",

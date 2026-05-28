@@ -16,6 +16,7 @@ export default defineConfig({
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
     testTimeout: 60_000,
     hookTimeout: 60_000,
+    teardownTimeout: 30_000,
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },
