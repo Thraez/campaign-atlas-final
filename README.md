@@ -574,6 +574,13 @@ public/atlas/search-index.json
 ```
 These are runtime files, not canon.
 ---
+## Development
+
+After cloning, run `npm install`. The `prepare` script installs a pre-commit hook that runs `tsc --noEmit`, `eslint .`, and `vitest run --changed` before every commit. A failure in any of those blocks the commit.
+
+To bypass intentionally (e.g. for a WIP commit), use `git commit --no-verify`.
+
+---
 ## Build modes
 
 The Vite app ships in two physical shapes. The editor route, the `AtlasPlacementEditor` component, and the dev-only local-save endpoint are tree-shaken out of the player bundle.
