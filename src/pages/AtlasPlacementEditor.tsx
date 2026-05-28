@@ -983,6 +983,7 @@ function AtlasPlacementEditorInner() {
   const regionIssues = issuesByScope((i) => i.code.includes("region") || i.code === "spoiler-leak-region");
   const routeIssues = issuesByScope((i) => i.code.includes("route"));
 
+  // eslint-disable-next-line react-hooks/refs
   const paletteIndex = useMemo(() => buildPaletteIndex({
     entities: project?.entities ?? [],
     maps: (project?.maps ?? []).map((m) => ({ id: m.id, name: m.name ?? m.id })),

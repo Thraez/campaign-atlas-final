@@ -585,6 +585,7 @@ The Vite app ships in two physical shapes. The editor route, the `AtlasPlacement
 - `npm run atlas:check-secrets <dir>` — sentinel scan over any directory. Catches DM-content sentinels and editor-code fingerprints (e.g. `/__atlas/save`, `saveAtlasPatchToLocalFs`, `AtlasPlacementEditor`, `/atlas/edit`).
 - `npm run atlas:check-shape <atlas.json>` — structural assertions over the player atlas.json.
 - `npm run atlas:publish` — full publish chain: build player atlas → vite build → both sentinel scans → shape scan.
+- **Dev plugin note:** `lovable-tagger` (`componentTagger`) is a Lovable visual-editor plugin; it loads only in `mode === "development"` and is absent from all builds.
 
 ---
 ## Verifying the player build is clean
