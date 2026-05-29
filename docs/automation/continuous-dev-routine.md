@@ -28,7 +28,8 @@ stay busy.
 
 ### 0. Read state
 - Read `memory/handovers/ACTIVE.md` (the handover + lock).
-- Read `docs/automation/continuous-dev-roadmap.md` (what to build).
+- Read `docs/automation/continuous-dev-queue.md` (the sequenced backlog — what's next).
+- Read `docs/automation/continuous-dev-roadmap.md` (the policy — design-check + HAND-BACK / NEVER lists).
 
 ### 1. Claim the lock — or stop
 At the top of `ACTIVE.md` is a **Run status** line:
@@ -44,9 +45,11 @@ Before doing any work, set `Run status: IN_PROGRESS since <now> (run <id>)` and 
 This is the conflict guard the human asked for.
 
 ### 2. Pick the work
-From the roadmap, in strict order:
-1. The first **WANT** not yet done → take it.
-2. If no WANT remains → the first **NICE-TO-HAVE** that **clearly passes the design check** (step 2a).
+Work from the **queue** (`docs/automation/continuous-dev-queue.md`). The roadmap remains the policy layer:
+its HAND-BACK / NEVER lists and the design-check still bind. In strict order:
+1. The **top WANT unit not marked `✅ DONE`** in the queue → take it. Read its cited spec/plan in full first.
+2. If every WANT unit is done (the queue's **REFUEL POINT**) → the first **NICE-TO-HAVE** that **clearly
+   passes the design check** (step 2a). Do not invent new wants.
 3. If a candidate is on the **HAND-BACK** or **NEVER** list → do **not** build it. Go to step 7
    (stop-and-report).
 4. If nothing is safe to build → go to step 7 (stop-and-report with candidate suggestions).
@@ -83,6 +86,8 @@ the player's browse experience, without adding permanent surface-area the docs w
 
 ### 6. Merge into the integration branch
 - Merge the run's worktree branch into `auto/continuous-dev` (preserve the small commits).
+- **Mark the completed unit `✅ DONE`** in `docs/automation/continuous-dev-queue.md` (append date + commit
+  hash) and include that edit in the merge, so the next run sees accurate progress.
 - **Never merge to `main`.** That is the human's gate.
 - Remove the run's worktree to keep things tidy.
 

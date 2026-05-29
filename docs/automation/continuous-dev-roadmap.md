@@ -21,6 +21,10 @@ TypeScript clean · ESLint clean · all tests green · atlas safety scans green.
 
 Build these first, in order. Each is inside the app's deliberate scope and already blessed.
 
+> The sequenced, bite-sized breakdown of these (A1/A2, B1/B2, C1–C3) lives in
+> `continuous-dev-queue.md` — that's what the routine actually pops from. This section is the priority
+> *policy*; the queue is the operational backlog.
+
 ### A. Speed up publishing
 - **What:** collapse the ten separate build-time scans into one parallel pass (~18s → ~13s).
 - **Why certain:** already specced; guarded by the integrity-smoke harness already on `main`.
