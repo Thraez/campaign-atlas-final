@@ -26,6 +26,58 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
+> **Refueled 2026-05-30** — section **D** below (4 units) was blessed by the human from a live dogfooding
+> pass. It is the current priority; build **D first** (D1 is a user-facing crash), then the older A–C.
+> A1–C3 are already ✅ DONE.
+
+### D — Daily-driver fixes from the 2026-05-30 dogfooding pass
+
+All four are **no-gate**: clear correctness/polish, bounded, revertible. Build top to bottom — **D1 first**
+(it stops a whole-app crash). Full ranking/context graduated from the Inbox in `docs/DEVELOPMENT_WANTS.md`.
+
+- [ ] **D1. Stop the whole app blank-screening; contain any future component crash.**
+  **Spec:** `docs/superpowers/specs/2026-05-30-crash-guard-error-boundary-design.md` — **read in full.**
+  Selecting an entry with no map location (e.g. an Event) white-screens the entire player viewer, with no
+  safety net. Two goals: (1) add an app-level React **error boundary** so no single component error can
+  ever blank the site again (graceful "something went wrong" + Reload instead); (2) drive out the actual
+  crash with a **headless regression test** that opens a location-less entity and asserts no throw. Also
+  add a finite-coordinate guard in `MapController`. The obvious `flyTo` path is already guarded — do not
+  assume it; reproduce via the test and fix what it surfaces.
+  - Files: new `src/components/ErrorBoundary.tsx`; `src/App.tsx`; `src/pages/AtlasViewer.tsx`; tests under `src/test/`.
+  - Done when: an error-boundary unit test shows the fallback (not a blank screen) when a child throws; a
+    regression test covers opening a location-less entity without crashing (or the documented
+    isolated-component equivalent if leaflet+jsdom blocks full-viewer render); no DM content in the
+    fallback copy; gate green. ~1 run.
+
+- [ ] **D2. Show proper-case names instead of lowercase file-slugs.**
+  **Spec:** `docs/superpowers/specs/2026-05-30-display-casing-design.md` — **Part 1.**
+  Notes without an explicit `title:` (e.g. imported NPCs) render as "corven"/"edric" because
+  `deriveTitle()` returns the raw filename slug uncapitalized. Title-case the derived fallback only
+  (explicit titles untouched) — fixes search results, the reading-panel title, and pin labels at once.
+  - Files: `scripts/build-atlas.ts` (export + fix `deriveTitle`); test under `src/test/`.
+  - Done when: a slug-derived title is title-cased ("corven" → "Corven", "great-hall" → "Great Hall");
+    explicit frontmatter titles unchanged; unit test covers it; gate green. ~1 run.
+
+- [ ] **D3. Show search snippets in original case.**
+  **Spec:** `docs/superpowers/specs/2026-05-30-display-casing-design.md` — **Part 2.**
+  Result snippets render all-lowercase because the search index `body` is lowercased for matching and the
+  viewer renders straight from it. Ship a parallel original-case `bodyText` for display; keep `body`
+  lowercased for matching; slice the display text using match offsets from the lowercased field.
+  - Files: `scripts/build-atlas.ts`, `src/atlas/content/loader.ts` (add `bodyText?`), `src/pages/AtlasViewer.tsx` (`snippet()` + call site); tests.
+  - **Touches the build pipeline** → the gate also requires `npm run atlas:publish:integrity-smoke` **and**
+    `npm run atlas:publish` green (no new secret leak — `bodyText` is the same redacted body as `body`).
+  - Done when: a snippet renders original-case text with the match highlighted; a build test shows entries
+    carry a non-lowercased `bodyText`; gate + integrity-smoke green. ~1 run.
+
+- [ ] **D4. Silence the CSS `@import`-order build warning.** *(no separate spec — fully specified here)*
+  `src/index.css` has `@import "leaflet/dist/leaflet.css";` *after* the three `@tailwind` directives, so
+  Vite/PostCSS warns on every start that `@import` must precede other statements. Move that one `@import`
+  to the **very top** of the file (above `@tailwind base;`).
+  - Files: `src/index.css`.
+  - Done when: the leaflet `@import` is the first statement; `npm run dev`/`npm run build` start with no
+    "`@import must precede`" warning; leaflet styles still apply (map controls/popups look unchanged);
+    gate green. ~1 run.
+
 ### A — Speed up publishing (Stage 2)
 
 **Spec:** `docs/superpowers/specs/2026-05-28-atlas-publish-speedup.md` · **Plan:** `docs/superpowers/plans/2026-05-28-atlas-publish-speedup.md`
