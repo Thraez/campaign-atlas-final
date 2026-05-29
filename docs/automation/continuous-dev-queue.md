@@ -42,12 +42,13 @@ Beyond that the routine asks the human to bless more work. That is by design —
     `atlas:publish:integrity-smoke` both green. ~1 run.
   - ✅ DONE 2026-05-30 — commit 8d1c6aec; integrity-smoke all 5 faults caught; atlas:publish EXIT:0
 
-- [ ] **A2. Add the parallel orchestrator.** New `scripts/atlas/publish-orchestrator.ts` imports the scan
+- [x] **A2. Add the parallel orchestrator.** New `scripts/atlas/publish-orchestrator.ts` imports the scan
   modules and runs the read-only scans via `Promise.all` (one process, no per-scan `tsx` cold-start).
   Rewire the scan portion of the `atlas:publish` script in `package.json` to a single orchestrator call.
   - Files: new `scripts/atlas/publish-orchestrator.ts`; `package.json` (the `atlas:publish` line).
   - Done when: integrity-smoke green (planted faults still rejected), publish exit code 0, scan phase
     measurably faster. ~1 run.
+  - ✅ DONE 2026-05-30 — commit a1274138; all 10 scans run via Promise.all, integrity-smoke all 5 faults caught, atlas:publish EXIT:0
 
 - [ ] **A3. (conditional) Cache `sharp.metadata()` between image checks.** Only if A2 leaves the scan phase
   above ~2s. Share the decode between `check-image-privacy` and `audit-assets`.
