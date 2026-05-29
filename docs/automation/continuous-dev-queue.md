@@ -35,11 +35,12 @@ Beyond that the routine asks the human to bless more work. That is by design —
 > Vite build dominates (~65%) and is out of scope. Optimize the **scan phase only** (~6.5s → ~1s, ~30%
 > total). Keep `npm run atlas:publish:integrity-smoke` green throughout — it is the safety net.
 
-- [ ] **A1. Make the scan scripts importable as modules.** Refactor the 6 scan scripts to export a callable
+- [x] **A1. Make the scan scripts importable as modules.** Refactor the 6 scan scripts to export a callable
   run function (e.g. `run({ dirs })`) while keeping their existing CLI entry shim. **No behavior change.**
   - Files: `scripts/check-no-secrets.ts`, `scripts/check-derived-secrets.ts`, `scripts/check-image-privacy.ts`, `scripts/check-fog-safety.ts`, `scripts/check-artifact-shape.ts`, `scripts/atlas/audit-assets.ts`
   - Done when: each script still works from the CLI exactly as before; `npm run atlas:publish` and
     `atlas:publish:integrity-smoke` both green. ~1 run.
+  - ✅ DONE 2026-05-30 — commit 8d1c6aec; integrity-smoke all 5 faults caught; atlas:publish EXIT:0
 
 - [ ] **A2. Add the parallel orchestrator.** New `scripts/atlas/publish-orchestrator.ts` imports the scan
   modules and runs the read-only scans via `Promise.all` (one process, no per-scan `tsx` cold-start).
