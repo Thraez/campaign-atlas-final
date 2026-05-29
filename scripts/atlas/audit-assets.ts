@@ -390,58 +390,24 @@ function loadConfig(configPath: string): Config {
   return JSON.parse(fs.readFileSync(configPath, "utf8")) as Config;
 }
 
-function main(): number {
-  const flags = parseFlags(process.argv.slice(2));
-  if (flags.parseError) {
-    console.error(`atlas:audit-assets: ${flags.parseError}`);
-    console.error("Usage: tsx scripts/atlas/audit-assets.ts [--assets-dir <path>] [--content-dir <path>] [--config <atlas.config.json>] [--strict]");
-    return 1;
-  }
+export interface RunOpts {
+  assetsDir: string;
+  publicDir: string;
+  contentDir: string;
+  strict?: boolean;
+}
 
-  const cwd = process.cwd();
-  const configPath = path.resolve(cwd, flags.configPath ?? "atlas.config.json");
-
-  // Defaults: assets dir is hardcoded to public/atlas/assets if no override.
-  // Content dir is taken from atlas.config.json's contentRoot.
-  let contentDir: string;
-  if (flags.contentDir) {
-    contentDir = path.resolve(cwd, flags.contentDir);
-  } else {
-    if (!fs.existsSync(configPath)) {
-      console.error(`atlas:audit-assets: config "${configPath}" does not exist (use --content-dir to override)`);
-      return 1;
-    }
-    let cfg: Config;
-    try {
-      cfg = loadConfig(configPath);
-    } catch (e) {
-      console.error(`atlas:audit-assets: failed to parse config "${configPath}": ${(e as Error).message}`);
-      return 1;
-    }
-    contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
-  }
-
-  const assetsDir = flags.assetsDir
-    ? path.resolve(cwd, flags.assetsDir)
-    : path.resolve(cwd, "public/atlas/assets");
-  // The public root is the parent that asset refPaths are computed against.
-  // For the default layout that is `public/`; for a custom --assets-dir it is
-  // the parent of the supplied directory (so refPath is just the basename
-  // sub-tree, which still gives meaningful orphan/reference comparison).
-  const publicDir = flags.assetsDir
-    ? path.dirname(assetsDir)
-    : path.resolve(cwd, "public");
-
-  if (!fs.existsSync(assetsDir)) {
-    console.log(`atlas:audit-assets: assets dir "${assetsDir}" does not exist, skipping`);
+export function run(opts: RunOpts): number {
+  if (!fs.existsSync(opts.assetsDir)) {
+    console.log(`atlas:audit-assets: assets dir "${opts.assetsDir}" does not exist, skipping`);
     return 0;
   }
-  if (!fs.existsSync(contentDir)) {
-    console.log(`atlas:audit-assets: content dir "${contentDir}" does not exist, skipping`);
+  if (!fs.existsSync(opts.contentDir)) {
+    console.log(`atlas:audit-assets: content dir "${opts.contentDir}" does not exist, skipping`);
     return 0;
   }
 
-  const report = auditAssets({ assetsDir, publicDir, contentDir });
+  const report = auditAssets({ assetsDir: opts.assetsDir, publicDir: opts.publicDir, contentDir: opts.contentDir });
 
   const totalsMb = (report.totals.totalBytes / (1024 * 1024)).toFixed(2);
   console.log(
@@ -477,12 +443,51 @@ function main(): number {
   );
 
   if (sizeErrors.length > 0) return 13;
-  if (flags.strict && (sizeWarns.length > 0 || report.orphans.length > 0 || report.brokenRefs.length > 0)) {
+  if (opts.strict && (sizeWarns.length > 0 || report.orphans.length > 0 || report.brokenRefs.length > 0)) {
     console.error("atlas:audit-assets: --strict failed because warnings/info findings are present");
     return 13;
   }
   console.log("atlas:audit-assets: clean");
   return 0;
+}
+
+function main(): number {
+  const flags = parseFlags(process.argv.slice(2));
+  if (flags.parseError) {
+    console.error(`atlas:audit-assets: ${flags.parseError}`);
+    console.error("Usage: tsx scripts/atlas/audit-assets.ts [--assets-dir <path>] [--content-dir <path>] [--config <atlas.config.json>] [--strict]");
+    return 1;
+  }
+
+  const cwd = process.cwd();
+  const configPath = path.resolve(cwd, flags.configPath ?? "atlas.config.json");
+
+  let contentDir: string;
+  if (flags.contentDir) {
+    contentDir = path.resolve(cwd, flags.contentDir);
+  } else {
+    if (!fs.existsSync(configPath)) {
+      console.error(`atlas:audit-assets: config "${configPath}" does not exist (use --content-dir to override)`);
+      return 1;
+    }
+    let cfg: Config;
+    try {
+      cfg = loadConfig(configPath);
+    } catch (e) {
+      console.error(`atlas:audit-assets: failed to parse config "${configPath}": ${(e as Error).message}`);
+      return 1;
+    }
+    contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
+  }
+
+  const assetsDir = flags.assetsDir
+    ? path.resolve(cwd, flags.assetsDir)
+    : path.resolve(cwd, "public/atlas/assets");
+  const publicDir = flags.assetsDir
+    ? path.dirname(assetsDir)
+    : path.resolve(cwd, "public");
+
+  return run({ assetsDir, publicDir, contentDir, strict: flags.strict });
 }
 
 // Run only when invoked as a script (not when imported by tests).

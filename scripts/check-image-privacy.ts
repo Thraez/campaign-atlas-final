@@ -76,20 +76,22 @@ function walkImages(dir: string): string[] {
   return out;
 }
 
-async function main() {
-  const args = parseArgs();
-  if (!args) {
-    console.error("Usage: tsx scripts/check-image-privacy.ts <artifact-dir> [--config <path>]");
-    process.exit(1);
+export interface RunOpts { dir: string; config?: string }
+
+export async function run(opts: RunOpts): Promise<number> {
+  const configAbs = opts.config ?? findConfig();
+  if (!configAbs) {
+    console.error("check-image-privacy: config not found (place atlas.config.json in cwd or pass --config)");
+    return 1;
   }
 
-  const images = walkImages(args.dir);
+  const images = walkImages(opts.dir);
   if (images.length === 0) {
     console.log("check-image-privacy: no images found — clean");
-    process.exit(0);
+    return 0;
   }
 
-  const secrets = deriveSecretsFromVault(args.config);
+  const secrets = deriveSecretsFromVault(configAbs);
 
   const violations: string[] = [];
 
@@ -127,13 +129,34 @@ async function main() {
 
   if (violations.length === 0) {
     console.log(`check-image-privacy: ${images.length} image(s) scanned — clean`);
-    process.exit(0);
+    return 0;
   }
 
   console.error("\ncheck-image-privacy: VIOLATIONS FOUND\n");
   for (const v of violations) console.error("  " + v);
   console.error(`\n${violations.length} violation(s) — player build must not ship`);
-  process.exit(EXIT_VIOLATION);
+  return EXIT_VIOLATION;
 }
 
-main();
+async function main(): Promise<number> {
+  const args = parseArgs();
+  if (!args) {
+    console.error("Usage: tsx scripts/check-image-privacy.ts <artifact-dir> [--config <path>]");
+    return 1;
+  }
+  return run({ dir: args.dir, config: args.config });
+}
+
+// Run only when invoked as a script (not when imported by tests).
+const invokedAsScript = (() => {
+  const arg1 = process.argv[1] ?? "";
+  return arg1.endsWith("check-image-privacy.ts") || arg1.endsWith("check-image-privacy.js");
+})();
+if (invokedAsScript) {
+  main()
+    .then((code) => process.exit(code))
+    .catch((e) => {
+      console.error("check-image-privacy: crashed", e);
+      process.exit(1);
+    });
+}

@@ -197,8 +197,10 @@ function siblingSearchIndex(atlasPath: string): string | null {
   return fs.existsSync(candidate) ? candidate : null;
 }
 
-function main(): number {
-  const target = resolveAtlasJson(process.argv[2]);
+export interface RunOpts { atlasJsonPath?: string }
+
+export function run(opts: RunOpts): number {
+  const target = resolveAtlasJson(opts.atlasJsonPath);
   if (!target) {
     console.error("atlas:check-shape: could not find atlas.json (tried arg, dist/atlas, public/atlas)");
     return 1;
@@ -234,6 +236,10 @@ function main(): number {
     console.error(`  ${who}${v.field}: ${v.message}`);
   }
   return 11;
+}
+
+function main(): number {
+  return run({ atlasJsonPath: process.argv[2] });
 }
 
 const invokedAsScript = (() => {
