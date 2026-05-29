@@ -50,15 +50,16 @@ Beyond that the routine asks the human to bless more work. That is by design —
     measurably faster. ~1 run.
   - ✅ DONE 2026-05-30 — commit a1274138; all 10 scans run via Promise.all, integrity-smoke all 5 faults caught, atlas:publish EXIT:0
 
-- [ ] **A3. (conditional) Cache `sharp.metadata()` between image checks.** Only if A2 leaves the scan phase
+- [x] **A3. (conditional) Cache `sharp.metadata()` between image checks.** Only if A2 leaves the scan phase
   above ~2s. Share the decode between `check-image-privacy` and `audit-assets`.
   - Done when: scan phase ~1s, all gates green. Skip this unit if A2 already hits ~1s. ~1 run.
+  - ✅ SKIPPED 2026-05-30 — orchestrator timed at 1.57s (< ~2s threshold); A3 cache not needed
 
 ### B — Verify import folder-mapping (close the 4 gaps)
 
 **Plan:** `docs/superpowers/plans/2026-05-16-import-folder-mapping.md` (core logic merged; these 4 gaps remain).
 
-- [ ] **B1. Fix the two `ImportStagingModal` gaps (one is a real bug).**
+- [x] **B1. Fix the two `ImportStagingModal` gaps (one is a real bug).**
   - Gap 1 (bug): the "Select all overwrites" control never renders — it filters on a `r.conflict` field
     that doesn't exist; should test `r.rowKind === "path-collision"`.
   - Gap 2: derive the type-option list from `importConfig.folders` keys instead of a hardcoded array (so
@@ -66,38 +67,43 @@ Beyond that the routine asks the human to bless more work. That is by design —
   - Files: `src/atlas/import/ImportStagingModal.tsx`; test `src/test/import-staging-modal.test.tsx`.
   - Done when: overwrite control renders on a collision; new folder types appear with no code change;
     test covers both; gates green. ~1 run.
+  - ✅ DONE (pre-queue) — commits f7261619 (conflictRows fix) + 361b14e4 (type dropdown from importConfig); 7/7 modal tests pass
 
-- [ ] **B2. Add the missing validation + build-pipeline tests, and a seed config.**
+- [x] **B2. Add the missing validation + build-pipeline tests, and a seed config.**
   - Validation tests for `sanitizeImportConfig()` (safe-segment regex, reserved names `_atlas`/`.`/`..`,
     missing-default fallback, absent `import:` block).
   - Build test: `importFolders` present in DM `atlas.json` under `worlds[0]`, **absent** in `--player` build.
   - Seed an example `import:` block in `content/astrath-deeprealm/_atlas/world.yaml`.
   - Files: `src/test/atlas-world-loader.test.ts`, `src/test/atlas-build.test.ts`, `content/astrath-deeprealm/_atlas/world.yaml`.
   - Done when: ~6 new tests green; player build proven free of the import config; gates green. ~1 run.
+  - ✅ DONE (pre-queue) — commits 31e5c8ed (world-loader import-block tests) + 9c13a46f (importFolders build test) + e06b2a5a (world.yaml import block)
 
 ### C — Richer markdown rendering (Phase 2)
 
 **Spec:** `docs/superpowers/specs/2026-05-18-obsidian-markdown-parity-design.md` (Phases 0+1 shipped; this is Phase 2).
 Render/styling parity only — **not** interactivity.
 
-- [ ] **C1. Highlights (`==text==`).** Add a `marked` inline extension → `<mark>` (or `.highlight` span);
+- [x] **C1. Highlights (`==text==`).** Add a `marked` inline extension → `<mark>` (or `.highlight` span);
   allow it in the sanitizer; theme-token the color; prove it renders identically across DM pane, reading
   view, and player projection.
   - Files: `src/atlas/content/markdownCore.ts`, `src/atlas/content/sanitizer.ts`, theme CSS, parity test.
   - Done when: highlight renders at parity on all three surfaces; gates + browser smoke green. ~1 run.
+  - ✅ DONE (pre-queue) — commit c77396d5; parity fixture verifies `<mark>wrong</mark>` survives sanitizer
 
-- [ ] **C2. Footnotes (`[^id]` + definitions) — with orphan-reference drop.** Sequential numbering,
+- [x] **C2. Footnotes (`[^id]` + definitions) — with orphan-reference drop.** Sequential numbering,
   backreferences. **Mandatory secrecy edge case:** if a footnote *definition* sits inside a stripped
   `%%…%%` or `:::dm…:::` block, the now-dangling reference must be **removed** from player/published output,
   never left as a bare `[^id]`. Allow `<sup>`/`<ol>` backref markup in the sanitizer.
   - Files: `src/atlas/content/markdownCore.ts`, `src/atlas/content/sanitizer.ts`, CSS; tests for the orphan
     case + a secrecy regression (definition inside `%%` ⇒ absent downstream).
   - Done when: footnotes render at parity; orphan-drop proven; secrecy contract holds; gates + smoke green. ~1–2 runs.
+  - ✅ DONE (pre-queue) — commit bf188e0f; parity fixture verifies footnote backref + orphan-drop logic
 
-- [ ] **C3. Task-list styling (`- [ ]` / `- [x]`).** GFM already parses these; scope is consistent,
+- [x] **C3. Task-list styling (`- [ ]` / `- [x]`).** GFM already parses these; scope is consistent,
   read-only checkbox styling across DM / reading / player surfaces. No interactivity.
   - Files: theme CSS; parity test.
   - Done when: checkboxes look consistent on all surfaces, non-interactive in read/player; gates green. ~1 run.
+  - ✅ DONE (pre-queue) — commit bf188e0f; parity fixture verifies `atlas-task-item`/`atlas-task-done` classes, no `<input>` emitted
 
 ---
 
