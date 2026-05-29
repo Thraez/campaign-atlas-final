@@ -132,3 +132,24 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
 Hand back per routine step 7 with candidate wants — do not invent direction. The human refuels the WANTS
 section (or blesses nice-to-haves into wants), and the loop continues. The routine's job is execution; the
 human's job is direction.
+
+---
+
+## 📥 INBOX — captured 2026-05-30, awaiting human sequencing
+
+> ⚠️ **Do NOT auto-build from this section.** These are new candidates from a live dogfooding pass, parked
+> here so they aren't lost. They are deliberately *not* `- [ ]` units and *not* in WANTS — the routine keeps
+> popping from WANTS as normal and ignores this list. The human triages these into WANTS / NICE-TO-HAVES
+> (with the right gate) after reviewing the ranked backlog.
+
+Full detail + ranking: **`docs/DEVELOPMENT_WANTS.md`**.
+
+- **Crash guard + error boundary** — selecting a location-less entry (e.g. an Event) white-screens the whole app; no error boundary contains it. → proposed WANT (top), no gate.
+- **Proper-case entity names** — names render as lowercase file-slugs in search/title/pins. → proposed WANT, no gate.
+- **Search snippet casing** — result snippets render lowercased straight from the index. → proposed WANT, no gate.
+- **CSS @import order** — `leaflet.css` imported after the Tailwind directives (build warning every start). → hygiene nibble.
+- **Editor works on first run** — dev serves the player atlas, so the editor opens with "Save won't work" until a manual build. → proposed WANT; write a short spec first (touches build wiring).
+- **Categorize imported notes** — `imports/` NPCs don't appear under Characters or any type tab. → NICE-TO-HAVE, pairs with item B.
+- **Image embeds dropped** — `![[image.png]]` vanishes silently in the reading view. → NICE-TO-HAVE (render) or WANT (just flag in Publish Check).
+- **Honest player preview** — local view shows DM notes; no faithful redacted "as players see it" preview. → NICE-TO-HAVE, design-check first.
+- **Planned/broken wikilinks** — `[[…/Note]]` / `[[Note#Heading]]` render as dead text. → fold into item C + surface in Publish Check.
