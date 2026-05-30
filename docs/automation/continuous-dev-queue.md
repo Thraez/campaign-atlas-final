@@ -196,6 +196,11 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   despite being correctness-critical (wrong reveal/conceal logic exposes DM content). ~1 run.
   - ✅ DONE 2026-05-30 — commit f9d89ad0; 15 new tests covering `pointInPolygon`, `isLit`, `effectivePolygons`;
     993/993 tests pass; tsc clean; eslint 0 errors
+- [x] **N7. Hygiene / coverage nibble #3** — `inferType.ts` (folder→type inference) and
+  `filterEntitiesForLens.ts` (DM/player visibility filter) both had zero test coverage despite being
+  correctness-critical (wrong visibility filtering exposes DM content to players). ~1 run.
+  - ✅ DONE 2026-05-30 — merge commit e22253c0; 23 tests for inferTypeFromPath/isIgnoredPath + 8 tests for
+    filterEntitiesForLens; 1024/1024 tests pass; tsc clean; eslint 0 errors
 
 ---
 
