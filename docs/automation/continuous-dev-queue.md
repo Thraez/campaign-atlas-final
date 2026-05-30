@@ -188,8 +188,10 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   when a map is crowded. Player-facing readability. ~1–2 runs.
 - [ ] **N3. Asset credits** — a `licenses:` frontmatter field + an auto-generated credits page. ~1–2 runs.
 - [ ] **N4. Import report polish** — a clearer "what came in / what was skipped" summary after an import. ~1 run.
-- [ ] **N5. Hygiene / coverage nibble** — one small, safe test-coverage addition or dead-code removal in a
+- [x] **N5. Hygiene / coverage nibble** — one small, safe test-coverage addition or dead-code removal in a
   weakly-covered module. The always-available safe filler. ~1 run.
+  - ✅ DONE 2026-05-30 — commit 70c8477c; added 5 validatePatchYaml map-kind tests (map/settings/world-map
+    path had zero coverage); 978/978 tests pass; tsc clean; eslint 0 errors
 
 ---
 
