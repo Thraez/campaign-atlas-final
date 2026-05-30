@@ -74,7 +74,7 @@ All four are **no-gate**: clear correctness/polish, bounded, revertible. Build t
     carry a non-lowercased `bodyText`; gate + integrity-smoke green. ~1 run.
   - ✅ DONE 2026-05-30 — commit 1b3fd01a; snippet() extracted to src/atlas/search/snippet.ts; bodyText added to search index; 8 new tests; 973/973 tests green; tsc clean; eslint 0 errors; integrity-smoke 5/5; atlas:publish clean
 
-- [ ] **D4. Silence the CSS `@import`-order build warning.** *(no separate spec — fully specified here)*
+- [x] **D4. Silence the CSS `@import`-order build warning.** *(no separate spec — fully specified here)*
   `src/index.css` has `@import "leaflet/dist/leaflet.css";` *after* the three `@tailwind` directives, so
   Vite/PostCSS warns on every start that `@import` must precede other statements. Move that one `@import`
   to the **very top** of the file (above `@tailwind base;`).
@@ -82,6 +82,7 @@ All four are **no-gate**: clear correctness/polish, bounded, revertible. Build t
   - Done when: the leaflet `@import` is the first statement; `npm run dev`/`npm run build` start with no
     "`@import must precede`" warning; leaflet styles still apply (map controls/popups look unchanged);
     gate green. ~1 run.
+  - ✅ DONE 2026-05-30 — commit c5a6c33c; @import moved to line 1; build clean with no CSS warning; 973/973 tests green; tsc clean; eslint 0 errors
 
 ### A — Speed up publishing (Stage 2)
 
