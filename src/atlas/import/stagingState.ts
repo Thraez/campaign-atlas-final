@@ -116,11 +116,15 @@ export interface StagingRow {
 
 /**
  * Derive a display title from filename and frontmatter, matching build-atlas.ts logic:
- *   title = fm.title.trim() if non-empty, else basename(file, '.md').replace(/[-_]+/g, ' ').trim()
+ *   title = fm.title.trim() if non-empty, else title-cased slug ("great-hall" → "Great Hall")
  */
 function deriveTitle(filename: string, fmTitle: unknown): string {
   if (typeof fmTitle === "string" && fmTitle.trim()) return fmTitle.trim();
-  return filename.replace(/\.md$/i, "").replace(/[-_]+/g, " ").trim();
+  return filename
+    .replace(/\.md$/i, "")
+    .replace(/[-_]+/g, " ")
+    .trim()
+    .replace(/(^|\s)(\p{L})/gu, (_m, sp, ch) => sp + ch.toUpperCase());
 }
 
 function extractStagingFields(raw: string, relPath: string): {

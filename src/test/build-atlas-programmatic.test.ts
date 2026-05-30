@@ -9,7 +9,7 @@
  * plugin uses.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { runBuild, BuildError } from "../../scripts/build-atlas";
+import { runBuild, BuildError, deriveTitle } from "../../scripts/build-atlas";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -100,5 +100,31 @@ describe("scripts/build-atlas runBuild() programmatic entry", () => {
     expect(err.code).toBe(6);
     expect(err.message).toBe("test message");
     expect(err.name).toBe("BuildError");
+  });
+});
+
+describe("deriveTitle", () => {
+  it("title-cases a single-word slug when no fmTitle provided", () => {
+    expect(deriveTitle("/notes/corven.md")).toBe("Corven");
+  });
+
+  it("title-cases each word of a hyphenated slug", () => {
+    expect(deriveTitle("/notes/great-hall.md")).toBe("Great Hall");
+  });
+
+  it("title-cases each word of an underscore slug", () => {
+    expect(deriveTitle("/notes/lost_city.md")).toBe("Lost City");
+  });
+
+  it("returns explicit fmTitle trimmed and unchanged (no forced case change)", () => {
+    expect(deriveTitle("/notes/corven.md", "  corven the Bold  ")).toBe("corven the Bold");
+  });
+
+  it("falls back to slug-derived title when fmTitle is empty string", () => {
+    expect(deriveTitle("/notes/edric.md", "")).toBe("Edric");
+  });
+
+  it("falls back to slug-derived title when fmTitle is whitespace-only", () => {
+    expect(deriveTitle("/notes/edric.md", "   ")).toBe("Edric");
   });
 });

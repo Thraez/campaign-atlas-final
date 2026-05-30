@@ -159,9 +159,12 @@ function globToRegExp(glob: string): RegExp {
   return new RegExp(`^${escaped}$`);
 }
 
-function deriveTitle(file: string, fmTitle?: unknown): string {
+export function deriveTitle(file: string, fmTitle?: unknown): string {
   if (typeof fmTitle === "string" && fmTitle.trim()) return fmTitle.trim();
-  return path.basename(file, ".md").replace(/[-_]+/g, " ").trim();
+  return path.basename(file, ".md")
+    .replace(/[-_]+/g, " ")
+    .trim()
+    .replace(/(^|\s)(\p{L})/gu, (_m, sp, ch) => sp + ch.toUpperCase());
 }
 
 function relImage(p: string): string {
