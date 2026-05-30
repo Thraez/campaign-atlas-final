@@ -106,6 +106,13 @@ describe("isAllowedTargetPath", () => {
     expect(isAllowedTargetPath(WORLD, `content/${WORLD}/../escape.md`, TEST_ALLOWED_FOLDERS)).toBe(false);
     expect(isAllowedTargetPath(WORLD, `/content/${WORLD}/npcs/x.md`, TEST_ALLOWED_FOLDERS)).toBe(false);
   });
+  it("rejects Windows-style backslash paths", () => {
+    // path.includes("\\") guard — a Windows path must never slip through on
+    // non-normalized input (e.g. drag-and-drop from File Explorer on Windows).
+    expect(
+      isAllowedTargetPath(WORLD, `content\\${WORLD}\\npcs\\x.md`, TEST_ALLOWED_FOLDERS),
+    ).toBe(false);
+  });
   it("rejects non-md extensions", () => {
     expect(isAllowedTargetPath(WORLD, `content/${WORLD}/npcs/x.txt`, TEST_ALLOWED_FOLDERS)).toBe(false);
     expect(isAllowedTargetPath(WORLD, `content/${WORLD}/npcs/x.yaml`, TEST_ALLOWED_FOLDERS)).toBe(false);
@@ -329,5 +336,54 @@ describe("updateStagingRow", () => {
     const r1 = updateStagingRow(r0, { included: true }, ctx);
     expect(r1.included).toBe(true);
     expect(r1.rowKind).toBe("path-collision");
+  });
+
+  it("parseError row cannot be re-included even with explicit included:true patch", () => {
+    // A row with a parse error must stay excluded regardless of DM intent — the
+    // file's content is unparseable and should never be written.
+    const r0 = buildStagingRow(
+      { filename: "broken.md", raw: "---\n: : bad yaml :\n  - [unterminated\n---\nbody" },
+      makeCtx(),
+    );
+    expect(r0.parseError).toBeTruthy();
+    expect(r0.included).toBe(false);
+    const r1 = updateStagingRow(r0, { included: true }, makeCtx());
+    expect(r1.included).toBe(false);
+  });
+
+  it("update row with type change: path stays anchored, rowKind stays update", () => {
+    // An entity that already exists in the atlas should always update in-place,
+    // even if the DM changes the inferred type — the type dropdown must not reroute it.
+    const existingById = new Map([["thornhold", "content/astrath-deeprealm/settlements/thornhold.md"]]);
+    const existingPaths = new Set(existingById.values());
+    const ctx = makeCtx({ existingById, existingPaths });
+    const r0 = buildStagingRow(
+      { filename: "thornhold.md", raw: "---\natlas:\n  type: settlement\n  id: thornhold\n---\n" },
+      ctx,
+    );
+    expect(r0.rowKind).toBe("update");
+    const r1 = updateStagingRow(r0, { inferredType: "ruin" }, ctx);
+    expect(r1.inferredType).toBe("ruin");
+    // Path must NOT change — update rows are anchored
+    expect(r1.targetPath).toBe("content/astrath-deeprealm/settlements/thornhold.md");
+    expect(r1.rowKind).toBe("update");
+    expect(r1.included).toBe(true);
+  });
+
+  it("empty patch preserves all mutable fields unchanged", () => {
+    const r0 = base();
+    const r1 = updateStagingRow(r0, {}, makeCtx());
+    expect(r1.inferredType).toBe(r0.inferredType);
+    expect(r1.targetPath).toBe(r0.targetPath);
+    expect(r1.rowKind).toBe(r0.rowKind);
+    expect(r1.included).toBe(r0.included);
+    expect(r1.resolvedVisibility).toBe(r0.resolvedVisibility);
+  });
+
+  it("resolvedVisibility patch is applied", () => {
+    const r0 = base();
+    expect(r0.resolvedVisibility).toBe("dm");
+    const r1 = updateStagingRow(r0, { resolvedVisibility: "player" }, makeCtx());
+    expect(r1.resolvedVisibility).toBe("player");
   });
 });
