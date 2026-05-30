@@ -56,4 +56,34 @@ describe("snippet()", () => {
     expect(result).not.toBeNull();
     expect(result).toMatch(/<mark[^>]*>thornhold<\/mark>/);
   });
+
+  it("prepends a leading ellipsis when the match is deep in a long body", () => {
+    // idx=70 → start = max(0, 70-50) = 20 > 0, so "…" should appear at front
+    const prefix = "A".repeat(70);
+    const display = prefix + "deep match here" + "B".repeat(20);
+    const lower = display.toLowerCase();
+    const result = snippet(display, lower, "deep match");
+    expect(result).not.toBeNull();
+    expect(result!.startsWith("…")).toBe(true);
+  });
+
+  it("appends a trailing ellipsis when the body extends far past the match", () => {
+    // match at idx=0, tail=200 → end = 0 + "quick match".length + 90 = 101 < 216
+    const display = "quick match here" + "Z".repeat(200);
+    const lower = display.toLowerCase();
+    const result = snippet(display, lower, "quick match");
+    expect(result).not.toBeNull();
+    expect(result!.endsWith("…")).toBe(true);
+  });
+
+  it("HTML-escapes & < > characters in the surrounding display text", () => {
+    const display = "Armor & Weapons are < 10 gp or > 5 gp each.";
+    const lower = display.toLowerCase();
+    const result = snippet(display, lower, "weapons");
+    expect(result).not.toBeNull();
+    expect(result).toContain("&amp;");
+    expect(result).toContain("&lt;");
+    expect(result).toContain("&gt;");
+    expect(result).toMatch(/<mark[^>]*>Weapons<\/mark>/);
+  });
 });
