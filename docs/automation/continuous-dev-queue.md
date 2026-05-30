@@ -201,6 +201,11 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   correctness-critical (wrong visibility filtering exposes DM content to players). ~1 run.
   - ✅ DONE 2026-05-30 — merge commit e22253c0; 23 tests for inferTypeFromPath/isIgnoredPath + 8 tests for
     filterEntitiesForLens; 1024/1024 tests pass; tsc clean; eslint 0 errors
+- [x] **N8. Hygiene / coverage nibble #4** — `stagingState.ts` error-path branches: `updateStagingRow`
+  with a `parseError` row, update-row type-change anchoring, empty patch passthrough, `resolvedVisibility`
+  patch, and `isAllowedTargetPath` Windows backslash guard — all were untested branches on correctness-
+  critical import routing logic. ~1 run.
+  - ✅ DONE 2026-05-30 — merge commit e28c8247; 6 new tests; 1029/1029 tests pass; tsc clean; eslint 0 errors
 
 ---
 
