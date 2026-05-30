@@ -206,6 +206,10 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   patch, and `isAllowedTargetPath` Windows backslash guard — all were untested branches on correctness-
   critical import routing logic. ~1 run.
   - ✅ DONE 2026-05-30 — merge commit e28c8247; 6 new tests; 1029/1029 tests pass; tsc clean; eslint 0 errors
+- [x] **N9. Hygiene / coverage nibble #5** — `snippet.ts` branch coverage: leading "…" (match deep in body),
+  trailing "…" (body extends far past match), and `escapeHtml()` converting `&`, `<`, `>` in surrounding
+  display text. Three untested conditional branches in the search-snippet display logic. ~1 run.
+  - ✅ DONE 2026-05-30 — merge commit 849c7983; 3 new tests; 1032/1032 tests pass; tsc clean; eslint 0 errors
 
 ---
 
