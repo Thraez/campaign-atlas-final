@@ -46,7 +46,10 @@ function MapController({ flyTo }: { flyTo: { x: number; y: number; height: numbe
   const map = useMap();
   useEffect(() => {
     if (!flyTo) return;
-    map.flyTo([flyTo.height - flyTo.y, flyTo.x], Math.max(map.getZoom(), -1), { duration: 0.6 });
+    const lat = flyTo.height - flyTo.y;
+    const lng = flyTo.x;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    map.flyTo([lat, lng], Math.max(map.getZoom(), -1), { duration: 0.6 });
   }, [flyTo, map]);
   return null;
 }
