@@ -51,6 +51,43 @@ describe("validatePatchYaml entity-frontmatter", () => {
   });
 });
 
+describe("validatePatchYaml map patch", () => {
+  it("accepts a well-formed map patch", () => {
+    const patch = "maps:\n  - id: dungeon-level-1\n    name: Level 1\n    width: 4000\n    height: 3000\n";
+    const r = validatePatchYaml(patch, "map");
+    expect(r.ok).toBe(true);
+    expect(r.errors).toHaveLength(0);
+  });
+
+  it("rejects a patch with no maps: array", () => {
+    const patch = "worlds:\n  - id: w1\n    name: My World\n";
+    const r = validatePatchYaml(patch, "map");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/maps/);
+  });
+
+  it("rejects a patch with an empty maps: array", () => {
+    const patch = "maps: []\n";
+    const r = validatePatchYaml(patch, "map");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/empty/i);
+  });
+
+  it("rejects a map entry missing a string id", () => {
+    const patch = "maps:\n  - name: Unnamed\n    width: 1000\n    height: 800\n";
+    const r = validatePatchYaml(patch, "map");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/id/);
+  });
+
+  it("rejects markdown code fences in a map patch", () => {
+    const patch = "```yaml\nmaps:\n  - id: x\n```\n";
+    const r = validatePatchYaml(patch, "map");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/fence/i);
+  });
+});
+
 describe("validateProject", () => {
   it("passes a clean project", () => {
     const r = validateProject({ project, draftPlacements: [{ entityId: "town", mapId: "m1", x: 100, y: 200 }] });
