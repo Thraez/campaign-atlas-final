@@ -192,6 +192,10 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   weakly-covered module. The always-available safe filler. ~1 run.
   - ✅ DONE 2026-05-30 — commit 70c8477c; added 5 validatePatchYaml map-kind tests (map/settings/world-map
     path had zero coverage); 978/978 tests pass; tsc clean; eslint 0 errors
+- [x] **N6. Hygiene / coverage nibble #2** — fog-of-war geometry (`effectiveLit.ts`) had zero test coverage
+  despite being correctness-critical (wrong reveal/conceal logic exposes DM content). ~1 run.
+  - ✅ DONE 2026-05-30 — commit f9d89ad0; 15 new tests covering `pointInPolygon`, `isLit`, `effectivePolygons`;
+    993/993 tests pass; tsc clean; eslint 0 errors
 
 ---
 
