@@ -35,7 +35,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
 All four are **no-gate**: clear correctness/polish, bounded, revertible. Build top to bottom — **D1 first**
 (it stops a whole-app crash). Full ranking/context graduated from the Inbox in `docs/DEVELOPMENT_WANTS.md`.
 
-- [ ] **D1. Stop the whole app blank-screening; contain any future component crash.**
+- [x] **D1. Stop the whole app blank-screening; contain any future component crash.**
   **Spec:** `docs/superpowers/specs/2026-05-30-crash-guard-error-boundary-design.md` — **read in full.**
   Selecting an entry with no map location (e.g. an Event) white-screens the entire player viewer, with no
   safety net. Two goals: (1) add an app-level React **error boundary** so no single component error can
@@ -48,6 +48,9 @@ All four are **no-gate**: clear correctness/polish, bounded, revertible. Build t
     regression test covers opening a location-less entity without crashing (or the documented
     isolated-component equivalent if leaflet+jsdom blocks full-viewer render); no DM content in the
     fallback copy; gate green. ~1 run.
+  - ✅ DONE 2026-05-30 — commit 36cc1670; ErrorBoundary wraps Routes in App.tsx; 3 boundary tests + 3
+    location-less entity regression tests pass; MapController finite-coord guard added; 959/959 tests
+    green; tsc clean; eslint 0 errors
 
 - [ ] **D2. Show proper-case names instead of lowercase file-slugs.**
   **Spec:** `docs/superpowers/specs/2026-05-30-display-casing-design.md` — **Part 1.**
