@@ -62,7 +62,7 @@ All four are **no-gate**: clear correctness/polish, bounded, revertible. Build t
     explicit frontmatter titles unchanged; unit test covers it; gate green. ~1 run.
   - ✅ DONE 2026-05-30 — commit 7d8c6beb; deriveTitle exported + title-cased; stagingState.ts synced; 6 unit tests added; 965/965 tests green; tsc clean; eslint 0 errors
 
-- [ ] **D3. Show search snippets in original case.**
+- [x] **D3. Show search snippets in original case.**
   **Spec:** `docs/superpowers/specs/2026-05-30-display-casing-design.md` — **Part 2.**
   Result snippets render all-lowercase because the search index `body` is lowercased for matching and the
   viewer renders straight from it. Ship a parallel original-case `bodyText` for display; keep `body`
@@ -72,6 +72,7 @@ All four are **no-gate**: clear correctness/polish, bounded, revertible. Build t
     `npm run atlas:publish` green (no new secret leak — `bodyText` is the same redacted body as `body`).
   - Done when: a snippet renders original-case text with the match highlighted; a build test shows entries
     carry a non-lowercased `bodyText`; gate + integrity-smoke green. ~1 run.
+  - ✅ DONE 2026-05-30 — commit 1b3fd01a; snippet() extracted to src/atlas/search/snippet.ts; bodyText added to search index; 8 new tests; 973/973 tests green; tsc clean; eslint 0 errors; integrity-smoke 5/5; atlas:publish clean
 
 - [ ] **D4. Silence the CSS `@import`-order build warning.** *(no separate spec — fully specified here)*
   `src/index.css` has `@import "leaflet/dist/leaflet.css";` *after* the three `@tailwind` directives, so
