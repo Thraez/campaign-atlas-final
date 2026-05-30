@@ -103,6 +103,27 @@ describe("scripts/build-atlas runBuild() programmatic entry", () => {
   });
 });
 
+describe("search index bodyText field", () => {
+  it("search-index.json entries carry bodyText (original case) alongside lowercased body", async () => {
+    const result = await runBuild({ player: false, strict: false });
+    expect(result.ok).toBe(true);
+    const indexPath = path.join(tmpRoot, ".local-atlas", "search-index.json");
+    const index = JSON.parse(fs.readFileSync(indexPath, "utf8")) as Array<{
+      id: string;
+      body?: string;
+      bodyText?: string;
+    }>;
+    // Every entry with a non-empty body must also carry bodyText.
+    const withBody = index.filter((e) => e.body && e.body.length > 0);
+    expect(withBody.length).toBeGreaterThan(0);
+    withBody.forEach((e) => {
+      expect(e.bodyText).toBeDefined();
+      // body must be the lowercased form of bodyText
+      expect(e.body).toBe(e.bodyText!.toLowerCase());
+    });
+  });
+});
+
 describe("deriveTitle", () => {
   it("title-cases a single-word slug when no fmTitle provided", () => {
     expect(deriveTitle("/notes/corven.md")).toBe("Corven");
