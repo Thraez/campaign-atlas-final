@@ -18,6 +18,7 @@ import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
+import { snippet } from "@/atlas/search/snippet";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
@@ -713,23 +714,6 @@ function useRecentlyRevealedIds(): Set<string> | null {
   return ids;
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c] as string));
-}
-
-// Build a 140-char snippet around the first match of `q` in `body`.
-function snippet(body: string | undefined, q: string): string | null {
-  if (!body || !q) return null;
-  const lower = body;
-  const idx = lower.indexOf(q);
-  if (idx < 0) return null;
-  const start = Math.max(0, idx - 50);
-  const end = Math.min(body.length, idx + q.length + 90);
-  const slice = (start > 0 ? "…" : "") + body.slice(start, end) + (end < body.length ? "…" : "");
-  const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-  return escapeHtml(slice).replace(re, (m) => `<mark class="bg-primary/30 text-foreground rounded-sm px-0.5">${escapeHtml(m)}</mark>`);
-}
-
 function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: SearchProps) {
   const placedIds = useMemo(() => new Set(placements.map((p) => p.entityId)), [placements]);
   const [activeType, setActiveType] = useState<string | null>(null);
@@ -780,7 +764,7 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
       .filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s)
       .slice(0, 40)
-      .map(({ e }) => ({ e, snip: snippet(e.body, q) }));
+      .map(({ e }) => ({ e, snip: snippet(e.bodyText ?? e.body, e.body, q) }));
   }, [query, index, activeType, activeTag, thisMapOnly, placedIds, recentOnly, recentlyRevealed]);
 
   // Reset selection when filters or query change.

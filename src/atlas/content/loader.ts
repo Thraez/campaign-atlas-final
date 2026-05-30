@@ -22,6 +22,7 @@ export interface SearchIndexEntry {
   summary?: string;
   excerpt?: string;
   body?: string;        // lowercased plain-text body for full-text search
+  bodyText?: string;   // original-case plain-text body for display (snippets)
   dateRaw?: string;
   dateValue?: number;
   dateYear?: number;
