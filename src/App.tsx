@@ -5,6 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Landing from "./pages/Landing.tsx";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Lazy-load heavy/secondary routes to keep the landing bundle small.
 const AtlasViewer = lazy(() => import("./pages/AtlasViewer.tsx"));
@@ -43,6 +44,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/+$/, "") || "/"}>
+        <ErrorBoundary>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/" element={<Landing />} />
@@ -58,6 +60,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
+        </ErrorBoundary>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
