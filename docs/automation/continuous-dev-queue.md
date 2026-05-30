@@ -52,7 +52,7 @@ All four are **no-gate**: clear correctness/polish, bounded, revertible. Build t
     location-less entity regression tests pass; MapController finite-coord guard added; 959/959 tests
     green; tsc clean; eslint 0 errors
 
-- [ ] **D2. Show proper-case names instead of lowercase file-slugs.**
+- [x] **D2. Show proper-case names instead of lowercase file-slugs.**
   **Spec:** `docs/superpowers/specs/2026-05-30-display-casing-design.md` — **Part 1.**
   Notes without an explicit `title:` (e.g. imported NPCs) render as "corven"/"edric" because
   `deriveTitle()` returns the raw filename slug uncapitalized. Title-case the derived fallback only
@@ -60,6 +60,7 @@ All four are **no-gate**: clear correctness/polish, bounded, revertible. Build t
   - Files: `scripts/build-atlas.ts` (export + fix `deriveTitle`); test under `src/test/`.
   - Done when: a slug-derived title is title-cased ("corven" → "Corven", "great-hall" → "Great Hall");
     explicit frontmatter titles unchanged; unit test covers it; gate green. ~1 run.
+  - ✅ DONE 2026-05-30 — commit 7d8c6beb; deriveTitle exported + title-cased; stagingState.ts synced; 6 unit tests added; 965/965 tests green; tsc clean; eslint 0 errors
 
 - [ ] **D3. Show search snippets in original case.**
   **Spec:** `docs/superpowers/specs/2026-05-30-display-casing-design.md` — **Part 2.**
