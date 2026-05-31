@@ -26,9 +26,69 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
-> **Refueled 2026-05-30** — section **D** below (4 units) was blessed by the human from a live dogfooding
-> pass. It is the current priority; build **D first** (D1 is a user-facing crash), then the older A–C.
-> A1–C3 are already ✅ DONE.
+> **Refueled 2026-05-31** — section **E** below (5 units) was blessed by the human (Opus refuel session)
+> from the ranked inbox in `docs/DEVELOPMENT_WANTS.md`. **E is the current priority — build top to bottom**
+> (E1 is the safest, E5 the most feature-shaped). Each cites a full spec under
+> `docs/superpowers/specs/2026-05-31-*.md` — **read it in full first.** Sections D, A, B, C below are all
+> ✅ DONE.
+
+### E — Refuel 2026-05-31 (blessed from the ranked inbox)
+
+Ordered by confidence/safety: build **E1 first**. Each is bounded and revertible. E1–E2 are clear
+correctness/polish; E3 touches dev/build wiring (spec picked the approach); E4–E5 carry some UX/feature
+latitude — the spec pins the chosen shape.
+
+- [ ] **E1. Accessible names for icon-only controls.**
+  **Spec:** `docs/superpowers/specs/2026-05-31-accessibility-labels-design.md` — **read in full.**
+  Several icon-only buttons (the minimap region; the map-layer-panel nudge/lock/duplicate/remove buttons;
+  per-pin discard/remove; two EntitiesTab trash buttons) have no accessible name. Add `aria-label`/`role`
+  matching the codebase's existing pattern. Pure additive, no visual change.
+  - Files: `src/atlas/AtlasMinimap.tsx`, `src/atlas/MapLayerPanel.tsx`, `src/pages/AtlasPlacementEditor.tsx`,
+    `src/atlas/tabs/EntitiesTab.tsx`; new test under `src/test/`.
+  - Done when: listed controls expose accessible names (sampled test green); no behaviour/visual change;
+    gate green. ~1 run.
+
+- [ ] **E2. Flag dropped image embeds in Publish Check.**
+  **Spec:** `docs/superpowers/specs/2026-05-31-dropped-image-embed-flag-design.md` — **read in full.**
+  Obsidian `![[Portrait.png]]` embeds silently vanish in the player view. Add a Publish Check **warning**
+  (the pre-blessed "flag it" half — not the larger "render it" change) so the DM sees which images won't
+  publish. One check in `validateProject.ts`; reuses the existing Issue/UI model.
+  - Files: `src/atlas/yaml/validateProject.ts`; extend `src/test/atlas-publish-check.test.ts`.
+  - Done when: player-visible entities with image embeds raise a `dropped-image-embed` warning; no false
+    positives on DM-only/non-image/stripped-block embeds; gate green. ~1 run.
+
+- [ ] **E3. Editor "just works" on first run (auto-build the DM atlas).**
+  **Spec:** `docs/superpowers/specs/2026-05-31-editor-first-run-autobuild-design.md` — **read in full.**
+  On a fresh checkout `npm run dev` serves the player atlas, so the editor opens degraded with a "Save
+  won't work — run `npm run atlas:build`" banner. Add a `predev` guard (`scripts/ensure-dm-atlas.ts`) that
+  builds the DM atlas when missing/stale (skips when fresh; never blocks dev on build failure). **Touches
+  dev/build wiring** — the spec picked the `predev` approach; also run `npm run atlas:publish` once as a
+  safety check.
+  - Files: `package.json` (`predev`); new `scripts/ensure-dm-atlas.ts`; test for the pure staleness check.
+  - Done when: fresh checkout → `npm run dev` auto-builds and the editor opens with content + no banner;
+    warm start skips the rebuild; build failure doesn't abort dev; `npm run build`/player build unaffected;
+    gate green. ~1 run.
+
+- [ ] **E4. Clearer import report (post-import summary).**
+  **Spec:** `docs/superpowers/specs/2026-05-31-import-report-summary-design.md` — **read in full.**
+  After a vault import the only feedback is a bare count. Enrich the existing success toast with a plain-
+  language breakdown (added / updated / replaced / skipped, plus a distinct "couldn't be read" line) derived
+  from the staged rows. No new mandatory step — sleek, one-glance. UX latitude: spec pins the chosen shape.
+  - Files: `src/atlas/import/useMdImportFlow.ts` (+ a pure `summarizeImport` helper, likely in
+    `src/atlas/import/`); test for the helper.
+  - Done when: the DM sees a correct plain-language breakdown after import without extra clicks; existing
+    conflict/rebuild toasts unchanged; gate green. ~1 run.
+
+- [ ] **E5. Phrase search (`"exact phrase"`) in the player search.**
+  **Spec:** `docs/superpowers/specs/2026-05-31-phrase-search-design.md` — **read in full.**
+  Add quoted exact-contiguous-phrase matching to `SearchPalette` (AND-combined with unquoted terms);
+  introduces **no** fuzzy matching (a non-goal). Extract the parse + match into tested pure functions under
+  `src/atlas/search/`. Most feature-shaped item in this batch — easy to defer.
+  - Files: `src/pages/AtlasViewer.tsx`, new pure helpers under `src/atlas/search/`; tests. **Contingency
+    only:** if `bodyText` isn't on the index entries, a one-field add in `scripts/build-atlas.ts` pulls in
+    the `atlas:publish:integrity-smoke` + `atlas:publish` gate (see spec).
+  - Done when: `"exact phrase"` restricts results to contiguous matches; mixed queries AND correctly; the
+    phrase is highlighted; parse/match logic is unit-tested; gate green. ~1–2 runs.
 
 ### D — Daily-driver fixes from the 2026-05-30 dogfooding pass
 
