@@ -26,17 +26,18 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
-> **Refueled 2026-05-31** — section **E** below (5 units) was blessed by the human (Opus refuel session)
-> from the ranked inbox in `docs/DEVELOPMENT_WANTS.md`. **E is the current priority — build top to bottom**
-> (E1 is the safest, E5 the most feature-shaped). Each cites a full spec under
+> **Refueled 2026-05-31** — section **E** below (6 units) was blessed by the human from the ranked inbox in
+> `docs/DEVELOPMENT_WANTS.md` (E1–E5 in the Opus refuel session; **E6 added 2026-05-31** during the E1 merge
+> session, same human bless). **E is the current priority — build top to bottom.** **E1 is ✅ DONE**
+> (merged to main `a7f22fbc`); E2 is next. Each cites a full spec under
 > `docs/superpowers/specs/2026-05-31-*.md` — **read it in full first.** Sections D, A, B, C below are all
 > ✅ DONE.
 
 ### E — Refuel 2026-05-31 (blessed from the ranked inbox)
 
-Ordered by confidence/safety: build **E1 first**. Each is bounded and revertible. E1–E2 are clear
-correctness/polish; E3 touches dev/build wiring (spec picked the approach); E4–E5 carry some UX/feature
-latitude — the spec pins the chosen shape.
+Ordered by confidence/safety: **E1 is done**; build **E2 next**. Each is bounded and revertible. E2 and E6
+are clear correctness/polish (E6 mirrors E2 — same Publish Check surface); E3 touches dev/build wiring (spec
+picked the approach); E4–E5 carry some UX/feature latitude — the spec pins the chosen shape.
 
 - [x] **E1. Accessible names for icon-only controls.**
   **Spec:** `docs/superpowers/specs/2026-05-31-accessibility-labels-design.md` — **read in full.**
@@ -95,6 +96,19 @@ latitude — the spec pins the chosen shape.
     the `atlas:publish:integrity-smoke` + `atlas:publish` gate (see spec).
   - Done when: `"exact phrase"` restricts results to contiguous matches; mixed queries AND correctly; the
     phrase is highlighted; parse/match logic is unit-tested; gate green. ~1–2 runs.
+
+- [ ] **E6. Flag broken wikilinks in Publish Check.**
+  **Spec:** `docs/superpowers/specs/2026-05-31-broken-wikilink-flag-design.md` — **read in full.**
+  A wikilink whose target doesn't resolve (`[[Ghost Town]]`, `[[Note#Heading]]`) renders to players as dead
+  text, and the DM is never warned. Add a Publish Check **suggestion** (deliberately low-key — not a
+  warning; many broken links are intentional WIP) that surfaces, per player-visible entity, the broken
+  targets players would see. Mirrors E2 exactly: one check in `validateProject.ts`, reuses the existing
+  Issue/UI model. **No regex needed** — `entity.links[]` already carries `broken: boolean`; iterate it like
+  the existing `wikilink-to-dm` check. Sibling of E2; same "flag it, don't fix the renderer" half.
+  - Files: `src/atlas/yaml/validateProject.ts`; extend `src/test/atlas-publish-check.test.ts`.
+  - Done when: player-visible entities with broken links raise one aggregated `broken-wikilink` suggestion
+    per entity (naming the dead targets, with a `go-entity` action); no issue for DM-only entities or
+    all-resolving entities; no per-link spam; no UI/schema change; gate green. ~1 run.
 
 ### D — Daily-driver fixes from the 2026-05-30 dogfooding pass
 
