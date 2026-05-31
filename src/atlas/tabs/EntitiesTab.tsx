@@ -372,6 +372,7 @@ function ListField({
               variant="ghost"
               className="h-7 w-7 p-0"
               onClick={() => onChange(values.filter((_, j) => j !== i))}
+              aria-label="Remove value"
             >
               <Trash2 className="h-3 w-3" />
             </Button>
@@ -481,7 +482,7 @@ function RelationshipSection({
                 {r.visibility !== "player" && r.visibility !== "rumor" && (
                   <span className="text-[9px] uppercase rounded px-1 py-0.5 bg-destructive/15 text-destructive">DM</span>
                 )}
-                <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => remove(i)}>
+                <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => remove(i)} aria-label="Remove link">
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </div>
