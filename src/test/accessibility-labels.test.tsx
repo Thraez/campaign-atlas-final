@@ -22,16 +22,23 @@ import type { AtlasProject, Entity, MapDocument, MapLayer } from "@/atlas/conten
 
 // AtlasMinimap uses useMap() which requires a MapContainer context at runtime.
 // Stub the hook so we can render the component in isolation.
-vi.mock("react-leaflet", () => ({
-  useMap: () => ({
+//
+// IMPORTANT: useMap() must return a *stable* reference, exactly as real
+// react-leaflet does (it hands back the one Leaflet map instance). AtlasMinimap's
+// viewport effect depends on `parent`; if the stub returned a fresh object each
+// call, the effect would re-run every render, setVp() a new object every time,
+// and spin in an infinite render loop until the heap is exhausted.
+vi.mock("react-leaflet", () => {
+  const fakeMap = {
     getBounds: () => ({
       getSouthWest: () => ({ lng: 0, lat: 0 }),
       getNorthEast: () => ({ lng: 500, lat: 500 }),
     }),
     on: () => {},
     off: () => {},
-  }),
-}));
+  };
+  return { useMap: () => fakeMap };
+});
 
 // ---------------------------------------------------------------------------
 // Minimal stubs
