@@ -90,13 +90,11 @@ function parseArgs(argv: string[]): Args | null {
   return { target, config };
 }
 
-export async function main(): Promise<number> {
-  const args = parseArgs(process.argv.slice(2));
-  if (!args) {
-    console.error("atlas:check-fog-safety: missing target dir");
-    console.error("Usage: tsx scripts/check-fog-safety.ts <artifact-dir> [--config atlas.config.json]");
-    return 1;
-  }
+export interface RunOpts { dir: string; config?: string }
+
+export async function run(opts: RunOpts): Promise<number> {
+  const configPath = opts.config ?? "atlas.config.json";
+  const args: Args = { target: opts.dir, config: configPath };
 
   const targetAbs = path.resolve(process.cwd(), args.target);
   if (!fs.existsSync(targetAbs)) {
@@ -291,6 +289,16 @@ export async function main(): Promise<number> {
 
   // Return the first finding's code for deterministic exit code in tests.
   return findings[0].code;
+}
+
+export async function main(): Promise<number> {
+  const args = parseArgs(process.argv.slice(2));
+  if (!args) {
+    console.error("atlas:check-fog-safety: missing target dir");
+    console.error("Usage: tsx scripts/check-fog-safety.ts <artifact-dir> [--config atlas.config.json]");
+    return 1;
+  }
+  return run({ dir: args.target, config: args.config });
 }
 
 const invokedAsScript = (() => {

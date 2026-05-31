@@ -164,7 +164,7 @@ export function MapLayerPanel(props: Props) {
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" title="Clear local draft assets">
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" title="Clear local draft assets" aria-label="Clear local draft assets">
                 <Eraser className="h-3.5 w-3.5" />
               </Button>
             </AlertDialogTrigger>
@@ -249,14 +249,14 @@ export function MapLayerPanel(props: Props) {
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Transform</span>
               <div className="flex items-center gap-1">
-                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onDuplicate(selected.id)} title="Duplicate">
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onDuplicate(selected.id)} title="Duplicate" aria-label="Duplicate layer">
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
-                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setLocked((v) => !v)} title={locked ? "Unlock" : "Lock"}>
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setLocked((v) => !v)} title={locked ? "Unlock" : "Lock"} aria-label={locked ? "Unlock layer" : "Lock layer"}>
                   {locked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
                 </Button>
                 {localSelected && (
-                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => onRemove(selected.id)} title="Remove">
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => onRemove(selected.id)} title="Remove" aria-label="Remove layer">
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 )}
@@ -298,10 +298,10 @@ export function MapLayerPanel(props: Props) {
                 {NUDGE_STEPS.map((step) => (
                   <div key={step} className="flex items-center gap-1">
                     <span className="text-[10px] text-muted-foreground w-12">±{step}</span>
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => nudge(-step, 0)}><ChevronLeft className="h-3.5 w-3.5" /></Button>
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => nudge(step, 0)}><ChevronRight className="h-3.5 w-3.5" /></Button>
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => nudge(0, -step)}><ChevronUp className="h-3.5 w-3.5" /></Button>
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => nudge(0, step)}><ChevronDown className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => nudge(-step, 0)} aria-label={`Nudge layer left (±${step})`}><ChevronLeft className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => nudge(step, 0)} aria-label={`Nudge layer right (±${step})`}><ChevronRight className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => nudge(0, -step)} aria-label={`Nudge layer up (±${step})`}><ChevronUp className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => nudge(0, step)} aria-label={`Nudge layer down (±${step})`}><ChevronDown className="h-3.5 w-3.5" /></Button>
                   </div>
                 ))}
               </div>

@@ -204,45 +204,49 @@ export function scanArtifactForSecrets(dir: string, secrets: SecretEntry[]): Der
   return { derivedCount: secrets.length, filesScanned, hits };
 }
 
+function resolveConfig(configHint?: string): string | null {
+  if (configHint) return path.resolve(process.cwd(), configHint);
+  for (const c of CONFIG_CANDIDATES) {
+    const abs = path.resolve(process.cwd(), c);
+    if (fs.existsSync(abs)) return abs;
+  }
+  return null;
+}
+
 function parseArgs(): { target: string; config: string } | null {
   const args = process.argv.slice(2);
   let target: string | undefined;
-  let config: string | undefined;
+  let configHint: string | undefined;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a === "--config") config = args[++i];
-    else if (a.startsWith("--config=")) config = a.slice(9);
+    if (a === "--config") configHint = args[++i];
+    else if (a.startsWith("--config=")) configHint = a.slice(9);
     else if (!target) target = a;
   }
   if (!target) return null;
-  if (!config) {
-    for (const c of CONFIG_CANDIDATES) {
-      if (fs.existsSync(path.resolve(process.cwd(), c))) {
-        config = c;
-        break;
-      }
-    }
-  }
+  const config = resolveConfig(configHint);
   if (!config) return null;
-  return { target, config: path.resolve(process.cwd(), config) };
+  return { target, config };
 }
 
-function main(): number {
-  const args = parseArgs();
-  if (!args) {
-    console.error("Usage: tsx scripts/check-derived-secrets.ts <artifact-dir> [--config atlas.config.json]");
+export interface RunOpts { dir: string; config?: string }
+
+export function run(opts: RunOpts): number {
+  const configAbs = resolveConfig(opts.config);
+  if (!configAbs) {
+    console.error("atlas:check-derived-secrets: config not found (place atlas.config.json in cwd or pass --config)");
     return 1;
   }
-  const targetAbs = path.resolve(process.cwd(), args.target);
+  const targetAbs = path.resolve(process.cwd(), opts.dir);
   if (!fs.existsSync(targetAbs)) {
-    console.log(`atlas:check-derived-secrets: target "${args.target}" does not exist, skipping`);
+    console.log(`atlas:check-derived-secrets: target "${opts.dir}" does not exist, skipping`);
     return 0;
   }
-  if (!fs.existsSync(args.config)) {
-    console.error(`atlas:check-derived-secrets: config "${args.config}" does not exist`);
+  if (!fs.existsSync(configAbs)) {
+    console.error(`atlas:check-derived-secrets: config "${configAbs}" does not exist`);
     return 1;
   }
-  const secrets = deriveSecretsFromVault(args.config);
+  const secrets = deriveSecretsFromVault(configAbs);
   if (secrets.length === 0) {
     console.log("atlas:check-derived-secrets: vault has no hidden/dm entities — nothing to check");
     return 0;
@@ -250,7 +254,7 @@ function main(): number {
   const result = scanArtifactForSecrets(targetAbs, secrets);
   console.log(
     `atlas:check-derived-secrets: derived ${result.derivedCount} secret name(s); ` +
-    `scanned ${result.filesScanned} file(s) in ${args.target}`,
+    `scanned ${result.filesScanned} file(s) in ${opts.dir}`,
   );
   if (result.hits.length === 0) {
     console.log("atlas:check-derived-secrets: clean");
@@ -264,6 +268,15 @@ function main(): number {
     );
   }
   return 12;
+}
+
+function main(): number {
+  const args = parseArgs();
+  if (!args) {
+    console.error("Usage: tsx scripts/check-derived-secrets.ts <artifact-dir> [--config atlas.config.json]");
+    return 1;
+  }
+  return run({ dir: args.target, config: args.config });
 }
 
 const invokedAsScript = (() => {

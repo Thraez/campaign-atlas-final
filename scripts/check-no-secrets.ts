@@ -98,20 +98,21 @@ export function scanDir(dir: string): ScanResult {
   return result;
 }
 
-function main(): number {
-  const target = process.argv[2] ?? "dist";
-  const abs = path.resolve(process.cwd(), target);
+export interface RunOpts { dir: string }
+
+export function run(opts: RunOpts): number {
+  const abs = path.resolve(process.cwd(), opts.dir);
   if (!fs.existsSync(abs)) {
-    console.log(`atlas:check-secrets: target "${target}" does not exist, skipping`);
+    console.log(`atlas:check-secrets: target "${opts.dir}" does not exist, skipping`);
     return 0;
   }
   const stat = fs.statSync(abs);
   if (!stat.isDirectory()) {
-    console.error(`atlas:check-secrets: target "${target}" is not a directory`);
+    console.error(`atlas:check-secrets: target "${opts.dir}" is not a directory`);
     return 1;
   }
   const res = scanDir(abs);
-  console.log(`atlas:check-secrets: scanned ${res.files} text file(s) in ${target}`);
+  console.log(`atlas:check-secrets: scanned ${res.files} text file(s) in ${opts.dir}`);
   for (const h of res.dmHits) {
     console.error(`  DM LEAK    ${path.relative(process.cwd(), h.file)}  :: ${h.pattern}`);
   }
@@ -125,6 +126,10 @@ function main(): number {
   if (ed) return 9;
   console.log("atlas:check-secrets: clean");
   return 0;
+}
+
+function main(): number {
+  return run({ dir: process.argv[2] ?? "dist" });
 }
 
 // Run only when invoked as a script (not when imported by tests).

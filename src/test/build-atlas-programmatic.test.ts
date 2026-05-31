@@ -9,7 +9,7 @@
  * plugin uses.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { runBuild, BuildError } from "../../scripts/build-atlas";
+import { runBuild, BuildError, deriveTitle } from "../../scripts/build-atlas";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -100,5 +100,52 @@ describe("scripts/build-atlas runBuild() programmatic entry", () => {
     expect(err.code).toBe(6);
     expect(err.message).toBe("test message");
     expect(err.name).toBe("BuildError");
+  });
+});
+
+describe("search index bodyText field", () => {
+  it("search-index.json entries carry bodyText (original case) alongside lowercased body", async () => {
+    const result = await runBuild({ player: false, strict: false });
+    expect(result.ok).toBe(true);
+    const indexPath = path.join(tmpRoot, ".local-atlas", "search-index.json");
+    const index = JSON.parse(fs.readFileSync(indexPath, "utf8")) as Array<{
+      id: string;
+      body?: string;
+      bodyText?: string;
+    }>;
+    // Every entry with a non-empty body must also carry bodyText.
+    const withBody = index.filter((e) => e.body && e.body.length > 0);
+    expect(withBody.length).toBeGreaterThan(0);
+    withBody.forEach((e) => {
+      expect(e.bodyText).toBeDefined();
+      // body must be the lowercased form of bodyText
+      expect(e.body).toBe(e.bodyText!.toLowerCase());
+    });
+  });
+});
+
+describe("deriveTitle", () => {
+  it("title-cases a single-word slug when no fmTitle provided", () => {
+    expect(deriveTitle("/notes/corven.md")).toBe("Corven");
+  });
+
+  it("title-cases each word of a hyphenated slug", () => {
+    expect(deriveTitle("/notes/great-hall.md")).toBe("Great Hall");
+  });
+
+  it("title-cases each word of an underscore slug", () => {
+    expect(deriveTitle("/notes/lost_city.md")).toBe("Lost City");
+  });
+
+  it("returns explicit fmTitle trimmed and unchanged (no forced case change)", () => {
+    expect(deriveTitle("/notes/corven.md", "  corven the Bold  ")).toBe("corven the Bold");
+  });
+
+  it("falls back to slug-derived title when fmTitle is empty string", () => {
+    expect(deriveTitle("/notes/edric.md", "")).toBe("Edric");
+  });
+
+  it("falls back to slug-derived title when fmTitle is whitespace-only", () => {
+    expect(deriveTitle("/notes/edric.md", "   ")).toBe("Edric");
   });
 });

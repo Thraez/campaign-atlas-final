@@ -79,6 +79,8 @@ export function AtlasMinimap({ map, layers, width = 180, className }: Props) {
         "absolute bottom-3 right-3 z-[400] rounded-md border border-border shadow-lg cursor-crosshair overflow-hidden bg-card/80 backdrop-blur-sm"
       }
       style={{ width, height, background: map.oceanColor ?? "#18313f" }}
+      role="img"
+      aria-label="Minimap — click or drag to pan"
       title="Minimap — click or drag to pan, scroll to zoom"
     >
       {[...layers].sort((a, b) => a.zIndex - b.zIndex).map((layer) => (

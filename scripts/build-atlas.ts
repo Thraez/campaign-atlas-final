@@ -159,9 +159,12 @@ function globToRegExp(glob: string): RegExp {
   return new RegExp(`^${escaped}$`);
 }
 
-function deriveTitle(file: string, fmTitle?: unknown): string {
+export function deriveTitle(file: string, fmTitle?: unknown): string {
   if (typeof fmTitle === "string" && fmTitle.trim()) return fmTitle.trim();
-  return path.basename(file, ".md").replace(/[-_]+/g, " ").trim();
+  return path.basename(file, ".md")
+    .replace(/[-_]+/g, " ")
+    .trim()
+    .replace(/(^|\s)(\p{L})/gu, (_m, sp, ch) => sp + ch.toUpperCase());
 }
 
 function relImage(p: string): string {
@@ -941,7 +944,8 @@ async function runBuildCore(flags: BuildFlags) {
 
   // Strip markdown syntax for the search index body field. Keeps it small enough
   // for client-side full-text scan without shipping a wasm search engine.
-  const stripMd = (s: string) =>
+  // Core strips markdown but preserves original case — used as bodyText for display.
+  const stripMdCore = (s: string) =>
     s
       .replace(/```[\s\S]*?```/g, " ")
       .replace(/!\[[^\]]*]\([^)]*\)/g, " ")
@@ -949,22 +953,27 @@ async function runBuildCore(flags: BuildFlags) {
       .replace(/\[([^\]]*)]\([^)]*\)/g, "$1")
       .replace(/[*_`>#~]+/g, " ")
       .replace(/\s+/g, " ")
-      .trim()
-      .toLowerCase();
+      .trim();
+  // Lowercase wrapper — used for full-text matching.
+  const stripMd = (s: string) => stripMdCore(s).toLowerCase();
 
-  const searchIndex = pending.map(({ entity }) => ({
-    id: entity.id,
-    title: entity.title,
-    type: entity.type,
-    aliases: entity.aliases,
-    tags: entity.tags,
-    summary: entity.summary,
-    excerpt: entity.body.replace(/\s+/g, " ").trim().slice(0, 240),
-    body: stripMd(entity.body).slice(0, 4000),
-    dateRaw: entity.dateRaw,
-    dateValue: entity.dateValue,
-    dateYear: entity.dateYear,
-  }));
+  const searchIndex = pending.map(({ entity }) => {
+    const stripped = stripMdCore(entity.body).slice(0, 4000);
+    return {
+      id: entity.id,
+      title: entity.title,
+      type: entity.type,
+      aliases: entity.aliases,
+      tags: entity.tags,
+      summary: entity.summary,
+      excerpt: entity.body.replace(/\s+/g, " ").trim().slice(0, 240),
+      body: stripped.toLowerCase(),
+      bodyText: stripped,
+      dateRaw: entity.dateRaw,
+      dateValue: entity.dateValue,
+      dateYear: entity.dateYear,
+    };
+  });
   fs.writeFileSync(path.join(outDir, "search-index.json"), JSON.stringify(searchIndex, null, 2));
 
   const r = project.buildReport!;

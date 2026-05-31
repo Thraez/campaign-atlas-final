@@ -1140,6 +1140,7 @@ function AtlasPlacementEditorInner() {
             toast.info("Cleared overrides");
           }}
           title="Discard all local pin overrides"
+          aria-label="Discard all local pin overrides"
         >
           <RotateCcw className="h-4 w-4" />
         </Button>
@@ -2071,8 +2072,8 @@ function EntityRow({
               )}
             </PopoverContent>
           </Popover>
-          {onReset && <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={onReset} title="Discard local edit"><RotateCcw className="h-3.5 w-3.5" /></Button>}
-          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={onRemove} title="Remove placement"><Trash2 className="h-3.5 w-3.5" /></Button>
+          {onReset && <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={onReset} title="Discard local edit" aria-label="Discard local edit"><RotateCcw className="h-3.5 w-3.5" /></Button>}
+          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={onRemove} title="Remove placement" aria-label="Remove placement"><Trash2 className="h-3.5 w-3.5" /></Button>
         </div>
       )}
     </div>
