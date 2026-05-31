@@ -38,7 +38,7 @@ Ordered by confidence/safety: build **E1 first**. Each is bounded and revertible
 correctness/polish; E3 touches dev/build wiring (spec picked the approach); E4–E5 carry some UX/feature
 latitude — the spec pins the chosen shape.
 
-- [ ] **E1. Accessible names for icon-only controls.**
+- [x] **E1. Accessible names for icon-only controls.**
   **Spec:** `docs/superpowers/specs/2026-05-31-accessibility-labels-design.md` — **read in full.**
   Several icon-only buttons (the minimap region; the map-layer-panel nudge/lock/duplicate/remove buttons;
   per-pin discard/remove; two EntitiesTab trash buttons) have no accessible name. Add `aria-label`/`role`
@@ -47,6 +47,12 @@ latitude — the spec pins the chosen shape.
     `src/atlas/tabs/EntitiesTab.tsx`; new test under `src/test/`.
   - Done when: listed controls expose accessible names (sampled test green); no behaviour/visual change;
     gate green. ~1 run.
+  - ✅ DONE 2026-05-31 — commits a9a1a222 (aria-labels + role on minimap/layer-panel/placement-editor/
+    EntitiesTab + 6-test regression guard) + 3191e7ad (fix: stable react-leaflet mock — the original test
+    returned a fresh useMap() object each render, spinning AtlasMinimap's viewport effect into an
+    infinite-loop OOM; this was the real cause of 8 prior routine hand-backs, not machine memory).
+    Merged to main via a7f22fbc. Full gate: 1039 tests green (4 shards, no OOM); tsc clean; eslint 0 errors;
+    atlas:publish 10/10 scans clean; integrity-smoke 5/5.
 
 - [ ] **E2. Flag dropped image embeds in Publish Check.**
   **Spec:** `docs/superpowers/specs/2026-05-31-dropped-image-embed-flag-design.md` — **read in full.**
