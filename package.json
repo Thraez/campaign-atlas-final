@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "tsx scripts/ensure-dm-atlas.ts",
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
