@@ -55,7 +55,7 @@ picked the approach); E4–E5 carry some UX/feature latitude — the spec pins t
     Merged to main via a7f22fbc. Full gate: 1039 tests green (4 shards, no OOM); tsc clean; eslint 0 errors;
     atlas:publish 10/10 scans clean; integrity-smoke 5/5.
 
-- [ ] **E2. Flag dropped image embeds in Publish Check.**
+- [x] **E2. Flag dropped image embeds in Publish Check.**
   **Spec:** `docs/superpowers/specs/2026-05-31-dropped-image-embed-flag-design.md` — **read in full.**
   Obsidian `![[Portrait.png]]` embeds silently vanish in the player view. Add a Publish Check **warning**
   (the pre-blessed "flag it" half — not the larger "render it" change) so the DM sees which images won't
@@ -63,6 +63,9 @@ picked the approach); E4–E5 carry some UX/feature latitude — the spec pins t
   - Files: `src/atlas/yaml/validateProject.ts`; extend `src/test/atlas-publish-check.test.ts`.
   - Done when: player-visible entities with image embeds raise a `dropped-image-embed` warning; no false
     positives on DM-only/non-image/stripped-block embeds; gate green. ~1 run.
+  - ✅ DONE 2026-06-02 — commit a0eab4c0 (warn on dropped image embeds; scans e.body with image-extension
+    filter; DM-only and non-image embeds not flagged; 4 regression tests). Gate: 1043 tests green (4
+    shards, no OOM); tsc clean; eslint 0 errors (16 pre-existing warnings). Merged to auto/continuous-dev.
 
 - [ ] **E3. Editor "just works" on first run (auto-build the DM atlas).**
   **Spec:** `docs/superpowers/specs/2026-05-31-editor-first-run-autobuild-design.md` — **read in full.**
