@@ -320,6 +320,26 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
         scope: { entityId: e.id },
       });
     }
+    // Image embeds (![[image.ext]]) in player-visible body are silently dropped
+    // by the player projection (no embed-to-img conversion there). Warn so the
+    // DM can fix before publishing.
+    if (playerVisibleVis.has(e.visibility)) {
+      for (const m of (e.body || "").matchAll(/!\[\[([^[\]\n]+?)\]\]/g)) {
+        const target = m[1].split("|")[0].trim();
+        if (/\.(?:png|jpe?g|gif|webp|svg|avif)$/i.test(target)) {
+          issues.push({
+            severity: "warning",
+            code: "dropped-image-embed",
+            category: "yaml",
+            message: `Image embed \`![[${target}]]\` won't appear in the player view.`,
+            hint: "Add the image through the editor's image field so it's published with the note.",
+            scope: { entityId: e.id },
+            actions: [{ kind: "go-entity", label: "Go to note", payload: e.id }],
+          });
+        }
+      }
+    }
+
     // Player-visible wikilinks pointing at DM-only entities leak titles via
     // tooltips / autocomplete. The strict build already drops them but warn.
     if (playerVisibleVis.has(e.visibility) && Array.isArray(e.links)) {
