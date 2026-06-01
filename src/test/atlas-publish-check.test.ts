@@ -127,4 +127,28 @@ describe("validateProject — Publish Check", () => {
     expect(r.meta.mapCount).toBe(1);
     expect(r.meta.atlasVersion).toBe("1.0.0");
   });
+
+  it("warns on image embed in player-visible body", () => {
+    const e = entity({ id: "npc", body: "![[Portrait.png]]" });
+    const r = validateProject({ project: baseProject({ entities: [e] }), draftPlacements: [] });
+    expect(r.issues.some((i) => i.code === "dropped-image-embed" && i.severity === "warning")).toBe(true);
+  });
+
+  it("does not warn when player-visible body has no image embed", () => {
+    const e = entity({ id: "npc", body: "Just some flavour text." });
+    const r = validateProject({ project: baseProject({ entities: [e] }), draftPlacements: [] });
+    expect(r.issues.some((i) => i.code === "dropped-image-embed")).toBe(false);
+  });
+
+  it("does not warn for non-image embed (no image extension)", () => {
+    const e = entity({ id: "npc", body: "See also ![[Some Note]]." });
+    const r = validateProject({ project: baseProject({ entities: [e] }), draftPlacements: [] });
+    expect(r.issues.some((i) => i.code === "dropped-image-embed")).toBe(false);
+  });
+
+  it("does not warn for dm-only entity even if body has image embed", () => {
+    const e = entity({ id: "secret", visibility: "dm", body: "![[SecretMap.png]]" });
+    const r = validateProject({ project: baseProject({ entities: [e] }), draftPlacements: [] });
+    expect(r.issues.some((i) => i.code === "dropped-image-embed")).toBe(false);
+  });
 });
