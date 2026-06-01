@@ -67,7 +67,7 @@ picked the approach); E4–E5 carry some UX/feature latitude — the spec pins t
     filter; DM-only and non-image embeds not flagged; 4 regression tests). Gate: 1043 tests green (4
     shards, no OOM); tsc clean; eslint 0 errors (16 pre-existing warnings). Merged to auto/continuous-dev.
 
-- [ ] **E3. Editor "just works" on first run (auto-build the DM atlas).**
+- [x] **E3. Editor "just works" on first run (auto-build the DM atlas).**
   **Spec:** `docs/superpowers/specs/2026-05-31-editor-first-run-autobuild-design.md` — **read in full.**
   On a fresh checkout `npm run dev` serves the player atlas, so the editor opens degraded with a "Save
   won't work — run `npm run atlas:build`" banner. Add a `predev` guard (`scripts/ensure-dm-atlas.ts`) that
@@ -78,6 +78,9 @@ picked the approach); E4–E5 carry some UX/feature latitude — the spec pins t
   - Done when: fresh checkout → `npm run dev` auto-builds and the editor opens with content + no banner;
     warm start skips the rebuild; build failure doesn't abort dev; `npm run build`/player build unaffected;
     gate green. ~1 run.
+  - ✅ DONE 2026-06-02 — commit fc839c6c (predev hook + scripts/ensure-dm-atlas.ts; isAtlasStale pure
+    helper; 4 unit tests). Gate: 1047 tests green (4 shards, no OOM); tsc clean; eslint 0 errors;
+    atlas:publish 10/10 scans clean. Merged to auto/continuous-dev.
 
 - [ ] **E4. Clearer import report (post-import summary).**
   **Spec:** `docs/superpowers/specs/2026-05-31-import-report-summary-design.md` — **read in full.**
