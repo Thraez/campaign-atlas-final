@@ -95,7 +95,7 @@ picked the approach); E4–E5 carry some UX/feature latitude — the spec pins t
     uses description on success toast; toast.warning when couldntBeRead > 0; 11 unit tests). Gate: 1058
     tests green (4 shards, no OOM); tsc clean; eslint 0 errors. Merged to auto/continuous-dev.
 
-- [ ] **E5. Phrase search (`"exact phrase"`) in the player search.**
+- [x] **E5. Phrase search (`"exact phrase"`) in the player search.**
   **Spec:** `docs/superpowers/specs/2026-05-31-phrase-search-design.md` — **read in full.**
   Add quoted exact-contiguous-phrase matching to `SearchPalette` (AND-combined with unquoted terms);
   introduces **no** fuzzy matching (a non-goal). Extract the parse + match into tested pure functions under
@@ -105,6 +105,10 @@ picked the approach); E4–E5 carry some UX/feature latitude — the spec pins t
     the `atlas:publish:integrity-smoke` + `atlas:publish` gate (see spec).
   - Done when: `"exact phrase"` restricts results to contiguous matches; mixed queries AND correctly; the
     phrase is highlighted; parse/match logic is unit-tested; gate green. ~1–2 runs.
+  - ✅ DONE 2026-06-02 — commits 487a8083 (parseSearchQuery + matchesPhrases helpers + 15 unit tests) +
+    b669ed51 (wire phrase filter + highlighted snippet into SearchPalette; placeholder updated). Gate: 1073
+    tests green (4 shards, no OOM); tsc clean; eslint 0 errors. No build/scan pipeline impact
+    (bodyText was already present on index entries — contingency not triggered).
 
 - [ ] **E6. Flag broken wikilinks in Publish Check.**
   **Spec:** `docs/superpowers/specs/2026-05-31-broken-wikilink-flag-design.md` — **read in full.**

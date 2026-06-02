@@ -19,6 +19,7 @@ import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 import { snippet } from "@/atlas/search/snippet";
+import { parseSearchQuery, matchesPhrases } from "@/atlas/search/parseSearchQuery";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
@@ -739,32 +740,46 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
   }, [index]);
 
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
     let pool = index;
     if (activeType) pool = pool.filter((e) => e.type === activeType);
     if (activeTag) pool = pool.filter((e) => e.tags.includes(activeTag));
     if (thisMapOnly) pool = pool.filter((e) => placedIds.has(e.id));
     if (recentOnly && recentlyRevealed) pool = pool.filter((e) => recentlyRevealed.has(e.id));
-    if (!q) return pool.slice(0, 40).map((e) => ({ e, snip: null as string | null }));
+
+    const raw = query.trim();
+    if (!raw) return pool.slice(0, 40).map((e) => ({ e, snip: null as string | null }));
+
+    const { phrases, rest } = parseSearchQuery(raw);
+    const q = rest.toLowerCase();
+    // When query is phrases-only, score by the first phrase so results are still ranked.
+    const scoreQuery = q || (phrases.length > 0 ? phrases[0] : "");
+    const phrasesOnly = phrases.length > 0 && rest === "";
+
+    // Hard AND-filter: exclude entries missing any required phrase.
+    if (phrases.length > 0) pool = pool.filter((e) => matchesPhrases(e, phrases));
 
     const score = (e: SearchIndexEntry): number => {
+      if (!scoreQuery) return 0;
       let s = 0;
       const t = e.title.toLowerCase();
-      if (t === q) s += 30;
-      if (t.startsWith(q)) s += 14;
-      if (t.includes(q)) s += 10;
-      if (e.aliases.some((a) => a.toLowerCase().includes(q))) s += 6;
-      if (e.tags.some((tt) => tt.toLowerCase().includes(q))) s += 3;
-      if ((e.summary ?? "").toLowerCase().includes(q)) s += 2;
-      if ((e.body ?? "").includes(q)) s += 1;
+      if (t === scoreQuery) s += 30;
+      if (t.startsWith(scoreQuery)) s += 14;
+      if (t.includes(scoreQuery)) s += 10;
+      if (e.aliases.some((a) => a.toLowerCase().includes(scoreQuery))) s += 6;
+      if (e.tags.some((tt) => tt.toLowerCase().includes(scoreQuery))) s += 3;
+      if ((e.summary ?? "").toLowerCase().includes(scoreQuery)) s += 2;
+      if ((e.body ?? "").includes(scoreQuery)) s += 1;
       return s;
     };
+    // When phrases-only, all phrase-matched entries are shown (sorted by phrase score).
+    // When unquoted terms are present, the existing score > 0 gate still applies.
+    const snippetQuery = phrases.length > 0 ? phrases[0] : scoreQuery;
     return pool
       .map((e) => ({ e, s: score(e) }))
-      .filter((x) => x.s > 0)
+      .filter((x) => phrasesOnly || x.s > 0)
       .sort((a, b) => b.s - a.s)
       .slice(0, 40)
-      .map(({ e }) => ({ e, snip: snippet(e.bodyText ?? e.body, e.body, q) }));
+      .map(({ e }) => ({ e, snip: snippet(e.bodyText ?? e.body, e.body, snippetQuery) }));
   }, [query, index, activeType, activeTag, thisMapOnly, placedIds, recentOnly, recentlyRevealed]);
 
   // Reset selection when filters or query change.
@@ -809,7 +824,7 @@ function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: 
           <Search className="h-4 w-4 text-muted-foreground" />
           <Input
             autoFocus
-            placeholder="Search titles, lore body, tags…"
+            placeholder='Search titles, lore body, tags… "exact phrase"'
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="border-0 focus-visible:ring-0 p-0 h-auto"
