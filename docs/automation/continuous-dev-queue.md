@@ -351,6 +351,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - ✅ DONE 2026-06-02 — commit e0f82b90; 20 new tests in `src/test/atlas-world-loader.test.ts`;
     merged 81589996. Gate: 1161 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
     pre-existing warnings).
+- [x] **N16. Hygiene / coverage nibble #12** — `src/atlas/import/parseObsidian.ts` had several untested
+  branches: `generateAutoSummary` truncation paths (blocks < 20 chars skipped → undefined; block > maxLen
+  truncated at word boundary; hard char cut when no space); `parseObsidianFile` level="placeable" (dm +
+  mappable type); broken-wikilink detection via `knownEntityNames`; player-published + broken-wikilinks
+  warning; malformed YAML frontmatter error path; https:// attachment resolved=true; relative attachment
+  unresolved warning. All are correctness-critical import UI paths.
+  - ✅ DONE 2026-06-02 — commit fbe76799; 10 new tests added to `src/test/atlas-import.test.ts`;
+    merged <merge-hash>. Gate: 1175 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
+    pre-existing warnings).
 
 ---
 
