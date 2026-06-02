@@ -341,6 +341,16 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - ✅ DONE 2026-06-02 — commit ef1a12f4; 17 new tests in `src/test/atlas-parser-placements.test.ts`;
     merged 5c0a9d8e. Gate: 1141 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
     pre-existing warnings).
+- [x] **N14. Hygiene / coverage nibble #10** — `scripts/atlas/loadWorldConfig.ts` helper branches
+  had zero test coverage: `sanitizeScale` (non-number/zero/negative `unitsPerPixel` → warn+undefined;
+  default `unitLabel`), `sanitizeGrid` (invalid kind/size → warn+undefined; `enabled` default),
+  `calendar` (empty or all-invalid months → warn+undefined; mixed valid/invalid filtering),
+  `normalizeVis` (undefined → silent default; invalid string → warn+default), region geometry
+  (fewer-than-3-points → warn+drop), route edge-cases (invalid mode, string waypoint conversion,
+  invalid waypoint skip). ~1 run.
+  - ✅ DONE 2026-06-02 — commit e0f82b90; 20 new tests in `src/test/atlas-world-loader.test.ts`;
+    merged 81589996. Gate: 1161 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
+    pre-existing warnings).
 
 ---
 
