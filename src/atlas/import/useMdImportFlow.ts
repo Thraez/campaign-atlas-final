@@ -20,6 +20,7 @@ import {
   SaveBusyError,
 } from "@/atlas/save/localFsSave";
 import type { ImportFolderConfig } from "../content/schema";
+import { summarizeImport, formatImportSummaryLine } from "./summarizeImport";
 
 export interface UseMdImportFlowArgs {
   /** Active world id; drives target-path allowlist. */
@@ -110,7 +111,25 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
           },
         );
       } else {
-        toast.success(`Imported ${count} file${count === 1 ? "" : "s"} and rebuilt the atlas`);
+        const summary = summarizeImport(rows);
+        const mainLine = formatImportSummaryLine(summary);
+        const couldntLine =
+          summary.couldntBeRead > 0
+            ? `${summary.couldntBeRead} couldn't be read — check the source file${summary.couldntBeRead === 1 ? "" : "s"}.`
+            : undefined;
+        const description =
+          [mainLine, couldntLine].filter(Boolean).join("\n") || undefined;
+        if (summary.couldntBeRead > 0) {
+          toast.warning(
+            `Imported ${count} note${count === 1 ? "" : "s"} and rebuilt the atlas`,
+            { description, duration: 10_000 },
+          );
+        } else {
+          toast.success(
+            `Imported ${count} note${count === 1 ? "" : "s"} and rebuilt the atlas`,
+            { description },
+          );
+        }
       }
       setOpen(false);
       setRows([]);

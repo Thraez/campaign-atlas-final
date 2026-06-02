@@ -82,7 +82,7 @@ picked the approach); E4–E5 carry some UX/feature latitude — the spec pins t
     helper; 4 unit tests). Gate: 1047 tests green (4 shards, no OOM); tsc clean; eslint 0 errors;
     atlas:publish 10/10 scans clean. Merged to auto/continuous-dev.
 
-- [ ] **E4. Clearer import report (post-import summary).**
+- [x] **E4. Clearer import report (post-import summary).**
   **Spec:** `docs/superpowers/specs/2026-05-31-import-report-summary-design.md` — **read in full.**
   After a vault import the only feedback is a bare count. Enrich the existing success toast with a plain-
   language breakdown (added / updated / replaced / skipped, plus a distinct "couldn't be read" line) derived
@@ -91,6 +91,9 @@ picked the approach); E4–E5 carry some UX/feature latitude — the spec pins t
     `src/atlas/import/`); test for the helper.
   - Done when: the DM sees a correct plain-language breakdown after import without extra clicks; existing
     conflict/rebuild toasts unchanged; gate green. ~1 run.
+  - ✅ DONE 2026-06-02 — commit dcbba70c (summarizeImport helper + formatImportSummaryLine; useMdImportFlow
+    uses description on success toast; toast.warning when couldntBeRead > 0; 11 unit tests). Gate: 1058
+    tests green (4 shards, no OOM); tsc clean; eslint 0 errors. Merged to auto/continuous-dev.
 
 - [ ] **E5. Phrase search (`"exact phrase"`) in the player search.**
   **Spec:** `docs/superpowers/specs/2026-05-31-phrase-search-design.md` — **read in full.**
