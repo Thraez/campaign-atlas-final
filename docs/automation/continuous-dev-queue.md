@@ -110,7 +110,7 @@ picked the approach); E4–E5 carry some UX/feature latitude — the spec pins t
     tests green (4 shards, no OOM); tsc clean; eslint 0 errors. No build/scan pipeline impact
     (bodyText was already present on index entries — contingency not triggered).
 
-- [ ] **E6. Flag broken wikilinks in Publish Check.**
+- [x] **E6. Flag broken wikilinks in Publish Check.**
   **Spec:** `docs/superpowers/specs/2026-05-31-broken-wikilink-flag-design.md` — **read in full.**
   A wikilink whose target doesn't resolve (`[[Ghost Town]]`, `[[Note#Heading]]`) renders to players as dead
   text, and the DM is never warned. Add a Publish Check **suggestion** (deliberately low-key — not a
@@ -122,6 +122,10 @@ picked the approach); E4–E5 carry some UX/feature latitude — the spec pins t
   - Done when: player-visible entities with broken links raise one aggregated `broken-wikilink` suggestion
     per entity (naming the dead targets, with a `go-entity` action); no issue for DM-only entities or
     all-resolving entities; no per-link spam; no UI/schema change; gate green. ~1 run.
+  - ✅ DONE 2026-06-02 — commit 5ea9ee8d; iterates e.links[], filters broken===true, emits one aggregated
+    Issue per entity (severity "suggestion", category "yaml", go-entity action, up to 3 targets listed
+    inline + "…and N more" for longer). 4 new tests (player+broken, player+resolved, dm+broken,
+    multi-broken-aggregated); 1077 tests green (4 shards); tsc clean; eslint 0 errors.
 
 ### D — Daily-driver fixes from the 2026-05-30 dogfooding pass
 

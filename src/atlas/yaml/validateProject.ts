@@ -357,6 +357,26 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
         }
       }
     }
+    // Broken wikilinks in player-visible entities render as dead, non-clickable
+    // text to players. Aggregate all broken targets into one suggestion per
+    // entity so the Publish Check stays sleek (not one issue per link).
+    if (playerVisibleVis.has(e.visibility) && Array.isArray(e.links)) {
+      const broken = e.links.filter((l) => l.broken);
+      if (broken.length > 0) {
+        const CAP = 3;
+        const listed = broken.slice(0, CAP).map((l) => `[[${l.target}]]`).join(", ");
+        const extra = broken.length > CAP ? ` …and ${broken.length - CAP} more` : "";
+        issues.push({
+          severity: "suggestion",
+          code: "broken-wikilink",
+          category: "yaml",
+          message: `Players will see dead text for ${broken.length} broken link${broken.length === 1 ? "" : "s"} in "${e.title}": ${listed}${extra}.`,
+          hint: "Create the linked note, fix the spelling, or remove the link so players don't see dead text.",
+          scope: { entityId: e.id },
+          actions: [{ kind: "go-entity", label: "Open note", payload: e.id }],
+        });
+      }
+    }
     // Player-visible relationships pointing at DM-only entities leak too.
     if (playerVisibleVis.has(e.visibility) && Array.isArray(e.relationships)) {
       for (const rel of e.relationships) {

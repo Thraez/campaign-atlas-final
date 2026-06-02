@@ -151,4 +151,50 @@ describe("validateProject — Publish Check", () => {
     const r = validateProject({ project: baseProject({ entities: [e] }), draftPlacements: [] });
     expect(r.issues.some((i) => i.code === "dropped-image-embed")).toBe(false);
   });
+
+  it("flags broken wikilink in player-visible entity as suggestion", () => {
+    const e = entity({
+      id: "town",
+      links: [{ target: "Ghost Town", resolvedId: undefined, display: "Ghost Town", broken: true }],
+    });
+    const r = validateProject({ project: baseProject({ entities: [e] }), draftPlacements: [] });
+    const issue = r.issues.find((i) => i.code === "broken-wikilink");
+    expect(issue).toBeDefined();
+    expect(issue?.severity).toBe("suggestion");
+    expect(issue?.message).toContain("[[Ghost Town]]");
+  });
+
+  it("does not flag player-visible entity whose links all resolve", () => {
+    const e = entity({
+      id: "town",
+      links: [{ target: "Iron Tower", resolvedId: "iron-tower", display: "Iron Tower", broken: false }],
+    });
+    const r = validateProject({ project: baseProject({ entities: [e] }), draftPlacements: [] });
+    expect(r.issues.some((i) => i.code === "broken-wikilink")).toBe(false);
+  });
+
+  it("does not flag dm-only entity with broken links", () => {
+    const e = entity({
+      id: "secret",
+      visibility: "dm",
+      links: [{ target: "Nowhere", resolvedId: undefined, display: "Nowhere", broken: true }],
+    });
+    const r = validateProject({ project: baseProject({ entities: [e] }), draftPlacements: [] });
+    expect(r.issues.some((i) => i.code === "broken-wikilink")).toBe(false);
+  });
+
+  it("aggregates multiple broken links into one issue per entity", () => {
+    const e = entity({
+      id: "hub",
+      links: [
+        { target: "Old Mill", resolvedId: undefined, display: "Old Mill", broken: true },
+        { target: "Ghost Town", resolvedId: undefined, display: "Ghost Town", broken: true },
+        { target: "Lost Keep", resolvedId: undefined, display: "Lost Keep", broken: true },
+      ],
+    });
+    const r = validateProject({ project: baseProject({ entities: [e] }), draftPlacements: [] });
+    const issues = r.issues.filter((i) => i.code === "broken-wikilink");
+    expect(issues).toHaveLength(1);
+    expect(issues[0].message).toContain("3 broken links");
+  });
 });
