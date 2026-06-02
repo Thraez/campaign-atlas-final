@@ -332,6 +332,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - ✅ DONE 2026-06-02 — commits 96a180c9 (fix+test: infinite-recursion bug fix + 21 new tests);
     merged 33d52578. Gate: 1124 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
     pre-existing warnings).
+- [x] **N13. Hygiene / coverage nibble #9** — `scripts/atlas/parseFrontmatter.ts` private helpers
+  (`parsePlacements`, `parsePinStyle`, `parseProfile`, `parseRelationships`) had zero branch coverage
+  on their validation/rejection paths. Key correctness cases: non-array inputs warn+return undefined,
+  non-object items skipped, missing required fields warn+skip, pin priority clamped 0..10, invalid
+  shape/labelMode silently ignored, relationship invalid visibility defaults to "dm" (security invariant).
+  ~1 run.
+  - ✅ DONE 2026-06-02 — commit ef1a12f4; 17 new tests in `src/test/atlas-parser-placements.test.ts`;
+    merged 5c0a9d8e. Gate: 1141 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
+    pre-existing warnings).
 
 ---
 
