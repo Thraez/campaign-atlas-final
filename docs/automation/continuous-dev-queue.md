@@ -321,6 +321,17 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   All correctness-critical: wrong date parsing = wrong sort order in the DM's event timeline. ~1 run.
   - ✅ DONE 2026-06-02 — commit f4cec947; 10 new tests in `src/test/calendar-date.test.ts`; 1092 tests
     green (4 shards, no OOM); tsc clean; eslint 0 errors. Merged to auto/continuous-dev (merge 0446e431).
+- [x] **N12. Hygiene / coverage nibble #8** — `src/atlas/import/mapImport.ts` pure helpers had
+  significant uncovered branches: `nameFromFilename` (entirely untested), `resolveSize` sizing modes
+  (`stretch-to-current`, `center-natural`, `custom` with keepAspect variants), and `validateImportPlan`
+  validation rules (duplicate map id, invalid map/layer size, external URL, missing src, unusual
+  extension, oversize image). Discovered and fixed a real infinite-recursion bug: the no-currentMap
+  fallback in `stretch-to-current`/`center-natural`/`fit-within-current` called `resolveSize(image)`
+  without resetting the sizing mode, causing infinite recursion. Fixed by inlining the natural-size
+  result; all three cases corrected. ~1 run.
+  - ✅ DONE 2026-06-02 — commits 96a180c9 (fix+test: infinite-recursion bug fix + 21 new tests);
+    merged 33d52578. Gate: 1124 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
+    pre-existing warnings).
 
 ---
 
