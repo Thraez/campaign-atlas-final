@@ -314,6 +314,13 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   summary). ~1 run.
   - ✅ DONE 2026-06-02 — commit e6cd02f9; 5 new tests in `atlas-diff.test.ts`; 1082 tests green (4 shards,
     no OOM); tsc clean; eslint 0 errors. Merged to auto/continuous-dev (merge a4457587).
+- [x] **N11. Hygiene / coverage nibble #7** — `scripts/atlas/calendarDate.ts` (`parseAtlasDate`) had zero
+  test coverage despite powering event-timeline sorting and player-visible date labels. Multiple branches:
+  YYYY-MM-DD with/without a world calendar, YYYY-MM and YYYY partial dates, custom-calendar label
+  formatting (month names + epoch suffix), month-index overflow clamp, and ISO 8601 Date.parse fallback.
+  All correctness-critical: wrong date parsing = wrong sort order in the DM's event timeline. ~1 run.
+  - ✅ DONE 2026-06-02 — commit f4cec947; 10 new tests in `src/test/calendar-date.test.ts`; 1092 tests
+    green (4 shards, no OOM); tsc clean; eslint 0 errors. Merged to auto/continuous-dev (merge 0446e431).
 
 ---
 
