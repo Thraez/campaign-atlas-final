@@ -19,6 +19,16 @@ _None yet._
 ## Run history
 *(Each daily run appends one line: what was fixed, or "clean run — nothing safe to fix".)*
 
+- 2026-06-02 (run qa-20260602b) — **Fixed (tests only, no behavior change):** added
+  regression tests for the world-config loader — the code that reads the DM's map,
+  region, route, and fog definitions out of `world.yaml`. Four cases now lock in how it
+  behaves when a fog or route block is nested under one map but names a *different* map
+  (it keeps the parent map and warns), and when a map has no id at all (the nested fog/route
+  keeps its own named map and stays silent). These branches had no coverage — the previous
+  run only covered the equivalent case for regions — so a future tweak couldn't silently
+  change how the DM's overlays get assigned to maps. Baseline was fully green first (lint
+  clean, types clean, 1161 tests). Source untouched. Commit `908fba3f`, merged `42b7d8ab`.
+  Test count 1161 → 1165.
 - 2026-06-02 (run qa-20260602) — **Fixed (tests only, no behavior change):** added a
   regression guard for the slug generator that turns place/person names into the IDs and
   links used across the published atlas. It had zero tests despite being the source of
