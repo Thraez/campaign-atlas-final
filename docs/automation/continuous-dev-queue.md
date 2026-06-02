@@ -360,6 +360,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - ✅ DONE 2026-06-02 — commit fbe76799; 10 new tests added to `src/test/atlas-import.test.ts`;
     merged 46bf0952. Gate: 1175 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
     pre-existing warnings).
+- [x] **N17. Hygiene / coverage nibble #13** — `src/atlas/content/parseWikilinks.ts` had no tests for
+  the security contract or edge cases: `tokenizeWikilinks` (empty body, no-wikilinks passthrough,
+  resolved/broken/aliased links, token substitution, multi-link order) and `renderLinkTokens`
+  (`hideBroken: true` must never leak raw target names to players — key security invariant; `hideBroken:
+  false` exposes target in title attr for DM view; resolved `<a>` tag; HTML escaping in target and
+  display text for XSS guard; URL-encoded href; out-of-bounds token index → empty string, no crash).
+  - ✅ DONE 2026-06-02 — commit 9dcff86d; 15 new tests in `src/test/content/parseWikilinks.test.ts`;
+    merged 1ae2f168. Gate: 1190 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
+    pre-existing warnings).
 
 ---
 
