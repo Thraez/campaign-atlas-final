@@ -307,6 +307,13 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   trailing "…" (body extends far past match), and `escapeHtml()` converting `&`, `<`, `>` in surrounding
   display text. Three untested conditional branches in the search-snippet display logic. ~1 run.
   - ✅ DONE 2026-05-30 — merge commit 849c7983; 3 new tests; 1032/1032 tests pass; tsc clean; eslint 0 errors
+- [x] **N10. Hygiene / coverage nibble #6** — `computeAtlasDiff.ts` (the editor's "Changes since last
+  publish" diff engine) had five uncovered branches: `title-changed`, `summary-changed`, `route-added`,
+  `route-removed`, `region-removed` on active maps, and overlays emitted when a whole map is removed.
+  All are correctness-critical (a missed diff entry means the DM gets a silent gap in their publish
+  summary). ~1 run.
+  - ✅ DONE 2026-06-02 — commit e6cd02f9; 5 new tests in `atlas-diff.test.ts`; 1082 tests green (4 shards,
+    no OOM); tsc clean; eslint 0 errors. Merged to auto/continuous-dev (merge a4457587).
 
 ---
 
