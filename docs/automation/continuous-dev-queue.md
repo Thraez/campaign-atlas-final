@@ -358,7 +358,7 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   warning; malformed YAML frontmatter error path; https:// attachment resolved=true; relative attachment
   unresolved warning. All are correctness-critical import UI paths.
   - ✅ DONE 2026-06-02 — commit fbe76799; 10 new tests added to `src/test/atlas-import.test.ts`;
-    merged <merge-hash>. Gate: 1175 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
+    merged 46bf0952. Gate: 1175 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
     pre-existing warnings).
 
 ---
