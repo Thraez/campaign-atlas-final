@@ -579,3 +579,89 @@ routes:
     expect(cfg.warnings.some((w) => w.includes("skipped invalid waypoint"))).toBe(true);
   });
 });
+
+describe("loadWorldConfig — nested fog/route mapId handling", () => {
+  it("warns when a nested fog declares a different mapId than its parent and uses the parent id", () => {
+    writeWorldYaml(`
+maps:
+  - id: m1
+    name: Main
+    width: 1000
+    height: 1000
+    fog:
+      mapId: somewhere-else
+      enabled: true
+      reveals: [[[0,0],[5,0],[5,5],[0,5]]]
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(
+      cfg.warnings.some(
+        (w) => w.includes("fog nested under map") && w.includes("somewhere-else")
+      )
+    ).toBe(true);
+    expect(cfg.fogs).toHaveLength(1);
+    expect(cfg.fogs[0].mapId).toBe("m1");
+  });
+
+  it("warns when a nested route declares a different mapId than its parent and uses the parent id", () => {
+    writeWorldYaml(`
+maps:
+  - id: m1
+    name: Main
+    width: 1000
+    height: 1000
+    routes:
+      - id: rt-mismatch
+        mapId: somewhere-else
+        name: X
+        visibility: player
+        waypoints: [[0,0],[10,10]]
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(
+      cfg.warnings.some(
+        (w) =>
+          w.includes('route "rt-mismatch" nested under map') &&
+          w.includes("somewhere-else")
+      )
+    ).toBe(true);
+    expect(cfg.routes).toHaveLength(1);
+    expect(cfg.routes[0].mapId).toBe("m1");
+  });
+
+  it("nested fog under an id-less map falls back to the fog's own mapId with no mismatch warning", () => {
+    writeWorldYaml(`
+maps:
+  - name: NoId
+    width: 1000
+    height: 1000
+    fog:
+      mapId: explicit-fog-map
+      enabled: true
+      reveals: [[[0,0],[5,0],[5,5],[0,5]]]
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.fogs).toHaveLength(1);
+    expect(cfg.fogs[0].mapId).toBe("explicit-fog-map");
+    expect(cfg.warnings.some((w) => w.includes("fog nested under map"))).toBe(false);
+  });
+
+  it("nested route under an id-less map falls back to the route's own mapId with no mismatch warning", () => {
+    writeWorldYaml(`
+maps:
+  - name: NoId
+    width: 1000
+    height: 1000
+    routes:
+      - id: rt-fallback
+        mapId: explicit-route-map
+        name: R
+        visibility: player
+        waypoints: [[0,0],[10,10]]
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.routes).toHaveLength(1);
+    expect(cfg.routes[0].mapId).toBe("explicit-route-map");
+    expect(cfg.warnings.some((w) => w.includes("nested under map"))).toBe(false);
+  });
+});
