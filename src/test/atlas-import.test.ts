@@ -65,6 +65,89 @@ describe("parseObsidianFile", () => {
   });
 });
 
+describe("generateAutoSummary — edge cases", () => {
+  it("returns undefined when all blocks are too short (< 20 chars)", () => {
+    expect(generateAutoSummary("Hi.\n\nOk.\n\nFine.")).toBeUndefined();
+  });
+
+  it("returns a block unchanged when it fits within maxLen", () => {
+    const body = "This is a short but valid paragraph.";
+    expect(generateAutoSummary(body)).toBe(body);
+  });
+
+  it("truncates at the last word boundary when block exceeds maxLen", () => {
+    const body = "word ".repeat(60).trim(); // 299 chars, well over default 220
+    const result = generateAutoSummary(body);
+    expect(result).toBeDefined();
+    expect(result!.length).toBeLessThanOrEqual(221); // maxLen + "…"
+    expect(result!.endsWith("…")).toBe(true);
+    // Must cut at a word boundary (space before truncation point)
+    expect(result!.replace(/…$/, "").endsWith(" ")).toBe(false); // trailing space stripped by cut
+  });
+
+  it("falls back to hard-character cut when no space exists in the last region", () => {
+    // A single long word with no spaces — lastSpace will be -1 or ≤ 80
+    const body = "x".repeat(230); // single run, no spaces
+    const result = generateAutoSummary(body);
+    expect(result!.endsWith("…")).toBe(true);
+    expect(result!.length).toBeLessThanOrEqual(222);
+  });
+});
+
+describe("parseObsidianFile — uncovered branches", () => {
+  it("classifies dm-visibility settlement as level='placeable'", () => {
+    // dm + mappable type → placeable (not wiki-only)
+    const f = parseObsidianFile("---\natlas:\n  visibility: dm\n---\nbody", "settlements/Thornwall.md");
+    expect(f.level).toBe("placeable");
+    expect(f.effectiveVisibility).toBe("dm");
+  });
+
+  it("marks wikilinks as broken when target not in knownEntityNames", () => {
+    const f = parseObsidianFile(
+      "The [[Ghost Town]] lies east of [[Thornwall]].",
+      "lore/Rumor.md",
+      { knownEntityNames: new Set(["thornwall"]) }
+    );
+    const ghost = f.wikilinks.find((w) => w.target === "Ghost Town");
+    const known = f.wikilinks.find((w) => w.target === "Thornwall");
+    expect(ghost?.broken).toBe(true);
+    expect(known?.broken).toBeUndefined(); // resolved links have no broken flag
+  });
+
+  it("emits a warning when player-published file has broken wikilinks", () => {
+    const f = parseObsidianFile(
+      "---\natlas:\n  visibility: player\n---\nSee [[MissingNPC]].",
+      "npcs/Hero.md",
+      { knownEntityNames: new Set() }
+    );
+    expect(f.warnings.some((w) => /unresolved wikilinks/i.test(w))).toBe(true);
+  });
+
+  it("records a frontmatterError warning on malformed YAML", () => {
+    const f = parseObsidianFile("---\nkey: [\nbad yaml\n---\nbody", "lore/Bad.md");
+    expect(f.frontmatterError).toBeDefined();
+    expect(f.warnings.some((w) => /frontmatter parse error/i.test(w))).toBe(true);
+    expect(f.hasFrontmatter).toBe(false);
+  });
+
+  it("resolves https:// attachment as resolved=true without rewriting", () => {
+    const f = parseObsidianFile(
+      "![[https://example.com/map.png]]",
+      "notes/X.md"
+    );
+    const att = f.attachments.find((a) => a.rawSrc === "https://example.com/map.png");
+    expect(att).toBeDefined();
+    expect(att!.resolved).toBe(true);
+    expect(att!.suggestedTarget).toBe("https://example.com/map.png");
+  });
+
+  it("emits attachment warning for unresolved relative attachments", () => {
+    const f = parseObsidianFile("![[portrait.png]]", "npcs/X.md");
+    expect(f.attachments[0].resolved).toBe(false);
+    expect(f.warnings.some((w) => /attachment.*need a target/i.test(w))).toBe(true);
+  });
+});
+
 describe("buildEntityFrontmatterPatch", () => {
   it("produces parseable YAML blocks", () => {
     const a = buildEntityFrontmatterPatch([
