@@ -19,4 +19,11 @@ _None yet._
 ## Run history
 *(Each daily run appends one line: what was fixed, or "clean run — nothing safe to fix".)*
 
+- 2026-06-02 (run qa-20260602) — **Fixed (tests only, no behavior change):** added a
+  regression guard for the slug generator that turns place/person names into the IDs and
+  links used across the published atlas. It had zero tests despite being the source of
+  truth the import preview copies; the 11 new cases lock in how it handles accents,
+  apostrophes, spacing, and length so a future tweak can't silently change everyone's
+  links. Baseline was fully green first (lint clean, types clean, 1092 tests). Commit
+  `cc109245`, merged `fb53fbec`. Test count 1092 → 1103.
 - 2026-06-02 — routine created; first run pending.
