@@ -121,4 +121,39 @@ describe("dm field labels per type", () => {
   it("unknown types fall back to npc shape", () => {
     expect(dmFieldsForType("mystery_thing").map((f) => f.key)).toContain("wants");
   });
+  it("undefined type falls back to npc shape", () => {
+    const keys = dmFieldsForType(undefined).map((f) => f.key);
+    expect(keys).toContain("wants");
+    expect(keys).toContain("secret");
+  });
+  it("empty-string type falls back to npc shape", () => {
+    expect(dmFieldsForType("").map((f) => f.key)).toContain("wants");
+  });
+  it("matches type case-insensitively (canonical types)", () => {
+    expect(dmFieldsForType("NPC").map((f) => f.key)).toContain("wants");
+    expect(dmFieldsForType("Faction").map((f) => f.key)).toContain("goal");
+  });
+  it("matches aliases case-insensitively", () => {
+    expect(dmFieldsForType("City").map((f) => f.key)).toContain("will_not_tolerate");
+  });
+  it("settlement aliases (town/village/hamlet) → settlement shape", () => {
+    for (const t of ["town", "village", "hamlet"]) {
+      expect(dmFieldsForType(t).map((f) => f.key)).toContain("will_not_tolerate");
+    }
+  });
+  it("region aliases (area/zone/district) → region shape", () => {
+    for (const t of ["area", "zone", "district"]) {
+      expect(dmFieldsForType(t).map((f) => f.key)).toContain("travel_mood");
+    }
+  });
+  it("faction aliases (party/cult/guild/order/church) → faction shape", () => {
+    for (const t of ["party", "cult", "guild", "order", "church"]) {
+      expect(dmFieldsForType(t).map((f) => f.key)).toContain("forbidden_line");
+    }
+  });
+  it("npc aliases (character/person) → npc shape", () => {
+    for (const t of ["character", "person"]) {
+      expect(dmFieldsForType(t).map((f) => f.key)).toContain("secret");
+    }
+  });
 });
