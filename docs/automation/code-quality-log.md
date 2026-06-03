@@ -28,6 +28,16 @@ behavior. Clear an item once you've dealt with it.)*
 ## Run history
 *(Each daily run appends one line: what was fixed, or "clean run — nothing safe to fix".)*
 
+- 2026-06-03 (run qa-20260603b) — **Fixed (tests only, no behavior change):** added regression
+  tests for the helper that decides *which DM fields the entity editor shows* for a given kind of
+  thing (an NPC gets Wants/Fears/Secret, a faction gets Goal/Forbidden line, a settlement gets
+  Will-not-tolerate, and so on). The existing tests covered the four main kinds, one shorthand
+  (city → settlement), and the unknown-kind fallback — but never pinned what happens with no kind
+  at all, a blank kind, odd capitalization (e.g. "Faction"), or 12 of the 13 shorthands the editor
+  accepts (town/village/hamlet, area/zone/district, party/cult/guild/order/church, character/person).
+  The 8 new cases lock all of those in, so a future tweak can't silently change which fields a DM
+  sees when editing an entity. Baseline was fully green first (lint clean, types clean, 1195 tests).
+  Source untouched. Commit `3e39a30e`, merged `2503a258`. Test count 1195 → 1203.
 - 2026-06-03 (run qa-20260603) — **Fixed (tests only, no behavior change):** added regression
   tests for the rule that decides which "this NPC is connected to that one" links a player is
   allowed to see. The code treats a *rumored* connection as something players can see (alongside
