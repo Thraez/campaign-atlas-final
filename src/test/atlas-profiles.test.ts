@@ -58,6 +58,44 @@ describe("relationship player filter", () => {
     const out = filterRelationshipsForPlayer([r], { entityVisibility: vis });
     expect(out.unresolved).toHaveLength(1);
   });
+
+  it("counts an unresolved player relationship as a leak too (never shipped)", () => {
+    const r: EntityRelationship = { entity: "missing-npc", type: "knows", visibility: "player" };
+    const out = filterRelationshipsForPlayer([r], { entityVisibility: vis });
+    expect(out.unresolved).toEqual([r]);
+    expect(out.droppedByLeak).toEqual([r]);
+    expect(out.kept).toHaveLength(0);
+  });
+
+  it("keeps a rumor-visibility relationship pointing at a player entity", () => {
+    const r: EntityRelationship = { entity: "thornhold", type: "rumored_ally", visibility: "rumor" };
+    const out = filterRelationshipsForPlayer([r], { entityVisibility: vis });
+    expect(out.kept).toEqual([r]);
+    expect(out.droppedByLeak).toHaveLength(0);
+    expect(out.droppedByVisibility).toHaveLength(0);
+  });
+
+  it("keeps a rumor→rumor relationship (rumor entities are player-visible)", () => {
+    const localVis = new Map(vis).set("whisper-inn", "rumor");
+    const r: EntityRelationship = { entity: "whisper-inn", type: "frequents", visibility: "rumor" };
+    const out = filterRelationshipsForPlayer([r], { entityVisibility: localVis });
+    expect(out.kept).toEqual([r]);
+    expect(out.droppedByLeak).toHaveLength(0);
+  });
+
+  it("treats a rumor relationship pointing at a DM entity as a spoiler leak", () => {
+    const r: EntityRelationship = { entity: "deeproot", type: "secretly_funds", visibility: "rumor" };
+    const out = filterRelationshipsForPlayer([r], { entityVisibility: vis });
+    expect(out.kept).toHaveLength(0);
+    expect(out.droppedByLeak).toEqual([r]);
+  });
+
+  it("treats a rumor relationship pointing at a hidden entity as a spoiler leak", () => {
+    const r: EntityRelationship = { entity: "river-cult", type: "knows_secret_of", visibility: "rumor" };
+    const out = filterRelationshipsForPlayer([r], { entityVisibility: vis });
+    expect(out.kept).toHaveLength(0);
+    expect(out.droppedByLeak).toEqual([r]);
+  });
 });
 
 describe("dm field labels per type", () => {
