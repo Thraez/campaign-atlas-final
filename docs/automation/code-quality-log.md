@@ -12,13 +12,34 @@ Newest entries at the top.
 *(The routine found these but did not change them, because they'd need a judgment call or could change
 behavior. Clear an item once you've dealt with it.)*
 
-_None yet._
+- 2026-06-03 (run qa-20260603) — **The "what's new for players" Publish Check counts changes,
+  not entities — so its badge can overstate.** In `src/atlas/publish/computeAtlasDiff.ts`, when a
+  single entity has more than one thing edited at once (say its title *and* its body), the panel
+  records that as two separate changes, and the summary badge ("N entities") counts those records
+  rather than distinct entities. So one entity edited in two ways reads as "2 entities changed."
+  Not touched because the right number depends on what you want the badge to *mean* — "how many
+  entities changed" (then it should count distinct entities) vs "how many changes there are" (then
+  it's correct as-is) — and the placement/map counts next to it count records the same way, so
+  changing only this one could make them inconsistent. That's a product call, not a safe mechanical
+  fix. If you want it to read as distinct-entity counts, this is a small change — say the word.
 
 ---
 
 ## Run history
 *(Each daily run appends one line: what was fixed, or "clean run — nothing safe to fix".)*
 
+- 2026-06-03 (run qa-20260603) — **Fixed (tests only, no behavior change):** added regression
+  tests for the rule that decides which "this NPC is connected to that one" links a player is
+  allowed to see. The code treats a *rumored* connection as something players can see (alongside
+  plain player-visible ones) — but every existing test only checked plain and DM-only links, so the
+  rumored case had zero coverage. The five new cases lock in that a rumored link to a visible person
+  shows, a rumored link to a *secret* (DM-only or hidden) person is caught as a spoiler leak and
+  never shipped, and a link pointing at a person who no longer exists is also held back. This is the
+  app's most important promise — players never see DM-only content — so pinning it means a future
+  tweak can't silently start leaking rumored connections. Baseline was fully green first (lint clean,
+  types clean, 1190 tests). Source untouched. Commit `d53e502f`, merged `8cd69862`. Test count
+  1190 → 1195. *(Also handed back one item — see above: the Publish Check "N entities" badge can
+  overstate when one entity has several edits.)*
 - 2026-06-02 (run qa-20260602b) — **Fixed (tests only, no behavior change):** added
   regression tests for the world-config loader — the code that reads the DM's map,
   region, route, and fog definitions out of `world.yaml`. Four cases now lock in how it
