@@ -28,6 +28,15 @@ behavior. Clear an item once you've dealt with it.)*
 ## Run history
 *(Each daily run appends one line: what was fixed, or "clean run — nothing safe to fix".)*
 
+- 2026-06-04 (run qa-20260604) — **Fixed (dead code removed, no behavior change):** the part of
+  the Obsidian import that finds attached images was carrying around the source note's folder path
+  but never using it — a leftover from an earlier design where attachments were going to be filed
+  next to their note. Today every imported image is simply suggested into one shared
+  `assets/images/` folder by its filename, so that folder value did nothing. Removed it (and the
+  now-unused argument that fed it). The import behaves exactly as before — the existing tests that
+  check how relative, web (`https://`), and embedded images are handled all pass unchanged, and the
+  full suite is identical at 1203 tests. Baseline was fully green first (lint clean, types clean,
+  1203 tests). Commit `029799a6`, merged `244b3cc1`. Test count unchanged 1203 → 1203.
 - 2026-06-03 (run qa-20260603b) — **Fixed (tests only, no behavior change):** added regression
   tests for the helper that decides *which DM fields the entity editor shows* for a given kind of
   thing (an NPC gets Wants/Fears/Secret, a faction gets Goal/Forbidden line, a settlement gets
