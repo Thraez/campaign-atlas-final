@@ -235,4 +235,71 @@ describe("computeAtlasDiff", () => {
     const diff = computeAtlasDiff(before, after);
     expect(diff.hasChanges).toBe(true);
   });
+
+  it("counts.entities is distinct entity count — two change-kinds on one entity counts as 1", () => {
+    const before = project(
+      [entity({ id: "a", title: "Old Name", body: "old body content here that is different" })],
+      [map({ id: "m" })]
+    );
+    const after = project(
+      [entity({ id: "a", title: "New Name", body: "new different body content here" })],
+      [map({ id: "m" })]
+    );
+    const diff = computeAtlasDiff(before, after);
+    // title-changed + body-changed = 2 records for entity "a"
+    expect(diff.entities.filter((e) => e.id === "a").length).toBeGreaterThan(1);
+    // but the summary count is 1 (one distinct entity changed)
+    expect(diff.counts.entities).toBe(1);
+  });
+
+  it("counts.entities handles multiple distinct entities each with multiple change-kinds", () => {
+    const before = project(
+      [
+        entity({ id: "a", title: "A Old", body: "body a old" }),
+        entity({ id: "b", title: "B Old", body: "body b old content" }),
+      ],
+      [map({ id: "m" })]
+    );
+    const after = project(
+      [
+        entity({ id: "a", title: "A New", body: "body a new different" }),
+        entity({ id: "b", title: "B New", body: "body b new different content" }),
+      ],
+      [map({ id: "m" })]
+    );
+    const diff = computeAtlasDiff(before, after);
+    // Each entity has title-changed + body-changed = 4 records total
+    expect(diff.entities.length).toBe(4);
+    // But the distinct entity count is 2
+    expect(diff.counts.entities).toBe(2);
+  });
+
+  it("counts.maps uses distinct map ids", () => {
+    const before = project([], [map({ id: "m1" }), map({ id: "m2" })]);
+    const after = project([], [map({ id: "m1" }), map({ id: "m3" })]);
+    const diff = computeAtlasDiff(before, after);
+    expect(diff.counts.maps).toBe(2); // m2 removed + m3 added = 2 distinct maps
+  });
+
+  it("counts.placements uses distinct entityId+mapId pairs", () => {
+    const before = project(
+      [entity({ id: "a", title: "A" }), entity({ id: "b", title: "B" })],
+      [map({ id: "m" })],
+      [
+        { id: "a@m", entityId: "a", mapId: "m", x: 100, y: 100, visibility: "player" },
+        { id: "b@m", entityId: "b", mapId: "m", x: 200, y: 200, visibility: "player" },
+      ]
+    );
+    const after = project(
+      [entity({ id: "a", title: "A" }), entity({ id: "b", title: "B" })],
+      [map({ id: "m" })],
+      [
+        { id: "a@m", entityId: "a", mapId: "m", x: 150, y: 100, visibility: "player" }, // moved
+        // b removed
+      ]
+    );
+    const diff = computeAtlasDiff(before, after);
+    expect(diff.placements.length).toBe(2); // moved + removed
+    expect(diff.counts.placements).toBe(2); // 2 distinct placements
+  });
 });
