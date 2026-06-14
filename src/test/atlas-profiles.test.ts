@@ -3,6 +3,9 @@ import {
   stripDmProfile,
   filterRelationshipsForPlayer,
   compactProfile,
+  isEmptyDmProfile,
+  compactDmProfile,
+  compactPlayerProfile,
 } from "@/atlas/profiles/profileBuild";
 import { dmFieldsForType } from "@/atlas/profiles/profileFields";
 import type { EntityRelationship } from "@/atlas/profiles/profileTypes";
@@ -155,5 +158,86 @@ describe("dm field labels per type", () => {
     for (const t of ["character", "person"]) {
       expect(dmFieldsForType(t).map((f) => f.key)).toContain("secret");
     }
+  });
+});
+
+describe("stripDmProfile — branch coverage", () => {
+  it("returns undefined when profile is undefined", () => {
+    expect(stripDmProfile(undefined)).toBeUndefined();
+  });
+  it("returns undefined when profile has no player half", () => {
+    expect(stripDmProfile({ dm: { secret: "hidden agenda" } })).toBeUndefined();
+  });
+  it("returns the player object when it is empty (isEmptyPlayer=true, but player exists)", () => {
+    const out = stripDmProfile({ player: {}, dm: { secret: "hidden" } });
+    expect(out).toEqual({ player: {} });
+    expect((out as { dm?: unknown })?.dm).toBeUndefined();
+  });
+});
+
+describe("isEmptyDmProfile", () => {
+  it("returns true for undefined", () => {
+    expect(isEmptyDmProfile(undefined)).toBe(true);
+  });
+  it("returns true for an empty object", () => {
+    expect(isEmptyDmProfile({})).toBe(true);
+  });
+  it("returns true when all values are empty or whitespace-only strings", () => {
+    expect(isEmptyDmProfile({ wants: "", secret: "   " })).toBe(true);
+  });
+  it("returns false when any field has non-empty content", () => {
+    expect(isEmptyDmProfile({ secret: "hidden truth" })).toBe(false);
+  });
+});
+
+describe("compactDmProfile — branch coverage", () => {
+  it("returns undefined for undefined input", () => {
+    expect(compactDmProfile(undefined)).toBeUndefined();
+  });
+  it("returns undefined when all values are empty or whitespace", () => {
+    expect(compactDmProfile({ wants: "", secret: "  " })).toBeUndefined();
+  });
+  it("keeps non-empty values and trims them, drops empty ones", () => {
+    const out = compactDmProfile({ wants: "  gold  ", secret: "" });
+    expect(out?.wants).toBe("gold");
+    expect(Object.keys(out ?? {}).includes("secret")).toBe(false);
+  });
+});
+
+describe("compactPlayerProfile — branch coverage", () => {
+  it("returns undefined for undefined input", () => {
+    expect(compactPlayerProfile(undefined)).toBeUndefined();
+  });
+  it("returns undefined when all fields are empty or absent", () => {
+    expect(compactPlayerProfile({})).toBeUndefined();
+    expect(compactPlayerProfile({ known_for: "  " })).toBeUndefined();
+  });
+  it("trims known_for and keeps it when non-empty", () => {
+    expect(compactPlayerProfile({ known_for: "  hero of Thornhold  " })?.known_for).toBe("hero of Thornhold");
+  });
+  it("filters empty strings from visible_traits, keeps non-empty ones", () => {
+    const out = compactPlayerProfile({ visible_traits: ["brave", "", "  "] });
+    expect(out?.visible_traits).toEqual(["brave"]);
+    expect(out?.known_for).toBeUndefined();
+  });
+  it("filters empty strings from rumors, keeps non-empty ones", () => {
+    const out = compactPlayerProfile({ rumors: ["seen in the catacombs", ""] });
+    expect(out?.rumors).toEqual(["seen in the catacombs"]);
+  });
+});
+
+describe("compactProfile — branch coverage", () => {
+  it("returns undefined for undefined input", () => {
+    expect(compactProfile(undefined)).toBeUndefined();
+  });
+  it("keeps only the dm half when player half is absent", () => {
+    const out = compactProfile({ dm: { secret: "hidden truth" } });
+    expect(out?.dm?.secret).toBe("hidden truth");
+    expect(out?.player).toBeUndefined();
+  });
+  it("keeps only the player half when dm half is absent", () => {
+    const out = compactProfile({ player: { rumors: ["seen in catacombs"] } });
+    expect(out?.player?.rumors).toEqual(["seen in catacombs"]);
+    expect(out?.dm).toBeUndefined();
   });
 });
