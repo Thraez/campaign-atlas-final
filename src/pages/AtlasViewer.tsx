@@ -30,6 +30,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 
 import { resolvePinStyle, pinSvg, type PinPreset } from "@/atlas/pins/presets";
+import { shouldShowLabel } from "@/atlas/pins/labelVisibility";
 
 function pinIconForStyle(style: PinPreset, opts?: { dim?: boolean }): L.DivIcon {
   // iconSize defines the hit area Leaflet uses for click/touch dispatch. The
@@ -623,7 +624,7 @@ function PlacementMarkers({
     if (style.labelMode === "never") mode = "none";
     else if (style.labelMode === "hover") mode = "hover";
     else if (style.labelMode === "always") mode = "always";
-    else mode = zoom >= style.labelMinZoom ? "always" : "hover";
+    else mode = shouldShowLabel(zoom, style.priority) ? "always" : "hover";
     if (mode === "always") {
       const pt = map.latLngToContainerPoint([H - p.y, p.x + dx]);
       const collides = taken.some((t) => Math.hypot(t.x - pt.x, t.y - pt.y) < 70);
