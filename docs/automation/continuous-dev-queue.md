@@ -458,6 +458,17 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - ✅ DONE 2026-06-02 — commit 9dcff86d; 15 new tests in `src/test/content/parseWikilinks.test.ts`;
     merged 1ae2f168. Gate: 1190 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
     pre-existing warnings).
+- [x] **N18. Hygiene / coverage nibble #14** — `src/atlas/profiles/profileBuild.ts` pure helpers
+  (`compactProfile`, `compactDmProfile`, `compactPlayerProfile`, `isEmptyDmProfile`, `stripDmProfile`)
+  had only 2 test cases across 4 functions with ~12 untested branches. All are correctness-critical:
+  they determine what profile data ships in the player build (DM-only fields must be stripped).
+  Branches covered: undefined inputs → undefined; empty-object inputs → undefined; whitespace-only
+  values discarded; mixed valid/invalid fields → only valid kept + trimmed; rumors/visible_traits
+  with empty strings filtered; dm-only profile half kept when player absent; player-only half kept
+  when dm absent; isEmptyPlayer=true path in stripDmProfile (empty player object is preserved as-is).
+  - ✅ DONE 2026-06-15 — commit 7c663c19; 18 new tests in `src/test/atlas-profiles.test.ts`;
+    merged into auto/continuous-dev. Gate: 1268 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
 
 ---
 
