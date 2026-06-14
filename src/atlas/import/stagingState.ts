@@ -110,6 +110,14 @@ export interface StagingRow {
   /** Full file body (text). Preserved verbatim through the commit. */
   content: string;
   typeWasExplicit: boolean;
+  /**
+   * True when the type fell through to the silent lore-fallback because the note had no
+   * explicit atlas.type, no recognized tags, and landed in an unmapped folder.
+   * Used by the staging modal to surface a "Pick a type" affordance so the DM can fix
+   * it before importing. Deliberately-typed lore notes (explicit or tag/folder-inferred)
+   * are NOT flagged.
+   */
+  typeWasGuessed: boolean;
   resolvedVisibility: string;
   rawContent: string;
 }
@@ -130,6 +138,7 @@ function deriveTitle(filename: string, fmTitle: unknown): string {
 function extractStagingFields(raw: string, relPath: string): {
   type: string;
   typeWasExplicit: boolean;
+  typeWasGuessed: boolean;
   id: string | undefined;
   visibility: string;
   fmTitle: string | undefined;
@@ -148,6 +157,8 @@ function extractStagingFields(raw: string, relPath: string): {
     const fromTags = explicit ? null : inferTypeFromTags(data.tags);
     const fromFolder = explicit || fromTags ? null : inferTypeFromPath(relPath);
     const type = explicit ?? fromTags ?? (fromFolder && fromFolder !== "note" ? fromFolder : "lore");
+    // Guessed = no explicit type, no recognized tag, and the folder gave no useful signal.
+    const typeWasGuessed = !explicit && !fromTags && fromFolder === "note";
 
     const visRaw = typeof atlas.visibility === "string" ? atlas.visibility : undefined;
     const validVis = ["player", "dm", "hidden", "rumor"];
@@ -159,12 +170,12 @@ function extractStagingFields(raw: string, relPath: string): {
     const fmTitle = typeof data.title === "string" ? data.title : undefined;
     const frontmatterPath = typeof data.path === "string" ? data.path : undefined;
     return {
-      type, typeWasExplicit: !!explicit, id, visibility,
+      type, typeWasExplicit: !!explicit, typeWasGuessed, id, visibility,
       fmTitle, frontmatterPath, parseError: undefined,
     };
   } catch (e) {
     return {
-      type: "lore", typeWasExplicit: false, id: undefined, visibility: "dm",
+      type: "lore", typeWasExplicit: false, typeWasGuessed: false, id: undefined, visibility: "dm",
       fmTitle: undefined, frontmatterPath: undefined,
       parseError: e instanceof Error ? e.message : String(e),
     };
@@ -178,7 +189,7 @@ function nextRowId(filename: string): string {
 }
 
 export function buildStagingRow(input: RawImportFile, ctx: StagingContext): StagingRow {
-  const { type, typeWasExplicit, id, visibility, fmTitle, frontmatterPath, parseError } =
+  const { type, typeWasExplicit, typeWasGuessed, id, visibility, fmTitle, frontmatterPath, parseError } =
     extractStagingFields(input.raw, input.filename);
 
   // Compute resolvedId matching build-atlas.ts logic exactly:
@@ -220,6 +231,7 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     parseError,
     content: input.raw,
     typeWasExplicit,
+    typeWasGuessed,
     resolvedVisibility: visibility,
     rawContent: input.raw,
   };
