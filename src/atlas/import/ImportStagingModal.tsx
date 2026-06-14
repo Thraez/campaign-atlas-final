@@ -187,9 +187,9 @@ export function ImportStagingModal({
                           <span className="opacity-60">id:</span>{" "}
                           <span>{row.resolvedId}</span>
                         </span>
-                        {!row.typeWasExplicit && !row.parseError && (
+                        {row.typeWasGuessed && !row.parseError && (
                           <Badge className="bg-amber-500/20 text-amber-200 border-amber-500/40 text-[10px]">
-                            confirm type
+                            Pick a type
                           </Badge>
                         )}
                       </div>

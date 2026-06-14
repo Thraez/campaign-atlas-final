@@ -183,11 +183,79 @@ describe("ImportStagingModal", () => {
     expect((screen.getByLabelText("Include b.md") as HTMLInputElement).checked).toBe(true);
   });
 
-  it("flags rows whose type was not explicit and shows resolved visibility", () => {
+  it("shows 'Pick a type' badge on a guessed row (unmapped, no signal) and not on an explicit row", () => {
+    const guessedRow = {
+      id: "r1", filename: "mystery.md", inferredType: "lore",
+      typeWasExplicit: false, typeWasGuessed: true, resolvedId: "mystery",
+      resolvedVisibility: "dm", rawContent: "", content: "",
+      targetPath: "content/w/imports/mystery.md",
+      pathAllowed: true, rowKind: "create", included: true,
+    };
+    const explicitRow = {
+      id: "r2", filename: "corven.md", inferredType: "npc",
+      typeWasExplicit: true, typeWasGuessed: false, resolvedId: "corven",
+      resolvedVisibility: "dm", rawContent: "", content: "",
+      targetPath: "content/w/npcs/corven.md",
+      pathAllowed: true, rowKind: "create", included: true,
+    };
+    render(
+      <ImportStagingModal
+        open rows={[guessedRow as never, explicitRow as never]}
+        importConfig={{ folders: { npc: "npcs" }, defaultFolder: "imports" }}
+        onPatchRow={() => {}} onCancel={() => {}} onCommit={() => {}}
+      />,
+    );
+    // Guessed row shows the "Pick a type" affordance
+    expect(screen.getByText(/Pick a type/i)).toBeInTheDocument();
+    // Explicit row does NOT show it — only one badge in the whole table
+    expect(screen.getAllByText(/Pick a type/i)).toHaveLength(1);
+    expect(screen.getByText("corven")).toBeInTheDocument(); // resolved id still visible
+    expect(screen.getByLabelText(/visibility for corven\.md/i)).toBeInTheDocument();
+  });
+
+  it("does not show 'Pick a type' for a tag-inferred row (confident inference)", () => {
+    const tagInferredRow = {
+      id: "r3", filename: "garron.md", inferredType: "npc",
+      typeWasExplicit: false, typeWasGuessed: false, resolvedId: "garron",
+      resolvedVisibility: "dm", rawContent: "", content: "",
+      targetPath: "content/w/npcs/garron.md",
+      pathAllowed: true, rowKind: "create", included: true,
+    };
+    render(
+      <ImportStagingModal
+        open rows={[tagInferredRow as never]}
+        importConfig={{ folders: { npc: "npcs" }, defaultFolder: "imports" }}
+        onPatchRow={() => {}} onCancel={() => {}} onCommit={() => {}}
+      />,
+    );
+    expect(screen.queryByText(/Pick a type/i)).toBeNull();
+  });
+
+  it("does not show 'Pick a type' for a parse-error row", () => {
+    const errorRow = {
+      id: "r4", filename: "bad.md", inferredType: "lore",
+      typeWasExplicit: false, typeWasGuessed: false, resolvedId: "bad",
+      resolvedVisibility: "dm", rawContent: "", content: "",
+      targetPath: "content/w/imports/bad.md",
+      pathAllowed: true, rowKind: "create", included: false,
+      parseError: "YAML parse error",
+    };
+    render(
+      <ImportStagingModal
+        open rows={[errorRow as never]}
+        importConfig={{ folders: { npc: "npcs" }, defaultFolder: "imports" }}
+        onPatchRow={() => {}} onCancel={() => {}} onCommit={() => {}}
+      />,
+    );
+    expect(screen.queryByText(/Pick a type/i)).toBeNull();
+  });
+
+  it("shows resolved visibility column (row-level check)", () => {
     const row = {
-      id: "r1", filename: "corven.md", inferredType: "npc",
-      typeWasExplicit: false, resolvedId: "corven", resolvedVisibility: "dm",
-      rawContent: "", content: "", targetPath: "content/w/npcs/corven.md",
+      id: "r5", filename: "corven.md", inferredType: "npc",
+      typeWasExplicit: true, typeWasGuessed: false, resolvedId: "corven",
+      resolvedVisibility: "dm", rawContent: "", content: "",
+      targetPath: "content/w/npcs/corven.md",
       pathAllowed: true, rowKind: "create", included: true,
     };
     render(
@@ -196,8 +264,7 @@ describe("ImportStagingModal", () => {
         onPatchRow={() => {}} onCancel={() => {}} onCommit={() => {}}
       />,
     );
-    expect(screen.getByText(/confirm type/i)).toBeInTheDocument();
-    expect(screen.getByText("corven")).toBeInTheDocument();        // resolved id
+    expect(screen.getByText("corven")).toBeInTheDocument();
     expect(screen.getByLabelText(/visibility for corven\.md/i)).toBeInTheDocument();
   });
 });
