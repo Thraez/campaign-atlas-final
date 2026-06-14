@@ -387,3 +387,94 @@ describe("updateStagingRow", () => {
     expect(r1.resolvedVisibility).toBe("player");
   });
 });
+
+// F1 — "Categorize imported notes": typeWasGuessed distinguishes a silent lore
+// fallback from notes that have a genuine explicit, tag, or folder signal.
+describe("typeWasGuessed flag (F1: categorize imported notes)", () => {
+  const ctx = makeCtx();
+
+  it("false when atlas.type is explicit", () => {
+    const row = buildStagingRow(
+      { filename: "hero.md", raw: "---\natlas:\n  type: npc\n  id: hero\n---\n" },
+      ctx,
+    );
+    expect(row.typeWasGuessed).toBe(false);
+    expect(row.typeWasExplicit).toBe(true);
+    expect(row.inferredType).toBe("npc");
+  });
+
+  it("false when type comes from a recognized tag (confident inference)", () => {
+    const row = buildStagingRow(
+      { filename: "garron.md", raw: "---\ntags:\n  - npc\n---\n" },
+      ctx,
+    );
+    expect(row.typeWasGuessed).toBe(false);
+    expect(row.typeWasExplicit).toBe(false);
+    expect(row.inferredType).toBe("npc");
+  });
+
+  it("false when type comes from a mapped folder (confident folder inference)", () => {
+    // "npcs/" is in FOLDER_TYPE_MAP → inferTypeFromPath returns "npc", not "note"
+    const row = buildStagingRow(
+      { filename: "npcs/garron.md", raw: "---\n---\n" },
+      ctx,
+    );
+    expect(row.typeWasGuessed).toBe(false);
+    expect(row.inferredType).toBe("npc");
+  });
+
+  it("false for a note explicitly typed as lore (deliberate, not guessed)", () => {
+    const row = buildStagingRow(
+      { filename: "ancient-lore.md", raw: "---\natlas:\n  type: lore\n---\n" },
+      ctx,
+    );
+    expect(row.typeWasGuessed).toBe(false);
+    expect(row.typeWasExplicit).toBe(true);
+    expect(row.inferredType).toBe("lore");
+  });
+
+  it("true for a note in an unmapped folder with no explicit type or tags", () => {
+    // "imports/" is not in FOLDER_TYPE_MAP → inferTypeFromPath returns "note"
+    const row = buildStagingRow(
+      { filename: "imports/mystery-npc.md", raw: "---\ntitle: The Dark Lord\n---\n" },
+      ctx,
+    );
+    expect(row.typeWasGuessed).toBe(true);
+    expect(row.typeWasExplicit).toBe(false);
+    // Data default stays "lore" — marking it guessed doesn't change the stored type
+    expect(row.inferredType).toBe("lore");
+  });
+
+  it("true for a bare file with no frontmatter signal at all", () => {
+    const row = buildStagingRow(
+      { filename: "mystery-note.md", raw: "# Just a heading\nSome body text.\n" },
+      ctx,
+    );
+    expect(row.typeWasGuessed).toBe(true);
+    expect(row.inferredType).toBe("lore");
+  });
+
+  it("false for a parse-error row (errors are not categorization guesses)", () => {
+    const row = buildStagingRow(
+      { filename: "bad.md", raw: "---\n: broken: yaml: [\n---\n" },
+      ctx,
+    );
+    expect(row.typeWasGuessed).toBe(false);
+    expect(!!row.parseError).toBe(true);
+  });
+
+  it("changing type on a guessed row routes to the correct folder after updateStagingRow", () => {
+    const rows = buildStagingRows(
+      [{ filename: "the-npc.md", raw: "---\n---\n" }],
+      ctx,
+    );
+    const [row] = rows;
+    expect(row.typeWasGuessed).toBe(true);
+    expect(row.inferredType).toBe("lore");
+    expect(row.targetPath).toContain("/imports/"); // default folder (lore not in TEST_IMPORT_CONFIG.folders)
+
+    const updated = updateStagingRow(row, { inferredType: "npc" }, ctx);
+    expect(updated.inferredType).toBe("npc");
+    expect(updated.targetPath).toContain("/npcs/");
+  });
+});

@@ -26,12 +26,74 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
-> **Refueled 2026-05-31** — section **E** below (6 units) was blessed by the human from the ranked inbox in
-> `docs/DEVELOPMENT_WANTS.md` (E1–E5 in the Opus refuel session; **E6 added 2026-05-31** during the E1 merge
-> session, same human bless). **E is the current priority — build top to bottom.** **E1 is ✅ DONE**
-> (merged to main `a7f22fbc`); E2 is next. Each cites a full spec under
-> `docs/superpowers/specs/2026-05-31-*.md` — **read it in full first.** Sections D, A, B, C below are all
-> ✅ DONE.
+> **Refueled 2026-06-14** — section **F** (3 units) blessed by the human. **Build in order: F1 → F2 → F3.**
+> F1 categorize-imports · F2 distinct-entity publish counts · F3 pin label de-cluttering — each cites a full
+> spec under `docs/superpowers/specs/2026-06-14-*.md` (**read in full first**).
+> **Earmarked, NOT yet buildable:** "Honest player preview" — high value, but needs a human shaping session
+> before it can be specced. Do **not** auto-build it.
+>
+> **Refueled 2026-05-31** — section **E** (6 units) was blessed from the ranked inbox in
+> `docs/DEVELOPMENT_WANTS.md`. **E is now ✅ DONE** (E1 merged to main `a7f22fbc`; E2–E6 on
+> `auto/continuous-dev`, then consolidated to main in the v0.1.0 merge 2026-06-14). Sections D, A, B, C are
+> all ✅ DONE.
+
+### F — Refuel 2026-06-14 (blessed from the inbox)
+
+- [x] **F1. Categorize imported notes (stop silent "Lore" bucketing).**
+  **Spec:** `docs/superpowers/specs/2026-06-14-categorize-imported-notes-design.md` — **read in full.**
+  Imported notes with no explicit `atlas.type`, no recognized tag, and an unmapped source folder silently
+  fall through to type `"lore"`, so an imported NPC never shows under the **Characters** tab (and is
+  indistinguishable from a deliberate lore note). Keep the automatic path (explicit / tags / mapped-folder)
+  intact; the core change is making the *fallback* honest + fixable — surface "guessed" rows in the existing
+  import staging modal (reuses the per-row type dropdown from B1/B2) so the DM assigns the right type in one
+  glance. Pure DM-editor + import-staging change; **no secrecy risk** (player projection filters on
+  `visibility`, never `type` — verified in the spec). **Design decided (2026-06-14):** a guessed note stays
+  data-default `"lore"` but is **marked guessed** + one-click fixable in the staging modal; a separate
+  "Uncategorized" bucket is **out of scope for v1**. **No fragile filename/content heuristics in v1.**
+  - Files: `src/atlas/import/stagingState.ts`, `src/atlas/import/inferType.ts`,
+    `src/atlas/import/ImportStagingModal.tsx`; tests in `src/test/import-staging-modal.test.tsx` + stagingState
+    coverage for the guessed-vs-deliberate-lore distinction.
+  - Done when: an unmapped-folder / no-signal note is flagged "guessed" in the staging modal and assigning it
+    "npc" routes it under Characters after import; explicitly-typed / tagged / mapped-folder notes are
+    unaffected (no false flag); a deliberately-lore note isn't flagged; import still completes with zero extra
+    mandatory clicks; standard gate green. ~1–2 runs.
+  - ✅ DONE 2026-06-14 — commits ef10e2c3 (typeWasGuessed field + 8 staging-state tests) + 4d2d059b
+    ("Pick a type" badge in modal + 4 modal tests). Gate: 1214 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings). inferType.ts unchanged (no behavior change to recognized folders).
+
+- [x] **F2. "What's new for players" counts distinct entities (not edit-records).**
+  **Spec:** `docs/superpowers/specs/2026-06-14-publish-diff-distinct-entity-count-design.md` — **read in full.**
+  The publish summary badge counts change-records, so one entity edited two ways reads as "2 entities
+  changed." Make the entity / map / placement summary counts tally **distinct ids** (fix all three together
+  for consistency); the detailed change list is unchanged. DM-editor publish-summary only; no secrecy impact.
+  Decided by the human 2026-06-14 (clears the "handed back" badge item in the code-quality log).
+  - Files: `src/atlas/publish/computeAtlasDiff.ts` (+ the badge consumer if it self-counts);
+    `src/test/atlas-diff.test.ts`.
+  - Done when: an entity with title+body changes counts as 1 in the badge (test asserts); maps/placements
+    likewise distinct; detailed change list unchanged; gate green. ~1 run.
+  - ✅ DONE 2026-06-14 — commit abea3ba0 (`counts` uses `new Set(...).size` for entities/placements/maps;
+    4 new tests: single-entity two-change-kinds counts as 1, two entities with multiple kinds each counts
+    as 2, maps distinct, placements distinct). Badge consumer (`PublishedDiffPanel`) confirmed reads
+    `diff.counts` not `.length`. Gate: 1218 tests green (4 shards); tsc EXIT:0; eslint 0 errors (16 known
+    warnings).
+
+- [x] **F3. Pin label de-cluttering on crowded maps.**
+  **Spec:** `docs/superpowers/specs/2026-06-14-pin-label-decluttering-design.md` — **read in full.**
+  Crowded maps render all pin labels at once into an unreadable smear. Use the existing `pin.priority` to
+  thin **labels only** (markers always show) via a zoom×priority threshold extracted as a pure, unit-tested
+  visibility function. **Autonomy guard:** if it needs true label-collision detection, ship the threshold
+  version and hand back the upgrade — don't expand scope. (Graduated from NICE-TO-HAVE N2.)
+  - Files: the map pin/label render layer under `src/atlas/` + a new pure `labelVisibility` helper + test;
+    theme/CSS if labels fade.
+  - Done when: zoomed-out crowded maps show only higher-priority labels and reveal more on zoom-in; markers
+    always show; low-pin maps unchanged; visibility logic unit-tested; gate green (+ publish scans only if the
+    build path is touched). ~1–2 runs.
+  - ✅ DONE 2026-06-14 — commit b7f63ed2 (new `src/atlas/pins/labelVisibility.ts` with `labelVisibilityThreshold`
+    + `shouldShowLabel`; `AtlasViewer.tsx` wires `shouldShowLabel(zoom, style.priority)` into "auto" mode
+    label decisions, replacing per-preset `labelMinZoom` lookup; explicit "always"/"hover"/"never" overrides
+    untouched; priority-ordered collision detection preserved). 18 new unit tests.
+    Gate: 1236 tests green (4 shards); tsc EXIT:0; eslint 0 errors (16 known warnings). Render-layer change
+    only — publish scans not needed.
 
 ### E — Refuel 2026-05-31 (blessed from the ranked inbox)
 

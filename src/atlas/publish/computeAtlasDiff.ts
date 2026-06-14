@@ -224,9 +224,9 @@ export function computeAtlasDiff(
   return {
     hasChanges: entities.length + placements.length + maps.length + overlays.length > 0,
     counts: {
-      entities: entities.length,
-      placements: placements.length,
-      maps: maps.length,
+      entities: new Set(entities.map((e) => e.id)).size,
+      placements: new Set(placements.map((p) => `${p.entityId}@${p.mapId}`)).size,
+      maps: new Set(maps.map((m) => m.id)).size,
       overlays: overlays.length,
     },
     entities, placements, maps, overlays,
