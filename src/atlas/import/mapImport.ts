@@ -155,19 +155,19 @@ export function resolveSize(image: ImportImage, currentMap?: MapDocument): Resol
         layer: { x: 0, y: 0, width: nw, height: nh },
       };
     case "stretch-to-current":
-      if (!cm) return resolveSize(image); // fallback
+      if (!cm) return { mapWidth: nw, mapHeight: nh, layer: { x: 0, y: 0, width: nw, height: nh } };
       return {
         mapWidth: cm.width, mapHeight: cm.height,
         layer: { x: 0, y: 0, width: cm.width, height: cm.height },
       };
     case "center-natural":
-      if (!cm) return resolveSize(image);
+      if (!cm) return { mapWidth: nw, mapHeight: nh, layer: { x: 0, y: 0, width: nw, height: nh } };
       return {
         mapWidth: cm.width, mapHeight: cm.height,
         layer: { x: Math.round((cm.width - nw) / 2), y: Math.round((cm.height - nh) / 2), width: nw, height: nh },
       };
     case "fit-within-current": {
-      if (!cm) return resolveSize(image);
+      if (!cm) return { mapWidth: nw, mapHeight: nh, layer: { x: 0, y: 0, width: nw, height: nh } };
       const scale = Math.min(cm.width / nw, cm.height / nh);
       const w = Math.round(nw * scale);
       const h = Math.round(nh * scale);

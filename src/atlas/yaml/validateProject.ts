@@ -320,6 +320,26 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
         scope: { entityId: e.id },
       });
     }
+    // Image embeds (![[image.ext]]) in player-visible body are silently dropped
+    // by the player projection (no embed-to-img conversion there). Warn so the
+    // DM can fix before publishing.
+    if (playerVisibleVis.has(e.visibility)) {
+      for (const m of (e.body || "").matchAll(/!\[\[([^[\]\n]+?)\]\]/g)) {
+        const target = m[1].split("|")[0].trim();
+        if (/\.(?:png|jpe?g|gif|webp|svg|avif)$/i.test(target)) {
+          issues.push({
+            severity: "warning",
+            code: "dropped-image-embed",
+            category: "yaml",
+            message: `Image embed \`![[${target}]]\` won't appear in the player view.`,
+            hint: "Add the image through the editor's image field so it's published with the note.",
+            scope: { entityId: e.id },
+            actions: [{ kind: "go-entity", label: "Go to note", payload: e.id }],
+          });
+        }
+      }
+    }
+
     // Player-visible wikilinks pointing at DM-only entities leak titles via
     // tooltips / autocomplete. The strict build already drops them but warn.
     if (playerVisibleVis.has(e.visibility) && Array.isArray(e.links)) {
@@ -335,6 +355,26 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
             scope: { entityId: e.id },
           });
         }
+      }
+    }
+    // Broken wikilinks in player-visible entities render as dead, non-clickable
+    // text to players. Aggregate all broken targets into one suggestion per
+    // entity so the Publish Check stays sleek (not one issue per link).
+    if (playerVisibleVis.has(e.visibility) && Array.isArray(e.links)) {
+      const broken = e.links.filter((l) => l.broken);
+      if (broken.length > 0) {
+        const CAP = 3;
+        const listed = broken.slice(0, CAP).map((l) => `[[${l.target}]]`).join(", ");
+        const extra = broken.length > CAP ? ` …and ${broken.length - CAP} more` : "";
+        issues.push({
+          severity: "suggestion",
+          code: "broken-wikilink",
+          category: "yaml",
+          message: `Players will see dead text for ${broken.length} broken link${broken.length === 1 ? "" : "s"} in "${e.title}": ${listed}${extra}.`,
+          hint: "Create the linked note, fix the spelling, or remove the link so players don't see dead text.",
+          scope: { entityId: e.id },
+          actions: [{ kind: "go-entity", label: "Open note", payload: e.id }],
+        });
       }
     }
     // Player-visible relationships pointing at DM-only entities leak too.

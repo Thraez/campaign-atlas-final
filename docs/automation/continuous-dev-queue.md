@@ -55,7 +55,7 @@ picked the approach); E4–E5 carry some UX/feature latitude — the spec pins t
     Merged to main via a7f22fbc. Full gate: 1039 tests green (4 shards, no OOM); tsc clean; eslint 0 errors;
     atlas:publish 10/10 scans clean; integrity-smoke 5/5.
 
-- [ ] **E2. Flag dropped image embeds in Publish Check.**
+- [x] **E2. Flag dropped image embeds in Publish Check.**
   **Spec:** `docs/superpowers/specs/2026-05-31-dropped-image-embed-flag-design.md` — **read in full.**
   Obsidian `![[Portrait.png]]` embeds silently vanish in the player view. Add a Publish Check **warning**
   (the pre-blessed "flag it" half — not the larger "render it" change) so the DM sees which images won't
@@ -63,8 +63,11 @@ picked the approach); E4–E5 carry some UX/feature latitude — the spec pins t
   - Files: `src/atlas/yaml/validateProject.ts`; extend `src/test/atlas-publish-check.test.ts`.
   - Done when: player-visible entities with image embeds raise a `dropped-image-embed` warning; no false
     positives on DM-only/non-image/stripped-block embeds; gate green. ~1 run.
+  - ✅ DONE 2026-06-02 — commit a0eab4c0 (warn on dropped image embeds; scans e.body with image-extension
+    filter; DM-only and non-image embeds not flagged; 4 regression tests). Gate: 1043 tests green (4
+    shards, no OOM); tsc clean; eslint 0 errors (16 pre-existing warnings). Merged to auto/continuous-dev.
 
-- [ ] **E3. Editor "just works" on first run (auto-build the DM atlas).**
+- [x] **E3. Editor "just works" on first run (auto-build the DM atlas).**
   **Spec:** `docs/superpowers/specs/2026-05-31-editor-first-run-autobuild-design.md` — **read in full.**
   On a fresh checkout `npm run dev` serves the player atlas, so the editor opens degraded with a "Save
   won't work — run `npm run atlas:build`" banner. Add a `predev` guard (`scripts/ensure-dm-atlas.ts`) that
@@ -75,8 +78,11 @@ picked the approach); E4–E5 carry some UX/feature latitude — the spec pins t
   - Done when: fresh checkout → `npm run dev` auto-builds and the editor opens with content + no banner;
     warm start skips the rebuild; build failure doesn't abort dev; `npm run build`/player build unaffected;
     gate green. ~1 run.
+  - ✅ DONE 2026-06-02 — commit fc839c6c (predev hook + scripts/ensure-dm-atlas.ts; isAtlasStale pure
+    helper; 4 unit tests). Gate: 1047 tests green (4 shards, no OOM); tsc clean; eslint 0 errors;
+    atlas:publish 10/10 scans clean. Merged to auto/continuous-dev.
 
-- [ ] **E4. Clearer import report (post-import summary).**
+- [x] **E4. Clearer import report (post-import summary).**
   **Spec:** `docs/superpowers/specs/2026-05-31-import-report-summary-design.md` — **read in full.**
   After a vault import the only feedback is a bare count. Enrich the existing success toast with a plain-
   language breakdown (added / updated / replaced / skipped, plus a distinct "couldn't be read" line) derived
@@ -85,8 +91,11 @@ picked the approach); E4–E5 carry some UX/feature latitude — the spec pins t
     `src/atlas/import/`); test for the helper.
   - Done when: the DM sees a correct plain-language breakdown after import without extra clicks; existing
     conflict/rebuild toasts unchanged; gate green. ~1 run.
+  - ✅ DONE 2026-06-02 — commit dcbba70c (summarizeImport helper + formatImportSummaryLine; useMdImportFlow
+    uses description on success toast; toast.warning when couldntBeRead > 0; 11 unit tests). Gate: 1058
+    tests green (4 shards, no OOM); tsc clean; eslint 0 errors. Merged to auto/continuous-dev.
 
-- [ ] **E5. Phrase search (`"exact phrase"`) in the player search.**
+- [x] **E5. Phrase search (`"exact phrase"`) in the player search.**
   **Spec:** `docs/superpowers/specs/2026-05-31-phrase-search-design.md` — **read in full.**
   Add quoted exact-contiguous-phrase matching to `SearchPalette` (AND-combined with unquoted terms);
   introduces **no** fuzzy matching (a non-goal). Extract the parse + match into tested pure functions under
@@ -96,8 +105,12 @@ picked the approach); E4–E5 carry some UX/feature latitude — the spec pins t
     the `atlas:publish:integrity-smoke` + `atlas:publish` gate (see spec).
   - Done when: `"exact phrase"` restricts results to contiguous matches; mixed queries AND correctly; the
     phrase is highlighted; parse/match logic is unit-tested; gate green. ~1–2 runs.
+  - ✅ DONE 2026-06-02 — commits 487a8083 (parseSearchQuery + matchesPhrases helpers + 15 unit tests) +
+    b669ed51 (wire phrase filter + highlighted snippet into SearchPalette; placeholder updated). Gate: 1073
+    tests green (4 shards, no OOM); tsc clean; eslint 0 errors. No build/scan pipeline impact
+    (bodyText was already present on index entries — contingency not triggered).
 
-- [ ] **E6. Flag broken wikilinks in Publish Check.**
+- [x] **E6. Flag broken wikilinks in Publish Check.**
   **Spec:** `docs/superpowers/specs/2026-05-31-broken-wikilink-flag-design.md` — **read in full.**
   A wikilink whose target doesn't resolve (`[[Ghost Town]]`, `[[Note#Heading]]`) renders to players as dead
   text, and the DM is never warned. Add a Publish Check **suggestion** (deliberately low-key — not a
@@ -109,6 +122,10 @@ picked the approach); E4–E5 carry some UX/feature latitude — the spec pins t
   - Done when: player-visible entities with broken links raise one aggregated `broken-wikilink` suggestion
     per entity (naming the dead targets, with a `go-entity` action); no issue for DM-only entities or
     all-resolving entities; no per-link spam; no UI/schema change; gate green. ~1 run.
+  - ✅ DONE 2026-06-02 — commit 5ea9ee8d; iterates e.links[], filters broken===true, emits one aggregated
+    Issue per entity (severity "suggestion", category "yaml", go-entity action, up to 3 targets listed
+    inline + "…and N more" for longer). 4 new tests (player+broken, player+resolved, dm+broken,
+    multi-broken-aggregated); 1077 tests green (4 shards); tsc clean; eslint 0 errors.
 
 ### D — Daily-driver fixes from the 2026-05-30 dogfooding pass
 
@@ -290,6 +307,68 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   trailing "…" (body extends far past match), and `escapeHtml()` converting `&`, `<`, `>` in surrounding
   display text. Three untested conditional branches in the search-snippet display logic. ~1 run.
   - ✅ DONE 2026-05-30 — merge commit 849c7983; 3 new tests; 1032/1032 tests pass; tsc clean; eslint 0 errors
+- [x] **N10. Hygiene / coverage nibble #6** — `computeAtlasDiff.ts` (the editor's "Changes since last
+  publish" diff engine) had five uncovered branches: `title-changed`, `summary-changed`, `route-added`,
+  `route-removed`, `region-removed` on active maps, and overlays emitted when a whole map is removed.
+  All are correctness-critical (a missed diff entry means the DM gets a silent gap in their publish
+  summary). ~1 run.
+  - ✅ DONE 2026-06-02 — commit e6cd02f9; 5 new tests in `atlas-diff.test.ts`; 1082 tests green (4 shards,
+    no OOM); tsc clean; eslint 0 errors. Merged to auto/continuous-dev (merge a4457587).
+- [x] **N11. Hygiene / coverage nibble #7** — `scripts/atlas/calendarDate.ts` (`parseAtlasDate`) had zero
+  test coverage despite powering event-timeline sorting and player-visible date labels. Multiple branches:
+  YYYY-MM-DD with/without a world calendar, YYYY-MM and YYYY partial dates, custom-calendar label
+  formatting (month names + epoch suffix), month-index overflow clamp, and ISO 8601 Date.parse fallback.
+  All correctness-critical: wrong date parsing = wrong sort order in the DM's event timeline. ~1 run.
+  - ✅ DONE 2026-06-02 — commit f4cec947; 10 new tests in `src/test/calendar-date.test.ts`; 1092 tests
+    green (4 shards, no OOM); tsc clean; eslint 0 errors. Merged to auto/continuous-dev (merge 0446e431).
+- [x] **N12. Hygiene / coverage nibble #8** — `src/atlas/import/mapImport.ts` pure helpers had
+  significant uncovered branches: `nameFromFilename` (entirely untested), `resolveSize` sizing modes
+  (`stretch-to-current`, `center-natural`, `custom` with keepAspect variants), and `validateImportPlan`
+  validation rules (duplicate map id, invalid map/layer size, external URL, missing src, unusual
+  extension, oversize image). Discovered and fixed a real infinite-recursion bug: the no-currentMap
+  fallback in `stretch-to-current`/`center-natural`/`fit-within-current` called `resolveSize(image)`
+  without resetting the sizing mode, causing infinite recursion. Fixed by inlining the natural-size
+  result; all three cases corrected. ~1 run.
+  - ✅ DONE 2026-06-02 — commits 96a180c9 (fix+test: infinite-recursion bug fix + 21 new tests);
+    merged 33d52578. Gate: 1124 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
+    pre-existing warnings).
+- [x] **N13. Hygiene / coverage nibble #9** — `scripts/atlas/parseFrontmatter.ts` private helpers
+  (`parsePlacements`, `parsePinStyle`, `parseProfile`, `parseRelationships`) had zero branch coverage
+  on their validation/rejection paths. Key correctness cases: non-array inputs warn+return undefined,
+  non-object items skipped, missing required fields warn+skip, pin priority clamped 0..10, invalid
+  shape/labelMode silently ignored, relationship invalid visibility defaults to "dm" (security invariant).
+  ~1 run.
+  - ✅ DONE 2026-06-02 — commit ef1a12f4; 17 new tests in `src/test/atlas-parser-placements.test.ts`;
+    merged 5c0a9d8e. Gate: 1141 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
+    pre-existing warnings).
+- [x] **N14. Hygiene / coverage nibble #10** — `scripts/atlas/loadWorldConfig.ts` helper branches
+  had zero test coverage: `sanitizeScale` (non-number/zero/negative `unitsPerPixel` → warn+undefined;
+  default `unitLabel`), `sanitizeGrid` (invalid kind/size → warn+undefined; `enabled` default),
+  `calendar` (empty or all-invalid months → warn+undefined; mixed valid/invalid filtering),
+  `normalizeVis` (undefined → silent default; invalid string → warn+default), region geometry
+  (fewer-than-3-points → warn+drop), route edge-cases (invalid mode, string waypoint conversion,
+  invalid waypoint skip). ~1 run.
+  - ✅ DONE 2026-06-02 — commit e0f82b90; 20 new tests in `src/test/atlas-world-loader.test.ts`;
+    merged 81589996. Gate: 1161 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
+    pre-existing warnings).
+- [x] **N16. Hygiene / coverage nibble #12** — `src/atlas/import/parseObsidian.ts` had several untested
+  branches: `generateAutoSummary` truncation paths (blocks < 20 chars skipped → undefined; block > maxLen
+  truncated at word boundary; hard char cut when no space); `parseObsidianFile` level="placeable" (dm +
+  mappable type); broken-wikilink detection via `knownEntityNames`; player-published + broken-wikilinks
+  warning; malformed YAML frontmatter error path; https:// attachment resolved=true; relative attachment
+  unresolved warning. All are correctness-critical import UI paths.
+  - ✅ DONE 2026-06-02 — commit fbe76799; 10 new tests added to `src/test/atlas-import.test.ts`;
+    merged 46bf0952. Gate: 1175 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
+    pre-existing warnings).
+- [x] **N17. Hygiene / coverage nibble #13** — `src/atlas/content/parseWikilinks.ts` had no tests for
+  the security contract or edge cases: `tokenizeWikilinks` (empty body, no-wikilinks passthrough,
+  resolved/broken/aliased links, token substitution, multi-link order) and `renderLinkTokens`
+  (`hideBroken: true` must never leak raw target names to players — key security invariant; `hideBroken:
+  false` exposes target in title attr for DM view; resolved `<a>` tag; HTML escaping in target and
+  display text for XSS guard; URL-encoded href; out-of-bounds token index → empty string, no crash).
+  - ✅ DONE 2026-06-02 — commit 9dcff86d; 15 new tests in `src/test/content/parseWikilinks.test.ts`;
+    merged 1ae2f168. Gate: 1190 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
+    pre-existing warnings).
 
 ---
 

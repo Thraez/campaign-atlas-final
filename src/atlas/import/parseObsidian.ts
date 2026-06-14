@@ -127,9 +127,8 @@ function extractWikilinks(body: string): WikilinkRef[] {
   return out;
 }
 
-function extractAttachments(body: string, fileRelPath: string): AttachmentRef[] {
+function extractAttachments(body: string): AttachmentRef[] {
   const out: AttachmentRef[] = [];
-  const fileDir = fileRelPath.split("/").slice(0, -1).join("/");
   const push = (src: string) => {
     const rawSrc = src.trim();
     if (!rawSrc || /^https?:\/\//i.test(rawSrc) || /^\//.test(rawSrc)) {
@@ -202,7 +201,7 @@ export function parseObsidianFile(
       if (!opts.knownEntityNames.has(key)) w.broken = true;
     }
   }
-  const attachments = extractAttachments(body, relPath);
+  const attachments = extractAttachments(body);
 
   const title =
     typeof data.title === "string" ? data.title : safeFilenameToTitle(filename);

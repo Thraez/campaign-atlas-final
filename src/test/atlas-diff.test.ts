@@ -175,6 +175,60 @@ describe("computeAtlasDiff", () => {
     expect(diff.overlays.find((o) => o.kind === "region-added" && o.name === "New region")).toBeDefined();
   });
 
+  it("detects entity title changes", () => {
+    const before = project([entity({ id: "a", title: "Old Name" })], [map({ id: "m" })]);
+    const after = project([entity({ id: "a", title: "New Name" })], [map({ id: "m" })]);
+    const diff = computeAtlasDiff(before, after);
+    const change = diff.entities.find((e) => e.kind === "title-changed");
+    expect(change).toBeDefined();
+    expect(change!.before).toBe("Old Name");
+    expect(change!.after).toBe("New Name");
+  });
+
+  it("detects entity summary changes", () => {
+    const before = project([entity({ id: "a", title: "A", summary: "original" })], [map({ id: "m" })]);
+    const after = project([entity({ id: "a", title: "A", summary: "updated" })], [map({ id: "m" })]);
+    const diff = computeAtlasDiff(before, after);
+    expect(diff.entities.find((e) => e.kind === "summary-changed")).toBeDefined();
+  });
+
+  it("detects route added and removed on the same map", () => {
+    const before = project([], [map({
+      id: "m",
+      routes: [{ id: "rt1", mapId: "m", name: "Old Road", waypoints: [[0, 0], [1, 1]], visibility: "player" }],
+    })]);
+    const after = project([], [map({
+      id: "m",
+      routes: [{ id: "rt2", mapId: "m", name: "New Road", waypoints: [[2, 2], [3, 3]], visibility: "player" }],
+    })]);
+    const diff = computeAtlasDiff(before, after);
+    expect(diff.overlays.find((o) => o.kind === "route-added" && o.name === "New Road")).toBeDefined();
+    expect(diff.overlays.find((o) => o.kind === "route-removed" && o.name === "Old Road")).toBeDefined();
+  });
+
+  it("detects region removed on the same map", () => {
+    const before = project([], [map({
+      id: "m",
+      regions: [{ id: "r1", mapId: "m", name: "Gone region", points: [[0, 0], [1, 0], [1, 1]], visibility: "player" }],
+    })]);
+    const after = project([], [map({ id: "m", regions: [] })]);
+    const diff = computeAtlasDiff(before, after);
+    expect(diff.overlays.find((o) => o.kind === "region-removed" && o.name === "Gone region")).toBeDefined();
+  });
+
+  it("emits overlay removals for regions and routes on a removed map", () => {
+    const before = project([], [map({
+      id: "m",
+      regions: [{ id: "r1", mapId: "m", name: "Lost region", points: [[0, 0], [1, 0], [1, 1]], visibility: "player" }],
+      routes: [{ id: "rt1", mapId: "m", name: "Lost road", waypoints: [[0, 0], [1, 1]], visibility: "player" }],
+    })]);
+    const after = project([], []);
+    const diff = computeAtlasDiff(before, after);
+    expect(diff.maps.find((m) => m.id === "m" && m.kind === "removed")).toBeDefined();
+    expect(diff.overlays.find((o) => o.kind === "region-removed" && o.name === "Lost region")).toBeDefined();
+    expect(diff.overlays.find((o) => o.kind === "route-removed" && o.name === "Lost road")).toBeDefined();
+  });
+
   it("hasChanges reflects total change count", () => {
     const before = project([], [map({ id: "m" })]);
     const after = project([entity({ id: "a", title: "A" })], [map({ id: "m" })]);
