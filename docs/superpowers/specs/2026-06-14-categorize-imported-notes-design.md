@@ -64,15 +64,14 @@ dropdown** (built in queue section B1/B2, sourced from `importConfig.folders`). 
 This is deliberately the "flag + one-click fix" half, mirroring how E2/E6 chose "surface it" over "auto-guess
 it." No fragile filename/content heuristics in v1.
 
-## The one design choice to confirm at build time
+## Design decision — LOCKED 2026-06-14 (by the human)
 
-What should a guessed note default to if the DM **doesn't** touch it during import?
-- **(Recommended)** Keep the data default `"lore"` (so nothing regresses), but mark it guessed so it's visible
-  and easy to re-type later — i.e. the *only* change is making the guess honest + fixable.
-- **(Alternative)** Introduce a visible **"Uncategorized"** treatment (its own bucket/tab) so guessed notes
-  don't blend into deliberate Lore at all. Bigger surface change; defer unless the human wants it.
+A guessed note keeps its data default `"lore"` but is **marked as guessed** so it's visible and **one-click
+fixable** in the staging modal. The only change is making the guess **honest + fixable** — never silent
+burial.
 
-Build the recommended shape unless the human says otherwise. Do **not** add a mandatory blocking import step.
+**Out of scope for v1 (do NOT build):** a separate visible "Uncategorized" bucket/tab. Also do **not** add a
+mandatory blocking import step — the affordance is optional, import still completes untouched.
 
 ## Files (expect)
 

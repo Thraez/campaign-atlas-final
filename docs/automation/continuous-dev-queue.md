@@ -26,9 +26,11 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
-> **Refueled 2026-06-14** — section **F** below was blessed by the human (graduated from the INBOX:
-> "Categorize imported notes"). **F is the current priority — build it first.** It cites a full spec under
-> `docs/superpowers/specs/2026-06-14-*.md` — **read it in full first.**
+> **Refueled 2026-06-14** — section **F** (3 units) blessed by the human. **Build in order: F1 → F2 → F3.**
+> F1 categorize-imports · F2 distinct-entity publish counts · F3 pin label de-cluttering — each cites a full
+> spec under `docs/superpowers/specs/2026-06-14-*.md` (**read in full first**).
+> **Earmarked, NOT yet buildable:** "Honest player preview" — high value, but needs a human shaping session
+> before it can be specced. Do **not** auto-build it.
 >
 > **Refueled 2026-05-31** — section **E** (6 units) was blessed from the ranked inbox in
 > `docs/DEVELOPMENT_WANTS.md`. **E is now ✅ DONE** (E1 merged to main `a7f22fbc`; E2–E6 on
@@ -45,9 +47,9 @@ Beyond that the routine asks the human to bless more work. That is by design —
   intact; the core change is making the *fallback* honest + fixable — surface "guessed" rows in the existing
   import staging modal (reuses the per-row type dropdown from B1/B2) so the DM assigns the right type in one
   glance. Pure DM-editor + import-staging change; **no secrecy risk** (player projection filters on
-  `visibility`, never `type` — verified in the spec). One design fork is flagged in the spec (default a
-  guessed note to `"lore"`-but-marked vs a visible "Uncategorized" bucket) — build the recommended shape
-  unless the human says otherwise. **No fragile filename/content heuristics in v1.**
+  `visibility`, never `type` — verified in the spec). **Design decided (2026-06-14):** a guessed note stays
+  data-default `"lore"` but is **marked guessed** + one-click fixable in the staging modal; a separate
+  "Uncategorized" bucket is **out of scope for v1**. **No fragile filename/content heuristics in v1.**
   - Files: `src/atlas/import/stagingState.ts`, `src/atlas/import/inferType.ts`,
     `src/atlas/import/ImportStagingModal.tsx`; tests in `src/test/import-staging-modal.test.tsx` + stagingState
     coverage for the guessed-vs-deliberate-lore distinction.
@@ -55,6 +57,29 @@ Beyond that the routine asks the human to bless more work. That is by design —
     "npc" routes it under Characters after import; explicitly-typed / tagged / mapped-folder notes are
     unaffected (no false flag); a deliberately-lore note isn't flagged; import still completes with zero extra
     mandatory clicks; standard gate green. ~1–2 runs.
+
+- [ ] **F2. "What's new for players" counts distinct entities (not edit-records).**
+  **Spec:** `docs/superpowers/specs/2026-06-14-publish-diff-distinct-entity-count-design.md` — **read in full.**
+  The publish summary badge counts change-records, so one entity edited two ways reads as "2 entities
+  changed." Make the entity / map / placement summary counts tally **distinct ids** (fix all three together
+  for consistency); the detailed change list is unchanged. DM-editor publish-summary only; no secrecy impact.
+  Decided by the human 2026-06-14 (clears the "handed back" badge item in the code-quality log).
+  - Files: `src/atlas/publish/computeAtlasDiff.ts` (+ the badge consumer if it self-counts);
+    `src/test/atlas-diff.test.ts`.
+  - Done when: an entity with title+body changes counts as 1 in the badge (test asserts); maps/placements
+    likewise distinct; detailed change list unchanged; gate green. ~1 run.
+
+- [ ] **F3. Pin label de-cluttering on crowded maps.**
+  **Spec:** `docs/superpowers/specs/2026-06-14-pin-label-decluttering-design.md` — **read in full.**
+  Crowded maps render all pin labels at once into an unreadable smear. Use the existing `pin.priority` to
+  thin **labels only** (markers always show) via a zoom×priority threshold extracted as a pure, unit-tested
+  visibility function. **Autonomy guard:** if it needs true label-collision detection, ship the threshold
+  version and hand back the upgrade — don't expand scope. (Graduated from NICE-TO-HAVE N2.)
+  - Files: the map pin/label render layer under `src/atlas/` + a new pure `labelVisibility` helper + test;
+    theme/CSS if labels fade.
+  - Done when: zoomed-out crowded maps show only higher-priority labels and reveal more on zoom-in; markers
+    always show; low-pin maps unchanged; visibility logic unit-tested; gate green (+ publish scans only if the
+    build path is touched). ~1–2 runs.
 
 ### E — Refuel 2026-05-31 (blessed from the ranked inbox)
 

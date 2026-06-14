@@ -12,16 +12,11 @@ Newest entries at the top.
 *(The routine found these but did not change them, because they'd need a judgment call or could change
 behavior. Clear an item once you've dealt with it.)*
 
-- 2026-06-03 (run qa-20260603) — **The "what's new for players" Publish Check counts changes,
-  not entities — so its badge can overstate.** In `src/atlas/publish/computeAtlasDiff.ts`, when a
-  single entity has more than one thing edited at once (say its title *and* its body), the panel
-  records that as two separate changes, and the summary badge ("N entities") counts those records
-  rather than distinct entities. So one entity edited in two ways reads as "2 entities changed."
-  Not touched because the right number depends on what you want the badge to *mean* — "how many
-  entities changed" (then it should count distinct entities) vs "how many changes there are" (then
-  it's correct as-is) — and the placement/map counts next to it count records the same way, so
-  changing only this one could make them inconsistent. That's a product call, not a safe mechanical
-  fix. If you want it to read as distinct-entity counts, this is a small change — say the word.
+- ✅ RESOLVED 2026-06-14 — **The "what's new for players" badge counted changes, not entities.** The human
+  decided (2026-06-14) it should count **distinct entities** (and the map/placement counts likewise, for
+  consistency). Queued as WANT **F2** in `docs/automation/continuous-dev-queue.md` — spec
+  `docs/superpowers/specs/2026-06-14-publish-diff-distinct-entity-count-design.md`. No longer a pending
+  decision; the routine builds it as F2.
 
 ---
 
