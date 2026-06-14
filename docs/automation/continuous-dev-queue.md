@@ -26,16 +26,37 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
-> **Refueled 2026-06-14** — section **F** (3 units) blessed by the human. **Build in order: F1 → F2 → F3.**
-> F1 categorize-imports · F2 distinct-entity publish counts · F3 pin label de-cluttering — each cites a full
-> spec under `docs/superpowers/specs/2026-06-14-*.md` (**read in full first**).
-> **Earmarked, NOT yet buildable:** "Honest player preview" — high value, but needs a human shaping session
-> before it can be specced. Do **not** auto-build it.
+> **Refueled 2026-06-14 (round 2)** — section **G** below blessed by the human: **G1 Honest player preview**
+> is the current priority — build it next. Spec:
+> `docs/superpowers/specs/2026-06-14-honest-player-preview-design.md` (**read in full first**). Section **F**
+> (F1–F3) is ✅ DONE and consolidated to `main` as **v0.2.0** (merge `258027b3`, tag `v0.2.0`).
+> F1 categorize-imports · F2 distinct-entity publish counts · F3 pin label de-cluttering.
 >
 > **Refueled 2026-05-31** — section **E** (6 units) was blessed from the ranked inbox in
 > `docs/DEVELOPMENT_WANTS.md`. **E is now ✅ DONE** (E1 merged to main `a7f22fbc`; E2–E6 on
 > `auto/continuous-dev`, then consolidated to main in the v0.1.0 merge 2026-06-14). Sections D, A, B, C are
 > all ✅ DONE.
+
+### G — Refuel 2026-06-14 round 2 (blessed by the human)
+
+- [ ] **G1. Honest player preview — faithful "as players see it" view.**
+  **Spec:** `docs/superpowers/specs/2026-06-14-honest-player-preview-design.md` — **read in full.**
+  Today the editor's "player" view only filters *which entities* show (`filterEntitiesForLens`); it does not
+  consistently redact content *within* an entity, so `%%dm%%` blocks, DM-only profile fields, secret/DM
+  relationships, and DM-entity links can still leak in the reading pane. Make the **player** ViewMode drive a
+  faithful projection of the whole reading experience via the EXISTING pure `projectEntityForPlayer()`
+  pipeline (verified reusable client-side — **reuse only; no new redaction logic; no rebuild**), plus a clear
+  "previewing as players see it" indicator. **Mandatory:** a leak-regression test (an entity with a
+  `%%secret%%`, a DM-only profile field, a `visibility: dm` relationship, and a `[[DM-only]]` link renders
+  NONE of them in the player preview). Build the default single-toggle shape; a separate full-screen preview
+  route is out of scope for v1.
+  - Files: `src/atlas/view/ViewModeProvider.tsx` + consumers; `src/atlas/entity/EntityReadingView.tsx`,
+    `EntityPanes.tsx`, `EntityPanel.tsx`; `src/pages/AtlasPlacementEditor.tsx` (toggle + indicator); tests
+    (the mandatory leak-regression test + an indicator test).
+  - Done when: Player view shows entities fully redacted (no `%%dm%%`, no DM fields, no secret/DM
+    relationships, DM-links redacted) AND only player-visible entities/maps appear AND a clear indicator
+    shows; DM view unchanged; the leak-regression test proves a planted DM secret is absent from the preview;
+    gate green (no build-pipeline change). ~1–2 runs.
 
 ### F — Refuel 2026-06-14 (blessed from the inbox)
 
