@@ -39,7 +39,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ### G — Refuel 2026-06-14 round 2 (blessed by the human)
 
-- [ ] **G1. Honest player preview — faithful "as players see it" view.**
+- [x] **G1. Honest player preview — faithful "as players see it" view.**
   **Spec:** `docs/superpowers/specs/2026-06-14-honest-player-preview-design.md` — **read in full.**
   Today the editor's "player" view only filters *which entities* show (`filterEntitiesForLens`); it does not
   consistently redact content *within* an entity, so `%%dm%%` blocks, DM-only profile fields, secret/DM
@@ -57,6 +57,12 @@ Beyond that the routine asks the human to bless more work. That is by design —
     relationships, DM-links redacted) AND only player-visible entities/maps appear AND a clear indicator
     shows; DM view unchanged; the leak-regression test proves a planted DM secret is absent from the preview;
     gate green (no build-pipeline change). ~1–2 runs.
+  - ✅ DONE 2026-06-14 — commits 38443725 (feat: EntityPanes honors global ViewMode — player pane is primary
+    in player mode + "Player preview — as players see it" banner; ViewModeToggle gets "Previewing as players
+    see it" chip in editor header) + merge e838641b. Mandatory leak-regression test: 14 assertions across
+    4 DM channels (%%dm%% block, profile.dm field, visibility:dm relationship, [[DM-only]] link) — all
+    absent from player render, all present in DM render. Gate: 1250 tests green (4 shards); tsc clean;
+    eslint 0 errors (16 pre-existing warnings). No build-pipeline change — pure client-side reuse.
 
 ### F — Refuel 2026-06-14 (blessed from the inbox)
 
