@@ -469,6 +469,22 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - ✅ DONE 2026-06-15 — commit 7c663c19; 18 new tests in `src/test/atlas-profiles.test.ts`;
     merged into auto/continuous-dev. Gate: 1268 tests green (4 shards, no OOM); tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings).
+- [x] **N19. Hygiene / coverage nibble #15** — `src/atlas/pins/presets.ts` had only 3 tests
+  covering the happy path for `defaultPresetForType`, `diffPinOverride`, and `resolvePinStyle`;
+  `pinSvg` had zero coverage. Added 18 tests covering:
+  - `defaultPresetForType(undefined)` and empty string → "custom"
+  - Type aliases: `divine_site`→temple, `black_market`→shop, `wilderness_landmark`→hazard,
+    `player_base`, `resonance_site`, `mystery`
+  - Case-insensitivity: SETTLEMENT/NPC/Dungeon resolve correctly
+  - `diffPinOverride` with explicit preset change stored as override
+  - `diffPinOverride` preserving `labelMinZoom` and `priority` overrides
+  - `resolvePinStyle` with no override / null override → returns preset defaults
+  - `resolvePinStyle` for unknown type → custom preset
+  - `pinSvg`: all 6 shape branches (circle/square/diamond/shield/star/teardrop)
+  - `pinSvg`: dim option → opacity:0.6; pulse → atlas-pulse animation
+  - ✅ DONE 2026-06-15 — commit 159dd883; 18 new tests in `src/test/atlas-pin-presets.test.ts`;
+    merged 0de1cd00. Gate: 1286 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
 
 ---
 
