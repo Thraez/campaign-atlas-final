@@ -26,12 +26,35 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
-> **Refueled 2026-05-31** — section **E** below (6 units) was blessed by the human from the ranked inbox in
-> `docs/DEVELOPMENT_WANTS.md` (E1–E5 in the Opus refuel session; **E6 added 2026-05-31** during the E1 merge
-> session, same human bless). **E is the current priority — build top to bottom.** **E1 is ✅ DONE**
-> (merged to main `a7f22fbc`); E2 is next. Each cites a full spec under
-> `docs/superpowers/specs/2026-05-31-*.md` — **read it in full first.** Sections D, A, B, C below are all
-> ✅ DONE.
+> **Refueled 2026-06-14** — section **F** below was blessed by the human (graduated from the INBOX:
+> "Categorize imported notes"). **F is the current priority — build it first.** It cites a full spec under
+> `docs/superpowers/specs/2026-06-14-*.md` — **read it in full first.**
+>
+> **Refueled 2026-05-31** — section **E** (6 units) was blessed from the ranked inbox in
+> `docs/DEVELOPMENT_WANTS.md`. **E is now ✅ DONE** (E1 merged to main `a7f22fbc`; E2–E6 on
+> `auto/continuous-dev`, then consolidated to main in the v0.1.0 merge 2026-06-14). Sections D, A, B, C are
+> all ✅ DONE.
+
+### F — Refuel 2026-06-14 (blessed from the inbox)
+
+- [ ] **F1. Categorize imported notes (stop silent "Lore" bucketing).**
+  **Spec:** `docs/superpowers/specs/2026-06-14-categorize-imported-notes-design.md` — **read in full.**
+  Imported notes with no explicit `atlas.type`, no recognized tag, and an unmapped source folder silently
+  fall through to type `"lore"`, so an imported NPC never shows under the **Characters** tab (and is
+  indistinguishable from a deliberate lore note). Keep the automatic path (explicit / tags / mapped-folder)
+  intact; the core change is making the *fallback* honest + fixable — surface "guessed" rows in the existing
+  import staging modal (reuses the per-row type dropdown from B1/B2) so the DM assigns the right type in one
+  glance. Pure DM-editor + import-staging change; **no secrecy risk** (player projection filters on
+  `visibility`, never `type` — verified in the spec). One design fork is flagged in the spec (default a
+  guessed note to `"lore"`-but-marked vs a visible "Uncategorized" bucket) — build the recommended shape
+  unless the human says otherwise. **No fragile filename/content heuristics in v1.**
+  - Files: `src/atlas/import/stagingState.ts`, `src/atlas/import/inferType.ts`,
+    `src/atlas/import/ImportStagingModal.tsx`; tests in `src/test/import-staging-modal.test.tsx` + stagingState
+    coverage for the guessed-vs-deliberate-lore distinction.
+  - Done when: an unmapped-folder / no-signal note is flagged "guessed" in the staging modal and assigning it
+    "npc" routes it under Characters after import; explicitly-typed / tagged / mapped-folder notes are
+    unaffected (no false flag); a deliberately-lore note isn't flagged; import still completes with zero extra
+    mandatory clicks; standard gate green. ~1–2 runs.
 
 ### E — Refuel 2026-05-31 (blessed from the ranked inbox)
 
