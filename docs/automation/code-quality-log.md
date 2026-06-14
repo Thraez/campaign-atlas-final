@@ -28,6 +28,16 @@ behavior. Clear an item once you've dealt with it.)*
 ## Run history
 *(Each daily run appends one line: what was fixed, or "clean run — nothing safe to fix".)*
 
+- 2026-06-14 (run qa-20260614) — **Fixed (dead code removed, no behavior change):** the app
+  carried a leftover mobile-detection helper (`useIsMobile`, in `src/hooks/use-mobile.tsx`) from
+  the original UI scaffolding that nothing ever used — no screen, menu, or component referenced
+  it. Removed the whole file. Confirmed it was truly dead by searching the entire project for any
+  use of it (both by name, `useIsMobile`, and by its file path, `use-mobile`) and checking for any
+  dynamic/glob imports that could pull it in indirectly — zero references anywhere. The app behaves
+  exactly as before: lint still 0 errors / 16 known warnings, types clean, and all 1203 tests pass
+  unchanged across the four shards (identical before and after). Baseline was fully green first
+  (lint clean, types clean, 1203 tests). Commit `b1abeb97`, merged `08888314`. Test count unchanged
+  1203 → 1203.
 - 2026-06-04 (run qa-20260604) — **Fixed (dead code removed, no behavior change):** the part of
   the Obsidian import that finds attached images was carrying around the source note's folder path
   but never using it — a leftover from an earlier design where attachments were going to be filed
