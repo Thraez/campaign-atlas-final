@@ -77,7 +77,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
     `diff.counts` not `.length`. Gate: 1218 tests green (4 shards); tsc EXIT:0; eslint 0 errors (16 known
     warnings).
 
-- [ ] **F3. Pin label de-cluttering on crowded maps.**
+- [x] **F3. Pin label de-cluttering on crowded maps.**
   **Spec:** `docs/superpowers/specs/2026-06-14-pin-label-decluttering-design.md` — **read in full.**
   Crowded maps render all pin labels at once into an unreadable smear. Use the existing `pin.priority` to
   thin **labels only** (markers always show) via a zoom×priority threshold extracted as a pure, unit-tested
@@ -88,6 +88,12 @@ Beyond that the routine asks the human to bless more work. That is by design —
   - Done when: zoomed-out crowded maps show only higher-priority labels and reveal more on zoom-in; markers
     always show; low-pin maps unchanged; visibility logic unit-tested; gate green (+ publish scans only if the
     build path is touched). ~1–2 runs.
+  - ✅ DONE 2026-06-14 — commit b7f63ed2 (new `src/atlas/pins/labelVisibility.ts` with `labelVisibilityThreshold`
+    + `shouldShowLabel`; `AtlasViewer.tsx` wires `shouldShowLabel(zoom, style.priority)` into "auto" mode
+    label decisions, replacing per-preset `labelMinZoom` lookup; explicit "always"/"hover"/"never" overrides
+    untouched; priority-ordered collision detection preserved). 18 new unit tests.
+    Gate: 1236 tests green (4 shards); tsc EXIT:0; eslint 0 errors (16 known warnings). Render-layer change
+    only — publish scans not needed.
 
 ### E — Refuel 2026-05-31 (blessed from the ranked inbox)
 
