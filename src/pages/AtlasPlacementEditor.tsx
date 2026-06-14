@@ -150,13 +150,23 @@ function FlyTo({ target }: { target: { lat: number; lng: number } | null }) {
 function ViewModeToggle() {
   const { mode, setMode } = useViewMode();
   return (
-    <div className="inline-flex rounded border overflow-hidden text-xs" role="group" aria-label="View mode">
-      <button type="button"
-        className={mode === "dm" ? "px-2 py-1 bg-primary text-primary-foreground" : "px-2 py-1"}
-        aria-pressed={mode === "dm"} onClick={() => setMode("dm")}>DM view</button>
-      <button type="button"
-        className={mode === "player" ? "px-2 py-1 bg-primary text-primary-foreground" : "px-2 py-1"}
-        aria-pressed={mode === "player"} onClick={() => setMode("player")}>Player view</button>
+    <div className="flex items-center gap-2">
+      <div className="inline-flex rounded border overflow-hidden text-xs" role="group" aria-label="View mode">
+        <button type="button"
+          className={mode === "dm" ? "px-2 py-1 bg-primary text-primary-foreground" : "px-2 py-1"}
+          aria-pressed={mode === "dm"} onClick={() => setMode("dm")}>DM view</button>
+        <button type="button"
+          className={mode === "player" ? "px-2 py-1 bg-primary text-primary-foreground" : "px-2 py-1"}
+          aria-pressed={mode === "player"} onClick={() => setMode("player")}>Player view</button>
+      </div>
+      {mode === "player" && (
+        <span
+          data-testid="player-mode-indicator"
+          className="text-[11px] text-amber-300 border border-amber-500/40 bg-amber-500/10 rounded px-2 py-0.5 hidden sm:inline"
+        >
+          Previewing as players see it
+        </span>
+      )}
     </div>
   );
 }
