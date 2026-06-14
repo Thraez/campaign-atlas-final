@@ -39,7 +39,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ### F — Refuel 2026-06-14 (blessed from the inbox)
 
-- [ ] **F1. Categorize imported notes (stop silent "Lore" bucketing).**
+- [x] **F1. Categorize imported notes (stop silent "Lore" bucketing).**
   **Spec:** `docs/superpowers/specs/2026-06-14-categorize-imported-notes-design.md` — **read in full.**
   Imported notes with no explicit `atlas.type`, no recognized tag, and an unmapped source folder silently
   fall through to type `"lore"`, so an imported NPC never shows under the **Characters** tab (and is
@@ -57,6 +57,9 @@ Beyond that the routine asks the human to bless more work. That is by design —
     "npc" routes it under Characters after import; explicitly-typed / tagged / mapped-folder notes are
     unaffected (no false flag); a deliberately-lore note isn't flagged; import still completes with zero extra
     mandatory clicks; standard gate green. ~1–2 runs.
+  - ✅ DONE 2026-06-14 — commits ef10e2c3 (typeWasGuessed field + 8 staging-state tests) + 4d2d059b
+    ("Pick a type" badge in modal + 4 modal tests). Gate: 1214 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings). inferType.ts unchanged (no behavior change to recognized folders).
 
 - [ ] **F2. "What's new for players" counts distinct entities (not edit-records).**
   **Spec:** `docs/superpowers/specs/2026-06-14-publish-diff-distinct-entity-count-design.md` — **read in full.**
