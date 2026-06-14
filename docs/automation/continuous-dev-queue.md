@@ -61,7 +61,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
     ("Pick a type" badge in modal + 4 modal tests). Gate: 1214 tests green (4 shards, no OOM); tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings). inferType.ts unchanged (no behavior change to recognized folders).
 
-- [ ] **F2. "What's new for players" counts distinct entities (not edit-records).**
+- [x] **F2. "What's new for players" counts distinct entities (not edit-records).**
   **Spec:** `docs/superpowers/specs/2026-06-14-publish-diff-distinct-entity-count-design.md` — **read in full.**
   The publish summary badge counts change-records, so one entity edited two ways reads as "2 entities
   changed." Make the entity / map / placement summary counts tally **distinct ids** (fix all three together
@@ -71,6 +71,11 @@ Beyond that the routine asks the human to bless more work. That is by design —
     `src/test/atlas-diff.test.ts`.
   - Done when: an entity with title+body changes counts as 1 in the badge (test asserts); maps/placements
     likewise distinct; detailed change list unchanged; gate green. ~1 run.
+  - ✅ DONE 2026-06-14 — commit abea3ba0 (`counts` uses `new Set(...).size` for entities/placements/maps;
+    4 new tests: single-entity two-change-kinds counts as 1, two entities with multiple kinds each counts
+    as 2, maps distinct, placements distinct). Badge consumer (`PublishedDiffPanel`) confirmed reads
+    `diff.counts` not `.length`. Gate: 1218 tests green (4 shards); tsc EXIT:0; eslint 0 errors (16 known
+    warnings).
 
 - [ ] **F3. Pin label de-cluttering on crowded maps.**
   **Spec:** `docs/superpowers/specs/2026-06-14-pin-label-decluttering-design.md` — **read in full.**
