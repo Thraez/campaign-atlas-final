@@ -18,6 +18,7 @@ import { MapLayerPanel } from "@/atlas/MapLayerPanel";
 import { MapLayerEditableOverlay } from "@/atlas/MapLayerEditableOverlay";
 import { MapSettingsPanel } from "@/atlas/MapSettingsPanel";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
+import { OceanBackground } from "@/atlas/ocean/OceanBackground";
 import { overridesSchema } from "@/atlas/schemas/imports";
 import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
@@ -1531,6 +1532,7 @@ function AtlasPlacementEditorInner() {
                 }}
               />
               <div className="relative flex-1 min-h-0">
+          <OceanBackground map={activeMap} />
           <MapContainer
             crs={FlatCRS}
             center={[activeMap.height / 2, activeMap.width / 2]}
@@ -1538,7 +1540,7 @@ function AtlasPlacementEditorInner() {
             minZoom={-6}
             maxZoom={4}
             attributionControl={false}
-            style={{ width: "100%", height: "100%", background: activeMap.oceanColor ?? "#18313f", cursor: (pendingId || regionDraft.drawing) ? "crosshair" : undefined }}
+            style={{ width: "100%", height: "100%", background: activeMap.water?.enabled === false ? (activeMap.oceanColor ?? "#18313f") : "transparent", cursor: (pendingId || regionDraft.drawing) ? "crosshair" : undefined }}
           >
             <FlyTo target={flyTo} />
             <MapClickCapture onClick={onMapClick} />

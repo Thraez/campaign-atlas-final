@@ -665,3 +665,87 @@ maps:
     expect(cfg.warnings.some((w) => w.includes("nested under map"))).toBe(false);
   });
 });
+
+describe("loadWorldConfig — sanitizeWater", () => {
+  it("no water key → water is undefined on the map", () => {
+    writeWorldYaml(`
+maps:
+  - id: m1
+    name: Main
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.maps[0].water).toBeUndefined();
+  });
+
+  it("water.enabled:false is preserved", () => {
+    writeWorldYaml(`
+maps:
+  - id: m1
+    name: Main
+    water:
+      enabled: false
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.maps[0].water?.enabled).toBe(false);
+  });
+
+  it("water.enabled:true is preserved", () => {
+    writeWorldYaml(`
+maps:
+  - id: m1
+    name: Main
+    water:
+      enabled: true
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.maps[0].water?.enabled).toBe(true);
+  });
+
+  it("intensity is clamped to 0..1", () => {
+    writeWorldYaml(`
+maps:
+  - id: m1
+    name: Main
+    water:
+      intensity: 2.5
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.maps[0].water?.intensity).toBe(1);
+  });
+
+  it("speed is clamped to 0..1", () => {
+    writeWorldYaml(`
+maps:
+  - id: m1
+    name: Main
+    water:
+      speed: -0.5
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.maps[0].water?.speed).toBe(0);
+  });
+
+  it("valid hex crestColor is preserved", () => {
+    writeWorldYaml(`
+maps:
+  - id: m1
+    name: Main
+    water:
+      crestColor: "#aabbcc"
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.maps[0].water?.crestColor).toBe("#aabbcc");
+  });
+
+  it("invalid hex crestColor is dropped (not stored)", () => {
+    writeWorldYaml(`
+maps:
+  - id: m1
+    name: Main
+    water:
+      crestColor: not-a-color
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.maps[0].water?.crestColor).toBeUndefined();
+  });
+});
