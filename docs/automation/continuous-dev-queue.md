@@ -53,7 +53,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
 > revertible, and cites its own spec (**read in full first**). I1 carries a mandatory leak-regression test;
 > I2/I3 are pure player-facing additions; I4 is docs-only.
 
-- [ ] **I1. Show authored Connections on the entity page.**
+- [x] **I1. Show authored Connections on the entity page.**
   **Spec:** `docs/superpowers/specs/2026-06-15-connections-on-entity-page-design.md` — **read in full.**
   Authored `entity.relationships[]` are saved in the editor with per-link visibility tags but never
   displayed in the reading pane (player or DM). Render them as a compact **"Connections"** list in
@@ -69,6 +69,10 @@ Beyond that the routine asks the human to bless more work. That is by design —
   - Done when: Connections renders beneath Mentioned in; DM view shows all rels with DM badge;
     player view shows only player-safe rels; clicking a target opens the entity; no Connections
     section when relationships is empty; leak-regression test green; standard gate green. ~1–2 runs.
+  - ✅ DONE 2026-06-16 — commit e20ad90c (feat(I1): Connections section on entity page; entityById
+    added to destructuring; 7 EntityPanel unit tests + 4 I1 leak-regression tests in
+    player-preview-leak-regression.test.tsx). Gate: 1417 tests green (4 shards, no OOM); tsc clean;
+    eslint 0 errors (16 pre-existing warnings). Pure client-side display — no build-pipeline change.
 
 - [ ] **I2. Map distance ruler — click two points to measure straight-line world distance.**
   **Spec:** `docs/superpowers/specs/2026-06-15-map-distance-ruler-design.md` — **read in full.**
