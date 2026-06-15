@@ -75,7 +75,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
     mount + 7 world-loader tests). Gate: 1393 tests green (4 shards); tsc clean; eslint 0 errors (16
     pre-existing warnings); integrity-smoke 5/5; atlas:publish 10/10 clean.
 
-- [ ] **H2. "Living water" controls in the map settings panel.**
+- [x] **H2. "Living water" controls in the map settings panel.**
   **Spec:** `docs/superpowers/specs/2026-06-15-animated-ocean-background-design.md` — **read in full** (build phase 4).
   Add a "Living water" section under the existing ocean-colour picker in `MapSettingsPanel.tsx`: a toggle
   (enabled), **Strength** (intensity) + **Speed** (speed) sliders, and a **Wave colour** picker (crestColor,
@@ -86,6 +86,9 @@ Beyond that the routine asks the human to bless more work. That is by design —
   - Done when: the DM can turn the living water on/off and adjust strength/speed/wave-colour per map, see it
     change live on the map, and Save persists it (round-trips via `world.yaml`); toggling off restores the flat
     colour; standard gate green. ~1 run.
+  - ✅ DONE 2026-06-15 — commit b65e7630 (Living water section in MapSettingsPanel: toggle + Strength/Speed
+    sliders + Wave colour picker + 9 UI tests in src/test/map-settings-panel.test.tsx). Gate: all 4 shards
+    green; tsc clean; eslint 0 errors (16 pre-existing warnings). Pure editor UI — no pipeline impact.
 
 ### G — Refuel 2026-06-14 round 2 (blessed by the human)
 
