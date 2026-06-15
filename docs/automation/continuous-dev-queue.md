@@ -74,7 +74,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
     player-preview-leak-regression.test.tsx). Gate: 1417 tests green (4 shards, no OOM); tsc clean;
     eslint 0 errors (16 pre-existing warnings). Pure client-side display — no build-pipeline change.
 
-- [ ] **I2. Map distance ruler — click two points to measure straight-line world distance.**
+- [x] **I2. Map distance ruler — click two points to measure straight-line world distance.**
   **Spec:** `docs/superpowers/specs/2026-06-15-map-distance-ruler-design.md` — **read in full.**
   Add a tape-measure mode to both the player viewer and the DM editor: click a ruler button in the toolbar to
   enter ruler mode, click two map points, see a dashed line with a distance label (e.g. "12.3 mi"; falls back
@@ -88,6 +88,9 @@ Beyond that the routine asks the human to bless more work. That is by design —
   - Done when: two-click measurement works in both viewer and editor; label shows world units (or px fallback);
     ruler button clears/exits; `measureDistance` unit-tested; standard gate green (tsc + eslint + sharded
     vitest). ~1–2 runs.
+  - ✅ DONE 2026-06-16 — commit 8288dd28 (feat(I2): RulerLayer + measureDistance + button in both viewer and
+    editor toolbars; 6 unit tests in src/test/ruler/measureDistance.test.ts). Gate: 1423 tests green (4 shards,
+    no OOM); tsc clean; eslint 0 errors (16 pre-existing warnings). Pure client-side UI — no build-pipeline change.
 
 - [ ] **I3. Shareable deep links (map + pan/zoom + open entity).**
   **Spec:** `docs/superpowers/specs/2026-06-15-deep-link-pan-open-design.md` — **read in full.**
