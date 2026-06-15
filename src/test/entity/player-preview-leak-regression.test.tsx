@@ -255,3 +255,75 @@ describe("G1 — EntityPanes reading mode: DM mode keeps DM pane as primary", ()
     expect(screen.getByTestId("entity-pane-dm").textContent).toContain("DM_BLOCK_SECRET");
   });
 });
+
+// ── I1 — Connections-section leak regression ─────────────────────────────────
+//
+// Channels under test (Connections-specific):
+//   5. visibility:dm relationship  — "DM_RELATION_SECRET" (label) must be absent from player Connections
+//   6. player-visible relationship pointing at a DM-only target — "Secret Villain" title must be absent
+//      from player Connections (filterRelationshipsForPlayer drops it via the "leaking target" rule)
+
+// Extend leakTestEntity with an additional player-visible relationship pointing at the DM-only target.
+const connectionLeakEntity: Entity = {
+  ...leakTestEntity,
+  relationships: [
+    // Channel 5: dm-visibility relationship
+    { entity: "secret-villain", type: "ally", label: "DM_RELATION_SECRET", visibility: "dm" },
+    // Channel 6: player-visible but target is DM-only — must also be stripped
+    { entity: "secret-villain", type: "knows_about", label: "PLAYER_LINK_TO_DM_TARGET", visibility: "player" },
+  ] as EntityRelationship[],
+};
+
+describe("I1 — Connections section: player mode hides DM relationship channels", () => {
+  beforeEach(() => localStorage.setItem("atlas.viewMode", "player"));
+  afterEach(() => localStorage.clear());
+
+  it("dm-visibility relationship label absent from Connections in player mode (channel 5)", () => {
+    render(
+      <MemoryRouter>
+        <ViewModeProvider>
+          <EntityReadingView entity={connectionLeakEntity} entitiesById={entitiesById} />
+        </ViewModeProvider>
+      </MemoryRouter>,
+    );
+    expect(document.body.textContent).not.toContain("DM_RELATION_SECRET");
+  });
+
+  it("player-visible relationship targeting a DM-only entity absent from Connections in player mode (channel 6)", () => {
+    render(
+      <MemoryRouter>
+        <ViewModeProvider>
+          <EntityReadingView entity={connectionLeakEntity} entitiesById={entitiesById} />
+        </ViewModeProvider>
+      </MemoryRouter>,
+    );
+    // filterRelationshipsForPlayer drops this because secret-villain is dm-only
+    expect(document.body.textContent).not.toContain("PLAYER_LINK_TO_DM_TARGET");
+  });
+});
+
+describe("I1 — Connections section: DM mode shows all relationship channels", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("dm-visibility relationship label present in Connections in DM mode (channel 5)", () => {
+    render(
+      <MemoryRouter>
+        <ViewModeProvider>
+          <EntityReadingView entity={connectionLeakEntity} entitiesById={entitiesById} />
+        </ViewModeProvider>
+      </MemoryRouter>,
+    );
+    expect(document.body.textContent).toContain("DM_RELATION_SECRET");
+  });
+
+  it("player-visible relationship to DM-only target present in Connections in DM mode (channel 6)", () => {
+    render(
+      <MemoryRouter>
+        <ViewModeProvider>
+          <EntityReadingView entity={connectionLeakEntity} entitiesById={entitiesById} />
+        </ViewModeProvider>
+      </MemoryRouter>,
+    );
+    expect(document.body.textContent).toContain("PLAYER_LINK_TO_DM_TARGET");
+  });
+});

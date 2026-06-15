@@ -223,7 +223,7 @@ function ImageThumb({ src, alt, onClick }: { src: string; alt: string; onClick: 
 }
 
 export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function EntityPanel(
-  { entity, placements, onOpenEntity, onClose, onShowOnMap, readerAffordances = true },
+  { entity, placements, entityById, onOpenEntity, onClose, onShowOnMap, readerAffordances = true },
   ref
 ) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -347,6 +347,32 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
                     {b.title}
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {(entity.relationships ?? []).length > 0 && (
+            <div className="pt-3 border-t border-border" data-testid="connections-section">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Connections</div>
+              <div className="flex flex-col gap-1">
+                {(entity.relationships ?? []).map((r, i) => {
+                  const target = entityById.get(r.entity);
+                  const displayLabel = r.label ?? r.type;
+                  return (
+                    <div key={`${r.entity}-${i}`} className="flex items-center gap-1.5 text-xs">
+                      <span className="text-muted-foreground shrink-0">{displayLabel}:</span>
+                      <button
+                        className="hover:underline truncate text-left"
+                        onClick={() => onOpenEntity(r.entity)}
+                      >
+                        {target ? target.title : <span className="text-muted-foreground">{r.entity}</span>}
+                      </button>
+                      {r.visibility === "dm" && (
+                        <span className="text-[10px] text-muted-foreground shrink-0">(DM)</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
