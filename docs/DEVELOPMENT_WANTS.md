@@ -1,6 +1,6 @@
 # Development wants — ranked backlog
 
-**Last updated:** 2026-05-30
+**Last updated:** 2026-06-15
 **What this is:** the master, human-facing list of everything we want to do to the atlas — bugs, daily-friction fixes, polish, bigger features, and known non-goals — ranked by impact against effort. It is broader than the hourly routine's backlog: `docs/automation/continuous-dev-queue.md` (operational, auto-built) and `docs/automation/continuous-dev-roadmap.md` (policy) are the *blessed subset* the routine works from. This doc is where ideas land first; blessed items graduate into the queue.
 
 Many items below came from a live dogfooding pass on 2026-05-30 (walking the player viewer and the DM editor end to end). Those are marked **🆕 dogfooding**.
@@ -93,6 +93,36 @@ Each is a real architecture or surface decision — handled human-first, never a
 - **Map tiling / per-map chunking** — for very large or numerous maps. *(🆕 dogfooding corroboration: all six map images currently load eagerly up front — same root cause.)*
 - **Relationship graph view** — a visual web of who connects to whom.
 - **Published progressive fog** — fog that reveals as the campaign advances, in the player build.
+
+---
+
+## Added 2026-06-15 — from a feature brainstorm
+
+A human-directed feature ideation pass. Four openings surfaced (verified against the live code, so each is a
+real gap, not something already shipped). **#1 is in progress now** (spec being written); #2–#4 are parked
+here so they aren't lost.
+
+- **Show authored relationships on the entity page** *(added 2026-06-15 · Impact: High · Effort: S)* —
+  **in progress.** `entity.relationships[]` is authored + saved in the editor (and even visibility-tagged per
+  link), but is **never displayed** in the reading panel — player or DM. Surface it as a small "Connections"
+  list beneath the existing "Mentioned in" backlinks, honoring each relationship's own visibility. Distinct
+  from the Tier-5 relationship-graph view — this is pure display of data that already exists.
+
+- **One-click Publish from the editor** *(added 2026-06-15 · Impact: High · Effort: M–L, design-first)* —
+  Today, getting changes onto the player site means a terminal command (`npm run atlas:publish`) and/or a push
+  in GitHub Desktop. A single **Publish** button in the editor that runs the build + safety scans + push, then
+  confirms "your players can see it now." Best fit for the sleek / hide-the-internals preference. Needs a short
+  design first (likely a local editor endpoint, same channel as Save) — do not auto-build.
+
+- **Live shareable links** *(added 2026-06-15 · Impact: Med · Effort: S)* — the URL should follow the player
+  as they pan and open places (not just the first entry opened), so a shared link lands on the exact spot and
+  browser Back works. **GitHub Pages confirmed fine:** the existing `?entity=` share link already proves
+  query-param state works on the static site; we keep using query params, which avoid the SPA-refresh 404 that
+  only affects path-style routes.
+
+- **Map distance ruler** *(added 2026-06-15 · Impact: Med · Effort: S–M)* — click two points on a map to
+  measure distance in world units via the existing `MapScale`. A tape measure for players; explicitly **not**
+  the "travel-time crunch beyond route speed" non-goal (no weather/mount calculators — just distance).
 
 ---
 
