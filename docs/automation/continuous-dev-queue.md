@@ -485,6 +485,16 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - ✅ DONE 2026-06-15 — commit 159dd883; 18 new tests in `src/test/atlas-pin-presets.test.ts`;
     merged 0de1cd00. Gate: 1286 tests green (4 shards, no OOM); tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings).
+- [x] **N20. Hygiene / coverage nibble #16** — `src/atlas/session/sessionSnapshot.ts`
+  (`sessionHasWork`) had 6 untested slice branches — override/map/region/route/fog/layer each
+  returning true. `deserializeSession`'s inner state-field guard (missing required fields →
+  null) was never reached because the existing "junk" test short-circuits at the version check.
+  Added 15 tests: each `sessionHasWork` slice independently true and false; `deserializeSession`
+  with valid version + non-object / missing-field state → null; pristine-match entityEdit not
+  counted as work (gap in prior test).
+  - ✅ DONE 2026-06-15 — commit 566f8515; 15 new tests in `src/test/session/sessionSnapshot.test.ts`;
+    merged defb8429. Gate: 1301 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
 
 ---
 
