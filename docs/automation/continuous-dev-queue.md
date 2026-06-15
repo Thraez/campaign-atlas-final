@@ -26,6 +26,10 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
+> **Refueled 2026-06-15** — section **H** below (animated ocean / "living water") blessed by the human:
+> build **H1 → H2**. Spec: `docs/superpowers/specs/2026-06-15-animated-ocean-background-design.md`. This is
+> the **current priority** (G-series is ✅ DONE).
+>
 > **Refueled 2026-06-14 (round 2)** — section **G** below blessed by the human: **G1 Honest player preview**
 > is the current priority — build it next. Spec:
 > `docs/superpowers/specs/2026-06-14-honest-player-preview-design.md` (**read in full first**). Section **F**
@@ -36,6 +40,48 @@ Beyond that the routine asks the human to bless more work. That is by design —
 > `docs/DEVELOPMENT_WANTS.md`. **E is now ✅ DONE** (E1 merged to main `a7f22fbc`; E2–E6 on
 > `auto/continuous-dev`, then consolidated to main in the v0.1.0 merge 2026-06-14). Sections D, A, B, C are
 > all ✅ DONE.
+
+### H — Refuel 2026-06-15 (animated ocean / "living water" — blessed by the human)
+
+> Human-directed look-&-feel refuel. Full design (**read in full first**):
+> `docs/superpowers/specs/2026-06-15-animated-ocean-background-design.md`. Build **H1 → H2**.
+> Default: water is **on but gentle**, **per map**, with a hard off switch back to today's flat colour.
+
+- [ ] **H1. Animated ocean background — rendering + config + player parity.**
+  **Spec:** `docs/superpowers/specs/2026-06-15-animated-ocean-background-design.md` — **read in full** (build phases 1–3).
+  Upgrade each map's flat `oceanColor` fill into a configurable, gently animated "living water" layer rendered
+  behind the map (a `pointer-events:none` backdrop below the Leaflet panes; the base `oceanColor` stays as the
+  fallback). Add a per-map `water` config (`enabled`/`intensity`/`speed`/`crestColor`) on `MapDocument` with a
+  pure `resolveWater()` (defaults: on, gentle, slow; crest derived from `oceanColor`; clamps). `enabled:false`
+  → renders nothing → byte-for-byte today's flat colour (the kill switch). One shared `OceanBackground`
+  component used by BOTH the player viewer and the editor; respects `prefers-reduced-motion` (renders still).
+  Thread `water` through `loadWorldConfig` (parse/sanitize) → `buildFullWorldYaml` (serialize) → `build-atlas`
+  (into player `atlas.json`), so the water shows on the player site and through fog automatically (no secrecy
+  risk — benign world-level theme data, like the existing `oceanColor`).
+  - Files: `src/atlas/content/schema.ts`; new `src/atlas/ocean/OceanBackground.tsx` + `src/atlas/ocean/resolveWater.ts`;
+    `src/pages/AtlasViewer.tsx`, `src/pages/AtlasPlacementEditor.tsx`; `scripts/atlas/loadWorldConfig.ts`,
+    `src/atlas/yaml/buildFullWorldYaml.ts`, `scripts/build-atlas.ts`; tests under `src/test/ocean/**` + extend
+    world-loader/build tests.
+  - **Autonomy guard:** if the backdrop can't sit behind the Leaflet panes without breaking map drag/zoom,
+    ship the simplest equivalent (animate the container background) and hand back the pane-layer upgrade — do
+    not risk interaction or expand scope.
+  - **Touches the build pipeline** → gate also requires `npm run atlas:publish:integrity-smoke` **and**
+    `npm run atlas:publish` green (no secret leak; `water` carries no DM content).
+  - Done when: maps show a gentle living sea by default; `enabled:false` reverts to exactly the flat colour;
+    water shows in the player build incl. through fog; reduced-motion renders still; `resolveWater` unit-tested;
+    config round-trips into the player `atlas.json`; standard gate + publish + integrity-smoke green. ~1–2 runs.
+
+- [ ] **H2. "Living water" controls in the map settings panel.**
+  **Spec:** `docs/superpowers/specs/2026-06-15-animated-ocean-background-design.md` — **read in full** (build phase 4).
+  Add a "Living water" section under the existing ocean-colour picker in `MapSettingsPanel.tsx`: a toggle
+  (enabled), **Strength** (intensity) + **Speed** (speed) sliders, and a **Wave colour** picker (crestColor,
+  pre-filled with the derived default). Each control calls the existing `onPatch({ water })` → `patchMap` →
+  existing Save (`buildFullWorldYaml` → `/__atlas/save`); undo is automatic. When the toggle is off, hide/grey
+  the three tuning controls. Pure DM-editor UI; no secrecy or build-pipeline impact.
+  - Files: `src/atlas/MapSettingsPanel.tsx`; UI test under `src/test/`.
+  - Done when: the DM can turn the living water on/off and adjust strength/speed/wave-colour per map, see it
+    change live on the map, and Save persists it (round-trips via `world.yaml`); toggling off restores the flat
+    colour; standard gate green. ~1 run.
 
 ### G — Refuel 2026-06-14 round 2 (blessed by the human)
 
