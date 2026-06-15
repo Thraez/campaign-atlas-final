@@ -26,16 +26,96 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
-> **Refueled 2026-06-14** — section **F** (3 units) blessed by the human. **Build in order: F1 → F2 → F3.**
-> F1 categorize-imports · F2 distinct-entity publish counts · F3 pin label de-cluttering — each cites a full
-> spec under `docs/superpowers/specs/2026-06-14-*.md` (**read in full first**).
-> **Earmarked, NOT yet buildable:** "Honest player preview" — high value, but needs a human shaping session
-> before it can be specced. Do **not** auto-build it.
+> **Refueled 2026-06-15** — section **H** below (animated ocean / "living water") blessed by the human:
+> build **H1 → H2**. Spec: `docs/superpowers/specs/2026-06-15-animated-ocean-background-design.md`. This is
+> the **current priority** (G-series is ✅ DONE).
+>
+> **Refueled 2026-06-14 (round 2)** — section **G** below blessed by the human: **G1 Honest player preview**
+> is the current priority — build it next. Spec:
+> `docs/superpowers/specs/2026-06-14-honest-player-preview-design.md` (**read in full first**). Section **F**
+> (F1–F3) is ✅ DONE and consolidated to `main` as **v0.2.0** (merge `258027b3`, tag `v0.2.0`).
+> F1 categorize-imports · F2 distinct-entity publish counts · F3 pin label de-cluttering.
 >
 > **Refueled 2026-05-31** — section **E** (6 units) was blessed from the ranked inbox in
 > `docs/DEVELOPMENT_WANTS.md`. **E is now ✅ DONE** (E1 merged to main `a7f22fbc`; E2–E6 on
 > `auto/continuous-dev`, then consolidated to main in the v0.1.0 merge 2026-06-14). Sections D, A, B, C are
 > all ✅ DONE.
+
+### H — Refuel 2026-06-15 (animated ocean / "living water" — blessed by the human)
+
+> Human-directed look-&-feel refuel. Full design (**read in full first**):
+> `docs/superpowers/specs/2026-06-15-animated-ocean-background-design.md`. Build **H1 → H2**.
+> Default: water is **on but gentle**, **per map**, with a hard off switch back to today's flat colour.
+
+- [x] **H1. Animated ocean background — rendering + config + player parity.**
+  **Spec:** `docs/superpowers/specs/2026-06-15-animated-ocean-background-design.md` — **read in full** (build phases 1–3).
+  Upgrade each map's flat `oceanColor` fill into a configurable, gently animated "living water" layer rendered
+  behind the map (a `pointer-events:none` backdrop below the Leaflet panes; the base `oceanColor` stays as the
+  fallback). Add a per-map `water` config (`enabled`/`intensity`/`speed`/`crestColor`) on `MapDocument` with a
+  pure `resolveWater()` (defaults: on, gentle, slow; crest derived from `oceanColor`; clamps). `enabled:false`
+  → renders nothing → byte-for-byte today's flat colour (the kill switch). One shared `OceanBackground`
+  component used by BOTH the player viewer and the editor; respects `prefers-reduced-motion` (renders still).
+  Thread `water` through `loadWorldConfig` (parse/sanitize) → `buildFullWorldYaml` (serialize) → `build-atlas`
+  (into player `atlas.json`), so the water shows on the player site and through fog automatically (no secrecy
+  risk — benign world-level theme data, like the existing `oceanColor`).
+  - Files: `src/atlas/content/schema.ts`; new `src/atlas/ocean/OceanBackground.tsx` + `src/atlas/ocean/resolveWater.ts`;
+    `src/pages/AtlasViewer.tsx`, `src/pages/AtlasPlacementEditor.tsx`; `scripts/atlas/loadWorldConfig.ts`,
+    `src/atlas/yaml/buildFullWorldYaml.ts`, `scripts/build-atlas.ts`; tests under `src/test/ocean/**` + extend
+    world-loader/build tests.
+  - **Autonomy guard:** if the backdrop can't sit behind the Leaflet panes without breaking map drag/zoom,
+    ship the simplest equivalent (animate the container background) and hand back the pane-layer upgrade — do
+    not risk interaction or expand scope.
+  - **Touches the build pipeline** → gate also requires `npm run atlas:publish:integrity-smoke` **and**
+    `npm run atlas:publish` green (no secret leak; `water` carries no DM content).
+  - Done when: maps show a gentle living sea by default; `enabled:false` reverts to exactly the flat colour;
+    water shows in the player build incl. through fog; reduced-motion renders still; `resolveWater` unit-tested;
+    config round-trips into the player `atlas.json`; standard gate + publish + integrity-smoke green. ~1–2 runs.
+  - ✅ DONE 2026-06-15 — commits 2e6766c3 (schema + ocean module: resolveWater + OceanBackground + 22 tests)
+    + 12db1a49 (config plumbing: loadWorldConfig sanitizeWater + buildFullWorldYaml serialize + viewer/editor
+    mount + 7 world-loader tests). Gate: 1393 tests green (4 shards); tsc clean; eslint 0 errors (16
+    pre-existing warnings); integrity-smoke 5/5; atlas:publish 10/10 clean.
+
+- [x] **H2. "Living water" controls in the map settings panel.**
+  **Spec:** `docs/superpowers/specs/2026-06-15-animated-ocean-background-design.md` — **read in full** (build phase 4).
+  Add a "Living water" section under the existing ocean-colour picker in `MapSettingsPanel.tsx`: a toggle
+  (enabled), **Strength** (intensity) + **Speed** (speed) sliders, and a **Wave colour** picker (crestColor,
+  pre-filled with the derived default). Each control calls the existing `onPatch({ water })` → `patchMap` →
+  existing Save (`buildFullWorldYaml` → `/__atlas/save`); undo is automatic. When the toggle is off, hide/grey
+  the three tuning controls. Pure DM-editor UI; no secrecy or build-pipeline impact.
+  - Files: `src/atlas/MapSettingsPanel.tsx`; UI test under `src/test/`.
+  - Done when: the DM can turn the living water on/off and adjust strength/speed/wave-colour per map, see it
+    change live on the map, and Save persists it (round-trips via `world.yaml`); toggling off restores the flat
+    colour; standard gate green. ~1 run.
+  - ✅ DONE 2026-06-15 — commit b65e7630 (Living water section in MapSettingsPanel: toggle + Strength/Speed
+    sliders + Wave colour picker + 9 UI tests in src/test/map-settings-panel.test.tsx). Gate: all 4 shards
+    green; tsc clean; eslint 0 errors (16 pre-existing warnings). Pure editor UI — no pipeline impact.
+
+### G — Refuel 2026-06-14 round 2 (blessed by the human)
+
+- [x] **G1. Honest player preview — faithful "as players see it" view.**
+  **Spec:** `docs/superpowers/specs/2026-06-14-honest-player-preview-design.md` — **read in full.**
+  Today the editor's "player" view only filters *which entities* show (`filterEntitiesForLens`); it does not
+  consistently redact content *within* an entity, so `%%dm%%` blocks, DM-only profile fields, secret/DM
+  relationships, and DM-entity links can still leak in the reading pane. Make the **player** ViewMode drive a
+  faithful projection of the whole reading experience via the EXISTING pure `projectEntityForPlayer()`
+  pipeline (verified reusable client-side — **reuse only; no new redaction logic; no rebuild**), plus a clear
+  "previewing as players see it" indicator. **Mandatory:** a leak-regression test (an entity with a
+  `%%secret%%`, a DM-only profile field, a `visibility: dm` relationship, and a `[[DM-only]]` link renders
+  NONE of them in the player preview). Build the default single-toggle shape; a separate full-screen preview
+  route is out of scope for v1.
+  - Files: `src/atlas/view/ViewModeProvider.tsx` + consumers; `src/atlas/entity/EntityReadingView.tsx`,
+    `EntityPanes.tsx`, `EntityPanel.tsx`; `src/pages/AtlasPlacementEditor.tsx` (toggle + indicator); tests
+    (the mandatory leak-regression test + an indicator test).
+  - Done when: Player view shows entities fully redacted (no `%%dm%%`, no DM fields, no secret/DM
+    relationships, DM-links redacted) AND only player-visible entities/maps appear AND a clear indicator
+    shows; DM view unchanged; the leak-regression test proves a planted DM secret is absent from the preview;
+    gate green (no build-pipeline change). ~1–2 runs.
+  - ✅ DONE 2026-06-14 — commits 38443725 (feat: EntityPanes honors global ViewMode — player pane is primary
+    in player mode + "Player preview — as players see it" banner; ViewModeToggle gets "Previewing as players
+    see it" chip in editor header) + merge e838641b. Mandatory leak-regression test: 14 assertions across
+    4 DM channels (%%dm%% block, profile.dm field, visibility:dm relationship, [[DM-only]] link) — all
+    absent from player render, all present in DM render. Gate: 1250 tests green (4 shards); tsc clean;
+    eslint 0 errors (16 pre-existing warnings). No build-pipeline change — pure client-side reuse.
 
 ### F — Refuel 2026-06-14 (blessed from the inbox)
 
@@ -431,6 +511,88 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - ✅ DONE 2026-06-02 — commit 9dcff86d; 15 new tests in `src/test/content/parseWikilinks.test.ts`;
     merged 1ae2f168. Gate: 1190 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
     pre-existing warnings).
+- [x] **N18. Hygiene / coverage nibble #14** — `src/atlas/profiles/profileBuild.ts` pure helpers
+  (`compactProfile`, `compactDmProfile`, `compactPlayerProfile`, `isEmptyDmProfile`, `stripDmProfile`)
+  had only 2 test cases across 4 functions with ~12 untested branches. All are correctness-critical:
+  they determine what profile data ships in the player build (DM-only fields must be stripped).
+  Branches covered: undefined inputs → undefined; empty-object inputs → undefined; whitespace-only
+  values discarded; mixed valid/invalid fields → only valid kept + trimmed; rumors/visible_traits
+  with empty strings filtered; dm-only profile half kept when player absent; player-only half kept
+  when dm absent; isEmptyPlayer=true path in stripDmProfile (empty player object is preserved as-is).
+  - ✅ DONE 2026-06-15 — commit 7c663c19; 18 new tests in `src/test/atlas-profiles.test.ts`;
+    merged into auto/continuous-dev. Gate: 1268 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
+- [x] **N19. Hygiene / coverage nibble #15** — `src/atlas/pins/presets.ts` had only 3 tests
+  covering the happy path for `defaultPresetForType`, `diffPinOverride`, and `resolvePinStyle`;
+  `pinSvg` had zero coverage. Added 18 tests covering:
+  - `defaultPresetForType(undefined)` and empty string → "custom"
+  - Type aliases: `divine_site`→temple, `black_market`→shop, `wilderness_landmark`→hazard,
+    `player_base`, `resonance_site`, `mystery`
+  - Case-insensitivity: SETTLEMENT/NPC/Dungeon resolve correctly
+  - `diffPinOverride` with explicit preset change stored as override
+  - `diffPinOverride` preserving `labelMinZoom` and `priority` overrides
+  - `resolvePinStyle` with no override / null override → returns preset defaults
+  - `resolvePinStyle` for unknown type → custom preset
+  - `pinSvg`: all 6 shape branches (circle/square/diamond/shield/star/teardrop)
+  - `pinSvg`: dim option → opacity:0.6; pulse → atlas-pulse animation
+  - ✅ DONE 2026-06-15 — commit 159dd883; 18 new tests in `src/test/atlas-pin-presets.test.ts`;
+    merged 0de1cd00. Gate: 1286 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
+- [x] **N20. Hygiene / coverage nibble #16** — `src/atlas/session/sessionSnapshot.ts`
+  (`sessionHasWork`) had 6 untested slice branches — override/map/region/route/fog/layer each
+  returning true. `deserializeSession`'s inner state-field guard (missing required fields →
+  null) was never reached because the existing "junk" test short-circuits at the version check.
+  Added 15 tests: each `sessionHasWork` slice independently true and false; `deserializeSession`
+  with valid version + non-object / missing-field state → null; pristine-match entityEdit not
+  counted as work (gap in prior test).
+  - ✅ DONE 2026-06-15 — commit 566f8515; 15 new tests in `src/test/session/sessionSnapshot.test.ts`;
+    merged defb8429. Gate: 1301 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
+- [x] **N21. Hygiene / coverage nibble #17** — `src/atlas/editor/textareaInsert.ts` (toolbar text
+  insertion helpers) had zero test coverage despite being the pure core of the DM editor's
+  toolbar. Three functions: `wrapInline` (selection vs. placeholder; custom placeholder; full-string
+  wrap; empty buffer), `prefixLines` (single line without/with trailing newline; multiline spanning;
+  mid-line selection expands to line start), `insertBlock` (with/without trailing newline
+  controlling insertAt; all four sep branches — head empty / ends-`\n\n` / ends-`\n` / bare text;
+  trailingNl omitted when tail already starts with `\n`). 15 tests total.
+  - ✅ DONE 2026-06-15 — commit 11b81910; 15 new tests in `src/test/textareaInsert.test.ts`;
+    Gate: 1316 tests green (4 shards, no OOM); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+- [x] **N22. Hygiene / coverage nibble #18** — `src/atlas/yaml/dump.ts` (`patchHeader`, `dumpYaml`)
+  and `src/atlas/yaml/buildPatches.ts` (`buildEntityFrontmatterPatch`) had uncovered branches. The
+  only existing test exercised `buildEntityFrontmatterPatch` as a smoke test; all the following were
+  untested: `patchHeader` without notes (if-branch skipped); `patchHeader` with notes (lines appended);
+  `dumpYaml` valid YAML structure + 2-space indent + no code fences; `buildEntityFrontmatterPatch`
+  with no title (top object must omit title key); empty-array exclusion (aliases/tags: [] stripped);
+  undefined-value exclusion; single-file singular suffix ("1 file"); multiple-files plural suffix
+  ("2 files"); sections[] populated with label + yaml per patch; "# file:" body marker per patch.
+  - ✅ DONE 2026-06-15 — commit b6062345; 15 new tests in `src/test/yaml/buildPatches.test.ts`;
+    Gate: 1331 tests green (4 shards, no OOM); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+- [x] **N23. Hygiene / coverage nibble #19** — `src/atlas/yaml/validatePatch.ts` (`validatePatchYaml`)
+  had 17 uncovered branches across the `entity-frontmatter` and `placement` kinds. The `entity-frontmatter`
+  kind (added in N22) had only 3 tests (valid, invalid visibility, markdown fences); all structural
+  validation paths were untested. The `placement` kind was completely untested. Branches covered:
+  `entity-frontmatter`: empty patch → "Patch is empty" error; no object blocks (top-level list) → error;
+  block with no `atlas:` section → warning; `atlas:` is array or scalar (not a mapping) → error;
+  `atlas.type` not a string → error; `atlas.summary` not a string → warning; `atlas.aliases / images /
+  placements / relationships` not an array → errors; `placements[].mapId` not a string → warning;
+  `placements[].x/y` non-numeric → error. `placement` kind: valid patch → ok; no placements block →
+  error; missing mapId → warning; non-numeric coordinates → error.
+  - ✅ DONE 2026-06-15 — commit 2406e018; 17 new tests added to `src/test/atlas-patch-engine.test.ts`
+    (run routine-n23-20260615). Gate: 1348 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
+- [x] **N24. Hygiene / coverage nibble #20** — `src/atlas/content/stripDmBlocks.ts` is on the critical
+  security path (strips DM-only `%%...%%` and `:::dm...:::` blocks before the player-safe build) but had
+  only a single parity test covering one happy path. Multiple correctness branches were untested:
+  `stripDmBlocks`: no-markers fast path (count:0, unbalanced:false); multiple `%%` blocks accumulate
+  count; unbalanced `%%` (odd occurrence) detected as build error; fenced-code guard (unbalanced
+  detection skips `%%` inside ` ``` ` blocks); unclosed `:::dm` (opens > closes) detected; balanced
+  `:::dm`/`:::` pair not flagged; fenced-code guard for `:::dm`; 3+ blank-line collapse after strip;
+  combined `%%` + `:::dm` in one pass. `stripDmFromShippingString`: undefined passthrough; no-marker
+  fast path (string returned as-is); inline `%%` stripped + trimmed; internal whitespace collapsed
+  after strip; `:::dm...:::` stripped.
+  - ✅ DONE 2026-06-15 — commit a8aa28ed; 16 new tests in `src/test/content/stripDmBlocks.test.ts`
+    (run routine-n24-20260615). Gate: 1364 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
 
 ---
 

@@ -64,7 +64,15 @@ export interface MapDocument {
   scale?: MapScale;
   grid?: GridOverlay;
   oceanColor?: string;
+  water?: WaterConfig;
   wrapX?: boolean;
+}
+
+export interface WaterConfig {
+  enabled?: boolean;    // default true
+  intensity?: number;   // 0..1, default 0.35 (gentle)
+  speed?: number;       // 0..1, default 0.3 (slow)
+  crestColor?: string;  // hex; default derived from oceanColor
 }
 
 export interface MapScale {

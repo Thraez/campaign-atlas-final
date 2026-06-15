@@ -20,6 +20,7 @@ import type {
   Region,
   Route,
   RouteMode,
+  WaterConfig,
   WorldCalendar,
 } from "../../src/atlas/content/schema";
 
@@ -148,6 +149,7 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
     const id = m.id ?? `${worldId}-map-${i}`;
     const scale = sanitizeScale(m.scale, warnings, `map "${id}"`);
     const grid = sanitizeGrid(m.grid, warnings, `map "${id}"`);
+    const water = sanitizeWater(m.water as WaterConfig | undefined, warnings, `map "${id}"`);
     return {
       id,
       worldId,
@@ -155,6 +157,7 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
       width: m.width ?? 200000,
       height: m.height ?? 100000,
       oceanColor: m.oceanColor ?? "#18313f",
+      ...(water !== undefined ? { water } : {}),
       wrapX: m.wrapX ?? false,
       scale,
       grid,
@@ -337,6 +340,19 @@ function sanitizeGrid(g: GridOverlay | undefined, warnings: string[], where: str
     return undefined;
   }
   return { kind: g.kind, size: g.size, color: g.color, enabled: g.enabled !== false };
+}
+
+function sanitizeWater(w: WaterConfig | undefined, _warnings: string[], _where: string): WaterConfig | undefined {
+  if (!w) return undefined;
+  const out: WaterConfig = {};
+  if (w.enabled === false) out.enabled = false;
+  else if (w.enabled === true) out.enabled = true;
+  if (typeof w.intensity === "number") out.intensity = Math.min(1, Math.max(0, w.intensity));
+  if (typeof w.speed === "number") out.speed = Math.min(1, Math.max(0, w.speed));
+  if (typeof w.crestColor === "string" && /^#[0-9a-fA-F]{6}$/.test(w.crestColor)) {
+    out.crestColor = w.crestColor;
+  }
+  return out;
 }
 
 function normalizeVis(v: unknown, warnings: string[], where: string): EntityVisibility {

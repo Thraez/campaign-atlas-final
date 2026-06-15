@@ -14,6 +14,7 @@ import {
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
+import { OceanBackground } from "@/atlas/ocean/OceanBackground";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
@@ -356,6 +357,7 @@ export default function AtlasViewer() {
           className="flex-1 relative min-h-0"
           aria-label={`Interactive map: ${activeMap.name}. Use arrow keys to pan, plus and minus to zoom.`}
         >
+          <OceanBackground map={activeMap} />
           <MapContainer
             crs={FlatCRS}
             center={[activeMap.height / 2, activeMap.width / 2]}
@@ -366,7 +368,7 @@ export default function AtlasViewer() {
             keyboard
             keyboardPanDelta={80}
             attributionControl={false}
-            style={{ width: "100%", height: "100%", background: activeMap.oceanColor ?? "#18313f" }}
+            style={{ width: "100%", height: "100%", background: activeMap.water?.enabled === false ? (activeMap.oceanColor ?? "#18313f") : "transparent" }}
           >
             <MapController flyTo={flyTarget} />
 

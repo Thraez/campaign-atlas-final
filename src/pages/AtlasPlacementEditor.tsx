@@ -18,6 +18,7 @@ import { MapLayerPanel } from "@/atlas/MapLayerPanel";
 import { MapLayerEditableOverlay } from "@/atlas/MapLayerEditableOverlay";
 import { MapSettingsPanel } from "@/atlas/MapSettingsPanel";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
+import { OceanBackground } from "@/atlas/ocean/OceanBackground";
 import { overridesSchema } from "@/atlas/schemas/imports";
 import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
@@ -150,13 +151,23 @@ function FlyTo({ target }: { target: { lat: number; lng: number } | null }) {
 function ViewModeToggle() {
   const { mode, setMode } = useViewMode();
   return (
-    <div className="inline-flex rounded border overflow-hidden text-xs" role="group" aria-label="View mode">
-      <button type="button"
-        className={mode === "dm" ? "px-2 py-1 bg-primary text-primary-foreground" : "px-2 py-1"}
-        aria-pressed={mode === "dm"} onClick={() => setMode("dm")}>DM view</button>
-      <button type="button"
-        className={mode === "player" ? "px-2 py-1 bg-primary text-primary-foreground" : "px-2 py-1"}
-        aria-pressed={mode === "player"} onClick={() => setMode("player")}>Player view</button>
+    <div className="flex items-center gap-2">
+      <div className="inline-flex rounded border overflow-hidden text-xs" role="group" aria-label="View mode">
+        <button type="button"
+          className={mode === "dm" ? "px-2 py-1 bg-primary text-primary-foreground" : "px-2 py-1"}
+          aria-pressed={mode === "dm"} onClick={() => setMode("dm")}>DM view</button>
+        <button type="button"
+          className={mode === "player" ? "px-2 py-1 bg-primary text-primary-foreground" : "px-2 py-1"}
+          aria-pressed={mode === "player"} onClick={() => setMode("player")}>Player view</button>
+      </div>
+      {mode === "player" && (
+        <span
+          data-testid="player-mode-indicator"
+          className="text-[11px] text-amber-300 border border-amber-500/40 bg-amber-500/10 rounded px-2 py-0.5 hidden sm:inline"
+        >
+          Previewing as players see it
+        </span>
+      )}
     </div>
   );
 }
@@ -1521,6 +1532,7 @@ function AtlasPlacementEditorInner() {
                 }}
               />
               <div className="relative flex-1 min-h-0">
+          <OceanBackground map={activeMap} />
           <MapContainer
             crs={FlatCRS}
             center={[activeMap.height / 2, activeMap.width / 2]}
@@ -1528,7 +1540,7 @@ function AtlasPlacementEditorInner() {
             minZoom={-6}
             maxZoom={4}
             attributionControl={false}
-            style={{ width: "100%", height: "100%", background: activeMap.oceanColor ?? "#18313f", cursor: (pendingId || regionDraft.drawing) ? "crosshair" : undefined }}
+            style={{ width: "100%", height: "100%", background: activeMap.water?.enabled === false ? (activeMap.oceanColor ?? "#18313f") : "transparent", cursor: (pendingId || regionDraft.drawing) ? "crosshair" : undefined }}
           >
             <FlyTo target={flyTo} />
             <MapClickCapture onClick={onMapClick} />
