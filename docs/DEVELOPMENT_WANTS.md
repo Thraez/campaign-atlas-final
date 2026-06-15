@@ -5,6 +5,16 @@
 
 Many items below came from a live dogfooding pass on 2026-05-30 (walking the player viewer and the DM editor end to end). Those are marked **🆕 dogfooding**.
 
+> **📍 Reality update — 2026-06-15.** Most of Tiers 1–3 below have **shipped** (v0.1.0 → v0.3.0): the crash
+> guard + error boundary, proper-case names, snippet casing, accessibility labels, editor-works-on-first-run,
+> categorize-imports, the import report, honest player preview, phrase search, pin de-cluttering, richer
+> markdown, and the dropped-image / broken-link *flags*. The genuinely-open work has been sequenced into a real
+> plan — see **`docs/superpowers/specs/2026-06-15-atlas-roadmap-design.md`**. The blessed, build-ready subset is
+> queued in `docs/automation/continuous-dev-queue.md` (section **I** = I1–I4 Connections · ruler · deep-links ·
+> README; design-gated **N3 / N25 / N26** = asset credits · render image embeds · render planned-links). The
+> three lead big-bets now have briefs: Obsidian read-only merge, one-click Publish, relationship graph. Treat
+> the tiers below as the idea inbox; the roadmap doc is the current source of sequencing.
+
 ## How to read the ranking
 
 - **Impact** = how much it improves the experience of building or sharing a world. High / Med / Low.
