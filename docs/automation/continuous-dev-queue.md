@@ -47,7 +47,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
 > `docs/superpowers/specs/2026-06-15-animated-ocean-background-design.md`. Build **H1 → H2**.
 > Default: water is **on but gentle**, **per map**, with a hard off switch back to today's flat colour.
 
-- [ ] **H1. Animated ocean background — rendering + config + player parity.**
+- [x] **H1. Animated ocean background — rendering + config + player parity.**
   **Spec:** `docs/superpowers/specs/2026-06-15-animated-ocean-background-design.md` — **read in full** (build phases 1–3).
   Upgrade each map's flat `oceanColor` fill into a configurable, gently animated "living water" layer rendered
   behind the map (a `pointer-events:none` backdrop below the Leaflet panes; the base `oceanColor` stays as the
@@ -70,6 +70,10 @@ Beyond that the routine asks the human to bless more work. That is by design —
   - Done when: maps show a gentle living sea by default; `enabled:false` reverts to exactly the flat colour;
     water shows in the player build incl. through fog; reduced-motion renders still; `resolveWater` unit-tested;
     config round-trips into the player `atlas.json`; standard gate + publish + integrity-smoke green. ~1–2 runs.
+  - ✅ DONE 2026-06-15 — commits 2e6766c3 (schema + ocean module: resolveWater + OceanBackground + 22 tests)
+    + 12db1a49 (config plumbing: loadWorldConfig sanitizeWater + buildFullWorldYaml serialize + viewer/editor
+    mount + 7 world-loader tests). Gate: 1393 tests green (4 shards); tsc clean; eslint 0 errors (16
+    pre-existing warnings); integrity-smoke 5/5; atlas:publish 10/10 clean.
 
 - [ ] **H2. "Living water" controls in the map settings panel.**
   **Spec:** `docs/superpowers/specs/2026-06-15-animated-ocean-background-design.md` — **read in full** (build phase 4).
