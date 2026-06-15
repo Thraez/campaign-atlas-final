@@ -12,6 +12,18 @@ Newest entries at the top.
 *(The routine found these but did not change them, because they'd need a judgment call or could change
 behavior. Clear an item once you've dealt with it.)*
 
+- ⚠️ **The two routines ran on top of each other today — the shared lock failed (2026-06-15).** While this
+  code-quality run held the lock (`IN_PROGRESS since 2026-06-15T15:02:27 (run qa-20260615)`), the hourly
+  feature routine fired at the same time, **misread the live lock as a leftover header**, and reset it to
+  `IDLE` mid-run (see `ACTIVE.md` body, `routine-check-20260615e`). No harm done this time — the feature run
+  was a no-op REFUEL-POINT check and this run made no changes — but the mutual-exclusion both routines depend
+  on did not hold. **Why it matters:** if this races again on a day when one routine is actually committing,
+  the two could collide on `auto/continuous-dev`. **Likely cause:** the feature routine recognises the lock
+  by matching a run-id it expects in the body, and it attributed my header's timestamp to a *previous* check
+  run rather than to an active different-routine run. Worth a human look at how the lock owner is identified
+  (e.g. record the owning routine name in the `Run status:` line, not just a timestamp) so a foreign but live
+  lock is never mistaken for a stale one. I did not change the lock logic — that's a design call.
+
 - ✅ RESOLVED 2026-06-14 — **The "what's new for players" badge counted changes, not entities.** The human
   decided (2026-06-14) it should count **distinct entities** (and the map/placement counts likewise, for
   consistency). Queued as WANT **F2** in `docs/automation/continuous-dev-queue.md` — spec
@@ -23,6 +35,15 @@ behavior. Clear an item once you've dealt with it.)*
 ## Run history
 *(Each daily run appends one line: what was fixed, or "clean run — nothing safe to fix".)*
 
+- 2026-06-15 (run qa-20260615) — **Clean run — nothing changed (stopped on a lock collision).** Confirmed
+  `auto/continuous-dev` (@ `08a55c5e`) is fully healthy: lint clean (0 errors, 16 known warnings), types
+  clean, and **all 1402 tests pass** across the four shards (350 + 394 + 336 + 322). The branch grew since the
+  last run (1203 → 1402 tests) from the H1/H2 and N18–N24 work. Did **not** make a fix this run: mid-run the
+  hourly feature routine fired concurrently and reset the shared lock (see the handed-back item above), so per
+  the routine's "when in doubt, stop" rule I made no mutating change while the lock was contested. Baseline
+  was green, so there was nothing broken to fix regardless. Worktree cut from origin tip `08a55c5e`, removed
+  cleanly; empty run branch deleted; no commits to source, `main` untouched. (This docs-only log entry is the
+  run's only commit.)
 - 2026-06-14 (run qa-20260614) — **Fixed (dead code removed, no behavior change):** the app
   carried a leftover mobile-detection helper (`useIsMobile`, in `src/hooks/use-mobile.tsx`) from
   the original UI scaffolding that nothing ever used — no screen, menu, or component referenced
