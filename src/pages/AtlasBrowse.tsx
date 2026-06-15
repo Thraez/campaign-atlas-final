@@ -166,18 +166,26 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
                   <h2 className="font-display text-2xl text-primary border-b border-border pb-1 mb-3">{letter}</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {list.map((e) => (
-                      <Link
+                      <div
                         key={e.id}
-                        to={`/atlas?entity=${encodeURIComponent(e.id)}`}
-                        className="block rounded border border-border bg-card hover:bg-accent/40 transition px-3 py-2"
+                        className="relative rounded border border-border bg-card hover:bg-accent/40 transition px-3 py-2"
                       >
                         <div className="flex items-baseline gap-2">
-                          <span className="font-medium text-sm truncate">{e.title}</span>
+                          {/* Stretched link: the title link's ::after overlay makes
+                              the whole card navigate to the entity, while the type
+                              and tag chips below stay as separate, non-nested links
+                              (z-10 lifts them above the overlay). Nesting <a> in <a>
+                              is invalid HTML and breaks the chip clicks. */}
+                          <Link
+                            to={`/atlas?entity=${encodeURIComponent(e.id)}`}
+                            className="font-medium text-sm truncate after:absolute after:inset-0 after:content-['']"
+                          >
+                            {e.title}
+                          </Link>
                           {playerTypeLabel(e.type) && (
                             <Link
                               to={`/atlas/type/${encodeURIComponent(e.type)}`}
-                              onClick={(ev) => ev.stopPropagation()}
-                              className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                              className="relative z-10 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
                             >
                               {playerTypeLabel(e.type)}
                             </Link>
@@ -195,14 +203,14 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
                               <Link
                                 key={t}
                                 to={`/atlas/tag/${encodeURIComponent(t)}`}
-                                onClick={(ev) => ev.stopPropagation()}
+                                className="relative z-10"
                               >
                                 <Badge variant="outline" className="text-[10px] hover:bg-accent">#{t}</Badge>
                               </Link>
                             ))}
                           </div>
                         )}
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 </section>
