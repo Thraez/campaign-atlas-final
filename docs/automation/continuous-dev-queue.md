@@ -495,6 +495,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - ✅ DONE 2026-06-15 — commit 566f8515; 15 new tests in `src/test/session/sessionSnapshot.test.ts`;
     merged defb8429. Gate: 1301 tests green (4 shards, no OOM); tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings).
+- [x] **N21. Hygiene / coverage nibble #17** — `src/atlas/editor/textareaInsert.ts` (toolbar text
+  insertion helpers) had zero test coverage despite being the pure core of the DM editor's
+  toolbar. Three functions: `wrapInline` (selection vs. placeholder; custom placeholder; full-string
+  wrap; empty buffer), `prefixLines` (single line without/with trailing newline; multiline spanning;
+  mid-line selection expands to line start), `insertBlock` (with/without trailing newline
+  controlling insertAt; all four sep branches — head empty / ends-`\n\n` / ends-`\n` / bare text;
+  trailingNl omitted when tail already starts with `\n`). 15 tests total.
+  - ✅ DONE 2026-06-15 — commit 11b81910; 15 new tests in `src/test/textareaInsert.test.ts`;
+    Gate: 1316 tests green (4 shards, no OOM); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
 ---
 
