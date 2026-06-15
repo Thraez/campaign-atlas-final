@@ -527,6 +527,19 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - ✅ DONE 2026-06-15 — commit 2406e018; 17 new tests added to `src/test/atlas-patch-engine.test.ts`
     (run routine-n23-20260615). Gate: 1348 tests green (4 shards, no OOM); tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings).
+- [x] **N24. Hygiene / coverage nibble #20** — `src/atlas/content/stripDmBlocks.ts` is on the critical
+  security path (strips DM-only `%%...%%` and `:::dm...:::` blocks before the player-safe build) but had
+  only a single parity test covering one happy path. Multiple correctness branches were untested:
+  `stripDmBlocks`: no-markers fast path (count:0, unbalanced:false); multiple `%%` blocks accumulate
+  count; unbalanced `%%` (odd occurrence) detected as build error; fenced-code guard (unbalanced
+  detection skips `%%` inside ` ``` ` blocks); unclosed `:::dm` (opens > closes) detected; balanced
+  `:::dm`/`:::` pair not flagged; fenced-code guard for `:::dm`; 3+ blank-line collapse after strip;
+  combined `%%` + `:::dm` in one pass. `stripDmFromShippingString`: undefined passthrough; no-marker
+  fast path (string returned as-is); inline `%%` stripped + trimmed; internal whitespace collapsed
+  after strip; `:::dm...:::` stripped.
+  - ✅ DONE 2026-06-15 — commit a8aa28ed; 16 new tests in `src/test/content/stripDmBlocks.test.ts`
+    (run routine-n24-20260615). Gate: 1364 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
 
 ---
 
