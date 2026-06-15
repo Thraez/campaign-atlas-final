@@ -88,6 +88,116 @@ describe("validatePatchYaml map patch", () => {
   });
 });
 
+describe("validatePatchYaml entity-frontmatter — uncovered branches", () => {
+  it("rejects an empty patch (all comments / blank lines)", () => {
+    const r = validatePatchYaml("# just a comment\n", "entity-frontmatter");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/empty/i);
+  });
+
+  it("rejects when no object blocks are parsed (e.g. YAML list at top level)", () => {
+    // yaml.loadAll parses a list — filtered out because it's an array, not an object
+    const r = validatePatchYaml("- item1\n- item2\n", "entity-frontmatter");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/at least one frontmatter block/);
+  });
+
+  it("warns when a block has no atlas: section (title-only)", () => {
+    const r = validatePatchYaml("title: Thornhold\n", "entity-frontmatter");
+    expect(r.ok).toBe(true);
+    expect(r.warnings.join(" ")).toMatch(/no `atlas:/);
+  });
+
+  it("rejects when atlas: is an array (must be a mapping)", () => {
+    const r = validatePatchYaml("atlas:\n  - one\n  - two\n", "entity-frontmatter");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/mapping/);
+  });
+
+  it("rejects when atlas: is a scalar (must be a mapping)", () => {
+    const r = validatePatchYaml("atlas: not-a-mapping\n", "entity-frontmatter");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/mapping/);
+  });
+
+  it("rejects when atlas.type is not a string", () => {
+    const r = validatePatchYaml("atlas:\n  type: 42\n", "entity-frontmatter");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/type must be a string/);
+  });
+
+  it("warns when atlas.summary is not a string", () => {
+    const r = validatePatchYaml("atlas:\n  summary: 99\n", "entity-frontmatter");
+    expect(r.ok).toBe(true);
+    expect(r.warnings.join(" ")).toMatch(/summary.*string/);
+  });
+
+  it("rejects when atlas.aliases is not an array", () => {
+    const r = validatePatchYaml("atlas:\n  aliases: wrong\n", "entity-frontmatter");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/aliases.*array/);
+  });
+
+  it("rejects when atlas.images is not an array", () => {
+    const r = validatePatchYaml("atlas:\n  images: not-an-array\n", "entity-frontmatter");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/images.*array/);
+  });
+
+  it("rejects when atlas.placements is not an array", () => {
+    const r = validatePatchYaml("atlas:\n  placements: bad\n", "entity-frontmatter");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/placements.*array/);
+  });
+
+  it("warns when a placement entry is missing mapId", () => {
+    const r = validatePatchYaml("atlas:\n  placements:\n    - x: 0.5\n      y: 0.3\n", "entity-frontmatter");
+    expect(r.ok).toBe(true);
+    expect(r.warnings.join(" ")).toMatch(/mapId/);
+  });
+
+  it("rejects when a placement entry has non-numeric coordinates", () => {
+    const r = validatePatchYaml("atlas:\n  placements:\n    - mapId: m1\n      x: left\n      y: top\n", "entity-frontmatter");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/numeric.*x.*y|x.*y.*numeric/i);
+  });
+
+  it("rejects when atlas.relationships is not an array", () => {
+    const r = validatePatchYaml("atlas:\n  relationships: bad\n", "entity-frontmatter");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/relationships.*array/);
+  });
+});
+
+describe("validatePatchYaml placement kind", () => {
+  it("accepts a valid placement patch", () => {
+    const patch = "atlas:\n  placements:\n    - mapId: overland\n      x: 0.5\n      y: 0.3\n";
+    const r = validatePatchYaml(patch, "placement");
+    expect(r.ok).toBe(true);
+    expect(r.errors).toHaveLength(0);
+  });
+
+  it("rejects when no atlas.placements block is present", () => {
+    const r = validatePatchYaml("title: Thornhold\n", "placement");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/placement.*at least one/i);
+  });
+
+  it("warns when a placement entry is missing mapId", () => {
+    const patch = "atlas:\n  placements:\n    - x: 0.2\n      y: 0.4\n";
+    const r = validatePatchYaml(patch, "placement");
+    expect(r.ok).toBe(true);
+    expect(r.warnings.join(" ")).toMatch(/mapId/);
+  });
+
+  it("rejects when a placement entry has non-numeric coordinates", () => {
+    const patch = "atlas:\n  placements:\n    - mapId: overland\n      x: far-left\n      y: top\n";
+    const r = validatePatchYaml(patch, "placement");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/numeric/i);
+  });
+});
+
 describe("validateProject", () => {
   it("passes a clean project", () => {
     const r = validateProject({ project, draftPlacements: [{ entityId: "town", mapId: "m1", x: 100, y: 200 }] });
