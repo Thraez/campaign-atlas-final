@@ -1,9 +1,10 @@
-import { Grid3x3, Globe2, Droplets } from "lucide-react";
+import { Grid3x3, Globe2, Droplets, Waves } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { GridKind, GridOverlay, MapDocument } from "@/atlas/content/schema";
+import type { GridKind, GridOverlay, MapDocument, WaterConfig } from "@/atlas/content/schema";
+import { deriveCrestColor, DEFAULT_WATER } from "@/atlas/ocean/resolveWater";
 
 interface Props {
   map: MapDocument;
@@ -20,6 +21,14 @@ export function MapSettingsPanel({ map, onPatch }: Props) {
 
   const setGrid = (patch: Partial<GridOverlay>) => {
     onPatch({ grid: { ...grid, ...patch } });
+  };
+
+  const water = map.water ?? {};
+  const waterEnabled = water.enabled !== false;
+  const derivedCrest = deriveCrestColor(map.oceanColor ?? "#18313f");
+
+  const setWater = (patch: Partial<WaterConfig>) => {
+    onPatch({ water: { ...water, ...patch } });
   };
 
   return (
@@ -65,6 +74,75 @@ export function MapSettingsPanel({ map, onPatch }: Props) {
               className="h-8 text-xs font-mono"
             />
           </div>
+        </section>
+
+        <section className="space-y-2 border-t border-border pt-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+              <Waves className="h-3 w-3" /> Living water
+            </div>
+            <label className="flex items-center gap-1.5 text-xs">
+              <input
+                type="checkbox"
+                data-testid="water-toggle"
+                checked={waterEnabled}
+                onChange={(e) => setWater({ enabled: e.target.checked })}
+              />
+              animated
+            </label>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Gentle wave animation behind the map. Turn off to use a flat background colour.
+          </p>
+          {waterEnabled && (
+            <div className="space-y-3">
+              <div>
+                <Label className="text-[10px] text-muted-foreground">
+                  Strength {Math.round((water.intensity ?? DEFAULT_WATER.intensity) * 100)}%
+                </Label>
+                <Slider
+                  data-testid="water-strength"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={[water.intensity ?? DEFAULT_WATER.intensity]}
+                  onValueChange={([v]) => setWater({ intensity: v })}
+                />
+              </div>
+              <div>
+                <Label className="text-[10px] text-muted-foreground">
+                  Speed {Math.round((water.speed ?? DEFAULT_WATER.speed) * 100)}%
+                </Label>
+                <Slider
+                  data-testid="water-speed"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={[water.speed ?? DEFAULT_WATER.speed]}
+                  onValueChange={([v]) => setWater({ speed: v })}
+                />
+              </div>
+              <div>
+                <Label className="text-[10px] text-muted-foreground">Wave colour</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    data-testid="water-crest-color-picker"
+                    value={water.crestColor ?? derivedCrest}
+                    onChange={(e) => setWater({ crestColor: e.target.value })}
+                    className="h-8 w-12 rounded border border-border bg-transparent cursor-pointer"
+                  />
+                  <Input
+                    data-testid="water-crest-color-input"
+                    value={water.crestColor ?? ""}
+                    placeholder={derivedCrest}
+                    onChange={(e) => setWater({ crestColor: e.target.value || undefined })}
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="space-y-2">
