@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   Search, X, MapPin, ArrowLeft, Compass, Grid3x3, CalendarClock,
-  LayoutGrid,
+  LayoutGrid, Ruler,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,6 +26,7 @@ import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { RulerLayer } from "@/atlas/ruler/RulerLayer";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
@@ -133,6 +134,7 @@ export default function AtlasViewer() {
   const hasDesktopAside = useHasDesktopAside();
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const [showGrid, setShowGrid] = useState<boolean | null>(null); // null = use map default
+  const [rulerActive, setRulerActive] = useState(false);
   // Aside expanded/collapsed state, persisted across reloads so a DM who
   // prefers the full-width map keeps it that way.
   const [asideExpanded, setAsideExpanded] = useState<boolean>(() => {
@@ -328,6 +330,16 @@ export default function AtlasViewer() {
             <Grid3x3 className="h-4 w-4" aria-hidden="true" />
           </Button>
         )}
+        <Button
+          variant={rulerActive ? "secondary" : "ghost"}
+          size="sm"
+          onClick={() => setRulerActive((v) => !v)}
+          title="Measure distance (click two points)"
+          aria-label="Toggle distance ruler"
+          aria-pressed={rulerActive}
+        >
+          <Ruler className="h-4 w-4" aria-hidden="true" />
+        </Button>
         <Button variant="secondary" size="sm" onClick={() => setSearchOpen(true)} className="gap-2" aria-label="Search atlas (Ctrl+K)">
           <Search className="h-4 w-4" aria-hidden="true" />
           <span className="hidden sm:inline">Search</span>
@@ -368,9 +380,16 @@ export default function AtlasViewer() {
             keyboard
             keyboardPanDelta={80}
             attributionControl={false}
-            style={{ width: "100%", height: "100%", background: activeMap.water?.enabled === false ? (activeMap.oceanColor ?? "#18313f") : "transparent" }}
+            style={{ width: "100%", height: "100%", background: activeMap.water?.enabled === false ? (activeMap.oceanColor ?? "#18313f") : "transparent", cursor: rulerActive ? "crosshair" : undefined }}
           >
             <MapController flyTo={flyTarget} />
+            <RulerLayer
+              active={rulerActive}
+              mapHeight={activeMap.height}
+              scale={activeMap.scale}
+              wrapX={activeMap.wrapX}
+              mapWidth={activeMap.width}
+            />
 
             {/* Horizontal wrap: render copies at -W, 0, +W when wrapX enabled */}
             {(activeMap.wrapX ? [-activeMap.width, 0, activeMap.width] : [0]).map((dx) => (
