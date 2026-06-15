@@ -504,6 +504,16 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   trailingNl omitted when tail already starts with `\n`). 15 tests total.
   - ✅ DONE 2026-06-15 — commit 11b81910; 15 new tests in `src/test/textareaInsert.test.ts`;
     Gate: 1316 tests green (4 shards, no OOM); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+- [x] **N22. Hygiene / coverage nibble #18** — `src/atlas/yaml/dump.ts` (`patchHeader`, `dumpYaml`)
+  and `src/atlas/yaml/buildPatches.ts` (`buildEntityFrontmatterPatch`) had uncovered branches. The
+  only existing test exercised `buildEntityFrontmatterPatch` as a smoke test; all the following were
+  untested: `patchHeader` without notes (if-branch skipped); `patchHeader` with notes (lines appended);
+  `dumpYaml` valid YAML structure + 2-space indent + no code fences; `buildEntityFrontmatterPatch`
+  with no title (top object must omit title key); empty-array exclusion (aliases/tags: [] stripped);
+  undefined-value exclusion; single-file singular suffix ("1 file"); multiple-files plural suffix
+  ("2 files"); sections[] populated with label + yaml per patch; "# file:" body marker per patch.
+  - ✅ DONE 2026-06-15 — commit b6062345; 15 new tests in `src/test/yaml/buildPatches.test.ts`;
+    Gate: 1331 tests green (4 shards, no OOM); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
 ---
 
