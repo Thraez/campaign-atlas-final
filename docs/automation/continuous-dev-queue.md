@@ -26,6 +26,12 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
+> **Refueled 2026-06-15 (round 2)** — section **I** below blessed by the human from a roadmap brainstorm:
+> build **I1 → I4** in order (Connections · distance ruler · shareable deep-links · README-rail fix). Each
+> cites its own spec under `docs/superpowers/specs/2026-06-15-*-design.md` — **read in full first.** H-series
+> and all prior sections are ✅ DONE. After I1–I4, the design-gated nice-to-haves **N3 / N25 / N26** (asset
+> credits · render image embeds · render planned-links) each need the design-check before building.
+>
 > **Refueled 2026-06-15** — section **H** below (animated ocean / "living water") blessed by the human:
 > build **H1 → H2**. Spec: `docs/superpowers/specs/2026-06-15-animated-ocean-background-design.md`. This is
 > the **current priority** (G-series is ✅ DONE).
@@ -40,6 +46,72 @@ Beyond that the routine asks the human to bless more work. That is by design —
 > `docs/DEVELOPMENT_WANTS.md`. **E is now ✅ DONE** (E1 merged to main `a7f22fbc`; E2–E6 on
 > `auto/continuous-dev`, then consolidated to main in the v0.1.0 merge 2026-06-14). Sections D, A, B, C are
 > all ✅ DONE.
+
+### I — Refuel 2026-06-15 round 2 (roadmap brainstorm — blessed by the human)
+
+> Human-directed roadmap refuel from a feature-planning session. Build **I1 → I4** in order. Each is bounded,
+> revertible, and cites its own spec (**read in full first**). I1 carries a mandatory leak-regression test;
+> I2/I3 are pure player-facing additions; I4 is docs-only.
+
+- [ ] **I1. Show authored Connections on the entity page.**
+  **Spec:** `docs/superpowers/specs/2026-06-15-connections-on-entity-page-design.md` — **read in full.**
+  Authored `entity.relationships[]` are saved in the editor with per-link visibility tags but never
+  displayed in the reading pane (player or DM). Render them as a compact **"Connections"** list in
+  `EntityPanel`, directly beneath the existing "Mentioned in" backlinks. DM view shows all
+  relationships; `visibility: dm` rows get a `(DM)` badge. Player view shows only the
+  player-safe relationships that `projectEntityForPlayer` already filters — **no new redaction
+  logic; reuse only.** Each target name is clickable (`onOpenEntity`); unresolved ids degrade
+  gracefully. **Mandatory:** a leak-regression DOM test asserting a `visibility: dm` relationship
+  and a relationship to a DM-only entity are absent from the player Connections render and present
+  in the DM render.
+  - Files: `src/atlas/entity/EntityPanel.tsx`; `src/test/entity/EntityPanel.test.tsx`; extend
+    `src/test/entity/player-preview-leak-regression.test.tsx`.
+  - Done when: Connections renders beneath Mentioned in; DM view shows all rels with DM badge;
+    player view shows only player-safe rels; clicking a target opens the entity; no Connections
+    section when relationships is empty; leak-regression test green; standard gate green. ~1–2 runs.
+
+- [ ] **I2. Map distance ruler — click two points to measure straight-line world distance.**
+  **Spec:** `docs/superpowers/specs/2026-06-15-map-distance-ruler-design.md` — **read in full.**
+  Add a tape-measure mode to both the player viewer and the DM editor: click a ruler button in the toolbar to
+  enter ruler mode, click two map points, see a dashed line with a distance label (e.g. "12.3 mi"; falls back
+  to "NNN px" when no scale is configured). Clicking the button again clears and exits. In the editor, ruler
+  mode auto-deactivates when pin-placement or region-drawing mode is entered. Explicitly NOT travel-time or
+  multi-segment path measurement. New pure helper `measureDistance` (pixel distance → world-unit label, reusing
+  the `MapScale` data already present in `atlas.json`); new `RulerLayer` react-leaflet component shared by both
+  viewers; reuses `mapClickToAtlasCoord` for coordinate conversion.
+  - Files: `src/atlas/ruler/measureDistance.ts`; `src/atlas/ruler/RulerLayer.tsx`; `src/pages/AtlasViewer.tsx`;
+    `src/pages/AtlasPlacementEditor.tsx`; `src/test/ruler/measureDistance.test.ts`.
+  - Done when: two-click measurement works in both viewer and editor; label shows world units (or px fallback);
+    ruler button clears/exits; `measureDistance` unit-tested; standard gate green (tsc + eslint + sharded
+    vitest). ~1–2 runs.
+
+- [ ] **I3. Shareable deep links (map + pan/zoom + open entity).**
+  **Spec:** `docs/superpowers/specs/2026-06-15-deep-link-pan-open-design.md` — **read in full.**
+  Today only `?entity=<id>` is captured; the map always boots to its default center and Back navigates away
+  from the atlas. Extend the existing query-param share link (CRITICAL: stay query-param — path routes 404 on
+  GitHub Pages static hosting) to also capture active map (`?map=`), viewport center (`?cx=`/`?cy=` in map-space
+  pixels), and zoom (`?cz=`). Add pure `serializeDeepLink`/`parseDeepLink` helpers in new `src/atlas/deepLink.ts`;
+  a `ViewSyncController` child of `<MapContainer>` (using the existing `moveend`/`zoomend` pattern from
+  `AtlasMinimap`) lifts viewport readings up to `AtlasViewer`; `replaceState` keeps the URL current on pan/zoom;
+  `pushState` on `openEntity` + a `popstate` listener make Back work through entity navigation. `CopyLinkButton`
+  in `EntityPanel` reads `window.location.href` (already current). Boot path replaces the inline `URLSearchParams`
+  parse with `parseDeepLink`. Old `?entity=`-only links must still work.
+  - Files: new `src/atlas/deepLink.ts`; `src/pages/AtlasViewer.tsx`; `src/atlas/entity/EntityPanel.tsx`; new
+    `src/test/deep-link.test.ts`.
+  - Done when: entity opens push history (Back returns to prior entity); pan/zoom updates URL without new Back
+    entries; map switch updates `?map=`; copied link reopens exact view in a fresh tab; old `?entity=`-only
+    links unaffected; pure helpers unit-tested; gate green. ~1–2 runs.
+
+- [ ] **I4. Fix README editor-rail drift.**
+  **Spec:** `docs/superpowers/specs/2026-06-15-docs-readme-editor-rail-design.md` — read in full.
+  The README's "DM Creator Cockpit" section lists Pins / Maps / Regions / Routes / Fog / Entities / Import /
+  Publish Check. The live rail (verified in `src/atlas/shell/railRegistry.tsx`) is Characters / Locations /
+  Factions / Events / Items / Lore / Pins / Regions / Routes / Fog / Save / Publish. Rewrite the README panel
+  list and per-panel bullets to match: six content category tabs instead of one Entities tab, Maps and Import
+  moved to "menu-only" panels, Publish Check → Publish, Save added as a system rail item.
+  - Files: `README.md`.
+  - Done when: README panel list matches the live rail exactly; Maps and Import documented as menu-only; no code
+    files modified; docs-only gate. ~1 run.
 
 ### H — Refuel 2026-06-15 (animated ocean / "living water" — blessed by the human)
 
@@ -421,12 +493,26 @@ A run that stops here and asks is a **success**, not a stall.
 Lighter specs on purpose — these are the agent's own ideas, so the bar to start is higher. When genuinely
 unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
 
-- [ ] **N1. Phrase search** (`"exact phrase"`) in the player search. Sanctioned in the docs; distinct from
-  fuzzy search (which is on the NEVER list). Area: the search index + query path. ~1–2 runs.
-- [ ] **N2. Pin de-cluttering at high pin counts** using the existing `pin.priority` field to thin labels
-  when a map is crowded. Player-facing readability. ~1–2 runs.
-- [ ] **N3. Asset credits** — a `licenses:` frontmatter field + an auto-generated credits page. ~1–2 runs.
-- [ ] **N4. Import report polish** — a clearer "what came in / what was skipped" summary after an import. ~1 run.
+- [x] **N1. Phrase search** (`"exact phrase"`) in the player search. ✅ SUPERSEDED — shipped as **E5**
+  (2026-06-02, commits 487a8083 + b669ed51). Kept for the record; do not rebuild.
+- [x] **N2. Pin de-cluttering at high pin counts** ✅ SUPERSEDED — shipped as **F3** (2026-06-14, commit
+  b7f63ed2). Kept for the record; do not rebuild.
+- [ ] **N3. Asset credits — `credit` field + player credits page.** ⚠️ HUMAN-BLESS-REQUIRED / design-gated — do NOT auto-build.
+  **Spec:** `docs/superpowers/specs/2026-06-15-asset-credits-design.md` — **read in full (design sign-off required first).**
+  Add an optional `atlas.credit` string to entity frontmatter (parsed in `parseFrontmatter.ts`, threaded through
+  `build-atlas.ts` into `entity.credit` in the player `atlas.json`) and a new `/atlas/credits` player page
+  (`src/pages/AtlasCredits.tsx`) that lists every player-visible entity with a non-empty credit string,
+  alphabetically. Navigation entry added in `AtlasNavMenu.tsx` and `AtlasViewer.tsx`. DM-only entities with
+  credits are excluded by the existing build-time visibility gate — no new redaction logic. Mandatory secrecy
+  regression test: a `visibility: dm` entity with a credit must be absent from the player build and the credits page.
+  - Files: `src/atlas/content/schema.ts`, `scripts/atlas/parseFrontmatter.ts`, `scripts/build-atlas.ts`, new
+    `src/pages/AtlasCredits.tsx`, `src/App.tsx`, `src/atlas/AtlasNavMenu.tsx`, `src/pages/AtlasViewer.tsx`; tests under `src/test/`.
+  - **Touches the build pipeline** → gate also requires `npm run atlas:publish:integrity-smoke` **and** `npm run atlas:publish` green.
+  - Done when: `atlas.credit` in frontmatter round-trips into player `atlas.json`; `/atlas/credits` lists credited
+    player-visible entities alphabetically; DM-only credited entity absent from page + atlas (regression test asserts);
+    Credits link visible in nav; empty-state shown when no credits exist; gate + integrity-smoke + atlas:publish green. ~1–2 runs.
+- [x] **N4. Import report polish** ✅ SUPERSEDED — shipped as **E4** (2026-06-02, commit dcbba70c).
+  Kept for the record; do not rebuild.
 - [x] **N5. Hygiene / coverage nibble** — one small, safe test-coverage addition or dead-code removal in a
   weakly-covered module. The always-available safe filler. ~1 run.
   - ✅ DONE 2026-05-30 — commit 70c8477c; added 5 validatePatchYaml map-kind tests (map/settings/world-map
@@ -593,6 +679,35 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - ✅ DONE 2026-06-15 — commit a8aa28ed; 16 new tests in `src/test/content/stripDmBlocks.test.ts`
     (run routine-n24-20260615). Gate: 1364 tests green (4 shards, no OOM); tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings).
+- [ ] **N25. Render inline image embeds (`![[image.png]]`).** ⚠️ design-check first — changes player-visible rendering + touches the build pipeline.
+  **Spec:** `docs/superpowers/specs/2026-06-15-render-image-embeds-design.md` — **read in full.**
+  `![[Portrait.png]]` embeds silently vanish in the player view and in the published `atlas.json` because only
+  the DM editor's `renderEntityMarkdown` applies an embed-conversion pre-pass before calling `marked`;
+  `projectEntityForPlayer` and `build-atlas.ts` call `markdownToHtml` directly with no such pass. Extract the
+  existing embed pre-pass from `renderEntityMarkdown.ts` into an exported `resolveImageEmbeds` helper and wire it
+  into both gaps. The sanitizer already allows `img` — no sanitizer change. **Autonomy guard:** if rendering
+  requires building a new vault-image → atlas-asset copy pipeline, ship the render change only and hand back the
+  pipeline half. **Mandatory:** a secrecy regression test proving an embed inside a `%%` block is absent from player `bodyHtml`.
+  - Files: `src/atlas/content/renderEntityMarkdown.ts`, `src/atlas/content/projectEntityForPlayer.ts`,
+    `scripts/build-atlas.ts`; tests in `src/test/content/renderEntityMarkdown.test.ts` + extend `projectEntityForPlayer` tests.
+  - **Touches the build pipeline** → gate also requires `npm run atlas:publish:integrity-smoke` **and** `npm run atlas:publish` green.
+  - Done when: `![[Portrait.png]]` renders as `<img>` in the player viewer and in the published `atlas.json`; an
+    embed inside `%%` is absent from player output (regression test); DM editor render unchanged; gate + integrity-smoke + atlas:publish green. ~1–2 runs.
+- [ ] **N26. Render planned/broken wikilinks as visible "planned link" styling.** ⚠️ design-check first — changes player-visible rendering.
+  **Spec:** `docs/superpowers/specs/2026-06-15-render-planned-links-design.md` — **read in full.**
+  Wikilinks whose target doesn't resolve render today as muted, non-clickable `atlas-unresolved` spans
+  indistinguishable from plain prose. Split the single CSS class into `atlas-planned-link` (DM view — dashed
+  amber underline + `title=` tooltip naming the target) and `atlas-planned-link-player` (player/player-preview —
+  neutral dotted underline, no tooltip, no target in HTML). Change only `renderLinkTokens` in
+  `src/atlas/content/parseWikilinks.ts` (reuse the existing `broken` flag; no new regex); update `src/index.css`
+  (two new rules, remove old `.atlas-unresolved`); update tests. **CRITICAL security invariant:** `hideBroken: true`
+  must never put `link.target` anywhere in the rendered HTML — the existing N17 security test must stay green; new
+  cross-surface tests must assert class name + no-target-leak on both surfaces.
+  - Files: `src/atlas/content/parseWikilinks.ts`, `src/index.css`, `src/test/content/parseWikilinks.test.ts`,
+    `src/test/content/parseWikilinks-parity.test.ts`.
+  - Done when: broken links render as `atlas-planned-link` (DM, amber dashed, tooltip present) or
+    `atlas-planned-link-player` (player, neutral, no tooltip, no target in HTML); existing N17 security test green;
+    new planned-link tests green across DM and player surfaces; standard gate green (sharded vitest, tsc, eslint). ~1 run.
 
 ---
 
