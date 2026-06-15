@@ -26,16 +26,43 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
-> **Refueled 2026-06-14** — section **F** (3 units) blessed by the human. **Build in order: F1 → F2 → F3.**
-> F1 categorize-imports · F2 distinct-entity publish counts · F3 pin label de-cluttering — each cites a full
-> spec under `docs/superpowers/specs/2026-06-14-*.md` (**read in full first**).
-> **Earmarked, NOT yet buildable:** "Honest player preview" — high value, but needs a human shaping session
-> before it can be specced. Do **not** auto-build it.
+> **Refueled 2026-06-14 (round 2)** — section **G** below blessed by the human: **G1 Honest player preview**
+> is the current priority — build it next. Spec:
+> `docs/superpowers/specs/2026-06-14-honest-player-preview-design.md` (**read in full first**). Section **F**
+> (F1–F3) is ✅ DONE and consolidated to `main` as **v0.2.0** (merge `258027b3`, tag `v0.2.0`).
+> F1 categorize-imports · F2 distinct-entity publish counts · F3 pin label de-cluttering.
 >
 > **Refueled 2026-05-31** — section **E** (6 units) was blessed from the ranked inbox in
 > `docs/DEVELOPMENT_WANTS.md`. **E is now ✅ DONE** (E1 merged to main `a7f22fbc`; E2–E6 on
 > `auto/continuous-dev`, then consolidated to main in the v0.1.0 merge 2026-06-14). Sections D, A, B, C are
 > all ✅ DONE.
+
+### G — Refuel 2026-06-14 round 2 (blessed by the human)
+
+- [x] **G1. Honest player preview — faithful "as players see it" view.**
+  **Spec:** `docs/superpowers/specs/2026-06-14-honest-player-preview-design.md` — **read in full.**
+  Today the editor's "player" view only filters *which entities* show (`filterEntitiesForLens`); it does not
+  consistently redact content *within* an entity, so `%%dm%%` blocks, DM-only profile fields, secret/DM
+  relationships, and DM-entity links can still leak in the reading pane. Make the **player** ViewMode drive a
+  faithful projection of the whole reading experience via the EXISTING pure `projectEntityForPlayer()`
+  pipeline (verified reusable client-side — **reuse only; no new redaction logic; no rebuild**), plus a clear
+  "previewing as players see it" indicator. **Mandatory:** a leak-regression test (an entity with a
+  `%%secret%%`, a DM-only profile field, a `visibility: dm` relationship, and a `[[DM-only]]` link renders
+  NONE of them in the player preview). Build the default single-toggle shape; a separate full-screen preview
+  route is out of scope for v1.
+  - Files: `src/atlas/view/ViewModeProvider.tsx` + consumers; `src/atlas/entity/EntityReadingView.tsx`,
+    `EntityPanes.tsx`, `EntityPanel.tsx`; `src/pages/AtlasPlacementEditor.tsx` (toggle + indicator); tests
+    (the mandatory leak-regression test + an indicator test).
+  - Done when: Player view shows entities fully redacted (no `%%dm%%`, no DM fields, no secret/DM
+    relationships, DM-links redacted) AND only player-visible entities/maps appear AND a clear indicator
+    shows; DM view unchanged; the leak-regression test proves a planted DM secret is absent from the preview;
+    gate green (no build-pipeline change). ~1–2 runs.
+  - ✅ DONE 2026-06-14 — commits 38443725 (feat: EntityPanes honors global ViewMode — player pane is primary
+    in player mode + "Player preview — as players see it" banner; ViewModeToggle gets "Previewing as players
+    see it" chip in editor header) + merge e838641b. Mandatory leak-regression test: 14 assertions across
+    4 DM channels (%%dm%% block, profile.dm field, visibility:dm relationship, [[DM-only]] link) — all
+    absent from player render, all present in DM render. Gate: 1250 tests green (4 shards); tsc clean;
+    eslint 0 errors (16 pre-existing warnings). No build-pipeline change — pure client-side reuse.
 
 ### F — Refuel 2026-06-14 (blessed from the inbox)
 
@@ -431,6 +458,62 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - ✅ DONE 2026-06-02 — commit 9dcff86d; 15 new tests in `src/test/content/parseWikilinks.test.ts`;
     merged 1ae2f168. Gate: 1190 tests green (4 shards, no OOM); tsc clean; eslint 0 errors (16
     pre-existing warnings).
+- [x] **N18. Hygiene / coverage nibble #14** — `src/atlas/profiles/profileBuild.ts` pure helpers
+  (`compactProfile`, `compactDmProfile`, `compactPlayerProfile`, `isEmptyDmProfile`, `stripDmProfile`)
+  had only 2 test cases across 4 functions with ~12 untested branches. All are correctness-critical:
+  they determine what profile data ships in the player build (DM-only fields must be stripped).
+  Branches covered: undefined inputs → undefined; empty-object inputs → undefined; whitespace-only
+  values discarded; mixed valid/invalid fields → only valid kept + trimmed; rumors/visible_traits
+  with empty strings filtered; dm-only profile half kept when player absent; player-only half kept
+  when dm absent; isEmptyPlayer=true path in stripDmProfile (empty player object is preserved as-is).
+  - ✅ DONE 2026-06-15 — commit 7c663c19; 18 new tests in `src/test/atlas-profiles.test.ts`;
+    merged into auto/continuous-dev. Gate: 1268 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
+- [x] **N19. Hygiene / coverage nibble #15** — `src/atlas/pins/presets.ts` had only 3 tests
+  covering the happy path for `defaultPresetForType`, `diffPinOverride`, and `resolvePinStyle`;
+  `pinSvg` had zero coverage. Added 18 tests covering:
+  - `defaultPresetForType(undefined)` and empty string → "custom"
+  - Type aliases: `divine_site`→temple, `black_market`→shop, `wilderness_landmark`→hazard,
+    `player_base`, `resonance_site`, `mystery`
+  - Case-insensitivity: SETTLEMENT/NPC/Dungeon resolve correctly
+  - `diffPinOverride` with explicit preset change stored as override
+  - `diffPinOverride` preserving `labelMinZoom` and `priority` overrides
+  - `resolvePinStyle` with no override / null override → returns preset defaults
+  - `resolvePinStyle` for unknown type → custom preset
+  - `pinSvg`: all 6 shape branches (circle/square/diamond/shield/star/teardrop)
+  - `pinSvg`: dim option → opacity:0.6; pulse → atlas-pulse animation
+  - ✅ DONE 2026-06-15 — commit 159dd883; 18 new tests in `src/test/atlas-pin-presets.test.ts`;
+    merged 0de1cd00. Gate: 1286 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
+- [x] **N20. Hygiene / coverage nibble #16** — `src/atlas/session/sessionSnapshot.ts`
+  (`sessionHasWork`) had 6 untested slice branches — override/map/region/route/fog/layer each
+  returning true. `deserializeSession`'s inner state-field guard (missing required fields →
+  null) was never reached because the existing "junk" test short-circuits at the version check.
+  Added 15 tests: each `sessionHasWork` slice independently true and false; `deserializeSession`
+  with valid version + non-object / missing-field state → null; pristine-match entityEdit not
+  counted as work (gap in prior test).
+  - ✅ DONE 2026-06-15 — commit 566f8515; 15 new tests in `src/test/session/sessionSnapshot.test.ts`;
+    merged defb8429. Gate: 1301 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
+- [x] **N21. Hygiene / coverage nibble #17** — `src/atlas/editor/textareaInsert.ts` (toolbar text
+  insertion helpers) had zero test coverage despite being the pure core of the DM editor's
+  toolbar. Three functions: `wrapInline` (selection vs. placeholder; custom placeholder; full-string
+  wrap; empty buffer), `prefixLines` (single line without/with trailing newline; multiline spanning;
+  mid-line selection expands to line start), `insertBlock` (with/without trailing newline
+  controlling insertAt; all four sep branches — head empty / ends-`\n\n` / ends-`\n` / bare text;
+  trailingNl omitted when tail already starts with `\n`). 15 tests total.
+  - ✅ DONE 2026-06-15 — commit 11b81910; 15 new tests in `src/test/textareaInsert.test.ts`;
+    Gate: 1316 tests green (4 shards, no OOM); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+- [x] **N22. Hygiene / coverage nibble #18** — `src/atlas/yaml/dump.ts` (`patchHeader`, `dumpYaml`)
+  and `src/atlas/yaml/buildPatches.ts` (`buildEntityFrontmatterPatch`) had uncovered branches. The
+  only existing test exercised `buildEntityFrontmatterPatch` as a smoke test; all the following were
+  untested: `patchHeader` without notes (if-branch skipped); `patchHeader` with notes (lines appended);
+  `dumpYaml` valid YAML structure + 2-space indent + no code fences; `buildEntityFrontmatterPatch`
+  with no title (top object must omit title key); empty-array exclusion (aliases/tags: [] stripped);
+  undefined-value exclusion; single-file singular suffix ("1 file"); multiple-files plural suffix
+  ("2 files"); sections[] populated with label + yaml per patch; "# file:" body marker per patch.
+  - ✅ DONE 2026-06-15 — commit b6062345; 15 new tests in `src/test/yaml/buildPatches.test.ts`;
+    Gate: 1331 tests green (4 shards, no OOM); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
 ---
 
