@@ -514,6 +514,19 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   ("2 files"); sections[] populated with label + yaml per patch; "# file:" body marker per patch.
   - ✅ DONE 2026-06-15 — commit b6062345; 15 new tests in `src/test/yaml/buildPatches.test.ts`;
     Gate: 1331 tests green (4 shards, no OOM); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+- [x] **N23. Hygiene / coverage nibble #19** — `src/atlas/yaml/validatePatch.ts` (`validatePatchYaml`)
+  had 17 uncovered branches across the `entity-frontmatter` and `placement` kinds. The `entity-frontmatter`
+  kind (added in N22) had only 3 tests (valid, invalid visibility, markdown fences); all structural
+  validation paths were untested. The `placement` kind was completely untested. Branches covered:
+  `entity-frontmatter`: empty patch → "Patch is empty" error; no object blocks (top-level list) → error;
+  block with no `atlas:` section → warning; `atlas:` is array or scalar (not a mapping) → error;
+  `atlas.type` not a string → error; `atlas.summary` not a string → warning; `atlas.aliases / images /
+  placements / relationships` not an array → errors; `placements[].mapId` not a string → warning;
+  `placements[].x/y` non-numeric → error. `placement` kind: valid patch → ok; no placements block →
+  error; missing mapId → warning; non-numeric coordinates → error.
+  - ✅ DONE 2026-06-15 — commit 2406e018; 17 new tests added to `src/test/atlas-patch-engine.test.ts`
+    (run routine-n23-20260615). Gate: 1348 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
 
 ---
 
