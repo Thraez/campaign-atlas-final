@@ -26,6 +26,11 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
+> **Refueled 2026-06-16 (round 2)** — section **K** below blessed by the human: **K1 Sync from Obsidian**
+> (read-only merge, 5 phases). Design: `docs/superpowers/specs/2026-06-16-obsidian-readonly-merge-design.md`;
+> Plan: `docs/superpowers/plans/2026-06-16-obsidian-readonly-merge.md` — **read both in full before each phase.**
+> Phase 1 (merge engine + secrecy core) is ✅ DONE. Phases 2–5 follow in subsequent runs. J-series is ✅ DONE.
+>
 > **Refueled 2026-06-16** — section **J** below blessed by the human: **J1 One-click Publish** is the
 > current priority. Design: `docs/superpowers/specs/2026-06-16-one-click-publish-design.md`; Plan:
 > `docs/superpowers/plans/2026-06-16-one-click-publish.md` — **read both in full before starting.**
@@ -82,6 +87,22 @@ Beyond that the routine asks the human to bless more work. That is by design —
     → get "Published ✓ — players will see it in a couple of minutes"; every safety decision D1–D14 implemented;
     full gate green. ~5–8 runs across the increments.
   - ✅ DONE 2026-06-16 (Increment 5, final) — commits `3d9ca5ca` (usePublishFlow push half: confirm→publishing→terminal states, 11 tests) + `67333fb2` (PublishCheckTab terminal state rendering + shebang regression fix; build + atlas:check-secrets dist clean). Full J1 feature: DM clicks Publish → safety check → readiness card → confirm → "Published ✓ — players will see it in a couple of minutes".
+
+### K — Refuel 2026-06-16 round 2 (Obsidian read-only merge — blessed by the human)
+
+> Human-approved feature: safety-bounded Obsidian vault sync. **Read design + plan in full before each phase.**
+> Design: `docs/superpowers/specs/2026-06-16-obsidian-readonly-merge-design.md`
+> Plan: `docs/superpowers/plans/2026-06-16-obsidian-readonly-merge.md`
+> Phase 1 (merge engine + secrecy core) ✅ DONE. Build Phase 2 next (identity hardening + sync-map).
+
+- [ ] **K1. Sync from Obsidian (read-only merge, Phases 2–5 remain).**
+  **Design:** `docs/superpowers/specs/2026-06-16-obsidian-readonly-merge-design.md` — **read in full first.**
+  **Plan:** `docs/superpowers/plans/2026-06-16-obsidian-readonly-merge.md` — **follow phase-by-phase.**
+  Merges updated vault notes into atlas entities, preserving atlas-side work (pins, visibility, relationships).
+  Never writes to the vault. Never auto-exposes DM content to players. Disk is always the base.
+  - Phases: **1** — merge engine + secrecy core ✅ DONE 2026-06-16 (`4ae3b795` `17711225` `209930b8` `5e196ff5`); **2** — identity hardening, sync-map, needsReview population from DM-canon; **3** — vault-scan endpoint, ignoreRules (picomatch), .local-atlas config; **4** — SyncPanel UI, delete ImportPanel; **5** — ship gate.
+  - Gate (each phase): targeted vitest green; tsc clean; eslint 0 errors; no player-build leak.
+  - Done when: DM can point the editor at their vault folder → see a diff of what changed → confirm per-entity → atlas updates in-place without losing pins/placements/relationships; full Phase 5 gate green.
 
 ### I — Refuel 2026-06-15 round 2 (roadmap brainstorm — blessed by the human)
 
