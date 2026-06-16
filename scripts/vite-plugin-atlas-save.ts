@@ -802,6 +802,40 @@ async function runAtlasBuild(repoRoot: string): Promise<BuildResult> {
 }
 
 /**
+ * Player atlas build (player+strict → public/atlas/atlas.json) with the same
+ * timeout race as the DM rebuild. Used by publish-check. Returns a simplified
+ * result compatible with the endpoint's build-failed path.
+ */
+export async function runPlayerBuildWithTimeout(): Promise<{ ok: boolean; error?: string }> {
+  const timeoutMs = BUILD_TIMEOUT_MS;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<BuildResult>((resolve) => {
+    timer = setTimeout(
+      () => resolve({ ok: false, durationMs: timeoutMs, stderr: `player build timed out after ${timeoutMs}ms` }),
+      timeoutMs,
+    );
+  });
+  try {
+    const result: BuildResult | import("./build-atlas").BuildResult = await Promise.race([
+      runBuild({ player: true, strict: true }),
+      timeout,
+    ]);
+    if (timer) clearTimeout(timer);
+    if (result.ok) return { ok: true };
+    const errStr =
+      "error" in result && result.error
+        ? result.error
+        : "stderr" in result
+          ? (result.stderr ?? "")
+          : "";
+    return { ok: false, error: errStr ? errStr.slice(-2000) : "player build failed" };
+  } catch (e) {
+    if (timer) clearTimeout(timer);
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
  * Lists image files in `public/atlas/assets/images/`.
  * Returns filenames only (not full paths), sorted alphabetically.
  * Returns an empty array if the directory doesn't exist yet.
