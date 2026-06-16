@@ -59,7 +59,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
 > Increment 0 (plumbing) is independently testable and ships first. The push increment (5) is the only
 > outward-facing step; it ships last and only after the safety-check half (0–3) is green-gated.
 
-- [ ] **J1. One-click Publish from the editor.**
+- [x] **J1. One-click Publish from the editor.**
   **Design:** `docs/superpowers/specs/2026-06-16-one-click-publish-design.md` — **read in full first.**
   **Plan:** `docs/superpowers/plans/2026-06-16-one-click-publish.md` — **read in full; follow task-by-task.**
   Add a single **Publish** button to the DM editor that builds the player-safe atlas, runs every safety scan,
@@ -72,7 +72,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
     atlas:scan alias, CI hardening) ✅ DONE 2026-06-16 `592d2221`; **1** — `publish-check` endpoint +
     scan adapter + types ✅ DONE 2026-06-16 `734056c9`; **2** — readiness card + check-half UI (neutral idle, demote validator) ✅ DONE 2026-06-16 `6b5e4273`; **3** —
     tree-shake fingerprint guard ✅ DONE 2026-06-16 `8c5e7570`; **4** — `publish-push` endpoint (re-verify, scoped commit, push, snapshot) ✅ DONE 2026-06-16 `b3465f87`;
-    **5** — confirm→publish wiring.
+    **5** — confirm→publish wiring ✅ DONE 2026-06-16 `67333fb2`.
   - Gate: targeted vitest run for all new test files (whole-suite OOMs — shard, see memory); tsc clean; eslint
     0 errors; `npm run build && npm run atlas:check-secrets dist` exit 0 (no editor endpoints in bundle);
     `npm run atlas:scan` exit 0; spec cross-check D1–D14 all landed.
@@ -81,6 +81,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
   - Done when: DM can click Publish in the editor → see a plain-language safety verdict + change list → confirm
     → get "Published ✓ — players will see it in a couple of minutes"; every safety decision D1–D14 implemented;
     full gate green. ~5–8 runs across the increments.
+  - ✅ DONE 2026-06-16 (Increment 5, final) — commits `3d9ca5ca` (usePublishFlow push half: confirm→publishing→terminal states, 11 tests) + `67333fb2` (PublishCheckTab terminal state rendering + shebang regression fix; build + atlas:check-secrets dist clean). Full J1 feature: DM clicks Publish → safety check → readiness card → confirm → "Published ✓ — players will see it in a couple of minutes".
 
 ### I — Refuel 2026-06-15 round 2 (roadmap brainstorm — blessed by the human)
 
