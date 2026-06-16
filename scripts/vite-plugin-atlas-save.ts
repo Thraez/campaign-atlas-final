@@ -49,11 +49,18 @@ import { createHash } from "node:crypto";
 import matter from "gray-matter";
 import yaml from "js-yaml";
 import sharp from "sharp";
-import { isWritableAssetPath, isWritableSourcePath } from "../src/atlas/save/sourcePathAllowlist";
+import {
+  isWritableAssetPath,
+  isWritableSourcePath,
+  isReadableVaultPath,
+  isReadableLocalAtlasPath,
+} from "../src/atlas/save/sourcePathAllowlist";
+import { makeIgnore } from "../src/atlas/import/ignoreRules";
 import { runBuild, type BuildResult as InProcessBuildResult } from "./build-atlas";
 import { tryAcquireBuildLock, releaseBuildLock } from "./atlas/buildLock";
 
 const MAX_FILE_BYTES = 1024 * 1024;
+const MAX_VAULT_AGGREGATE_BYTES = 25 * 1024 * 1024;
 // Asset uploads arrive as base64 data URLs; this cap covers ~5.5 MB of binary
 // after the base64 inflation (matches the build's per-asset audit cap).
 const MAX_ASSET_DATAURL_BYTES = 8 * 1024 * 1024;
@@ -909,6 +916,124 @@ export async function handleDeleteImageRequest(
   return { status: 200, deleted: name };
 }
 
+/**
+ * Pure handler for GET /__atlas/vault-scan.
+ * Recursively walks vaultRoot, returning all .md files (vault-relative POSIX
+ * paths → UTF-8 contents). Files outside the root (via symlink) are skipped.
+ * Returns 413-style error if the aggregate size of valid files exceeds 25 MB.
+ * No write operations are performed — read-only.
+ */
+export async function handleVaultScanRequest(
+  vaultRoot: string,
+  ignoreGlobs: string[],
+): Promise<
+  | { ok: true; files: Record<string, string> }
+  | { ok: false; status: number; error: string }
+> {
+  try {
+    const s = await fs.stat(vaultRoot);
+    if (!s.isDirectory()) return { ok: false, status: 400, error: "VaultNotDirectory" };
+  } catch {
+    return { ok: false, status: 400, error: "VaultNotFound" };
+  }
+
+  const isIgnored = makeIgnore(ignoreGlobs);
+  const rootResolved = path.resolve(vaultRoot);
+  const files: Record<string, string> = {};
+  let aggregateBytes = 0;
+
+  async function processFile(absPath: string): Promise<{ ok: false; status: number; error: string } | null> {
+    const relPosix = path.relative(rootResolved, absPath).split(path.sep).join("/");
+    if (!isReadableVaultPath(rootResolved, absPath)) return null;
+    if (isIgnored(relPosix)) return null;
+    let size: number;
+    try {
+      size = (await fs.stat(absPath)).size;
+    } catch {
+      return null;
+    }
+    if (size > MAX_FILE_BYTES) return null; // skip individual oversized files silently
+    aggregateBytes += size;
+    if (aggregateBytes > MAX_VAULT_AGGREGATE_BYTES) {
+      return { ok: false, status: 413, error: "VaultTooLarge" };
+    }
+    try {
+      files[relPosix] = await fs.readFile(absPath, "utf8");
+    } catch {
+      // unreadable file — skip silently
+    }
+    return null;
+  }
+
+  async function walk(dir: string): Promise<{ ok: false; status: number; error: string } | null> {
+    let entries: import("node:fs").Dirent[];
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return null;
+    }
+    for (const entry of entries) {
+      const abs = path.join(dir, entry.name);
+      if (entry.isSymbolicLink()) {
+        let real: string;
+        try { real = await fs.realpath(abs); } catch { continue; }
+        // Symlink escape guard: resolved path must still be within vault root
+        if (!real.startsWith(rootResolved + path.sep)) continue;
+        let realStat: Awaited<ReturnType<typeof fs.stat>>;
+        try { realStat = await fs.stat(real); } catch { continue; }
+        if (realStat.isDirectory()) {
+          const r = await walk(real);
+          if (r) return r;
+        } else if (realStat.isFile()) {
+          const r = await processFile(real);
+          if (r) return r;
+        }
+        continue;
+      }
+      if (entry.isDirectory()) {
+        const r = await walk(abs);
+        if (r) return r;
+        continue;
+      }
+      if (entry.isFile()) {
+        const r = await processFile(abs);
+        if (r) return r;
+      }
+    }
+    return null;
+  }
+
+  const err = await walk(rootResolved);
+  if (err) return err;
+  return { ok: true, files };
+}
+
+/**
+ * Pure handler for POST /__atlas/local-write.
+ * Writes `contents` to `.local-atlas/<name>`, where `name` must be one of the
+ * two allowed filenames (editor-settings.json or sync-map.json).
+ * This is the only write that targets `.local-atlas/` — never `content/`, never
+ * the vault. Validated by `isReadableLocalAtlasPath`.
+ */
+export async function handleLocalWriteRequest(
+  name: string,
+  contents: string,
+  repoRoot: string,
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  const relPath = `.local-atlas/${name}`;
+  if (!isReadableLocalAtlasPath(relPath)) {
+    return { ok: false, status: 400, error: "DisallowedPath" };
+  }
+  const targetPath = path.resolve(repoRoot, ".local-atlas", name);
+  try {
+    await fs.mkdir(path.dirname(targetPath), { recursive: true });
+    await fs.writeFile(targetPath, contents, "utf8");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, status: 500, error: (e as Error).message };
+  }
+}
+
 /** Allowlist-guarded reader for GET /__atlas/read?path=... */
 async function readAllowlistedFile(repoRoot: string, relPath: string): Promise<
   | { ok: true; contents: string }
@@ -1001,6 +1126,74 @@ export function atlasSavePlugin(): Plugin {
             res.statusCode = result.status;
             res.end(JSON.stringify({ error: result.error, path: relPath }));
           }
+        });
+      });
+
+      // GET /__atlas/vault-scan?vaultRoot=<abs>&ignore=<glob>&ignore=<glob>
+      // Read-only walk of the DM's Obsidian vault; no write ops ever reached.
+      server.middlewares.use("/__atlas/vault-scan", (req, res, next) => {
+        if (req.method !== "GET") return next();
+        if (!isAllowedDevRequest({ host: req.headers.host, origin: req.headers.origin, method: req.method })) {
+          res.statusCode = 403;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
+          return;
+        }
+        const url = new URL(req.url ?? "/", "http://localhost");
+        const vaultRoot = url.searchParams.get("vaultRoot") ?? "";
+        const ignoreGlobs = url.searchParams.getAll("ignore");
+        if (!vaultRoot) {
+          res.statusCode = 400;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: "MissingVaultRoot" }));
+          return;
+        }
+        handleVaultScanRequest(vaultRoot, ignoreGlobs).then((result) => {
+          res.setHeader("Content-Type", "application/json");
+          if (result.ok) {
+            res.statusCode = 200;
+            res.end(JSON.stringify({ files: result.files }));
+          } else {
+            res.statusCode = result.status;
+            res.end(JSON.stringify({ error: result.error }));
+          }
+        });
+      });
+
+      // GET /__atlas/local/editor-settings.json — reads .local-atlas/editor-settings.json
+      // GET /__atlas/local/sync-map.json — reads .local-atlas/sync-map.json
+      server.middlewares.use(serveLocalAtlas("/__atlas/local/editor-settings.json"));
+      server.middlewares.use(serveLocalAtlas("/__atlas/local/sync-map.json"));
+
+      // POST /__atlas/local-write { name, contents }
+      // Writes machine-local config (editor-settings.json or sync-map.json) only.
+      server.middlewares.use("/__atlas/local-write", (req, res, next) => {
+        if (req.method !== "POST") return next();
+        if (!isAllowedDevRequest({ host: req.headers.host, origin: req.headers.origin, method: req.method })) {
+          res.statusCode = 403;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
+          return;
+        }
+        let raw = "";
+        req.setEncoding("utf8");
+        req.on("data", (chunk: string) => { raw += chunk; });
+        req.on("end", async () => {
+          let body: { name?: unknown; contents?: unknown };
+          try {
+            body = JSON.parse(raw) as { name?: unknown; contents?: unknown };
+          } catch {
+            res.statusCode = 400;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "InvalidBody" }));
+            return;
+          }
+          const name = typeof body.name === "string" ? body.name : "";
+          const contents = typeof body.contents === "string" ? body.contents : "";
+          const result = await handleLocalWriteRequest(name, contents, server.config.root);
+          res.statusCode = result.ok ? 200 : (result as { ok: false; status: number }).status;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify(result));
         });
       });
 

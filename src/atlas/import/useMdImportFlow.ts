@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import {
   buildStagingRows,
   updateStagingRow,
+  type RawImportFile,
   type StagingRow,
   type StagingRowPatch,
 } from "./stagingState";
@@ -52,9 +53,17 @@ export interface UseMdImportFlowArgs {
   onImported: () => void | Promise<void>;
 }
 
-interface RawFileInput {
-  filename: string;
-  raw: string;
+/**
+ * Maps a `/__atlas/vault-scan` response to staging inputs.
+ * Extracts the POSIX basename for the staging filename and preserves the
+ * vault-relative path for sync-map identity resolution.
+ */
+export function vaultScanResultToInputs(files: Record<string, string>): RawImportFile[] {
+  return Object.entries(files).map(([relPath, raw]) => ({
+    filename: relPath.split("/").pop() ?? relPath,
+    raw,
+    vaultRelPath: relPath,
+  }));
 }
 
 export function useMdImportFlow(args: UseMdImportFlowArgs) {
@@ -73,7 +82,7 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
   }, [worldId, importConfig, existingById]);
 
   const openWithInputs = useCallback(
-    (inputs: RawFileInput[]) => {
+    (inputs: RawImportFile[]) => {
       if (inputs.length === 0) {
         toast.error("No .md files to stage");
         return;
@@ -101,6 +110,41 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
       openWithInputs(inputs);
     },
     [openWithInputs],
+  );
+
+  const openWithVaultScan = useCallback(
+    async (vaultRoot: string, ignoreGlobs: string[]) => {
+      try {
+        assertDmBuildLoaded(existingById);
+      } catch (err) {
+        if (err instanceof DmBuildRequiredError) {
+          toast.error(err.message);
+          return;
+        }
+        throw err;
+      }
+      const params = new URLSearchParams({ vaultRoot });
+      for (const g of ignoreGlobs) params.append("ignore", g);
+      let data: { ok: true; files: Record<string, string> } | { ok: false; status: number; error: string };
+      try {
+        const resp = await fetch(`/__atlas/vault-scan?${params.toString()}`);
+        data = (await resp.json()) as typeof data;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        toast.error(`Vault scan failed: ${msg}`);
+        return;
+      }
+      if (!data.ok) {
+        if (data.status === 413) {
+          toast.error("Vault is too large to scan — more than 25 MB of Obsidian notes");
+        } else {
+          toast.error(`Vault scan failed: ${data.error}`);
+        }
+        return;
+      }
+      openWithInputs(vaultScanResultToInputs(data.files));
+    },
+    [existingById, openWithInputs],
   );
 
   const patchRow = useCallback(
@@ -197,6 +241,7 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
     isImporting,
     openWithFiles,
     openWithInputs,
+    openWithVaultScan,
     patchRow,
     cancel,
     commit,
