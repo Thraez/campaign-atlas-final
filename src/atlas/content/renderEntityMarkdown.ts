@@ -1,5 +1,5 @@
-import { dropOrphanFootnoteRefs, renderMarkdownBodyToSafeHtml } from "@/atlas/content/markdownCore";
-import { stripDmBlocks } from "@/atlas/content/stripDmBlocks";
+import { dropOrphanFootnoteRefs, renderMarkdownBodyToSafeHtml } from "./markdownCore";
+import { stripDmBlocks } from "./stripDmBlocks";
 
 export interface RenderOpts {
   showDmNotes: boolean;
