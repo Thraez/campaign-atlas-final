@@ -22,6 +22,25 @@ import {
 import type { ImportFolderConfig } from "../content/schema";
 import { summarizeImport, formatImportSummaryLine } from "./summarizeImport";
 
+/** Thrown by assertDmBuildLoaded when the DM atlas has not been built yet. */
+export class DmBuildRequiredError extends Error {
+  constructor() {
+    super("Rebuild in DM mode first — Sync needs the full DM atlas loaded.");
+    this.name = "DmBuildRequiredError";
+  }
+}
+
+/**
+ * Guard: requires the DM build to be loaded before a vault sync can run.
+ * Throws DmBuildRequiredError if existingById is empty (player atlas or no build).
+ * Phase 3's openWithVaultScan calls this before fetching vault files.
+ */
+export function assertDmBuildLoaded(existingById: ReadonlyMap<string, string>): void {
+  if (existingById.size === 0) {
+    throw new DmBuildRequiredError();
+  }
+}
+
 export interface UseMdImportFlowArgs {
   /** Active world id; drives target-path allowlist. */
   worldId: string;

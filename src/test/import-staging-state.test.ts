@@ -9,7 +9,8 @@ import {
   type StagingRow,
   type StagingContext,
 } from "@/atlas/import/stagingState";
-import type { ImportFolderConfig } from "@/atlas/content/schema";
+import type { ImportFolderConfig, EntityVisibility } from "@/atlas/content/schema";
+import type { SyncMap } from "@/atlas/import/syncMap";
 
 const WORLD = "astrath-deeprealm";
 
@@ -38,6 +39,8 @@ const TEST_ALLOWED_FOLDERS: ReadonlySet<string> = new Set([
 function makeCtx(overrides?: {
   existingById?: ReadonlyMap<string, string>;
   existingPaths?: ReadonlySet<string>;
+  syncMap?: SyncMap;
+  entityMeta?: ReadonlyMap<string, { visibility: EntityVisibility; type: string; sourcePath: string }>;
 }): StagingContext {
   return {
     worldId: WORLD,
@@ -45,6 +48,8 @@ function makeCtx(overrides?: {
     allowedFolders: TEST_ALLOWED_FOLDERS,
     existingById: overrides?.existingById ?? new Map(),
     existingPaths: overrides?.existingPaths ?? new Set(),
+    syncMap: overrides?.syncMap,
+    entityMeta: overrides?.entityMeta,
   };
 }
 
@@ -507,5 +512,203 @@ describe("Task 1.6 — needsReview: defaults to included=false, DM can opt in", 
     expect(opted.included).toBe(true);
     // needsReview preserved so the UI can still show the warning even when opted in
     expect(opted.needsReview).toEqual({ reason: "secrecy-increase" });
+  });
+});
+
+// ── Task 2.2 — sync-map identity override ────────────────────────────────────
+//
+// A vault note whose slugify(title) does NOT match an existing entity id, but
+// whose vaultRelPath appears in the sync-map pointing at that entity, should
+// produce an update row with the sync-map's id — not the title slug.
+
+describe("Task 2.2 — sync-map identity override", () => {
+  it("sync-map entry overrides title-slug for identity resolution", () => {
+    const existingById = new Map([
+      ["thornhold", "content/astrath-deeprealm/settlements/thornhold.md"],
+    ]);
+    const existingPaths = new Set(existingById.values());
+    const syncMap: SyncMap = {
+      "notes/thornhold-keep.md": { id: "thornhold", baseType: "settlement" },
+    };
+    const ctx = makeCtx({ existingById, existingPaths, syncMap });
+    // Vault note's title slugifies to "thornhold-keep", NOT "thornhold"
+    const row = buildStagingRow(
+      {
+        filename: "thornhold-keep.md",
+        raw: "---\ntitle: Thornhold Keep\natlas:\n  type: settlement\n---\n",
+        vaultRelPath: "notes/thornhold-keep.md",
+      },
+      ctx,
+    );
+    expect(row.resolvedId).toBe("thornhold");
+    expect(row.targetPath).toBe("content/astrath-deeprealm/settlements/thornhold.md");
+    expect(row.rowKind).toBe("update");
+    // baseType propagated from sync-map entry for two-way type resolution
+    expect(row.baseType).toBe("settlement");
+  });
+
+  it("atlas.id in frontmatter takes priority over sync-map", () => {
+    const existingById = new Map([
+      ["corven", "content/astrath-deeprealm/npcs/corven.md"],
+      ["other-entity", "content/astrath-deeprealm/npcs/other-entity.md"],
+    ]);
+    const existingPaths = new Set(existingById.values());
+    const syncMap: SyncMap = {
+      "notes/note.md": { id: "other-entity", baseType: "npc" },
+    };
+    const ctx = makeCtx({ existingById, existingPaths, syncMap });
+    // atlas.id = "corven" wins over sync-map pointing to "other-entity"
+    const row = buildStagingRow(
+      {
+        filename: "note.md",
+        raw: "---\natlas:\n  id: corven\n  type: npc\n---\n",
+        vaultRelPath: "notes/note.md",
+      },
+      ctx,
+    );
+    expect(row.resolvedId).toBe("corven");
+    expect(row.rowKind).toBe("update");
+  });
+
+  it("no sync-map entry → falls through to title-slug identity (existing behavior)", () => {
+    const existingById = new Map([
+      ["thornhold", "content/astrath-deeprealm/settlements/thornhold.md"],
+    ]);
+    const existingPaths = new Set(existingById.values());
+    const ctx = makeCtx({ existingById, existingPaths });
+    const row = buildStagingRow(
+      { filename: "thornhold.md", raw: "---\natlas:\n  type: settlement\n  id: thornhold\n---\n" },
+      ctx,
+    );
+    expect(row.rowKind).toBe("update");
+    expect(row.resolvedId).toBe("thornhold");
+  });
+
+  it("sync-map entry for a vaultRelPath not in the input has no effect", () => {
+    const syncMap: SyncMap = { "notes/other.md": { id: "something", baseType: "npc" } };
+    const ctx = makeCtx({ syncMap });
+    const row = buildStagingRow(
+      {
+        filename: "new-note.md",
+        raw: "---\natlas:\n  type: npc\n---\n",
+        vaultRelPath: "notes/new-note.md", // different from the sync-map key
+      },
+      ctx,
+    );
+    // Should fall through to slug-based create
+    expect(row.rowKind).toBe("create");
+  });
+});
+
+// ── Task 2.3 — needsReview populated from DM-canon (entityMeta) ──────────────
+//
+// Update rows are checked against the DM-canon entity map to detect
+// exposure increases (dm entity + vault wants player visibility) and
+// type conflicts (both disk and vault changed from the last-synced base).
+
+describe("Task 2.3 — needsReview from entityMeta", () => {
+  const W = "w";
+  const cfg: ImportFolderConfig = { folders: { npc: "npcs" }, defaultFolder: "imports" };
+  const folders = new Set(["npcs", "imports"]);
+
+  function metaCtx(overrides: {
+    existingById: ReadonlyMap<string, string>;
+    entityMeta: ReadonlyMap<string, { visibility: EntityVisibility; type: string; sourcePath: string }>;
+    syncMap?: SyncMap;
+  }): StagingContext {
+    return {
+      worldId: W,
+      importConfig: cfg,
+      allowedFolders: folders,
+      existingById: overrides.existingById,
+      existingPaths: new Set(overrides.existingById.values()),
+      entityMeta: overrides.entityMeta,
+      syncMap: overrides.syncMap,
+    };
+  }
+
+  it("dm entity + vault publish:true → secrecy-increase, included=false", () => {
+    const existingById = new Map([["villain", "content/w/npcs/villain.md"]]);
+    const entityMeta = new Map([
+      ["villain", { visibility: "dm" as EntityVisibility, type: "npc", sourcePath: "content/w/npcs/villain.md" }],
+    ]);
+    const ctx = metaCtx({ existingById, entityMeta });
+    const row = buildStagingRow(
+      { filename: "villain.md", raw: "---\natlas:\n  id: villain\n  type: npc\n  publish: true\n---\n" },
+      ctx,
+    );
+    expect(row.needsReview?.reason).toBe("secrecy-increase");
+    expect(row.included).toBe(false);
+  });
+
+  it("dm entity + vault visibility:player → secrecy-increase", () => {
+    const existingById = new Map([["hidden-npc", "content/w/npcs/hidden-npc.md"]]);
+    const entityMeta = new Map([
+      ["hidden-npc", { visibility: "dm" as EntityVisibility, type: "npc", sourcePath: "content/w/npcs/hidden-npc.md" }],
+    ]);
+    const ctx = metaCtx({ existingById, entityMeta });
+    const row = buildStagingRow(
+      { filename: "hidden-npc.md", raw: "---\natlas:\n  id: hidden-npc\n  type: npc\n  visibility: player\n---\n" },
+      ctx,
+    );
+    expect(row.needsReview?.reason).toBe("secrecy-increase");
+    expect(row.included).toBe(false);
+  });
+
+  it("type conflict (disk and vault both diverge from baseType) → type-conflict, included=false", () => {
+    // baseType="npc", disk changed to "location", vault changed to "faction" → conflict
+    const existingById = new Map([["hero", "content/w/npcs/hero.md"]]);
+    const entityMeta = new Map([
+      ["hero", { visibility: "player" as EntityVisibility, type: "location", sourcePath: "content/w/npcs/hero.md" }],
+    ]);
+    const syncMap: SyncMap = { "notes/hero.md": { id: "hero", baseType: "npc" } };
+    const ctx = metaCtx({ existingById, entityMeta, syncMap });
+    const row = buildStagingRow(
+      { filename: "hero.md", raw: "---\natlas:\n  id: hero\n  type: faction\n---\n", vaultRelPath: "notes/hero.md" },
+      ctx,
+    );
+    expect(row.needsReview?.reason).toBe("type-conflict");
+    expect(row.included).toBe(false);
+  });
+
+  it("no exposure increase and no type conflict → needsReview remains undefined, included=true", () => {
+    const existingById = new Map([["npc-a", "content/w/npcs/npc-a.md"]]);
+    const entityMeta = new Map([
+      ["npc-a", { visibility: "dm" as EntityVisibility, type: "npc", sourcePath: "content/w/npcs/npc-a.md" }],
+    ]);
+    const ctx = metaCtx({ existingById, entityMeta });
+    const row = buildStagingRow(
+      { filename: "npc-a.md", raw: "---\natlas:\n  id: npc-a\n  type: npc\n  visibility: dm\n---\n" },
+      ctx,
+    );
+    expect(row.needsReview).toBeUndefined();
+    expect(row.included).toBe(true);
+  });
+
+  it("player entity + vault wanting player visibility → no secrecy-increase (already exposed)", () => {
+    const existingById = new Map([["pub-npc", "content/w/npcs/pub-npc.md"]]);
+    const entityMeta = new Map([
+      ["pub-npc", { visibility: "player" as EntityVisibility, type: "npc", sourcePath: "content/w/npcs/pub-npc.md" }],
+    ]);
+    const ctx = metaCtx({ existingById, entityMeta });
+    const row = buildStagingRow(
+      { filename: "pub-npc.md", raw: "---\natlas:\n  id: pub-npc\n  type: npc\n  publish: true\n---\n" },
+      ctx,
+    );
+    expect(row.needsReview).toBeUndefined();
+    expect(row.included).toBe(true);
+  });
+
+  it("create row: entityMeta not consulted, needsReview stays undefined", () => {
+    const entityMeta = new Map([
+      ["unrelated", { visibility: "dm" as EntityVisibility, type: "npc", sourcePath: "content/w/npcs/unrelated.md" }],
+    ]);
+    const ctx = metaCtx({ existingById: new Map(), entityMeta });
+    const row = buildStagingRow(
+      { filename: "brand-new.md", raw: "---\natlas:\n  type: npc\n  publish: true\n---\n" },
+      ctx,
+    );
+    expect(row.rowKind).toBe("create");
+    expect(row.needsReview).toBeUndefined();
   });
 });
