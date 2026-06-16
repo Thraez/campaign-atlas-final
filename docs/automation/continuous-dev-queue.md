@@ -71,7 +71,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
   - Increments (order matters): **0** — plumbing (snapshotBaseline export, shared lock, .gitignore,
     atlas:scan alias, CI hardening) ✅ DONE 2026-06-16 `592d2221`; **1** — `publish-check` endpoint +
     scan adapter + types ✅ DONE 2026-06-16 `734056c9`; **2** — readiness card + check-half UI (neutral idle, demote validator) ✅ DONE 2026-06-16 `6b5e4273`; **3** —
-    tree-shake fingerprint guard; **4** — `publish-push` endpoint (re-verify, scoped commit, push, snapshot);
+    tree-shake fingerprint guard ✅ DONE 2026-06-16 `8c5e7570`; **4** — `publish-push` endpoint (re-verify, scoped commit, push, snapshot);
     **5** — confirm→publish wiring.
   - Gate: targeted vitest run for all new test files (whole-suite OOMs — shard, see memory); tsc clean; eslint
     0 errors; `npm run build && npm run atlas:check-secrets dist` exit 0 (no editor endpoints in bundle);
