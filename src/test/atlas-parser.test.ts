@@ -221,7 +221,7 @@ describe("renderLinkTokens — player safety", () => {
     const out = renderLinkTokens(html, links, { hideBroken: true });
     expect(out).not.toMatch(/Secret Vault/);
     expect(out).toMatch(/the vault/);
-    expect(out).toMatch(/atlas-unresolved/);
+    expect(out).toMatch(/atlas-planned-link-player/);
   });
 
   it("DM build still shows target in tooltip for authoring help", () => {

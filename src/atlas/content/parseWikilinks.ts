@@ -51,11 +51,8 @@ export function renderLinkTokens(
     if (!link) return "";
     const text = escapeHtml(link.display);
     if (link.broken || !link.resolvedId) {
-      // Unresolved wikilinks usually mean "note not created yet" — render as
-      // subtle non-clickable text. In player builds we must not leak the raw
-      // target (it could name a DM-only entity), so omit the title attribute.
-      if (opts.hideBroken) return `<span class="atlas-unresolved">${text}</span>`;
-      return `<span class="atlas-unresolved" title="Unresolved link: ${escapeHtml(link.target)}">${text}</span>`;
+      if (opts.hideBroken) return `<span class="atlas-planned-link-player">${text}</span>`;
+      return `<span class="atlas-planned-link" title="Planned link: ${escapeHtml(link.target)}">${text}</span>`;
     }
     return `<a class="atlas-wikilink" data-entity-id="${escapeHtml(link.resolvedId)}" href="#/entity/${encodeURIComponent(link.resolvedId)}">${text}</a>`;
   });

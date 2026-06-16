@@ -26,6 +26,11 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
+> **Refueled 2026-06-16** — section **J** below blessed by the human: **J1 One-click Publish** is the
+> current priority. Design: `docs/superpowers/specs/2026-06-16-one-click-publish-design.md`; Plan:
+> `docs/superpowers/plans/2026-06-16-one-click-publish.md` — **read both in full before starting.**
+> I-series (I1–I4) and N25–N26 are ✅ DONE.
+>
 > **Refueled 2026-06-15 (round 2)** — section **I** below blessed by the human from a roadmap brainstorm:
 > build **I1 → I4** in order (Connections · distance ruler · shareable deep-links · README-rail fix). Each
 > cites its own spec under `docs/superpowers/specs/2026-06-15-*-design.md` — **read in full first.** H-series
@@ -47,13 +52,42 @@ Beyond that the routine asks the human to bless more work. That is by design —
 > `auto/continuous-dev`, then consolidated to main in the v0.1.0 merge 2026-06-14). Sections D, A, B, C are
 > all ✅ DONE.
 
+### J — Refuel 2026-06-16 (one-click Publish — blessed by the human)
+
+> Human-directed feature refuel. Build **J1** — one substantial unit (5 increments, TDD throughout).
+> **Read the design doc and the plan in full before starting** — the plan has per-task TDD steps; follow them.
+> Increment 0 (plumbing) is independently testable and ships first. The push increment (5) is the only
+> outward-facing step; it ships last and only after the safety-check half (0–3) is green-gated.
+
+- [ ] **J1. One-click Publish from the editor.**
+  **Design:** `docs/superpowers/specs/2026-06-16-one-click-publish-design.md` — **read in full first.**
+  **Plan:** `docs/superpowers/plans/2026-06-16-one-click-publish.md` — **read in full; follow task-by-task.**
+  Add a single **Publish** button to the DM editor that builds the player-safe atlas, runs every safety scan,
+  shows a plain-language readiness verdict + player-vs-player change list, and — only after the DM confirms —
+  makes a scoped commit and pushes to `main` (the existing GitHub Pages deploy trigger). Two dev-only endpoints
+  (`POST /__atlas/publish-check` + `POST /__atlas/publish-push`) live in the existing save plugin. A shared
+  module-level build lock serializes save + publish (D4). CI is hardened to run the full scan set — closing the
+  pre-existing fog/image/asset gap (D13). Every line is editor-only, tree-shaken from player builds (D7).
+  - Increments (order matters): **0** — plumbing (snapshotBaseline export, shared lock, .gitignore,
+    atlas:scan alias, CI hardening); **1** — `publish-check` endpoint + scan adapter + types; **2** —
+    readiness card + check-half UI (neutral idle, demote validator); **3** — tree-shake fingerprint guard;
+    **4** — `publish-push` endpoint (re-verify, scoped commit, push, snapshot); **5** — confirm→publish wiring.
+  - Gate: targeted vitest run for all new test files (whole-suite OOMs — shard, see memory); tsc clean; eslint
+    0 errors; `npm run build && npm run atlas:check-secrets dist` exit 0 (no editor endpoints in bundle);
+    `npm run atlas:scan` exit 0; spec cross-check D1–D14 all landed.
+  - **Autonomy guard (push is irreversible):** build and gate Increments 0–4 fully before wiring Increment 5.
+    If verification fails twice in the same area, hand back.
+  - Done when: DM can click Publish in the editor → see a plain-language safety verdict + change list → confirm
+    → get "Published ✓ — players will see it in a couple of minutes"; every safety decision D1–D14 implemented;
+    full gate green. ~5–8 runs across the increments.
+
 ### I — Refuel 2026-06-15 round 2 (roadmap brainstorm — blessed by the human)
 
 > Human-directed roadmap refuel from a feature-planning session. Build **I1 → I4** in order. Each is bounded,
 > revertible, and cites its own spec (**read in full first**). I1 carries a mandatory leak-regression test;
 > I2/I3 are pure player-facing additions; I4 is docs-only.
 
-- [ ] **I1. Show authored Connections on the entity page.**
+- [x] **I1. Show authored Connections on the entity page.**
   **Spec:** `docs/superpowers/specs/2026-06-15-connections-on-entity-page-design.md` — **read in full.**
   Authored `entity.relationships[]` are saved in the editor with per-link visibility tags but never
   displayed in the reading pane (player or DM). Render them as a compact **"Connections"** list in
@@ -69,8 +103,12 @@ Beyond that the routine asks the human to bless more work. That is by design —
   - Done when: Connections renders beneath Mentioned in; DM view shows all rels with DM badge;
     player view shows only player-safe rels; clicking a target opens the entity; no Connections
     section when relationships is empty; leak-regression test green; standard gate green. ~1–2 runs.
+  - ✅ DONE 2026-06-16 — commit e20ad90c (feat(I1): Connections section on entity page; entityById
+    added to destructuring; 7 EntityPanel unit tests + 4 I1 leak-regression tests in
+    player-preview-leak-regression.test.tsx). Gate: 1417 tests green (4 shards, no OOM); tsc clean;
+    eslint 0 errors (16 pre-existing warnings). Pure client-side display — no build-pipeline change.
 
-- [ ] **I2. Map distance ruler — click two points to measure straight-line world distance.**
+- [x] **I2. Map distance ruler — click two points to measure straight-line world distance.**
   **Spec:** `docs/superpowers/specs/2026-06-15-map-distance-ruler-design.md` — **read in full.**
   Add a tape-measure mode to both the player viewer and the DM editor: click a ruler button in the toolbar to
   enter ruler mode, click two map points, see a dashed line with a distance label (e.g. "12.3 mi"; falls back
@@ -84,8 +122,11 @@ Beyond that the routine asks the human to bless more work. That is by design —
   - Done when: two-click measurement works in both viewer and editor; label shows world units (or px fallback);
     ruler button clears/exits; `measureDistance` unit-tested; standard gate green (tsc + eslint + sharded
     vitest). ~1–2 runs.
+  - ✅ DONE 2026-06-16 — commit 8288dd28 (feat(I2): RulerLayer + measureDistance + button in both viewer and
+    editor toolbars; 6 unit tests in src/test/ruler/measureDistance.test.ts). Gate: 1423 tests green (4 shards,
+    no OOM); tsc clean; eslint 0 errors (16 pre-existing warnings). Pure client-side UI — no build-pipeline change.
 
-- [ ] **I3. Shareable deep links (map + pan/zoom + open entity).**
+- [x] **I3. Shareable deep links (map + pan/zoom + open entity).**
   **Spec:** `docs/superpowers/specs/2026-06-15-deep-link-pan-open-design.md` — **read in full.**
   Today only `?entity=<id>` is captured; the map always boots to its default center and Back navigates away
   from the atlas. Extend the existing query-param share link (CRITICAL: stay query-param — path routes 404 on
@@ -101,8 +142,12 @@ Beyond that the routine asks the human to bless more work. That is by design —
   - Done when: entity opens push history (Back returns to prior entity); pan/zoom updates URL without new Back
     entries; map switch updates `?map=`; copied link reopens exact view in a fresh tab; old `?entity=`-only
     links unaffected; pure helpers unit-tested; gate green. ~1–2 runs.
+  - ✅ DONE 2026-06-16 — commit dc44d15d (feat(I3): serializeDeepLink/parseDeepLink pure helpers + ViewSyncController
+    + replaceState URL sync + pushState/popstate Back support + enriched CopyLinkButton; 12 unit tests in
+    src/test/deep-link.test.ts). Gate: 1435 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings). Pure client-side — no build-pipeline change.
 
-- [ ] **I4. Fix README editor-rail drift.**
+- [x] **I4. Fix README editor-rail drift.**
   **Spec:** `docs/superpowers/specs/2026-06-15-docs-readme-editor-rail-design.md` — read in full.
   The README's "DM Creator Cockpit" section lists Pins / Maps / Regions / Routes / Fog / Entities / Import /
   Publish Check. The live rail (verified in `src/atlas/shell/railRegistry.tsx`) is Characters / Locations /
@@ -112,6 +157,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
   - Files: `README.md`.
   - Done when: README panel list matches the live rail exactly; Maps and Import documented as menu-only; no code
     files modified; docs-only gate. ~1 run.
+  - ✅ DONE 2026-06-16 — commit 576981ae (docs(I4): fix README editor-rail drift — six content tabs, Save, Publish, menu-only Maps/Import). Docs-only gate: eslint 0 errors (16 pre-existing warnings); no tests (docs change). README "DM Creator Cockpit" now lists Content/Map/System/Menu groups matching the live rail exactly.
 
 ### H — Refuel 2026-06-15 (animated ocean / "living water" — blessed by the human)
 
@@ -679,7 +725,7 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - ✅ DONE 2026-06-15 — commit a8aa28ed; 16 new tests in `src/test/content/stripDmBlocks.test.ts`
     (run routine-n24-20260615). Gate: 1364 tests green (4 shards, no OOM); tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings).
-- [ ] **N25. Render inline image embeds (`![[image.png]]`).** ⚠️ design-check first — changes player-visible rendering + touches the build pipeline.
+- [x] **N25. Render inline image embeds (`![[image.png]]`).** ⚠️ design-check first — changes player-visible rendering + touches the build pipeline.
   **Spec:** `docs/superpowers/specs/2026-06-15-render-image-embeds-design.md` — **read in full.**
   `![[Portrait.png]]` embeds silently vanish in the player view and in the published `atlas.json` because only
   the DM editor's `renderEntityMarkdown` applies an embed-conversion pre-pass before calling `marked`;
@@ -693,7 +739,14 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - **Touches the build pipeline** → gate also requires `npm run atlas:publish:integrity-smoke` **and** `npm run atlas:publish` green.
   - Done when: `![[Portrait.png]]` renders as `<img>` in the player viewer and in the published `atlas.json`; an
     embed inside `%%` is absent from player output (regression test); DM editor render unchanged; gate + integrity-smoke + atlas:publish green. ~1–2 runs.
-- [ ] **N26. Render planned/broken wikilinks as visible "planned link" styling.** ⚠️ design-check first — changes player-visible rendering.
+  - ✅ DONE 2026-06-16 — commit 999587c8 (feat(N25): resolveImageEmbeds extracted from renderEntityMarkdown + wired
+    into projectEntityForPlayer + build-atlas.ts; stripDmBlocks runs before resolveImageEmbeds in both paths so
+    embeds in %%...%% absent from player output; 5 unit tests for resolveImageEmbeds + 4 tests for
+    projectEntityForPlayer embed rendering incl. mandatory secrecy regression). Gate: 1447 tests green (4 shards,
+    no OOM); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings); integrity-smoke 5/5;
+    publish-orchestrator 10/10 clean. Note: vite build step of atlas:publish fails from external worktree path
+    (pre-existing env issue, not caused by this change — inside-repo builds confirmed clean).
+- [x] **N26. Render planned/broken wikilinks as visible "planned link" styling.**
   **Spec:** `docs/superpowers/specs/2026-06-15-render-planned-links-design.md` — **read in full.**
   Wikilinks whose target doesn't resolve render today as muted, non-clickable `atlas-unresolved` spans
   indistinguishable from plain prose. Split the single CSS class into `atlas-planned-link` (DM view — dashed
@@ -708,6 +761,7 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - Done when: broken links render as `atlas-planned-link` (DM, amber dashed, tooltip present) or
     `atlas-planned-link-player` (player, neutral, no tooltip, no target in HTML); existing N17 security test green;
     new planned-link tests green across DM and player surfaces; standard gate green (sharded vitest, tsc, eslint). ~1 run.
+  - ✅ DONE 2026-06-16 — commit f783e8e1 (feat(N26): render broken wikilinks as planned-link styling; atlas-planned-link DM dashed-amber + atlas-planned-link-player neutral dotted; dead .atlas-broken-link + .atlas-unresolved selectors removed; 3 new cross-surface planned-link tests + stale assertions updated; security invariant preserved). Gate: 1438 tests green (4 shards, no OOM); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings). Pure client-side CSS + one function change — no build-pipeline impact.
 
 ---
 

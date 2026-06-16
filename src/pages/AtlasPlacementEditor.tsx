@@ -3,7 +3,7 @@ import { MapContainer, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Compass, Crosshair, RotateCcw, MapPin, Target, Trash2, Layers as LayersIcon, Settings2, Upload, Save as SaveIcon, Undo2, Redo2, Plus, X, Menu as MenuIcon } from "lucide-react";
+import { ArrowLeft, Compass, Crosshair, RotateCcw, MapPin, Target, Trash2, Layers as LayersIcon, Settings2, Upload, Save as SaveIcon, Undo2, Redo2, Plus, X, Menu as MenuIcon, Ruler } from "lucide-react";
 import { toast } from "sonner";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity, ImportFolderConfig, MapDocument, MapLayer } from "@/atlas/content/schema";
@@ -86,6 +86,7 @@ import { EditorPanelHost } from "@/atlas/shell/EditorPanelHost";
 import { buildRailItems } from "@/atlas/shell/railRegistry";
 import { ViewModeProvider, useViewMode } from "@/atlas/view/ViewModeProvider";
 import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
+import { RulerLayer } from "@/atlas/ruler/RulerLayer";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 // Bumped to v3: storage shape now carries label + pin override per placement.
@@ -198,6 +199,7 @@ function AtlasPlacementEditorInner() {
   const [flyTo, setFlyTo] = useState<{ lat: number; lng: number } | null>(null);
   const [showLayers, setShowLayers] = useState(true);
   const [showRegions, setShowRegions] = useState(true);
+  const [rulerActive, setRulerActive] = useState(false);
   // Phase 1B B1/B2: toggle exposed by the Maps → Layers panel header. When
   // true, the selected layer is draggable and corner handles appear.
   const [editGeometry, setEditGeometry] = useState(false);
@@ -1115,6 +1117,16 @@ function AtlasPlacementEditorInner() {
         <Button variant={showRegions ? "secondary" : "ghost"} size="sm" onClick={() => setShowRegions((v) => !v)} title="Toggle region overlays">
           Regions
         </Button>
+        <Button
+          variant={rulerActive ? "secondary" : "ghost"}
+          size="sm"
+          onClick={() => setRulerActive((v) => !v)}
+          title="Measure distance (click two points)"
+          aria-label="Toggle distance ruler"
+          aria-pressed={rulerActive}
+        >
+          <Ruler className="h-4 w-4" aria-hidden="true" />
+        </Button>
         <SaveStatus
           status={session.status}
           unsavedCount={session.unsavedCount}
@@ -1540,9 +1552,16 @@ function AtlasPlacementEditorInner() {
             minZoom={-6}
             maxZoom={4}
             attributionControl={false}
-            style={{ width: "100%", height: "100%", background: activeMap.water?.enabled === false ? (activeMap.oceanColor ?? "#18313f") : "transparent", cursor: (pendingId || regionDraft.drawing) ? "crosshair" : undefined }}
+            style={{ width: "100%", height: "100%", background: activeMap.water?.enabled === false ? (activeMap.oceanColor ?? "#18313f") : "transparent", cursor: (pendingId || regionDraft.drawing || rulerActive) ? "crosshair" : undefined }}
           >
             <FlyTo target={flyTo} />
+            <RulerLayer
+              active={rulerActive && !pendingId && !regionDraft.drawing}
+              mapHeight={activeMap.height}
+              scale={activeMap.scale}
+              wrapX={activeMap.wrapX}
+              mapWidth={activeMap.width}
+            />
             <MapClickCapture onClick={onMapClick} />
 
             {/* Map base image layers — built-in + locally edited/uploaded.

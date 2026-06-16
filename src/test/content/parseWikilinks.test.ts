@@ -68,6 +68,8 @@ describe("renderLinkTokens — security invariant (player builds)", () => {
     expect(html).toContain("the stranger");
     expect(html).not.toContain("DM-Secret NPC");
     expect(html).not.toContain("title=");
+    expect(html).toContain("atlas-planned-link-player");
+    expect(html).not.toContain("atlas-planned-link\"");
   });
 
   it("hideBroken: false — broken link exposes target in title attribute (DM view)", () => {
@@ -77,7 +79,9 @@ describe("renderLinkTokens — security invariant (player builds)", () => {
     const html = renderLinkTokens(`<p>${tokenized}</p>`, links, { hideBroken: false });
     expect(html).toContain("Unknown Place");
     expect(html).toContain("title=");
-    expect(html).toContain("Unresolved link");
+    expect(html).toContain("Planned link");
+    expect(html).toContain("atlas-planned-link\"");
+    expect(html).not.toContain("atlas-planned-link-player");
   });
 
   it("default opts (no hideBroken) — same as hideBroken: false, title attribute present", () => {
@@ -86,9 +90,10 @@ describe("renderLinkTokens — security invariant (player builds)", () => {
     });
     const html = renderLinkTokens(`<p>${tokenized}</p>`, links);
     expect(html).toContain("title=");
+    expect(html).toContain("atlas-planned-link\"");
   });
 
-  it("resolved link → renders <a> with entity id and href, no unresolved class", () => {
+  it("resolved link → renders <a> with entity id and href, no planned-link class", () => {
     const { tokenized, links } = tokenizeWikilinks("[[Corven]]", {
       resolveByName: RESOLVE_KNOWN,
     });
@@ -98,6 +103,7 @@ describe("renderLinkTokens — security invariant (player builds)", () => {
     expect(html).toContain('href="#/entity/corven"');
     expect(html).toContain("Corven");
     expect(html).not.toContain("atlas-unresolved");
+    expect(html).not.toContain("atlas-planned-link");
   });
 
   it("HTML-special chars in broken target are escaped in title attribute (XSS guard)", () => {
@@ -139,5 +145,41 @@ describe("renderLinkTokens — security invariant (player builds)", () => {
     expect(html).not.toContain("undefined");
     // Index 0 is rendered; index 1 produces "" (no crash)
     expect(html).toContain("A");
+  });
+});
+
+describe("renderLinkTokens — planned-link cross-surface (N26)", () => {
+  const RESOLVE = (n: string) => (n === "Corven" ? "corven" : undefined);
+
+  it("DM surface (hideBroken: false): broken link → atlas-planned-link with title containing target", () => {
+    const { tokenized, links } = tokenizeWikilinks("[[Ghost Town]]", { resolveByName: RESOLVE });
+    const html = renderLinkTokens(`<p>${tokenized}</p>`, links, { hideBroken: false });
+    expect(html).toContain('class="atlas-planned-link"');
+    expect(html).toContain('title="Planned link: Ghost Town"');
+    expect(html).toContain("Ghost Town");
+    expect(html).not.toContain("atlas-planned-link-player");
+    expect(html).not.toContain("atlas-unresolved");
+  });
+
+  it("player surface (hideBroken: true): broken link → atlas-planned-link-player, no title, no raw target", () => {
+    const { tokenized, links } = tokenizeWikilinks("[[Secret Place|the place]]", { resolveByName: RESOLVE });
+    const html = renderLinkTokens(`<p>${tokenized}</p>`, links, { hideBroken: true });
+    expect(html).toContain('class="atlas-planned-link-player"');
+    expect(html).toContain("the place");
+    expect(html).not.toContain("Secret Place");
+    expect(html).not.toContain("title=");
+    expect(html).not.toContain("atlas-planned-link\"");
+    expect(html).not.toContain("atlas-unresolved");
+  });
+
+  it("both surfaces: resolved link → atlas-wikilink <a>, unaffected by planned-link change", () => {
+    const { tokenized, links } = tokenizeWikilinks("[[Corven]]", { resolveByName: RESOLVE });
+    const htmlDm = renderLinkTokens(`<p>${tokenized}</p>`, links, { hideBroken: false });
+    const htmlPlayer = renderLinkTokens(`<p>${tokenized}</p>`, links, { hideBroken: true });
+    for (const html of [htmlDm, htmlPlayer]) {
+      expect(html).toContain('class="atlas-wikilink"');
+      expect(html).not.toContain("atlas-planned-link");
+      expect(html).not.toContain("atlas-unresolved");
+    }
   });
 });

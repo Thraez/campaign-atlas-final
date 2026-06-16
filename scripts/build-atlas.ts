@@ -13,6 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { markdownToHtml } from "../src/atlas/content/markdownCore";
+import { resolveImageEmbeds, DEFAULT_RESOLVE_ASSET } from "../src/atlas/content/renderEntityMarkdown";
 import { parseFrontmatter, type ParsedFile } from "./atlas/parseFrontmatter";
 import { stripDmBlocks, stripDmFromShippingString } from "./atlas/stripDmBlocks";
 import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
@@ -521,7 +522,9 @@ async function runBuildCore(flags: BuildFlags) {
   const backlinkMap = new Map<string, Map<string, string>>();
   for (const item of pending) {
     const { entity, rawBody } = item;
-    const { tokenized, links } = tokenizeWikilinks(rawBody, { resolveByName });
+    // Resolve ![[image.ext]] AFTER DM stripping (rawBody is already noDm) so embeds in %% blocks are absent.
+    const resolvedBody = resolveImageEmbeds(rawBody, DEFAULT_RESOLVE_ASSET);
+    const { tokenized, links } = tokenizeWikilinks(resolvedBody, { resolveByName });
     entity.links = links;
     for (const l of links) {
       // Cross-reference spoiler leak detection (player builds only). The link

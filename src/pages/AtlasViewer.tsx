@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   Search, X, MapPin, ArrowLeft, Compass, Grid3x3, CalendarClock,
-  LayoutGrid,
+  LayoutGrid, Ruler,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,6 +26,8 @@ import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { RulerLayer } from "@/atlas/ruler/RulerLayer";
+import { serializeDeepLink, parseDeepLink } from "@/atlas/deepLink";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
@@ -46,15 +48,43 @@ function pinIconForStyle(style: PinPreset, opts?: { dim?: boolean }): L.DivIcon 
   });
 }
 
-function MapController({ flyTo }: { flyTo: { x: number; y: number; height: number } | null }) {
+function MapController({ flyTo }: { flyTo: { x: number; y: number; height: number; zoom?: number } | null }) {
   const map = useMap();
   useEffect(() => {
     if (!flyTo) return;
     const lat = flyTo.height - flyTo.y;
     const lng = flyTo.x;
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    map.flyTo([lat, lng], Math.max(map.getZoom(), -1), { duration: 0.6 });
+    const targetZoom = flyTo.zoom != null && Number.isFinite(flyTo.zoom)
+      ? flyTo.zoom
+      : Math.max(map.getZoom(), -1);
+    map.flyTo([lat, lng], targetZoom, { duration: 0.6 });
   }, [flyTo, map]);
+  return null;
+}
+
+function ViewSyncController({
+  mapId,
+  mapHeight,
+  onViewChange,
+}: {
+  mapId: string;
+  mapHeight: number;
+  onViewChange: (cx: number, cy: number, cz: number) => void;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    const update = () => {
+      const c = map.getCenter();
+      onViewChange(c.lng, mapHeight - c.lat, map.getZoom());
+    };
+    map.on("moveend", update);
+    map.on("zoomend", update);
+    return () => {
+      map.off("moveend", update);
+      map.off("zoomend", update);
+    };
+  }, [map, mapId, mapHeight, onViewChange]);
   return null;
 }
 
@@ -124,7 +154,7 @@ export default function AtlasViewer() {
   const [error, setError] = useState<string | null>(null);
   const [activeMapId, setActiveMapId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [flyTarget, setFlyTarget] = useState<{ x: number; y: number; height: number } | null>(null);
+  const [flyTarget, setFlyTarget] = useState<{ x: number; y: number; height: number; zoom?: number } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   // The bottom sheet renders the entity panel at *every* viewport below the
@@ -133,6 +163,7 @@ export default function AtlasViewer() {
   const hasDesktopAside = useHasDesktopAside();
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const [showGrid, setShowGrid] = useState<boolean | null>(null); // null = use map default
+  const [rulerActive, setRulerActive] = useState(false);
   // Aside expanded/collapsed state, persisted across reloads so a DM who
   // prefers the full-width map keeps it that way.
   const [asideExpanded, setAsideExpanded] = useState<boolean>(() => {
@@ -144,18 +175,76 @@ export default function AtlasViewer() {
     window.localStorage.setItem("atlas.viewer.asidePinned", String(asideExpanded));
   }, [asideExpanded]);
 
+  const [viewCenter, setViewCenter] = useState<{ x: number; y: number; zoom: number } | null>(null);
+  const viewCenterRef = useRef<{ x: number; y: number; zoom: number } | null>(null);
+
+  const handleViewChange = useCallback((cx: number, cy: number, cz: number) => {
+    const vc = { x: cx, y: cy, zoom: cz };
+    setViewCenter(vc);
+    viewCenterRef.current = vc;
+  }, []);
+
+  // Keep URL in sync with viewport (replaceState — no new Back entries for pan/zoom)
+  useEffect(() => {
+    if (!activeMapId) return;
+    window.history.replaceState(
+      null, "",
+      "?" + serializeDeepLink({
+        mapId: activeMapId,
+        entityId: openId,
+        center: viewCenter ? { x: viewCenter.x, y: viewCenter.y } : null,
+        zoom: viewCenter?.zoom ?? null,
+      })
+    );
+  }, [activeMapId, openId, viewCenter]);
+
+  // Back navigation: restore entity/map when the user presses Back
+  const popStateHandler = useCallback(() => {
+    const dl = parseDeepLink(window.location.search);
+    setOpenId(dl.entityId);
+    if (dl.mapId && data?.project.maps.some((m) => m.id === dl.mapId)) {
+      setActiveMapId(dl.mapId);
+    }
+    if (dl.center && data) {
+      const mapIdForFly = dl.mapId ?? activeMapId;
+      const targetMap = data.project.maps.find((m) => m.id === mapIdForFly);
+      if (targetMap) {
+        setFlyTarget({ x: dl.center.x, y: dl.center.y, height: targetMap.height, zoom: dl.zoom ?? undefined });
+      }
+    }
+    if (!dl.entityId) setMobilePanelOpen(false);
+  }, [data, activeMapId]);
+
+  useEffect(() => {
+    window.addEventListener("popstate", popStateHandler);
+    return () => window.removeEventListener("popstate", popStateHandler);
+  }, [popStateHandler]);
+
   useEffect(() => {
     Promise.all([loadAtlasContent(true), loadSearchIndex()])
       .then(([project, index]) => {
         setData({ project, index });
-        setActiveMapId(project.worlds[0]?.defaultMapId ?? project.maps[0]?.id ?? null);
-        const params = new URLSearchParams(window.location.search);
-        const want = params.get("entity");
-        if (want) {
-          setOpenId(want);
+        const defaultMapId = project.worlds[0]?.defaultMapId ?? project.maps[0]?.id ?? null;
+        const dl = parseDeepLink(window.location.search);
+        // Use map from deep link if valid, else fall back to default
+        const targetMapId = (dl.mapId && project.maps.some((m) => m.id === dl.mapId))
+          ? dl.mapId
+          : defaultMapId;
+        setActiveMapId(targetMapId);
+        if (dl.entityId) {
+          setOpenId(dl.entityId);
           // Sheet only matters when the aside isn't mounted.
           if (!hasDesktopAside) setMobilePanelOpen(true);
-          const placement = project.placements.find((p) => p.entityId === want);
+        }
+        if (dl.center) {
+          // Full deep link: fly to the exact shared viewport
+          const mapForFly = project.maps.find((m) => m.id === targetMapId);
+          if (mapForFly) {
+            setFlyTarget({ x: dl.center.x, y: dl.center.y, height: mapForFly.height, zoom: dl.zoom ?? undefined });
+          }
+        } else if (dl.entityId) {
+          // Old-style ?entity= link: fly to the entity's placement (backward compat)
+          const placement = project.placements.find((p) => p.entityId === dl.entityId);
           if (placement) {
             const m = project.maps.find((mm) => mm.id === placement.mapId);
             if (m) {
@@ -185,6 +274,17 @@ export default function AtlasViewer() {
 
   const openEntity = useCallback(
     (id: string, fly = true) => {
+      // Push a history entry so Back returns to the previous entity (or no-entity state)
+      const vc = viewCenterRef.current;
+      window.history.pushState(
+        null, "",
+        "?" + serializeDeepLink({
+          mapId: activeMapId,
+          entityId: id,
+          center: vc ? { x: vc.x, y: vc.y } : null,
+          zoom: vc?.zoom ?? null,
+        })
+      );
       setOpenId(id);
       // Only open the bottom sheet on viewports where the desktop aside
       // isn't rendered; otherwise the Radix overlay covers the screen
@@ -195,7 +295,7 @@ export default function AtlasViewer() {
         if (placement) setFlyTarget({ x: placement.x, y: placement.y, height: activeMap.height });
       }
     },
-    [data, activeMap, hasDesktopAside]
+    [data, activeMap, hasDesktopAside, activeMapId]
   );
 
   // Intercept wikilink clicks inside rendered HTML
@@ -328,6 +428,16 @@ export default function AtlasViewer() {
             <Grid3x3 className="h-4 w-4" aria-hidden="true" />
           </Button>
         )}
+        <Button
+          variant={rulerActive ? "secondary" : "ghost"}
+          size="sm"
+          onClick={() => setRulerActive((v) => !v)}
+          title="Measure distance (click two points)"
+          aria-label="Toggle distance ruler"
+          aria-pressed={rulerActive}
+        >
+          <Ruler className="h-4 w-4" aria-hidden="true" />
+        </Button>
         <Button variant="secondary" size="sm" onClick={() => setSearchOpen(true)} className="gap-2" aria-label="Search atlas (Ctrl+K)">
           <Search className="h-4 w-4" aria-hidden="true" />
           <span className="hidden sm:inline">Search</span>
@@ -368,9 +478,21 @@ export default function AtlasViewer() {
             keyboard
             keyboardPanDelta={80}
             attributionControl={false}
-            style={{ width: "100%", height: "100%", background: activeMap.water?.enabled === false ? (activeMap.oceanColor ?? "#18313f") : "transparent" }}
+            style={{ width: "100%", height: "100%", background: activeMap.water?.enabled === false ? (activeMap.oceanColor ?? "#18313f") : "transparent", cursor: rulerActive ? "crosshair" : undefined }}
           >
             <MapController flyTo={flyTarget} />
+            <ViewSyncController
+              mapId={activeMap.id}
+              mapHeight={activeMap.height}
+              onViewChange={handleViewChange}
+            />
+            <RulerLayer
+              active={rulerActive}
+              mapHeight={activeMap.height}
+              scale={activeMap.scale}
+              wrapX={activeMap.wrapX}
+              mapWidth={activeMap.width}
+            />
 
             {/* Horizontal wrap: render copies at -W, 0, +W when wrapX enabled */}
             {(activeMap.wrapX ? [-activeMap.width, 0, activeMap.width] : [0]).map((dx) => (

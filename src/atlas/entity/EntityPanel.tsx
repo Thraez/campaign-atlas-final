@@ -33,18 +33,17 @@ export interface EntityPanelProps {
   readerAffordances?: boolean;
 }
 
-function CopyLinkButton({ entityId }: { entityId: string }) {
+function CopyLinkButton() {
   const [copied, setCopied] = useState(false);
   const handle = useCallback(async () => {
     try {
-      const base = window.location.origin + (import.meta.env.BASE_URL || "/").replace(/\/+$/, "");
-      await navigator.clipboard.writeText(`${base}/atlas?entity=${encodeURIComponent(entityId)}`);
+      await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
       // ignore
     }
-  }, [entityId]);
+  }, []);
   return (
     <Button variant="ghost" size="icon" onClick={handle} title="Copy share link">
       {copied ? <Check className="h-4 w-4 text-green-500" /> : <Link2 className="h-4 w-4" />}
@@ -223,7 +222,7 @@ function ImageThumb({ src, alt, onClick }: { src: string; alt: string; onClick: 
 }
 
 export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function EntityPanel(
-  { entity, placements, onOpenEntity, onClose, onShowOnMap, readerAffordances = true },
+  { entity, placements, entityById, onOpenEntity, onClose, onShowOnMap, readerAffordances = true },
   ref
 ) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -280,7 +279,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
               <Printer className="h-4 w-4" aria-hidden="true" />
             </Button>
           )}
-          <CopyLinkButton entityId={entity.id} />
+          <CopyLinkButton />
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close panel"><X className="h-4 w-4" aria-hidden="true" /></Button>
         </div>
       </div>
@@ -347,6 +346,32 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
                     {b.title}
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {(entity.relationships ?? []).length > 0 && (
+            <div className="pt-3 border-t border-border" data-testid="connections-section">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Connections</div>
+              <div className="flex flex-col gap-1">
+                {(entity.relationships ?? []).map((r, i) => {
+                  const target = entityById.get(r.entity);
+                  const displayLabel = r.label ?? r.type;
+                  return (
+                    <div key={`${r.entity}-${i}`} className="flex items-center gap-1.5 text-xs">
+                      <span className="text-muted-foreground shrink-0">{displayLabel}:</span>
+                      <button
+                        className="hover:underline truncate text-left"
+                        onClick={() => onOpenEntity(r.entity)}
+                      >
+                        {target ? target.title : <span className="text-muted-foreground">{r.entity}</span>}
+                      </button>
+                      {r.visibility === "dm" && (
+                        <span className="text-[10px] text-muted-foreground shrink-0">(DM)</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
