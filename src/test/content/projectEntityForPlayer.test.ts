@@ -67,3 +67,43 @@ describe("projectEntityForPlayer", () => {
     expect((p.relationships ?? []).some((r) => r.entity === "edric2")).toBe(true);
   });
 });
+
+describe("projectEntityForPlayer — image embed rendering (N25)", () => {
+  it("renders ![[image.png]] as <img> in bodyHtml", () => {
+    const e = ent({ id: "npc1", title: "Npc1", visibility: "player",
+      body: "![[Portrait.png]]\n\nPublic text." });
+    const ctx = buildProjectionContext(new Map([[e.id, e]]));
+    const p = projectEntityForPlayer(e, ctx);
+    expect(p.bodyHtml).toContain('<img');
+    expect(p.bodyHtml).toContain('Portrait.png');
+  });
+
+  it("secrecy: embed inside %% block is absent from bodyHtml (mandatory regression)", () => {
+    const e = ent({ id: "npc2", title: "Npc2", visibility: "player",
+      body: "%%\n![[secret.png]]\n%%\n\nPublic text." });
+    const ctx = buildProjectionContext(new Map([[e.id, e]]));
+    const p = projectEntityForPlayer(e, ctx);
+    expect(p.bodyHtml).not.toContain('<img');
+    expect(p.bodyHtml).not.toContain('secret.png');
+    expect(p.bodyHtml).toContain('Public text.');
+  });
+
+  it("secrecy: embed inside :::dm block is absent from bodyHtml", () => {
+    const e = ent({ id: "npc3", title: "Npc3", visibility: "player",
+      body: ":::dm\n![[dm-secret.png]]\n:::\n\nPlayer content." });
+    const ctx = buildProjectionContext(new Map([[e.id, e]]));
+    const p = projectEntityForPlayer(e, ctx);
+    expect(p.bodyHtml).not.toContain('dm-secret.png');
+    expect(p.bodyHtml).toContain('Player content.');
+  });
+
+  it("a public embed alongside public text renders both img and text", () => {
+    const e = ent({ id: "npc4", title: "Npc4", visibility: "player",
+      body: "![[banner.jpg]]\n\nLore paragraph." });
+    const ctx = buildProjectionContext(new Map([[e.id, e]]));
+    const p = projectEntityForPlayer(e, ctx);
+    expect(p.bodyHtml).toContain('<img');
+    expect(p.bodyHtml).toContain('banner.jpg');
+    expect(p.bodyHtml).toContain('Lore paragraph.');
+  });
+});

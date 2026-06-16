@@ -8,6 +8,7 @@ import { markdownToHtml } from "@/atlas/content/markdownCore";
 import type { Entity } from "@/atlas/content/schema";
 import type { EntityVisibility } from "@/atlas/content/schema";
 import { stripDmBlocks, stripDmFromShippingString } from "@/atlas/content/stripDmBlocks";
+import { resolveImageEmbeds } from "@/atlas/content/renderEntityMarkdown";
 import { tokenizeWikilinks, renderLinkTokens } from "@/atlas/content/parseWikilinks";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 import { compactProfile, stripDmProfile, filterRelationshipsForPlayer } from "@/atlas/profiles/profileBuild";
@@ -79,8 +80,12 @@ export function projectEntityForPlayer(entity: Entity, ctx: ProjectionContext): 
   // 1. Body: DM blocks stripped
   let body = stripDmBlocks(entity.body ?? "").text;
 
-  // 2. Tokenise wikilinks
-  const { tokenized, links } = tokenizeWikilinks(body, { resolveByName: ctx.resolveByName });
+  // 1b. Resolve ![[image.ext]] embeds AFTER DM stripping so embeds inside %% blocks are already gone.
+  // Use a separate variable so entity.body (returned as raw markdown) stays in parity with the build.
+  const bodyForHtml = resolveImageEmbeds(body);
+
+  // 2. Tokenise wikilinks (from embed-resolved text so <img> appears in rendered HTML)
+  const { tokenized, links } = tokenizeWikilinks(bodyForHtml, { resolveByName: ctx.resolveByName });
 
   // 3. Redact links to secret targets (redact in body string AND mark link as broken)
   for (const l of links) {
