@@ -219,8 +219,10 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
   }
 
   const pathAllowed = isAllowedTargetPath(ctx.worldId, targetPath, ctx.allowedFolders);
-  // create and update default ON; path-collision requires explicit opt-in (same as today's conflict)
-  const included = !parseError && pathAllowed && rowKind !== "path-collision";
+  // Phase 2 populates needsReview for update rows with exposure/type conflicts
+  const needsReview: StagingRow["needsReview"] = undefined;
+  // create and update default ON; path-collision requires explicit opt-in; needsReview rows default OFF
+  const included = !parseError && pathAllowed && rowKind !== "path-collision" && !needsReview;
 
   return {
     id: nextRowId(input.filename),
@@ -238,6 +240,7 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     typeWasGuessed,
     resolvedVisibility: visibility,
     rawContent: input.raw,
+    needsReview,
   };
 }
 
