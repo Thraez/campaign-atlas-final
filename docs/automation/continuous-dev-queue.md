@@ -69,9 +69,10 @@ Beyond that the routine asks the human to bless more work. That is by design —
   module-level build lock serializes save + publish (D4). CI is hardened to run the full scan set — closing the
   pre-existing fog/image/asset gap (D13). Every line is editor-only, tree-shaken from player builds (D7).
   - Increments (order matters): **0** — plumbing (snapshotBaseline export, shared lock, .gitignore,
-    atlas:scan alias, CI hardening); **1** — `publish-check` endpoint + scan adapter + types; **2** —
-    readiness card + check-half UI (neutral idle, demote validator); **3** — tree-shake fingerprint guard;
-    **4** — `publish-push` endpoint (re-verify, scoped commit, push, snapshot); **5** — confirm→publish wiring.
+    atlas:scan alias, CI hardening) ✅ DONE 2026-06-16 `592d2221`; **1** — `publish-check` endpoint +
+    scan adapter + types; **2** — readiness card + check-half UI (neutral idle, demote validator); **3** —
+    tree-shake fingerprint guard; **4** — `publish-push` endpoint (re-verify, scoped commit, push, snapshot);
+    **5** — confirm→publish wiring.
   - Gate: targeted vitest run for all new test files (whole-suite OOMs — shard, see memory); tsc clean; eslint
     0 errors; `npm run build && npm run atlas:check-secrets dist` exit 0 (no editor endpoints in bundle);
     `npm run atlas:scan` exit 0; spec cross-check D1–D14 all landed.
