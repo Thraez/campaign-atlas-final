@@ -93,14 +93,14 @@ Beyond that the routine asks the human to bless more work. That is by design —
 > Human-approved feature: safety-bounded Obsidian vault sync. **Read design + plan in full before each phase.**
 > Design: `docs/superpowers/specs/2026-06-16-obsidian-readonly-merge-design.md`
 > Plan: `docs/superpowers/plans/2026-06-16-obsidian-readonly-merge.md`
-> Phases 1–2 ✅ DONE. Build Phase 3 next (vault-scan endpoint, ignoreRules/picomatch, .local-atlas config).
+> Phases 1–3 ✅ DONE. Build Phase 4 next (SyncPanel UI, delete ImportPanel).
 
 - [ ] **K1. Sync from Obsidian (read-only merge, Phases 3–5 remain).**
   **Design:** `docs/superpowers/specs/2026-06-16-obsidian-readonly-merge-design.md` — **read in full first.**
   **Plan:** `docs/superpowers/plans/2026-06-16-obsidian-readonly-merge.md` — **follow phase-by-phase.**
   Merges updated vault notes into atlas entities, preserving atlas-side work (pins, visibility, relationships).
   Never writes to the vault. Never auto-exposes DM content to players. Disk is always the base.
-  - Phases: **1** — merge engine + secrecy core ✅ DONE 2026-06-16 (`4ae3b795` `17711225` `209930b8` `5e196ff5`); **2** — identity hardening, sync-map, needsReview from DM-canon ✅ DONE 2026-06-16 (`d01ff125` `aed21421` `bccef3c2`); **3** — vault-scan endpoint, ignoreRules (picomatch), .local-atlas config; **4** — SyncPanel UI, delete ImportPanel; **5** — ship gate.
+  - Phases: **1** — merge engine + secrecy core ✅ DONE 2026-06-16 (`4ae3b795` `17711225` `209930b8` `5e196ff5`); **2** — identity hardening, sync-map, needsReview from DM-canon ✅ DONE 2026-06-16 (`d01ff125` `aed21421` `bccef3c2`); **3** — vault-scan endpoint, ignoreRules (picomatch), .local-atlas config ✅ DONE 2026-06-17 (`50cfc81d`); **4** — SyncPanel UI, delete ImportPanel; **5** — ship gate.
   - Gate (each phase): targeted vitest green; tsc clean; eslint 0 errors; no player-build leak.
   - Done when: DM can point the editor at their vault folder → see a diff of what changed → confirm per-entity → atlas updates in-place without losing pins/placements/relationships; full Phase 5 gate green.
 
