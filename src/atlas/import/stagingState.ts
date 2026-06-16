@@ -120,6 +120,10 @@ export interface StagingRow {
   typeWasGuessed: boolean;
   resolvedVisibility: string;
   rawContent: string;
+  /** Last-synced vault type for this entity (from sync-map, §3.6). Undefined on first sync. */
+  baseType?: string;
+  /** Opt-in review flag: row defaults to included=false until the DM ticks it (Phase 2 populates). */
+  needsReview?: { reason: "secrecy-increase" | "rename-link" | "type-conflict" };
 }
 
 /**

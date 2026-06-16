@@ -14,6 +14,8 @@
  *     a misuse can't widen the surface.
  */
 import { hashContent, type FileChange } from "@/atlas/save/localFsSave";
+import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter";
+import { mergeImportFrontmatter } from "./mergeImportFrontmatter";
 import { isWritableSourcePath } from "@/atlas/save/sourcePathAllowlist";
 import { rewriteFrontmatter } from "@/atlas/content/frontmatterRewrite";
 import type { StagingRow } from "./stagingState";
@@ -63,22 +65,40 @@ export async function buildImportChanges(
   const changes: FileChange[] = [];
   for (const row of eligible) {
     let baseHash: string | null = null;
-    if (row.rowKind === "update" || row.rowKind === "path-collision") {
+    let content: string;
+
+    if (row.rowKind === "update") {
+      // Read fresh disk content at commit time (not stale staging-time snapshot).
       const currentRaw = await readSourceFile(row.targetPath, fetchFn);
       baseHash = await hashContent(currentRaw);
+      const merged = mergeImportFrontmatter({
+        disk: parseFrontmatter(currentRaw),
+        vault: parseFrontmatter(row.rawContent),
+        inferredType: row.inferredType,
+        baseType: row.baseType, // from sync-map (Phase 2); undefined → vault wins on type
+      });
+      content = stringifyFrontmatter(merged.content, merged.data);
+    } else {
+      // path-collision: read disk for baseHash but still rewrite from vault.
+      if (row.rowKind === "path-collision") {
+        const currentRaw = await readSourceFile(row.targetPath, fetchFn);
+        baseHash = await hashContent(currentRaw);
+      }
+      // create/path-collision: new entities always default to dm-only unless
+      // the DM explicitly approved a secrecy-increase row (Phase 2 populates needsReview).
+      const safeVisibility =
+        row.needsReview?.reason === "secrecy-increase"
+          ? row.resolvedVisibility
+          : "dm";
+      content = rewriteFrontmatter(row.rawContent, {
+        id: row.resolvedId,
+        type: row.inferredType,
+        visibility: safeVisibility,
+        tagsAdd: row.inferredType ? [row.inferredType] : [],
+      });
     }
-    const content = rewriteFrontmatter(row.rawContent, {
-      id: row.resolvedId,
-      type: row.inferredType,
-      visibility: row.resolvedVisibility,
-      tagsAdd: row.inferredType ? [row.inferredType] : [],
-    });
-    changes.push({
-      path: row.targetPath,
-      content,
-      kind: "entity-md",
-      baseHash,
-    });
+
+    changes.push({ path: row.targetPath, content, kind: "entity-md", baseHash });
   }
   return changes;
 }
