@@ -113,7 +113,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
     src/test/deep-link.test.ts). Gate: 1435 tests green (4 shards, no OOM); tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings). Pure client-side — no build-pipeline change.
 
-- [ ] **I4. Fix README editor-rail drift.**
+- [x] **I4. Fix README editor-rail drift.**
   **Spec:** `docs/superpowers/specs/2026-06-15-docs-readme-editor-rail-design.md` — read in full.
   The README's "DM Creator Cockpit" section lists Pins / Maps / Regions / Routes / Fog / Entities / Import /
   Publish Check. The live rail (verified in `src/atlas/shell/railRegistry.tsx`) is Characters / Locations /
@@ -123,6 +123,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
   - Files: `README.md`.
   - Done when: README panel list matches the live rail exactly; Maps and Import documented as menu-only; no code
     files modified; docs-only gate. ~1 run.
+  - ✅ DONE 2026-06-16 — commit 576981ae (docs(I4): fix README editor-rail drift — six content tabs, Save, Publish, menu-only Maps/Import). Docs-only gate: eslint 0 errors (16 pre-existing warnings); no tests (docs change). README "DM Creator Cockpit" now lists Content/Map/System/Menu groups matching the live rail exactly.
 
 ### H — Refuel 2026-06-15 (animated ocean / "living water" — blessed by the human)
 
