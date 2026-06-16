@@ -53,6 +53,7 @@ import {
   isWritableAssetPath,
   isWritableSourcePath,
   isReadableVaultPath,
+  isReadableLocalAtlasPath,
 } from "../src/atlas/save/sourcePathAllowlist";
 import { makeIgnore } from "../src/atlas/import/ignoreRules";
 import { runBuild, type BuildResult as InProcessBuildResult } from "./build-atlas";
@@ -1007,6 +1008,32 @@ export async function handleVaultScanRequest(
   return { ok: true, files };
 }
 
+/**
+ * Pure handler for POST /__atlas/local-write.
+ * Writes `contents` to `.local-atlas/<name>`, where `name` must be one of the
+ * two allowed filenames (editor-settings.json or sync-map.json).
+ * This is the only write that targets `.local-atlas/` — never `content/`, never
+ * the vault. Validated by `isReadableLocalAtlasPath`.
+ */
+export async function handleLocalWriteRequest(
+  name: string,
+  contents: string,
+  repoRoot: string,
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  const relPath = `.local-atlas/${name}`;
+  if (!isReadableLocalAtlasPath(relPath)) {
+    return { ok: false, status: 400, error: "DisallowedPath" };
+  }
+  const targetPath = path.resolve(repoRoot, ".local-atlas", name);
+  try {
+    await fs.mkdir(path.dirname(targetPath), { recursive: true });
+    await fs.writeFile(targetPath, contents, "utf8");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, status: 500, error: (e as Error).message };
+  }
+}
+
 /** Allowlist-guarded reader for GET /__atlas/read?path=... */
 async function readAllowlistedFile(repoRoot: string, relPath: string): Promise<
   | { ok: true; contents: string }
@@ -1130,6 +1157,43 @@ export function atlasSavePlugin(): Plugin {
             res.statusCode = result.status;
             res.end(JSON.stringify({ error: result.error }));
           }
+        });
+      });
+
+      // GET /__atlas/local/editor-settings.json — reads .local-atlas/editor-settings.json
+      // GET /__atlas/local/sync-map.json — reads .local-atlas/sync-map.json
+      server.middlewares.use(serveLocalAtlas("/__atlas/local/editor-settings.json"));
+      server.middlewares.use(serveLocalAtlas("/__atlas/local/sync-map.json"));
+
+      // POST /__atlas/local-write { name, contents }
+      // Writes machine-local config (editor-settings.json or sync-map.json) only.
+      server.middlewares.use("/__atlas/local-write", (req, res, next) => {
+        if (req.method !== "POST") return next();
+        if (!isAllowedDevRequest({ host: req.headers.host, origin: req.headers.origin, method: req.method })) {
+          res.statusCode = 403;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
+          return;
+        }
+        let raw = "";
+        req.setEncoding("utf8");
+        req.on("data", (chunk: string) => { raw += chunk; });
+        req.on("end", async () => {
+          let body: { name?: unknown; contents?: unknown };
+          try {
+            body = JSON.parse(raw) as { name?: unknown; contents?: unknown };
+          } catch {
+            res.statusCode = 400;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "InvalidBody" }));
+            return;
+          }
+          const name = typeof body.name === "string" ? body.name : "";
+          const contents = typeof body.contents === "string" ? body.contents : "";
+          const result = await handleLocalWriteRequest(name, contents, server.config.root);
+          res.statusCode = result.ok ? 200 : (result as { ok: false; status: number }).status;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify(result));
         });
       });
 
