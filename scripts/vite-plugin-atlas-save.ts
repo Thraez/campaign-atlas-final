@@ -1088,6 +1088,52 @@ export function atlasSavePlugin(): Plugin {
         });
       });
 
+      // POST /__atlas/publish-push — re-verify green → scoped commit → push → snapshot.
+      // Uses the same loopback gate and shared build lock as publish-check (D5, D4).
+      // Returns PublishPushResult as JSON with statusCode 200; 500 for unexpected throws.
+      // ⚠️ This endpoint pushes to main — never fire it against the real repo during tests.
+      server.middlewares.use("/__atlas/publish-push", (req, res, next) => {
+        if (req.method !== "POST") return next();
+        if (
+          !isAllowedDevRequest({
+            host: req.headers.host,
+            origin: req.headers.origin,
+            method: req.method,
+          })
+        ) {
+          res.statusCode = 403;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
+          return;
+        }
+        if (!tryAcquireBuildLock()) {
+          res.statusCode = 423;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: "Locked", detail: "another build is in flight" }));
+          return;
+        }
+        void (async () => {
+          try {
+            const { runPublishPush } = await import("./atlas/runPublishPush");
+            const result = await runPublishPush(server.config.root);
+            res.statusCode = 200;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify(result));
+          } catch (e) {
+            res.statusCode = 500;
+            res.setHeader("Content-Type", "application/json");
+            res.end(
+              JSON.stringify({
+                error: "PublishPushFailed",
+                detail: e instanceof Error ? e.message : String(e),
+              }),
+            );
+          } finally {
+            releaseBuildLock();
+          }
+        })();
+      });
+
       // POST /__atlas/publish-check — player build + site build + scans → verdict + diff (no git).
       server.middlewares.use("/__atlas/publish-check", (req, res, next) => {
         if (req.method !== "POST") return next();
