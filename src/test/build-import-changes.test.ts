@@ -138,6 +138,72 @@ describe("buildImportChanges", () => {
   });
 });
 
+// ── Task 1.4 — update rows merge instead of overwrite ─────────────────────────
+
+describe("buildImportChanges — update rows use mergeImportFrontmatter", () => {
+  it("update row keeps placements/visibility from disk, takes prose from vault", async () => {
+    const diskRaw = [
+      "---",
+      "atlas:",
+      "  id: corven",
+      "  type: npc",
+      "  visibility: dm",
+      "  placements:",
+      "    - mapId: m1",
+      "      x: 10",
+      "      y: 20",
+      "---",
+      "OLD PROSE",
+    ].join("\n");
+    const vaultRaw = [
+      "---",
+      "atlas:",
+      "  summary: updated summary",
+      "---",
+      "NEW PROSE",
+    ].join("\n");
+
+    const row = {
+      id: "r1", filename: "corven.md", inferredType: "npc",
+      resolvedId: "corven", targetPath: "content/w/npcs/corven.md",
+      pathAllowed: true, rowKind: "update" as const,
+      included: true, content: vaultRaw, rawContent: vaultRaw,
+      typeWasExplicit: true, typeWasGuessed: false, resolvedVisibility: "dm",
+    };
+    const changes = await buildImportChanges([row as never], {
+      fetchFn: fakeReadFetch({ "content/w/npcs/corven.md": diskRaw }),
+    });
+    expect(changes).toHaveLength(1);
+    expect(changes[0].content).toContain("NEW PROSE");
+    expect(changes[0].content).not.toContain("OLD PROSE");
+    expect(changes[0].content).toContain("placements");
+    expect(changes[0].content).toContain("visibility: dm");
+    expect(changes[0].baseHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+  });
+
+  it("create row with vault publish:true still defaults to dm (no needsReview approval)", async () => {
+    const vaultRaw = [
+      "---",
+      "atlas:",
+      "  publish: true",
+      "  summary: public note",
+      "---",
+      "Content",
+    ].join("\n");
+    const row = {
+      id: "r1", filename: "newplace.md", inferredType: "location",
+      resolvedId: "newplace", targetPath: "content/w/places/newplace.md",
+      pathAllowed: true, rowKind: "create" as const,
+      included: true, content: vaultRaw, rawContent: vaultRaw,
+      typeWasExplicit: false, typeWasGuessed: false, resolvedVisibility: "player",
+    };
+    const [change] = await buildImportChanges([row as never]);
+    const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
+    expect(atlas.visibility).toBe("dm");
+    expect(change.baseHash).toBeNull();
+  });
+});
+
 describe("buildImportChanges persists inferred atlas fields", () => {
   it("rewrites frontmatter (not verbatim) for a create row with no atlas.type", async () => {
     const raw = `---\ntags:\n  - npc\n---\n# Corven\n\nbody\n`;

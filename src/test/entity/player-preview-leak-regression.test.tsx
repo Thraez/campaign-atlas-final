@@ -327,3 +327,31 @@ describe("I1 — Connections section: DM mode shows all relationship channels", 
     expect(document.body.textContent).toContain("PLAYER_LINK_TO_DM_TARGET");
   });
 });
+
+// ── K1 — Re-import merge leak-regression ─────────────────────────────────────
+//
+// Proves the merge + player pipeline cannot silently expose DM content:
+//   A. DM-only entity re-synced from a vault copy with no visibility stays dm
+//   B. Real %%...%% and :::dm::: blocks in merged prose are stripped by the player pipeline
+
+import { mergeImportFrontmatter } from "@/atlas/import/mergeImportFrontmatter";
+import { stripDmBlocks } from "@/atlas/content/stripDmBlocks";
+
+describe("K1 — re-import merge: never auto-exposes, strips real DM blocks", () => {
+  it("DM-only entity re-synced from a visibility-less vault copy stays dm (channel A)", () => {
+    const disk = { data: { atlas: { id: "villain", visibility: "dm" } }, content: "secret plans" };
+    const vault = { data: { atlas: {} }, content: "updated public lore %%dm only note%%" };
+    const r = mergeImportFrontmatter({ disk, vault, inferredType: "npc", baseType: "npc" });
+    expect((r.data.atlas as Record<string, unknown>).visibility).toBe("dm");
+    expect(r.exposureIncrease).toBe(false);
+  });
+
+  it("a real (non-sentinel) %%...%% and :::dm::: block in merged prose is stripped on the player path (channel B)", () => {
+    const body = "Public.\n%%hidden plot twist%%\n:::dm\nGM only\n:::\nMore public.";
+    const out = stripDmBlocks(body);
+    expect(out.text).not.toContain("hidden plot twist");
+    expect(out.text).not.toContain("GM only");
+    expect(out.text).toContain("Public.");
+    expect(out.text).toContain("More public.");
+  });
+});

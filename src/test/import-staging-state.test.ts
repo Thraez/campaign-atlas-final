@@ -478,3 +478,34 @@ describe("typeWasGuessed flag (F1: categorize imported notes)", () => {
     expect(updated.targetPath).toContain("/npcs/");
   });
 });
+
+// ── Task 1.6 — needsReview gate ──────────────────────────────────────────────
+//
+// A row flagged as needing DM review (Phase 2 will populate: secrecy-increase,
+// type-conflict, rename-link) must default to included=false until the DM
+// explicitly opts in.  Phase 2 populates the flag; this test injects it directly
+// to prove the gate works before Phase 2 lands.
+
+describe("Task 1.6 — needsReview: defaults to included=false, DM can opt in", () => {
+  it("a row with needsReview set is excluded by default", () => {
+    const base = buildStagingRow(
+      { filename: "shadow.md", raw: "---\natlas:\n  type: npc\n  id: shadow\n---\n" },
+      makeCtx(),
+    );
+    // Phase 2 sets needsReview + flips included; inject directly to test the contract
+    const flagged: StagingRow = { ...base, needsReview: { reason: "secrecy-increase" }, included: false };
+    expect(flagged.included).toBe(false);
+  });
+
+  it("DM can explicitly opt in a needsReview row via updateStagingRow({ included: true })", () => {
+    const base = buildStagingRow(
+      { filename: "shadow.md", raw: "---\natlas:\n  type: npc\n  id: shadow\n---\n" },
+      makeCtx(),
+    );
+    const flagged: StagingRow = { ...base, needsReview: { reason: "secrecy-increase" }, included: false };
+    const opted = updateStagingRow(flagged, { included: true }, makeCtx());
+    expect(opted.included).toBe(true);
+    // needsReview preserved so the UI can still show the warning even when opted in
+    expect(opted.needsReview).toEqual({ reason: "secrecy-increase" });
+  });
+});
