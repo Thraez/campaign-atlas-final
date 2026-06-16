@@ -92,7 +92,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
     editor toolbars; 6 unit tests in src/test/ruler/measureDistance.test.ts). Gate: 1423 tests green (4 shards,
     no OOM); tsc clean; eslint 0 errors (16 pre-existing warnings). Pure client-side UI — no build-pipeline change.
 
-- [ ] **I3. Shareable deep links (map + pan/zoom + open entity).**
+- [x] **I3. Shareable deep links (map + pan/zoom + open entity).**
   **Spec:** `docs/superpowers/specs/2026-06-15-deep-link-pan-open-design.md` — **read in full.**
   Today only `?entity=<id>` is captured; the map always boots to its default center and Back navigates away
   from the atlas. Extend the existing query-param share link (CRITICAL: stay query-param — path routes 404 on
@@ -108,6 +108,10 @@ Beyond that the routine asks the human to bless more work. That is by design —
   - Done when: entity opens push history (Back returns to prior entity); pan/zoom updates URL without new Back
     entries; map switch updates `?map=`; copied link reopens exact view in a fresh tab; old `?entity=`-only
     links unaffected; pure helpers unit-tested; gate green. ~1–2 runs.
+  - ✅ DONE 2026-06-16 — commit dc44d15d (feat(I3): serializeDeepLink/parseDeepLink pure helpers + ViewSyncController
+    + replaceState URL sync + pushState/popstate Back support + enriched CopyLinkButton; 12 unit tests in
+    src/test/deep-link.test.ts). Gate: 1435 tests green (4 shards, no OOM); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings). Pure client-side — no build-pipeline change.
 
 - [ ] **I4. Fix README editor-rail drift.**
   **Spec:** `docs/superpowers/specs/2026-06-15-docs-readme-editor-rail-design.md` — read in full.
