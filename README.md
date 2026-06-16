@@ -690,15 +690,23 @@ Open:
 /atlas/edit
 ```
 This is a local/private DM tool. It is not the source of truth. It creates local draft changes, then exports YAML/frontmatter patches that you commit.
-The Creator Cockpit currently includes:
-Pins
-Maps
-Regions
-Routes
-Fog
-Entities
-Import
-Publish Check
+The Creator Cockpit rail currently includes:
+Content tabs: Characters, Locations, Factions, Events, Items, Lore
+Map tabs: Pins, Regions, Routes, Fog
+System tabs: Save, Publish
+Panels accessible from the ☰ menu only (not rail icons): Maps (Map Details), Import
+Content tabs (Characters, Locations, Factions, Events, Items, Lore)
+Each content category has its own tab with a browse view and a create-new form.
+Use any content tab to:
+browse entities in that category
+create a new entity of that type
+edit visibility
+edit summary
+edit aliases
+edit images
+edit profile data
+edit relationships
+export entity frontmatter patches
 Pins tab
 Use this to:
 place unplaced entities
@@ -710,17 +718,6 @@ remove placements
 reset draft changes
 change labels and pin style overrides
 export entity frontmatter placement patches
-Maps tab
-Use this to:
-change map size
-change ocean color
-enable/disable horizontal wrap
-edit grid and scale
-upload map layers
-add external URL layers
-move, resize, scale, center, fit, and reorder layers
-export world map/layer patches
-export uploaded assets as a zip
 Regions tab
 Use this to:
 draw region polygons
@@ -749,18 +746,12 @@ reveal around a pin
 reveal around a route
 reveal a selected region
 export `world.yaml` fog patches
-Entities tab
+Save tab (keyboard shortcut: Ctrl+S)
 Use this to:
-edit visibility
-edit summary
-edit aliases
-edit images
-edit profile data
-edit relationships
-export entity frontmatter patches
-Import tab
-Use this to review imported Obsidian/markdown content and identify missing metadata or safe defaults.
-Publish Check tab
+save all draft changes to disk
+review the generated YAML/frontmatter diff before writing
+write accepted changes to your local repository
+Publish tab
 Use this before publishing to check:
 player-safety issues
 invalid YAML/content
@@ -772,6 +763,20 @@ empty maps
 pins outside bounds
 route/region/fog problems
 local draft changes not exported
+Menu-only panels (open via the ☰ hamburger menu, not rail icons)
+Maps (Map Details)
+Use this to:
+change map size
+change ocean color
+enable/disable horizontal wrap
+edit grid and scale
+upload map layers
+add external URL layers
+move, resize, scale, center, fit, and reorder layers
+export world map/layer patches
+export uploaded assets as a zip
+Import
+Use this to review imported Obsidian/markdown content and identify missing metadata or safe defaults.
 ---
 ## Save workflow (local repo)
 
