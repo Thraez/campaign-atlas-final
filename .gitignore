@@ -41,3 +41,7 @@ backups/
 
 # Visual-companion brainstorm artifacts
 .superpowers/
+
+# Editor diff baseline — local snapshot of the last deployed player atlas
+# (D14). Written by publish-push after a successful push; never committed.
+public/atlas/.last-published.json
