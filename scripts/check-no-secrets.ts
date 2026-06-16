@@ -30,6 +30,8 @@ export const DM_CONTENT_SENTINELS = [
 
 export const EDITOR_CODE_FINGERPRINTS = [
   "/__atlas/save",
+  "/__atlas/publish-check",
+  "/__atlas/publish-push",
   "saveAtlasPatchToLocalFs",
   "AtlasPlacementEditor",
   "/atlas/edit",
