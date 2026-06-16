@@ -10,7 +10,7 @@
  */
 import { useEffect, useState } from "react";
 import type { AtlasProject } from "@/atlas/content/schema";
-import { computeAtlasDiff } from "./computeAtlasDiff";
+import { computeAtlasDiff, type AtlasDiff } from "./computeAtlasDiff";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,8 +26,10 @@ import {
 } from "lucide-react";
 
 interface Props {
-  /** The currently-loaded atlas project (= about-to-deploy state). */
-  current: AtlasProject;
+  /** The currently-loaded atlas project (= about-to-deploy state). Used only in self-fetch mode. */
+  current?: AtlasProject;
+  /** Precomputed server-side diff (player-vs-player). When set, renders directly — no fetch, no compute. */
+  diff?: AtlasDiff;
 }
 
 const BASE = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "/");
@@ -42,13 +44,14 @@ async function fetchBaseline(): Promise<AtlasProject | null> {
   }
 }
 
-export function PublishedDiffPanel({ current }: Props) {
+export function PublishedDiffPanel({ current, diff: providedDiff }: Props) {
   const [baseline, setBaseline] = useState<AtlasProject | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!providedDiff);
   const [missing, setMissing] = useState(false);
   const [open, setOpen] = useState(true);
 
   useEffect(() => {
+    if (providedDiff) { setLoading(false); return; }
     let mounted = true;
     setLoading(true);
     fetchBaseline().then((b) => {
@@ -58,7 +61,7 @@ export function PublishedDiffPanel({ current }: Props) {
       setLoading(false);
     });
     return () => { mounted = false; };
-  }, []);
+  }, [providedDiff]);
 
   const refresh = () => {
     setLoading(true);
@@ -69,7 +72,7 @@ export function PublishedDiffPanel({ current }: Props) {
     });
   };
 
-  const diff = baseline ? computeAtlasDiff(baseline, current) : null;
+  const diff = providedDiff ?? (baseline && current ? computeAtlasDiff(baseline, current) : null);
 
   return (
     <div className="rounded-md border border-border bg-card/30">
@@ -95,7 +98,7 @@ export function PublishedDiffPanel({ current }: Props) {
       {open && (
         <div className="px-2 pb-2 text-xs space-y-2">
           {loading && <div className="text-muted-foreground py-2">Loading baseline…</div>}
-          {!loading && missing && (
+          {!loading && missing && !providedDiff && (
             <div className="rounded border border-amber-500/30 bg-amber-500/5 p-2 space-y-1">
               <div className="text-foreground">No baseline snapshot found.</div>
               <div className="text-muted-foreground">
