@@ -11,7 +11,7 @@ import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { scanDir, DM_CONTENT_SENTINELS, EDITOR_CODE_FINGERPRINTS } from "../../scripts/check-no-secrets";
+import { scanDir, scanFile, DM_CONTENT_SENTINELS, EDITOR_CODE_FINGERPRINTS } from "../../scripts/check-no-secrets";
 
 const ROOT = path.resolve(__dirname, "../..");
 const SCRIPT = path.resolve(ROOT, "scripts/check-no-secrets.ts");
@@ -66,6 +66,13 @@ describe.sequential("sentinel scanner", () => {
     expect(r.dmHits).toHaveLength(0);
     const cli = run(SCRIPT, [dir]);
     expect(cli.status).toBe(9);
+  });
+
+  it("flags a bundle containing the publish endpoint string as an editor leak", () => {
+    const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "fp-")), "bundle.js");
+    fs.writeFileSync(f, 'fetch("/__atlas/publish-check")');
+    const hits = scanFile(f);
+    expect(hits.some(h => h.kind === "editor" && h.pattern === "/__atlas/publish-check")).toBe(true);
   });
 
   it("CLI exits 10 when both kinds leak", () => {
