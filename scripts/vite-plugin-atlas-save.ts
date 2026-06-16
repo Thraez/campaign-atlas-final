@@ -51,6 +51,7 @@ import yaml from "js-yaml";
 import sharp from "sharp";
 import { isWritableAssetPath, isWritableSourcePath } from "../src/atlas/save/sourcePathAllowlist";
 import { runBuild, type BuildResult as InProcessBuildResult } from "./build-atlas";
+import { tryAcquireBuildLock, releaseBuildLock } from "./atlas/buildLock";
 
 const MAX_FILE_BYTES = 1024 * 1024;
 // Asset uploads arrive as base64 data URLs; this cap covers ~5.5 MB of binary
@@ -905,7 +906,6 @@ export function atlasSavePlugin(): Plugin {
   // racing a save of the same image is theoretically possible but benign in
   // practice — both ops succeed or the later one wins. The mutex is not
   // extended to DELETE to avoid blocking the image picker during long rebuilds.
-  let saveInFlight = false;
   return {
     name: "atlas-save",
     apply: "serve",
@@ -1014,14 +1014,13 @@ export function atlasSavePlugin(): Plugin {
           res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
           return;
         }
-        // A11: reject concurrent saves with 423 Locked.
-        if (saveInFlight) {
+        // A11: reject concurrent saves/builds with 423 Locked (D4: shared lock).
+        if (!tryAcquireBuildLock()) {
           res.statusCode = 423;
           res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "Locked", detail: "another save is in flight" }));
+          res.end(JSON.stringify({ error: "Locked", detail: "another build is in flight" }));
           return;
         }
-        saveInFlight = true;
         let raw = "";
         req.setEncoding("utf8");
         req.on("data", (chunk: string) => { raw += chunk; });
@@ -1047,11 +1046,11 @@ export function atlasSavePlugin(): Plugin {
             res.setHeader("Content-Type", "application/json");
             res.end(JSON.stringify(result.payload));
           } finally {
-            saveInFlight = false;
+            releaseBuildLock();
           }
         });
         req.on("error", () => {
-          saveInFlight = false;
+          releaseBuildLock();
         });
       });
     },
