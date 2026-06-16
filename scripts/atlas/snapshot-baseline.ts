@@ -1,4 +1,3 @@
-#!/usr/bin/env tsx
 /**
  * Snapshot the about-to-be-overwritten player atlas to
  * public/atlas/.last-published.json, the editor diff baseline.
