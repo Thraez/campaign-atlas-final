@@ -26,6 +26,11 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
+> **Refueled 2026-06-16** — section **J** below blessed by the human: **J1 One-click Publish** is the
+> current priority. Design: `docs/superpowers/specs/2026-06-16-one-click-publish-design.md`; Plan:
+> `docs/superpowers/plans/2026-06-16-one-click-publish.md` — **read both in full before starting.**
+> I-series (I1–I4) and N25–N26 are ✅ DONE.
+>
 > **Refueled 2026-06-15 (round 2)** — section **I** below blessed by the human from a roadmap brainstorm:
 > build **I1 → I4** in order (Connections · distance ruler · shareable deep-links · README-rail fix). Each
 > cites its own spec under `docs/superpowers/specs/2026-06-15-*-design.md` — **read in full first.** H-series
@@ -46,6 +51,35 @@ Beyond that the routine asks the human to bless more work. That is by design —
 > `docs/DEVELOPMENT_WANTS.md`. **E is now ✅ DONE** (E1 merged to main `a7f22fbc`; E2–E6 on
 > `auto/continuous-dev`, then consolidated to main in the v0.1.0 merge 2026-06-14). Sections D, A, B, C are
 > all ✅ DONE.
+
+### J — Refuel 2026-06-16 (one-click Publish — blessed by the human)
+
+> Human-directed feature refuel. Build **J1** — one substantial unit (5 increments, TDD throughout).
+> **Read the design doc and the plan in full before starting** — the plan has per-task TDD steps; follow them.
+> Increment 0 (plumbing) is independently testable and ships first. The push increment (5) is the only
+> outward-facing step; it ships last and only after the safety-check half (0–3) is green-gated.
+
+- [ ] **J1. One-click Publish from the editor.**
+  **Design:** `docs/superpowers/specs/2026-06-16-one-click-publish-design.md` — **read in full first.**
+  **Plan:** `docs/superpowers/plans/2026-06-16-one-click-publish.md` — **read in full; follow task-by-task.**
+  Add a single **Publish** button to the DM editor that builds the player-safe atlas, runs every safety scan,
+  shows a plain-language readiness verdict + player-vs-player change list, and — only after the DM confirms —
+  makes a scoped commit and pushes to `main` (the existing GitHub Pages deploy trigger). Two dev-only endpoints
+  (`POST /__atlas/publish-check` + `POST /__atlas/publish-push`) live in the existing save plugin. A shared
+  module-level build lock serializes save + publish (D4). CI is hardened to run the full scan set — closing the
+  pre-existing fog/image/asset gap (D13). Every line is editor-only, tree-shaken from player builds (D7).
+  - Increments (order matters): **0** — plumbing (snapshotBaseline export, shared lock, .gitignore,
+    atlas:scan alias, CI hardening); **1** — `publish-check` endpoint + scan adapter + types; **2** —
+    readiness card + check-half UI (neutral idle, demote validator); **3** — tree-shake fingerprint guard;
+    **4** — `publish-push` endpoint (re-verify, scoped commit, push, snapshot); **5** — confirm→publish wiring.
+  - Gate: targeted vitest run for all new test files (whole-suite OOMs — shard, see memory); tsc clean; eslint
+    0 errors; `npm run build && npm run atlas:check-secrets dist` exit 0 (no editor endpoints in bundle);
+    `npm run atlas:scan` exit 0; spec cross-check D1–D14 all landed.
+  - **Autonomy guard (push is irreversible):** build and gate Increments 0–4 fully before wiring Increment 5.
+    If verification fails twice in the same area, hand back.
+  - Done when: DM can click Publish in the editor → see a plain-language safety verdict + change list → confirm
+    → get "Published ✓ — players will see it in a couple of minutes"; every safety decision D1–D14 implemented;
+    full gate green. ~5–8 runs across the increments.
 
 ### I — Refuel 2026-06-15 round 2 (roadmap brainstorm — blessed by the human)
 
