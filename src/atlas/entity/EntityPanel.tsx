@@ -33,18 +33,17 @@ export interface EntityPanelProps {
   readerAffordances?: boolean;
 }
 
-function CopyLinkButton({ entityId }: { entityId: string }) {
+function CopyLinkButton() {
   const [copied, setCopied] = useState(false);
   const handle = useCallback(async () => {
     try {
-      const base = window.location.origin + (import.meta.env.BASE_URL || "/").replace(/\/+$/, "");
-      await navigator.clipboard.writeText(`${base}/atlas?entity=${encodeURIComponent(entityId)}`);
+      await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
       // ignore
     }
-  }, [entityId]);
+  }, []);
   return (
     <Button variant="ghost" size="icon" onClick={handle} title="Copy share link">
       {copied ? <Check className="h-4 w-4 text-green-500" /> : <Link2 className="h-4 w-4" />}
@@ -280,7 +279,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
               <Printer className="h-4 w-4" aria-hidden="true" />
             </Button>
           )}
-          <CopyLinkButton entityId={entity.id} />
+          <CopyLinkButton />
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close panel"><X className="h-4 w-4" aria-hidden="true" /></Button>
         </div>
       </div>
