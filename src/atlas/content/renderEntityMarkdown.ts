@@ -9,19 +9,28 @@ export interface RenderOpts {
 const EMBED_RE = /!\[\[([^[\]\n]+?)\]\]/g;
 const WIKILINK_RE = /\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+?))?\]\]/g;
 
+export const DEFAULT_RESOLVE_ASSET = (n: string): string => `/atlas/assets/images/${n}`;
+
+/** Convert Obsidian image embed syntax to standard markdown img before the wikilink pass. */
+export function resolveImageEmbeds(
+  md: string,
+  resolveAsset: (name: string) => string = DEFAULT_RESOLVE_ASSET
+): string {
+  return md.replace(EMBED_RE, (_m, name: string) => {
+    const clean = name.trim();
+    return `![${clean}](${resolveAsset(clean)})`;
+  });
+}
+
 export function renderEntityMarkdown(body: string, opts: RenderOpts): string {
-  const resolveAsset =
-    opts.resolveAsset ?? ((n: string) => `/atlas/assets/images/${n}`);
+  const resolveAsset = opts.resolveAsset ?? DEFAULT_RESOLVE_ASSET;
 
   let text = opts.showDmNotes
     ? body
     : dropOrphanFootnoteRefs(stripDmBlocks(body).text);
 
   // ![[image.ext]] → markdown image (resolved), before wikilink pass.
-  text = text.replace(EMBED_RE, (_m, name: string) => {
-    const clean = name.trim();
-    return `![${clean}](${resolveAsset(clean)})`;
-  });
+  text = resolveImageEmbeds(text, resolveAsset);
 
   // [[target#anchor|alias]] → styled non-navigating reference.
   // data-link holds the entity name only (no anchor) so navigation resolves the

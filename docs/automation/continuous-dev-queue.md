@@ -691,7 +691,7 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - ✅ DONE 2026-06-15 — commit a8aa28ed; 16 new tests in `src/test/content/stripDmBlocks.test.ts`
     (run routine-n24-20260615). Gate: 1364 tests green (4 shards, no OOM); tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings).
-- [ ] **N25. Render inline image embeds (`![[image.png]]`).** ⚠️ design-check first — changes player-visible rendering + touches the build pipeline.
+- [x] **N25. Render inline image embeds (`![[image.png]]`).** ⚠️ design-check first — changes player-visible rendering + touches the build pipeline.
   **Spec:** `docs/superpowers/specs/2026-06-15-render-image-embeds-design.md` — **read in full.**
   `![[Portrait.png]]` embeds silently vanish in the player view and in the published `atlas.json` because only
   the DM editor's `renderEntityMarkdown` applies an embed-conversion pre-pass before calling `marked`;
@@ -705,6 +705,13 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - **Touches the build pipeline** → gate also requires `npm run atlas:publish:integrity-smoke` **and** `npm run atlas:publish` green.
   - Done when: `![[Portrait.png]]` renders as `<img>` in the player viewer and in the published `atlas.json`; an
     embed inside `%%` is absent from player output (regression test); DM editor render unchanged; gate + integrity-smoke + atlas:publish green. ~1–2 runs.
+  - ✅ DONE 2026-06-16 — commit 999587c8 (feat(N25): resolveImageEmbeds extracted from renderEntityMarkdown + wired
+    into projectEntityForPlayer + build-atlas.ts; stripDmBlocks runs before resolveImageEmbeds in both paths so
+    embeds in %%...%% absent from player output; 5 unit tests for resolveImageEmbeds + 4 tests for
+    projectEntityForPlayer embed rendering incl. mandatory secrecy regression). Gate: 1447 tests green (4 shards,
+    no OOM); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings); integrity-smoke 5/5;
+    publish-orchestrator 10/10 clean. Note: vite build step of atlas:publish fails from external worktree path
+    (pre-existing env issue, not caused by this change — inside-repo builds confirmed clean).
 - [x] **N26. Render planned/broken wikilinks as visible "planned link" styling.**
   **Spec:** `docs/superpowers/specs/2026-06-15-render-planned-links-design.md` — **read in full.**
   Wikilinks whose target doesn't resolve render today as muted, non-clickable `atlas-unresolved` spans

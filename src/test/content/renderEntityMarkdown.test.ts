@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { renderEntityMarkdown } from "@/atlas/content/renderEntityMarkdown";
+import { renderEntityMarkdown, resolveImageEmbeds } from "@/atlas/content/renderEntityMarkdown";
+import { stripDmBlocks } from "@/atlas/content/stripDmBlocks";
 
 describe("renderEntityMarkdown", () => {
   const body = `# Corven
@@ -55,6 +56,36 @@ describe("renderEntityMarkdown anchor-wikilinks", () => {
     const html = renderEntityMarkdown("[[Tidemarrow]]", { showDmNotes: false });
     expect(html).toContain('data-link="Tidemarrow"');
     expect(html).toContain("Tidemarrow");
+  });
+});
+
+describe("resolveImageEmbeds", () => {
+  it("converts ![[image.png]] to standard markdown img with default path", () => {
+    const out = resolveImageEmbeds("Before\n\n![[Portrait.png]]\n\nAfter");
+    expect(out).toBe("Before\n\n![Portrait.png](/atlas/assets/images/Portrait.png)\n\nAfter");
+  });
+  it("uses provided resolveAsset when given", () => {
+    const out = resolveImageEmbeds("![[face.jpg]]", (n) => `/custom/${n}`);
+    expect(out).toContain("/custom/face.jpg");
+  });
+  it("leaves text without embeds unchanged", () => {
+    const plain = "No embeds here. [[wikilink]] stays.";
+    expect(resolveImageEmbeds(plain)).toBe(plain);
+  });
+  it("converts multiple embeds in one pass", () => {
+    const out = resolveImageEmbeds("![[a.png]] and ![[b.jpg]]");
+    expect(out).toContain("![a.png](/atlas/assets/images/a.png)");
+    expect(out).toContain("![b.jpg](/atlas/assets/images/b.jpg)");
+  });
+  it("secrecy: embed inside %%-stripped body produces no img (mirrors player path)", () => {
+    // stripDmBlocks runs BEFORE resolveImageEmbeds in both projectEntityForPlayer and build-atlas.
+    // This test proves the ordering guarantee: the embed inside %% is already gone.
+    const rawBody = "%%\n![[secret.png]]\n%%\n\nPublic text.";
+    const { text: stripped } = stripDmBlocks(rawBody);
+    const resolved = resolveImageEmbeds(stripped);
+    expect(resolved).not.toContain("secret.png");
+    expect(resolved).not.toContain("![[");
+    expect(resolved).toContain("Public text.");
   });
 });
 
