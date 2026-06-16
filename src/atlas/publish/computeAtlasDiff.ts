@@ -13,12 +13,30 @@
  * Body changes use a coarse heuristic: a hash-style length+prefix comparison.
  * Exact text diff is out of scope here — the user goes to git for that.
  */
-import type {
-  AtlasProject,
-  Entity,
-  MapDocument,
-  MapPlacement,
-} from "@/atlas/content/schema";
+// Inline shapes — avoids @/ import so this file is safe to import from Node scripts
+// (esbuild bundles the vite config and can't resolve @/ aliases at that stage).
+// The real types in @/atlas/content/schema are structurally assignable to these.
+type AtlasProject = {
+  entities: Entity[];
+  placements: MapPlacement[];
+  maps: MapDocument[];
+  version?: string;
+  publishedAt?: string;
+};
+type Entity = {
+  id: string;
+  title: string;
+  visibility?: string;
+  body?: string;
+  summary?: string;
+};
+type MapDocument = {
+  id: string;
+  name: string;
+  regions?: Array<{ id: string; name?: string }>;
+  routes?: Array<{ id: string; name?: string }>;
+};
+type MapPlacement = { entityId: string; mapId: string; x: number; y: number };
 
 export interface EntityChange {
   id: string;

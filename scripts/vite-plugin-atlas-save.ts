@@ -1087,6 +1087,52 @@ export function atlasSavePlugin(): Plugin {
           releaseBuildLock();
         });
       });
+
+      // POST /__atlas/publish-check — player build + site build + scans → verdict + diff (no git).
+      server.middlewares.use("/__atlas/publish-check", (req, res, next) => {
+        if (req.method !== "POST") return next();
+        if (
+          !isAllowedDevRequest({
+            host: req.headers.host,
+            origin: req.headers.origin,
+            method: req.method,
+          })
+        ) {
+          res.statusCode = 403;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
+          return;
+        }
+        if (!tryAcquireBuildLock()) {
+          res.statusCode = 423;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: "Locked", detail: "another build is in flight" }));
+          return;
+        }
+        void (async () => {
+          try {
+            // Dynamic import: breaks the static analysis chain so esbuild
+            // doesn't try to bundle the scan scripts (which have shebangs)
+            // when loading vite.config.ts for a player build.
+            const { runPublishCheck } = await import("./atlas/runPublishCheck");
+            const result = await runPublishCheck(server.config.root);
+            res.statusCode = 200;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify(result));
+          } catch (e) {
+            res.statusCode = 500;
+            res.setHeader("Content-Type", "application/json");
+            res.end(
+              JSON.stringify({
+                error: "PublishCheckFailed",
+                detail: e instanceof Error ? e.message : String(e),
+              }),
+            );
+          } finally {
+            releaseBuildLock();
+          }
+        })();
+      });
     },
   };
 }

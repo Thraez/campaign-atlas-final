@@ -1,4 +1,3 @@
-#!/usr/bin/env tsx
 /**
  * Sentinel-string scanner for built artifacts.
  *

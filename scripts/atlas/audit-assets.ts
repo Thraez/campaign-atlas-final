@@ -1,4 +1,3 @@
-#!/usr/bin/env tsx
 /**
  * Asset auditor for the atlas content vault.
  *
