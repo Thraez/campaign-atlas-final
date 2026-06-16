@@ -705,7 +705,7 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - **Touches the build pipeline** → gate also requires `npm run atlas:publish:integrity-smoke` **and** `npm run atlas:publish` green.
   - Done when: `![[Portrait.png]]` renders as `<img>` in the player viewer and in the published `atlas.json`; an
     embed inside `%%` is absent from player output (regression test); DM editor render unchanged; gate + integrity-smoke + atlas:publish green. ~1–2 runs.
-- [ ] **N26. Render planned/broken wikilinks as visible "planned link" styling.** ⚠️ design-check first — changes player-visible rendering.
+- [x] **N26. Render planned/broken wikilinks as visible "planned link" styling.**
   **Spec:** `docs/superpowers/specs/2026-06-15-render-planned-links-design.md` — **read in full.**
   Wikilinks whose target doesn't resolve render today as muted, non-clickable `atlas-unresolved` spans
   indistinguishable from plain prose. Split the single CSS class into `atlas-planned-link` (DM view — dashed
@@ -720,6 +720,7 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - Done when: broken links render as `atlas-planned-link` (DM, amber dashed, tooltip present) or
     `atlas-planned-link-player` (player, neutral, no tooltip, no target in HTML); existing N17 security test green;
     new planned-link tests green across DM and player surfaces; standard gate green (sharded vitest, tsc, eslint). ~1 run.
+  - ✅ DONE 2026-06-16 — commit f783e8e1 (feat(N26): render broken wikilinks as planned-link styling; atlas-planned-link DM dashed-amber + atlas-planned-link-player neutral dotted; dead .atlas-broken-link + .atlas-unresolved selectors removed; 3 new cross-surface planned-link tests + stale assertions updated; security invariant preserved). Gate: 1438 tests green (4 shards, no OOM); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings). Pure client-side CSS + one function change — no build-pipeline impact.
 
 ---
 
