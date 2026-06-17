@@ -26,6 +26,12 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
+> **Refueled 2026-06-17** — section **L** below blessed by the human: **L1 Asset credits — corner badge +
+> credits page (DM-toggled)**. This is the **current priority** (K-series is ✅ DONE). Design:
+> `docs/superpowers/specs/2026-06-17-asset-credits-badge-and-page-design.md` — **read in full first.** It
+> supersedes the page-only N3 spec and folds N3 in. Two increments: ship Increment 1 (data + badge + page,
+> driven by `world.yaml`) before Increment 2 (the in-editor toggle UI).
+>
 > **Refueled 2026-06-16 (round 2)** — section **K** below blessed by the human: **K1 Sync from Obsidian**
 > (read-only merge, 5 phases). Design: `docs/superpowers/specs/2026-06-16-obsidian-readonly-merge-design.md`;
 > Plan: `docs/superpowers/plans/2026-06-16-obsidian-readonly-merge.md` — **read both in full before each phase.**
@@ -104,6 +110,45 @@ Beyond that the routine asks the human to bless more work. That is by design —
   - Gate (each phase): targeted vitest green; tsc clean; eslint 0 errors; no player-build leak.
   - Done when: DM can point the editor at their vault folder → see a diff of what changed → confirm per-entity → atlas updates in-place without losing pins/placements/relationships; full Phase 5 gate green.
   - ✅ DONE 2026-06-17 — ship gate: tsc clean; eslint 0 errors (14 pre-existing warnings); 1574 tests green (4 shards, no OOM); atlas:build:player clean; atlas:check-secrets + atlas:check-derived exit 0; integrity-smoke 5/5; atlas:publish 10/10 clean.
+
+### L — Refuel 2026-06-17 (asset credits — blessed by the human)
+
+> Human-directed feature refuel from a brainstorm. Build **L1** — one bounded feature in **two increments**
+> (Increment 1 ships before Increment 2). **Read the design doc in full before starting.** L1 supersedes and
+> folds in the page-only N3 nice-to-have. Carries a mandatory leak-regression test.
+
+- [ ] **L1. Asset credits — in-image corner badge + aggregate credits page, DM-toggled at build time.**
+  **Design:** `docs/superpowers/specs/2026-06-17-asset-credits-badge-and-page-design.md` — **read in full first.**
+  Add an optional `atlas.credit` string to entity frontmatter (parsed → threaded into `entity.credit` in the
+  player `atlas.json`) and a world-level `credits: { badges, page }` block in `world.yaml` (both default
+  `true`), threaded through the world-config pipeline exactly as the "living water" `water` block was
+  (`loadWorldConfig` → `buildFullWorldYaml` → `build-atlas`). Two player-facing surfaces, each gated by its
+  toggle: (1) a **faint bottom-right corner badge (~5px inset)** over each credited entity's images in
+  `EntityPanel` that reveals the full credit at full opacity on hover/focus; (2) a `/atlas/credits` page
+  listing player-visible credited entities alphabetically, with a nav link (hidden when no credits exist).
+  The DM flips both from a **"Credits (site-wide)" section in `MapSettingsPanel`**, persisted via the
+  existing Save flow.
+  - **Increment 1** (ship first): schema (`Entity.credit?`, `World.credits?`, `CreditsConfig`), frontmatter
+    parse, `resolveCredits()` + world-config parse/serialize, build-atlas threading, `CreditBadge` in
+    EntityPanel, the credits page + gated nav. Fully functional via `world.yaml` (hand-editable).
+  - **Increment 2**: the "Credits (site-wide)" toggle UI in `MapSettingsPanel` (world-level patch path —
+    follow the existing `defaultMapId` edit path; `water`/`oceanColor` are per-map and not a direct model).
+  - Files: `src/atlas/content/schema.ts`, `scripts/atlas/parseFrontmatter.ts`, `scripts/atlas/loadWorldConfig.ts`,
+    `src/atlas/yaml/buildFullWorldYaml.ts`, `scripts/build-atlas.ts`, new `src/atlas/entity/CreditBadge.tsx`,
+    `src/atlas/entity/EntityPanel.tsx`, new `src/pages/AtlasCredits.tsx`, `src/App.tsx`,
+    `src/atlas/AtlasNavMenu.tsx`, `src/pages/AtlasViewer.tsx`, `src/atlas/MapSettingsPanel.tsx`, `src/index.css`;
+    tests under `src/test/` (resolveCredits, build round-trip, EntityPanel badge, credits page, settings toggle).
+  - **Touches the build pipeline** → gate ALSO requires `npm run atlas:publish:integrity-smoke` **and**
+    `npm run atlas:publish` green (no DM content leaks; `credit`/`credits` carry no DM content).
+  - **Mandatory:** a leak-regression test proving a `visibility: dm` entity with a credit is absent from the
+    player `atlas.json`, the credits page, and any badge.
+  - **Autonomy guard:** if the world-level patch path for Increment 2 is a large new surface, ship Increment 1
+    fully (credits driven by `world.yaml`) and hand back Increment 2 with a note.
+  - Done when: `atlas.credit` round-trips into the player atlas; faint corner badge shows on credited images
+    and reveals the full credit on hover/focus (thumb-click still opens the lightbox); `/atlas/credits` lists
+    credited player-visible entities with a gated nav link; both surfaces hide when their toggle is off; the
+    DM can flip both from Map Settings and Save persists it; DM-only credited entity absent everywhere player
+    (regression test asserts); full gate + integrity-smoke + atlas:publish green. ~2–4 runs.
 
 ### I — Refuel 2026-06-15 round 2 (roadmap brainstorm — blessed by the human)
 
@@ -567,20 +612,11 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   (2026-06-02, commits 487a8083 + b669ed51). Kept for the record; do not rebuild.
 - [x] **N2. Pin de-cluttering at high pin counts** ✅ SUPERSEDED — shipped as **F3** (2026-06-14, commit
   b7f63ed2). Kept for the record; do not rebuild.
-- [ ] **N3. Asset credits — `credit` field + player credits page.** ⚠️ HUMAN-BLESS-REQUIRED / design-gated — do NOT auto-build.
-  **Spec:** `docs/superpowers/specs/2026-06-15-asset-credits-design.md` — **read in full (design sign-off required first).**
-  Add an optional `atlas.credit` string to entity frontmatter (parsed in `parseFrontmatter.ts`, threaded through
-  `build-atlas.ts` into `entity.credit` in the player `atlas.json`) and a new `/atlas/credits` player page
-  (`src/pages/AtlasCredits.tsx`) that lists every player-visible entity with a non-empty credit string,
-  alphabetically. Navigation entry added in `AtlasNavMenu.tsx` and `AtlasViewer.tsx`. DM-only entities with
-  credits are excluded by the existing build-time visibility gate — no new redaction logic. Mandatory secrecy
-  regression test: a `visibility: dm` entity with a credit must be absent from the player build and the credits page.
-  - Files: `src/atlas/content/schema.ts`, `scripts/atlas/parseFrontmatter.ts`, `scripts/build-atlas.ts`, new
-    `src/pages/AtlasCredits.tsx`, `src/App.tsx`, `src/atlas/AtlasNavMenu.tsx`, `src/pages/AtlasViewer.tsx`; tests under `src/test/`.
-  - **Touches the build pipeline** → gate also requires `npm run atlas:publish:integrity-smoke` **and** `npm run atlas:publish` green.
-  - Done when: `atlas.credit` in frontmatter round-trips into player `atlas.json`; `/atlas/credits` lists credited
-    player-visible entities alphabetically; DM-only credited entity absent from page + atlas (regression test asserts);
-    Credits link visible in nav; empty-state shown when no credits exist; gate + integrity-smoke + atlas:publish green. ~1–2 runs.
+- [x] **N3. Asset credits — `credit` field + player credits page.** ✅ SUPERSEDED — blessed and folded into
+  **L1** (2026-06-17), which keeps the credits page and adds the in-image corner badge + DM toggles.
+  See section **L** above and `docs/superpowers/specs/2026-06-17-asset-credits-badge-and-page-design.md`.
+  The original page-only spec (`docs/superpowers/specs/2026-06-15-asset-credits-design.md`) is retained for
+  history; do not build it separately.
 - [x] **N4. Import report polish** ✅ SUPERSEDED — shipped as **E4** (2026-06-02, commit dcbba70c).
   Kept for the record; do not rebuild.
 - [x] **N5. Hygiene / coverage nibble** — one small, safe test-coverage addition or dead-code removal in a
