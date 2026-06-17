@@ -132,6 +132,8 @@ export interface StagingRow {
   baseType?: string;
   /** Opt-in review flag: row defaults to included=false until the DM ticks it (Phase 2 populates). */
   needsReview?: { reason: "secrecy-increase" | "rename-link" | "type-conflict" };
+  /** Vault-relative POSIX path — present when the row came from a vault scan (openWithVaultScan). */
+  vaultRelPath?: string;
 }
 
 /**
@@ -272,6 +274,7 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     rawContent: input.raw,
     baseType,
     needsReview,
+    vaultRelPath: input.vaultRelPath,
   };
 }
 

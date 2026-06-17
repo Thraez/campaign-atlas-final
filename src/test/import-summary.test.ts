@@ -28,6 +28,7 @@ describe("summarizeImport", () => {
       replaced: 0,
       skipped: 0,
       couldntBeRead: 0,
+      needsReview: 0,
     });
   });
 
@@ -81,6 +82,7 @@ describe("summarizeImport", () => {
       replaced: 1,
       skipped: 2,
       couldntBeRead: 2,
+      needsReview: 0,
     });
   });
 });

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import {
   Users, MapPin, Flag, ScrollText, Package, BookOpen,
   Pin as PinIcon, Shapes, Route, CloudFog,
-  Save as SaveIcon, ShieldCheck,
+  Save as SaveIcon, ShieldCheck, RefreshCw,
 } from "lucide-react";
 
 export type RailGroup = "content" | "map" | "system";
@@ -51,5 +51,6 @@ export function buildRailItems({ panels, counts }: BuildRailArgs): RailItem[] {
     mk("fog", "map", "Fog", <CloudFog className={ICON} />, "F"),
     mk("save", "system", "Save", <SaveIcon className={ICON} />, "Ctrl+S"),
     mk("publish", "system", "Publish", <ShieldCheck className={ICON} />),
+    mk("sync", "system", "Sync from Obsidian", <RefreshCw className={ICON} />, "O"),
   ];
 }

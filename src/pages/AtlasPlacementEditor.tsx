@@ -33,7 +33,7 @@ import {
 } from "@/atlas/save/canonicalEntitySave";
 import { useWorldYamlBaseline, worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
 import { buildFullWorldYaml } from "@/atlas/yaml/buildFullWorldYaml";
-import { ImportPanel } from "@/atlas/import/ImportPanel";
+import { SyncPanel } from "@/atlas/sync/SyncPanel";
 import { ImportStagingModal } from "@/atlas/import/ImportStagingModal";
 import { PasteMarkdownDialog } from "@/atlas/import/PasteMarkdownDialog";
 import { useMdImportFlow } from "@/atlas/import/useMdImportFlow";
@@ -1513,8 +1513,8 @@ function AtlasPlacementEditorInner() {
                 }}
               />
             ),
-            import: (
-              <ImportPanel knownEntityNames={new Set(project.entities.flatMap((e) => [e.id.toLowerCase(), e.title.toLowerCase(), ...e.aliases.map((a) => a.toLowerCase())]))} />
+            sync: (
+              <SyncPanel onSync={(root, globs) => void importFlow.openWithVaultScan(root, globs)} />
             ),
             // Menu-reachable panels (no rail icon — opened via ☰ menu or CommandPalette).
             world: (

@@ -267,4 +267,64 @@ describe("ImportStagingModal", () => {
     expect(screen.getByText("corven")).toBeInTheDocument();
     expect(screen.getByLabelText(/visibility for corven\.md/i)).toBeInTheDocument();
   });
+
+  it("vault sync update row — visibility select is disabled (disk is authoritative)", () => {
+    const syncUpdateRow = {
+      id: "r6", filename: "corven.md", inferredType: "npc",
+      typeWasExplicit: true, typeWasGuessed: false, resolvedId: "corven",
+      resolvedVisibility: "dm", rawContent: "", content: "",
+      targetPath: "content/w/npcs/corven.md",
+      pathAllowed: true, rowKind: "update", included: true,
+      vaultRelPath: "notes/corven.md",
+    };
+    render(
+      <ImportStagingModal
+        open rows={[syncUpdateRow as never]}
+        importConfig={{ folders: { npc: "npcs" }, defaultFolder: "imports" }}
+        onPatchRow={() => {}} onCancel={() => {}} onCommit={() => {}}
+      />,
+    );
+    const visSelect = screen.getByLabelText(/visibility for corven\.md/i) as HTMLButtonElement;
+    expect(visSelect.hasAttribute("disabled") || visSelect.getAttribute("aria-disabled") === "true").toBe(true);
+  });
+
+  it("regular (non-vault) update row — visibility select is enabled", () => {
+    const regularUpdateRow = {
+      id: "r7", filename: "corven.md", inferredType: "npc",
+      typeWasExplicit: true, typeWasGuessed: false, resolvedId: "corven",
+      resolvedVisibility: "dm", rawContent: "", content: "",
+      targetPath: "content/w/npcs/corven.md",
+      pathAllowed: true, rowKind: "update", included: true,
+      // no vaultRelPath
+    };
+    render(
+      <ImportStagingModal
+        open rows={[regularUpdateRow as never]}
+        importConfig={{ folders: { npc: "npcs" }, defaultFolder: "imports" }}
+        onPatchRow={() => {}} onCancel={() => {}} onCommit={() => {}}
+      />,
+    );
+    const visSelect = screen.getByLabelText(/visibility for corven\.md/i) as HTMLButtonElement;
+    expect(visSelect.getAttribute("aria-disabled")).not.toBe("true");
+  });
+
+  it("needsReview row shows plain-language reason badge", () => {
+    const reviewRow = {
+      id: "r8", filename: "villain.md", inferredType: "npc",
+      typeWasExplicit: true, typeWasGuessed: false, resolvedId: "villain",
+      resolvedVisibility: "dm", rawContent: "", content: "",
+      targetPath: "content/w/npcs/villain.md",
+      pathAllowed: true, rowKind: "update", included: false,
+      vaultRelPath: "notes/villain.md",
+      needsReview: { reason: "secrecy-increase" as const },
+    };
+    render(
+      <ImportStagingModal
+        open rows={[reviewRow as never]}
+        importConfig={{ folders: { npc: "npcs" }, defaultFolder: "imports" }}
+        onPatchRow={() => {}} onCancel={() => {}} onCommit={() => {}}
+      />,
+    );
+    expect(screen.getByText(/Review needed/i)).toBeInTheDocument();
+  });
 });

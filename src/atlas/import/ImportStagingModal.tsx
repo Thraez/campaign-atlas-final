@@ -198,7 +198,7 @@ export function ImportStagingModal({
                       <Select
                         value={row.resolvedVisibility || "dm"}
                         onValueChange={(v) => onPatchRow(row.id, { resolvedVisibility: v })}
-                        disabled={!!row.parseError}
+                        disabled={!!row.parseError || (!!row.vaultRelPath && row.rowKind === "update")}
                       >
                         <SelectTrigger className="h-7 text-[11px]"
                           aria-label={`Visibility for ${row.filename}`}>
@@ -251,6 +251,17 @@ export function ImportStagingModal({
                         {row.rowKind === "path-collision" && !blocked && row.included && (
                           <Badge className="bg-amber-500/20 text-amber-200 border-amber-500/40 text-[10px] gap-1">
                             Will overwrite — existing file backed up
+                          </Badge>
+                        )}
+
+                        {row.needsReview && !blocked && (
+                          <Badge className="bg-violet-500/20 text-violet-200 border-violet-500/40 text-[10px] gap-1">
+                            Review needed —{" "}
+                            {row.needsReview.reason === "secrecy-increase"
+                              ? "vault wants to expose a DM-only note"
+                              : row.needsReview.reason === "type-conflict"
+                                ? "type changed on both sides"
+                                : "needs your attention"}
                           </Badge>
                         )}
 
