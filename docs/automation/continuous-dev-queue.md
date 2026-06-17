@@ -95,14 +95,15 @@ Beyond that the routine asks the human to bless more work. That is by design —
 > Plan: `docs/superpowers/plans/2026-06-16-obsidian-readonly-merge.md`
 > Phases 1–4 ✅ DONE. Build Phase 5 next (ship gate: full vitest + integrity smoke).
 
-- [ ] **K1. Sync from Obsidian (read-only merge, Phases 3–5 remain).**
+- [x] **K1. Sync from Obsidian (read-only merge, Phases 3–5 remain).**
   **Design:** `docs/superpowers/specs/2026-06-16-obsidian-readonly-merge-design.md` — **read in full first.**
   **Plan:** `docs/superpowers/plans/2026-06-16-obsidian-readonly-merge.md` — **follow phase-by-phase.**
   Merges updated vault notes into atlas entities, preserving atlas-side work (pins, visibility, relationships).
   Never writes to the vault. Never auto-exposes DM content to players. Disk is always the base.
-  - Phases: **1** — merge engine + secrecy core ✅ DONE 2026-06-16 (`4ae3b795` `17711225` `209930b8` `5e196ff5`); **2** — identity hardening, sync-map, needsReview from DM-canon ✅ DONE 2026-06-16 (`d01ff125` `aed21421` `bccef3c2`); **3** — vault-scan endpoint, ignoreRules (picomatch), .local-atlas config ✅ DONE 2026-06-17 (`50cfc81d`); **4** — SyncPanel UI, delete ImportPanel ✅ DONE 2026-06-17 (`96788c9c`); **5** — ship gate.
+  - Phases: **1** — merge engine + secrecy core ✅ DONE 2026-06-16 (`4ae3b795` `17711225` `209930b8` `5e196ff5`); **2** — identity hardening, sync-map, needsReview from DM-canon ✅ DONE 2026-06-16 (`d01ff125` `aed21421` `bccef3c2`); **3** — vault-scan endpoint, ignoreRules (picomatch), .local-atlas config ✅ DONE 2026-06-17 (`50cfc81d`); **4** — SyncPanel UI, delete ImportPanel ✅ DONE 2026-06-17 (`96788c9c`); **5** — ship gate ✅ DONE 2026-06-17.
   - Gate (each phase): targeted vitest green; tsc clean; eslint 0 errors; no player-build leak.
   - Done when: DM can point the editor at their vault folder → see a diff of what changed → confirm per-entity → atlas updates in-place without losing pins/placements/relationships; full Phase 5 gate green.
+  - ✅ DONE 2026-06-17 — ship gate: tsc clean; eslint 0 errors (14 pre-existing warnings); 1574 tests green (4 shards, no OOM); atlas:build:player clean; atlas:check-secrets + atlas:check-derived exit 0; integrity-smoke 5/5; atlas:publish 10/10 clean.
 
 ### I — Refuel 2026-06-15 round 2 (roadmap brainstorm — blessed by the human)
 
