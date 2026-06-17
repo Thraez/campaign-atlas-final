@@ -22,6 +22,8 @@ import {
 } from "@/atlas/save/localFsSave";
 import type { ImportFolderConfig } from "../content/schema";
 import { summarizeImport, formatImportSummaryLine } from "./summarizeImport";
+import { recordSync } from "./syncMap";
+import { loadSyncMap, saveSyncMap, loadSettings, saveSettings } from "../sync/useSyncSettings";
 
 /** Thrown by assertDmBuildLoaded when the DM atlas has not been built yet. */
 export class DmBuildRequiredError extends Error {
@@ -192,6 +194,19 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
             `Imported ${count} note${count === 1 ? "" : "s"} and rebuilt the atlas`,
             { description },
           );
+        }
+        // Persist sync-map for vault-scan rows
+        const vaultRows = rows.filter(
+          (r) => r.vaultRelPath && r.included && r.pathAllowed && !r.parseError,
+        );
+        if (vaultRows.length > 0) {
+          let syncMap = await loadSyncMap();
+          for (const r of vaultRows) {
+            syncMap = recordSync(syncMap, r.vaultRelPath!, r.resolvedId, r.inferredType);
+          }
+          await saveSyncMap(syncMap);
+          const s = await loadSettings();
+          await saveSettings({ ...s, lastSyncAt: new Date().toISOString() });
         }
       }
       setOpen(false);
