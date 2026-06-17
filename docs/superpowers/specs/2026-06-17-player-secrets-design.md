@@ -2,6 +2,7 @@
 
 **Created:** 2026-06-17 · **Status:** approved direction (human brainstorm) · **Owner:** the DM
 **Hardened:** 2026-06-17 against an adversarial spec review (red-team leak hunt, crypto, feasibility, scope, DM-UX).
+**Build-ready:** 2026-06-17 — authoring resolved to two per-type "Add secret" buttons (no hand-written YAML). Ready for implementation planning.
 **Related:** idea panel in `docs/DEVELOPMENT_WANTS.md` (2026-06-17 section) · secrecy model in `README.md`
 ("Where do your secrets live") · scan contracts under `scripts/`.
 
@@ -47,8 +48,11 @@ never present until decryption.
 ## Authoring model (the DM's experience)
 
 Canon stays in Obsidian markdown; secret *text never enters the page body*. Secrets are written in the note's
-`atlas` frontmatter; a reference marker in the body marks where the box appears. An editor **"Insert secret"**
-button writes both at once (auto-generating the id), so the DM never hand-types syntax.
+`atlas` frontmatter; a reference marker in the body marks where the box appears. **The DM never hand-types
+YAML:** the editor provides **two buttons, one per secret type** — *Add a character secret* and *Add a puzzle
+secret* — each of which inserts the correct, ready-to-fill frontmatter block (keys pre-written, an
+auto-generated `id`, blank value fields) and drops the matching `{{secret:id}}` marker at the cursor. The DM
+just fills in the blanks (the reveal text, and the character or password).
 
 ```yaml
 # in an entity's frontmatter
@@ -206,9 +210,11 @@ collapses any non-zero task to overall exit 1 (per-scan codes are informational)
   are writable), so it must be extended to permit this single fixed DM keys path (kept folder-excluded).
   *(Note: `check-derived-secrets` protects DM entity titles/aliases, not key values — key-value protection is
   `check-player-secrets`' job.)*
-- **"Insert secret" button** — a small modal: *who is this for?* (character dropdown **OR** "puzzle password"),
-  *what do they learn?* (reveal), optional *teaser*. Writes the frontmatter entry with an auto-generated id and
-  inserts `{{secret:id}}` at the cursor.
+- **Two per-type "Add secret" buttons** (the DM's no-YAML path) — *Add a character secret* and *Add a puzzle
+  secret*. Each inserts the correct ready-to-fill frontmatter block (pre-written keys, auto-generated `id`,
+  blank values) and drops the `{{secret:id}}` marker at the cursor. *Add a character secret* offers a character
+  dropdown (sourced from the keys panel) for `for:`; *Add a puzzle secret* exposes `password:` + optional
+  `teaser:`. Both then take the `reveal:` text. The DM only ever fills blanks — never writes YAML structure.
 - **Preview** — "Preview as players see it" renders secrets **sealed** (the `projectEntityForPlayer` mirror
   learns the marker→placeholder transform too), so the DM can visually confirm redaction before publishing.
 
