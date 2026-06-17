@@ -26,6 +26,13 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
+> **Refueled 2026-06-18** — section **M** below blessed by the DM from a design session
+> (brainstorm → spec → adversarial review → plan): **M1 Joyful wayfinding** (hover-peek cards + wander
+> button) is the **current priority** (L-series remains queued below it). Design:
+> `docs/superpowers/specs/2026-06-17-browsing-feel-design.md`; Plan:
+> `docs/superpowers/plans/2026-06-17-wayfinding.md` — **read both in full before each phase.** Wander
+> (plan Tasks 1–8) is independently shippable and ships first; hover-peek follows.
+>
 > **Refueled 2026-06-17** — section **L** below blessed by the human: **L1 Asset credits — corner badge +
 > credits page (DM-toggled)**. This is the **current priority** (K-series is ✅ DONE). Design:
 > `docs/superpowers/specs/2026-06-17-asset-credits-badge-and-page-design.md` — **read in full first.** It
@@ -62,6 +69,45 @@ Beyond that the routine asks the human to bless more work. That is by design —
 > `docs/DEVELOPMENT_WANTS.md`. **E is now ✅ DONE** (E1 merged to main `a7f22fbc`; E2–E6 on
 > `auto/continuous-dev`, then consolidated to main in the v0.1.0 merge 2026-06-14). Sections D, A, B, C are
 > all ✅ DONE.
+
+### M — Refuel 2026-06-18 (joyful wayfinding — blessed by the DM)
+
+> DM-directed feature refuel from a design session. Build **M1** — one substantial feature in **two halves**:
+> Wander (plan Tasks 1–8) ships first and is independently usable; hover-peek (Tasks 9–17) follows.
+> **Read the design doc and the plan in full before each phase** — the plan has per-task TDD steps; follow
+> them top to bottom and commit per task. Operates only over already-redacted player data → no new secrecy
+> surface (re-verified in the spec).
+
+- [ ] **M1. Joyful wayfinding — hover-peek cards + wander button (player site).**
+  **Design:** `docs/superpowers/specs/2026-06-17-browsing-feel-design.md` — **read in full first.**
+  **Plan:** `docs/superpowers/plans/2026-06-17-wayfinding.md` — **read in full; follow task-by-task.**
+  Two player-site browsing upgrades over already-published player data: (1) a **hover-peek card** (portrait +
+  type badge + name + one-line summary + a corner map-jump button shown only when the place has a non-fogged
+  pin) that pops on hovering a wikilink, a Connections entry, or a map pin — desktop hover, mobile tap-to-peek,
+  portal-rendered with a full keyboard/screen-reader contract; (2) a **Wander button + whole-world discovery
+  meter** that flies the player to a random already-visible place they haven't opened (never reveals fog —
+  fogged/secret pins are excluded from the player build), with a quiet "X of Y places" meter and
+  filled-vs-hollow pins as a free footprints trail. Visited-state lives in localStorage mirroring
+  `playerNotes.ts`.
+  - Phases (order matters): **0** — foundations (sanitizer `data-entity-id`/`aria-haspopup`, visited store);
+    **1–2** — Wander (pure `selectWanderTarget`/`discoveryMeter`; visited hook + openId mark + filled pins;
+    Wander control + cross-map fly) — independently shippable; **3–4** — hover-peek (resolve/position helpers,
+    `HoverPeekCard`, peek controller + portal + prose hover, movement guard, Connections/pin hover, mobile
+    tap); **5** — a11y close-out (Escape ordering) + full gate.
+  - **Touches the build pipeline** (the sanitizer allow-list runs at build time) → final gate ALSO requires
+    `npm run atlas:publish` **and** `npm run atlas:publish:integrity-smoke` green (the `data-entity-id` /
+    `aria-haspopup` additions carry no DM content).
+  - **Mandatory secrecy re-confirm:** the wander pool + meter read only `data.project.placements`, and the peek
+    card reads only player `entityById` + `images[0]`/`summary` — all from the player `atlas.json`, which
+    excludes DM-only entities/placements at build (`build-atlas.ts:347,409,654,664`). No new fetch, no new
+    field; the visited set is localStorage-only, never serialized to any artifact or URL.
+  - **Autonomy guard:** Wander (Tasks 1–8) is self-contained — ship it first. If the hover-peek portal/mobile
+    interaction can't be made non-janky within two attempts in the same area, ship Wander + the desktop
+    prose/pin hover and hand back the mobile-tap + Connections refinements with a note.
+  - Done when: hovering a link / Connections entry / pin pops the card (desktop) and tapping peeks then opens
+    (mobile); the map button flies to non-fogged places; Wander flies to a random unopened visible place
+    (cross-map switch included) and the meter + filled pins track discovery; all new helpers unit-tested;
+    full gate + atlas:publish + integrity-smoke green. ~8–12 runs across the phases.
 
 ### J — Refuel 2026-06-16 (one-click Publish — blessed by the human)
 
