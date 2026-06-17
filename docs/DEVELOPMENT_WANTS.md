@@ -159,3 +159,64 @@ A compact summary of where the **🆕 new** items should graduate, once blessed:
 | #9 Planned/broken wikilinks | fold into C + Publish Check | design slice |
 
 Until you've reviewed this, the new items are parked in the queue's **Inbox** section (not the auto-built WANTS).
+
+---
+
+## Added 2026-06-17 — "make it a great website" idea panel
+
+A human-directed divergent ideation pass (6 lenses + a dedicated player-secrets design pass, synthesized).
+Grounded against shipped reality and `NON_GOALS.md`, so each item is genuinely new and **static-site-safe**
+(works on GitHub Pages, no backend). Source: this session's idea panel.
+
+**▶ Selected to design next (DM's pick, in order):**
+1. **Player secrets** — Whisper → Sealed Letter (the flagship; see design below). *Brainstorm started 2026-06-17.*
+2. **Atmosphere** — per-map weather + ambient soundscape.
+3. **Browsing feel** — hover-peek cards + wander button.
+
+The rest below are the captured idea inbox (not yet sequenced).
+
+### 🔐 Player secrets — "content meant for your character" (FLAGSHIP, design in progress)
+
+Four flavors, split by *hidden* vs *truly locked*. **Honest rule:** anything that would ruin the campaign if
+peeked early MUST use the locked kind (real encryption); the hidden kind is for delight, not real spoilers.
+
+| Flavor | Effort | What it is | Real security? |
+|---|---|---|---|
+| **Whisper Cards** | S | Player types their character's name on a page → a card unfurls a line meant for them. Wrong words shimmer & refuse. | ❌ Hidden only (readable in the page source) |
+| **Character Dossier links** | M | Each player gets a private bookmark (`?as=vesper`); personal "for your eyes" lines appear woven into pages, no typing. | ❌ Hidden only |
+| **Sealed Letter** | M | Wax-sealed passphrase box; secret ships as scrambled gibberish, passphrase unscrambles it in-browser (Web Crypto AES-GCM). Wrong phrase reveals *nothing*. | ✅ Genuinely locked |
+| **Per-Character Keys** | L | Same real encryption, one key per player → unlocks *their own* secrets across the whole atlas. The full "password for your character" dream. | ✅ Genuinely locked, per-player |
+
+**Recommended build order:** Whisper Cards (wow, fast) → Sealed Letter (real security; lays the crypto plumbing) → Per-Character Keys (full realization).
+
+**DM's refinements (2026-06-17):** secrets should weave *inline into prose* and attach to *pins* (not just standalone cards); the trigger is a **❓/question box you click to open a password field**; and there should be a **per-character "everything your character knows" tab** collecting that player's secrets. → points at the locked / Per-Character-Keys end, scoped carefully. *This is the active brainstorm.*
+
+### 🗺️ Other themes (idea inbox)
+
+**A world you step into (atmosphere)** — 🌟 per-map weather (mist/snow/heat-shimmer, reuses ocean engine, M) · time-of-day mood wash (M) · 🌟 ambient soundscape w/ one mute (M) · living map flourishes (drifting clouds, inked sea-serpent, M) · in-world cover page (S).
+
+> **DM requirement for the soundscape (2026-06-17):** sound must be **zoom- and location-aware** — a sound bed activates only when zoomed deep into a *specific* area, and changes behavior across zoom levels (overview = quiet/none; harbor at high zoom = gulls; caverns = drips). NOT one flat loop per map. Treat browser autoplay policy + performance as first-class design risks.
+
+**Lore reads like a found artifact** — illuminated-manuscript reading pane (drop caps, parchment, S) · 🌟 in-world document props (letters/ledgers/songs as aged props w/ wax seals, M) · quill reveal on open (S).
+
+**Joyful wayfinding** — ⭐ hover-peek cards (preview before clicking, M) · region doorways (shimmer + zoom-through to next map, M) · ⭐ wander button (random unseen place + discovery meter, S) · footprints / what's-new (M) · search that flies the map to a place (M) · 🌟 constellation view (star-chart of connections; sharpens roadmap graph, L).
+
+**World reveals itself as the campaign moves** — ⭐ reveal beats (tag content w/ a story beat, flip to revealed at publish, build-time gated, M) · living rumor board (rumors → proven false / confirmed, M) · factions standings board (allied/wary/at-war grid w/ dates, M) · player codex (auto "what you've uncovered," M) · timeline eras + known-so-far cutoff (S).
+
+**At the table & sharing** — present mode (full-screen reveal for the table, M) · ⭐ QR + share card for any view (S) · auto social-share cards (Discord link unfurls, M) · mobile player viewer (view-only, L) · session recap pages (DM-written, L) · printable table pack / bound gazetteer (M).
+
+**Premium polish** — 🌟 per-region theming (site recolors as you travel, M) · cinematic first-load (M) · one shared motion language (M) · large-world performance pass (M).
+
+*(⭐ = best impact-per-effort · 🌟 = highest wow · S = one sitting · M = a day or two · L = multi-session, design-first)*
+
+### Gaps the panel flagged (worth a future idea)
+
+- No single **"calm / plain mode"** master switch to strip weather + sound + motion + washes at once (matters once atmosphere lands; beyond per-feature reduced-motion).
+- No **entity media richness** — image galleries, captioned art, name-pronunciation audio, hero-art lightbox.
+- No lightweight **player-side private bookmarks / "my places"** shortlist (local-only, distinct from the server-notes non-goal).
+- No **reading ergonomics** for long lore — dyslexia-friendly font toggle, reading-width control.
+- No DM **"health check"** surface — pre-publish view of broken links, art-less entities, orphaned notes.
+
+### Cut for collision (recorded so we don't re-pitch)
+
+Diegetic login screen (folded into Sealed Letter theater) · Konami-code easter egg (flavor footnote only) · blacklight hidden-ink map layer (overlaps reveal-beats / secrets crypto) · Loremaster's cipher ARG (far-future extension of the secrets crypto) · breadcrumb chip row (redundant with deep-links + footprints) · pinned "open tonight" tray (folded into Present Mode).
