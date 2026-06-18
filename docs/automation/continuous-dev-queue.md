@@ -78,7 +78,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
 > them top to bottom and commit per task. Operates only over already-redacted player data → no new secrecy
 > surface (re-verified in the spec).
 
-- [ ] **M1. Joyful wayfinding — hover-peek cards + wander button (player site).**
+- [x] **M1. Joyful wayfinding — hover-peek cards + wander button (player site).**
   **Design:** `docs/superpowers/specs/2026-06-17-browsing-feel-design.md` — **read in full first.**
   **Plan:** `docs/superpowers/plans/2026-06-17-wayfinding.md` — **read in full; follow task-by-task.**
   Two player-site browsing upgrades over already-published player data: (1) a **hover-peek card** (portrait +
@@ -108,7 +108,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
     (mobile); the map button flies to non-fogged places; Wander flies to a random unopened visible place
     (cross-map switch included) and the meter + filled pins track discovery; all new helpers unit-tested;
     full gate + atlas:publish + integrity-smoke green. ~8–12 runs across the phases.
-  - ⏳ IN PROGRESS 2026-06-18 — Tasks 1–8 done (Wander half: sanitizer, aria-haspopup, visited store, selectWanderTarget, discoveryMeter, useVisitedPlaces hook, pin discovery class + AtlasViewer wiring, WanderControl); merged at b9b6c5b1 (1590 tests green, tsc clean, lint 0 errors). Tasks 9–18 (hover-peek half: Phases 3–5) are next.
+  - ✅ DONE 2026-06-18 — Tasks 1–8 (Wander half) merged at b9b6c5b1 (1590 tests); Tasks 9–18 (hover-peek half) merged at 8be06e46. 32 wayfinding tests (14 files); tsc clean; eslint 0 errors (14 pre-existing warnings); vitest 4-shard green (1606 total); npm run build clean; atlas:publish 10/10; integrity-smoke 5/5. New modules: src/atlas/peek/ (resolvePeekEntityId, computePeekPosition, HoverPeekCard, usePeekController); prose + Connections + pin hover wired into AtlasViewer + EntityPanel.
 
 ### J — Refuel 2026-06-16 (one-click Publish — blessed by the human)
 
