@@ -32,6 +32,7 @@ import { PLAYER_VISIBLE } from "./atlas/visibility";
 import { isLit } from "../src/atlas/fog/effectiveLit";
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
 import { filterSoundscapeForPlayer } from "./atlas/filterSoundscape";
+import { hashAudioAssets, rewriteAudioSrcs } from "./atlas/hashAudioAssets";
 import {
   stripDmProfile,
   filterRelationshipsForPlayer,
@@ -813,12 +814,21 @@ async function runBuildCore(flags: BuildFlags) {
 
   // -------- Soundscape player-strip --------
   // Drop DM-visibility areas, neutralise area IDs, strip names so DM location
-  // labels never reach the player artifact.
+  // labels never reach the player artifact. Then content-hash audio filenames
+  // so the original DM file paths never appear in the player build.
   if (flags.player) {
     maps = maps.map((m) => {
       if (!m.soundscape) return m;
       return { ...m, soundscape: filterSoundscapeForPlayer(m.soundscape) };
     });
+    const allAreas = maps.flatMap((m) => m.soundscape?.areas ?? []);
+    if (allAreas.length > 0) {
+      const rewrite = hashAudioAssets(allAreas, path.join(ROOT, "public"));
+      maps = maps.map((m) => {
+        if (!m.soundscape?.areas?.length) return m;
+        return { ...m, soundscape: { ...m.soundscape, areas: rewriteAudioSrcs(m.soundscape.areas, rewrite) } };
+      });
+    }
   }
 
   // -------- Profile + relationship player-strip --------
