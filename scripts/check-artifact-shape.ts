@@ -152,6 +152,24 @@ export function scanArtifactShape(atlas: unknown): ShapeResult {
       }
       checkStringField(violations, mapId, `route[${r.id ?? "?"}].name`, r.name);
     }
+    // Soundscape: each area must have a neutralised id (area-N), no name, player-visible.
+    const sc = m.soundscape as Record<string, unknown> | undefined;
+    if (sc) {
+      const areas = Array.isArray(sc.areas) ? (sc.areas as Record<string, unknown>[]) : [];
+      for (const a of areas) {
+        const aId = typeof a.id === "string" ? a.id : "?";
+        if (typeof a.id !== "string" || !/^area-\d+$/.test(a.id)) {
+          violations.push({ field: `map[${mapId}].soundscape.area[${aId}].id`, message: `soundscape area id "${a.id}" is not neutralised (expected area-N)` });
+        }
+        const vis = a.visibility as string | undefined;
+        if (vis !== undefined && !PLAYER_VISIBLE.has(vis as never)) {
+          violations.push({ field: `map[${mapId}].soundscape.area[${aId}].visibility`, message: `soundscape area visibility "${vis}" not in PLAYER_VISIBLE` });
+        }
+        if (a.name !== undefined) {
+          violations.push({ field: `map[${mapId}].soundscape.area[${aId}].name`, message: `soundscape area name "${a.name}" must be stripped in player builds` });
+        }
+      }
+    }
   }
 
   return { violations };
