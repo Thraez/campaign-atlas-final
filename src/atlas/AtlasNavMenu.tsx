@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Menu, Compass, LayoutGrid, CalendarClock, MapPin, type LucideIcon } from "lucide-react";
+import { Menu, Compass, LayoutGrid, CalendarClock, MapPin, Star, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
@@ -9,6 +9,8 @@ interface AtlasNavMenuProps {
   publishedAt?: string;
   /** Optional footer slot — e.g. the OfflineStatus controls. */
   footer?: React.ReactNode;
+  /** When true, show the Credits nav link. Only shown when credits.page is on AND ≥1 credit exists. */
+  showCredits?: boolean;
 }
 
 /**
@@ -19,7 +21,7 @@ interface AtlasNavMenuProps {
  * Embedded in the toolbar of `AtlasViewer`, `AtlasBrowse`, `AtlasTimeline`
  * with `lg:hidden` so it disappears once the inline buttons fit naturally.
  */
-export function AtlasNavMenu({ publishedAt, footer }: AtlasNavMenuProps) {
+export function AtlasNavMenu({ publishedAt, footer, showCredits }: AtlasNavMenuProps) {
   const editorEnabled = __INCLUDE_EDITOR__ && isDmToolsEnabled();
   return (
     <Sheet>
@@ -39,6 +41,9 @@ export function AtlasNavMenu({ publishedAt, footer }: AtlasNavMenuProps) {
           <NavItem to="/atlas" icon={MapPin} label="Map" />
           <NavItem to="/atlas/browse" icon={LayoutGrid} label="Browse" />
           <NavItem to="/atlas/timeline" icon={CalendarClock} label="Timeline" />
+          {showCredits && (
+            <NavItem to="/atlas/credits" icon={Star} label="Credits" />
+          )}
           {editorEnabled && (
             <NavItem to="/atlas/edit" icon={MapPin} label="Edit pins" badge="DM" />
           )}

@@ -401,4 +401,69 @@ import:
     ) as { worlds: Array<{ importFolders?: unknown }> };
     expect(playerAtlas.worlds[0].importFolders).toBeUndefined();
   });
+
+  it("entity.credit round-trips into player and DM atlas.json", () => {
+    const dir = path.join(tmpRoot, "credit-roundtrip");
+    writeWorldVault(dir, `maps:\n  - id: m1\n    name: Main\n    width: 1000\n    height: 1000\n`);
+    fs.writeFileSync(
+      path.join(dir, "content/test-world/notes/Credited.md"),
+      `---\ntitle: Credited NPC\natlas:\n  visibility: player\n  credit: "Portrait by Evelyn K, CC BY 4.0"\n---\nbody\n`
+    );
+
+    const playerOut = path.join(tmpRoot, "credit-player-out");
+    const pr = run(["--player", "--config", path.join(dir, "atlas.config.json"), "--out", playerOut]);
+    expect(pr.status, pr.stderr).toBe(0);
+    const playerAtlas = JSON.parse(fs.readFileSync(path.join(playerOut, "atlas.json"), "utf8")) as {
+      entities: Array<{ id: string; credit?: string }>;
+    };
+    const credited = playerAtlas.entities.find((e) => e.id === "credited-npc");
+    expect(credited?.credit).toBe("Portrait by Evelyn K, CC BY 4.0");
+  });
+
+  it("world.credits block round-trips into player atlas.json", () => {
+    const dir = path.join(tmpRoot, "world-credits-roundtrip");
+    writeWorldVault(dir, `maps:\n  - id: m1\n    name: Main\n    width: 1000\n    height: 1000\ncredits:\n  badges: false\n  page: true\n`);
+
+    const playerOut = path.join(tmpRoot, "world-credits-out");
+    const pr = run(["--player", "--config", path.join(dir, "atlas.config.json"), "--out", playerOut]);
+    expect(pr.status, pr.stderr).toBe(0);
+    const playerAtlas = JSON.parse(fs.readFileSync(path.join(playerOut, "atlas.json"), "utf8")) as {
+      worlds: Array<{ credits?: { badges?: boolean; page?: boolean } }>;
+    };
+    expect(playerAtlas.worlds[0].credits).toEqual({ badges: false, page: true });
+  });
+
+  it("SECRECY REGRESSION: dm-only entity credit is absent from player atlas.json", () => {
+    const dir = path.join(tmpRoot, "dm-credit-secrecy");
+    writeWorldVault(dir, `maps:\n  - id: m1\n    name: Main\n    width: 1000\n    height: 1000\n`);
+    // DM-only entity with a credit — must not appear in player build
+    fs.writeFileSync(
+      path.join(dir, "content/test-world/notes/Secret-Artist.md"),
+      `---\ntitle: Secret Artist\natlas:\n  visibility: dm\n  credit: "Secret credit must not leak"\n---\nDM-only body\n`
+    );
+    // Player-visible entity with a credit — must appear in player build
+    fs.writeFileSync(
+      path.join(dir, "content/test-world/notes/Public-Credited.md"),
+      `---\ntitle: Public Credited\natlas:\n  visibility: player\n  credit: "Public artist credit"\n---\nPublic body\n`
+    );
+
+    const playerOut = path.join(tmpRoot, "dm-credit-secrecy-out");
+    const pr = run(["--player", "--config", path.join(dir, "atlas.config.json"), "--out", playerOut]);
+    expect(pr.status, pr.stderr).toBe(0);
+    const playerAtlas = JSON.parse(fs.readFileSync(path.join(playerOut, "atlas.json"), "utf8")) as {
+      entities: Array<{ id: string; credit?: string; visibility?: string }>;
+    };
+
+    // DM entity must be absent entirely
+    const dmEntity = playerAtlas.entities.find((e) => e.id === "secret-artist");
+    expect(dmEntity, "dm-only entity must not appear in player build").toBeUndefined();
+
+    // Player entity must carry its credit
+    const playerEntity = playerAtlas.entities.find((e) => e.id === "public-credited");
+    expect(playerEntity?.credit).toBe("Public artist credit");
+
+    // No entity in the player build should carry the DM credit string
+    const anyDmCredit = playerAtlas.entities.some((e) => e.credit?.includes("Secret credit must not leak"));
+    expect(anyDmCredit, "DM credit string must not appear in player build").toBe(false);
+  });
 });

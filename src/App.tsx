@@ -17,6 +17,7 @@ const AtlasPlacementEditor = __INCLUDE_EDITOR__
   : null;
 const AtlasTimeline = lazy(() => import("./pages/AtlasTimeline.tsx"));
 const AtlasBrowse = lazy(() => import("./pages/AtlasBrowse.tsx"));
+const AtlasCredits = lazy(() => import("./pages/AtlasCredits.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 
@@ -56,6 +57,7 @@ const App = () => (
             <Route path="/atlas/browse" element={<AtlasBrowse mode="browse" />} />
             <Route path="/atlas/tag/:tag" element={<AtlasBrowse mode="tag" />} />
             <Route path="/atlas/type/:type" element={<AtlasBrowse mode="type" />} />
+            <Route path="/atlas/credits" element={<AtlasCredits />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

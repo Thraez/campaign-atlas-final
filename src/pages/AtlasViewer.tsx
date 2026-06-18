@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   Search, X, MapPin, ArrowLeft, Compass, Grid3x3, CalendarClock,
-  LayoutGrid, Ruler,
+  LayoutGrid, Ruler, Star,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -282,6 +282,9 @@ export default function AtlasViewer() {
     return m;
   }, [data]);
 
+  const worldCredits = data?.project.worlds[0]?.credits;
+  const showCredits = worldCredits?.page !== false && (data?.project.entities.some((e) => e.credit) ?? false);
+
   const { visited, mark: markVisitedEntity } = useVisitedPlaces();
 
   const pointerFine = typeof window !== "undefined" && !!window.matchMedia?.("(pointer: fine)").matches;
@@ -480,7 +483,7 @@ export default function AtlasViewer() {
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
       <a href="#atlas-main" className="skip-to-main">Skip to map</a>
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
-        <AtlasNavMenu publishedAt={data.project.publishedAt} />
+        <AtlasNavMenu publishedAt={data.project.publishedAt} showCredits={showCredits} />
         <Link to="/" className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2">
           <Compass className="h-5 w-5" aria-hidden="true" /> <span className="hidden sm:inline">Astrath Atlas</span>
         </Link>
@@ -528,6 +531,11 @@ export default function AtlasViewer() {
         <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
           <Link to="/atlas/timeline" title="Timeline of dated entries"><CalendarClock className="h-4 w-4 mr-1" aria-hidden="true" />Timeline</Link>
         </Button>
+        {showCredits && (
+          <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
+            <Link to="/atlas/credits" title="Image credits"><Star className="h-4 w-4 mr-1" aria-hidden="true" />Credits</Link>
+          </Button>
+        )}
         {__INCLUDE_EDITOR__ && isDmToolsEnabled() && (
           <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
             <Link to="/atlas/edit" title="DM placement editor">Edit pins</Link>
@@ -637,6 +645,7 @@ export default function AtlasViewer() {
               }}
               onPeek={(id, rect) => peekCtl.onTriggerEnter(id, rect)}
               onPeekLeave={peekCtl.onTriggerLeave}
+              credits={worldCredits}
             />
           </aside>
         ) : (
@@ -675,6 +684,7 @@ export default function AtlasViewer() {
               }}
               onPeek={(id, rect) => peekCtl.onTriggerEnter(id, rect)}
               onPeekLeave={peekCtl.onTriggerLeave}
+              credits={worldCredits}
             />
           </SheetContent>
         </Sheet>

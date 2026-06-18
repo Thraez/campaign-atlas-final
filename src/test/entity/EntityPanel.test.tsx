@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
-import type { Entity } from "@/atlas/content/schema";
+import type { CreditsConfig, Entity } from "@/atlas/content/schema";
 import type { EntityRelationship } from "@/atlas/profiles/profileTypes";
 
 const e: Entity = {
@@ -164,5 +164,50 @@ describe("EntityPanel — Connections section", () => {
     );
     screen.getByText("Ally NPC").click();
     expect(onOpenEntity).toHaveBeenCalledWith("ally-npc");
+  });
+});
+
+// ── L1 — Credit badge ────────────────────────────────────────────────────────
+
+const entityWithImage: Entity = {
+  ...e,
+  images: ["thumb.png"],
+  credit: "Art by Jane Doe",
+} as Entity;
+
+function renderWithBadge(opts: { credit?: string | undefined; credits?: CreditsConfig } = {}) {
+  const entity = {
+    ...entityWithImage,
+    credit: "credit" in opts ? opts.credit : entityWithImage.credit,
+  } as Entity;
+  return render(
+    <MemoryRouter>
+      <EntityPanel
+        entity={entity}
+        placements={[]}
+        entityById={new Map([[entity.id, entity]])}
+        onOpenEntity={() => {}}
+        onClose={() => {}}
+        onShowOnMap={() => {}}
+        credits={opts.credits}
+      />
+    </MemoryRouter>,
+  );
+}
+
+describe("EntityPanel — credit badge", () => {
+  it("renders badge when entity has credit and badges are not disabled", () => {
+    renderWithBadge();
+    expect(screen.getByRole("note", { name: /Image credit: Art by Jane Doe/i })).toBeInTheDocument();
+  });
+
+  it("hides badge when credits.badges is false", () => {
+    renderWithBadge({ credits: { badges: false } });
+    expect(screen.queryByRole("note", { name: /Image credit/i })).not.toBeInTheDocument();
+  });
+
+  it("no badge when entity has no credit field", () => {
+    renderWithBadge({ credit: undefined });
+    expect(screen.queryByRole("note", { name: /Image credit/i })).not.toBeInTheDocument();
   });
 });

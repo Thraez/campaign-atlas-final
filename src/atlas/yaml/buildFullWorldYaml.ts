@@ -16,7 +16,7 @@
  * block of the existing file is re-prepended byte-for-byte (or a default
  * boilerplate header when there's no existing file).
  */
-import type { FogOverlay, MapDocument, MapLayer, Region, Route, WaterConfig, WorldCalendar } from "@/atlas/content/schema";
+import type { CreditsConfig, FogOverlay, MapDocument, MapLayer, Region, Route, WaterConfig, WorldCalendar } from "@/atlas/content/schema";
 import { DEFAULT_WATER } from "@/atlas/ocean/resolveWater";
 import { fogToYamlObject } from "@/atlas/fog/useFogDraft";
 import { regionToYamlObject } from "@/atlas/regions/useRegionDraft";
@@ -35,6 +35,8 @@ export interface BuildFullWorldYamlOpts {
   /** Current on-disk file contents — used by serializeWorldYaml to preserve the leading comment block.
    *  Pass null when the file does not yet exist. */
   existing: string | null;
+  /** Optional site-wide credits config. When present, serialized as a top-level `credits:` block. */
+  credits?: CreditsConfig;
 }
 
 export function buildFullWorldYaml(opts: BuildFullWorldYamlOpts): string {
@@ -42,6 +44,7 @@ export function buildFullWorldYaml(opts: BuildFullWorldYamlOpts): string {
   if (opts.schemaVersion !== undefined) root.schemaVersion = opts.schemaVersion;
   root.maps = opts.maps.map(mapToYamlObject);
   if (opts.calendar) root.calendar = calendarToYamlObject(opts.calendar);
+  if (opts.credits) root.credits = creditsToYamlObject(opts.credits);
   const body = dumpYaml(root);
   return serializeWorldYaml(body, opts.existing);
 }
@@ -112,5 +115,12 @@ function calendarToYamlObject(c: WorldCalendar): Record<string, unknown> {
   if (c.name) out.name = c.name;
   if (c.epochName) out.epochName = c.epochName;
   if (c.daysPerWeek !== undefined) out.daysPerWeek = c.daysPerWeek;
+  return out;
+}
+
+function creditsToYamlObject(c: CreditsConfig): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (c.badges !== undefined) out.badges = c.badges;
+  if (c.page !== undefined) out.page = c.page;
   return out;
 }

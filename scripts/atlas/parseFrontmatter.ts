@@ -30,6 +30,7 @@ export interface AtlasFrontmatter {
   profile?: EntityProfile;
   relationships?: EntityRelationship[];
   race?: string;
+  credit?: string;
 }
 
 export interface ParsedFile {
@@ -65,6 +66,8 @@ export function parseFrontmatter(raw: string, sourcePath: string): ParsedFile {
     profile: parseProfile(atlasRaw.profile, sourcePath, warnings),
     relationships: parseRelationships(atlasRaw.relationships, sourcePath, warnings),
     race: pickString(atlasRaw.race, data.race),
+    credit: typeof atlasRaw.credit === "string" && atlasRaw.credit.trim().length > 0
+      ? atlasRaw.credit.trim() : undefined,
   };
 
   if (typeof atlasRaw.visibility === "string") {

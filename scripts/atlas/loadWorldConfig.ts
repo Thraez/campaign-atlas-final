@@ -9,6 +9,7 @@ import path from "node:path";
 import yaml from "js-yaml";
 import { resolveAndMigrate, SchemaVersionError } from "./schemaVersion";
 import type {
+  CreditsConfig,
   EntityVisibility,
   FogOverlay,
   GridOverlay,
@@ -23,6 +24,18 @@ import type {
   WaterConfig,
   WorldCalendar,
 } from "../../src/atlas/content/schema";
+
+/** Pure helper: coerce a raw `credits` block to a CreditsConfig, defaulting both flags to true. */
+export function resolveCredits(raw: unknown): CreditsConfig {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    return { badges: true, page: true };
+  }
+  const r = raw as Record<string, unknown>;
+  return {
+    badges: r.badges === false ? false : true,
+    page: r.page === false ? false : true,
+  };
+}
 
 const VALID_VIS: EntityVisibility[] = ["player", "dm", "hidden", "rumor"];
 const VALID_MODES: RouteMode[] = ["foot", "horse", "ship", "cart", "fly", "custom"];
@@ -79,6 +92,7 @@ interface WorldYaml {
     folders?: Record<string, unknown>;
     defaultFolder?: unknown;
   };
+  credits?: unknown;
 }
 
 export interface WorldConfig {
@@ -90,6 +104,7 @@ export interface WorldConfig {
   schemaVersion: number;
   warnings: string[];
   importConfig: ImportFolderConfig; // always present — defaults applied here
+  credits: CreditsConfig;           // always present — both default true
 }
 
 export class WorldConfigError extends Error {}
@@ -316,8 +331,9 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
   }
 
   const importConfig = sanitizeImportConfig(data.import, warnings);
+  const credits = resolveCredits(data.credits);
 
-  return { maps, regions, fogs, routes, calendar, schemaVersion: resolvedVersion, warnings, importConfig };
+  return { maps, regions, fogs, routes, calendar, schemaVersion: resolvedVersion, warnings, importConfig, credits };
 }
 
 function sanitizeScale(s: MapScale | undefined, warnings: string[], where: string): MapScale | undefined {

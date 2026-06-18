@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { loadWorldConfig } from "../../scripts/atlas/loadWorldConfig";
+import { loadWorldConfig, resolveCredits } from "../../scripts/atlas/loadWorldConfig";
 
 let tmpRoot: string;
 const WORLD = "test-world";
@@ -747,5 +747,65 @@ maps:
 `);
     const cfg = loadWorldConfig(tmpRoot, WORLD)!;
     expect(cfg.maps[0].water?.crestColor).toBeUndefined();
+  });
+});
+
+describe("resolveCredits", () => {
+  it("missing/null input → both flags default to true", () => {
+    expect(resolveCredits(null)).toEqual({ badges: true, page: true });
+    expect(resolveCredits(undefined)).toEqual({ badges: true, page: true });
+  });
+
+  it("empty object → both flags default to true", () => {
+    expect(resolveCredits({})).toEqual({ badges: true, page: true });
+  });
+
+  it("non-object input → both flags default to true", () => {
+    expect(resolveCredits("yes")).toEqual({ badges: true, page: true });
+    expect(resolveCredits(42)).toEqual({ badges: true, page: true });
+    expect(resolveCredits([])).toEqual({ badges: true, page: true });
+  });
+
+  it("badges: false is preserved, page stays true", () => {
+    expect(resolveCredits({ badges: false })).toEqual({ badges: false, page: true });
+  });
+
+  it("page: false is preserved, badges stays true", () => {
+    expect(resolveCredits({ page: false })).toEqual({ badges: true, page: false });
+  });
+
+  it("both false is preserved", () => {
+    expect(resolveCredits({ badges: false, page: false })).toEqual({ badges: false, page: false });
+  });
+
+  it("non-boolean truthy value coerces to true", () => {
+    expect(resolveCredits({ badges: "yes", page: 1 })).toEqual({ badges: true, page: true });
+  });
+});
+
+describe("loadWorldConfig — credits block", () => {
+  it("no credits block → both flags default to true", () => {
+    writeWorldYaml(`${baseMap}`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.credits).toEqual({ badges: true, page: true });
+  });
+
+  it("credits block with both false round-trips", () => {
+    writeWorldYaml(`${baseMap}
+credits:
+  badges: false
+  page: false
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.credits).toEqual({ badges: false, page: false });
+  });
+
+  it("credits block with only page: false defaults badges to true", () => {
+    writeWorldYaml(`${baseMap}
+credits:
+  page: false
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.credits).toEqual({ badges: true, page: false });
   });
 });
