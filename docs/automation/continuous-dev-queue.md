@@ -871,6 +871,18 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     new planned-link tests green across DM and player surfaces; standard gate green (sharded vitest, tsc, eslint). ~1 run.
   - ✅ DONE 2026-06-16 — commit f783e8e1 (feat(N26): render broken wikilinks as planned-link styling; atlas-planned-link DM dashed-amber + atlas-planned-link-player neutral dotted; dead .atlas-broken-link + .atlas-unresolved selectors removed; 3 new cross-surface planned-link tests + stale assertions updated; security invariant preserved). Gate: 1438 tests green (4 shards, no OOM); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings). Pure client-side CSS + one function change — no build-pipeline impact.
 
+- [x] **N27. Hygiene / coverage nibble #21** — `src/atlas/peek/computePeekPosition.ts` (M1) had the
+  right-edge clamp tested but two clamp branches untested: anchor at the left viewport edge clamped to
+  `gap`, and mid-viewport anchor left at `rawLeft` unchanged. Also untested: the exact boundary where
+  `roomBelow === card.height + gap` places below, vs one pixel short flips above. `usePeekController.ts`
+  (M1) had three state-machine transitions untested: re-hover while peek already open (switches entity
+  immediately without the open delay), `onCardLeave` (schedules the close grace period), and `dismiss`
+  (immediately clears the peek card). 7 new tests total; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-18 — commit cb3853ac (test(N27): computePeekPosition left-edge clamp + unclamped
+    middle + exact-boundary flip × 2; usePeekController re-hover + onCardLeave + dismiss; 7 new tests in
+    computePeekPosition.test.ts + usePeekController.test.tsx). Gate: 1690 tests green (4 shards, no OOM;
+    shard-4 RPC timeout flake confirmed infra); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
