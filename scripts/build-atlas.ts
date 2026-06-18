@@ -31,6 +31,7 @@ import { parseAtlasDate } from "./atlas/calendarDate";
 import { PLAYER_VISIBLE } from "./atlas/visibility";
 import { isLit } from "../src/atlas/fog/effectiveLit";
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
+import { filterSoundscapeForPlayer } from "./atlas/filterSoundscape";
 import {
   stripDmProfile,
   filterRelationshipsForPlayer,
@@ -808,6 +809,16 @@ async function runBuildCore(flags: BuildFlags) {
       redactedMaps.push({ ...m, layers: newLayers, fog: playerFog });
     }
     maps = redactedMaps;
+  }
+
+  // -------- Soundscape player-strip --------
+  // Drop DM-visibility areas, neutralise area IDs, strip names so DM location
+  // labels never reach the player artifact.
+  if (flags.player) {
+    maps = maps.map((m) => {
+      if (!m.soundscape) return m;
+      return { ...m, soundscape: filterSoundscapeForPlayer(m.soundscape) };
+    });
   }
 
   // -------- Profile + relationship player-strip --------
