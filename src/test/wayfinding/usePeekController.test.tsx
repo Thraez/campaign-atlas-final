@@ -48,3 +48,29 @@ it("tapPeek shows immediately and a second tap on the same id signals open", () 
   act(() => { opened = result.current.tapPeek("a", rect); });
   expect(opened).toBe("a");
 });
+
+it("re-hover while peek is already open switches entity immediately (no delay)", () => {
+  const { result } = renderHook(() => usePeekController({ pointerFine: true }));
+  act(() => { result.current.onTriggerEnter("first", rect); vi.advanceTimersByTime(200); });
+  expect(result.current.peek?.entityId).toBe("first");
+  const rect2 = { ...rect, left: 200, right: 260 } as DOMRect;
+  act(() => result.current.onTriggerEnter("second", rect2));
+  expect(result.current.peek?.entityId).toBe("second");
+});
+
+it("onCardLeave schedules the close grace period", () => {
+  const { result } = renderHook(() => usePeekController({ pointerFine: true }));
+  act(() => { result.current.onTriggerEnter("a", rect); vi.advanceTimersByTime(200); });
+  expect(result.current.peek).not.toBeNull();
+  act(() => result.current.onCardLeave());
+  act(() => vi.advanceTimersByTime(80));
+  expect(result.current.peek).toBeNull();
+});
+
+it("dismiss immediately closes the peek card", () => {
+  const { result } = renderHook(() => usePeekController({ pointerFine: true }));
+  act(() => { result.current.onTriggerEnter("a", rect); vi.advanceTimersByTime(200); });
+  expect(result.current.peek).not.toBeNull();
+  act(() => result.current.dismiss());
+  expect(result.current.peek).toBeNull();
+});
