@@ -1,18 +1,7 @@
-import type { FogOverlay, Point } from "@/atlas/content/schema";
+import type { FogOverlay } from "@/atlas/content/schema";
+import { pointInPolygon } from "@/atlas/geometry/polygon";
 
 export const DEFAULT_FEATHER_PX = 16;
-
-function pointInPolygon(x: number, y: number, poly: Point[]): boolean {
-  if (poly.length < 3) return false;
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [xi, yi] = poly[i], [xj, yj] = poly[j];
-    const hit = (yi > y) !== (yj > y) &&
-      x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
-    if (hit) inside = !inside;
-  }
-  return inside;
-}
 
 /** A point is lit iff fog is disabled, OR it is inside some reveal and
  *  inside no conceal. Geometry uses the strict boundary — feather is
