@@ -164,7 +164,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
 > (Increment 1 ships before Increment 2). **Read the design doc in full before starting.** L1 supersedes and
 > folds in the page-only N3 nice-to-have. Carries a mandatory leak-regression test.
 
-- [ ] **L1. Asset credits — in-image corner badge + aggregate credits page, DM-toggled at build time.**
+- [x] **L1. Asset credits — in-image corner badge + aggregate credits page, DM-toggled at build time.**
   **Design:** `docs/superpowers/specs/2026-06-17-asset-credits-badge-and-page-design.md` — **read in full first.**
   Add an optional `atlas.credit` string to entity frontmatter (parsed → threaded into `entity.credit` in the
   player `atlas.json`) and a world-level `credits: { badges, page }` block in `world.yaml` (both default
@@ -196,6 +196,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
     credited player-visible entities with a gated nav link; both surfaces hide when their toggle is off; the
     DM can flip both from Map Settings and Save persists it; DM-only credited entity absent everywhere player
     (regression test asserts); full gate + integrity-smoke + atlas:publish green. ~2–4 runs.
+  - ✅ DONE 2026-06-18 — **Increment 1** shipped: commit e71d99f3. Schema (Entity.credit, World.credits, CreditsConfig), parseFrontmatter, resolveCredits(), loadWorldConfig, buildFullWorldYaml, build-atlas, CreditBadge component, /atlas/credits page, AtlasNavMenu + AtlasViewer wiring. Gate: tsc clean; eslint clean; vitest 4-shard (375 tests) green; atlas:publish 10/10. Secrecy: dm-only credit absent from player atlas.json (build + page guard). **Increment 2 (MapSettingsPanel toggle) hands back** — world-level patch path is new surface not covered by the existing per-map edit model; Increment 1 is fully usable via `world.yaml`.
 
 ### I — Refuel 2026-06-15 round 2 (roadmap brainstorm — blessed by the human)
 
