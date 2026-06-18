@@ -75,6 +75,9 @@
 .atlas-viewer-pin > svg {
   pointer-events: none;
 }
+/* Discovered pins appear fully opaque; undiscovered are slightly dimmed. */
+.atlas-pin--undiscovered { opacity: 0.55; }
+.atlas-pin--discovered   { opacity: 1; }
 
 /* Leaflet overrides for fantasy theme */
 .leaflet-container {

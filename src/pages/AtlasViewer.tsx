@@ -28,6 +28,11 @@ import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
 import { serializeDeepLink, parseDeepLink } from "@/atlas/deepLink";
+import { useVisitedPlaces } from "@/atlas/visited/useVisitedPlaces";
+import { pinDiscoveryClass } from "@/atlas/wander/pinDiscoveryClass";
+import { selectWanderTarget } from "@/atlas/wander/selectWanderTarget";
+import { discoveryMeter } from "@/atlas/wander/discoveryMeter";
+import { WanderControl } from "@/atlas/wander/WanderControl";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
@@ -35,13 +40,14 @@ const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 import { resolvePinStyle, pinSvg, type PinPreset } from "@/atlas/pins/presets";
 import { shouldShowLabel } from "@/atlas/pins/labelVisibility";
 
-function pinIconForStyle(style: PinPreset, opts?: { dim?: boolean }): L.DivIcon {
+function pinIconForStyle(style: PinPreset, opts?: { dim?: boolean; extraClass?: string }): L.DivIcon {
   // iconSize defines the hit area Leaflet uses for click/touch dispatch. The
   // visual SVG is smaller (~22px) but we expose a 44x44 hit area so mobile
   // touch targets meet WCAG 2.5.5 (Target Size, Level AAA). The SVG centers
   // visually inside the box via the `atlas-viewer-pin` CSS rule.
+  const cls = opts?.extraClass ? `atlas-viewer-pin ${opts.extraClass}` : "atlas-viewer-pin";
   return L.divIcon({
-    className: "atlas-viewer-pin",
+    className: cls,
     html: pinSvg({ color: style.color, shape: style.shape }, { dim: opts?.dim }),
     iconSize: [44, 44],
     iconAnchor: [22, 36],
@@ -272,6 +278,8 @@ export default function AtlasViewer() {
     return m;
   }, [data]);
 
+  const { visited, mark: markVisitedEntity } = useVisitedPlaces();
+
   const openEntity = useCallback(
     (id: string, fly = true) => {
       // Push a history entry so Back returns to the previous entity (or no-entity state)
@@ -297,6 +305,35 @@ export default function AtlasViewer() {
     },
     [data, activeMap, hasDesktopAside, activeMapId]
   );
+
+  // "Discovered" = an entity panel opened by ANY means (click, search, wander,
+  // deep-link, Back). openId is the single choke point for all paths.
+  useEffect(() => {
+    if (openId) markVisitedEntity(openId);
+  }, [openId, markVisitedEntity]);
+
+  const meter = useMemo(
+    () => (data ? discoveryMeter(data.project.placements, visited) : { discovered: 0, total: 0 }),
+    [data, visited],
+  );
+
+  const [wanderEmpty, setWanderEmpty] = useState(false);
+  const wander = useCallback(() => {
+    if (!data) return;
+    const target = selectWanderTarget(data.project.placements, visited);
+    if (!target) { setWanderEmpty(true); return; }
+    setWanderEmpty(false);
+    if (target.mapId !== activeMapId) setActiveMapId(target.mapId);
+    const targetMap = data.project.maps.find((m) => m.id === target.mapId);
+    openEntity(target.entityId, false);
+    if (targetMap) setFlyTarget({ x: target.x, y: target.y, height: targetMap.height });
+  }, [data, visited, activeMapId, openEntity]);
+
+  useEffect(() => {
+    if (!wanderEmpty) return;
+    const t = window.setTimeout(() => setWanderEmpty(false), 4000);
+    return () => window.clearTimeout(t);
+  }, [wanderEmpty]);
 
   // Intercept wikilink clicks inside rendered HTML
   const panelRef = useRef<HTMLDivElement>(null);
@@ -504,6 +541,7 @@ export default function AtlasViewer() {
                 entityById={entityById}
                 showGrid={showGrid}
                 onOpenEntity={openEntity}
+                visited={visited}
               />
             ))}
 
@@ -511,6 +549,19 @@ export default function AtlasViewer() {
 
             <AtlasMinimap map={activeMap} layers={activeMap.layers} />
           </MapContainer>
+
+          {/* Wander button + discovery meter — bottom-left map overlay */}
+          <WanderControl
+            discovered={meter.discovered}
+            total={meter.total}
+            canWander={meter.discovered < meter.total}
+            onWander={wander}
+          />
+          {wanderEmpty && (
+            <div className="atlas-wander-note absolute left-3 bottom-20 z-[500] max-w-xs rounded-lg border bg-background/95 px-3 py-2 text-xs text-muted-foreground">
+              You've explored everything you can reach — travel onward to uncover more.
+            </div>
+          )}
         </main>
 
         {/* Desktop side panel — only mounts at lg+. Below that, the entity
@@ -608,9 +659,10 @@ interface WrappedWorldProps {
   entityById: Map<string, Entity>;
   showGrid: boolean | null;
   onOpenEntity: (id: string, fly?: boolean) => void;
+  visited: Set<string>;
 }
 
-function WrappedWorld({ dx, map, placements, entityById, showGrid, onOpenEntity }: WrappedWorldProps) {
+function WrappedWorld({ dx, map, placements, entityById, showGrid, onOpenEntity, visited }: WrappedWorldProps) {
   const H = map.height;
   return (
     <>
@@ -703,6 +755,7 @@ function WrappedWorld({ dx, map, placements, entityById, showGrid, onOpenEntity 
         placements={placements}
         entityById={entityById}
         onOpenEntity={onOpenEntity}
+        visited={visited}
       />
 
     </>
@@ -713,12 +766,13 @@ function WrappedWorld({ dx, map, placements, entityById, showGrid, onOpenEntity 
  *  labels are permanently visible based on per-pin priority + labelMinZoom +
  *  a screen-space collision pass (higher priority wins). */
 function PlacementMarkers({
-  dx, H, placements, entityById, onOpenEntity,
+  dx, H, placements, entityById, onOpenEntity, visited,
 }: {
   dx: number; H: number;
   placements: MapPlacement[];
   entityById: Map<string, Entity>;
   onOpenEntity: (id: string, fly?: boolean) => void;
+  visited: Set<string>;
 }) {
   const map = useMap();
   const [zoom, setZoom] = useState(map.getZoom());
@@ -768,7 +822,7 @@ function PlacementMarkers({
           <Marker
             key={`${p.id}-${dx}`}
             position={[H - p.y, p.x + dx]}
-            icon={pinIconForStyle(style, { dim })}
+            icon={pinIconForStyle(style, { dim, extraClass: pinDiscoveryClass(p.entityId, visited) })}
             eventHandlers={{ click: () => onOpenEntity(p.entityId, false) }}
           >
             {labelMode !== "none" && (

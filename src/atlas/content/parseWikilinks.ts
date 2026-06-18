@@ -54,7 +54,7 @@ export function renderLinkTokens(
       if (opts.hideBroken) return `<span class="atlas-planned-link-player">${text}</span>`;
       return `<span class="atlas-planned-link" title="Planned link: ${escapeHtml(link.target)}">${text}</span>`;
     }
-    return `<a class="atlas-wikilink" data-entity-id="${escapeHtml(link.resolvedId)}" href="#/entity/${encodeURIComponent(link.resolvedId)}">${text}</a>`;
+    return `<a class="atlas-wikilink" data-entity-id="${escapeHtml(link.resolvedId)}" href="#/entity/${encodeURIComponent(link.resolvedId)}" aria-haspopup="dialog">${text}</a>`;
   });
 }
 
