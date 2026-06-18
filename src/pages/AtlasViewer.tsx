@@ -15,6 +15,9 @@ import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { OceanBackground } from "@/atlas/ocean/OceanBackground";
+import { SoundSettingsProvider } from "@/atlas/sound/SoundSettingsProvider";
+import { SoundscapeLayer } from "@/atlas/sound/SoundscapeLayer";
+import { SoundControl } from "@/atlas/sound/SoundControl";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
@@ -480,6 +483,7 @@ export default function AtlasViewer() {
     : [];
 
   return (
+    <SoundSettingsProvider>
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
       <a href="#atlas-main" className="skip-to-main">Skip to map</a>
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
@@ -573,6 +577,7 @@ export default function AtlasViewer() {
               mapHeight={activeMap.height}
               onViewChange={handleViewChange}
             />
+            <SoundscapeLayer map={activeMap} />
             <RulerLayer
               active={rulerActive}
               mapHeight={activeMap.height}
@@ -601,6 +606,8 @@ export default function AtlasViewer() {
 
             <AtlasMinimap map={activeMap} layers={activeMap.layers} />
           </MapContainer>
+
+          <SoundControl />
 
           {/* Wander button + discovery meter — bottom-left map overlay */}
           <WanderControl
@@ -730,6 +737,7 @@ export default function AtlasViewer() {
           document.body,
         )}
     </div>
+    </SoundSettingsProvider>
   );
 }
 
