@@ -31,6 +31,8 @@ export interface EntityPanelProps {
   /** Player-personal affordances (private notes, PDF handout). Default true =
    *  the player site is unchanged. The DM editor passes false. */
   readerAffordances?: boolean;
+  onPeek?: (entityId: string, rect: DOMRect) => void;
+  onPeekLeave?: () => void;
 }
 
 function CopyLinkButton() {
@@ -222,7 +224,7 @@ function ImageThumb({ src, alt, onClick }: { src: string; alt: string; onClick: 
 }
 
 export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function EntityPanel(
-  { entity, placements, entityById, onOpenEntity, onClose, onShowOnMap, readerAffordances = true },
+  { entity, placements, entityById, onOpenEntity, onClose, onShowOnMap, readerAffordances = true, onPeek, onPeekLeave },
   ref
 ) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -342,6 +344,10 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
                     key={b.id}
                     className="text-xs px-2 py-1 rounded bg-muted hover:bg-accent transition"
                     onClick={() => onOpenEntity(b.id)}
+                    onMouseEnter={(e) => onPeek?.(b.id, e.currentTarget.getBoundingClientRect())}
+                    onMouseLeave={() => onPeekLeave?.()}
+                    onFocus={(e) => onPeek?.(b.id, e.currentTarget.getBoundingClientRect())}
+                    onBlur={() => onPeekLeave?.()}
                   >
                     {b.title}
                   </button>
@@ -363,6 +369,10 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
                       <button
                         className="hover:underline truncate text-left"
                         onClick={() => onOpenEntity(r.entity)}
+                        onMouseEnter={(e) => onPeek?.(r.entity, e.currentTarget.getBoundingClientRect())}
+                        onMouseLeave={() => onPeekLeave?.()}
+                        onFocus={(e) => onPeek?.(r.entity, e.currentTarget.getBoundingClientRect())}
+                        onBlur={() => onPeekLeave?.()}
                       >
                         {target ? target.title : <span className="text-muted-foreground">{r.entity}</span>}
                       </button>
