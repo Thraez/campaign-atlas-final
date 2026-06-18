@@ -18,7 +18,8 @@ import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { printEntityHandout } from "@/atlas/printHandout";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
-import type { Entity, MapPlacement } from "@/atlas/content/schema";
+import type { CreditsConfig, Entity, MapPlacement } from "@/atlas/content/schema";
+import { CreditBadge } from "./CreditBadge";
 
 export interface EntityPanelProps {
   entity: Entity | null;
@@ -33,6 +34,8 @@ export interface EntityPanelProps {
   readerAffordances?: boolean;
   onPeek?: (entityId: string, rect: DOMRect) => void;
   onPeekLeave?: () => void;
+  /** Site-wide credits config from world.credits; defaults both on when absent. */
+  credits?: CreditsConfig;
 }
 
 function CopyLinkButton() {
@@ -210,7 +213,7 @@ function ImageThumb({ src, alt, onClick }: { src: string; alt: string; onClick: 
   return (
     <button
       onClick={onClick}
-      className="flex-shrink-0 rounded border border-border overflow-hidden hover:border-primary transition focus:outline-none focus:ring-2 focus:ring-primary"
+      className="rounded border border-border overflow-hidden hover:border-primary transition focus:outline-none focus:ring-2 focus:ring-primary block"
     >
       <img
         src={src}
@@ -224,7 +227,7 @@ function ImageThumb({ src, alt, onClick }: { src: string; alt: string; onClick: 
 }
 
 export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function EntityPanel(
-  { entity, placements, entityById, onOpenEntity, onClose, onShowOnMap, readerAffordances = true, onPeek, onPeekLeave },
+  { entity, placements, entityById, onOpenEntity, onClose, onShowOnMap, readerAffordances = true, onPeek, onPeekLeave, credits },
   ref
 ) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -295,12 +298,16 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
           {entity.images.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
               {entity.images.map((src, i) => (
-                <ImageThumb
-                  key={`${src}-${i}`}
-                  src={imageUrl(src)}
-                  alt={`${entity.title} image ${i + 1}`}
-                  onClick={() => setLightboxSrc(imageUrl(src))}
-                />
+                <div key={`${src}-${i}`} className="relative flex-shrink-0">
+                  <ImageThumb
+                    src={imageUrl(src)}
+                    alt={`${entity.title} image ${i + 1}`}
+                    onClick={() => setLightboxSrc(imageUrl(src))}
+                  />
+                  {credits?.badges !== false && entity.credit && (
+                    <CreditBadge credit={entity.credit} />
+                  )}
+                </div>
               ))}
             </div>
           )}

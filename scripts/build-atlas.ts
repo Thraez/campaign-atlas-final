@@ -38,6 +38,7 @@ import {
 } from "../src/atlas/profiles/profileBuild";
 import type {
   AtlasProject,
+  CreditsConfig,
   Entity,
   MapDocument,
   MapPlacement,
@@ -462,6 +463,7 @@ async function runBuildCore(flags: BuildFlags) {
       tags: scrubTags(stripArr(parsed.atlas.tags ?? [])),
       summary: stripField(parsed.atlas.summary),
       race: stripField(parsed.atlas.race),
+      credit: parsed.atlas.credit,
       images: (parsed.atlas.images ?? []).map(relImage),
       body: noDm,
       bodyHtml: "",
@@ -911,6 +913,7 @@ async function runBuildCore(flags: BuildFlags) {
       name: "Astrath Deeprealm",
       defaultMapId: primaryMapId,
       ...(flags.player ? {} : { importFolders: worldCfg?.importConfig ?? { folders: {}, defaultFolder: "imports" } }),
+      credits: worldCfg?.credits ?? ({ badges: true, page: true } satisfies CreditsConfig),
     }],
     maps,
     entities: pending.map((p) => p.entity),

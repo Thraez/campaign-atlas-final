@@ -44,11 +44,17 @@ export interface ImportFolderConfig {
   defaultFolder: string;
 }
 
+export interface CreditsConfig {
+  badges?: boolean; // default true — show corner credit badge on entity images
+  page?: boolean;   // default true — publish the /atlas/credits aggregate page
+}
+
 export interface World {
   id: string;
   name: string;
   defaultMapId?: string;
   importFolders?: ImportFolderConfig; // present in DM builds only; absent in player builds
+  credits?: CreditsConfig;            // both default true when absent
 }
 
 export interface MapDocument {
@@ -178,6 +184,8 @@ export interface Entity {
   profile?: import("@/atlas/profiles/profileTypes").EntityProfile;
   /** Entity-to-entity relationships. Filtered by visibility in player builds. */
   relationships?: import("@/atlas/profiles/profileTypes").EntityRelationship[];
+  /** Optional attribution string for the entity's images (e.g. "Portrait by Evelyn K, CC BY 4.0"). */
+  credit?: string;
 }
 
 /** Per-placement pin styling overrides. Stored under atlas.placements[].pin in YAML.
