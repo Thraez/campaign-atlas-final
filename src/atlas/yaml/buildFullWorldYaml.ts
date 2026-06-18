@@ -16,7 +16,7 @@
  * block of the existing file is re-prepended byte-for-byte (or a default
  * boilerplate header when there's no existing file).
  */
-import type { CreditsConfig, FogOverlay, MapDocument, MapLayer, Region, Route, WaterConfig, WorldCalendar } from "@/atlas/content/schema";
+import type { CreditsConfig, FogOverlay, MapDocument, MapLayer, Region, Route, SoundscapeConfig, WaterConfig, WorldCalendar } from "@/atlas/content/schema";
 import { DEFAULT_WATER } from "@/atlas/ocean/resolveWater";
 import { fogToYamlObject } from "@/atlas/fog/useFogDraft";
 import { regionToYamlObject } from "@/atlas/regions/useRegionDraft";
@@ -71,6 +71,7 @@ function mapToYamlObject(m: MapDocument): Record<string, unknown> {
     out.fog = fogToYamlObject(m.fog as FogOverlay);
   }
   if (m.water) out.water = waterToYamlObject(m.water);
+  if (m.soundscape) out.soundscape = soundscapeToYamlObject(m.soundscape);
   return out;
 }
 
@@ -105,6 +106,24 @@ function waterToYamlObject(w: WaterConfig): Record<string, unknown> {
   if (w.intensity !== undefined && w.intensity !== DEFAULT_WATER.intensity) out.intensity = w.intensity;
   if (w.speed !== undefined && w.speed !== DEFAULT_WATER.speed) out.speed = w.speed;
   if (w.crestColor) out.crestColor = w.crestColor;
+  return out;
+}
+
+function soundscapeToYamlObject(s: SoundscapeConfig): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (s.enabled === false) out.enabled = false;
+  else if (s.enabled === true) out.enabled = true;
+  if (s.masterGain !== undefined) out.masterGain = s.masterGain;
+  if (s.areas && s.areas.length > 0) {
+    out.areas = s.areas.map((a) => {
+      const area: Record<string, unknown> = { id: a.id, bed: { src: a.bed.src, ...(a.bed.srcFallback ? { srcFallback: a.bed.srcFallback } : {}), ...(a.bed.gain !== undefined ? { gain: a.bed.gain } : {}) } };
+      if (a.regionId) area.regionId = a.regionId;
+      if (a.points && a.points.length > 0) area.points = a.points;
+      if (a.visibility) area.visibility = a.visibility;
+      if (a.name) area.name = a.name;
+      return area;
+    });
+  }
   return out;
 }
 
