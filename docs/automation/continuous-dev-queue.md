@@ -108,6 +108,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
     (mobile); the map button flies to non-fogged places; Wander flies to a random unopened visible place
     (cross-map switch included) and the meter + filled pins track discovery; all new helpers unit-tested;
     full gate + atlas:publish + integrity-smoke green. ~8–12 runs across the phases.
+  - ⏳ IN PROGRESS 2026-06-18 — Tasks 1–8 done (Wander half: sanitizer, aria-haspopup, visited store, selectWanderTarget, discoveryMeter, useVisitedPlaces hook, pin discovery class + AtlasViewer wiring, WanderControl); merged at b9b6c5b1 (1590 tests green, tsc clean, lint 0 errors). Tasks 9–18 (hover-peek half: Phases 3–5) are next.
 
 ### J — Refuel 2026-06-16 (one-click Publish — blessed by the human)
 
