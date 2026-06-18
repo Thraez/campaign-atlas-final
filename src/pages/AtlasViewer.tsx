@@ -33,6 +33,10 @@ import { pinDiscoveryClass } from "@/atlas/wander/pinDiscoveryClass";
 import { selectWanderTarget } from "@/atlas/wander/selectWanderTarget";
 import { discoveryMeter } from "@/atlas/wander/discoveryMeter";
 import { WanderControl } from "@/atlas/wander/WanderControl";
+import { createPortal } from "react-dom";
+import { HoverPeekCard } from "@/atlas/peek/HoverPeekCard";
+import { usePeekController } from "@/atlas/peek/usePeekController";
+import { resolvePeekEntityId } from "@/atlas/peek/resolvePeekEntityId";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
@@ -280,6 +284,14 @@ export default function AtlasViewer() {
 
   const { visited, mark: markVisitedEntity } = useVisitedPlaces();
 
+  const pointerFine = typeof window !== "undefined" && !!window.matchMedia?.("(pointer: fine)").matches;
+  const peekCtl = usePeekController({ pointerFine });
+
+  const onPinPeek = useCallback((id: string, ev: MouseEvent) => {
+    const r = { top: ev.clientY, bottom: ev.clientY + 1, left: ev.clientX, right: ev.clientX + 1, width: 1, height: 1 } as DOMRect;
+    peekCtl.onTriggerEnter(id, r);
+  }, [peekCtl]);
+
   const openEntity = useCallback(
     (id: string, fly = true) => {
       // Push a history entry so Back returns to the previous entity (or no-entity state)
@@ -343,14 +355,43 @@ export default function AtlasViewer() {
     const handler = (e: MouseEvent) => {
       const target = (e.target as HTMLElement).closest<HTMLAnchorElement>("a.atlas-wikilink");
       if (!target) return;
+      if (!pointerFine) {
+        e.preventDefault();
+        const id = resolvePeekEntityId(target);
+        if (id) {
+          const open = peekCtl.tapPeek(id, target.getBoundingClientRect());
+          if (open) openEntity(open);
+        }
+        return;
+      }
       const id = target.getAttribute("data-entity-id");
       if (!id) return;
       e.preventDefault();
       openEntity(id);
     };
+    const over = (e: MouseEvent) => {
+      const a = (e.target as HTMLElement).closest<HTMLElement>("a.atlas-wikilink");
+      if (!a) return;
+      const id = resolvePeekEntityId(a);
+      if (id) peekCtl.onTriggerEnter(id, a.getBoundingClientRect(), { x: e.clientX, y: e.clientY });
+    };
+    const out = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest("a.atlas-wikilink")) peekCtl.onTriggerLeave();
+    };
+    const move = (e: MouseEvent) => {
+      peekCtl.onPointerMove({ x: e.clientX, y: e.clientY });
+    };
     el.addEventListener("click", handler);
-    return () => el.removeEventListener("click", handler);
-  }, [openEntity, openId]);
+    el.addEventListener("mouseover", over);
+    el.addEventListener("mouseout", out);
+    el.addEventListener("mousemove", move);
+    return () => {
+      el.removeEventListener("click", handler);
+      el.removeEventListener("mouseover", over);
+      el.removeEventListener("mouseout", out);
+      el.removeEventListener("mousemove", move);
+    };
+  }, [openEntity, openId, pointerFine, peekCtl]);
 
   // Cmd/Ctrl-K opens search
   useEffect(() => {
@@ -359,12 +400,13 @@ export default function AtlasViewer() {
         e.preventDefault();
         setSearchOpen(true);
       } else if (e.key === "Escape") {
+        if (peekCtl.peek) { peekCtl.dismiss(); return; }
         setSearchOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [peekCtl]);
 
   if (error) {
     const offline = typeof navigator !== "undefined" && !navigator.onLine;
@@ -542,6 +584,8 @@ export default function AtlasViewer() {
                 showGrid={showGrid}
                 onOpenEntity={openEntity}
                 visited={visited}
+                onPinPeek={onPinPeek}
+                onPinPeekLeave={peekCtl.onTriggerLeave}
               />
             ))}
 
@@ -591,6 +635,8 @@ export default function AtlasViewer() {
                 const m = data.project.maps.find((mm) => mm.id === p.mapId);
                 if (m) setFlyTarget({ x: p.x, y: p.y, height: m.height });
               }}
+              onPeek={(id, rect) => peekCtl.onTriggerEnter(id, rect)}
+              onPeekLeave={peekCtl.onTriggerLeave}
             />
           </aside>
         ) : (
@@ -627,6 +673,8 @@ export default function AtlasViewer() {
                 if (m) setFlyTarget({ x: p.x, y: p.y, height: m.height });
                 setMobilePanelOpen(false);
               }}
+              onPeek={(id, rect) => peekCtl.onTriggerEnter(id, rect)}
+              onPeekLeave={peekCtl.onTriggerLeave}
             />
           </SheetContent>
         </Sheet>
@@ -648,6 +696,29 @@ export default function AtlasViewer() {
           onClose={() => setSearchOpen(false)}
         />
       )}
+      {peekCtl.peek && data && entityById.get(peekCtl.peek.entityId) &&
+        createPortal(
+          <div style={{ position: "fixed", left: peekCtl.peek.position.left, top: peekCtl.peek.position.top, zIndex: 1000 }}>
+            <HoverPeekCard
+              entity={entityById.get(peekCtl.peek.entityId)!}
+              hasPlacement={data.project.placements.some((p) => p.entityId === peekCtl.peek!.entityId)}
+              onOpen={() => { const id = peekCtl.peek!.entityId; peekCtl.dismiss(); openEntity(id); }}
+              onFlyToMap={() => {
+                const id = peekCtl.peek!.entityId; peekCtl.dismiss();
+                const pl = data.project.placements.find((p) => p.entityId === id);
+                if (pl) {
+                  if (pl.mapId !== activeMapId) setActiveMapId(pl.mapId);
+                  const m = data.project.maps.find((mm) => mm.id === pl.mapId);
+                  openEntity(id, false);
+                  if (m) setFlyTarget({ x: pl.x, y: pl.y, height: m.height });
+                }
+              }}
+              onMouseEnter={peekCtl.onCardEnter}
+              onMouseLeave={peekCtl.onCardLeave}
+            />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -660,9 +731,11 @@ interface WrappedWorldProps {
   showGrid: boolean | null;
   onOpenEntity: (id: string, fly?: boolean) => void;
   visited: Set<string>;
+  onPinPeek?: (id: string, ev: MouseEvent) => void;
+  onPinPeekLeave?: () => void;
 }
 
-function WrappedWorld({ dx, map, placements, entityById, showGrid, onOpenEntity, visited }: WrappedWorldProps) {
+function WrappedWorld({ dx, map, placements, entityById, showGrid, onOpenEntity, visited, onPinPeek, onPinPeekLeave }: WrappedWorldProps) {
   const H = map.height;
   return (
     <>
@@ -756,6 +829,8 @@ function WrappedWorld({ dx, map, placements, entityById, showGrid, onOpenEntity,
         entityById={entityById}
         onOpenEntity={onOpenEntity}
         visited={visited}
+        onPinPeek={onPinPeek}
+        onPinPeekLeave={onPinPeekLeave}
       />
 
     </>
@@ -766,13 +841,15 @@ function WrappedWorld({ dx, map, placements, entityById, showGrid, onOpenEntity,
  *  labels are permanently visible based on per-pin priority + labelMinZoom +
  *  a screen-space collision pass (higher priority wins). */
 function PlacementMarkers({
-  dx, H, placements, entityById, onOpenEntity, visited,
+  dx, H, placements, entityById, onOpenEntity, visited, onPinPeek, onPinPeekLeave,
 }: {
   dx: number; H: number;
   placements: MapPlacement[];
   entityById: Map<string, Entity>;
   onOpenEntity: (id: string, fly?: boolean) => void;
   visited: Set<string>;
+  onPinPeek?: (id: string, ev: MouseEvent) => void;
+  onPinPeekLeave?: () => void;
 }) {
   const map = useMap();
   const [zoom, setZoom] = useState(map.getZoom());
@@ -823,7 +900,11 @@ function PlacementMarkers({
             key={`${p.id}-${dx}`}
             position={[H - p.y, p.x + dx]}
             icon={pinIconForStyle(style, { dim, extraClass: pinDiscoveryClass(p.entityId, visited) })}
-            eventHandlers={{ click: () => onOpenEntity(p.entityId, false) }}
+            eventHandlers={{
+              click: () => onOpenEntity(p.entityId, false),
+              mouseover: (e) => onPinPeek?.(p.entityId, e.originalEvent as MouseEvent),
+              mouseout: () => onPinPeekLeave?.(),
+            }}
           >
             {labelMode !== "none" && (
               <Tooltip
@@ -836,10 +917,6 @@ function PlacementMarkers({
                 {labelText}
               </Tooltip>
             )}
-            <Popup>
-              <div className="text-sm font-medium">{ent.title}</div>
-              {ent.summary && <div className="text-xs opacity-70">{ent.summary}</div>}
-            </Popup>
           </Marker>
         );
       })}
