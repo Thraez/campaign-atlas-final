@@ -128,3 +128,59 @@ describe.sequential("artifact shape gate", () => {
     expect(out).toMatch(/DM block/);
   });
 });
+
+describe("scanArtifactShape — soundscape assertions", () => {
+  function makeAtlas(soundscapeOverride?: unknown) {
+    return {
+      version: "1",
+      publishedAt: "",
+      worlds: [],
+      maps: [
+        {
+          id: "test-map",
+          name: "Test",
+          soundscape: soundscapeOverride,
+        },
+      ],
+      placements: [],
+      assets: [],
+      entities: [],
+    };
+  }
+
+  it("clean soundscape with neutralised IDs and no names → zero violations", () => {
+    const atlas = makeAtlas({
+      enabled: true,
+      areas: [
+        { id: "area-0", bed: { src: "atlas/assets/audio/abc12345.ogg" }, visibility: "player" },
+        { id: "area-1", bed: { src: "atlas/assets/audio/def67890.ogg" } },
+      ],
+    });
+    const r = scanArtifactShape(atlas);
+    expect(r.violations.filter((v) => v.field.includes("soundscape"))).toHaveLength(0);
+  });
+
+  it("flags a DM-visibility area", () => {
+    const atlas = makeAtlas({
+      areas: [{ id: "area-0", bed: { src: "audio/x.ogg" }, visibility: "dm" }],
+    });
+    const r = scanArtifactShape(atlas);
+    expect(r.violations.some((v) => v.field.includes("soundscape") && v.message.includes("visibility"))).toBe(true);
+  });
+
+  it("flags an area with a non-neutralised id", () => {
+    const atlas = makeAtlas({
+      areas: [{ id: "dungeon-lair", bed: { src: "audio/x.ogg" } }],
+    });
+    const r = scanArtifactShape(atlas);
+    expect(r.violations.some((v) => v.field.includes("soundscape") && v.message.includes("id"))).toBe(true);
+  });
+
+  it("flags an area that still has a name", () => {
+    const atlas = makeAtlas({
+      areas: [{ id: "area-0", bed: { src: "audio/x.ogg" }, name: "Ye Olde Tavern" }],
+    });
+    const r = scanArtifactShape(atlas);
+    expect(r.violations.some((v) => v.field.includes("soundscape") && v.message.includes("name"))).toBe(true);
+  });
+});

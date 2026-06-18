@@ -94,14 +94,17 @@ export default defineConfig(({ mode }) => {
               cacheableResponse: { statuses: [0, 200] },
             },
           },
-          // Local atlas assets (maps/images/icons committed to /public/atlas/assets).
+          // Local atlas assets (maps/images/icons/audio committed to /public/atlas/assets).
+          // rangeRequests + status 206 are required for audio streaming (browsers use
+          // HTTP range requests for <audio> elements).
           {
             urlPattern: ({ url }) => url.pathname.includes("/atlas/assets/"),
             handler: "CacheFirst",
             options: {
               cacheName: "atlas-assets",
               expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 60 },
-              cacheableResponse: { statuses: [0, 200] },
+              cacheableResponse: { statuses: [0, 200, 206] },
+              rangeRequests: true,
             },
           },
           // Google Fonts stylesheet + files.

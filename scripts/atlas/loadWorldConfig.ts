@@ -21,6 +21,7 @@ import type {
   Region,
   Route,
   RouteMode,
+  SoundscapeConfig,
   WaterConfig,
   WorldCalendar,
 } from "../../src/atlas/content/schema";
@@ -67,6 +68,7 @@ interface WorldYaml {
       waypoints: Array<Point | { entityId: string } | string>;
     }>;
     fog?: Partial<FogOverlay> & { mapId?: string; reveals?: Point[][]; enabled?: boolean };
+    soundscape?: SoundscapeConfig;
   }>;
   regions?: Array<Partial<Region> & { id: string; mapId: string; name: string; points: Point[] }>;
   fog?: Array<Partial<FogOverlay> & { mapId: string; reveals?: Point[][]; enabled?: boolean }>;
@@ -173,6 +175,7 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
       height: m.height ?? 100000,
       oceanColor: m.oceanColor ?? "#18313f",
       ...(water !== undefined ? { water } : {}),
+      ...(m.soundscape ? { soundscape: m.soundscape } : {}),
       wrapX: m.wrapX ?? false,
       scale,
       grid,

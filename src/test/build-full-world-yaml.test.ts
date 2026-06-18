@@ -305,3 +305,37 @@ describe("buildFullWorldYaml — schema version", () => {
     expect(out).not.toMatch(/^schemaVersion:/m);
   });
 });
+
+describe("buildFullWorldYaml — soundscape round-trip", () => {
+  it("round-trips soundscape config through YAML", () => {
+    const map = makeMap({
+      soundscape: {
+        enabled: true,
+        masterGain: 0.7,
+        areas: [
+          {
+            id: "area-tavern",
+            bed: { src: "audio/tavern.ogg", gain: 0.8 },
+            points: [[0, 0], [100, 0], [100, 100], [0, 100]],
+            visibility: "player" as const,
+          },
+        ],
+      },
+    });
+    const out = buildFullWorldYaml({ maps: [map], schemaVersion: 1, existing: null });
+    const cfg = loadEmitted(out)!;
+    const sc = cfg.maps[0].soundscape;
+    expect(sc).toBeDefined();
+    expect(sc!.enabled).toBe(true);
+    expect(sc!.masterGain).toBe(0.7);
+    expect(sc!.areas).toHaveLength(1);
+    expect(sc!.areas![0].id).toBe("area-tavern");
+    expect(sc!.areas![0].bed.src).toBe("audio/tavern.ogg");
+    expect(sc!.areas![0].bed.gain).toBe(0.8);
+  });
+
+  it("omits soundscape key when undefined", () => {
+    const out = buildFullWorldYaml({ maps: [makeMap()], schemaVersion: 1, existing: null });
+    expect(out).not.toMatch(/soundscape:/);
+  });
+});

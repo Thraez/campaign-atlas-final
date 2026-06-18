@@ -71,6 +71,7 @@ export interface MapDocument {
   grid?: GridOverlay;
   oceanColor?: string;
   water?: WaterConfig;
+  soundscape?: SoundscapeConfig;
   wrapX?: boolean;
 }
 
@@ -79,6 +80,41 @@ export interface WaterConfig {
   intensity?: number;   // 0..1, default 0.35 (gentle)
   speed?: number;       // 0..1, default 0.3 (slow)
   crestColor?: string;  // hex; default derived from oceanColor
+}
+
+/** One looping ambient bed. Two files so Safari (no Ogg) has a fallback. */
+export interface SoundBed {
+  /** Path under atlas/assets/audio/ (primary, e.g. .ogg). */
+  src: string;
+  /** Optional Safari-friendly twin (.mp3/.aac). */
+  srcFallback?: string;
+  /** Per-bed loudness, 0..1, default 0.7. */
+  gain?: number;
+}
+
+/** A place that makes sound. Either borrows a region's shape (regionId) or
+ *  carries its own polygon (points). Exactly one bed; zoom layering is by
+ *  nesting smaller areas, not by multiple beds. */
+export interface SoundArea {
+  id: string;
+  /** Ride-on: borrow this region's points + visibility. */
+  regionId?: string;
+  /** Sound-only zone: own polygon (used when regionId is absent). */
+  points?: Point[];
+  /** Sound-only zones only; ride-on areas inherit the region's visibility. */
+  visibility?: EntityVisibility;
+  /** Optional label (editor + credits). DM-strippable; never required to ship. */
+  name?: string;
+  bed: SoundBed;
+}
+
+/** Per-map soundscape config (sibling of `water`). */
+export interface SoundscapeConfig {
+  /** default true. false ⇒ no AudioContext, no control for this map. */
+  enabled?: boolean;
+  /** Overall loudness, 0..1, default 0.6. */
+  masterGain?: number;
+  areas?: SoundArea[];
 }
 
 export interface MapScale {
