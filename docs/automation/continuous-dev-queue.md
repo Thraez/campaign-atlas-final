@@ -873,6 +873,24 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
 
 ---
 
+### O — Atmosphere soundscape
+
+**Spec:** `docs/superpowers/specs/2026-06-18-atmosphere-soundscape-design.md`
+**Plan:** `docs/superpowers/plans/2026-06-18-atmosphere-soundscape-phase1a.md`
+
+- [x] **O1. Phase 1a — schema through player-build secrecy (Tasks 1–16).**
+  Wires `SoundscapeConfig` schema into `atlas.json`; builds full React sound layer
+  (`AudioEngine`, `SoundscapeLayer`, `SoundSettingsProvider`, `SoundControl`); integrates
+  into `AtlasViewer`; adds YAML round-trip, player-build secrecy filter + content-hash
+  audio filenames, build-time shape assertions, and Workbox audio range-request caching.
+  Task 17 (first real sound file) BLOCKED — needs DM-supplied `.ogg`/`.mp3` audio files.
+  - ✅ DONE 2026-06-18 — merge commit `c44f5d25`; Tasks 1–16 green; 1683 tests pass (4 shards);
+    tsc clean; eslint 0 errors; atlas secrecy gates clean (check-secrets, check-derived, check-shape).
+    **Task 17 BLOCKED:** add a sound file to `public/atlas/assets/audio/` and wire it into
+    `world.yaml` soundscape config to activate the first live area — see plan Task 17 for exact YAML.
+
+---
+
 ## After the queue empties
 
 Hand back per routine step 7 with candidate wants — do not invent direction. The human refuels the WANTS
