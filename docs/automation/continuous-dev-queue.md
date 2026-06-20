@@ -948,6 +948,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   empty). 6 new tests across two files; pure test coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit 4dd3826c (test(N29): playerSecretsStore corruption/recovery + collectCharacterSecrets undefined-secrets; 5 new tests in playerSecretsStore.test.ts + 1 in collectCharacterSecrets.test.ts). Gate: 13 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N30. Hygiene / coverage nibble #24** — `src/atlas/sync/useSyncSettings.ts` (K1) had zero test
+  coverage despite being the persistence layer for the Obsidian sync panel. Four async functions with
+  clear untested branches: `loadSettings`/`loadSyncMap` each have three paths (success → parsed object;
+  non-ok response → empty object `{}`; fetch throws → empty object `{}`); `saveSettings`/`saveSyncMap`
+  each have one path (POST to `/__atlas/local-write` with correct `name` + serialized `contents`).
+  7 new tests in `src/test/sync-settings.test.ts` using `vi.stubGlobal("fetch", ...)` mocks;
+  pure test coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit 8199ab53 (test(N30): useSyncSettings fetch branches — loadSettings/saveSettings/loadSyncMap/saveSyncMap (7 tests)). Gate: 7 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
