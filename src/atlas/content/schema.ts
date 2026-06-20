@@ -186,6 +186,16 @@ export interface MapLayer {
   tileSrc?: string;
 }
 
+/** Encrypted secret blob emitted to the player build. Plaintext never ships. */
+export interface PlayerSecret {
+  id: string;
+  lockType: "password" | "character";
+  teaser?: string;  // only for password type; intentionally public
+  salt: string;     // base64, 16 random bytes
+  iv: string;       // base64, 12 random bytes
+  ciphertext: string; // base64( AES-GCM ciphertext || 16-byte auth tag )
+}
+
 export interface ResolvedLink {
   target: string; // raw target text from [[...]]
   resolvedId?: string; // resolved entity id when known
@@ -222,6 +232,8 @@ export interface Entity {
   relationships?: import("@/atlas/profiles/profileTypes").EntityRelationship[];
   /** Optional attribution string for the entity's images (e.g. "Portrait by Evelyn K, CC BY 4.0"). */
   credit?: string;
+  /** Encrypted secrets. Only ciphertext blobs ship in player builds — no plaintext, passphrase, or key. */
+  secrets?: PlayerSecret[];
 }
 
 /** Per-placement pin styling overrides. Stored under atlas.placements[].pin in YAML.
@@ -249,6 +261,8 @@ export interface MapPlacement {
   visibility: EntityVisibility;
   /** Optional pin-styling overrides; renderer falls back to entity.type preset. */
   pin?: PinPlacementStyle;
+  /** References a secret id on the entity; character-secret pins are omitted from player builds. */
+  secretId?: string;
 }
 
 export interface AssetRef {
