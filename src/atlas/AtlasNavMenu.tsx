@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Menu, Compass, LayoutGrid, CalendarClock, MapPin, Star, type LucideIcon } from "lucide-react";
+import { Menu, Compass, LayoutGrid, CalendarClock, MapPin, Star, KeyRound, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
@@ -41,6 +41,7 @@ export function AtlasNavMenu({ publishedAt, footer, showCredits }: AtlasNavMenuP
           <NavItem to="/atlas" icon={MapPin} label="Map" />
           <NavItem to="/atlas/browse" icon={LayoutGrid} label="Browse" />
           <NavItem to="/atlas/timeline" icon={CalendarClock} label="Timeline" />
+          <NavItem to="/atlas/secrets" icon={KeyRound} label="Your secrets" />
           {showCredits && (
             <NavItem to="/atlas/credits" icon={Star} label="Credits" />
           )}

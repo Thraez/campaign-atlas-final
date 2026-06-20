@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   Search, X, MapPin, ArrowLeft, Compass, Grid3x3, CalendarClock,
-  LayoutGrid, Ruler, Star,
+  LayoutGrid, Ruler, Star, KeyRound,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -534,6 +534,9 @@ export default function AtlasViewer() {
         </Button>
         <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
           <Link to="/atlas/timeline" title="Timeline of dated entries"><CalendarClock className="h-4 w-4 mr-1" aria-hidden="true" />Timeline</Link>
+        </Button>
+        <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
+          <Link to="/atlas/secrets" title="Your character's secrets"><KeyRound className="h-4 w-4 mr-1" aria-hidden="true" />Secrets</Link>
         </Button>
         {showCredits && (
           <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
