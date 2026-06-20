@@ -929,6 +929,16 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     middle + exact-boundary flip × 2; usePeekController re-hover + onCardLeave + dismiss; 7 new tests in
     computePeekPosition.test.ts + usePeekController.test.tsx). Gate: 1690 tests green (4 shards, no OOM;
     shard-4 RPC timeout flake confirmed infra); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+- [x] **N28. Hygiene / coverage nibble #22** — `src/atlas/publish/BuildReportPanel.tsx` exports two pure
+  functions (`deriveBuildIssues`, `buildReportToMarkdown`) with no test coverage. `deriveBuildIssues`
+  converts raw `BuildReport` counts into structured `BuildReportIssue` records — all four count fields
+  (missingAssets, duplicateSlugs, unresolvedLinks, externalAssets) had untested singular/plural branches,
+  and the `parseWarningString` helper had untested owner-prefix and em-dash-suggestion paths.
+  `buildReportToMarkdown` had no tests at all (ready/blocked header, meta fields, Fix line, scope
+  formatting, summary counts). 19 new tests; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-20 — commit 720be4ca (test(N28): deriveBuildIssues + buildReportToMarkdown — 19 tests
+    in src/atlas/publish/BuildReportPanel.test.ts). Gate: 19 tests green (targeted vitest run); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
 
 ---
 
