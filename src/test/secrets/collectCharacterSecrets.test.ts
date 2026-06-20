@@ -24,6 +24,14 @@ it("returns empty when no entities have character secrets", async () => {
   expect(found).toHaveLength(0);
 });
 
+it("handles entities with no secrets field (undefined)", async () => {
+  const entities: Entity[] = [
+    { id: "place", title: "Place" } as Entity,
+  ];
+  const found = await collectCharacterSecrets(entities, "any-key");
+  expect(found).toHaveLength(0);
+});
+
 it("skips password-lock secrets", async () => {
   const blob = await encryptSecret("password guarded", "vesper-key");
   const entities: Entity[] = [
