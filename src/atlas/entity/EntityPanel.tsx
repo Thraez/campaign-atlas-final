@@ -257,7 +257,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
       const secret = id ? byId.get(id) : undefined;
       if (secret) mountSecretBlock(node, secret);
     });
-  }, [entity?.id, entity?.bodyHtml, entity?.secrets]);
+  }, [entity]);
 
   if (!entity) {
     return (
