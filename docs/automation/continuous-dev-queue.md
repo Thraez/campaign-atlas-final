@@ -26,6 +26,11 @@ Beyond that the routine asks the human to bless more work. That is by design —
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
+> **Refueled 2026-06-20** — section **P** below blessed by the DM: **P1 Player Secrets** is the
+> **current priority** (M-series and all prior sections are ✅ DONE). Design:
+> `docs/superpowers/specs/2026-06-17-player-secrets-design.md`; Plan:
+> `docs/superpowers/plans/2026-06-17-player-secrets.md` — **read both in full before each phase.**
+>
 > **Refueled 2026-06-18** — section **M** below blessed by the DM from a design session
 > (brainstorm → spec → adversarial review → plan): **M1 Joyful wayfinding** (hover-peek cards + wander
 > button) is the **current priority** (L-series remains queued below it). Design:
@@ -69,6 +74,48 @@ Beyond that the routine asks the human to bless more work. That is by design —
 > `docs/DEVELOPMENT_WANTS.md`. **E is now ✅ DONE** (E1 merged to main `a7f22fbc`; E2–E6 on
 > `auto/continuous-dev`, then consolidated to main in the v0.1.0 merge 2026-06-14). Sections D, A, B, C are
 > all ✅ DONE.
+
+### P — Refuel 2026-06-20 (player secrets — blessed by the DM)
+
+> DM-directed feature refuel. Build **P1** — one substantial feature across **6 phases** (19 TDD tasks).
+> **Read the design doc and the plan in full before each phase.** Phase 1 (schema + build-time leak scan)
+> is self-contained and ships first. No server, no accounts.
+
+- [ ] **P1. Player Secrets — sealed reveals & character keys (player site).**
+  **Design:** `docs/superpowers/specs/2026-06-17-player-secrets-design.md` — **read in full first.**
+  **Plan:** `docs/superpowers/plans/2026-06-17-player-secrets.md` — **read in full; follow task-by-task.**
+  Lets the DM embed encrypted secrets in player-facing entity pages. Two modes: (1) a **per-secret
+  password** (a sealed box visible to all, unlocked by typing the right phrase — shown as an unopened
+  envelope until solved); (2) a **per-character key** (the secret is invisible to everyone except the
+  character whose key matches, revealed only after the owner signs in). Decryption is entirely
+  client-side (no server, no accounts); plaintext never ships in the player build at rest; a new
+  build-time scan (`check-player-secrets`, wired into the publish orchestrator) fails `atlas:publish`
+  if any secret text leaks into the player bundle. No new server surface; fits the existing secrecy model.
+  - Phases (order matters): **1** — schema (`AtlasSecretSpec`, `Entity.secrets`, `MapPlacement.secretId`)
+    + build helpers (`buildSecrets.ts`, `stripSecretMarkers.ts`) + `check-player-secrets` leak scan
+    registered in the publish orchestrator; **2** — client-side crypto (`secretCrypto.ts` — seal +
+    character-key derivation); **3** — `SecretBox` component (sealed UI, passphrase unlock, character-key
+    gate, sanitizer allow-list for `data-secret-id`); **4** — DM authoring (two toolbar "Add secret"
+    buttons + `EntityEditPanel` field + `CharacterKeysPanel` in the editor rail); **5** — player-site
+    integration (`EntityPanel` mount, `CharacterSecretsPage`, always-visible nav route); **6** — ship
+    gate (full sharded suite + secrecy re-confirm + atlas:publish green).
+  - **Touches the build pipeline** (new `check-player-secrets` scan registered in the publish
+    orchestrator) → gate ALSO requires `npm run atlas:publish` green (proves the new scan ran clean
+    against both `dist/` and `public/atlas/`).
+  - **Mandatory secrecy invariant:** `check-player-secrets` must fail publish if any secret cleartext,
+    passphrase, or character key appears in the player bundle. A fortress self-test — hand-authored
+    secret in the real vault round-tripped through build, with only ciphertext in `atlas.json` and
+    `search-index.json` — must pass before Phase 6 closes.
+  - **Editor gate:** DM authoring code (Phases 4–5) is imported from `AtlasPlacementEditor` only
+    (already `__INCLUDE_EDITOR__`-gated). The player-facing `SecretBox` component (Phase 3) is
+    player-runtime — verify it carries no decrypt path that accepts a raw key.
+  - **Autonomy guard:** Phase 1 (schema + scan) ships first and is fully self-contained. If client-side
+    crypto (Phase 2) can't be made portable across target browsers within two attempts in the same area,
+    hand back with a note.
+  - Done when: the DM can author a per-secret-password secret and a per-character-key secret; players
+    see the sealed box and can unlock it with the right phrase (or it reveals only for the right
+    character); `check-player-secrets` catches any plaintext leak; full gate + atlas:publish green.
+    ~4–6 runs across the phases.
 
 ### M — Refuel 2026-06-18 (joyful wayfinding — blessed by the DM)
 
@@ -887,8 +934,9 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
 
 ### O — Atmosphere soundscape
 
-**Spec:** `docs/superpowers/specs/2026-06-18-atmosphere-soundscape-design.md`
-**Plan:** `docs/superpowers/plans/2026-06-18-atmosphere-soundscape-phase1a.md`
+**Spec:** `docs/superpowers/specs/2026-06-17-atmosphere-sound-design.md`
+**Plan (Phase 1a):** `docs/superpowers/plans/2026-06-18-atmosphere-soundscape-phase1a.md`
+**Plan (Phase 1b):** `docs/superpowers/plans/2026-06-20-atmosphere-soundscape-phase1b.md`
 
 - [x] **O1. Phase 1a — schema through player-build secrecy (Tasks 1–16).**
   Wires `SoundscapeConfig` schema into `atlas.json`; builds full React sound layer
@@ -900,6 +948,38 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     tsc clean; eslint 0 errors; atlas secrecy gates clean (check-secrets, check-derived, check-shape).
     **Task 17 BLOCKED:** add a sound file to `public/atlas/assets/audio/` and wire it into
     `world.yaml` soundscape config to activate the first live area — see plan Task 17 for exact YAML.
+
+- [ ] **O2. Phase 1b — DM sound-authoring UI.**
+  **Design:** `docs/superpowers/specs/2026-06-17-atmosphere-sound-design.md` — **read in full first
+  (focus on §10.4 editor authoring, §4 decisions, §6 activation, §9 secrecy, §10.1 schema).**
+  **Plan:** `docs/superpowers/plans/2026-06-20-atmosphere-soundscape-phase1b.md` — **read in full; follow
+  task-by-task.**
+  Adds a **"Sound"** rail item to the DM editor so the DM can author soundscapes without hand-editing
+  `world.yaml`: give an existing region a sound (ride-on), draw a custom sound zone on the map, pick an
+  audio file per area, set Volume and Loudness, and Save. Persistence reuses the Phase 1a YAML
+  round-trip (`soundscapeToYamlObject`) through the existing unified Save. No new persistence path, no
+  player-runtime changes. All new code is editor-only (`__INCLUDE_EDITOR__`-gated). Real audio files are
+  **not** required to build or test — tests use placeholder filenames.
+  - **Prerequisite: O1 (Phase 1a, Tasks 1–16) must be merged.** Confirm `src/atlas/sound/` and
+    `soundscapeToYamlObject` exist in the working tree before beginning.
+  - Phases (order matters): **A** — authoring draft state (`useSoundscapeDraft` hook,
+    `soundAreaDraftToConfig` pure helper); **B** — on-map drawing + panel (`SoundAreaLayer` draw-capture,
+    `SoundscapeTab` authoring panel, `listAvailableAudio` file-picker helper); **C** — wire into the
+    editor shell (Sound rail item in `railRegistry`, mount in `AtlasPlacementEditor`, player-build
+    exclusion guard test); **D** — end-to-end verify (author → Save → build → `atlas:publish` green
+    with placeholder audio; DM-only zone filtered, player zone survives with neutralised id + hashed
+    filename).
+  - **Editor gate:** all new code under `src/atlas/sound-editor/` + `src/atlas/tabs/SoundscapeTab.tsx`
+    is reachable only from the `__INCLUDE_EDITOR__`-gated `AtlasPlacementEditor`. A structural guard
+    test (Phase C, Task 8) asserts no player surface imports the authoring code.
+  - **Phase 1a secrecy stays green:** newly drawn sound zones default to `visibility: dm`; Phase D
+    re-runs `filterSoundscape` + `checkSoundscapeSecrecy` with authored data; `npm run atlas:publish`
+    must be green.
+  - Done when: the Sound rail item opens the authoring panel; the DM can give a player region a sound,
+    draw a DM-only zone, pick `placeholder.ogg`, Save, and the correct soundscape appears in
+    `world.yaml`; player build includes the player area (neutralised id + hashed filename) and excludes
+    the DM zone; all Phase 1a secrecy gates green; sharded Vitest + tsc + eslint + atlas:publish green.
+    ~3–4 runs.
 
 ---
 
