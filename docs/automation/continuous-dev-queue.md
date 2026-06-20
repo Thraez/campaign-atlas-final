@@ -939,6 +939,14 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   - ✅ DONE 2026-06-20 — commit 720be4ca (test(N28): deriveBuildIssues + buildReportToMarkdown — 19 tests
     in src/atlas/publish/BuildReportPanel.test.ts). Gate: 19 tests green (targeted vitest run); tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings).
+- [x] **N29. Hygiene / coverage nibble #23** — `src/atlas/secrets/playerSecretsStore.ts` (P1) had only
+  happy-path coverage. Five corruption/recovery branches were untested: corrupt JSON in localStorage →
+  defaults; `characterKey` stored as non-string → null; `unlocked` stored as non-array → empty list;
+  non-string items inside `unlocked` array → filtered out; `localStorage.setItem` probe throws (storage
+  unavailable) → graceful null/false defaults. `src/atlas/secrets/collectCharacterSecrets.ts` (P1)
+  was missing the `e.secrets ?? []` null-guard path (entity with no `secrets` field at all → returns
+  empty). 6 new tests across two files; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit 4dd3826c (test(N29): playerSecretsStore corruption/recovery + collectCharacterSecrets undefined-secrets; 5 new tests in playerSecretsStore.test.ts + 1 in collectCharacterSecrets.test.ts). Gate: 13 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
 ---
 
