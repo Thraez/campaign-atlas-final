@@ -1,5 +1,5 @@
-import type { FogOverlay } from "@/atlas/content/schema";
-import { pointInPolygon } from "@/atlas/geometry/polygon";
+import type { FogOverlay } from "../content/schema";
+import { pointInPolygon } from "../geometry/polygon";
 
 export const DEFAULT_FEATHER_PX = 16;
 
