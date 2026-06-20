@@ -20,6 +20,7 @@ import { printEntityHandout } from "@/atlas/printHandout";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 import type { CreditsConfig, Entity, MapPlacement } from "@/atlas/content/schema";
 import { CreditBadge } from "./CreditBadge";
+import { mountSecretBlock } from "@/atlas/secrets/secretBlockView";
 
 export interface EntityPanelProps {
   entity: Entity | null;
@@ -231,6 +232,32 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
   ref
 ) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  // Merge the forwarded ref (used by callers) and the local bodyRef (used by the secret effect).
+  const setBodyRefs = useCallback(
+    (el: HTMLDivElement | null) => {
+      (bodyRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+      if (typeof ref === "function") ref(el);
+      else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = el;
+    },
+    [ref],
+  );
+
+  // Post-render: mount SecretBlock DOM views into placeholder spans.
+  // Runs whenever the entity body changes (new entity or re-render after edit).
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el || !entity) return;
+    const nodes = el.querySelectorAll<HTMLElement>("[data-secret-id]");
+    if (nodes.length === 0) return;
+    const byId = new Map((entity.secrets ?? []).map((s) => [s.id, s]));
+    nodes.forEach((node) => {
+      const id = node.getAttribute("data-secret-id");
+      const secret = id ? byId.get(id) : undefined;
+      if (secret) mountSecretBlock(node, secret);
+    });
+  }, [entity?.id, entity?.bodyHtml, entity?.secrets]);
 
   if (!entity) {
     return (
@@ -323,7 +350,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
           )}
 
           <div
-            ref={ref}
+            ref={setBodyRefs}
             className="atlas-prose prose prose-sm max-w-none dark:prose-invert"
             dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(entity.bodyHtml) }}
           />

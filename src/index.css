@@ -432,6 +432,61 @@
   outline-offset: 2px;
 }
 
+/* Atlas viewer: player-secret sealed-box and reveal styles */
+.atlas-secret-sealed {
+  border: 1px solid hsl(var(--border));
+  border-left: 3px solid hsl(var(--primary) / 0.5);
+  border-radius: 6px;
+  padding: 0.6rem 0.85rem;
+  margin: 0.75rem 0;
+  background: hsl(var(--muted) / 0.3);
+}
+.atlas-secret-teaser {
+  font-size: 0.85em;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 0.5rem;
+  font-style: italic;
+}
+.atlas-secret-form {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.atlas-secret-input {
+  flex: 1;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.85em;
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+.atlas-secret-form button[type="submit"] {
+  padding: 0.2rem 0.65rem;
+  font-size: 0.8em;
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  cursor: pointer;
+}
+.atlas-secret-form button[type="submit"]:hover {
+  background: hsl(var(--accent));
+}
+.atlas-secret-msg {
+  margin-top: 0.35rem;
+  font-size: 0.8em;
+  color: hsl(var(--muted-foreground));
+}
+.atlas-secret-open {
+  border-left: 3px solid hsl(var(--accent) / 0.6);
+  padding-left: 0.75rem;
+  margin: 0.75rem 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .atlas-secret-sealed, .atlas-secret-open { transition: none !important; }
+}
+
 /* Print: hide app chrome and print only the open entity panel.
    Players who hit Ctrl+P / Cmd+P from /atlas get a clean handout
    (the dedicated "Print / Save as PDF" button uses a separate
