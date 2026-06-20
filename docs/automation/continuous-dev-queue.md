@@ -81,7 +81,7 @@ Beyond that the routine asks the human to bless more work. That is by design —
 > **Read the design doc and the plan in full before each phase.** Phase 1 (schema + build-time leak scan)
 > is self-contained and ships first. No server, no accounts.
 
-- [ ] **P1. Player Secrets — sealed reveals & character keys (player site).** *(Phase 1 ✅ 2026-06-20 `174a4f23`; Phase 2 ✅ 2026-06-20 `e0f8380e`; Phase 3 ✅ 2026-06-20 `888ced5a`; Phase 4 ✅ 2026-06-20 `8edd67be` — next: Phase 5 Add-secret buttons)*
+- [ ] **P1. Player Secrets — sealed reveals & character keys (player site).** *(Phase 1 ✅ 2026-06-20 `174a4f23`; Phase 2 ✅ 2026-06-20 `e0f8380e`; Phase 3 ✅ 2026-06-20 `888ced5a`; Phase 4 ✅ 2026-06-20 `8edd67be`; Phase 5 ✅ 2026-06-20 `c7050483` — next: Phase 6 player-site integration + ship gate)*
   **Design:** `docs/superpowers/specs/2026-06-17-player-secrets-design.md` — **read in full first.**
   **Plan:** `docs/superpowers/plans/2026-06-17-player-secrets.md` — **read in full; follow task-by-task.**
   Lets the DM embed encrypted secrets in player-facing entity pages. Two modes: (1) a **per-secret
