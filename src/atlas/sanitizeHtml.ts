@@ -47,6 +47,7 @@ const ALLOWED_ATTR = [
   "href", "title", "name", "id",
   "src", "alt", "width", "height", "loading",
   "class", "data-link", "data-id", "data-entity-id", "data-broken", "data-display", "data-callout",
+  "data-secret-id", "data-lock-type",
   "aria-haspopup",
   "open",
   "colspan", "rowspan", "scope", "align",
