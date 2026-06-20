@@ -84,6 +84,7 @@ import { useEntityEditDraft } from "@/atlas/categories/useEntityEditDraft";
 import { EditorRail } from "@/atlas/shell/EditorRail";
 import { EditorPanelHost } from "@/atlas/shell/EditorPanelHost";
 import { buildRailItems } from "@/atlas/shell/railRegistry";
+import { CharacterKeysPanel } from "@/atlas/secrets/CharacterKeysPanel";
 import { ViewModeProvider, useViewMode } from "@/atlas/view/ViewModeProvider";
 import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
@@ -1527,6 +1528,9 @@ function AtlasPlacementEditorInner() {
                 }}
               />
             ),
+            characterKeys: activeWorldId ? (
+              <CharacterKeysPanel worldDir={`content/${activeWorldId}`} />
+            ) : null,
           };
           const counts: Record<string, number | undefined> = {
             pins: unplaced.length > 0 ? unplaced.length : undefined,
