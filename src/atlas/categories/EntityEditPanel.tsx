@@ -18,6 +18,14 @@ import { FormatToolbar } from "@/atlas/editor/FormatToolbar";
 import { ImagePickerPanel } from "@/atlas/editor/ImagePickerPanel";
 import { applyToolbarAction, type ToolbarActionId } from "@/atlas/editor/toolbarActions";
 
+interface DraftSecret {
+  id: string;
+  for?: string;
+  password?: string;
+  teaser?: string;
+  reveal: string;
+}
+
 export function EntityEditPanel({
   sourcePath,
   onClose,
@@ -45,6 +53,8 @@ export function EntityEditPanel({
   >([]);
   const [images, setImages] = useState<string[]>([]);
   const [showImagePicker, setShowImagePicker] = useState(false);
+  const [draftSecrets, setDraftSecrets] = useState<DraftSecret[]>([]);
+  const [charNames, setCharNames] = useState<string[]>([]);
 
   // Load entity list once (cached by loadAtlasContent)
   useEffect(() => {
@@ -65,6 +75,26 @@ export function EntityEditPanel({
       .catch(() => {/* non-fatal — dev-only endpoint */});
   }, []);
 
+  // Fetch character names from the DM keys file to populate the "for:" dropdown.
+  useEffect(() => {
+    const parts = sourcePath.replace(/\\/g, "/").split("/");
+    if (parts.length < 2) return;
+    const keysPath = `${parts[0]}/${parts[1]}/_dm/character-keys.yaml`;
+    readSourceFile(keysPath, fetch)
+      .then((content) => {
+        const names: string[] = [];
+        for (const line of content.split("\n")) {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith("#") && !trimmed.startsWith(" ") && trimmed.includes(":")) {
+            const name = trimmed.split(":")[0].trim();
+            if (name) names.push(name);
+          }
+        }
+        setCharNames(names);
+      })
+      .catch(() => {/* non-fatal — keys file may not exist yet */});
+  }, [sourcePath]);
+
   useEffect(() => {
     let alive = true;
     setPhase("loading");
@@ -73,6 +103,10 @@ export function EntityEditPanel({
         const raw = await readSourceFile(sourcePath, fetch);
         if (!alive) return;
         rawRef.current = raw;
+        const fm = parseFrontmatter(raw);
+        const atlas = ((fm.data.atlas as Record<string, unknown>) ?? {});
+        // Always initialize secret drafts from on-disk frontmatter so they survive re-mounts.
+        setDraftSecrets(Array.isArray(atlas.secrets) ? (atlas.secrets as DraftSecret[]) : []);
         // No-loss: if a live draft for THIS sourcePath already exists (the user
         // was editing, left Edit, and came back), keep it. Only seed the draft
         // from disk on a genuine first open. rawRef is still refreshed above so
@@ -82,8 +116,6 @@ export function EntityEditPanel({
           setPhase("ready");
           return;
         }
-        const fm = parseFrontmatter(raw);
-        const atlas = ((fm.data.atlas as Record<string, unknown>) ?? {});
         const baseHash = await hashContent(raw);
         api.load({
           sourcePath,
@@ -124,6 +156,12 @@ export function EntityEditPanel({
         atlas.summary = api.draft.fields.summary;
       } else {
         delete atlas.summary;
+      }
+      const filteredSecrets = draftSecrets.filter((s) => s.reveal.trim().length > 0);
+      if (filteredSecrets.length > 0) {
+        atlas.secrets = filteredSecrets;
+      } else {
+        delete atlas.secrets;
       }
       const nextData: Record<string, unknown> = { ...data, atlas };
       const content = stringifyFrontmatter(api.draft.body, nextData);
@@ -170,6 +208,32 @@ export function EntityEditPanel({
     );
     api.setBody(result.value);
     setAcCtx(null);
+    requestAnimationFrame(() => {
+      textareaRef.current?.setSelectionRange(result.selStart, result.selEnd);
+      textareaRef.current?.focus();
+    });
+  };
+
+  const handleAddSecret = (type: "character" | "password") => {
+    if (!api.draft || !textareaRef.current) return;
+    const ta = textareaRef.current;
+    const oldBody = api.draft.body;
+    const actionId = type === "character" ? "secret:character" : "secret:password";
+    const result = applyToolbarAction(actionId, oldBody, ta.selectionStart, ta.selectionEnd);
+    api.setBody(result.value);
+    setAcCtx(null);
+    // Extract the newly generated secret ID by diffing old vs new markers
+    const oldIds = new Set([...oldBody.matchAll(/\{\{secret:([^}]+)\}\}/g)].map((m) => m[1]));
+    const newId = [...result.value.matchAll(/\{\{secret:([^}]+)\}\}/g)]
+      .map((m) => m[1])
+      .find((id) => !oldIds.has(id));
+    if (newId) {
+      const scaffold: DraftSecret =
+        type === "character"
+          ? { id: newId, for: "", reveal: "" }
+          : { id: newId, password: "", teaser: "", reveal: "" };
+      setDraftSecrets((prev) => [...prev, scaffold]);
+    }
     requestAnimationFrame(() => {
       textareaRef.current?.setSelectionRange(result.selStart, result.selEnd);
       textareaRef.current?.focus();
@@ -354,6 +418,121 @@ export function EntityEditPanel({
                 onImportImage={handleImageImport}
               />
             )}
+          </div>
+        </div>
+        {/* Secrets section */}
+        <div className="block">
+          <span className="block mb-1 text-xs font-medium">Secrets</span>
+          {draftSecrets.length > 0 && (
+            <div className="space-y-2 mb-2">
+              {draftSecrets.map((s, i) => (
+                <div key={s.id} className="border rounded p-2 space-y-1 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[10px] text-muted-foreground">{`{{secret:${s.id}}}`}</span>
+                    <button
+                      type="button"
+                      aria-label={`Remove secret ${s.id}`}
+                      className="text-xs text-red-400 hover:text-red-600"
+                      onClick={() => setDraftSecrets((prev) => prev.filter((_, j) => j !== i))}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  {"for" in s ? (
+                    <label className="block">
+                      <span className="block mb-0.5">Character</span>
+                      {charNames.length > 0 ? (
+                        <select
+                          aria-label="Character for secret"
+                          className="w-full h-7 px-1 rounded border bg-background text-xs"
+                          value={s.for ?? ""}
+                          onChange={(e) =>
+                            setDraftSecrets((prev) =>
+                              prev.map((x, j) => (j === i ? { ...x, for: e.target.value } : x)),
+                            )
+                          }
+                        >
+                          <option value="">— pick a character —</option>
+                          {charNames.map((n) => (
+                            <option key={n} value={n}>{n}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          className="w-full h-7 px-1 rounded border bg-background text-xs"
+                          placeholder="Character name"
+                          value={s.for ?? ""}
+                          onChange={(e) =>
+                            setDraftSecrets((prev) =>
+                              prev.map((x, j) => (j === i ? { ...x, for: e.target.value } : x)),
+                            )
+                          }
+                        />
+                      )}
+                    </label>
+                  ) : (
+                    <>
+                      <label className="block">
+                        <span className="block mb-0.5">Password (passphrase)</span>
+                        <input
+                          className="w-full h-7 px-1 rounded border bg-background text-xs"
+                          placeholder="the tide remembers"
+                          value={s.password ?? ""}
+                          onChange={(e) =>
+                            setDraftSecrets((prev) =>
+                              prev.map((x, j) => (j === i ? { ...x, password: e.target.value } : x)),
+                            )
+                          }
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="block mb-0.5">Teaser (public hint, optional)</span>
+                        <input
+                          className="w-full h-7 px-1 rounded border bg-background text-xs"
+                          placeholder="Only a true fjordmark person knows this"
+                          value={s.teaser ?? ""}
+                          onChange={(e) =>
+                            setDraftSecrets((prev) =>
+                              prev.map((x, j) => (j === i ? { ...x, teaser: e.target.value } : x)),
+                            )
+                          }
+                        />
+                      </label>
+                    </>
+                  )}
+                  <label className="block">
+                    <span className="block mb-0.5">Reveal text (markdown)</span>
+                    <textarea
+                      rows={3}
+                      className="w-full px-1 py-0.5 rounded border bg-background font-mono text-[11px]"
+                      placeholder="The reveal the player sees once unlocked…"
+                      value={s.reveal}
+                      onChange={(e) =>
+                        setDraftSecrets((prev) =>
+                          prev.map((x, j) => (j === i ? { ...x, reveal: e.target.value } : x)),
+                        )
+                      }
+                    />
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="h-7 px-2 text-xs rounded border"
+              onClick={() => handleAddSecret("character")}
+            >
+              + Add character secret
+            </button>
+            <button
+              type="button"
+              className="h-7 px-2 text-xs rounded border"
+              onClick={() => handleAddSecret("password")}
+            >
+              + Add puzzle secret
+            </button>
           </div>
         </div>
       </div>
