@@ -61,11 +61,17 @@ export function isWritableSourcePath(input: string): boolean {
     return true;
   }
 
+  // Single fixed DM-only keys file. The _dm folder stays build-excluded; only
+  // this exact filename is writable, so it can never become a general _dm write.
+  if (secondLast === "_dm" && last === "character-keys.yaml") {
+    return parts.length >= 4; // content/<world>/_dm/character-keys.yaml
+  }
+
   // .md branch — last segment must end .md (case-sensitive)
   if (!/^[A-Za-z0-9_\-. ]+\.md$/.test(last)) return false;
-  // Disallow _atlas anywhere in the middle for .md files (atlas dir is yaml-only)
+  // Disallow _atlas or _dm anywhere in the middle for .md files
   for (let i = 1; i < parts.length - 1; i++) {
-    if (parts[i] === "_atlas") return false;
+    if (parts[i] === "_atlas" || parts[i] === "_dm") return false;
   }
   return true;
 }
