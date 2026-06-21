@@ -32,6 +32,16 @@ describe("prepareAreas", () => {
     expect(prepareAreas(map)).toHaveLength(0);
   });
 
+  it("accepts an exactly-3-point polygon (triangle — minimum valid)", () => {
+    // points.length < 3 is the skip guard; exactly 3 must NOT be skipped
+    const map = baseMap({ soundscape: { areas: [{ id: "s0", points: [[0, 0], [50, 0], [25, 50]], bed: { src: "a.ogg" } }] } });
+    const prepared = prepareAreas(map);
+    expect(prepared).toHaveLength(1);
+    expect(prepared[0].id).toBe("s0");
+    expect(prepared[0].points).toHaveLength(3);
+    expect(prepared[0].bbox).toEqual({ minX: 0, minY: 0, maxX: 50, maxY: 50 });
+  });
+
   it("returns [] when there is no soundscape", () => {
     expect(prepareAreas(baseMap({}))).toEqual([]);
   });
