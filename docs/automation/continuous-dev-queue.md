@@ -1043,6 +1043,16 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   state. 4 new tests (7 total); pure test coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit 05a081aa (test(sound): N39 soundPrefs missing branches — null JSON, non-object JSON, partial prefs, non-boolean fields (7 total)). Gate: 7 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N40. Hygiene / coverage nibble #34** — `src/atlas/sound/resolveSoundscape.ts` `selectActiveBed`
+  had three untested branch groups: (1) the `viewArea <= 0` early-return path (zero-area viewport →
+  returns `prevId` as-is, whether null or a live id); (2) the dead-band floor path (eligible empty,
+  prevId set but coverage below `FILL_MIN × HYSTERESIS` → drops to silence, returning null — only the
+  within-dead-band and null-prevId cases were previously tested); (3) the equal-size sibling stability
+  guard (`prevId` is an eligible peer with the same `bboxArea` as the sort winner → keeps `prevId`
+  to prevent flickering — previously only tested with `prevId=null`). 3 new `it` blocks with 5
+  assertions total (10 tests in file); pure test coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit 35b8156a (test(sound): N40 selectActiveBed gap coverage — zero-area viewport, below-dead-band drop, sibling stability (10 total)). Gate: 10 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
