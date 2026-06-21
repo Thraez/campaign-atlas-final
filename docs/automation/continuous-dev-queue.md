@@ -1111,6 +1111,17 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   (14 total in file); pure test coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit 6fca135c (test(N46): rewriteAudioSrcs branch coverage — 8 new tests, 14 total). Gate: 14 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N47. Hygiene / coverage nibble #41** — `src/atlas/entity/EntityPanel.tsx` (M1 hover-peek
+  integration) had zero coverage for the `onPeek?.()`/`onPeekLeave?.()` prop-call bindings on
+  backlink ("Mentioned in") buttons and Connections entry buttons. Both surfaces wire four events
+  each (mouseEnter/mouseLeave/focus/blur) to the optional peek callbacks, but `EntityPanel.test.tsx`
+  never passed either prop and never fired hover or focus events. 6 new tests: backlink mouseEnter
+  → `onPeek("ally-npc", rect)`; backlink mouseLeave → `onPeekLeave()`; backlink focus →
+  `onPeek("ally-npc", rect)`; backlink blur → `onPeekLeave()`; Connections mouseEnter →
+  `onPeek("ally-npc", rect)`; Connections mouseLeave → `onPeekLeave()`. Pure test coverage —
+  no source changes.
+  - ✅ DONE 2026-06-21 — commit 86ab3321 (test(N47): EntityPanel hover-peek prop bindings — 6 new tests); merge dcd919c3. Gate: 21 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
