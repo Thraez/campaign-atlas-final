@@ -1053,6 +1053,14 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   assertions total (10 tests in file); pure test coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit 35b8156a (test(sound): N40 selectActiveBed gap coverage — zero-area viewport, below-dead-band drop, sibling stability (10 total)). Gate: 10 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N41. Hygiene / coverage nibble #35** — `src/test/sound/SoundControl.test.tsx` had only 1 test
+  (the invite-to-speaker flow). Four untested branches in `SoundControl.tsx`: the dismiss button
+  (hides the invite without enabling sound); the muted toggle (aria-label "Mute sound" → "Unmute sound"
+  on click); the calm mode button (aria-pressed + text reflects calmMode state); and the post-enable
+  invite-hide (invite and dismiss both absent once soundEnabled is true). 4 new tests (5 total);
+  pure test coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit dc6014e6 (test(ui): N41 SoundControl branch coverage — dismiss, mute toggle, calm mode, invite-hide (5 total)). Gate: 5 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
