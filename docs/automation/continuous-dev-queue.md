@@ -1091,6 +1091,16 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   tests total); pure test coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit e7adfdbf (test(N44): readViewport edge-case coverage — mapHeight=0, oversized viewport, NW corner (4 tests)). Gate: 4 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N45. Hygiene / coverage nibble #39** — `src/atlas/entity/EntityPanel.tsx` CreditBadge
+  integration had two untested structural branches: (1) `images.length === 0` — when the entity
+  has no images the outer images-section guard (`images.length > 0`) is false, so the badge never
+  renders even when `entity.credit` is set; (2) `images.length > 1` — when multiple images are
+  present the badge should appear once per image (the `.map()` loop renders a CreditBadge inside
+  each image `div`). N31 covered the pure CreditBadge component contract; these two tests cover the
+  integration mount logic inside EntityPanel. 2 new tests (5 total in the credit-badge describe
+  block); pure test coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit 20a5faeb (test(N45): EntityPanel CreditBadge integration — zero-images guard + multi-image (2 new tests, 5 total)); merged b689a6b9. Gate: 15 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
