@@ -965,6 +965,17 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   tests in `src/test/entity/CreditBadge.test.tsx`; pure test coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit 8b4a131f (test(N31): CreditBadge pure component — 5 tests (text content, CSS class, title attr, aria-label, role)); merged ae3a6687. Gate: 5 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N32. Hygiene / coverage nibble #26** — `src/atlas/secrets/secretBlockView.ts` (P1) had no test
+  coverage. It is the imperative DOM driver for the player-facing sealed-secret UI and has seven testable
+  branches: character lock with no character key (host stays empty/invisible); character lock with key +
+  reveal succeeds (inserts `atlas-secret-open` div); character lock with key + reveal returns null (host
+  stays cleared); password lock renders sealed box with passphrase input and submit button; password lock
+  with teaser text; password lock without teaser (no `.atlas-secret-teaser` element); password form submit
+  with correct passphrase (content revealed, `markUnlocked` called); password form submit with wrong
+  passphrase ("The seal holds firm." message, `markUnlocked` not called). 8 new tests using
+  `vi.mock` for `revealToHtml` and `playerSecretsStore`; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit 5e359416 (test(N32): secretBlockView DOM branches — 8 tests); merged d6476f7d. Gate: 8 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
