@@ -1017,6 +1017,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   `localFsSave` and `sonner`; pure test coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit fc323326 (test(N36): CharacterKeysPanel load/add/remove/persist contract — 8 tests); merged 3b2f2fc8. Gate: 8 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N37. Hygiene / coverage nibble #31** — `src/atlas/sound/AudioEngine.ts` (Phase 1a soundscape engine)
+  had only 4 tests covering unlock/crossfade/cache/resume. 9 new tests added to the existing
+  `src/test/sound/AudioEngine.test.ts` (13 total): `crossfadeTo(same id)` is a no-op; `crossfadeTo(null)`
+  fades out active bed; `setMuted(true)` ramps master gain to 0; `setMuted(false)` ramps back to
+  masterGain; `setMasterGain()` clamps to [0, 1]; `canPlay` fallback uses `srcFallback` when primary
+  format is unsupported; `dispose()` clears context + buffer cache; LRU evicts oldest buffer when cache
+  exceeds 4 entries. Pure test coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit 26fa0366 (test(sound): N37 AudioEngine coverage — 9 new tests, 13 total); merged f37a9012. Gate: 13 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
