@@ -1122,6 +1122,17 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   no source changes.
   - ✅ DONE 2026-06-21 — commit 86ab3321 (test(N47): EntityPanel hover-peek prop bindings — 6 new tests); merge dcd919c3. Gate: 21 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N48. Hygiene / coverage nibble #42** — `src/atlas/deepLink.ts` (`parseDeepLink`) had a latent
+  bug: `Number("") === 0`, so empty-string params like `?cx=&cy=` parsed as `center:{x:0,y:0}` and
+  `?cz=` parsed as `zoom:0` instead of `null`. The bug can't be triggered by the app's own
+  `serializeDeepLink` (which only sets params to non-empty strings or omits them), but a hand-crafted
+  URL would silently snap the viewport to the origin. Fixed by switching the three numeric-param checks
+  from `cxStr !== null` to plain truthiness (`cxStr ? Number(cxStr) : NaN`), so empty string falls
+  through to NaN (treated as absent). 4 new tests: empty map+entity strings → null; empty cx+cy →
+  center null; valid cx + empty cy → center null; empty cz → zoom null. Source fix + 4 tests;
+  16/16 deep-link tests green. No source changes to serializeDeepLink.
+  - ✅ DONE 2026-06-21 — commit a882796d (fix+test(N48): parseDeepLink empty-string params treated as absent); merge 90c5c629. Gate: 16 tests green (targeted vitest); shard 1/4 435 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
