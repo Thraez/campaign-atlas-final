@@ -1171,6 +1171,13 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   pure test coverage — no source changes.
   - ✅ DONE 2026-06-22 — commit 87405d3e (test(N52): filterSoundscape ...rest spread — regionId + points survive neutralisation (15 total)); merge 7b3ab2a8. Gate: 15 tests green (targeted vitest); shard 1/4 443 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N53. Hygiene / coverage nibble #47** — `src/atlas/sound/resolveSoundscape.ts` (`prepareAreas`)
+  skip-guard is `points.length < 3`, so exactly 3 points (a triangle — the minimum valid polygon) must NOT
+  be skipped. The existing "skips degenerate polygons" test uses 2 points (caught by `< 3`), but the boundary
+  at exactly 3 was untested, leaving the skip-guard's minimum undocumented. 1 new test (6 total in
+  prepareAreas.test.ts); pure test coverage — no source changes.
+  - ✅ DONE 2026-06-22 — commit 27e08bee (test(N53): prepareAreas triangle-boundary — exactly-3-point polygon is minimum valid (6 tests)). Gate: 6 tests green (targeted vitest); shard 1/4 443 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
