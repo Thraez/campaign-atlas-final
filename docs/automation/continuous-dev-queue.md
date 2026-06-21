@@ -1034,6 +1034,14 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   state "error" + `error` field = "Publish failed (500)"; `confirm()` network throw → state "error"
   + `error` field = exception message. 4 new tests (15 total); pure test coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit b9b5ad90 (test(publish): N38 usePublishFlow error branches — 4 new tests). Gate: 15 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+- [x] **N39. Hygiene / coverage nibble #33** — `src/atlas/sound/soundPrefs.ts` had four untested branches
+  in `loadSoundPrefs`: the `!p` guard (stored JSON is `"null"` → `null` after parse, triggers `!p` check),
+  the `typeof p !== "object"` guard (stored JSON is a number), the partial-prefs path (only some fields
+  present in the stored object → missing fields fall back to per-field defaults), and the non-boolean
+  field path (field values are strings/numbers/null → each falls back to its default). All are recovery
+  paths that ensure corrupt or migrated localStorage data never leaves `loadSoundPrefs` with a malformed
+  state. 4 new tests (7 total); pure test coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit 05a081aa (test(sound): N39 soundPrefs missing branches — null JSON, non-object JSON, partial prefs, non-boolean fields (7 total)). Gate: 7 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
 ---
 
