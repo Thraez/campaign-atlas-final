@@ -47,4 +47,37 @@ describe("readViewport", () => {
     expect(cy).toBe(0);
     expect(view).toEqual({ minX: -20, maxX: 20, minY: 0, maxY: 50 });
   });
+
+  it("passes through negative minY when viewport extends beyond the north edge (no clamping)", () => {
+    // ne.lat > mapHeight means the viewport's north edge is above the map top.
+    // minY = mapHeight - ne.lat becomes negative; readViewport does not clamp to 0.
+    const mapHeight = 500;
+    const map = mockMap({ lat: 400, lng: 200 }, { lat: 50, lng: 100 }, { lat: 600, lng: 300 });
+    const { cx, cy, view } = readViewport(map, mapHeight);
+    expect(cx).toBe(200);
+    expect(cy).toBe(100); // 500 - 400
+    expect(view.minY).toBe(-100); // 500 - 600: negative, not clamped
+    expect(view.maxY).toBe(450);  // 500 - 50
+  });
+
+  it("passes through maxY exceeding mapHeight when viewport extends beyond the south edge (no clamping)", () => {
+    // sw.lat < 0 means the viewport's south edge is below the map bottom.
+    // maxY = mapHeight - sw.lat exceeds mapHeight; readViewport does not clamp.
+    const mapHeight = 500;
+    const map = mockMap({ lat: 100, lng: 200 }, { lat: -80, lng: 100 }, { lat: 200, lng: 300 });
+    const { cx, cy, view } = readViewport(map, mapHeight);
+    expect(cx).toBe(200);
+    expect(cy).toBe(400); // 500 - 100
+    expect(view.minY).toBe(300); // 500 - 200
+    expect(view.maxY).toBe(580); // 500 - (-80): exceeds mapHeight, not clamped
+  });
+
+  it("passes through out-of-bounds y in both directions simultaneously (no clamping)", () => {
+    // Viewport extends past both north and south map edges at once.
+    const mapHeight = 400;
+    const map = mockMap({ lat: 200, lng: 0 }, { lat: -50, lng: -10 }, { lat: 450, lng: 10 });
+    const { view } = readViewport(map, mapHeight);
+    expect(view.minY).toBe(-50);  // 400 - 450: negative
+    expect(view.maxY).toBe(450);  // 400 - (-50): > mapHeight
+  });
 });
