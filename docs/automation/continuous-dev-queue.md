@@ -985,6 +985,19 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   `vi.mock` for `loadAtlasContent`, `playerSecretsStore`, and `collectCharacterSecrets`; pure test
   coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit 07ea3531 (test(N33): CharacterSecretsPage SecretsBody state machine — 6 tests); merged 2952a5ff. Gate: 6 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+- [x] **N34. Hygiene / coverage nibble #28** — `src/atlas/content/projectEntityForPlayer.ts` is the core
+  client-side secrecy projection function used by the honest-player-preview (G1) and the entity reading
+  pane; it had seven untested branch gaps. Branches covered: alias-based wikilink redaction
+  (`buildProjectionContext` wires aliases into the name index — a `[[Alias]]` link to a secret entity
+  must be redacted via the alias path, not just the title path); `rumor`-visibility entity NOT in
+  `secretIds` (security invariant: `PLAYER_VISIBLE` includes `"rumor"`, so links to rumor entities are
+  preserved, not redacted); `relationships → undefined` when ALL relationships are filtered out (the
+  `kept.length > 0 ? kept : undefined` branch was only exercised when at least one relationship survived);
+  `%%dm%%` in a relationship label stripped (`stripDmFromShippingString` on `r.label`); `%%dm%%` in
+  `entity.summary` stripped; `%%dm%%` in `entity.race` stripped; secret marker id containing `"` is
+  HTML-escaped in `data-secret-id` attribute (XSS guard). 7 new tests in
+  `src/test/content/projectEntityForPlayer-gaps.test.ts`; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit 6201ce06 (test(N34): projectEntityForPlayer branch gaps — 7 tests); merged fb94220a. Gate: 7 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
 ---
 
