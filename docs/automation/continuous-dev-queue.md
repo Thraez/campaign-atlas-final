@@ -1133,6 +1133,16 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   16/16 deep-link tests green. No source changes to serializeDeepLink.
   - ✅ DONE 2026-06-21 — commit a882796d (fix+test(N48): parseDeepLink empty-string params treated as absent); merge 90c5c629. Gate: 16 tests green (targeted vitest); shard 1/4 435 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N49. Hygiene / coverage nibble #43** — `src/atlas/sound/readViewport.ts` had 4 tests (N44)
+  covering the lat→y flip, zero-height map, x-direction overflow, and northwest-corner edge case, but
+  the y-direction no-clamp contract was untested. The existing x-overflow test used a viewport whose y
+  values were exactly at the map boundary (minY=0, maxY=mapHeight), so callers depending on negative
+  minY or maxY > mapHeight had no documented proof of the no-clamping guarantee. Added 3 tests:
+  (1) viewport north edge beyond map top → minY is negative (not clamped); (2) viewport south edge
+  below map bottom → maxY exceeds mapHeight (not clamped); (3) both directions simultaneously out of
+  bounds. All 7 readViewport tests green.
+  - ✅ DONE 2026-06-21 — commit 036dcff6 (test(N49): readViewport y-direction overflow — 3 tests); merge 25d39ba3. Gate: 7 tests green (targeted vitest); shard 1/4 438 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
