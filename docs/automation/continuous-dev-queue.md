@@ -1082,6 +1082,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   exported — import added to the test file only).
   - ✅ DONE 2026-06-21 — commit e1f03f50 (test(N43): computeActiveId branch coverage — stable prevId, hysteresis dead-band, area switch (6 tests total)). Gate: 6 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N44. Hygiene / coverage nibble #38** — `src/atlas/sound/readViewport.ts` had only 1 test
+  (the basic lat-flip). The function is pure arithmetic (no branches) so the existing test already
+  covered the happy path; three additional edge-case inputs were unguarded: (1) `mapHeight=0` — all
+  y values become negated lats (cy = -lat, minY = -ne.lat, maxY = -sw.lat); (2) a viewport wider
+  than the map (sw.lng negative, ne.lng > map width) — readViewport does NOT clamp, callers own that;
+  (3) centre at the northwest corner (lat = mapHeight) → cy = 0 (top of map). 3 new `it` blocks (4
+  tests total); pure test coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit e7adfdbf (test(N44): readViewport edge-case coverage — mapHeight=0, oversized viewport, NW corner (4 tests)). Gate: 4 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
