@@ -1162,6 +1162,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   spread in the return must preserve. 3 new tests (13 total); pure test coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit 9f23e1b0 (test(N51): filterSoundscape falsy-value coverage — masterGain:0, enabled:false, areas:undefined (13 total)); merge ef2fbbce. Gate: 13 tests green (targeted vitest); shard 1/4 441 tests green (known RPC timeout flake, all 51 test files pass); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N52. Hygiene / coverage nibble #46** — `scripts/atlas/filterSoundscape.ts` (`filterSoundscapeForPlayer`)
+  spread contract for area shape fields was untested: the `...rest` destructuring (which strips `name` and
+  replaces `id`) must preserve all other fields. Two gaps: `regionId` (the ride-on link to a map region — present
+  in the source comment "Preserves all other fields (bed src, gain, points, regionId, etc.)" but never asserted
+  in tests) and `points` (the own-polygon array for sound-only zones). The `makeArea` helper used in all prior
+  tests never passed either field, so both survival contracts were undocumented by tests. 2 new tests (15 total);
+  pure test coverage — no source changes.
+  - ✅ DONE 2026-06-22 — commit 87405d3e (test(N52): filterSoundscape ...rest spread — regionId + points survive neutralisation (15 total)); merge 7b3ab2a8. Gate: 15 tests green (targeted vitest); shard 1/4 443 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
