@@ -25,6 +25,12 @@ describe("labelVisibilityThreshold", () => {
   it("never returns negative", () => {
     expect(labelVisibilityThreshold(100)).toBe(0);
   });
+  it("returns 4 at zoom -1 (between zoom -2=5 and zoom 0=3)", () => {
+    expect(labelVisibilityThreshold(-1)).toBe(4);
+  });
+  it("returns 2 at zoom 1 (between zoom 0=3 and zoom 2=1)", () => {
+    expect(labelVisibilityThreshold(1)).toBe(2);
+  });
 });
 
 describe("shouldShowLabel", () => {
@@ -61,5 +67,11 @@ describe("shouldShowLabel", () => {
   });
   it("even priority 0 is hidden at zoom -6 (threshold 9)", () => {
     expect(shouldShowLabel(-6, 0)).toBe(false);
+  });
+  it("priority 0 is hidden at zoom 2 (threshold 1) — zoom 3 is the first zoom where priority 0 shows", () => {
+    expect(shouldShowLabel(2, 0)).toBe(false);
+  });
+  it("priority 0 is hidden at zoom 0 (threshold 3)", () => {
+    expect(shouldShowLabel(0, 0)).toBe(false);
   });
 });
