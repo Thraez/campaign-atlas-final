@@ -957,6 +957,14 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   pure test coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit 8199ab53 (test(N30): useSyncSettings fetch branches — loadSettings/saveSettings/loadSyncMap/saveSyncMap (7 tests)). Gate: 7 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N31. Hygiene / coverage nibble #25** — `src/atlas/entity/CreditBadge.tsx` (L1) had no dedicated
+  component tests. The EntityPanel integration tests (L1 section) verified the conditional rendering
+  branches (badge shown, badges=false hidden, no credit hidden), but the component's own contract was
+  untested: text content rendered, `atlas-credit-badge` CSS class applied, `title` attribute equal to
+  the credit string (tooltip), `aria-label` prefixed with "Image credit:", and `role="note"`. 5 new
+  tests in `src/test/entity/CreditBadge.test.tsx`; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit 8b4a131f (test(N31): CreditBadge pure component — 5 tests (text content, CSS class, title attr, aria-label, role)); merged ae3a6687. Gate: 5 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
