@@ -90,4 +90,23 @@ describe("filterSoundscapeForPlayer", () => {
     const result = filterSoundscapeForPlayer(sc);
     expect(result?.areas).toHaveLength(0);
   });
+
+  it("preserves masterGain: 0 (falsy number is a valid mute volume, not 'unset')", () => {
+    const sc: SoundscapeConfig = { masterGain: 0, areas: [] };
+    const result = filterSoundscapeForPlayer(sc);
+    expect(result?.masterGain).toBe(0);
+  });
+
+  it("preserves enabled: false (explicitly-disabled soundscape passes through)", () => {
+    const sc: SoundscapeConfig = { enabled: false, masterGain: 0.8, areas: [] };
+    const result = filterSoundscapeForPlayer(sc);
+    expect(result?.enabled).toBe(false);
+    expect(result?.masterGain).toBe(0.8);
+  });
+
+  it("handles missing areas field (undefined areas treated as empty)", () => {
+    const sc = { masterGain: 0.5 } as unknown as SoundscapeConfig;
+    const result = filterSoundscapeForPlayer(sc);
+    expect(result?.areas).toHaveLength(0);
+  });
 });
