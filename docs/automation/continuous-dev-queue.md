@@ -1070,6 +1070,18 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit e0b9f1c8 (test(sound): N42 SoundSettingsProvider branch coverage — enableSound, setMuted, engine pass-through, engine stability (5 total)). Gate: 5 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N43. Hygiene / coverage nibble #37** — `src/test/sound/SoundscapeLayer.logic.test.ts` had only
+  2 tests for `computeActiveId` (basic area-hit and overview-scale null). Three untested branches in
+  `selectActiveBed`: (1) prevId unchanged when it is already the sole eligible winner (`prevId ===
+  smallest.id` → stability branch not entered, smallest returned directly); (2) hysteresis dead-band
+  — eligible empty but prevId area's coverage is in [FILL_MIN×HYSTERESIS, FILL_MIN) → prevId kept;
+  same setup without prevId → null; (3) area switch to a strictly smaller nested area — inner area
+  has lower bboxArea than prevId's outer area so `smallest.bboxArea >= prev.bboxArea` is false and
+  the new inner id is returned. 4 new `it` blocks (6 tests total); pure test coverage — no source
+  changes. Also exports `FILL_MIN` and `HYSTERESIS` from `resolveSoundscape.ts` (they were already
+  exported — import added to the test file only).
+  - ✅ DONE 2026-06-21 — commit e1f03f50 (test(N43): computeActiveId branch coverage — stable prevId, hysteresis dead-band, area switch (6 tests total)). Gate: 6 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
