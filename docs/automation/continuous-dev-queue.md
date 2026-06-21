@@ -1101,6 +1101,16 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   block); pure test coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit 20a5faeb (test(N45): EntityPanel CreditBadge integration — zero-images guard + multi-image (2 new tests, 5 total)); merged b689a6b9. Gate: 15 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N46. Hygiene / coverage nibble #40** — `scripts/atlas/hashAudioAssets.ts` exports two functions
+  but `rewriteAudioSrcs` had zero test coverage despite sitting on the build-atlas sound path
+  (`build-atlas.ts:875` — rewrites every sound area's `src`/`srcFallback` to its content-hashed name
+  in the published `atlas.json`). Eight branches covered: `src` found in rewrite map → hashed; `src`
+  not found → original kept (`??` fallback); `srcFallback` present + found → hashed; `srcFallback`
+  present + not found → original kept; no `srcFallback` → key absent from output; empty areas → `[]`;
+  multi-area array → all areas rewritten; immutability — original `areas` array untouched. 8 new tests
+  (14 total in file); pure test coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit 6fca135c (test(N46): rewriteAudioSrcs branch coverage — 8 new tests, 14 total). Gate: 14 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
