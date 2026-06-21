@@ -62,4 +62,28 @@ describe("selectActiveBed", () => {
     const view = rect(0, 0, 100, 100);
     expect(selectActiveBed([a, b], 50, 50, view, null)).toBe("aaa");
   });
+
+  it("returns prevId unchanged when the viewport has zero area (degenerate)", () => {
+    // viewArea = 0 → early return without computing coverage; preserves whatever prevId was
+    const view = rect(200, 200, 200, 200); // width=0, height=0
+    expect(selectActiveBed([region], 500, 500, view, "region")).toBe("region");
+    expect(selectActiveBed([region], 500, 500, view, null)).toBeNull();
+  });
+
+  it("drops to silence when prevId coverage falls below the hysteresis floor", () => {
+    // city 200×200=40K; view 200×800=160K → coverage 0.25 < FILL_MIN×HYSTERESIS(0.5×0.85=0.425)
+    // dead-band does not apply; no other area is eligible → null
+    const view = rect(400, 600, 600, 1400);
+    expect(selectActiveBed([city], 500, 700, view, "city")).toBeNull();
+  });
+
+  it("keeps the previous winner over a new equal-size challenger (sibling stability)", () => {
+    const a = sq("aaa", 0, 0, 100, 100);
+    const b = sq("bbb", 0, 0, 100, 100);
+    const view = rect(0, 0, 100, 100);
+    // Without prevId the alphabetically smaller id wins the sort tiebreak
+    expect(selectActiveBed([a, b], 50, 50, view, null)).toBe("aaa");
+    // With prevId="bbb" (would lose the sort) the stability guard keeps it because sizes are equal
+    expect(selectActiveBed([a, b], 50, 50, view, "bbb")).toBe("bbb");
+  });
 });
