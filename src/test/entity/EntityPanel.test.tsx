@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
 import type { CreditsConfig, Entity } from "@/atlas/content/schema";
@@ -244,5 +244,133 @@ describe("EntityPanel — credit badge", () => {
     );
     const badges = screen.getAllByRole("note", { name: /Image credit: Art by Jane Doe/i });
     expect(badges).toHaveLength(2);
+  });
+});
+
+// ── N47 — hover-peek prop bindings ───────────────────────────────────────────
+
+const entityWithBacklink: Entity = {
+  ...e,
+  backlinks: [{ id: "ally-npc", title: "Ally NPC" }],
+} as Entity;
+
+const entityWithRelationship: Entity = {
+  ...e,
+  relationships: [{ entity: "ally-npc", type: "allied_with", visibility: "player" as const }],
+} as Entity;
+
+describe("EntityPanel — hover-peek prop bindings (N47)", () => {
+  it("calls onPeek with backlink id + rect on mouseEnter", () => {
+    const onPeek = vi.fn();
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityWithBacklink}
+          placements={[]}
+          entityById={baseEntityById}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+          onPeek={onPeek}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.mouseEnter(screen.getByText("Ally NPC"));
+    expect(onPeek).toHaveBeenCalledWith("ally-npc", expect.any(Object));
+  });
+
+  it("calls onPeekLeave on mouseLeave from a backlink button", () => {
+    const onPeekLeave = vi.fn();
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityWithBacklink}
+          placements={[]}
+          entityById={baseEntityById}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+          onPeekLeave={onPeekLeave}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.mouseLeave(screen.getByText("Ally NPC"));
+    expect(onPeekLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onPeek with backlink id on focus", () => {
+    const onPeek = vi.fn();
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityWithBacklink}
+          placements={[]}
+          entityById={baseEntityById}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+          onPeek={onPeek}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.focus(screen.getByText("Ally NPC"));
+    expect(onPeek).toHaveBeenCalledWith("ally-npc", expect.any(Object));
+  });
+
+  it("calls onPeekLeave on blur from a backlink button", () => {
+    const onPeekLeave = vi.fn();
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityWithBacklink}
+          placements={[]}
+          entityById={baseEntityById}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+          onPeekLeave={onPeekLeave}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.blur(screen.getByText("Ally NPC"));
+    expect(onPeekLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onPeek with Connection entity id + rect on mouseEnter", () => {
+    const onPeek = vi.fn();
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityWithRelationship}
+          placements={[]}
+          entityById={baseEntityById}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+          onPeek={onPeek}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.mouseEnter(screen.getByText("Ally NPC"));
+    expect(onPeek).toHaveBeenCalledWith("ally-npc", expect.any(Object));
+  });
+
+  it("calls onPeekLeave on mouseLeave from a Connections entry button", () => {
+    const onPeekLeave = vi.fn();
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityWithRelationship}
+          placements={[]}
+          entityById={baseEntityById}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+          onPeekLeave={onPeekLeave}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.mouseLeave(screen.getByText("Ally NPC"));
+    expect(onPeekLeave).toHaveBeenCalledTimes(1);
   });
 });
