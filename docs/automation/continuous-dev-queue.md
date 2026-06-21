@@ -1143,6 +1143,16 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   bounds. All 7 readViewport tests green.
   - ✅ DONE 2026-06-21 — commit 036dcff6 (test(N49): readViewport y-direction overflow — 3 tests); merge 25d39ba3. Gate: 7 tests green (targeted vitest); shard 1/4 438 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N50. Hygiene / coverage nibble #44** — `src/atlas/pins/labelVisibility.ts` (`labelVisibilityThreshold`,
+  `shouldShowLabel`) had 18 tests (F3) covering the main zoom presets but two gaps in the threshold
+  sequence: zoom=-1 (threshold 4, between the tested -2=5 and 0=3) and zoom=1 (threshold 2, between
+  the tested 0=3 and 2=1) were never directly asserted. Two `shouldShowLabel` boundary cases were
+  also absent: `shouldShowLabel(2, 0)` = false (priority=0 hidden at zoom=2 where threshold=1 —
+  documents that zoom 3 is the first zoom where priority-0 labels appear) and `shouldShowLabel(0, 0)`
+  = false (priority=0 hidden at zoom=0 where threshold=3). 4 new tests (22 total); pure test
+  coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit b79faded (test(N50): labelVisibility boundary gaps — 4 new tests, 22 total); merge 947de000. Gate: 22 tests green (targeted vitest); shard 1/4 438 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
