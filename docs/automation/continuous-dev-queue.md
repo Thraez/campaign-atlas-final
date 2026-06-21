@@ -1026,6 +1026,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   exceeds 4 entries. Pure test coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit 26fa0366 (test(sound): N37 AudioEngine coverage — 9 new tests, 13 total); merged f37a9012. Gate: 13 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N38. Hygiene / coverage nibble #32** — `src/atlas/publish/usePublishFlow.ts` had four untested
+  error branches in the `check()` and `confirm()` async state-machine. Existing tests covered HTTP errors
+  at the state level but never asserted the `error` string, and the fetch-throw catch blocks were
+  completely untested. Branches added: `check()` HTTP non-ok → `error` field = "Check failed (N)";
+  `check()` network throw → `error` field = exception message; `confirm()` HTTP non-ok (500) →
+  state "error" + `error` field = "Publish failed (500)"; `confirm()` network throw → state "error"
+  + `error` field = exception message. 4 new tests (15 total); pure test coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit b9b5ad90 (test(publish): N38 usePublishFlow error branches — 4 new tests). Gate: 15 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
