@@ -90,4 +90,25 @@ describe("parseDeepLink", () => {
     const dl = parseDeepLink("?cy=200");
     expect(dl.center).toBeNull();
   });
+
+  it("treats empty-string map and entity params as null", () => {
+    const dl = parseDeepLink("?map=&entity=");
+    expect(dl.mapId).toBeNull();
+    expect(dl.entityId).toBeNull();
+  });
+
+  it("treats empty-string cx and cy as no center (Number('') is 0 — must not parse as coordinate)", () => {
+    const dl = parseDeepLink("?cx=&cy=");
+    expect(dl.center).toBeNull();
+  });
+
+  it("treats one valid and one empty-string coordinate as no center", () => {
+    const dl = parseDeepLink("?cx=100&cy=");
+    expect(dl.center).toBeNull();
+  });
+
+  it("treats empty-string cz as no zoom", () => {
+    const dl = parseDeepLink("?cz=");
+    expect(dl.zoom).toBeNull();
+  });
 });
