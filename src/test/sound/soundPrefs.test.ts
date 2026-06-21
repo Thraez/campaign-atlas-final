@@ -17,4 +17,24 @@ describe("soundPrefs", () => {
     localStorage.setItem("atlas-player-sound-v1", "{not json");
     expect(loadSoundPrefs()).toEqual(DEFAULT_PREFS);
   });
+
+  it("degrades to defaults when stored JSON is null", () => {
+    localStorage.setItem("atlas-player-sound-v1", "null");
+    expect(loadSoundPrefs()).toEqual(DEFAULT_PREFS);
+  });
+
+  it("degrades to defaults when stored JSON is a non-object (number)", () => {
+    localStorage.setItem("atlas-player-sound-v1", "42");
+    expect(loadSoundPrefs()).toEqual(DEFAULT_PREFS);
+  });
+
+  it("fills missing fields from defaults when stored object is partial", () => {
+    localStorage.setItem("atlas-player-sound-v1", JSON.stringify({ soundEnabled: true }));
+    expect(loadSoundPrefs()).toEqual({ soundEnabled: true, muted: false, calmMode: false });
+  });
+
+  it("falls back per-field to defaults when stored fields are non-boolean", () => {
+    localStorage.setItem("atlas-player-sound-v1", JSON.stringify({ soundEnabled: "yes", muted: 1, calmMode: null }));
+    expect(loadSoundPrefs()).toEqual(DEFAULT_PREFS);
+  });
 });
