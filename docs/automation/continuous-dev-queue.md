@@ -998,6 +998,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   HTML-escaped in `data-secret-id` attribute (XSS guard). 7 new tests in
   `src/test/content/projectEntityForPlayer-gaps.test.ts`; pure test coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit 6201ce06 (test(N34): projectEntityForPlayer branch gaps — 7 tests); merged fb94220a. Gate: 7 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+- [x] **N35. Hygiene / coverage nibble #29** — `src/atlas/sync/SyncPanel.tsx` (K1) had no dedicated
+  component tests. `useSyncSettings` fetch branches were covered in N30, but the panel's own
+  render/interaction contract was entirely untested: Sync button disabled when no vault path is saved;
+  vault path and ignore globs populated from saved settings on mount; Sync button enabled when a vault
+  path is loaded; Save button calls `saveSettings` with current vault path and parsed globs; Sync now
+  button calls `onSync` prop with the vault root and parsed globs; last-sync timestamp displayed when
+  `lastSyncAt` is set. 7 new tests in `src/test/sync-panel.test.tsx` using `vi.mock` for
+  `useSyncSettings`; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit 0d06fc95 (test(N35): SyncPanel render/interaction contract — 7 tests); merged 43f4012c. Gate: 7 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
 ---
 
