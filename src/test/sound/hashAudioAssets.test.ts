@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { hashAudioAssets } from "../../../scripts/atlas/hashAudioAssets";
+import { hashAudioAssets, rewriteAudioSrcs } from "../../../scripts/atlas/hashAudioAssets";
 import type { SoundArea } from "@/atlas/content/schema";
 
 let tmpDir: string;
@@ -70,5 +70,64 @@ describe("hashAudioAssets", () => {
   it("returns empty map when no areas", () => {
     const map = hashAudioAssets([], tmpDir);
     expect(map.size).toBe(0);
+  });
+});
+
+describe("rewriteAudioSrcs", () => {
+  it("rewrites src when rewrite map contains it", () => {
+    const areas = [{ id: "a", bed: { src: "atlas/assets/maps/foo.ogg" } }];
+    const rewrite = new Map([["atlas/assets/maps/foo.ogg", "atlas/assets/audio/abc12345.ogg"]]);
+    expect(rewriteAudioSrcs(areas, rewrite)[0].bed.src).toBe("atlas/assets/audio/abc12345.ogg");
+  });
+
+  it("keeps original src when rewrite map does not contain it", () => {
+    const areas = [{ id: "a", bed: { src: "atlas/assets/maps/bar.ogg" } }];
+    expect(rewriteAudioSrcs(areas, new Map())[0].bed.src).toBe("atlas/assets/maps/bar.ogg");
+  });
+
+  it("rewrites srcFallback when rewrite map contains it", () => {
+    const areas = [{ id: "a", bed: { src: "atlas/assets/maps/foo.ogg", srcFallback: "atlas/assets/maps/foo.mp3" } }];
+    const rewrite = new Map([
+      ["atlas/assets/maps/foo.ogg", "atlas/assets/audio/abc.ogg"],
+      ["atlas/assets/maps/foo.mp3", "atlas/assets/audio/abc.mp3"],
+    ]);
+    expect(rewriteAudioSrcs(areas, rewrite)[0].bed.srcFallback).toBe("atlas/assets/audio/abc.mp3");
+  });
+
+  it("keeps original srcFallback when rewrite map does not contain it", () => {
+    const areas = [{ id: "a", bed: { src: "atlas/assets/maps/foo.ogg", srcFallback: "atlas/assets/maps/foo.mp3" } }];
+    const rewrite = new Map([["atlas/assets/maps/foo.ogg", "atlas/assets/audio/abc.ogg"]]);
+    expect(rewriteAudioSrcs(areas, rewrite)[0].bed.srcFallback).toBe("atlas/assets/maps/foo.mp3");
+  });
+
+  it("omits srcFallback from output when area has no srcFallback", () => {
+    const areas = [{ id: "a", bed: { src: "atlas/assets/maps/foo.ogg" } }];
+    const rewrite = new Map([["atlas/assets/maps/foo.ogg", "atlas/assets/audio/abc.ogg"]]);
+    expect(rewriteAudioSrcs(areas, rewrite)[0].bed.srcFallback).toBeUndefined();
+  });
+
+  it("returns empty array when areas is empty", () => {
+    expect(rewriteAudioSrcs([], new Map())).toEqual([]);
+  });
+
+  it("rewrites all areas in a multi-area array", () => {
+    const areas = [
+      { id: "a1", bed: { src: "atlas/assets/maps/foo.ogg" } },
+      { id: "a2", bed: { src: "atlas/assets/maps/bar.ogg" } },
+    ];
+    const rewrite = new Map([
+      ["atlas/assets/maps/foo.ogg", "atlas/assets/audio/aaa.ogg"],
+      ["atlas/assets/maps/bar.ogg", "atlas/assets/audio/bbb.ogg"],
+    ]);
+    const result = rewriteAudioSrcs(areas, rewrite);
+    expect(result[0].bed.src).toBe("atlas/assets/audio/aaa.ogg");
+    expect(result[1].bed.src).toBe("atlas/assets/audio/bbb.ogg");
+  });
+
+  it("does not mutate the original areas", () => {
+    const areas = [{ id: "a", bed: { src: "atlas/assets/maps/foo.ogg" } }];
+    const rewrite = new Map([["atlas/assets/maps/foo.ogg", "atlas/assets/audio/abc.ogg"]]);
+    rewriteAudioSrcs(areas, rewrite);
+    expect(areas[0].bed.src).toBe("atlas/assets/maps/foo.ogg");
   });
 });
