@@ -976,6 +976,16 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   `vi.mock` for `revealToHtml` and `playerSecretsStore`; pure test coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit 5e359416 (test(N32): secretBlockView DOM branches — 8 tests); merged d6476f7d. Gate: 8 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N33. Hygiene / coverage nibble #27** — `src/atlas/secrets/CharacterSecretsPage.tsx` (P1) had no
+  test coverage. The `SecretsBody` sub-component drives the player-facing character-key sign-in and secret
+  reveal flow with four distinct state branches: no key (sign-in form); key present + pending resolve
+  (Searching…); key present + no secrets found (no-results message); key present + secrets found (secrets
+  list with entity links). The form submit → `setCharacterKey` call and the Forget button → `forgetAll`
+  call were also untested. 6 new tests in `src/test/secrets/CharacterSecretsPage.test.tsx` using
+  `vi.mock` for `loadAtlasContent`, `playerSecretsStore`, and `collectCharacterSecrets`; pure test
+  coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit 07ea3531 (test(N33): CharacterSecretsPage SecretsBody state machine — 6 tests); merged 2952a5ff. Gate: 6 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
