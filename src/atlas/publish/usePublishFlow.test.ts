@@ -61,6 +61,22 @@ describe("usePublishFlow (check half)", () => {
     act(() => { result.current.check(); });
     await waitFor(() => expect(result.current.state).toBe("error"));
   });
+
+  it("→ error exposes HTTP status in error string", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) })));
+    const { result } = renderHook(() => usePublishFlow());
+    act(() => { result.current.check(); });
+    await waitFor(() => expect(result.current.state).toBe("error"));
+    expect(result.current.error).toBe("Check failed (503)");
+  });
+
+  it("→ error on network throw, exposes exception message", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("Network down"); }));
+    const { result } = renderHook(() => usePublishFlow());
+    act(() => { result.current.check(); });
+    await waitFor(() => expect(result.current.state).toBe("error"));
+    expect(result.current.error).toBe("Network down");
+  });
 });
 
 describe("usePublishFlow (push half)", () => {
@@ -106,5 +122,21 @@ describe("usePublishFlow (push half)", () => {
     mockPushHttp(423);
     act(() => { result.current.confirm(); });
     await waitFor(() => expect(result.current.state).toBe("busy"));
+  });
+
+  it("confirm() → error on non-ok HTTP, exposes status in error string", async () => {
+    const { result } = await reachReady();
+    mockPushHttp(500);
+    act(() => { result.current.confirm(); });
+    await waitFor(() => expect(result.current.state).toBe("error"));
+    expect(result.current.error).toBe("Publish failed (500)");
+  });
+
+  it("confirm() → error on network throw, exposes exception message", async () => {
+    const { result } = await reachReady();
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("Connection refused"); }));
+    act(() => { result.current.confirm(); });
+    await waitFor(() => expect(result.current.state).toBe("error"));
+    expect(result.current.error).toBe("Connection refused");
   });
 });
