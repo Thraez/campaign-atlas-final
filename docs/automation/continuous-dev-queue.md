@@ -1008,6 +1008,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   `useSyncSettings`; pure test coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit 0d06fc95 (test(N35): SyncPanel render/interaction contract — 7 tests); merged 43f4012c. Gate: 7 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N36. Hygiene / coverage nibble #30** — `src/atlas/secrets/CharacterKeysPanel.tsx` (P1) had no test
+  coverage. The panel's load/add/remove/persist contract was entirely untested: loading indicator shown
+  while fetch is pending; empty state on 404; rows populated from saved YAML on mount; Add character adds
+  a new row; Remove character removes the row; Save button calls `saveAtlasPatchToLocalFs` with the
+  correct path and kind; Save button is disabled while save is in flight; blank-name rows excluded from
+  the saved YAML. 8 new tests in `src/test/secrets/CharacterKeysPanel.test.tsx` mocking
+  `localFsSave` and `sonner`; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit fc323326 (test(N36): CharacterKeysPanel load/add/remove/persist contract — 8 tests); merged 3b2f2fc8. Gate: 8 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
