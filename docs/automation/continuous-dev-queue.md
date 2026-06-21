@@ -1153,6 +1153,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit b79faded (test(N50): labelVisibility boundary gaps — 4 new tests, 22 total); merge 947de000. Gate: 22 tests green (targeted vitest); shard 1/4 438 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N51. Hygiene / coverage nibble #45** — `scripts/atlas/filterSoundscape.ts` (`filterSoundscapeForPlayer`)
+  had its existing "preserves masterGain and enabled flag" test covering only the truthy cases (`enabled: true`,
+  `masterGain: 0.6`). Three falsy-value gaps were untested: `masterGain: 0` (a valid mute-volume — the spread
+  operator preserves it, but future refactors using `if (sc.masterGain)` would silently drop it); `enabled: false`
+  (explicitly-disabled soundscape must pass through unchanged); and `sc.areas` being `undefined` (the `?? []`
+  guard ensures no crash, producing `areas: []`). All three document the falsy-value contract that the object
+  spread in the return must preserve. 3 new tests (13 total); pure test coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit 9f23e1b0 (test(N51): filterSoundscape falsy-value coverage — masterGain:0, enabled:false, areas:undefined (13 total)); merge ef2fbbce. Gate: 13 tests green (targeted vitest); shard 1/4 441 tests green (known RPC timeout flake, all 51 test files pass); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
