@@ -1061,6 +1061,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   pure test coverage — no source changes.
   - ✅ DONE 2026-06-21 — commit dc6014e6 (test(ui): N41 SoundControl branch coverage — dismiss, mute toggle, calm mode, invite-hide (5 total)). Gate: 5 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N42. Hygiene / coverage nibble #36** — `src/test/sound/SoundSettingsProvider.test.tsx` had only
+  1 test (calm mode toggle). Four untested branches in `SoundSettingsProvider.tsx`: `enableSound`
+  (sets `soundEnabled: true` + persists via `saveSoundPrefs`); `setMuted(true/false)` (updates muted
+  value exposed in context); muted state passes through to `engine.setMuted()` via the mirror effect;
+  and `engine` ref stability across re-renders (the `useState(() => new AudioEngine(...))` initialiser
+  guarantees the same instance, never recreated on state change). 4 new tests (5 total); pure test
+  coverage — no source changes.
+  - ✅ DONE 2026-06-21 — commit e0b9f1c8 (test(sound): N42 SoundSettingsProvider branch coverage — enableSound, setMuted, engine pass-through, engine stability (5 total)). Gate: 5 tests green (targeted vitest run); tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
