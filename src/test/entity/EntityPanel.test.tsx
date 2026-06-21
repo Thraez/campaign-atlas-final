@@ -210,4 +210,39 @@ describe("EntityPanel — credit badge", () => {
     renderWithBadge({ credit: undefined });
     expect(screen.queryByRole("note", { name: /Image credit/i })).not.toBeInTheDocument();
   });
+
+  it("no badge when entity has no images (images.length === 0 guard)", () => {
+    const entity = { ...entityWithImage, images: [] } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={new Map([[entity.id, entity]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole("note", { name: /Image credit/i })).not.toBeInTheDocument();
+  });
+
+  it("renders a badge on each image when entity has multiple images", () => {
+    const entity = { ...entityWithImage, images: ["img1.png", "img2.png"] } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={new Map([[entity.id, entity]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    const badges = screen.getAllByRole("note", { name: /Image credit: Art by Jane Doe/i });
+    expect(badges).toHaveLength(2);
+  });
 });
