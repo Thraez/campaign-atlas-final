@@ -87,6 +87,14 @@ describe("resolveImageEmbeds", () => {
     expect(resolved).not.toContain("![[");
     expect(resolved).toContain("Public text.");
   });
+  it("![[image.png|Alt text]] uses alias as alt and filename as src", () => {
+    const out = resolveImageEmbeds("![[Portrait.png|Lord Corven]]");
+    expect(out).toBe("![Lord Corven](/atlas/assets/images/Portrait.png)");
+  });
+  it("![[image.png]] without alias uses filename as alt text (unchanged behavior)", () => {
+    const out = resolveImageEmbeds("![[Portrait.png]]");
+    expect(out).toBe("![Portrait.png](/atlas/assets/images/Portrait.png)");
+  });
 });
 
 describe("renderEntityMarkdown highlight secrecy", () => {

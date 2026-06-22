@@ -11,14 +11,18 @@ const WIKILINK_RE = /\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+?))?\]\]/g;
 
 export const DEFAULT_RESOLVE_ASSET = (n: string): string => `/atlas/assets/images/${n}`;
 
-/** Convert Obsidian image embed syntax to standard markdown img before the wikilink pass. */
+/** Convert Obsidian image embed syntax to standard markdown img before the wikilink pass.
+ *  Handles the optional pipe-alias: ![[image.png|Alt text]] → ![Alt text](resolved/image.png)
+ */
 export function resolveImageEmbeds(
   md: string,
   resolveAsset: (name: string) => string = DEFAULT_RESOLVE_ASSET
 ): string {
   return md.replace(EMBED_RE, (_m, name: string) => {
-    const clean = name.trim();
-    return `![${clean}](${resolveAsset(clean)})`;
+    const pipeIdx = name.indexOf("|");
+    const filename = (pipeIdx >= 0 ? name.slice(0, pipeIdx) : name).trim();
+    const alt = (pipeIdx >= 0 ? name.slice(pipeIdx + 1) : name).trim();
+    return `![${alt}](${resolveAsset(filename)})`;
   });
 }
 
