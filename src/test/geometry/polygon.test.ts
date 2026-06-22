@@ -13,6 +13,11 @@ describe("pointInPolygon", () => {
 describe("bboxOf / rectArea / rectIntersectArea", () => {
   it("computes a bbox", () => expect(bboxOf(square)).toEqual({ minX: 0, minY: 0, maxX: 100, maxY: 100 }));
   it("returns null for empty points", () => expect(bboxOf([])).toBeNull());
+  it("non-axis-aligned triangle: each vertex contributes a different extreme", () => {
+    // [10,80]: minX=10; [90,20]: minY=20 and maxX=90; [50,90]: maxY=90
+    const tri: Point[] = [[10, 80], [90, 20], [50, 90]];
+    expect(bboxOf(tri)).toEqual({ minX: 10, minY: 20, maxX: 90, maxY: 90 });
+  });
   it("computes rect area", () => expect(rectArea({ minX: 0, minY: 0, maxX: 10, maxY: 20 })).toBe(200));
   it("computes overlap area of two rects", () => {
     const a = { minX: 0, minY: 0, maxX: 100, maxY: 100 };
