@@ -1238,6 +1238,18 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   13 tests in `src/test/tabs/TabFrame.test.tsx`; pure test coverage — no source changes.
   - ✅ DONE 2026-06-23 — commit 4731599f (test(N61): TabFrame render branches — 13 tests). Gate: 13 tests green (targeted vitest); shard 1/4 461 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N62. Hygiene / coverage nibble #55** — `src/atlas/tabs/FogTab.tsx` had only 6 tests covering
+  the draw-fog section, fog-shapes-list, and feather-control. 14 new tests added in 4 describe blocks:
+  **Reveals section** — title "Fog of war" always rendered; "No reveals yet" message when reveals is
+  empty; reveal count label ("Reveals (2)") when populated; Clear-all button absent with no reveals,
+  present with reveals. **Validation issues** — chips absent when issues is empty; blocking message
+  rendered; warning message rendered. **Dirty state** — Discard button absent when not dirty; present
+  when dirty and calls reset on click. **Cross-tab convenience reveals** — "Select a region" message
+  when regionApi absent; "Reveal selected region" button when regionApi.selectedId is set; "Select a
+  route" message when routeApi absent; "Reveal around route" button when routeApi.selectedId is set.
+  Pure test coverage — no source changes.
+  - ✅ DONE 2026-06-23 — commit 9ee0d2a8 (test(N62): FogTab render branches — 14 new tests); merge 42c4a035. Gate: 20 tests green (targeted vitest, 6 pre-existing + 14 new); shard 1/4 461 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
