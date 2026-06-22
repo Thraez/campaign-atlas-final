@@ -1178,6 +1178,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   prepareAreas.test.ts); pure test coverage — no source changes.
   - ✅ DONE 2026-06-22 — commit 27e08bee (test(N53): prepareAreas triangle-boundary — exactly-3-point polygon is minimum valid (6 tests)). Gate: 6 tests green (targeted vitest); shard 1/4 443 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N54. Hygiene / fix+test nibble #48** — `src/atlas/content/renderEntityMarkdown.ts` (`resolveImageEmbeds`)
+  silently passed the entire `![[image.png|Alt text]]` match (including the pipe-alias) as the asset filename,
+  producing a broken src path `/atlas/assets/images/image.png|Alt text`. Fixed by splitting on `|` to use the
+  left part as the filename and the right part (if present) as the alt text. Matches Obsidian's pipe-alias
+  semantics: `![[image.png|Alt text]]` → `![Alt text](/atlas/assets/images/image.png)`. 2 new tests (16 total
+  in renderEntityMarkdown.test.ts): pipe-alias uses alias as alt + filename as src; no-pipe behavior unchanged.
+  Source fix + tests — build pipeline touched (`resolveImageEmbeds` called from `build-atlas.ts`).
+  - ✅ DONE 2026-06-22 — commit 0206c87c (fix+test(N54): resolveImageEmbeds pipe-alias — 2 new tests, 16 total). Gate: 16 tests green (targeted vitest); shard 1/4 443 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings); atlas:publish 12/12 scans clean.
+
 ---
 
 ### O — Atmosphere soundscape
