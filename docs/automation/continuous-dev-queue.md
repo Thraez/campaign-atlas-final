@@ -1187,6 +1187,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   Source fix + tests — build pipeline touched (`resolveImageEmbeds` called from `build-atlas.ts`).
   - ✅ DONE 2026-06-22 — commit 0206c87c (fix+test(N54): resolveImageEmbeds pipe-alias — 2 new tests, 16 total). Gate: 16 tests green (targeted vitest); shard 1/4 443 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings); atlas:publish 12/12 scans clean.
 
+- [x] **N55. Hygiene / coverage nibble #49** — `src/atlas/content/renderEntityMarkdown.ts` pipeline had three
+  untested edge cases. `renderEntityMarkdown` with an empty body produced empty html (no crash, no spurious
+  tags); `renderEntityMarkdown` with a body that is only a `%%` block produced empty html (full strip +
+  `dropOrphanFootnoteRefs` + markdown-to-html chain all produce `""`). `resolveImageEmbeds` called with a
+  custom `resolveAsset` that returns an empty string produced `![alt]()` (empty src) — documents that the
+  falsy-return contract is the caller's responsibility. 3 new tests (19 total in
+  renderEntityMarkdown.test.ts); pure test coverage — no source changes.
+  - ✅ DONE 2026-06-22 — commit b818fc45 (test(N55): renderEntityMarkdown edge cases — empty body, %%block-only body, resolveAsset empty-return (19 tests)). Gate: 19 tests green (targeted vitest); shard 1/4 443 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
