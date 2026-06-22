@@ -1221,6 +1221,14 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   the `undefined` scale behaviour. 1 new test (7 total in `src/test/ruler/measureDistance.test.ts`).
   - ✅ DONE 2026-06-22 — commit abcd5ed3 (fix+test(N58): measureDistance degenerate-scale guard — unitsPerPixel:0 falls back to px label (7 tests)). Gate: 7 tests green (targeted vitest); shard 1/4 443 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N60. Hygiene / coverage nibble #53** — `src/atlas/tabs/PublishCheckTab.tsx` had no
+  component-level tests despite being the primary publish action surface (added in J1). Added 8 tests
+  mocking `usePublishFlow` to cover: idle (button enabled, hint visible), checking (spinner text shown,
+  button disabled, idle hint absent, ReadinessCard safety verdict absent), published (success message
+  shown), error (error string rendered). `PublishedDiffPanel` mocked to prevent fetch calls in jsdom.
+  File: `src/test/publish-check-tab.test.tsx`.
+  - ✅ DONE 2026-06-22 — commit c061b4a6 (test+nibble(N60): PublishCheckTab spinner/state coverage — 8 tests). Gate: 8 tests green (targeted vitest); shard 1/4 451 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
