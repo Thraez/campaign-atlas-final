@@ -1203,6 +1203,17 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   1 new test (9 total in `src/test/geometry/polygon.test.ts`); pure test coverage — no source changes.
   - ✅ DONE 2026-06-22 — commit d8c08062 (test(N56): bboxOf non-axis-aligned triangle — each vertex contributes a different extreme (9 tests)); merge 92883da0. Gate: 9 tests green (targeted vitest); shard 1/4 443 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N57. Hygiene / coverage nibble #51** — `src/atlas/publish/usePublishFlow.ts` state-machine
+  intermediate transitions were implicit but unasserted. `check()` calls `setState("checking")`
+  synchronously before the first `await`, and `confirm()` calls `setState("publishing")` similarly;
+  both transitions were verifiable only by their final states in existing tests. Added 2 tests using
+  a deferred-promise fetch mock to observe the mid-flight state: (1) `idle → checking immediately
+  (before fetch resolves)` — asserts state is "checking" right after `act(() => check())` with a
+  never-yet-resolved fetch, then resolves and confirms `ready`; (2) `confirm() transitions to
+  publishing immediately (before fetch resolves)` — same pattern from the ready state. 2 new tests
+  (17 total in `src/atlas/publish/usePublishFlow.test.ts`); pure test coverage — no source changes.
+  - ✅ DONE 2026-06-22 — commit b0bc13f9 (test(publish): N57 usePublishFlow intermediate-state coverage — checking + publishing transitions (17 total)); merge e72667e9. Gate: 17 tests green (targeted vitest); shard 1/4 443 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
