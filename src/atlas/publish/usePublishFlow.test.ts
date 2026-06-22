@@ -77,6 +77,18 @@ describe("usePublishFlow (check half)", () => {
     await waitFor(() => expect(result.current.state).toBe("error"));
     expect(result.current.error).toBe("Network down");
   });
+
+  it("transitions to checking immediately (before fetch resolves)", async () => {
+    let resolveFetch!: (v: unknown) => void;
+    const pending = new Promise((r) => { resolveFetch = r; });
+    vi.stubGlobal("fetch", vi.fn(() => pending));
+    const { result } = renderHook(() => usePublishFlow());
+    expect(result.current.state).toBe("idle");
+    act(() => { result.current.check(); });
+    expect(result.current.state).toBe("checking");
+    resolveFetch({ ok: true, status: 200, json: async () => SAFE_CHECK });
+    await waitFor(() => expect(result.current.state).toBe("ready"));
+  });
 });
 
 describe("usePublishFlow (push half)", () => {
@@ -138,5 +150,16 @@ describe("usePublishFlow (push half)", () => {
     act(() => { result.current.confirm(); });
     await waitFor(() => expect(result.current.state).toBe("error"));
     expect(result.current.error).toBe("Connection refused");
+  });
+
+  it("confirm() transitions to publishing immediately (before fetch resolves)", async () => {
+    const { result } = await reachReady();
+    let resolveFetch!: (v: unknown) => void;
+    const pending = new Promise((r) => { resolveFetch = r; });
+    vi.stubGlobal("fetch", vi.fn(() => pending));
+    act(() => { result.current.confirm(); });
+    expect(result.current.state).toBe("publishing");
+    resolveFetch({ ok: true, status: 200, json: async () => ({ status: "published", pushedAt: "t", commit: "abc" }) });
+    await waitFor(() => expect(result.current.state).toBe("published"));
   });
 });
