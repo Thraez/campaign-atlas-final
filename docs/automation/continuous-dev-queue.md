@@ -1196,6 +1196,13 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   renderEntityMarkdown.test.ts); pure test coverage — no source changes.
   - ✅ DONE 2026-06-22 — commit b818fc45 (test(N55): renderEntityMarkdown edge cases — empty body, %%block-only body, resolveAsset empty-return (19 tests)). Gate: 19 tests green (targeted vitest); shard 1/4 443 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N56. Hygiene / coverage nibble #50** — `src/atlas/geometry/polygon.ts` (`bboxOf`) was only
+  exercised by an axis-aligned square, where every vertex contributes to a different extreme by
+  construction. A non-axis-aligned triangle documents the min/max contract where the four extremes come
+  from different vertices: `[[10,80],[90,20],[50,90]]` → `{minX:10,minY:20,maxX:90,maxY:90}`.
+  1 new test (9 total in `src/test/geometry/polygon.test.ts`); pure test coverage — no source changes.
+  - ✅ DONE 2026-06-22 — commit d8c08062 (test(N56): bboxOf non-axis-aligned triangle — each vertex contributes a different extreme (9 tests)); merge 92883da0. Gate: 9 tests green (targeted vitest); shard 1/4 443 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
