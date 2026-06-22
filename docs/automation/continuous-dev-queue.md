@@ -1214,6 +1214,13 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   (17 total in `src/atlas/publish/usePublishFlow.test.ts`); pure test coverage — no source changes.
   - ✅ DONE 2026-06-22 — commit b0bc13f9 (test(publish): N57 usePublishFlow intermediate-state coverage — checking + publishing transitions (17 total)); merge e72667e9. Gate: 17 tests green (targeted vitest); shard 1/4 443 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N58. Hygiene / coverage nibble #52** — `src/atlas/ruler/measureDistance.ts` had an untested
+  degenerate-scale edge case: a `MapScale` with `unitsPerPixel: 0` would produce a misleading `"0.0 mi"`
+  label for any distance (truthy scale object, but multiplying by zero). Added a one-line guard
+  (`scale && scale.unitsPerPixel !== 0`) so a zero-rate scale falls back to the plain pixel label, matching
+  the `undefined` scale behaviour. 1 new test (7 total in `src/test/ruler/measureDistance.test.ts`).
+  - ✅ DONE 2026-06-22 — commit abcd5ed3 (fix+test(N58): measureDistance degenerate-scale guard — unitsPerPixel:0 falls back to px label (7 tests)). Gate: 7 tests green (targeted vitest); shard 1/4 443 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
