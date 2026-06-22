@@ -1229,6 +1229,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   File: `src/test/publish-check-tab.test.tsx`.
   - ✅ DONE 2026-06-22 — commit c061b4a6 (test+nibble(N60): PublishCheckTab spinner/state coverage — 8 tests). Gate: 8 tests green (targeted vitest); shard 1/4 451 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N61. Hygiene / coverage nibble #54** — `src/atlas/tabs/TabFrame.tsx` is the shared frame
+  for every DM creator cockpit tab but had no tests. Branches covered: title and YAML-count badge
+  always rendered; draft badge shows zero and non-zero counts; blocking badge absent at 0 / present
+  when > 0; warning badge absent at 0 / present when > 0; `rawYamlPreview` undefined → toggle
+  absent; provided → toggle present, content hidden by default, shown after click, re-hidden after
+  second click; empty string → `# (nothing to preview)` placeholder after toggle; children rendered.
+  13 tests in `src/test/tabs/TabFrame.test.tsx`; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-23 — commit 4731599f (test(N61): TabFrame render branches — 13 tests). Gate: 13 tests green (targeted vitest); shard 1/4 461 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
