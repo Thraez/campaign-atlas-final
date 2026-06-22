@@ -97,6 +97,23 @@ describe("resolveImageEmbeds", () => {
   });
 });
 
+describe("renderEntityMarkdown edge cases", () => {
+  it("empty body produces empty html", () => {
+    const html = renderEntityMarkdown("", { showDmNotes: false });
+    expect(html).toBe("");
+  });
+
+  it("body that is only a %% block produces empty html (whole body stripped)", () => {
+    const html = renderEntityMarkdown("%%\nDM secret\n%%", { showDmNotes: false });
+    expect(html).toBe("");
+  });
+
+  it("resolveImageEmbeds: resolveAsset returning empty string yields empty src (![alt]())", () => {
+    const out = resolveImageEmbeds("![[img.png]]", () => "");
+    expect(out).toBe("![img.png]()");
+  });
+});
+
 describe("renderEntityMarkdown highlight secrecy", () => {
   const bodyWithSecret = [
     "Public text.",
