@@ -28,8 +28,16 @@ export interface DiffPreviewModalProps {
   previousContents?: Record<string, string>;
   /** When true, ask the dev plugin to run `atlas:build` after writes. */
   rebuildAfterSave?: boolean;
+  /** Fired when an actual disk write begins (Save to disk / Try again), i.e.
+   *  the only moment the editor should consider the session "saving". Never
+   *  fires on open or cancel. */
+  onConfirm?: () => void;
   /** Called after a successful save+rebuild (or just save if rebuild is off). */
   onSaved?: (result: LocalSaveResult) => void;
+  /** Fired when an actual disk write fails, with a human-readable reason, so
+   *  the editor can reflect a persistent "Save failed" status (the modal also
+   *  shows its own error UI with Try again / Cancel). */
+  onWriteFailed?: (message: string) => void;
   onClose: () => void;
 }
 
@@ -78,7 +86,7 @@ function diffLines(prev: string, next: string): DiffStat {
   return { added, removed, unified: lines.join("\n") };
 }
 
-export function DiffPreviewModal({ open, changes, previousContents, rebuildAfterSave, onSaved, onClose }: DiffPreviewModalProps) {
+export function DiffPreviewModal({ open, changes, previousContents, rebuildAfterSave, onConfirm, onSaved, onWriteFailed, onClose }: DiffPreviewModalProps) {
   const [phase, setPhase] = useState<Phase>({ kind: "review" });
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
 
@@ -111,12 +119,23 @@ export function DiffPreviewModal({ open, changes, previousContents, rebuildAfter
   );
 
   const runSave = async () => {
+    onConfirm?.();            // a real write is starting — editor flips to "saving" now
     setPhase({ kind: "saving" });
     try {
       const result = await saveAtlasPatchToLocalFs(changes, undefined, { rebuild: !!rebuildAfterSave });
       setPhase({ kind: "success", result });
       onSaved?.(result);
     } catch (err: unknown) {
+      // Surface the failure to the editor so the session status reflects a
+      // real "Save failed" (not a stranded "saving"/"unsaved"). The branches
+      // below still render the modal's own detailed error UI.
+      onWriteFailed?.(
+        err instanceof DisallowedPathError
+          ? `Path not in allowlist: ${err.path}`
+          : err instanceof ConflictError
+            ? `Conflict on ${err.failedPath} (${err.reason})`
+            : err instanceof Error ? err.message : "Unknown error",
+      );
       if (err instanceof DisallowedPathError) {
         setPhase({ kind: "disallowed", path: err.path });
       } else if (err instanceof ConflictError) {

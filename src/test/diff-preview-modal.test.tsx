@@ -102,6 +102,51 @@ describe("DiffPreviewModal", () => {
     });
   });
 
+  it("onConfirm fires the moment Save to disk starts (before the write resolves)", async () => {
+    // B1: the editor uses onConfirm to mark the session "saving" only when a
+    // real write begins — never just because the modal opened.
+    let resolveSave: (v: { saved: number; paths: string[] }) => void = () => {};
+    mockedSave.mockImplementation(() => new Promise((res) => { resolveSave = res; }));
+    const onConfirm = vi.fn();
+    render(<DiffPreviewModal open changes={sampleChanges} onConfirm={onConfirm} onClose={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Save to disk" }));
+    // Synchronous: onConfirm runs at the top of runSave, before the await.
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    await act(async () => { resolveSave({ saved: 1, paths: [sampleChanges[0].path] }); });
+    await waitFor(() => screen.getByText(/Wrote 1 file\./));
+  });
+
+  it("onConfirm is NOT called when the user cancels without saving", () => {
+    const onConfirm = vi.fn();
+    render(<DiffPreviewModal open changes={sampleChanges} onConfirm={onConfirm} onClose={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(mockedSave).not.toHaveBeenCalled();
+  });
+
+  it("onWriteFailed fires with the reason on a real write failure, not on success", async () => {
+    // Completes B1: a failed disk write must reach the editor's "Save failed"
+    // status, not silently revert to "unsaved".
+    const onWriteFailed = vi.fn();
+    mockedSave.mockRejectedValueOnce(new LocalSaveError("disk full"));
+    const { unmount } = render(
+      <DiffPreviewModal open changes={sampleChanges} onWriteFailed={onWriteFailed} onClose={() => {}} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save to disk" }));
+    await waitFor(() => screen.getByText("Save failed."));
+    expect(onWriteFailed).toHaveBeenCalledTimes(1);
+    expect(onWriteFailed).toHaveBeenCalledWith("disk full");
+    unmount();
+
+    // Success path must NOT call onWriteFailed.
+    onWriteFailed.mockClear();
+    mockedSave.mockResolvedValueOnce({ saved: 1, paths: [sampleChanges[0].path] });
+    render(<DiffPreviewModal open changes={sampleChanges} onWriteFailed={onWriteFailed} onClose={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Save to disk" }));
+    await waitFor(() => screen.getByText(/Wrote 1 file\./));
+    expect(onWriteFailed).not.toHaveBeenCalled();
+  });
+
   it("DisallowedPathError renders allowlist message and offending path", async () => {
     mockedSave.mockRejectedValue(new DisallowedPathError("package.json"));
     render(<DiffPreviewModal open changes={sampleChanges} onClose={() => {}} />);

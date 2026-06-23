@@ -116,4 +116,42 @@ describe("useEditorSession", () => {
     expect(result.current.status).toBe("failed");
     expect(result.current.failedReason).toBe("disk permission denied");
   });
+
+  // B1 regression: opening the review modal flips status to "saving"; if the
+  // DM cancels the modal, markIdle must drop "saving" back to the true dirty
+  // state (NOT "failed" — cancelling a review is not an error) so the Save
+  // button re-enables without a page reload.
+  it("markIdle reverts a premature 'saving' back to 'unsaved' when dirt remains", async () => {
+    const h = makeHolder();
+    const { result, rerender } = renderHook(() => useHarness("A", h));
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    act(() => { h.bump(); rerender(); });
+    expect(result.current.status).toBe("unsaved");
+    act(() => { result.current.markSaving(); });
+    expect(result.current.status).toBe("saving");
+    act(() => { result.current.markIdle(); });
+    expect(result.current.status).toBe("unsaved");
+    expect(result.current.failedReason).toBeNull();
+  });
+
+  it("markIdle returns to 'clean' when no dirt remains", async () => {
+    const h = makeHolder();
+    const { result } = renderHook(() => useHarness("A", h));
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    act(() => { result.current.markSaving(); });
+    expect(result.current.status).toBe("saving");
+    act(() => { result.current.markIdle(); });
+    expect(result.current.status).toBe("clean");
+  });
+
+  it("markIdle clears a prior failed reason", async () => {
+    const h = makeHolder();
+    const { result } = renderHook(() => useHarness("A", h));
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    act(() => { result.current.markFailed("disk permission denied"); });
+    expect(result.current.status).toBe("failed");
+    act(() => { result.current.markIdle(); });
+    expect(result.current.status).toBe("clean");
+    expect(result.current.failedReason).toBeNull();
+  });
 });

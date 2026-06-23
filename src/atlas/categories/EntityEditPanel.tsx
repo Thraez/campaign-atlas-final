@@ -262,17 +262,27 @@ export function EntityEditPanel({
 
   // ---------- Render ----------
 
-  if (phase === "loading" || !api.draft) return <div className="p-4 text-xs">Loading…</div>;
-  if (phase === "saved") return <div className="p-4 text-xs">Saved.</div>;
+  // B2: check error/saved BEFORE the loading guard. On a failed load (e.g. the
+  // source .md is missing → /__atlas/read 404), api.load() never runs so
+  // api.draft stays null; if the loading guard ran first, its `!api.draft`
+  // clause would swallow the error state and hang forever on "Loading…".
   if (phase === "error")
     return (
-      <div className="p-4 text-xs text-red-300">
-        {error}
-        <button className="underline ml-2" onClick={onClose}>
+      <div className="p-4 text-xs text-red-300 space-y-2">
+        <p>{error ?? "Couldn't open this entry for editing."}</p>
+        <p className="text-muted-foreground">
+          Its source file may be missing. Rebuild the atlas (restart the dev server
+          or run <code className="font-mono">npm run atlas:build</code>) so the list
+          matches what's on disk.
+        </p>
+        <button className="underline" onClick={onClose}>
           Close
         </button>
       </div>
     );
+  if (phase === "saved") return <div className="p-4 text-xs">Saved.</div>;
+  // "saving" intentionally falls through to the form (Save button shows "Saving…").
+  if (phase === "loading" || !api.draft) return <div className="p-4 text-xs">Loading…</div>;
 
   const d = api.draft!;
   const filteredEntities = acCtx?.type === "entity" ? filterEntities(entities, acCtx.query) : [];

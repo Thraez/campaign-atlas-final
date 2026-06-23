@@ -110,7 +110,7 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
           <Compass className="h-5 w-5" /> <span className="hidden sm:inline">Astrath Atlas</span>
         </Link>
         <span className="text-muted-foreground">/</span>
-        <span className="flex items-center gap-1.5 text-sm font-medium">
+        <span className="flex items-center gap-1.5 text-sm font-medium min-w-0 truncate">
           {headingIcon} {heading}
         </span>
         <div className="flex-1" />
@@ -118,7 +118,9 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
           placeholder="Filter…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="h-8 w-44 sm:w-64 text-sm"
+          // B4: shrinkable on mobile (w-32 + min-w-0) so the toolbar never
+          // overflows a ~390px viewport; full width returns at the sm: breakpoint.
+          className="h-8 w-32 sm:w-64 min-w-0 text-sm"
         />
         <Button asChild variant="ghost" size="sm">
           <Link to="/atlas"><ArrowLeft className="h-4 w-4 mr-1" />Map</Link>

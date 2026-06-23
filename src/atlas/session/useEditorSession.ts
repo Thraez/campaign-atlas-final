@@ -55,6 +55,10 @@ export interface EditorSessionAPI {
   markSaving: () => void;
   markSaved: () => Promise<void>;
   markFailed: (reason: string) => void;
+  /** Drop a non-terminal "saving"/"failed" status back to the true dirty
+   *  state (unsaved/clean). Used when the DM cancels the save-review modal:
+   *  no write happened, so "saving" must not stick. Not a failure path. */
+  markIdle: () => void;
   discardAll: () => Promise<void>;
 }
 
@@ -156,6 +160,12 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
   const dismissRestoredNotice = useCallback(() => setRestoredNotice(null), []);
   const markSaving = useCallback(() => { setFailedReason(null); setStatus("saving"); }, []);
   const markFailed = useCallback((reason: string) => { setFailedReason(reason); setStatus("failed"); }, []);
+  // Recompute from the live dirty count rather than blindly setting "unsaved":
+  // a cancelled save that had already cleared everything must land on "clean".
+  const markIdle = useCallback(() => {
+    setFailedReason(null);
+    setStatus(perMapDirtyCount() > 0 ? "unsaved" : "clean");
+  }, [perMapDirtyCount]);
   const markSaved = useCallback(async () => {
     slicesRef.current = {
       overrides: {}, mapOverrideByMap: {}, regionByMap: {},
@@ -183,6 +193,6 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
   return {
     hydrated, status, unsavedCount, failedReason,
     restoredNotice, dismissRestoredNotice,
-    onMapWillChange, markSaving, markSaved, markFailed, discardAll,
+    onMapWillChange, markSaving, markSaved, markFailed, markIdle, discardAll,
   };
 }

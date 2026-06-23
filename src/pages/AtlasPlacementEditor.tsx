@@ -22,6 +22,7 @@ import { OceanBackground } from "@/atlas/ocean/OceanBackground";
 import { overridesSchema } from "@/atlas/schemas/imports";
 import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
+import { filterDirtyPlacements } from "@/atlas/editor/dirtyPlacements";
 import type { FileChange } from "@/atlas/save/localFsSave";
 import { SaveStatus } from "@/atlas/session/SaveStatus";
 import { DiscardConfirmModal } from "@/atlas/session/DiscardConfirmModal";
@@ -787,7 +788,10 @@ function AtlasPlacementEditorInner() {
    */
   const onSaveClick = async () => {
     if (!project || !activeMap) return;
-    const drafts = buildDraftPlacements();
+    // B3: buildDraftPlacements() returns a draft for every *effective* placement
+    // (incl. canon-only ones). Queue only the placements the DM actually
+    // overrode this session, or a clean Save would rewrite every placed entity.
+    const drafts = filterDirtyPlacements(buildDraftPlacements(), overrides, activeMap.id);
     const fmPatches = entityFrontmatterPatches(entityDrafts, project.entities);
     if (drafts.length === 0 && fmPatches.length === 0 && !worldYamlDirty) {
       toast.info("No changes to save");
@@ -846,7 +850,9 @@ function AtlasPlacementEditorInner() {
         toast.info("No canonical changes to write");
         return;
       }
-      session.markSaving();
+      // B1: do NOT mark "saving" here — opening the review modal is not a write.
+      // The session flips to "saving" only when the DM confirms (modal onConfirm),
+      // so cancelling the modal can't strand the status bar on "Saving…".
       setPendingChanges(fileChanges);
       setSaveModalOpen(true);
     } catch (err) {
@@ -1176,7 +1182,8 @@ function AtlasPlacementEditorInner() {
           variant="default"
           size="sm"
           onClick={onSaveClick}
-          disabled={saveModalOpen}
+          // W2: nothing to write when the session is clean — don't offer Save.
+          disabled={saveModalOpen || session.status === "clean"}
           className="gap-1"
           title="Write canonical .md frontmatter and rebuild the atlas. Commit with git when ready."
         >
@@ -1676,11 +1683,17 @@ function AtlasPlacementEditorInner() {
         open={saveModalOpen}
         changes={pendingChanges}
         previousContents={
+          // Only world.yaml has an on-disk baseline here, so entity .md changes
+          // render as full adds ("+N -0") in the diff. Acceptable: the DM still
+          // sees exactly what will be written. (Per-entity baselines would give
+          // granular diffs but require plumbing readSourceFile output through.)
           worldYamlBaseline.raw !== null && activeWorldId
             ? { [worldYamlPath(activeWorldId)]: worldYamlBaseline.raw }
             : undefined
         }
         rebuildAfterSave={true}
+        onConfirm={() => session.markSaving()}
+        onWriteFailed={(msg) => session.markFailed(msg)}
         onSaved={(result) => {
           void session.markSaved();
           setLastSavedAt(Date.now());
@@ -1793,6 +1806,10 @@ function AtlasPlacementEditorInner() {
         onClose={() => {
           setSaveModalOpen(false);
           setPendingChanges([]);
+          // B1: if the DM confirmed then cancelled (or a write failed and they
+          // backed out), drop the lingering "saving" status back to the true
+          // dirty state so the Save button re-enables without a reload.
+          if (session.status === "saving") session.markIdle();
         }}
       />
       <DiscardConfirmModal

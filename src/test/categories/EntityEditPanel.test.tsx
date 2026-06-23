@@ -92,6 +92,35 @@ it("loads an entity, edits the body, saves via the shared rewrite", async () => 
   await waitFor(() => expect(onSaved).toHaveBeenCalled());
 });
 
+it("surfaces an inline error (not a perpetual Loading…) when the source file is missing", async () => {
+  // B2: an orphaned entity whose .md is absent makes /__atlas/read 404. The
+  // panel must show the error + a Close affordance, never hang on "Loading…".
+  const fetchMock = vi.fn(async (url: string) => {
+    if (String(url).includes("/__atlas/read")) {
+      return new Response(
+        JSON.stringify({ error: "NotFound", path: "content/w/npcs/ghost.md" }),
+        { status: 404 },
+      );
+    }
+    return new Response(JSON.stringify({ saved: 1, paths: [] }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(
+    <EntityEditPanel
+      sourcePath="content/w/npcs/ghost.md"
+      onClose={() => {}}
+      onSaved={() => {}}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByText(/source file not found/i)).toBeInTheDocument(),
+  );
+  expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /close/i })).toBeInTheDocument();
+});
+
 it("formatting toolbar wraps the textarea selection and updates the body", async () => {
   const fetchMock = vi.fn(async (url: string) => {
     if (String(url).includes("/__atlas/read")) {
