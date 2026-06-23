@@ -1315,6 +1315,19 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     new tests); merge from run/n67-20260623. Gate: 11 tests green (8 new + 3 pre-existing); tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N68. Hygiene / coverage nibble #61** — `src/atlas/yaml/buildFullWorldYaml.ts` had three untested
+  branch groups in `waterToYamlObject`, `creditsToYamlObject`, and `layerToYamlObject`. (1) **water
+  round-trip**: all non-default fields (enabled:true, intensity:0.8, speed:0.6, crestColor:#aabbcc);
+  enabled:false path (intensity/speed absent from YAML); default intensity/speed omitted from YAML when
+  equal to DEFAULT_WATER values (0.35, 0.3) — documents the contract that callers need `resolveWater`
+  to get defaults applied. (2) **credits round-trip**: badges:false + page:false survive serialisation
+  (resolveCredits only defaults to true when the key is absent); credits key omitted when opts.credits
+  is undefined, and loadWorldConfig then defaults both to true. (3) **layer optional fields**: rotation
+  and tileSrc survive the YAML round-trip. 6 new tests; pure coverage — no source changes.
+  - ✅ DONE 2026-06-23 — commit a6fc57a7 (test(N68): buildFullWorldYaml water/credits/layer optional
+    fields — 6 new tests); merge `43835432`. Gate: 22 tests green (6 new + 16 pre-existing); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
