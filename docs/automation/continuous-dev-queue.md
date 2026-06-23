@@ -1261,6 +1261,17 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   `src/test/tabs/RegionsTab.test.tsx`; pure test coverage — no source changes.
   - ✅ DONE 2026-06-23 — commit d20538d3 (test(N63): RegionsTab render branches — 13 tests); merge 1db982e8. Gate: 13 tests green (targeted vitest); shard 1/4 461 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N64. Hygiene / coverage nibble #57** — `src/atlas/tabs/RoutesTab.tsx` had no dedicated component
+  tests. Seven describe blocks covering the key conditional render branches: **Empty state** — "No routes
+  yet" message when effective is empty. **Route list** — name and waypoint count rendered; "new" badge for
+  routes in `draft.added`; "edit" badge for routes with edits (not in added). **Selected route form** —
+  name input shown when `selectedId` matches; absent when no selection. **Validation chips** — absent when
+  issues empty; blocking message rendered; warning message rendered. **Dirty state** — Discard button
+  absent when not dirty; present when dirty and click calls reset. **Drawing mode** — "Draw route" button
+  shown when not drawing; drawing indicator with waypoint count shown when drawing is active. 13 new tests
+  in `src/test/tabs/RoutesTab.test.tsx`; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-23 — commit 436bcb1c (test(n64): RoutesTab render branches — 13 new tests); merge d5ae6c43. Gate: 13 tests green (targeted vitest); shard 1/4 461 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings). Previous run crashed at 00:00Z after writing commit; resumed at 03:05Z and completed merge.
+
 ---
 
 ### O — Atmosphere soundscape
