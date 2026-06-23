@@ -34,4 +34,19 @@ describe("command palette", () => {
     expect(r.every((x) => x.kind === "command")).toBe(true);
     expect(r.some((x) => x.id === "cmd.publish")).toBe(true);
   });
+
+  it("'>' with no search term returns all commands without recent-sorting", () => {
+    const r = queryPalette(index, ">");
+    expect(r.length).toBe(2);
+    expect(r.every((x) => x.kind === "command")).toBe(true);
+  });
+
+  it("sorts results by match position — prefix match ranks before mid-word match", () => {
+    // "o" at index 0 in "Overview map"; "o" at index 1 in "Corven"; index 2 in "Thornhold"
+    const r = queryPalette(index, "o");
+    const mapPos = r.findIndex((x) => x.id === "overview");
+    const entityPos = r.findIndex((x) => x.id === "corven");
+    expect(mapPos).toBeGreaterThanOrEqual(0);
+    expect(mapPos).toBeLessThan(entityPos);
+  });
 });
