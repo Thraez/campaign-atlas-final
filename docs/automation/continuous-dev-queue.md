@@ -1328,6 +1328,20 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     fields — 6 new tests); merge `43835432`. Gate: 22 tests green (6 new + 16 pre-existing); tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N69. Hygiene / coverage nibble #62** — `src/atlas/shell/CommandPalette.tsx` had only 2 tests
+  (Ctrl-K open + Escape close). Five interaction branches were untested: Meta-K (Cmd-K) opens the palette
+  (the `e.metaKey` path in the keydown handler); ArrowDown advances `sel` — Enter fires `onChoose` on the
+  second result; ArrowUp clamps `sel` at 0 — cannot navigate below the first result; clicking the backdrop
+  overlay (`onMouseDown` on the outer div) closes the palette; clicking a result button fires `onChoose`
+  and closes. `queryPalette` in `useCommandPalette.ts` had two untested branches: `'>'` with an empty
+  search term returns all commands without recent-sorting (`commandOnly && !q` path, line 40 — distinct
+  from the existing `'>pub'` test); sort-by-match-position — "Overview map" (`'o'` at index 0) ranks
+  before "Corven" (`'o'` at index 1), documenting the `indexOf` sort contract. 7 new tests across both
+  files; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-23 — commit 85dd2b7c (test(N69): CommandPalette + queryPalette branch coverage — 7
+    new tests); merge 59a0dd35. Gate: 12 tests green (7 new + 5 pre-existing); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
