@@ -1285,6 +1285,21 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     from run/n65-20260623. Gate: 15 tests green (targeted vitest); shard 1/4 476 tests green; tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N66. Hygiene / coverage nibble #59** — `src/atlas/import/inferTypeFromTags.ts` (tag-keyword →
+  entity-type resolver used in the import pipeline) had zero test coverage despite being correctness-critical:
+  wrong tag mapping routes an NPC under the wrong tab after import. Added 45 tests in 7 describe blocks to
+  `src/test/infer-type-from-tags.test.ts`: **non-array inputs** (null/undefined/string/number/object → null);
+  **empty/no-match arrays** (empty, non-string items, unrecognized tags → null); **npc synonyms**
+  (npc/character/person → "npc"); **faction synonyms** (faction/guild/organization/organisation → "faction");
+  **item synonyms** (item/artifact/weapon/armor/armour → "item"); **17 single-keyword types** (event/lore/
+  settlement/city/town/village/capital/port/region/ruin/dungeon/cave/temple/shop/hazard/landmark/location);
+  **case-insensitive + whitespace-trim** (NPC/"  npc  "/tab-padded all match); **first-recognized-tag wins**
+  (unrecognized prefix tags don't block the recognized hit; non-string items skipped). Pure coverage —
+  no source changes.
+  - ✅ DONE 2026-06-23 — commit b8fa8fde (test(n66): inferTypeFromTags — 45 branch-coverage tests); merge
+    from run/n66-20260623. Gate: 45 tests green (targeted vitest); tsc EXIT:0; eslint 0 errors (16
+    pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
