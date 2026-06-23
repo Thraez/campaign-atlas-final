@@ -1366,6 +1366,18 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     13 total); merge bd26c741. Gate: 17 tests green (7 new + 6 pre-existing + 4 other suite tests);
     tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N73. Hygiene / coverage nibble #65** — `src/atlas/entity/EntityReadingView.tsx` had 3 tests
+  covering the visibility banner and %%dm%% stripping but five branch groups were untested: the DM-mode
+  wikilink resolution path (`byName` title map + `tokenizeWikilinks` + `renderLinkTokens`); the alias
+  sub-path in the DM `byName` map; the `PLAYER_VISIBLE.has("rumor")` branch (only "player" was
+  previously exercised); the empty-body edge case; and the optional callback props (`onClose`,
+  `onShowOnMap`). 7 new tests (10 total); also updated the `ent()` helper to accept `aliases` (was
+  hardcoded `[]`). Pure test coverage — no source changes.
+  - Files: `src/test/entity/EntityReadingView.test.tsx`; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-24 — commit ecc7506a (test(N73): EntityReadingView branch coverage — 7 new tests,
+    10 total); merge 583da58d. Gate: 10 tests green (targeted vitest); shard 1/4 489 tests green;
+    tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
