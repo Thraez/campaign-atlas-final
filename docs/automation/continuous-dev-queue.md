@@ -1342,6 +1342,18 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     new tests); merge 59a0dd35. Gate: 12 tests green (7 new + 5 pre-existing); tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N70. Hygiene / coverage nibble #63** — `src/atlas/yaml/worldYamlSerialize.ts` had a documented
+  gap: no test for the case where the existing file contains ONLY header comments and no YAML keys.
+  `captureLeadingCommentBlock` must capture every comment line and normalise to exactly one trailing
+  blank separator even when there is no YAML body following them. Also untested: leading blank lines
+  before the first comment are included in the capture; indented comments (`/^\s*#/`) are captured;
+  a YAML key with an inline comment (non-leading `#`) stops the scan; single comment line with no
+  trailing newline still gets the blank-line separator before the body.
+  - Files: `src/test/world-yaml-serialize.test.ts`; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-23 — commit 3e97a8c4 (test(N70): worldYamlSerialize edge-case coverage — 6 new
+    tests); merge TBD. Gate: 16 tests green (6 new + 10 pre-existing); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
