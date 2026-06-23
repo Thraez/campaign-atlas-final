@@ -1300,6 +1300,21 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     from run/n66-20260623. Gate: 45 tests green (targeted vitest); tsc EXIT:0; eslint 0 errors (16
     pre-existing warnings).
 
+- [x] **N67. Hygiene / coverage nibble #60** — `src/atlas/save/canonicalEntitySave.ts` had two untested
+  error paths in `buildCanonicalEntityChanges` and three untested edge cases in `entityFrontmatterPatches`.
+  `useWorldYamlBaseline.ts` exported `worldYamlPath` (pure path-builder used by the save hook) with zero
+  tests. 8 new tests extending `src/test/atlas-entity-save-seam.test.ts` in 4 new describe blocks:
+  **worldYamlPath** (2 tests): correct `content/<worldId>/_atlas/world.yaml` format; single-segment id.
+  **entityFrontmatterPatches edge cases** (4 tests): draft for unknown entity id silently omitted (not a
+  crash); entity with `relationships: []` → `atlas.relationships: undefined` (no empty-array noise written
+  to .md files); entity with a relationship preserves it; draft aliases override entity's existing aliases.
+  **buildCanonicalEntityChanges error paths** (2 tests): `CanonicalSaveError` when placement references
+  unknown entity id; `CanonicalSaveError` when entity has no `sourcePath` (player-mode atlas strips it —
+  the "rebuild in DM mode" guard). Pure test coverage — no source changes.
+  - ✅ DONE 2026-06-23 — commit b1dec300 (test(N67): canonicalEntitySave error paths + worldYamlPath — 8
+    new tests); merge from run/n67-20260623. Gate: 11 tests green (8 new + 3 pre-existing); tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
