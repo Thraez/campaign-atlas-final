@@ -1378,6 +1378,23 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     10 total); merge 583da58d. Gate: 10 tests green (targeted vitest); shard 1/4 489 tests green;
     tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N74. Hygiene / coverage nibble #66** — `src/atlas/publish/PublishedDiffPanel.tsx` had only
+  2 tests (entity render + no-changes message) despite the component having 13 untested render
+  branches. Covered: header badge counts (entities/pins/maps+overlays each shown when
+  `diff.counts` > 0); Placements section (added placement renders entity title + section heading;
+  moved placement hint shows before/after coordinates; removed placement hint shows "mapId: removed");
+  Maps section (added map renders name under "Maps (N)" heading); Regions & routes section
+  (region-added overlay renders name + section heading); entity hint formatting (visibility-changed
+  shows "visibility: x → y"; title-changed shows "title: x → y"); collapse toggle (header click
+  flips `aria-expanded` and hides/shows content, round-trip verified); loading state (shows
+  "Loading baseline…" while fetch is pending via `vi.stubGlobal`); missing baseline (shows "No
+  baseline snapshot found." when fetch returns non-OK response). 13 new tests (15 total);
+  pure test coverage — no source changes.
+  - Files: `src/atlas/publish/PublishedDiffPanel.test.tsx`; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-24 — commit bbb90d66 (test(N74): PublishedDiffPanel branch coverage — 13 new
+    tests, 15 total); merge bbb90d66. Gate: 15 tests green (targeted vitest); shard 1/4 489 tests
+    green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
