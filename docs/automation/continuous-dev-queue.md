@@ -1354,6 +1354,18 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     tests); merge cce1ef03. Gate: 16 tests green (6 new + 10 pre-existing); tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N71. Hygiene / coverage nibble #64** — `scripts/build-atlas.ts` (`deriveTitle`) had six tests
+  covering the happy-path but four branch groups were untested: non-string `fmTitle` values (number,
+  boolean, object) that should fall through to the slug-derived path (the `typeof fmTitle === "string"`
+  guard); multiple consecutive hyphens collapsed by the `/[-_]+/g` regex; mixed hyphens and underscores
+  collapsed into spaces; unicode first-letter capitalisation via the `(\p{L})/gu` regex flag; and a
+  leading separator producing a leading space that `.trim()` removes. 7 new tests (13 total);
+  pure test coverage — no source changes.
+  - Files: `src/test/build-atlas-programmatic.test.ts`; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-23 — commit 129294e8 (test(N71): deriveTitle branch coverage — 7 new tests,
+    13 total); merge bd26c741. Gate: 17 tests green (7 new + 6 pre-existing + 4 other suite tests);
+    tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
