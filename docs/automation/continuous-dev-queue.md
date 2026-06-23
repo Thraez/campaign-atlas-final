@@ -1271,6 +1271,19 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   shown when not drawing; drawing indicator with waypoint count shown when drawing is active. 13 new tests
   in `src/test/tabs/RoutesTab.test.tsx`; pure test coverage — no source changes.
   - ✅ DONE 2026-06-23 — commit 436bcb1c (test(n64): RoutesTab render branches — 13 new tests); merge d5ae6c43. Gate: 13 tests green (targeted vitest); shard 1/4 461 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings). Previous run crashed at 00:00Z after writing commit; resumed at 03:05Z and completed merge.
+- [x] **N65. Hygiene / coverage nibble #35** — `src/atlas/tabs/EntitiesTab.tsx` (the entity authoring
+  panel) had no dedicated component tests despite being the primary DM data-entry surface. Added 15 tests
+  in 7 describe blocks to a new `src/test/tabs/EntitiesTab.test.tsx`: **Empty state** — no entity form
+  shown when entities list is empty. **Entity form** — sourcePath rendered when first entity auto-selected.
+  **Discard button** — absent with no drafts; present with dirty count; click calls onDraftsChange({}).
+  **Import bar** — hidden when neither handler provided; "Import .md files…" button shown with handler;
+  "Paste markdown" shown with handler. **Relationship section** — "No relationships yet." empty state; DM
+  badge for non-player-visibility relationships; unresolved entity warning; leak warning when player-visible
+  relationship targets DM-only entity. **Handout bundle section** — "Print handout bundle" summary always
+  rendered. Pure test coverage — no source changes.
+  - ✅ DONE 2026-06-23 — commit d2c42bf2 (test(n65): EntitiesTab render branches — 15 new tests); merge
+    from run/n65-20260623. Gate: 15 tests green (targeted vitest); shard 1/4 476 tests green; tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
 
 ---
 
