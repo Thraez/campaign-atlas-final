@@ -1351,7 +1351,7 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
   trailing newline still gets the blank-line separator before the body.
   - Files: `src/test/world-yaml-serialize.test.ts`; pure test coverage — no source changes.
   - ✅ DONE 2026-06-23 — commit 3e97a8c4 (test(N70): worldYamlSerialize edge-case coverage — 6 new
-    tests); merge TBD. Gate: 16 tests green (6 new + 10 pre-existing); tsc EXIT:0;
+    tests); merge cce1ef03. Gate: 16 tests green (6 new + 10 pre-existing); tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings).
 
 ---
