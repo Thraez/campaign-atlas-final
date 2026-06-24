@@ -1537,6 +1537,18 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     green (targeted vitest); shard 1/4 502 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing
     warnings).
 
+- [x] **N84. Hygiene / coverage nibble #76** — `src/atlas/notes/playerNotes.ts` had 0 test coverage
+  despite being the player-side scratchpad (localStorage read/write/export/import) with many
+  error-handling branches. 11 tests cover: `loadNote` empty-id guard and missing-note null;
+  `saveNote`+`loadNote` round-trip; empty-text deletion; `deleteNote`; `loadAllNotes` corrupt-JSON
+  fallback; malformed-entry skip (missing text/updatedAt); `exportNotesJson`/`importNotesJson`
+  wrapped-format round-trip; raw NoteMap import; invalid-JSON error; missing-text entry error. Uses
+  `_resetNotesForTests()` for isolation (same pattern as `visitedPlaces.ts`).
+  - Files: `src/test/notes/playerNotes.test.ts` (new, 11 tests).
+  - ✅ DONE 2026-06-24 — commit f588def3 (test(N84): playerNotes coverage — 11 tests). Gate: 11/11 tests
+    green (targeted vitest); shard 1/4 502 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing
+    warnings). Merge commit 32eb45b3.
+
 ---
 
 ### O — Atmosphere soundscape
