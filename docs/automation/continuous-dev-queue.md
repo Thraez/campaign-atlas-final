@@ -1601,6 +1601,26 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     covered). Gate: 9/9 tests green (targeted vitest); shard 1/4 507 tests green; tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings). Merge commit 9bbbf031.
 
+- [x] **N89. Hygiene / coverage nibble #81** — `src/atlas/content/projectEntityForPlayer.ts` had
+  4 untested branches on the DM-content redaction path (security-critical).
+  1. **Orphan `{{secret:id}}` marker** — the `!knownSecretIds.has(id) → return ""` branch drops
+     a marker whose id has no matching entry in `entity.secrets` (stale reference after a secret
+     is deleted). Explicitly documented in source but never tested.
+  2. **`entity.secrets` undefined + secret marker** — `entity.secrets ?? []` yields an empty Set
+     so every marker in the body is an orphan and gets dropped. Guards both the null-coalescing
+     and the orphan-drop branch together.
+  3. **Empty relationships array `[]`** — `relationships.length > 0` is false so the filter block
+     is skipped; the output stays `[]` (not `undefined`). Distinct from the "all filtered →
+     undefined" case already tested in N34.
+  4. **`%%dm%%` in `relationship.description`** — the `r.description` strip branch is the sibling
+     of the already-tested `r.label` strip; it was uncovered.
+  4 tests added to `src/test/content/projectEntityForPlayer-gaps.test.ts` in a new
+  "branch gaps (N89)" describe block. No source changes.
+  - Files: `src/test/content/projectEntityForPlayer-gaps.test.ts` (4 tests added, no source changes).
+  - ✅ DONE 2026-06-24 — commit 3a88495a (test(N89): projectEntityForPlayer — 4 untested branches
+    covered). Gate: 11/11 tests green (targeted vitest); shard 1/4 511 tests green; tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings). Merge commit 5d7b9a53.
+
 ---
 
 ### O — Atmosphere soundscape
