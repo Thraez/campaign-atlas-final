@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
-import type { CreditsConfig, Entity } from "@/atlas/content/schema";
+import type { CreditsConfig, Entity, MapPlacement } from "@/atlas/content/schema";
 import type { EntityRelationship } from "@/atlas/profiles/profileTypes";
 
 const e: Entity = {
@@ -372,5 +372,174 @@ describe("EntityPanel — hover-peek prop bindings (N47)", () => {
     );
     fireEvent.mouseLeave(screen.getByText("Ally NPC"));
     expect(onPeekLeave).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── N76 — structural / interaction branches ──────────────────────────────────
+
+describe("EntityPanel — null entity empty state (N76)", () => {
+  it("renders the 'select a pin' prompt when entity is null", () => {
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={null}
+          placements={[]}
+          entityById={new Map()}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/select a pin/i)).toBeInTheDocument();
+  });
+});
+
+describe("EntityPanel — header fields (N76)", () => {
+  it("renders entity.summary as a quoted paragraph", () => {
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={{ ...e, summary: "A shadowy figure." }}
+          placements={[]}
+          entityById={new Map()}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("A shadowy figure.")).toBeInTheDocument();
+  });
+
+  it("renders entity.aliases as 'aka ...'", () => {
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={{ ...e, aliases: ["The Shadow", "Shade"] }}
+          placements={[]}
+          entityById={new Map()}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/aka The Shadow, Shade/)).toBeInTheDocument();
+  });
+
+  it("renders the 'Rumored' badge when entity.visibility is 'rumor'", () => {
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={{ ...e, visibility: "rumor" as const }}
+          placements={[]}
+          entityById={new Map()}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/rumored/i)).toBeInTheDocument();
+  });
+
+  it("includes entity.race in the type kicker when both type and race are set", () => {
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={{ ...e, race: "Human" } as Entity}
+          placements={[]}
+          entityById={new Map()}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    // playerTypeLabel("npc") === "Person"
+    expect(screen.getByText("Person · Human")).toBeInTheDocument();
+  });
+
+  it("renders entity.tags as # links", () => {
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={{ ...e, tags: ["kingdom", "rival"] }}
+          placements={[]}
+          entityById={new Map()}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("#kingdom")).toBeInTheDocument();
+    expect(screen.getByText("#rival")).toBeInTheDocument();
+  });
+});
+
+describe("EntityPanel — placement and onShowOnMap (N76)", () => {
+  const p: MapPlacement = {
+    id: "pin1",
+    entityId: "corven",
+    mapId: "world-map",
+    x: 50,
+    y: 75,
+    visibility: "player",
+  };
+
+  it("renders 'Show on map' button when placements is non-empty", () => {
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={e}
+          placements={[p]}
+          entityById={new Map()}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/show on map/i)).toBeInTheDocument();
+  });
+
+  it("calls onShowOnMap with the placement object when 'Show on map' is clicked", () => {
+    const onShowOnMap = vi.fn();
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={e}
+          placements={[p]}
+          entityById={new Map()}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={onShowOnMap}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByText(/show on map/i));
+    expect(onShowOnMap).toHaveBeenCalledWith(p);
+  });
+});
+
+describe("EntityPanel — onClose callback (N76)", () => {
+  it("calls onClose when the X button is clicked", () => {
+    const onClose = vi.fn();
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={e}
+          placements={[]}
+          entityById={new Map()}
+          onOpenEntity={() => {}}
+          onClose={onClose}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByLabelText(/close panel/i));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
