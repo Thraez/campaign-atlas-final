@@ -1513,6 +1513,19 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     total); merge 95877761. Gate: 9/9 tests green (targeted vitest); shard 1/4 499 tests green;
     tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N82. Hygiene / coverage nibble #74** — `src/atlas/save/canonicalPlacementSave.ts` had 11 tests
+  covering the happy paths and known error conditions, but three branches in `readSourceFile` and
+  `mergePlacementsIntoFrontmatter` were untested. 3 new tests (14 total); pure test coverage —
+  no source changes.
+  - **readSourceFile (2 new):** non-404 server error (status 500) → CanonicalSaveError with status
+    in message; malformed response body (`contents: 42`, not a string) → CanonicalSaveError.
+  - **mergePlacementsIntoFrontmatter (1 new):** data with no `atlas` key at all → creates atlas block
+    from scratch (the `data.atlas ?? {}` coalescing path was never exercised with a bare object).
+  - Files: `src/test/canonical-placement-save.test.ts`.
+  - ✅ DONE 2026-06-24 — commit 376b1196 (test(N82): canonicalPlacementSave branch coverage — 3 new
+    tests, 14 total); merge 376b1196. Gate: 14/14 tests green (targeted vitest); shard 1/4 502 tests
+    green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
