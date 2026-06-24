@@ -226,3 +226,58 @@ describe("buildImportChanges persists inferred atlas fields", () => {
     expect(change.baseHash).toBeNull();              // create-only
   });
 });
+
+// ── N92 branch-coverage gaps ───────────────────────────────────────────────
+
+describe("buildImportChanges — readSourceFile branch coverage (N92)", () => {
+  it("throws ImportCommitError on non-404 server error in update row", async () => {
+    const raw = "---\natlas:\n  type: npc\n---\nbody\n";
+    const row = {
+      id: "r1", filename: "corven.md", inferredType: "npc",
+      resolvedId: "corven", targetPath: "content/w/npcs/corven.md",
+      pathAllowed: true, rowKind: "update" as const,
+      included: true, content: raw, rawContent: raw,
+      typeWasExplicit: true, typeWasGuessed: false, resolvedVisibility: "dm",
+    };
+    const serverErrorFetch: typeof fetch = async () =>
+      new Response("internal server error", { status: 500 }) as Response;
+    await expect(
+      buildImportChanges([row as never], { fetchFn: serverErrorFetch }),
+    ).rejects.toBeInstanceOf(ImportCommitError);
+  });
+
+  it("throws ImportCommitError when read response body has non-string contents", async () => {
+    const raw = "---\natlas:\n  type: settlement\n  id: thornhold\n---\nbody\n";
+    const row = {
+      id: "r1", filename: "thornhold.md", inferredType: "settlement",
+      resolvedId: "thornhold", targetPath: "content/w/settlements/thornhold.md",
+      pathAllowed: true, rowKind: "path-collision" as const,
+      included: true, content: raw, rawContent: raw,
+      typeWasExplicit: false, typeWasGuessed: false, resolvedVisibility: "dm",
+    };
+    const malformedFetch: typeof fetch = async () =>
+      new Response(JSON.stringify({ path: "content/w/settlements/thornhold.md", contents: 42 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }) as Response;
+    await expect(
+      buildImportChanges([row as never], { fetchFn: malformedFetch }),
+    ).rejects.toBeInstanceOf(ImportCommitError);
+  });
+
+  it("needsReview secrecy-increase bypasses the dm default and uses resolvedVisibility", async () => {
+    const raw = "---\natlas:\n  summary: public note\n---\nContent\n";
+    const row = {
+      id: "r1", filename: "newplace.md", inferredType: "location",
+      resolvedId: "newplace", targetPath: "content/w/places/newplace.md",
+      pathAllowed: true, rowKind: "create" as const,
+      included: true, content: raw, rawContent: raw,
+      typeWasExplicit: false, typeWasGuessed: false,
+      resolvedVisibility: "player",
+      needsReview: { reason: "secrecy-increase" as const },
+    };
+    const [change] = await buildImportChanges([row as never]);
+    const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
+    expect(atlas.visibility).toBe("player");
+  });
+});
