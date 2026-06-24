@@ -103,3 +103,63 @@ describe("projectEntityForPlayer — branch gaps (N34)", () => {
     expect(p.bodyHtml).not.toContain('data-secret-id="sig"xss"');
   });
 });
+
+describe("projectEntityForPlayer — branch gaps (N89)", () => {
+  it("orphan {{secret:id}} marker (id not in entity.secrets) is dropped from bodyHtml", () => {
+    // The `if (!knownSecretIds.has(id)) return ""` branch drops markers whose id has
+    // no matching entry in entity.secrets (e.g. a stale reference after a secret is deleted).
+    const e = ent({ id: "npc", title: "NPC", visibility: "player",
+      body: "{{secret:orphan-id}}\n\nPublic text.",
+      secrets: [{ id: "other-id", lockType: "character", salt: "s", iv: "iv", ciphertext: "ct" }],
+    });
+    const ctx = buildProjectionContext(new Map([[e.id, e]]));
+    const p = projectEntityForPlayer(e, ctx);
+    expect(p.bodyHtml).not.toContain("atlas-secret-block");
+    expect(p.bodyHtml).not.toContain("orphan-id");
+    expect(p.bodyHtml).toContain("Public text.");
+  });
+
+  it("{{secret:id}} markers are all dropped when entity.secrets is undefined", () => {
+    // entity.secrets ?? [] yields an empty Set, so every marker is an orphan.
+    // Guards both the null-coalescing and the orphan-drop branch together.
+    const e = ent({ id: "npc", title: "NPC", visibility: "player",
+      body: "{{secret:s1}}\n\nSome lore.",
+      // secrets intentionally omitted → undefined
+    });
+    const ctx = buildProjectionContext(new Map([[e.id, e]]));
+    const p = projectEntityForPlayer(e, ctx);
+    expect(p.bodyHtml).not.toContain("atlas-secret-block");
+    expect(p.bodyHtml).not.toContain("s1");
+    expect(p.bodyHtml).toContain("Some lore.");
+  });
+
+  it("empty relationships array is preserved as [] (filter block is skipped)", () => {
+    // `if (relationships && relationships.length > 0)` is falsy for [], so the array
+    // passes through unchanged — the output is [] not undefined.
+    const e = ent({ id: "npc", title: "NPC", visibility: "player",
+      relationships: [] as Entity["relationships"],
+    });
+    const ctx = buildProjectionContext(new Map([[e.id, e]]));
+    const p = projectEntityForPlayer(e, ctx);
+    expect(Array.isArray(p.relationships)).toBe(true);
+    expect(p.relationships).toHaveLength(0);
+  });
+
+  it("%%dm%% content in a relationship description is stripped", () => {
+    // `if (r.description) r.description = stripDmFromShippingString(r.description) ?? r.description`
+    // r.label stripping is already tested (N34); r.description is a sibling branch not yet covered.
+    const ally = ent({ id: "ally", title: "Ally", visibility: "player" });
+    const e = ent({ id: "npc", title: "NPC", visibility: "player",
+      relationships: [
+        { type: "ally", entity: "ally", label: "public ally",
+          description: "%%classified info%% old friends", visibility: "player" },
+      ] as Entity["relationships"],
+    });
+    const all = new Map([[ally.id, ally], [e.id, e]]);
+    const p = projectEntityForPlayer(e, buildProjectionContext(all));
+    const rel = p.relationships?.[0];
+    expect(rel?.description).not.toContain("%%");
+    expect(rel?.description).not.toContain("classified info");
+    expect(rel?.description).toContain("old friends");
+  });
+});
