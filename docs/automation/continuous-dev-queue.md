@@ -1561,6 +1561,20 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     — 4 new tests, 25 total). Gate: 25/25 tests green (targeted vitest); shard 1/4 502 tests green;
     tsc EXIT:0; eslint 0 errors (16 pre-existing warnings). Merge commit 0b494617.
 
+- [x] **N86. Hygiene / coverage nibble #78** — `src/atlas/save/canonicalEntitySave.ts`
+  `entityFrontmatterPatches` had several untested branches despite being on the critical Save path
+  (the function builds the frontmatter patch set that gets written to entity .md files on every Save).
+  Branches covered: empty drafts → []; unknown entity id → silently skipped (not thrown, so a stale
+  draft for a deleted entity can't crash a Save); type / visibility / summary / aliases / images each
+  independently tested for draft-wins vs entity-fallback; empty relationships array (from draft or
+  from entity) → stripped to undefined in output; non-empty draft relationships preserved; entity
+  relationship fallback when draft has none; draft profile wins over entity profile; entity profile
+  used when no draft profile supplied. 11 tests total.
+  - Files: new `src/test/save/canonicalEntitySave.test.ts`.
+  - ✅ DONE 2026-06-24 — commit f335bde1 (test(N86): entityFrontmatterPatches branch coverage — 11
+    new tests). Gate: 11/11 tests green (targeted vitest); shard 1/4 505 tests green; tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings). Merge commit c0856af1.
+
 ---
 
 ### O — Atmosphere soundscape
