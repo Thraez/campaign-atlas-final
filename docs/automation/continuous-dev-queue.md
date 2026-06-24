@@ -1700,6 +1700,22 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     coverage (14 new tests)). Gate: 14/14 tests green (targeted vitest); shard 1/4 518 tests green;
     tsc EXIT:0; eslint 0 errors (16 pre-existing warnings). Merge commit 4cc81424.
 
+- [x] **N95. Hygiene / coverage nibble #87** — `useEntityEditDraft.ts` had a large coverage gap:
+  `setField` was completely untested, and the null-draft guard branches in both `setField` and
+  `setBody` (the `d ? ... : d` false path when no draft is loaded) were unreachable under the
+  existing test suite. `applySnapshot(null)` was also untested.
+  5 new tests covering:
+  - `setField` marks draft dirty after a field change
+  - `setField` updates only the targeted field; all other fields unchanged
+  - `setField` no-op when no draft is loaded (null guard false branch)
+  - `setBody` no-op when no draft is loaded (null guard false branch)
+  - `applySnapshot(null)` clears the draft
+  Pure test additions — no source changes.
+  - Files: new `src/test/categories/useEntityEditDraft.test.ts` (5 tests, no source changes).
+  - ✅ DONE 2026-06-25 — commit 3ca4e6ac (test(N95): useEntityEditDraft — setField + null-draft
+    no-op branch coverage (5 new tests)). Gate: 5/5 tests green (targeted vitest); shard 1/4
+    525 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
