@@ -1549,6 +1549,18 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     green (targeted vitest); shard 1/4 502 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing
     warnings). Merge commit 32eb45b3.
 
+- [x] **N85. Hygiene / coverage nibble #77** — `src/atlas/editor/toolbarActions.ts` had two untested
+  action cases: `secret:character` and `secret:password`. Both use `crypto.getRandomValues` to generate
+  a unique `{{secret:s-...}}` id and call `insertBlock` — the block-insertion contract and uniqueness
+  guarantee were undocumented by tests. 4 new tests (25 total): `secret:character` value matches
+  `/\{\{secret:s-[a-z0-9]+\}\}/`; `secret:password` matches same regex; `secret:character` inserts
+  after existing content as a block (`"intro\n\n{{secret:s-...}}\n"`); two consecutive calls produce
+  different ids. Pure test coverage — no source changes.
+  - Files: `src/test/editor/toolbarActions.test.ts`.
+  - ✅ DONE 2026-06-24 — commit fdc06307 (test(N85): toolbarActions secret:character + secret:password
+    — 4 new tests, 25 total). Gate: 25/25 tests green (targeted vitest); shard 1/4 502 tests green;
+    tsc EXIT:0; eslint 0 errors (16 pre-existing warnings). Merge commit 0b494617.
+
 ---
 
 ### O — Atmosphere soundscape
