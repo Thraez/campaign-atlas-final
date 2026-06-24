@@ -1584,6 +1584,23 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     tests). Gate: 2/2 tests green (targeted vitest); shard 1/4 504 tests green; tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings). Merge commit d8088cde.
 
+- [x] **N88. Hygiene / coverage nibble #80** — `src/atlas/content/projectMapForPlayer.ts` had 3
+  uncovered branches in the player map-projection function (security-critical: wrong behaviour
+  here could expose DM content to players).
+  1. **Orphan placement** — the `!e` null-guard silently drops a pin whose entityId is not in
+     the entities map (stale pin for a deleted entity must not crash and must not appear in
+     `foggedEntityIds`). Previously only the `!PLAYER_VISIBLE` branch was tested.
+  2. **`rumor`-visibility placement** — `rumor` is in PLAYER_VISIBLE so the pin must be included.
+     Tested for routes already; not tested for placements.
+  3. **Region with no `visibility` field** — defaults to `"dm"` via `r.visibility ?? "dm"`, so
+     an unlabelled region must be excluded from the player projection. The `?? "dm"` default path
+     was never exercised.
+  3 tests added to existing `src/test/content/projectMapForPlayer.test.ts`.
+  - Files: `src/test/content/projectMapForPlayer.test.ts` (3 tests added, no source changes).
+  - ✅ DONE 2026-06-24 — commit eafc3472 (test(N88): projectMapForPlayer — 3 untested branches
+    covered). Gate: 9/9 tests green (targeted vitest); shard 1/4 507 tests green; tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings). Merge commit 9bbbf031.
+
 ---
 
 ### O — Atmosphere soundscape
