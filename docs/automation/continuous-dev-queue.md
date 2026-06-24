@@ -1420,6 +1420,19 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     30 total); merge fc68a9c5. Gate: 30 tests green (targeted vitest); shard 1/4 489 tests green;
     tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N77. Hygiene / coverage nibble #69** — `src/atlas/entity/EntityPanel.tsx` had two untested
+  internal component branches. `ImageThumb` fires `onError` on image load failure → sets
+  `broken=true` → renders "Image missing" placeholder div with the src in its `title` attribute
+  (previously the broken state was never exercised in tests). `CopyLinkButton` sets `copied=true`
+  after a successful `navigator.clipboard.writeText` → renders the Check icon with `text-green-500`
+  class (copied state was never exercised). 3 new tests (33 total); pure test coverage — no source
+  changes.
+  - Files: `src/test/entity/EntityPanel.test.tsx`; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-24 — commit 76a98237 (test(N77): EntityPanel ImageThumb broken-image +
+    CopyLinkButton copied state — 3 new tests, 33 total); merge 25b0445f. Gate: 33 tests green
+    (targeted vitest); shard 1/4 489 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing
+    warnings).
+
 ---
 
 ### O — Atmosphere soundscape
