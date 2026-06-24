@@ -1407,6 +1407,19 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     10 total); merge 2a6585f0. Gate: 10 tests green (targeted vitest); shard 1/4 489 tests green;
     tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N76. Hygiene / coverage nibble #68** — `src/atlas/entity/EntityPanel.tsx` had 21 tests
+  (Connections, credit-badge, N47 hover-peek) but nine structural/interaction branches were untested:
+  the null-entity empty-state render; `entity.summary` quoted paragraph; `entity.aliases` "aka ..."
+  line; `entity.visibility === "rumor"` → "Rumored — uncertain" badge; `entity.race` combined with
+  type in the kicker ("Person · Human"); `entity.tags` rendered as # links; `placements` non-empty
+  → "Show on map" button visible; `onShowOnMap` callback fired with the placement object on click;
+  `onClose` callback fired when the X button is clicked. 9 new tests (30 total); pure test coverage
+  — no source changes.
+  - Files: `src/test/entity/EntityPanel.test.tsx`; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-24 — commit e1ca29f2 (test(N76): EntityPanel structural branches — 9 new tests,
+    30 total); merge fc68a9c5. Gate: 30 tests green (targeted vitest); shard 1/4 489 tests green;
+    tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
