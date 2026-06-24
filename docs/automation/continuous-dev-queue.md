@@ -1636,6 +1636,24 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     unicode — 3 new tests, 6 total). Gate: 6/6 tests green (targeted vitest); shard 1/4 511 tests
     green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings). Merge commit 8e686397.
 
+- [x] **N91. Hygiene / coverage nibble #83** — `src/atlas/yaml/validatePatch.ts` had 4 branches
+  left uncovered after N23: the YAML parse-error catch block, the `# entity:` multi-chunk
+  separator in `splitYamlChunks` (distinct from the already-tested `# file:` path), and the
+  `settings` / `world-map` kind aliases for the map-validation branch.
+  1. **YAML parse error** — malformed YAML causes `yaml.loadAll` to throw; catch block sets
+     `firstError` and emits "YAML parse error: …" in the errors array.
+  2. **`# entity:` separator** — multi-chunk patch using `# entity:` headers splits into 2 valid
+     frontmatter blocks, both pass structural validation (`ok: true`).
+  3. **`settings` kind alias** — `validatePatchYaml(patch, "settings")` accepts a valid `maps:`
+     array (same code path as `"map"`).
+  4. **`world-map` kind alias** — `validatePatchYaml(patch, "world-map")` rejects a patch with
+     no `maps:` array.
+  4 new tests; pure test coverage — no source changes.
+  - Files: `src/test/atlas-patch-engine.test.ts` (4 tests added, no source changes).
+  - ✅ DONE 2026-06-24 — commit 3c43e1ca (test(N91): validatePatch — 4 uncovered branches).
+    Gate: 35/35 tests green (targeted vitest); shard 1/4 511 tests green; tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings). Merge commit 7258523e.
+
 ---
 
 ### O — Atmosphere soundscape
