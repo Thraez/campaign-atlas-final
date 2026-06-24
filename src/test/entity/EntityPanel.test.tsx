@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
 import type { CreditsConfig, Entity, MapPlacement } from "@/atlas/content/schema";
@@ -541,5 +541,79 @@ describe("EntityPanel — onClose callback (N76)", () => {
     );
     fireEvent.click(screen.getByLabelText(/close panel/i));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── N77 — ImageThumb broken-image + CopyLinkButton copied state ──────────────
+
+const entityWithPortrait: Entity = {
+  ...e,
+  images: ["portrait.png"],
+} as Entity;
+
+describe("EntityPanel — ImageThumb broken-image placeholder (N77)", () => {
+  it("renders the image thumbnail initially with no placeholder", () => {
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityWithPortrait}
+          placements={[]}
+          entityById={new Map()}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("img", { name: /Corven image 1/i })).toBeInTheDocument();
+    expect(screen.queryByText("Image missing")).not.toBeInTheDocument();
+  });
+
+  it("fires onError → 'Image missing' placeholder shown, original img gone", () => {
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityWithPortrait}
+          placements={[]}
+          entityById={new Map()}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.error(screen.getByRole("img", { name: /Corven image 1/i }));
+    const placeholder = screen.getByText("Image missing");
+    expect(placeholder).toBeInTheDocument();
+    expect(placeholder).toHaveAttribute("title", expect.stringContaining("Image failed to load:"));
+    expect(screen.queryByRole("img", { name: /Corven image 1/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("EntityPanel — CopyLinkButton copied state (N77)", () => {
+  it("shows the Check icon (text-green-500) after a successful clipboard write", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+      writable: true,
+    });
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={e}
+          placements={[]}
+          entityById={new Map()}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTitle("Copy share link"));
+    await waitFor(() => {
+      expect(screen.getByTitle("Copy share link").querySelector(".text-green-500")).toBeTruthy();
+    });
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true, writable: true });
   });
 });
