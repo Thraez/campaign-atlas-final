@@ -1526,6 +1526,17 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     tests, 14 total); merge 376b1196. Gate: 14/14 tests green (targeted vitest); shard 1/4 502 tests
     green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N83. Hygiene / coverage nibble #75** — `src/atlas/tabs/download.ts` had 0 tests despite being
+  the shared download helper used by all tab exports (JSON / Markdown / YAML). Two tests cover the
+  single code path: anchor created with correct `download` filename, blob has correct `type` and `size`,
+  `click()` called, `URL.revokeObjectURL` called with the object URL, and `toast.success` fires with the
+  filename. `URL.createObjectURL` / `revokeObjectURL` defined via `Object.defineProperty` (jsdom doesn't
+  implement them). Blob content verified via `.size` (jsdom v16 in this setup lacks `Blob.text()`).
+  - Files: `src/test/tabs/download.test.ts` (new, 2 tests).
+  - ✅ DONE 2026-06-24 — commit d4e2a712 (test(N83): downloadText coverage — 2 tests). Gate: 2/2 tests
+    green (targeted vitest); shard 1/4 502 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing
+    warnings).
+
 ---
 
 ### O — Atmosphere soundscape
