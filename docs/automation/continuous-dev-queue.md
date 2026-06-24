@@ -1395,6 +1395,18 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     tests, 15 total); merge bbb90d66. Gate: 15 tests green (targeted vitest); shard 1/4 489 tests
     green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N75. Hygiene / coverage nibble #67** — `src/atlas/publish/ReadinessCard.tsx` had 5 tests
+  covering the main happy paths but five branch groups were untested: `onConfirm` callback called
+  when "Publish now" is clicked; `build-failed` with no `buildError` → no `<pre>` block rendered
+  (the `buildFailed && result.buildError` guard); `locator.file` present in a reason → file path
+  shown in mono; `locator.entityId + onGoToEntity` → "Go to entity" button shown, click fires
+  callback with the entity id; `locator.entityId` without `onGoToEntity` → "Go to entity" button
+  absent. 5 new tests (10 total); pure test coverage — no source changes.
+  - Files: `src/atlas/publish/ReadinessCard.test.tsx`; pure test coverage — no source changes.
+  - ✅ DONE 2026-06-24 — commit 5f3ef0da (test(N75): ReadinessCard branch coverage — 5 new tests,
+    10 total); merge 2a6585f0. Gate: 10 tests green (targeted vitest); shard 1/4 489 tests green;
+    tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
