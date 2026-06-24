@@ -1621,6 +1621,21 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     covered). Gate: 11/11 tests green (targeted vitest); shard 1/4 511 tests green; tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings). Merge commit 5d7b9a53.
 
+- [x] **N90. Hygiene / coverage nibble #82** — `src/atlas/secrets/secretCrypto.ts` had only
+  3 tests (round-trip, wrong-passphrase → null, random salt/iv). Three output-contract and
+  edge-case branches were untested:
+  1. **Output byte-length contract** — `salt` decoded from base64 is exactly 16 bytes; `iv`
+     is exactly 12 bytes (AES-256-GCM format contract; callers may depend on these lengths).
+  2. **Empty-string plaintext** — `""` encrypts and decrypts back to `""` without error
+     (TextEncoder + AES-GCM handle zero-length buffers correctly).
+  3. **Unicode / multi-byte plaintext** — emoji and diacritical characters survive the
+     TextEncoder → AES-GCM → TextDecoder round-trip intact.
+  3 new tests (6 total); pure test coverage — no source changes.
+  - Files: `src/test/secrets/secretCrypto.test.ts` (3 tests added, no source changes).
+  - ✅ DONE 2026-06-24 — commit f2921ae1 (test(N90): secretCrypto output-format + empty-string +
+    unicode — 3 new tests, 6 total). Gate: 6/6 tests green (targeted vitest); shard 1/4 511 tests
+    green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings). Merge commit 8e686397.
+
 ---
 
 ### O — Atmosphere soundscape
