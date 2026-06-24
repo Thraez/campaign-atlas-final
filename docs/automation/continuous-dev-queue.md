@@ -1575,6 +1575,15 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     new tests). Gate: 11/11 tests green (targeted vitest); shard 1/4 505 tests green; tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings). Merge commit c0856af1.
 
+- [x] **N87. Hygiene / coverage nibble #79** — `src/atlas/editor/pinClickIntent.ts`
+  `resolvePinClickIntent` had no test coverage despite being called on every map-pin click in
+  the editor. 2-branch pure function: pending=true → place-anchor; pending=false →
+  open-entity with entityId. 2 tests total.
+  - Files: new `src/test/editor/pinClickIntent.test.ts`.
+  - ✅ DONE 2026-06-24 — commit 549b79c4 (test(N87): pinClickIntent branch coverage — 2 new
+    tests). Gate: 2/2 tests green (targeted vitest); shard 1/4 504 tests green; tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings). Merge commit d8088cde.
+
 ---
 
 ### O — Atmosphere soundscape
