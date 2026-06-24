@@ -1654,6 +1654,23 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     Gate: 35/35 tests green (targeted vitest); shard 1/4 511 tests green; tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings). Merge commit 7258523e.
 
+- [x] **N92. Hygiene / coverage nibble #84** — `src/atlas/import/buildImportChanges.ts` had
+  3 untested branches in its inner `readSourceFile` helper and the `needsReview` secrecy-increase
+  bypass path (the critical "DM explicitly approved player-visibility for a new entity" gate).
+  1. **Non-404 server error in update row** — `readSourceFile` returns status 500 → `ImportCommitError`
+     with "Failed to read … status 500" in the message (`!res.ok` branch, not the 404 case).
+  2. **Malformed read response in path-collision row** — server returns `{ contents: 42 }` (not a
+     string) → `ImportCommitError` (`typeof body.contents !== "string"` guard).
+  3. **`needsReview.reason === "secrecy-increase"` in create row** — when the DM explicitly approved
+     a visibility upgrade via the sync-map review gate, `resolvedVisibility` (`"player"`) is used
+     instead of the default `"dm"` guard. This branch was shadowed by the existing test that set
+     `resolvedVisibility: "player"` but omitted `needsReview`.
+  3 new tests (10 total); pure test additions — no source changes.
+  - Files: `src/test/build-import-changes.test.ts` (3 tests added, no source changes).
+  - ✅ DONE 2026-06-24 — commit 79b553f3 (test(N92): buildImportChanges branch coverage — 3 new
+    tests, 10 total). Gate: 10/10 tests green (targeted vitest); shard 1/4 511 tests green;
+    tsc EXIT:0; eslint 0 errors (16 pre-existing warnings). Merge commit 671f7030.
+
 ---
 
 ### O — Atmosphere soundscape
