@@ -22,14 +22,13 @@ import { OceanBackground } from "@/atlas/ocean/OceanBackground";
 import { overridesSchema } from "@/atlas/schemas/imports";
 import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
-import { filterDirtyPlacements } from "@/atlas/editor/dirtyPlacements";
+import { buildSavePlan } from "@/atlas/editor/saveGate";
 import type { FileChange } from "@/atlas/save/localFsSave";
 import { SaveStatus } from "@/atlas/session/SaveStatus";
 import { DiscardConfirmModal } from "@/atlas/session/DiscardConfirmModal";
 import { CanonicalSaveError } from "@/atlas/save/canonicalPlacementSave";
 import {
   type FrontmatterDraft,
-  entityFrontmatterPatches,
   buildCanonicalEntityChanges,
 } from "@/atlas/save/canonicalEntitySave";
 import { useWorldYamlBaseline, worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
@@ -791,12 +790,20 @@ function AtlasPlacementEditorInner() {
     // B3: buildDraftPlacements() returns a draft for every *effective* placement
     // (incl. canon-only ones). Queue only the placements the DM actually
     // overrode this session, or a clean Save would rewrite every placed entity.
-    const drafts = filterDirtyPlacements(buildDraftPlacements(), overrides, activeMap.id);
-    const fmPatches = entityFrontmatterPatches(entityDrafts, project.entities);
-    if (drafts.length === 0 && fmPatches.length === 0 && !worldYamlDirty) {
+    const plan = buildSavePlan({
+      allDraftPlacements: buildDraftPlacements(),
+      overrides,
+      activeMapId: activeMap.id,
+      entityDrafts,
+      projectEntities: project.entities,
+      worldYamlDirty,
+    });
+    if (plan.isEmpty) {
       toast.info("No changes to save");
       return;
     }
+    const drafts = plan.dirtyPlacements;
+    const fmPatches = plan.frontmatterPatches;
     const entitiesById = new Map(project.entities.map((e) => [e.id, e]));
     try {
       // One FileChange per entity .md path even when an entity is edited in
