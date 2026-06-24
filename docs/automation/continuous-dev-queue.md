@@ -1496,6 +1496,23 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     tests, 24 total); merge 70b92f55. Gate: 24/24 tests green (targeted vitest); shard 1/4 499 tests
     green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N81. Hygiene / coverage nibble #73** — `src/atlas/save/newEntitySave.ts` had only 2 tests
+  covering the main happy paths. `slugify` is exported but never tested directly. `buildNewEntityChange`
+  had four untested branches: summary absent → `atlas.summary` key missing; locations category →
+  folder "settlements" + type "settlement"; kind with surrounding whitespace → trimmed before write;
+  visibility "rumor" persists in atlas.visibility. 7 new tests (9 total); pure test coverage —
+  no source changes.
+  - **slugify (3 new):** leading/trailing non-alphanumeric stripped (`"!Hello World!"` → `"hello-world"`);
+    apostrophe becomes dash separator between letters (`"Dragon's Lair"` → `"dragon-s-lair"`); multiple
+    non-alphanumeric chars collapse to single dash (`"The Hilt & Flagon"` → `"the-hilt-flagon"`).
+  - **buildNewEntityChange (4 new):** no summary → `atlas.summary` key absent; locations category →
+    path uses `/settlements/` + type `"settlement"`; kind `"  ranger  "` (whitespace) → type `"ranger"`;
+    visibility `"rumor"` → persists in atlas block + lore folder path correct.
+  - Files: `src/test/save/newEntitySave.test.ts`.
+  - ✅ DONE 2026-06-24 — commit 1beb3bc9 (test(N81): newEntitySave branch coverage — 7 new tests, 9
+    total); merge 95877761. Gate: 9/9 tests green (targeted vitest); shard 1/4 499 tests green;
+    tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
