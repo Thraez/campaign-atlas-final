@@ -22,4 +22,23 @@ describe("secretCrypto", () => {
     expect(b1.salt).not.toBe(b2.salt);
     expect(b1.ciphertext).not.toBe(b2.ciphertext);
   });
+
+  it("output salt decodes to 16 bytes and iv decodes to 12 bytes", async () => {
+    const blob = await encryptSecret("test", "pass");
+    expect(Buffer.from(blob.salt, "base64").length).toBe(16);
+    expect(Buffer.from(blob.iv, "base64").length).toBe(12);
+  });
+
+  it("round-trips empty string plaintext", async () => {
+    const blob = await encryptSecret("", "passphrase");
+    const fakeBlob: SecretBlob = { id: "empty", lockType: "password", ...blob };
+    expect(await decryptSecret(fakeBlob, "passphrase")).toBe("");
+  });
+
+  it("round-trips unicode / multi-byte plaintext", async () => {
+    const plain = "Ëlfhëim 🗡️ — the ward holds";
+    const blob = await encryptSecret(plain, "unicode-key");
+    const fakeBlob: SecretBlob = { id: "uni", lockType: "character", ...blob };
+    expect(await decryptSecret(fakeBlob, "unicode-key")).toBe(plain);
+  });
 });
