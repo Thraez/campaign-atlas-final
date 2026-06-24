@@ -1671,6 +1671,19 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     tests, 10 total). Gate: 10/10 tests green (targeted vitest); shard 1/4 511 tests green;
     tsc EXIT:0; eslint 0 errors (16 pre-existing warnings). Merge commit 671f7030.
 
+- [x] **N93. Hygiene / coverage nibble #85** — `src/atlas/content/frontmatterRewrite.ts` had no test
+  file at all. Two untested branches: (1) `normaliseTags` receiving a bare string value (`tags: "npc"`)
+  rather than an array — the string-input branch that returns `[existing.trim()]`; (2) `patch.summary`
+  writing into `atlas.summary` — the field existed in the patch interface but was never exercised.
+  Also covered: empty-string and `null` tag inputs (return `[]`), no-duplicate guard when the existing
+  string tag equals the added tag, multi-field patch in one call, and preservation of untouched atlas
+  fields and existing tag arrays.
+  11 new tests (new file); pure test additions — no source changes.
+  - Files: new `src/test/frontmatter-rewrite.test.ts` (11 tests, no source changes).
+  - ✅ DONE 2026-06-24 — commit bfbacc59 (test(N93): frontmatterRewrite branch coverage — 11 new
+    tests). Gate: 11/11 tests green (targeted vitest); shard 1/4 511 tests green;
+    tsc EXIT:0; eslint 0 errors (16 pre-existing warnings). Merge commit c1a6fded.
+
 ---
 
 ### O — Atmosphere soundscape
