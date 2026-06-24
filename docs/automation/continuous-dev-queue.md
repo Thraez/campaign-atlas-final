@@ -1468,6 +1468,34 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     51b99e4e. Gate: 16/16 tests green (targeted vitest); shard 1/4 499 tests green; tsc EXIT:0;
     eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N80. Hygiene / coverage nibble #72** — `src/atlas/save/sourcePathAllowlist.ts` controls which
+  paths can receive writes/reads via the dev-only local-FS save endpoint and is security-critical, but
+  two functions had significant branch gaps. `isWritableAssetPath` (image upload allowlist) had zero
+  test coverage. `isWritableSourcePath` had several untested input-guard branches.
+
+  **isWritableSourcePath — input guards (5 new):**
+  - empty string → false (length === 0 guard)
+  - absolute path (leading `/`) → false
+  - `./`-prefixed path → false
+  - backslash (Windows-style) path → false (repo paths are POSIX)
+  - `_atlas` branch with non-.yaml/.yml extension (e.g. `.json`) → false
+
+  **isWritableAssetPath (8 new, 0 → 8):**
+  - `public/atlas/assets/maps/<file>.png` → true
+  - `public/atlas/assets/images/<file>.jpg` → true
+  - `.gif` extension → true (animated portraits/tokens are a valid DM use case)
+  - empty string → false
+  - absolute path → false
+  - `audio` bucket → false (only `maps` and `images` are writable)
+  - non-image extension (`.yaml`) → false
+  - sub-directory path (6 parts, length ≠ 5) → false
+
+  Pure test coverage — no source changes.
+  - Files: `src/test/save/sourcePathAllowlist.test.ts`.
+  - ✅ DONE 2026-06-24 — commit 3084aca0 (test(N80): sourcePathAllowlist write-path guards — 13 new
+    tests, 24 total); merge 70b92f55. Gate: 24/24 tests green (targeted vitest); shard 1/4 499 tests
+    green; tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
