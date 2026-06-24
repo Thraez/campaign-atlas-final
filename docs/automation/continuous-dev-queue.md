@@ -1684,6 +1684,22 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     tests). Gate: 11/11 tests green (targeted vitest); shard 1/4 511 tests green;
     tsc EXIT:0; eslint 0 errors (16 pre-existing warnings). Merge commit c1a6fded.
 
+- [x] **N94. Hygiene / coverage nibble #86** — `src/atlas/yaml/dump.ts` had no test file at all.
+  Two pure exported functions with zero coverage: `patchHeader` (builds the standard comment
+  block prepended to every tool-generated YAML patch) and `dumpYaml` (wraps `js-yaml` with fixed
+  serialization options used by all patch builders).
+  Branches covered for `patchHeader`: title / subject / applyTo / Generated-timestamp ISO format /
+  CANON MODEL boilerplate all present; notes lines appear when `notes` is provided; extra lines
+  added vs absent; empty-array `notes` omits the block (same line count as absent); trailing
+  newline (blank separator before YAML body). Branches covered for `dumpYaml`: flat object
+  serialization; 2-space nested indentation; `sortKeys: false` key-order preservation; array
+  dash notation; no YAML document markers (`---` / `...`).
+  14 new tests (new file); pure test additions — no source changes.
+  - Files: new `src/test/yaml-dump.test.ts` (14 tests, no source changes).
+  - ✅ DONE 2026-06-24 — commit ac4d9cbf (test(N94): yaml/dump — patchHeader and dumpYaml branch
+    coverage (14 new tests)). Gate: 14/14 tests green (targeted vitest); shard 1/4 518 tests green;
+    tsc EXIT:0; eslint 0 errors (16 pre-existing warnings). Merge commit 4cc81424.
+
 ---
 
 ### O — Atmosphere soundscape
