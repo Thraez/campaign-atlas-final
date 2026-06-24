@@ -1433,6 +1433,26 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     (targeted vitest); shard 1/4 489 tests green; tsc EXIT:0; eslint 0 errors (16 pre-existing
     warnings).
 
+- [x] **N78. Hygiene / coverage nibble #70** — `src/atlas/tabs/PublishCheckTab.tsx` had 8 tests
+  (N60) covering idle/checking/published/error publish-flow states. Ten new tests added across two
+  describe blocks. **Publish-flow states:** `busy` → button text "Busy — finishing the current
+  build" + disabled; `nothing-to-publish` → "Already up to date — nothing new to publish.";
+  `git-failed` (no pushReason) → "Couldn't publish automatically" header; `git-failed` +
+  pushReason "offline" → "You appear to be offline." sub-message; `git-failed` + pushReason
+  "behind" → "Your branch is behind — pull first in GitHub Desktop."; `ready` + safe
+  `checkResult` → `ReadinessCard` renders "Safe to publish — no DM-only content is exposed."
+  **Issue rendering:** `IssueCard` with `issue.hint` → hint div rendered; `IssueCard` with
+  `scope.mapId` + `onGoToMap` callback → "Go to map" button fires callback with mapId; `IssueCard`
+  with `scope.entityId` + `onGoToEntity` → "Go to entity" button fires with entityId; `passedChecks`
+  with items → "Passed (2)" collapsible header rendered. Also promoted `validateProject` to
+  a `vi.mock` factory (preserving all other exports) so issue-rendering tests can control the
+  report via `mockReturnValue`. 18/18 total tests green; pure test coverage — no source changes.
+  - Files: `src/test/publish-check-tab.test.tsx`.
+  - ✅ DONE 2026-06-24 — commit 6bc0c346 (test(N78): PublishCheckTab 10 new tests —
+    busy/nothing-to-publish/git-failed/ready states + IssueCard hint/go-to callbacks + passedChecks
+    block); merge 6466b258. Gate: 18/18 tests green (targeted vitest); shard 1/4 499 tests green;
+    tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
