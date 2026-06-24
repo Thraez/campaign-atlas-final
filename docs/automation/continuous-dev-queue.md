@@ -1453,6 +1453,21 @@ unsure which to pick, take **N5 (hygiene nibble)** — it's the safest filler.
     block); merge 6466b258. Gate: 18/18 tests green (targeted vitest); shard 1/4 499 tests green;
     tsc EXIT:0; eslint 0 errors (16 pre-existing warnings).
 
+- [x] **N79. Hygiene / coverage nibble #71** — `src/atlas/geometry/polygon.ts` had 9 tests covering
+  interior/exterior/degenerate-polygon, square/triangle bboxOf, basic rectArea, and partial-overlap +
+  disjoint rectIntersectArea. Seven new tests added to cover the remaining branches. The helpers are
+  used by both fog rendering (`effectiveLit.ts`) and soundscape (`resolveSoundscape.ts`), making
+  correctness-critical. Branches covered: `pointInPolygon` with empty array → false (length < 3 guard);
+  `pointInPolygon` with single-point array → false (same guard); `bboxOf` single-point → collapsed
+  bbox where min === max; `rectArea` zero-width (maxX === minX) → 0 via `Math.max(0, ...)` guard;
+  `rectArea` inverted axes (maxX < minX) → 0 via same guard; `rectIntersectArea` touching edge
+  (a.maxX === b.minX) → 0; `rectIntersectArea` inner rect fully inside outer → inner's area (1200).
+  Pure test coverage — no source changes.
+  - Files: `src/test/geometry/polygon.test.ts`.
+  - ✅ DONE 2026-06-24 — commit 23bfb55b (test(n79): polygon.ts edge cases — 7 new tests); merge
+    51b99e4e. Gate: 16/16 tests green (targeted vitest); shard 1/4 499 tests green; tsc EXIT:0;
+    eslint 0 errors (16 pre-existing warnings).
+
 ---
 
 ### O — Atmosphere soundscape
