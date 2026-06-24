@@ -61,4 +61,28 @@ describe("projectMapForPlayer", () => {
       entitiesById, isFogged });
     expect(r.regions.length).toBe(0);
   });
+
+  it("drops an orphan placement whose entityId is not in the entities map", () => {
+    const r = projectMapForPlayer({
+      placements: [{ entityId: "gone", x: 10, y: 10, mapId: "m" }] as never[],
+      regions: [], routes: [], entitiesById, isFogged,
+    });
+    expect(r.placements).toHaveLength(0);
+    expect(r.foggedEntityIds).not.toContain("gone");
+  });
+
+  it("includes rumor-visibility placements (rumor is player-visible)", () => {
+    const rumorMap = new Map<string, Entity>([["d", ent("d", "rumor")]]);
+    const r = projectMapForPlayer({
+      placements: [{ entityId: "d", x: 10, y: 10, mapId: "m" }] as never[],
+      regions: [], routes: [], entitiesById: rumorMap, isFogged,
+    });
+    expect(r.placements.map((p) => p.entityId)).toContain("d");
+  });
+
+  it("defaults a region with no visibility field to dm (excluded from player view)", () => {
+    const regions = [{ id: "r1" }] as never[]; // no visibility — must default to dm
+    const r = projectMapForPlayer({ placements: [], regions, routes: [], entitiesById, isFogged });
+    expect(r.regions).toHaveLength(0);
+  });
 });
