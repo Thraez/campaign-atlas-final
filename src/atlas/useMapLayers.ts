@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
+import { logger } from "@/lib/logger";
 
 /** A layer authored locally in the editor. Either a freshly uploaded image
  *  (object URL preview) or a URL/path the user typed. */
@@ -28,19 +29,44 @@ interface Stored {
   [mapId: string]: LocalLayer[];
 }
 
+/**
+ * Structural guard for one persisted layer. localStorage is an untrusted
+ * boundary (corrupt blob, hand-edited DevTools, older shape), so we validate
+ * the required MapLayer fields per entry and drop only the malformed ones
+ * rather than blind-casting the whole blob or wiping every layer on one bad row.
+ */
+function isStoredLayer(v: unknown): v is LocalLayer {
+  if (!v || typeof v !== "object") return false;
+  const l = v as Record<string, unknown>;
+  return (
+    typeof l.id === "string" &&
+    typeof l.src === "string" &&
+    typeof l.x === "number" &&
+    typeof l.y === "number" &&
+    typeof l.width === "number" &&
+    typeof l.height === "number" &&
+    typeof l.opacity === "number" &&
+    typeof l.zIndex === "number" &&
+    (l.origin === "upload" || l.origin === "url" || l.origin === "edit")
+  );
+}
+
 function loadStored(): Stored {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
-    const parsed = JSON.parse(raw) as Stored;
-    // For uploads, we persist a dataUrl rather than the (now-dead) object URL.
-    // Restore src from dataUrl so previews survive a page reload.
-    for (const m of Object.keys(parsed)) {
-      parsed[m] = parsed[m].map((l) =>
-        l.dataUrl ? { ...l, src: l.dataUrl, isObjectUrl: false } : l,
-      );
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const out: Stored = {};
+    for (const [mapId, layers] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!Array.isArray(layers)) continue;
+      // For uploads, we persist a dataUrl rather than the (now-dead) object URL.
+      // Restore src from dataUrl so previews survive a page reload.
+      out[mapId] = layers
+        .filter(isStoredLayer)
+        .map((l) => (l.dataUrl ? { ...l, src: l.dataUrl, isObjectUrl: false } : l));
     }
-    return parsed;
+    return out;
   } catch {
     return {};
   }
@@ -171,7 +197,15 @@ export function useMapLayers(map: MapDocument | undefined, undoStack?: UndoStack
           const sf = safeFilename(file.name);
           // Sniff natural size so the layer doesn't default to "stretch over the whole map".
           const dims = await readImageSize(url).catch(() => null);
-          const dataUrl = await fileToDataUrl(file).catch(() => undefined);
+          const dataUrl = await fileToDataUrl(file).catch((e: unknown) => {
+            // Without cached bytes the object-URL preview works this session but
+            // is dropped on reload — surface it rather than losing it silently.
+            logger.warn(
+              `Map layer upload "${file.name}": could not cache image bytes; preview will not survive a reload`,
+              e,
+            );
+            return undefined;
+          });
           return {
             id,
             src: url,
@@ -230,11 +264,12 @@ export function useMapLayers(map: MapDocument | undefined, undoStack?: UndoStack
   const duplicateLayer = useCallback(
     (id: string) => {
       if (!map) return;
-      const src =
-        (byMapRef.current[map.id] ?? []).find((l) => l.id === id) ??
-        (map.layers.find((l) => l.id === id)
-          ? { ...map.layers.find((l) => l.id === id)!, origin: "edit" as const }
-          : null);
+      // Resolve the source layer explicitly: a local override wins; otherwise a
+      // built-in map layer is promoted to a LocalLayer edit. Either way `src`
+      // is a fully-typed LocalLayer, so no cast is needed below.
+      const local = (byMapRef.current[map.id] ?? []).find((l) => l.id === id);
+      const builtin = map.layers.find((l) => l.id === id);
+      const src: LocalLayer | null = local ?? (builtin ? { ...builtin, origin: "edit" } : null);
       if (!src) return;
       const newId = `${src.id}-copy-${Date.now().toString(36).slice(-4)}`;
       const dup: LocalLayer = {
@@ -243,7 +278,7 @@ export function useMapLayers(map: MapDocument | undefined, undoStack?: UndoStack
         x: src.x + 200,
         y: src.y + 200,
         zIndex: src.zIndex + 1,
-        origin: "upload" === src.origin ? "upload" : ((src as LocalLayer).origin ?? "edit"),
+        origin: src.origin,
       };
       mutateByMap(
         (s) => ({ ...s, [map.id]: [...(s[map.id] ?? []), dup] }),
