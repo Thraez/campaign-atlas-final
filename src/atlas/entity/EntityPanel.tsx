@@ -18,6 +18,7 @@ import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { printEntityHandout } from "@/atlas/printHandout";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
+import { logger } from "@/lib/logger";
 import type { Entity, MapPlacement } from "@/atlas/content/schema";
 
 export interface EntityPanelProps {
@@ -40,8 +41,9 @@ function CopyLinkButton() {
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // ignore
+    } catch (e) {
+      logger.warn("Copy share link failed", e);
+      toast.error("Could not copy link");
     }
   }, []);
   return (

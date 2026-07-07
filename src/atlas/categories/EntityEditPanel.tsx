@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 import { parseFrontmatter, stringifyFrontmatter } from "@/atlas/import/frontmatter";
 import { useEntityEditDraft, type EntityEditDraftAPI } from "./useEntityEditDraft";
 import { saveAtlasPatchToLocalFs, hashContent, type FileChange } from "@/atlas/save/localFsSave";
@@ -103,6 +105,7 @@ export function EntityEditPanel({
         setPhase("ready");
       } catch (e) {
         if (!alive) return;
+        logger.error("Entity load failed", e);
         setError(e instanceof Error ? e.message : String(e));
         setPhase("error");
       }
@@ -142,6 +145,7 @@ export function EntityEditPanel({
       api.clear();
       onSaved();
     } catch (e) {
+      logger.error("Entity save failed", e);
       setError(e instanceof Error ? e.message : String(e));
       setPhase("error");
     }
@@ -197,9 +201,10 @@ export function EntityEditPanel({
           setImages((prev) => (prev.includes(safeName) ? prev : [...prev, safeName].sort()));
           applySelection(safeName);
         })
-        .catch((e: unknown) =>
-          alert("Image upload failed: " + (e instanceof Error ? e.message : String(e))),
-        );
+        .catch((e: unknown) => {
+          logger.error("Image upload failed", e);
+          toast.error(`Image upload failed: ${e instanceof Error ? e.message : String(e)}`);
+        });
     };
     reader.readAsDataURL(file);
   };
@@ -211,15 +216,22 @@ export function EntityEditPanel({
           setImages((prev) => prev.filter((n) => n !== name));
         } else {
           r.json().then(
-            (body: unknown) =>
-              alert("Delete failed: " + ((body as { error?: string })?.error ?? r.status)),
-            () => alert(`Delete failed: ${r.status}`),
+            (body: unknown) => {
+              const detail = (body as { error?: string })?.error ?? r.status;
+              logger.error("Image delete failed", detail);
+              toast.error(`Delete failed: ${detail}`);
+            },
+            () => {
+              logger.error("Image delete failed", r.status);
+              toast.error(`Delete failed: ${r.status}`);
+            },
           );
         }
       })
-      .catch((e: unknown) =>
-        alert("Delete failed: " + (e instanceof Error ? e.message : String(e))),
-      );
+      .catch((e: unknown) => {
+        logger.error("Image delete failed", e);
+        toast.error(`Delete failed: ${e instanceof Error ? e.message : String(e)}`);
+      });
   };
 
   const handlePickerSelect = (name: string) => {

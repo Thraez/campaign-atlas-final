@@ -7,8 +7,11 @@
  *
  * Every read/write is wrapped in try/catch so that a corrupt blob, full
  * storage quota, or a hostile sandbox (private browsing) degrades gracefully
- * to an empty in-memory map rather than crashing the viewer.
+ * to an empty in-memory map rather than crashing the viewer. Genuine anomalies
+ * (unreadable blob, failed persist) are logged via the logger seam for
+ * observability; the expected private-browsing capability probe stays quiet.
  */
+import { logger } from "@/lib/logger";
 
 const STORAGE_KEY = "atlas-player-notes-v1";
 
@@ -52,7 +55,8 @@ export function loadAllNotes(): NoteMap {
       out[k] = { text: n.text, updatedAt: n.updatedAt };
     }
     return out;
-  } catch {
+  } catch (e) {
+    logger.warn("Player notes: unreadable stored blob, resetting to empty", e);
     return {};
   }
 }
@@ -76,8 +80,10 @@ export function saveNote(entityId: string, text: string): void {
       map[entityId] = { text: trimmed, updatedAt: new Date().toISOString() };
     }
     s.setItem(STORAGE_KEY, JSON.stringify(map));
-  } catch {
-    // Quota or serialization issue — drop silently. The viewer keeps working.
+  } catch (e) {
+    // Quota or serialization issue — the note isn't persisted but the viewer
+    // keeps working. Surface it for observability rather than dropping silently.
+    logger.warn("Player notes: save failed (quota or serialization)", e);
   }
 }
 

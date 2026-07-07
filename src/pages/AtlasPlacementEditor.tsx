@@ -955,6 +955,7 @@ function AtlasPlacementEditorInner() {
           : err instanceof Error
             ? err.message
             : String(err);
+      logger.error("Save preparation failed", err);
       session.markFailed(msg);
       toast.error(`Could not prepare save: ${msg}`);
     }
@@ -1900,7 +1901,7 @@ function AtlasPlacementEditorInner() {
                 onPatch={(p) => {
                   // The world name is hardcoded in build-atlas.ts (not in world.yaml),
                   // so there is no live write path here yet. Log for DM awareness.
-                  console.warn("WorldDetailsPanel.onPatch: world name patch not yet persisted", p);
+                  logger.warn("WorldDetailsPanel.onPatch: world name patch not yet persisted", p);
                 }}
               />
             ),
