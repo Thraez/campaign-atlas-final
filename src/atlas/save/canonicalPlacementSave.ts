@@ -35,7 +35,10 @@ export interface PlacementDraft {
 }
 
 export class CanonicalSaveError extends Error {
-  constructor(message: string, public readonly entityId?: string) {
+  constructor(
+    message: string,
+    public readonly entityId?: string,
+  ) {
     super(message);
     this.name = "CanonicalSaveError";
   }
@@ -47,10 +50,7 @@ export interface CanonicalSaveDeps {
 }
 
 /** Fetch the current on-disk contents of an allowlisted source file. */
-export async function readSourceFile(
-  relPath: string,
-  fetchFn: typeof fetch,
-): Promise<string> {
+export async function readSourceFile(relPath: string, fetchFn: typeof fetch): Promise<string> {
   if (!isWritableSourcePath(relPath)) {
     throw new CanonicalSaveError(`Path not in source allowlist: ${relPath}`);
   }
@@ -74,7 +74,7 @@ export function mergePlacementsIntoFrontmatter(
   data: Record<string, unknown>,
   drafts: PlacementDraft[],
 ): Record<string, unknown> {
-  const atlas = ((data.atlas as Record<string, unknown>) ?? {});
+  const atlas = (data.atlas as Record<string, unknown>) ?? {};
   const existing = Array.isArray(atlas.placements)
     ? (atlas.placements as Array<Record<string, unknown>>)
     : [];

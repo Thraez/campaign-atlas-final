@@ -104,7 +104,10 @@ export class ConflictError extends Error {
 }
 
 export class LocalSaveError extends Error {
-  constructor(message: string, public readonly detail?: unknown) {
+  constructor(
+    message: string,
+    public readonly detail?: unknown,
+  ) {
     super(message);
     this.name = "LocalSaveError";
   }
@@ -161,7 +164,10 @@ export async function saveAtlasPatchToLocalFs(
     if (f.kind !== "entity-md" && f.kind !== "world-yaml" && f.kind !== "asset-binary") {
       throw new LocalSaveError(`Invalid kind for ${f.path}: ${String(f.kind)}`);
     }
-    if (f.baseHash !== null && (typeof f.baseHash !== "string" || !f.baseHash.startsWith("sha256:"))) {
+    if (
+      f.baseHash !== null &&
+      (typeof f.baseHash !== "string" || !f.baseHash.startsWith("sha256:"))
+    ) {
       throw new LocalSaveError(`Invalid baseHash for ${f.path}`);
     }
     if (f.kind === "asset-binary") {
@@ -220,7 +226,9 @@ export async function saveAtlasPatchToLocalFs(
       body &&
       body.error === "Conflict" &&
       typeof body.failedPath === "string" &&
-      (body.reason === "stale-base" || body.reason === "missing-base" || body.reason === "already-exists")
+      (body.reason === "stale-base" ||
+        body.reason === "missing-base" ||
+        body.reason === "already-exists")
     ) {
       throw new ConflictError(body.reason, body.failedPath, body.currentHash);
     }
@@ -228,7 +236,7 @@ export async function saveAtlasPatchToLocalFs(
       throw new SaveBusyError();
     }
     throw new LocalSaveError(
-      (body && typeof body.error === "string") ? body.error : `Save failed with status ${res.status}`,
+      body && typeof body.error === "string" ? body.error : `Save failed with status ${res.status}`,
       body ?? undefined,
     );
   }

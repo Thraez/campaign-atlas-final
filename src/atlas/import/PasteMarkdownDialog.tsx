@@ -71,8 +71,7 @@ export function PasteMarkdownDialog({ open, onOpenChange, onSubmit }: PasteMarkd
     const id = slugify(title.trim());
     const filename = `${id || "untitled"}.md`;
     // Build the .md content with frontmatter the import pipeline will parse.
-    const raw =
-      `---\ntitle: "${title.trim().replace(/"/g, '\\"')}"\natlas:\n  id: ${id || "untitled"}\n  type: ${type}\n  visibility: dm\n---\n\n${body.trim()}\n`;
+    const raw = `---\ntitle: "${title.trim().replace(/"/g, '\\"')}"\natlas:\n  id: ${id || "untitled"}\n  type: ${type}\n  visibility: dm\n---\n\n${body.trim()}\n`;
     onSubmit({ filename, raw, type });
     reset();
     onOpenChange(false);
@@ -90,8 +89,8 @@ export function PasteMarkdownDialog({ open, onOpenChange, onSubmit }: PasteMarkd
         <DialogHeader>
           <DialogTitle>Paste markdown</DialogTitle>
           <DialogDescription>
-            Quick-capture a single entity. Saved as a new <code>.md</code> in the
-            inferred folder. Visibility defaults to <strong>DM-only</strong>.
+            Quick-capture a single entity. Saved as a new <code>.md</code> in the inferred folder.
+            Visibility defaults to <strong>DM-only</strong>.
           </DialogDescription>
         </DialogHeader>
 

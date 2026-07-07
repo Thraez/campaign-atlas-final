@@ -21,12 +21,7 @@ import { forwardRef, useRef, useImperativeHandle } from "react";
 import { ShieldAlert } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface DmMaskingTextareaProps {
   value: string;
@@ -48,7 +43,7 @@ function wrap(
   end: number,
   open: string,
   close: string,
-  blockStyle: boolean
+  blockStyle: boolean,
 ): { next: string; cursorStart: number; cursorEnd: number } {
   const before = value.slice(0, start);
   const middle = value.slice(start, end);
@@ -59,18 +54,30 @@ function wrap(
       const insert = `${before.endsWith("\n") || before.length === 0 ? "" : "\n"}${open}\n${placeholder}\n${close}\n`;
       const next = before + insert + after;
       const placeholderStart = next.indexOf(placeholder, before.length);
-      return { next, cursorStart: placeholderStart, cursorEnd: placeholderStart + placeholder.length };
+      return {
+        next,
+        cursorStart: placeholderStart,
+        cursorEnd: placeholderStart + placeholder.length,
+      };
     }
     const insert = `${open}${placeholder}${close}`;
     const next = before + insert + after;
     const placeholderStart = next.indexOf(placeholder, before.length);
-    return { next, cursorStart: placeholderStart, cursorEnd: placeholderStart + placeholder.length };
+    return {
+      next,
+      cursorStart: placeholderStart,
+      cursorEnd: placeholderStart + placeholder.length,
+    };
   }
   if (blockStyle) {
     const leadingNl = before.endsWith("\n") || before.length === 0 ? "" : "\n";
     const trailingNl = after.startsWith("\n") || after.length === 0 ? "" : "\n";
     const next = `${before}${leadingNl}${open}\n${middle}\n${close}${trailingNl}${after}`;
-    return { next, cursorStart: start + leadingNl.length + open.length + 1, cursorEnd: start + leadingNl.length + open.length + 1 + middle.length };
+    return {
+      next,
+      cursorStart: start + leadingNl.length + open.length + 1,
+      cursorEnd: start + leadingNl.length + open.length + 1 + middle.length,
+    };
   }
   const next = `${before}${open}${middle}${close}${after}`;
   return { next, cursorStart: start + open.length, cursorEnd: start + open.length + middle.length };
@@ -83,7 +90,7 @@ export interface DmMaskingTextareaRef {
 export const DmMaskingTextarea = forwardRef<DmMaskingTextareaRef, DmMaskingTextareaProps>(
   function DmMaskingTextarea(
     { value, onChange, rows, placeholder, className, blockOnly, inlineOnly, ...rest },
-    ref
+    ref,
   ) {
     const taRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -123,8 +130,8 @@ export const DmMaskingTextarea = forwardRef<DmMaskingTextareaRef, DmMaskingTexta
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="text-xs max-w-xs">
-                  Wraps the selection in <code className="text-[10px]">%% ... %%</code> (Obsidian comment).
-                  Stripped from player builds. Use for short parenthetical DM notes.
+                  Wraps the selection in <code className="text-[10px]">%% ... %%</code> (Obsidian
+                  comment). Stripped from player builds. Use for short parenthetical DM notes.
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -164,5 +171,5 @@ export const DmMaskingTextarea = forwardRef<DmMaskingTextareaRef, DmMaskingTexta
         />
       </div>
     );
-  }
+  },
 );

@@ -76,12 +76,17 @@ function walkImages(dir: string): string[] {
   return out;
 }
 
-export interface RunOpts { dir: string; config?: string }
+export interface RunOpts {
+  dir: string;
+  config?: string;
+}
 
 export async function run(opts: RunOpts): Promise<number> {
   const configAbs = opts.config ?? findConfig();
   if (!configAbs) {
-    console.error("check-image-privacy: config not found (place atlas.config.json in cwd or pass --config)");
+    console.error(
+      "check-image-privacy: config not found (place atlas.config.json in cwd or pass --config)",
+    );
     return 1;
   }
 
@@ -117,9 +122,7 @@ export async function run(opts: RunOpts): Promise<number> {
       if (meta.iptc) leaking.push("iptc");
       if (meta.xmp) leaking.push("xmp");
       if (leaking.length > 0) {
-        violations.push(
-          `METADATA LEAK: ${imgPath}\n    contains ${leaking.join(", ")}`,
-        );
+        violations.push(`METADATA LEAK: ${imgPath}\n    contains ${leaking.join(", ")}`);
       }
     } catch {
       // Unreadable image is unexpected in a valid player build — flag it.

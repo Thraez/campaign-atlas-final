@@ -72,7 +72,8 @@ function SaveHarness({
   initialOverrides?: Record<string, { x: number; y: number }>;
   draftPlacements?: Draft[];
 }) {
-  const [overrides, setOverrides] = useState<Record<string, { x: number; y: number }>>(initialOverrides);
+  const [overrides, setOverrides] =
+    useState<Record<string, { x: number; y: number }>>(initialOverrides);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<FileChange[]>([]);
 
@@ -91,7 +92,8 @@ function SaveHarness({
     holders: {
       overrides: {
         get: () => overrides,
-        set: (o: Record<string, unknown>) => setOverrides(o as Record<string, { x: number; y: number }>),
+        set: (o: Record<string, unknown>) =>
+          setOverrides(o as Record<string, { x: number; y: number }>),
       },
       mapOverride: { get: () => ({}), set: () => {} },
       region: { snapshot: () => ({ edits: {}, added: [], deleted: [] }), applySnapshot: () => {} },
@@ -140,7 +142,9 @@ function SaveHarness({
       {/* Command-palette / keyboard / rail save path — reachable even when the
           session is clean (AtlasPlacementEditor lines 1010 / 1549). The B3 gate
           is the only thing protecting a clean Save invoked this way. */}
-      <button data-testid="cmd-save" onClick={onSaveClick}>cmd save</button>
+      <button data-testid="cmd-save" onClick={onSaveClick}>
+        cmd save
+      </button>
 
       {/* Toolbar Save — reproduces the W2 disabled gate (line 1186). */}
       <button
@@ -165,7 +169,9 @@ function SaveHarness({
         rebuildAfterSave={false}
         onConfirm={() => session.markSaving()}
         onWriteFailed={(m) => session.markFailed(m)}
-        onSaved={() => { void session.markSaved(); }}
+        onSaved={() => {
+          void session.markSaved();
+        }}
         onClose={() => {
           setSaveModalOpen(false);
           setPendingChanges([]);

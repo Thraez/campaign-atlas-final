@@ -15,12 +15,12 @@ const DEFAULT_KIND: Record<CategoryId, string> = {
 };
 
 export interface NewEntityInput {
-  worldRoot: string;          // e.g. "content/astrath-deeprealm"
+  worldRoot: string; // e.g. "content/astrath-deeprealm"
   category: CategoryId;
   title: string;
   summary?: string;
   visibility: EntityVisibility;
-  kind?: string;              // granular type; defaults from category
+  kind?: string; // granular type; defaults from category
 }
 
 export function buildNewEntityChange(input: NewEntityInput): FileChange {

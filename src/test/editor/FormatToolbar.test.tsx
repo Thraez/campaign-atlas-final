@@ -5,7 +5,16 @@ import { FormatToolbar } from "@/atlas/editor/FormatToolbar";
 describe("FormatToolbar", () => {
   it("renders the always-visible inline actions", () => {
     render(<FormatToolbar onAction={() => {}} />);
-    for (const label of ["Bold", "Italic", "Highlight", "Heading", "List", "Quote", "Wikilink", "Callout"]) {
+    for (const label of [
+      "Bold",
+      "Italic",
+      "Highlight",
+      "Heading",
+      "List",
+      "Quote",
+      "Wikilink",
+      "Callout",
+    ]) {
       expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
     }
   });

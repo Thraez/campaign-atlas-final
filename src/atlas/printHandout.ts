@@ -12,9 +12,17 @@ import { playerTypeLabel } from "./content/typeLabel";
 import { normalizeAtlasAssetUrl } from "./url";
 
 const escapeHtml = (s: string): string =>
-  s.replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-  }[c] as string));
+  s.replace(
+    /[&<>"']/g,
+    (c) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[c] as string,
+  );
 
 const HANDOUT_CSS = `
   @page { size: A4; margin: 18mm 16mm; }
@@ -61,9 +69,7 @@ function renderEntitySection(entity: Entity, withPageBreak: boolean): string {
   const aliases = entity.aliases.length
     ? `<p class="aliases">Also known as ${escapeHtml(entity.aliases.join(", "))}</p>`
     : "";
-  const summary = entity.summary
-    ? `<p class="summary">${escapeHtml(entity.summary)}</p>`
-    : "";
+  const summary = entity.summary ? `<p class="summary">${escapeHtml(entity.summary)}</p>` : "";
   // entity.bodyHtml is sanitized server-side at build time and contains
   // <a class="atlas-wikilink"> tokens; render as-is for the handout.
   const body = entity.bodyHtml || `<p>${escapeHtml(entity.body || "")}</p>`;

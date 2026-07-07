@@ -2,7 +2,13 @@ import { Grid3x3, Globe2, Droplets, Waves } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { GridKind, GridOverlay, MapDocument, WaterConfig } from "@/atlas/content/schema";
 import { deriveCrestColor, DEFAULT_WATER } from "@/atlas/ocean/resolveWater";
 
@@ -13,7 +19,12 @@ interface Props {
   onReset: () => void;
 }
 
-const DEFAULT_GRID: GridOverlay = { kind: "square", size: 256, color: "rgba(255,255,255,0.08)", enabled: true };
+const DEFAULT_GRID: GridOverlay = {
+  kind: "square",
+  size: 256,
+  color: "rgba(255,255,255,0.08)",
+  enabled: true,
+};
 
 export function MapSettingsPanel({ map, onPatch }: Props) {
   const grid = map.grid ?? DEFAULT_GRID;
@@ -42,15 +53,27 @@ export function MapSettingsPanel({ map, onPatch }: Props) {
       <div className="flex-1 overflow-auto p-3 space-y-5">
         <section className="space-y-2">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Map size</div>
-          <p className="text-[10px] text-muted-foreground">Width and height in pixels. Matches your uploaded map image.</p>
+          <p className="text-[10px] text-muted-foreground">
+            Width and height in pixels. Matches your uploaded map image.
+          </p>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label className="text-[10px] text-muted-foreground">Width</Label>
-              <Input type="number" value={Math.round(map.width)} onChange={(e) => onPatch({ width: Math.max(1, Number(e.target.value)) })} className="h-7 text-xs" />
+              <Input
+                type="number"
+                value={Math.round(map.width)}
+                onChange={(e) => onPatch({ width: Math.max(1, Number(e.target.value)) })}
+                className="h-7 text-xs"
+              />
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Height</Label>
-              <Input type="number" value={Math.round(map.height)} onChange={(e) => onPatch({ height: Math.max(1, Number(e.target.value)) })} className="h-7 text-xs" />
+              <Input
+                type="number"
+                value={Math.round(map.height)}
+                onChange={(e) => onPatch({ height: Math.max(1, Number(e.target.value)) })}
+                className="h-7 text-xs"
+              />
             </div>
           </div>
         </section>
@@ -59,7 +82,9 @@ export function MapSettingsPanel({ map, onPatch }: Props) {
           <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
             <Droplets className="h-3 w-3" /> Background color
           </div>
-          <p className="text-[10px] text-muted-foreground">Fills behind the map and any area the map doesn't cover.</p>
+          <p className="text-[10px] text-muted-foreground">
+            Fills behind the map and any area the map doesn't cover.
+          </p>
           <div className="flex items-center gap-2">
             <input
               type="color"
@@ -178,16 +203,28 @@ export function MapSettingsPanel({ map, onPatch }: Props) {
             <div>
               <Label className="text-[10px] text-muted-foreground">Style</Label>
               <Select value={grid.kind} onValueChange={(v) => setGrid({ kind: v as GridKind })}>
-                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="square" className="text-xs">Square</SelectItem>
-                  <SelectItem value="hex" className="text-xs">Hex (pointy)</SelectItem>
+                  <SelectItem value="square" className="text-xs">
+                    Square
+                  </SelectItem>
+                  <SelectItem value="hex" className="text-xs">
+                    Hex (pointy)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Cell size</Label>
-              <Input type="number" min={4} value={grid.size} onChange={(e) => setGrid({ size: Math.max(4, Number(e.target.value)) })} className="h-7 text-xs" />
+              <Input
+                type="number"
+                min={4}
+                value={grid.size}
+                onChange={(e) => setGrid({ size: Math.max(4, Number(e.target.value)) })}
+                className="h-7 text-xs"
+              />
             </div>
           </div>
           <div>

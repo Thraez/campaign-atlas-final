@@ -11,7 +11,16 @@ const testMap: MapDocument = {
   width: 2000,
   height: 1500,
   layers: [
-    { id: "builtin-1", src: "atlas/assets/maps/base.png", x: 0, y: 0, width: 2000, height: 1500, opacity: 1, zIndex: 10 },
+    {
+      id: "builtin-1",
+      src: "atlas/assets/maps/base.png",
+      x: 0,
+      y: 0,
+      width: 2000,
+      height: 1500,
+      opacity: 1,
+      zIndex: 10,
+    },
   ],
   regions: [],
   routes: [],
@@ -27,7 +36,9 @@ beforeEach(() => {
     onerror: (() => void) | null = null;
     naturalWidth = 100;
     naturalHeight = 100;
-    set src(_v: string) { setTimeout(() => this.onload && this.onload(), 0); }
+    set src(_v: string) {
+      setTimeout(() => this.onload && this.onload(), 0);
+    }
   };
 });
 
@@ -140,12 +151,66 @@ describe("useMapLayers + undo", () => {
       width: 2000,
       height: 1500,
       layers: [
-        { id: "L1", src: "atlas/assets/maps/a.png", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 20 },
-        { id: "L2", src: "atlas/assets/maps/b.png", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 20 },
-        { id: "L3", src: "atlas/assets/maps/c.png", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 20 },
-        { id: "L4", src: "atlas/assets/maps/d.png", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 20 },
-        { id: "L5", src: "atlas/assets/maps/e.png", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 20 },
-        { id: "L6", src: "atlas/assets/maps/f.png", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 20 },
+        {
+          id: "L1",
+          src: "atlas/assets/maps/a.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 20,
+        },
+        {
+          id: "L2",
+          src: "atlas/assets/maps/b.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 20,
+        },
+        {
+          id: "L3",
+          src: "atlas/assets/maps/c.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 20,
+        },
+        {
+          id: "L4",
+          src: "atlas/assets/maps/d.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 20,
+        },
+        {
+          id: "L5",
+          src: "atlas/assets/maps/e.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 20,
+        },
+        {
+          id: "L6",
+          src: "atlas/assets/maps/f.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 20,
+        },
       ],
       regions: [],
       routes: [],
@@ -158,7 +223,14 @@ describe("useMapLayers + undo", () => {
     act(() => result.current.editBuiltinLayer("L4"));
     act(() => result.current.editBuiltinLayer("L1"));
     act(() => result.current.editBuiltinLayer("L2"));
-    expect(result.current.mergedLayers.map((l) => l.id)).toEqual(["L1", "L2", "L3", "L4", "L5", "L6"]);
+    expect(result.current.mergedLayers.map((l) => l.id)).toEqual([
+      "L1",
+      "L2",
+      "L3",
+      "L4",
+      "L5",
+      "L6",
+    ]);
   });
 
   it("mergedLayers places upload/url additions after the canon block", async () => {
@@ -171,8 +243,26 @@ describe("useMapLayers + undo", () => {
       width: 2000,
       height: 1500,
       layers: [
-        { id: "L1", src: "atlas/assets/maps/a.png", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 20 },
-        { id: "L2", src: "atlas/assets/maps/b.png", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 20 },
+        {
+          id: "L1",
+          src: "atlas/assets/maps/a.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 20,
+        },
+        {
+          id: "L2",
+          src: "atlas/assets/maps/b.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 20,
+        },
       ],
       regions: [],
       routes: [],

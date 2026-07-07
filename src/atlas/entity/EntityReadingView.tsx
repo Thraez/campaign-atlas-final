@@ -2,7 +2,10 @@ import { useMemo } from "react";
 import { markdownToHtml } from "@/atlas/content/markdownCore";
 import type { Entity, MapPlacement } from "@/atlas/content/schema";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
-import { projectEntityForPlayer, buildProjectionContext } from "@/atlas/content/projectEntityForPlayer";
+import {
+  projectEntityForPlayer,
+  buildProjectionContext,
+} from "@/atlas/content/projectEntityForPlayer";
 import { useViewMode } from "@/atlas/view/ViewModeProvider";
 import { tokenizeWikilinks, renderLinkTokens } from "@/atlas/content/parseWikilinks";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
@@ -10,7 +13,12 @@ import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 const PLAYER_VISIBLE = new Set(["player", "rumor"]);
 
 export function EntityReadingView({
-  entity, entitiesById, placements = [], onOpenEntity, onClose, onShowOnMap,
+  entity,
+  entitiesById,
+  placements = [],
+  onOpenEntity,
+  onClose,
+  onShowOnMap,
 }: {
   entity: Entity;
   entitiesById: Map<string, Entity>;

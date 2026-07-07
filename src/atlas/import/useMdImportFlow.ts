@@ -14,11 +14,7 @@ import {
   type StagingRowPatch,
 } from "./stagingState";
 import { buildImportChanges, ImportCommitError } from "./buildImportChanges";
-import {
-  saveAtlasPatchToLocalFs,
-  ConflictError,
-  SaveBusyError,
-} from "@/atlas/save/localFsSave";
+import { saveAtlasPatchToLocalFs, ConflictError, SaveBusyError } from "@/atlas/save/localFsSave";
 import type { ImportFolderConfig } from "../content/schema";
 import { summarizeImport, formatImportSummaryLine } from "./summarizeImport";
 
@@ -103,13 +99,10 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
       const result = await saveAtlasPatchToLocalFs(changes, undefined, { rebuild: true });
       const count = result.saved;
       if (result.rebuilt === false) {
-        toast.warning(
-          `Imported ${count} file${count === 1 ? "" : "s"} but atlas rebuild failed`,
-          {
-            description: result.rebuildError ?? "Run `npm run atlas:build` manually.",
-            duration: 12_000,
-          },
-        );
+        toast.warning(`Imported ${count} file${count === 1 ? "" : "s"} but atlas rebuild failed`, {
+          description: result.rebuildError ?? "Run `npm run atlas:build` manually.",
+          duration: 12_000,
+        });
       } else {
         const summary = summarizeImport(rows);
         const mainLine = formatImportSummaryLine(summary);
@@ -117,18 +110,16 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
           summary.couldntBeRead > 0
             ? `${summary.couldntBeRead} couldn't be read — check the source file${summary.couldntBeRead === 1 ? "" : "s"}.`
             : undefined;
-        const description =
-          [mainLine, couldntLine].filter(Boolean).join("\n") || undefined;
+        const description = [mainLine, couldntLine].filter(Boolean).join("\n") || undefined;
         if (summary.couldntBeRead > 0) {
-          toast.warning(
-            `Imported ${count} note${count === 1 ? "" : "s"} and rebuilt the atlas`,
-            { description, duration: 10_000 },
-          );
+          toast.warning(`Imported ${count} note${count === 1 ? "" : "s"} and rebuilt the atlas`, {
+            description,
+            duration: 10_000,
+          });
         } else {
-          toast.success(
-            `Imported ${count} note${count === 1 ? "" : "s"} and rebuilt the atlas`,
-            { description },
-          );
+          toast.success(`Imported ${count} note${count === 1 ? "" : "s"} and rebuilt the atlas`, {
+            description,
+          });
         }
       }
       setOpen(false);

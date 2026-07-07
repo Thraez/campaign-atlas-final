@@ -2,7 +2,7 @@ import type { SearchIndexEntry } from "@/atlas/content/loader";
 
 export interface ParsedQuery {
   phrases: string[]; // lowercased, trimmed, non-empty quoted spans
-  rest: string;      // text outside quotes, trimmed
+  rest: string; // text outside quotes, trimmed
 }
 
 /**
@@ -22,7 +22,10 @@ export function parseSearchQuery(raw: string): ParsedQuery {
         restParts.push(raw.slice(i));
         break;
       }
-      const phrase = raw.slice(i + 1, closeIdx).trim().toLowerCase();
+      const phrase = raw
+        .slice(i + 1, closeIdx)
+        .trim()
+        .toLowerCase();
       if (phrase) phrases.push(phrase);
       i = closeIdx + 1;
     } else {

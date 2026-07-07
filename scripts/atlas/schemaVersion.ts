@@ -46,7 +46,7 @@ const MIGRATIONS: Record<number, (input: AnyYaml, warnings: string[]) => AnyYaml
 export function resolveAndMigrate(
   input: AnyYaml,
   source: string,
-  warnings: string[]
+  warnings: string[],
 ): { data: AnyYaml; version: number } {
   const raw = (input as { schemaVersion?: unknown }).schemaVersion;
   let version: number;
@@ -54,12 +54,12 @@ export function resolveAndMigrate(
   if (raw === undefined || raw === null) {
     warnings.push(
       `${source}: no schemaVersion declared — treating as legacy v${LEGACY_ATLAS_SCHEMA_VERSION}. ` +
-        `Add "schemaVersion: ${CURRENT_ATLAS_SCHEMA_VERSION}" at the top of world.yaml to silence this warning.`
+        `Add "schemaVersion: ${CURRENT_ATLAS_SCHEMA_VERSION}" at the top of world.yaml to silence this warning.`,
     );
     version = LEGACY_ATLAS_SCHEMA_VERSION;
   } else if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 1) {
     throw new SchemaVersionError(
-      `${source}: schemaVersion must be a positive integer (got ${JSON.stringify(raw)}).`
+      `${source}: schemaVersion must be a positive integer (got ${JSON.stringify(raw)}).`,
     );
   } else {
     version = raw;
@@ -68,13 +68,13 @@ export function resolveAndMigrate(
   if (version > CURRENT_ATLAS_SCHEMA_VERSION) {
     throw new SchemaVersionError(
       `${source}: schemaVersion ${version} is newer than this build supports ` +
-        `(max ${CURRENT_ATLAS_SCHEMA_VERSION}). Update the atlas build script before loading this world.`
+        `(max ${CURRENT_ATLAS_SCHEMA_VERSION}). Update the atlas build script before loading this world.`,
     );
   }
   if (version < MIN_SUPPORTED_ATLAS_SCHEMA_VERSION) {
     throw new SchemaVersionError(
       `${source}: schemaVersion ${version} is no longer supported ` +
-        `(min ${MIN_SUPPORTED_ATLAS_SCHEMA_VERSION}). No migration path exists.`
+        `(min ${MIN_SUPPORTED_ATLAS_SCHEMA_VERSION}). No migration path exists.`,
     );
   }
 
@@ -83,7 +83,7 @@ export function resolveAndMigrate(
     const step = MIGRATIONS[version];
     if (!step) {
       throw new SchemaVersionError(
-        `${source}: no migration registered for schemaVersion ${version} -> ${version + 1}.`
+        `${source}: no migration registered for schemaVersion ${version} -> ${version + 1}.`,
       );
     }
     data = step(data, warnings);

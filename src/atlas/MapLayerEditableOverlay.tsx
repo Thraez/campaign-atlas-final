@@ -71,7 +71,14 @@ function handleDivIcon(): L.DivIcon {
 }
 
 export function MapLayerEditableOverlay({
-  layer, mapDoc, editMode, isSelected, lockAspect, onSelect, onCommit, onBackgroundClick,
+  layer,
+  mapDoc,
+  editMode,
+  isSelected,
+  lockAspect,
+  onSelect,
+  onCommit,
+  onBackgroundClick,
 }: Props) {
   const lmap = useMap();
   const overlayRef = useRef<L.ImageOverlay | null>(null);
@@ -104,10 +111,12 @@ export function MapLayerEditableOverlay({
     let startY = layer.y;
 
     const setBoundsFor = (nx: number, ny: number) => {
-      overlay.setBounds(L.latLngBounds(
-        L.latLng(mapDoc.height - (ny + layer.height), nx),
-        L.latLng(mapDoc.height - ny, nx + layer.width),
-      ));
+      overlay.setBounds(
+        L.latLngBounds(
+          L.latLng(mapDoc.height - (ny + layer.height), nx),
+          L.latLng(mapDoc.height - ny, nx + layer.width),
+        ),
+      );
     };
 
     const onMouseDown = (e: MouseEvent) => {
@@ -183,7 +192,7 @@ export function MapLayerEditableOverlay({
   const corners = useMemo(() => {
     const left = layer.x;
     const right = layer.x + layer.width;
-    const top = mapDoc.height - layer.y;            // lat of top (atlas y=0)
+    const top = mapDoc.height - layer.y; // lat of top (atlas y=0)
     const bottom = mapDoc.height - (layer.y + layer.height); // lat of bottom
     return {
       nw: L.latLng(top, left),
@@ -249,7 +258,15 @@ interface HandleProps {
  * the underlying mouse event, which the React onDrag handler does not
  * expose cleanly.
  */
-function ResizeHandle({ corner, position, layer, mapDoc, lockAspect, overlayRef, onCommit }: HandleProps) {
+function ResizeHandle({
+  corner,
+  position,
+  layer,
+  mapDoc,
+  lockAspect,
+  overlayRef,
+  onCommit,
+}: HandleProps) {
   const lmap = useMap();
   const markerRef = useRef<L.Marker | null>(null);
 
@@ -271,13 +288,17 @@ function ResizeHandle({ corner, position, layer, mapDoc, lockAspect, overlayRef,
     const setBoundsFor = (nx: number, ny: number, nw: number, nh: number) => {
       const overlay = overlayRef.current;
       if (!overlay) return;
-      overlay.setBounds(L.latLngBounds(
-        L.latLng(mapDoc.height - (ny + nh), nx),
-        L.latLng(mapDoc.height - ny, nx + nw),
-      ));
+      overlay.setBounds(
+        L.latLngBounds(
+          L.latLng(mapDoc.height - (ny + nh), nx),
+          L.latLng(mapDoc.height - ny, nx + nw),
+        ),
+      );
     };
 
-    const computeFromDrag = (current: L.LatLng): { x: number; y: number; width: number; height: number } => {
+    const computeFromDrag = (
+      current: L.LatLng,
+    ): { x: number; y: number; width: number; height: number } => {
       if (!startMouse) return { x: startX, y: startY, width: startW, height: startH };
       // Convert Leaflet delta to atlas delta.
       // dx_atlas = dLng; dy_atlas = -dLat (atlas y is measured downward, lat upward).
@@ -353,7 +374,7 @@ function ResizeHandle({ corner, position, layer, mapDoc, lockAspect, overlayRef,
       startW = layer.width;
       startH = layer.height;
       aspect = startH === 0 ? 1 : startW / startH;
-      startMouse = (marker.getLatLng());
+      startMouse = marker.getLatLng();
       lmap.dragging.disable();
     };
 
@@ -405,7 +426,19 @@ function ResizeHandle({ corner, position, layer, mapDoc, lockAspect, overlayRef,
       marker.off("dragend", onDragEnd);
       document.removeEventListener("keydown", onKey);
     };
-  }, [corner, layer.x, layer.y, layer.width, layer.height, lmap, lockAspect, mapDoc, onCommit, overlayRef, position]);
+  }, [
+    corner,
+    layer.x,
+    layer.y,
+    layer.width,
+    layer.height,
+    lmap,
+    lockAspect,
+    mapDoc,
+    onCommit,
+    overlayRef,
+    position,
+  ]);
 
   return (
     <Marker
@@ -415,7 +448,9 @@ function ResizeHandle({ corner, position, layer, mapDoc, lockAspect, overlayRef,
       draggable
       // Bubble click through to the underlying layer so selection survives.
       eventHandlers={{
-        click: (e) => { L.DomEvent.stopPropagation(e.originalEvent); },
+        click: (e) => {
+          L.DomEvent.stopPropagation(e.originalEvent);
+        },
       }}
     />
   );

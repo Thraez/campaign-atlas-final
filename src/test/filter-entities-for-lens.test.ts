@@ -4,7 +4,21 @@ import type { Entity } from "@/atlas/content/schema";
 import type { ViewMode } from "@/atlas/view/ViewModeProvider";
 
 function ent(visibility: Entity["visibility"]): Entity {
-  return { id: "x", title: "X", type: "note", visibility, aliases: [], tags: [], images: [], body: "", bodyHtml: "", frontmatter: {}, sourcePath: "", links: [], backlinks: [] } as Entity;
+  return {
+    id: "x",
+    title: "X",
+    type: "note",
+    visibility,
+    aliases: [],
+    tags: [],
+    images: [],
+    body: "",
+    bodyHtml: "",
+    frontmatter: {},
+    sourcePath: "",
+    links: [],
+    backlinks: [],
+  } as Entity;
 }
 
 // ---------------------------------------------------------------------------

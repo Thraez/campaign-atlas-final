@@ -23,22 +23,24 @@ describe("normalizeAtlasAssetUrl", () => {
   });
 
   it("prefixes BASE_URL to absolute /atlas paths", () => {
-    expect(normalizeAtlasAssetUrl("/atlas/assets/maps/foo.webp", "/repo/"))
-      .toBe("/repo/atlas/assets/maps/foo.webp");
+    expect(normalizeAtlasAssetUrl("/atlas/assets/maps/foo.webp", "/repo/")).toBe(
+      "/repo/atlas/assets/maps/foo.webp",
+    );
   });
 
   it("prefixes BASE_URL to relative atlas paths", () => {
-    expect(normalizeAtlasAssetUrl("atlas/assets/maps/foo.webp", "/repo/"))
-      .toBe("/repo/atlas/assets/maps/foo.webp");
+    expect(normalizeAtlasAssetUrl("atlas/assets/maps/foo.webp", "/repo/")).toBe(
+      "/repo/atlas/assets/maps/foo.webp",
+    );
   });
 
   it("works under root base", () => {
-    expect(normalizeAtlasAssetUrl("/atlas/assets/maps/foo.webp", "/"))
-      .toBe("/atlas/assets/maps/foo.webp");
+    expect(normalizeAtlasAssetUrl("/atlas/assets/maps/foo.webp", "/")).toBe(
+      "/atlas/assets/maps/foo.webp",
+    );
   });
 
   it("normalizes base without trailing slash", () => {
-    expect(normalizeAtlasAssetUrl("/atlas/x.webp", "/repo"))
-      .toBe("/repo/atlas/x.webp");
+    expect(normalizeAtlasAssetUrl("/atlas/x.webp", "/repo")).toBe("/repo/atlas/x.webp");
   });
 });

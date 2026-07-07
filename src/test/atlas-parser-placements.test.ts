@@ -169,13 +169,7 @@ describe("parseFrontmatter — parseProfile edge cases", () => {
   });
 
   it("array atlas.profile emits a warning and returns undefined", () => {
-    const raw = [
-      "---",
-      "atlas:",
-      "  profile:",
-      "    - not: object",
-      "---",
-    ].join("\n");
+    const raw = ["---", "atlas:", "  profile:", "    - not: object", "---"].join("\n");
     const p = parseFrontmatter(raw, "x.md");
     expect(p.atlas.profile).toBeUndefined();
     expect(p.warnings.join(" ")).toMatch(/profile must be an object/);
@@ -195,39 +189,21 @@ describe("parseFrontmatter — parseRelationships edge cases", () => {
   });
 
   it("non-object item in relationships is skipped with a warning", () => {
-    const raw = [
-      "---",
-      "atlas:",
-      "  relationships:",
-      '    - "skip-me"',
-      "---",
-    ].join("\n");
+    const raw = ["---", "atlas:", "  relationships:", '    - "skip-me"', "---"].join("\n");
     const p = parseFrontmatter(raw, "x.md");
     expect(p.atlas.relationships).toBeUndefined();
     expect(p.warnings.join(" ")).toMatch(/not an object/);
   });
 
   it("relationship missing entity id is skipped with a warning", () => {
-    const raw = [
-      "---",
-      "atlas:",
-      "  relationships:",
-      "    - type: allies_with",
-      "---",
-    ].join("\n");
+    const raw = ["---", "atlas:", "  relationships:", "    - type: allies_with", "---"].join("\n");
     const p = parseFrontmatter(raw, "x.md");
     expect(p.atlas.relationships).toBeUndefined();
     expect(p.warnings.join(" ")).toMatch(/missing entity id/);
   });
 
   it("relationship missing type is skipped with a warning", () => {
-    const raw = [
-      "---",
-      "atlas:",
-      "  relationships:",
-      "    - entity: thornhold",
-      "---",
-    ].join("\n");
+    const raw = ["---", "atlas:", "  relationships:", "    - entity: thornhold", "---"].join("\n");
     const p = parseFrontmatter(raw, "x.md");
     expect(p.atlas.relationships).toBeUndefined();
     expect(p.warnings.join(" ")).toMatch(/missing type/);

@@ -4,7 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import * as nodeCrypto from "node:crypto";
 import sharp from "sharp";
-import { handleSaveRequest, handleAssetsImagesRequest, handleDeleteImageRequest, type FilePayload } from "../../scripts/vite-plugin-atlas-save";
+import {
+  handleSaveRequest,
+  handleAssetsImagesRequest,
+  handleDeleteImageRequest,
+  type FilePayload,
+} from "../../scripts/vite-plugin-atlas-save";
 
 let tmp: string;
 beforeEach(() => {
@@ -26,10 +31,7 @@ function file(over: Partial<FilePayload> = {}): FilePayload {
 
 describe("handleSaveRequest", () => {
   it("writes a single allowed file and returns its hash", async () => {
-    const r = await handleSaveRequest(
-      { files: [file({ content: "hello" })] },
-      tmp,
-    );
+    const r = await handleSaveRequest({ files: [file({ content: "hello" })] }, tmp);
     expect(r.status).toBe(200);
     const written = fs.readFileSync(path.join(tmp, "content/world/notes/ok.md"), "utf8");
     expect(written).toBe("hello");
@@ -50,7 +52,10 @@ describe("handleSaveRequest", () => {
     const r = await handleSaveRequest(
       {
         files: [
-          file({ path: "content/world/notes/hero.md", content: "---\natlas:\n  id: hero\n---\nBody\n" }),
+          file({
+            path: "content/world/notes/hero.md",
+            content: "---\natlas:\n  id: hero\n---\nBody\n",
+          }),
           file({
             path: "content/world/_atlas/world.yaml",
             content: "schemaVersion: 1\nmaps: []\n",
@@ -73,17 +78,16 @@ describe("handleSaveRequest", () => {
     for (const f of payload.files) {
       expect(f.hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     }
-    expect(fs.readFileSync(path.join(tmp, "content/world/notes/hero.md"), "utf8")).toContain("id: hero");
+    expect(fs.readFileSync(path.join(tmp, "content/world/notes/hero.md"), "utf8")).toContain(
+      "id: hero",
+    );
     expect(fs.existsSync(path.join(tmp, "content/world/_atlas/world.yaml"))).toBe(true);
     const png = fs.readFileSync(path.join(tmp, "public/atlas/assets/maps/pin.png"));
     expect(png.length).toBeGreaterThan(0);
   });
 
   it("rejects a disallowed path with no file written", async () => {
-    const r = await handleSaveRequest(
-      { files: [file({ path: "src/App.tsx" })] },
-      tmp,
-    );
+    const r = await handleSaveRequest({ files: [file({ path: "src/App.tsx" })] }, tmp);
     expect(r.status).toBe(400);
     expect((r.payload as Record<string, unknown>).error).toBe("DisallowedPath");
     expect(fs.existsSync(path.join(tmp, "src/App.tsx"))).toBe(false);
@@ -170,7 +174,9 @@ describe("handleSaveRequest", () => {
       tmp,
     );
     expect(r.status).toBe(200);
-    expect(fs.readFileSync(path.join(tmp, "content/new-world/_atlas/world.yaml"), "utf8")).toBe("id: x\n");
+    expect(fs.readFileSync(path.join(tmp, "content/new-world/_atlas/world.yaml"), "utf8")).toBe(
+      "id: x\n",
+    );
   });
 
   it("writes non-ASCII content byte-for-byte", async () => {
@@ -287,11 +293,24 @@ describe("handleSaveRequest", () => {
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.writeFileSync(target, "original");
       const r = await handleSaveRequest(
-        { files: [file({ path: "content/world/notes/dupe.md", content: "would-overwrite", baseHash: null })] },
+        {
+          files: [
+            file({
+              path: "content/world/notes/dupe.md",
+              content: "would-overwrite",
+              baseHash: null,
+            }),
+          ],
+        },
         tmp,
       );
       expect(r.status).toBe(409);
-      const p = r.payload as { error: string; reason: string; failedPath: string; currentHash: string };
+      const p = r.payload as {
+        error: string;
+        reason: string;
+        failedPath: string;
+        currentHash: string;
+      };
       expect(p.error).toBe("Conflict");
       expect(p.reason).toBe("already-exists");
       expect(p.failedPath).toBe("content/world/notes/dupe.md");
@@ -360,7 +379,12 @@ describe("handleSaveRequest", () => {
         tmp,
       );
       expect(r.status).toBe(409);
-      const p = r.payload as { error: string; reason: string; failedPath: string; currentHash: string };
+      const p = r.payload as {
+        error: string;
+        reason: string;
+        failedPath: string;
+        currentHash: string;
+      };
       expect(p.error).toBe("Conflict");
       expect(p.reason).toBe("stale-base");
       expect(p.failedPath).toBe("content/world/notes/edit.md");
@@ -616,9 +640,7 @@ describe("handleSaveRequest", () => {
       fs.writeFileSync(blockerAbs, "blocker");
       await handleSaveRequest(
         {
-          files: [
-            file({ path: "content/world/blocked/x.md", content: "x", baseHash: null }),
-          ],
+          files: [file({ path: "content/world/blocked/x.md", content: "x", baseHash: null })],
         },
         tmp,
       );
@@ -653,7 +675,11 @@ describe("handleSaveRequest", () => {
       );
       expect(r.status).toBe(200);
       expect(seenAtHook.ok).toBe(true);
-      const payload = (r as { payload: { rebuilt?: boolean; publishedAt?: string | null; build?: { ok: boolean } } }).payload;
+      const payload = (
+        r as {
+          payload: { rebuilt?: boolean; publishedAt?: string | null; build?: { ok: boolean } };
+        }
+      ).payload;
       expect(payload.rebuilt).toBe(true);
       expect(payload.publishedAt).toBe("2026-05-15T05:00:00.000Z");
       expect(payload.build).toEqual({ ok: true, durationMs: 1 });
@@ -661,17 +687,19 @@ describe("handleSaveRequest", () => {
 
     it("does NOT run afterWrite when validation fails", async () => {
       const afterWrite = vi.fn();
-      const r = await handleSaveRequest(
-        { files: [file({ path: "src/App.tsx" })] },
-        tmp,
-        { afterWrite },
-      );
+      const r = await handleSaveRequest({ files: [file({ path: "src/App.tsx" })] }, tmp, {
+        afterWrite,
+      });
       expect(r.status).toBe(400);
       expect(afterWrite).not.toHaveBeenCalled();
     });
 
     it("returns 207 rebuilt:false when afterWrite reports a failed build", async () => {
-      const afterWrite = async () => ({ ok: false, durationMs: 42, stderr: "build failed: bad-yaml" });
+      const afterWrite = async () => ({
+        ok: false,
+        durationMs: 42,
+        stderr: "build failed: bad-yaml",
+      });
       const r = await handleSaveRequest(
         { files: [file({ path: "content/world/notes/r.md" })] },
         tmp,
@@ -895,7 +923,12 @@ describe("handleSaveRequest", () => {
       const r = await handleSaveRequest(
         {
           files: [
-            file({ path: mdPath, content: "---\ntitle: x\n---\nBody", kind: "entity-md", baseHash: null }),
+            file({
+              path: mdPath,
+              content: "---\ntitle: x\n---\nBody",
+              kind: "entity-md",
+              baseHash: null,
+            }),
             file({
               path: ASSET_PATH,
               content: PNG_DATA_URL,
@@ -921,7 +954,11 @@ describe("handleSaveRequest", () => {
       fs.mkdirSync(path.dirname(abs), { recursive: true });
       fs.writeFileSync(abs, "existing body");
       const r = await handleSaveRequest(
-        { files: [file({ path: mdPath, content: "existing body", kind: "entity-md", baseHash: null })] },
+        {
+          files: [
+            file({ path: mdPath, content: "existing body", kind: "entity-md", baseHash: null }),
+          ],
+        },
         tmp,
       );
       expect(r.status).toBe(409);
@@ -977,7 +1014,9 @@ describe("handleSaveRequest", () => {
         tmp,
       );
       expect(r.status).toBe(200);
-      expect(fs.readFileSync(path.join(tmp, "content/world/_atlas/world.yaml"), "utf8")).toContain("schemaVersion: 1");
+      expect(fs.readFileSync(path.join(tmp, "content/world/_atlas/world.yaml"), "utf8")).toContain(
+        "schemaVersion: 1",
+      );
       const png = fs.readFileSync(path.join(tmp, ASSET_PATH));
       // Sharp re-encodes, so length differs from raw input — just verify it's a non-empty PNG.
       expect(png.length).toBeGreaterThan(0);
@@ -1111,7 +1150,15 @@ describe("handleDeleteImageRequest", () => {
     const backupRoot = path.join(tmp, ".atlas-backups");
     const timestamps = fs.readdirSync(backupRoot);
     expect(timestamps).toHaveLength(1);
-    const backupFile = path.join(backupRoot, timestamps[0], "public", "atlas", "assets", "images", "to-delete.png");
+    const backupFile = path.join(
+      backupRoot,
+      timestamps[0],
+      "public",
+      "atlas",
+      "assets",
+      "images",
+      "to-delete.png",
+    );
     expect(fs.existsSync(backupFile)).toBe(true);
     expect(fs.readFileSync(backupFile, "utf8")).toBe("fake-image");
   });
@@ -1184,7 +1231,16 @@ describe("handleSaveRequest — EXIF / metadata stripping", () => {
     expect(beforeMeta.exif).toBeTruthy();
 
     const r = await handleSaveRequest(
-      { files: [{ path: imgPath, content: toDataUrl("image/jpeg", buf), kind: "asset-binary", baseHash: null }] },
+      {
+        files: [
+          {
+            path: imgPath,
+            content: toDataUrl("image/jpeg", buf),
+            kind: "asset-binary",
+            baseHash: null,
+          },
+        ],
+      },
       tmp,
     );
     expect(r.status).toBe(200);
@@ -1199,7 +1255,16 @@ describe("handleSaveRequest — EXIF / metadata stripping", () => {
   it("accepts a clean PNG with no metadata and writes it successfully", async () => {
     const buf = await plainPng();
     const r = await handleSaveRequest(
-      { files: [{ path: "public/atlas/assets/images/clean.png", content: toDataUrl("image/png", buf), kind: "asset-binary", baseHash: null }] },
+      {
+        files: [
+          {
+            path: "public/atlas/assets/images/clean.png",
+            content: toDataUrl("image/png", buf),
+            kind: "asset-binary",
+            baseHash: null,
+          },
+        ],
+      },
       tmp,
     );
     expect(r.status).toBe(200);
@@ -1209,7 +1274,16 @@ describe("handleSaveRequest — EXIF / metadata stripping", () => {
   it("returns 400 image-decode-failed for a corrupt image body", async () => {
     const garbage = Buffer.from("not-an-image-at-all-just-random-bytes");
     const r = await handleSaveRequest(
-      { files: [{ path: imgPath, content: toDataUrl("image/jpeg", garbage), kind: "asset-binary", baseHash: null }] },
+      {
+        files: [
+          {
+            path: imgPath,
+            content: toDataUrl("image/jpeg", garbage),
+            kind: "asset-binary",
+            baseHash: null,
+          },
+        ],
+      },
       tmp,
     );
     expect(r.status).toBe(400);
@@ -1219,7 +1293,9 @@ describe("handleSaveRequest — EXIF / metadata stripping", () => {
   it("re-save of the same image is a no-op (hash-equal skip survives strip)", async () => {
     const buf = await plainJpeg();
     const dataUrl = toDataUrl("image/jpeg", buf);
-    const payload = { files: [{ path: imgPath, content: dataUrl, kind: "asset-binary" as const, baseHash: null }] };
+    const payload = {
+      files: [{ path: imgPath, content: dataUrl, kind: "asset-binary" as const, baseHash: null }],
+    };
 
     // First save
     const r1 = await handleSaveRequest(payload, tmp);
@@ -1236,7 +1312,16 @@ describe("handleSaveRequest — EXIF / metadata stripping", () => {
     // Since we can't easily exceed 6 MB in a unit test, verify via the raw-input path.
     const oversized = Buffer.alloc(MAX_ASSET_BINARY_BYTES + 1, 0x00);
     const r = await handleSaveRequest(
-      { files: [{ path: imgPath, content: toDataUrl("image/jpeg", oversized), kind: "asset-binary", baseHash: null }] },
+      {
+        files: [
+          {
+            path: imgPath,
+            content: toDataUrl("image/jpeg", oversized),
+            kind: "asset-binary",
+            baseHash: null,
+          },
+        ],
+      },
       tmp,
     );
     expect(r.status).toBe(400);

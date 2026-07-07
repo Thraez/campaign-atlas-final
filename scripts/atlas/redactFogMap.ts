@@ -19,8 +19,17 @@ export class FogRedactionError extends Error {
   }
 }
 
-export interface MapSize { width: number; height: number; }
-export interface LayerRect { x: number; y: number; width: number; height: number; tileSrc?: string; }
+export interface MapSize {
+  width: number;
+  height: number;
+}
+export interface LayerRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  tileSrc?: string;
+}
 
 /**
  * Apply a feathered fog alpha mask to a single layer image.
@@ -38,11 +47,11 @@ export async function redactLayer(
   imageBuffer: Buffer,
   mapSize: MapSize,
   fog: FogOverlay,
-  layer: LayerRect
+  layer: LayerRect,
 ): Promise<Buffer> {
   if (layer.tileSrc) {
     throw new FogRedactionError(
-      `Tiled layer is not supported for fog redaction (layer rect ${JSON.stringify(layer)}).`
+      `Tiled layer is not supported for fog redaction (layer rect ${JSON.stringify(layer)}).`,
     );
   }
 
@@ -93,7 +102,7 @@ function buildMaskSvg(
   mapSize: MapSize,
   reveals: Point[][],
   conceals: Point[][],
-  blurSigma: number
+  blurSigma: number,
 ): string {
   const pathFor = (poly: Point[]): string =>
     poly.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x} ${y}`).join(" ") + " Z";

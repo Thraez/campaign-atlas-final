@@ -42,8 +42,17 @@ interface Config {
 }
 
 const TEXT_EXTENSIONS = new Set([
-  ".html", ".js", ".mjs", ".cjs", ".css", ".json",
-  ".txt", ".xml", ".webmanifest", ".svg", ".md",
+  ".html",
+  ".js",
+  ".mjs",
+  ".cjs",
+  ".css",
+  ".json",
+  ".txt",
+  ".xml",
+  ".webmanifest",
+  ".svg",
+  ".md",
 ]);
 
 /** Names below this length are skipped to avoid noisy generic matches. */
@@ -52,11 +61,43 @@ const MIN_NAME_LENGTH = 4;
 /** Common English words / very generic short strings that are not useful as
  *  secret names — if a DM uses one, the static sentinel test still applies. */
 const GENERIC_NAMES = new Set([
-  "the", "and", "for", "from", "into", "with", "this", "that",
-  "north", "south", "east", "west", "city", "town", "lake", "river",
-  "wood", "hill", "mountain", "road", "path", "door", "gate", "tower",
-  "keep", "ruin", "ruins", "temple", "shrine", "cave", "caves",
-  "draft", "dm", "hidden", "secret", "note", "notes",
+  "the",
+  "and",
+  "for",
+  "from",
+  "into",
+  "with",
+  "this",
+  "that",
+  "north",
+  "south",
+  "east",
+  "west",
+  "city",
+  "town",
+  "lake",
+  "river",
+  "wood",
+  "hill",
+  "mountain",
+  "road",
+  "path",
+  "door",
+  "gate",
+  "tower",
+  "keep",
+  "ruin",
+  "ruins",
+  "temple",
+  "shrine",
+  "cave",
+  "caves",
+  "draft",
+  "dm",
+  "hidden",
+  "secret",
+  "note",
+  "notes",
 ]);
 
 export interface SecretEntry {
@@ -102,12 +143,7 @@ function globToRegExp(glob: string): RegExp {
   return new RegExp(`^${escaped}$`);
 }
 
-function walkMd(
-  dir: string,
-  contentRoot: string,
-  include: string[],
-  exclude: string[],
-): string[] {
+function walkMd(dir: string, contentRoot: string, include: string[], exclude: string[]): string[] {
   const out: string[] = [];
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -146,9 +182,10 @@ export function deriveSecretsFromVault(configPath: string): SecretEntry[] {
     const isUnpublished = parsed.atlas.publish === false;
     if (!isHiddenVisibility && !isUnpublished) continue;
 
-    const title = typeof parsed.data.title === "string"
-      ? parsed.data.title.trim()
-      : path.basename(file, ".md").replace(/[-_]+/g, " ").trim();
+    const title =
+      typeof parsed.data.title === "string"
+        ? parsed.data.title.trim()
+        : path.basename(file, ".md").replace(/[-_]+/g, " ").trim();
     if (isReportableName(title)) {
       secrets.push({ name: title, source: rel, field: "title" });
     }
@@ -193,7 +230,11 @@ export function scanArtifactForSecrets(dir: string, secrets: SecretEntry[]): Der
         if (!TEXT_EXTENSIONS.has(ext)) continue;
         filesScanned += 1;
         let text: string;
-        try { text = fs.readFileSync(full, "utf8"); } catch { continue; }
+        try {
+          text = fs.readFileSync(full, "utf8");
+        } catch {
+          continue;
+        }
         for (const s of secrets) {
           if (text.includes(s.name)) hits.push({ file: full, match: s });
         }
@@ -229,12 +270,17 @@ function parseArgs(): { target: string; config: string } | null {
   return { target, config };
 }
 
-export interface RunOpts { dir: string; config?: string }
+export interface RunOpts {
+  dir: string;
+  config?: string;
+}
 
 export function run(opts: RunOpts): number {
   const configAbs = resolveConfig(opts.config);
   if (!configAbs) {
-    console.error("atlas:check-derived-secrets: config not found (place atlas.config.json in cwd or pass --config)");
+    console.error(
+      "atlas:check-derived-secrets: config not found (place atlas.config.json in cwd or pass --config)",
+    );
     return 1;
   }
   const targetAbs = path.resolve(process.cwd(), opts.dir);
@@ -254,7 +300,7 @@ export function run(opts: RunOpts): number {
   const result = scanArtifactForSecrets(targetAbs, secrets);
   console.log(
     `atlas:check-derived-secrets: derived ${result.derivedCount} secret name(s); ` +
-    `scanned ${result.filesScanned} file(s) in ${opts.dir}`,
+      `scanned ${result.filesScanned} file(s) in ${opts.dir}`,
   );
   if (result.hits.length === 0) {
     console.log("atlas:check-derived-secrets: clean");
@@ -263,8 +309,7 @@ export function run(opts: RunOpts): number {
   for (const h of result.hits) {
     const rel = path.relative(process.cwd(), h.file);
     console.error(
-      `  DERIVED LEAK ${rel}  :: "${h.match.name}" ` +
-      `(${h.match.field} of ${h.match.source})`,
+      `  DERIVED LEAK ${rel}  :: "${h.match.name}" ` + `(${h.match.field} of ${h.match.source})`,
     );
   }
   return 12;
@@ -273,7 +318,9 @@ export function run(opts: RunOpts): number {
 function main(): number {
   const args = parseArgs();
   if (!args) {
-    console.error("Usage: tsx scripts/check-derived-secrets.ts <artifact-dir> [--config atlas.config.json]");
+    console.error(
+      "Usage: tsx scripts/check-derived-secrets.ts <artifact-dir> [--config atlas.config.json]",
+    );
     return 1;
   }
   return run({ dir: args.target, config: args.config });

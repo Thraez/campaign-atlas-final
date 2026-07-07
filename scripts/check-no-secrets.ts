@@ -37,8 +37,17 @@ export const EDITOR_CODE_FINGERPRINTS = [
 ] as const;
 
 const TEXT_EXTENSIONS = new Set([
-  ".html", ".js", ".mjs", ".cjs", ".css", ".json",
-  ".txt", ".xml", ".webmanifest", ".svg", ".md",
+  ".html",
+  ".js",
+  ".mjs",
+  ".cjs",
+  ".css",
+  ".json",
+  ".txt",
+  ".xml",
+  ".webmanifest",
+  ".svg",
+  ".md",
 ]);
 
 export interface ScanHit {
@@ -98,7 +107,9 @@ export function scanDir(dir: string): ScanResult {
   return result;
 }
 
-export interface RunOpts { dir: string }
+export interface RunOpts {
+  dir: string;
+}
 
 export function run(opts: RunOpts): number {
   const abs = path.resolve(process.cwd(), opts.dir);

@@ -87,26 +87,31 @@ export function useRouteDraft(
   const [draftWaypoints, setDraftWaypoints] = useState<Waypoint[]>([]);
 
   const draftRef = useRef(draft);
-  useEffect(() => { draftRef.current = draft; }, [draft]);
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
 
   const applyDraft = useCallback((next: RouteDraft) => {
     draftRef.current = next;
     setDraft(next);
   }, []);
 
-  const mutateDraft = useCallback((compute: (prev: RouteDraft) => RouteDraft, label: string) => {
-    const before = draftRef.current;
-    const after = compute(before);
-    if (after === before) return;
-    applyDraft(after);
-    if (undoStack) {
-      undoStack.push({
-        undo: () => applyDraft(before),
-        redo: () => applyDraft(after),
-        label,
-      });
-    }
-  }, [applyDraft, undoStack]);
+  const mutateDraft = useCallback(
+    (compute: (prev: RouteDraft) => RouteDraft, label: string) => {
+      const before = draftRef.current;
+      const after = compute(before);
+      if (after === before) return;
+      applyDraft(after);
+      if (undoStack) {
+        undoStack.push({
+          undo: () => applyDraft(before),
+          redo: () => applyDraft(after),
+          label,
+        });
+      }
+    },
+    [applyDraft, undoStack],
+  );
 
   const baseRoutes = map?.routes ?? [];
 
@@ -124,7 +129,7 @@ export function useRouteDraft(
 
   const projectIds = useMemo(
     () => new Set(baseRoutes.map((r) => r.id).concat(draft.added.map((r) => r.id))),
-    [baseRoutes, draft.added]
+    [baseRoutes, draft.added],
   );
 
   const placementByEntity = useMemo(() => {
@@ -137,31 +142,52 @@ export function useRouteDraft(
     return m;
   }, [project, map]);
 
-  const resolveWaypoint = useCallback((w: Waypoint): Point | null => {
-    if (Array.isArray(w)) return w;
-    return placementByEntity.get(w.entityId) ?? null;
-  }, [placementByEntity]);
+  const resolveWaypoint = useCallback(
+    (w: Waypoint): Point | null => {
+      if (Array.isArray(w)) return w;
+      return placementByEntity.get(w.entityId) ?? null;
+    },
+    [placementByEntity],
+  );
 
-  const resolveRoute = useCallback((r: Route): Point[] => {
-    const out: Point[] = [];
-    for (const w of r.waypoints) {
-      const p = resolveWaypoint(w);
-      if (p) out.push(p);
-    }
-    return out;
-  }, [resolveWaypoint]);
+  const resolveRoute = useCallback(
+    (r: Route): Point[] => {
+      const out: Point[] = [];
+      for (const w of r.waypoints) {
+        const p = resolveWaypoint(w);
+        if (p) out.push(p);
+      }
+      return out;
+    },
+    [resolveWaypoint],
+  );
 
-  const dirty = draft.added.length > 0 || draft.deleted.length > 0 || Object.keys(draft.edits).length > 0;
+  const dirty =
+    draft.added.length > 0 || draft.deleted.length > 0 || Object.keys(draft.edits).length > 0;
   const dirtyCount = draft.added.length + draft.deleted.length + Object.keys(draft.edits).length;
 
-  const startDraw = useCallback(() => { setDrawing(true); setDraftWaypoints([]); setSelectedId(null); }, []);
-  const cancelDraw = useCallback(() => { setDrawing(false); setDraftWaypoints([]); }, []);
+  const startDraw = useCallback(() => {
+    setDrawing(true);
+    setDraftWaypoints([]);
+    setSelectedId(null);
+  }, []);
+  const cancelDraw = useCallback(() => {
+    setDrawing(false);
+    setDraftWaypoints([]);
+  }, []);
   const addDraftPoint = useCallback((p: Point) => setDraftWaypoints((w) => [...w, p]), []);
-  const addDraftEntity = useCallback((entityId: string) => setDraftWaypoints((w) => [...w, { entityId }]), []);
+  const addDraftEntity = useCallback(
+    (entityId: string) => setDraftWaypoints((w) => [...w, { entityId }]),
+    [],
+  );
   const removeLastDraftPoint = useCallback(() => setDraftWaypoints((w) => w.slice(0, -1)), []);
 
   const finishDraw = useCallback((): string | null => {
-    if (draftWaypoints.length < 2 || !map) { setDrawing(false); setDraftWaypoints([]); return null; }
+    if (draftWaypoints.length < 2 || !map) {
+      setDrawing(false);
+      setDraftWaypoints([]);
+      return null;
+    }
     const id = uniqueId(slugify(`route-${effective.length + 1}`), projectIds);
     const route: Route = {
       id,
@@ -181,126 +207,238 @@ export function useRouteDraft(
     return id;
   }, [draftWaypoints, map, effective.length, projectIds, mutateDraft]);
 
-  const patch = useCallback((id: string, partial: Partial<Route>) => {
-    mutateDraft((d) => {
-      const addedIdx = d.added.findIndex((r) => r.id === id);
-      if (addedIdx >= 0) {
-        const added = d.added.slice();
-        added[addedIdx] = { ...added[addedIdx], ...partial };
-        return { ...d, added };
-      }
-      return { ...d, edits: { ...d.edits, [id]: { ...(d.edits[id] ?? {}), ...partial } } };
-    }, `patch route ${id}`);
-  }, [mutateDraft]);
+  const patch = useCallback(
+    (id: string, partial: Partial<Route>) => {
+      mutateDraft((d) => {
+        const addedIdx = d.added.findIndex((r) => r.id === id);
+        if (addedIdx >= 0) {
+          const added = d.added.slice();
+          added[addedIdx] = { ...added[addedIdx], ...partial };
+          return { ...d, added };
+        }
+        return { ...d, edits: { ...d.edits, [id]: { ...(d.edits[id] ?? {}), ...partial } } };
+      }, `patch route ${id}`);
+    },
+    [mutateDraft],
+  );
 
-  const getEffective = useCallback((id: string): Route | null => effective.find((r) => r.id === id) ?? null, [effective]);
+  const getEffective = useCallback(
+    (id: string): Route | null => effective.find((r) => r.id === id) ?? null,
+    [effective],
+  );
 
-  const moveWaypoint = useCallback((id: string, idx: number, p: Point) => {
-    const cur = getEffective(id); if (!cur) return;
-    const ws = cur.waypoints.slice(); ws[idx] = p;
-    patch(id, { waypoints: ws });
-  }, [getEffective, patch]);
+  const moveWaypoint = useCallback(
+    (id: string, idx: number, p: Point) => {
+      const cur = getEffective(id);
+      if (!cur) return;
+      const ws = cur.waypoints.slice();
+      ws[idx] = p;
+      patch(id, { waypoints: ws });
+    },
+    [getEffective, patch],
+  );
 
-  const setWaypointEntity = useCallback((id: string, idx: number, entityId: string) => {
-    const cur = getEffective(id); if (!cur) return;
-    const ws = cur.waypoints.slice(); ws[idx] = { entityId };
-    patch(id, { waypoints: ws });
-  }, [getEffective, patch]);
+  const setWaypointEntity = useCallback(
+    (id: string, idx: number, entityId: string) => {
+      const cur = getEffective(id);
+      if (!cur) return;
+      const ws = cur.waypoints.slice();
+      ws[idx] = { entityId };
+      patch(id, { waypoints: ws });
+    },
+    [getEffective, patch],
+  );
 
-  const removeWaypoint = useCallback((id: string, idx: number) => {
-    const cur = getEffective(id); if (!cur) return;
-    if (cur.waypoints.length <= 2) return;
-    patch(id, { waypoints: cur.waypoints.filter((_, i) => i !== idx) });
-  }, [getEffective, patch]);
+  const removeWaypoint = useCallback(
+    (id: string, idx: number) => {
+      const cur = getEffective(id);
+      if (!cur) return;
+      if (cur.waypoints.length <= 2) return;
+      patch(id, { waypoints: cur.waypoints.filter((_, i) => i !== idx) });
+    },
+    [getEffective, patch],
+  );
 
-  const insertWaypointAfter = useCallback((id: string, idx: number, w: Waypoint) => {
-    const cur = getEffective(id); if (!cur) return;
-    const ws = cur.waypoints.slice(); ws.splice(idx + 1, 0, w);
-    patch(id, { waypoints: ws });
-  }, [getEffective, patch]);
+  const insertWaypointAfter = useCallback(
+    (id: string, idx: number, w: Waypoint) => {
+      const cur = getEffective(id);
+      if (!cur) return;
+      const ws = cur.waypoints.slice();
+      ws.splice(idx + 1, 0, w);
+      patch(id, { waypoints: ws });
+    },
+    [getEffective, patch],
+  );
 
-  const duplicate = useCallback((id: string): string | null => {
-    const cur = getEffective(id); if (!cur || !map) return null;
-    const newId = uniqueId(`${cur.id}-copy`, projectIds);
-    const offset: Point = [Math.round(map.width * 0.02), Math.round(map.height * 0.02)];
-    const copy: Route = {
-      ...cur, id: newId, name: `${cur.name} (copy)`,
-      waypoints: cur.waypoints.map((w) =>
-        Array.isArray(w) ? ([w[0] + offset[0], w[1] + offset[1]] as Point) : { ...w }
-      ),
-    };
-    mutateDraft((d) => ({ ...d, added: [...d.added, copy] }), `duplicate route ${id}`);
-    setSelectedId(newId);
-    return newId;
-  }, [getEffective, map, projectIds, mutateDraft]);
+  const duplicate = useCallback(
+    (id: string): string | null => {
+      const cur = getEffective(id);
+      if (!cur || !map) return null;
+      const newId = uniqueId(`${cur.id}-copy`, projectIds);
+      const offset: Point = [Math.round(map.width * 0.02), Math.round(map.height * 0.02)];
+      const copy: Route = {
+        ...cur,
+        id: newId,
+        name: `${cur.name} (copy)`,
+        waypoints: cur.waypoints.map((w) =>
+          Array.isArray(w) ? ([w[0] + offset[0], w[1] + offset[1]] as Point) : { ...w },
+        ),
+      };
+      mutateDraft((d) => ({ ...d, added: [...d.added, copy] }), `duplicate route ${id}`);
+      setSelectedId(newId);
+      return newId;
+    },
+    [getEffective, map, projectIds, mutateDraft],
+  );
 
-  const remove = useCallback((id: string) => {
-    mutateDraft((d) => {
-      const addedIdx = d.added.findIndex((r) => r.id === id);
-      if (addedIdx >= 0) return { ...d, added: d.added.filter((r) => r.id !== id) };
-      const { [id]: _drop, ...restEdits } = d.edits; void _drop;
-      return { ...d, edits: restEdits, deleted: d.deleted.includes(id) ? d.deleted : [...d.deleted, id] };
-    }, `remove route ${id}`);
-    setSelectedId((s) => (s === id ? null : s));
-  }, [mutateDraft]);
+  const remove = useCallback(
+    (id: string) => {
+      mutateDraft((d) => {
+        const addedIdx = d.added.findIndex((r) => r.id === id);
+        if (addedIdx >= 0) return { ...d, added: d.added.filter((r) => r.id !== id) };
+        const { [id]: _drop, ...restEdits } = d.edits;
+        void _drop;
+        return {
+          ...d,
+          edits: restEdits,
+          deleted: d.deleted.includes(id) ? d.deleted : [...d.deleted, id],
+        };
+      }, `remove route ${id}`);
+      setSelectedId((s) => (s === id ? null : s));
+    },
+    [mutateDraft],
+  );
 
   // reset() bypasses the undo stack — see comment in useRegionDraft.ts.
-  const reset = useCallback(() => { applyDraft(EMPTY); setSelectedId(null); cancelDraw(); }, [applyDraft, cancelDraw]);
+  const reset = useCallback(() => {
+    applyDraft(EMPTY);
+    setSelectedId(null);
+    cancelDraw();
+  }, [applyDraft, cancelDraw]);
 
   const issues = useMemo<RouteIssue[]>(() => {
     const out: RouteIssue[] = [];
     const seen = new Set<string>();
     for (const r of effective) {
-      if (seen.has(r.id)) out.push({ severity: "blocking", code: "duplicate-route-id", message: `Duplicate route "${r.id}"`, routeId: r.id });
+      if (seen.has(r.id))
+        out.push({
+          severity: "blocking",
+          code: "duplicate-route-id",
+          message: `Duplicate route "${r.id}"`,
+          routeId: r.id,
+        });
       seen.add(r.id);
-      if (r.waypoints.length < 2) out.push({ severity: "blocking", code: "route-too-few-waypoints", message: `Route "${r.name}" needs ≥ 2 waypoints`, routeId: r.id });
-      if (map && r.mapId !== map.id) out.push({ severity: "warning", code: "route-wrong-map", message: `Route "${r.name}" mapId "${r.mapId}" doesn't match active map`, routeId: r.id });
+      if (r.waypoints.length < 2)
+        out.push({
+          severity: "blocking",
+          code: "route-too-few-waypoints",
+          message: `Route "${r.name}" needs ≥ 2 waypoints`,
+          routeId: r.id,
+        });
+      if (map && r.mapId !== map.id)
+        out.push({
+          severity: "warning",
+          code: "route-wrong-map",
+          message: `Route "${r.name}" mapId "${r.mapId}" doesn't match active map`,
+          routeId: r.id,
+        });
       for (const w of r.waypoints) {
         if (!Array.isArray(w)) {
           if (opts.entityIds && !opts.entityIds.has(w.entityId)) {
-            out.push({ severity: "warning", code: "route-unknown-entity", message: `Route "${r.name}" references unknown entity "${w.entityId}"`, routeId: r.id });
+            out.push({
+              severity: "warning",
+              code: "route-unknown-entity",
+              message: `Route "${r.name}" references unknown entity "${w.entityId}"`,
+              routeId: r.id,
+            });
           } else if (!placementByEntity.has(w.entityId)) {
-            out.push({ severity: "warning", code: "route-entity-no-placement", message: `Entity "${w.entityId}" has no placement on this map`, routeId: r.id });
+            out.push({
+              severity: "warning",
+              code: "route-entity-no-placement",
+              message: `Entity "${w.entityId}" has no placement on this map`,
+              routeId: r.id,
+            });
           }
           if (opts.dmEntityIds && r.visibility === "player" && opts.dmEntityIds.has(w.entityId)) {
-            out.push({ severity: "blocking", code: "spoiler-leak", message: `Player route "${r.name}" uses DM-only entity waypoint "${w.entityId}"`, routeId: r.id });
+            out.push({
+              severity: "blocking",
+              code: "spoiler-leak",
+              message: `Player route "${r.name}" uses DM-only entity waypoint "${w.entityId}"`,
+              routeId: r.id,
+            });
           }
         } else if (map) {
           const [x, y] = w;
           if (x < 0 || y < 0 || x > map.width || y > map.height) {
-            out.push({ severity: "warning", code: "route-out-of-bounds", message: `Route "${r.name}" has waypoints outside map bounds`, routeId: r.id });
+            out.push({
+              severity: "warning",
+              code: "route-out-of-bounds",
+              message: `Route "${r.name}" has waypoints outside map bounds`,
+              routeId: r.id,
+            });
             break;
           }
         }
       }
       if (r.speed != null && !map?.scale) {
-        out.push({ severity: "warning", code: "route-no-scale", message: `Route "${r.name}" has speed but map has no scale — travel time won't render`, routeId: r.id });
+        out.push({
+          severity: "warning",
+          code: "route-no-scale",
+          message: `Route "${r.name}" has speed but map has no scale — travel time won't render`,
+          routeId: r.id,
+        });
       }
     }
     return out;
   }, [effective, map, opts.entityIds, opts.dmEntityIds, placementByEntity]);
 
   const snapshot = useCallback((): RouteDraft => draftRef.current, []);
-  const applySnapshot = useCallback((snap: RouteDraft) => { applyDraft(snap); }, [applyDraft]);
+  const applySnapshot = useCallback(
+    (snap: RouteDraft) => {
+      applyDraft(snap);
+    },
+    [applyDraft],
+  );
 
   return {
-    draft, effective, dirty, dirtyCount,
-    selectedId, setSelectedId,
-    drawing, draftWaypoints,
-    startDraw, cancelDraw, addDraftPoint, addDraftEntity, removeLastDraftPoint, finishDraw,
-    patch, moveWaypoint, setWaypointEntity, removeWaypoint, insertWaypointAfter,
-    duplicate, remove, reset,
-    snapshot, applySnapshot,
+    draft,
+    effective,
+    dirty,
+    dirtyCount,
+    selectedId,
+    setSelectedId,
+    drawing,
+    draftWaypoints,
+    startDraw,
+    cancelDraw,
+    addDraftPoint,
+    addDraftEntity,
+    removeLastDraftPoint,
+    finishDraw,
+    patch,
+    moveWaypoint,
+    setWaypointEntity,
+    removeWaypoint,
+    insertWaypointAfter,
+    duplicate,
+    remove,
+    reset,
+    snapshot,
+    applySnapshot,
     issues,
-    resolveWaypoint, resolveRoute,
+    resolveWaypoint,
+    resolveRoute,
   };
 }
 
 export function routeToYamlObject(r: Route): Record<string, unknown> {
   const out: Record<string, unknown> = {
-    id: r.id, mapId: r.mapId, name: r.name, visibility: r.visibility,
+    id: r.id,
+    mapId: r.mapId,
+    name: r.name,
+    visibility: r.visibility,
     waypoints: r.waypoints.map((w) =>
-      Array.isArray(w) ? [Math.round(w[0]), Math.round(w[1])] : { entityId: w.entityId }
+      Array.isArray(w) ? [Math.round(w[0]), Math.round(w[1])] : { entityId: w.entityId },
     ),
   };
   if (r.mode) out.mode = r.mode;

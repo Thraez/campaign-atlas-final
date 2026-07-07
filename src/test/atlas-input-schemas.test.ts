@@ -103,7 +103,7 @@ describe("overridesSchema", () => {
 
 describe("safeParseInput", () => {
   it("returns ok=true with parsed data on success", () => {
-    const out = safeParseInput(overridesSchema, { "k": { x: 1, y: 2 } });
+    const out = safeParseInput(overridesSchema, { k: { x: 1, y: 2 } });
     expect(out.ok).toBe(true);
     if (out.ok) expect(out.data["k"]).toMatchObject({ x: 1, y: 2 });
   });

@@ -18,8 +18,8 @@ export interface PinPreset {
   /** Stable preset id used in YAML (atlas.placements[].pin.preset). */
   id: PinPresetId;
   label: string;
-  icon: string;        // lucide icon name (looked up by viewer/editor)
-  color: string;       // CSS color (hex)
+  icon: string; // lucide icon name (looked up by viewer/editor)
+  color: string; // CSS color (hex)
   shape: PinShape;
   labelMode: PinLabelMode;
   /** Higher = shows label sooner / wins collision arbitration. */
@@ -29,28 +29,195 @@ export interface PinPreset {
 }
 
 export type PinPresetId =
-  | "settlement" | "capital" | "village" | "region" | "ruin" | "dungeon" | "cave"
-  | "npc" | "faction" | "temple" | "shop" | "port" | "hazard" | "mystery"
-  | "resonance_site" | "player_base" | "custom";
+  | "settlement"
+  | "capital"
+  | "village"
+  | "region"
+  | "ruin"
+  | "dungeon"
+  | "cave"
+  | "npc"
+  | "faction"
+  | "temple"
+  | "shop"
+  | "port"
+  | "hazard"
+  | "mystery"
+  | "resonance_site"
+  | "player_base"
+  | "custom";
 
 export const PIN_PRESETS: Record<PinPresetId, PinPreset> = {
-  capital:        { id: "capital",        label: "Capital",        icon: "crown",     color: "#f0a830", shape: "shield",   labelMode: "always", priority: 9, labelMinZoom: -6 },
-  settlement:     { id: "settlement",     label: "Settlement",     icon: "building",  color: "#f4c95d", shape: "teardrop", labelMode: "auto",   priority: 6, labelMinZoom: -2 },
-  village:        { id: "village",        label: "Village",        icon: "home",      color: "#d6b86b", shape: "teardrop", labelMode: "auto",   priority: 4, labelMinZoom: -1 },
-  port:           { id: "port",           label: "Port",           icon: "anchor",    color: "#5cb8d9", shape: "teardrop", labelMode: "auto",   priority: 6, labelMinZoom: -2 },
-  region:         { id: "region",         label: "Region",         icon: "map",       color: "#7fb069", shape: "diamond",  labelMode: "always", priority: 7, labelMinZoom: -6 },
-  ruin:           { id: "ruin",           label: "Ruin",           icon: "landmark",  color: "#b07d62", shape: "teardrop", labelMode: "auto",   priority: 3, labelMinZoom: 0  },
-  dungeon:        { id: "dungeon",        label: "Dungeon",        icon: "skull",     color: "#8e5cd9", shape: "teardrop", labelMode: "auto",   priority: 5, labelMinZoom: -1 },
-  cave:           { id: "cave",           label: "Cave",           icon: "mountain",  color: "#7a6f63", shape: "teardrop", labelMode: "auto",   priority: 3, labelMinZoom: 0  },
-  npc:            { id: "npc",            label: "NPC",            icon: "user",      color: "#5cb8d9", shape: "circle",   labelMode: "hover",  priority: 2, labelMinZoom: 1  },
-  faction:        { id: "faction",        label: "Faction",        icon: "flag",      color: "#d95c8e", shape: "shield",   labelMode: "auto",   priority: 5, labelMinZoom: -1 },
-  temple:         { id: "temple",         label: "Temple",         icon: "church",    color: "#e2c275", shape: "teardrop", labelMode: "auto",   priority: 4, labelMinZoom: 0  },
-  shop:           { id: "shop",           label: "Shop",           icon: "store",     color: "#9ec18a", shape: "circle",   labelMode: "hover",  priority: 1, labelMinZoom: 2  },
-  hazard:         { id: "hazard",         label: "Hazard",         icon: "alert",     color: "#e85d3a", shape: "diamond",  labelMode: "auto",   priority: 5, labelMinZoom: -1 },
-  mystery:        { id: "mystery",        label: "Mystery",        icon: "help",      color: "#a070ff", shape: "diamond",  labelMode: "auto",   priority: 4, labelMinZoom: 0  },
-  resonance_site: { id: "resonance_site", label: "Resonance Site", icon: "sparkles",  color: "#7ad3ff", shape: "star",     labelMode: "auto",   priority: 6, labelMinZoom: -1 },
-  player_base:    { id: "player_base",    label: "Player Base",    icon: "tent",      color: "#f7d76b", shape: "star",     labelMode: "always", priority: 8, labelMinZoom: -6 },
-  custom:         { id: "custom",         label: "Custom",         icon: "pin",       color: "#cfd6dc", shape: "teardrop", labelMode: "auto",   priority: 3, labelMinZoom: 0  },
+  capital: {
+    id: "capital",
+    label: "Capital",
+    icon: "crown",
+    color: "#f0a830",
+    shape: "shield",
+    labelMode: "always",
+    priority: 9,
+    labelMinZoom: -6,
+  },
+  settlement: {
+    id: "settlement",
+    label: "Settlement",
+    icon: "building",
+    color: "#f4c95d",
+    shape: "teardrop",
+    labelMode: "auto",
+    priority: 6,
+    labelMinZoom: -2,
+  },
+  village: {
+    id: "village",
+    label: "Village",
+    icon: "home",
+    color: "#d6b86b",
+    shape: "teardrop",
+    labelMode: "auto",
+    priority: 4,
+    labelMinZoom: -1,
+  },
+  port: {
+    id: "port",
+    label: "Port",
+    icon: "anchor",
+    color: "#5cb8d9",
+    shape: "teardrop",
+    labelMode: "auto",
+    priority: 6,
+    labelMinZoom: -2,
+  },
+  region: {
+    id: "region",
+    label: "Region",
+    icon: "map",
+    color: "#7fb069",
+    shape: "diamond",
+    labelMode: "always",
+    priority: 7,
+    labelMinZoom: -6,
+  },
+  ruin: {
+    id: "ruin",
+    label: "Ruin",
+    icon: "landmark",
+    color: "#b07d62",
+    shape: "teardrop",
+    labelMode: "auto",
+    priority: 3,
+    labelMinZoom: 0,
+  },
+  dungeon: {
+    id: "dungeon",
+    label: "Dungeon",
+    icon: "skull",
+    color: "#8e5cd9",
+    shape: "teardrop",
+    labelMode: "auto",
+    priority: 5,
+    labelMinZoom: -1,
+  },
+  cave: {
+    id: "cave",
+    label: "Cave",
+    icon: "mountain",
+    color: "#7a6f63",
+    shape: "teardrop",
+    labelMode: "auto",
+    priority: 3,
+    labelMinZoom: 0,
+  },
+  npc: {
+    id: "npc",
+    label: "NPC",
+    icon: "user",
+    color: "#5cb8d9",
+    shape: "circle",
+    labelMode: "hover",
+    priority: 2,
+    labelMinZoom: 1,
+  },
+  faction: {
+    id: "faction",
+    label: "Faction",
+    icon: "flag",
+    color: "#d95c8e",
+    shape: "shield",
+    labelMode: "auto",
+    priority: 5,
+    labelMinZoom: -1,
+  },
+  temple: {
+    id: "temple",
+    label: "Temple",
+    icon: "church",
+    color: "#e2c275",
+    shape: "teardrop",
+    labelMode: "auto",
+    priority: 4,
+    labelMinZoom: 0,
+  },
+  shop: {
+    id: "shop",
+    label: "Shop",
+    icon: "store",
+    color: "#9ec18a",
+    shape: "circle",
+    labelMode: "hover",
+    priority: 1,
+    labelMinZoom: 2,
+  },
+  hazard: {
+    id: "hazard",
+    label: "Hazard",
+    icon: "alert",
+    color: "#e85d3a",
+    shape: "diamond",
+    labelMode: "auto",
+    priority: 5,
+    labelMinZoom: -1,
+  },
+  mystery: {
+    id: "mystery",
+    label: "Mystery",
+    icon: "help",
+    color: "#a070ff",
+    shape: "diamond",
+    labelMode: "auto",
+    priority: 4,
+    labelMinZoom: 0,
+  },
+  resonance_site: {
+    id: "resonance_site",
+    label: "Resonance Site",
+    icon: "sparkles",
+    color: "#7ad3ff",
+    shape: "star",
+    labelMode: "auto",
+    priority: 6,
+    labelMinZoom: -1,
+  },
+  player_base: {
+    id: "player_base",
+    label: "Player Base",
+    icon: "tent",
+    color: "#f7d76b",
+    shape: "star",
+    labelMode: "always",
+    priority: 8,
+    labelMinZoom: -6,
+  },
+  custom: {
+    id: "custom",
+    label: "Custom",
+    icon: "pin",
+    color: "#cfd6dc",
+    shape: "teardrop",
+    labelMode: "auto",
+    priority: 3,
+    labelMinZoom: 0,
+  },
 };
 
 /** Maps an entity type (from frontmatter atlas.type) to a default preset. */
@@ -97,7 +264,7 @@ export interface PinOverride {
 /** Resolve final pin style for rendering, merging preset + per-placement overrides. */
 export function resolvePinStyle(
   entityType: string | undefined,
-  override?: PinOverride | null
+  override?: PinOverride | null,
 ): PinPreset {
   const presetId = override?.preset ?? defaultPresetForType(entityType);
   const base = PIN_PRESETS[presetId] ?? PIN_PRESETS.custom;
@@ -115,23 +282,29 @@ export function resolvePinStyle(
 /** Compute the minimal override object: drops keys equal to preset defaults. */
 export function diffPinOverride(
   entityType: string | undefined,
-  styled: Partial<PinPreset> & { preset?: PinPresetId }
+  styled: Partial<PinPreset> & { preset?: PinPresetId },
 ): PinOverride | undefined {
   const presetId = styled.preset ?? defaultPresetForType(entityType);
   const base = PIN_PRESETS[presetId] ?? PIN_PRESETS.custom;
   const out: PinOverride = {};
-  if (styled.preset && styled.preset !== defaultPresetForType(entityType)) out.preset = styled.preset;
+  if (styled.preset && styled.preset !== defaultPresetForType(entityType))
+    out.preset = styled.preset;
   if (styled.color && styled.color !== base.color) out.color = styled.color;
   if (styled.icon && styled.icon !== base.icon) out.icon = styled.icon;
   if (styled.shape && styled.shape !== base.shape) out.shape = styled.shape;
   if (styled.labelMode && styled.labelMode !== base.labelMode) out.labelMode = styled.labelMode;
-  if (styled.labelMinZoom !== undefined && styled.labelMinZoom !== base.labelMinZoom) out.labelMinZoom = styled.labelMinZoom;
-  if (styled.priority !== undefined && styled.priority !== base.priority) out.priority = styled.priority;
+  if (styled.labelMinZoom !== undefined && styled.labelMinZoom !== base.labelMinZoom)
+    out.labelMinZoom = styled.labelMinZoom;
+  if (styled.priority !== undefined && styled.priority !== base.priority)
+    out.priority = styled.priority;
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /** Render an SVG pin glyph as an HTML string for Leaflet DivIcons. */
-export function pinSvg(style: Pick<PinPreset, "color" | "shape">, opts?: { dim?: boolean; pulse?: boolean }): string {
+export function pinSvg(
+  style: Pick<PinPreset, "color" | "shape">,
+  opts?: { dim?: boolean; pulse?: boolean },
+): string {
   const fill = style.color;
   const stroke = "#0a0a0acc";
   const opacity = opts?.dim ? 0.6 : 1;

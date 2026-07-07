@@ -6,9 +6,7 @@ const BASE = { oceanColor: "#18313f" } as const;
 
 describe("OceanBackground", () => {
   it("renders nothing when water.enabled is false", () => {
-    const { container } = render(
-      <OceanBackground map={{ ...BASE, water: { enabled: false } }} />
-    );
+    const { container } = render(<OceanBackground map={{ ...BASE, water: { enabled: false } }} />);
     expect(container.firstChild).toBeNull();
   });
 

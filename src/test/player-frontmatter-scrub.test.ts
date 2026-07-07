@@ -22,13 +22,17 @@ function writeVault(root: string) {
   fs.mkdirSync(path.join(root, "content/test-world/notes"), { recursive: true });
   fs.writeFileSync(
     path.join(root, "atlas.config.json"),
-    JSON.stringify({
-      contentRoot: "content",
-      outputDir: "out",
-      defaultWorld: "test-world",
-      include: ["**/*.md"],
-      exclude: [],
-    }, null, 2),
+    JSON.stringify(
+      {
+        contentRoot: "content",
+        outputDir: "out",
+        defaultWorld: "test-world",
+        include: ["**/*.md"],
+        exclude: [],
+      },
+      null,
+      2,
+    ),
     "utf8",
   );
   fs.writeFileSync(
@@ -52,9 +56,9 @@ function writeVault(root: string) {
     [
       "---",
       'title: "Foo Bar"',
-      'tags: [npc, scholar, stub, FACTION]',
+      "tags: [npc, scholar, stub, FACTION]",
       'aliases: ["Foo", "Foo Bar", "Mr. Foo"]',
-      'visibility: player',
+      "visibility: player",
       "---",
       "Body.",
       "",

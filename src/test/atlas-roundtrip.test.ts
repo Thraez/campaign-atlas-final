@@ -18,7 +18,10 @@ const ROOT = path.resolve(__dirname, "../..");
 const SCRIPT = path.resolve(ROOT, "scripts/build-atlas.ts");
 const IS_WIN = process.platform === "win32";
 
-function run(args: string[], opts: ExecFileSyncOptions = {}): { status: number; stdout: string; stderr: string } {
+function run(
+  args: string[],
+  opts: ExecFileSyncOptions = {},
+): { status: number; stdout: string; stderr: string } {
   try {
     const stdout = execFileSync(IS_WIN ? "npx.cmd" : "npx", ["tsx", SCRIPT, ...args], {
       cwd: ROOT,
@@ -31,13 +34,21 @@ function run(args: string[], opts: ExecFileSyncOptions = {}): { status: number; 
     return { status: 0, stdout: String(stdout), stderr: "" };
   } catch (e) {
     const err = e as { status?: number; stdout?: Buffer | string; stderr?: Buffer | string };
-    return { status: err.status ?? 1, stdout: String(err.stdout ?? ""), stderr: String(err.stderr ?? "") };
+    return {
+      status: err.status ?? 1,
+      stdout: String(err.stdout ?? ""),
+      stderr: String(err.stderr ?? ""),
+    };
   }
 }
 
 let tmpRoot: string;
-beforeAll(() => { tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "roundtrip-")); });
-afterAll(() => { fs.rmSync(tmpRoot, { recursive: true, force: true }); });
+beforeAll(() => {
+  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "roundtrip-"));
+});
+afterAll(() => {
+  fs.rmSync(tmpRoot, { recursive: true, force: true });
+});
 
 interface MutableAtlasShape extends Record<string, unknown> {
   version?: unknown;
@@ -49,21 +60,31 @@ function makeVault(dir: string): string {
   fs.mkdirSync(path.join(dir, "content/w/_atlas"), { recursive: true });
   fs.mkdirSync(path.join(dir, "content/w/notes"), { recursive: true });
   const configPath = path.join(dir, "atlas.config.json");
-  fs.writeFileSync(configPath, JSON.stringify({
-    contentRoot: "content", outputDir: "out", defaultWorld: "w",
-    include: ["**/*.md"], exclude: [],
-  }));
-  fs.writeFileSync(path.join(dir, "content/w/_atlas/world.yaml"),
-    `schemaVersion: 1\nmaps:\n  - id: m1\n    name: M1\n    width: 1000\n    height: 1000\n    layers: []\n`
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify({
+      contentRoot: "content",
+      outputDir: "out",
+      defaultWorld: "w",
+      include: ["**/*.md"],
+      exclude: [],
+    }),
   );
-  fs.writeFileSync(path.join(dir, "content/w/notes/A.md"),
-    `---\ntitle: A\natlas:\n  visibility: player\n  type: settlement\n  placements:\n    - mapId: m1\n      x: 100\n      y: 100\n---\nBody A with [[B]].\n`
+  fs.writeFileSync(
+    path.join(dir, "content/w/_atlas/world.yaml"),
+    `schemaVersion: 1\nmaps:\n  - id: m1\n    name: M1\n    width: 1000\n    height: 1000\n    layers: []\n`,
   );
-  fs.writeFileSync(path.join(dir, "content/w/notes/B.md"),
-    `---\ntitle: B\natlas:\n  visibility: player\n  type: ruin\n  placements:\n    - mapId: m1\n      x: 500\n      y: 500\n---\nBody B with no links.\n`
+  fs.writeFileSync(
+    path.join(dir, "content/w/notes/A.md"),
+    `---\ntitle: A\natlas:\n  visibility: player\n  type: settlement\n  placements:\n    - mapId: m1\n      x: 100\n      y: 100\n---\nBody A with [[B]].\n`,
   );
-  fs.writeFileSync(path.join(dir, "content/w/notes/Secret.md"),
-    `---\ntitle: Secret\natlas:\n  visibility: dm\n---\nDM only.\n`
+  fs.writeFileSync(
+    path.join(dir, "content/w/notes/B.md"),
+    `---\ntitle: B\natlas:\n  visibility: player\n  type: ruin\n  placements:\n    - mapId: m1\n      x: 500\n      y: 500\n---\nBody B with no links.\n`,
+  );
+  fs.writeFileSync(
+    path.join(dir, "content/w/notes/Secret.md"),
+    `---\ntitle: Secret\natlas:\n  visibility: dm\n---\nDM only.\n`,
   );
   return configPath;
 }
@@ -86,7 +107,8 @@ function stripVolatile(obj: MutableAtlasShape): MutableAtlasShape {
   // builds (e.g. asset audit warnings), which differ across temp dirs even
   // for identical canon.
   const { version: _v, publishedAt: _p, ...rest } = obj;
-  void _v; void _p;
+  void _v;
+  void _p;
   if (rest.buildReport && typeof rest.buildReport === "object") {
     rest.buildReport = { ...rest.buildReport };
     delete (rest.buildReport as Record<string, unknown>).warnings;
@@ -106,8 +128,12 @@ describe.sequential("atlas build roundtrip", () => {
     const r2 = run(["--player", "--strict", "--config", configPath, "--out", out2]);
     expect(r2.status, r2.stderr).toBe(0);
 
-    const a1 = JSON.parse(fs.readFileSync(path.join(out1, "atlas.json"), "utf8")) as MutableAtlasShape;
-    const a2 = JSON.parse(fs.readFileSync(path.join(out2, "atlas.json"), "utf8")) as MutableAtlasShape;
+    const a1 = JSON.parse(
+      fs.readFileSync(path.join(out1, "atlas.json"), "utf8"),
+    ) as MutableAtlasShape;
+    const a2 = JSON.parse(
+      fs.readFileSync(path.join(out2, "atlas.json"), "utf8"),
+    ) as MutableAtlasShape;
 
     expect(normalize(stripVolatile(a1))).toEqual(normalize(stripVolatile(a2)));
   });
@@ -123,8 +149,12 @@ describe.sequential("atlas build roundtrip", () => {
     const r2 = run(["--config", configPath, "--out", out2]);
     expect(r2.status, r2.stderr).toBe(0);
 
-    const a1 = JSON.parse(fs.readFileSync(path.join(out1, "atlas.json"), "utf8")) as MutableAtlasShape;
-    const a2 = JSON.parse(fs.readFileSync(path.join(out2, "atlas.json"), "utf8")) as MutableAtlasShape;
+    const a1 = JSON.parse(
+      fs.readFileSync(path.join(out1, "atlas.json"), "utf8"),
+    ) as MutableAtlasShape;
+    const a2 = JSON.parse(
+      fs.readFileSync(path.join(out2, "atlas.json"), "utf8"),
+    ) as MutableAtlasShape;
 
     expect(normalize(stripVolatile(a1))).toEqual(normalize(stripVolatile(a2)));
   });

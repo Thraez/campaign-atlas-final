@@ -3,7 +3,9 @@ import "fake-indexeddb/auto";
 import { idbGet, idbSet, idbDelete } from "@/atlas/session/idbStore";
 
 describe("idbStore", () => {
-  beforeEach(async () => { await idbDelete("k"); });
+  beforeEach(async () => {
+    await idbDelete("k");
+  });
 
   it("returns null for a missing key", async () => {
     expect(await idbGet<{ a: number }>("k")).toBeNull();

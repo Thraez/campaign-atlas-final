@@ -89,7 +89,7 @@ describe("player-notes: export / import", () => {
   it("import merges into existing notes rather than replacing", () => {
     saveNote("kept", "existing value");
     const result = importNotesJson(
-      JSON.stringify({ added: { text: "new value", updatedAt: "2026-01-01T00:00:00Z" } })
+      JSON.stringify({ added: { text: "new value", updatedAt: "2026-01-01T00:00:00Z" } }),
     );
     expect(result.imported).toBe(1);
     expect(loadNote("kept")?.text).toBe("existing value");
@@ -108,7 +108,7 @@ describe("player-notes: export / import", () => {
         good: { text: "ok", updatedAt: "2026-01-01T00:00:00Z" },
         broken: "not an object",
         missing_text: { updatedAt: "2026-01-01T00:00:00Z" },
-      })
+      }),
     );
     expect(result.imported).toBe(1);
     expect(result.errors.length).toBeGreaterThanOrEqual(2);
@@ -135,7 +135,7 @@ describe("player-notes: degraded environments", () => {
         good: { text: "ok", updatedAt: "2026-01-01" },
         bad: { text: 42, updatedAt: "2026-01-01" },
         also_bad: "string-instead-of-object",
-      })
+      }),
     );
     const all = loadAllNotes();
     expect(Object.keys(all)).toEqual(["good"]);

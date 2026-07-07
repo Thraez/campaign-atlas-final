@@ -125,7 +125,7 @@ export function ImportPanel({ knownEntityNames }: { knownEntityNames?: Set<strin
       (f) =>
         f.title.toLowerCase().includes(q) ||
         f.relPath.toLowerCase().includes(q) ||
-        f.inferredType.toLowerCase().includes(q)
+        f.inferredType.toLowerCase().includes(q),
     );
   }, [files, filter]);
 
@@ -149,10 +149,15 @@ export function ImportPanel({ knownEntityNames }: { knownEntityNames?: Set<strin
     //    same slug (build would later reject with `duplicate slug`).
     const dups = new Set<string>();
     const slugCount = new Map<string, number>();
-    for (const f of files) slugCount.set(f.suggestedId.toLowerCase(), (slugCount.get(f.suggestedId.toLowerCase()) ?? 0) + 1);
+    for (const f of files)
+      slugCount.set(
+        f.suggestedId.toLowerCase(),
+        (slugCount.get(f.suggestedId.toLowerCase()) ?? 0) + 1,
+      );
     for (const f of files) {
       const slug = f.suggestedId.toLowerCase();
-      const collidesWithCanon = knownEntityNames?.has(slug) || knownEntityNames?.has(f.title.toLowerCase());
+      const collidesWithCanon =
+        knownEntityNames?.has(slug) || knownEntityNames?.has(f.title.toLowerCase());
       const collidesWithinBatch = (slugCount.get(slug) ?? 0) > 1;
       if (collidesWithCanon || collidesWithinBatch) dups.add(f.relPath);
     }
@@ -169,7 +174,9 @@ export function ImportPanel({ knownEntityNames }: { knownEntityNames?: Set<strin
     for (const f of files) {
       if (f.hasFrontmatter) withFm++;
       else missingFm++;
-      missingAttachments += f.attachments.filter((a) => !a.resolved && !a.rawSrc.startsWith("/")).length;
+      missingAttachments += f.attachments.filter(
+        (a) => !a.resolved && !a.rawSrc.startsWith("/"),
+      ).length;
       brokenLinks += f.wikilinks.filter((w) => w.broken).length;
       if (effectiveLevel(f) === "player-published" && f.warnings.length > 0) playerWarnings++;
       if (dupSet.has(f.relPath)) duplicates++;
@@ -178,7 +185,10 @@ export function ImportPanel({ knownEntityNames }: { knownEntityNames?: Set<strin
   }, [files, overrides, dupSet]);
 
   /** Build EntityFrontmatterPatch[] for the chosen files. */
-  const collectPatches = (relPaths: Iterable<string>, opts: { safeOnly?: boolean } = {}): EntityFrontmatterPatch[] => {
+  const collectPatches = (
+    relPaths: Iterable<string>,
+    opts: { safeOnly?: boolean } = {},
+  ): EntityFrontmatterPatch[] => {
     const out: EntityFrontmatterPatch[] = [];
     const wantSafe = !!opts.safeOnly;
     for (const rel of relPaths) {
@@ -203,7 +213,11 @@ export function ImportPanel({ knownEntityNames }: { knownEntityNames?: Set<strin
     return out;
   };
 
-  const exportPatches = (relPaths: Iterable<string>, label: string, opts: { safeOnly?: boolean } = {}) => {
+  const exportPatches = (
+    relPaths: Iterable<string>,
+    label: string,
+    opts: { safeOnly?: boolean } = {},
+  ) => {
     const patches = collectPatches(relPaths, opts);
     if (!patches.length) {
       toast.warning("Nothing to export.");
@@ -215,11 +229,20 @@ export function ImportPanel({ knownEntityNames }: { knownEntityNames?: Set<strin
       toast.error(`Patch validation failed: ${validation.errors[0]}`);
       return;
     }
-    downloadText(artifact.filename.replace(".yaml", `-${label}.yaml`), artifact.content, artifact.mime);
+    downloadText(
+      artifact.filename.replace(".yaml", `-${label}.yaml`),
+      artifact.content,
+      artifact.mime,
+    );
   };
 
   const exportSelected = () => exportPatches(selected, "selected");
-  const exportSafeAll = () => exportPatches(files.map((f) => f.relPath), "safe-all", { safeOnly: true });
+  const exportSafeAll = () =>
+    exportPatches(
+      files.map((f) => f.relPath),
+      "safe-all",
+      { safeOnly: true },
+    );
 
   const toggleSelected = (relPath: string) =>
     setSelected((s) => {
@@ -233,17 +256,37 @@ export function ImportPanel({ knownEntityNames }: { knownEntityNames?: Set<strin
     <div className="flex flex-col h-full">
       <div className="p-3 border-b border-border space-y-2">
         <div className="text-xs text-muted-foreground">
-          Drop in your Obsidian vault — the tool infers types, defaults unsafe values to <strong>DM-only</strong>, and generates suggested frontmatter patches.
+          Drop in your Obsidian vault — the tool infers types, defaults unsafe values to{" "}
+          <strong>DM-only</strong>, and generates suggested frontmatter patches.
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="default" className="flex-1 gap-1.5" onClick={() => folderInput.current?.click()}>
+          <Button
+            size="sm"
+            variant="default"
+            className="flex-1 gap-1.5"
+            onClick={() => folderInput.current?.click()}
+          >
             <FolderOpen className="h-3.5 w-3.5" /> Pick vault folder
           </Button>
-          <Button size="sm" variant="secondary" className="gap-1.5" onClick={() => fileInput.current?.click()}>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="gap-1.5"
+            onClick={() => fileInput.current?.click()}
+          >
             <Upload className="h-3.5 w-3.5" /> Files
           </Button>
           {files.length > 0 && (
-            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => { setFiles([]); setOverrides({}); setSelected(new Set()); }}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-destructive"
+              onClick={() => {
+                setFiles([]);
+                setOverrides({});
+                setSelected(new Set());
+              }}
+            >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           )}
@@ -256,7 +299,10 @@ export function ImportPanel({ knownEntityNames }: { knownEntityNames?: Set<strin
           webkitdirectory=""
           directory=""
           className="hidden"
-          onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }}
+          onChange={(e) => {
+            handleFiles(e.target.files);
+            e.target.value = "";
+          }}
         />
         <input
           ref={fileInput}
@@ -264,31 +310,69 @@ export function ImportPanel({ knownEntityNames }: { knownEntityNames?: Set<strin
           multiple
           accept=".md,text/markdown"
           className="hidden"
-          onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }}
+          onChange={(e) => {
+            handleFiles(e.target.files);
+            e.target.value = "";
+          }}
         />
 
         {files.length > 0 && (
           <>
             <div className="grid grid-cols-2 gap-1.5 text-[10px]">
               <Stat label="With frontmatter" value={summary.withFm} />
-              <Stat label="Missing frontmatter" value={summary.missingFm} tone={summary.missingFm ? "warn" : undefined} />
-              <Stat label="Unresolved wikilinks" value={summary.brokenLinks} tone={summary.brokenLinks ? "warn" : undefined} />
-              <Stat label="Missing attachments" value={summary.missingAttachments} tone={summary.missingAttachments ? "warn" : undefined} />
-              <Stat label="Duplicate titles" value={summary.duplicates} tone={summary.duplicates ? "warn" : undefined} />
+              <Stat
+                label="Missing frontmatter"
+                value={summary.missingFm}
+                tone={summary.missingFm ? "warn" : undefined}
+              />
+              <Stat
+                label="Unresolved wikilinks"
+                value={summary.brokenLinks}
+                tone={summary.brokenLinks ? "warn" : undefined}
+              />
+              <Stat
+                label="Missing attachments"
+                value={summary.missingAttachments}
+                tone={summary.missingAttachments ? "warn" : undefined}
+              />
+              <Stat
+                label="Duplicate titles"
+                value={summary.duplicates}
+                tone={summary.duplicates ? "warn" : undefined}
+              />
             </div>
             {summary.duplicates > 0 && (
               <div className="rounded border border-amber-500/40 bg-amber-500/5 text-[10px] p-2 text-amber-100">
-                <strong>{summary.duplicates} file{summary.duplicates === 1 ? "" : "s"}</strong> would
-                collide with an existing entity slug (or with another file in this batch). The build
-                will fail with "duplicate slug" — rename, set <code>atlas.id</code>, or skip.
+                <strong>
+                  {summary.duplicates} file{summary.duplicates === 1 ? "" : "s"}
+                </strong>{" "}
+                would collide with an existing entity slug (or with another file in this batch). The
+                build will fail with "duplicate slug" — rename, set <code>atlas.id</code>, or skip.
               </div>
             )}
-            <Input placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} className="h-7 text-xs" />
+            <Input
+              placeholder="Filter…"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="h-7 text-xs"
+            />
             <div className="flex gap-1.5">
-              <Button size="sm" variant="default" className="flex-1 gap-1.5" onClick={exportSelected} disabled={selected.size === 0}>
+              <Button
+                size="sm"
+                variant="default"
+                className="flex-1 gap-1.5"
+                onClick={exportSelected}
+                disabled={selected.size === 0}
+              >
                 <Download className="h-3.5 w-3.5" /> Export selected ({selected.size})
               </Button>
-              <Button size="sm" variant="secondary" className="gap-1.5" onClick={exportSafeAll} title="Export every non-ignored file whose effective visibility is safe">
+              <Button
+                size="sm"
+                variant="secondary"
+                className="gap-1.5"
+                onClick={exportSafeAll}
+                title="Export every non-ignored file whose effective visibility is safe"
+              >
                 <Sparkles className="h-3.5 w-3.5" /> Safe all
               </Button>
             </div>
@@ -308,10 +392,15 @@ export function ImportPanel({ knownEntityNames }: { knownEntityNames?: Set<strin
             return (
               <div key={lvl} className="px-2 py-2">
                 <div className="flex items-center gap-2 px-1 py-1">
-                  <Badge variant="outline" className={`text-[10px] uppercase tracking-wider border ${LEVEL_TONE[lvl]}`}>
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] uppercase tracking-wider border ${LEVEL_TONE[lvl]}`}
+                  >
                     {LEVEL_LABEL[lvl]}
                   </Badge>
-                  <span className="text-[10px] text-muted-foreground">{list.length} file{list.length === 1 ? "" : "s"}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {list.length} file{list.length === 1 ? "" : "s"}
+                  </span>
                 </div>
                 <div className="space-y-1.5">
                   {list.map((f) => (
@@ -323,7 +412,9 @@ export function ImportPanel({ knownEntityNames }: { knownEntityNames?: Set<strin
                       selected={selected.has(f.relPath)}
                       onToggleSelected={() => toggleSelected(f.relPath)}
                       onSetVisibility={(v) => setOverride(f.relPath, { visibility: v })}
-                      onSetLevel={(l) => setOverride(f.relPath, { level: l, ignored: l === "ignored" })}
+                      onSetLevel={(l) =>
+                        setOverride(f.relPath, { level: l, ignored: l === "ignored" })
+                      }
                     />
                   ))}
                 </div>
@@ -338,7 +429,9 @@ export function ImportPanel({ knownEntityNames }: { knownEntityNames?: Set<strin
 
 function Stat({ label, value, tone }: { label: string; value: number; tone?: "warn" }) {
   return (
-    <div className={`rounded border px-2 py-1 ${tone === "warn" ? "border-amber-500/30 text-amber-300 bg-amber-500/10" : "border-border text-muted-foreground bg-muted/30"}`}>
+    <div
+      className={`rounded border px-2 py-1 ${tone === "warn" ? "border-amber-500/30 text-amber-300 bg-amber-500/10" : "border-border text-muted-foreground bg-muted/30"}`}
+    >
       <div className="text-[9px] uppercase tracking-wider">{label}</div>
       <div className="text-sm font-medium">{value}</div>
     </div>
@@ -355,17 +448,36 @@ interface FileRowProps {
   onSetLevel: (l: ImportLevel) => void;
 }
 
-function FileRow({ file, effectiveLevel, effectiveVisibility, selected, onToggleSelected, onSetVisibility, onSetLevel }: FileRowProps) {
+function FileRow({
+  file,
+  effectiveLevel,
+  effectiveVisibility,
+  selected,
+  onToggleSelected,
+  onSetVisibility,
+  onSetLevel,
+}: FileRowProps) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={`rounded-md border ${selected ? "border-primary/50 bg-primary/5" : "border-border bg-muted/20"} px-2 py-1.5`}>
+    <div
+      className={`rounded-md border ${selected ? "border-primary/50 bg-primary/5" : "border-border bg-muted/20"} px-2 py-1.5`}
+    >
       <div className="flex items-start gap-2">
         <input type="checkbox" checked={selected} onChange={onToggleSelected} className="mt-1" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-sm truncate">
             <span className="font-medium truncate">{file.title}</span>
-            <Badge variant="outline" className="text-[9px] h-4 px-1">{file.inferredType}</Badge>
-            {!file.hasFrontmatter && <Badge variant="outline" className="text-[9px] h-4 px-1 text-amber-300 border-amber-500/30">no FM</Badge>}
+            <Badge variant="outline" className="text-[9px] h-4 px-1">
+              {file.inferredType}
+            </Badge>
+            {!file.hasFrontmatter && (
+              <Badge
+                variant="outline"
+                className="text-[9px] h-4 px-1 text-amber-300 border-amber-500/30"
+              >
+                no FM
+              </Badge>
+            )}
           </div>
           <div className="text-[10px] text-muted-foreground truncate font-mono">{file.relPath}</div>
           {file.warnings.length > 0 && (
@@ -377,21 +489,29 @@ function FileRow({ file, effectiveLevel, effectiveVisibility, selected, onToggle
               ))}
             </div>
           )}
-          <button onClick={() => setOpen((v) => !v)} className="text-[10px] text-primary hover:underline mt-1">
+          <button
+            onClick={() => setOpen((v) => !v)}
+            className="text-[10px] text-primary hover:underline mt-1"
+          >
             {open ? "hide" : "details"}
           </button>
           {open && (
             <div className="mt-1.5 space-y-1.5 text-[10px] text-muted-foreground">
               {file.suggestedSummary && (
                 <div>
-                  <span className="text-foreground font-medium">Summary{file.summaryWasGenerated ? " (suggested)" : ""}:</span> {file.suggestedSummary}
+                  <span className="text-foreground font-medium">
+                    Summary{file.summaryWasGenerated ? " (suggested)" : ""}:
+                  </span>{" "}
+                  {file.suggestedSummary}
                 </div>
               )}
               {file.wikilinks.length > 0 && (
                 <div>
                   <span className="text-foreground font-medium">Wikilinks:</span>{" "}
                   {file.wikilinks.slice(0, 8).map((w, i) => (
-                    <span key={i} className={`mr-1.5 ${w.broken ? "text-amber-300" : ""}`}>[[{w.target}]]</span>
+                    <span key={i} className={`mr-1.5 ${w.broken ? "text-amber-300" : ""}`}>
+                      [[{w.target}]]
+                    </span>
                   ))}
                   {file.wikilinks.length > 8 && <span>+{file.wikilinks.length - 8} more</span>}
                 </div>
@@ -401,7 +521,8 @@ function FileRow({ file, effectiveLevel, effectiveVisibility, selected, onToggle
                   <span className="text-foreground font-medium">Attachments:</span>{" "}
                   {file.attachments.map((a, i) => (
                     <div key={i} className="font-mono">
-                      {a.rawSrc} → {a.suggestedTarget} {!a.resolved && <span className="text-amber-300">(needs path)</span>}
+                      {a.rawSrc} → {a.suggestedTarget}{" "}
+                      {!a.resolved && <span className="text-amber-300">(needs path)</span>}
                     </div>
                   ))}
                 </div>
@@ -411,14 +532,44 @@ function FileRow({ file, effectiveLevel, effectiveVisibility, selected, onToggle
         </div>
         <div className="flex flex-col gap-1 shrink-0">
           <div className="flex gap-0.5">
-            <IconBtn title="Mark DM only" active={effectiveVisibility === "dm"} onClick={() => onSetVisibility("dm")} icon={<Lock className="h-3 w-3" />} />
-            <IconBtn title="Mark player visible" active={effectiveVisibility === "player"} onClick={() => onSetVisibility("player")} icon={<Eye className="h-3 w-3" />} />
-            <IconBtn title="Mark hidden" active={effectiveVisibility === "hidden"} onClick={() => onSetVisibility("hidden")} icon={<EyeOff className="h-3 w-3" />} />
+            <IconBtn
+              title="Mark DM only"
+              active={effectiveVisibility === "dm"}
+              onClick={() => onSetVisibility("dm")}
+              icon={<Lock className="h-3 w-3" />}
+            />
+            <IconBtn
+              title="Mark player visible"
+              active={effectiveVisibility === "player"}
+              onClick={() => onSetVisibility("player")}
+              icon={<Eye className="h-3 w-3" />}
+            />
+            <IconBtn
+              title="Mark hidden"
+              active={effectiveVisibility === "hidden"}
+              onClick={() => onSetVisibility("hidden")}
+              icon={<EyeOff className="h-3 w-3" />}
+            />
           </div>
           <div className="flex gap-0.5">
-            <IconBtn title="Make placeable" active={effectiveLevel === "placeable"} onClick={() => onSetLevel("placeable")} icon={<MapPin className="h-3 w-3" />} />
-            <IconBtn title="Wiki only" active={effectiveLevel === "wiki-only"} onClick={() => onSetLevel("wiki-only")} icon={<ShieldAlert className="h-3 w-3" />} />
-            <IconBtn title="Ignore file" active={effectiveLevel === "ignored"} onClick={() => onSetLevel("ignored")} icon={<Trash2 className="h-3 w-3" />} />
+            <IconBtn
+              title="Make placeable"
+              active={effectiveLevel === "placeable"}
+              onClick={() => onSetLevel("placeable")}
+              icon={<MapPin className="h-3 w-3" />}
+            />
+            <IconBtn
+              title="Wiki only"
+              active={effectiveLevel === "wiki-only"}
+              onClick={() => onSetLevel("wiki-only")}
+              icon={<ShieldAlert className="h-3 w-3" />}
+            />
+            <IconBtn
+              title="Ignore file"
+              active={effectiveLevel === "ignored"}
+              onClick={() => onSetLevel("ignored")}
+              icon={<Trash2 className="h-3 w-3" />}
+            />
           </div>
         </div>
       </div>
@@ -426,7 +577,17 @@ function FileRow({ file, effectiveLevel, effectiveVisibility, selected, onToggle
   );
 }
 
-function IconBtn({ title, active, onClick, icon }: { title: string; active: boolean; onClick: () => void; icon: React.ReactNode }) {
+function IconBtn({
+  title,
+  active,
+  onClick,
+  icon,
+}: {
+  title: string;
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+}) {
   return (
     <button
       title={title}

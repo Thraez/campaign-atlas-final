@@ -11,22 +11,22 @@ import { dumpYaml, patchHeader } from "@/atlas/yaml/dump";
 export type ImportMode = "layers" | "per-image" | "world-plus-regional" | "variants" | "custom";
 
 export type SizingMode =
-  | "natural"             // map size = image natural size
-  | "stretch-to-current"  // layer fills the current map
-  | "center-natural"      // layer centered at natural size
-  | "fit-within-current"  // layer scaled to fit, aspect preserved
-  | "custom";             // user-provided width/height (keepAspect optional)
+  | "natural" // map size = image natural size
+  | "stretch-to-current" // layer fills the current map
+  | "center-natural" // layer centered at natural size
+  | "fit-within-current" // layer scaled to fit, aspect preserved
+  | "custom"; // user-provided width/height (keepAspect optional)
 
 export interface ImportImage {
-  id: string;                       // local UI id
-  file?: File;                      // browser File (when picked)
-  filename: string;                 // safe filename used in repo
-  originalFilename: string;         // raw filename from picker
+  id: string; // local UI id
+  file?: File; // browser File (when picked)
+  filename: string; // safe filename used in repo
+  originalFilename: string; // raw filename from picker
   mime: string;
   bytes: number;
   naturalWidth: number;
   naturalHeight: number;
-  dataUrl?: string;                 // for preview + zipping
+  dataUrl?: string; // for preview + zipping
   /** Per-image assignment (filled in step 3). */
   assignment: ImageAssignment;
 }
@@ -39,7 +39,7 @@ export interface ImageAssignment {
   worldId: string;
   // Layer-level
   layerId: string;
-  targetAssetPath: string;          // e.g. public/atlas/assets/maps/foo.webp
+  targetAssetPath: string; // e.g. public/atlas/assets/maps/foo.webp
   opacity: number;
   zIndex: number;
   // Sizing
@@ -86,24 +86,36 @@ export function safeFilename(raw: string): string {
   const dot = raw.lastIndexOf(".");
   const stem = (dot >= 0 ? raw.slice(0, dot) : raw).toLowerCase();
   const ext = (dot >= 0 ? raw.slice(dot + 1) : "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const safeStem = stem.replace(/\s+/g, "-").replace(ID_SAFE, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  const safeStem = stem
+    .replace(/\s+/g, "-")
+    .replace(ID_SAFE, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
   return ext ? `${safeStem || "image"}.${ext}` : safeStem || "image";
 }
 
 export function idFromFilename(raw: string): string {
   const dot = raw.lastIndexOf(".");
   const stem = (dot >= 0 ? raw.slice(0, dot) : raw).toLowerCase();
-  return stem.replace(/[\s_]+/g, "-").replace(ID_SAFE, "").replace(/-+/g, "-").replace(/^-|-$/g, "") || "image";
+  return (
+    stem
+      .replace(/[\s_]+/g, "-")
+      .replace(ID_SAFE, "")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "") || "image"
+  );
 }
 
 export function nameFromFilename(raw: string): string {
   const dot = raw.lastIndexOf(".");
   const stem = dot >= 0 ? raw.slice(0, dot) : raw;
-  return stem
-    .replace(/[-_]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (c) => c.toUpperCase()) || "Untitled";
+  return (
+    stem
+      .replace(/[-_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (c) => c.toUpperCase()) || "Untitled"
+  );
 }
 
 export function defaultTargetPath(filename: string): string {
@@ -124,7 +136,9 @@ export function defaultAssignment(
   return {
     createNewMap,
     mapId: createNewMap ? id : (currentMap?.id ?? id),
-    mapName: createNewMap ? nameFromFilename(filename) : (currentMap?.name ?? nameFromFilename(filename)),
+    mapName: createNewMap
+      ? nameFromFilename(filename)
+      : (currentMap?.name ?? nameFromFilename(filename)),
     worldId: currentMap?.worldId ?? worldId,
     layerId: id,
     targetAssetPath: defaultTargetPath(safe),
@@ -151,20 +165,28 @@ export function resolveSize(image: ImportImage, currentMap?: MapDocument): Resol
   switch (a.sizing) {
     case "natural":
       return {
-        mapWidth: nw, mapHeight: nh,
+        mapWidth: nw,
+        mapHeight: nh,
         layer: { x: 0, y: 0, width: nw, height: nh },
       };
     case "stretch-to-current":
       if (!cm) return { mapWidth: nw, mapHeight: nh, layer: { x: 0, y: 0, width: nw, height: nh } };
       return {
-        mapWidth: cm.width, mapHeight: cm.height,
+        mapWidth: cm.width,
+        mapHeight: cm.height,
         layer: { x: 0, y: 0, width: cm.width, height: cm.height },
       };
     case "center-natural":
       if (!cm) return { mapWidth: nw, mapHeight: nh, layer: { x: 0, y: 0, width: nw, height: nh } };
       return {
-        mapWidth: cm.width, mapHeight: cm.height,
-        layer: { x: Math.round((cm.width - nw) / 2), y: Math.round((cm.height - nh) / 2), width: nw, height: nh },
+        mapWidth: cm.width,
+        mapHeight: cm.height,
+        layer: {
+          x: Math.round((cm.width - nw) / 2),
+          y: Math.round((cm.height - nh) / 2),
+          width: nw,
+          height: nh,
+        },
       };
     case "fit-within-current": {
       if (!cm) return { mapWidth: nw, mapHeight: nh, layer: { x: 0, y: 0, width: nw, height: nh } };
@@ -172,8 +194,14 @@ export function resolveSize(image: ImportImage, currentMap?: MapDocument): Resol
       const w = Math.round(nw * scale);
       const h = Math.round(nh * scale);
       return {
-        mapWidth: cm.width, mapHeight: cm.height,
-        layer: { x: Math.round((cm.width - w) / 2), y: Math.round((cm.height - h) / 2), width: w, height: h },
+        mapWidth: cm.width,
+        mapHeight: cm.height,
+        layer: {
+          x: Math.round((cm.width - w) / 2),
+          y: Math.round((cm.height - h) / 2),
+          width: w,
+          height: h,
+        },
       };
     }
     case "custom": {
@@ -198,7 +226,14 @@ export function buildImportPlan(input: BuildPlanInput): ImportPlan {
   const mapBuckets = new Map<string, PlannedMap>();
   const assets: ImportPlan["assets"] = [];
 
-  const ensureMap = (id: string, name: string, worldId: string, w: number, h: number, replaces = false): PlannedMap => {
+  const ensureMap = (
+    id: string,
+    name: string,
+    worldId: string,
+    w: number,
+    h: number,
+    replaces = false,
+  ): PlannedMap => {
     let m = mapBuckets.get(id);
     if (!m) {
       m = { id, name, worldId, width: w, height: h, layers: [], replaces };
@@ -221,7 +256,10 @@ export function buildImportPlan(input: BuildPlanInput): ImportPlan {
     let createNew = a.createNewMap;
     if (mode === "world-plus-regional") {
       createNew = true;
-      if (i === 0) { mapId = a.mapId || "world-overview"; mapName = a.mapName || "World"; }
+      if (i === 0) {
+        mapId = a.mapId || "world-overview";
+        mapName = a.mapName || "World";
+      }
     }
     if (mode === "per-image") createNew = true;
     if (mode === "layers") createNew = false;
@@ -231,7 +269,11 @@ export function buildImportPlan(input: BuildPlanInput): ImportPlan {
     const targetWorldId = a.worldId || currentMap?.worldId || input.defaultWorldId;
 
     const plannedMap = ensureMap(
-      targetMapId, targetMapName, targetWorldId, sized.mapWidth, sized.mapHeight,
+      targetMapId,
+      targetMapName,
+      targetWorldId,
+      sized.mapWidth,
+      sized.mapHeight,
       !createNew && targetMapId === currentMap?.id,
     );
     if (!createNew && currentMap) {
@@ -254,7 +296,9 @@ export function buildImportPlan(input: BuildPlanInput): ImportPlan {
   });
 
   if (mode === "variants" && images.length > 0) {
-    warnings.push("Variant mode tags layers but does not yet auto-set entity visibility — confirm in the player build.");
+    warnings.push(
+      "Variant mode tags layers but does not yet auto-set entity visibility — confirm in the player build.",
+    );
   }
 
   return { maps: [...mapBuckets.values()], assets, warnings };
@@ -269,33 +313,61 @@ export function validateImportPlan(plan: ImportPlan, images: ImportImage[]): Val
   const issues: ValidationIssue[] = [];
   const mapIds = new Set<string>();
   for (const m of plan.maps) {
-    if (mapIds.has(m.id)) issues.push({ severity: "blocking", message: `Duplicate map id "${m.id}"` });
+    if (mapIds.has(m.id))
+      issues.push({ severity: "blocking", message: `Duplicate map id "${m.id}"` });
     mapIds.add(m.id);
     const layerIds = new Set<string>();
-    if (m.width <= 0 || m.height <= 0) issues.push({ severity: "blocking", message: `Map "${m.id}" has invalid size (${m.width}×${m.height})` });
+    if (m.width <= 0 || m.height <= 0)
+      issues.push({
+        severity: "blocking",
+        message: `Map "${m.id}" has invalid size (${m.width}×${m.height})`,
+      });
     for (const l of m.layers) {
-      if (layerIds.has(l.id)) issues.push({ severity: "blocking", message: `Duplicate layer id "${l.id}" in map "${m.id}"` });
+      if (layerIds.has(l.id))
+        issues.push({
+          severity: "blocking",
+          message: `Duplicate layer id "${l.id}" in map "${m.id}"`,
+        });
       layerIds.add(l.id);
-      if (l.width <= 0 || l.height <= 0) issues.push({ severity: "blocking", message: `Layer "${l.id}" has invalid size` });
-      if (l.opacity < 0 || l.opacity > 1) issues.push({ severity: "blocking", message: `Layer "${l.id}" opacity must be in 0..1` });
-      if (/^https?:\/\//i.test(l.src)) issues.push({ severity: "warning", message: `Layer "${l.id}" uses an external URL — won't work offline` });
-      if (!l.src) issues.push({ severity: "blocking", message: `Layer "${l.id}" is missing image source` });
+      if (l.width <= 0 || l.height <= 0)
+        issues.push({ severity: "blocking", message: `Layer "${l.id}" has invalid size` });
+      if (l.opacity < 0 || l.opacity > 1)
+        issues.push({ severity: "blocking", message: `Layer "${l.id}" opacity must be in 0..1` });
+      if (/^https?:\/\//i.test(l.src))
+        issues.push({
+          severity: "warning",
+          message: `Layer "${l.id}" uses an external URL — won't work offline`,
+        });
+      if (!l.src)
+        issues.push({ severity: "blocking", message: `Layer "${l.id}" is missing image source` });
     }
   }
   for (const img of images) {
     if (!/\.(png|jpe?g|webp|svg)$/i.test(img.filename)) {
-      issues.push({ severity: "warning", message: `"${img.originalFilename}" has an unusual extension` });
+      issues.push({
+        severity: "warning",
+        message: `"${img.originalFilename}" has an unusual extension`,
+      });
     }
     if (img.bytes > 8 * 1024 * 1024) {
-      issues.push({ severity: "warning", message: `"${img.originalFilename}" is ${(img.bytes / 1024 / 1024).toFixed(1)}MB — consider compressing` });
+      issues.push({
+        severity: "warning",
+        message: `"${img.originalFilename}" is ${(img.bytes / 1024 / 1024).toFixed(1)}MB — consider compressing`,
+      });
     }
   }
   for (const a of plan.assets) {
     if (!a.targetPath.startsWith("public/atlas/assets/")) {
-      issues.push({ severity: "blocking", message: `Asset path "${a.targetPath}" must live under public/atlas/assets/` });
+      issues.push({
+        severity: "blocking",
+        message: `Asset path "${a.targetPath}" must live under public/atlas/assets/`,
+      });
     }
     if (/\s|[^\w./-]/.test(a.targetPath)) {
-      issues.push({ severity: "blocking", message: `Asset path "${a.targetPath}" contains unsafe characters` });
+      issues.push({
+        severity: "blocking",
+        message: `Asset path "${a.targetPath}" contains unsafe characters`,
+      });
     }
   }
   return issues;
@@ -362,11 +434,13 @@ export function buildReadme(plan: ImportPlan, images: ImportImage[]): string {
     "",
     "    npm run atlas:build",
     "    git add public/atlas content",
-    "    git commit -m \"atlas: import maps\"",
+    '    git commit -m "atlas: import maps"',
     "    git push",
     "",
     "## Maps in this patch",
-    ...plan.maps.map((m) => `- **${m.name}** (\`${m.id}\`) — ${m.width}×${m.height}, ${m.layers.length} layer(s)`),
+    ...plan.maps.map(
+      (m) => `- **${m.name}** (\`${m.id}\`) — ${m.width}×${m.height}, ${m.layers.length} layer(s)`,
+    ),
   ];
   return lines.join("\n");
 }

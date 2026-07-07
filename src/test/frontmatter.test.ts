@@ -29,7 +29,8 @@ describe("parseFrontmatter", () => {
   });
 
   it("parses nested atlas frontmatter with placements", () => {
-    const raw = "---\natlas:\n  type: place\n  placements:\n    - mapId: m1\n      x: 0.5\n      y: 0.6\n---\nbody\n";
+    const raw =
+      "---\natlas:\n  type: place\n  placements:\n    - mapId: m1\n      x: 0.5\n      y: 0.6\n---\nbody\n";
     const r = parseFrontmatter(raw);
     expect(r.data).toEqual({
       atlas: {
@@ -117,10 +118,7 @@ describe("stringifyFrontmatter", () => {
     // Swap one placement, keep the other.
     const nextAtlas = {
       ...atlas,
-      placements: [
-        placements[0],
-        { mapId: "regional", x: 0.9, y: 0.9 },
-      ],
+      placements: [placements[0], { mapId: "regional", x: 0.9, y: 0.9 }],
     };
     const next = stringifyFrontmatter(parsed.content, { ...parsed.data, atlas: nextAtlas });
     const reparsed = parseFrontmatter(next);

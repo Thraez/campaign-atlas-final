@@ -11,14 +11,22 @@ import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { scanDir, DM_CONTENT_SENTINELS, EDITOR_CODE_FINGERPRINTS } from "../../scripts/check-no-secrets";
+import {
+  scanDir,
+  DM_CONTENT_SENTINELS,
+  EDITOR_CODE_FINGERPRINTS,
+} from "../../scripts/check-no-secrets";
 
 const ROOT = path.resolve(__dirname, "../..");
 const SCRIPT = path.resolve(ROOT, "scripts/check-no-secrets.ts");
 const BUILD_SCRIPT = path.resolve(ROOT, "scripts/build-atlas.ts");
 const FIXTURE = path.resolve(__dirname, "fixtures/sentinel-vault");
 
-interface RunResult { status: number; stdout: string; stderr: string; }
+interface RunResult {
+  status: number;
+  stdout: string;
+  stderr: string;
+}
 
 const IS_WIN = process.platform === "win32";
 
@@ -34,13 +42,21 @@ function run(script: string, args: string[], opts: ExecFileSyncOptions = {}): Ru
     return { status: 0, stdout: String(stdout), stderr: "" };
   } catch (e) {
     const err = e as { status?: number; stdout?: Buffer | string; stderr?: Buffer | string };
-    return { status: err.status ?? 1, stdout: String(err.stdout ?? ""), stderr: String(err.stderr ?? "") };
+    return {
+      status: err.status ?? 1,
+      stdout: String(err.stdout ?? ""),
+      stderr: String(err.stderr ?? ""),
+    };
   }
 }
 
 let tmpRoot: string;
-beforeAll(() => { tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-sentinel-")); });
-afterAll(() => { fs.rmSync(tmpRoot, { recursive: true, force: true }); });
+beforeAll(() => {
+  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-sentinel-"));
+});
+afterAll(() => {
+  fs.rmSync(tmpRoot, { recursive: true, force: true });
+});
 
 function plant(dir: string, name: string, contents: string) {
   fs.mkdirSync(dir, { recursive: true });
@@ -94,8 +110,10 @@ describe.sequential("sentinel scanner", () => {
     const build = run(BUILD_SCRIPT, [
       "--player",
       "--strict",
-      "--config", path.join(FIXTURE, "atlas.config.json"),
-      "--out", out,
+      "--config",
+      path.join(FIXTURE, "atlas.config.json"),
+      "--out",
+      out,
     ]);
     expect(build.status, build.stderr + build.stdout).toBe(0);
     const r = scanDir(out);

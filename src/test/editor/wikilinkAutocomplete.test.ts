@@ -80,7 +80,12 @@ const ENTITIES = [
   { id: "aldoria", title: "Aldoria", type: "settlement", aliases: ["City of Sails"] },
   { id: "brynn-vale", title: "Brynn Vale", type: "region", aliases: [] },
   { id: "commander-aldric", title: "Commander Aldric", type: "npc", aliases: ["Aldric"] },
-  { id: "iron-brotherhood", title: "Iron Brotherhood", type: "faction", aliases: ["the Brotherhood"] },
+  {
+    id: "iron-brotherhood",
+    title: "Iron Brotherhood",
+    type: "faction",
+    aliases: ["the Brotherhood"],
+  },
 ];
 
 describe("filterEntities", () => {

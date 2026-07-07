@@ -40,12 +40,18 @@ const TEMPLATES: Array<{ id: ToolbarActionId; label: string }> = [
 
 // Obsidian-core callout types the DM reaches for most.
 const CALLOUT_TYPES = [
-  "note", "info", "tip", "success", "question",
-  "warning", "danger", "example", "quote",
+  "note",
+  "info",
+  "tip",
+  "success",
+  "question",
+  "warning",
+  "danger",
+  "example",
+  "quote",
 ];
 
-const BTN =
-  "h-7 px-2 rounded border bg-background hover:bg-muted text-xs whitespace-nowrap";
+const BTN = "h-7 px-2 rounded border bg-background hover:bg-muted text-xs whitespace-nowrap";
 
 export function FormatToolbar({ onAction, onInsertImage }: FormatToolbarProps) {
   const [moreOpen, setMoreOpen] = useState(false);
@@ -72,21 +78,12 @@ export function FormatToolbar({ onAction, onInsertImage }: FormatToolbarProps) {
     <div className="relative mb-1">
       <div className="flex flex-wrap gap-1 items-center" role="toolbar" aria-label="Formatting">
         {ALWAYS.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            className={BTN}
-            onClick={() => fire(a.id)}
-          >
+          <button key={a.id} type="button" className={BTN} onClick={() => fire(a.id)}>
             {a.label}
           </button>
         ))}
         {onInsertImage && (
-          <button
-            type="button"
-            className={BTN}
-            onClick={onInsertImage}
-          >
+          <button type="button" className={BTN} onClick={onInsertImage}>
             Image
           </button>
         )}
@@ -98,12 +95,7 @@ export function FormatToolbar({ onAction, onInsertImage }: FormatToolbarProps) {
         >
           Templates ▾
         </button>
-        <button
-          type="button"
-          className={BTN}
-          aria-expanded={moreOpen}
-          onClick={toggleMore}
-        >
+        <button type="button" className={BTN} aria-expanded={moreOpen} onClick={toggleMore}>
           More ▾
         </button>
       </div>

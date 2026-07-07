@@ -554,10 +554,7 @@ routes:
       - [5, 10]
 `);
     const cfg = loadWorldConfig(tmpRoot, WORLD)!;
-    expect(cfg.routes[0].waypoints).toEqual([
-      { entityId: "some-entity-id" },
-      [5, 10],
-    ]);
+    expect(cfg.routes[0].waypoints).toEqual([{ entityId: "some-entity-id" }, [5, 10]]);
   });
 
   it("route with invalid waypoint warns and skips it", () => {
@@ -595,9 +592,7 @@ maps:
 `);
     const cfg = loadWorldConfig(tmpRoot, WORLD)!;
     expect(
-      cfg.warnings.some(
-        (w) => w.includes("fog nested under map") && w.includes("somewhere-else")
-      )
+      cfg.warnings.some((w) => w.includes("fog nested under map") && w.includes("somewhere-else")),
     ).toBe(true);
     expect(cfg.fogs).toHaveLength(1);
     expect(cfg.fogs[0].mapId).toBe("m1");
@@ -620,10 +615,8 @@ maps:
     const cfg = loadWorldConfig(tmpRoot, WORLD)!;
     expect(
       cfg.warnings.some(
-        (w) =>
-          w.includes('route "rt-mismatch" nested under map') &&
-          w.includes("somewhere-else")
-      )
+        (w) => w.includes('route "rt-mismatch" nested under map') && w.includes("somewhere-else"),
+      ),
     ).toBe(true);
     expect(cfg.routes).toHaveLength(1);
     expect(cfg.routes[0].mapId).toBe("m1");

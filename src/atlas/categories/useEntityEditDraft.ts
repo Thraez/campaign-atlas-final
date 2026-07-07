@@ -49,7 +49,8 @@ export function useEntityEditDraft(): EntityEditDraftAPI {
   }, []);
   const clear = useCallback(() => setDraft(null), []);
   const isDirty = useCallback(
-    () => !!ref.current && fingerprint(ref.current.fields, ref.current.body) !== ref.current.pristine,
+    () =>
+      !!ref.current && fingerprint(ref.current.fields, ref.current.body) !== ref.current.pristine,
     [],
   );
   const snapshot = useCallback<() => EntityEditSnapshot>(() => ref.current, []);

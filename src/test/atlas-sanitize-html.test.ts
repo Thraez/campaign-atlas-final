@@ -10,7 +10,7 @@ import { sanitizeAtlasHtml } from "../atlas/sanitizeHtml";
 describe("sanitizeAtlasHtml — keeps useful markdown output", () => {
   it("preserves headings, paragraphs, emphasis, strong", () => {
     const out = sanitizeAtlasHtml(
-      "<h2>Title</h2><p>Hello <em>there</em> <strong>friend</strong>.</p>"
+      "<h2>Title</h2><p>Hello <em>there</em> <strong>friend</strong>.</p>",
     );
     expect(out).toContain("<h2>Title</h2>");
     expect(out).toContain("<em>there</em>");
@@ -22,7 +22,7 @@ describe("sanitizeAtlasHtml — keeps useful markdown output", () => {
       "<ul><li>a</li><li>b</li></ul>" +
         "<blockquote><p>q</p></blockquote>" +
         "<pre><code>x()</code></pre>" +
-        "<table><thead><tr><th>h</th></tr></thead><tbody><tr><td>v</td></tr></tbody></table>"
+        "<table><thead><tr><th>h</th></tr></thead><tbody><tr><td>v</td></tr></tbody></table>",
     );
     expect(out).toContain("<ul>");
     expect(out).toContain("<li>a</li>");
@@ -41,7 +41,7 @@ describe("sanitizeAtlasHtml — keeps useful markdown output", () => {
   it("preserves wikilink token spans emitted by build-atlas", () => {
     // renderLinkTokens output looks like a span with data-* attributes.
     const out = sanitizeAtlasHtml(
-      '<p>See <span class="atlas-link" data-link="entity-id" data-display="Display">Display</span> later.</p>'
+      '<p>See <span class="atlas-link" data-link="entity-id" data-display="Display">Display</span> later.</p>',
     );
     expect(out).toContain('data-link="entity-id"');
     expect(out).toContain('data-display="Display"');

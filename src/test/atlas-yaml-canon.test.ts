@@ -5,7 +5,7 @@ describe("validatePatchYaml — map", () => {
   it("accepts a well-formed map patch", () => {
     const r = validatePatchYaml(
       `# header\nmaps:\n  - id: foo\n    width: 100\n    height: 100\n`,
-      "map"
+      "map",
     );
     expect(r.ok).toBe(true);
     expect(r.errors).toEqual([]);

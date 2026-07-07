@@ -66,7 +66,11 @@ function write(rel: string, body: string) {
 /** Build a vault with a config + world.yaml + entity files, then return paths. */
 function makeVault(opts: {
   worldYaml: string;
-  entities: Array<{ rel: string; visibility: "player" | "dm" | "hidden" | "rumor"; title?: string }>;
+  entities: Array<{
+    rel: string;
+    visibility: "player" | "dm" | "hidden" | "rumor";
+    title?: string;
+  }>;
 }): { configPath: string; outDir: string } {
   write(
     "atlas.config.json",
@@ -76,13 +80,13 @@ function makeVault(opts: {
       defaultWorld: "w",
       include: ["**/*.md"],
       exclude: [],
-    })
+    }),
   );
   write("content/w/_atlas/world.yaml", opts.worldYaml);
   for (const e of opts.entities) {
     write(
       `content/w/${e.rel}`,
-      `---\ntitle: ${e.title ?? path.basename(e.rel, ".md").replace(/-/g, " ")}\natlas:\n  type: settlement\n  visibility: ${e.visibility}\n  placements:\n    - mapId: m1\n      x: 100\n      y: 100\n---\nbody\n`
+      `---\ntitle: ${e.title ?? path.basename(e.rel, ".md").replace(/-/g, " ")}\natlas:\n  type: settlement\n  visibility: ${e.visibility}\n  placements:\n    - mapId: m1\n      x: 100\n      y: 100\n---\nbody\n`,
     );
   }
   return {
@@ -274,7 +278,7 @@ describe("strict player build — nested maps[] geometry", () => {
   it("(9) nested regions player-safe → exit 0", () => {
     const v = makeVault({
       worldYaml: nestedMap(
-        `    regions:\n      - id: nested-safe\n        name: Safe\n        entityId: alice\n        visibility: player\n        points: [[0,0],[10,0],[10,10]]\n`
+        `    regions:\n      - id: nested-safe\n        name: Safe\n        entityId: alice\n        visibility: player\n        points: [[0,0],[10,0],[10,10]]\n`,
       ),
       entities: [{ rel: "alice.md", visibility: "player" }],
     });
@@ -285,7 +289,7 @@ describe("strict player build — nested maps[] geometry", () => {
   it("(10) nested regions linked to DM entity → exit 6, names the region", () => {
     const v = makeVault({
       worldYaml: nestedMap(
-        `    regions:\n      - id: nested-bad\n        name: Bad\n        entityId: secret-base\n        visibility: player\n        points: [[0,0],[10,0],[10,10]]\n`
+        `    regions:\n      - id: nested-bad\n        name: Bad\n        entityId: secret-base\n        visibility: player\n        points: [[0,0],[10,0],[10,10]]\n`,
       ),
       entities: [{ rel: "secret-base.md", visibility: "dm" }],
     });
@@ -298,7 +302,7 @@ describe("strict player build — nested maps[] geometry", () => {
   it("(11) nested routes player-safe → exit 0", () => {
     const v = makeVault({
       worldYaml: nestedMap(
-        `    routes:\n      - id: nested-safe-route\n        name: Safe\n        visibility: player\n        waypoints:\n          - { entityId: alice }\n          - [500,500]\n`
+        `    routes:\n      - id: nested-safe-route\n        name: Safe\n        visibility: player\n        waypoints:\n          - { entityId: alice }\n          - [500,500]\n`,
       ),
       entities: [{ rel: "alice.md", visibility: "player" }],
     });
@@ -309,7 +313,7 @@ describe("strict player build — nested maps[] geometry", () => {
   it("(12) nested routes waypoint → DM entity → exit 7, names the route", () => {
     const v = makeVault({
       worldYaml: nestedMap(
-        `    routes:\n      - id: nested-bad-route\n        name: Bad\n        visibility: player\n        waypoints:\n          - [0,0]\n          - { entityId: secret-base }\n`
+        `    routes:\n      - id: nested-bad-route\n        name: Bad\n        visibility: player\n        waypoints:\n          - [0,0]\n          - { entityId: secret-base }\n`,
       ),
       entities: [{ rel: "secret-base.md", visibility: "dm" }],
     });

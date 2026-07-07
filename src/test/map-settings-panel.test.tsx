@@ -16,19 +16,25 @@ const BASE_MAP: MapDocument = {
 
 describe("MapSettingsPanel — Living water (H2)", () => {
   it("renders the Animated water toggle checked by default (no water config)", () => {
-    render(<MapSettingsPanel map={BASE_MAP} baseMap={BASE_MAP} onPatch={vi.fn()} onReset={vi.fn()} />);
+    render(
+      <MapSettingsPanel map={BASE_MAP} baseMap={BASE_MAP} onPatch={vi.fn()} onReset={vi.fn()} />,
+    );
     const toggle = screen.getByTestId("water-toggle") as HTMLInputElement;
     expect(toggle.checked).toBe(true);
   });
 
   it("renders Strength and Speed sliders when water is on", () => {
-    render(<MapSettingsPanel map={BASE_MAP} baseMap={BASE_MAP} onPatch={vi.fn()} onReset={vi.fn()} />);
+    render(
+      <MapSettingsPanel map={BASE_MAP} baseMap={BASE_MAP} onPatch={vi.fn()} onReset={vi.fn()} />,
+    );
     expect(screen.getByTestId("water-strength")).toBeTruthy();
     expect(screen.getByTestId("water-speed")).toBeTruthy();
   });
 
   it("renders the Wave colour picker pre-filled with the derived default", () => {
-    render(<MapSettingsPanel map={BASE_MAP} baseMap={BASE_MAP} onPatch={vi.fn()} onReset={vi.fn()} />);
+    render(
+      <MapSettingsPanel map={BASE_MAP} baseMap={BASE_MAP} onPatch={vi.fn()} onReset={vi.fn()} />,
+    );
     const picker = screen.getByTestId("water-crest-color-picker") as HTMLInputElement;
     // Should be pre-filled with deriveCrestColor(oceanColor)
     const expected = deriveCrestColor(BASE_MAP.oceanColor!).toLowerCase();
@@ -45,11 +51,13 @@ describe("MapSettingsPanel — Living water (H2)", () => {
 
   it("toggle off emits onPatch({ water: { enabled: false } })", () => {
     const onPatch = vi.fn();
-    render(<MapSettingsPanel map={BASE_MAP} baseMap={BASE_MAP} onPatch={onPatch} onReset={vi.fn()} />);
+    render(
+      <MapSettingsPanel map={BASE_MAP} baseMap={BASE_MAP} onPatch={onPatch} onReset={vi.fn()} />,
+    );
     const toggle = screen.getByTestId("water-toggle");
     fireEvent.click(toggle);
     expect(onPatch).toHaveBeenCalledWith(
-      expect.objectContaining({ water: expect.objectContaining({ enabled: false }) })
+      expect.objectContaining({ water: expect.objectContaining({ enabled: false }) }),
     );
   });
 
@@ -60,27 +68,31 @@ describe("MapSettingsPanel — Living water (H2)", () => {
     const toggle = screen.getByTestId("water-toggle");
     fireEvent.click(toggle);
     expect(onPatch).toHaveBeenCalledWith(
-      expect.objectContaining({ water: expect.objectContaining({ enabled: true }) })
+      expect.objectContaining({ water: expect.objectContaining({ enabled: true }) }),
     );
   });
 
   it("wave colour picker change emits onPatch with crestColor", () => {
     const onPatch = vi.fn();
-    render(<MapSettingsPanel map={BASE_MAP} baseMap={BASE_MAP} onPatch={onPatch} onReset={vi.fn()} />);
+    render(
+      <MapSettingsPanel map={BASE_MAP} baseMap={BASE_MAP} onPatch={onPatch} onReset={vi.fn()} />,
+    );
     const picker = screen.getByTestId("water-crest-color-picker");
     fireEvent.change(picker, { target: { value: "#aabbcc" } });
     expect(onPatch).toHaveBeenCalledWith(
-      expect.objectContaining({ water: expect.objectContaining({ crestColor: "#aabbcc" }) })
+      expect.objectContaining({ water: expect.objectContaining({ crestColor: "#aabbcc" }) }),
     );
   });
 
   it("wave colour text input change emits onPatch with crestColor", () => {
     const onPatch = vi.fn();
-    render(<MapSettingsPanel map={BASE_MAP} baseMap={BASE_MAP} onPatch={onPatch} onReset={vi.fn()} />);
+    render(
+      <MapSettingsPanel map={BASE_MAP} baseMap={BASE_MAP} onPatch={onPatch} onReset={vi.fn()} />,
+    );
     const input = screen.getByTestId("water-crest-color-input");
     fireEvent.change(input, { target: { value: "#112233" } });
     expect(onPatch).toHaveBeenCalledWith(
-      expect.objectContaining({ water: expect.objectContaining({ crestColor: "#112233" }) })
+      expect.objectContaining({ water: expect.objectContaining({ crestColor: "#112233" }) }),
     );
   });
 
@@ -91,7 +103,7 @@ describe("MapSettingsPanel — Living water (H2)", () => {
     const input = screen.getByTestId("water-crest-color-input");
     fireEvent.change(input, { target: { value: "" } });
     expect(onPatch).toHaveBeenCalledWith(
-      expect.objectContaining({ water: expect.objectContaining({ crestColor: undefined }) })
+      expect.objectContaining({ water: expect.objectContaining({ crestColor: undefined }) }),
     );
   });
 });

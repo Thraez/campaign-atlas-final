@@ -37,7 +37,9 @@ describe("pin presets", () => {
 
   it("diffPinOverride drops keys equal to preset defaults", () => {
     const settle = PIN_PRESETS.settlement;
-    expect(diffPinOverride("settlement", { color: settle.color, shape: settle.shape })).toBeUndefined();
+    expect(
+      diffPinOverride("settlement", { color: settle.color, shape: settle.shape }),
+    ).toBeUndefined();
     const diff = diffPinOverride("settlement", { color: "#ff0000", shape: settle.shape });
     expect(diff).toEqual({ color: "#ff0000" });
   });

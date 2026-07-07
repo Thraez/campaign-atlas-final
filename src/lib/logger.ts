@@ -18,8 +18,7 @@ export function shouldEmit(level: LogLevel, isDev: boolean): boolean {
 
 function emit(level: LogLevel, args: unknown[]): void {
   if (!shouldEmit(level, import.meta.env.DEV)) return;
-  const sink =
-    level === "error" ? console.error : level === "warn" ? console.warn : console.log;
+  const sink = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
   sink(`[${level}]`, ...args);
 }
 

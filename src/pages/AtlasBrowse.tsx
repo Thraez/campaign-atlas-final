@@ -23,7 +23,9 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
   const [activeType, setActiveType] = useState<string | null>(null);
 
   useEffect(() => {
-    loadAtlasContent(true).then(setProject).catch((e: Error) => setError(e.message));
+    loadAtlasContent(true)
+      .then(setProject)
+      .catch((e: Error) => setError(e.message));
   }, []);
 
   const entries = useMemo(() => {
@@ -38,7 +40,8 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
           !e.title.toLowerCase().includes(q) &&
           !(e.summary ?? "").toLowerCase().includes(q) &&
           !e.aliases.some((a) => a.toLowerCase().includes(q))
-        ) return false;
+        )
+          return false;
       }
       return true;
     });
@@ -67,18 +70,24 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
 
   const placedIds = useMemo(
     () => new Set((project?.placements ?? []).map((p) => p.entityId)),
-    [project]
+    [project],
   );
 
   const heading =
-    mode === "tag" ? `#${facetDecoded}` :
-    mode === "type" ? (playerTypeLabel(facetDecoded) || facetDecoded) :
-    "Browse";
+    mode === "tag"
+      ? `#${facetDecoded}`
+      : mode === "type"
+        ? playerTypeLabel(facetDecoded) || facetDecoded
+        : "Browse";
 
   const headingIcon =
-    mode === "tag" ? <Hash className="h-5 w-5" /> :
-    mode === "type" ? <Tag className="h-5 w-5" /> :
-    <LayoutGrid className="h-5 w-5" />;
+    mode === "tag" ? (
+      <Hash className="h-5 w-5" />
+    ) : mode === "type" ? (
+      <Tag className="h-5 w-5" />
+    ) : (
+      <LayoutGrid className="h-5 w-5" />
+    );
 
   if (error) {
     return (
@@ -87,7 +96,10 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
           <h1 className="font-display text-2xl text-primary">Atlas not built yet</h1>
           <p className="text-sm text-muted-foreground">{error}</p>
           <Button asChild variant="secondary">
-            <Link to="/atlas"><ArrowLeft className="h-4 w-4 mr-1" />Back to atlas</Link>
+            <Link to="/atlas">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back to atlas
+            </Link>
           </Button>
         </div>
       </div>
@@ -106,7 +118,10 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
         <AtlasNavMenu publishedAt={project.publishedAt} />
-        <Link to="/atlas" className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2">
+        <Link
+          to="/atlas"
+          className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2"
+        >
           <Compass className="h-5 w-5" /> <span className="hidden sm:inline">Astrath Atlas</span>
         </Link>
         <span className="text-muted-foreground">/</span>
@@ -123,7 +138,10 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
           className="h-8 w-32 sm:w-64 min-w-0 text-sm"
         />
         <Button asChild variant="ghost" size="sm">
-          <Link to="/atlas"><ArrowLeft className="h-4 w-4 mr-1" />Map</Link>
+          <Link to="/atlas">
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Map
+          </Link>
         </Button>
       </header>
 
@@ -155,17 +173,27 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
         <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
           {grouped.length === 0 ? (
             <div className="text-center text-sm text-muted-foreground py-16">
-              {mode === "tag"
-                ? <>No entries tagged <code className="px-1 py-0.5 rounded bg-muted">#{facetDecoded}</code> yet.</>
-                : mode === "type"
-                ? <>No entries of type <code className="px-1 py-0.5 rounded bg-muted">{facetDecoded}</code> yet.</>
-                : <>No entries match your filter.</>}
+              {mode === "tag" ? (
+                <>
+                  No entries tagged{" "}
+                  <code className="px-1 py-0.5 rounded bg-muted">#{facetDecoded}</code> yet.
+                </>
+              ) : mode === "type" ? (
+                <>
+                  No entries of type{" "}
+                  <code className="px-1 py-0.5 rounded bg-muted">{facetDecoded}</code> yet.
+                </>
+              ) : (
+                <>No entries match your filter.</>
+              )}
             </div>
           ) : (
             <div className="space-y-6">
               {grouped.map(([letter, list]) => (
                 <section key={letter}>
-                  <h2 className="font-display text-2xl text-primary border-b border-border pb-1 mb-3">{letter}</h2>
+                  <h2 className="font-display text-2xl text-primary border-b border-border pb-1 mb-3">
+                    {letter}
+                  </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {list.map((e) => (
                       <div
@@ -197,7 +225,9 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
                           )}
                         </div>
                         {e.summary && (
-                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{e.summary}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                            {e.summary}
+                          </p>
                         )}
                         {e.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1.5">
@@ -207,7 +237,9 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
                                 to={`/atlas/tag/${encodeURIComponent(t)}`}
                                 className="relative z-10"
                               >
-                                <Badge variant="outline" className="text-[10px] hover:bg-accent">#{t}</Badge>
+                                <Badge variant="outline" className="text-[10px] hover:bg-accent">
+                                  #{t}
+                                </Badge>
                               </Link>
                             ))}
                           </div>

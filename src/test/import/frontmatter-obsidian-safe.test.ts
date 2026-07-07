@@ -5,7 +5,9 @@ import { stringifyFrontmatter, parseFrontmatter } from "@/atlas/import/frontmatt
 describe("stringifyFrontmatter — Obsidian Properties safety", () => {
   it("round-trips data through a strict re-parse without field loss", () => {
     const data = {
-      title: "Corven", type: "npc", visibility: "dm",
+      title: "Corven",
+      type: "npc",
+      visibility: "dm",
       aliases: ["The Smuggler-King", "Onyx"],
       summary: "A line with: a colon, a #hash, and a 'quote'.",
       tags: ["npc", "legend"],
@@ -26,7 +28,9 @@ describe("stringifyFrontmatter — Obsidian Properties safety", () => {
 
   it("quotes strings that YAML would otherwise coerce (numbers, bools, dates)", () => {
     const raw = stringifyFrontmatter("body", {
-      date: "0-1-1", code: "012", flag: "true",
+      date: "0-1-1",
+      code: "012",
+      flag: "true",
     });
     const back = parseFrontmatter(raw);
     expect(back.data.date).toBe("0-1-1");

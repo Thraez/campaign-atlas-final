@@ -14,9 +14,9 @@ import { slugify } from "@/atlas/content/slugify";
 import { inferTypeFromPath, isIgnoredPath } from "./inferType";
 
 export type ImportLevel =
-  | "ignored"          // folder excluded → never imported
-  | "wiki-only"        // entity, no map placement
-  | "placeable"        // can be placed on a map (DM-side)
+  | "ignored" // folder excluded → never imported
+  | "wiki-only" // entity, no map placement
+  | "placeable" // can be placed on a map (DM-side)
   | "player-published"; // included in player build (visibility allows)
 
 const VALID_VIS: EntityVisibility[] = ["player", "dm", "hidden", "rumor"];
@@ -75,17 +75,17 @@ function safeFilenameToTitle(name: string): string {
 /** Generate a one-paragraph summary from the first meaningful prose. */
 export function generateAutoSummary(body: string, maxLen = 220): string | undefined {
   const cleaned = body
-    .replace(/```[\s\S]*?```/g, "")           // fenced code
-    .replace(/`[^`\n]+`/g, "")                 // inline code
-    .replace(/<!--[\s\S]*?-->/g, "")           // HTML comments
-    .replace(/%%[\s\S]*?%%/g, "")              // Obsidian comments
-    .replace(/<[^>]+>/g, "")                   // raw HTML
-    .replace(/!\[\[[^\]]+\]\]/g, "")           // embeds
-    .replace(/!\[[^\]]*\]\([^)]+\)/g, "")      // md images
+    .replace(/```[\s\S]*?```/g, "") // fenced code
+    .replace(/`[^`\n]+`/g, "") // inline code
+    .replace(/<!--[\s\S]*?-->/g, "") // HTML comments
+    .replace(/%%[\s\S]*?%%/g, "") // Obsidian comments
+    .replace(/<[^>]+>/g, "") // raw HTML
+    .replace(/!\[\[[^\]]+\]\]/g, "") // embeds
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, "") // md images
     .replace(/^\s*>\s?\[!.+?\][\s\S]*?(?=\n\n|$)/gm, "") // callouts
-    .replace(/^\s*>.*$/gm, "")                 // blockquotes
-    .replace(/^\s{0,3}#{1,6}\s.*$/gm, "")      // headings
-    .replace(/^\s*[-*+]\s+/gm, "")             // list markers
+    .replace(/^\s*>.*$/gm, "") // blockquotes
+    .replace(/^\s{0,3}#{1,6}\s.*$/gm, "") // headings
+    .replace(/^\s*[-*+]\s+/gm, "") // list markers
     .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, t, d) => (d ?? t).trim())
     .replace(/\*\*?([^*]+)\*\*?/g, "$1");
 
@@ -144,7 +144,7 @@ export interface ParseObsidianOpts {
 export function parseObsidianFile(
   raw: string,
   relPath: string,
-  opts: ParseObsidianOpts = {}
+  opts: ParseObsidianOpts = {},
 ): ImportedFile {
   const filename = relPath.split(/[\\/]/).pop() ?? relPath;
   const ignored = isIgnoredPath(relPath);
@@ -193,10 +193,8 @@ export function parseObsidianFile(
   }
   const attachments = extractAttachments(body);
 
-  const title =
-    typeof data.title === "string" ? data.title : safeFilenameToTitle(filename);
-  const suggestedId =
-    typeof atlas.id === "string" ? atlas.id : slugify(title);
+  const title = typeof data.title === "string" ? data.title : safeFilenameToTitle(filename);
+  const suggestedId = typeof atlas.id === "string" ? atlas.id : slugify(title);
 
   // Classify import level.
   let level: ImportLevel = "wiki-only";
@@ -212,7 +210,9 @@ export function parseObsidianFile(
     warnings.push(`Player-published file has unresolved wikilinks — could leak DM-only refs`);
   }
   if (attachments.some((a) => !a.resolved && !a.rawSrc.startsWith("/"))) {
-    warnings.push(`${attachments.filter((a) => !a.resolved).length} attachment(s) need a target path`);
+    warnings.push(
+      `${attachments.filter((a) => !a.resolved).length} attachment(s) need a target path`,
+    );
   }
 
   return {
@@ -236,11 +236,4 @@ export function parseObsidianFile(
   };
 }
 
-const mappableTypes = new Set([
-  "settlement",
-  "region",
-  "ruin",
-  "dungeon",
-  "location",
-  "map_note",
-]);
+const mappableTypes = new Set(["settlement", "region", "ruin", "dungeon", "location", "map_note"]);

@@ -26,7 +26,15 @@ interface Props {
   playerMode?: boolean;
 }
 
-function DrawingClicks({ api, map, onCircleAnchor }: { api: FogDraftAPI; map: MapDocument; onCircleAnchor: (p: Point) => void }) {
+function DrawingClicks({
+  api,
+  map,
+  onCircleAnchor,
+}: {
+  api: FogDraftAPI;
+  map: MapDocument;
+  onCircleAnchor: (p: Point) => void;
+}) {
   useMapEvents({
     click(e) {
       if (!api.tool) return;
@@ -57,13 +65,16 @@ export function FogLayer({ map, api, preview = true, playerMode = false }: Props
   // Outer rectangle + reveal holes + conceal re-fills (evenodd: outer→fog, reveals→clear, conceals→fog again).
   const fogPositions = useMemo<L.LatLngExpression[][]>(() => {
     const outer: L.LatLngExpression[] = [
-      [0, 0], [0, map.width], [H, map.width], [H, 0],
+      [0, 0],
+      [0, map.width],
+      [H, map.width],
+      [H, 0],
     ];
     const reveals: L.LatLngExpression[][] = fog.reveals.map((poly) =>
-      poly.map(([x, y]) => xy2ll(x, y))
+      poly.map(([x, y]) => xy2ll(x, y)),
     );
     const conceals: L.LatLngExpression[][] = (fog.conceals ?? []).map((poly) =>
-      poly.map(([x, y]) => xy2ll(x, y))
+      poly.map(([x, y]) => xy2ll(x, y)),
     );
     return [outer, ...reveals, ...conceals];
   }, [fog.reveals, fog.conceals, H, map.width]);
@@ -75,17 +86,19 @@ export function FogLayer({ map, api, preview = true, playerMode = false }: Props
       {(preview || playerMode) && fog.enabled && (
         <Polygon
           positions={fogPositions}
-          pathOptions={{
-            color: "transparent",
-            fillColor: playerMode ? "#1a1a2e" : (fog.color ?? "rgba(0,0,0,0.55)"),
-            // fillOpacity stays 1 in both modes. DM semi-transparency comes from
-            // the rgba alpha in fog.color (e.g. "rgba(0,0,0,0.55)"), not from this
-            // property. SVG composites fill × fillOpacity, so 0.55 × 1 = 0.55.
-            fillOpacity: 1,
-            weight: 0,
-            interactive: false,
-            fillRule: "evenodd",
-          } as L.PathOptions}
+          pathOptions={
+            {
+              color: "transparent",
+              fillColor: playerMode ? "#1a1a2e" : (fog.color ?? "rgba(0,0,0,0.55)"),
+              // fillOpacity stays 1 in both modes. DM semi-transparency comes from
+              // the rgba alpha in fog.color (e.g. "rgba(0,0,0,0.55)"), not from this
+              // property. SVG composites fill × fillOpacity, so 0.55 × 1 = 0.55.
+              fillOpacity: 1,
+              weight: 0,
+              interactive: false,
+              fillRule: "evenodd",
+            } as L.PathOptions
+          }
         />
       )}
 
@@ -94,7 +107,13 @@ export function FogLayer({ map, api, preview = true, playerMode = false }: Props
         <Polyline
           key={`reveal-outline-${i}`}
           positions={poly.map(([x, y]) => xy2ll(x, y)).concat([xy2ll(poly[0][0], poly[0][1])])}
-          pathOptions={{ color: "hsl(var(--accent))", weight: 1, opacity: 0.6, dashArray: "3,3", interactive: false }}
+          pathOptions={{
+            color: "hsl(var(--accent))",
+            weight: 1,
+            opacity: 0.6,
+            dashArray: "3,3",
+            interactive: false,
+          }}
         />
       ))}
 
@@ -103,7 +122,13 @@ export function FogLayer({ map, api, preview = true, playerMode = false }: Props
         <Polyline
           key={`conceal-outline-${i}`}
           positions={poly.map(([x, y]) => xy2ll(x, y)).concat([xy2ll(poly[0][0], poly[0][1])])}
-          pathOptions={{ color: "hsl(var(--destructive))", weight: 1, opacity: 0.6, dashArray: "3,3", interactive: false }}
+          pathOptions={{
+            color: "hsl(var(--destructive))",
+            weight: 1,
+            opacity: 0.6,
+            dashArray: "3,3",
+            interactive: false,
+          }}
         />
       ))}
 
@@ -114,38 +139,53 @@ export function FogLayer({ map, api, preview = true, playerMode = false }: Props
             <Polygon
               positions={api.draftPoints.map(([x, y]) => xy2ll(x, y))}
               pathOptions={{
-                color: api.tool === "fog-polygon" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
-                dashArray: "4,4", fillOpacity: 0.12, weight: 2
+                color:
+                  api.tool === "fog-polygon" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
+                dashArray: "4,4",
+                fillOpacity: 0.12,
+                weight: 2,
               }}
             />
           ) : (
             <Polyline
               positions={api.draftPoints.map(([x, y]) => xy2ll(x, y))}
               pathOptions={{
-                color: api.tool === "fog-polygon" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
-                dashArray: "4,4", weight: 2
+                color:
+                  api.tool === "fog-polygon" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
+                dashArray: "4,4",
+                weight: 2,
               }}
             />
           )}
           {api.draftPoints.map((p, i) => (
-            <CircleMarker key={`draft-${i}`} center={xy2ll(p[0], p[1])} radius={4}
+            <CircleMarker
+              key={`draft-${i}`}
+              center={xy2ll(p[0], p[1])}
+              radius={4}
               pathOptions={{
-                color: api.tool === "fog-polygon" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
-                fillColor: api.tool === "fog-polygon" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
-                fillOpacity: 1
-              }} />
+                color:
+                  api.tool === "fog-polygon" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
+                fillColor:
+                  api.tool === "fog-polygon" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
+                fillOpacity: 1,
+              }}
+            />
           ))}
         </>
       )}
 
       {/* Circle anchor preview (reveal = primary color, conceal = destructive color). */}
       {(api.tool === "circle" || api.tool === "fog-circle") && api.draftPoints.length === 1 && (
-        <CircleMarker center={xy2ll(api.draftPoints[0][0], api.draftPoints[0][1])} radius={5}
+        <CircleMarker
+          center={xy2ll(api.draftPoints[0][0], api.draftPoints[0][1])}
+          radius={5}
           pathOptions={{
             color: api.tool === "fog-circle" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
-            fillColor: api.tool === "fog-circle" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
-            fillOpacity: 1
-          }} />
+            fillColor:
+              api.tool === "fog-circle" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
+            fillOpacity: 1,
+          }}
+        />
       )}
     </>
   );

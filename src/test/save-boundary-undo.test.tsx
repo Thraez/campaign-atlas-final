@@ -24,10 +24,29 @@ const baseMap: MapDocument = {
   width: 1000,
   height: 1000,
   layers: [
-    { id: "base", src: "atlas/assets/maps/base.png", x: 0, y: 0, width: 1000, height: 1000, opacity: 1, zIndex: 10 },
+    {
+      id: "base",
+      src: "atlas/assets/maps/base.png",
+      x: 0,
+      y: 0,
+      width: 1000,
+      height: 1000,
+      opacity: 1,
+      zIndex: 10,
+    },
   ],
   regions: [
-    { id: "r1", mapId: "m1", name: "Existing", points: [[0, 0], [100, 0], [100, 100]], visibility: "dm" } as Region,
+    {
+      id: "r1",
+      mapId: "m1",
+      name: "Existing",
+      points: [
+        [0, 0],
+        [100, 0],
+        [100, 100],
+      ],
+      visibility: "dm",
+    } as Region,
   ],
   routes: [],
 };
@@ -97,17 +116,19 @@ describe("save-boundary undo", () => {
     act(() => result.current.undoStack.clear());
 
     // Push the save-boundary entry.
-    act(() => result.current.undoStack.push({
-      label: "save (cleared local drafts)",
-      undo: () => {
-        result.current.layers.applySnapshot(preLayers);
-        result.current.region.applySnapshot(preRegion);
-      },
-      redo: () => {
-        result.current.layers.applySnapshot({});
-        result.current.region.applySnapshot({ edits: {}, added: [], deleted: [] });
-      },
-    }));
+    act(() =>
+      result.current.undoStack.push({
+        label: "save (cleared local drafts)",
+        undo: () => {
+          result.current.layers.applySnapshot(preLayers);
+          result.current.region.applySnapshot(preRegion);
+        },
+        redo: () => {
+          result.current.layers.applySnapshot({});
+          result.current.region.applySnapshot({ edits: {}, added: [], deleted: [] });
+        },
+      }),
+    );
 
     // Verify cleared state.
     expect(result.current.layers.localLayers).toHaveLength(0);

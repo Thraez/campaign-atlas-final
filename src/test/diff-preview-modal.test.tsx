@@ -106,19 +106,30 @@ describe("DiffPreviewModal", () => {
     // B1: the editor uses onConfirm to mark the session "saving" only when a
     // real write begins — never just because the modal opened.
     let resolveSave: (v: { saved: number; paths: string[] }) => void = () => {};
-    mockedSave.mockImplementation(() => new Promise((res) => { resolveSave = res; }));
+    mockedSave.mockImplementation(
+      () =>
+        new Promise((res) => {
+          resolveSave = res;
+        }),
+    );
     const onConfirm = vi.fn();
-    render(<DiffPreviewModal open changes={sampleChanges} onConfirm={onConfirm} onClose={() => {}} />);
+    render(
+      <DiffPreviewModal open changes={sampleChanges} onConfirm={onConfirm} onClose={() => {}} />,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Save to disk" }));
     // Synchronous: onConfirm runs at the top of runSave, before the await.
     expect(onConfirm).toHaveBeenCalledTimes(1);
-    await act(async () => { resolveSave({ saved: 1, paths: [sampleChanges[0].path] }); });
+    await act(async () => {
+      resolveSave({ saved: 1, paths: [sampleChanges[0].path] });
+    });
     await waitFor(() => screen.getByText(/Wrote 1 file\./));
   });
 
   it("onConfirm is NOT called when the user cancels without saving", () => {
     const onConfirm = vi.fn();
-    render(<DiffPreviewModal open changes={sampleChanges} onConfirm={onConfirm} onClose={() => {}} />);
+    render(
+      <DiffPreviewModal open changes={sampleChanges} onConfirm={onConfirm} onClose={() => {}} />,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onConfirm).not.toHaveBeenCalled();
     expect(mockedSave).not.toHaveBeenCalled();
@@ -130,7 +141,12 @@ describe("DiffPreviewModal", () => {
     const onWriteFailed = vi.fn();
     mockedSave.mockRejectedValueOnce(new LocalSaveError("disk full"));
     const { unmount } = render(
-      <DiffPreviewModal open changes={sampleChanges} onWriteFailed={onWriteFailed} onClose={() => {}} />,
+      <DiffPreviewModal
+        open
+        changes={sampleChanges}
+        onWriteFailed={onWriteFailed}
+        onClose={() => {}}
+      />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Save to disk" }));
     await waitFor(() => screen.getByText("Save failed."));
@@ -141,7 +157,14 @@ describe("DiffPreviewModal", () => {
     // Success path must NOT call onWriteFailed.
     onWriteFailed.mockClear();
     mockedSave.mockResolvedValueOnce({ saved: 1, paths: [sampleChanges[0].path] });
-    render(<DiffPreviewModal open changes={sampleChanges} onWriteFailed={onWriteFailed} onClose={() => {}} />);
+    render(
+      <DiffPreviewModal
+        open
+        changes={sampleChanges}
+        onWriteFailed={onWriteFailed}
+        onClose={() => {}}
+      />,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Save to disk" }));
     await waitFor(() => screen.getByText(/Wrote 1 file\./));
     expect(onWriteFailed).not.toHaveBeenCalled();
@@ -173,18 +196,31 @@ describe("DiffPreviewModal", () => {
   });
 
   it("Save button is disabled and shows loading while save is pending", async () => {
-    let resolveSave: (v: { saved: number; paths: string[]; files: Array<{ path: string; hash: string }> }) => void = () => {};
+    let resolveSave: (v: {
+      saved: number;
+      paths: string[];
+      files: Array<{ path: string; hash: string }>;
+    }) => void = () => {};
     mockedSave.mockImplementation(
-      () => new Promise((res) => { resolveSave = res; }),
+      () =>
+        new Promise((res) => {
+          resolveSave = res;
+        }),
     );
     render(<DiffPreviewModal open changes={sampleChanges} onClose={() => {}} />);
     const btn = screen.getByRole("button", { name: "Save to disk" }) as HTMLButtonElement;
     fireEvent.click(btn);
-    const loading = await screen.findByRole("button", { name: "Saving…" }) as HTMLButtonElement;
+    const loading = (await screen.findByRole("button", { name: "Saving…" })) as HTMLButtonElement;
     expect(loading.disabled).toBe(true);
-    expect((screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
     await act(async () => {
-      resolveSave({ saved: 1, paths: [sampleChanges[0].path], files: [{ path: sampleChanges[0].path, hash: "sha256:abc" }] });
+      resolveSave({
+        saved: 1,
+        paths: [sampleChanges[0].path],
+        files: [{ path: sampleChanges[0].path, hash: "sha256:abc" }],
+      });
     });
     await waitFor(() => screen.getByText(/Wrote 1 file\./));
   });

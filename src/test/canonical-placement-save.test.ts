@@ -71,7 +71,9 @@ describe("mergePlacementsIntoFrontmatter", () => {
     const next = mergePlacementsIntoFrontmatter(data, [
       { entityId: "thornhold", mapId: "overview", x: 100, y: 200 },
     ]);
-    const placements = (next.atlas as { placements: Array<{ mapId: string; x: number; y: number }> }).placements;
+    const placements = (
+      next.atlas as { placements: Array<{ mapId: string; x: number; y: number }> }
+    ).placements;
     // Sorted alphabetically by mapId — preserved + replaced.
     expect(placements).toEqual([
       { mapId: "northern", x: 10, y: 20 },
@@ -93,13 +95,10 @@ describe("mergePlacementsIntoFrontmatter", () => {
   });
 
   it("only emits label/pin when explicitly provided", () => {
-    const next = mergePlacementsIntoFrontmatter(
-      { atlas: {} },
-      [
-        { entityId: "a", mapId: "overview", x: 0, y: 0 },
-        { entityId: "a", mapId: "city", x: 0, y: 0, label: "Custom", pin: { color: "red" } },
-      ],
-    );
+    const next = mergePlacementsIntoFrontmatter({ atlas: {} }, [
+      { entityId: "a", mapId: "overview", x: 0, y: 0 },
+      { entityId: "a", mapId: "city", x: 0, y: 0, label: "Custom", pin: { color: "red" } },
+    ]);
     const placements = (next.atlas as { placements: Array<Record<string, unknown>> }).placements;
     // Placements are sorted alphabetically by mapId; locate by mapId rather than position.
     const city = placements.find((p) => p.mapId === "city")!;
@@ -172,9 +171,7 @@ describe("buildCanonicalPlacementChanges round-trip", () => {
     });
     const ent = makeEntity();
     const fetchFn = vi.fn(async (url: string) => {
-      expect(url).toBe(
-        `/__atlas/read?path=${encodeURIComponent(ent.sourcePath)}`,
-      );
+      expect(url).toBe(`/__atlas/read?path=${encodeURIComponent(ent.sourcePath)}`);
       return jsonResponse(200, { path: ent.sourcePath, contents: original });
     });
 
@@ -203,9 +200,7 @@ describe("buildCanonicalPlacementChanges round-trip", () => {
     expect(atlas.x).toBeUndefined();
     expect(atlas.y).toBeUndefined();
     // New placement present.
-    expect(atlas.placements).toEqual([
-      { mapId: "overview", x: 100, y: 200 },
-    ]);
+    expect(atlas.placements).toEqual([{ mapId: "overview", x: 100, y: 200 }]);
   });
 
   it("groups drafts for the same entity into a single .md write", async () => {
@@ -222,7 +217,7 @@ describe("buildCanonicalPlacementChanges round-trip", () => {
     );
     expect(changes).toHaveLength(1);
     expect(fetchFn).toHaveBeenCalledTimes(1);
-    const atlas = (parseFrontmatter(changes[0].content).data.atlas) as Record<string, unknown>;
+    const atlas = parseFrontmatter(changes[0].content).data.atlas as Record<string, unknown>;
     const placements = atlas.placements as Array<{ mapId: string }>;
     expect(placements.map((p) => p.mapId).sort()).toEqual(["city", "overview"]);
   });

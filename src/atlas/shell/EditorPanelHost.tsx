@@ -13,7 +13,10 @@ function clampWidth(px: number): number {
 }
 
 export function EditorPanelHost({
-  activeId, title, onDismiss, children,
+  activeId,
+  title,
+  onDismiss,
+  children,
 }: {
   activeId: string | null;
   title: string;
@@ -23,9 +26,7 @@ export function EditorPanelHost({
   const [width, setWidth] = useState<number>(() => {
     const saved = Number(localStorage.getItem(KEY));
     return clampWidth(
-      Number.isFinite(saved) && saved > 0
-        ? saved
-        : Math.floor(window.innerWidth * DEFAULT_FRAC),
+      Number.isFinite(saved) && saved > 0 ? saved : Math.floor(window.innerWidth * DEFAULT_FRAC),
     );
   });
   const dragging = useRef(false);
@@ -95,7 +96,9 @@ export function EditorPanelHost({
           role="separator"
           aria-orientation="vertical"
           title="Drag to resize"
-          onMouseDown={() => { dragging.current = true; }}
+          onMouseDown={() => {
+            dragging.current = true;
+          }}
           className="absolute top-0 right-0 h-full w-1 cursor-col-resize hover:bg-primary/40"
         />
       </aside>

@@ -6,8 +6,8 @@ import type { WorldCalendar } from "@/atlas/content/schema";
 const THREE_MONTH_CAL: WorldCalendar = {
   months: [
     { name: "Frostmelt", days: 30 },
-    { name: "Highsun",   days: 40 },
-    { name: "Ashfall",   days: 35 },
+    { name: "Highsun", days: 40 },
+    { name: "Ashfall", days: 35 },
   ],
 };
 

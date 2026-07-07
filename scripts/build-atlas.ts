@@ -13,7 +13,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { markdownToHtml } from "../src/atlas/content/markdownCore";
-import { resolveImageEmbeds, DEFAULT_RESOLVE_ASSET } from "../src/atlas/content/renderEntityMarkdown";
+import {
+  resolveImageEmbeds,
+  DEFAULT_RESOLVE_ASSET,
+} from "../src/atlas/content/renderEntityMarkdown";
 import { parseFrontmatter, type ParsedFile } from "./atlas/parseFrontmatter";
 import { stripDmBlocks, stripDmFromShippingString } from "./atlas/stripDmBlocks";
 import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
@@ -103,7 +106,7 @@ function walk(
   contentRoot: string,
   include: string[],
   exclude: string[],
-  scanned: { excludedFiles: number; excludedPaths: string[] }
+  scanned: { excludedFiles: number; excludedPaths: string[] },
 ): string[] {
   const out: string[] = [];
   if (!fs.existsSync(dir)) return out;
@@ -162,7 +165,8 @@ function globToRegExp(glob: string): RegExp {
 
 export function deriveTitle(file: string, fmTitle?: unknown): string {
   if (typeof fmTitle === "string" && fmTitle.trim()) return fmTitle.trim();
-  return path.basename(file, ".md")
+  return path
+    .basename(file, ".md")
     .replace(/[-_]+/g, " ")
     .trim()
     .replace(/(^|\s)(\p{L})/gu, (_m, sp, ch) => sp + ch.toUpperCase());
@@ -248,7 +252,9 @@ function parseFlags(): BuildFlags {
  * this directly so an in-flight save can rebuild atlas.json without
  * spawning a child process.
  */
-export async function runBuild(flags: BuildFlags = { player: false, strict: false }): Promise<BuildResult> {
+export async function runBuild(
+  flags: BuildFlags = { player: false, strict: false },
+): Promise<BuildResult> {
   const started = Date.now();
   try {
     await runBuildCore(flags);
@@ -299,7 +305,13 @@ async function runBuildCore(flags: BuildFlags) {
     entity: Entity;
     rawBody: string;
     /** Explicit multi-map placements from atlas.placements[]. */
-    placements: Array<{ mapId?: string; x: number; y: number; label?: string; pin?: import("../src/atlas/content/schema").PinPlacementStyle }>;
+    placements: Array<{
+      mapId?: string;
+      x: number;
+      y: number;
+      label?: string;
+      pin?: import("../src/atlas/content/schema").PinPlacementStyle;
+    }>;
     /** Legacy atlas.x / atlas.y, used only if `placements` is empty. */
     legacy?: { x: number; y: number };
   };
@@ -343,7 +355,8 @@ async function runBuildCore(flags: BuildFlags) {
     }
     slugSeen.set(id, rel);
 
-    const visibility = parsed.atlas.visibility ?? (parsed.atlas.publish === false ? "dm" : "player");
+    const visibility =
+      parsed.atlas.visibility ?? (parsed.atlas.publish === false ? "dm" : "player");
     const isSecret = !PLAYER_VISIBLE.has(visibility) || parsed.atlas.publish === false;
     allParsed.push({ file, rel, parsed, title, id, visibility, isSecret });
   }
@@ -352,7 +365,10 @@ async function runBuildCore(flags: BuildFlags) {
   // (player-visible and DM/hidden). Used for wikilink resolution so we can
   // detect cross-ref leaks (a public-entry link to a DM-only target).
   const crossRefNameIndex = new Map<string, string>();
-  const allEntityVisibility = new Map<string, import("../src/atlas/content/schema").EntityVisibility>();
+  const allEntityVisibility = new Map<
+    string,
+    import("../src/atlas/content/schema").EntityVisibility
+  >();
   const secretEntityIds = new Set<string>();
   // Every literal string (title / id / alias) belonging to a non-player
   // entity. Used to scrub warning text before it ships in a player build.
@@ -379,7 +395,11 @@ async function runBuildCore(flags: BuildFlags) {
   for (const file of scanInfo.excludedPaths) {
     const rel = path.relative(ROOT, file).replace(/\\/g, "/");
     let raw: string;
-    try { raw = fs.readFileSync(file, "utf8"); } catch { continue; }
+    try {
+      raw = fs.readFileSync(file, "utf8");
+    } catch {
+      continue;
+    }
     const parsed = parseFrontmatter(raw, rel);
     const title = deriveTitle(file, (parsed.data.title as string) ?? undefined);
     if (!title) continue;
@@ -417,7 +437,9 @@ async function runBuildCore(flags: BuildFlags) {
     const { text: noDmStripped, count: cStripped, unbalanced } = stripDmBlocks(parsed.body);
     detectedDmBlocks += cStripped;
     if (unbalanced) {
-      errors.push(`${rel}: body has an unbalanced DM delimiter — likely an unclosed %%...%% block or an unclosed :::dm...::: callout. Add the closing fence (or remove the stray opener).`);
+      errors.push(
+        `${rel}: body has an unbalanced DM delimiter — likely an unclosed %%...%% block or an unclosed :::dm...::: callout. Add the closing fence (or remove the stray opener).`,
+      );
     }
     const noDm = flags.player ? noDmStripped : parsed.body;
     if (flags.player) strippedDmBlocks += cStripped;
@@ -430,9 +452,7 @@ async function runBuildCore(flags: BuildFlags) {
       : (s: string | undefined) => s;
     const stripArr = flags.player
       ? (arr: string[]) =>
-          arr
-            .map((x) => stripDmFromShippingString(x) ?? "")
-            .filter((x) => x.length > 0)
+          arr.map((x) => stripDmFromShippingString(x) ?? "").filter((x) => x.length > 0)
       : (arr: string[]) => arr;
 
     // Player builds only: strip meta tags ("#npc", "#stub") that read as
@@ -535,7 +555,7 @@ async function runBuildCore(flags: BuildFlags) {
         crossRefLeaks += 1;
         const targetVis = allEntityVisibility.get(l.resolvedId) ?? "dm";
         warnings.push(
-          `entity "${entity.id}": wikilink "${l.target}" resolves to ${targetVis} entity "${l.resolvedId}" — spoiler leak, redacted from player output`
+          `entity "${entity.id}": wikilink "${l.target}" resolves to ${targetVis} entity "${l.resolvedId}" — spoiler leak, redacted from player output`,
         );
         // Redact body markdown: replace the raw `[[target(|display)?]]`
         // syntax with "…" so the secret name doesn't leak through atlas.json
@@ -544,7 +564,7 @@ async function runBuildCore(flags: BuildFlags) {
           const escTarget = l.target.replace(/[.+*?^${}()|[\]\\]/g, "\\$&");
           entity.body = entity.body.replace(
             new RegExp(`\\[\\[${escTarget}(?:\\|[^\\]]+)?\\]\\]`, "g"),
-            "…"
+            "…",
           );
         }
         l.resolvedId = undefined;
@@ -574,7 +594,10 @@ async function runBuildCore(flags: BuildFlags) {
   }
   for (const { entity } of pending) {
     const m = backlinkMap.get(entity.id);
-    if (m) entity.backlinks = Array.from(m.entries()).filter(([id]) => id !== entity.id).map(([id, title]) => ({ id, title }));
+    if (m)
+      entity.backlinks = Array.from(m.entries())
+        .filter(([id]) => id !== entity.id)
+        .map(([id, title]) => ({ id, title }));
   }
 
   const worldId = cfg.defaultWorld;
@@ -582,7 +605,10 @@ async function runBuildCore(flags: BuildFlags) {
 
   // Build entity → visibility map up-front so route/region leak detection
   // (which runs before the relationship pass) can use it too.
-  const entityVisibility = new Map<string, import("../src/atlas/content/schema").EntityVisibility>();
+  const entityVisibility = new Map<
+    string,
+    import("../src/atlas/content/schema").EntityVisibility
+  >();
   for (const { entity } of pending) entityVisibility.set(entity.id, entity.visibility);
 
   // worldCfg was loaded earlier (so entity dates can resolve against the calendar).
@@ -590,7 +616,18 @@ async function runBuildCore(flags: BuildFlags) {
 
   let maps: MapDocument[] = worldCfg?.maps?.length
     ? worldCfg.maps
-    : [{ id: fallbackMapId, worldId, name: "Overview", width: 200000, height: 100000, layers: [], oceanColor: "#18313f", wrapX: true }];
+    : [
+        {
+          id: fallbackMapId,
+          worldId,
+          name: "Overview",
+          width: 200000,
+          height: 100000,
+          layers: [],
+          oceanColor: "#18313f",
+          wrapX: true,
+        },
+      ];
 
   // Soft warning: if the maps assets directory has uploaded image files but
   // every map has empty layers, the user almost certainly forgot to wire them
@@ -600,14 +637,18 @@ async function runBuildCore(flags: BuildFlags) {
     const mapsAssetsDir = path.join(ROOT, "public/atlas/assets/maps");
     const allEmpty = maps.every((m) => !m.layers || m.layers.length === 0);
     if (allEmpty && fs.existsSync(mapsAssetsDir)) {
-      const imgs = fs.readdirSync(mapsAssetsDir).filter((f) => /\.(png|jpe?g|webp|gif|svg)$/i.test(f));
+      const imgs = fs
+        .readdirSync(mapsAssetsDir)
+        .filter((f) => /\.(png|jpe?g|webp|gif|svg)$/i.test(f));
       if (imgs.length > 0) {
         warnings.push(
-          `world.yaml: every map has layers: [] but ${imgs.length} image file(s) are present in public/atlas/assets/maps/ (${imgs.slice(0, 3).join(", ")}${imgs.length > 3 ? ", …" : ""}). Add a layers: entry referencing them.`
+          `world.yaml: every map has layers: [] but ${imgs.length} image file(s) are present in public/atlas/assets/maps/ (${imgs.slice(0, 3).join(", ")}${imgs.length > 3 ? ", …" : ""}). Add a layers: entry referencing them.`,
         );
       }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   let regions: Region[] = worldCfg?.regions ?? [];
   const fogs: FogOverlay[] = worldCfg?.fogs ?? [];
@@ -647,9 +688,12 @@ async function runBuildCore(flags: BuildFlags) {
   for (const item of pending) {
     const { entity } = item;
     // Build the effective list: explicit placements win; legacy x/y only as fallback.
-    const list = item.placements.length > 0
-      ? item.placements
-      : (item.legacy ? [{ mapId: undefined, x: item.legacy.x, y: item.legacy.y }] : []);
+    const list =
+      item.placements.length > 0
+        ? item.placements
+        : item.legacy
+          ? [{ mapId: undefined, x: item.legacy.x, y: item.legacy.y }]
+          : [];
     if (list.length === 0) continue;
     if (flags.player && !PLAYER_VISIBLE.has(entity.visibility)) {
       secretPlacementsExcluded += list.length;
@@ -658,7 +702,9 @@ async function runBuildCore(flags: BuildFlags) {
     for (const p of list) {
       const mapId = p.mapId ?? primaryMapId;
       if (!validMapIds.has(mapId)) {
-        warnings.push(`entity "${entity.id}": placement references unknown mapId "${mapId}" — skipped`);
+        warnings.push(
+          `entity "${entity.id}": placement references unknown mapId "${mapId}" — skipped`,
+        );
         continue;
       }
       if (flags.player && isFoggedOnMap(mapId, p.x, p.y)) {
@@ -704,7 +750,7 @@ async function runBuildCore(flags: BuildFlags) {
         if (!targetVis || !PLAYER_VISIBLE.has(targetVis)) {
           routeLeaks += 1;
           warnings.push(
-            `route "${r.id}": player-visible route routes through ${targetVis ? `${targetVis} entity` : "unknown entity"} "${w.entityId}" — spoiler leak`
+            `route "${r.id}": player-visible route routes through ${targetVis ? `${targetVis} entity` : "unknown entity"} "${w.entityId}" — spoiler leak`,
           );
         }
       }
@@ -718,7 +764,9 @@ async function runBuildCore(flags: BuildFlags) {
         const p = placementByMapEntity.get(`${r.mapId}:${w.entityId}`);
         if (!p) {
           routeWaypointMisses += 1;
-          warnings.push(`route "${r.id}": waypoint entity "${w.entityId}" has no placement on map "${r.mapId}" — route skipped`);
+          warnings.push(
+            `route "${r.id}": waypoint entity "${w.entityId}" has no placement on map "${r.mapId}" — route skipped`,
+          );
           dropped = true;
           break;
         }
@@ -763,7 +811,10 @@ async function runBuildCore(flags: BuildFlags) {
   if (flags.player) {
     const redactedMaps: typeof maps = [];
     for (const m of maps) {
-      if (!m.fog?.enabled) { redactedMaps.push(m); continue; }
+      if (!m.fog?.enabled) {
+        redactedMaps.push(m);
+        continue;
+      }
 
       const fog = m.fog;
       const newLayers: typeof m.layers = [];
@@ -771,23 +822,23 @@ async function runBuildCore(flags: BuildFlags) {
         if (layer.tileSrc) {
           throw new FogRedactionError(
             `Map "${m.id}" layer "${layer.id}" is tiled (tileSrc set) — fog is not supported for tiled layers. ` +
-            `Either remove fog.enabled on this map or convert the layer to a raster image.`
+              `Either remove fog.enabled on this map or convert the layer to a raster image.`,
           );
         }
         const srcPath = path.resolve(ROOT, "public", layer.src);
         if (!fs.existsSync(srcPath)) {
           warnings.push(
-            `map "${m.id}" layer "${layer.id}": source image missing at ${path.relative(ROOT, srcPath)} — skipped fog redaction (layer will not render)`
+            `map "${m.id}" layer "${layer.id}": source image missing at ${path.relative(ROOT, srcPath)} — skipped fog redaction (layer will not render)`,
           );
           continue;
         }
         const imageBuffer = fs.readFileSync(srcPath);
-        const redacted = await redactLayer(
-          imageBuffer,
-          { width: m.width, height: m.height },
-          fog,
-          { x: layer.x, y: layer.y, width: layer.width, height: layer.height }
-        );
+        const redacted = await redactLayer(imageBuffer, { width: m.width, height: m.height }, fog, {
+          x: layer.x,
+          y: layer.y,
+          width: layer.width,
+          height: layer.height,
+        });
         // Output path: insert ".fog" before the extension. Strip any query/hash.
         const cleanSrc = layer.src.replace(/[?#].*$/, "");
         const ext = path.extname(cleanSrc); // ".png", ".jpg", etc.
@@ -796,7 +847,10 @@ async function runBuildCore(flags: BuildFlags) {
         const outPath = `${base}.fog.png`;
         fs.writeFileSync(outPath, redacted);
         // Rewrite the layer src to the redacted file (relative to public/, forward slashes).
-        const newSrcRel = path.relative(path.resolve(ROOT, "public"), outPath).split(path.sep).join("/");
+        const newSrcRel = path
+          .relative(path.resolve(ROOT, "public"), outPath)
+          .split(path.sep)
+          .join("/");
         newLayers.push({ ...layer, src: newSrcRel });
       }
       // Strip fog geometry — only mapId + enabled remain in the player atlas.
@@ -820,7 +874,7 @@ async function runBuildCore(flags: BuildFlags) {
     if (!targetVis || !PLAYER_VISIBLE.has(targetVis)) {
       regionLeaks += 1;
       warnings.push(
-        `region "${r.id}": player-visible region links to ${targetVis ? `${targetVis} entity` : "unknown entity"} "${r.entityId}" — spoiler leak`
+        `region "${r.id}": player-visible region links to ${targetVis ? `${targetVis} entity` : "unknown entity"} "${r.entityId}" — spoiler leak`,
       );
     }
   }
@@ -843,12 +897,12 @@ async function runBuildCore(flags: BuildFlags) {
       for (const r of res.droppedByLeak) {
         warnings.push(
           `entity "${entity.id}": relationship → "${r.entity}" (visibility=${r.visibility}) ` +
-          `would leak a DM-only target — dropped from player build`
+            `would leak a DM-only target — dropped from player build`,
         );
       }
       for (const r of res.unresolved) {
         warnings.push(
-          `entity "${entity.id}": relationship → "${r.entity}" points at unknown entity — dropped`
+          `entity "${entity.id}": relationship → "${r.entity}" points at unknown entity — dropped`,
         );
       }
       entity.relationships = res.kept.length > 0 ? res.kept : undefined;
@@ -858,7 +912,7 @@ async function runBuildCore(flags: BuildFlags) {
         if (!entityVisibility.has(r.entity)) {
           unresolvedRelationships += 1;
           warnings.push(
-            `entity "${entity.id}": relationship → "${r.entity}" points at unknown entity`
+            `entity "${entity.id}": relationship → "${r.entity}" points at unknown entity`,
           );
         }
       }
@@ -906,12 +960,16 @@ async function runBuildCore(flags: BuildFlags) {
     version: new Date().toISOString().replace(/[:.]/g, "-"),
     schemaVersion: worldCfg?.schemaVersion ?? CURRENT_ATLAS_SCHEMA_VERSION,
     publishedAt: new Date().toISOString(),
-    worlds: [{
-      id: worldId,
-      name: "Astrath Deeprealm",
-      defaultMapId: primaryMapId,
-      ...(flags.player ? {} : { importFolders: worldCfg?.importConfig ?? { folders: {}, defaultFolder: "imports" } }),
-    }],
+    worlds: [
+      {
+        id: worldId,
+        name: "Astrath Deeprealm",
+        defaultMapId: primaryMapId,
+        ...(flags.player
+          ? {}
+          : { importFolders: worldCfg?.importConfig ?? { folders: {}, defaultFolder: "imports" } }),
+      },
+    ],
     maps,
     entities: pending.map((p) => p.entity),
     placements,
@@ -927,7 +985,7 @@ async function runBuildCore(flags: BuildFlags) {
       // title/id/alias is scrubbed to "…" so a leak message about a hidden
       // entity doesn't itself leak the secret's name.
       warnings: flags.player ? scrubSecretNames(warnings, secretNames) : warnings,
-      brokenLinks: unresolvedLinks,        // back-compat alias
+      brokenLinks: unresolvedLinks, // back-compat alias
       unresolvedLinks,
       duplicateSlugs,
       strippedDmBlocks,
@@ -980,12 +1038,16 @@ async function runBuildCore(flags: BuildFlags) {
   fs.writeFileSync(path.join(outDir, "search-index.json"), JSON.stringify(searchIndex, null, 2));
 
   const r = project.buildReport!;
-  console.log(`\n=== Atlas build report (${flags.player ? "PLAYER" : "DM"}${flags.strict ? ", strict" : ""}) ===`);
+  console.log(
+    `\n=== Atlas build report (${flags.player ? "PLAYER" : "DM"}${flags.strict ? ", strict" : ""}) ===`,
+  );
   console.log(`Scanned:                 ${r.scanned}`);
   console.log(`Included entities:       ${r.included}`);
   console.log(`Excluded by folder:      ${scanInfo.excludedFiles}`);
   console.log(`Excluded by visibility:  ${visibilityExcluded}`);
-  console.log(`Stripped DM blocks:      ${r.strippedDmBlocks}${flags.player ? "" : ` (DM build keeps ${detectedDmBlocks} block${detectedDmBlocks === 1 ? "" : "s"} in body)`}`);
+  console.log(
+    `Stripped DM blocks:      ${r.strippedDmBlocks}${flags.player ? "" : ` (DM build keeps ${detectedDmBlocks} block${detectedDmBlocks === 1 ? "" : "s"} in body)`}`,
+  );
   console.log(`Excluded secret pins:    ${secretPlacementsExcluded}`);
   console.log(`Excluded secret regions: ${regionsExcluded}`);
   console.log(`Excluded secret routes:  ${routesExcluded}`);
@@ -1098,11 +1160,13 @@ function isMainModule(): boolean {
 
 if (isMainModule()) {
   const flags = parseFlags();
-  runBuild(flags).then((result) => {
-    if (!result.ok) process.exit(result.exitCode);
-  }).catch((e: unknown) => {
-    // runBuild itself shouldn't throw, but belt + suspenders.
-    console.error(e);
-    process.exit(1);
-  });
+  runBuild(flags)
+    .then((result) => {
+      if (!result.ok) process.exit(result.exitCode);
+    })
+    .catch((e: unknown) => {
+      // runBuild itself shouldn't throw, but belt + suspenders.
+      console.error(e);
+      process.exit(1);
+    });
 }

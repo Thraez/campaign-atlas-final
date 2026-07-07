@@ -13,11 +13,16 @@ interface RulerLayerProps {
   onClear?: () => void;
 }
 
-type RulerPoints =
-  | null
-  | { p1: { x: number; y: number }; p2?: { x: number; y: number } };
+type RulerPoints = null | { p1: { x: number; y: number }; p2?: { x: number; y: number } };
 
-export function RulerLayer({ active, mapHeight, scale, wrapX, mapWidth, onClear }: RulerLayerProps) {
+export function RulerLayer({
+  active,
+  mapHeight,
+  scale,
+  wrapX,
+  mapWidth,
+  onClear,
+}: RulerLayerProps) {
   const [points, setPoints] = useState<RulerPoints>(null);
 
   const prevActiveRef = useRef(active);
@@ -30,7 +35,9 @@ export function RulerLayer({ active, mapHeight, scale, wrapX, mapWidth, onClear 
 
   // onClear ref so click handler doesn't become stale
   const onClearRef = useRef(onClear);
-  useEffect(() => { onClearRef.current = onClear; }, [onClear]);
+  useEffect(() => {
+    onClearRef.current = onClear;
+  }, [onClear]);
 
   useMapEvents({
     click(e) {

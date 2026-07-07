@@ -66,7 +66,9 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
   const mapIds = new Set(project.maps.map((m) => m.id));
   const entityIds = new Set(project.entities.map((e) => e.id));
   const dmEntityIds = new Set(
-    project.entities.filter((e) => e.visibility === "dm" || e.visibility === "hidden").map((e) => e.id)
+    project.entities
+      .filter((e) => e.visibility === "dm" || e.visibility === "hidden")
+      .map((e) => e.id),
   );
   const playerVisibleVis = new Set(["player", "rumor"]);
   const validVis = new Set(["player", "dm", "hidden", "rumor"]);
@@ -364,7 +366,10 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
       const broken = e.links.filter((l) => l.broken);
       if (broken.length > 0) {
         const CAP = 3;
-        const listed = broken.slice(0, CAP).map((l) => `[[${l.target}]]`).join(", ");
+        const listed = broken
+          .slice(0, CAP)
+          .map((l) => `[[${l.target}]]`)
+          .join(", ");
         const extra = broken.length > CAP ? ` …and ${broken.length - CAP} more` : "";
         issues.push({
           severity: "suggestion",
@@ -383,8 +388,7 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
         // Schema field is `entity` (the target slug). Older code used `targetId`
         // — accept both for back-compat with any in-flight YAML.
         const targetId =
-          (rel as { entity?: string }).entity ??
-          (rel as { targetId?: string }).targetId;
+          (rel as { entity?: string }).entity ?? (rel as { targetId?: string }).targetId;
         const relVis = (rel as { visibility?: string }).visibility ?? "player";
         if (!targetId) continue;
         if (!entityIds.has(targetId)) {
@@ -521,7 +525,8 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
 
   if (counts.blocking === 0) passedChecks.push("No blocking issues");
   if (counts.warning === 0) passedChecks.push("No warnings");
-  if (!issues.some((i) => i.code.startsWith("spoiler-leak"))) passedChecks.push("No DM-content leakage detected");
+  if (!issues.some((i) => i.code.startsWith("spoiler-leak")))
+    passedChecks.push("No DM-content leakage detected");
 
   return {
     issues,
@@ -548,9 +553,13 @@ export function buildPublishReport(report: ValidationReport): string {
   if (report.meta.atlasVersion) lines.push(`Atlas version: \`${report.meta.atlasVersion}\``);
   if (report.meta.builtAt) lines.push(`Built at: ${report.meta.builtAt}`);
   lines.push(`Entities: ${report.meta.entityCount} · Maps: ${report.meta.mapCount}`);
-  lines.push(`Draft placements: ${report.meta.draftPlacementCount} · Pending uploads: ${report.meta.pendingAssetCount}`);
+  lines.push(
+    `Draft placements: ${report.meta.draftPlacementCount} · Pending uploads: ${report.meta.pendingAssetCount}`,
+  );
   lines.push("");
-  lines.push(`**${report.counts.blocking} blocking · ${report.counts.warning} warnings · ${report.counts.suggestion} suggestions**`);
+  lines.push(
+    `**${report.counts.blocking} blocking · ${report.counts.warning} warnings · ${report.counts.suggestion} suggestions**`,
+  );
   lines.push("");
   for (const sev of ["blocking", "warning", "suggestion"] as const) {
     const list = report.issues.filter((i) => i.severity === sev);
@@ -558,7 +567,11 @@ export function buildPublishReport(report: ValidationReport): string {
     lines.push(`## ${sev.charAt(0).toUpperCase()}${sev.slice(1)} (${list.length})`);
     lines.push("");
     for (const i of list) {
-      const where = i.scope?.mapId ? ` _(map: ${i.scope.mapId})_` : i.scope?.entityId ? ` _(entity: ${i.scope.entityId})_` : "";
+      const where = i.scope?.mapId
+        ? ` _(map: ${i.scope.mapId})_`
+        : i.scope?.entityId
+          ? ` _(entity: ${i.scope.entityId})_`
+          : "";
       lines.push(`- **[${i.code}]** ${i.message}${where}`);
       if (i.hint) lines.push(`  - ${i.hint}`);
     }
@@ -579,4 +592,3 @@ export const CATEGORY_LABELS: Record<IssueCategory, string> = {
   map: "Maps & Geometry",
   draft: "Drafts & Export",
 };
-

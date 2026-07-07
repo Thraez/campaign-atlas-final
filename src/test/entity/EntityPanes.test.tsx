@@ -6,9 +6,19 @@ import { EntityPanes } from "@/atlas/entity/EntityPanes";
 import type { Entity } from "@/atlas/content/schema";
 
 const corven = {
-  id: "corven", title: "Corven", type: "npc", visibility: "dm",
-  aliases: [], tags: [], images: [], body: "Public line.\n\n%%\nSECRET-XYZ\n%%\n",
-  bodyHtml: "", frontmatter: {}, sourcePath: "p/c.md", links: [], backlinks: [],
+  id: "corven",
+  title: "Corven",
+  type: "npc",
+  visibility: "dm",
+  aliases: [],
+  tags: [],
+  images: [],
+  body: "Public line.\n\n%%\nSECRET-XYZ\n%%\n",
+  bodyHtml: "",
+  frontmatter: {},
+  sourcePath: "p/c.md",
+  links: [],
+  backlinks: [],
 } as Entity;
 
 const withHeadings = {

@@ -14,10 +14,29 @@ const baseMap: MapDocument = {
   height: 1000,
   layers: [],
   regions: [
-    { id: "r1", mapId: "m1", name: "Existing", points: [[0, 0], [100, 0], [100, 100]], visibility: "dm" } as Region,
+    {
+      id: "r1",
+      mapId: "m1",
+      name: "Existing",
+      points: [
+        [0, 0],
+        [100, 0],
+        [100, 100],
+      ],
+      visibility: "dm",
+    } as Region,
   ],
   routes: [
-    { id: "rt1", mapId: "m1", name: "Existing route", waypoints: [[0, 0], [100, 100]], visibility: "dm" } as Route,
+    {
+      id: "rt1",
+      mapId: "m1",
+      name: "Existing route",
+      waypoints: [
+        [0, 0],
+        [100, 100],
+      ],
+      visibility: "dm",
+    } as Route,
   ],
 };
 

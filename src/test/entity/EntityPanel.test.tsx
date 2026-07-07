@@ -6,18 +6,41 @@ import type { Entity } from "@/atlas/content/schema";
 import type { EntityRelationship } from "@/atlas/profiles/profileTypes";
 
 const e: Entity = {
-  id: "corven", title: "Corven", type: "npc", visibility: "player",
-  aliases: [], tags: [], images: [], body: "", bodyHtml: "<p>Bio body</p>",
-  frontmatter: {}, sourcePath: "", links: [], backlinks: [],
+  id: "corven",
+  title: "Corven",
+  type: "npc",
+  visibility: "player",
+  aliases: [],
+  tags: [],
+  images: [],
+  body: "",
+  bodyHtml: "<p>Bio body</p>",
+  frontmatter: {},
+  sourcePath: "",
+  links: [],
+  backlinks: [],
 } as Entity;
 
 const ally: Entity = {
-  id: "ally-npc", title: "Ally NPC", type: "npc", visibility: "player",
-  aliases: [], tags: [], images: [], body: "", bodyHtml: "",
-  frontmatter: {}, sourcePath: "", links: [], backlinks: [],
+  id: "ally-npc",
+  title: "Ally NPC",
+  type: "npc",
+  visibility: "player",
+  aliases: [],
+  tags: [],
+  images: [],
+  body: "",
+  bodyHtml: "",
+  frontmatter: {},
+  sourcePath: "",
+  links: [],
+  backlinks: [],
 } as Entity;
 
-const baseEntityById = new Map([[e.id, e], [ally.id, ally]]);
+const baseEntityById = new Map([
+  [e.id, e],
+  [ally.id, ally],
+]);
 
 const renderPanel = (readerAffordances?: boolean) =>
   render(
@@ -75,7 +98,11 @@ describe("EntityPanel — Connections section", () => {
   });
 
   it("renders Connections section with a player-visible relationship", () => {
-    const rel: EntityRelationship = { entity: "ally-npc", type: "allied_with", visibility: "player" };
+    const rel: EntityRelationship = {
+      entity: "ally-npc",
+      type: "allied_with",
+      visibility: "player",
+    };
     render(
       <MemoryRouter>
         <EntityPanel
@@ -94,7 +121,12 @@ describe("EntityPanel — Connections section", () => {
   });
 
   it("shows (DM) badge on dm-visibility relationships", () => {
-    const rel: EntityRelationship = { entity: "ally-npc", type: "secret_enemy", label: "Secret Foe", visibility: "dm" };
+    const rel: EntityRelationship = {
+      entity: "ally-npc",
+      type: "secret_enemy",
+      label: "Secret Foe",
+      visibility: "dm",
+    };
     render(
       <MemoryRouter>
         <EntityPanel
@@ -112,7 +144,12 @@ describe("EntityPanel — Connections section", () => {
   });
 
   it("prefers label over type when both present", () => {
-    const rel: EntityRelationship = { entity: "ally-npc", type: "allied_with", label: "Close Ally", visibility: "player" };
+    const rel: EntityRelationship = {
+      entity: "ally-npc",
+      type: "allied_with",
+      label: "Close Ally",
+      visibility: "player",
+    };
     render(
       <MemoryRouter>
         <EntityPanel
@@ -130,7 +167,11 @@ describe("EntityPanel — Connections section", () => {
   });
 
   it("degrades gracefully when target id is unresolved — shows raw id, no crash", () => {
-    const rel: EntityRelationship = { entity: "unknown-ghost-id", type: "haunts", visibility: "player" };
+    const rel: EntityRelationship = {
+      entity: "unknown-ghost-id",
+      type: "haunts",
+      visibility: "player",
+    };
     render(
       <MemoryRouter>
         <EntityPanel
@@ -148,7 +189,11 @@ describe("EntityPanel — Connections section", () => {
   });
 
   it("calls onOpenEntity with the target id when a Connections entry is clicked", () => {
-    const rel: EntityRelationship = { entity: "ally-npc", type: "allied_with", visibility: "player" };
+    const rel: EntityRelationship = {
+      entity: "ally-npc",
+      type: "allied_with",
+      visibility: "player",
+    };
     const onOpenEntity = vi.fn();
     render(
       <MemoryRouter>

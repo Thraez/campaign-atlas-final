@@ -22,7 +22,12 @@ export interface ProfileFieldDef {
 
 /** Player-visible profile fields — universal across entity types. */
 export const PLAYER_PROFILE_FIELDS: ProfileFieldDef[] = [
-  { key: "known_for", label: "Known for", placeholder: "What players hear about this on the street.", multiline: true },
+  {
+    key: "known_for",
+    label: "Known for",
+    placeholder: "What players hear about this on the street.",
+    multiline: true,
+  },
 ];
 /** Player-visible list fields (string[] in YAML). */
 export const PLAYER_PROFILE_LIST_FIELDS: ProfileFieldDef[] = [
@@ -81,9 +86,7 @@ const TYPE_ALIASES: Record<string, string> = {
 
 export function dmFieldsForType(type: string | undefined): ProfileFieldDef[] {
   const t = (type ?? "").toLowerCase();
-  const canonical = DM_PROFILE_FIELDS_BY_TYPE[t]
-    ? t
-    : TYPE_ALIASES[t] ?? "npc";
+  const canonical = DM_PROFILE_FIELDS_BY_TYPE[t] ? t : (TYPE_ALIASES[t] ?? "npc");
   return DM_PROFILE_FIELDS_BY_TYPE[canonical] ?? DM_PROFILE_FIELDS_BY_TYPE.npc;
 }
 

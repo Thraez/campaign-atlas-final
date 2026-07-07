@@ -85,7 +85,7 @@ async function renderEditorRoute() {
           <Route path="/atlas/edit" element={<Gate />} />
         </Routes>
       </Suspense>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
@@ -121,7 +121,7 @@ describe("Landing tile gating", () => {
     render(
       <MemoryRouter>
         <Landing />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
   }
 

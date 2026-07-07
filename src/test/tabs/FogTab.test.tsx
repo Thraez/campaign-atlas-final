@@ -100,7 +100,7 @@ describe("FogTab — Draw fog section", () => {
         api={api}
         showFogPreview={false}
         setShowFogPreview={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText(/draw fog/i)).toBeInTheDocument();
@@ -115,16 +115,35 @@ describe("FogTab — Draw fog section", () => {
 describe("FogTab — Fog shapes list", () => {
   it("renders Fog shapes list when conceals are present", () => {
     const api = makeMockApi({
-      conceals: [[[0, 0], [10, 0], [10, 10]]],
+      conceals: [
+        [
+          [0, 0],
+          [10, 0],
+          [10, 10],
+        ],
+      ],
     });
     render(
       <FogTab
-        map={makeMap({ fog: { mapId: "map-1", enabled: true, reveals: [], conceals: [[[0, 0], [10, 0], [10, 10]]] } })}
+        map={makeMap({
+          fog: {
+            mapId: "map-1",
+            enabled: true,
+            reveals: [],
+            conceals: [
+              [
+                [0, 0],
+                [10, 0],
+                [10, 10],
+              ],
+            ],
+          },
+        })}
         project={makeProject()}
         api={api}
         showFogPreview={false}
         setShowFogPreview={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText(/fog shapes/i)).toBeInTheDocument();
@@ -140,7 +159,7 @@ describe("FogTab — Fog shapes list", () => {
         api={api}
         showFogPreview={false}
         setShowFogPreview={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.queryByText(/fog shapes/i)).toBeNull();
@@ -157,7 +176,7 @@ describe("FogTab — Feather control", () => {
         api={api}
         showFogPreview={false}
         setShowFogPreview={vi.fn()}
-      />
+      />,
     );
 
     const featherInput = screen.getByLabelText(/soft edge/i) as HTMLInputElement;
@@ -173,7 +192,7 @@ describe("FogTab — Feather control", () => {
         api={api}
         showFogPreview={false}
         setShowFogPreview={vi.fn()}
-      />
+      />,
     );
 
     const featherInput = screen.getByLabelText(/soft edge/i) as HTMLInputElement;
@@ -189,7 +208,7 @@ describe("FogTab — Feather control", () => {
         api={api}
         showFogPreview={false}
         setShowFogPreview={vi.fn()}
-      />
+      />,
     );
 
     const featherInput = screen.getByLabelText(/soft edge/i);

@@ -42,21 +42,19 @@ const App = () => (
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <ErrorBoundary>
-      <Suspense fallback={<RouteFallback />}>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/atlas" element={<AtlasViewer />} />
-          {AtlasPlacementEditor && (
-            <Route path="/atlas/edit" element={<AtlasEditorRoute />} />
-          )}
-          <Route path="/atlas/timeline" element={<AtlasTimeline />} />
-          <Route path="/atlas/browse" element={<AtlasBrowse mode="browse" />} />
-          <Route path="/atlas/tag/:tag" element={<AtlasBrowse mode="tag" />} />
-          <Route path="/atlas/type/:type" element={<AtlasBrowse mode="type" />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Suspense>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/atlas" element={<AtlasViewer />} />
+            {AtlasPlacementEditor && <Route path="/atlas/edit" element={<AtlasEditorRoute />} />}
+            <Route path="/atlas/timeline" element={<AtlasTimeline />} />
+            <Route path="/atlas/browse" element={<AtlasBrowse mode="browse" />} />
+            <Route path="/atlas/tag/:tag" element={<AtlasBrowse mode="tag" />} />
+            <Route path="/atlas/type/:type" element={<AtlasBrowse mode="type" />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </ErrorBoundary>
     </BrowserRouter>
   </TooltipProvider>

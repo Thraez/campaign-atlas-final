@@ -90,7 +90,10 @@ function parseArgs(argv: string[]): Args | null {
   return { target, config };
 }
 
-export interface RunOpts { dir: string; config?: string }
+export interface RunOpts {
+  dir: string;
+  config?: string;
+}
 
 export async function run(opts: RunOpts): Promise<number> {
   const configPath = opts.config ?? "atlas.config.json";
@@ -295,7 +298,9 @@ export async function main(): Promise<number> {
   const args = parseArgs(process.argv.slice(2));
   if (!args) {
     console.error("atlas:check-fog-safety: missing target dir");
-    console.error("Usage: tsx scripts/check-fog-safety.ts <artifact-dir> [--config atlas.config.json]");
+    console.error(
+      "Usage: tsx scripts/check-fog-safety.ts <artifact-dir> [--config atlas.config.json]",
+    );
     return 1;
   }
   return run({ dir: args.target, config: args.config });

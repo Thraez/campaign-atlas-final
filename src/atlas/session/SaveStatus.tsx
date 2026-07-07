@@ -28,7 +28,14 @@ function savedAgo(ts: number, now: number): string {
   return `Saved ${Math.floor(d / 3_600_000)}h ago`;
 }
 
-export function SaveStatus({ status, unsavedCount, savedAt, failedReason, onSave, onDiscard }: Props) {
+export function SaveStatus({
+  status,
+  unsavedCount,
+  savedAt,
+  failedReason,
+  onSave,
+  onDiscard,
+}: Props) {
   const [, setTick] = useState(0);
   useEffect(() => {
     if (status !== "saved") return;
@@ -46,13 +53,22 @@ export function SaveStatus({ status, unsavedCount, savedAt, failedReason, onSave
   else label = countText;
 
   const dot =
-    status === "saving" ? <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" aria-hidden />
-    : <span className={`inline-block h-2 w-2 rounded-full ${
-        status === "failed" ? "bg-red-500"
-        : status === "unsaved" ? "bg-amber-500"
-        : status === "saved" ? "bg-emerald-500"
-        : "bg-muted-foreground/50"
-      }`} aria-hidden />;
+    status === "saving" ? (
+      <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" aria-hidden />
+    ) : (
+      <span
+        className={`inline-block h-2 w-2 rounded-full ${
+          status === "failed"
+            ? "bg-red-500"
+            : status === "unsaved"
+              ? "bg-amber-500"
+              : status === "saved"
+                ? "bg-emerald-500"
+                : "bg-muted-foreground/50"
+        }`}
+        aria-hidden
+      />
+    );
 
   const showSave = status === "unsaved" || status === "saving" || status === "failed";
   const showDiscard = status === "unsaved" || status === "failed";

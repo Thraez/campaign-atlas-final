@@ -96,7 +96,7 @@ export function exportNotesJson(): string {
       notes: map,
     },
     null,
-    2
+    2,
   );
 }
 

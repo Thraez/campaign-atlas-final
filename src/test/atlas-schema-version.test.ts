@@ -117,7 +117,7 @@ describe("schemaVersion — resolveAndMigrate primitive", () => {
 
   it("throws SchemaVersionError for future versions", () => {
     expect(() =>
-      resolveAndMigrate({ schemaVersion: CURRENT_ATLAS_SCHEMA_VERSION + 1 }, "test", [])
+      resolveAndMigrate({ schemaVersion: CURRENT_ATLAS_SCHEMA_VERSION + 1 }, "test", []),
     ).toThrow(SchemaVersionError);
   });
 
@@ -126,7 +126,7 @@ describe("schemaVersion — resolveAndMigrate primitive", () => {
     const { version } = resolveAndMigrate(
       { schemaVersion: CURRENT_ATLAS_SCHEMA_VERSION },
       "test",
-      warnings
+      warnings,
     );
     expect(version).toBe(CURRENT_ATLAS_SCHEMA_VERSION);
     expect(warnings).toEqual([]);

@@ -6,7 +6,10 @@ import { buildPaletteIndex } from "@/atlas/shell/useCommandPalette";
 
 const index = buildPaletteIndex({
   entities: [{ id: "corven", title: "Corven", type: "npc" }] as never,
-  maps: [], commands: [], settings: [], recent: [],
+  maps: [],
+  commands: [],
+  settings: [],
+  recent: [],
 });
 
 describe("CommandPalette", () => {

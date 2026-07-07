@@ -14,10 +14,8 @@ describe("buildNewEntityChange", () => {
       kind: "npc",
     });
     expect(change.kind).toBe("entity-md");
-    expect(change.baseHash).toBeNull();              // create-only
-    expect(change.path).toBe(
-      "content/astrath-deeprealm/npcs/captain-mire-vale.md",
-    );
+    expect(change.baseHash).toBeNull(); // create-only
+    expect(change.path).toBe("content/astrath-deeprealm/npcs/captain-mire-vale.md");
     const fm = parseFrontmatter(change.content);
     // title stays at root; atlas: block carries id, type, visibility, summary
     expect(fm.data.title).toBe("Captain Mire Vale");
@@ -34,8 +32,10 @@ describe("buildNewEntityChange", () => {
     // same title produced a different id here than the build assigned —
     // "Kael's Café" became "kael-s-caf" instead of the canonical "kaels-cafe".
     const change = buildNewEntityChange({
-      worldRoot: "content/w", category: "characters",
-      title: "Kael's Café", visibility: "player",
+      worldRoot: "content/w",
+      category: "characters",
+      title: "Kael's Café",
+      visibility: "player",
     });
     expect(change.path).toBe("content/w/npcs/kaels-cafe.md");
     const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
@@ -44,8 +44,10 @@ describe("buildNewEntityChange", () => {
 
   it("defaults kind from category when kind is omitted", () => {
     const change = buildNewEntityChange({
-      worldRoot: "content/w", category: "factions",
-      title: "The Tide Court", visibility: "player",
+      worldRoot: "content/w",
+      category: "factions",
+      title: "The Tide Court",
+      visibility: "player",
     });
     const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
     expect(atlas.type).toBe("faction");

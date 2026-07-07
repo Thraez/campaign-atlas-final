@@ -3,9 +3,23 @@ import { pointInPolygon, isLit, effectivePolygons } from "@/atlas/fog/effectiveL
 import type { Point, FogOverlay } from "@/atlas/content/schema";
 
 // Convenience fixtures
-const SQUARE: Point[] = [[0, 0], [10, 0], [10, 10], [0, 10]];
-const INNER_SQUARE: Point[] = [[3, 3], [7, 3], [7, 7], [3, 7]];
-const TRIANGLE: Point[] = [[0, 0], [10, 0], [5, 10]];
+const SQUARE: Point[] = [
+  [0, 0],
+  [10, 0],
+  [10, 10],
+  [0, 10],
+];
+const INNER_SQUARE: Point[] = [
+  [3, 3],
+  [7, 3],
+  [7, 7],
+  [3, 7],
+];
+const TRIANGLE: Point[] = [
+  [0, 0],
+  [10, 0],
+  [5, 10],
+];
 
 function fog(overrides: Partial<FogOverlay>): FogOverlay {
   return {
@@ -22,7 +36,12 @@ function fog(overrides: Partial<FogOverlay>): FogOverlay {
 
 describe("pointInPolygon", () => {
   it("returns false for a polygon with fewer than 3 points", () => {
-    expect(pointInPolygon(5, 5, [[0, 0], [10, 0]])).toBe(false);
+    expect(
+      pointInPolygon(5, 5, [
+        [0, 0],
+        [10, 0],
+      ]),
+    ).toBe(false);
   });
 
   it("returns false for an empty polygon", () => {
@@ -58,7 +77,10 @@ describe("effectivePolygons", () => {
   });
 
   it("filters out reveal polygons with fewer than 3 points", () => {
-    const tooShort: Point[] = [[0, 0], [5, 0]];
+    const tooShort: Point[] = [
+      [0, 0],
+      [5, 0],
+    ];
     const f = fog({ reveals: [SQUARE, tooShort] });
     const { reveals } = effectivePolygons(f);
     expect(reveals).toHaveLength(1);

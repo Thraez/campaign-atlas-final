@@ -8,12 +8,14 @@ describe("EntityEditorPanel (create mode)", () => {
     const onCreate = vi.fn();
     render(
       <EntityEditorPanel
-        mode="create" category="characters"
-        onCreate={onCreate} onCancel={vi.fn()}
+        mode="create"
+        category="characters"
+        onCreate={onCreate}
+        onCancel={vi.fn()}
       />,
     );
     fireEvent.change(screen.getByLabelText(/name/i), { target: { value: "Mire Vale" } });
-    expect(screen.queryByText(/relationships/i)).toBeNull();   // hidden by default
+    expect(screen.queryByText(/relationships/i)).toBeNull(); // hidden by default
     fireEvent.click(screen.getByRole("button", { name: /more details/i }));
     expect(screen.getByText(/relationships/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /create/i }));

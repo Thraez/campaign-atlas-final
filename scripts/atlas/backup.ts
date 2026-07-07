@@ -32,10 +32,7 @@ const INCLUDE_PATHS = [
   "examples/seed-world",
 ];
 
-const SKIP_BASENAMES = new Set([
-  ".DS_Store",
-  "Thumbs.db",
-]);
+const SKIP_BASENAMES = new Set([".DS_Store", "Thumbs.db"]);
 
 /** Recursively add a path (file or directory) to the zip under the same relative path. */
 function addToZip(zip: JSZip, rel: string): void {
@@ -82,7 +79,9 @@ async function main(): Promise<void> {
 
   // Manifest: human-readable record of what's in this zip. Helpful when
   // browsing a backup directory.
-  const fileNames = Object.keys(zip.files).filter((n) => !zip.files[n].dir).sort();
+  const fileNames = Object.keys(zip.files)
+    .filter((n) => !zip.files[n].dir)
+    .sort();
   const manifest = [
     `# Atlas backup ${TS}`,
     ``,
@@ -95,10 +94,16 @@ async function main(): Promise<void> {
   zip.file("MANIFEST.md", manifest);
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
-  const blob = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 6 } });
+  const blob = await zip.generateAsync({
+    type: "nodebuffer",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  });
   fs.writeFileSync(OUT_FILE, blob);
   const sizeMb = (blob.length / 1024 / 1024).toFixed(2);
-  console.log(`\n✓ Wrote ${path.relative(ROOT, OUT_FILE)} (${sizeMb} MB, ${fileNames.length} files)`);
+  console.log(
+    `\n✓ Wrote ${path.relative(ROOT, OUT_FILE)} (${sizeMb} MB, ${fileNames.length} files)`,
+  );
 }
 
 main().catch((e) => {

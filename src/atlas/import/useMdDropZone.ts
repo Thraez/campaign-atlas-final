@@ -36,9 +36,11 @@ function collectFiles(dt: DataTransfer | null): File[] {
       if (it.kind !== "file") continue;
       // Reject folders. webkitGetAsEntry may not exist in all browsers — if
       // it does and reports a directory, skip; otherwise take the File.
-      const entry = (it as DataTransferItem & {
-        webkitGetAsEntry?: () => { isDirectory?: boolean } | null;
-      }).webkitGetAsEntry?.();
+      const entry = (
+        it as DataTransferItem & {
+          webkitGetAsEntry?: () => { isDirectory?: boolean } | null;
+        }
+      ).webkitGetAsEntry?.();
       if (entry && entry.isDirectory) continue;
       const f = it.getAsFile();
       if (f) out.push(f);

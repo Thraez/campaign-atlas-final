@@ -61,10 +61,7 @@ describe("captureLeadingCommentBlock", () => {
 describe("serializeWorldYaml", () => {
   it("round-trips the leading comment block byte-for-byte", () => {
     const existing =
-      "# Header line one\n" +
-      "# Header line two\n" +
-      "\n" +
-      "schemaVersion: 1\nmaps: []\n";
+      "# Header line one\n" + "# Header line two\n" + "\n" + "schemaVersion: 1\nmaps: []\n";
     const newBody = "schemaVersion: 1\nmaps:\n  - id: overview\n";
     const out = serializeWorldYaml(newBody, existing);
     expect(out.startsWith("# Header line one\n# Header line two\n\n")).toBe(true);
@@ -93,7 +90,9 @@ describe("serializeWorldYaml", () => {
     const newBody = "schemaVersion: 1\nmaps:\n  - id: overview\n";
     const out = serializeWorldYaml(newBody, existing);
     // Comments survive (without the BOM, which would be illegal mid-file).
-    expect(out.startsWith("# Astrath Deeprealm — config\n#\n# CANON: source of truth\n\n")).toBe(true);
+    expect(out.startsWith("# Astrath Deeprealm — config\n#\n# CANON: source of truth\n\n")).toBe(
+      true,
+    );
     // And the blank-line separator between comments and YAML body is still
     // there — the YAML body starts on the line AFTER a blank line.
     expect(out).toMatch(/# CANON: source of truth\n\nschemaVersion: 1/);

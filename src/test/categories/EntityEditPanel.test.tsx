@@ -10,12 +10,14 @@ describe("useEntityEditDraft", () => {
     const { result } = renderHook(() => useEntityEditDraft());
     expect(result.current.isDirty()).toBe(false);
 
-    act(() => result.current.load({
-      sourcePath: "content/w/npcs/corven.md",
-      baseHash: "sha256:abc",
-      fields: { id: "corven", type: "npc", visibility: "dm", summary: "s" },
-      body: "# Corven\n",
-    }));
+    act(() =>
+      result.current.load({
+        sourcePath: "content/w/npcs/corven.md",
+        baseHash: "sha256:abc",
+        fields: { id: "corven", type: "npc", visibility: "dm", summary: "s" },
+        body: "# Corven\n",
+      }),
+    );
     expect(result.current.isDirty()).toBe(false); // loaded == pristine
 
     act(() => result.current.setBody("# Corven edited\n"));
@@ -45,7 +47,10 @@ it("loads an entity, edits the body, builds a save change through the shared rew
     expect(body.files[0].path).toBe("content/w/npcs/corven.md");
     expect(body.files[0].content).toContain("new body");
     expect(body.files[0].content).toContain("atlas:");
-    return new Response(JSON.stringify({ saved: 1, paths: body.files.map((f: {path:string}) => f.path) }), { status: 200 });
+    return new Response(
+      JSON.stringify({ saved: 1, paths: body.files.map((f: { path: string }) => f.path) }),
+      { status: 200 },
+    );
   });
   vi.stubGlobal("fetch", fetchMock);
 
@@ -74,17 +79,16 @@ it("loads an entity, edits the body, saves via the shared rewrite", async () => 
     expect(body.files[0].path).toBe("content/w/npcs/corven.md");
     expect(body.files[0].content).toContain("new body");
     expect(body.files[0].content).toContain("atlas:");
-    return new Response(JSON.stringify({ saved: 1, paths: body.files.map((f: {path:string}) => f.path) }), { status: 200 });
+    return new Response(
+      JSON.stringify({ saved: 1, paths: body.files.map((f: { path: string }) => f.path) }),
+      { status: 200 },
+    );
   });
   vi.stubGlobal("fetch", fetchMock);
 
   const onSaved = vi.fn();
   render(
-    <EntityEditPanel
-      sourcePath="content/w/npcs/corven.md"
-      onClose={() => {}}
-      onSaved={onSaved}
-    />,
+    <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={onSaved} />,
   );
   await waitFor(() => expect(screen.getByLabelText(/body/i)).toBeTruthy());
   fireEvent.change(screen.getByLabelText(/body/i), { target: { value: "# Corven\n\nnew body\n" } });
@@ -97,26 +101,19 @@ it("surfaces an inline error (not a perpetual Loading…) when the source file i
   // panel must show the error + a Close affordance, never hang on "Loading…".
   const fetchMock = vi.fn(async (url: string) => {
     if (String(url).includes("/__atlas/read")) {
-      return new Response(
-        JSON.stringify({ error: "NotFound", path: "content/w/npcs/ghost.md" }),
-        { status: 404 },
-      );
+      return new Response(JSON.stringify({ error: "NotFound", path: "content/w/npcs/ghost.md" }), {
+        status: 404,
+      });
     }
     return new Response(JSON.stringify({ saved: 1, paths: [] }), { status: 200 });
   });
   vi.stubGlobal("fetch", fetchMock);
 
   render(
-    <EntityEditPanel
-      sourcePath="content/w/npcs/ghost.md"
-      onClose={() => {}}
-      onSaved={() => {}}
-    />,
+    <EntityEditPanel sourcePath="content/w/npcs/ghost.md" onClose={() => {}} onSaved={() => {}} />,
   );
 
-  await waitFor(() =>
-    expect(screen.getByText(/source file not found/i)).toBeInTheDocument(),
-  );
+  await waitFor(() => expect(screen.getByText(/source file not found/i)).toBeInTheDocument());
   expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: /close/i })).toBeInTheDocument();
 });
@@ -131,11 +128,7 @@ it("formatting toolbar wraps the textarea selection and updates the body", async
   vi.stubGlobal("fetch", fetchMock);
 
   render(
-    <EntityEditPanel
-      sourcePath="content/w/npcs/corven.md"
-      onClose={() => {}}
-      onSaved={() => {}}
-    />,
+    <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={() => {}} />,
   );
   await waitFor(() => screen.getByDisplayValue(/old body/i));
   const ta = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
@@ -145,9 +138,7 @@ it("formatting toolbar wraps the textarea selection and updates the body", async
   ta.setSelectionRange(start, start + "Corven".length);
   fireEvent.click(screen.getByRole("button", { name: "Bold" }));
   await waitFor(() =>
-    expect((screen.getByLabelText(/body/i) as HTMLTextAreaElement).value).toContain(
-      "**Corven**",
-    ),
+    expect((screen.getByLabelText(/body/i) as HTMLTextAreaElement).value).toContain("**Corven**"),
   );
 });
 
@@ -161,11 +152,7 @@ it("edit panel has no embedded preview or DM-notes toggle (superseded by global 
   vi.stubGlobal("fetch", fetchMock);
 
   render(
-    <EntityEditPanel
-      sourcePath="content/w/npcs/corven.md"
-      onClose={() => {}}
-      onSaved={() => {}}
-    />,
+    <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={() => {}} />,
   );
   await waitFor(() => screen.getByDisplayValue(/old body/i));
   expect(screen.queryByText(/show dm notes/i)).not.toBeInTheDocument();

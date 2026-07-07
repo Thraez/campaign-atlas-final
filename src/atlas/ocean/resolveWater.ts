@@ -38,22 +38,17 @@ export function deriveCrestColor(oceanColor: string): string {
  * Resolve WaterConfig to concrete values, applying defaults and clamping.
  * Pure — same input, same output. Used by OceanBackground and by tests.
  */
-export function resolveWater(
-  map: Pick<MapDocument, "water" | "oceanColor">
-): ResolvedWater {
+export function resolveWater(map: Pick<MapDocument, "water" | "oceanColor">): ResolvedWater {
   const w: WaterConfig | undefined = map.water;
   const oceanColor = map.oceanColor ?? "#18313f";
   const derivedCrest = deriveCrestColor(oceanColor);
 
   const enabled = w?.enabled !== false;
   const intensity = clamp01(
-    typeof w?.intensity === "number" ? w.intensity : DEFAULT_WATER.intensity
+    typeof w?.intensity === "number" ? w.intensity : DEFAULT_WATER.intensity,
   );
-  const speed = clamp01(
-    typeof w?.speed === "number" ? w.speed : DEFAULT_WATER.speed
-  );
-  const crestColor =
-    w?.crestColor && isValidHex(w.crestColor) ? w.crestColor : derivedCrest;
+  const speed = clamp01(typeof w?.speed === "number" ? w.speed : DEFAULT_WATER.speed);
+  const crestColor = w?.crestColor && isValidHex(w.crestColor) ? w.crestColor : derivedCrest;
 
   return { enabled, intensity, speed, crestColor };
 }

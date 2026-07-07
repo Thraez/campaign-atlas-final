@@ -9,7 +9,15 @@
  */
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, AlertTriangle, ShieldAlert, Printer, FileUp, ClipboardPaste } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  AlertTriangle,
+  ShieldAlert,
+  Printer,
+  FileUp,
+  ClipboardPaste,
+} from "lucide-react";
 import type { AtlasProject, Entity, EntityVisibility } from "@/atlas/content/schema";
 import type { EntityProfile, EntityRelationship } from "@/atlas/profiles/profileTypes";
 import {
@@ -19,16 +27,19 @@ import {
   dmFieldsForType,
 } from "@/atlas/profiles/profileFields";
 import { filterRelationshipsForPlayer } from "@/atlas/profiles/profileBuild";
-import {
-  type FrontmatterDraft,
-  entityFrontmatterPatches,
-} from "@/atlas/save/canonicalEntitySave";
+import { type FrontmatterDraft, entityFrontmatterPatches } from "@/atlas/save/canonicalEntitySave";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DmMaskingTextarea } from "@/atlas/DmMaskingTextarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { TabFrame } from "./TabFrame";
 import { buildEntityFrontmatterPatch } from "@/atlas/yaml/buildPatches";
 import { printEntityBundle } from "@/atlas/printHandout";
@@ -64,7 +75,7 @@ export function EntitiesTab({
 
   const selected = useMemo(
     () => project.entities.find((e) => e.id === selectedId),
-    [project.entities, selectedId]
+    [project.entities, selectedId],
   );
 
   const merged = (e: Entity): { entity: Entity; draft: FrontmatterDraft } => ({
@@ -92,7 +103,10 @@ export function EntitiesTab({
     [drafts, project.entities],
   );
 
-  const yamlPreview = useMemo(() => (patches.length ? buildEntityFrontmatterPatch(patches).content : ""), [patches]);
+  const yamlPreview = useMemo(
+    () => (patches.length ? buildEntityFrontmatterPatch(patches).content : ""),
+    [patches],
+  );
 
   return (
     <TabFrame
@@ -135,12 +149,7 @@ export function EntitiesTab({
             </>
           )}
           {onPasteMarkdown && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="gap-1 text-xs"
-              onClick={onPasteMarkdown}
-            >
+            <Button size="sm" variant="ghost" className="gap-1 text-xs" onClick={onPasteMarkdown}>
               <ClipboardPaste className="h-3.5 w-3.5" />
               Paste markdown
             </Button>
@@ -151,7 +160,9 @@ export function EntitiesTab({
       <div>
         <Label className="text-[10px]">Entity</Label>
         <Select value={selectedId ?? ""} onValueChange={setSelectedId}>
-          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Pick an entity" /></SelectTrigger>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder="Pick an entity" />
+          </SelectTrigger>
           <SelectContent>
             {project.entities.map((e) => (
               <SelectItem key={e.id} value={e.id} className="text-xs">
@@ -195,7 +206,8 @@ function EntityForm({
   const v = (k: keyof FrontmatterDraft, fallback: unknown) => (draft[k] ?? fallback) as never;
   const effectiveType = (draft.type ?? entity.type) as string;
   const effectiveProfile: EntityProfile = draft.profile ?? entity.profile ?? {};
-  const effectiveRelationships: EntityRelationship[] = draft.relationships ?? entity.relationships ?? [];
+  const effectiveRelationships: EntityRelationship[] =
+    draft.relationships ?? entity.relationships ?? [];
 
   const setProfile = (next: EntityProfile) => setDraft({ profile: next });
   const setPlayer = (key: string, value: string | string[]) => {
@@ -215,17 +227,34 @@ function EntityForm({
       <div className="grid grid-cols-2 gap-2">
         <div>
           <Label className="text-[10px]">Type</Label>
-          <Input value={v("type", entity.type)} onChange={(e) => setDraft({ type: e.target.value })} className="h-7 text-xs" />
+          <Input
+            value={v("type", entity.type)}
+            onChange={(e) => setDraft({ type: e.target.value })}
+            className="h-7 text-xs"
+          />
         </div>
         <div>
           <Label className="text-[10px]">Visibility</Label>
-          <Select value={v("visibility", entity.visibility)} onValueChange={(val) => setDraft({ visibility: val as EntityVisibility })}>
-            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+          <Select
+            value={v("visibility", entity.visibility)}
+            onValueChange={(val) => setDraft({ visibility: val as EntityVisibility })}
+          >
+            <SelectTrigger className="h-7 text-xs">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              <SelectItem value="player" className="text-xs">player</SelectItem>
-              <SelectItem value="dm" className="text-xs">dm</SelectItem>
-              <SelectItem value="hidden" className="text-xs">hidden</SelectItem>
-              <SelectItem value="rumor" className="text-xs">rumor</SelectItem>
+              <SelectItem value="player" className="text-xs">
+                player
+              </SelectItem>
+              <SelectItem value="dm" className="text-xs">
+                dm
+              </SelectItem>
+              <SelectItem value="hidden" className="text-xs">
+                hidden
+              </SelectItem>
+              <SelectItem value="rumor" className="text-xs">
+                rumor
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -243,7 +272,14 @@ function EntityForm({
         <Label className="text-[10px]">Aliases (comma-separated)</Label>
         <Input
           value={(draft.aliases ?? entity.aliases).join(", ")}
-          onChange={(e) => setDraft({ aliases: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+          onChange={(e) =>
+            setDraft({
+              aliases: e.target.value
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            })
+          }
           className="h-7 text-xs"
         />
       </div>
@@ -252,7 +288,14 @@ function EntityForm({
         <Textarea
           rows={2}
           value={(draft.images ?? entity.images).join("\n")}
-          onChange={(e) => setDraft({ images: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })}
+          onChange={(e) =>
+            setDraft({
+              images: e.target.value
+                .split("\n")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            })
+          }
           className="text-xs font-mono"
         />
       </div>
@@ -418,7 +461,7 @@ function RelationshipSection({
   // leaks are surfaced inline in the editor — no need to wait for a build.
   const playerCheck = useMemo(
     () => filterRelationshipsForPlayer(relationships, { entityVisibility }),
-    [relationships, entityVisibility]
+    [relationships, entityVisibility],
   );
   const leakIds = new Set(playerCheck.droppedByLeak.map((r) => r.entity));
   const unresolvedIds = new Set(playerCheck.unresolved.map((r) => r.entity));
@@ -456,7 +499,10 @@ function RelationshipSection({
                 onClick={() => add(m.id)}
                 className="block w-full text-left text-xs px-2 py-1 rounded hover:bg-accent"
               >
-                {m.title} <span className="text-muted-foreground">· {m.type} · {m.visibility}</span>
+                {m.title}{" "}
+                <span className="text-muted-foreground">
+                  · {m.type} · {m.visibility}
+                </span>
               </button>
             ))}
           </div>
@@ -480,9 +526,17 @@ function RelationshipSection({
                   <span className="text-muted-foreground ml-1">· {target?.visibility ?? "?"}</span>
                 </div>
                 {r.visibility !== "player" && r.visibility !== "rumor" && (
-                  <span className="text-[9px] uppercase rounded px-1 py-0.5 bg-destructive/15 text-destructive">DM</span>
+                  <span className="text-[9px] uppercase rounded px-1 py-0.5 bg-destructive/15 text-destructive">
+                    DM
+                  </span>
                 )}
-                <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => remove(i)} aria-label="Remove link">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0"
+                  onClick={() => remove(i)}
+                  aria-label="Remove link"
+                >
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </div>
@@ -493,8 +547,8 @@ function RelationshipSection({
               )}
               {isLeak && (
                 <div className="flex items-center gap-1 text-[10px] text-destructive">
-                  <ShieldAlert className="h-3 w-3" /> Player-visible relationship points at a DM-only entity — will be
-                  stripped from player builds (strict mode fails).
+                  <ShieldAlert className="h-3 w-3" /> Player-visible relationship points at a
+                  DM-only entity — will be stripped from player builds (strict mode fails).
                 </div>
               )}
               <div className="grid grid-cols-2 gap-1">
@@ -509,13 +563,26 @@ function RelationshipSection({
                 </div>
                 <div>
                   <Label className="text-[10px]">Visibility</Label>
-                  <Select value={r.visibility} onValueChange={(val) => update(i, { visibility: val as EntityVisibility })}>
-                    <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                  <Select
+                    value={r.visibility}
+                    onValueChange={(val) => update(i, { visibility: val as EntityVisibility })}
+                  >
+                    <SelectTrigger className="h-7 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="player" className="text-xs">player</SelectItem>
-                      <SelectItem value="rumor" className="text-xs">rumor</SelectItem>
-                      <SelectItem value="dm" className="text-xs">dm</SelectItem>
-                      <SelectItem value="hidden" className="text-xs">hidden</SelectItem>
+                      <SelectItem value="player" className="text-xs">
+                        player
+                      </SelectItem>
+                      <SelectItem value="rumor" className="text-xs">
+                        rumor
+                      </SelectItem>
+                      <SelectItem value="dm" className="text-xs">
+                        dm
+                      </SelectItem>
+                      <SelectItem value="hidden" className="text-xs">
+                        hidden
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -560,7 +627,7 @@ function HandoutBundleSection({ entities }: { entities: Entity[] }) {
     const q = filter.trim().toLowerCase();
     if (!q) return entities;
     return entities.filter(
-      (e) => e.title.toLowerCase().includes(q) || e.id.toLowerCase().includes(q)
+      (e) => e.title.toLowerCase().includes(q) || e.id.toLowerCase().includes(q),
     );
   }, [entities, filter]);
 
@@ -607,7 +674,8 @@ function HandoutBundleSection({ entities }: { entities: Entity[] }) {
       </summary>
       <div className="px-2 pb-2 space-y-2">
         <p className="text-[10px] text-muted-foreground">
-          Pick multiple entities to print as one PDF (one entity per page). Single-entity print is on the player viewer.
+          Pick multiple entities to print as one PDF (one entity per page). Single-entity print is
+          on the player viewer.
         </p>
         <Input
           value={filter}

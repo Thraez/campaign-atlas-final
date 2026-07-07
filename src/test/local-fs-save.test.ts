@@ -29,8 +29,9 @@ function file(over: Partial<FileChange> = {}): FileChange {
 describe("saveAtlasPatchToLocalFs", () => {
   it("rejects empty changes without calling fetch", async () => {
     const fetchFn = vi.fn();
-    await expect(saveAtlasPatchToLocalFs([], { fetchFn: fetchFn as unknown as typeof fetch }))
-      .rejects.toBeInstanceOf(LocalSaveError);
+    await expect(
+      saveAtlasPatchToLocalFs([], { fetchFn: fetchFn as unknown as typeof fetch }),
+    ).rejects.toBeInstanceOf(LocalSaveError);
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
@@ -52,10 +53,9 @@ describe("saveAtlasPatchToLocalFs", () => {
     const fetchFn = vi.fn();
     const big = "a".repeat(1024 * 1024 + 1);
     await expect(
-      saveAtlasPatchToLocalFs(
-        [file({ content: big })],
-        { fetchFn: fetchFn as unknown as typeof fetch },
-      ),
+      saveAtlasPatchToLocalFs([file({ content: big })], {
+        fetchFn: fetchFn as unknown as typeof fetch,
+      }),
     ).rejects.toBeInstanceOf(LocalSaveError);
     expect(fetchFn).not.toHaveBeenCalled();
   });
@@ -64,7 +64,14 @@ describe("saveAtlasPatchToLocalFs", () => {
     const fetchFn = vi.fn();
     await expect(
       saveAtlasPatchToLocalFs(
-        [{ path: "content/world/notes/ok.md", content: "x", kind: "garbage" as unknown as FileChange["kind"], baseHash: null }],
+        [
+          {
+            path: "content/world/notes/ok.md",
+            content: "x",
+            kind: "garbage" as unknown as FileChange["kind"],
+            baseHash: null,
+          },
+        ],
         { fetchFn: fetchFn as unknown as typeof fetch },
       ),
     ).rejects.toBeInstanceOf(LocalSaveError);
@@ -74,10 +81,9 @@ describe("saveAtlasPatchToLocalFs", () => {
   it("rejects a malformed baseHash without calling fetch", async () => {
     const fetchFn = vi.fn();
     await expect(
-      saveAtlasPatchToLocalFs(
-        [file({ baseHash: "not-a-hash" })],
-        { fetchFn: fetchFn as unknown as typeof fetch },
-      ),
+      saveAtlasPatchToLocalFs([file({ baseHash: "not-a-hash" })], {
+        fetchFn: fetchFn as unknown as typeof fetch,
+      }),
     ).rejects.toBeInstanceOf(LocalSaveError);
     expect(fetchFn).not.toHaveBeenCalled();
   });
@@ -103,20 +109,22 @@ describe("saveAtlasPatchToLocalFs", () => {
     expect(calls[0].init?.method).toBe("POST");
     expect(JSON.parse(String(calls[0].init?.body))).toEqual({
       files: [
-        { path: "content/world/notes/ok.md", content: "hello", kind: "entity-md", baseHash: "sha256:dead" },
+        {
+          path: "content/world/notes/ok.md",
+          content: "hello",
+          kind: "entity-md",
+          baseHash: "sha256:dead",
+        },
       ],
     });
   });
 
   it("400 DisallowedPath from server throws DisallowedPathError", async () => {
-    const fetchFn = vi.fn(async () =>
-      jsonResponse(400, { error: "DisallowedPath", path: "x" }),
-    );
+    const fetchFn = vi.fn(async () => jsonResponse(400, { error: "DisallowedPath", path: "x" }));
     await expect(
-      saveAtlasPatchToLocalFs(
-        [file({ content: "hi" })],
-        { fetchFn: fetchFn as unknown as typeof fetch },
-      ),
+      saveAtlasPatchToLocalFs([file({ content: "hi" })], {
+        fetchFn: fetchFn as unknown as typeof fetch,
+      }),
     ).rejects.toBeInstanceOf(DisallowedPathError);
   });
 
@@ -129,10 +137,9 @@ describe("saveAtlasPatchToLocalFs", () => {
         currentHash: "sha256:cafe",
       }),
     );
-    const err = await saveAtlasPatchToLocalFs(
-      [file({ content: "x" })],
-      { fetchFn: fetchFn as unknown as typeof fetch },
-    ).catch((e: unknown) => e);
+    const err = await saveAtlasPatchToLocalFs([file({ content: "x" })], {
+      fetchFn: fetchFn as unknown as typeof fetch,
+    }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ConflictError);
     const ce = err as ConflictError;
     expect(ce.reason).toBe("stale-base");
@@ -145,10 +152,9 @@ describe("saveAtlasPatchToLocalFs", () => {
       jsonResponse(423, { error: "Locked", detail: "another save in flight" }),
     );
     await expect(
-      saveAtlasPatchToLocalFs(
-        [file({ content: "x" })],
-        { fetchFn: fetchFn as unknown as typeof fetch },
-      ),
+      saveAtlasPatchToLocalFs([file({ content: "x" })], {
+        fetchFn: fetchFn as unknown as typeof fetch,
+      }),
     ).rejects.toBeInstanceOf(SaveBusyError);
   });
 
@@ -157,10 +163,9 @@ describe("saveAtlasPatchToLocalFs", () => {
       jsonResponse(500, { error: "WriteFailed", detail: "disk full" }),
     );
     await expect(
-      saveAtlasPatchToLocalFs(
-        [file({ content: "hi" })],
-        { fetchFn: fetchFn as unknown as typeof fetch },
-      ),
+      saveAtlasPatchToLocalFs([file({ content: "hi" })], {
+        fetchFn: fetchFn as unknown as typeof fetch,
+      }),
     ).rejects.toBeInstanceOf(LocalSaveError);
   });
 
@@ -196,10 +201,9 @@ describe("saveAtlasPatchToLocalFs", () => {
         files: [{ path: "content/world/notes/ok.md", hash: "sha256:abc" }],
       });
     });
-    await saveAtlasPatchToLocalFs(
-      [file({ content: "x" })],
-      { fetchFn: fetchFn as unknown as typeof fetch },
-    );
+    await saveAtlasPatchToLocalFs([file({ content: "x" })], {
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
     expect(JSON.parse(captured)).toEqual({
       files: [
         { path: "content/world/notes/ok.md", content: "x", kind: "entity-md", baseHash: null },
@@ -218,10 +222,9 @@ describe("saveAtlasPatchToLocalFs", () => {
         files: [{ path: "content/world/notes/x.md", hash: "sha256:abc" }],
       });
     });
-    await saveAtlasPatchToLocalFs(
-      [file({ path: "content/world/notes/x.md", content: text })],
-      { fetchFn: fetchFn as unknown as typeof fetch },
-    );
+    await saveAtlasPatchToLocalFs([file({ path: "content/world/notes/x.md", content: text })], {
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
     const parsed = JSON.parse(captured) as { files: Array<{ content: string }> };
     expect(parsed.files[0].content).toBe(text);
   });

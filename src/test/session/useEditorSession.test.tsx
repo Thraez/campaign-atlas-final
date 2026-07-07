@@ -12,9 +12,15 @@ import { useEditorSession, SESSION_IDB_KEY } from "@/atlas/session/useEditorSess
 function makeHolder(initial = 0) {
   let n = initial;
   return {
-    get value() { return { n }; },
-    bump() { n++; },
-    setN(v: number) { n = v; },
+    get value() {
+      return { n };
+    },
+    bump() {
+      n++;
+    },
+    setN(v: number) {
+      n = v;
+    },
   };
 }
 
@@ -45,7 +51,10 @@ function useHarness(activeMapId: string, holder: ReturnType<typeof makeHolder>) 
 }
 
 describe("useEditorSession", () => {
-  beforeEach(async () => { vi.useRealTimers(); await idbDelete(SESSION_IDB_KEY); });
+  beforeEach(async () => {
+    vi.useRealTimers();
+    await idbDelete(SESSION_IDB_KEY);
+  });
 
   it("starts clean with no snapshot", async () => {
     const h = makeHolder();
@@ -60,7 +69,10 @@ describe("useEditorSession", () => {
     const h = makeHolder();
     const { result, rerender } = renderHook(() => useHarness("A", h));
     await waitFor(() => expect(result.current.hydrated).toBe(true));
-    act(() => { h.bump(); h.bump(); });
+    act(() => {
+      h.bump();
+      h.bump();
+    });
     rerender();
     expect(result.current.status).toBe("unsaved");
     expect(result.current.unsavedCount).toBe(2);
@@ -71,8 +83,13 @@ describe("useEditorSession", () => {
     const h = makeHolder();
     const first = renderHook(() => useHarness("A", h));
     await vi.waitFor(() => expect(first.result.current.hydrated).toBe(true));
-    act(() => { h.bump(); first.rerender(); });
-    await act(async () => { await vi.runAllTimersAsync(); });
+    act(() => {
+      h.bump();
+      first.rerender();
+    });
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
     vi.useRealTimers();
 
     const stored = await idbGet<unknown>(SESSION_IDB_KEY);
@@ -89,8 +106,13 @@ describe("useEditorSession", () => {
     const h = makeHolder();
     const { result, rerender } = renderHook(() => useHarness("A", h));
     await waitFor(() => expect(result.current.hydrated).toBe(true));
-    act(() => { h.bump(); rerender(); });
-    await act(async () => { await result.current.discardAll(); });
+    act(() => {
+      h.bump();
+      rerender();
+    });
+    await act(async () => {
+      await result.current.discardAll();
+    });
     rerender();
     expect(result.current.status).toBe("clean");
     expect(await idbGet(SESSION_IDB_KEY)).toBeNull();
@@ -100,10 +122,17 @@ describe("useEditorSession", () => {
     const h = makeHolder();
     const { result, rerender } = renderHook(() => useHarness("A", h));
     await waitFor(() => expect(result.current.hydrated).toBe(true));
-    act(() => { h.bump(); rerender(); });
-    act(() => { result.current.markSaving(); });
+    act(() => {
+      h.bump();
+      rerender();
+    });
+    act(() => {
+      result.current.markSaving();
+    });
     expect(result.current.status).toBe("saving");
-    await act(async () => { await result.current.markSaved(); });
+    await act(async () => {
+      await result.current.markSaved();
+    });
     rerender();
     expect(result.current.status).toBe("saved");
   });
@@ -112,7 +141,9 @@ describe("useEditorSession", () => {
     const h = makeHolder();
     const { result } = renderHook(() => useHarness("A", h));
     await waitFor(() => expect(result.current.hydrated).toBe(true));
-    act(() => { result.current.markFailed("disk permission denied"); });
+    act(() => {
+      result.current.markFailed("disk permission denied");
+    });
     expect(result.current.status).toBe("failed");
     expect(result.current.failedReason).toBe("disk permission denied");
   });
@@ -125,11 +156,18 @@ describe("useEditorSession", () => {
     const h = makeHolder();
     const { result, rerender } = renderHook(() => useHarness("A", h));
     await waitFor(() => expect(result.current.hydrated).toBe(true));
-    act(() => { h.bump(); rerender(); });
+    act(() => {
+      h.bump();
+      rerender();
+    });
     expect(result.current.status).toBe("unsaved");
-    act(() => { result.current.markSaving(); });
+    act(() => {
+      result.current.markSaving();
+    });
     expect(result.current.status).toBe("saving");
-    act(() => { result.current.markIdle(); });
+    act(() => {
+      result.current.markIdle();
+    });
     expect(result.current.status).toBe("unsaved");
     expect(result.current.failedReason).toBeNull();
   });
@@ -138,9 +176,13 @@ describe("useEditorSession", () => {
     const h = makeHolder();
     const { result } = renderHook(() => useHarness("A", h));
     await waitFor(() => expect(result.current.hydrated).toBe(true));
-    act(() => { result.current.markSaving(); });
+    act(() => {
+      result.current.markSaving();
+    });
     expect(result.current.status).toBe("saving");
-    act(() => { result.current.markIdle(); });
+    act(() => {
+      result.current.markIdle();
+    });
     expect(result.current.status).toBe("clean");
   });
 
@@ -148,9 +190,13 @@ describe("useEditorSession", () => {
     const h = makeHolder();
     const { result } = renderHook(() => useHarness("A", h));
     await waitFor(() => expect(result.current.hydrated).toBe(true));
-    act(() => { result.current.markFailed("disk permission denied"); });
+    act(() => {
+      result.current.markFailed("disk permission denied");
+    });
     expect(result.current.status).toBe("failed");
-    act(() => { result.current.markIdle(); });
+    act(() => {
+      result.current.markIdle();
+    });
     expect(result.current.status).toBe("clean");
     expect(result.current.failedReason).toBeNull();
   });

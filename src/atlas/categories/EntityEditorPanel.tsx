@@ -12,7 +12,11 @@ export interface NewEntityDraft {
 }
 
 export function EntityEditorPanel({
-  mode, category, onCreate, onCancel, fullFields,
+  mode,
+  category,
+  onCreate,
+  onCancel,
+  fullFields,
 }: {
   mode: "create" | "edit";
   category: CategoryId;
@@ -32,19 +36,28 @@ export function EntityEditorPanel({
       <div className="flex-1 overflow-auto p-3 space-y-3 text-xs">
         <label className="block">
           <span className="block mb-1">Name</span>
-          <input aria-label="Name" className="w-full h-8 px-2 rounded border bg-background"
-            value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input
+            aria-label="Name"
+            className="w-full h-8 px-2 rounded border bg-background"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
         </label>
         <label className="block">
           <span className="block mb-1">One-line summary</span>
-          <input className="w-full h-8 px-2 rounded border bg-background"
-            value={summary} onChange={(e) => setSummary(e.target.value)} />
+          <input
+            className="w-full h-8 px-2 rounded border bg-background"
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+          />
         </label>
         <label className="block">
           <span className="block mb-1">Visibility</span>
-          <select className="w-full h-8 px-2 rounded border bg-background"
+          <select
+            className="w-full h-8 px-2 rounded border bg-background"
             value={visibility}
-            onChange={(e) => setVisibility(e.target.value as EntityVisibility)}>
+            onChange={(e) => setVisibility(e.target.value as EntityVisibility)}
+          >
             <option value="player">player</option>
             <option value="dm">dm</option>
             <option value="hidden">hidden</option>
@@ -53,18 +66,30 @@ export function EntityEditorPanel({
         </label>
         <label className="block">
           <span className="block mb-1">Kind</span>
-          <input className="w-full h-8 px-2 rounded border bg-background"
+          <input
+            className="w-full h-8 px-2 rounded border bg-background"
             placeholder="defaults from category"
-            value={kind} onChange={(e) => setKind(e.target.value)} />
+            value={kind}
+            onChange={(e) => setKind(e.target.value)}
+          />
         </label>
 
-        <button type="button" className="text-primary underline"
-          onClick={() => setShowMore((s) => !s)}>
+        <button
+          type="button"
+          className="text-primary underline"
+          onClick={() => setShowMore((s) => !s)}
+        >
           {showMore ? "Hide details" : "More details"}
         </button>
         {showMore && (
           <div className="border-t pt-3">
-            <div>{fullFields ?? <p className="text-muted-foreground">Relationships and profile fields appear here.</p>}</div>
+            <div>
+              {fullFields ?? (
+                <p className="text-muted-foreground">
+                  Relationships and profile fields appear here.
+                </p>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -72,16 +97,20 @@ export function EntityEditorPanel({
         <button type="button" className="h-8 px-3 text-xs rounded border" onClick={onCancel}>
           Cancel
         </button>
-        <button type="button"
+        <button
+          type="button"
           className="h-8 px-3 text-xs rounded bg-primary text-primary-foreground"
           disabled={!title.trim()}
           onClick={() =>
             onCreate({
-              category, title: title.trim(),
+              category,
+              title: title.trim(),
               summary: summary.trim() || undefined,
-              visibility, kind: kind.trim() || undefined,
+              visibility,
+              kind: kind.trim() || undefined,
             })
-          }>
+          }
+        >
           {mode === "create" ? "Create" : "Save changes"}
         </button>
       </div>

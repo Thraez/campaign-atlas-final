@@ -35,14 +35,22 @@ describe("relationship player filter", () => {
   ]);
 
   it("keeps player→player relationships", () => {
-    const r: EntityRelationship = { entity: "thornhold", type: "trades_with", visibility: "player" };
+    const r: EntityRelationship = {
+      entity: "thornhold",
+      type: "trades_with",
+      visibility: "player",
+    };
     const out = filterRelationshipsForPlayer([r], { entityVisibility: vis });
     expect(out.kept).toHaveLength(1);
     expect(out.droppedByLeak).toHaveLength(0);
   });
 
   it("flags player→DM relationships as spoiler leaks (does not ship them)", () => {
-    const r: EntityRelationship = { entity: "deeproot", type: "secretly_funds", visibility: "player" };
+    const r: EntityRelationship = {
+      entity: "deeproot",
+      type: "secretly_funds",
+      visibility: "player",
+    };
     const out = filterRelationshipsForPlayer([r], { entityVisibility: vis });
     expect(out.kept).toHaveLength(0);
     expect(out.droppedByLeak).toHaveLength(1);
@@ -71,7 +79,11 @@ describe("relationship player filter", () => {
   });
 
   it("keeps a rumor-visibility relationship pointing at a player entity", () => {
-    const r: EntityRelationship = { entity: "thornhold", type: "rumored_ally", visibility: "rumor" };
+    const r: EntityRelationship = {
+      entity: "thornhold",
+      type: "rumored_ally",
+      visibility: "rumor",
+    };
     const out = filterRelationshipsForPlayer([r], { entityVisibility: vis });
     expect(out.kept).toEqual([r]);
     expect(out.droppedByLeak).toHaveLength(0);
@@ -87,14 +99,22 @@ describe("relationship player filter", () => {
   });
 
   it("treats a rumor relationship pointing at a DM entity as a spoiler leak", () => {
-    const r: EntityRelationship = { entity: "deeproot", type: "secretly_funds", visibility: "rumor" };
+    const r: EntityRelationship = {
+      entity: "deeproot",
+      type: "secretly_funds",
+      visibility: "rumor",
+    };
     const out = filterRelationshipsForPlayer([r], { entityVisibility: vis });
     expect(out.kept).toHaveLength(0);
     expect(out.droppedByLeak).toEqual([r]);
   });
 
   it("treats a rumor relationship pointing at a hidden entity as a spoiler leak", () => {
-    const r: EntityRelationship = { entity: "river-cult", type: "knows_secret_of", visibility: "rumor" };
+    const r: EntityRelationship = {
+      entity: "river-cult",
+      type: "knows_secret_of",
+      visibility: "rumor",
+    };
     const out = filterRelationshipsForPlayer([r], { entityVisibility: vis });
     expect(out.kept).toHaveLength(0);
     expect(out.droppedByLeak).toEqual([r]);
@@ -213,7 +233,9 @@ describe("compactPlayerProfile — branch coverage", () => {
     expect(compactPlayerProfile({ known_for: "  " })).toBeUndefined();
   });
   it("trims known_for and keeps it when non-empty", () => {
-    expect(compactPlayerProfile({ known_for: "  hero of Thornhold  " })?.known_for).toBe("hero of Thornhold");
+    expect(compactPlayerProfile({ known_for: "  hero of Thornhold  " })?.known_for).toBe(
+      "hero of Thornhold",
+    );
   });
   it("filters empty strings from visible_traits, keeps non-empty ones", () => {
     const out = compactPlayerProfile({ visible_traits: ["brave", "", "  "] });

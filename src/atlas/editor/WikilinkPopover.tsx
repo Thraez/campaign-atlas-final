@@ -57,9 +57,7 @@ export function WikilinkPopover({
           role="option"
           aria-selected={i === clampedIndex}
           className={`flex items-baseline gap-2 px-2 py-1 cursor-pointer select-none ${
-            i === clampedIndex
-              ? "bg-primary text-primary-foreground"
-              : "hover:bg-muted"
+            i === clampedIndex ? "bg-primary text-primary-foreground" : "hover:bg-muted"
           }`}
           onMouseDown={(e) => {
             // prevent textarea blur before onSelect fires

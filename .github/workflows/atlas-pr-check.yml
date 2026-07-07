@@ -31,6 +31,9 @@ jobs:
       - name: Type-check (whole app)
         run: npm run typecheck
 
+      - name: Check formatting
+        run: npm run format:check
+
       - name: Build player-safe atlas (strict)
         run: npm run atlas:build:player
 

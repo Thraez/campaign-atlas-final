@@ -47,7 +47,10 @@ export function TabFrame(props: TabFrameProps) {
           <Badge variant="outline" title="Rows already committed in YAML canon">
             {builtFromYamlCount} from YAML
           </Badge>
-          <Badge variant={localDraftCount > 0 ? "default" : "outline"} title="Edits pending in this browser">
+          <Badge
+            variant={localDraftCount > 0 ? "default" : "outline"}
+            title="Edits pending in this browser"
+          >
             {localDraftCount} draft
           </Badge>
           {blockingCount > 0 && (
@@ -55,9 +58,7 @@ export function TabFrame(props: TabFrameProps) {
               <ShieldAlert className="h-3 w-3" /> {blockingCount} blocking
             </Badge>
           )}
-          {warningCount > 0 && (
-            <Badge variant="secondary">{warningCount} warning</Badge>
-          )}
+          {warningCount > 0 && <Badge variant="secondary">{warningCount} warning</Badge>}
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto">

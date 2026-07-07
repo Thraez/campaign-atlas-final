@@ -65,11 +65,7 @@ function Harness({
       rows={rows}
       importConfig={importConfig}
       onPatchRow={(id, patch) =>
-        setRows((rs) =>
-          rs.map((r) =>
-            r.id === id ? updateStagingRow(r, patch, ctx) : r,
-          ),
-        )
+        setRows((rs) => rs.map((r) => (r.id === id ? updateStagingRow(r, patch, ctx) : r)))
       }
       onCancel={() => {}}
       onCommit={() => onCommit?.(rows.filter((r) => r.included && r.pathAllowed && !r.parseError))}
@@ -92,9 +88,7 @@ describe("ImportStagingModal", () => {
     expect(
       screen.getByDisplayValue("content/astrath-deeprealm/settlements/thornhold.md"),
     ).toBeTruthy();
-    expect(
-      screen.getByDisplayValue("content/astrath-deeprealm/npcs/garron.md"),
-    ).toBeTruthy();
+    expect(screen.getByDisplayValue("content/astrath-deeprealm/npcs/garron.md")).toBeTruthy();
   });
 
   it("Import button reflects the count of included rows", () => {
@@ -116,9 +110,7 @@ describe("ImportStagingModal", () => {
     const existingPaths = new Set(["content/astrath-deeprealm/settlements/thornhold.md"]);
     const ctx = makeCtx({ existingPaths });
     const rows = buildStagingRows(
-      [
-        { filename: "thornhold.md", raw: "---\natlas: { type: settlement, id: thornhold }\n---\n" },
-      ],
+      [{ filename: "thornhold.md", raw: "---\natlas: { type: settlement, id: thornhold }\n---\n" }],
       ctx,
     );
     render(<Harness initial={rows} ctx={ctx} />);
@@ -185,24 +177,43 @@ describe("ImportStagingModal", () => {
 
   it("shows 'Pick a type' badge on a guessed row (unmapped, no signal) and not on an explicit row", () => {
     const guessedRow = {
-      id: "r1", filename: "mystery.md", inferredType: "lore",
-      typeWasExplicit: false, typeWasGuessed: true, resolvedId: "mystery",
-      resolvedVisibility: "dm", rawContent: "", content: "",
+      id: "r1",
+      filename: "mystery.md",
+      inferredType: "lore",
+      typeWasExplicit: false,
+      typeWasGuessed: true,
+      resolvedId: "mystery",
+      resolvedVisibility: "dm",
+      rawContent: "",
+      content: "",
       targetPath: "content/w/imports/mystery.md",
-      pathAllowed: true, rowKind: "create", included: true,
+      pathAllowed: true,
+      rowKind: "create",
+      included: true,
     };
     const explicitRow = {
-      id: "r2", filename: "corven.md", inferredType: "npc",
-      typeWasExplicit: true, typeWasGuessed: false, resolvedId: "corven",
-      resolvedVisibility: "dm", rawContent: "", content: "",
+      id: "r2",
+      filename: "corven.md",
+      inferredType: "npc",
+      typeWasExplicit: true,
+      typeWasGuessed: false,
+      resolvedId: "corven",
+      resolvedVisibility: "dm",
+      rawContent: "",
+      content: "",
       targetPath: "content/w/npcs/corven.md",
-      pathAllowed: true, rowKind: "create", included: true,
+      pathAllowed: true,
+      rowKind: "create",
+      included: true,
     };
     render(
       <ImportStagingModal
-        open rows={[guessedRow as never, explicitRow as never]}
+        open
+        rows={[guessedRow as never, explicitRow as never]}
         importConfig={{ folders: { npc: "npcs" }, defaultFolder: "imports" }}
-        onPatchRow={() => {}} onCancel={() => {}} onCommit={() => {}}
+        onPatchRow={() => {}}
+        onCancel={() => {}}
+        onCommit={() => {}}
       />,
     );
     // Guessed row shows the "Pick a type" affordance
@@ -215,17 +226,28 @@ describe("ImportStagingModal", () => {
 
   it("does not show 'Pick a type' for a tag-inferred row (confident inference)", () => {
     const tagInferredRow = {
-      id: "r3", filename: "garron.md", inferredType: "npc",
-      typeWasExplicit: false, typeWasGuessed: false, resolvedId: "garron",
-      resolvedVisibility: "dm", rawContent: "", content: "",
+      id: "r3",
+      filename: "garron.md",
+      inferredType: "npc",
+      typeWasExplicit: false,
+      typeWasGuessed: false,
+      resolvedId: "garron",
+      resolvedVisibility: "dm",
+      rawContent: "",
+      content: "",
       targetPath: "content/w/npcs/garron.md",
-      pathAllowed: true, rowKind: "create", included: true,
+      pathAllowed: true,
+      rowKind: "create",
+      included: true,
     };
     render(
       <ImportStagingModal
-        open rows={[tagInferredRow as never]}
+        open
+        rows={[tagInferredRow as never]}
         importConfig={{ folders: { npc: "npcs" }, defaultFolder: "imports" }}
-        onPatchRow={() => {}} onCancel={() => {}} onCommit={() => {}}
+        onPatchRow={() => {}}
+        onCancel={() => {}}
+        onCommit={() => {}}
       />,
     );
     expect(screen.queryByText(/Pick a type/i)).toBeNull();
@@ -233,18 +255,29 @@ describe("ImportStagingModal", () => {
 
   it("does not show 'Pick a type' for a parse-error row", () => {
     const errorRow = {
-      id: "r4", filename: "bad.md", inferredType: "lore",
-      typeWasExplicit: false, typeWasGuessed: false, resolvedId: "bad",
-      resolvedVisibility: "dm", rawContent: "", content: "",
+      id: "r4",
+      filename: "bad.md",
+      inferredType: "lore",
+      typeWasExplicit: false,
+      typeWasGuessed: false,
+      resolvedId: "bad",
+      resolvedVisibility: "dm",
+      rawContent: "",
+      content: "",
       targetPath: "content/w/imports/bad.md",
-      pathAllowed: true, rowKind: "create", included: false,
+      pathAllowed: true,
+      rowKind: "create",
+      included: false,
       parseError: "YAML parse error",
     };
     render(
       <ImportStagingModal
-        open rows={[errorRow as never]}
+        open
+        rows={[errorRow as never]}
         importConfig={{ folders: { npc: "npcs" }, defaultFolder: "imports" }}
-        onPatchRow={() => {}} onCancel={() => {}} onCommit={() => {}}
+        onPatchRow={() => {}}
+        onCancel={() => {}}
+        onCommit={() => {}}
       />,
     );
     expect(screen.queryByText(/Pick a type/i)).toBeNull();
@@ -252,16 +285,28 @@ describe("ImportStagingModal", () => {
 
   it("shows resolved visibility column (row-level check)", () => {
     const row = {
-      id: "r5", filename: "corven.md", inferredType: "npc",
-      typeWasExplicit: true, typeWasGuessed: false, resolvedId: "corven",
-      resolvedVisibility: "dm", rawContent: "", content: "",
+      id: "r5",
+      filename: "corven.md",
+      inferredType: "npc",
+      typeWasExplicit: true,
+      typeWasGuessed: false,
+      resolvedId: "corven",
+      resolvedVisibility: "dm",
+      rawContent: "",
+      content: "",
       targetPath: "content/w/npcs/corven.md",
-      pathAllowed: true, rowKind: "create", included: true,
+      pathAllowed: true,
+      rowKind: "create",
+      included: true,
     };
     render(
       <ImportStagingModal
-        open rows={[row as never]} importConfig={{ folders: { npc: "npcs" }, defaultFolder: "imports" }}
-        onPatchRow={() => {}} onCancel={() => {}} onCommit={() => {}}
+        open
+        rows={[row as never]}
+        importConfig={{ folders: { npc: "npcs" }, defaultFolder: "imports" }}
+        onPatchRow={() => {}}
+        onCancel={() => {}}
+        onCommit={() => {}}
       />,
     );
     expect(screen.getByText("corven")).toBeInTheDocument();

@@ -30,11 +30,7 @@ function mkTmp(): string {
 }
 
 /** Write atlas.config.json + content/<worldId>/_atlas/world.yaml */
-function writeSourceConfig(
-  dir: string,
-  worldId: string,
-  worldYaml: string,
-): void {
+function writeSourceConfig(dir: string, worldId: string, worldYaml: string): void {
   fs.writeFileSync(
     path.join(dir, "atlas.config.json"),
     JSON.stringify({
@@ -67,7 +63,12 @@ async function buildTransparentPng(): Promise<Buffer> {
 /** Build a 10×10 RGBA PNG that is fully opaque (white). */
 async function buildOpaquePng(): Promise<Buffer> {
   return sharp({
-    create: { width: 10, height: 10, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } },
+    create: {
+      width: 10,
+      height: 10,
+      channels: 4,
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
+    },
   })
     .png()
     .toBuffer();
@@ -174,7 +175,7 @@ describe("check-fog-safety", () => {
             layers: [
               {
                 id: "lyr",
-                src: "atlas/assets/maps/world.png",  // NOT .fog.png
+                src: "atlas/assets/maps/world.png", // NOT .fog.png
                 x: 0,
                 y: 0,
                 width: 100,
@@ -225,7 +226,14 @@ describe("check-fog-safety", () => {
             fog: {
               mapId: "world",
               enabled: true,
-              reveals: [[[1, 1], [2, 1], [2, 2], [1, 2]]],  // LEAK: geometry not stripped
+              reveals: [
+                [
+                  [1, 1],
+                  [2, 1],
+                  [2, 2],
+                  [1, 2],
+                ],
+              ], // LEAK: geometry not stripped
             },
           },
         ],

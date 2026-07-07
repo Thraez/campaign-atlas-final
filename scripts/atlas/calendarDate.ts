@@ -11,18 +11,18 @@
 import type { WorldCalendar } from "../../src/atlas/content/schema";
 
 export interface ParsedDate {
-  value: number;        // sortable integer (days from epoch year 0)
+  value: number; // sortable integer (days from epoch year 0)
   year: number;
-  monthIndex?: number;  // 0-based
+  monthIndex?: number; // 0-based
   day?: number;
-  label: string;        // pretty rendered label
+  label: string; // pretty rendered label
 }
 
 const ISO_RE = /^(-?\d{1,6})(?:-(\d{1,2}))?(?:-(\d{1,2}))?$/;
 
 export function parseAtlasDate(
   raw: string | undefined,
-  calendar: WorldCalendar | undefined
+  calendar: WorldCalendar | undefined,
 ): ParsedDate | null {
   if (!raw) return null;
   const trimmed = raw.trim();
@@ -41,9 +41,7 @@ export function parseAtlasDate(
       const value = year * yearLength + dayOfYear;
       const monthName = months[safeMonth]?.name ?? `M${safeMonth + 1}`;
       const epoch = calendar.epochName ? ` ${calendar.epochName}` : "";
-      const label = m[2] || m[3]
-        ? `${day} ${monthName}, ${year}${epoch}`
-        : `${year}${epoch}`;
+      const label = m[2] || m[3] ? `${day} ${monthName}, ${year}${epoch}` : `${year}${epoch}`;
       return { value, year, monthIndex: safeMonth, day, label };
     }
     // No calendar: use 365-day approximation for sorting.

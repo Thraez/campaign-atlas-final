@@ -15,7 +15,12 @@ import {
 import type { MapDocument } from "@/atlas/content/schema";
 
 const fakeMap: MapDocument = {
-  id: "world", worldId: "astrath", name: "World", width: 4000, height: 3000, layers: [],
+  id: "world",
+  worldId: "astrath",
+  name: "World",
+  width: 4000,
+  height: 3000,
+  layers: [],
 };
 
 const makeImage = (overrides: Partial<ImportImage> = {}): ImportImage => {
@@ -64,17 +69,32 @@ describe("mapImport helpers", () => {
   it("buildImportPlan per-image creates one map per image", () => {
     const a = makeImage({ id: "a", originalFilename: "alpha.png" });
     const b = makeImage({ id: "b", originalFilename: "beta.png" });
-    const plan = buildImportPlan({ images: [a, b], mode: "per-image", currentMap: fakeMap, defaultWorldId: "astrath" });
+    const plan = buildImportPlan({
+      images: [a, b],
+      mode: "per-image",
+      currentMap: fakeMap,
+      defaultWorldId: "astrath",
+    });
     expect(plan.maps).toHaveLength(2);
     expect(plan.maps.map((m) => m.id).sort()).toEqual(["alpha", "beta"]);
     expect(plan.assets).toHaveLength(2);
   });
 
   it("buildImportPlan layers mode reuses current map and brings existing layers", () => {
-    const cm: MapDocument = { ...fakeMap, layers: [{ id: "base", src: "/x.webp", x: 0, y: 0, width: 10, height: 10, opacity: 1, zIndex: 0 }] };
+    const cm: MapDocument = {
+      ...fakeMap,
+      layers: [
+        { id: "base", src: "/x.webp", x: 0, y: 0, width: 10, height: 10, opacity: 1, zIndex: 0 },
+      ],
+    };
     const img = makeImage();
     img.assignment = defaultAssignment("over.png", "layers", cm, "astrath");
-    const plan = buildImportPlan({ images: [img], mode: "layers", currentMap: cm, defaultWorldId: "astrath" });
+    const plan = buildImportPlan({
+      images: [img],
+      mode: "layers",
+      currentMap: cm,
+      defaultWorldId: "astrath",
+    });
     expect(plan.maps).toHaveLength(1);
     expect(plan.maps[0].id).toBe("world");
     expect(plan.maps[0].layers.map((l) => l.id)).toEqual(["base", "over"]);
@@ -98,7 +118,9 @@ describe("mapImport helpers", () => {
     b.assignment.layerId = a.assignment.layerId;
     const plan = buildImportPlan({ images: [a, b], mode: "per-image", defaultWorldId: "astrath" });
     const issues = validateImportPlan(plan, [a, b]);
-    expect(issues.some((i) => i.severity === "blocking" && /Duplicate layer/.test(i.message))).toBe(true);
+    expect(issues.some((i) => i.severity === "blocking" && /Duplicate layer/.test(i.message))).toBe(
+      true,
+    );
   });
 
   it("validateImportPlan rejects unsafe asset paths", () => {
@@ -106,7 +128,9 @@ describe("mapImport helpers", () => {
     img.assignment.targetAssetPath = "public/atlas/assets/maps/bad path.png";
     const plan = buildImportPlan({ images: [img], mode: "per-image", defaultWorldId: "astrath" });
     const issues = validateImportPlan(plan, [img]);
-    expect(issues.some((i) => i.severity === "blocking" && /unsafe characters/.test(i.message))).toBe(true);
+    expect(
+      issues.some((i) => i.severity === "blocking" && /unsafe characters/.test(i.message)),
+    ).toBe(true);
   });
 
   it("validateImportPlan rejects asset paths outside public/atlas/assets", () => {
@@ -114,7 +138,11 @@ describe("mapImport helpers", () => {
     img.assignment.targetAssetPath = "src/random/file.png";
     const plan = buildImportPlan({ images: [img], mode: "per-image", defaultWorldId: "astrath" });
     const issues = validateImportPlan(plan, [img]);
-    expect(issues.some((i) => i.severity === "blocking" && /must live under public\/atlas\/assets/.test(i.message))).toBe(true);
+    expect(
+      issues.some(
+        (i) => i.severity === "blocking" && /must live under public\/atlas\/assets/.test(i.message),
+      ),
+    ).toBe(true);
   });
 
   it("validateImportPlan rejects opacity outside 0..1", () => {
@@ -269,54 +297,125 @@ describe("validateImportPlan — uncovered validation rules", () => {
       ],
     });
     const issues = validateImportPlan(plan, []);
-    expect(issues.some((i) => i.severity === "blocking" && /Duplicate map id/.test(i.message))).toBe(true);
+    expect(
+      issues.some((i) => i.severity === "blocking" && /Duplicate map id/.test(i.message)),
+    ).toBe(true);
   });
 
   it("flags a map with zero width as blocking", () => {
     const plan = makeMinimalPlan({
       maps: [{ id: "m", name: "M", worldId: "w", width: 0, height: 100, layers: [] }],
     });
-    expect(validateImportPlan(plan, []).some((i) => i.severity === "blocking" && /invalid size/.test(i.message))).toBe(true);
+    expect(
+      validateImportPlan(plan, []).some(
+        (i) => i.severity === "blocking" && /invalid size/.test(i.message),
+      ),
+    ).toBe(true);
   });
 
   it("flags a layer with zero height as blocking", () => {
     const plan = makeMinimalPlan({
-      maps: [{ id: "m", name: "M", worldId: "w", width: 100, height: 100, layers: [
-        { id: "l", src: "/atlas/assets/x.jpg", x: 0, y: 0, width: 100, height: 0, opacity: 1, zIndex: 0 },
-      ]}],
+      maps: [
+        {
+          id: "m",
+          name: "M",
+          worldId: "w",
+          width: 100,
+          height: 100,
+          layers: [
+            {
+              id: "l",
+              src: "/atlas/assets/x.jpg",
+              x: 0,
+              y: 0,
+              width: 100,
+              height: 0,
+              opacity: 1,
+              zIndex: 0,
+            },
+          ],
+        },
+      ],
     });
-    expect(validateImportPlan(plan, []).some((i) => i.severity === "blocking" && /invalid size/.test(i.message))).toBe(true);
+    expect(
+      validateImportPlan(plan, []).some(
+        (i) => i.severity === "blocking" && /invalid size/.test(i.message),
+      ),
+    ).toBe(true);
   });
 
   it("flags an external URL layer src as a warning", () => {
     const plan = makeMinimalPlan({
-      maps: [{ id: "m", name: "M", worldId: "w", width: 100, height: 100, layers: [
-        { id: "l", src: "https://cdn.example.com/map.jpg", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 0 },
-      ]}],
+      maps: [
+        {
+          id: "m",
+          name: "M",
+          worldId: "w",
+          width: 100,
+          height: 100,
+          layers: [
+            {
+              id: "l",
+              src: "https://cdn.example.com/map.jpg",
+              x: 0,
+              y: 0,
+              width: 100,
+              height: 100,
+              opacity: 1,
+              zIndex: 0,
+            },
+          ],
+        },
+      ],
     });
-    expect(validateImportPlan(plan, []).some((i) => i.severity === "warning" && /won't work offline/.test(i.message))).toBe(true);
+    expect(
+      validateImportPlan(plan, []).some(
+        (i) => i.severity === "warning" && /won't work offline/.test(i.message),
+      ),
+    ).toBe(true);
   });
 
   it("flags a missing layer src as blocking", () => {
     const plan = makeMinimalPlan({
-      maps: [{ id: "m", name: "M", worldId: "w", width: 100, height: 100, layers: [
-        { id: "l", src: "", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 0 },
-      ]}],
+      maps: [
+        {
+          id: "m",
+          name: "M",
+          worldId: "w",
+          width: 100,
+          height: 100,
+          layers: [
+            { id: "l", src: "", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 0 },
+          ],
+        },
+      ],
     });
-    expect(validateImportPlan(plan, []).some((i) => i.severity === "blocking" && /missing image source/.test(i.message))).toBe(true);
+    expect(
+      validateImportPlan(plan, []).some(
+        (i) => i.severity === "blocking" && /missing image source/.test(i.message),
+      ),
+    ).toBe(true);
   });
 
   it("flags an unusual image extension as a warning", () => {
     const img = makeImage({ originalFilename: "photo.bmp" });
     img.filename = "photo.bmp";
     const plan = buildImportPlan({ images: [img], mode: "per-image", defaultWorldId: "astrath" });
-    expect(validateImportPlan(plan, [img]).some((i) => i.severity === "warning" && /unusual extension/.test(i.message))).toBe(true);
+    expect(
+      validateImportPlan(plan, [img]).some(
+        (i) => i.severity === "warning" && /unusual extension/.test(i.message),
+      ),
+    ).toBe(true);
   });
 
   it("flags an oversize image as a warning", () => {
     const img = makeImage();
     img.bytes = 9 * 1024 * 1024; // 9 MB — over the 8 MB limit
     const plan = buildImportPlan({ images: [img], mode: "per-image", defaultWorldId: "astrath" });
-    expect(validateImportPlan(plan, [img]).some((i) => i.severity === "warning" && /MB/.test(i.message) && /compress/.test(i.message))).toBe(true);
+    expect(
+      validateImportPlan(plan, [img]).some(
+        (i) => i.severity === "warning" && /MB/.test(i.message) && /compress/.test(i.message),
+      ),
+    ).toBe(true);
   });
 });

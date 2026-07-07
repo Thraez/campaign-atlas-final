@@ -14,9 +14,7 @@ describe("isAllowedDevRequest", () => {
     ];
     for (const { host, label } of cases) {
       it(`accepts GET with Host=${label}`, () => {
-        expect(
-          isAllowedDevRequest({ host, origin: undefined, method: "GET" }),
-        ).toBe(true);
+        expect(isAllowedDevRequest({ host, origin: undefined, method: "GET" })).toBe(true);
       });
     }
   });
@@ -33,9 +31,7 @@ describe("isAllowedDevRequest", () => {
     ];
     for (const { host, label } of cases) {
       it(`rejects GET with Host=${label}`, () => {
-        expect(
-          isAllowedDevRequest({ host, origin: undefined, method: "GET" }),
-        ).toBe(false);
+        expect(isAllowedDevRequest({ host, origin: undefined, method: "GET" })).toBe(false);
       });
       it(`rejects POST with Host=${label}`, () => {
         expect(

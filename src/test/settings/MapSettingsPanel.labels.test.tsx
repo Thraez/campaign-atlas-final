@@ -13,6 +13,8 @@ describe("MapSettingsPanel plain labels", () => {
     expect(screen.getByText(/Wrap east–west/)).toBeInTheDocument();
     // No raw keys / jargon anywhere in the rendered panel:
     const txt = document.body.textContent ?? "";
-    expect(txt).not.toMatch(/oceanColor|wrapX|\bgrid\b\s*key|Unsaved:|Discard local edits|world\.yaml|rebuilds/);
+    expect(txt).not.toMatch(
+      /oceanColor|wrapX|\bgrid\b\s*key|Unsaved:|Discard local edits|world\.yaml|rebuilds/,
+    );
   });
 });

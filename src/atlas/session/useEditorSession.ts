@@ -14,7 +14,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
 import { idbGet, idbSet, idbDelete } from "./idbStore";
 import {
-  serializeSession, deserializeSession, sessionHasWork,
+  serializeSession,
+  deserializeSession,
+  sessionHasWork,
   type SessionState,
 } from "./sessionSnapshot";
 import type { EntityEditSnapshot } from "@/atlas/categories/useEntityEditDraft";
@@ -30,7 +32,10 @@ export interface EditorSessionArgs {
   activeMapId: string | null;
   undoStack: Pick<UndoStackAPI, "clear">;
   holders: {
-    overrides: { get: () => SessionState["overrides"]; set: (o: SessionState["overrides"]) => void };
+    overrides: {
+      get: () => SessionState["overrides"];
+      set: (o: SessionState["overrides"]) => void;
+    };
     mapOverride: { get: () => Record<string, unknown>; set: (m: Record<string, unknown>) => void };
     region: Holder<unknown>;
     route: Holder<unknown>;
@@ -67,8 +72,14 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
 
   // Per-map slices live in a ref (synchronous, not render state).
   const slicesRef = useRef<SessionState>({
-    overrides: {}, mapOverrideByMap: {}, regionByMap: {},
-    routeByMap: {}, fogByMap: {}, layerByMap: {}, entityEdit: null, savedAt: Date.now(),
+    overrides: {},
+    mapOverrideByMap: {},
+    regionByMap: {},
+    routeByMap: {},
+    fogByMap: {},
+    layerByMap: {},
+    entityEdit: null,
+    savedAt: Date.now(),
   });
   const [hydrated, setHydrated] = useState(false);
   const [status, setStatus] = useState<SaveLifecycle>("clean");
@@ -77,30 +88,40 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
   const mapRef = useRef(activeMapId);
 
   // ---- collect / apply the active map's holder slices ----
-  const collectActiveInto = useCallback((s: SessionState, mapId: string | null) => {
-    s.overrides = holders.overrides.get();
-    // layer.snapshot() returns the full byMap store — assign wholesale, not per-key
-    s.layerByMap = holders.layer.snapshot() as never;
-    const mo = holders.mapOverride.get();
-    s.mapOverrideByMap = mo as never;
-    s.entityEdit = holders.editorEntity.get();
-    if (!mapId) return;
-    s.regionByMap[mapId] = holders.region.snapshot() as never;
-    s.routeByMap[mapId] = holders.route.snapshot() as never;
-    s.fogByMap[mapId] = holders.fog.snapshot() as never;
-  }, [holders]);
+  const collectActiveInto = useCallback(
+    (s: SessionState, mapId: string | null) => {
+      s.overrides = holders.overrides.get();
+      // layer.snapshot() returns the full byMap store — assign wholesale, not per-key
+      s.layerByMap = holders.layer.snapshot() as never;
+      const mo = holders.mapOverride.get();
+      s.mapOverrideByMap = mo as never;
+      s.entityEdit = holders.editorEntity.get();
+      if (!mapId) return;
+      s.regionByMap[mapId] = holders.region.snapshot() as never;
+      s.routeByMap[mapId] = holders.route.snapshot() as never;
+      s.fogByMap[mapId] = holders.fog.snapshot() as never;
+    },
+    [holders],
+  );
 
-  const applyActiveFrom = useCallback((s: SessionState, mapId: string | null) => {
-    holders.overrides.set(s.overrides);
-    holders.mapOverride.set(s.mapOverrideByMap as never);
-    // layer.applySnapshot() expects the full byMap store
-    holders.layer.applySnapshot(s.layerByMap as never);
-    holders.editorEntity.set(s.entityEdit);
-    if (!mapId) return;
-    holders.region.applySnapshot((s.regionByMap[mapId] ?? { edits: {}, added: [], deleted: [] }) as never);
-    holders.route.applySnapshot((s.routeByMap[mapId] ?? { edits: {}, added: [], deleted: [] }) as never);
-    holders.fog.applySnapshot((s.fogByMap[mapId] ?? null) as never);
-  }, [holders]);
+  const applyActiveFrom = useCallback(
+    (s: SessionState, mapId: string | null) => {
+      holders.overrides.set(s.overrides);
+      holders.mapOverride.set(s.mapOverrideByMap as never);
+      // layer.applySnapshot() expects the full byMap store
+      holders.layer.applySnapshot(s.layerByMap as never);
+      holders.editorEntity.set(s.entityEdit);
+      if (!mapId) return;
+      holders.region.applySnapshot(
+        (s.regionByMap[mapId] ?? { edits: {}, added: [], deleted: [] }) as never,
+      );
+      holders.route.applySnapshot(
+        (s.routeByMap[mapId] ?? { edits: {}, added: [], deleted: [] }) as never,
+      );
+      holders.fog.applySnapshot((s.fogByMap[mapId] ?? null) as never);
+    },
+    [holders],
+  );
 
   // ---- mount hydrate + restore detection ----
   useEffect(() => {
@@ -116,18 +137,23 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
       }
       setHydrated(true);
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
     // mount-only
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ---- non-destructive map switch ----
-  const onMapWillChange = useCallback((nextMapId: string | null) => {
-    const cur = mapRef.current;
-    collectActiveInto(slicesRef.current, cur);          // save outgoing
-    mapRef.current = nextMapId;
-    applyActiveFrom(slicesRef.current, nextMapId);       // restore incoming
-  }, [collectActiveInto, applyActiveFrom]);
+  const onMapWillChange = useCallback(
+    (nextMapId: string | null) => {
+      const cur = mapRef.current;
+      collectActiveInto(slicesRef.current, cur); // save outgoing
+      mapRef.current = nextMapId;
+      applyActiveFrom(slicesRef.current, nextMapId); // restore incoming
+    },
+    [collectActiveInto, applyActiveFrom],
+  );
 
   useEffect(() => {
     if (activeMapId !== mapRef.current) onMapWillChange(activeMapId);
@@ -158,8 +184,14 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
   }, [unsavedCount, hydrated, collectActiveInto]);
 
   const dismissRestoredNotice = useCallback(() => setRestoredNotice(null), []);
-  const markSaving = useCallback(() => { setFailedReason(null); setStatus("saving"); }, []);
-  const markFailed = useCallback((reason: string) => { setFailedReason(reason); setStatus("failed"); }, []);
+  const markSaving = useCallback(() => {
+    setFailedReason(null);
+    setStatus("saving");
+  }, []);
+  const markFailed = useCallback((reason: string) => {
+    setFailedReason(reason);
+    setStatus("failed");
+  }, []);
   // Recompute from the live dirty count rather than blindly setting "unsaved":
   // a cancelled save that had already cleared everything must land on "clean".
   const markIdle = useCallback(() => {
@@ -168,21 +200,42 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
   }, [perMapDirtyCount]);
   const markSaved = useCallback(async () => {
     slicesRef.current = {
-      overrides: {}, mapOverrideByMap: {}, regionByMap: {},
-      routeByMap: {}, fogByMap: {}, layerByMap: {}, entityEdit: null, savedAt: Date.now(),
+      overrides: {},
+      mapOverrideByMap: {},
+      regionByMap: {},
+      routeByMap: {},
+      fogByMap: {},
+      layerByMap: {},
+      entityEdit: null,
+      savedAt: Date.now(),
     };
     await idbDelete(SESSION_IDB_KEY);
     setRestoredNotice(null);
     setStatus("saved");
   }, []);
   const discardAll = useCallback(async () => {
-    applyActiveFrom({
-      overrides: {}, mapOverrideByMap: {}, regionByMap: {},
-      routeByMap: {}, fogByMap: {}, layerByMap: {}, entityEdit: null, savedAt: Date.now(),
-    }, mapRef.current);
+    applyActiveFrom(
+      {
+        overrides: {},
+        mapOverrideByMap: {},
+        regionByMap: {},
+        routeByMap: {},
+        fogByMap: {},
+        layerByMap: {},
+        entityEdit: null,
+        savedAt: Date.now(),
+      },
+      mapRef.current,
+    );
     slicesRef.current = {
-      overrides: {}, mapOverrideByMap: {}, regionByMap: {},
-      routeByMap: {}, fogByMap: {}, layerByMap: {}, entityEdit: null, savedAt: Date.now(),
+      overrides: {},
+      mapOverrideByMap: {},
+      regionByMap: {},
+      routeByMap: {},
+      fogByMap: {},
+      layerByMap: {},
+      entityEdit: null,
+      savedAt: Date.now(),
     };
     undoStack.clear();
     await idbDelete(SESSION_IDB_KEY);
@@ -191,8 +244,17 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
   }, [applyActiveFrom, undoStack]);
 
   return {
-    hydrated, status, unsavedCount, failedReason,
-    restoredNotice, dismissRestoredNotice,
-    onMapWillChange, markSaving, markSaved, markFailed, markIdle, discardAll,
+    hydrated,
+    status,
+    unsavedCount,
+    failedReason,
+    restoredNotice,
+    dismissRestoredNotice,
+    onMapWillChange,
+    markSaving,
+    markSaved,
+    markFailed,
+    markIdle,
+    discardAll,
   };
 }

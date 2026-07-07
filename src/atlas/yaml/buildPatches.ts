@@ -108,9 +108,7 @@ export function buildEntityFrontmatterPatch(patches: EntityFrontmatterPatch[]): 
     filename: `entity-frontmatter-patch-${patches.length}.yaml`,
     mime: "text/yaml",
     content: header + bodyParts.join("\n"),
-    summary: [
-      `Frontmatter for ${patches.length} entity file${patches.length === 1 ? "" : "s"}`,
-    ],
+    summary: [`Frontmatter for ${patches.length} entity file${patches.length === 1 ? "" : "s"}`],
     sections,
   };
 }

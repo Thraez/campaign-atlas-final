@@ -23,7 +23,9 @@ import { run as checkFogSafety } from "../check-fog-safety.js";
 import { run as checkArtifactShape } from "../check-artifact-shape.js";
 import { run as auditAssets } from "./audit-assets.js";
 
-interface Config { contentRoot: string }
+interface Config {
+  contentRoot: string;
+}
 
 function resolveContentDir(): string {
   const configPath = path.resolve(process.cwd(), "atlas.config.json");
@@ -49,20 +51,29 @@ async function main(): Promise<number> {
   }
 
   const tasks: ScanTask[] = [
-    { label: "check-secrets dist",          fn: () => checkNoSecrets({ dir: "dist" }) },
-    { label: "check-secrets public/atlas",   fn: () => checkNoSecrets({ dir: "public/atlas" }) },
-    { label: "check-shape",                  fn: () => checkArtifactShape({ atlasJsonPath: "public/atlas/atlas.json" }) },
-    { label: "check-derived dist",           fn: () => checkDerivedSecrets({ dir: "dist" }) },
-    { label: "check-derived public/atlas",   fn: () => checkDerivedSecrets({ dir: "public/atlas" }) },
-    { label: "check-image-privacy dist",     fn: () => checkImagePrivacy({ dir: "dist" }) },
-    { label: "check-image-privacy public/atlas", fn: () => checkImagePrivacy({ dir: "public/atlas" }) },
-    { label: "audit-assets",                 fn: () => auditAssets({ assetsDir: "public/atlas/assets", publicDir: "public", contentDir }) },
-    { label: "check-fog public/atlas",       fn: () => checkFogSafety({ dir: "public/atlas" }) },
-    { label: "check-fog dist",               fn: () => checkFogSafety({ dir: "dist" }) },
+    { label: "check-secrets dist", fn: () => checkNoSecrets({ dir: "dist" }) },
+    { label: "check-secrets public/atlas", fn: () => checkNoSecrets({ dir: "public/atlas" }) },
+    {
+      label: "check-shape",
+      fn: () => checkArtifactShape({ atlasJsonPath: "public/atlas/atlas.json" }),
+    },
+    { label: "check-derived dist", fn: () => checkDerivedSecrets({ dir: "dist" }) },
+    { label: "check-derived public/atlas", fn: () => checkDerivedSecrets({ dir: "public/atlas" }) },
+    { label: "check-image-privacy dist", fn: () => checkImagePrivacy({ dir: "dist" }) },
+    {
+      label: "check-image-privacy public/atlas",
+      fn: () => checkImagePrivacy({ dir: "public/atlas" }),
+    },
+    {
+      label: "audit-assets",
+      fn: () => auditAssets({ assetsDir: "public/atlas/assets", publicDir: "public", contentDir }),
+    },
+    { label: "check-fog public/atlas", fn: () => checkFogSafety({ dir: "public/atlas" }) },
+    { label: "check-fog dist", fn: () => checkFogSafety({ dir: "dist" }) },
   ];
 
   const results = await Promise.all(
-    tasks.map(async (t) => ({ label: t.label, code: await t.fn() }))
+    tasks.map(async (t) => ({ label: t.label, code: await t.fn() })),
   );
 
   const failures = results.filter((r) => r.code !== 0);

@@ -1,7 +1,14 @@
-export interface Anchor { id: string; line: number; }
+export interface Anchor {
+  id: string;
+  line: number;
+}
 
 function slug(s: string): string {
-  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 /** Ordered structural anchors: markdown ATX headings. id is the slugged text. */
