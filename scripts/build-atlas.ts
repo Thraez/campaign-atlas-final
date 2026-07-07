@@ -140,7 +140,22 @@ interface BuiltEntity {
 
 function loadConfig(configPath: string): Config {
   const raw = fs.readFileSync(configPath, "utf8");
-  return JSON.parse(raw) as Config;
+  const parsed: unknown = JSON.parse(raw);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`${configPath}: not a valid atlas config (expected a JSON object).`);
+  }
+  const c = parsed as Record<string, unknown>;
+  for (const key of ["contentRoot", "outputDir", "defaultWorld"] as const) {
+    if (typeof c[key] !== "string") {
+      throw new Error(`${configPath}: "${key}" must be a string.`);
+    }
+  }
+  for (const key of ["include", "exclude"] as const) {
+    if (!Array.isArray(c[key]) || (c[key] as unknown[]).some((x) => typeof x !== "string")) {
+      throw new Error(`${configPath}: "${key}" must be an array of strings.`);
+    }
+  }
+  return parsed as Config;
 }
 
 function walk(
