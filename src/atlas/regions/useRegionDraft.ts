@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MapDocument, Point, Region } from "@/atlas/content/schema";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
+import { slugify as toSlug } from "@/atlas/content/slugify";
 
 export interface RegionDraft {
   /** Per-id partial overrides applied to existing canon regions. */
@@ -60,7 +61,9 @@ export interface RegionDraftAPI {
 }
 
 function slugify(s: string): string {
-  return s.toLowerCase().trim().replace(/[\s_]+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-") || "region";
+  // Delegate to the canonical build/runtime slug rule; keep the "region"
+  // fallback so an all-symbol name still yields a usable id.
+  return toSlug(s) || "region";
 }
 
 function uniqueId(base: string, taken: Set<string>): string {

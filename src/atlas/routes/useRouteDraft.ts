@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AtlasProject, MapDocument, Point, Route, RouteMode } from "@/atlas/content/schema";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
+import { slugify as toSlug } from "@/atlas/content/slugify";
 
 export type Waypoint = Point | { entityId: string };
 
@@ -62,7 +63,9 @@ export interface RouteDraftAPI {
 }
 
 function slugify(s: string): string {
-  return s.toLowerCase().trim().replace(/[\s_]+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-") || "route";
+  // Delegate to the canonical build/runtime slug rule; keep the "route"
+  // fallback so an all-symbol name still yields a usable id.
+  return toSlug(s) || "route";
 }
 
 function uniqueId(base: string, taken: Set<string>): string {

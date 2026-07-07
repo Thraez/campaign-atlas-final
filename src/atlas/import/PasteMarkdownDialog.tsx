@@ -7,6 +7,7 @@
  * and conflict rules apply — we just don't render the multi-row table.
  */
 import { useState } from "react";
+import { slugify } from "@/atlas/content/slugify";
 import {
   Dialog,
   DialogContent,
@@ -50,17 +51,6 @@ export interface PasteMarkdownDialogProps {
    * commits (caller decides — this component just hands over the input).
    */
   onSubmit: (input: { filename: string; raw: string; type: string }) => void;
-}
-
-function slugify(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/['']/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
 }
 
 export function PasteMarkdownDialog({ open, onOpenChange, onSubmit }: PasteMarkdownDialogProps) {

@@ -10,6 +10,7 @@
 
 import type { EntityVisibility } from "@/atlas/content/schema";
 import { parseFrontmatter } from "./frontmatter";
+import { slugify } from "@/atlas/content/slugify";
 import { inferTypeFromPath, isIgnoredPath } from "./inferType";
 
 export type ImportLevel =
@@ -69,17 +70,6 @@ const MD_IMAGE_RE = /!\[[^\]]*\]\(([^)]+)\)/g;
 
 function safeFilenameToTitle(name: string): string {
   return name.replace(/\.md$/i, "").replace(/[-_]+/g, " ").trim();
-}
-
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/['']/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
 }
 
 /** Generate a one-paragraph summary from the first meaningful prose. */

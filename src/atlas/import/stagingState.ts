@@ -22,6 +22,7 @@ import { parseFrontmatter } from "./frontmatter";
 import type { ImportFolderConfig } from "../content/schema";
 import { inferTypeFromTags } from "./inferTypeFromTags";
 import { inferTypeFromPath } from "./inferType";
+import { slugify } from "@/atlas/content/slugify";
 
 /**
  * Inferred entity-type (from frontmatter / fallback) → destination folder.
@@ -31,17 +32,6 @@ export function inferTargetFolder(type: string, cfg: ImportFolderConfig): string
   return cfg.folders[type] ?? cfg.defaultFolder;
 }
 
-/** Slug rules mirror scripts/atlas/slugify.ts exactly — keep derivation identical to build. */
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/['']/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-}
 
 export function computeTargetPath(worldId: string, folder: string, stem: string): string {
   return `content/${worldId}/${folder}/${slugify(stem)}.md`;

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { parseFrontmatter, stringifyFrontmatter } from "@/atlas/import/frontmatter";
 import { useEntityEditDraft, type EntityEditDraftAPI } from "./useEntityEditDraft";
 import { saveAtlasPatchToLocalFs, hashContent, type FileChange } from "@/atlas/save/localFsSave";
-import { slugify } from "@/atlas/save/newEntitySave";
+import { slugify } from "@/atlas/content/slugify";
 import { readSourceFile } from "@/atlas/save/canonicalPlacementSave";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import {
