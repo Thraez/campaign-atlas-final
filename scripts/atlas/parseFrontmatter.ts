@@ -1,6 +1,7 @@
 import matter from "gray-matter";
 import type { EntityVisibility, PinPlacementStyle } from "../../src/atlas/content/schema";
 import type { EntityProfile, EntityRelationship } from "../../src/atlas/profiles/profileTypes";
+import { isValidVisibility } from "./visibility";
 
 export interface AtlasPlacementSpec {
   mapId?: string;
@@ -39,8 +40,6 @@ export interface ParsedFile {
   warnings: string[];
 }
 
-const VALID_VIS: EntityVisibility[] = ["player", "dm", "hidden", "rumor"];
-
 export function parseFrontmatter(raw: string, sourcePath: string): ParsedFile {
   const warnings: string[] = [];
   const fm = matter(raw);
@@ -72,8 +71,8 @@ export function parseFrontmatter(raw: string, sourcePath: string): ParsedFile {
   };
 
   if (typeof atlasRaw.visibility === "string") {
-    if (VALID_VIS.includes(atlasRaw.visibility as EntityVisibility)) {
-      atlas.visibility = atlasRaw.visibility as EntityVisibility;
+    if (isValidVisibility(atlasRaw.visibility)) {
+      atlas.visibility = atlasRaw.visibility;
     } else {
       // Fail-safe: spoiler protection beats convenience. Invalid visibility
       // values must NOT silently fall through to the player default.
@@ -232,8 +231,8 @@ function parseRelationships(
     }
     let visibility: EntityVisibility = "dm";
     if (typeof r.visibility === "string") {
-      if (VALID_VIS.includes(r.visibility as EntityVisibility)) {
-        visibility = r.visibility as EntityVisibility;
+      if (isValidVisibility(r.visibility)) {
+        visibility = r.visibility;
       } else {
         warnings.push(
           `${sourcePath}: atlas.relationships[${i}] invalid visibility "${r.visibility}" — defaulted to "dm"`,

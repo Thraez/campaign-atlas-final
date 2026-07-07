@@ -18,6 +18,7 @@
  */
 
 import yaml from "js-yaml";
+import { isValidVisibility } from "@/atlas/content/visibility";
 
 export type PatchKind = "map" | "placement" | "settings" | "world-map" | "entity-frontmatter";
 
@@ -109,7 +110,6 @@ export function validatePatchYaml(content: string, kind: PatchKind): ValidationR
   }
 
   if (kind === "entity-frontmatter") {
-    const VALID_VIS = new Set(["player", "dm", "hidden", "rumor"]);
     const blocks = parsed.filter(
       (d): d is Record<string, unknown> => !!d && typeof d === "object" && !Array.isArray(d),
     );
@@ -128,10 +128,7 @@ export function validatePatchYaml(content: string, kind: PatchKind): ValidationR
         continue;
       }
       const a = atlas as Record<string, unknown>;
-      if (
-        a.visibility !== undefined &&
-        (typeof a.visibility !== "string" || !VALID_VIS.has(a.visibility))
-      ) {
+      if (a.visibility !== undefined && !isValidVisibility(a.visibility)) {
         errors.push(
           `atlas.visibility must be one of player|dm|hidden|rumor (got "${String(a.visibility)}").`,
         );

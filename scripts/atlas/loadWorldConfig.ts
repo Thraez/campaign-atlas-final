@@ -23,8 +23,8 @@ import type {
   WaterConfig,
   WorldCalendar,
 } from "../../src/atlas/content/schema";
+import { isValidVisibility } from "./visibility";
 
-const VALID_VIS: EntityVisibility[] = ["player", "dm", "hidden", "rumor"];
 const VALID_MODES: RouteMode[] = ["foot", "horse", "ship", "cart", "fly", "custom"];
 
 export type WaypointSpec = Point | { entityId: string };
@@ -415,8 +415,7 @@ function sanitizeWater(
 }
 
 function normalizeVis(v: unknown, warnings: string[], where: string): EntityVisibility {
-  if (typeof v === "string" && VALID_VIS.includes(v as EntityVisibility))
-    return v as EntityVisibility;
+  if (isValidVisibility(v)) return v;
   if (v !== undefined) warnings.push(`${where}: invalid visibility "${v}", defaulting to "player"`);
   return "player";
 }

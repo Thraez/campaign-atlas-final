@@ -9,6 +9,7 @@
  */
 
 import type { EntityVisibility } from "@/atlas/content/schema";
+import { isValidVisibility } from "@/atlas/content/visibility";
 import { parseFrontmatter } from "./frontmatter";
 import { slugify } from "@/atlas/content/slugify";
 import { inferTypeFromPath, isIgnoredPath } from "./inferType";
@@ -18,8 +19,6 @@ export type ImportLevel =
   | "wiki-only" // entity, no map placement
   | "placeable" // can be placed on a map (DM-side)
   | "player-published"; // included in player build (visibility allows)
-
-const VALID_VIS: EntityVisibility[] = ["player", "dm", "hidden", "rumor"];
 
 export interface WikilinkRef {
   target: string;
@@ -173,8 +172,8 @@ export function parseObsidianFile(
   if (!visRaw) {
     visibilityWasMissing = true;
     if (atlas.publish === true) effectiveVisibility = "player";
-  } else if (VALID_VIS.includes(visRaw as EntityVisibility)) {
-    effectiveVisibility = visRaw as EntityVisibility;
+  } else if (isValidVisibility(visRaw)) {
+    effectiveVisibility = visRaw;
   } else {
     visibilityWasInvalid = true;
     effectiveVisibility = "dm";

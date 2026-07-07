@@ -31,6 +31,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseFrontmatter } from "./atlas/parseFrontmatter";
+import { isSecretVisibility } from "./atlas/visibility";
 import { slugify } from "./atlas/slugify";
 
 interface Config {
@@ -178,7 +179,7 @@ export function deriveSecretsFromVault(configPath: string): SecretEntry[] {
     const rel = path.relative(path.dirname(configPath), file).replace(/\\/g, "/");
     const parsed = parseFrontmatter(raw, rel);
     const isHiddenVisibility =
-      parsed.atlas.visibility === "dm" || parsed.atlas.visibility === "hidden";
+      parsed.atlas.visibility !== undefined && isSecretVisibility(parsed.atlas.visibility);
     const isUnpublished = parsed.atlas.publish === false;
     if (!isHiddenVisibility && !isUnpublished) continue;
 

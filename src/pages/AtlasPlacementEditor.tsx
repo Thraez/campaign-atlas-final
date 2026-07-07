@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
+import { isSecretVisibility } from "@/atlas/content/visibility";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type {
   AtlasProject,
@@ -387,9 +388,7 @@ function AtlasPlacementEditorInner() {
   const dmEntityIdSet = useMemo(
     () =>
       new Set(
-        (project?.entities ?? [])
-          .filter((e) => e.visibility === "dm" || e.visibility === "hidden")
-          .map((e) => e.id),
+        (project?.entities ?? []).filter((e) => isSecretVisibility(e.visibility)).map((e) => e.id),
       ),
     [project],
   );

@@ -1,12 +1,16 @@
 /**
- * Single source of truth for which entity visibilities are allowed in
- * player-shipped artifacts. Imported by both the build pipeline
- * (scripts/build-atlas.ts) and the post-build artifact shape checker
- * (scripts/check-artifact-shape.ts) so the literal can never drift.
+ * Re-export shim: the canonical entity-visibility vocabulary lives in
+ * `src/atlas/content/visibility.ts` so the app and the build tooling share ONE
+ * definition and it can never drift. Kept here (with the historical
+ * `PLAYER_VISIBLE` name) so `build-atlas.ts` and `check-artifact-shape.ts` —
+ * which import the player-visible set from this path — did not have to change.
  */
-import type { EntityVisibility } from "../../src/atlas/content/schema";
-
-export const PLAYER_VISIBLE: ReadonlySet<EntityVisibility> = new Set<EntityVisibility>([
-  "player",
-  "rumor",
-]);
+export {
+  ALL_VISIBILITY,
+  VALID_VISIBILITY,
+  PLAYER_VISIBLE_VISIBILITY,
+  PLAYER_VISIBLE_VISIBILITY as PLAYER_VISIBLE,
+  isPlayerVisible,
+  isSecretVisibility,
+  isValidVisibility,
+} from "../../src/atlas/content/visibility";

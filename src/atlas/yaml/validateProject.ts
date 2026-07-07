@@ -13,6 +13,11 @@
  * their output in order and tallies the counts.
  */
 import type { AtlasProject, MapDocument, Entity } from "@/atlas/content/schema";
+import {
+  PLAYER_VISIBLE_VISIBILITY,
+  VALID_VISIBILITY,
+  isSecretVisibility,
+} from "@/atlas/content/visibility";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import type { PlacementOverride } from "./buildPatches";
 
@@ -602,12 +607,10 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
     mapIds: new Set(project.maps.map((m) => m.id)),
     entityIds: new Set(project.entities.map((e) => e.id)),
     dmEntityIds: new Set(
-      project.entities
-        .filter((e) => e.visibility === "dm" || e.visibility === "hidden")
-        .map((e) => e.id),
+      project.entities.filter((e) => isSecretVisibility(e.visibility)).map((e) => e.id),
     ),
-    playerVisibleVis: new Set(["player", "rumor"]),
-    validVis: new Set(["player", "dm", "hidden", "rumor"]),
+    playerVisibleVis: new Set<string>(PLAYER_VISIBLE_VISIBILITY),
+    validVis: new Set<string>(VALID_VISIBILITY),
     entityById: new Map(project.entities.map((e) => [e.id, e] as const)),
   };
 
