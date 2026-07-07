@@ -1,12 +1,12 @@
 /**
- * Regions tab — visual draw + form-driven edit, exports world.yaml regions patch.
+ * Regions tab — visual draw + form-driven edit, saved into world.yaml.
  *
  * Drawing & geometry editing happen on the map (RegionLayer); this panel owns
- * the per-region form, the validation summary, and the unified export. All
- * state lives in `useRegionDraft` so the map and the form stay in sync.
+ * the per-region form and the validation summary. All state lives in
+ * `useRegionDraft` so the map and the form stay in sync.
  *
- * YAML remains canon — every change here is a local draft until the DM
- * downloads the patch and commits it.
+ * YAML remains canon — every change here is a local draft until the DM hits
+ * Save, which writes world.yaml and rebuilds the atlas.
  */
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";

@@ -1,7 +1,7 @@
 /**
  * Project-wide validation with severity levels.
  *
- * Used by the central Export DM Changes modal to give the DM a single
+ * Used by the Publish Check dashboard to give the DM a single
  * "what would break / what should I look at" report. Pure, no I/O.
  */
 import type { AtlasProject, MapDocument } from "@/atlas/content/schema";
@@ -13,8 +13,8 @@ export type Severity = "blocking" | "warning" | "suggestion" | "passed";
 export type IssueCategory = "safety" | "yaml" | "map" | "draft";
 
 export interface IssueAction {
-  /** "go-entity" | "go-map" | "show-fix" | "export-patch" */
-  kind: "go-entity" | "go-map" | "show-fix" | "export-patch";
+  /** "go-entity" | "go-map" | "show-fix" */
+  kind: "go-entity" | "go-map" | "show-fix";
   label: string;
   /** Free-form payload — for "show-fix" this is the suggested patch text. */
   payload?: string;

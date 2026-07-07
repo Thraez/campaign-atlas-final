@@ -5,7 +5,6 @@
  * they are in:
  *   - Built from YAML  (the canon row count this tab edits)
  *   - Local draft      (how many in-browser changes are pending)
- *   - Export status    (when this tab last produced a patch)
  *   - Blocking issues  (anything from validateProject scoped to this tab)
  *
  * Tabs put their primary form / list inside `children`. Raw YAML belongs in the

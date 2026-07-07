@@ -4,7 +4,7 @@
  * Regions tab and the editor map can both drive the same model.
  *
  * Persistence: regions remain in `world.yaml`. The hook only tracks LOCAL
- * draft changes; export goes through buildPatches/dumpYaml as usual.
+ * draft changes; Save serializes them into world.yaml via buildPatches/dumpYaml.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MapDocument, Point, Region } from "@/atlas/content/schema";

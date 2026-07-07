@@ -1,8 +1,8 @@
 /**
- * Routes tab — visual draw + form-driven edit, exports world.yaml routes patch.
+ * Routes tab — visual draw + form-driven edit, saved into world.yaml.
  *
  * State lives in `useRouteDraft`; the map (RouteLayer) and this form share it.
- * YAML stays canon — every change is a local draft until the DM exports.
+ * YAML stays canon — every change is a local draft until the DM hits Save.
  */
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
