@@ -86,60 +86,35 @@ export function FogTab({
     [fog, map.id],
   );
 
+  // Polygon tools (reveal + fog) share one key map; circle tools share another.
+  // The only differences are which finish runs and that Backspace (remove last
+  // point) applies to polygons only — circles have a single anchor, so there is
+  // nothing to walk back.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
-      if (tool === "polygon") {
-        if (e.key === "Enter") {
-          e.preventDefault();
+      const isPolygonTool = tool === "polygon" || tool === "fog-polygon";
+      const isCircleTool = tool === "circle" || tool === "fog-circle";
+      if (!isPolygonTool && !isCircleTool) return;
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (isPolygonTool) {
           if (!finishDraftPolygon()) toast.warning("Need at least 3 points.");
-        } else if (e.key === "Escape") {
-          e.preventDefault();
-          cancelDraft();
-        } else if (e.key === "Backspace") {
-          e.preventDefault();
-          removeLastDraftPoint();
-        }
-      } else if (tool === "circle") {
-        if (e.key === "Enter") {
-          e.preventDefault();
+        } else {
           if (!finishDraftCircle(circleRadius)) toast.warning("Click a center first.");
-        } else if (e.key === "Escape") {
-          e.preventDefault();
-          cancelDraft();
         }
-      } else if (tool === "fog-polygon") {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          if (!finishDraftPolygon()) toast.warning("Need at least 3 points.");
-        } else if (e.key === "Escape") {
-          e.preventDefault();
-          cancelDraft();
-        } else if (e.key === "Backspace") {
-          e.preventDefault();
-          removeLastDraftPoint();
-        }
-      } else if (tool === "fog-circle") {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          if (!finishDraftCircle(circleRadius)) toast.warning("Click a center first.");
-        } else if (e.key === "Escape") {
-          e.preventDefault();
-          cancelDraft();
-        }
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancelDraft();
+      } else if (e.key === "Backspace" && isPolygonTool) {
+        e.preventDefault();
+        removeLastDraftPoint();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [
-    tool,
-    finishDraftPolygon,
-    finishDraftCircle,
-    cancelDraft,
-    removeLastDraftPoint,
-    circleRadius,
-  ]);
+  }, [tool, finishDraftPolygon, finishDraftCircle, cancelDraft, removeLastDraftPoint, circleRadius]);
 
   const placementsByEntity = useMemo(() => {
     const m = new Map<string, [number, number]>();
