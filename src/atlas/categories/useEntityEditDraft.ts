@@ -1,9 +1,10 @@
 import { useCallback, useRef, useState } from "react";
+import type { EntityVisibility } from "@/atlas/content/schema";
 
 export interface EntityEditFields {
   id: string;
   type: string;
-  visibility: string;
+  visibility: EntityVisibility;
   summary: string;
 }
 export interface EntityEditDraft {
@@ -22,7 +23,7 @@ function fingerprint(fields: EntityEditFields, body: string): string {
 export interface EntityEditDraftAPI {
   draft: EntityEditDraft | null;
   load: (init: Omit<EntityEditDraft, "pristine">) => void;
-  setField: (k: keyof EntityEditFields, v: string) => void;
+  setField: <K extends keyof EntityEditFields>(k: K, v: EntityEditFields[K]) => void;
   setBody: (b: string) => void;
   clear: () => void;
   isDirty: () => boolean;
@@ -41,7 +42,7 @@ export function useEntityEditDraft(): EntityEditDraftAPI {
   const load = useCallback((init: Omit<EntityEditDraft, "pristine">) => {
     setDraft({ ...init, pristine: fingerprint(init.fields, init.body) });
   }, []);
-  const setField = useCallback((k: keyof EntityEditFields, v: string) => {
+  const setField = useCallback(<K extends keyof EntityEditFields>(k: K, v: EntityEditFields[K]) => {
     setDraft((d) => (d ? { ...d, fields: { ...d.fields, [k]: v } } : d));
   }, []);
   const setBody = useCallback((b: string) => {

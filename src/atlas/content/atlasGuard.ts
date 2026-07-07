@@ -73,5 +73,23 @@ export function parseSearchIndex(data: unknown, source = "search-index.json"): S
       `${source} is not a valid search index (expected a list). It may be corrupt — rebuild the atlas.`,
     );
   }
+  // Every entry must carry the core searchable fields. A truncated or
+  // wrong-format file often parses as an array of the wrong shape, which would
+  // otherwise crash deep in the search UI; fail here with an actionable message.
+  data.forEach((entry, i) => {
+    const e = entry as Record<string, unknown> | null;
+    if (
+      !e ||
+      typeof e !== "object" ||
+      typeof e.id !== "string" ||
+      typeof e.title !== "string" ||
+      typeof e.type !== "string"
+    ) {
+      throw new Error(
+        `${source} entry ${i} is missing required id/title/type fields — it looks corrupt or ` +
+          `from an older format. Rebuild the atlas.`,
+      );
+    }
+  });
   return data as SearchIndexEntry[];
 }

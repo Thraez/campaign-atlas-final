@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
+import { isValidVisibility, ALL_VISIBILITY } from "@/atlas/content/visibility";
 import { parseFrontmatter, stringifyFrontmatter } from "@/atlas/import/frontmatter";
 import { useEntityEditDraft, type EntityEditDraftAPI } from "./useEntityEditDraft";
 import { saveAtlasPatchToLocalFs, hashContent, type FileChange } from "@/atlas/save/localFsSave";
@@ -97,7 +98,7 @@ export function EntityEditPanel({
           fields: {
             id: String(atlas.id ?? ""),
             type: String(atlas.type ?? ""),
-            visibility: String(atlas.visibility ?? "dm"),
+            visibility: isValidVisibility(atlas.visibility) ? atlas.visibility : "dm",
             summary: String(atlas.summary ?? ""),
           },
           body: fm.content,
@@ -327,9 +328,11 @@ export function EntityEditPanel({
             aria-label="Visibility"
             className="w-full h-8 px-2 rounded border bg-background"
             value={d.fields.visibility}
-            onChange={(e) => api.setField("visibility", e.target.value)}
+            onChange={(e) => {
+              if (isValidVisibility(e.target.value)) api.setField("visibility", e.target.value);
+            }}
           >
-            {["player", "dm", "hidden", "rumor"].map((v) => (
+            {ALL_VISIBILITY.map((v) => (
               <option key={v} value={v}>
                 {v}
               </option>
