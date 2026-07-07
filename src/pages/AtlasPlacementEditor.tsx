@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Compass, Crosshair, RotateCcw, MapPin, Target, Trash2, Layers as LayersIcon, Settings2, Upload, Save as SaveIcon, Undo2, Redo2, Plus, X, Menu as MenuIcon, Ruler } from "lucide-react";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity, ImportFolderConfig, MapDocument, MapLayer } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
@@ -251,7 +252,7 @@ function AtlasPlacementEditorInner() {
             duration: 8000,
           });
         }
-      } catch { /* network blip; retry next tick */ }
+      } catch (err) { logger.debug("[editor] background atlas refresh failed; retrying next tick", err); }
       timer = window.setTimeout(tick, 30_000);
     };
     timer = window.setTimeout(tick, 30_000);

@@ -11,6 +11,7 @@
  * is false during dev.
  */
 import { Workbox } from "workbox-window";
+import { logger } from "@/lib/logger";
 
 let wb: Workbox | null = null;
 let waitingWorker: ServiceWorker | null = null;
@@ -50,7 +51,7 @@ export function registerServiceWorker(): void {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.getRegistrations().then((regs) => {
         regs.forEach((r) => r.unregister());
-      }).catch(() => {});
+      }).catch((err) => logger.debug("[pwa] leftover SW cleanup failed", err));
     }
     return;
   }
@@ -69,7 +70,7 @@ export function registerServiceWorker(): void {
   });
 
   wb.register().catch((err) => {
-    console.warn("[pwa] service worker registration failed", err);
+    logger.warn("[pwa] service worker registration failed", err);
   });
 }
 
@@ -94,7 +95,7 @@ export async function checkForUpdate(): Promise<void> {
   try {
     await wb.update();
   } catch (err) {
-    console.warn("[pwa] update check failed", err);
+    logger.warn("[pwa] update check failed", err);
   }
 }
 
