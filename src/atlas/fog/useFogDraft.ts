@@ -97,12 +97,14 @@ const DEFAULT_FOG = (mapId: string): FogOverlay => ({
 });
 
 export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackAPI): FogDraftAPI {
-  const base: FogOverlay = useMemo(
+  // Named `baseFog` to mirror `baseRoutes`/`baseRegions` in the sibling draft
+  // hooks — one greppable convention for "the canon value this draft overrides".
+  const baseFog: FogOverlay = useMemo(
     () => map?.fog ?? (map ? DEFAULT_FOG(map.id) : DEFAULT_FOG("")),
     [map],
   );
   const [override, setOverride] = useState<FogOverlay | null>(null);
-  const fog = override ?? base;
+  const fog = override ?? baseFog;
   const dirty = override !== null;
 
   const [tool, setTool] = useState<FogTool>(null);
@@ -122,11 +124,15 @@ export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackA
    * Apply a partial change to the fog overlay and (optionally) record an
    * undo entry. Records the snapshot pair (prior override, next override)
    * so Cmd+Z reverts both the visible flag and any reveal change at once.
+   *
+   * Named `mutateDraft` to match the undo-aware mutation primitive in the
+   * sibling route/region draft hooks (fog patches a single overlay rather than
+   * a collection, so it takes a partial instead of a compute callback).
    */
-  const mutate = useCallback(
+  const mutateDraft = useCallback(
     (p: Partial<FogOverlay>) => {
       const before = overrideRef.current;
-      const cur = before ?? base;
+      const cur = before ?? baseFog;
       const next: FogOverlay = { ...cur, ...p };
       // No real change → no-op.
       if (before && (Object.keys(p) as (keyof FogOverlay)[]).every((k) => before[k] === next[k]))
@@ -140,11 +146,11 @@ export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackA
         });
       }
     },
-    [base, applyOverride, undoStack],
+    [baseFog, applyOverride, undoStack],
   );
 
-  const setEnabled = useCallback((v: boolean) => mutate({ enabled: v }), [mutate]);
-  const setColor = useCallback((v: string | undefined) => mutate({ color: v }), [mutate]);
+  const setEnabled = useCallback((v: boolean) => mutateDraft({ enabled: v }), [mutateDraft]);
+  const setColor = useCallback((v: string | undefined) => mutateDraft({ color: v }), [mutateDraft]);
 
   const addDraftPoint = useCallback((p: Point) => setDraftPoints((s) => [...s, p]), []);
   const removeLastDraftPoint = useCallback(() => setDraftPoints((s) => s.slice(0, -1)), []);
@@ -155,16 +161,16 @@ export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackA
 
   const addReveal = useCallback(
     (poly: Point[]) => {
-      mutate({ reveals: [...fog.reveals, poly] });
+      mutateDraft({ reveals: [...fog.reveals, poly] });
     },
-    [mutate, fog.reveals],
+    [mutateDraft, fog.reveals],
   );
 
   const addConceal = useCallback(
     (poly: Point[]) => {
-      mutate({ conceals: [...(fog.conceals ?? []), poly] });
+      mutateDraft({ conceals: [...(fog.conceals ?? []), poly] });
     },
-    [mutate, fog.conceals],
+    [mutateDraft, fog.conceals],
   );
 
   const finishDraftPolygon = useCallback((): boolean => {
@@ -199,23 +205,23 @@ export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackA
 
   const removeReveal = useCallback(
     (index: number) => {
-      mutate({ reveals: fog.reveals.filter((_, i) => i !== index) });
+      mutateDraft({ reveals: fog.reveals.filter((_, i) => i !== index) });
     },
-    [mutate, fog.reveals],
+    [mutateDraft, fog.reveals],
   );
 
-  const clearReveals = useCallback(() => mutate({ reveals: [] }), [mutate]);
+  const clearReveals = useCallback(() => mutateDraft({ reveals: [] }), [mutateDraft]);
 
-  const setFeatherPx = useCallback((n: number) => mutate({ featherPx: n }), [mutate]);
+  const setFeatherPx = useCallback((n: number) => mutateDraft({ featherPx: n }), [mutateDraft]);
 
   const removeConceal = useCallback(
     (index: number) => {
-      mutate({ conceals: (fog.conceals ?? []).filter((_, i) => i !== index) });
+      mutateDraft({ conceals: (fog.conceals ?? []).filter((_, i) => i !== index) });
     },
-    [mutate, fog.conceals],
+    [mutateDraft, fog.conceals],
   );
 
-  const clearConceals = useCallback(() => mutate({ conceals: [] }), [mutate]);
+  const clearConceals = useCallback(() => mutateDraft({ conceals: [] }), [mutateDraft]);
 
   const revealRegion = useCallback(
     (r: Region) => {
