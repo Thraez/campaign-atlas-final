@@ -969,7 +969,11 @@ function buildEntity(
   // Shipping-field sanitization: every string that lands in atlas.json must
   // be free of %% blocks in player builds. The body is already handled
   // above; this covers summary, aliases, tags, profile player fields, etc.
-  const stripField = player
+  // Sanitize a single shipping string. In player builds this strips %% DM
+  // blocks and returns `undefined` when the field was ENTIRELY DM content — so
+  // callers fall back explicitly (e.g. `?? title`). In DM builds it passes
+  // the value through unchanged.
+  const sanitizeShippingField = player
     ? (s: string | undefined) => stripDmFromShippingString(s)
     : (s: string | undefined) => s;
   const stripArr = player
@@ -995,15 +999,15 @@ function buildEntity(
 
   const entity: Entity = {
     id,
-    title: stripField(title) ?? title,
+    title: sanitizeShippingField(title) ?? title,
     type: parsed.atlas.type ?? "note",
     world: parsed.atlas.world ?? opts.defaultWorld,
     visibility,
     canon: (parsed.atlas.canon as Entity["canon"]) ?? "canon",
     aliases: dedupAliases(stripArr(parsed.atlas.aliases ?? []), title),
     tags: scrubTags(stripArr(parsed.atlas.tags ?? [])),
-    summary: stripField(parsed.atlas.summary),
-    race: stripField(parsed.atlas.race),
+    summary: sanitizeShippingField(parsed.atlas.summary),
+    race: sanitizeShippingField(parsed.atlas.race),
     images: (parsed.atlas.images ?? []).map(relImage),
     body: noDm,
     bodyHtml: "",
@@ -1041,12 +1045,12 @@ function buildEntity(
   // Date / timeline support.
   const parsedDate = parseAtlasDate(parsed.atlas.date, opts.calendar);
   if (parsedDate) {
-    entity.dateRaw = stripField(parsedDate.label);
+    entity.dateRaw = sanitizeShippingField(parsedDate.label);
     entity.dateValue = parsed.atlas.dateValue ?? parsedDate.value;
     entity.dateYear = parsedDate.year;
   } else if (typeof parsed.atlas.dateValue === "number") {
     entity.dateValue = parsed.atlas.dateValue;
-    entity.dateRaw = stripField(parsed.atlas.date);
+    entity.dateRaw = sanitizeShippingField(parsed.atlas.date);
   }
 
   const fmAtlas = (parsed.data.atlas as Record<string, unknown>) ?? {};
