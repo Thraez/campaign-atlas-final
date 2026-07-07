@@ -919,10 +919,13 @@ function AtlasPlacementEditorInner() {
         get: () => mapOverrideRef.current as Record<string, unknown>,
         set: (m) => { mapOverrideRef.current = m as Record<string, Partial<MapDocument>>; setMapOverride(m as Record<string, Partial<MapDocument>>); },
       },
-      region: { snapshot: regionDraft.snapshot, applySnapshot: regionDraft.applySnapshot },
-      route: { snapshot: routeDraft.snapshot, applySnapshot: routeDraft.applySnapshot },
-      fog: { snapshot: fogDraft.snapshot, applySnapshot: fogDraft.applySnapshot },
-      layer: { snapshot: layerEditor.snapshot, applySnapshot: layerEditor.applySnapshot },
+      // The session stores each holder's snapshot as `unknown` and restores it
+      // through a `(s: unknown) => void`, so coerce back to each draft's own
+      // snapshot type at the registration boundary.
+      region: { snapshot: regionDraft.snapshot, applySnapshot: (s) => regionDraft.applySnapshot(s as Parameters<typeof regionDraft.applySnapshot>[0]) },
+      route: { snapshot: routeDraft.snapshot, applySnapshot: (s) => routeDraft.applySnapshot(s as Parameters<typeof routeDraft.applySnapshot>[0]) },
+      fog: { snapshot: fogDraft.snapshot, applySnapshot: (s) => fogDraft.applySnapshot(s as Parameters<typeof fogDraft.applySnapshot>[0]) },
+      layer: { snapshot: layerEditor.snapshot, applySnapshot: (s) => layerEditor.applySnapshot(s as Parameters<typeof layerEditor.applySnapshot>[0]) },
       editorEntity: {
         get: () => entityEditDraft.snapshot(),
         set: (v) => entityEditDraft.applySnapshot(v as never),

@@ -15,11 +15,11 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Linting */
-    "strict": false,
+    /* Strictness — full strict on. noUnusedLocals/Parameters stay off so
+       intentional unused args (e.g. _prefixed) don't block builds. */
+    "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noImplicitAny": false,
     "noFallthroughCasesInSwitch": false,
 
     "paths": {

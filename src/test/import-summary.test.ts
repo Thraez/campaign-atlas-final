@@ -15,6 +15,7 @@ function makeRow(overrides: Partial<StagingRow>): StagingRow {
     content: "",
     rawContent: "",
     typeWasExplicit: false,
+    typeWasGuessed: false,
     resolvedVisibility: "dm",
     ...overrides,
   };

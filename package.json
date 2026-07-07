@@ -11,7 +11,7 @@
     "build:player": "vite build --mode production",
     "build:editor": "vite build --mode editor",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -392,7 +392,7 @@ export default function AtlasViewer() {
     );
   }
 
-  const openEntity_ = openId ? entityById.get(openId) : null;
+  const openEntity_ = openId ? entityById.get(openId) ?? null : null;
   const openPlacements = openEntity_
     ? data.project.placements.filter((p) => p.entityId === openEntity_.id)
     : [];
