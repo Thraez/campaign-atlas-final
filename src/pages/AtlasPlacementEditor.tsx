@@ -50,7 +50,6 @@ import { MapLayerEditableOverlay } from "@/atlas/MapLayerEditableOverlay";
 import { MapSettingsPanel } from "@/atlas/MapSettingsPanel";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { OceanBackground } from "@/atlas/ocean/OceanBackground";
-import { overridesSchema } from "@/atlas/schemas/imports";
 import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
 import { buildSavePlan } from "@/atlas/editor/saveGate";
@@ -87,6 +86,15 @@ import { EntitySurface } from "@/atlas/entity/EntitySurface";
 import { resolvePinClickIntent } from "@/atlas/editor/pinClickIntent";
 import { resolveEntityCloseIntent } from "@/atlas/editor/entityCloseIntent";
 import { mapClickToAtlasCoord } from "@/atlas/editor/mapClickCoord";
+import {
+  type Overrides,
+  type OverrideValue,
+  overrideKey,
+  loadOverrides,
+  finishLegacyMigration,
+  persistOverrides,
+  LEGACY_STORAGE_KEY_V1,
+} from "@/atlas/editor/placementOverrides";
 import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { MapImportWizard } from "@/atlas/import/MapImportWizard";
@@ -120,43 +128,6 @@ import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
-// Bumped to v3: storage shape now carries label + pin override per placement.
-// v1/v2 entries (just x/y) are still readable — extra fields are simply absent.
-const STORAGE_KEY = "atlas-placement-overrides-v3";
-const LEGACY_STORAGE_KEY_V1 = "atlas-placement-overrides-v1";
-const LEGACY_STORAGE_KEY_V2 = "atlas-placement-overrides-v2";
-
-/** Local-draft override shape. `null` = explicitly removed from this map. */
-type OverrideValue = { x: number; y: number; label?: string; pin?: PinOverride };
-type Override = OverrideValue | null;
-
-interface Overrides {
-  [mapEntityKey: string]: Override; // key = `${mapId}:${entityId}`
-}
-
-const overrideKey = (mapId: string, entityId: string) => `${mapId}:${entityId}`;
-
-/**
- * Boundary-validate an overrides JSON string from localStorage. Malformed
- * entries (corrupt browser storage, hand-edited DevTools) are dropped per
- * key rather than crashing the editor. Returns an empty object on total
- * failure.
- */
-function safeParseOverrides(raw: string): Overrides {
-  let json: unknown;
-  try {
-    json = JSON.parse(raw);
-  } catch {
-    return {};
-  }
-  const parsed = overridesSchema.safeParse(json);
-  if (!parsed.success) return {};
-  const out: Overrides = {};
-  for (const [k, v] of Object.entries(parsed.data)) {
-    out[k] = v as Override;
-  }
-  return out;
-}
 
 function pinDivIcon(
   color: string,
@@ -231,27 +202,7 @@ function ViewModeToggle() {
 function AtlasPlacementEditorInner() {
   const [project, setProject] = useState<AtlasProject | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [overrides, setOverrides] = useState<Overrides>(() => {
-    try {
-      const v3 = localStorage.getItem(STORAGE_KEY);
-      if (v3) return safeParseOverrides(v3);
-      // Forward-migration: v2 entries are already keyed by `${mapId}:${entityId}`
-      // and only carry x/y — directly compatible with the v3 shape.
-      const v2raw = localStorage.getItem(LEGACY_STORAGE_KEY_V2);
-      if (v2raw) return safeParseOverrides(v2raw);
-      // v1 was entityId-keyed; defer mapId resolution until project loads.
-      const v1raw = localStorage.getItem(LEGACY_STORAGE_KEY_V1);
-      if (!v1raw) return {};
-      const v1 = safeParseOverrides(v1raw);
-      const migrated: Overrides = {};
-      Object.entries(v1).forEach(([eid, val]) => {
-        migrated[`__legacy__:${eid}`] = val;
-      });
-      return migrated;
-    } catch {
-      return {};
-    }
-  });
+  const [overrides, setOverrides] = useState<Overrides>(loadOverrides);
   const [activeMapId, setActiveMapId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null); // entity awaiting click-to-place
   const [filter, setFilter] = useState("");
@@ -272,18 +223,9 @@ function AtlasPlacementEditorInner() {
         setActiveMapId(defaultMap);
         // Finish v1 → v2 migration now that we know the default mapId.
         setOverrides((o) => {
-          const out: Overrides = {};
-          let migrated = false;
-          for (const [k, v] of Object.entries(o)) {
-            if (k.startsWith("__legacy__:") && defaultMap) {
-              out[overrideKey(defaultMap, k.slice("__legacy__:".length))] = v;
-              migrated = true;
-            } else {
-              out[k] = v;
-            }
-          }
+          const { overrides: next, migrated } = finishLegacyMigration(o, defaultMap);
           if (migrated) localStorage.removeItem(LEGACY_STORAGE_KEY_V1);
-          return migrated ? out : o;
+          return next;
         });
       })
       .catch((e: Error) => setError(e.message));
@@ -377,7 +319,7 @@ function AtlasPlacementEditorInner() {
   });
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
+    persistOverrides(overrides);
   }, [overrides]);
 
   // Stamp a local edit timestamp on every override mutation AFTER mount.
