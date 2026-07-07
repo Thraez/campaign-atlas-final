@@ -23,6 +23,7 @@ import type { ImportFolderConfig } from "../content/schema";
 import { inferTypeFromTags } from "./inferTypeFromTags";
 import { inferTypeFromPath } from "./inferType";
 import { slugify } from "@/atlas/content/slugify";
+import { isValidVisibility } from "@/atlas/content/visibility";
 
 /**
  * Inferred entity-type (from frontmatter / fallback) → destination folder.
@@ -96,8 +97,6 @@ export interface StagingRow {
   rowKind: "create" | "update" | "path-collision";
   included: boolean;
   parseError?: string;
-  /** Full file body (text). Preserved verbatim through the commit. */
-  content: string;
   typeWasExplicit: boolean;
   /**
    * True when the type fell through to the silent lore-fallback because the note had no
@@ -108,6 +107,7 @@ export interface StagingRow {
    */
   typeWasGuessed: boolean;
   resolvedVisibility: string;
+  /** Full file body (text). Preserved verbatim through the commit. */
   rawContent: string;
 }
 
@@ -154,9 +154,8 @@ function extractStagingFields(
     const typeWasGuessed = !explicit && !fromTags && fromFolder === "note";
 
     const visRaw = typeof atlas.visibility === "string" ? atlas.visibility : undefined;
-    const validVis = ["player", "dm", "hidden", "rumor"];
     const visibility =
-      visRaw && validVis.includes(visRaw) ? visRaw : atlas.publish === true ? "player" : "dm";
+      visRaw && isValidVisibility(visRaw) ? visRaw : atlas.publish === true ? "player" : "dm";
 
     const id = typeof atlas.id === "string" ? atlas.id : undefined;
     const fmTitle = typeof data.title === "string" ? data.title : undefined;
@@ -240,7 +239,6 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     rowKind,
     included,
     parseError,
-    content: input.raw,
     typeWasExplicit,
     typeWasGuessed,
     resolvedVisibility: visibility,

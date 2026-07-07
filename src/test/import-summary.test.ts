@@ -12,7 +12,6 @@ function makeRow(overrides: Partial<StagingRow>): StagingRow {
     pathAllowed: true,
     rowKind: "create",
     included: true,
-    content: "",
     rawContent: "",
     typeWasExplicit: false,
     typeWasGuessed: false,
