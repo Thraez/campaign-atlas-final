@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TabFrame } from "./TabFrame";
+import { ValidationChips } from "./ValidationChips";
 import { dumpYaml } from "@/atlas/yaml/dump";
 import { fogToYamlObject, type FogDraftAPI } from "@/atlas/fog/useFogDraft";
 
@@ -470,19 +471,8 @@ export function FogTab({
           </div>
         </div>
 
-        {/* Validation chips */}
-        {issues.length > 0 && (
-          <div className="space-y-1">
-            {issues.slice(0, 5).map((i, idx) => (
-              <div
-                key={idx}
-                className={`text-[11px] px-2 py-1 rounded border ${i.severity === "blocking" ? "border-destructive/50 bg-destructive/10 text-destructive" : "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"}`}
-              >
-                {i.message}
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Validation chips (fog reveals are anonymous → no per-chip selection) */}
+        <ValidationChips issues={issues} />
 
         {/* Reveal list */}
         <div className="space-y-1">

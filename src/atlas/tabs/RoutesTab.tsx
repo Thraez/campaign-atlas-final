@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { TabFrame } from "./TabFrame";
+import { ValidationChips } from "./ValidationChips";
 import { dumpYaml } from "@/atlas/yaml/dump";
 import { ROUTE_MODES, routeToYamlObject, type RouteDraftAPI } from "@/atlas/routes/useRouteDraft";
 
@@ -222,23 +223,7 @@ export function RoutesTab({ project, map, api, blockingCount, warningCount, onFi
           </div>
         )}
 
-        {issues.length > 0 && (
-          <div className="space-y-1">
-            {issues.slice(0, 5).map((i, idx) => (
-              <div
-                key={idx}
-                className={`text-[11px] px-2 py-1 rounded border ${i.severity === "blocking" ? "border-destructive/50 bg-destructive/10 text-destructive" : "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"}`}
-              >
-                <button
-                  className="text-left hover:underline"
-                  onClick={() => i.routeId && setSelectedId(i.routeId)}
-                >
-                  {i.message}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+        <ValidationChips issues={issues} onSelect={(i) => i.routeId && setSelectedId(i.routeId)} />
 
         <div className="space-y-1">
           {effective.length === 0 && (
