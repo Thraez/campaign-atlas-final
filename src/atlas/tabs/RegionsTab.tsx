@@ -163,7 +163,10 @@ export function RegionsTab({ project, map, api, blockingCount, warningCount, onF
         )}
 
         {/* Validation chips */}
-        <ValidationChips issues={issues} onSelect={(i) => i.regionId && setSelectedId(i.regionId)} />
+        <ValidationChips
+          issues={issues}
+          onSelect={(i) => i.regionId && setSelectedId(i.regionId)}
+        />
 
         {/* Region list */}
         <div className="space-y-1">

@@ -200,7 +200,18 @@ export function MapLayerEditableOverlay({
       document.removeEventListener("keydown", onKey);
       lmap.dragging.enable();
     };
-  }, [editMode, isSelected, locked, lmap, mapDoc, layer.x, layer.y, layer.width, layer.height, onCommit]);
+  }, [
+    editMode,
+    isSelected,
+    locked,
+    lmap,
+    mapDoc,
+    layer.x,
+    layer.y,
+    layer.width,
+    layer.height,
+    onCommit,
+  ]);
 
   // -----------------------------------------------------------------------
   // B2 — corner handle positions (in Leaflet lat/lng).
@@ -303,7 +314,9 @@ function ResizeHandle({
     const setBoundsFor = (nx: number, ny: number, nw: number, nh: number) => {
       const overlay = overlayRef.current;
       if (!overlay) return;
-      overlay.setBounds(latLngBoundsForRect({ x: nx, y: ny, width: nw, height: nh }, mapDoc.height));
+      overlay.setBounds(
+        latLngBoundsForRect({ x: nx, y: ny, width: nw, height: nh }, mapDoc.height),
+      );
     };
 
     const computeFromDrag = (

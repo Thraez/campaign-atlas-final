@@ -53,9 +53,7 @@ describe("ValidationChips", () => {
   });
 
   it("gives blocking and warning issues distinct color classes", () => {
-    render(
-      <ValidationChips issues={[issue("boom", "blocking"), issue("careful", "warning")]} />,
-    );
+    render(<ValidationChips issues={[issue("boom", "blocking"), issue("careful", "warning")]} />);
     const blockingChip = screen.getByText("boom").closest("div");
     const warningChip = screen.getByText("careful").closest("div");
     expect(blockingChip?.className).toContain("text-destructive");

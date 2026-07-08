@@ -53,7 +53,12 @@ import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
 import { serializeDeepLink, parseDeepLink } from "@/atlas/deepLink";
-import { ROUTE_MODE_LABEL, routeDistancePx, formatTravelTime, gridLines } from "@/atlas/map/geometry";
+import {
+  ROUTE_MODE_LABEL,
+  routeDistancePx,
+  formatTravelTime,
+  gridLines,
+} from "@/atlas/map/geometry";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;

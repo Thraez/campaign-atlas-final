@@ -48,7 +48,10 @@ describe("check-no-secrets scanFile — unreadable file", () => {
     try {
       const file = path.join(dir, "junk.txt");
       // 0xFF 0xFE 0x00 are invalid UTF-8; utf8 read yields U+FFFD, not a throw.
-      fs.writeFileSync(file, Buffer.concat([Buffer.from([0xff, 0xfe, 0x00]), Buffer.from(SENTINEL)]));
+      fs.writeFileSync(
+        file,
+        Buffer.concat([Buffer.from([0xff, 0xfe, 0x00]), Buffer.from(SENTINEL)]),
+      );
 
       const hits = scanFile(file);
 

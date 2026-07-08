@@ -3,7 +3,12 @@
  */
 import { describe, it, expect } from "vitest";
 import type { GridOverlay, MapDocument } from "@/atlas/content/schema";
-import { ROUTE_MODE_LABEL, routeDistancePx, formatTravelTime, gridLines } from "@/atlas/map/geometry";
+import {
+  ROUTE_MODE_LABEL,
+  routeDistancePx,
+  formatTravelTime,
+  gridLines,
+} from "@/atlas/map/geometry";
 
 function makeMap(width: number, height: number): MapDocument {
   return {
@@ -25,18 +30,22 @@ describe("routeDistancePx", () => {
   });
 
   it("computes a 3-4-5 segment length", () => {
-    expect(routeDistancePx([
-      [0, 0],
-      [3, 4],
-    ])).toBe(5);
+    expect(
+      routeDistancePx([
+        [0, 0],
+        [3, 4],
+      ]),
+    ).toBe(5);
   });
 
   it("sums multiple segments", () => {
-    expect(routeDistancePx([
-      [0, 0],
-      [3, 4], // +5
-      [3, 4 + 12], // +12
-    ])).toBe(17);
+    expect(
+      routeDistancePx([
+        [0, 0],
+        [3, 4], // +5
+        [3, 4 + 12], // +12
+      ]),
+    ).toBe(17);
   });
 });
 

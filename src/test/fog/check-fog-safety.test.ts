@@ -396,7 +396,14 @@ describe("check-fog-safety", () => {
           width: 100,
           height: 100,
           layers: [
-            { id: "lyr", src: "atlas/assets/maps/world.fog.png", x: 0, y: 0, width: 100, height: 100 },
+            {
+              id: "lyr",
+              src: "atlas/assets/maps/world.fog.png",
+              x: 0,
+              y: 0,
+              width: 100,
+              height: 100,
+            },
           ],
           fog: { mapId: "world", enabled: true },
         },
