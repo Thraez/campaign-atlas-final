@@ -233,6 +233,69 @@ describe("useMapLayers + undo", () => {
     ]);
   });
 
+  it("a locked layer rejects geometry edits but still accepts unlock + metadata", () => {
+    const { result } = renderHook(() => useMapLayers(testMap));
+    act(() => result.current.editBuiltinLayer("builtin-1"));
+    act(() => result.current.updateLayer("builtin-1", { x: 100, y: 50 }));
+    act(() => result.current.updateLayer("builtin-1", { locked: true }));
+
+    // Geometry edits from any source now no-op.
+    act(() => result.current.updateLayer("builtin-1", { x: 999, y: 999, width: 5, opacity: 0.1 }));
+    const l = result.current.localLayers.find((x) => x.id === "builtin-1")!;
+    expect(l.locked).toBe(true);
+    expect(l.x).toBe(100);
+    expect(l.y).toBe(50);
+    expect(l.width).toBe(2000);
+    expect(l.opacity).toBe(1);
+
+    // Metadata still applies while locked.
+    act(() => result.current.updateLayer("builtin-1", { name: "Base" }));
+    expect(result.current.localLayers.find((x) => x.id === "builtin-1")!.name).toBe("Base");
+
+    // Unlock → geometry edits apply again.
+    act(() => result.current.updateLayer("builtin-1", { locked: false }));
+    act(() => result.current.updateLayer("builtin-1", { x: 300 }));
+    expect(result.current.localLayers.find((x) => x.id === "builtin-1")!.x).toBe(300);
+  });
+
+  it("a blocked geometry edit on a locked layer records no undo entry", () => {
+    const { result } = renderHook(() => {
+      const undoStack = useUndoStack();
+      const layers = useMapLayers(testMap, undoStack);
+      return { undoStack, layers };
+    });
+    act(() => result.current.layers.editBuiltinLayer("builtin-1"));
+    act(() => result.current.layers.updateLayer("builtin-1", { locked: true }));
+    act(() => result.current.undoStack.clear());
+
+    act(() => result.current.layers.updateLayer("builtin-1", { x: 999 }));
+    expect(result.current.undoStack.canUndo).toBe(false);
+    expect(result.current.layers.localLayers.find((l) => l.id === "builtin-1")?.x).toBe(0);
+  });
+
+  it("lock persists across a fresh hook mount (localStorage round-trip)", () => {
+    const first = renderHook(() => useMapLayers(testMap));
+    act(() => first.result.current.editBuiltinLayer("builtin-1"));
+    act(() => first.result.current.updateLayer("builtin-1", { locked: true }));
+    first.unmount();
+
+    const second = renderHook(() => useMapLayers(testMap));
+    expect(second.result.current.localLayers.find((l) => l.id === "builtin-1")?.locked).toBe(true);
+  });
+
+  it("lock survives an undo of an unrelated later change", () => {
+    const { result } = renderHook(() => {
+      const undoStack = useUndoStack();
+      const layers = useMapLayers(testMap, undoStack);
+      return { undoStack, layers };
+    });
+    act(() => result.current.layers.editBuiltinLayer("builtin-1"));
+    act(() => result.current.layers.updateLayer("builtin-1", { locked: true }));
+    act(() => result.current.layers.updateLayer("builtin-1", { name: "Base" }));
+    act(() => result.current.undoStack.undo()); // undo the name change
+    expect(result.current.layers.localLayers.find((l) => l.id === "builtin-1")?.locked).toBe(true);
+  });
+
   it("mergedLayers places upload/url additions after the canon block", async () => {
     // Adds (origin = "upload" / "url") never had a canonical slot, so they
     // belong at the end of the array — preserving canon order for the rest.

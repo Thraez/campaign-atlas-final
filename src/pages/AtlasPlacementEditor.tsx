@@ -1968,6 +1968,9 @@ function AtlasPlacementEditorInner() {
                           mapDoc={activeMap}
                           editMode={editGeometry}
                           isSelected={isSelected}
+                          locked={
+                            layerEditor.localLayers.find((l) => l.id === layer.id)?.locked ?? false
+                          }
                           lockAspect={lockAspectRatio}
                           onSelect={() => layerEditor.setSelectedId(layer.id)}
                           onBackgroundClick={handleLayerBackgroundClick}

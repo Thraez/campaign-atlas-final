@@ -41,6 +41,8 @@ interface Props {
   mapDoc: MapDocument;
   editMode: boolean;
   isSelected: boolean;
+  /** When true the layer is pinned: no body drag, no resize handles. */
+  locked?: boolean;
   /** Force a uniform aspect ratio on corner resize (also forced by Shift). */
   lockAspect?: boolean;
   onSelect: () => void;
@@ -75,6 +77,7 @@ export function MapLayerEditableOverlay({
   mapDoc,
   editMode,
   isSelected,
+  locked,
   lockAspect,
   onSelect,
   onCommit,
@@ -99,7 +102,8 @@ export function MapLayerEditableOverlay({
   // B1 — body drag.
   // -----------------------------------------------------------------------
   useEffect(() => {
-    if (!editMode || !isSelected) return;
+    // A locked layer is not draggable — bail before wiring any mouse handlers.
+    if (!editMode || !isSelected || locked) return;
     const overlay = overlayRef.current;
     if (!overlay) return;
     const img = overlay.getElement() as HTMLImageElement | undefined;
@@ -184,7 +188,7 @@ export function MapLayerEditableOverlay({
       document.removeEventListener("keydown", onKey);
       lmap.dragging.enable();
     };
-  }, [editMode, isSelected, lmap, mapDoc, layer.x, layer.y, layer.width, layer.height, onCommit]);
+  }, [editMode, isSelected, locked, lmap, mapDoc, layer.x, layer.y, layer.width, layer.height, onCommit]);
 
   // -----------------------------------------------------------------------
   // B2 — corner handle positions (in Leaflet lat/lng).
@@ -222,7 +226,7 @@ export function MapLayerEditableOverlay({
           },
         }}
       />
-      {editMode && isSelected && (
+      {editMode && isSelected && !locked && (
         <>
           {(["nw", "ne", "sw", "se"] as const).map((corner) => (
             <ResizeHandle

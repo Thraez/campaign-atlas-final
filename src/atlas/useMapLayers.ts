@@ -22,6 +22,27 @@ export interface LocalLayer extends MapLayer {
   dataUrl?: string;
 }
 
+/**
+ * Fields a locked layer refuses to change. Lock protects the layer's geometry
+ * and appearance on the canvas; the lock flag itself and metadata (name,
+ * targetPath) stay editable so the layer can be unlocked and renamed.
+ */
+const LOCKED_GEOMETRY_KEYS: ReadonlyArray<keyof LocalLayer> = [
+  "x",
+  "y",
+  "width",
+  "height",
+  "opacity",
+  "zIndex",
+  "rotation",
+];
+
+function stripLockedGeometry(patch: Partial<LocalLayer>): Partial<LocalLayer> {
+  const out: Partial<LocalLayer> = { ...patch };
+  for (const k of LOCKED_GEOMETRY_KEYS) delete out[k];
+  return out;
+}
+
 const STORAGE_KEY = "atlas-local-map-layers-v1";
 
 interface Stored {
@@ -305,11 +326,18 @@ export function useMapLayers(map: MapDocument | undefined, undoStack?: UndoStack
   );
 
   const updateLayer = useCallback(
-    (id: string, patch: Partial<MapLayer>) => {
+    (id: string, patch: Partial<LocalLayer>) => {
       if (!map) return;
       mutateByMap((s) => {
         const cur = s[map.id] ?? [];
-        const next = cur.map((l) => (l.id === id ? { ...l, ...patch } : l));
+        const target = cur.find((l) => l.id === id);
+        // A locked layer rejects geometry/appearance edits from ANY source — the
+        // panel Transform controls and the canvas drag/resize both funnel through
+        // here — while the lock toggle and metadata (name, path) still apply, so
+        // it can be unlocked and renamed. This is the single enforcement point.
+        const effective = target?.locked ? stripLockedGeometry(patch) : patch;
+        if (Object.keys(effective).length === 0) return s;
+        const next = cur.map((l) => (l.id === id ? { ...l, ...effective } : l));
         // No-op if nothing actually changed — avoid recording empty undo entries
         // when the user clicks a no-op nudge step.
         if (next === cur || cur.every((l, i) => l === next[i])) return s;

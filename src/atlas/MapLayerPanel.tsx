@@ -49,7 +49,7 @@ interface Props {
   onAddFiles: (files: File[]) => void | Promise<void>;
   onAddUrl: (src: string) => void | Promise<void>;
   onEditBuiltin: (id: string) => void;
-  onUpdate: (id: string, patch: Partial<MapLayer>) => void;
+  onUpdate: (id: string, patch: Partial<LocalLayer>) => void;
   onDuplicate: (id: string) => void;
   onRemove: (id: string) => void;
   onClearAll: () => void;
@@ -125,11 +125,15 @@ export function MapLayerPanel(props: Props) {
   const setLockAspect = props.setLockAspect ?? setLockAspectInternal;
   const editGeometry = props.editGeometry ?? false;
   const setEditGeometry = props.setEditGeometry;
-  const [locked, setLocked] = useState(false);
 
   const selected = mergedLayers.find((l) => l.id === selectedId) ?? null;
   const localSelected = localLayers.find((l) => l.id === selectedId) ?? null;
   const isBuiltinReadOnly = !!selected && !localSelected;
+  // Lock lives on the layer model, so it persists and travels with the layer
+  // through reorder / undo / reload — not panel-local state that resets on every
+  // layer switch. A built-in layer is unlocked until the toggle promotes it to a
+  // local edit (see the lock button below).
+  const locked = localSelected?.locked ?? false;
 
   const aspect = selected ? (selected.height === 0 ? 1 : selected.width / selected.height) : 1;
 
@@ -382,7 +386,15 @@ export function MapLayerPanel(props: Props) {
                   size="sm"
                   variant="ghost"
                   className="h-7 w-7 p-0"
-                  onClick={() => setLocked((v) => !v)}
+                  onClick={() => {
+                    if (!selected) return;
+                    // Locking a built-in promotes it to a local edit so the flag
+                    // has somewhere to persist. The lock toggle bypasses patch()
+                    // (which itself refuses to run while locked) so a layer can
+                    // always be unlocked.
+                    ensureEditable(selected.id);
+                    onUpdate(selected.id, { locked: !locked });
+                  }}
                   title={locked ? "Unlock" : "Lock"}
                   aria-label={locked ? "Unlock layer" : "Lock layer"}
                 >
@@ -538,9 +550,7 @@ export function MapLayerPanel(props: Props) {
                   </Label>
                   <Input
                     value={localSelected.name ?? ""}
-                    onChange={(e) =>
-                      onUpdate(selected.id, { name: e.target.value } as Partial<MapLayer>)
-                    }
+                    onChange={(e) => onUpdate(selected.id, { name: e.target.value })}
                     className="h-7 text-xs"
                   />
                 </div>
@@ -551,9 +561,7 @@ export function MapLayerPanel(props: Props) {
                     </Label>
                     <Input
                       value={localSelected.targetPath ?? ""}
-                      onChange={(e) =>
-                        onUpdate(selected.id, { targetPath: e.target.value } as Partial<MapLayer>)
-                      }
+                      onChange={(e) => onUpdate(selected.id, { targetPath: e.target.value })}
                       className="h-7 text-xs font-mono"
                     />
                   </div>
