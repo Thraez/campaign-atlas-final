@@ -21,6 +21,10 @@
  *   14  GEOMETRY-LEAK
  *   15  IN-FOG-CONTENT
  *   16  ALPHA-LEAK
+ *   17  COULD-NOT-VERIFY-GEOMETRY — a source world config was present but failed
+ *       to load, so the geometry-dependent checks (15, 16) never ran and the
+ *       fog maps cannot be certified. (Config *absent* is a legitimate
+ *       configless run and still exits 0.)
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -117,6 +121,11 @@ export async function run(opts: RunOpts): Promise<number> {
   // loadWorldConfig(contentRoot, worldId) — we derive these from atlas.config.json.
   const configAbs = path.resolve(process.cwd(), args.config);
   let sourceFogs: FogOverlay[] = [];
+  // Distinguish "config present but FAILED to load" (a verification gap we must
+  // not paper over) from "config absent" (a legitimate configless run) and from
+  // "world.yaml absent" (loadWorldConfig returns null without throwing). Only a
+  // genuine load failure — a thrown WorldConfigError — sets this.
+  let configLoadFailed = false;
 
   if (fs.existsSync(configAbs)) {
     try {
@@ -128,8 +137,9 @@ export async function run(opts: RunOpts): Promise<number> {
         sourceFogs = worldCfg.fogs as FogOverlay[];
       }
     } catch (e) {
+      configLoadFailed = true;
       console.error(
-        `atlas:check-fog-safety: failed to load source world config — skipping in-fog-content + alpha-leak checks`,
+        `atlas:check-fog-safety: failed to load source world config — in-fog-content + alpha-leak checks could not run`,
         e,
       );
     }
@@ -281,17 +291,31 @@ export async function run(opts: RunOpts): Promise<number> {
     `atlas:check-fog-safety: scanned ${fogMaps.length} fog-enabled map(s) in ${args.target}`,
   );
 
-  if (findings.length === 0) {
-    console.log("atlas:check-fog-safety: clean");
-    return 0;
+  // A config we were handed but could not load means the geometry-dependent
+  // checks (IN-FOG-CONTENT, ALPHA-LEAK) never ran for these maps, so we cannot
+  // certify them — surface the gap rather than silently reporting "clean".
+  const geometryUnverified = configLoadFailed && fogMaps.length > 0;
+  if (geometryUnverified) {
+    console.error(
+      "atlas:check-fog-safety: source world config failed to load — IN-FOG-CONTENT and " +
+        "ALPHA-LEAK checks were SKIPPED; fog maps cannot be certified.",
+    );
   }
 
-  for (const f of findings) {
-    console.error(`  [${f.code}] ${f.message}`);
+  if (findings.length > 0) {
+    for (const f of findings) {
+      console.error(`  [${f.code}] ${f.message}`);
+    }
+    // A concrete leak outranks the verification gap — return its code.
+    return findings[0].code;
   }
 
-  // Return the first finding's code for deterministic exit code in tests.
-  return findings[0].code;
+  if (geometryUnverified) {
+    return 17; // COULD-NOT-VERIFY-GEOMETRY
+  }
+
+  console.log("atlas:check-fog-safety: clean");
+  return 0;
 }
 
 export async function main(): Promise<number> {

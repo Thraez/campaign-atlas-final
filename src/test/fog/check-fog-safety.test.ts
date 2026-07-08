@@ -379,4 +379,79 @@ describe("check-fog-safety", () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  /**
+   * Write only atlas.json for a fog-enabled map that is otherwise clean:
+   * a redacted .fog.png layer, fog stripped to {mapId, enabled}, no placements.
+   * With no source config this scans clean; the point of the two tests below is
+   * how the scanner behaves when source geometry can/can't be derived.
+   */
+  function writeCleanFogArtifact(dir: string): string {
+    const artifactDir = path.join(dir, "out");
+    fs.mkdirSync(artifactDir, { recursive: true });
+    writePlayerAtlas(artifactDir, {
+      maps: [
+        {
+          id: "world",
+          width: 100,
+          height: 100,
+          layers: [
+            { id: "lyr", src: "atlas/assets/maps/world.fog.png", x: 0, y: 0, width: 100, height: 100 },
+          ],
+          fog: { mapId: "world", enabled: true },
+        },
+      ],
+      placements: [],
+    });
+    return artifactDir;
+  }
+
+  // -------------------------------------------------------------------------
+  // Test 8: source config PRESENT but world.yaml is broken → exit 17.
+  // The geometry-dependent checks (15, 16) cannot run, so an otherwise-clean
+  // fog map must NOT be reported clean — it is unverified.
+  // -------------------------------------------------------------------------
+  it("could-not-verify (17): present-but-broken world.yaml on a clean fog map", async () => {
+    const dir = mkTmp();
+    try {
+      // Markdown fences make loadWorldConfig throw (its hard-fail guard).
+      writeSourceConfig(dir, "w", "```yaml\nschemaVersion: 1\n```");
+      writeCleanFogArtifact(dir);
+
+      process.chdir(dir);
+      const { main } = await import("../../../scripts/check-fog-safety");
+      process.argv = ["node", "check-fog-safety.ts", "out"];
+      const code = await main();
+      expect(code).toBe(17);
+    } finally {
+      process.chdir(origCwd);
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // Test 9: source config present but world.yaml ABSENT → exit 0.
+  // loadWorldConfig returns null (not a throw) for an absent world.yaml, which
+  // is a legitimate configless state — it must stay distinct from the 17 above.
+  // -------------------------------------------------------------------------
+  it("absent world.yaml is legitimate → exit 0 (distinct from broken/17)", async () => {
+    const dir = mkTmp();
+    try {
+      // Config file only; no content/<world>/_atlas/world.yaml is created.
+      fs.writeFileSync(
+        path.join(dir, "atlas.config.json"),
+        JSON.stringify({ contentRoot: "content", outputDir: "out", defaultWorld: "w" }),
+      );
+      writeCleanFogArtifact(dir);
+
+      process.chdir(dir);
+      const { main } = await import("../../../scripts/check-fog-safety");
+      process.argv = ["node", "check-fog-safety.ts", "out"];
+      const code = await main();
+      expect(code).toBe(0);
+    } finally {
+      process.chdir(origCwd);
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
