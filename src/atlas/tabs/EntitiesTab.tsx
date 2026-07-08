@@ -19,13 +19,18 @@ import {
   ClipboardPaste,
 } from "lucide-react";
 import type { AtlasProject, Entity, EntityVisibility } from "@/atlas/content/schema";
-import type { EntityProfile, EntityRelationship } from "@/atlas/profiles/profileTypes";
+import type {
+  EntityProfile,
+  EntityRelationship,
+  PlayerProfile,
+} from "@/atlas/profiles/profileTypes";
 import {
   PLAYER_PROFILE_FIELDS,
   PLAYER_PROFILE_LIST_FIELDS,
   RELATIONSHIP_TYPES,
   dmFieldsForType,
 } from "@/atlas/profiles/profileFields";
+import type { PlayerTextFieldDef, PlayerListFieldDef } from "@/atlas/profiles/profileFields";
 import { filterRelationshipsForPlayer } from "@/atlas/profiles/profileBuild";
 import { type FrontmatterDraft, entityFrontmatterPatches } from "@/atlas/save/canonicalEntitySave";
 import { Button } from "@/components/ui/button";
@@ -203,17 +208,26 @@ function EntityForm({
   entityVisibility: Map<string, EntityVisibility>;
   allEntities: Entity[];
 }) {
-  const v = (k: keyof FrontmatterDraft, fallback: unknown) => (draft[k] ?? fallback) as never;
-  const effectiveType = (draft.type ?? entity.type) as string;
+  // Typed draft accessor: returns the drafted value for `k` or `fallback`,
+  // narrowed to the field's own type. Replaces an `as never` hole that
+  // silently disabled type-checking on every field value.
+  const draftValue = <K extends keyof FrontmatterDraft>(
+    k: K,
+    fallback: NonNullable<FrontmatterDraft[K]>,
+  ): NonNullable<FrontmatterDraft[K]> => draft[k] ?? fallback;
+  const effectiveType = draft.type ?? entity.type;
   const effectiveProfile: EntityProfile = draft.profile ?? entity.profile ?? {};
   const effectiveRelationships: EntityRelationship[] =
     draft.relationships ?? entity.relationships ?? [];
 
   const setProfile = (next: EntityProfile) => setDraft({ profile: next });
-  const setPlayer = (key: string, value: string | string[]) => {
-    const player = { ...(effectiveProfile.player ?? {}) } as Record<string, unknown>;
-    player[key] = value;
-    setProfile({ ...effectiveProfile, player: player as EntityProfile["player"] });
+  const setPlayerText = (key: PlayerTextFieldDef["key"], value: string) => {
+    const player: PlayerProfile = { ...effectiveProfile.player, [key]: value };
+    setProfile({ ...effectiveProfile, player });
+  };
+  const setPlayerList = (key: PlayerListFieldDef["key"], value: string[]) => {
+    const player: PlayerProfile = { ...effectiveProfile.player, [key]: value };
+    setProfile({ ...effectiveProfile, player });
   };
   const setDm = (key: string, value: string) => {
     const dm = { ...(effectiveProfile.dm ?? {}) };
@@ -228,7 +242,7 @@ function EntityForm({
         <div>
           <Label className="text-[10px]">Type</Label>
           <Input
-            value={v("type", entity.type)}
+            value={draftValue("type", entity.type)}
             onChange={(e) => setDraft({ type: e.target.value })}
             className="h-7 text-xs"
           />
@@ -236,7 +250,7 @@ function EntityForm({
         <div>
           <Label className="text-[10px]">Visibility</Label>
           <Select
-            value={v("visibility", entity.visibility)}
+            value={draftValue("visibility", entity.visibility)}
             onValueChange={(val) => setDraft({ visibility: val as EntityVisibility })}
           >
             <SelectTrigger className="h-7 text-xs">
@@ -263,7 +277,7 @@ function EntityForm({
         <Label className="text-[10px]">Summary</Label>
         <DmMaskingTextarea
           rows={2}
-          value={v("summary", entity.summary ?? "")}
+          value={draftValue("summary", entity.summary ?? "")}
           onChange={(next) => setDraft({ summary: next })}
           className="text-xs"
         />
@@ -303,7 +317,8 @@ function EntityForm({
       <ProfileSection
         type={effectiveType}
         profile={effectiveProfile}
-        onSetPlayer={setPlayer}
+        onSetPlayerText={setPlayerText}
+        onSetPlayerList={setPlayerList}
         onSetDm={setDm}
       />
 
@@ -321,16 +336,18 @@ function EntityForm({
 function ProfileSection({
   type,
   profile,
-  onSetPlayer,
+  onSetPlayerText,
+  onSetPlayerList,
   onSetDm,
 }: {
   type: string;
   profile: EntityProfile;
-  onSetPlayer: (key: string, value: string | string[]) => void;
+  onSetPlayerText: (key: PlayerTextFieldDef["key"], value: string) => void;
+  onSetPlayerList: (key: PlayerListFieldDef["key"], value: string[]) => void;
   onSetDm: (key: string, value: string) => void;
 }) {
   const dmFields = dmFieldsForType(type);
-  const player = profile.player ?? {};
+  const player: PlayerProfile = profile.player ?? {};
   const dm = profile.dm ?? {};
   return (
     <div className="space-y-2 rounded-md border border-border/60 p-2">
@@ -346,8 +363,8 @@ function ProfileSection({
             <DmMaskingTextarea
               rows={2}
               placeholder={f.placeholder}
-              value={(player as Record<string, string>)[f.key] ?? ""}
-              onChange={(next) => onSetPlayer(f.key, next)}
+              value={player[f.key] ?? ""}
+              onChange={(next) => onSetPlayerText(f.key, next)}
               className="text-xs"
             />
           </div>
@@ -357,8 +374,8 @@ function ProfileSection({
             key={f.key}
             label={f.label}
             placeholder={f.placeholder}
-            values={(player as Record<string, string[]>)[f.key] ?? []}
-            onChange={(vals) => onSetPlayer(f.key, vals)}
+            values={player[f.key] ?? []}
+            onChange={(vals) => onSetPlayerList(f.key, vals)}
           />
         ))}
       </div>
