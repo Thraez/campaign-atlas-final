@@ -53,6 +53,7 @@ export function FogTab({
   const {
     fog,
     dirty,
+    dirtyCount,
     setEnabled,
     setColor,
     tool,
@@ -60,7 +61,7 @@ export function FogTab({
     draftPoints,
     addDraftPoint: _addDraftPoint,
     removeLastDraftPoint,
-    cancelDraft,
+    cancelDraw,
     finishDraftPolygon,
     finishDraftCircle,
     removeReveal,
@@ -106,7 +107,7 @@ export function FogTab({
         }
       } else if (e.key === "Escape") {
         e.preventDefault();
-        cancelDraft();
+        cancelDraw();
       } else if (e.key === "Backspace" && isPolygonTool) {
         e.preventDefault();
         removeLastDraftPoint();
@@ -114,7 +115,7 @@ export function FogTab({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tool, finishDraftPolygon, finishDraftCircle, cancelDraft, removeLastDraftPoint, circleRadius]);
+  }, [tool, finishDraftPolygon, finishDraftCircle, cancelDraw, removeLastDraftPoint, circleRadius]);
 
   const placementsByEntity = useMemo(() => {
     const m = new Map<string, [number, number]>();
@@ -126,7 +127,7 @@ export function FogTab({
     <TabFrame
       title="Fog of war"
       builtFromYamlCount={map.fog?.reveals.length ?? 0}
-      localDraftCount={dirty ? 1 : 0}
+      localDraftCount={dirtyCount}
       blockingCount={blockingCount}
       warningCount={warningCount}
       rawYamlPreview={advancedYaml ? yamlBlock : undefined}
@@ -175,7 +176,7 @@ export function FogTab({
               size="sm"
               variant={tool === "polygon" ? "default" : "outline"}
               className="h-7 text-xs gap-1"
-              onClick={() => (tool === "polygon" ? cancelDraft() : setTool("polygon"))}
+              onClick={() => (tool === "polygon" ? cancelDraw() : setTool("polygon"))}
             >
               <Pen className="h-3.5 w-3.5" /> Polygon
             </Button>
@@ -183,7 +184,7 @@ export function FogTab({
               size="sm"
               variant={tool === "circle" ? "default" : "outline"}
               className="h-7 text-xs gap-1"
-              onClick={() => (tool === "circle" ? cancelDraft() : setTool("circle"))}
+              onClick={() => (tool === "circle" ? cancelDraw() : setTool("circle"))}
             >
               <CircleIcon className="h-3.5 w-3.5" /> Circle
             </Button>
@@ -206,7 +207,7 @@ export function FogTab({
                 >
                   Finish
                 </Button>
-                <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={cancelDraft}>
+                <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={cancelDraw}>
                   Cancel
                 </Button>
               </div>
@@ -238,7 +239,7 @@ export function FogTab({
                   >
                     Add
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={cancelDraft}>
+                  <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={cancelDraw}>
                     Cancel
                   </Button>
                 </div>
@@ -363,7 +364,7 @@ export function FogTab({
               size="sm"
               variant={tool === "fog-polygon" ? "default" : "outline"}
               className="h-7 text-xs gap-1"
-              onClick={() => (tool === "fog-polygon" ? cancelDraft() : setTool("fog-polygon"))}
+              onClick={() => (tool === "fog-polygon" ? cancelDraw() : setTool("fog-polygon"))}
             >
               <Pen className="h-3.5 w-3.5" /> Polygon
             </Button>
@@ -371,7 +372,7 @@ export function FogTab({
               size="sm"
               variant={tool === "fog-circle" ? "default" : "outline"}
               className="h-7 text-xs gap-1"
-              onClick={() => (tool === "fog-circle" ? cancelDraft() : setTool("fog-circle"))}
+              onClick={() => (tool === "fog-circle" ? cancelDraw() : setTool("fog-circle"))}
             >
               <CircleIcon className="h-3.5 w-3.5" /> Circle
             </Button>
@@ -392,7 +393,7 @@ export function FogTab({
                 >
                   Finish
                 </Button>
-                <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={cancelDraft}>
+                <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={cancelDraw}>
                   Cancel
                 </Button>
               </div>
@@ -424,7 +425,7 @@ export function FogTab({
                   >
                     Add
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={cancelDraft}>
+                  <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={cancelDraw}>
                     Cancel
                   </Button>
                 </div>

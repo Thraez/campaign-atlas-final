@@ -1050,7 +1050,7 @@ function AtlasPlacementEditorInner() {
     perMapDirtyCount: () =>
       regionDraft.dirtyCount +
       routeDraft.dirtyCount +
-      (fogDraft.dirty ? 1 : 0) +
+      fogDraft.dirtyCount +
       layerEditor.localLayers.length +
       (mapMetadataDirty ? 1 : 0) +
       dirtyCount +

@@ -141,6 +141,17 @@ describe("useFogDraft", () => {
     expect(result.current.fog.enabled).toBe(false);
   });
 
+  it("dirtyCount mirrors dirty (0 when canon, 1 when overridden, 0 after reset)", () => {
+    const { result } = renderHook(() => useFogDraft(map));
+    expect(result.current.dirtyCount).toBe(0);
+    act(() => result.current.setEnabled(false));
+    expect(result.current.dirty).toBe(true);
+    expect(result.current.dirtyCount).toBe(1);
+    act(() => result.current.reset());
+    expect(result.current.dirty).toBe(false);
+    expect(result.current.dirtyCount).toBe(0);
+  });
+
   it("draws a polygon reveal (≥3 points)", () => {
     const { result } = renderHook(() => useFogDraft(map));
     act(() => result.current.setTool("polygon"));

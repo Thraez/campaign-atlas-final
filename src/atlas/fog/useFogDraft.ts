@@ -26,6 +26,9 @@ export interface FogDraftAPI {
   fog: FogOverlay;
   /** True if local edits diverge from canon. */
   dirty: boolean;
+  /** Pending-change count (0 or 1 — fog is a single overlay). Mirrors the
+   *  routes/regions `dirtyCount` so all three tabs read one uniform field. */
+  dirtyCount: number;
   setEnabled: (v: boolean) => void;
   setColor: (v: string | undefined) => void;
   // Reveal authoring
@@ -34,7 +37,7 @@ export interface FogDraftAPI {
   draftPoints: Point[];
   addDraftPoint: (p: Point) => void;
   removeLastDraftPoint: () => void;
-  cancelDraft: () => void;
+  cancelDraw: () => void;
   finishDraftPolygon: () => boolean;
   /** Draw a circle by anchor + radius (in map units). Adds polygon approximation. */
   finishDraftCircle: (radius: number) => boolean;
@@ -106,6 +109,7 @@ export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackA
   const [override, setOverride] = useState<FogOverlay | null>(null);
   const fog = override ?? baseFog;
   const dirty = override !== null;
+  const dirtyCount = dirty ? 1 : 0;
 
   const [tool, setTool] = useState<FogTool>(null);
   const [draftPoints, setDraftPoints] = useState<Point[]>([]);
@@ -154,7 +158,7 @@ export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackA
 
   const addDraftPoint = useCallback((p: Point) => setDraftPoints((s) => [...s, p]), []);
   const removeLastDraftPoint = useCallback(() => setDraftPoints((s) => s.slice(0, -1)), []);
-  const cancelDraft = useCallback(() => {
+  const cancelDraw = useCallback(() => {
     setTool(null);
     setDraftPoints([]);
   }, []);
@@ -248,8 +252,8 @@ export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackA
   // reset() bypasses the undo stack — see comment in useRegionDraft.ts.
   const reset = useCallback(() => {
     applyOverride(null);
-    cancelDraft();
-  }, [applyOverride, cancelDraft]);
+    cancelDraw();
+  }, [applyOverride, cancelDraw]);
 
   const issues = useMemo<FogIssue[]>(() => {
     const out: FogIssue[] = [];
@@ -292,6 +296,7 @@ export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackA
   return {
     fog,
     dirty,
+    dirtyCount,
     setEnabled,
     setColor,
     tool,
@@ -299,7 +304,7 @@ export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackA
     draftPoints,
     addDraftPoint,
     removeLastDraftPoint,
-    cancelDraft,
+    cancelDraw,
     finishDraftPolygon,
     finishDraftCircle,
     removeReveal,

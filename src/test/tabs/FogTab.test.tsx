@@ -61,6 +61,7 @@ function makeMockApi(fogOverrides: Partial<FogDraftAPI["fog"]> = {}): FogDraftAP
   return {
     fog,
     dirty: false,
+    dirtyCount: 0,
     setEnabled: vi.fn(),
     setColor: vi.fn(),
     tool: null,
@@ -68,7 +69,7 @@ function makeMockApi(fogOverrides: Partial<FogDraftAPI["fog"]> = {}): FogDraftAP
     draftPoints: [],
     addDraftPoint: vi.fn(),
     removeLastDraftPoint: vi.fn(),
-    cancelDraft: vi.fn(),
+    cancelDraw: vi.fn(),
     finishDraftPolygon: vi.fn(() => true),
     finishDraftCircle: vi.fn(() => true),
     removeReveal: vi.fn(),
@@ -216,7 +217,7 @@ describe("FogTab — drawing keyboard shortcuts", () => {
   it("Escape cancels the draft for any active tool", () => {
     const api = renderWithTool("fog-circle");
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(api.cancelDraft).toHaveBeenCalledTimes(1);
+    expect(api.cancelDraw).toHaveBeenCalledTimes(1);
   });
 
   it("ignores keys when no tool is active", () => {
