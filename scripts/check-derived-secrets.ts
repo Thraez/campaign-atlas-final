@@ -219,7 +219,8 @@ export function scanArtifactForSecrets(dir: string, secrets: SecretEntry[]): Der
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(d, { withFileTypes: true });
-    } catch {
+    } catch (err) {
+      console.warn(`check-derived-secrets: skipped unreadable dir ${d}: ${(err as Error).message}`);
       return;
     }
     for (const e of entries) {
@@ -233,7 +234,13 @@ export function scanArtifactForSecrets(dir: string, secrets: SecretEntry[]): Der
         let text: string;
         try {
           text = fs.readFileSync(full, "utf8");
-        } catch {
+        } catch (err) {
+          // utf8 reads substitute U+FFFD for undecodable bytes rather than
+          // throwing, so this only fires on genuine OS-level I/O errors. Log the
+          // skip instead of swallowing it; the exit code is unaffected.
+          console.warn(
+            `check-derived-secrets: skipped unreadable file ${full}: ${(err as Error).message}`,
+          );
           continue;
         }
         for (const s of secrets) {
