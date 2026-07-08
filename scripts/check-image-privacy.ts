@@ -124,9 +124,13 @@ export async function run(opts: RunOpts): Promise<number> {
       if (leaking.length > 0) {
         violations.push(`METADATA LEAK: ${imgPath}\n    contains ${leaking.join(", ")}`);
       }
-    } catch {
-      // Unreadable image is unexpected in a valid player build — flag it.
-      violations.push(`UNREADABLE: ${imgPath}\n    could not inspect metadata`);
+    } catch (err) {
+      // Unreadable image is unexpected in a valid player build — flag it, and
+      // keep the underlying error so a real decode failure is diagnosable
+      // rather than an opaque "could not inspect metadata".
+      violations.push(
+        `UNREADABLE: ${imgPath}\n    could not inspect metadata: ${(err as Error).message}`,
+      );
     }
   }
 
