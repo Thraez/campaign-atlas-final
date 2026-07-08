@@ -922,6 +922,37 @@ async function readAllowlistedFile(
   }
 }
 
+/**
+ * Shared loopback gate for the write/read `/__atlas/*` middleware. If the
+ * request is not an allowed dev request, write a 403 and return `true` — the
+ * caller must then `return` without handling it. Returns `false` when the
+ * request may proceed. This is the single place the `/__atlas/*` endpoints
+ * (read, assets/images, save) reject non-loopback callers, so the gate can't
+ * drift between them.
+ *
+ * `serveLocalAtlas` deliberately does NOT use this: on a disallowed request it
+ * falls through to Vite's static serving (the *player* atlas) rather than 403,
+ * to preserve the LAN player-preview workflow without leaking DM canon.
+ */
+export function rejectNonLoopback(
+  req: import("http").IncomingMessage,
+  res: import("http").ServerResponse,
+): boolean {
+  if (
+    isAllowedDevRequest({
+      host: req.headers.host,
+      origin: req.headers.origin,
+      method: req.method,
+    })
+  ) {
+    return false;
+  }
+  res.statusCode = 403;
+  res.setHeader("Content-Type", "application/json");
+  res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
+  return true;
+}
+
 export function atlasSavePlugin(): Plugin {
   // A11: a save is in flight or it isn't. Rather than coalescing concurrent
   // saves (the previous behaviour), reject overlapping requests with 423
@@ -994,18 +1025,7 @@ export function atlasSavePlugin(): Plugin {
       // GET /__atlas/read?path=content/...
       server.middlewares.use("/__atlas/read", (req, res, next) => {
         if (req.method !== "GET") return next();
-        if (
-          !isAllowedDevRequest({
-            host: req.headers.host,
-            origin: req.headers.origin,
-            method: req.method,
-          })
-        ) {
-          res.statusCode = 403;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
-          return;
-        }
+        if (rejectNonLoopback(req, res)) return;
         const url = new URL(req.url ?? "/", "http://localhost");
         const relPath = url.searchParams.get("path") ?? "";
         readAllowlistedFile(server.config.root, relPath).then((result) => {
@@ -1024,18 +1044,7 @@ export function atlasSavePlugin(): Plugin {
       // DELETE /__atlas/assets/images?name=<filename> — remove an image from the library
       server.middlewares.use("/__atlas/assets/images", (req, res, next) => {
         if (req.method !== "GET" && req.method !== "DELETE") return next();
-        if (
-          !isAllowedDevRequest({
-            host: req.headers.host,
-            origin: req.headers.origin,
-            method: req.method,
-          })
-        ) {
-          res.statusCode = 403;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
-          return;
-        }
+        if (rejectNonLoopback(req, res)) return;
         if (req.method === "GET") {
           handleAssetsImagesRequest(server.config.root).then((result) => {
             res.statusCode = result.status;
@@ -1066,18 +1075,7 @@ export function atlasSavePlugin(): Plugin {
       // POST /__atlas/save  { files, rebuild?: boolean }
       server.middlewares.use("/__atlas/save", (req, res, next) => {
         if (req.method !== "POST") return next();
-        if (
-          !isAllowedDevRequest({
-            host: req.headers.host,
-            origin: req.headers.origin,
-            method: req.method,
-          })
-        ) {
-          res.statusCode = 403;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
-          return;
-        }
+        if (rejectNonLoopback(req, res)) return;
         // A11: reject concurrent saves with 423 Locked.
         if (saveInFlight) {
           res.statusCode = 423;

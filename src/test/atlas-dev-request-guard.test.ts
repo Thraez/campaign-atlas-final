@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { isAllowedDevRequest } from "../../scripts/vite-plugin-atlas-save";
+import { isAllowedDevRequest, rejectNonLoopback } from "../../scripts/vite-plugin-atlas-save";
+import type { IncomingMessage, ServerResponse } from "node:http";
 
 describe("isAllowedDevRequest", () => {
   describe("loopback Host accepted", () => {
@@ -175,5 +176,80 @@ describe("isAllowedDevRequest", () => {
         }),
       ).toBe(true);
     });
+  });
+});
+
+describe("rejectNonLoopback (the shared 403 gate for /__atlas/* middleware)", () => {
+  function mockReq(headers: { host?: string; origin?: string }, method: string): IncomingMessage {
+    return { headers, method } as unknown as IncomingMessage;
+  }
+  function mockRes() {
+    const res = {
+      statusCode: 200,
+      headers: {} as Record<string, string>,
+      body: undefined as string | undefined,
+      ended: false,
+      setHeader(name: string, value: string) {
+        this.headers[name.toLowerCase()] = value;
+      },
+      end(body?: string) {
+        this.body = body;
+        this.ended = true;
+      },
+    };
+    return res;
+  }
+
+  it("lets an allowed loopback GET through: returns false and writes nothing", () => {
+    const res = mockRes();
+    const blocked = rejectNonLoopback(
+      mockReq({ host: "localhost:8080", origin: undefined }, "GET"),
+      res as unknown as ServerResponse,
+    );
+    expect(blocked).toBe(false);
+    expect(res.ended).toBe(false);
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("lets an allowed loopback POST (loopback Origin) through", () => {
+    const res = mockRes();
+    const blocked = rejectNonLoopback(
+      mockReq({ host: "localhost:8080", origin: "http://localhost:8080" }, "POST"),
+      res as unknown as ServerResponse,
+    );
+    expect(blocked).toBe(false);
+    expect(res.ended).toBe(false);
+  });
+
+  it("rejects a non-loopback Host: returns true and writes a 403 loopback-only body", () => {
+    const res = mockRes();
+    const blocked = rejectNonLoopback(
+      mockReq({ host: "192.168.1.42:8080", origin: undefined }, "GET"),
+      res as unknown as ServerResponse,
+    );
+    expect(blocked).toBe(true);
+    expect(res.statusCode).toBe(403);
+    expect(res.headers["content-type"]).toBe("application/json");
+    expect(JSON.parse(res.body as string)).toEqual({ error: "Forbidden", detail: "loopback-only" });
+  });
+
+  it("rejects a write with a missing Origin (curl / non-browser) even from loopback Host", () => {
+    const res = mockRes();
+    const blocked = rejectNonLoopback(
+      mockReq({ host: "localhost:8080", origin: undefined }, "POST"),
+      res as unknown as ServerResponse,
+    );
+    expect(blocked).toBe(true);
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("rejects a write with a cross-origin Origin", () => {
+    const res = mockRes();
+    const blocked = rejectNonLoopback(
+      mockReq({ host: "localhost:8080", origin: "http://attacker.example.com" }, "DELETE"),
+      res as unknown as ServerResponse,
+    );
+    expect(blocked).toBe(true);
+    expect(res.statusCode).toBe(403);
   });
 });
