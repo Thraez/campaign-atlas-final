@@ -58,7 +58,8 @@ export function deriveBuildIssues(report: BuildReport): BuildReportIssue[] {
       severity: "error",
       code: "missing-asset",
       message: `${report.missingAssets} local asset reference${report.missingAssets === 1 ? "" : "s"} could not be resolved`,
-      suggestion: "Add the missing files under public/atlas/assets/ or correct the references in world.yaml / entity frontmatter.",
+      suggestion:
+        "Add the missing files under public/atlas/assets/ or correct the references in world.yaml / entity frontmatter.",
     });
   }
   if ((report.duplicateSlugs ?? 0) > 0) {
@@ -82,7 +83,8 @@ export function deriveBuildIssues(report: BuildReport): BuildReportIssue[] {
       severity: "info",
       code: "external-asset",
       message: `${report.externalAssets} external asset URL${report.externalAssets === 1 ? "" : "s"} referenced (not bundled)`,
-      suggestion: "If the host disappears, the player atlas will break. Consider downloading the file into public/atlas/assets/.",
+      suggestion:
+        "If the host disappears, the player atlas will break. Consider downloading the file into public/atlas/assets/.",
     });
   }
 
@@ -120,7 +122,7 @@ function parseWarningString(raw: string): BuildReportIssue {
  */
 export function buildReportToMarkdown(
   report: BuildReport,
-  meta?: { atlasVersion?: string; publishedAt?: string }
+  meta?: { atlasVersion?: string; publishedAt?: string },
 ): string {
   const issues = deriveBuildIssues(report);
   const errors = issues.filter((i) => i.severity === "error");
@@ -148,7 +150,9 @@ export function buildReportToMarkdown(
     if (!list.length) return;
     lines.push(`## ${label}`);
     for (const i of list) {
-      const head = i.scope ? `**[${i.code}]** \`${i.scope}\` — ${i.message}` : `**[${i.code}]** ${i.message}`;
+      const head = i.scope
+        ? `**[${i.code}]** \`${i.scope}\` — ${i.message}`
+        : `**[${i.code}]** ${i.message}`;
       lines.push(`- ${head}`);
       if (i.suggestion) lines.push(`  - _Fix:_ ${i.suggestion}`);
     }
@@ -167,7 +171,12 @@ export function buildReportToMarkdown(
 
 const SEVERITY_META: Record<
   BuildReportSeverity,
-  { label: string; icon: typeof ShieldAlert; tone: string; badge: "destructive" | "secondary" | "outline" }
+  {
+    label: string;
+    icon: typeof ShieldAlert;
+    tone: string;
+    badge: "destructive" | "secondary" | "outline";
+  }
 > = {
   error: { label: "Errors", icon: ShieldAlert, tone: "text-destructive", badge: "destructive" },
   warning: { label: "Warnings", icon: AlertTriangle, tone: "text-amber-500", badge: "secondary" },
@@ -199,12 +208,16 @@ export function BuildReportPanel(props: BuildReportPanelProps) {
           <span className="font-medium">No publish report found.</span>
         </div>
         <p>Run the atlas validation/build command to generate one:</p>
-        <pre className="rounded bg-muted/50 p-1.5 text-[11px] font-mono">npm run atlas:build:player</pre>
+        <pre className="rounded bg-muted/50 p-1.5 text-[11px] font-mono">
+          npm run atlas:build:player
+        </pre>
       </div>
     );
   }
 
-  return <BuildReportPanelInner report={report} atlasVersion={atlasVersion} publishedAt={publishedAt} />;
+  return (
+    <BuildReportPanelInner report={report} atlasVersion={atlasVersion} publishedAt={publishedAt} />
+  );
 }
 
 function BuildReportPanelInner({
@@ -228,7 +241,7 @@ function BuildReportPanelInner({
 
   const md = useMemo(
     () => buildReportToMarkdown(report, { atlasVersion, publishedAt }),
-    [report, atlasVersion, publishedAt]
+    [report, atlasVersion, publishedAt],
   );
 
   const onCopy = async () => {
@@ -252,12 +265,18 @@ function BuildReportPanelInner({
         }`}
       >
         <div className="flex items-center gap-2 font-medium">
-          {ok ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <ShieldAlert className="h-4 w-4 text-destructive" />}
-          {ok ? "Last build passed all gates." : `Last build had ${grouped.error.length} blocking issue(s).`}
+          {ok ? (
+            <CheckCircle2 className="h-4 w-4 text-primary" />
+          ) : (
+            <ShieldAlert className="h-4 w-4 text-destructive" />
+          )}
+          {ok
+            ? "Last build passed all gates."
+            : `Last build had ${grouped.error.length} blocking issue(s).`}
         </div>
         <div className="mt-1 text-[10px] text-muted-foreground">
-          {grouped.error.length} error · {grouped.warning.length} warning · {grouped.info.length} info ·
-          {" "}{report.scanned} scanned · {report.included} included
+          {grouped.error.length} error · {grouped.warning.length} warning · {grouped.info.length}{" "}
+          info · {report.scanned} scanned · {report.included} included
         </div>
       </div>
 
@@ -276,13 +295,28 @@ function BuildReportPanelInner({
         const meta = SEVERITY_META[sev];
         const Icon = meta.icon;
         return (
-          <Section key={sev} testId={`build-report-section-${sev}`} label={meta.label} icon={<Icon className={`h-3.5 w-3.5 ${meta.tone}`} />} count={list.length}>
+          <Section
+            key={sev}
+            testId={`build-report-section-${sev}`}
+            label={meta.label}
+            icon={<Icon className={`h-3.5 w-3.5 ${meta.tone}`} />}
+            count={list.length}
+          >
             <ul className="space-y-1.5">
               {list.map((i, idx) => (
-                <li key={idx} className="rounded-md border border-border bg-card/50 p-2 text-xs space-y-1">
+                <li
+                  key={idx}
+                  className="rounded-md border border-border bg-card/50 p-2 text-xs space-y-1"
+                >
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <Badge variant={meta.badge} className="text-[9px]">{i.code}</Badge>
-                    {i.scope && <span className="font-mono text-[10px] text-muted-foreground truncate">{i.scope}</span>}
+                    <Badge variant={meta.badge} className="text-[9px]">
+                      {i.code}
+                    </Badge>
+                    {i.scope && (
+                      <span className="font-mono text-[10px] text-muted-foreground truncate">
+                        {i.scope}
+                      </span>
+                    )}
                   </div>
                   <div className="text-foreground">{i.message}</div>
                   {i.suggestion && (
@@ -327,7 +361,9 @@ function Section({
       >
         {icon}
         <span>{label}</span>
-        <Badge variant="outline" className="text-[9px] ml-1">{count}</Badge>
+        <Badge variant="outline" className="text-[9px] ml-1">
+          {count}
+        </Badge>
         <span className="ml-auto">{open ? "−" : "+"}</span>
       </button>
       {open && <div className="px-2 pb-2">{children}</div>}

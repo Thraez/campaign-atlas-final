@@ -38,7 +38,14 @@ export const SIZE_ERROR_BYTES = 4 * 1024 * 1024;
 
 /** Extensions that count as image/asset files when walking the assets dir. */
 const ASSET_EXTENSIONS = new Set([
-  ".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg", ".avif", ".bmp",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".gif",
+  ".svg",
+  ".avif",
+  ".bmp",
 ]);
 
 interface Config {
@@ -254,10 +261,7 @@ export function collectReferences(contentDir: string): AssetReference[] {
       continue;
     }
     const rel = path.relative(process.cwd(), file).replace(/\\/g, "/");
-    const raws = [
-      ...extractMarkdownImageRefs(text),
-      ...extractFrontmatterImageRefs(text),
-    ];
+    const raws = [...extractMarkdownImageRefs(text), ...extractFrontmatterImageRefs(text)];
     for (const r of raws) {
       const norm = normalizeRefPath(r);
       if (!norm) continue;
@@ -407,22 +411,30 @@ export function run(opts: RunOpts): number {
     return 0;
   }
 
-  const report = auditAssets({ assetsDir: opts.assetsDir, publicDir: opts.publicDir, contentDir: opts.contentDir });
+  const report = auditAssets({
+    assetsDir: opts.assetsDir,
+    publicDir: opts.publicDir,
+    contentDir: opts.contentDir,
+  });
 
   const totalsMb = (report.totals.totalBytes / (1024 * 1024)).toFixed(2);
   console.log(
     `atlas:audit-assets: scanned ${report.totals.assetCount} asset(s) (${totalsMb} MB total), ` +
-    `${report.references.length} reference(s) in content`,
+      `${report.references.length} reference(s) in content`,
   );
 
   // Size findings: errors first, then warnings.
   const sizeErrors = report.oversize.filter((f) => f.severity === "error");
   const sizeWarns = report.oversize.filter((f) => f.severity === "warning");
   for (const f of sizeErrors) {
-    console.error(`  OVERSIZE (error)   ${f.refPath} :: ${formatBytes(f.size)} > ${formatBytes(SIZE_ERROR_BYTES)}`);
+    console.error(
+      `  OVERSIZE (error)   ${f.refPath} :: ${formatBytes(f.size)} > ${formatBytes(SIZE_ERROR_BYTES)}`,
+    );
   }
   for (const f of sizeWarns) {
-    console.log(`  OVERSIZE (warn)    ${f.refPath} :: ${formatBytes(f.size)} > ${formatBytes(SIZE_WARN_BYTES)}`);
+    console.log(
+      `  OVERSIZE (warn)    ${f.refPath} :: ${formatBytes(f.size)} > ${formatBytes(SIZE_WARN_BYTES)}`,
+    );
   }
 
   // Orphans: warn-only.
@@ -433,17 +445,22 @@ export function run(opts: RunOpts): number {
   // Broken refs: info line only — build-atlas.ts is the authority and will
   // already fail strict-player builds on missing assets.
   for (const b of report.brokenRefs) {
-    console.log(`  BROKEN REF (info)  ${b.refPath} :: referenced by ${b.source} (build-atlas reports this as an error)`);
+    console.log(
+      `  BROKEN REF (info)  ${b.refPath} :: referenced by ${b.source} (build-atlas reports this as an error)`,
+    );
   }
 
   console.log(
     `atlas:audit-assets: ${report.totals.assetCount} assets, ${totalsMb} MB total, ` +
-    `${report.totals.oversizeCount} oversized, ${report.totals.orphanCount} orphan` +
-    (report.totals.brokenRefCount > 0 ? `, ${report.totals.brokenRefCount} broken ref(s)` : ""),
+      `${report.totals.oversizeCount} oversized, ${report.totals.orphanCount} orphan` +
+      (report.totals.brokenRefCount > 0 ? `, ${report.totals.brokenRefCount} broken ref(s)` : ""),
   );
 
   if (sizeErrors.length > 0) return 13;
-  if (opts.strict && (sizeWarns.length > 0 || report.orphans.length > 0 || report.brokenRefs.length > 0)) {
+  if (
+    opts.strict &&
+    (sizeWarns.length > 0 || report.orphans.length > 0 || report.brokenRefs.length > 0)
+  ) {
     console.error("atlas:audit-assets: --strict failed because warnings/info findings are present");
     return 13;
   }
@@ -455,7 +472,9 @@ function main(): number {
   const flags = parseFlags(process.argv.slice(2));
   if (flags.parseError) {
     console.error(`atlas:audit-assets: ${flags.parseError}`);
-    console.error("Usage: tsx scripts/atlas/audit-assets.ts [--assets-dir <path>] [--content-dir <path>] [--config <atlas.config.json>] [--strict]");
+    console.error(
+      "Usage: tsx scripts/atlas/audit-assets.ts [--assets-dir <path>] [--content-dir <path>] [--config <atlas.config.json>] [--strict]",
+    );
     return 1;
   }
 
@@ -467,14 +486,18 @@ function main(): number {
     contentDir = path.resolve(cwd, flags.contentDir);
   } else {
     if (!fs.existsSync(configPath)) {
-      console.error(`atlas:audit-assets: config "${configPath}" does not exist (use --content-dir to override)`);
+      console.error(
+        `atlas:audit-assets: config "${configPath}" does not exist (use --content-dir to override)`,
+      );
       return 1;
     }
     let cfg: Config;
     try {
       cfg = loadConfig(configPath);
     } catch (e) {
-      console.error(`atlas:audit-assets: failed to parse config "${configPath}": ${(e as Error).message}`);
+      console.error(
+        `atlas:audit-assets: failed to parse config "${configPath}": ${(e as Error).message}`,
+      );
       return 1;
     }
     contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
@@ -483,9 +506,7 @@ function main(): number {
   const assetsDir = flags.assetsDir
     ? path.resolve(cwd, flags.assetsDir)
     : path.resolve(cwd, "public/atlas/assets");
-  const publicDir = flags.assetsDir
-    ? path.dirname(assetsDir)
-    : path.resolve(cwd, "public");
+  const publicDir = flags.assetsDir ? path.dirname(assetsDir) : path.resolve(cwd, "public");
 
   return run({ assetsDir, publicDir, contentDir, strict: flags.strict });
 }

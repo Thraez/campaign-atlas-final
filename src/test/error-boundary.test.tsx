@@ -20,7 +20,7 @@ describe("ErrorBoundary", () => {
     render(
       <ErrorBoundary>
         <div data-testid="child">ok</div>
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByTestId("child")).toBeInTheDocument();
   });
@@ -29,7 +29,7 @@ describe("ErrorBoundary", () => {
     render(
       <ErrorBoundary>
         <Boom />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.getByText(/Something went wrong/i)).toBeInTheDocument();
@@ -42,8 +42,8 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary>
           <Boom />
-        </ErrorBoundary>
-      )
+        </ErrorBoundary>,
+      ),
     ).not.toThrow();
   });
 });

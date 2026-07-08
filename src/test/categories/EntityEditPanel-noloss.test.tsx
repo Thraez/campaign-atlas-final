@@ -5,7 +5,9 @@ import { useEntityEditDraft } from "@/atlas/categories/useEntityEditDraft";
 import { EntityEditPanel } from "@/atlas/categories/EntityEditPanel";
 
 vi.mock("@/atlas/save/canonicalPlacementSave", () => ({
-  readSourceFile: vi.fn(async () => "---\natlas:\n  id: corven\n  type: npc\n  visibility: dm\n---\nDisk body v1\n"),
+  readSourceFile: vi.fn(
+    async () => "---\natlas:\n  id: corven\n  type: npc\n  visibility: dm\n---\nDisk body v1\n",
+  ),
 }));
 vi.mock("@/atlas/save/localFsSave", () => ({
   hashContent: vi.fn(async () => "hash-v1"),
@@ -18,13 +20,7 @@ vi.mock("@/atlas/save/localFsSave", () => ({
  * live in the same React tree so state updates from api.load() propagate
  * to the panel on the same render cycle.
  */
-function EditHost({
-  sourcePath,
-  show,
-}: {
-  sourcePath: string;
-  show: boolean;
-}) {
+function EditHost({ sourcePath, show }: { sourcePath: string; show: boolean }) {
   const api = useEntityEditDraft();
   return show ? (
     <EntityEditPanel sourcePath={sourcePath} draftApi={api} onClose={() => {}} onSaved={() => {}} />

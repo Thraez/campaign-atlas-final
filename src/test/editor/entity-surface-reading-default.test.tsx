@@ -6,9 +6,19 @@ import { ViewModeProvider } from "@/atlas/view/ViewModeProvider";
 import type { Entity } from "@/atlas/content/schema";
 
 const corven = {
-  id: "corven", title: "Corven", type: "npc", visibility: "dm",
-  aliases: [], tags: [], images: [], body: "# Corven\n\nbody\n", bodyHtml: "",
-  frontmatter: {}, sourcePath: "content/w/npcs/corven.md", links: [], backlinks: [],
+  id: "corven",
+  title: "Corven",
+  type: "npc",
+  visibility: "dm",
+  aliases: [],
+  tags: [],
+  images: [],
+  body: "# Corven\n\nbody\n",
+  bodyHtml: "",
+  frontmatter: {},
+  sourcePath: "content/w/npcs/corven.md",
+  links: [],
+  backlinks: [],
 } as Entity;
 
 describe("entity surface opens in Reading, Edit toggles", () => {

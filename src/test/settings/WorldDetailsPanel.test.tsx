@@ -8,7 +8,9 @@ describe("WorldDetailsPanel", () => {
     const onPatch = vi.fn();
     render(<WorldDetailsPanel world={{ name: "Astrath" }} onPatch={onPatch} />);
     expect(screen.getByText("World name")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("World name"), { target: { value: "Astrath Deeprealm" } });
+    fireEvent.change(screen.getByLabelText("World name"), {
+      target: { value: "Astrath Deeprealm" },
+    });
     expect(onPatch).toHaveBeenCalledWith({ name: "Astrath Deeprealm" });
   });
 });

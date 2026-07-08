@@ -49,7 +49,7 @@ export function captureLeadingCommentBlock(existing: string): string {
   // the entire leading-comment block silently disappears on the next save.
   // See the matching fix in import/frontmatter.ts:38 — same class of bug.
   // Use an escape (not the literal char) so the source file is BOM-free.
-  const stripped = existing.charCodeAt(0) === 0xFEFF ? existing.slice(1) : existing;
+  const stripped = existing.charCodeAt(0) === 0xfeff ? existing.slice(1) : existing;
   // Normalise to `\n` line endings while capturing so we can re-emit with the
   // same convention.
   const lines = stripped.split(/\r?\n/);

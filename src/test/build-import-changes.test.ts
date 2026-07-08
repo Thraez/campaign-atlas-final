@@ -117,9 +117,9 @@ describe("buildImportChanges", () => {
       makeCtx(),
     );
     const off = updateStagingRow(rows[0], { included: false }, makeCtx());
-    await expect(
-      buildImportChanges([off], { fetchFn: fakeReadFetch({}) }),
-    ).rejects.toBeInstanceOf(ImportCommitError);
+    await expect(buildImportChanges([off], { fetchFn: fakeReadFetch({}) })).rejects.toBeInstanceOf(
+      ImportCommitError,
+    );
   });
 
   it("wraps a failed read of a path-collision file into ImportCommitError", async () => {
@@ -132,9 +132,9 @@ describe("buildImportChanges", () => {
     const opted = updateStagingRow(rows[0], { included: true }, ctx);
     // fetch map empty → read returns 404.
     const fetchFn = vi.fn(fakeReadFetch({}));
-    await expect(
-      buildImportChanges([opted], { fetchFn }),
-    ).rejects.toBeInstanceOf(ImportCommitError);
+    await expect(buildImportChanges([opted], { fetchFn })).rejects.toBeInstanceOf(
+      ImportCommitError,
+    );
   });
 });
 
@@ -142,21 +142,27 @@ describe("buildImportChanges persists inferred atlas fields", () => {
   it("rewrites frontmatter (not verbatim) for a create row with no atlas.type", async () => {
     const raw = `---\ntags:\n  - npc\n---\n# Corven\n\nbody\n`;
     const row = {
-      id: "r1", filename: "corven.md",
-      inferredType: "npc", typeWasExplicit: false,
-      resolvedId: "corven", resolvedVisibility: "dm",
-      rawContent: raw, content: raw,
+      id: "r1",
+      filename: "corven.md",
+      inferredType: "npc",
+      typeWasExplicit: false,
+      resolvedId: "corven",
+      resolvedVisibility: "dm",
+      rawContent: raw,
+      content: raw,
       targetPath: "content/w/npcs/corven.md",
-      pathAllowed: true, rowKind: "create" as const,
-      included: true, frontmatterPath: undefined,
+      pathAllowed: true,
+      rowKind: "create" as const,
+      included: true,
+      frontmatterPath: undefined,
     };
     const [change] = await buildImportChanges([row as never]);
-    expect(change.content).not.toBe(raw);            // not verbatim
+    expect(change.content).not.toBe(raw); // not verbatim
     const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
     expect(atlas.type).toBe("npc");
     expect(atlas.id).toBe("corven");
     expect(atlas.visibility).toBe("dm");
     expect(parseFrontmatter(change.content).data.tags).toContain("npc");
-    expect(change.baseHash).toBeNull();              // create-only
+    expect(change.baseHash).toBeNull(); // create-only
   });
 });

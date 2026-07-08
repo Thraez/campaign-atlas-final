@@ -18,6 +18,7 @@ import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { printEntityHandout } from "@/atlas/printHandout";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
+import { logger } from "@/lib/logger";
 import type { Entity, MapPlacement } from "@/atlas/content/schema";
 
 export interface EntityPanelProps {
@@ -40,8 +41,9 @@ function CopyLinkButton() {
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // ignore
+    } catch (e) {
+      logger.warn("Copy share link failed", e);
+      toast.error("Could not copy link");
     }
   }, []);
   return (
@@ -94,7 +96,8 @@ function NotesPanel({ entityId, entityTitle }: { entityId: string; entityTitle: 
   }, [entityId, text]);
 
   const handleClear = useCallback(() => {
-    if (text && !window.confirm(`Delete your note for "${entityTitle}"? This cannot be undone.`)) return;
+    if (text && !window.confirm(`Delete your note for "${entityTitle}"? This cannot be undone.`))
+      return;
     setText("");
     deleteNote(entityId);
     setSavedAt(null);
@@ -113,23 +116,26 @@ function NotesPanel({ entityId, entityTitle }: { entityId: string; entityTitle: 
     URL.revokeObjectURL(url);
   }, []);
 
-  const handleImport = useCallback((file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = importNotesJson(String(reader.result ?? ""));
-      if (result.imported > 0) {
-        toast.success(`Imported ${result.imported} note(s)`);
-        const fresh = loadNote(entityId);
-        setText(fresh?.text ?? "");
-        setSavedAt(fresh?.updatedAt ?? null);
-      } else if (result.errors.length > 0) {
-        toast.error(`Import failed: ${result.errors[0]}`);
-      } else {
-        toast.message("No notes to import");
-      }
-    };
-    reader.readAsText(file);
-  }, [entityId]);
+  const handleImport = useCallback(
+    (file: File) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = importNotesJson(String(reader.result ?? ""));
+        if (result.imported > 0) {
+          toast.success(`Imported ${result.imported} note(s)`);
+          const fresh = loadNote(entityId);
+          setText(fresh?.text ?? "");
+          setSavedAt(fresh?.updatedAt ?? null);
+        } else if (result.errors.length > 0) {
+          toast.error(`Import failed: ${result.errors[0]}`);
+        } else {
+          toast.message("No notes to import");
+        }
+      };
+      reader.readAsText(file);
+    },
+    [entityId],
+  );
 
   return (
     <div className="pt-3 border-t border-border">
@@ -139,7 +145,14 @@ function NotesPanel({ entityId, entityTitle }: { entityId: string; entityTitle: 
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        <span>My notes {savedAt && <span className="normal-case text-[10px] text-muted-foreground/70 ml-1">— saved {formatRelative(savedAt)}</span>}</span>
+        <span>
+          My notes{" "}
+          {savedAt && (
+            <span className="normal-case text-[10px] text-muted-foreground/70 ml-1">
+              — saved {formatRelative(savedAt)}
+            </span>
+          )}
+        </span>
         <span aria-hidden="true">{open ? "−" : "+"}</span>
       </button>
       {open && (
@@ -157,10 +170,20 @@ function NotesPanel({ entityId, entityTitle }: { entityId: string; entityTitle: 
               Stored locally in this browser. Never uploaded.
             </p>
             <div className="flex gap-1.5">
-              <Button size="sm" variant="ghost" onClick={handleExport} title="Export all your notes as JSON">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleExport}
+                title="Export all your notes as JSON"
+              >
                 Export
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => importInputRef.current?.click()} title="Import notes from JSON">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => importInputRef.current?.click()}
+                title="Import notes from JSON"
+              >
                 Import
               </Button>
               <input
@@ -223,7 +246,7 @@ function ImageThumb({ src, alt, onClick }: { src: string; alt: string; onClick: 
 
 export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function EntityPanel(
   { entity, placements, entityById, onOpenEntity, onClose, onShowOnMap, readerAffordances = true },
-  ref
+  ref,
 ) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
@@ -249,7 +272,9 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
               const typeLabel = playerTypeLabel(entity.type);
               const kicker = [typeLabel, entity.race].filter(Boolean).join(" · ");
               return kicker ? (
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{kicker}</div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {kicker}
+                </div>
               ) : null;
             })()}
             {entity.visibility === "rumor" && (
@@ -264,7 +289,9 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
           </div>
           <h2 className="font-display text-xl text-foreground truncate">{entity.title}</h2>
           {entity.aliases.length > 0 && (
-            <div className="text-xs text-muted-foreground mt-0.5">aka {entity.aliases.join(", ")}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              aka {entity.aliases.join(", ")}
+            </div>
           )}
         </div>
         <div className="flex items-center">
@@ -280,14 +307,18 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
             </Button>
           )}
           <CopyLinkButton />
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close panel"><X className="h-4 w-4" aria-hidden="true" /></Button>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close panel">
+            <X className="h-4 w-4" aria-hidden="true" />
+          </Button>
         </div>
       </div>
 
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-4">
           {entity.summary && (
-            <p className="text-sm italic text-muted-foreground border-l-2 border-primary pl-3">{entity.summary}</p>
+            <p className="text-sm italic text-muted-foreground border-l-2 border-primary pl-3">
+              {entity.summary}
+            </p>
           )}
 
           {entity.images.length > 0 && (
@@ -306,7 +337,13 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
           {placements.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {placements.map((p) => (
-                <Button key={p.id} size="sm" variant="secondary" className="gap-1" onClick={() => onShowOnMap(p)}>
+                <Button
+                  key={p.id}
+                  size="sm"
+                  variant="secondary"
+                  className="gap-1"
+                  onClick={() => onShowOnMap(p)}
+                >
                   <MapPin className="h-3.5 w-3.5" /> Show on map
                 </Button>
               ))}
@@ -319,15 +356,15 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
             dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(entity.bodyHtml) }}
           />
 
-          {readerAffordances && (
-            <NotesPanel entityId={entity.id} entityTitle={entity.title} />
-          )}
+          {readerAffordances && <NotesPanel entityId={entity.id} entityTitle={entity.title} />}
 
           {entity.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-2">
               {entity.tags.map((t) => (
                 <Link key={t} to={`/atlas/tag/${encodeURIComponent(t)}`}>
-                  <Badge variant="outline" className="hover:bg-accent cursor-pointer">#{t}</Badge>
+                  <Badge variant="outline" className="hover:bg-accent cursor-pointer">
+                    #{t}
+                  </Badge>
                 </Link>
               ))}
             </div>
@@ -335,7 +372,9 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
 
           {entity.backlinks.length > 0 && (
             <div className="pt-3 border-t border-border">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Mentioned in</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                Mentioned in
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {entity.backlinks.map((b) => (
                   <button
@@ -352,7 +391,9 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
 
           {(entity.relationships ?? []).length > 0 && (
             <div className="pt-3 border-t border-border" data-testid="connections-section">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Connections</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                Connections
+              </div>
               <div className="flex flex-col gap-1">
                 {(entity.relationships ?? []).map((r, i) => {
                   const target = entityById.get(r.entity);
@@ -364,7 +405,11 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
                         className="hover:underline truncate text-left"
                         onClick={() => onOpenEntity(r.entity)}
                       >
-                        {target ? target.title : <span className="text-muted-foreground">{r.entity}</span>}
+                        {target ? (
+                          target.title
+                        ) : (
+                          <span className="text-muted-foreground">{r.entity}</span>
+                        )}
                       </button>
                       {r.visibility === "dm" && (
                         <span className="text-[10px] text-muted-foreground shrink-0">(DM)</span>

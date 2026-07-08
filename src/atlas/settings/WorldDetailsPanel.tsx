@@ -1,8 +1,11 @@
 // src/atlas/settings/WorldDetailsPanel.tsx
-export interface WorldDetails { name?: string; }
+export interface WorldDetails {
+  name?: string;
+}
 
 export function WorldDetailsPanel({
-  world, onPatch,
+  world,
+  onPatch,
 }: {
   world: WorldDetails;
   onPatch: (p: Partial<WorldDetails>) => void;

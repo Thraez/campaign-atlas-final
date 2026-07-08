@@ -8,7 +8,13 @@
  * No GitHub API, no auth — guarded disk writes only.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -86,7 +92,16 @@ function diffLines(prev: string, next: string): DiffStat {
   return { added, removed, unified: lines.join("\n") };
 }
 
-export function DiffPreviewModal({ open, changes, previousContents, rebuildAfterSave, onConfirm, onSaved, onWriteFailed, onClose }: DiffPreviewModalProps) {
+export function DiffPreviewModal({
+  open,
+  changes,
+  previousContents,
+  rebuildAfterSave,
+  onConfirm,
+  onSaved,
+  onWriteFailed,
+  onClose,
+}: DiffPreviewModalProps) {
   const [phase, setPhase] = useState<Phase>({ kind: "review" });
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
 
@@ -119,10 +134,12 @@ export function DiffPreviewModal({ open, changes, previousContents, rebuildAfter
   );
 
   const runSave = async () => {
-    onConfirm?.();            // a real write is starting — editor flips to "saving" now
+    onConfirm?.(); // a real write is starting — editor flips to "saving" now
     setPhase({ kind: "saving" });
     try {
-      const result = await saveAtlasPatchToLocalFs(changes, undefined, { rebuild: !!rebuildAfterSave });
+      const result = await saveAtlasPatchToLocalFs(changes, undefined, {
+        rebuild: !!rebuildAfterSave,
+      });
       setPhase({ kind: "success", result });
       onSaved?.(result);
     } catch (err: unknown) {
@@ -134,7 +151,9 @@ export function DiffPreviewModal({ open, changes, previousContents, rebuildAfter
           ? `Path not in allowlist: ${err.path}`
           : err instanceof ConflictError
             ? `Conflict on ${err.failedPath} (${err.reason})`
-            : err instanceof Error ? err.message : "Unknown error",
+            : err instanceof Error
+              ? err.message
+              : "Unknown error",
       );
       if (err instanceof DisallowedPathError) {
         setPhase({ kind: "disallowed", path: err.path });
@@ -178,7 +197,9 @@ export function DiffPreviewModal({ open, changes, previousContents, rebuildAfter
         {phase.kind === "success" ? (
           <>
             <DialogHeader>
-              <DialogTitle>Wrote {phase.result.saved} file{phase.result.saved === 1 ? "" : "s"}.</DialogTitle>
+              <DialogTitle>
+                Wrote {phase.result.saved} file{phase.result.saved === 1 ? "" : "s"}.
+              </DialogTitle>
               <DialogDescription>
                 {phase.result.build
                   ? phase.result.build.ok
@@ -208,7 +229,11 @@ export function DiffPreviewModal({ open, changes, previousContents, rebuildAfter
             <DialogHeader>
               <DialogTitle>Path not in allowlist.</DialogTitle>
               <DialogDescription>
-                The path <code className="font-mono">{phase.path}</code> is not in the source allowlist. The editor can only write to <code className="font-mono">content/**/_atlas/*.yaml</code> and <code className="font-mono">content/**/*.md</code>. This is a hard safety guard. If you reached this state via normal editor use, please file a bug.
+                The path <code className="font-mono">{phase.path}</code> is not in the source
+                allowlist. The editor can only write to{" "}
+                <code className="font-mono">content/**/_atlas/*.yaml</code> and{" "}
+                <code className="font-mono">content/**/*.md</code>. This is a hard safety guard. If
+                you reached this state via normal editor use, please file a bug.
               </DialogDescription>
             </DialogHeader>
             <div className="flex justify-end pt-2">
@@ -222,7 +247,9 @@ export function DiffPreviewModal({ open, changes, previousContents, rebuildAfter
               <DialogDescription>{phase.message}</DialogDescription>
             </DialogHeader>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={onClose}>Cancel</Button>
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
               <Button onClick={runSave}>Try again</Button>
             </div>
           </>
@@ -230,10 +257,12 @@ export function DiffPreviewModal({ open, changes, previousContents, rebuildAfter
           <>
             <DialogHeader>
               <DialogTitle>
-                Review changes — {changes.length} file{changes.length === 1 ? "" : "s"} will be written.
+                Review changes — {changes.length} file{changes.length === 1 ? "" : "s"} will be
+                written.
               </DialogTitle>
               <DialogDescription>
-                Files will be written to your local repository. After saving, run <code className="font-mono">git status</code> to review and commit.
+                Files will be written to your local repository. After saving, run{" "}
+                <code className="font-mono">git status</code> to review and commit.
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="flex-1 pr-3 -mr-3">
@@ -268,7 +297,9 @@ export function DiffPreviewModal({ open, changes, previousContents, rebuildAfter
               </ul>
             </ScrollArea>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={onClose}>Cancel</Button>
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
               <Button onClick={runSave} disabled={phase.kind === "saving"}>
                 {phase.kind === "saving" ? "Saving…" : "Save to disk"}
               </Button>

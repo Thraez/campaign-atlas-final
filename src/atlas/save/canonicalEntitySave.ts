@@ -141,10 +141,7 @@ export async function buildCanonicalEntityChanges(
     if (entity) patchByEntity.set(entity.id, p);
   }
 
-  const touchedIds = new Set<string>([
-    ...placementsByEntity.keys(),
-    ...patchByEntity.keys(),
-  ]);
+  const touchedIds = new Set<string>([...placementsByEntity.keys(), ...patchByEntity.keys()]);
   if (touchedIds.size === 0) return [];
 
   const changes: FileChange[] = [];

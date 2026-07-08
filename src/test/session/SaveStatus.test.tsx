@@ -3,8 +3,10 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { SaveStatus } from "@/atlas/session/SaveStatus";
 
 const base = {
-  onSave: vi.fn(), onDiscard: vi.fn(),
-  savedAt: null as number | null, failedReason: null as string | null,
+  onSave: vi.fn(),
+  onDiscard: vi.fn(),
+  savedAt: null as number | null,
+  failedReason: null as string | null,
 };
 
 describe("SaveStatus", () => {
@@ -35,15 +37,32 @@ describe("SaveStatus", () => {
 
   it("failed → reason + Retry calls onSave", () => {
     const onSave = vi.fn();
-    render(<SaveStatus status="failed" unsavedCount={2} {...base} onSave={onSave} failedReason="disk permission denied" />);
+    render(
+      <SaveStatus
+        status="failed"
+        unsavedCount={2}
+        {...base}
+        onSave={onSave}
+        failedReason="disk permission denied"
+      />,
+    );
     expect(screen.getByText(/Save failed — disk permission denied/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /retry/i }));
     expect(onSave).toHaveBeenCalled();
   });
 
   it("Save click calls onSave; Discard click calls onDiscard", () => {
-    const onSave = vi.fn(); const onDiscard = vi.fn();
-    render(<SaveStatus status="unsaved" unsavedCount={5} {...base} onSave={onSave} onDiscard={onDiscard} />);
+    const onSave = vi.fn();
+    const onDiscard = vi.fn();
+    render(
+      <SaveStatus
+        status="unsaved"
+        unsavedCount={5}
+        {...base}
+        onSave={onSave}
+        onDiscard={onDiscard}
+      />,
+    );
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
     fireEvent.click(screen.getByRole("button", { name: /discard/i }));
     expect(onSave).toHaveBeenCalled();

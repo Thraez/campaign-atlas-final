@@ -11,7 +11,16 @@ const testMap: MapDocument = {
   width: 2000,
   height: 1500,
   layers: [
-    { id: "builtin-1", src: "atlas/assets/maps/base.png", x: 0, y: 0, width: 2000, height: 1500, opacity: 1, zIndex: 10 },
+    {
+      id: "builtin-1",
+      src: "atlas/assets/maps/base.png",
+      x: 0,
+      y: 0,
+      width: 2000,
+      height: 1500,
+      opacity: 1,
+      zIndex: 10,
+    },
   ],
   regions: [],
   routes: [],
@@ -27,7 +36,9 @@ beforeEach(() => {
     onerror: (() => void) | null = null;
     naturalWidth = 100;
     naturalHeight = 100;
-    set src(_v: string) { setTimeout(() => this.onload && this.onload(), 0); }
+    set src(_v: string) {
+      setTimeout(() => this.onload && this.onload(), 0);
+    }
   };
 });
 
@@ -140,12 +151,66 @@ describe("useMapLayers + undo", () => {
       width: 2000,
       height: 1500,
       layers: [
-        { id: "L1", src: "atlas/assets/maps/a.png", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 20 },
-        { id: "L2", src: "atlas/assets/maps/b.png", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 20 },
-        { id: "L3", src: "atlas/assets/maps/c.png", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 20 },
-        { id: "L4", src: "atlas/assets/maps/d.png", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 20 },
-        { id: "L5", src: "atlas/assets/maps/e.png", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 20 },
-        { id: "L6", src: "atlas/assets/maps/f.png", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 20 },
+        {
+          id: "L1",
+          src: "atlas/assets/maps/a.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 20,
+        },
+        {
+          id: "L2",
+          src: "atlas/assets/maps/b.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 20,
+        },
+        {
+          id: "L3",
+          src: "atlas/assets/maps/c.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 20,
+        },
+        {
+          id: "L4",
+          src: "atlas/assets/maps/d.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 20,
+        },
+        {
+          id: "L5",
+          src: "atlas/assets/maps/e.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 20,
+        },
+        {
+          id: "L6",
+          src: "atlas/assets/maps/f.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 20,
+        },
       ],
       regions: [],
       routes: [],
@@ -158,7 +223,77 @@ describe("useMapLayers + undo", () => {
     act(() => result.current.editBuiltinLayer("L4"));
     act(() => result.current.editBuiltinLayer("L1"));
     act(() => result.current.editBuiltinLayer("L2"));
-    expect(result.current.mergedLayers.map((l) => l.id)).toEqual(["L1", "L2", "L3", "L4", "L5", "L6"]);
+    expect(result.current.mergedLayers.map((l) => l.id)).toEqual([
+      "L1",
+      "L2",
+      "L3",
+      "L4",
+      "L5",
+      "L6",
+    ]);
+  });
+
+  it("a locked layer rejects geometry edits but still accepts unlock + metadata", () => {
+    const { result } = renderHook(() => useMapLayers(testMap));
+    act(() => result.current.editBuiltinLayer("builtin-1"));
+    act(() => result.current.updateLayer("builtin-1", { x: 100, y: 50 }));
+    act(() => result.current.updateLayer("builtin-1", { locked: true }));
+
+    // Geometry edits from any source now no-op.
+    act(() => result.current.updateLayer("builtin-1", { x: 999, y: 999, width: 5, opacity: 0.1 }));
+    const l = result.current.localLayers.find((x) => x.id === "builtin-1")!;
+    expect(l.locked).toBe(true);
+    expect(l.x).toBe(100);
+    expect(l.y).toBe(50);
+    expect(l.width).toBe(2000);
+    expect(l.opacity).toBe(1);
+
+    // Metadata still applies while locked.
+    act(() => result.current.updateLayer("builtin-1", { name: "Base" }));
+    expect(result.current.localLayers.find((x) => x.id === "builtin-1")!.name).toBe("Base");
+
+    // Unlock → geometry edits apply again.
+    act(() => result.current.updateLayer("builtin-1", { locked: false }));
+    act(() => result.current.updateLayer("builtin-1", { x: 300 }));
+    expect(result.current.localLayers.find((x) => x.id === "builtin-1")!.x).toBe(300);
+  });
+
+  it("a blocked geometry edit on a locked layer records no undo entry", () => {
+    const { result } = renderHook(() => {
+      const undoStack = useUndoStack();
+      const layers = useMapLayers(testMap, undoStack);
+      return { undoStack, layers };
+    });
+    act(() => result.current.layers.editBuiltinLayer("builtin-1"));
+    act(() => result.current.layers.updateLayer("builtin-1", { locked: true }));
+    act(() => result.current.undoStack.clear());
+
+    act(() => result.current.layers.updateLayer("builtin-1", { x: 999 }));
+    expect(result.current.undoStack.canUndo).toBe(false);
+    expect(result.current.layers.localLayers.find((l) => l.id === "builtin-1")?.x).toBe(0);
+  });
+
+  it("lock persists across a fresh hook mount (localStorage round-trip)", () => {
+    const first = renderHook(() => useMapLayers(testMap));
+    act(() => first.result.current.editBuiltinLayer("builtin-1"));
+    act(() => first.result.current.updateLayer("builtin-1", { locked: true }));
+    first.unmount();
+
+    const second = renderHook(() => useMapLayers(testMap));
+    expect(second.result.current.localLayers.find((l) => l.id === "builtin-1")?.locked).toBe(true);
+  });
+
+  it("lock survives an undo of an unrelated later change", () => {
+    const { result } = renderHook(() => {
+      const undoStack = useUndoStack();
+      const layers = useMapLayers(testMap, undoStack);
+      return { undoStack, layers };
+    });
+    act(() => result.current.layers.editBuiltinLayer("builtin-1"));
+    act(() => result.current.layers.updateLayer("builtin-1", { locked: true }));
+    act(() => result.current.layers.updateLayer("builtin-1", { name: "Base" }));
+    act(() => result.current.undoStack.undo()); // undo the name change
+    expect(result.current.layers.localLayers.find((l) => l.id === "builtin-1")?.locked).toBe(true);
   });
 
   it("mergedLayers places upload/url additions after the canon block", async () => {
@@ -171,8 +306,26 @@ describe("useMapLayers + undo", () => {
       width: 2000,
       height: 1500,
       layers: [
-        { id: "L1", src: "atlas/assets/maps/a.png", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 20 },
-        { id: "L2", src: "atlas/assets/maps/b.png", x: 0, y: 0, width: 100, height: 100, opacity: 1, zIndex: 20 },
+        {
+          id: "L1",
+          src: "atlas/assets/maps/a.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 20,
+        },
+        {
+          id: "L2",
+          src: "atlas/assets/maps/b.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 20,
+        },
       ],
       regions: [],
       routes: [],

@@ -56,10 +56,15 @@ export function deserializeSession(blob: unknown): SessionState | null {
   if (!env.state || typeof env.state !== "object") return null;
   const s = env.state as Partial<SessionState>;
   if (
-    !s.overrides || !s.mapOverrideByMap || !s.regionByMap ||
-    !s.routeByMap || !s.fogByMap || !s.layerByMap ||
+    !s.overrides ||
+    !s.mapOverrideByMap ||
+    !s.regionByMap ||
+    !s.routeByMap ||
+    !s.fogByMap ||
+    !s.layerByMap ||
     typeof s.savedAt !== "number"
-  ) return null;
+  )
+    return null;
   s.entityEdit = (s as Partial<SessionState>).entityEdit ?? null;
   return s as SessionState;
 }
@@ -68,12 +73,17 @@ export function deserializeSession(blob: unknown): SessionState | null {
 export function sessionHasWork(s: SessionState): boolean {
   const anyOverride = Object.values(s.overrides).some((v) => v != null);
   const anyMap = Object.values(s.mapOverrideByMap).some((m) => m && Object.keys(m).length > 0);
-  const anyRegion = Object.values(s.regionByMap).some((r) => r.added.length || r.deleted.length || Object.keys(r.edits).length);
-  const anyRoute = Object.values(s.routeByMap).some((r) => r.added.length || r.deleted.length || Object.keys(r.edits).length);
+  const anyRegion = Object.values(s.regionByMap).some(
+    (r) => r.added.length || r.deleted.length || Object.keys(r.edits).length,
+  );
+  const anyRoute = Object.values(s.routeByMap).some(
+    (r) => r.added.length || r.deleted.length || Object.keys(r.edits).length,
+  );
   const anyFog = Object.values(s.fogByMap).some((f) => f != null);
   const anyLayer = Object.values(s.layerByMap).some((l) => l.length > 0);
   const anyEntityEdit =
     !!s.entityEdit &&
-    JSON.stringify({ fields: s.entityEdit.fields, body: s.entityEdit.body }) !== s.entityEdit.pristine;
+    JSON.stringify({ fields: s.entityEdit.fields, body: s.entityEdit.body }) !==
+      s.entityEdit.pristine;
   return anyOverride || anyMap || anyRegion || anyRoute || anyFog || anyLayer || anyEntityEdit;
 }

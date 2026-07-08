@@ -19,7 +19,10 @@ import { rewriteFrontmatter } from "@/atlas/content/frontmatterRewrite";
 import type { StagingRow } from "./stagingState";
 
 export class ImportCommitError extends Error {
-  constructor(message: string, public readonly path?: string) {
+  constructor(
+    message: string,
+    public readonly path?: string,
+  ) {
     super(message);
     this.name = "ImportCommitError";
   }
@@ -53,9 +56,7 @@ export async function buildImportChanges(
   deps?: BuildImportChangesDeps,
 ): Promise<FileChange[]> {
   const fetchFn = deps?.fetchFn ?? fetch;
-  const eligible = rows.filter(
-    (r) => r.included && r.pathAllowed && !r.parseError,
-  );
+  const eligible = rows.filter((r) => r.included && r.pathAllowed && !r.parseError);
   if (eligible.length === 0) {
     throw new ImportCommitError("No rows selected for import");
   }

@@ -69,8 +69,26 @@ describe("buildFullWorldYaml — round-trip", () => {
   it("preserves layers in order with rounded geometry", () => {
     const map = makeMap({
       layers: [
-        { id: "L1", src: "atlas/assets/maps/a.png", x: 10.7, y: 20.2, width: 100.6, height: 50.4, opacity: 1, zIndex: 20 },
-        { id: "L2", src: "atlas/assets/maps/b.png", x: 0, y: 0, width: 200, height: 100, opacity: 0.8, zIndex: 30 },
+        {
+          id: "L1",
+          src: "atlas/assets/maps/a.png",
+          x: 10.7,
+          y: 20.2,
+          width: 100.6,
+          height: 50.4,
+          opacity: 1,
+          zIndex: 20,
+        },
+        {
+          id: "L2",
+          src: "atlas/assets/maps/b.png",
+          x: 0,
+          y: 0,
+          width: 200,
+          height: 100,
+          opacity: 0.8,
+          zIndex: 30,
+        },
       ],
     });
     const out = buildFullWorldYaml({
@@ -80,8 +98,24 @@ describe("buildFullWorldYaml — round-trip", () => {
     });
     const cfg = loadEmitted(out)!;
     expect(cfg.maps[0].layers).toHaveLength(2);
-    expect(cfg.maps[0].layers[0]).toMatchObject({ id: "L1", x: 11, y: 20, width: 101, height: 50, opacity: 1, zIndex: 20 });
-    expect(cfg.maps[0].layers[1]).toMatchObject({ id: "L2", x: 0, y: 0, width: 200, height: 100, opacity: 0.8, zIndex: 30 });
+    expect(cfg.maps[0].layers[0]).toMatchObject({
+      id: "L1",
+      x: 11,
+      y: 20,
+      width: 101,
+      height: 50,
+      opacity: 1,
+      zIndex: 20,
+    });
+    expect(cfg.maps[0].layers[1]).toMatchObject({
+      id: "L2",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      opacity: 0.8,
+      zIndex: 30,
+    });
   });
 
   it("preserves scale and grid metadata", () => {
@@ -98,7 +132,12 @@ describe("buildFullWorldYaml — round-trip", () => {
     });
     const cfg = loadEmitted(out)!;
     expect(cfg.maps[0].scale).toEqual({ unitsPerPixel: 0.05, unitLabel: "mi" });
-    expect(cfg.maps[0].grid).toEqual({ kind: "hex", size: 5000, color: "rgba(255,255,255,0.06)", enabled: false });
+    expect(cfg.maps[0].grid).toEqual({
+      kind: "hex",
+      size: 5000,
+      color: "rgba(255,255,255,0.06)",
+      enabled: false,
+    });
     expect(cfg.maps[0].oceanColor).toBe("#18313f");
     expect(cfg.maps[0].wrapX).toBe(false);
   });
@@ -108,7 +147,12 @@ describe("buildFullWorldYaml — round-trip", () => {
       id: "r1",
       mapId: "m1",
       name: "Forest",
-      points: [[0, 0], [100, 0], [100, 100], [0, 100]],
+      points: [
+        [0, 0],
+        [100, 0],
+        [100, 100],
+        [0, 100],
+      ],
       visibility: "player",
       color: "#7fb069",
       fillOpacity: 0.18,
@@ -128,7 +172,12 @@ describe("buildFullWorldYaml — round-trip", () => {
       visibility: "player",
       color: "#7fb069",
     });
-    expect(cfg.regions[0].points).toEqual([[0, 0], [100, 0], [100, 100], [0, 100]]);
+    expect(cfg.regions[0].points).toEqual([
+      [0, 0],
+      [100, 0],
+      [100, 100],
+      [0, 100],
+    ]);
   });
 
   it("round-trips routes with coord and entityId waypoints", () => {
@@ -154,11 +203,7 @@ describe("buildFullWorldYaml — round-trip", () => {
     expect(cfg.routes[0].name).toBe("Trade Road");
     expect(cfg.routes[0].mode).toBe("horse");
     expect(cfg.routes[0].speed).toBe(6);
-    expect(cfg.routes[0].waypoints).toEqual([
-      [0, 0],
-      { entityId: "thornhold" },
-      [200, 200],
-    ]);
+    expect(cfg.routes[0].waypoints).toEqual([[0, 0], { entityId: "thornhold" }, [200, 200]]);
   });
 
   it("round-trips fog with reveals", () => {
@@ -167,8 +212,18 @@ describe("buildFullWorldYaml — round-trip", () => {
       enabled: true,
       color: "rgba(0,0,0,0.55)",
       reveals: [
-        [[0, 0], [10, 0], [10, 10], [0, 10]],
-        [[100, 100], [150, 100], [150, 150], [100, 150]],
+        [
+          [0, 0],
+          [10, 0],
+          [10, 10],
+          [0, 10],
+        ],
+        [
+          [100, 100],
+          [150, 100],
+          [150, 150],
+          [100, 150],
+        ],
       ],
     };
     const out = buildFullWorldYaml({
@@ -181,7 +236,12 @@ describe("buildFullWorldYaml — round-trip", () => {
     expect(cfg.fogs[0].mapId).toBe("m1");
     expect(cfg.fogs[0].enabled).toBe(true);
     expect(cfg.fogs[0].reveals).toHaveLength(2);
-    expect(cfg.fogs[0].reveals[0]).toEqual([[0, 0], [10, 0], [10, 10], [0, 10]]);
+    expect(cfg.fogs[0].reveals[0]).toEqual([
+      [0, 0],
+      [10, 0],
+      [10, 10],
+      [0, 10],
+    ]);
   });
 
   it("omits empty regions/routes/fog from output so loadWorldConfig stays terse", () => {
@@ -199,7 +259,17 @@ describe("buildFullWorldYaml — round-trip", () => {
   it("emits fog when disabled-but-has-reveals or enabled-but-empty", () => {
     // Authored reveals but currently disabled — preserve them.
     const map = makeMap({
-      fog: { mapId: "m1", enabled: false, reveals: [[[0, 0], [5, 0], [5, 5]]] },
+      fog: {
+        mapId: "m1",
+        enabled: false,
+        reveals: [
+          [
+            [0, 0],
+            [5, 0],
+            [5, 5],
+          ],
+        ],
+      },
     });
     const out = buildFullWorldYaml({ maps: [map], schemaVersion: 1, existing: null });
     const cfg = loadEmitted(out)!;
@@ -255,7 +325,9 @@ describe("buildFullWorldYaml — comment preservation", () => {
       schemaVersion: 1,
       existing,
     });
-    expect(out.startsWith("# Hand-written header line one\n# Hand-written header line two\n\n")).toBe(true);
+    expect(
+      out.startsWith("# Hand-written header line one\n# Hand-written header line two\n\n"),
+    ).toBe(true);
     // The body still parses.
     const cfg = loadEmitted(out)!;
     expect(cfg.maps[0].id).toBe("m1");
@@ -291,7 +363,9 @@ describe("buildFullWorldYaml — comment preservation", () => {
       schemaVersion: 1,
       existing,
     });
-    expect(out.startsWith("# Astrath Deeprealm — map / region / fog / route / calendar config.\n")).toBe(true);
+    expect(
+      out.startsWith("# Astrath Deeprealm — map / region / fog / route / calendar config.\n"),
+    ).toBe(true);
     expect(out).toContain("# IMPORTANT: This file must be PURE YAML.");
   });
 });

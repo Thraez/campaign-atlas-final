@@ -37,8 +37,17 @@ export const EDITOR_CODE_FINGERPRINTS = [
 ] as const;
 
 const TEXT_EXTENSIONS = new Set([
-  ".html", ".js", ".mjs", ".cjs", ".css", ".json",
-  ".txt", ".xml", ".webmanifest", ".svg", ".md",
+  ".html",
+  ".js",
+  ".mjs",
+  ".cjs",
+  ".css",
+  ".json",
+  ".txt",
+  ".xml",
+  ".webmanifest",
+  ".svg",
+  ".md",
 ]);
 
 export interface ScanHit {
@@ -58,7 +67,11 @@ export function scanFile(file: string): ScanHit[] {
   let text: string;
   try {
     text = fs.readFileSync(file, "utf8");
-  } catch {
+  } catch (err) {
+    // utf8 reads substitute U+FFFD for undecodable bytes rather than throwing,
+    // so this only fires on genuine OS-level I/O errors (permissions, races).
+    // Log the skip instead of swallowing it; the exit code is unaffected.
+    console.warn(`check-no-secrets: skipped unreadable file ${file}: ${(err as Error).message}`);
     return hits;
   }
   for (const s of DM_CONTENT_SENTINELS) {
@@ -76,7 +89,8 @@ export function scanDir(dir: string): ScanResult {
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(d, { withFileTypes: true });
-    } catch {
+    } catch (err) {
+      console.warn(`check-no-secrets: skipped unreadable dir ${d}: ${(err as Error).message}`);
       return;
     }
     for (const e of entries) {
@@ -98,7 +112,9 @@ export function scanDir(dir: string): ScanResult {
   return result;
 }
 
-export interface RunOpts { dir: string }
+export interface RunOpts {
+  dir: string;
+}
 
 export function run(opts: RunOpts): number {
   const abs = path.resolve(process.cwd(), opts.dir);

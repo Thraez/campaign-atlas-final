@@ -78,7 +78,7 @@ function writeFortress(dir: string): void {
       include: [],
       // Match the project's real config — depth-agnostic excludes.
       exclude: ["**/_drafts/**", "**/_dm/**", "**/archive/**"],
-    })
+    }),
   );
   fs.writeFileSync(
     path.join(dir, "content/test-world/_atlas/world.yaml"),
@@ -101,7 +101,7 @@ calendar:
   months:
     - { name: One, days: 30 }
     - { name: Two, days: 30 }
-`
+`,
   );
   // DM-only entity with a distinctive secret name — must NOT leak anywhere.
   fs.writeFileSync(
@@ -115,7 +115,7 @@ atlas:
     - SUNHAVEN_TOWER_ALIAS_001
 ---
 This is the inside of the secret tower. SUNHAVEN_TOWER_BODY_001.
-`
+`,
   );
   // Public entity exercising every leak surface.
   fs.writeFileSync(
@@ -152,7 +152,7 @@ atlas:
       description: "Description %% REL_DESC_SECRET %% here."
 ---
 Public body of Thornhold. The Lord of [[SUNHAVEN_TOWER_OF_SECRETS]] is mentioned here.
-`
+`,
   );
 }
 
@@ -167,7 +167,7 @@ function writeUnbalanced(dir: string): void {
       defaultWorld: "test-world",
       include: [],
       exclude: [],
-    })
+    }),
   );
   fs.writeFileSync(
     path.join(dir, "content/test-world/_atlas/world.yaml"),
@@ -179,7 +179,7 @@ maps:
     width: 100
     height: 100
     layers: []
-`
+`,
   );
   fs.writeFileSync(
     path.join(dir, "content/test-world/settlements/Unbalanced.md"),
@@ -190,7 +190,7 @@ atlas:
 ---
 This is text. %% I forgot to close this block and everything after it might
 be DM-only spoiler content the DM doesn't want shipped.
-`
+`,
   );
 }
 
@@ -228,23 +228,16 @@ describe("safety fortress: end-to-end spoiler leak gates", () => {
     const outDir = path.join(dir, "out");
     // Non-strict so the build completes even with the cross-ref leak; we then
     // assert that the leak was redacted from output rather than passing through.
-    const res = run([
-      "--player",
-      "--config",
-      path.join(dir, "atlas.config.json"),
-      "--out",
-      outDir,
-    ]);
+    const res = run(["--player", "--config", path.join(dir, "atlas.config.json"), "--out", outDir]);
     expect(res.status).toBe(0);
     const files = walkFiles(outDir);
     expect(files.length).toBeGreaterThan(0);
     for (const file of files) {
       const text = fs.readFileSync(file, "utf8");
       for (const secret of SECRET_STRINGS) {
-        expect(
-          text.includes(secret),
-          `file ${path.basename(file)} leaks secret "${secret}"`
-        ).toBe(false);
+        expect(text.includes(secret), `file ${path.basename(file)} leaks secret "${secret}"`).toBe(
+          false,
+        );
       }
       // No literal %% should reach the player output for any shipping field.
       // Note: code fences inside body bodies are rendered to HTML so by the time
@@ -252,7 +245,7 @@ describe("safety fortress: end-to-end spoiler leak gates", () => {
       // doesn't use code fences, so a simple substring check is sufficient.
       expect(
         text.includes("%%"),
-        `file ${path.basename(file)} contains unstripped %% delimiter`
+        `file ${path.basename(file)} contains unstripped %% delimiter`,
       ).toBe(false);
     }
   });
@@ -282,13 +275,7 @@ describe("safety fortress: end-to-end spoiler leak gates", () => {
     fs.mkdirSync(dir, { recursive: true });
     writeUnbalanced(dir);
     const outDir = path.join(dir, "out");
-    const res = run([
-      "--player",
-      "--config",
-      path.join(dir, "atlas.config.json"),
-      "--out",
-      outDir,
-    ]);
+    const res = run(["--player", "--config", path.join(dir, "atlas.config.json"), "--out", outDir]);
     expect(res.status).toBe(1);
     expect(`${res.stdout}${res.stderr}`).toMatch(/unbalanced (DM delimiter|%%)/i);
   });
@@ -301,12 +288,7 @@ describe("safety fortress: end-to-end spoiler leak gates", () => {
     fs.mkdirSync(dir, { recursive: true });
     writeFortress(dir);
     const outDir = path.join(dir, "out");
-    const res = run([
-      "--config",
-      path.join(dir, "atlas.config.json"),
-      "--out",
-      outDir,
-    ]);
+    const res = run(["--config", path.join(dir, "atlas.config.json"), "--out", outDir]);
     expect(res.status).toBe(0);
     const atlas = fs.readFileSync(path.join(outDir, "atlas.json"), "utf8");
     // The DM build keeps DM entities (so secrets DO appear here).

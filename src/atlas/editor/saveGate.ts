@@ -53,8 +53,6 @@ export function buildSavePlan<TDraft extends { entityId: string }>(
   );
   const frontmatterPatches = entityFrontmatterPatches(input.entityDrafts, input.projectEntities);
   const isEmpty =
-    dirtyPlacements.length === 0 &&
-    frontmatterPatches.length === 0 &&
-    !input.worldYamlDirty;
+    dirtyPlacements.length === 0 && frontmatterPatches.length === 0 && !input.worldYamlDirty;
   return { dirtyPlacements, frontmatterPatches, isEmpty };
 }

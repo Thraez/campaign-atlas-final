@@ -12,9 +12,9 @@ function makeRow(overrides: Partial<StagingRow>): StagingRow {
     pathAllowed: true,
     rowKind: "create",
     included: true,
-    content: "",
     rawContent: "",
     typeWasExplicit: false,
+    typeWasGuessed: false,
     resolvedVisibility: "dm",
     ...overrides,
   };
@@ -33,7 +33,13 @@ describe("summarizeImport", () => {
 
   it("counts an included create row as added", () => {
     const rows = [makeRow({ rowKind: "create", included: true })];
-    expect(summarizeImport(rows)).toMatchObject({ added: 1, updated: 0, replaced: 0, skipped: 0, couldntBeRead: 0 });
+    expect(summarizeImport(rows)).toMatchObject({
+      added: 1,
+      updated: 0,
+      replaced: 0,
+      skipped: 0,
+      couldntBeRead: 0,
+    });
   });
 
   it("counts an included update row as updated", () => {
@@ -66,14 +72,14 @@ describe("summarizeImport", () => {
 
   it("handles a fully mixed batch correctly", () => {
     const rows = [
-      makeRow({ rowKind: "create", included: true }),           // added
-      makeRow({ rowKind: "create", included: true }),           // added
-      makeRow({ rowKind: "update", included: true }),           // updated
-      makeRow({ rowKind: "path-collision", included: true }),   // replaced
-      makeRow({ rowKind: "create", included: false }),          // skipped
-      makeRow({ rowKind: "path-collision", included: false }),  // skipped
-      makeRow({ parseError: "bad YAML", included: false }),     // couldn't be read
-      makeRow({ pathAllowed: false, included: false }),         // couldn't be read
+      makeRow({ rowKind: "create", included: true }), // added
+      makeRow({ rowKind: "create", included: true }), // added
+      makeRow({ rowKind: "update", included: true }), // updated
+      makeRow({ rowKind: "path-collision", included: true }), // replaced
+      makeRow({ rowKind: "create", included: false }), // skipped
+      makeRow({ rowKind: "path-collision", included: false }), // skipped
+      makeRow({ parseError: "bad YAML", included: false }), // couldn't be read
+      makeRow({ pathAllowed: false, included: false }), // couldn't be read
     ];
     expect(summarizeImport(rows)).toEqual({
       added: 2,
@@ -87,18 +93,20 @@ describe("summarizeImport", () => {
 
 describe("formatImportSummaryLine", () => {
   it("returns empty string when all buckets are zero", () => {
-    expect(formatImportSummaryLine({ added: 0, updated: 0, replaced: 0, skipped: 0, couldntBeRead: 0 })).toBe("");
+    expect(
+      formatImportSummaryLine({ added: 0, updated: 0, replaced: 0, skipped: 0, couldntBeRead: 0 }),
+    ).toBe("");
   });
 
   it("shows only non-zero buckets joined by ·", () => {
     expect(
-      formatImportSummaryLine({ added: 3, updated: 1, replaced: 0, skipped: 2, couldntBeRead: 0 })
+      formatImportSummaryLine({ added: 3, updated: 1, replaced: 0, skipped: 2, couldntBeRead: 0 }),
     ).toBe("3 added · 1 updated · 2 skipped");
   });
 
   it("shows a single bucket without separators", () => {
     expect(
-      formatImportSummaryLine({ added: 5, updated: 0, replaced: 0, skipped: 0, couldntBeRead: 0 })
+      formatImportSummaryLine({ added: 5, updated: 0, replaced: 0, skipped: 0, couldntBeRead: 0 }),
     ).toBe("5 added");
   });
 });

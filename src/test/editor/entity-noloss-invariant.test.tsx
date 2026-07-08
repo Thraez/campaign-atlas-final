@@ -5,7 +5,10 @@ import { useEntityEditDraft } from "@/atlas/categories/useEntityEditDraft";
 import { EntityEditPanel } from "@/atlas/categories/EntityEditPanel";
 
 vi.mock("@/atlas/save/canonicalPlacementSave", () => ({
-  readSourceFile: vi.fn(async () => "---\natlas:\n  id: corven\n  type: npc\n  visibility: dm\n---\nOriginal disk body\n"),
+  readSourceFile: vi.fn(
+    async () =>
+      "---\natlas:\n  id: corven\n  type: npc\n  visibility: dm\n---\nOriginal disk body\n",
+  ),
 }));
 vi.mock("@/atlas/save/localFsSave", () => ({
   hashContent: vi.fn(async () => "h1"),

@@ -36,7 +36,7 @@ function checkStringField(
   out: ShapeViolation[],
   entityId: string,
   field: string,
-  value: unknown
+  value: unknown,
 ): void {
   if (typeof value !== "string" || value === "") return;
   if (DM_BLOCK_RE.test(value)) {
@@ -62,17 +62,37 @@ export function scanArtifactShape(atlas: unknown): ShapeResult {
     const id = typeof e.id === "string" ? e.id : "<unknown>";
     const vis = e.visibility as string | undefined;
     if (!vis || !PLAYER_VISIBLE.has(vis as never)) {
-      violations.push({ entityId: id, field: "visibility", message: `visibility "${vis}" not in PLAYER_VISIBLE` });
+      violations.push({
+        entityId: id,
+        field: "visibility",
+        message: `visibility "${vis}" not in PLAYER_VISIBLE`,
+      });
     }
     if (typeof e.sourcePath === "string" && e.sourcePath !== "") {
-      violations.push({ entityId: id, field: "sourcePath", message: `sourcePath leaked: "${e.sourcePath}"` });
+      violations.push({
+        entityId: id,
+        field: "sourcePath",
+        message: `sourcePath leaked: "${e.sourcePath}"`,
+      });
     }
-    if (e.frontmatter && typeof e.frontmatter === "object" && Object.keys(e.frontmatter as object).length > 0) {
-      violations.push({ entityId: id, field: "frontmatter", message: "frontmatter is non-empty (raw YAML leak)" });
+    if (
+      e.frontmatter &&
+      typeof e.frontmatter === "object" &&
+      Object.keys(e.frontmatter as object).length > 0
+    ) {
+      violations.push({
+        entityId: id,
+        field: "frontmatter",
+        message: "frontmatter is non-empty (raw YAML leak)",
+      });
     }
     const profile = e.profile as { dm?: unknown; player?: Record<string, unknown> } | undefined;
     if (profile && profile.dm !== undefined) {
-      violations.push({ entityId: id, field: "profile.dm", message: "profile.dm is defined in player artifact" });
+      violations.push({
+        entityId: id,
+        field: "profile.dm",
+        message: "profile.dm is defined in player artifact",
+      });
     }
     checkStringField(violations, id, "body", e.body);
     checkStringField(violations, id, "bodyHtml", e.bodyHtml);
@@ -166,7 +186,8 @@ export function scanSearchIndex(records: unknown): SearchIndexResult {
   const violations: ShapeViolation[] = [];
   if (!Array.isArray(records)) return { violations };
   for (const r of records as Record<string, unknown>[]) {
-    const id = typeof r.id === "string" ? r.id : (typeof r.title === "string" ? r.title : "<unknown>");
+    const id =
+      typeof r.id === "string" ? r.id : typeof r.title === "string" ? r.title : "<unknown>";
     const fields: Array<[string, unknown]> = [
       ["title", r.title],
       ["summary", r.summary],
@@ -197,12 +218,16 @@ function siblingSearchIndex(atlasPath: string): string | null {
   return fs.existsSync(candidate) ? candidate : null;
 }
 
-export interface RunOpts { atlasJsonPath?: string }
+export interface RunOpts {
+  atlasJsonPath?: string;
+}
 
 export function run(opts: RunOpts): number {
   const target = resolveAtlasJson(opts.atlasJsonPath);
   if (!target) {
-    console.error("atlas:check-shape: could not find atlas.json (tried arg, dist/atlas, public/atlas)");
+    console.error(
+      "atlas:check-shape: could not find atlas.json (tried arg, dist/atlas, public/atlas)",
+    );
     return 1;
   }
   let atlas: unknown;

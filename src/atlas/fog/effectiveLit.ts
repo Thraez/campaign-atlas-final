@@ -6,9 +6,9 @@ function pointInPolygon(x: number, y: number, poly: Point[]): boolean {
   if (poly.length < 3) return false;
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [xi, yi] = poly[i], [xj, yj] = poly[j];
-    const hit = (yi > y) !== (yj > y) &&
-      x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+    const [xi, yi] = poly[i],
+      [xj, yj] = poly[j];
+    const hit = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
     if (hit) inside = !inside;
   }
   return inside;
@@ -30,7 +30,8 @@ export function isLit(x: number, y: number, fog: FogOverlay): boolean {
  *  geometry for rasterization. No polygon clipping here — the mask
  *  is built by rasterizing reveals opaque, then punching conceals transparent. */
 export function effectivePolygons(fog: FogOverlay): {
-  reveals: Point[][]; conceals: Point[][];
+  reveals: Point[][];
+  conceals: Point[][];
 } {
   const ok = (p: Point[]) => p.length >= 3;
   return {

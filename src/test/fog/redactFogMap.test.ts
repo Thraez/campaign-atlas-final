@@ -1,15 +1,25 @@
 import { describe, it, expect } from "vitest";
 import sharp from "sharp";
-import { redactLayer, FogRedactionError, DEFAULT_FEATHER_PX } from "../../../scripts/atlas/redactFogMap";
+import {
+  redactLayer,
+  FogRedactionError,
+  DEFAULT_FEATHER_PX,
+} from "../../../scripts/atlas/redactFogMap";
 import type { FogOverlay } from "@/atlas/content/schema";
 
-const sq = (x0: number, y0: number, x1: number, y1: number): [number, number][] =>
-  [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+const sq = (x0: number, y0: number, x1: number, y1: number): [number, number][] => [
+  [x0, y0],
+  [x1, y0],
+  [x1, y1],
+  [x0, y1],
+];
 
 async function solidRed(width: number, height: number): Promise<Buffer> {
   return sharp({
     create: { width, height, channels: 3, background: { r: 255, g: 0, b: 0 } },
-  }).png().toBuffer();
+  })
+    .png()
+    .toBuffer();
 }
 
 async function alphaAt(buf: Buffer, x: number, y: number): Promise<number> {
@@ -72,7 +82,10 @@ describe("redactLayer", () => {
     const fog: FogOverlay = { mapId: "m", enabled: true, reveals: [sq(0, 0, 100, 100)] };
     const input = await solidRed(100, 100);
     await expect(
-      redactLayer(input, map, fog, { ...layerRect, tileSrc: "https://tiles.example/{z}/{x}/{y}.png" })
+      redactLayer(input, map, fog, {
+        ...layerRect,
+        tileSrc: "https://tiles.example/{z}/{x}/{y}.png",
+      }),
     ).rejects.toBeInstanceOf(FogRedactionError);
   });
 });

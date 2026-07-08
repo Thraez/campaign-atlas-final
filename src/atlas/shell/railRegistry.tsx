@@ -1,9 +1,18 @@
 // src/atlas/shell/railRegistry.tsx
 import type { ReactNode } from "react";
 import {
-  Users, MapPin, Flag, ScrollText, Package, BookOpen,
-  Pin as PinIcon, Shapes, Route, CloudFog,
-  Save as SaveIcon, ShieldCheck,
+  Users,
+  MapPin,
+  Flag,
+  ScrollText,
+  Package,
+  BookOpen,
+  Pin as PinIcon,
+  Shapes,
+  Route,
+  CloudFog,
+  Save as SaveIcon,
+  ShieldCheck,
 } from "lucide-react";
 
 export type RailGroup = "content" | "map" | "system";
@@ -31,10 +40,17 @@ const ICON = "h-4 w-4";
 
 export function buildRailItems({ panels, counts }: BuildRailArgs): RailItem[] {
   const mk = (
-    id: string, group: RailGroup, label: string,
-    icon: ReactNode, shortcut?: string,
+    id: string,
+    group: RailGroup,
+    label: string,
+    icon: ReactNode,
+    shortcut?: string,
   ): RailItem => ({
-    id, group, label, shortcut, icon,
+    id,
+    group,
+    label,
+    shortcut,
+    icon,
     badge: () => counts[id],
     panel: panels[id],
   });

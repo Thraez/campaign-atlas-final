@@ -178,9 +178,7 @@ describe("E1 — accessible names for icon-only controls", () => {
           project={project}
           drafts={{
             e1: {
-              relationships: [
-                { entity: "other", type: "allied_with", visibility: "dm" },
-              ] as never,
+              relationships: [{ entity: "other", type: "allied_with", visibility: "dm" }] as never,
             },
           }}
           onDraftsChange={vi.fn()}

@@ -10,10 +10,55 @@ import {
 const sample: SessionState = {
   overrides: { "m1:town": { x: 10, y: 20, label: "Town" } },
   mapOverrideByMap: { m1: { width: 4096 } },
-  regionByMap: { m1: { edits: {}, added: [{ id: "r1", mapId: "m1", name: "R", points: [[0,0],[1,1],[2,0]], visibility: "dm" }], deleted: [] } },
+  regionByMap: {
+    m1: {
+      edits: {},
+      added: [
+        {
+          id: "r1",
+          mapId: "m1",
+          name: "R",
+          points: [
+            [0, 0],
+            [1, 1],
+            [2, 0],
+          ],
+          visibility: "dm",
+        },
+      ],
+      deleted: [],
+    },
+  },
   routeByMap: { m1: { edits: {}, added: [], deleted: [] } },
-  fogByMap: { m1: { mapId: "m1", enabled: true, color: "rgba(0,0,0,0.55)", reveals: [[[0,0],[1,1],[2,0]]] } },
-  layerByMap: { m1: [{ id: "up-1", src: "data:x", x: 0, y: 0, width: 1, height: 1, opacity: 1, zIndex: 10, origin: "upload" }] },
+  fogByMap: {
+    m1: {
+      mapId: "m1",
+      enabled: true,
+      color: "rgba(0,0,0,0.55)",
+      reveals: [
+        [
+          [0, 0],
+          [1, 1],
+          [2, 0],
+        ],
+      ],
+    },
+  },
+  layerByMap: {
+    m1: [
+      {
+        id: "up-1",
+        src: "data:x",
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        opacity: 1,
+        zIndex: 10,
+        origin: "upload",
+      },
+    ],
+  },
   savedAt: 1_700_000_000_000,
   entityEdit: null,
 };
@@ -41,8 +86,13 @@ describe("sessionSnapshot", () => {
 });
 
 const emptyBase = {
-  overrides: {}, mapOverrideByMap: {}, regionByMap: {},
-  routeByMap: {}, fogByMap: {}, layerByMap: {}, savedAt: 1,
+  overrides: {},
+  mapOverrideByMap: {},
+  regionByMap: {},
+  routeByMap: {},
+  fogByMap: {},
+  layerByMap: {},
+  savedAt: 1,
   entityEdit: null,
 };
 
@@ -54,11 +104,16 @@ describe("entityEdit slice (backward compatible)", () => {
     expect(sessionHasWork(s)).toBe(false);
   });
   it("round-trips an entityEdit draft and counts it as work", () => {
-    const s = { ...emptyBase, entityEdit: {
-      sourcePath: "content/w/npcs/corven.md", baseHash: "sha256:x",
-      fields: { id: "corven", type: "npc", visibility: "dm", summary: "" },
-      body: "edited", pristine: "different",
-    } };
+    const s = {
+      ...emptyBase,
+      entityEdit: {
+        sourcePath: "content/w/npcs/corven.md",
+        baseHash: "sha256:x",
+        fields: { id: "corven", type: "npc", visibility: "dm", summary: "" },
+        body: "edited",
+        pristine: "different",
+      },
+    };
     const round = deserializeSession(serializeSession(s as never))!;
     expect(round.entityEdit?.body).toBe("edited");
     expect(sessionHasWork(round)).toBe(true);
@@ -67,10 +122,16 @@ describe("entityEdit slice (backward compatible)", () => {
     const fields = { id: "corven", type: "npc", visibility: "dm", summary: "" };
     const body = "same";
     const pristine = JSON.stringify({ fields, body });
-    const s = { ...emptyBase, entityEdit: {
-      sourcePath: "content/w/npcs/corven.md", baseHash: "sha256:x",
-      fields, body, pristine,
-    } };
+    const s = {
+      ...emptyBase,
+      entityEdit: {
+        sourcePath: "content/w/npcs/corven.md",
+        baseHash: "sha256:x",
+        fields,
+        body,
+        pristine,
+      },
+    };
     const round = deserializeSession(serializeSession(s as never))!;
     expect(sessionHasWork(round)).toBe(false);
   });
@@ -79,7 +140,9 @@ describe("entityEdit slice (backward compatible)", () => {
 describe("deserializeSession — inner state field guard", () => {
   it("returns null when state exists but is missing required fields", () => {
     // Valid version, but state is missing savedAt → null
-    expect(deserializeSession({ version: SESSION_SCHEMA_VERSION, state: { overrides: {} } })).toBeNull();
+    expect(
+      deserializeSession({ version: SESSION_SCHEMA_VERSION, state: { overrides: {} } }),
+    ).toBeNull();
   });
   it("returns null when state itself is not an object", () => {
     expect(deserializeSession({ version: SESSION_SCHEMA_VERSION, state: "corrupt" })).toBeNull();
@@ -112,7 +175,25 @@ describe("sessionHasWork — individual slice branches", () => {
   it("returns true when regionByMap has added regions", () => {
     const s: SessionState = {
       ...emptyBase,
-      regionByMap: { m1: { edits: {}, added: [{ id: "r1", mapId: "m1", name: "R", points: [[0,0],[1,1],[2,0]], visibility: "player" as const }], deleted: [] } },
+      regionByMap: {
+        m1: {
+          edits: {},
+          added: [
+            {
+              id: "r1",
+              mapId: "m1",
+              name: "R",
+              points: [
+                [0, 0],
+                [1, 1],
+                [2, 0],
+              ],
+              visibility: "player" as const,
+            },
+          ],
+          deleted: [],
+        },
+      },
     };
     expect(sessionHasWork(s)).toBe(true);
   });
@@ -126,7 +207,24 @@ describe("sessionHasWork — individual slice branches", () => {
   it("returns true when routeByMap has added routes", () => {
     const s: SessionState = {
       ...emptyBase,
-      routeByMap: { m1: { edits: {}, added: [{ id: "rt1", mapId: "m1", name: "Road", visibility: "player" as const, waypoints: [[0,0],[100,100]] }], deleted: [] } },
+      routeByMap: {
+        m1: {
+          edits: {},
+          added: [
+            {
+              id: "rt1",
+              mapId: "m1",
+              name: "Road",
+              visibility: "player" as const,
+              waypoints: [
+                [0, 0],
+                [100, 100],
+              ],
+            },
+          ],
+          deleted: [],
+        },
+      },
     };
     expect(sessionHasWork(s)).toBe(true);
   });
@@ -144,7 +242,21 @@ describe("sessionHasWork — individual slice branches", () => {
   it("returns true when layerByMap has at least one layer", () => {
     const s: SessionState = {
       ...emptyBase,
-      layerByMap: { m1: [{ id: "lay1", src: "data:x", x: 0, y: 0, width: 1, height: 1, opacity: 1, zIndex: 1, origin: "upload" as const }] },
+      layerByMap: {
+        m1: [
+          {
+            id: "lay1",
+            src: "data:x",
+            x: 0,
+            y: 0,
+            width: 1,
+            height: 1,
+            opacity: 1,
+            zIndex: 1,
+            origin: "upload" as const,
+          },
+        ],
+      },
     };
     expect(sessionHasWork(s)).toBe(true);
   });

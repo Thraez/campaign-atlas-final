@@ -57,7 +57,9 @@ export function PublishedDiffPanel({ current }: Props) {
       setMissing(b == null);
       setLoading(false);
     });
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const refresh = () => {
@@ -84,10 +86,20 @@ export function PublishedDiffPanel({ current }: Props) {
         <span>Changes since last publish</span>
         {diff?.hasChanges && (
           <span className="ml-auto flex items-center gap-1">
-            {diff.counts.entities > 0 && <Badge variant="secondary" className="text-[9px]">{diff.counts.entities} entities</Badge>}
-            {diff.counts.placements > 0 && <Badge variant="secondary" className="text-[9px]">{diff.counts.placements} pins</Badge>}
-            {(diff.counts.maps + diff.counts.overlays) > 0 && (
-              <Badge variant="secondary" className="text-[9px]">{diff.counts.maps + diff.counts.overlays} maps/overlays</Badge>
+            {diff.counts.entities > 0 && (
+              <Badge variant="secondary" className="text-[9px]">
+                {diff.counts.entities} entities
+              </Badge>
+            )}
+            {diff.counts.placements > 0 && (
+              <Badge variant="secondary" className="text-[9px]">
+                {diff.counts.placements} pins
+              </Badge>
+            )}
+            {diff.counts.maps + diff.counts.overlays > 0 && (
+              <Badge variant="secondary" className="text-[9px]">
+                {diff.counts.maps + diff.counts.overlays} maps/overlays
+              </Badge>
             )}
           </span>
         )}
@@ -99,11 +111,19 @@ export function PublishedDiffPanel({ current }: Props) {
             <div className="rounded border border-amber-500/30 bg-amber-500/5 p-2 space-y-1">
               <div className="text-foreground">No baseline snapshot found.</div>
               <div className="text-muted-foreground">
-                The diff panel compares against <code className="font-mono text-[10px]">public/atlas/.last-published.json</code>,
-                which is written by <code className="font-mono text-[10px]">npm run atlas:snapshot</code> (also chained at the
-                start of <code className="font-mono text-[10px]">atlas:publish</code>). Run a publish to seed it, then come back.
+                The diff panel compares against{" "}
+                <code className="font-mono text-[10px]">public/atlas/.last-published.json</code>,
+                which is written by{" "}
+                <code className="font-mono text-[10px]">npm run atlas:snapshot</code> (also chained
+                at the start of <code className="font-mono text-[10px]">atlas:publish</code>). Run a
+                publish to seed it, then come back.
               </div>
-              <Button size="sm" variant="ghost" onClick={refresh} className="h-6 px-2 text-[10px] gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={refresh}
+                className="h-6 px-2 text-[10px] gap-1"
+              >
                 <RotateCcw className="h-3 w-3" /> Re-check
               </Button>
             </div>
@@ -114,48 +134,66 @@ export function PublishedDiffPanel({ current }: Props) {
           {!loading && diff && diff.hasChanges && (
             <>
               {diff.entities.length > 0 && (
-                <DiffSection title="Entities" items={diff.entities.map((e) => ({
-                  key: `${e.id}-${e.kind}`,
-                  icon: iconFor(e.kind),
-                  label: e.title,
-                  hint: e.kind === "visibility-changed"
-                    ? `visibility: ${e.before} → ${e.after}`
-                    : e.kind === "title-changed"
-                    ? `title: ${e.before} → ${e.after}`
-                    : kindLabel(e.kind),
-                  tone: toneFor(e.kind),
-                }))} />
+                <DiffSection
+                  title="Entities"
+                  items={diff.entities.map((e) => ({
+                    key: `${e.id}-${e.kind}`,
+                    icon: iconFor(e.kind),
+                    label: e.title,
+                    hint:
+                      e.kind === "visibility-changed"
+                        ? `visibility: ${e.before} → ${e.after}`
+                        : e.kind === "title-changed"
+                          ? `title: ${e.before} → ${e.after}`
+                          : kindLabel(e.kind),
+                    tone: toneFor(e.kind),
+                  }))}
+                />
               )}
               {diff.placements.length > 0 && (
-                <DiffSection title="Placements" items={diff.placements.map((p, i) => ({
-                  key: `plc-${i}`,
-                  icon: iconFor(p.kind),
-                  label: `${p.entityTitle}`,
-                  hint: p.kind === "moved"
-                    ? `${p.mapId}: (${p.before?.x.toFixed(0)},${p.before?.y.toFixed(0)}) → (${p.after?.x.toFixed(0)},${p.after?.y.toFixed(0)})`
-                    : p.kind === "added"
-                    ? `${p.mapId}: (${p.after?.x.toFixed(0)},${p.after?.y.toFixed(0)})`
-                    : `${p.mapId}: removed`,
-                  tone: toneFor(p.kind),
-                }))} />
+                <DiffSection
+                  title="Placements"
+                  items={diff.placements.map((p, i) => ({
+                    key: `plc-${i}`,
+                    icon: iconFor(p.kind),
+                    label: `${p.entityTitle}`,
+                    hint:
+                      p.kind === "moved"
+                        ? `${p.mapId}: (${p.before?.x.toFixed(0)},${p.before?.y.toFixed(0)}) → (${p.after?.x.toFixed(0)},${p.after?.y.toFixed(0)})`
+                        : p.kind === "added"
+                          ? `${p.mapId}: (${p.after?.x.toFixed(0)},${p.after?.y.toFixed(0)})`
+                          : `${p.mapId}: removed`,
+                    tone: toneFor(p.kind),
+                  }))}
+                />
               )}
               {diff.maps.length > 0 && (
-                <DiffSection title="Maps" items={diff.maps.map((m) => ({
-                  key: `map-${m.id}-${m.kind}`,
-                  icon: iconFor(m.kind),
-                  label: m.name,
-                  hint: kindLabel(m.kind),
-                  tone: toneFor(m.kind),
-                }))} />
+                <DiffSection
+                  title="Maps"
+                  items={diff.maps.map((m) => ({
+                    key: `map-${m.id}-${m.kind}`,
+                    icon: iconFor(m.kind),
+                    label: m.name,
+                    hint: kindLabel(m.kind),
+                    tone: toneFor(m.kind),
+                  }))}
+                />
               )}
               {diff.overlays.length > 0 && (
-                <DiffSection title="Regions & routes" items={diff.overlays.map((o, i) => ({
-                  key: `ov-${i}`,
-                  icon: o.kind.endsWith("added") ? <Plus className="h-3 w-3" /> : <Minus className="h-3 w-3" />,
-                  label: o.name ?? "(untitled)",
-                  hint: `${o.mapId} — ${o.kind.replace("-", " ")}`,
-                  tone: o.kind.endsWith("added") ? "text-primary" : "text-destructive",
-                }))} />
+                <DiffSection
+                  title="Regions & routes"
+                  items={diff.overlays.map((o, i) => ({
+                    key: `ov-${i}`,
+                    icon: o.kind.endsWith("added") ? (
+                      <Plus className="h-3 w-3" />
+                    ) : (
+                      <Minus className="h-3 w-3" />
+                    ),
+                    label: o.name ?? "(untitled)",
+                    hint: `${o.mapId} — ${o.kind.replace("-", " ")}`,
+                    tone: o.kind.endsWith("added") ? "text-primary" : "text-destructive",
+                  }))}
+                />
               )}
             </>
           )}
@@ -183,14 +221,22 @@ function toneFor(kind: string): string {
 
 function kindLabel(kind: string): string {
   switch (kind) {
-    case "added": return "added";
-    case "removed": return "removed";
-    case "moved": return "moved";
-    case "summary-changed": return "summary edited";
-    case "body-changed": return "body edited";
-    case "title-changed": return "title changed";
-    case "visibility-changed": return "visibility changed";
-    default: return kind;
+    case "added":
+      return "added";
+    case "removed":
+      return "removed";
+    case "moved":
+      return "moved";
+    case "summary-changed":
+      return "summary edited";
+    case "body-changed":
+      return "body edited";
+    case "title-changed":
+      return "title changed";
+    case "visibility-changed":
+      return "visibility changed";
+    default:
+      return kind;
   }
 }
 
@@ -204,14 +250,18 @@ function DiffSection({
   if (items.length === 0) return null;
   return (
     <div className="space-y-1">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{title} ({items.length})</div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+        {title} ({items.length})
+      </div>
       <ul className="space-y-0.5">
         {items.map((it) => (
           <li key={it.key} className="flex items-start gap-1.5 leading-tight">
             <span className={`${it.tone} mt-0.5 shrink-0`}>{it.icon}</span>
             <span className="flex-1 min-w-0">
               <span className="text-foreground">{it.label}</span>
-              {it.hint && <span className="text-muted-foreground text-[10px] ml-1.5">— {it.hint}</span>}
+              {it.hint && (
+                <span className="text-muted-foreground text-[10px] ml-1.5">— {it.hint}</span>
+              )}
             </span>
           </li>
         ))}

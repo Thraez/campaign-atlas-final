@@ -44,69 +44,81 @@ export function RouteLayer({ map, api, visible = true }: Props) {
   const xy2ll = (x: number, y: number): [number, number] => [H - y, x];
 
   const routes = api.effective;
-  const selected = useMemo(() => routes.find((r) => r.id === api.selectedId) ?? null, [routes, api.selectedId]);
+  const selected = useMemo(
+    () => routes.find((r) => r.id === api.selectedId) ?? null,
+    [routes, api.selectedId],
+  );
 
   const draftPts = useMemo(() => {
-    return api.draftWaypoints
-      .map((w) => api.resolveWaypoint(w))
-      .filter((p): p is Point => !!p);
+    return api.draftWaypoints.map((w) => api.resolveWaypoint(w)).filter((p): p is Point => !!p);
   }, [api]);
 
   return (
     <>
       <DrawingClicks api={api} map={map} />
 
-      {visible && routes.map((r) => {
-        const pts = api.resolveRoute(r);
-        if (pts.length < 2) return null;
-        const isSelected = r.id === api.selectedId;
-        return (
-          <Polyline
-            key={r.id}
-            positions={pts.map(([x, y]) => xy2ll(x, y))}
-            pathOptions={{
-              color: r.color ?? "#cfd6dc",
-              weight: (r.weight ?? 3) + (isSelected ? 1 : 0),
-              opacity: 0.95,
-              dashArray: r.dashed ? "8 6" : undefined,
-              lineCap: "round",
-              lineJoin: "round",
-            }}
-            eventHandlers={{
-              click: (e) => {
-                if (api.drawing) return;
-                L.DomEvent.stopPropagation(e);
-                api.setSelectedId(r.id);
-              },
-            }}
-          />
-        );
-      })}
+      {visible &&
+        routes.map((r) => {
+          const pts = api.resolveRoute(r);
+          if (pts.length < 2) return null;
+          const isSelected = r.id === api.selectedId;
+          return (
+            <Polyline
+              key={r.id}
+              positions={pts.map(([x, y]) => xy2ll(x, y))}
+              pathOptions={{
+                color: r.color ?? "#cfd6dc",
+                weight: (r.weight ?? 3) + (isSelected ? 1 : 0),
+                opacity: 0.95,
+                dashArray: r.dashed ? "8 6" : undefined,
+                lineCap: "round",
+                lineJoin: "round",
+              }}
+              eventHandlers={{
+                click: (e) => {
+                  if (api.drawing) return;
+                  L.DomEvent.stopPropagation(e);
+                  api.setSelectedId(r.id);
+                },
+              }}
+            />
+          );
+        })}
 
       {/* Selected route — draggable handles for coord waypoints, square markers for entity refs. */}
-      {visible && selected && !api.drawing && selected.waypoints.map((w: Waypoint, i) => {
-        const p = api.resolveWaypoint(w);
-        if (!p) return null;
-        const isEntity = !Array.isArray(w);
-        return (
-          <Marker
-            key={`wp-${selected.id}-${i}`}
-            position={xy2ll(p[0], p[1])}
-            icon={handleIcon(isEntity ? "entity" : "coord")}
-            draggable={!isEntity}
-            eventHandlers={!isEntity ? {
-              dragend: (ev) => {
-                const ll = (ev.target as L.Marker).getLatLng();
-                api.moveWaypoint(selected.id, i, [Math.round(ll.lng), Math.round(H - ll.lat)]);
-              },
-              contextmenu: (ev) => {
-                L.DomEvent.preventDefault(ev.originalEvent);
-                api.removeWaypoint(selected.id, i);
-              },
-            } : undefined}
-          />
-        );
-      })}
+      {visible &&
+        selected &&
+        !api.drawing &&
+        selected.waypoints.map((w: Waypoint, i) => {
+          const p = api.resolveWaypoint(w);
+          if (!p) return null;
+          const isEntity = !Array.isArray(w);
+          return (
+            <Marker
+              key={`wp-${selected.id}-${i}`}
+              position={xy2ll(p[0], p[1])}
+              icon={handleIcon(isEntity ? "entity" : "coord")}
+              draggable={!isEntity}
+              eventHandlers={
+                !isEntity
+                  ? {
+                      dragend: (ev) => {
+                        const ll = (ev.target as L.Marker).getLatLng();
+                        api.moveWaypoint(selected.id, i, [
+                          Math.round(ll.lng),
+                          Math.round(H - ll.lat),
+                        ]);
+                      },
+                      contextmenu: (ev) => {
+                        L.DomEvent.preventDefault(ev.originalEvent);
+                        api.removeWaypoint(selected.id, i);
+                      },
+                    }
+                  : undefined
+              }
+            />
+          );
+        })}
 
       {/* In-progress draft preview. */}
       {api.drawing && draftPts.length > 0 && (
@@ -122,7 +134,11 @@ export function RouteLayer({ map, api, visible = true }: Props) {
               key={`draft-${i}`}
               center={xy2ll(p[0], p[1])}
               radius={4}
-              pathOptions={{ color: "hsl(var(--primary))", fillColor: "hsl(var(--primary))", fillOpacity: 1 }}
+              pathOptions={{
+                color: "hsl(var(--primary))",
+                fillColor: "hsl(var(--primary))",
+                fillOpacity: 1,
+              }}
             />
           ))}
         </>

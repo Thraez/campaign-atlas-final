@@ -8,7 +8,13 @@ interface ImagePickerPanelProps {
   onClose: () => void;
 }
 
-export function ImagePickerPanel({ images, onSelect, onImport, onDelete, onClose }: ImagePickerPanelProps) {
+export function ImagePickerPanel({
+  images,
+  onSelect,
+  onImport,
+  onDelete,
+  onClose,
+}: ImagePickerPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
 
@@ -64,9 +70,7 @@ export function ImagePickerPanel({ images, onSelect, onImport, onDelete, onClose
           No images yet — import one above
         </p>
       ) : visible.length === 0 ? (
-        <p className="px-2 py-3 text-muted-foreground italic text-center">
-          No images match
-        </p>
+        <p className="px-2 py-3 text-muted-foreground italic text-center">No images match</p>
       ) : (
         <div className="flex flex-wrap gap-1 p-2 max-h-40 overflow-y-auto">
           {visible.map((name) => (
@@ -93,7 +97,10 @@ export function ImagePickerPanel({ images, onSelect, onImport, onDelete, onClose
                   aria-label={`Delete ${name}`}
                   title={`Delete ${name}`}
                   className="absolute top-0.5 right-0.5 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[9px] leading-none"
-                  onClick={(e) => { e.stopPropagation(); onDelete(name); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(name);
+                  }}
                 >
                   ✕
                 </button>

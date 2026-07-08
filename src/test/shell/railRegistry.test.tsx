@@ -22,8 +22,18 @@ describe("railRegistry", () => {
     const ids = items.map((i) => i.id);
     expect(ids).toEqual(
       expect.arrayContaining([
-        "characters", "locations", "factions", "events", "items", "lore",
-        "pins", "regions", "routes", "fog", "save", "publish",
+        "characters",
+        "locations",
+        "factions",
+        "events",
+        "items",
+        "lore",
+        "pins",
+        "regions",
+        "routes",
+        "fog",
+        "save",
+        "publish",
       ]),
     );
   });

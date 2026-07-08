@@ -1,10 +1,4 @@
-export function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/['']/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-}
+// Single source of truth lives in src/ so the browser preview, the runtime
+// Save paths, and the build all derive byte-identical ids/slugs from a title.
+// Keep this path for build-side imports (build-atlas.ts imports from here).
+export { slugify } from "../../src/atlas/content/slugify";

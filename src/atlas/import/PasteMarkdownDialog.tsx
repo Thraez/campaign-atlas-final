@@ -7,6 +7,7 @@
  * and conflict rules apply — we just don't render the multi-row table.
  */
 import { useState } from "react";
+import { slugify } from "@/atlas/content/slugify";
 import {
   Dialog,
   DialogContent,
@@ -52,17 +53,6 @@ export interface PasteMarkdownDialogProps {
   onSubmit: (input: { filename: string; raw: string; type: string }) => void;
 }
 
-function slugify(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/['']/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-}
-
 export function PasteMarkdownDialog({ open, onOpenChange, onSubmit }: PasteMarkdownDialogProps) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState("imports");
@@ -81,8 +71,7 @@ export function PasteMarkdownDialog({ open, onOpenChange, onSubmit }: PasteMarkd
     const id = slugify(title.trim());
     const filename = `${id || "untitled"}.md`;
     // Build the .md content with frontmatter the import pipeline will parse.
-    const raw =
-      `---\ntitle: "${title.trim().replace(/"/g, '\\"')}"\natlas:\n  id: ${id || "untitled"}\n  type: ${type}\n  visibility: dm\n---\n\n${body.trim()}\n`;
+    const raw = `---\ntitle: "${title.trim().replace(/"/g, '\\"')}"\natlas:\n  id: ${id || "untitled"}\n  type: ${type}\n  visibility: dm\n---\n\n${body.trim()}\n`;
     onSubmit({ filename, raw, type });
     reset();
     onOpenChange(false);
@@ -100,8 +89,8 @@ export function PasteMarkdownDialog({ open, onOpenChange, onSubmit }: PasteMarkd
         <DialogHeader>
           <DialogTitle>Paste markdown</DialogTitle>
           <DialogDescription>
-            Quick-capture a single entity. Saved as a new <code>.md</code> in the
-            inferred folder. Visibility defaults to <strong>DM-only</strong>.
+            Quick-capture a single entity. Saved as a new <code>.md</code> in the inferred folder.
+            Visibility defaults to <strong>DM-only</strong>.
           </DialogDescription>
         </DialogHeader>
 

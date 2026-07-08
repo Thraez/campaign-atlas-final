@@ -98,9 +98,7 @@ describe("useUndoStack", () => {
     const { result } = renderHook(() => useUndoStack(3));
     for (let i = 0; i < 5; i++) {
       const id = String(i);
-      act(() =>
-        result.current.push({ undo: () => {}, redo: () => {}, label: id }),
-      );
+      act(() => result.current.push({ undo: () => {}, redo: () => {}, label: id }));
     }
     expect(result.current.pastSize).toBe(3);
     // The 3 most recent ("2","3","4") should still undo; "0" and "1" were evicted.

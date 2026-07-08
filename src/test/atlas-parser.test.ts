@@ -45,15 +45,15 @@ describe("parseFrontmatter flat-field fallbacks (Obsidian vault compat)", () => 
     // documentation-only and must stay invisible to the build pipeline.
     const raw = [
       "---",
-      'role: Main',
-      'voice: [precise, technical]',
+      "role: Main",
+      "voice: [precise, technical]",
       'mannerism: ["fidgets"]',
       'catchphrase: "yes"',
       'appearance: ["lean"]',
       'occupation: ["scholar"]',
       'faction: ["Collegium"]',
       'connections: ["Harwick"]',
-      'status: [alive]',
+      "status: [alive]",
       "---",
       "",
     ].join("\n");
@@ -214,7 +214,9 @@ describe("tokenizeWikilinks", () => {
 });
 
 describe("renderLinkTokens — player safety", () => {
-  const links = [{ target: "Secret Vault", display: "the vault", resolvedId: undefined, broken: true }];
+  const links = [
+    { target: "Secret Vault", display: "the vault", resolvedId: undefined, broken: true },
+  ];
   const html = `before \u2063LINK[0]\u2063 after`;
 
   it("player build does NOT leak the raw target name in title=", () => {
@@ -229,4 +231,3 @@ describe("renderLinkTokens — player safety", () => {
     expect(out).toMatch(/Secret Vault/);
   });
 });
-

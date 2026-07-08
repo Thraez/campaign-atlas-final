@@ -28,11 +28,7 @@ export function ViewModeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [mode]);
   const setMode = useCallback((m: ViewMode) => setModeState(m), []);
-  return (
-    <ViewModeContext.Provider value={{ mode, setMode }}>
-      {children}
-    </ViewModeContext.Provider>
-  );
+  return <ViewModeContext.Provider value={{ mode, setMode }}>{children}</ViewModeContext.Provider>;
 }
 
 export function useViewMode(): Ctx {

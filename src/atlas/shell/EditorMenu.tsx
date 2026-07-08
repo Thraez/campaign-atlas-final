@@ -4,16 +4,22 @@
 // were removed program-wide and are forbidden (see CLAUDE.md hard rules).
 // The guardrail test enforces this allow-list.
 
-export interface EditorMenuItem { id: string; label: string; }
+export interface EditorMenuItem {
+  id: string;
+  label: string;
+}
 
 export const EDITOR_MENU_ITEMS: EditorMenuItem[] = [
   { id: "world-details", label: "Edit world details" },
-  { id: "map-details",   label: "Edit map details" },
-  { id: "help",          label: "Help" },
+  { id: "map-details", label: "Edit map details" },
+  { id: "help", label: "Help" },
 ];
 
 export function EditorMenu({
-  open, onWorldDetails, onMapDetails, onHelp,
+  open,
+  onWorldDetails,
+  onMapDetails,
+  onHelp,
 }: {
   open?: boolean;
   onWorldDetails: () => void;
@@ -24,7 +30,7 @@ export function EditorMenu({
   const handlers: Record<string, () => void> = {
     "world-details": onWorldDetails,
     "map-details": onMapDetails,
-    "help": onHelp,
+    help: onHelp,
   };
   return (
     <ul className="rounded-md border bg-background shadow-md text-sm w-48">

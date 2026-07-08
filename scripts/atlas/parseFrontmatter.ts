@@ -1,6 +1,7 @@
 import matter from "gray-matter";
 import type { EntityVisibility, PinPlacementStyle } from "../../src/atlas/content/schema";
 import type { EntityProfile, EntityRelationship } from "../../src/atlas/profiles/profileTypes";
+import { isValidVisibility } from "./visibility";
 
 export interface AtlasPlacementSpec {
   mapId?: string;
@@ -39,8 +40,6 @@ export interface ParsedFile {
   warnings: string[];
 }
 
-const VALID_VIS: EntityVisibility[] = ["player", "dm", "hidden", "rumor"];
-
 export function parseFrontmatter(raw: string, sourcePath: string): ParsedFile {
   const warnings: string[] = [];
   const fm = matter(raw);
@@ -58,8 +57,12 @@ export function parseFrontmatter(raw: string, sourcePath: string): ParsedFile {
     id: typeof atlasRaw.id === "string" ? atlasRaw.id : undefined,
     tags: toStringArray(atlasRaw.tags ?? data.tags),
     canon: typeof atlasRaw.canon === "string" ? atlasRaw.canon : undefined,
-    date: typeof atlasRaw.date === "string" ? atlasRaw.date
-        : (atlasRaw.date instanceof Date ? atlasRaw.date.toISOString().slice(0, 10) : undefined),
+    date:
+      typeof atlasRaw.date === "string"
+        ? atlasRaw.date
+        : atlasRaw.date instanceof Date
+          ? atlasRaw.date.toISOString().slice(0, 10)
+          : undefined,
     dateValue: typeof atlasRaw.dateValue === "number" ? atlasRaw.dateValue : undefined,
     placements: parsePlacements(atlasRaw.placements, sourcePath, warnings),
     profile: parseProfile(atlasRaw.profile, sourcePath, warnings),
@@ -68,14 +71,14 @@ export function parseFrontmatter(raw: string, sourcePath: string): ParsedFile {
   };
 
   if (typeof atlasRaw.visibility === "string") {
-    if (VALID_VIS.includes(atlasRaw.visibility as EntityVisibility)) {
-      atlas.visibility = atlasRaw.visibility as EntityVisibility;
+    if (isValidVisibility(atlasRaw.visibility)) {
+      atlas.visibility = atlasRaw.visibility;
     } else {
       // Fail-safe: spoiler protection beats convenience. Invalid visibility
       // values must NOT silently fall through to the player default.
       atlas.visibility = "dm";
       warnings.push(
-        `${sourcePath}: invalid atlas.visibility "${atlasRaw.visibility}" — defaulted to "dm"`
+        `${sourcePath}: invalid atlas.visibility "${atlasRaw.visibility}" — defaulted to "dm"`,
       );
     }
   }
@@ -99,7 +102,11 @@ function pickString(...candidates: unknown[]): string | undefined {
   return undefined;
 }
 
-function parsePlacements(v: unknown, sourcePath: string, warnings: string[]): AtlasPlacementSpec[] | undefined {
+function parsePlacements(
+  v: unknown,
+  sourcePath: string,
+  warnings: string[],
+): AtlasPlacementSpec[] | undefined {
   if (v === undefined || v === null) return undefined;
   if (!Array.isArray(v)) {
     warnings.push(`${sourcePath}: atlas.placements must be an array — ignored`);
@@ -130,7 +137,12 @@ function parsePlacements(v: unknown, sourcePath: string, warnings: string[]): At
 const VALID_SHAPES = new Set(["teardrop", "circle", "square", "diamond", "shield", "star"]);
 const VALID_LABEL_MODES = new Set(["auto", "always", "never", "hover"]);
 
-function parsePinStyle(v: unknown, sourcePath: string, idx: number, warnings: string[]): PinPlacementStyle | undefined {
+function parsePinStyle(
+  v: unknown,
+  sourcePath: string,
+  idx: number,
+  warnings: string[],
+): PinPlacementStyle | undefined {
   if (v === undefined || v === null) return undefined;
   if (typeof v !== "object") {
     warnings.push(`${sourcePath}: atlas.placements[${idx}].pin must be an object — ignored`);
@@ -141,12 +153,16 @@ function parsePinStyle(v: unknown, sourcePath: string, idx: number, warnings: st
   if (typeof r.preset === "string") out.preset = r.preset;
   if (typeof r.color === "string") out.color = r.color;
   if (typeof r.icon === "string") out.icon = r.icon;
-  if (typeof r.shape === "string" && VALID_SHAPES.has(r.shape)) out.shape = r.shape as PinPlacementStyle["shape"];
-  if (typeof r.labelMode === "string" && VALID_LABEL_MODES.has(r.labelMode)) out.labelMode = r.labelMode as PinPlacementStyle["labelMode"];
+  if (typeof r.shape === "string" && VALID_SHAPES.has(r.shape))
+    out.shape = r.shape as PinPlacementStyle["shape"];
+  if (typeof r.labelMode === "string" && VALID_LABEL_MODES.has(r.labelMode))
+    out.labelMode = r.labelMode as PinPlacementStyle["labelMode"];
   if (typeof r.labelMinZoom === "number") out.labelMinZoom = r.labelMinZoom;
   if (typeof r.priority === "number") {
     if (r.priority < 0 || r.priority > 10) {
-      warnings.push(`${sourcePath}: atlas.placements[${idx}].pin.priority out of range 0..10 — clamped`);
+      warnings.push(
+        `${sourcePath}: atlas.placements[${idx}].pin.priority out of range 0..10 — clamped`,
+      );
       out.priority = Math.max(0, Math.min(10, r.priority));
     } else {
       out.priority = r.priority;
@@ -155,7 +171,11 @@ function parsePinStyle(v: unknown, sourcePath: string, idx: number, warnings: st
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-function parseProfile(v: unknown, sourcePath: string, warnings: string[]): EntityProfile | undefined {
+function parseProfile(
+  v: unknown,
+  sourcePath: string,
+  warnings: string[],
+): EntityProfile | undefined {
   if (v === undefined || v === null) return undefined;
   if (typeof v !== "object" || Array.isArray(v)) {
     warnings.push(`${sourcePath}: atlas.profile must be an object — ignored`);
@@ -184,7 +204,11 @@ function parseProfile(v: unknown, sourcePath: string, warnings: string[]): Entit
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-function parseRelationships(v: unknown, sourcePath: string, warnings: string[]): EntityRelationship[] | undefined {
+function parseRelationships(
+  v: unknown,
+  sourcePath: string,
+  warnings: string[],
+): EntityRelationship[] | undefined {
   if (v === undefined || v === null) return undefined;
   if (!Array.isArray(v)) {
     warnings.push(`${sourcePath}: atlas.relationships must be an array — ignored`);
@@ -207,10 +231,12 @@ function parseRelationships(v: unknown, sourcePath: string, warnings: string[]):
     }
     let visibility: EntityVisibility = "dm";
     if (typeof r.visibility === "string") {
-      if (VALID_VIS.includes(r.visibility as EntityVisibility)) {
-        visibility = r.visibility as EntityVisibility;
+      if (isValidVisibility(r.visibility)) {
+        visibility = r.visibility;
       } else {
-        warnings.push(`${sourcePath}: atlas.relationships[${i}] invalid visibility "${r.visibility}" — defaulted to "dm"`);
+        warnings.push(
+          `${sourcePath}: atlas.relationships[${i}] invalid visibility "${r.visibility}" — defaulted to "dm"`,
+        );
       }
     }
     out.push({

@@ -10,7 +10,8 @@
 export function normalizeAtlasAssetUrl(src: string, base?: string): string {
   if (!src) return src;
   if (/^(https?:|data:|blob:)/i.test(src)) return src;
-  const b = base ?? (typeof import.meta !== "undefined" ? import.meta.env?.BASE_URL : undefined) ?? "/";
+  const b =
+    base ?? (typeof import.meta !== "undefined" ? import.meta.env?.BASE_URL : undefined) ?? "/";
   const cleaned = src.replace(/^\/+/, "");
   const baseWithSlash = b.endsWith("/") ? b : b + "/";
   return baseWithSlash + cleaned;

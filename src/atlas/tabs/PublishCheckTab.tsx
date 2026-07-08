@@ -46,9 +46,24 @@ interface Props {
 }
 
 const SEVERITY_META = {
-  blocking: { label: "Blocking", icon: ShieldAlert, badge: "destructive" as const, tone: "text-destructive" },
-  warning: { label: "Warnings", icon: AlertTriangle, badge: "secondary" as const, tone: "text-amber-500" },
-  suggestion: { label: "Suggestions", icon: Lightbulb, badge: "outline" as const, tone: "text-muted-foreground" },
+  blocking: {
+    label: "Blocking",
+    icon: ShieldAlert,
+    badge: "destructive" as const,
+    tone: "text-destructive",
+  },
+  warning: {
+    label: "Warnings",
+    icon: AlertTriangle,
+    badge: "secondary" as const,
+    tone: "text-amber-500",
+  },
+  suggestion: {
+    label: "Suggestions",
+    icon: Lightbulb,
+    badge: "outline" as const,
+    tone: "text-muted-foreground",
+  },
 };
 
 export function PublishCheckTab({
@@ -61,7 +76,7 @@ export function PublishCheckTab({
 }: Props) {
   const report = useMemo<ValidationReport>(
     () => validateProject({ project, draftPlacements, draftMap, draftLocalLayers }),
-    [project, draftPlacements, draftMap, draftLocalLayers]
+    [project, draftPlacements, draftMap, draftLocalLayers],
   );
 
   const ready = report.counts.blocking === 0;
@@ -87,25 +102,48 @@ export function PublishCheckTab({
         }`}
       >
         <div className="flex items-center gap-2 font-medium">
-          {ready ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <ShieldAlert className="h-4 w-4 text-destructive" />}
-          {ready ? "Player build is safe to publish." : "Resolve blocking issues before publishing."}
+          {ready ? (
+            <CheckCircle2 className="h-4 w-4 text-primary" />
+          ) : (
+            <ShieldAlert className="h-4 w-4 text-destructive" />
+          )}
+          {ready
+            ? "Player build is safe to publish."
+            : "Resolve blocking issues before publishing."}
         </div>
         <div className="mt-1 text-[10px] text-muted-foreground">
-          {report.counts.blocking} blocking · {report.counts.warning} warning · {report.counts.suggestion} suggestion
+          {report.counts.blocking} blocking · {report.counts.warning} warning ·{" "}
+          {report.counts.suggestion} suggestion
         </div>
       </div>
 
       {/* Snapshot meta */}
       <div className="rounded-md border border-border bg-card/40 p-2.5 text-[10px] text-muted-foreground space-y-0.5">
         <div className="flex flex-wrap gap-x-4 gap-y-0.5">
-          <span><strong className="text-foreground">{report.meta.entityCount}</strong> entities</span>
-          <span><strong className="text-foreground">{report.meta.mapCount}</strong> maps</span>
-          <span><strong className="text-foreground">{report.meta.draftPlacementCount}</strong> draft pins</span>
-          <span><strong className="text-foreground">{report.meta.pendingAssetCount}</strong> pending uploads</span>
+          <span>
+            <strong className="text-foreground">{report.meta.entityCount}</strong> entities
+          </span>
+          <span>
+            <strong className="text-foreground">{report.meta.mapCount}</strong> maps
+          </span>
+          <span>
+            <strong className="text-foreground">{report.meta.draftPlacementCount}</strong> draft
+            pins
+          </span>
+          <span>
+            <strong className="text-foreground">{report.meta.pendingAssetCount}</strong> pending
+            uploads
+          </span>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-0.5">
-          {report.meta.atlasVersion && <span>Atlas <code className="font-mono">{report.meta.atlasVersion}</code></span>}
-          {report.meta.builtAt && <span>Built {new Date(report.meta.builtAt).toLocaleString()}</span>}
+          {report.meta.atlasVersion && (
+            <span>
+              Atlas <code className="font-mono">{report.meta.atlasVersion}</code>
+            </span>
+          )}
+          {report.meta.builtAt && (
+            <span>Built {new Date(report.meta.builtAt).toLocaleString()}</span>
+          )}
         </div>
       </div>
 
@@ -209,7 +247,8 @@ function IssueCard({
   onGoToMap?: (mapId: string) => void;
   onGoToEntity?: (entityId: string) => void;
 }) {
-  const meta = SEVERITY_META[issue.severity as keyof typeof SEVERITY_META] ?? SEVERITY_META.suggestion;
+  const meta =
+    SEVERITY_META[issue.severity as keyof typeof SEVERITY_META] ?? SEVERITY_META.suggestion;
   const Icon = meta.icon;
   return (
     <li className="rounded-md border border-border bg-card/50 p-2 text-xs space-y-1">
@@ -217,9 +256,19 @@ function IssueCard({
         <Icon className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${meta.tone}`} />
         <div className="flex-1 min-w-0 space-y-1">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <Badge variant={meta.badge} className="text-[9px]">{issue.code}</Badge>
-            {issue.scope?.mapId && <span className="text-[10px] font-mono text-muted-foreground truncate">{issue.scope.mapId}</span>}
-            {issue.scope?.entityId && <span className="text-[10px] font-mono text-muted-foreground truncate">{issue.scope.entityId}</span>}
+            <Badge variant={meta.badge} className="text-[9px]">
+              {issue.code}
+            </Badge>
+            {issue.scope?.mapId && (
+              <span className="text-[10px] font-mono text-muted-foreground truncate">
+                {issue.scope.mapId}
+              </span>
+            )}
+            {issue.scope?.entityId && (
+              <span className="text-[10px] font-mono text-muted-foreground truncate">
+                {issue.scope.entityId}
+              </span>
+            )}
           </div>
           <div className="text-foreground">{issue.message}</div>
           {issue.hint && (
@@ -281,9 +330,21 @@ function CollapsibleBlock({
         <span>{title}</span>
         {counts && (
           <span className="ml-auto flex items-center gap-1">
-            {counts.blocking > 0 && <Badge variant="destructive" className="text-[9px]">{counts.blocking}</Badge>}
-            {counts.warning > 0 && <Badge variant="secondary" className="text-[9px]">{counts.warning}</Badge>}
-            {counts.suggestion > 0 && <Badge variant="outline" className="text-[9px]">{counts.suggestion}</Badge>}
+            {counts.blocking > 0 && (
+              <Badge variant="destructive" className="text-[9px]">
+                {counts.blocking}
+              </Badge>
+            )}
+            {counts.warning > 0 && (
+              <Badge variant="secondary" className="text-[9px]">
+                {counts.warning}
+              </Badge>
+            )}
+            {counts.suggestion > 0 && (
+              <Badge variant="outline" className="text-[9px]">
+                {counts.suggestion}
+              </Badge>
+            )}
           </span>
         )}
       </button>

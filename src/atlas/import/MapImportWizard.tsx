@@ -14,12 +14,34 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import JSZip from "jszip";
-import { Upload, Image as ImageIcon, X, ChevronLeft, ChevronRight, AlertTriangle, ShieldAlert, FileCode, Package } from "lucide-react";
+import {
+  Upload,
+  Image as ImageIcon,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  AlertTriangle,
+  ShieldAlert,
+  FileCode,
+  Package,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -48,62 +70,80 @@ interface Props {
 const ACCEPTED = ".png,.jpg,.jpeg,.webp,.svg";
 const STEPS = ["Select", "Mode", "Configure", "Sizing", "Preview", "Export"] as const;
 
-export function MapImportWizard({ open, onOpenChange, currentMap, defaultWorldId = "default" }: Props) {
+export function MapImportWizard({
+  open,
+  onOpenChange,
+  currentMap,
+  defaultWorldId = "default",
+}: Props) {
   const [step, setStep] = useState(0);
   const [images, setImages] = useState<ImportImage[]>([]);
   const [mode, setMode] = useState<ImportMode>("per-image");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const reset = () => { setStep(0); setImages([]); setMode("per-image"); };
+  const reset = () => {
+    setStep(0);
+    setImages([]);
+    setMode("per-image");
+  };
 
-  const addFiles = useCallback(async (files: FileList | File[]) => {
-    const arr = Array.from(files);
-    const next: ImportImage[] = [];
-    for (const file of arr) {
-      if (!/\.(png|jpe?g|webp|svg)$/i.test(file.name)) {
-        toast.warning(`Skipped "${file.name}" — unsupported extension`);
-        continue;
+  const addFiles = useCallback(
+    async (files: FileList | File[]) => {
+      const arr = Array.from(files);
+      const next: ImportImage[] = [];
+      for (const file of arr) {
+        if (!/\.(png|jpe?g|webp|svg)$/i.test(file.name)) {
+          toast.warning(`Skipped "${file.name}" — unsupported extension`);
+          continue;
+        }
+        try {
+          const dataUrl = await readDataUrl(file);
+          const dim = await readImageDimensions(dataUrl);
+          const safe = safeFilename(file.name);
+          next.push({
+            id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            file,
+            filename: safe,
+            originalFilename: file.name,
+            mime: file.type || "image/*",
+            bytes: file.size,
+            naturalWidth: dim.w,
+            naturalHeight: dim.h,
+            dataUrl,
+            assignment: defaultAssignment(file.name, mode, currentMap, defaultWorldId),
+          });
+        } catch (e) {
+          toast.error(`Failed to read "${file.name}": ${(e as Error).message}`);
+        }
       }
-      try {
-        const dataUrl = await readDataUrl(file);
-        const dim = await readImageDimensions(dataUrl);
-        const safe = safeFilename(file.name);
-        next.push({
-          id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          file,
-          filename: safe,
-          originalFilename: file.name,
-          mime: file.type || "image/*",
-          bytes: file.size,
-          naturalWidth: dim.w,
-          naturalHeight: dim.h,
-          dataUrl,
-          assignment: defaultAssignment(file.name, mode, currentMap, defaultWorldId),
-        });
-      } catch (e) {
-        toast.error(`Failed to read "${file.name}": ${(e as Error).message}`);
-      }
-    }
-    setImages((prev) => [...prev, ...next]);
-  }, [mode, currentMap, defaultWorldId]);
+      setImages((prev) => [...prev, ...next]);
+    },
+    [mode, currentMap, defaultWorldId],
+  );
 
   const removeImage = (id: string) => setImages((p) => p.filter((i) => i.id !== id));
 
   const updateAssignment = (id: string, patch: Partial<ImportImage["assignment"]>) =>
-    setImages((p) => p.map((img) => (img.id === id ? { ...img, assignment: { ...img.assignment, ...patch } } : img)));
+    setImages((p) =>
+      p.map((img) =>
+        img.id === id ? { ...img, assignment: { ...img.assignment, ...patch } } : img,
+      ),
+    );
 
   // Recompute defaults when mode changes (only the createNewMap flag flips).
   const onModeChange = (m: ImportMode) => {
     setMode(m);
-    setImages((prev) => prev.map((img) => ({
-      ...img,
-      assignment: defaultAssignment(img.originalFilename, m, currentMap, defaultWorldId),
-    })));
+    setImages((prev) =>
+      prev.map((img) => ({
+        ...img,
+        assignment: defaultAssignment(img.originalFilename, m, currentMap, defaultWorldId),
+      })),
+    );
   };
 
   const plan = useMemo(
     () => buildImportPlan({ images, mode, currentMap, defaultWorldId }),
-    [images, mode, currentMap, defaultWorldId]
+    [images, mode, currentMap, defaultWorldId],
   );
   const issues = useMemo(() => validateImportPlan(plan, images), [plan, images]);
   const blocking = issues.filter((i) => i.severity === "blocking");
@@ -117,7 +157,10 @@ export function MapImportWizard({ open, onOpenChange, currentMap, defaultWorldId
   })();
 
   const downloadAll = async () => {
-    if (blocking.length) { toast.error("Fix blocking issues first."); return; }
+    if (blocking.length) {
+      toast.error("Fix blocking issues first.");
+      return;
+    }
     const zip = new JSZip();
     const patch = buildPatchFile(plan);
     const readme = buildReadme(plan, images);
@@ -135,14 +178,21 @@ export function MapImportWizard({ open, onOpenChange, currentMap, defaultWorldId
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        onOpenChange(o);
+        if (!o) reset();
+      }}
+    >
       <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5 text-primary" /> Import Maps
           </DialogTitle>
           <DialogDescription>
-            YAML stays canon — this wizard generates a valid world.yaml patch + asset zip you commit to GitHub.
+            YAML stays canon — this wizard generates a valid world.yaml patch + asset zip you commit
+            to GitHub.
           </DialogDescription>
         </DialogHeader>
 
@@ -150,7 +200,9 @@ export function MapImportWizard({ open, onOpenChange, currentMap, defaultWorldId
         <div className="flex items-center gap-1 px-1 text-[11px]">
           {STEPS.map((s, i) => (
             <div key={s} className="flex items-center gap-1">
-              <div className={`px-2 py-0.5 rounded ${i === step ? "bg-primary text-primary-foreground" : i < step ? "bg-muted text-foreground" : "bg-muted/50 text-muted-foreground"}`}>
+              <div
+                className={`px-2 py-0.5 rounded ${i === step ? "bg-primary text-primary-foreground" : i < step ? "bg-muted text-foreground" : "bg-muted/50 text-muted-foreground"}`}
+              >
                 {i + 1}. {s}
               </div>
               {i < STEPS.length - 1 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
@@ -167,28 +219,58 @@ export function MapImportWizard({ open, onOpenChange, currentMap, defaultWorldId
               onRemove={removeImage}
             />
           )}
-          {step === 1 && <ModeStep mode={mode} onChange={onModeChange} hasCurrentMap={!!currentMap} />}
+          {step === 1 && (
+            <ModeStep mode={mode} onChange={onModeChange} hasCurrentMap={!!currentMap} />
+          )}
           {step === 2 && (
             <ConfigureStep images={images} updateAssignment={updateAssignment} mode={mode} />
           )}
           {step === 3 && (
-            <SizingStep images={images} updateAssignment={updateAssignment} hasCurrentMap={!!currentMap} />
+            <SizingStep
+              images={images}
+              updateAssignment={updateAssignment}
+              hasCurrentMap={!!currentMap}
+            />
           )}
           {step === 4 && (
-            <PreviewStep plan={plan} yamlPreview={yamlPreview} blocking={blocking} warnings={warnings} />
+            <PreviewStep
+              plan={plan}
+              yamlPreview={yamlPreview}
+              blocking={blocking}
+              warnings={warnings}
+            />
           )}
           {step === 5 && (
-            <ExportStep onDownload={downloadAll} blocking={blocking.length} planSummary={`${plan.maps.length} map(s), ${plan.assets.length} asset(s)`} />
+            <ExportStep
+              onDownload={downloadAll}
+              blocking={blocking.length}
+              planSummary={`${plan.maps.length} map(s), ${plan.assets.length} asset(s)`}
+            />
           )}
         </ScrollArea>
 
         <div className="flex items-center justify-between pt-3 border-t border-border">
           <div className="text-[11px] text-muted-foreground flex items-center gap-2">
-            {blocking.length > 0 && <Badge variant="destructive" className="gap-1"><ShieldAlert className="h-3 w-3" />{blocking.length} blocking</Badge>}
-            {warnings.length > 0 && <Badge variant="secondary" className="gap-1"><AlertTriangle className="h-3 w-3" />{warnings.length} warning</Badge>}
+            {blocking.length > 0 && (
+              <Badge variant="destructive" className="gap-1">
+                <ShieldAlert className="h-3 w-3" />
+                {blocking.length} blocking
+              </Badge>
+            )}
+            {warnings.length > 0 && (
+              <Badge variant="secondary" className="gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                {warnings.length} warning
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setStep((s) => Math.max(0, s - 1))}
+              disabled={step === 0}
+            >
               <ChevronLeft className="h-4 w-4" /> Back
             </Button>
             {step < STEPS.length - 1 ? (
@@ -196,7 +278,13 @@ export function MapImportWizard({ open, onOpenChange, currentMap, defaultWorldId
                 Next <ChevronRight className="h-4 w-4" />
               </Button>
             ) : (
-              <Button size="sm" variant="default" onClick={downloadAll} disabled={blocking.length > 0} className="gap-1">
+              <Button
+                size="sm"
+                variant="default"
+                onClick={downloadAll}
+                disabled={blocking.length > 0}
+                className="gap-1"
+              >
                 <Package className="h-4 w-4" /> Download package
               </Button>
             )}
@@ -209,7 +297,10 @@ export function MapImportWizard({ open, onOpenChange, currentMap, defaultWorldId
           accept={ACCEPTED}
           multiple
           className="hidden"
-          onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }}
+          onChange={(e) => {
+            if (e.target.files) addFiles(e.target.files);
+            e.target.value = "";
+          }}
         />
       </DialogContent>
     </Dialog>
@@ -218,7 +309,12 @@ export function MapImportWizard({ open, onOpenChange, currentMap, defaultWorldId
 
 // ---------- Step components --------------------------------------------------
 
-function SelectStep({ images, onPick, onDrop, onRemove }: {
+function SelectStep({
+  images,
+  onPick,
+  onDrop,
+  onRemove,
+}: {
   images: ImportImage[];
   onPick: () => void;
   onDrop: (files: FileList) => void;
@@ -228,19 +324,35 @@ function SelectStep({ images, onPick, onDrop, onRemove }: {
   return (
     <div className="space-y-3 p-1">
       <div
-        onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDrag(true);
+        }}
         onDragLeave={() => setDrag(false)}
-        onDrop={(e) => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files.length) onDrop(e.dataTransfer.files); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDrag(false);
+          if (e.dataTransfer.files.length) onDrop(e.dataTransfer.files);
+        }}
         onClick={onPick}
         className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition ${drag ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
       >
         <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
         <div className="text-sm font-medium">Drop map images here or click to browse</div>
-        <div className="text-[11px] text-muted-foreground mt-1">PNG, JPG, WEBP, SVG · multiple files OK</div>
+        <div className="text-[11px] text-muted-foreground mt-1">
+          PNG, JPG, WEBP, SVG · multiple files OK
+        </div>
       </div>
       {images.map((img) => (
-        <div key={img.id} className="flex items-center gap-3 rounded-md border border-border p-2 bg-card/50">
-          <img src={img.dataUrl} alt={img.originalFilename} className="h-12 w-12 object-cover rounded bg-muted" />
+        <div
+          key={img.id}
+          className="flex items-center gap-3 rounded-md border border-border p-2 bg-card/50"
+        >
+          <img
+            src={img.dataUrl}
+            alt={img.originalFilename}
+            className="h-12 w-12 object-cover rounded bg-muted"
+          />
           <div className="min-w-0 flex-1">
             <div className="text-sm truncate">{img.originalFilename}</div>
             <div className="text-[10px] text-muted-foreground">
@@ -248,7 +360,9 @@ function SelectStep({ images, onPick, onDrop, onRemove }: {
               {img.bytes > 4 * 1024 * 1024 && <span className="text-amber-500 ml-1">large</span>}
             </div>
           </div>
-          <Button size="sm" variant="ghost" onClick={() => onRemove(img.id)}><X className="h-4 w-4" /></Button>
+          <Button size="sm" variant="ghost" onClick={() => onRemove(img.id)}>
+            <X className="h-4 w-4" />
+          </Button>
         </div>
       ))}
       {images.length === 0 && (
@@ -260,13 +374,43 @@ function SelectStep({ images, onPick, onDrop, onRemove }: {
   );
 }
 
-function ModeStep({ mode, onChange, hasCurrentMap }: { mode: ImportMode; onChange: (m: ImportMode) => void; hasCurrentMap: boolean }) {
+function ModeStep({
+  mode,
+  onChange,
+  hasCurrentMap,
+}: {
+  mode: ImportMode;
+  onChange: (m: ImportMode) => void;
+  hasCurrentMap: boolean;
+}) {
   const opts: Array<{ id: ImportMode; label: string; desc: string; needsCurrent?: boolean }> = [
-    { id: "layers", label: "Add as layers on current map", desc: "All images become extra layers on the active map.", needsCurrent: true },
-    { id: "per-image", label: "One map per image", desc: "Each image creates its own map at its natural size." },
-    { id: "world-plus-regional", label: "World map + regional maps", desc: "First image is the overview; the rest are regional maps." },
-    { id: "variants", label: "Player + DM variants", desc: "Pair images by filename — second image becomes the DM-only layer.", needsCurrent: true },
-    { id: "custom", label: "Advanced custom assignment", desc: "Configure each image's map/layer manually in the next step." },
+    {
+      id: "layers",
+      label: "Add as layers on current map",
+      desc: "All images become extra layers on the active map.",
+      needsCurrent: true,
+    },
+    {
+      id: "per-image",
+      label: "One map per image",
+      desc: "Each image creates its own map at its natural size.",
+    },
+    {
+      id: "world-plus-regional",
+      label: "World map + regional maps",
+      desc: "First image is the overview; the rest are regional maps.",
+    },
+    {
+      id: "variants",
+      label: "Player + DM variants",
+      desc: "Pair images by filename — second image becomes the DM-only layer.",
+      needsCurrent: true,
+    },
+    {
+      id: "custom",
+      label: "Advanced custom assignment",
+      desc: "Configure each image's map/layer manually in the next step.",
+    },
   ];
   return (
     <div className="space-y-2 p-1">
@@ -279,12 +423,16 @@ function ModeStep({ mode, onChange, hasCurrentMap }: { mode: ImportMode; onChang
             onClick={() => !disabled && onChange(o.id)}
             disabled={disabled}
             className={`w-full text-left rounded-md border p-3 transition ${
-              mode === o.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+              mode === o.id
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/40"
             } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
           >
             <div className="text-sm font-medium">{o.label}</div>
             <div className="text-[11px] text-muted-foreground mt-0.5">{o.desc}</div>
-            {disabled && <div className="text-[10px] text-amber-500 mt-1">Requires an active map</div>}
+            {disabled && (
+              <div className="text-[10px] text-amber-500 mt-1">Requires an active map</div>
+            )}
           </button>
         );
       })}
@@ -292,14 +440,20 @@ function ModeStep({ mode, onChange, hasCurrentMap }: { mode: ImportMode; onChang
   );
 }
 
-function ConfigureStep({ images, updateAssignment, mode }: {
+function ConfigureStep({
+  images,
+  updateAssignment,
+  mode,
+}: {
   images: ImportImage[];
   updateAssignment: (id: string, patch: Partial<ImportImage["assignment"]>) => void;
   mode: ImportMode;
 }) {
   return (
     <div className="space-y-3 p-1">
-      <p className="text-[11px] text-muted-foreground">Auto-generated from filenames. Edit anything that should differ from defaults.</p>
+      <p className="text-[11px] text-muted-foreground">
+        Auto-generated from filenames. Edit anything that should differ from defaults.
+      </p>
       {images.map((img) => (
         <div key={img.id} className="rounded-md border border-border p-3 bg-card/50 space-y-2">
           <div className="flex items-center gap-2">
@@ -309,43 +463,90 @@ function ConfigureStep({ images, updateAssignment, mode }: {
           {(img.assignment.createNewMap || mode === "custom") && (
             <div className="grid grid-cols-2 gap-2">
               <Field label="Map id">
-                <Input value={img.assignment.mapId} onChange={(e) => updateAssignment(img.id, { mapId: idFromFilename(e.target.value) })} className="h-7 text-xs font-mono" />
+                <Input
+                  value={img.assignment.mapId}
+                  onChange={(e) =>
+                    updateAssignment(img.id, { mapId: idFromFilename(e.target.value) })
+                  }
+                  className="h-7 text-xs font-mono"
+                />
               </Field>
               <Field label="Map name">
-                <Input value={img.assignment.mapName} onChange={(e) => updateAssignment(img.id, { mapName: e.target.value })} className="h-7 text-xs" />
+                <Input
+                  value={img.assignment.mapName}
+                  onChange={(e) => updateAssignment(img.id, { mapName: e.target.value })}
+                  className="h-7 text-xs"
+                />
               </Field>
               <Field label="World id">
-                <Input value={img.assignment.worldId} onChange={(e) => updateAssignment(img.id, { worldId: e.target.value })} className="h-7 text-xs font-mono" />
+                <Input
+                  value={img.assignment.worldId}
+                  onChange={(e) => updateAssignment(img.id, { worldId: e.target.value })}
+                  className="h-7 text-xs font-mono"
+                />
               </Field>
               {mode === "custom" && (
                 <Field label="Create new map">
-                  <Switch checked={img.assignment.createNewMap} onCheckedChange={(v) => updateAssignment(img.id, { createNewMap: v })} />
+                  <Switch
+                    checked={img.assignment.createNewMap}
+                    onCheckedChange={(v) => updateAssignment(img.id, { createNewMap: v })}
+                  />
                 </Field>
               )}
             </div>
           )}
           <div className="grid grid-cols-2 gap-2">
             <Field label="Layer id">
-              <Input value={img.assignment.layerId} onChange={(e) => updateAssignment(img.id, { layerId: idFromFilename(e.target.value) })} className="h-7 text-xs font-mono" />
+              <Input
+                value={img.assignment.layerId}
+                onChange={(e) =>
+                  updateAssignment(img.id, { layerId: idFromFilename(e.target.value) })
+                }
+                className="h-7 text-xs font-mono"
+              />
             </Field>
             <Field label="Target asset path">
-              <Input value={img.assignment.targetAssetPath} onChange={(e) => updateAssignment(img.id, { targetAssetPath: e.target.value })} className="h-7 text-xs font-mono" />
+              <Input
+                value={img.assignment.targetAssetPath}
+                onChange={(e) => updateAssignment(img.id, { targetAssetPath: e.target.value })}
+                className="h-7 text-xs font-mono"
+              />
             </Field>
             <Field label="Opacity (0-1)">
-              <Input type="number" step="0.05" min="0" max="1" value={img.assignment.opacity}
-                onChange={(e) => updateAssignment(img.id, { opacity: Number(e.target.value) })} className="h-7 text-xs" />
+              <Input
+                type="number"
+                step="0.05"
+                min="0"
+                max="1"
+                value={img.assignment.opacity}
+                onChange={(e) => updateAssignment(img.id, { opacity: Number(e.target.value) })}
+                className="h-7 text-xs"
+              />
             </Field>
             <Field label="Z-index">
-              <Input type="number" value={img.assignment.zIndex}
-                onChange={(e) => updateAssignment(img.id, { zIndex: Number(e.target.value) })} className="h-7 text-xs" />
+              <Input
+                type="number"
+                value={img.assignment.zIndex}
+                onChange={(e) => updateAssignment(img.id, { zIndex: Number(e.target.value) })}
+                className="h-7 text-xs"
+              />
             </Field>
             {mode === "variants" && (
               <Field label="Variant">
-                <Select value={img.assignment.variant ?? "player"} onValueChange={(v) => updateAssignment(img.id, { variant: v as "player" | "dm" })}>
-                  <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                <Select
+                  value={img.assignment.variant ?? "player"}
+                  onValueChange={(v) => updateAssignment(img.id, { variant: v as "player" | "dm" })}
+                >
+                  <SelectTrigger className="h-7 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="player" className="text-xs">player</SelectItem>
-                    <SelectItem value="dm" className="text-xs">dm</SelectItem>
+                    <SelectItem value="player" className="text-xs">
+                      player
+                    </SelectItem>
+                    <SelectItem value="dm" className="text-xs">
+                      dm
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
@@ -357,7 +558,11 @@ function ConfigureStep({ images, updateAssignment, mode }: {
   );
 }
 
-function SizingStep({ images, updateAssignment, hasCurrentMap }: {
+function SizingStep({
+  images,
+  updateAssignment,
+  hasCurrentMap,
+}: {
   images: ImportImage[];
   updateAssignment: (id: string, patch: Partial<ImportImage["assignment"]>) => void;
   hasCurrentMap: boolean;
@@ -373,14 +578,27 @@ function SizingStep({ images, updateAssignment, hasCurrentMap }: {
     <div className="space-y-3 p-1">
       {images.map((img) => (
         <div key={img.id} className="rounded-md border border-border p-3 bg-card/50 space-y-2">
-          <div className="text-xs font-mono truncate">{img.originalFilename} · {img.naturalWidth}×{img.naturalHeight}</div>
+          <div className="text-xs font-mono truncate">
+            {img.originalFilename} · {img.naturalWidth}×{img.naturalHeight}
+          </div>
           <Field label="Sizing mode">
-            <Select value={img.assignment.sizing} onValueChange={(v) => updateAssignment(img.id, { sizing: v as SizingMode })}>
-              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+            <Select
+              value={img.assignment.sizing}
+              onValueChange={(v) => updateAssignment(img.id, { sizing: v as SizingMode })}
+            >
+              <SelectTrigger className="h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {sizingOpts.map((o) => (
-                  <SelectItem key={o.id} value={o.id} className="text-xs" disabled={o.needsCurrent && !hasCurrentMap}>
-                    {o.label}{o.needsCurrent && !hasCurrentMap ? " (need current map)" : ""}
+                  <SelectItem
+                    key={o.id}
+                    value={o.id}
+                    className="text-xs"
+                    disabled={o.needsCurrent && !hasCurrentMap}
+                  >
+                    {o.label}
+                    {o.needsCurrent && !hasCurrentMap ? " (need current map)" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -389,15 +607,30 @@ function SizingStep({ images, updateAssignment, hasCurrentMap }: {
           {img.assignment.sizing === "custom" && (
             <div className="grid grid-cols-3 gap-2">
               <Field label="Width">
-                <Input type="number" value={img.assignment.customWidth ?? img.naturalWidth}
-                  onChange={(e) => updateAssignment(img.id, { customWidth: Number(e.target.value) })} className="h-7 text-xs" />
+                <Input
+                  type="number"
+                  value={img.assignment.customWidth ?? img.naturalWidth}
+                  onChange={(e) =>
+                    updateAssignment(img.id, { customWidth: Number(e.target.value) })
+                  }
+                  className="h-7 text-xs"
+                />
               </Field>
               <Field label="Height">
-                <Input type="number" value={img.assignment.customHeight ?? img.naturalHeight}
-                  onChange={(e) => updateAssignment(img.id, { customHeight: Number(e.target.value) })} className="h-7 text-xs" />
+                <Input
+                  type="number"
+                  value={img.assignment.customHeight ?? img.naturalHeight}
+                  onChange={(e) =>
+                    updateAssignment(img.id, { customHeight: Number(e.target.value) })
+                  }
+                  className="h-7 text-xs"
+                />
               </Field>
               <Field label="Keep aspect">
-                <Switch checked={img.assignment.keepAspect} onCheckedChange={(v) => updateAssignment(img.id, { keepAspect: v })} />
+                <Switch
+                  checked={img.assignment.keepAspect}
+                  onCheckedChange={(v) => updateAssignment(img.id, { keepAspect: v })}
+                />
               </Field>
             </div>
           )}
@@ -407,7 +640,12 @@ function SizingStep({ images, updateAssignment, hasCurrentMap }: {
   );
 }
 
-function PreviewStep({ plan, yamlPreview, blocking, warnings }: {
+function PreviewStep({
+  plan,
+  yamlPreview,
+  blocking,
+  warnings,
+}: {
   plan: ReturnType<typeof buildImportPlan>;
   yamlPreview: string;
   blocking: { message: string }[];
@@ -419,15 +657,24 @@ function PreviewStep({ plan, yamlPreview, blocking, warnings }: {
       {plan.maps.map((m) => (
         <div key={m.id} className="rounded-md border border-border p-3 bg-card/50">
           <div className="text-sm font-medium flex items-center gap-2">
-            {m.name} <Badge variant="outline" className="text-[9px] font-mono">{m.id}</Badge>
-            {m.replaces && <Badge variant="secondary" className="text-[9px]">replaces existing</Badge>}
+            {m.name}{" "}
+            <Badge variant="outline" className="text-[9px] font-mono">
+              {m.id}
+            </Badge>
+            {m.replaces && (
+              <Badge variant="secondary" className="text-[9px]">
+                replaces existing
+              </Badge>
+            )}
           </div>
           <div className="text-[11px] text-muted-foreground mt-0.5">
             {m.width}×{m.height} · world: {m.worldId} · {m.layers.length} layer(s)
           </div>
           <ul className="mt-1 text-[11px] text-muted-foreground space-y-0.5">
             {m.layers.map((l) => (
-              <li key={l.id}><span className="font-mono">{l.id}</span> → {l.src} ({l.width}×{l.height})</li>
+              <li key={l.id}>
+                <span className="font-mono">{l.id}</span> → {l.src} ({l.width}×{l.height})
+              </li>
             ))}
           </ul>
         </div>
@@ -439,7 +686,11 @@ function PreviewStep({ plan, yamlPreview, blocking, warnings }: {
         <IssueList title="Warnings" items={warnings.map((i) => i.message)} variant="secondary" />
       )}
       <div>
-        <button type="button" onClick={() => setShowRaw((v) => !v)} className="text-[11px] text-muted-foreground hover:text-foreground">
+        <button
+          type="button"
+          onClick={() => setShowRaw((v) => !v)}
+          className="text-[11px] text-muted-foreground hover:text-foreground"
+        >
           {showRaw ? "Hide" : "Show"} advanced YAML preview
         </button>
         {showRaw && (
@@ -452,7 +703,15 @@ function PreviewStep({ plan, yamlPreview, blocking, warnings }: {
   );
 }
 
-function ExportStep({ onDownload, blocking, planSummary }: { onDownload: () => void; blocking: number; planSummary: string }) {
+function ExportStep({
+  onDownload,
+  blocking,
+  planSummary,
+}: {
+  onDownload: () => void;
+  blocking: number;
+  planSummary: string;
+}) {
   return (
     <div className="p-1 space-y-3">
       <div className="rounded-md border border-border p-4 bg-card/50">
@@ -460,28 +719,56 @@ function ExportStep({ onDownload, blocking, planSummary }: { onDownload: () => v
           <FileCode className="h-4 w-4 text-primary" /> Package contents
         </div>
         <ul className="mt-2 text-xs space-y-1 text-muted-foreground">
-          <li>• <span className="font-mono">world-map-patch.yaml</span> — paste/merge into <span className="font-mono">content/&lt;world&gt;/_atlas/world.yaml</span></li>
-          <li>• <span className="font-mono">atlas-assets.zip</span> — image files at their target paths</li>
-          <li>• <span className="font-mono">README-apply-map-import.md</span> — step-by-step apply guide</li>
+          <li>
+            • <span className="font-mono">world-map-patch.yaml</span> — paste/merge into{" "}
+            <span className="font-mono">content/&lt;world&gt;/_atlas/world.yaml</span>
+          </li>
+          <li>
+            • <span className="font-mono">atlas-assets.zip</span> — image files at their target
+            paths
+          </li>
+          <li>
+            • <span className="font-mono">README-apply-map-import.md</span> — step-by-step apply
+            guide
+          </li>
         </ul>
         <div className="mt-3 text-[11px] text-muted-foreground">{planSummary}</div>
       </div>
       <Button onClick={onDownload} disabled={blocking > 0} className="w-full gap-1">
         <Package className="h-4 w-4" /> Download package
       </Button>
-      {blocking > 0 && <p className="text-[11px] text-destructive">Resolve {blocking} blocking issue(s) in the Preview step first.</p>}
+      {blocking > 0 && (
+        <p className="text-[11px] text-destructive">
+          Resolve {blocking} blocking issue(s) in the Preview step first.
+        </p>
+      )}
     </div>
   );
 }
 
-function IssueList({ title, items, variant }: { title: string; items: string[]; variant: "destructive" | "secondary" }) {
+function IssueList({
+  title,
+  items,
+  variant,
+}: {
+  title: string;
+  items: string[];
+  variant: "destructive" | "secondary";
+}) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{title} ({items.length})</div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+        {title} ({items.length})
+      </div>
       <ul className="space-y-1">
         {items.map((m, i) => (
-          <li key={i} className="rounded-md border border-border bg-card/50 p-2 text-xs flex items-start gap-2">
-            <Badge variant={variant} className="text-[9px] shrink-0">{title.toLowerCase()}</Badge>
+          <li
+            key={i}
+            className="rounded-md border border-border bg-card/50 p-2 text-xs flex items-start gap-2"
+          >
+            <Badge variant={variant} className="text-[9px] shrink-0">
+              {title.toLowerCase()}
+            </Badge>
             <span>{m}</span>
           </li>
         ))}

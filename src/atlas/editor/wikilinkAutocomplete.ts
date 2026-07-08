@@ -22,7 +22,10 @@ const ENTITY_TRIGGER = /(?<!!)\[\[([^[\]\n]*)$/;
  * Returns the active autocomplete context at `selStart`, or null if the
  * cursor is not inside an open `![[` or `[[` trigger.
  */
-export function getAutocompleteContext(value: string, selStart: number): AutocompleteContext | null {
+export function getAutocompleteContext(
+  value: string,
+  selStart: number,
+): AutocompleteContext | null {
   const before = value.slice(0, selStart);
 
   // Check image trigger (![[) first — it contains [[ as a substring

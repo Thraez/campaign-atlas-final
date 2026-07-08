@@ -3,7 +3,12 @@ import { serializeDeepLink, parseDeepLink } from "@/atlas/deepLink";
 
 describe("serializeDeepLink", () => {
   it("serializes all four fields", () => {
-    const qs = serializeDeepLink({ mapId: "world", entityId: "corven", center: { x: 123, y: 456 }, zoom: 2.0 });
+    const qs = serializeDeepLink({
+      mapId: "world",
+      entityId: "corven",
+      center: { x: 123, y: 456 },
+      zoom: 2.0,
+    });
     const p = new URLSearchParams(qs);
     expect(p.get("map")).toBe("world");
     expect(p.get("entity")).toBe("corven");
@@ -22,7 +27,12 @@ describe("serializeDeepLink", () => {
   });
 
   it("rounds cx/cy to integers", () => {
-    const qs = serializeDeepLink({ mapId: null, entityId: null, center: { x: 100.7, y: 200.3 }, zoom: null });
+    const qs = serializeDeepLink({
+      mapId: null,
+      entityId: null,
+      center: { x: 100.7, y: 200.3 },
+      zoom: null,
+    });
     const p = new URLSearchParams(qs);
     expect(p.get("cx")).toBe("101");
     expect(p.get("cy")).toBe("200");
@@ -72,7 +82,12 @@ describe("parseDeepLink", () => {
   });
 
   it("round-trips through serialize/parse", () => {
-    const original = { mapId: "astrath", entityId: "corven", center: { x: 512, y: 384 }, zoom: -1.5 };
+    const original = {
+      mapId: "astrath",
+      entityId: "corven",
+      center: { x: 512, y: 384 },
+      zoom: -1.5,
+    };
     const qs = serializeDeepLink(original);
     const parsed = parseDeepLink("?" + qs);
     expect(parsed.mapId).toBe("astrath");

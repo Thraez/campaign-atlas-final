@@ -79,9 +79,7 @@ describe("block insert actions", () => {
 
   it("table inserts a GFM skeleton block", () => {
     const r = applyToolbarAction("table", "intro", 5, 5);
-    expect(r.value).toBe(
-      "intro\n\n| Column | Column |\n| --- | --- |\n| Cell | Cell |\n",
-    );
+    expect(r.value).toBe("intro\n\n| Column | Column |\n| --- | --- |\n| Cell | Cell |\n");
   });
 
   it("does not mutate the input string", () => {
@@ -129,7 +127,12 @@ describe("entry template inserts", () => {
   });
 
   it("all four template actions produce valid output (no throw)", () => {
-    for (const id of ["template:npc", "template:location", "template:secrets", "template:readaloud"] as const) {
+    for (const id of [
+      "template:npc",
+      "template:location",
+      "template:secrets",
+      "template:readaloud",
+    ] as const) {
       expect(() => applyToolbarAction(id, "body", 4, 4)).not.toThrow();
     }
   });

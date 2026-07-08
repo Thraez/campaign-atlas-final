@@ -68,8 +68,8 @@ describe("matchesPhrases", () => {
     expect(
       matchesPhrases(
         entry({ title: "Dungeon", aliases: [], summary: "", body: "iron and tower" }),
-        ["iron tower"]
-      )
+        ["iron tower"],
+      ),
     ).toBe(false);
   });
 
@@ -82,7 +82,7 @@ describe("matchesPhrases", () => {
       matchesPhrases(entry({ body: "iron tower stands near the ancient guard post" }), [
         "iron tower",
         "ancient guard",
-      ])
+      ]),
     ).toBe(true);
   });
 
@@ -91,11 +91,15 @@ describe("matchesPhrases", () => {
   });
 
   it("matches against aliases (lowercased)", () => {
-    expect(matchesPhrases(entry({ aliases: ["The Iron Spire"], body: "" }), ["iron spire"])).toBe(true);
+    expect(matchesPhrases(entry({ aliases: ["The Iron Spire"], body: "" }), ["iron spire"])).toBe(
+      true,
+    );
   });
 
   it("matches against summary (lowercased)", () => {
-    expect(matchesPhrases(entry({ summary: "A tall iron tower", body: "" }), ["tall iron tower"])).toBe(true);
+    expect(
+      matchesPhrases(entry({ summary: "A tall iron tower", body: "" }), ["tall iron tower"]),
+    ).toBe(true);
   });
 
   it("returns true for an empty phrase list (vacuously all match)", () => {

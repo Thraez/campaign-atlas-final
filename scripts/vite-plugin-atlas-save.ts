@@ -285,7 +285,8 @@ function isFilePayload(v: unknown): v is FilePayload {
   if (typeof o.path !== "string") return false;
   if (typeof o.content !== "string") return false;
   if (!isFileKind(o.kind)) return false;
-  if (o.baseHash !== null && (typeof o.baseHash !== "string" || !o.baseHash.startsWith("sha256:"))) return false;
+  if (o.baseHash !== null && (typeof o.baseHash !== "string" || !o.baseHash.startsWith("sha256:")))
+    return false;
   return true;
 }
 
@@ -316,7 +317,10 @@ export async function handleSaveRequest(
   opts?: HandleSaveOpts,
 ): Promise<HandlerResult> {
   if (!body || typeof body !== "object" || !Array.isArray((body as { files?: unknown }).files)) {
-    return { status: 400, payload: { error: "InvalidBody", detail: "expected { files: FilePayload[] }" } };
+    return {
+      status: 400,
+      payload: { error: "InvalidBody", detail: "expected { files: FilePayload[] }" },
+    };
   }
   const rawFiles = (body as { files: unknown[] }).files;
   if (rawFiles.length === 0) {
@@ -326,7 +330,10 @@ export async function handleSaveRequest(
     if (!isFilePayload(f)) {
       return {
         status: 400,
-        payload: { error: "InvalidBody", detail: "each file must be { path, content, kind, baseHash }" },
+        payload: {
+          error: "InvalidBody",
+          detail: "each file must be { path, content, kind, baseHash }",
+        },
       };
     }
   }
@@ -353,9 +360,8 @@ export async function handleSaveRequest(
   // Path allowlist — dispatch per kind. asset-binary lands under
   // public/atlas/assets/maps/<file>.<image-ext>; text kinds under content/.
   for (const f of list) {
-    const allowed = f.kind === "asset-binary"
-      ? isWritableAssetPath(f.path)
-      : isWritableSourcePath(f.path);
+    const allowed =
+      f.kind === "asset-binary" ? isWritableAssetPath(f.path) : isWritableSourcePath(f.path);
     if (!allowed) {
       return { status: 400, payload: { error: "DisallowedPath", path: f.path } };
     }
@@ -446,7 +452,8 @@ export async function handleSaveRequest(
         const mime = f.content.slice(5, f.content.indexOf(";base64,"));
         const s = sharp(buf, { animated: true });
         if (mime === "image/png") stripped = await s.png().toBuffer();
-        else if (mime === "image/jpeg" || mime === "image/jpg") stripped = await s.jpeg({ quality: 85, mozjpeg: true }).toBuffer();
+        else if (mime === "image/jpeg" || mime === "image/jpg")
+          stripped = await s.jpeg({ quality: 85, mozjpeg: true }).toBuffer();
         else if (mime === "image/webp") stripped = await s.webp({ quality: 85 }).toBuffer();
         else if (mime === "image/gif") stripped = await s.gif().toBuffer();
         else stripped = await s.toBuffer();
@@ -492,7 +499,12 @@ export async function handleSaveRequest(
   // Side benefit: we capture each file's pre-write content here so the
   // backup pass (A7) can write it to `.atlas-backups/<ts>/...` without a
   // second read.
-  const preWrite: Array<{ payload: FilePayload; existing: Buffer | null; bytesToWrite: Buffer; skip?: boolean }> = [];
+  const preWrite: Array<{
+    payload: FilePayload;
+    existing: Buffer | null;
+    bytesToWrite: Buffer;
+    skip?: boolean;
+  }> = [];
   for (const f of list) {
     const abs = path.resolve(repoRoot, f.path);
     let existingBytes: Buffer | null = null;
@@ -700,7 +712,9 @@ export async function handleSaveRequest(
         },
       };
     }
-    const publishedAt = opts?.readPublishedAt ? await opts.readPublishedAt().catch(() => null) : null;
+    const publishedAt = opts?.readPublishedAt
+      ? await opts.readPublishedAt().catch(() => null)
+      : null;
     return {
       status: 200,
       payload: {
@@ -765,7 +779,11 @@ async function runAtlasBuild(repoRoot: string): Promise<BuildResult> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<BuildResult>((resolve) => {
     timer = setTimeout(() => {
-      resolve({ ok: false, durationMs: timeoutMs, stderr: `atlas build timed out after ${timeoutMs}ms` });
+      resolve({
+        ok: false,
+        durationMs: timeoutMs,
+        stderr: `atlas build timed out after ${timeoutMs}ms`,
+      });
     }, timeoutMs);
   });
   try {
@@ -779,9 +797,12 @@ async function runAtlasBuild(repoRoot: string): Promise<BuildResult> {
     // Truncate just like the spawn path did so a huge build log doesn't
     // blow up the JSON response body. The two shapes have different error
     // field names — `error` for runBuild, `stderr` for the local timeout.
-    const errStr = "error" in result && result.error
-      ? result.error
-      : "stderr" in result ? result.stderr ?? "" : "";
+    const errStr =
+      "error" in result && result.error
+        ? result.error
+        : "stderr" in result
+          ? (result.stderr ?? "")
+          : "";
     return {
       ok: false,
       durationMs: result.durationMs,
@@ -810,10 +831,9 @@ async function runAtlasBuild(repoRoot: string): Promise<BuildResult> {
  * There is no per-image DM/player visibility distinction, and none is
  * added here. Do not add a secret-image scan for this path.
  */
-export async function handleAssetsImagesRequest(repoRoot: string): Promise<
-  | { status: 200; images: string[] }
-  | { status: 500; error: string }
-> {
+export async function handleAssetsImagesRequest(
+  repoRoot: string,
+): Promise<{ status: 200; images: string[] } | { status: 500; error: string }> {
   const dir = path.resolve(repoRoot, "public", "atlas", "assets", "images");
   try {
     const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -838,7 +858,12 @@ export async function handleAssetsImagesRequest(repoRoot: string): Promise<
 export async function handleDeleteImageRequest(
   repoRoot: string,
   name: string,
-): Promise<{ status: 200; deleted: string } | { status: 400; error: string } | { status: 404; error: string } | { status: 500; error: string }> {
+): Promise<
+  | { status: 200; deleted: string }
+  | { status: 400; error: string }
+  | { status: 404; error: string }
+  | { status: 500; error: string }
+> {
   if (!name || name.includes("/") || name.includes("\\") || name.includes("..")) {
     return { status: 400, error: "Invalid image name" };
   }
@@ -870,15 +895,19 @@ export async function handleDeleteImageRequest(
     if (err.code === "ENOENT") return { status: 404, error: "Not found" };
     return { status: 500, error: err.message };
   }
-  try { await pruneBackups(repoRoot, relPath); } catch { /* non-fatal */ }
+  try {
+    await pruneBackups(repoRoot, relPath);
+  } catch {
+    /* non-fatal */
+  }
   return { status: 200, deleted: name };
 }
 
 /** Allowlist-guarded reader for GET /__atlas/read?path=... */
-async function readAllowlistedFile(repoRoot: string, relPath: string): Promise<
-  | { ok: true; contents: string }
-  | { ok: false; status: number; error: string }
-> {
+async function readAllowlistedFile(
+  repoRoot: string,
+  relPath: string,
+): Promise<{ ok: true; contents: string } | { ok: false; status: number; error: string }> {
   if (!isWritableSourcePath(relPath)) {
     return { ok: false, status: 400, error: "DisallowedPath" };
   }
@@ -891,6 +920,37 @@ async function readAllowlistedFile(repoRoot: string, relPath: string): Promise<
     if (err.code === "ENOENT") return { ok: false, status: 404, error: "NotFound" };
     return { ok: false, status: 500, error: err.message };
   }
+}
+
+/**
+ * Shared loopback gate for the write/read `/__atlas/*` middleware. If the
+ * request is not an allowed dev request, write a 403 and return `true` — the
+ * caller must then `return` without handling it. Returns `false` when the
+ * request may proceed. This is the single place the `/__atlas/*` endpoints
+ * (read, assets/images, save) reject non-loopback callers, so the gate can't
+ * drift between them.
+ *
+ * `serveLocalAtlas` deliberately does NOT use this: on a disallowed request it
+ * falls through to Vite's static serving (the *player* atlas) rather than 403,
+ * to preserve the LAN player-preview workflow without leaking DM canon.
+ */
+export function rejectNonLoopback(
+  req: import("http").IncomingMessage,
+  res: import("http").ServerResponse,
+): boolean {
+  if (
+    isAllowedDevRequest({
+      host: req.headers.host,
+      origin: req.headers.origin,
+      method: req.method,
+    })
+  ) {
+    return false;
+  }
+  res.statusCode = 403;
+  res.setHeader("Content-Type", "application/json");
+  res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
+  return true;
 }
 
 export function atlasSavePlugin(): Plugin {
@@ -919,21 +979,36 @@ export function atlasSavePlugin(): Plugin {
       // request through to Vite's default public/ serving so the player atlas
       // still loads.
       const repoRoot = server.config.root;
-      const serveLocalAtlas = (publicRelPath: string) =>
-        (req: import("http").IncomingMessage, res: import("http").ServerResponse, next: () => void) => {
+      const serveLocalAtlas =
+        (publicRelPath: string) =>
+        (
+          req: import("http").IncomingMessage,
+          res: import("http").ServerResponse,
+          next: () => void,
+        ) => {
           if (req.method !== "GET") return next();
           const url = new URL(req.url ?? "/", "http://localhost");
           if (url.pathname !== publicRelPath) return next();
           // .local-atlas/atlas.json holds the DM build (hidden entities
           // visible). Gate it the same way as /__atlas/* so a LAN attacker
           // or cross-origin fetch can't pull DM canon by hitting this URL.
-          if (!isAllowedDevRequest({ host: req.headers.host, origin: req.headers.origin, method: req.method })) {
+          if (
+            !isAllowedDevRequest({
+              host: req.headers.host,
+              origin: req.headers.origin,
+              method: req.method,
+            })
+          ) {
             // Fall through to Vite's static serving (public/atlas/atlas.json,
             // the *player* build) rather than 403 — preserves the player
             // preview workflow over LAN without leaking DM canon.
             return next();
           }
-          const localPath = path.resolve(repoRoot, ".local-atlas", path.posix.basename(publicRelPath));
+          const localPath = path.resolve(
+            repoRoot,
+            ".local-atlas",
+            path.posix.basename(publicRelPath),
+          );
           fs.readFile(localPath, "utf8").then(
             (body) => {
               res.statusCode = 200;
@@ -950,12 +1025,7 @@ export function atlasSavePlugin(): Plugin {
       // GET /__atlas/read?path=content/...
       server.middlewares.use("/__atlas/read", (req, res, next) => {
         if (req.method !== "GET") return next();
-        if (!isAllowedDevRequest({ host: req.headers.host, origin: req.headers.origin, method: req.method })) {
-          res.statusCode = 403;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
-          return;
-        }
+        if (rejectNonLoopback(req, res)) return;
         const url = new URL(req.url ?? "/", "http://localhost");
         const relPath = url.searchParams.get("path") ?? "";
         readAllowlistedFile(server.config.root, relPath).then((result) => {
@@ -974,18 +1044,15 @@ export function atlasSavePlugin(): Plugin {
       // DELETE /__atlas/assets/images?name=<filename> — remove an image from the library
       server.middlewares.use("/__atlas/assets/images", (req, res, next) => {
         if (req.method !== "GET" && req.method !== "DELETE") return next();
-        if (!isAllowedDevRequest({ host: req.headers.host, origin: req.headers.origin, method: req.method })) {
-          res.statusCode = 403;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
-          return;
-        }
+        if (rejectNonLoopback(req, res)) return;
         if (req.method === "GET") {
           handleAssetsImagesRequest(server.config.root).then((result) => {
             res.statusCode = result.status;
             res.setHeader("Content-Type", "application/json");
             if (result.status === 200) {
-              res.end(JSON.stringify({ images: (result as { status: 200; images: string[] }).images }));
+              res.end(
+                JSON.stringify({ images: (result as { status: 200; images: string[] }).images }),
+              );
             } else {
               res.end(JSON.stringify({ error: (result as { status: 500; error: string }).error }));
             }
@@ -1008,12 +1075,7 @@ export function atlasSavePlugin(): Plugin {
       // POST /__atlas/save  { files, rebuild?: boolean }
       server.middlewares.use("/__atlas/save", (req, res, next) => {
         if (req.method !== "POST") return next();
-        if (!isAllowedDevRequest({ host: req.headers.host, origin: req.headers.origin, method: req.method })) {
-          res.statusCode = 403;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
-          return;
-        }
+        if (rejectNonLoopback(req, res)) return;
         // A11: reject concurrent saves with 423 Locked.
         if (saveInFlight) {
           res.statusCode = 423;
@@ -1024,7 +1086,9 @@ export function atlasSavePlugin(): Plugin {
         saveInFlight = true;
         let raw = "";
         req.setEncoding("utf8");
-        req.on("data", (chunk: string) => { raw += chunk; });
+        req.on("data", (chunk: string) => {
+          raw += chunk;
+        });
         req.on("end", async () => {
           try {
             let body: unknown;
@@ -1038,9 +1102,7 @@ export function atlasSavePlugin(): Plugin {
             }
             const rebuild = !!(body as { rebuild?: boolean })?.rebuild;
             const result = await handleSaveRequest(body, server.config.root, {
-              afterWrite: rebuild
-                ? async () => runAtlasBuild(server.config.root)
-                : undefined,
+              afterWrite: rebuild ? async () => runAtlasBuild(server.config.root) : undefined,
               readPublishedAt: rebuild ? () => readAtlasPublishedAt(server.config.root) : undefined,
             });
             res.statusCode = result.status;

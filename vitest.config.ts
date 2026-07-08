@@ -17,6 +17,19 @@ export default defineConfig({
     testTimeout: 60_000,
     hookTimeout: 60_000,
     teardownTimeout: 30_000,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html"],
+      // Signal for the risky surfaces (secret scrubbing, Save, build); the
+      // shadcn ui primitives and test files are noise here.
+      include: ["src/**/*.{ts,tsx}", "scripts/atlas/**/*.ts"],
+      exclude: [
+        "src/test/**",
+        "src/**/*.test.{ts,tsx}",
+        "src/components/ui/**",
+        "**/*.d.ts",
+      ],
+    },
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },

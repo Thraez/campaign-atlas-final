@@ -28,12 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { StagingRow } from "./stagingState";
 import type { ImportFolderConfig } from "../content/schema";
 
@@ -46,7 +41,12 @@ export interface ImportStagingModalProps {
   /** Patch one row by id. Caller threads the patch through updateStagingRow. */
   onPatchRow: (
     id: string,
-    patch: { included?: boolean; inferredType?: string; targetPath?: string; resolvedVisibility?: string },
+    patch: {
+      included?: boolean;
+      inferredType?: string;
+      targetPath?: string;
+      resolvedVisibility?: string;
+    },
   ) => void;
   onCancel: () => void;
   /** Commit only the included, non-blocked rows. */
@@ -90,16 +90,20 @@ export function ImportStagingModal({
   }, [importConfig]);
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onCancel();
+      }}
+    >
       <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Stage .md import</DialogTitle>
           <DialogDescription>
-            Review each file before committing. Target paths must be inside your
-            world&apos;s configured import folders — rows outside the allowlist are
-            red and can&apos;t be imported. Existing files default to{" "}
-            <strong>unchecked</strong>; re-check explicitly to overwrite (the
-            previous version is backed up).
+            Review each file before committing. Target paths must be inside your world&apos;s
+            configured import folders — rows outside the allowlist are red and can&apos;t be
+            imported. Existing files default to <strong>unchecked</strong>; re-check explicitly to
+            overwrite (the previous version is backed up).
           </DialogDescription>
         </DialogHeader>
 
@@ -153,8 +157,8 @@ export function ImportStagingModal({
                               </TooltipTrigger>
                               <TooltipContent>
                                 <p className="max-w-[320px] break-all text-[11px]">
-                                  Frontmatter <code>path</code>: {row.frontmatterPath} —
-                                  ignored. The editor uses the inferred target on the right.
+                                  Frontmatter <code>path</code>: {row.frontmatterPath} — ignored.
+                                  The editor uses the inferred target on the right.
                                 </p>
                               </TooltipContent>
                             </Tooltip>
@@ -184,8 +188,7 @@ export function ImportStagingModal({
                       </Select>
                       <div className="mt-1 flex items-center gap-1">
                         <span className="text-[10px] text-muted-foreground font-mono break-all">
-                          <span className="opacity-60">id:</span>{" "}
-                          <span>{row.resolvedId}</span>
+                          <span className="opacity-60">id:</span> <span>{row.resolvedId}</span>
                         </span>
                         {row.typeWasGuessed && !row.parseError && (
                           <Badge className="bg-amber-500/20 text-amber-200 border-amber-500/40 text-[10px]">
@@ -200,13 +203,17 @@ export function ImportStagingModal({
                         onValueChange={(v) => onPatchRow(row.id, { resolvedVisibility: v })}
                         disabled={!!row.parseError}
                       >
-                        <SelectTrigger className="h-7 text-[11px]"
-                          aria-label={`Visibility for ${row.filename}`}>
+                        <SelectTrigger
+                          className="h-7 text-[11px]"
+                          aria-label={`Visibility for ${row.filename}`}
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {["player", "dm", "hidden", "rumor"].map((v) => (
-                            <SelectItem key={v} value={v} className="text-[11px]">{v}</SelectItem>
+                            <SelectItem key={v} value={v} className="text-[11px]">
+                              {v}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -274,14 +281,14 @@ export function ImportStagingModal({
           <div className="space-y-0.5">
             {blockedCount > 0 && (
               <div>
-                {blockedCount} row{blockedCount === 1 ? "" : "s"} blocked —
-                fix the source file or target path to include.
+                {blockedCount} row{blockedCount === 1 ? "" : "s"} blocked — fix the source file or
+                target path to include.
               </div>
             )}
             {uncheckedConflictCount > 0 && (
               <div className="text-amber-300">
-                {uncheckedConflictCount} target{uncheckedConflictCount === 1 ? "" : "s"}{" "}
-                already exist on disk — re-check to overwrite (the existing file is backed up).
+                {uncheckedConflictCount} target{uncheckedConflictCount === 1 ? "" : "s"} already
+                exist on disk — re-check to overwrite (the existing file is backed up).
               </div>
             )}
           </div>
@@ -311,7 +318,9 @@ export function ImportStagingModal({
             onClick={onCommit}
             disabled={isImporting || includedCount === 0}
           >
-            {isImporting ? "Importing…" : `Import ${includedCount} file${includedCount === 1 ? "" : "s"}`}
+            {isImporting
+              ? "Importing…"
+              : `Import ${includedCount} file${includedCount === 1 ? "" : "s"}`}
           </Button>
         </DialogFooter>
       </DialogContent>

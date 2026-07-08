@@ -9,8 +9,8 @@ describe("wrapInline", () => {
   it("wraps selected text between markers", () => {
     const r = wrapInline("hello world", 6, 11, "**", "**");
     expect(r.value).toBe("hello **world**");
-    expect(r.selStart).toBe(8);  // "w" in world
-    expect(r.selEnd).toBe(13);   // after "d", before closing **
+    expect(r.selStart).toBe(8); // "w" in world
+    expect(r.selEnd).toBe(13); // after "d", before closing **
   });
 
   it("selection is preserved inside markers (not the markers themselves)", () => {
@@ -78,14 +78,14 @@ describe("prefixLines", () => {
     const r = prefixLines("hello", 0, 5, "- ");
     expect(r.value).toBe("- hello");
     expect(r.selStart).toBe(2); // 0 + 2
-    expect(r.selEnd).toBe(7);   // 5 + 2*1
+    expect(r.selEnd).toBe(7); // 5 + 2*1
   });
 
   it("prefixes all lines in a multi-line selection", () => {
     const r = prefixLines("line1\nline2\nline3", 0, 17, "- ");
     expect(r.value).toBe("- line1\n- line2\n- line3");
-    expect(r.selStart).toBe(2);  // 0 + 2
-    expect(r.selEnd).toBe(23);   // 17 + 2*3
+    expect(r.selStart).toBe(2); // 0 + 2
+    expect(r.selEnd).toBe(23); // 17 + 2*3
   });
 
   it("only prefixes the line containing the cursor (not neighbours)", () => {
@@ -99,8 +99,8 @@ describe("prefixLines", () => {
     // selStart mid line1, selEnd mid line2
     const r = prefixLines("line1\nline2", 3, 8, "- ");
     expect(r.value).toBe("- line1\n- line2");
-    expect(r.selStart).toBe(5);  // 3 + 2
-    expect(r.selEnd).toBe(12);   // 8 + 2*2
+    expect(r.selStart).toBe(5); // 3 + 2
+    expect(r.selEnd).toBe(12); // 8 + 2*2
   });
 
   it("handles empty prefix (no-op)", () => {

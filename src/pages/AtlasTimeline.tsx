@@ -23,12 +23,14 @@ export default function AtlasTimeline() {
   const [activeType, setActiveType] = useState<string | null>(null);
 
   useEffect(() => {
-    loadAtlasContent(true).then(setProject).catch((e: Error) => setError(e.message));
+    loadAtlasContent(true)
+      .then(setProject)
+      .catch((e: Error) => setError(e.message));
   }, []);
 
   const dated = useMemo(
     () => (project?.entities ?? []).filter((e) => typeof e.dateValue === "number"),
-    [project]
+    [project],
   );
 
   const allTypes = useMemo(() => {
@@ -48,7 +50,7 @@ export default function AtlasTimeline() {
         e.tags.some((t) => t.toLowerCase().includes(q))
       );
     });
-    const sorted = [...filtered].sort((a, b) => (a.dateValue! - b.dateValue!));
+    const sorted = [...filtered].sort((a, b) => a.dateValue! - b.dateValue!);
     const byYear = new Map<number, Entity[]>();
     sorted.forEach((e) => {
       const y = e.dateYear ?? 0;
@@ -70,7 +72,10 @@ export default function AtlasTimeline() {
           <h1 className="font-display text-2xl text-primary">Timeline unavailable</h1>
           <p className="text-sm text-muted-foreground">{error}</p>
           <Button asChild variant="secondary">
-            <Link to="/atlas"><ArrowLeft className="h-4 w-4 mr-1" />Back to atlas</Link>
+            <Link to="/atlas">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back to atlas
+            </Link>
           </Button>
         </div>
       </div>
@@ -89,7 +94,10 @@ export default function AtlasTimeline() {
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
         <AtlasNavMenu publishedAt={project.publishedAt} />
-        <Link to="/atlas" className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2">
+        <Link
+          to="/atlas"
+          className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2"
+        >
           <Compass className="h-5 w-5" /> <span className="hidden sm:inline">Astrath Atlas</span>
         </Link>
         <span className="text-muted-foreground">/</span>
@@ -118,7 +126,10 @@ export default function AtlasTimeline() {
           <Link to="/atlas/browse">Browse</Link>
         </Button>
         <Button asChild variant="ghost" size="sm">
-          <Link to="/atlas"><ArrowLeft className="h-4 w-4 mr-1" />Map</Link>
+          <Link to="/atlas">
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Map
+          </Link>
         </Button>
       </header>
 
@@ -158,7 +169,9 @@ export default function AtlasTimeline() {
 
           {groups.length === 0 ? (
             <div className="text-center text-sm text-muted-foreground py-16">
-              No dated entries yet. Add <code className="px-1 py-0.5 rounded bg-muted">atlas.date</code> to a markdown file's frontmatter.
+              No dated entries yet. Add{" "}
+              <code className="px-1 py-0.5 rounded bg-muted">atlas.date</code> to a markdown file's
+              frontmatter.
             </div>
           ) : (
             <ol className="relative border-l-2 border-border pl-5 space-y-6">
@@ -176,19 +189,27 @@ export default function AtlasTimeline() {
                         className="block rounded border border-border bg-card hover:bg-accent/40 transition px-3 py-2"
                       >
                         <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="text-xs text-muted-foreground tabular-nums">{e.dateRaw}</span>
+                          <span className="text-xs text-muted-foreground tabular-nums">
+                            {e.dateRaw}
+                          </span>
                           <span className="font-medium text-sm">{e.title}</span>
                           {playerTypeLabel(e.type) && (
-                            <Badge variant="outline" className="text-[10px] uppercase">{playerTypeLabel(e.type)}</Badge>
+                            <Badge variant="outline" className="text-[10px] uppercase">
+                              {playerTypeLabel(e.type)}
+                            </Badge>
                           )}
                         </div>
                         {e.summary && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{e.summary}</p>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {e.summary}
+                          </p>
                         )}
                         {e.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1.5">
                             {e.tags.slice(0, 5).map((t) => (
-                              <span key={t} className="text-[10px] text-muted-foreground">#{t}</span>
+                              <span key={t} className="text-[10px] text-muted-foreground">
+                                #{t}
+                              </span>
                             ))}
                           </div>
                         )}

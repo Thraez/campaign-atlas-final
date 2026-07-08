@@ -54,9 +54,7 @@ afterAll(() => {
 });
 
 function read(outDir: string) {
-  const atlas = JSON.parse(
-    fs.readFileSync(path.join(outDir, "atlas.json"), "utf8")
-  );
+  const atlas = JSON.parse(fs.readFileSync(path.join(outDir, "atlas.json"), "utf8"));
   return atlas as {
     entities: Array<{ id: string; visibility: string; body: string }>;
     placements: Array<{ entityId: string; mapId: string; x: number; y: number }>;
@@ -82,15 +80,12 @@ function writeWorldVault(dir: string, worldYaml: string) {
       defaultWorld: "test-world",
       include: ["**/*.md"],
       exclude: [],
-    })
+    }),
   );
-  fs.writeFileSync(
-    path.join(dir, "content/test-world/_atlas/world.yaml"),
-    worldYaml
-  );
+  fs.writeFileSync(path.join(dir, "content/test-world/_atlas/world.yaml"), worldYaml);
   fs.writeFileSync(
     path.join(dir, "content/test-world/notes/Stub.md"),
-    `---\ntitle: Stub\natlas:\n  visibility: player\n---\nbody\n`
+    `---\ntitle: Stub\natlas:\n  visibility: player\n---\nbody\n`,
   );
 }
 
@@ -120,12 +115,7 @@ describe.sequential("atlas build pipeline", () => {
 
   it("DM build keeps dm/hidden entities and preserves %% blocks", () => {
     const out = path.join(tmpRoot, "dm");
-    const result = run([
-      "--config",
-      path.join(FIXTURE, "atlas.config.json"),
-      "--out",
-      out,
-    ]);
+    const result = run(["--config", path.join(FIXTURE, "atlas.config.json"), "--out", out]);
     expect(result.status, result.stderr).toBe(0);
     const atlas = read(out);
     const ids = atlas.entities.map((e) => e.id);
@@ -138,12 +128,7 @@ describe.sequential("atlas build pipeline", () => {
 
   it("multi-map placements emit one MapPlacement per entry", () => {
     const out = path.join(tmpRoot, "multi");
-    const result = run([
-      "--config",
-      path.join(FIXTURE, "atlas.config.json"),
-      "--out",
-      out,
-    ]);
+    const result = run(["--config", path.join(FIXTURE, "atlas.config.json"), "--out", out]);
     expect(result.status).toBe(0);
     const atlas = read(out);
     const mm = atlas.placements.filter((p) => p.entityId === "multi-map-place");
@@ -153,12 +138,7 @@ describe.sequential("atlas build pipeline", () => {
 
   it("legacy atlas.x/atlas.y still produces a placement", () => {
     const out = path.join(tmpRoot, "legacy");
-    const result = run([
-      "--config",
-      path.join(FIXTURE, "atlas.config.json"),
-      "--out",
-      out,
-    ]);
+    const result = run(["--config", path.join(FIXTURE, "atlas.config.json"), "--out", out]);
     expect(result.status).toBe(0);
     const atlas = read(out);
     const ph = atlas.placements.find((p) => p.entityId === "public-town");
@@ -192,11 +172,11 @@ describe.sequential("atlas build pipeline", () => {
         defaultWorld: "test-world",
         include: ["**/*.md"],
         exclude: [],
-      })
+      }),
     );
     fs.writeFileSync(
       path.join(badDir, "content/test-world/notes/Bad.md"),
-      `---\ntitle: Bad\natlas:\n  visibility: secret\n---\nbody\n`
+      `---\ntitle: Bad\natlas:\n  visibility: secret\n---\nbody\n`,
     );
     const result = run([
       "--player",
@@ -221,11 +201,11 @@ describe.sequential("atlas build pipeline", () => {
         defaultWorld: "test-world",
         include: ["**/*.md"],
         exclude: [],
-      })
+      }),
     );
     fs.writeFileSync(
       path.join(badDir, "content/test-world/notes/Img.md"),
-      `---\ntitle: Img\natlas:\n  visibility: player\n  images:\n    - /atlas/assets/maps/does-not-exist.png\n---\nbody\n`
+      `---\ntitle: Img\natlas:\n  visibility: player\n  images:\n    - /atlas/assets/maps/does-not-exist.png\n---\nbody\n`,
     );
     const result = run([
       "--player",
@@ -251,15 +231,15 @@ describe.sequential("atlas build pipeline", () => {
         defaultWorld: "test-world",
         include: ["**/*.md"],
         exclude: [],
-      })
+      }),
     );
     fs.writeFileSync(
       path.join(badDir, "content/test-world/a/Same-Name.md"),
-      `---\ntitle: Same Name\natlas:\n  visibility: player\n---\nA\n`
+      `---\ntitle: Same Name\natlas:\n  visibility: player\n---\nA\n`,
     );
     fs.writeFileSync(
       path.join(badDir, "content/test-world/b/Same-Name.md"),
-      `---\ntitle: Same Name\natlas:\n  visibility: player\n---\nB\n`
+      `---\ntitle: Same Name\natlas:\n  visibility: player\n---\nB\n`,
     );
     const result = run([
       "--config",
@@ -275,7 +255,7 @@ describe.sequential("atlas build pipeline", () => {
     const dir = path.join(tmpRoot, "valid-world");
     writeWorldVault(
       dir,
-      `maps:\n  - id: test-world-overview\n    name: Overview\n    width: 1000\n    height: 500\n    layers:\n      - id: base\n        src: /atlas/assets/maps/map.jpg\n        x: 0\n        y: 0\n        width: 1000\n        height: 500\n        opacity: 1\n        zIndex: 1\n`
+      `maps:\n  - id: test-world-overview\n    name: Overview\n    width: 1000\n    height: 500\n    layers:\n      - id: base\n        src: /atlas/assets/maps/map.jpg\n        x: 0\n        y: 0\n        width: 1000\n        height: 500\n        opacity: 1\n        zIndex: 1\n`,
     );
     const result = run([
       "--config",
@@ -295,7 +275,7 @@ describe.sequential("atlas build pipeline", () => {
     const dir = path.join(tmpRoot, "fence-world");
     writeWorldVault(
       dir,
-      "```yaml\nmaps:\n  - id: test-world-overview\n    name: Overview\n    width: 1000\n    height: 500\n    layers: []\n```\n"
+      "```yaml\nmaps:\n  - id: test-world-overview\n    name: Overview\n    width: 1000\n    height: 500\n    layers: []\n```\n",
     );
     const result = run([
       "--config",
@@ -324,7 +304,7 @@ describe.sequential("atlas build pipeline", () => {
     const dir = path.join(tmpRoot, "missing-layer");
     writeWorldVault(
       dir,
-      `maps:\n  - id: test-world-overview\n    name: Overview\n    width: 1000\n    height: 500\n    layers:\n      - id: base\n        src: /atlas/assets/maps/does-not-exist-anywhere.png\n        x: 0\n        y: 0\n        width: 1000\n        height: 500\n        opacity: 1\n        zIndex: 1\n`
+      `maps:\n  - id: test-world-overview\n    name: Overview\n    width: 1000\n    height: 500\n    layers:\n      - id: base\n        src: /atlas/assets/maps/does-not-exist-anywhere.png\n        x: 0\n        y: 0\n        width: 1000\n        height: 500\n        opacity: 1\n        zIndex: 1\n`,
     );
     const result = run([
       "--player",
@@ -342,7 +322,7 @@ describe.sequential("atlas build pipeline", () => {
     const dir = path.join(tmpRoot, "ext-layer");
     writeWorldVault(
       dir,
-      `maps:\n  - id: test-world-overview\n    name: Overview\n    width: 1000\n    height: 500\n    layers:\n      - id: base\n        src: https://example.com/map.png\n        x: 0\n        y: 0\n        width: 1000\n        height: 500\n        opacity: 1\n        zIndex: 1\n`
+      `maps:\n  - id: test-world-overview\n    name: Overview\n    width: 1000\n    height: 500\n    layers:\n      - id: base\n        src: https://example.com/map.png\n        x: 0\n        y: 0\n        width: 1000\n        height: 500\n        opacity: 1\n        zIndex: 1\n`,
     );
     const result = run([
       "--player",
@@ -378,9 +358,9 @@ import:
     const dmOut = path.join(tmpRoot, "import-folders-dm");
     const dm = run(["--config", path.join(vaultDir, "atlas.config.json"), "--out", dmOut]);
     expect(dm.status, dm.stderr).toBe(0);
-    const dmAtlas = JSON.parse(
-      fs.readFileSync(path.join(dmOut, "atlas.json"), "utf8"),
-    ) as { worlds: Array<{ importFolders?: unknown }> };
+    const dmAtlas = JSON.parse(fs.readFileSync(path.join(dmOut, "atlas.json"), "utf8")) as {
+      worlds: Array<{ importFolders?: unknown }>;
+    };
     expect(dmAtlas.worlds[0].importFolders).toEqual({
       folders: { npc: "npcs" },
       defaultFolder: "imports",
@@ -396,9 +376,9 @@ import:
       playerOut,
     ]);
     expect(player.status, player.stderr).toBe(0);
-    const playerAtlas = JSON.parse(
-      fs.readFileSync(path.join(playerOut, "atlas.json"), "utf8"),
-    ) as { worlds: Array<{ importFolders?: unknown }> };
+    const playerAtlas = JSON.parse(fs.readFileSync(path.join(playerOut, "atlas.json"), "utf8")) as {
+      worlds: Array<{ importFolders?: unknown }>;
+    };
     expect(playerAtlas.worlds[0].importFolders).toBeUndefined();
   });
 });

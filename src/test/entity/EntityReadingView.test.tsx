@@ -7,16 +7,30 @@ import type { Entity } from "@/atlas/content/schema";
 
 function ent(p: Partial<Entity> & { id: string; title: string }): Entity {
   return {
-    id: p.id, title: p.title, type: p.type ?? "npc", visibility: p.visibility ?? "player",
-    aliases: [], tags: [], images: [], body: p.body ?? "", bodyHtml: "",
-    frontmatter: {}, sourcePath: "", links: [], backlinks: [],
+    id: p.id,
+    title: p.title,
+    type: p.type ?? "npc",
+    visibility: p.visibility ?? "player",
+    aliases: [],
+    tags: [],
+    images: [],
+    body: p.body ?? "",
+    bodyHtml: "",
+    frontmatter: {},
+    sourcePath: "",
+    links: [],
+    backlinks: [],
   } as Entity;
 }
 
 describe("EntityReadingView", () => {
   it("renders the projected bio for a hidden entity (works pre-publish)", () => {
-    const corven = ent({ id: "corven", title: "Corven", visibility: "dm",
-      body: "Public.\n\n%%\nsecret\n%%\n" });
+    const corven = ent({
+      id: "corven",
+      title: "Corven",
+      visibility: "dm",
+      body: "Public.\n\n%%\nsecret\n%%\n",
+    });
     // Player mode: stripping + visibility banner.
     localStorage.setItem("atlas.viewMode", "player");
     render(
@@ -43,8 +57,12 @@ describe("EntityReadingView", () => {
     expect(screen.queryByText(/not yet visible to players/i)).not.toBeInTheDocument();
   });
   it("dm lens shows raw DM content; player lens hides it", () => {
-    const corven = ent({ id: "corven", title: "Corven", visibility: "dm",
-      body: "Public.\n\n%%\nsecret truth\n%%\n" });
+    const corven = ent({
+      id: "corven",
+      title: "Corven",
+      visibility: "dm",
+      body: "Public.\n\n%%\nsecret truth\n%%\n",
+    });
     // Default lens = dm → secret visible.
     localStorage.clear();
     const { unmount } = render(
@@ -52,7 +70,7 @@ describe("EntityReadingView", () => {
         <ViewModeProvider>
           <EntityReadingView entity={corven} entitiesById={new Map([[corven.id, corven]])} />
         </ViewModeProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText(/secret truth/)).toBeInTheDocument();
     unmount();
@@ -63,7 +81,7 @@ describe("EntityReadingView", () => {
         <ViewModeProvider>
           <EntityReadingView entity={corven} entitiesById={new Map([[corven.id, corven]])} />
         </ViewModeProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.queryByText(/secret truth/)).not.toBeInTheDocument();
   });

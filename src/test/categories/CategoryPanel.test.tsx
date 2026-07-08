@@ -10,8 +10,13 @@ const entities = [
 describe("CategoryPanel", () => {
   it("lists only this category, recency-sorted (newest first)", () => {
     render(
-      <CategoryPanel category="characters" entities={entities}
-        onOpen={vi.fn()} onNew={vi.fn()} onImport={vi.fn()} />,
+      <CategoryPanel
+        category="characters"
+        entities={entities}
+        onOpen={vi.fn()}
+        onNew={vi.fn()}
+        onImport={vi.fn()}
+      />,
     );
     const rows = screen.getAllByTestId("entity-row").map((r) => r.textContent);
     expect(rows[0]).toContain("Borin"); // dateValue 9 first
@@ -19,8 +24,13 @@ describe("CategoryPanel", () => {
 
   it("filters by the search box", () => {
     render(
-      <CategoryPanel category="characters" entities={entities}
-        onOpen={vi.fn()} onNew={vi.fn()} onImport={vi.fn()} />,
+      <CategoryPanel
+        category="characters"
+        entities={entities}
+        onOpen={vi.fn()}
+        onNew={vi.fn()}
+        onImport={vi.fn()}
+      />,
     );
     fireEvent.change(screen.getByPlaceholderText(/search characters/i), {
       target: { value: "ald" },
@@ -32,8 +42,13 @@ describe("CategoryPanel", () => {
   it("shows the empty stub with New + Import when the category is empty", () => {
     const onNew = vi.fn();
     render(
-      <CategoryPanel category="items" entities={[]}
-        onOpen={vi.fn()} onNew={onNew} onImport={vi.fn()} />,
+      <CategoryPanel
+        category="items"
+        entities={[]}
+        onOpen={vi.fn()}
+        onNew={onNew}
+        onImport={vi.fn()}
+      />,
     );
     expect(screen.getByText(/No items yet/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /New Item/i }));
@@ -43,8 +58,13 @@ describe("CategoryPanel", () => {
   it("double-clicking a row opens the entity (interaction parity)", () => {
     const onOpen = vi.fn();
     render(
-      <CategoryPanel category="characters" entities={entities}
-        onOpen={onOpen} onNew={vi.fn()} onImport={vi.fn()} />,
+      <CategoryPanel
+        category="characters"
+        entities={entities}
+        onOpen={onOpen}
+        onNew={vi.fn()}
+        onImport={vi.fn()}
+      />,
     );
     const row = screen.getByText("Alda");
     fireEvent.doubleClick(row);

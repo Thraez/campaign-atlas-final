@@ -95,27 +95,43 @@ describe("isAllowedTargetPath", () => {
     }
   });
   it("rejects paths outside content/<world>/<allowed>/", () => {
-    expect(isAllowedTargetPath(WORLD, "content/other-world/npcs/x.md", TEST_ALLOWED_FOLDERS)).toBe(false);
-    expect(isAllowedTargetPath(WORLD, `content/${WORLD}/_atlas/world.yaml`, TEST_ALLOWED_FOLDERS)).toBe(false);
-    expect(isAllowedTargetPath(WORLD, `content/${WORLD}/secrets/x.md`, TEST_ALLOWED_FOLDERS)).toBe(false);
-    expect(isAllowedTargetPath(WORLD, `content/${WORLD}/npcs/sub/x.md`, TEST_ALLOWED_FOLDERS)).toBe(false);
+    expect(isAllowedTargetPath(WORLD, "content/other-world/npcs/x.md", TEST_ALLOWED_FOLDERS)).toBe(
+      false,
+    );
+    expect(
+      isAllowedTargetPath(WORLD, `content/${WORLD}/_atlas/world.yaml`, TEST_ALLOWED_FOLDERS),
+    ).toBe(false);
+    expect(isAllowedTargetPath(WORLD, `content/${WORLD}/secrets/x.md`, TEST_ALLOWED_FOLDERS)).toBe(
+      false,
+    );
+    expect(isAllowedTargetPath(WORLD, `content/${WORLD}/npcs/sub/x.md`, TEST_ALLOWED_FOLDERS)).toBe(
+      false,
+    );
     expect(isAllowedTargetPath(WORLD, "x.md", TEST_ALLOWED_FOLDERS)).toBe(false);
     expect(isAllowedTargetPath(WORLD, "", TEST_ALLOWED_FOLDERS)).toBe(false);
   });
   it("rejects traversal and absolute paths", () => {
-    expect(isAllowedTargetPath(WORLD, `content/${WORLD}/../escape.md`, TEST_ALLOWED_FOLDERS)).toBe(false);
-    expect(isAllowedTargetPath(WORLD, `/content/${WORLD}/npcs/x.md`, TEST_ALLOWED_FOLDERS)).toBe(false);
+    expect(isAllowedTargetPath(WORLD, `content/${WORLD}/../escape.md`, TEST_ALLOWED_FOLDERS)).toBe(
+      false,
+    );
+    expect(isAllowedTargetPath(WORLD, `/content/${WORLD}/npcs/x.md`, TEST_ALLOWED_FOLDERS)).toBe(
+      false,
+    );
   });
   it("rejects Windows-style backslash paths", () => {
     // path.includes("\\") guard — a Windows path must never slip through on
     // non-normalized input (e.g. drag-and-drop from File Explorer on Windows).
-    expect(
-      isAllowedTargetPath(WORLD, `content\\${WORLD}\\npcs\\x.md`, TEST_ALLOWED_FOLDERS),
-    ).toBe(false);
+    expect(isAllowedTargetPath(WORLD, `content\\${WORLD}\\npcs\\x.md`, TEST_ALLOWED_FOLDERS)).toBe(
+      false,
+    );
   });
   it("rejects non-md extensions", () => {
-    expect(isAllowedTargetPath(WORLD, `content/${WORLD}/npcs/x.txt`, TEST_ALLOWED_FOLDERS)).toBe(false);
-    expect(isAllowedTargetPath(WORLD, `content/${WORLD}/npcs/x.yaml`, TEST_ALLOWED_FOLDERS)).toBe(false);
+    expect(isAllowedTargetPath(WORLD, `content/${WORLD}/npcs/x.txt`, TEST_ALLOWED_FOLDERS)).toBe(
+      false,
+    );
+    expect(isAllowedTargetPath(WORLD, `content/${WORLD}/npcs/x.yaml`, TEST_ALLOWED_FOLDERS)).toBe(
+      false,
+    );
   });
 });
 
@@ -172,7 +188,9 @@ describe("buildStagingRow", () => {
   });
 
   it("routes to existing entity's path and sets rowKind=update when resolvedId matches", () => {
-    const existingById = new Map([["thornhold", "content/astrath-deeprealm/settlements/thornhold.md"]]);
+    const existingById = new Map([
+      ["thornhold", "content/astrath-deeprealm/settlements/thornhold.md"],
+    ]);
     const existingPaths = new Set(existingById.values());
     const row = buildStagingRow(
       {
@@ -354,7 +372,9 @@ describe("updateStagingRow", () => {
   it("update row with type change: path stays anchored, rowKind stays update", () => {
     // An entity that already exists in the atlas should always update in-place,
     // even if the DM changes the inferred type — the type dropdown must not reroute it.
-    const existingById = new Map([["thornhold", "content/astrath-deeprealm/settlements/thornhold.md"]]);
+    const existingById = new Map([
+      ["thornhold", "content/astrath-deeprealm/settlements/thornhold.md"],
+    ]);
     const existingPaths = new Set(existingById.values());
     const ctx = makeCtx({ existingById, existingPaths });
     const r0 = buildStagingRow(
@@ -404,10 +424,7 @@ describe("typeWasGuessed flag (F1: categorize imported notes)", () => {
   });
 
   it("false when type comes from a recognized tag (confident inference)", () => {
-    const row = buildStagingRow(
-      { filename: "garron.md", raw: "---\ntags:\n  - npc\n---\n" },
-      ctx,
-    );
+    const row = buildStagingRow({ filename: "garron.md", raw: "---\ntags:\n  - npc\n---\n" }, ctx);
     expect(row.typeWasGuessed).toBe(false);
     expect(row.typeWasExplicit).toBe(false);
     expect(row.inferredType).toBe("npc");
@@ -415,10 +432,7 @@ describe("typeWasGuessed flag (F1: categorize imported notes)", () => {
 
   it("false when type comes from a mapped folder (confident folder inference)", () => {
     // "npcs/" is in FOLDER_TYPE_MAP → inferTypeFromPath returns "npc", not "note"
-    const row = buildStagingRow(
-      { filename: "npcs/garron.md", raw: "---\n---\n" },
-      ctx,
-    );
+    const row = buildStagingRow({ filename: "npcs/garron.md", raw: "---\n---\n" }, ctx);
     expect(row.typeWasGuessed).toBe(false);
     expect(row.inferredType).toBe("npc");
   });
@@ -455,19 +469,13 @@ describe("typeWasGuessed flag (F1: categorize imported notes)", () => {
   });
 
   it("false for a parse-error row (errors are not categorization guesses)", () => {
-    const row = buildStagingRow(
-      { filename: "bad.md", raw: "---\n: broken: yaml: [\n---\n" },
-      ctx,
-    );
+    const row = buildStagingRow({ filename: "bad.md", raw: "---\n: broken: yaml: [\n---\n" }, ctx);
     expect(row.typeWasGuessed).toBe(false);
     expect(!!row.parseError).toBe(true);
   });
 
   it("changing type on a guessed row routes to the correct folder after updateStagingRow", () => {
-    const rows = buildStagingRows(
-      [{ filename: "the-npc.md", raw: "---\n---\n" }],
-      ctx,
-    );
+    const rows = buildStagingRows([{ filename: "the-npc.md", raw: "---\n---\n" }], ctx);
     const [row] = rows;
     expect(row.typeWasGuessed).toBe(true);
     expect(row.inferredType).toBe("lore");

@@ -3,6 +3,7 @@ import type { FileChange } from "@/atlas/save/localFsSave";
 import { stringifyFrontmatter } from "@/atlas/import/frontmatter";
 import { CATEGORIES, type CategoryId } from "@/atlas/content/entityCategory";
 import type { EntityVisibility } from "@/atlas/content/schema";
+import { slugify } from "@/atlas/content/slugify";
 
 const DEFAULT_KIND: Record<CategoryId, string> = {
   characters: "npc",
@@ -13,19 +14,13 @@ const DEFAULT_KIND: Record<CategoryId, string> = {
   lore: "lore",
 };
 
-export function slugify(title: string): string {
-  return title.trim().toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 export interface NewEntityInput {
-  worldRoot: string;          // e.g. "content/astrath-deeprealm"
+  worldRoot: string; // e.g. "content/astrath-deeprealm"
   category: CategoryId;
   title: string;
   summary?: string;
   visibility: EntityVisibility;
-  kind?: string;              // granular type; defaults from category
+  kind?: string; // granular type; defaults from category
 }
 
 export function buildNewEntityChange(input: NewEntityInput): FileChange {

@@ -33,7 +33,7 @@ const sampleReport: BuildReport = {
   included: 30,
   excluded: 12,
   warnings: [
-    "map m1 layer base: asset path \"/atlas/assets/maps/main.jpg\" starts with \"/\" — Use a relative path: \"atlas/assets/maps/main.jpg\".",
+    'map m1 layer base: asset path "/atlas/assets/maps/main.jpg" starts with "/" — Use a relative path: "atlas/assets/maps/main.jpg".',
   ],
   brokenLinks: 2,
   unresolvedLinks: 2,
@@ -90,9 +90,17 @@ describe("BuildReportPanel — severity grouping", () => {
   it("shows pass banner when there are no errors", async () => {
     const { BuildReportPanel } = await loadPanel();
     const clean: BuildReport = {
-      scanned: 5, included: 5, excluded: 0, warnings: [],
-      brokenLinks: 0, unresolvedLinks: 0, duplicateSlugs: 0, strippedDmBlocks: 0,
-      missingAssets: 0, localAssets: 0, externalAssets: 0,
+      scanned: 5,
+      included: 5,
+      excluded: 0,
+      warnings: [],
+      brokenLinks: 0,
+      unresolvedLinks: 0,
+      duplicateSlugs: 0,
+      strippedDmBlocks: 0,
+      missingAssets: 0,
+      localAssets: 0,
+      externalAssets: 0,
     };
     render(<BuildReportPanel report={clean} />);
     expect(screen.getByText(/Last build passed all gates\./)).toBeInTheDocument();
@@ -135,9 +143,17 @@ describe("buildReportToMarkdown", () => {
     setEnv({ dev: true });
     const { buildReportToMarkdown } = await loadPanel();
     const clean: BuildReport = {
-      scanned: 1, included: 1, excluded: 0, warnings: [],
-      brokenLinks: 0, unresolvedLinks: 0, duplicateSlugs: 0, strippedDmBlocks: 0,
-      missingAssets: 0, localAssets: 0, externalAssets: 0,
+      scanned: 1,
+      included: 1,
+      excluded: 0,
+      warnings: [],
+      brokenLinks: 0,
+      unresolvedLinks: 0,
+      duplicateSlugs: 0,
+      strippedDmBlocks: 0,
+      missingAssets: 0,
+      localAssets: 0,
+      externalAssets: 0,
     };
     const md = buildReportToMarkdown(clean);
     expect(md).toMatch(/Status:.*Ready to publish/);

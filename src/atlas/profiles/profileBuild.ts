@@ -88,17 +88,27 @@ export interface RelationshipFilterResult {
  */
 export function filterRelationshipsForPlayer(
   rels: EntityRelationship[],
-  opts: RelationshipFilterOpts
+  opts: RelationshipFilterOpts,
 ): RelationshipFilterResult {
   const kept: EntityRelationship[] = [];
   const droppedByVisibility: EntityRelationship[] = [];
   const droppedByLeak: EntityRelationship[] = [];
   const unresolved: EntityRelationship[] = [];
   for (const r of rels) {
-    if (!PLAYER_VIS.has(r.visibility)) { droppedByVisibility.push(r); continue; }
+    if (!PLAYER_VIS.has(r.visibility)) {
+      droppedByVisibility.push(r);
+      continue;
+    }
     const targetVis = opts.entityVisibility.get(r.entity);
-    if (targetVis === undefined) { unresolved.push(r); droppedByLeak.push(r); continue; }
-    if (!PLAYER_VIS.has(targetVis)) { droppedByLeak.push(r); continue; }
+    if (targetVis === undefined) {
+      unresolved.push(r);
+      droppedByLeak.push(r);
+      continue;
+    }
+    if (!PLAYER_VIS.has(targetVis)) {
+      droppedByLeak.push(r);
+      continue;
+    }
     kept.push(r);
   }
   return { kept, droppedByVisibility, droppedByLeak, unresolved };

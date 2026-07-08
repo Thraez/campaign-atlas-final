@@ -11,6 +11,7 @@
  * is false during dev.
  */
 import { Workbox } from "workbox-window";
+import { logger } from "@/lib/logger";
 
 let wb: Workbox | null = null;
 let waitingWorker: ServiceWorker | null = null;
@@ -31,7 +32,7 @@ function isPreviewHost(): boolean {
     h.includes("preview--") ||
     h.endsWith("lovableproject.com") ||
     h.endsWith("lovableproject-dev.com") ||
-    h.endsWith("lovable.app") && h.includes("preview")
+    (h.endsWith("lovable.app") && h.includes("preview"))
   );
 }
 
@@ -48,9 +49,12 @@ export function registerServiceWorker(): void {
     // Defensive: unregister any leftover SWs from previous experiments
     // so the editor preview never serves stale content.
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.getRegistrations().then((regs) => {
-        regs.forEach((r) => r.unregister());
-      }).catch(() => {});
+      navigator.serviceWorker
+        .getRegistrations()
+        .then((regs) => {
+          regs.forEach((r) => r.unregister());
+        })
+        .catch((err) => logger.debug("[pwa] leftover SW cleanup failed", err));
     }
     return;
   }
@@ -69,7 +73,7 @@ export function registerServiceWorker(): void {
   });
 
   wb.register().catch((err) => {
-    console.warn("[pwa] service worker registration failed", err);
+    logger.warn("[pwa] service worker registration failed", err);
   });
 }
 
@@ -94,7 +98,7 @@ export async function checkForUpdate(): Promise<void> {
   try {
     await wb.update();
   } catch (err) {
-    console.warn("[pwa] update check failed", err);
+    logger.warn("[pwa] update check failed", err);
   }
 }
 

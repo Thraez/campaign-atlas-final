@@ -1,0 +1,13 @@
+# Build outputs and generated artifacts — never reformat (some are guarded).
+dist
+dist-ssr
+coverage
+node_modules
+.local-atlas
+.atlas-backups
+backups
+public/atlas
+# Vault content and snapshots are authored/generated, not source code.
+content
+examples
+.claude

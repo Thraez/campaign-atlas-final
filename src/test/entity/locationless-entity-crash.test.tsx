@@ -45,8 +45,8 @@ describe("location-less entity — no crash regression", () => {
             onClose={() => {}}
             onShowOnMap={() => {}}
           />
-        </MemoryRouter>
-      )
+        </MemoryRouter>,
+      ),
     ).not.toThrow();
   });
 
@@ -61,7 +61,7 @@ describe("location-less entity — no crash regression", () => {
           onClose={() => {}}
           onShowOnMap={() => {}}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("The Sundering")).toBeInTheDocument();
     expect(screen.getByText("A cataclysmic event that shattered the world.")).toBeInTheDocument();
@@ -78,7 +78,7 @@ describe("location-less entity — no crash regression", () => {
           onClose={() => {}}
           onShowOnMap={() => {}}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.queryByText(/show on map/i)).not.toBeInTheDocument();
   });

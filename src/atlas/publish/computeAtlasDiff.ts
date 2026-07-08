@@ -13,17 +13,18 @@
  * Body changes use a coarse heuristic: a hash-style length+prefix comparison.
  * Exact text diff is out of scope here — the user goes to git for that.
  */
-import type {
-  AtlasProject,
-  Entity,
-  MapDocument,
-  MapPlacement,
-} from "@/atlas/content/schema";
+import type { AtlasProject, Entity, MapDocument, MapPlacement } from "@/atlas/content/schema";
 
 export interface EntityChange {
   id: string;
   title: string;
-  kind: "added" | "removed" | "visibility-changed" | "body-changed" | "summary-changed" | "title-changed";
+  kind:
+    | "added"
+    | "removed"
+    | "visibility-changed"
+    | "body-changed"
+    | "summary-changed"
+    | "title-changed";
   before?: string;
   after?: string;
 }
@@ -101,7 +102,7 @@ function indexBy<T>(items: T[], key: (t: T) => string): Map<string, T> {
 
 export function computeAtlasDiff(
   baseline: AtlasProject | null,
-  current: AtlasProject | null
+  current: AtlasProject | null,
 ): AtlasDiff {
   if (!baseline || !current) {
     return {
@@ -132,12 +133,21 @@ export function computeAtlasDiff(
     const prev = baseEntities.get(id)!;
     if (prev.visibility !== ent.visibility) {
       entities.push({
-        id, title: ent.title, kind: "visibility-changed",
-        before: prev.visibility, after: ent.visibility,
+        id,
+        title: ent.title,
+        kind: "visibility-changed",
+        before: prev.visibility,
+        after: ent.visibility,
       });
     }
     if (prev.title !== ent.title) {
-      entities.push({ id, title: ent.title, kind: "title-changed", before: prev.title, after: ent.title });
+      entities.push({
+        id,
+        title: ent.title,
+        kind: "title-changed",
+        before: prev.title,
+        after: ent.title,
+      });
     }
     if ((prev.summary ?? "") !== (ent.summary ?? "")) {
       entities.push({ id, title: ent.title, kind: "summary-changed" });
@@ -155,29 +165,40 @@ export function computeAtlasDiff(
   // ---- Placements ----
   const baselinePlc = indexBy(baseline.placements, (p) => `${p.entityId}@${p.mapId}`);
   const currentPlc = indexBy(current.placements, (p) => `${p.entityId}@${p.mapId}`);
-  const titleOf = (eid: string) => currEntities.get(eid)?.title ?? baseEntities.get(eid)?.title ?? eid;
+  const titleOf = (eid: string) =>
+    currEntities.get(eid)?.title ?? baseEntities.get(eid)?.title ?? eid;
 
   for (const [key, plc] of currentPlc) {
     if (!baselinePlc.has(key)) {
       placements.push({
-        entityId: plc.entityId, entityTitle: titleOf(plc.entityId), mapId: plc.mapId,
-        kind: "added", after: { x: plc.x, y: plc.y },
+        entityId: plc.entityId,
+        entityTitle: titleOf(plc.entityId),
+        mapId: plc.mapId,
+        kind: "added",
+        after: { x: plc.x, y: plc.y },
       });
       continue;
     }
     const prev = baselinePlc.get(key)!;
     if (placementMoved(prev, plc)) {
       placements.push({
-        entityId: plc.entityId, entityTitle: titleOf(plc.entityId), mapId: plc.mapId,
-        kind: "moved", before: { x: prev.x, y: prev.y }, after: { x: plc.x, y: plc.y },
+        entityId: plc.entityId,
+        entityTitle: titleOf(plc.entityId),
+        mapId: plc.mapId,
+        kind: "moved",
+        before: { x: prev.x, y: prev.y },
+        after: { x: plc.x, y: plc.y },
       });
     }
   }
   for (const [key, prev] of baselinePlc) {
     if (!currentPlc.has(key)) {
       placements.push({
-        entityId: prev.entityId, entityTitle: titleOf(prev.entityId), mapId: prev.mapId,
-        kind: "removed", before: { x: prev.x, y: prev.y },
+        entityId: prev.entityId,
+        entityTitle: titleOf(prev.entityId),
+        mapId: prev.mapId,
+        kind: "removed",
+        before: { x: prev.x, y: prev.y },
       });
     }
   }
@@ -198,7 +219,8 @@ export function computeAtlasDiff(
     const prevRegions = new Set((prev?.regions ?? []).map((r) => r.id));
     const prevRoutes = new Set((prev?.routes ?? []).map((r) => r.id));
     for (const r of m.regions ?? []) {
-      if (!prevRegions.has(r.id)) overlays.push({ mapId: m.id, kind: "region-added", name: r.name });
+      if (!prevRegions.has(r.id))
+        overlays.push({ mapId: m.id, kind: "region-added", name: r.name });
     }
     for (const r of m.routes ?? []) {
       if (!prevRoutes.has(r.id)) overlays.push({ mapId: m.id, kind: "route-added", name: r.name });
@@ -207,18 +229,22 @@ export function computeAtlasDiff(
       const currRegions = new Set((m.regions ?? []).map((r) => r.id));
       const currRoutes = new Set((m.routes ?? []).map((r) => r.id));
       for (const r of prev.regions ?? []) {
-        if (!currRegions.has(r.id)) overlays.push({ mapId: m.id, kind: "region-removed", name: r.name });
+        if (!currRegions.has(r.id))
+          overlays.push({ mapId: m.id, kind: "region-removed", name: r.name });
       }
       for (const r of prev.routes ?? []) {
-        if (!currRoutes.has(r.id)) overlays.push({ mapId: m.id, kind: "route-removed", name: r.name });
+        if (!currRoutes.has(r.id))
+          overlays.push({ mapId: m.id, kind: "route-removed", name: r.name });
       }
     }
   }
   // Catch overlays on removed maps (their regions/routes also vanish).
   for (const m of baseline.maps) {
     if (currMaps.has(m.id)) continue;
-    for (const r of m.regions ?? []) overlays.push({ mapId: m.id, kind: "region-removed", name: r.name });
-    for (const r of m.routes ?? []) overlays.push({ mapId: m.id, kind: "route-removed", name: r.name });
+    for (const r of m.regions ?? [])
+      overlays.push({ mapId: m.id, kind: "region-removed", name: r.name });
+    for (const r of m.routes ?? [])
+      overlays.push({ mapId: m.id, kind: "route-removed", name: r.name });
   }
 
   return {
@@ -229,7 +255,10 @@ export function computeAtlasDiff(
       maps: new Set(maps.map((m) => m.id)).size,
       overlays: overlays.length,
     },
-    entities, placements, maps, overlays,
+    entities,
+    placements,
+    maps,
+    overlays,
     meta: {
       baselineVersion: baseline.version,
       currentVersion: current.version,

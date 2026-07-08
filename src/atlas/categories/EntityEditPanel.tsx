@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { logger } from "@/lib/logger";
+import { isValidVisibility, ALL_VISIBILITY } from "@/atlas/content/visibility";
 import { parseFrontmatter, stringifyFrontmatter } from "@/atlas/import/frontmatter";
 import { useEntityEditDraft, type EntityEditDraftAPI } from "./useEntityEditDraft";
 import { saveAtlasPatchToLocalFs, hashContent, type FileChange } from "@/atlas/save/localFsSave";
-import { slugify } from "@/atlas/save/newEntitySave";
+import { slugify } from "@/atlas/content/slugify";
 import { readSourceFile } from "@/atlas/save/canonicalPlacementSave";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import {
@@ -54,7 +57,9 @@ export function EntityEditPanel({
           project.entities.map(({ id, title, type, aliases }) => ({ id, title, type, aliases })),
         ),
       )
-      .catch(() => {/* non-fatal — autocomplete just shows nothing */});
+      .catch(() => {
+        /* non-fatal — autocomplete just shows nothing */
+      });
   }, []);
 
   // Fetch image list from dev-only endpoint
@@ -62,7 +67,9 @@ export function EntityEditPanel({
     fetch("/__atlas/assets/images")
       .then((r) => (r.ok ? (r.json() as Promise<{ images: string[] }>) : { images: [] }))
       .then((data) => setImages((data as { images: string[] }).images ?? []))
-      .catch(() => {/* non-fatal — dev-only endpoint */});
+      .catch(() => {
+        /* non-fatal — dev-only endpoint */
+      });
   }, []);
 
   useEffect(() => {
@@ -83,7 +90,7 @@ export function EntityEditPanel({
           return;
         }
         const fm = parseFrontmatter(raw);
-        const atlas = ((fm.data.atlas as Record<string, unknown>) ?? {});
+        const atlas = (fm.data.atlas as Record<string, unknown>) ?? {};
         const baseHash = await hashContent(raw);
         api.load({
           sourcePath,
@@ -91,7 +98,7 @@ export function EntityEditPanel({
           fields: {
             id: String(atlas.id ?? ""),
             type: String(atlas.type ?? ""),
-            visibility: String(atlas.visibility ?? "dm"),
+            visibility: isValidVisibility(atlas.visibility) ? atlas.visibility : "dm",
             summary: String(atlas.summary ?? ""),
           },
           body: fm.content,
@@ -99,6 +106,7 @@ export function EntityEditPanel({
         setPhase("ready");
       } catch (e) {
         if (!alive) return;
+        logger.error("Entity load failed", e);
         setError(e instanceof Error ? e.message : String(e));
         setPhase("error");
       }
@@ -106,7 +114,7 @@ export function EntityEditPanel({
     return () => {
       alive = false;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourcePath]);
 
   const onSave = async () => {
@@ -138,6 +146,7 @@ export function EntityEditPanel({
       api.clear();
       onSaved();
     } catch (e) {
+      logger.error("Entity save failed", e);
       setError(e instanceof Error ? e.message : String(e));
       setPhase("error");
     }
@@ -180,20 +189,23 @@ export function EntityEditPanel({
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
-      const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase() : "";
+      const ext = file.name.includes(".")
+        ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase()
+        : "";
       const stem = file.name.slice(0, file.name.length - ext.length);
       const safeName = (slugify(stem) || "image") + ext;
       const imgPath = `public/atlas/assets/images/${safeName}`;
-      saveAtlasPatchToLocalFs(
-        [{ path: imgPath, content: dataUrl, kind: "asset-binary", baseHash: null }],
-      )
+      saveAtlasPatchToLocalFs([
+        { path: imgPath, content: dataUrl, kind: "asset-binary", baseHash: null },
+      ])
         .then(() => {
-          setImages((prev) =>
-            prev.includes(safeName) ? prev : [...prev, safeName].sort(),
-          );
+          setImages((prev) => (prev.includes(safeName) ? prev : [...prev, safeName].sort()));
           applySelection(safeName);
         })
-        .catch((e: unknown) => alert("Image upload failed: " + (e instanceof Error ? e.message : String(e))));
+        .catch((e: unknown) => {
+          logger.error("Image upload failed", e);
+          toast.error(`Image upload failed: ${e instanceof Error ? e.message : String(e)}`);
+        });
     };
     reader.readAsDataURL(file);
   };
@@ -205,12 +217,22 @@ export function EntityEditPanel({
           setImages((prev) => prev.filter((n) => n !== name));
         } else {
           r.json().then(
-            (body: unknown) => alert("Delete failed: " + ((body as { error?: string })?.error ?? r.status)),
-            () => alert(`Delete failed: ${r.status}`),
+            (body: unknown) => {
+              const detail = (body as { error?: string })?.error ?? r.status;
+              logger.error("Image delete failed", detail);
+              toast.error(`Delete failed: ${detail}`);
+            },
+            () => {
+              logger.error("Image delete failed", r.status);
+              toast.error(`Delete failed: ${r.status}`);
+            },
           );
         }
       })
-      .catch((e: unknown) => alert("Delete failed: " + (e instanceof Error ? e.message : String(e))));
+      .catch((e: unknown) => {
+        logger.error("Image delete failed", e);
+        toast.error(`Delete failed: ${e instanceof Error ? e.message : String(e)}`);
+      });
   };
 
   const handlePickerSelect = (name: string) => {
@@ -271,9 +293,9 @@ export function EntityEditPanel({
       <div className="p-4 text-xs text-red-300 space-y-2">
         <p>{error ?? "Couldn't open this entry for editing."}</p>
         <p className="text-muted-foreground">
-          Its source file may be missing. Rebuild the atlas (restart the dev server
-          or run <code className="font-mono">npm run atlas:build</code>) so the list
-          matches what's on disk.
+          Its source file may be missing. Rebuild the atlas (restart the dev server or run{" "}
+          <code className="font-mono">npm run atlas:build</code>) so the list matches what's on
+          disk.
         </p>
         <button className="underline" onClick={onClose}>
           Close
@@ -306,9 +328,11 @@ export function EntityEditPanel({
             aria-label="Visibility"
             className="w-full h-8 px-2 rounded border bg-background"
             value={d.fields.visibility}
-            onChange={(e) => api.setField("visibility", e.target.value)}
+            onChange={(e) => {
+              if (isValidVisibility(e.target.value)) api.setField("visibility", e.target.value);
+            }}
           >
-            {["player", "dm", "hidden", "rumor"].map((v) => (
+            {ALL_VISIBILITY.map((v) => (
               <option key={v} value={v}>
                 {v}
               </option>

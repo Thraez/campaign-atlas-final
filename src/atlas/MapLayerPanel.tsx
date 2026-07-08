@@ -1,13 +1,40 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, Link as LinkIcon, Trash2, Maximize2, Minimize2, Crosshair, RotateCcw, Lock, Unlock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Copy, Eraser, Move } from "lucide-react";
+import {
+  Upload,
+  Link as LinkIcon,
+  Trash2,
+  Maximize2,
+  Minimize2,
+  Crosshair,
+  RotateCcw,
+  Lock,
+  Unlock,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Eraser,
+  Move,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import { normalizeAtlasAssetUrl } from "./url";
@@ -22,7 +49,7 @@ interface Props {
   onAddFiles: (files: File[]) => void | Promise<void>;
   onAddUrl: (src: string) => void | Promise<void>;
   onEditBuiltin: (id: string) => void;
-  onUpdate: (id: string, patch: Partial<MapLayer>) => void;
+  onUpdate: (id: string, patch: Partial<LocalLayer>) => void;
   onDuplicate: (id: string) => void;
   onRemove: (id: string) => void;
   onClearAll: () => void;
@@ -58,15 +85,37 @@ function layerDisplayName(layer: MapLayer, local?: { name?: string; filename?: s
 }
 
 function basename(p: string): string {
-  return p.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
+  return (
+    p
+      .replace(/[\\/]+$/, "")
+      .split(/[\\/]/)
+      .pop() ?? ""
+  );
 }
 
 function stripExt(name: string): string {
-  return name.replace(/\.[a-zA-Z0-9]+$/, "").replace(/[-_]+/g, " ").trim();
+  return name
+    .replace(/\.[a-zA-Z0-9]+$/, "")
+    .replace(/[-_]+/g, " ")
+    .trim();
 }
 
 export function MapLayerPanel(props: Props) {
-  const { map, mergedLayers, localLayers, selectedId, setSelectedId, onAddFiles, onAddUrl, onEditBuiltin, onUpdate, onDuplicate, onRemove, onClearAll, onSetMapSize } = props;
+  const {
+    map,
+    mergedLayers,
+    localLayers,
+    selectedId,
+    setSelectedId,
+    onAddFiles,
+    onAddUrl,
+    onEditBuiltin,
+    onUpdate,
+    onDuplicate,
+    onRemove,
+    onClearAll,
+    onSetMapSize,
+  } = props;
   const fileInput = useRef<HTMLInputElement>(null);
   const [urlDraft, setUrlDraft] = useState("");
   // When the editor passes lockAspect/setLockAspect, mirror them; otherwise
@@ -76,11 +125,15 @@ export function MapLayerPanel(props: Props) {
   const setLockAspect = props.setLockAspect ?? setLockAspectInternal;
   const editGeometry = props.editGeometry ?? false;
   const setEditGeometry = props.setEditGeometry;
-  const [locked, setLocked] = useState(false);
 
   const selected = mergedLayers.find((l) => l.id === selectedId) ?? null;
   const localSelected = localLayers.find((l) => l.id === selectedId) ?? null;
   const isBuiltinReadOnly = !!selected && !localSelected;
+  // Lock lives on the layer model, so it persists and travels with the layer
+  // through reorder / undo / reload — not panel-local state that resets on every
+  // layer switch. A built-in layer is unlocked until the toggle promotes it to a
+  // local edit (see the lock button below).
+  const locked = localSelected?.locked ?? false;
 
   const aspect = selected ? (selected.height === 0 ? 1 : selected.width / selected.height) : 1;
 
@@ -124,15 +177,20 @@ export function MapLayerPanel(props: Props) {
     setSizeCenterAnchored(w, h);
   };
 
-  const fitWidth = () => selected && setSizeCenterAnchored(map.width, lockAspect ? map.width / aspect : selected.height);
-  const fitHeight = () => selected && setSizeCenterAnchored(lockAspect ? map.height * aspect : selected.width, map.height);
+  const fitWidth = () =>
+    selected && setSizeCenterAnchored(map.width, lockAspect ? map.width / aspect : selected.height);
+  const fitHeight = () =>
+    selected &&
+    setSizeCenterAnchored(lockAspect ? map.height * aspect : selected.width, map.height);
 
   return (
     <div className="flex flex-col h-full">
       <div className="p-3 border-b border-border space-y-2">
         <div className="flex items-baseline justify-between gap-2">
           <div className="min-w-0">
-            <div className="font-display text-sm truncate" title={map.name}>{map.name}</div>
+            <div className="font-display text-sm truncate" title={map.name}>
+              {map.name}
+            </div>
             <div className="text-[10px] text-muted-foreground truncate" title={map.id}>
               id: <code>{map.id}</code>
             </div>
@@ -152,19 +210,33 @@ export function MapLayerPanel(props: Props) {
             >
               <Move className="h-3.5 w-3.5" /> Adjust map image {editGeometry ? "(on)" : "(off)"}
             </Button>
-            <p className="text-[10px] text-muted-foreground">Off: click the map to place pins. On: drag/resize the map image.</p>
+            <p className="text-[10px] text-muted-foreground">
+              Off: click the map to place pins. On: drag/resize the map image.
+            </p>
           </div>
         )}
         <div className="text-xs text-muted-foreground">
-          Edits here are <strong>local drafts</strong> until you click <strong>Save</strong> — Save writes the layers (and any uploaded images) to disk and rebuilds.
+          Edits here are <strong>local drafts</strong> until you click <strong>Save</strong> — Save
+          writes the layers (and any uploaded images) to disk and rebuilds.
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="secondary" className="flex-1 gap-1.5" onClick={() => fileInput.current?.click()}>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="flex-1 gap-1.5"
+            onClick={() => fileInput.current?.click()}
+          >
             <Upload className="h-3.5 w-3.5" /> Upload images
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" title="Clear local draft assets" aria-label="Clear local draft assets">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0 text-destructive"
+                title="Clear local draft assets"
+                aria-label="Clear local draft assets"
+              >
                 <Eraser className="h-3.5 w-3.5" />
               </Button>
             </AlertDialogTrigger>
@@ -172,12 +244,21 @@ export function MapLayerPanel(props: Props) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Clear local draft assets?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Removes every uploaded image preview and local layer override from this browser, across every map. Already-published assets in <code>public/atlas/</code> are not touched.
+                  Removes every uploaded image preview and local layer override from this browser,
+                  across every map. Already-published assets in <code>public/atlas/</code> are not
+                  touched.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => { onClearAll(); toast.info("Local draft layers cleared."); }}>Clear drafts</AlertDialogAction>
+                <AlertDialogAction
+                  onClick={() => {
+                    onClearAll();
+                    toast.info("Local draft layers cleared.");
+                  }}
+                >
+                  Clear drafts
+                </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -201,7 +282,14 @@ export function MapLayerPanel(props: Props) {
             onChange={(e) => setUrlDraft(e.target.value)}
             className="h-8 text-xs"
           />
-          <Button size="sm" variant="ghost" onClick={() => { onAddUrl(urlDraft); setUrlDraft(""); }}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              onAddUrl(urlDraft);
+              setUrlDraft("");
+            }}
+          >
             <LinkIcon className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -215,48 +303,112 @@ export function MapLayerPanel(props: Props) {
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-1">
           {mergedLayers.length === 0 && (
-            <p className="text-xs text-muted-foreground p-3 text-center italic">No layers yet. Upload an image or paste a URL.</p>
+            <p className="text-xs text-muted-foreground p-3 text-center italic">
+              No layers yet. Upload an image or paste a URL.
+            </p>
           )}
-          {mergedLayers.slice().reverse().map((l) => {
-            const local = localLayers.find((x) => x.id === l.id);
-            const isSel = l.id === selectedId;
-            return (
-              <button
-                key={l.id}
-                onClick={() => setSelectedId(l.id)}
-                className={`w-full text-left rounded-md px-2 py-1.5 text-xs flex items-center gap-2 ${isSel ? "bg-primary/15 border border-primary/40" : "hover:bg-accent/40 border border-transparent"}`}
-              >
-                <div className="h-8 w-8 rounded bg-muted overflow-hidden shrink-0 flex items-center justify-center">
-                  <img src={normalizeAtlasAssetUrl(l.src)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium" title={layerDisplayName(l, local)}>{layerDisplayName(l, local)}</div>
-                  <div className="text-[10px] text-muted-foreground truncate font-mono" title={l.id}>{l.id}</div>
-                  <div className="text-[10px] text-muted-foreground truncate">
-                    {local?.origin === "upload" && <Badge variant="secondary" className="h-3.5 px-1 text-[9px] mr-1">local preview</Badge>}
-                    {local?.origin === "url" && <Badge variant="outline" className="h-3.5 px-1 text-[9px] mr-1">url</Badge>}
-                    {!local && <Badge variant="outline" className="h-3.5 px-1 text-[9px] mr-1">built-in</Badge>}
-                    {Math.round(l.width)}×{Math.round(l.height)}
+          {mergedLayers
+            .slice()
+            .reverse()
+            .map((l) => {
+              const local = localLayers.find((x) => x.id === l.id);
+              const isSel = l.id === selectedId;
+              return (
+                <button
+                  key={l.id}
+                  onClick={() => setSelectedId(l.id)}
+                  className={`w-full text-left rounded-md px-2 py-1.5 text-xs flex items-center gap-2 ${isSel ? "bg-primary/15 border border-primary/40" : "hover:bg-accent/40 border border-transparent"}`}
+                >
+                  <div className="h-8 w-8 rounded bg-muted overflow-hidden shrink-0 flex items-center justify-center">
+                    <img
+                      src={normalizeAtlasAssetUrl(l.src)}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
                   </div>
-                </div>
-              </button>
-            );
-          })}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-medium" title={layerDisplayName(l, local)}>
+                      {layerDisplayName(l, local)}
+                    </div>
+                    <div
+                      className="text-[10px] text-muted-foreground truncate font-mono"
+                      title={l.id}
+                    >
+                      {l.id}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground truncate">
+                      {local?.origin === "upload" && (
+                        <Badge variant="secondary" className="h-3.5 px-1 text-[9px] mr-1">
+                          local preview
+                        </Badge>
+                      )}
+                      {local?.origin === "url" && (
+                        <Badge variant="outline" className="h-3.5 px-1 text-[9px] mr-1">
+                          url
+                        </Badge>
+                      )}
+                      {!local && (
+                        <Badge variant="outline" className="h-3.5 px-1 text-[9px] mr-1">
+                          built-in
+                        </Badge>
+                      )}
+                      {Math.round(l.width)}×{Math.round(l.height)}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
         </div>
 
         {selected && (
           <div className="p-3 border-t border-border space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Transform</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Transform
+              </span>
               <div className="flex items-center gap-1">
-                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onDuplicate(selected.id)} title="Duplicate" aria-label="Duplicate layer">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0"
+                  onClick={() => onDuplicate(selected.id)}
+                  title="Duplicate"
+                  aria-label="Duplicate layer"
+                >
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
-                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setLocked((v) => !v)} title={locked ? "Unlock" : "Lock"} aria-label={locked ? "Unlock layer" : "Lock layer"}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0"
+                  onClick={() => {
+                    if (!selected) return;
+                    // Locking a built-in promotes it to a local edit so the flag
+                    // has somewhere to persist. The lock toggle bypasses patch()
+                    // (which itself refuses to run while locked) so a layer can
+                    // always be unlocked.
+                    ensureEditable(selected.id);
+                    onUpdate(selected.id, { locked: !locked });
+                  }}
+                  title={locked ? "Unlock" : "Lock"}
+                  aria-label={locked ? "Unlock layer" : "Lock layer"}
+                >
                   {locked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
                 </Button>
                 {localSelected && (
-                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => onRemove(selected.id)} title="Remove" aria-label="Remove layer">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-destructive"
+                    onClick={() => onRemove(selected.id)}
+                    title="Remove"
+                    aria-label="Remove layer"
+                  >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 )}
@@ -272,99 +424,216 @@ export function MapLayerPanel(props: Props) {
             <div className="grid grid-cols-2 gap-2">
               <Field label="X" value={selected.x} onChange={(v) => patch({ x: v })} />
               <Field label="Y" value={selected.y} onChange={(v) => patch({ y: v })} />
-              <Field label="Width" value={selected.width} onChange={(v) => {
-                const h = lockAspect ? v / aspect : selected.height;
-                setSize(v, h);
-              }} />
-              <Field label="Height" value={selected.height} onChange={(v) => {
-                const w = lockAspect ? v * aspect : selected.width;
-                setSize(w, v);
-              }} />
-              <Field label="zIndex" value={selected.zIndex} onChange={(v) => patch({ zIndex: v })} />
+              <Field
+                label="Width"
+                value={selected.width}
+                onChange={(v) => {
+                  const h = lockAspect ? v / aspect : selected.height;
+                  setSize(v, h);
+                }}
+              />
+              <Field
+                label="Height"
+                value={selected.height}
+                onChange={(v) => {
+                  const w = lockAspect ? v * aspect : selected.width;
+                  setSize(w, v);
+                }}
+              />
+              <Field
+                label="zIndex"
+                value={selected.zIndex}
+                onChange={(v) => patch({ zIndex: v })}
+              />
               <div className="col-span-2">
-                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Opacity {selected.opacity.toFixed(2)}</Label>
-                <Slider min={0} max={1} step={0.05} value={[selected.opacity]} onValueChange={([v]) => patch({ opacity: v })} />
+                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Opacity {selected.opacity.toFixed(2)}
+                </Label>
+                <Slider
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={[selected.opacity]}
+                  onValueChange={([v]) => patch({ opacity: v })}
+                />
               </div>
             </div>
 
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              <input type="checkbox" checked={lockAspect} onChange={(e) => setLockAspect(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={lockAspect}
+                onChange={(e) => setLockAspect(e.target.checked)}
+              />
               Lock aspect ratio
             </label>
 
             <div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Nudge</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                Nudge
+              </div>
               <div className="space-y-1.5">
                 {NUDGE_STEPS.map((step) => (
                   <div key={step} className="flex items-center gap-1">
                     <span className="text-[10px] text-muted-foreground w-12">±{step}</span>
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => nudge(-step, 0)} aria-label={`Nudge layer left (±${step})`}><ChevronLeft className="h-3.5 w-3.5" /></Button>
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => nudge(step, 0)} aria-label={`Nudge layer right (±${step})`}><ChevronRight className="h-3.5 w-3.5" /></Button>
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => nudge(0, -step)} aria-label={`Nudge layer up (±${step})`}><ChevronUp className="h-3.5 w-3.5" /></Button>
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => nudge(0, step)} aria-label={`Nudge layer down (±${step})`}><ChevronDown className="h-3.5 w-3.5" /></Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={() => nudge(-step, 0)}
+                      aria-label={`Nudge layer left (±${step})`}
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={() => nudge(step, 0)}
+                      aria-label={`Nudge layer right (±${step})`}
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={() => nudge(0, -step)}
+                      aria-label={`Nudge layer up (±${step})`}
+                    >
+                      <ChevronUp className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={() => nudge(0, step)}
+                      aria-label={`Nudge layer down (±${step})`}
+                    >
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 ))}
               </div>
             </div>
 
             <div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Scale</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                Scale
+              </div>
               <div className="flex flex-wrap gap-1">
                 {SCALE_STEPS.map((s) => (
-                  <Button key={s} size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => scale(s)}>
+                  <Button
+                    key={s}
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => scale(s)}
+                  >
                     {Math.round(s * 100)}%
                   </Button>
                 ))}
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={fitWidth}>Fit W</Button>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={fitHeight}>Fit H</Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={fitWidth}>
+                  Fit W
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={fitHeight}>
+                  Fit H
+                </Button>
               </div>
             </div>
 
             {localSelected && (
               <div className="space-y-2 border-t border-border pt-2">
                 <div>
-                  <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Name</Label>
-                  <Input value={localSelected.name ?? ""} onChange={(e) => onUpdate(selected.id, { name: e.target.value } as Partial<MapLayer>)} className="h-7 text-xs" />
+                  <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Name
+                  </Label>
+                  <Input
+                    value={localSelected.name ?? ""}
+                    onChange={(e) => onUpdate(selected.id, { name: e.target.value })}
+                    className="h-7 text-xs"
+                  />
                 </div>
                 {localSelected.origin === "upload" && (
                   <div>
-                    <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Target publish path</Label>
+                    <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Target publish path
+                    </Label>
                     <Input
                       value={localSelected.targetPath ?? ""}
-                      onChange={(e) => onUpdate(selected.id, { targetPath: e.target.value } as Partial<MapLayer>)}
+                      onChange={(e) => onUpdate(selected.id, { targetPath: e.target.value })}
                       className="h-7 text-xs font-mono"
                     />
                   </div>
                 )}
                 {localSelected.origin === "url" && /^https?:/i.test(localSelected.src) && (
-                  <p className="text-[10px] text-amber-300/90">External image — may break in published builds.</p>
+                  <p className="text-[10px] text-amber-300/90">
+                    External image — may break in published builds.
+                  </p>
                 )}
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-1.5 pt-1">
-              <Button size="sm" variant="secondary" className="text-xs" onClick={() => patch({ x: (map.width - selected.width) / 2, y: (map.height - selected.height) / 2 })}>
-                <Crosshair className="h-3.5 w-3.5 mr-1" />Center
+              <Button
+                size="sm"
+                variant="secondary"
+                className="text-xs"
+                onClick={() =>
+                  patch({
+                    x: (map.width - selected.width) / 2,
+                    y: (map.height - selected.height) / 2,
+                  })
+                }
+              >
+                <Crosshair className="h-3.5 w-3.5 mr-1" />
+                Center
               </Button>
-              <Button size="sm" variant="secondary" className="text-xs" onClick={() => patch({ x: 0, y: 0, width: map.width, height: map.height })}>
-                <Maximize2 className="h-3.5 w-3.5 mr-1" />Fit map
+              <Button
+                size="sm"
+                variant="secondary"
+                className="text-xs"
+                onClick={() => patch({ x: 0, y: 0, width: map.width, height: map.height })}
+              >
+                <Maximize2 className="h-3.5 w-3.5 mr-1" />
+                Fit map
               </Button>
-              <Button size="sm" variant="secondary" className="text-xs" onClick={() => onSetMapSize?.(selected.width, selected.height)} disabled={!onSetMapSize}>
-                <Minimize2 className="h-3.5 w-3.5 mr-1" />Map = layer
+              <Button
+                size="sm"
+                variant="secondary"
+                className="text-xs"
+                onClick={() => onSetMapSize?.(selected.width, selected.height)}
+                disabled={!onSetMapSize}
+              >
+                <Minimize2 className="h-3.5 w-3.5 mr-1" />
+                Map = layer
               </Button>
-              <Button size="sm" variant="secondary" className="text-xs" onClick={() => {
-                const xs = mergedLayers.map((l) => l.x);
-                const ys = mergedLayers.map((l) => l.y);
-                const xe = mergedLayers.map((l) => l.x + l.width);
-                const ye = mergedLayers.map((l) => l.y + l.height);
-                const w = Math.max(...xe) - Math.min(0, ...xs);
-                const h = Math.max(...ye) - Math.min(0, ...ys);
-                onSetMapSize?.(Math.max(map.width, w), Math.max(map.height, h));
-              }} disabled={!onSetMapSize}>
-                <Maximize2 className="h-3.5 w-3.5 mr-1" />Expand
+              <Button
+                size="sm"
+                variant="secondary"
+                className="text-xs"
+                onClick={() => {
+                  const xs = mergedLayers.map((l) => l.x);
+                  const ys = mergedLayers.map((l) => l.y);
+                  const xe = mergedLayers.map((l) => l.x + l.width);
+                  const ye = mergedLayers.map((l) => l.y + l.height);
+                  const w = Math.max(...xe) - Math.min(0, ...xs);
+                  const h = Math.max(...ye) - Math.min(0, ...ys);
+                  onSetMapSize?.(Math.max(map.width, w), Math.max(map.height, h));
+                }}
+                disabled={!onSetMapSize}
+              >
+                <Maximize2 className="h-3.5 w-3.5 mr-1" />
+                Expand
               </Button>
-              <Button size="sm" variant="ghost" className="text-xs col-span-2" onClick={() => patch({ x: 0, y: 0, opacity: 1 })}>
-                <RotateCcw className="h-3.5 w-3.5 mr-1" />Reset position
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-xs col-span-2"
+                onClick={() => patch({ x: 0, y: 0, opacity: 1 })}
+              >
+                <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                Reset position
               </Button>
             </div>
           </div>
@@ -374,7 +643,15 @@ export function MapLayerPanel(props: Props) {
   );
 }
 
-function Field({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
+function Field({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (n: number) => void;
+}) {
   return (
     <div>
       <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</Label>
@@ -387,4 +664,3 @@ function Field({ label, value, onChange }: { label: string; value: number; onCha
     </div>
   );
 }
-

@@ -24,7 +24,9 @@ import {
  */
 export function OfflineStatus() {
   const enabled = shouldEnableServiceWorker();
-  const [online, setOnline] = useState<boolean>(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [online, setOnline] = useState<boolean>(
+    typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
   const [updateReady, setUpdateReady] = useState(false);
   const [cached, setCached] = useState<boolean>(isOfflineReady());
 
@@ -118,16 +120,30 @@ export function OfflineMenu({ className }: OfflineMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Offline cache options" className={className} title="Offline cache">
-          {cached ? <Cloud className="h-4 w-4" aria-hidden="true" /> : <CloudOff className="h-4 w-4" aria-hidden="true" />}
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Offline cache options"
+          className={className}
+          title="Offline cache"
+        >
+          {cached ? (
+            <Cloud className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <CloudOff className="h-4 w-4" aria-hidden="true" />
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuLabel className="flex items-center gap-2 text-xs">
           {cached ? (
-            <><CheckCircle2 className="h-3.5 w-3.5 text-green-500" /> Available offline</>
+            <>
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-500" /> Available offline
+            </>
           ) : (
-            <><CloudOff className="h-3.5 w-3.5" /> Not yet cached</>
+            <>
+              <CloudOff className="h-3.5 w-3.5" /> Not yet cached
+            </>
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

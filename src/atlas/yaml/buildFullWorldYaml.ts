@@ -16,7 +16,15 @@
  * block of the existing file is re-prepended byte-for-byte (or a default
  * boilerplate header when there's no existing file).
  */
-import type { FogOverlay, MapDocument, MapLayer, Region, Route, WaterConfig, WorldCalendar } from "@/atlas/content/schema";
+import type {
+  FogOverlay,
+  MapDocument,
+  MapLayer,
+  Region,
+  Route,
+  WaterConfig,
+  WorldCalendar,
+} from "@/atlas/content/schema";
 import { DEFAULT_WATER } from "@/atlas/ocean/resolveWater";
 import { fogToYamlObject } from "@/atlas/fog/useFogDraft";
 import { regionToYamlObject } from "@/atlas/regions/useRegionDraft";
@@ -99,7 +107,8 @@ function waterToYamlObject(w: WaterConfig): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (w.enabled === false) out.enabled = false;
   else if (w.enabled === true) out.enabled = true;
-  if (w.intensity !== undefined && w.intensity !== DEFAULT_WATER.intensity) out.intensity = w.intensity;
+  if (w.intensity !== undefined && w.intensity !== DEFAULT_WATER.intensity)
+    out.intensity = w.intensity;
   if (w.speed !== undefined && w.speed !== DEFAULT_WATER.speed) out.speed = w.speed;
   if (w.crestColor) out.crestColor = w.crestColor;
   return out;

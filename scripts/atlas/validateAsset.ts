@@ -38,12 +38,7 @@ export const DEFAULT_SVG_POLICY: SvgPolicy = "warn";
 
 export type FindingSeverity = "error" | "warning";
 export type FindingCategory =
-  | "missing"
-  | "absolute-path"
-  | "bad-extension"
-  | "svg-policy"
-  | "oversize"
-  | "external";
+  "missing" | "absolute-path" | "bad-extension" | "svg-policy" | "oversize" | "external";
 
 export interface AssetFinding {
   severity: FindingSeverity;
@@ -89,7 +84,7 @@ export function githubPagesBasePath(repoSubpath: string | undefined): string {
 export function validateAsset(
   raw: string,
   owner: string,
-  opts: ValidateAssetOptions
+  opts: ValidateAssetOptions,
 ): AssetFinding[] {
   const findings: AssetFinding[] = [];
   if (!raw) return findings;

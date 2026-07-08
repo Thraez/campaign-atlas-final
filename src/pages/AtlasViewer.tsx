@@ -1,33 +1,64 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { MapContainer, Marker, Popup, Polygon, Polyline, ImageOverlay, Tooltip, useMap } from "react-leaflet";
+import {
+  MapContainer,
+  Marker,
+  Popup,
+  Polygon,
+  Polyline,
+  ImageOverlay,
+  Tooltip,
+  useMap,
+} from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { loadAtlasContent, loadSearchIndex, type SearchIndexEntry } from "@/atlas/content/loader";
-import type { AtlasProject, Entity, MapDocument, MapPlacement, Point, GridOverlay, MapScale } from "@/atlas/content/schema";
+import type {
+  AtlasProject,
+  Entity,
+  MapDocument,
+  MapPlacement,
+  Point,
+  GridOverlay,
+  MapScale,
+} from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
-  Search, X, MapPin, ArrowLeft, Compass, Grid3x3, CalendarClock,
-  LayoutGrid, Ruler,
+  Search,
+  X,
+  ArrowLeft,
+  Compass,
+  Grid3x3,
+  CalendarClock,
+  LayoutGrid,
+  Ruler,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { OceanBackground } from "@/atlas/ocean/OceanBackground";
-import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
-import { snippet } from "@/atlas/search/snippet";
-import { parseSearchQuery, matchesPhrases } from "@/atlas/search/parseSearchQuery";
+import { SearchPalette } from "@/atlas/search/SearchPalette";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
-import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
 import { serializeDeepLink, parseDeepLink } from "@/atlas/deepLink";
+import {
+  ROUTE_MODE_LABEL,
+  routeDistancePx,
+  formatTravelTime,
+  gridLines,
+} from "@/atlas/map/geometry";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
@@ -48,16 +79,19 @@ function pinIconForStyle(style: PinPreset, opts?: { dim?: boolean }): L.DivIcon 
   });
 }
 
-function MapController({ flyTo }: { flyTo: { x: number; y: number; height: number; zoom?: number } | null }) {
+function MapController({
+  flyTo,
+}: {
+  flyTo: { x: number; y: number; height: number; zoom?: number } | null;
+}) {
   const map = useMap();
   useEffect(() => {
     if (!flyTo) return;
     const lat = flyTo.height - flyTo.y;
     const lng = flyTo.x;
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    const targetZoom = flyTo.zoom != null && Number.isFinite(flyTo.zoom)
-      ? flyTo.zoom
-      : Math.max(map.getZoom(), -1);
+    const targetZoom =
+      flyTo.zoom != null && Number.isFinite(flyTo.zoom) ? flyTo.zoom : Math.max(map.getZoom(), -1);
     map.flyTo([lat, lng], targetZoom, { duration: 0.6 });
   }, [flyTo, map]);
   return null;
@@ -88,62 +122,6 @@ function ViewSyncController({
   return null;
 }
 
-const ROUTE_MODE_LABEL: Record<string, string> = {
-  foot: "on foot", horse: "on horseback", ship: "by ship", cart: "by cart", fly: "flying", custom: "",
-};
-
-function routeDistancePx(points: Point[]): number {
-  let d = 0;
-  for (let i = 1; i < points.length; i++) {
-    const dx = points[i][0] - points[i - 1][0];
-    const dy = points[i][1] - points[i - 1][1];
-    d += Math.hypot(dx, dy);
-  }
-  return d;
-}
-
-function formatTravelTime(hours: number): string {
-  if (hours < 1) return `${Math.round(hours * 60)} min`;
-  if (hours < 24) return `${hours.toFixed(hours < 4 ? 1 : 0)} h`;
-  const days = hours / 24;
-  return `${days.toFixed(days < 4 ? 1 : 0)} days`;
-}
-
-function gridLines(map: MapDocument, grid: GridOverlay): L.LatLngExpression[][] {
-  const lines: L.LatLngExpression[][] = [];
-  if (grid.kind === "square") {
-    for (let x = 0; x <= map.width; x += grid.size) {
-      lines.push([[0, x], [map.height, x]]);
-    }
-    for (let y = 0; y <= map.height; y += grid.size) {
-      lines.push([[y, 0], [y, map.width]]);
-    }
-    return lines;
-  }
-  // pointy-top hex grid
-  const r = grid.size;
-  const w = Math.sqrt(3) * r;
-  const h = 2 * r;
-  const dy = (3 / 4) * h;
-  for (let row = 0, py = 0; py <= map.height + h; row++, py = row * dy) {
-    const offset = row % 2 === 0 ? 0 : w / 2;
-    for (let px = -offset; px <= map.width + w; px += w) {
-      const cx = px + w / 2;
-      const cy = py;
-      const verts: [number, number][] = [];
-      for (let i = 0; i < 6; i++) {
-        const ang = (Math.PI / 3) * i - Math.PI / 2;
-        const vx = cx + r * Math.cos(ang);
-        const vy = cy + r * Math.sin(ang);
-        verts.push([map.height - vy, vx]);
-      }
-      verts.push(verts[0]);
-      lines.push(verts);
-    }
-  }
-  return lines;
-}
-
 interface ViewerState {
   project: AtlasProject;
   index: SearchIndexEntry[];
@@ -154,7 +132,12 @@ export default function AtlasViewer() {
   const [error, setError] = useState<string | null>(null);
   const [activeMapId, setActiveMapId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [flyTarget, setFlyTarget] = useState<{ x: number; y: number; height: number; zoom?: number } | null>(null);
+  const [flyTarget, setFlyTarget] = useState<{
+    x: number;
+    y: number;
+    height: number;
+    zoom?: number;
+  } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   // The bottom sheet renders the entity panel at *every* viewport below the
@@ -188,13 +171,15 @@ export default function AtlasViewer() {
   useEffect(() => {
     if (!activeMapId) return;
     window.history.replaceState(
-      null, "",
-      "?" + serializeDeepLink({
-        mapId: activeMapId,
-        entityId: openId,
-        center: viewCenter ? { x: viewCenter.x, y: viewCenter.y } : null,
-        zoom: viewCenter?.zoom ?? null,
-      })
+      null,
+      "",
+      "?" +
+        serializeDeepLink({
+          mapId: activeMapId,
+          entityId: openId,
+          center: viewCenter ? { x: viewCenter.x, y: viewCenter.y } : null,
+          zoom: viewCenter?.zoom ?? null,
+        }),
     );
   }, [activeMapId, openId, viewCenter]);
 
@@ -209,7 +194,12 @@ export default function AtlasViewer() {
       const mapIdForFly = dl.mapId ?? activeMapId;
       const targetMap = data.project.maps.find((m) => m.id === mapIdForFly);
       if (targetMap) {
-        setFlyTarget({ x: dl.center.x, y: dl.center.y, height: targetMap.height, zoom: dl.zoom ?? undefined });
+        setFlyTarget({
+          x: dl.center.x,
+          y: dl.center.y,
+          height: targetMap.height,
+          zoom: dl.zoom ?? undefined,
+        });
       }
     }
     if (!dl.entityId) setMobilePanelOpen(false);
@@ -227,9 +217,8 @@ export default function AtlasViewer() {
         const defaultMapId = project.worlds[0]?.defaultMapId ?? project.maps[0]?.id ?? null;
         const dl = parseDeepLink(window.location.search);
         // Use map from deep link if valid, else fall back to default
-        const targetMapId = (dl.mapId && project.maps.some((m) => m.id === dl.mapId))
-          ? dl.mapId
-          : defaultMapId;
+        const targetMapId =
+          dl.mapId && project.maps.some((m) => m.id === dl.mapId) ? dl.mapId : defaultMapId;
         setActiveMapId(targetMapId);
         if (dl.entityId) {
           setOpenId(dl.entityId);
@@ -240,7 +229,12 @@ export default function AtlasViewer() {
           // Full deep link: fly to the exact shared viewport
           const mapForFly = project.maps.find((m) => m.id === targetMapId);
           if (mapForFly) {
-            setFlyTarget({ x: dl.center.x, y: dl.center.y, height: mapForFly.height, zoom: dl.zoom ?? undefined });
+            setFlyTarget({
+              x: dl.center.x,
+              y: dl.center.y,
+              height: mapForFly.height,
+              zoom: dl.zoom ?? undefined,
+            });
           }
         } else if (dl.entityId) {
           // Old-style ?entity= link: fly to the entity's placement (backward compat)
@@ -255,16 +249,17 @@ export default function AtlasViewer() {
         }
       })
       .catch((e: Error) => setError(e.message));
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally runs once; URL-driven entity open should respect the viewport at load time
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally runs once; URL-driven entity open should respect the viewport at load time
   }, []);
 
   const activeMap: MapDocument | undefined = useMemo(
     () => data?.project.maps.find((m) => m.id === activeMapId),
-    [data, activeMapId]
+    [data, activeMapId],
   );
   const placementsOnMap: MapPlacement[] = useMemo(
-    () => (data && activeMap ? data.project.placements.filter((p) => p.mapId === activeMap.id) : []),
-    [data, activeMap]
+    () =>
+      data && activeMap ? data.project.placements.filter((p) => p.mapId === activeMap.id) : [],
+    [data, activeMap],
   );
   const entityById = useMemo(() => {
     const m = new Map<string, Entity>();
@@ -277,13 +272,15 @@ export default function AtlasViewer() {
       // Push a history entry so Back returns to the previous entity (or no-entity state)
       const vc = viewCenterRef.current;
       window.history.pushState(
-        null, "",
-        "?" + serializeDeepLink({
-          mapId: activeMapId,
-          entityId: id,
-          center: vc ? { x: vc.x, y: vc.y } : null,
-          zoom: vc?.zoom ?? null,
-        })
+        null,
+        "",
+        "?" +
+          serializeDeepLink({
+            mapId: activeMapId,
+            entityId: id,
+            center: vc ? { x: vc.x, y: vc.y } : null,
+            zoom: vc?.zoom ?? null,
+          }),
       );
       setOpenId(id);
       // Only open the bottom sheet on viewports where the desktop aside
@@ -291,11 +288,13 @@ export default function AtlasViewer() {
       // while the panel is the user-visible target (the gray-screen bug).
       if (!hasDesktopAside) setMobilePanelOpen(true);
       if (fly && data && activeMap) {
-        const placement = data.project.placements.find((p) => p.entityId === id && p.mapId === activeMap.id);
+        const placement = data.project.placements.find(
+          (p) => p.entityId === id && p.mapId === activeMap.id,
+        );
         if (placement) setFlyTarget({ x: placement.x, y: placement.y, height: activeMap.height });
       }
     },
-    [data, activeMap, hasDesktopAside, activeMapId]
+    [data, activeMap, hasDesktopAside, activeMapId],
   );
 
   // Intercept wikilink clicks inside rendered HTML
@@ -338,16 +337,20 @@ export default function AtlasViewer() {
             {offline ? "Atlas not available offline yet" : "Atlas not built yet"}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {offline
-              ? "Open the atlas once while online to cache it for offline use."
-              : error}
+            {offline ? "Open the atlas once while online to cache it for offline use." : error}
           </p>
           {!offline && (
             <p className="text-xs text-muted-foreground">
-              Run <code className="px-1.5 py-0.5 rounded bg-muted">npm run atlas:build</code> to generate <code>public/atlas/atlas.json</code>.
+              Run <code className="px-1.5 py-0.5 rounded bg-muted">npm run atlas:build</code> to
+              generate <code>public/atlas/atlas.json</code>.
             </p>
           )}
-          <Button asChild variant="secondary"><Link to="/"><ArrowLeft className="h-4 w-4 mr-1" />Back to home</Link></Button>
+          <Button asChild variant="secondary">
+            <Link to="/">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back to home
+            </Link>
+          </Button>
         </div>
       </div>
     );
@@ -371,47 +374,66 @@ export default function AtlasViewer() {
           <Compass className="h-10 w-10 mx-auto text-primary opacity-70" aria-hidden="true" />
           <h1 className="font-display text-2xl text-primary">Atlas has no maps yet</h1>
           <p className="text-sm text-muted-foreground">
-            The atlas published, but no map is configured for this world. Add at least one
-            map block to <code className="px-1 py-0.5 rounded bg-muted">content/&lt;world&gt;/_atlas/world.yaml</code>
-            and run <code className="px-1 py-0.5 rounded bg-muted">npm run atlas:build</code> to regenerate.
+            The atlas published, but no map is configured for this world. Add at least one map block
+            to{" "}
+            <code className="px-1 py-0.5 rounded bg-muted">
+              content/&lt;world&gt;/_atlas/world.yaml
+            </code>
+            and run <code className="px-1 py-0.5 rounded bg-muted">npm run atlas:build</code> to
+            regenerate.
           </p>
           {data.project.entities.length > 0 && (
             <p className="text-xs text-muted-foreground">
-              {data.project.entities.length} entities are present — they're searchable via the search palette
-              even without a map.
+              {data.project.entities.length} entities are present — they're searchable via the
+              search palette even without a map.
             </p>
           )}
           <div className="flex justify-center gap-2 pt-2">
             <Button onClick={() => setSearchOpen(true)} variant="default" className="gap-2">
               <Search className="h-4 w-4" /> Search entities (Ctrl+K)
             </Button>
-            <Button asChild variant="secondary"><Link to="/"><ArrowLeft className="h-4 w-4 mr-1" />Home</Link></Button>
+            <Button asChild variant="secondary">
+              <Link to="/">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Home
+              </Link>
+            </Button>
           </div>
         </div>
       </div>
     );
   }
 
-  const openEntity_ = openId ? entityById.get(openId) : null;
+  const openEntity_ = openId ? (entityById.get(openId) ?? null) : null;
   const openPlacements = openEntity_
     ? data.project.placements.filter((p) => p.entityId === openEntity_.id)
     : [];
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
-      <a href="#atlas-main" className="skip-to-main">Skip to map</a>
+      <a href="#atlas-main" className="skip-to-main">
+        Skip to map
+      </a>
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
         <AtlasNavMenu publishedAt={data.project.publishedAt} />
-        <Link to="/" className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2">
-          <Compass className="h-5 w-5" aria-hidden="true" /> <span className="hidden sm:inline">Astrath Atlas</span>
+        <Link
+          to="/"
+          className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2"
+        >
+          <Compass className="h-5 w-5" aria-hidden="true" />{" "}
+          <span className="hidden sm:inline">Astrath Atlas</span>
         </Link>
         <div className="flex-1" />
         {data.project.maps.length > 1 && (
           <Select value={activeMap.id} onValueChange={setActiveMapId}>
-            <SelectTrigger className="h-8 w-[180px] text-xs" aria-label="Choose map"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 w-[180px] text-xs" aria-label="Choose map">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {data.project.maps.map((m) => (
-                <SelectItem key={m.id} value={m.id} className="text-xs">{m.name}</SelectItem>
+                <SelectItem key={m.id} value={m.id} className="text-xs">
+                  {m.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -438,20 +460,36 @@ export default function AtlasViewer() {
         >
           <Ruler className="h-4 w-4" aria-hidden="true" />
         </Button>
-        <Button variant="secondary" size="sm" onClick={() => setSearchOpen(true)} className="gap-2" aria-label="Search atlas (Ctrl+K)">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setSearchOpen(true)}
+          className="gap-2"
+          aria-label="Search atlas (Ctrl+K)"
+        >
           <Search className="h-4 w-4" aria-hidden="true" />
           <span className="hidden sm:inline">Search</span>
-          <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded bg-muted border border-border">⌘K</kbd>
+          <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded bg-muted border border-border">
+            ⌘K
+          </kbd>
         </Button>
         <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
-          <Link to="/atlas/browse" title="Browse all entries"><LayoutGrid className="h-4 w-4 mr-1" aria-hidden="true" />Browse</Link>
+          <Link to="/atlas/browse" title="Browse all entries">
+            <LayoutGrid className="h-4 w-4 mr-1" aria-hidden="true" />
+            Browse
+          </Link>
         </Button>
         <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
-          <Link to="/atlas/timeline" title="Timeline of dated entries"><CalendarClock className="h-4 w-4 mr-1" aria-hidden="true" />Timeline</Link>
+          <Link to="/atlas/timeline" title="Timeline of dated entries">
+            <CalendarClock className="h-4 w-4 mr-1" aria-hidden="true" />
+            Timeline
+          </Link>
         </Button>
         {__INCLUDE_EDITOR__ && isDmToolsEnabled() && (
           <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
-            <Link to="/atlas/edit" title="DM placement editor">Edit pins</Link>
+            <Link to="/atlas/edit" title="DM placement editor">
+              Edit pins
+            </Link>
           </Button>
         )}
         <OfflineMenu />
@@ -478,7 +516,15 @@ export default function AtlasViewer() {
             keyboard
             keyboardPanDelta={80}
             attributionControl={false}
-            style={{ width: "100%", height: "100%", background: activeMap.water?.enabled === false ? (activeMap.oceanColor ?? "#18313f") : "transparent", cursor: rulerActive ? "crosshair" : undefined }}
+            style={{
+              width: "100%",
+              height: "100%",
+              background:
+                activeMap.water?.enabled === false
+                  ? (activeMap.oceanColor ?? "#18313f")
+                  : "transparent",
+              cursor: rulerActive ? "crosshair" : undefined,
+            }}
           >
             <MapController flyTo={flyTarget} />
             <ViewSyncController
@@ -587,7 +633,6 @@ export default function AtlasViewer() {
           query={query}
           setQuery={setQuery}
           index={data.index}
-          entityById={entityById}
           placements={data.project.placements}
           onPick={(id, fly) => {
             setSearchOpen(false);
@@ -610,21 +655,32 @@ interface WrappedWorldProps {
   onOpenEntity: (id: string, fly?: boolean) => void;
 }
 
-function WrappedWorld({ dx, map, placements, entityById, showGrid, onOpenEntity }: WrappedWorldProps) {
+function WrappedWorld({
+  dx,
+  map,
+  placements,
+  entityById,
+  showGrid,
+  onOpenEntity,
+}: WrappedWorldProps) {
   const H = map.height;
   return (
     <>
-      {[...map.layers].sort((a, b) => a.zIndex - b.zIndex).map((layer) => (
-        <ImageOverlay
-          key={`${layer.id}-${dx}`}
-          url={normalizeAtlasAssetUrl(layer.src)}
-          bounds={[
-            [H - (layer.y + layer.height), layer.x + dx],
-            [H - layer.y, layer.x + layer.width + dx],
-          ] as L.LatLngBoundsLiteral}
-          opacity={layer.opacity}
-        />
-      ))}
+      {[...map.layers]
+        .sort((a, b) => a.zIndex - b.zIndex)
+        .map((layer) => (
+          <ImageOverlay
+            key={`${layer.id}-${dx}`}
+            url={normalizeAtlasAssetUrl(layer.src)}
+            bounds={
+              [
+                [H - (layer.y + layer.height), layer.x + dx],
+                [H - layer.y, layer.x + layer.width + dx],
+              ] as L.LatLngBoundsLiteral
+            }
+            opacity={layer.opacity}
+          />
+        ))}
 
       {(map.regions ?? []).map((region) => {
         const ent = region.entityId ? entityById.get(region.entityId) : undefined;
@@ -635,11 +691,15 @@ function WrappedWorld({ dx, map, placements, entityById, showGrid, onOpenEntity 
             key={`${region.id}-${dx}`}
             positions={positions}
             pathOptions={{
-              color, weight: 1.5, fillColor: color,
+              color,
+              weight: 1.5,
+              fillColor: color,
               fillOpacity: region.fillOpacity ?? 0.18,
               opacity: region.strokeOpacity ?? 0.85,
             }}
-            eventHandlers={region.entityId ? { click: () => onOpenEntity(region.entityId!, false) } : undefined}
+            eventHandlers={
+              region.entityId ? { click: () => onOpenEntity(region.entityId!, false) } : undefined
+            }
           >
             {/* Hover label so users don't rely on fill color alone to identify
                 a region (WCAG 1.4.1). Click still opens the full popup. */}
@@ -655,47 +715,64 @@ function WrappedWorld({ dx, map, placements, entityById, showGrid, onOpenEntity 
       })}
 
       {(map.routes ?? []).map((route) => {
-        const pts = (route.resolvedPoints ?? []).map(([x, y]) => [H - y, x + dx] as [number, number]);
+        const pts = (route.resolvedPoints ?? []).map(
+          ([x, y]) => [H - y, x + dx] as [number, number],
+        );
         if (pts.length < 2) return null;
         const color = route.color ?? "#cfd6dc";
         const distPx = routeDistancePx(route.resolvedPoints ?? []);
         const scale: MapScale | undefined = map.scale;
-        const distLabel = scale ? `${(distPx * scale.unitsPerPixel).toFixed(1)} ${scale.unitLabel}` : `${Math.round(distPx)} px`;
-        const travel = scale && route.speed ? formatTravelTime((distPx * scale.unitsPerPixel) / route.speed) : null;
+        const distLabel = scale
+          ? `${(distPx * scale.unitsPerPixel).toFixed(1)} ${scale.unitLabel}`
+          : `${Math.round(distPx)} px`;
+        const travel =
+          scale && route.speed
+            ? formatTravelTime((distPx * scale.unitsPerPixel) / route.speed)
+            : null;
         const modeLabel = route.mode ? ROUTE_MODE_LABEL[route.mode] : "";
         return (
           <Polyline
             key={`${route.id}-${dx}`}
             positions={pts}
             pathOptions={{
-              color, weight: route.weight ?? 3, opacity: 0.9,
+              color,
+              weight: route.weight ?? 3,
+              opacity: 0.9,
               dashArray: route.dashed ? "8 6" : undefined,
-              lineCap: "round", lineJoin: "round",
+              lineCap: "round",
+              lineJoin: "round",
             }}
           >
             <Tooltip sticky direction="top" opacity={0.95}>
               <div className="text-xs">
                 <div className="font-medium">{route.name}</div>
-                <div className="opacity-80">{distLabel}{travel ? ` · ${travel} ${modeLabel}` : ""}</div>
+                <div className="opacity-80">
+                  {distLabel}
+                  {travel ? ` · ${travel} ${modeLabel}` : ""}
+                </div>
               </div>
             </Tooltip>
           </Polyline>
         );
       })}
 
-      {map.grid && (showGrid ?? map.grid.enabled !== false) && gridLines(map, map.grid).map((line, i) => (
-        <Polyline
-          key={`grid-${dx}-${i}`}
-          positions={line.map((p) => {
-            const [lat, lng] = p as [number, number];
-            return [lat, lng + dx] as [number, number];
-          })}
-          pathOptions={{
-            color: map.grid!.color ?? "rgba(255,255,255,0.08)",
-            weight: 1, opacity: 1, interactive: false,
-          }}
-        />
-      ))}
+      {map.grid &&
+        (showGrid ?? map.grid.enabled !== false) &&
+        gridLines(map, map.grid).map((line, i) => (
+          <Polyline
+            key={`grid-${dx}-${i}`}
+            positions={line.map((p) => {
+              const [lat, lng] = p as [number, number];
+              return [lat, lng + dx] as [number, number];
+            })}
+            pathOptions={{
+              color: map.grid!.color ?? "rgba(255,255,255,0.08)",
+              weight: 1,
+              opacity: 1,
+              interactive: false,
+            }}
+          />
+        ))}
 
       <PlacementMarkers
         dx={dx}
@@ -704,7 +781,6 @@ function WrappedWorld({ dx, map, placements, entityById, showGrid, onOpenEntity 
         entityById={entityById}
         onOpenEntity={onOpenEntity}
       />
-
     </>
   );
 }
@@ -713,9 +789,14 @@ function WrappedWorld({ dx, map, placements, entityById, showGrid, onOpenEntity 
  *  labels are permanently visible based on per-pin priority + labelMinZoom +
  *  a screen-space collision pass (higher priority wins). */
 function PlacementMarkers({
-  dx, H, placements, entityById, onOpenEntity,
+  dx,
+  H,
+  placements,
+  entityById,
+  onOpenEntity,
 }: {
-  dx: number; H: number;
+  dx: number;
+  H: number;
   placements: MapPlacement[];
   entityById: Map<string, Entity>;
   onOpenEntity: (id: string, fly?: boolean) => void;
@@ -725,7 +806,9 @@ function PlacementMarkers({
   useEffect(() => {
     const h = () => setZoom(map.getZoom());
     map.on("zoomend", h);
-    return () => { map.off("zoomend", h); };
+    return () => {
+      map.off("zoomend", h);
+    };
   }, [map]);
 
   // Resolve preset + decide label visibility (permanent / hover / none).
@@ -735,7 +818,10 @@ function PlacementMarkers({
     .map((p) => {
       const ent = entityById.get(p.entityId);
       if (!ent) return null;
-      const style = resolvePinStyle(ent.type, p.pin as import("@/atlas/pins/presets").PinOverride | undefined);
+      const style = resolvePinStyle(
+        ent.type,
+        p.pin as import("@/atlas/pins/presets").PinOverride | undefined,
+      );
       return { p, ent, style };
     })
     .filter((x): x is { p: MapPlacement; ent: Entity; style: PinPreset } => !!x)
@@ -790,269 +876,5 @@ function PlacementMarkers({
         );
       })}
     </>
-  );
-}
-
-interface SearchProps {
-  query: string;
-  setQuery: (q: string) => void;
-  index: SearchIndexEntry[];
-  entityById: Map<string, Entity>;
-  placements: MapPlacement[];
-  onPick: (id: string, fly: boolean) => void;
-  onClose: () => void;
-}
-
-/**
- * Hook: fetch `.last-published.json` (the publish-baseline snapshot written by
- * the `atlas:snapshot` script) and compute the set of entity ids that exist in
- * the CURRENT atlas but did NOT exist in the previous published one — i.e.
- * "recently revealed" since the last publish. Returns null while loading or
- * if the baseline doesn't exist (in which case the filter is unavailable).
- */
-function useRecentlyRevealedIds(): Set<string> | null {
-  const [ids, setIds] = useState<Set<string> | null>(null);
-  useEffect(() => {
-    let mounted = true;
-    const base = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "/");
-    Promise.all([
-      fetch(`${base}atlas/atlas.json`, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)),
-      fetch(`${base}atlas/.last-published.json`, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)),
-    ])
-      .then(([current, baseline]) => {
-        if (!mounted) return;
-        if (!current || !baseline) {
-          setIds(null);
-          return;
-        }
-        const baseIds = new Set<string>((baseline.entities ?? []).map((e: { id: string }) => e.id));
-        const out = new Set<string>();
-        for (const e of (current.entities ?? []) as Array<{ id: string }>) {
-          if (!baseIds.has(e.id)) out.add(e.id);
-        }
-        setIds(out);
-      })
-      .catch(() => {
-        if (mounted) setIds(null);
-      });
-    return () => { mounted = false; };
-  }, []);
-  return ids;
-}
-
-function SearchPalette({ query, setQuery, index, placements, onPick, onClose }: SearchProps) {
-  const placedIds = useMemo(() => new Set(placements.map((p) => p.entityId)), [placements]);
-  const [activeType, setActiveType] = useState<string | null>(null);
-  const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [activeIndex, setActiveIndex] = useState(-1);
-  /** "This map only" — restricts results to entities placed on the current map. */
-  const [thisMapOnly, setThisMapOnly] = useState(false);
-  /** "Recently revealed" — entities not present in the previous publish snapshot. */
-  const [recentOnly, setRecentOnly] = useState(false);
-  const recentlyRevealed = useRecentlyRevealedIds();
-  const listRef = useRef<HTMLDivElement>(null);
-
-  const allTypes = useMemo(() => {
-    const m = new Map<string, number>();
-    index.forEach((e) => m.set(e.type, (m.get(e.type) ?? 0) + 1));
-    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
-  }, [index]);
-
-  const allTags = useMemo(() => {
-    const m = new Map<string, number>();
-    index.forEach((e) => e.tags.forEach((t) => m.set(t, (m.get(t) ?? 0) + 1)));
-    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 12);
-  }, [index]);
-
-  const results = useMemo(() => {
-    let pool = index;
-    if (activeType) pool = pool.filter((e) => e.type === activeType);
-    if (activeTag) pool = pool.filter((e) => e.tags.includes(activeTag));
-    if (thisMapOnly) pool = pool.filter((e) => placedIds.has(e.id));
-    if (recentOnly && recentlyRevealed) pool = pool.filter((e) => recentlyRevealed.has(e.id));
-
-    const raw = query.trim();
-    if (!raw) return pool.slice(0, 40).map((e) => ({ e, snip: null as string | null }));
-
-    const { phrases, rest } = parseSearchQuery(raw);
-    const q = rest.toLowerCase();
-    // When query is phrases-only, score by the first phrase so results are still ranked.
-    const scoreQuery = q || (phrases.length > 0 ? phrases[0] : "");
-    const phrasesOnly = phrases.length > 0 && rest === "";
-
-    // Hard AND-filter: exclude entries missing any required phrase.
-    if (phrases.length > 0) pool = pool.filter((e) => matchesPhrases(e, phrases));
-
-    const score = (e: SearchIndexEntry): number => {
-      if (!scoreQuery) return 0;
-      let s = 0;
-      const t = e.title.toLowerCase();
-      if (t === scoreQuery) s += 30;
-      if (t.startsWith(scoreQuery)) s += 14;
-      if (t.includes(scoreQuery)) s += 10;
-      if (e.aliases.some((a) => a.toLowerCase().includes(scoreQuery))) s += 6;
-      if (e.tags.some((tt) => tt.toLowerCase().includes(scoreQuery))) s += 3;
-      if ((e.summary ?? "").toLowerCase().includes(scoreQuery)) s += 2;
-      if ((e.body ?? "").includes(scoreQuery)) s += 1;
-      return s;
-    };
-    // When phrases-only, all phrase-matched entries are shown (sorted by phrase score).
-    // When unquoted terms are present, the existing score > 0 gate still applies.
-    const snippetQuery = phrases.length > 0 ? phrases[0] : scoreQuery;
-    return pool
-      .map((e) => ({ e, s: score(e) }))
-      .filter((x) => phrasesOnly || x.s > 0)
-      .sort((a, b) => b.s - a.s)
-      .slice(0, 40)
-      .map(({ e }) => ({ e, snip: snippet(e.bodyText ?? e.body, e.body, snippetQuery) }));
-  }, [query, index, activeType, activeTag, thisMapOnly, placedIds, recentOnly, recentlyRevealed]);
-
-  // Reset selection when filters or query change.
-  useEffect(() => {
-    setActiveIndex(-1);
-  }, [query, activeType, activeTag, thisMapOnly, recentOnly]);
-
-  // Scroll active item into view.
-  useEffect(() => {
-    if (activeIndex < 0) return;
-    const el = listRef.current?.querySelector(`[data-index="${activeIndex}"]`) as HTMLElement | null;
-    if (el) el.scrollIntoView({ block: "nearest" });
-  }, [activeIndex]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (results.length === 0) return;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActiveIndex((i) => (i + 1) % results.length);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActiveIndex((i) => (i <= 0 ? results.length - 1 : i - 1));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      const idx = activeIndex >= 0 ? activeIndex : 0;
-      const r = results[idx];
-      if (r) onPick(r.e.id, placedIds.has(r.e.id));
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm flex items-start justify-center pt-[10vh] px-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-2xl bg-card border border-border rounded-lg shadow-2xl overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={handleKeyDown}
-      >
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <Input
-            autoFocus
-            placeholder='Search titles, lore body, tags… "exact phrase"'
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="border-0 focus-visible:ring-0 p-0 h-auto"
-          />
-          <Link to="/atlas/timeline" onClick={onClose} className="text-[11px] text-muted-foreground hover:text-foreground whitespace-nowrap">
-            Timeline →
-          </Link>
-        </div>
-
-        <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-border/50 bg-muted/20">
-          <button
-            onClick={() => setThisMapOnly((v) => !v)}
-            className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded inline-flex items-center gap-1 ${thisMapOnly ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
-            title={thisMapOnly ? "Showing only entities placed on the current map" : "Search within all maps"}
-            aria-pressed={thisMapOnly}
-          >
-            <MapPin className="h-3 w-3" /> {thisMapOnly ? "this map" : "all maps"}
-          </button>
-          {recentlyRevealed && recentlyRevealed.size > 0 && (
-            <button
-              onClick={() => setRecentOnly((v) => !v)}
-              className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded inline-flex items-center gap-1 ${recentOnly ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
-              title={`${recentlyRevealed.size} entities revealed since the last publish`}
-              aria-pressed={recentOnly}
-            >
-              <CalendarClock className="h-3 w-3" /> recent ({recentlyRevealed.size})
-            </button>
-          )}
-          <span className="w-full h-0" />
-        {(allTypes.length > 1 || allTags.length > 0) && (
-          <>
-            <button
-              onClick={() => setActiveType(null)}
-              className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === null ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
-            >
-              all
-            </button>
-            {allTypes.map(([t, n]) => {
-              const label = playerTypeLabel(t);
-              if (!label) return null;
-              return (
-                <button
-                  key={t}
-                  onClick={() => setActiveType(activeType === t ? null : t)}
-                  className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
-                >
-                  {label} <span className="opacity-60">{n}</span>
-                </button>
-              );
-            })}
-            {allTags.length > 0 && <span className="w-full h-0" />}
-            {allTags.map(([t, n]) => (
-              <button
-                key={t}
-                onClick={() => setActiveTag(activeTag === t ? null : t)}
-                className={`text-[10px] px-2 py-0.5 rounded ${activeTag === t ? "bg-secondary text-secondary-foreground" : "bg-muted/60 hover:bg-accent"}`}
-              >
-                #{t} <span className="opacity-60">{n}</span>
-              </button>
-            ))}
-          </>
-        )}
-        </div>
-
-        <div ref={listRef} className="max-h-[60vh] overflow-y-auto">
-          {results.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground text-center">No matches.</div>
-          ) : (
-            results.map(({ e: r, snip }, i) => {
-              const placed = placedIds.has(r.id);
-              const active = i === activeIndex;
-              return (
-                <button
-                  key={r.id}
-                  data-index={i}
-                  onClick={() => onPick(r.id, placed)}
-                  onMouseEnter={() => setActiveIndex(i)}
-                  className={`w-full text-left px-3 py-2 border-b border-border/50 last:border-b-0 ${
-                    active ? "bg-accent/60" : "hover:bg-accent/40"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{r.title}</span>
-                    {playerTypeLabel(r.type) && (
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{playerTypeLabel(r.type)}</span>
-                    )}
-                    {r.dateRaw && <span className="text-[10px] text-muted-foreground">· {r.dateRaw}</span>}
-                    {placed && <MapPin className="h-3 w-3 text-primary ml-auto" />}
-                  </div>
-                  {snip ? (
-                    <div
-                      className="text-xs text-muted-foreground line-clamp-2"
-                      dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(snip) }}
-                    />
-                  ) : (
-                    r.summary && <div className="text-xs text-muted-foreground line-clamp-1">{r.summary}</div>
-                  )}
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
-    </div>
   );
 }

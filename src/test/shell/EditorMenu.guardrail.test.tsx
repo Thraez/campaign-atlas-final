@@ -5,9 +5,11 @@ import { EditorMenu, EDITOR_MENU_ITEMS } from "@/atlas/shell/EditorMenu";
 
 describe("EditorMenu guardrail", () => {
   it("contains only the allow-listed items", () => {
-    expect(EDITOR_MENU_ITEMS.map((i) => i.id).sort()).toEqual(
-      ["help", "map-details", "world-details"],
-    );
+    expect(EDITOR_MENU_ITEMS.map((i) => i.id).sort()).toEqual([
+      "help",
+      "map-details",
+      "world-details",
+    ]);
   });
 
   it("contains no export/clone/backup/offline action ever", () => {

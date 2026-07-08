@@ -122,8 +122,8 @@ describe("buildEntityFrontmatterPatch — atlas key filtering", () => {
       atlas: {
         id: "x",
         type: "settlement",
-        aliases: [],       // empty array → must be excluded
-        tags: [],          // empty array → must be excluded
+        aliases: [], // empty array → must be excluded
+        tags: [], // empty array → must be excluded
         images: ["img.webp"], // non-empty → must be included
       },
     };
@@ -139,7 +139,7 @@ describe("buildEntityFrontmatterPatch — atlas key filtering", () => {
       atlas: {
         id: "y",
         type: "settlement",
-        summary: undefined,  // undefined → must be excluded
+        summary: undefined, // undefined → must be excluded
         visibility: "player",
       },
     };
@@ -204,11 +204,7 @@ describe("buildEntityFrontmatterPatch — multiple files", () => {
     ];
     const artifact = buildEntityFrontmatterPatch(patches);
     expect(artifact.sections).toHaveLength(3);
-    expect(artifact.sections!.map((s) => s.label)).toEqual([
-      "npcs/A.md",
-      "npcs/B.md",
-      "npcs/C.md",
-    ]);
+    expect(artifact.sections!.map((s) => s.label)).toEqual(["npcs/A.md", "npcs/B.md", "npcs/C.md"]);
   });
 
   it("emits a '# file:' marker in the body for each patch", () => {

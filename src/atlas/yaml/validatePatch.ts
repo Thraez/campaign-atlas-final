@@ -18,6 +18,7 @@
  */
 
 import yaml from "js-yaml";
+import { isValidVisibility } from "@/atlas/content/visibility";
 
 export type PatchKind = "map" | "placement" | "settings" | "world-map" | "entity-frontmatter";
 
@@ -34,7 +35,9 @@ export function validatePatchYaml(content: string, kind: PatchKind): ValidationR
   const warnings: string[] = [];
 
   if (FENCE_RE.test(content)) {
-    errors.push("Patch contains a markdown code fence (```). Strip fences before pasting into world.yaml.");
+    errors.push(
+      "Patch contains a markdown code fence (```). Strip fences before pasting into world.yaml.",
+    );
   }
 
   // Split out non-comment YAML chunks. Patches may concatenate multiple
@@ -61,8 +64,9 @@ export function validatePatchYaml(content: string, kind: PatchKind): ValidationR
   if (firstError) errors.push(`YAML parse error: ${firstError}`);
 
   if (kind === "map" || kind === "settings" || kind === "world-map") {
-    const mapsDoc = parsed.find((d): d is { maps: unknown } =>
-      !!d && typeof d === "object" && Array.isArray((d as { maps?: unknown }).maps)
+    const mapsDoc = parsed.find(
+      (d): d is { maps: unknown } =>
+        !!d && typeof d === "object" && Array.isArray((d as { maps?: unknown }).maps),
     );
     if (!mapsDoc) {
       errors.push("Map patch must contain a top-level `maps:` array.");
@@ -79,13 +83,17 @@ export function validatePatchYaml(content: string, kind: PatchKind): ValidationR
   }
 
   if (kind === "placement") {
-    const placementDocs = parsed.filter((d): d is { atlas: { placements: unknown } } =>
-      !!d && typeof d === "object" &&
-      typeof (d as { atlas?: unknown }).atlas === "object" &&
-      Array.isArray((d as { atlas: { placements?: unknown } }).atlas.placements)
+    const placementDocs = parsed.filter(
+      (d): d is { atlas: { placements: unknown } } =>
+        !!d &&
+        typeof d === "object" &&
+        typeof (d as { atlas?: unknown }).atlas === "object" &&
+        Array.isArray((d as { atlas: { placements?: unknown } }).atlas.placements),
     );
     if (placementDocs.length === 0) {
-      errors.push("Placement patch must contain at least one `atlas: { placements: [...] }` block.");
+      errors.push(
+        "Placement patch must contain at least one `atlas: { placements: [...] }` block.",
+      );
     }
     for (const doc of placementDocs) {
       const ps = doc.atlas.placements as Array<Record<string, unknown>>;
@@ -102,9 +110,8 @@ export function validatePatchYaml(content: string, kind: PatchKind): ValidationR
   }
 
   if (kind === "entity-frontmatter") {
-    const VALID_VIS = new Set(["player", "dm", "hidden", "rumor"]);
     const blocks = parsed.filter(
-      (d): d is Record<string, unknown> => !!d && typeof d === "object" && !Array.isArray(d)
+      (d): d is Record<string, unknown> => !!d && typeof d === "object" && !Array.isArray(d),
     );
     if (blocks.length === 0) {
       errors.push("Entity-frontmatter patch must contain at least one frontmatter block.");
@@ -121,8 +128,10 @@ export function validatePatchYaml(content: string, kind: PatchKind): ValidationR
         continue;
       }
       const a = atlas as Record<string, unknown>;
-      if (a.visibility !== undefined && (typeof a.visibility !== "string" || !VALID_VIS.has(a.visibility))) {
-        errors.push(`atlas.visibility must be one of player|dm|hidden|rumor (got "${String(a.visibility)}").`);
+      if (a.visibility !== undefined && !isValidVisibility(a.visibility)) {
+        errors.push(
+          `atlas.visibility must be one of player|dm|hidden|rumor (got "${String(a.visibility)}").`,
+        );
       }
       if (a.type !== undefined && typeof a.type !== "string") {
         errors.push("atlas.type must be a string.");
@@ -141,7 +150,8 @@ export function validatePatchYaml(content: string, kind: PatchKind): ValidationR
           errors.push("atlas.placements must be an array.");
         } else {
           for (const p of a.placements as Array<Record<string, unknown>>) {
-            if (typeof p?.mapId !== "string") warnings.push("atlas.placements[].mapId should be a string.");
+            if (typeof p?.mapId !== "string")
+              warnings.push("atlas.placements[].mapId should be a string.");
             if (typeof p?.x !== "number" || typeof p?.y !== "number") {
               errors.push("atlas.placements[] entries must have numeric x and y.");
               break;

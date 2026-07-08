@@ -19,7 +19,12 @@ const baseMap: MapDocument = {
       mapId: "world",
       name: "Thornhold",
       visibility: "player",
-      points: [[10, 10], [100, 10], [100, 100], [10, 100]],
+      points: [
+        [10, 10],
+        [100, 10],
+        [100, 100],
+        [10, 100],
+      ],
     },
   ],
 };
@@ -32,7 +37,9 @@ describe("useRegionDraft", () => {
     act(() => result.current.addDraftPoint([300, 200]));
     act(() => result.current.addDraftPoint([300, 300]));
     let id: string | null = null;
-    act(() => { id = result.current.finishDraw(); });
+    act(() => {
+      id = result.current.finishDraw();
+    });
     expect(id).toBeTruthy();
     expect(result.current.draft.added).toHaveLength(1);
     expect(result.current.effective).toHaveLength(2);
@@ -44,14 +51,18 @@ describe("useRegionDraft", () => {
     act(() => result.current.addDraftPoint([1, 1]));
     act(() => result.current.addDraftPoint([2, 2]));
     let id: string | null = null;
-    act(() => { id = result.current.finishDraw(); });
+    act(() => {
+      id = result.current.finishDraw();
+    });
     expect(id).toBeNull();
   });
 
   it("edits an existing region without touching others", () => {
     const { result } = renderHook(() => useRegionDraft(baseMap));
     act(() => result.current.patch("thornhold", { name: "Thornhold Reach" }));
-    expect(result.current.effective.find((r) => r.id === "thornhold")?.name).toBe("Thornhold Reach");
+    expect(result.current.effective.find((r) => r.id === "thornhold")?.name).toBe(
+      "Thornhold Reach",
+    );
     expect(result.current.draft.edits.thornhold?.name).toBe("Thornhold Reach");
   });
 
@@ -62,7 +73,9 @@ describe("useRegionDraft", () => {
     act(() => result.current.addDraftPoint([2, 1]));
     act(() => result.current.addDraftPoint([2, 2]));
     let newId: string | null = null;
-    act(() => { newId = result.current.finishDraw(); });
+    act(() => {
+      newId = result.current.finishDraw();
+    });
     act(() => result.current.remove(newId!));
     expect(result.current.draft.added).toHaveLength(0);
     act(() => result.current.remove("thornhold"));
@@ -89,7 +102,7 @@ describe("useRegionDraft", () => {
       useRegionDraft(baseMap, {
         entityIds: new Set(["secret"]),
         dmEntityIds: new Set(["secret"]),
-      })
+      }),
     );
     act(() => result.current.patch("thornhold", { entityId: "secret" }));
     const leak = result.current.issues.find((i) => i.code === "spoiler-leak");
@@ -110,7 +123,11 @@ describe("useRegionDraft", () => {
       mapId: "world",
       name: "R1",
       visibility: "player",
-      points: [[1.4, 2.6], [3.5, 4.5], [5, 5]],
+      points: [
+        [1.4, 2.6],
+        [3.5, 4.5],
+        [5, 5],
+      ],
       color: "#abc",
     };
     const y = regionToYamlObject(r);
@@ -119,7 +136,11 @@ describe("useRegionDraft", () => {
       mapId: "world",
       name: "R1",
       visibility: "player",
-      points: [[1, 3], [4, 5], [5, 5]],
+      points: [
+        [1, 3],
+        [4, 5],
+        [5, 5],
+      ],
       color: "#abc",
     });
     expect("entityId" in y).toBe(false);

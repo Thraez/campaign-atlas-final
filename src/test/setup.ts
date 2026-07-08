@@ -7,6 +7,12 @@ global.ResizeObserver = class ResizeObserver {
   disconnect() {}
 };
 
+// jsdom doesn't implement scrollIntoView; components that keep an active list
+// item in view (e.g. the search palette) call it in an effect.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
+
 Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: (query: string) => ({

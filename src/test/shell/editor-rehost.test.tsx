@@ -17,8 +17,7 @@ import { buildRailItems } from "@/atlas/shell/railRegistry";
 // renders the corresponding content.
 function ShellHarness() {
   const [activePanel, setActivePanel] = useState<string | null>(null);
-  const selectPanel = (id: string) =>
-    setActivePanel((cur) => (cur === id ? null : id));
+  const selectPanel = (id: string) => setActivePanel((cur) => (cur === id ? null : id));
   const dismissPanel = () => setActivePanel(null);
 
   const panels: Record<string, React.ReactNode> = {
@@ -66,7 +65,18 @@ function ShellHarness() {
 describe("editor shell rehost", () => {
   it("rail renders buttons for all content and map sections", () => {
     render(<ShellHarness />);
-    for (const label of ["Characters", "Locations", "Factions", "Events", "Items", "Lore", "Pins", "Regions", "Routes", "Fog"]) {
+    for (const label of [
+      "Characters",
+      "Locations",
+      "Factions",
+      "Events",
+      "Items",
+      "Lore",
+      "Pins",
+      "Regions",
+      "Routes",
+      "Fog",
+    ]) {
       expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
     }
   });

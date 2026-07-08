@@ -16,7 +16,10 @@ import { MemoryRouter } from "react-router-dom";
 import { ViewModeProvider } from "@/atlas/view/ViewModeProvider";
 import { EntityPanes } from "@/atlas/entity/EntityPanes";
 import { EntityReadingView } from "@/atlas/entity/EntityReadingView";
-import { projectEntityForPlayer, buildProjectionContext } from "@/atlas/content/projectEntityForPlayer";
+import {
+  projectEntityForPlayer,
+  buildProjectionContext,
+} from "@/atlas/content/projectEntityForPlayer";
 import type { Entity } from "@/atlas/content/schema";
 import type { EntityRelationship } from "@/atlas/profiles/profileTypes";
 
@@ -270,7 +273,12 @@ const connectionLeakEntity: Entity = {
     // Channel 5: dm-visibility relationship
     { entity: "secret-villain", type: "ally", label: "DM_RELATION_SECRET", visibility: "dm" },
     // Channel 6: player-visible but target is DM-only — must also be stripped
-    { entity: "secret-villain", type: "knows_about", label: "PLAYER_LINK_TO_DM_TARGET", visibility: "player" },
+    {
+      entity: "secret-villain",
+      type: "knows_about",
+      label: "PLAYER_LINK_TO_DM_TARGET",
+      visibility: "player",
+    },
   ] as EntityRelationship[],
 };
 

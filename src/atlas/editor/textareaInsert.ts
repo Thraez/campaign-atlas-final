@@ -63,14 +63,7 @@ export function insertBlock(value: string, selStart: number, block: string): Ins
   const head = value.slice(0, insertAt);
   const tail = value.slice(insertAt);
 
-  const sep =
-    head === ""
-      ? ""
-      : head.endsWith("\n\n")
-        ? ""
-        : head.endsWith("\n")
-          ? "\n"
-          : "\n\n";
+  const sep = head === "" ? "" : head.endsWith("\n\n") ? "" : head.endsWith("\n") ? "\n" : "\n\n";
   const trailingNl = tail.startsWith("\n") ? "" : "\n";
 
   const inserted = sep + block + trailingNl;

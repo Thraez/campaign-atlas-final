@@ -48,7 +48,12 @@ const PLAYER_ATLAS = path.join(PROJECT_ROOT, "public", "atlas", "atlas.json");
 // driven from this rather than the live vault so the guard stays active even
 // when the live vault happens to contain no hidden content.
 const FIXTURE_CONFIG = path.join(
-  PROJECT_ROOT, "src", "test", "fixtures", "atlas-build", "atlas.config.json",
+  PROJECT_ROOT,
+  "src",
+  "test",
+  "fixtures",
+  "atlas-build",
+  "atlas.config.json",
 );
 
 type Outcome = "PASS" | "FAIL" | "SKIP" | "ERROR";
@@ -67,7 +72,10 @@ function runScan(scriptRel: string, args: string[]): { code: number; stderr: str
     ["--import", "tsx", path.join(SCRIPTS_DIR, scriptRel), ...args],
     { cwd: PROJECT_ROOT, encoding: "utf8" },
   );
-  return { code: res.status ?? -1, stderr: (res.stderr ?? "") + (res.error ? String(res.error) : "") };
+  return {
+    code: res.status ?? -1,
+    stderr: (res.stderr ?? "") + (res.error ? String(res.error) : ""),
+  };
 }
 
 /** A clean run must exit 0 and a dirty run must exit non-zero, else FAIL. */
@@ -80,19 +88,28 @@ function assertCleanThenDirty(
   const c = clean();
   if (c.code !== 0) {
     return {
-      name, scan, outcome: "FAIL",
+      name,
+      scan,
+      outcome: "FAIL",
       detail: `clean copy was rejected (exit ${c.code}) — scan may be broken or always-fail\n${c.stderr.trim()}`,
     };
   }
   const d = dirty();
   if (d.code === 0) {
     return {
-      name, scan, outcome: "FAIL",
+      name,
+      scan,
+      outcome: "FAIL",
       detail: "planted fault was NOT caught (exit 0) — scan is weakened or skipped",
     };
   }
   if (d.code < 0) {
-    return { name, scan, outcome: "ERROR", detail: `dirty run failed to spawn\n${d.stderr.trim()}` };
+    return {
+      name,
+      scan,
+      outcome: "ERROR",
+      detail: `dirty run failed to spawn\n${d.stderr.trim()}`,
+    };
   }
   return { name, scan, outcome: "PASS", detail: `clean exit 0, dirty exit ${d.code}` };
 }
@@ -118,7 +135,10 @@ function variantSecret(): VariantResult {
     },
     () => {
       const dir = freshDir("secret-dirty");
-      fs.writeFileSync(path.join(dir, "leak.json"), JSON.stringify({ body: `prefix ${sentinel} suffix` }));
+      fs.writeFileSync(
+        path.join(dir, "leak.json"),
+        JSON.stringify({ body: `prefix ${sentinel} suffix` }),
+      );
       return runScan("check-no-secrets.ts", [dir]);
     },
   );
@@ -129,8 +149,11 @@ function variantDerived(): VariantResult {
   const secrets = deriveSecretsFromVault(FIXTURE_CONFIG);
   if (secrets.length === 0) {
     return {
-      name: "Vault-derived secret", scan: "check-derived-secrets.ts", outcome: "ERROR",
-      detail: `fixture ${path.relative(PROJECT_ROOT, FIXTURE_CONFIG)} yielded no derived ` +
+      name: "Vault-derived secret",
+      scan: "check-derived-secrets.ts",
+      outcome: "ERROR",
+      detail:
+        `fixture ${path.relative(PROJECT_ROOT, FIXTURE_CONFIG)} yielded no derived ` +
         "secrets — its hidden/dm entities may have changed; the harness needs updating",
     };
   }
@@ -153,7 +176,9 @@ function variantDerived(): VariantResult {
 
 // ---- Variant 3: EXIF metadata on an image (check-image-privacy) -------------
 async function variantExif(): Promise<VariantResult> {
-  const base = sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } } });
+  const base = sharp({
+    create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+  });
   const cleanBuf = await base.clone().jpeg().toBuffer();
   const dirtyBuf = await base
     .clone()
@@ -183,7 +208,9 @@ function variantFog(): VariantResult {
   const maps = Array.isArray(atlas.maps) ? (atlas.maps as Record<string, unknown>[]) : [];
   if (maps.length === 0) {
     return {
-      name: "Fog geometry leak", scan: "check-fog-safety.ts", outcome: "SKIP",
+      name: "Fog geometry leak",
+      scan: "check-fog-safety.ts",
+      outcome: "SKIP",
       detail: "player atlas has no maps — fog scan has nothing to check",
     };
   }
@@ -201,7 +228,15 @@ function variantFog(): VariantResult {
       const dmaps = dirty.maps as Record<string, unknown>[];
       // Enable fog on the first map and leave geometry in place — exactly the
       // strip-pipeline regression check-fog-safety exists to catch (code 14).
-      dmaps[0].fog = { enabled: true, reveals: [[0, 0], [10, 0], [10, 10], [0, 10]] };
+      dmaps[0].fog = {
+        enabled: true,
+        reveals: [
+          [0, 0],
+          [10, 0],
+          [10, 10],
+          [0, 10],
+        ],
+      };
       fs.writeFileSync(path.join(dir, "atlas.json"), JSON.stringify(dirty));
       return runScan("check-fog-safety.ts", [dir, "--config", CONFIG_PATH]);
     },
@@ -239,7 +274,7 @@ async function main(): Promise<number> {
   if (!fs.existsSync(PLAYER_ATLAS)) {
     console.error(
       `publish-integrity-smoke: ${path.relative(PROJECT_ROOT, PLAYER_ATLAS)} not found.\n` +
-      "Run `npm run atlas:build:player` (or `npm run atlas:publish`) first.",
+        "Run `npm run atlas:build:player` (or `npm run atlas:publish`) first.",
     );
     return 1;
   }
@@ -248,7 +283,9 @@ async function main(): Promise<number> {
     return 1;
   }
 
-  console.log("publish-integrity-smoke: planting faults and confirming every scan still rejects them\n");
+  console.log(
+    "publish-integrity-smoke: planting faults and confirming every scan still rejects them\n",
+  );
 
   const results: VariantResult[] = [];
   results.push(variantSecret());
@@ -270,14 +307,14 @@ async function main(): Promise<number> {
   if (failed.length > 0) {
     console.error(
       `publish-integrity-smoke: ${failed.length} scan(s) failed to reject their fault — ` +
-      "publish would ship a leak. NOT safe to optimize.",
+        "publish would ship a leak. NOT safe to optimize.",
     );
     return 1;
   }
   console.log(
     `publish-integrity-smoke: all ${results.length - skipped.length} active scan(s) caught their fault` +
-    (skipped.length > 0 ? ` (${skipped.length} skipped — no such content in vault)` : "") +
-    ". Safe.",
+      (skipped.length > 0 ? ` (${skipped.length} skipped — no such content in vault)` : "") +
+      ". Safe.",
   );
   return 0;
 }

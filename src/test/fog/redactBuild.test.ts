@@ -46,7 +46,7 @@ beforeAll(async () => {
       defaultWorld: "w",
       include: ["**/*.md"],
       exclude: [],
-    })
+    }),
   );
 
   // ---- world.yaml in content/w/_atlas/ ----
@@ -115,7 +115,7 @@ describe("D3: fog redaction wired into player build", () => {
 
     // Redacted PNG exists on disk.
     expect(
-      fs.existsSync(path.join(tmpDir, "public", "atlas", "assets", "maps", "world.fog.png"))
+      fs.existsSync(path.join(tmpDir, "public", "atlas", "assets", "maps", "world.fog.png")),
     ).toBe(true);
 
     // Fog geometry stripped — only mapId + enabled remain.
@@ -129,10 +129,10 @@ describe("D3: fog redaction wired into player build", () => {
 
     // Pixel inside the reveal square is opaque; pixel outside is transparent.
     const fogPng = fs.readFileSync(
-      path.join(tmpDir, "public", "atlas", "assets", "maps", "world.fog.png")
+      path.join(tmpDir, "public", "atlas", "assets", "maps", "world.fog.png"),
     );
     expect(await alphaAt(fogPng, 40, 40)).toBeGreaterThanOrEqual(250); // inside reveal
-    expect(await alphaAt(fogPng, 5, 5)).toBe(0);                       // outside reveal
+    expect(await alphaAt(fogPng, 5, 5)).toBe(0); // outside reveal
   });
 
   it("throws FogRedactionError for a tiled layer on a fog-enabled map", async () => {
@@ -162,10 +162,7 @@ fog:
     reveals:
       - [[20, 20], [60, 20], [60, 60], [20, 60]]
 `;
-    fs.writeFileSync(
-      path.join(tmpDir, "content", "w", "_atlas", "world.yaml"),
-      tiledYaml
-    );
+    fs.writeFileSync(path.join(tmpDir, "content", "w", "_atlas", "world.yaml"), tiledYaml);
 
     const { runBuild } = await import("../../../scripts/build-atlas");
     const r = await runBuild({ player: true, strict: false });

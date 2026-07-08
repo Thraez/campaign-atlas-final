@@ -38,7 +38,9 @@ function getNewestSourceMtime(contentRoot: string): number {
   try {
     const m = fs.statSync(path.resolve(ROOT, "atlas.config.json")).mtimeMs;
     if (m > newest) newest = m;
-  } catch { /* ok */ }
+  } catch {
+    /* ok */
+  }
 
   // Walk content dir for source files
   function walk(dir: string): void {
@@ -56,7 +58,9 @@ function getNewestSourceMtime(contentRoot: string): number {
         try {
           const m = fs.statSync(full).mtimeMs;
           if (m > newest) newest = m;
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
     }
   }
@@ -82,13 +86,13 @@ async function main(): Promise<void> {
       console.log(`[ensure-dm-atlas] DM atlas built in ${result.durationMs}ms.`);
     } else {
       console.warn(
-        `[ensure-dm-atlas] Build finished with errors (${result.error ?? "unknown"}). Starting dev server anyway.`
+        `[ensure-dm-atlas] Build finished with errors (${result.error ?? "unknown"}). Starting dev server anyway.`,
       );
     }
   } catch (e) {
     console.warn(
       "[ensure-dm-atlas] Build failed. Starting dev server anyway.",
-      e instanceof Error ? e.message : String(e)
+      e instanceof Error ? e.message : String(e),
     );
   }
 }
@@ -96,6 +100,6 @@ async function main(): Promise<void> {
 main().catch((e) => {
   console.warn(
     "[ensure-dm-atlas] Unexpected error. Starting dev server anyway.",
-    e instanceof Error ? e.message : String(e)
+    e instanceof Error ? e.message : String(e),
   );
 });

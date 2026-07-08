@@ -20,12 +20,30 @@ export interface ProfileFieldDef {
   multiline?: boolean;
 }
 
+/**
+ * Player field defs carry the concrete `PlayerProfile` key they write, so the
+ * form can call a type-safe writer instead of an untyped `Record` bag. Text
+ * fields map to string-valued keys; list fields to string[]-valued keys. A
+ * wrong key in the arrays below is a compile error.
+ */
+export interface PlayerTextFieldDef extends ProfileFieldDef {
+  key: "known_for";
+}
+export interface PlayerListFieldDef extends ProfileFieldDef {
+  key: "visible_traits" | "rumors";
+}
+
 /** Player-visible profile fields — universal across entity types. */
-export const PLAYER_PROFILE_FIELDS: ProfileFieldDef[] = [
-  { key: "known_for", label: "Known for", placeholder: "What players hear about this on the street.", multiline: true },
+export const PLAYER_PROFILE_FIELDS: PlayerTextFieldDef[] = [
+  {
+    key: "known_for",
+    label: "Known for",
+    placeholder: "What players hear about this on the street.",
+    multiline: true,
+  },
 ];
 /** Player-visible list fields (string[] in YAML). */
-export const PLAYER_PROFILE_LIST_FIELDS: ProfileFieldDef[] = [
+export const PLAYER_PROFILE_LIST_FIELDS: PlayerListFieldDef[] = [
   { key: "visible_traits", label: "Visible traits", placeholder: "Soft-spoken" },
   { key: "rumors", label: "Rumors", placeholder: "He knows where the drowned shrine is." },
 ];
@@ -81,9 +99,7 @@ const TYPE_ALIASES: Record<string, string> = {
 
 export function dmFieldsForType(type: string | undefined): ProfileFieldDef[] {
   const t = (type ?? "").toLowerCase();
-  const canonical = DM_PROFILE_FIELDS_BY_TYPE[t]
-    ? t
-    : TYPE_ALIASES[t] ?? "npc";
+  const canonical = DM_PROFILE_FIELDS_BY_TYPE[t] ? t : (TYPE_ALIASES[t] ?? "npc");
   return DM_PROFILE_FIELDS_BY_TYPE[canonical] ?? DM_PROFILE_FIELDS_BY_TYPE.npc;
 }
 

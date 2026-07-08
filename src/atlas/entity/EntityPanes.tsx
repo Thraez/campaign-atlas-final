@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { markdownToHtml } from "@/atlas/content/markdownCore";
 import type { Entity } from "@/atlas/content/schema";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
-import { projectEntityForPlayer, buildProjectionContext } from "@/atlas/content/projectEntityForPlayer";
+import {
+  projectEntityForPlayer,
+  buildProjectionContext,
+} from "@/atlas/content/projectEntityForPlayer";
 import { tokenizeWikilinks, renderLinkTokens } from "@/atlas/content/parseWikilinks";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 import { buildAnchors, mapScroll } from "@/atlas/entity/paneScrollSync";
@@ -11,7 +14,10 @@ import { useViewMode } from "@/atlas/view/ViewModeProvider";
 type Mode = "reading" | "editing";
 
 export function EntityPanes({
-  entity, entitiesById, mode, renderEdit,
+  entity,
+  entitiesById,
+  mode,
+  renderEdit,
 }: {
   entity: Entity;
   entitiesById: Map<string, Entity>;
@@ -27,7 +33,7 @@ export function EntityPanes({
 
   // When player preview is on, player pane is the primary; DM pane is collapsed by default.
   // These derived booleans keep backward-compatibility with DM mode unchanged.
-  const dmPaneVisible = isPlayerPreview ? showDm : (mode === "reading" || showDm);
+  const dmPaneVisible = isPlayerPreview ? showDm : mode === "reading" || showDm;
   const playerPaneVisible = isPlayerPreview || showPlayer;
 
   const dmHtml = useMemo(() => {
@@ -64,7 +70,10 @@ export function EntityPanes({
     });
   };
 
-  const topAnchorId = (el: HTMLElement | null, anchors: ReturnType<typeof buildAnchors>): string | null => {
+  const topAnchorId = (
+    el: HTMLElement | null,
+    anchors: ReturnType<typeof buildAnchors>,
+  ): string | null => {
     if (!el) return null;
     let best: string | null = null;
     for (const a of anchors) {
@@ -93,7 +102,9 @@ export function EntityPanes({
     if (!toId) return;
     syncing.current = true;
     scrollToAnchor(playerRef.current, toId);
-    requestAnimationFrame(() => { syncing.current = false; });
+    requestAnimationFrame(() => {
+      syncing.current = false;
+    });
   };
 
   const onPlayerScroll = () => {
@@ -104,7 +115,9 @@ export function EntityPanes({
     if (!toId) return;
     syncing.current = true;
     scrollToAnchor(dmRef.current, toId);
-    requestAnimationFrame(() => { syncing.current = false; });
+    requestAnimationFrame(() => {
+      syncing.current = false;
+    });
   };
 
   // EntityPanel renders bodyHtml as bare DOM — inject data-anchor-id so scrollToAnchor can find headings.
@@ -130,93 +143,93 @@ export function EntityPanes({
       )}
 
       <div className="flex flex-1 min-h-0 w-full">
-      {mode === "editing" && (
-        <section data-testid="entity-pane-edit" className="flex-1 min-w-0 overflow-auto border-r">
-          {renderEdit()}
+        {mode === "editing" && (
+          <section data-testid="entity-pane-edit" className="flex-1 min-w-0 overflow-auto border-r">
+            {renderEdit()}
+          </section>
+        )}
+
+        <section
+          ref={dmRef as React.Ref<HTMLElement>}
+          data-testid="entity-pane-dm"
+          className="flex-1 min-w-0 overflow-auto border-r"
+          style={{ display: dmPaneVisible ? undefined : "none" }}
+          onScroll={onDmScroll}
+        >
+          <div
+            className="prose prose-invert max-w-none p-3 text-sm"
+            dangerouslySetInnerHTML={{ __html: tagHeadings(dmHtml, dmAnchors) }}
+          />
         </section>
-      )}
 
-      <section
-        ref={dmRef as React.Ref<HTMLElement>}
-        data-testid="entity-pane-dm"
-        className="flex-1 min-w-0 overflow-auto border-r"
-        style={{ display: dmPaneVisible ? undefined : "none" }}
-        onScroll={onDmScroll}
-      >
-        <div
-          className="prose prose-invert max-w-none p-3 text-sm"
-          dangerouslySetInnerHTML={{ __html: tagHeadings(dmHtml, dmAnchors) }}
-        />
-      </section>
+        {/* Player pane: always mounted (persistent-DOM); hidden via display:none when collapsed. */}
+        <section
+          ref={playerRef as React.Ref<HTMLElement>}
+          data-testid="entity-pane-player"
+          className="flex-1 min-w-0 overflow-auto"
+          style={{ display: playerPaneVisible ? undefined : "none" }}
+          onScroll={onPlayerScroll}
+        >
+          <EntityPanel
+            entity={playerEntity}
+            placements={[]}
+            entityById={entitiesById}
+            onOpenEntity={() => {}}
+            onClose={() => {}}
+            onShowOnMap={() => {}}
+            readerAffordances={false}
+          />
+        </section>
 
-      {/* Player pane: always mounted (persistent-DOM); hidden via display:none when collapsed. */}
-      <section
-        ref={playerRef as React.Ref<HTMLElement>}
-        data-testid="entity-pane-player"
-        className="flex-1 min-w-0 overflow-auto"
-        style={{ display: playerPaneVisible ? undefined : "none" }}
-        onScroll={onPlayerScroll}
-      >
-        <EntityPanel
-          entity={playerEntity}
-          placements={[]}
-          entityById={entitiesById}
-          onOpenEntity={() => {}}
-          onClose={() => {}}
-          onShowOnMap={() => {}}
-          readerAffordances={false}
-        />
-      </section>
-
-      <div className="flex flex-col gap-1 p-1 border-l bg-muted/30">
-        {mode === "editing" && !showDm && (
-          <button
-            type="button"
-            className="text-[10px] px-1 py-2 rounded border [writing-mode:vertical-rl]"
-            onClick={() => setShowDm(true)}
-          >
-            ＋ Add DM view
-          </button>
-        )}
-        {/* In player preview mode the player pane is already primary — no expand button needed. */}
-        {!isPlayerPreview && !showPlayer && (
-          <button
-            type="button"
-            className="text-[10px] px-1 py-2 rounded border [writing-mode:vertical-rl]"
-            onClick={() => setShowPlayer(true)}
-          >
-            ＋ Add Player view
-          </button>
-        )}
-        {!isPlayerPreview && showPlayer && (
-          <button
-            type="button"
-            className="text-[10px] px-1 py-2 rounded border [writing-mode:vertical-rl]"
-            onClick={() => setShowPlayer(false)}
-          >
-            － Player view
-          </button>
-        )}
-        {/* In player preview mode, offer a peek at the raw DM content. */}
-        {isPlayerPreview && !showDm && (
-          <button
-            type="button"
-            className="text-[10px] px-1 py-2 rounded border [writing-mode:vertical-rl]"
-            onClick={() => setShowDm(true)}
-          >
-            ＋ DM view
-          </button>
-        )}
-        {isPlayerPreview && showDm && (
-          <button
-            type="button"
-            className="text-[10px] px-1 py-2 rounded border [writing-mode:vertical-rl]"
-            onClick={() => setShowDm(false)}
-          >
-            － DM view
-          </button>
-        )}
-      </div>
+        <div className="flex flex-col gap-1 p-1 border-l bg-muted/30">
+          {mode === "editing" && !showDm && (
+            <button
+              type="button"
+              className="text-[10px] px-1 py-2 rounded border [writing-mode:vertical-rl]"
+              onClick={() => setShowDm(true)}
+            >
+              ＋ Add DM view
+            </button>
+          )}
+          {/* In player preview mode the player pane is already primary — no expand button needed. */}
+          {!isPlayerPreview && !showPlayer && (
+            <button
+              type="button"
+              className="text-[10px] px-1 py-2 rounded border [writing-mode:vertical-rl]"
+              onClick={() => setShowPlayer(true)}
+            >
+              ＋ Add Player view
+            </button>
+          )}
+          {!isPlayerPreview && showPlayer && (
+            <button
+              type="button"
+              className="text-[10px] px-1 py-2 rounded border [writing-mode:vertical-rl]"
+              onClick={() => setShowPlayer(false)}
+            >
+              － Player view
+            </button>
+          )}
+          {/* In player preview mode, offer a peek at the raw DM content. */}
+          {isPlayerPreview && !showDm && (
+            <button
+              type="button"
+              className="text-[10px] px-1 py-2 rounded border [writing-mode:vertical-rl]"
+              onClick={() => setShowDm(true)}
+            >
+              ＋ DM view
+            </button>
+          )}
+          {isPlayerPreview && showDm && (
+            <button
+              type="button"
+              className="text-[10px] px-1 py-2 rounded border [writing-mode:vertical-rl]"
+              onClick={() => setShowDm(false)}
+            >
+              － DM view
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

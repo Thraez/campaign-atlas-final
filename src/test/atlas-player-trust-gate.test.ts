@@ -84,7 +84,7 @@ beforeAll(() => {
       encoding: "utf8",
       shell: IS_WIN,
       env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
-    }
+    },
   );
 });
 
@@ -130,9 +130,7 @@ function readAtlas(): {
 
 describe("player atlas trust gate", () => {
   it("sentinel scan: no DM-only sentinel string appears in any generated player file", () => {
-    const dirsToScan = [outDir, path.join(ROOT, "dist")].filter((d) =>
-      fs.existsSync(d)
-    );
+    const dirsToScan = [outDir, path.join(ROOT, "dist")].filter((d) => fs.existsSync(d));
     expect(dirsToScan).toContain(outDir);
     const offenders: string[] = [];
     for (const dir of dirsToScan) {
@@ -156,21 +154,14 @@ describe("player atlas trust gate", () => {
     const dmOut = path.join(tmpRoot, "dm-control");
     execFileSync(
       NPX,
-      [
-        "tsx",
-        SCRIPT,
-        "--config",
-        path.join(FIXTURE, "atlas.config.json"),
-        "--out",
-        dmOut,
-      ],
-    {
-      cwd: ROOT,
-      stdio: ["ignore", "pipe", "pipe"],
-      encoding: "utf8",
-      shell: IS_WIN,
-      env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
-    }
+      ["tsx", SCRIPT, "--config", path.join(FIXTURE, "atlas.config.json"), "--out", dmOut],
+      {
+        cwd: ROOT,
+        stdio: ["ignore", "pipe", "pipe"],
+        encoding: "utf8",
+        shell: IS_WIN,
+        env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
+      },
     );
     const text = fs.readFileSync(path.join(dmOut, "atlas.json"), "utf8");
     for (const s of SENTINELS) expect(text).toContain(s);
@@ -181,21 +172,17 @@ describe("player atlas trust gate", () => {
     expect(atlas.entities.length).toBeGreaterThan(0);
     for (const e of atlas.entities) {
       // sourcePath must be absent or empty — leaks vault layout otherwise.
-      expect(
-        !e.sourcePath || e.sourcePath === "",
-        `entity ${e.id} leaks sourcePath`
-      ).toBe(true);
+      expect(!e.sourcePath || e.sourcePath === "", `entity ${e.id} leaks sourcePath`).toBe(true);
       // frontmatter must be absent or empty object — frontmatter often
       // carries DM-only fields (date, internal ids, draft flags, …).
       expect(
         !e.frontmatter || Object.keys(e.frontmatter).length === 0,
-        `entity ${e.id} leaks non-empty frontmatter`
+        `entity ${e.id} leaks non-empty frontmatter`,
       ).toBe(true);
       // profile.dm must NEVER reach a player build.
-      expect(
-        !e.profile || e.profile.dm === undefined,
-        `entity ${e.id} leaks profile.dm`
-      ).toBe(true);
+      expect(!e.profile || e.profile.dm === undefined, `entity ${e.id} leaks profile.dm`).toBe(
+        true,
+      );
     }
   });
 
@@ -204,26 +191,26 @@ describe("player atlas trust gate", () => {
     for (const e of atlas.entities) {
       expect(
         PLAYER_SAFE_VIS.has(e.visibility),
-        `entity ${e.id} has non-player visibility "${e.visibility}"`
+        `entity ${e.id} has non-player visibility "${e.visibility}"`,
       ).toBe(true);
     }
     for (const p of atlas.placements) {
       expect(
         PLAYER_SAFE_VIS.has(p.visibility),
-        `placement ${p.entityId} has non-player visibility "${p.visibility}"`
+        `placement ${p.entityId} has non-player visibility "${p.visibility}"`,
       ).toBe(true);
     }
     for (const m of atlas.maps) {
       for (const r of m.regions ?? []) {
         expect(
           PLAYER_SAFE_VIS.has(r.visibility),
-          `region ${r.id} on map ${m.id} has non-player visibility "${r.visibility}"`
+          `region ${r.id} on map ${m.id} has non-player visibility "${r.visibility}"`,
         ).toBe(true);
       }
       for (const r of m.routes ?? []) {
         expect(
           PLAYER_SAFE_VIS.has(r.visibility),
-          `route ${r.id} on map ${m.id} has non-player visibility "${r.visibility}"`
+          `route ${r.id} on map ${m.id} has non-player visibility "${r.visibility}"`,
         ).toBe(true);
       }
     }

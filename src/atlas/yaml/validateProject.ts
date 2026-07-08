@@ -1,10 +1,23 @@
 /**
  * Project-wide validation with severity levels.
  *
- * Used by the central Export DM Changes modal to give the DM a single
+ * Used by the Publish Check dashboard to give the DM a single
  * "what would break / what should I look at" report. Pure, no I/O.
+ *
+ * The report is assembled by running an ordered list of independent
+ * `rule` functions (see `RULES` below). Each rule receives a read-only
+ * `ValidationContext` (the project plus a few precomputed lookup sets) and
+ * returns the issues and/or "passed" checks it found. Keeping each check in
+ * its own small named function makes the individual rules readable and
+ * testable in isolation; the driver in `validateProject` just concatenates
+ * their output in order and tallies the counts.
  */
-import type { AtlasProject, MapDocument } from "@/atlas/content/schema";
+import type { AtlasProject, MapDocument, Entity } from "@/atlas/content/schema";
+import {
+  PLAYER_VISIBLE_VISIBILITY,
+  VALID_VISIBILITY,
+  isSecretVisibility,
+} from "@/atlas/content/visibility";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import type { PlacementOverride } from "./buildPatches";
 
@@ -13,8 +26,8 @@ export type Severity = "blocking" | "warning" | "suggestion" | "passed";
 export type IssueCategory = "safety" | "yaml" | "map" | "draft";
 
 export interface IssueAction {
-  /** "go-entity" | "go-map" | "show-fix" | "export-patch" */
-  kind: "go-entity" | "go-map" | "show-fix" | "export-patch";
+  /** "go-entity" | "go-map" | "show-fix" */
+  kind: "go-entity" | "go-map" | "show-fix";
   label: string;
   /** Free-form payload — for "show-fix" this is the suggested patch text. */
   payload?: string;
@@ -58,23 +71,42 @@ export interface ValidateProjectOpts {
   draftLocalLayers?: LocalLayer[];
 }
 
-export function validateProject(opts: ValidateProjectOpts): ValidationReport {
+/**
+ * Read-only bundle every rule receives. The lookup sets are precomputed once
+ * so individual rules don't each re-scan the whole project.
+ */
+interface ValidationContext {
+  project: AtlasProject;
+  draftPlacements: PlacementOverride[];
+  draftMap?: MapDocument;
+  draftLocalLayers: LocalLayer[];
+  /** All map ids in the project. */
+  mapIds: Set<string>;
+  /** All entity ids (slugs) in the project. */
+  entityIds: Set<string>;
+  /** Entity ids that must never leak to players (visibility dm | hidden). */
+  dmEntityIds: Set<string>;
+  /** Visibilities that are shown to players (player | rumor). */
+  playerVisibleVis: Set<string>;
+  /** The complete set of accepted visibility values. */
+  validVis: Set<string>;
+  /** id → entity, for cheap title lookups when reporting. */
+  entityById: Map<string, Entity>;
+}
+
+/** What a single rule contributes to the report. */
+interface RuleOutput {
+  issues?: Issue[];
+  passed?: string[];
+}
+
+type Rule = (ctx: ValidationContext) => RuleOutput;
+
+// 1. Duplicate map IDs across project
+const checkMapIdUniqueness: Rule = (ctx) => {
   const issues: Issue[] = [];
-  const passedChecks: string[] = [];
-  const { project, draftPlacements, draftMap, draftLocalLayers = [] } = opts;
-
-  const mapIds = new Set(project.maps.map((m) => m.id));
-  const entityIds = new Set(project.entities.map((e) => e.id));
-  const dmEntityIds = new Set(
-    project.entities.filter((e) => e.visibility === "dm" || e.visibility === "hidden").map((e) => e.id)
-  );
-  const playerVisibleVis = new Set(["player", "rumor"]);
-  const validVis = new Set(["player", "dm", "hidden", "rumor"]);
-  const entityById = new Map(project.entities.map((e) => [e.id, e] as const));
-
-  // 1. Duplicate map IDs across project
   const seenMap = new Set<string>();
-  for (const m of project.maps) {
+  for (const m of ctx.project.maps) {
     if (seenMap.has(m.id))
       issues.push({
         severity: "blocking",
@@ -86,10 +118,15 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
       });
     seenMap.add(m.id);
   }
-  if (!seenMap.size || project.maps.length === seenMap.size) passedChecks.push("Unique map IDs");
+  const passed: string[] = [];
+  if (!seenMap.size || ctx.project.maps.length === seenMap.size) passed.push("Unique map IDs");
+  return { issues, passed };
+};
 
-  // 2. Per-map: duplicate layer IDs, empty maps, layer asset checks
-  for (const m of project.maps) {
+// 2. Per-map: duplicate layer IDs, empty maps, layer asset checks
+const checkMapLayers: Rule = (ctx) => {
+  const issues: Issue[] = [];
+  for (const m of ctx.project.maps) {
     const seen = new Set<string>();
     for (const l of m.layers) {
       if (seen.has(l.id))
@@ -171,10 +208,15 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
       });
     }
   }
+  return { issues };
+};
 
-  // 3. Region/route uniqueness + geometry checks
+// 3. Region/route uniqueness + geometry checks
+const checkRegionsAndRoutes: Rule = (ctx) => {
+  const issues: Issue[] = [];
+  // Region ids must be unique across the whole project, so this set spans maps.
   const seenRegion = new Set<string>();
-  for (const m of project.maps) {
+  for (const m of ctx.project.maps) {
     for (const r of m.regions ?? []) {
       if (seenRegion.has(r.id))
         issues.push({
@@ -195,7 +237,7 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
           hint: "A polygon needs at least 3 points. Edit it in the Regions tab.",
           scope: { mapId: m.id },
         });
-      if (r.entityId && !entityIds.has(r.entityId)) {
+      if (r.entityId && !ctx.entityIds.has(r.entityId)) {
         issues.push({
           severity: "warning",
           code: "unknown-entity",
@@ -205,7 +247,7 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
           scope: { mapId: m.id, entityId: r.entityId },
         });
       }
-      if (r.visibility === "player" && r.entityId && dmEntityIds.has(r.entityId)) {
+      if (r.visibility === "player" && r.entityId && ctx.dmEntityIds.has(r.entityId)) {
         issues.push({
           severity: "blocking",
           code: "spoiler-leak-region",
@@ -228,6 +270,7 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
         });
       }
     }
+    // Route ids only need to be unique within a single map.
     const seenRoute = new Set<string>();
     for (const route of m.routes ?? []) {
       if (seenRoute.has(route.id))
@@ -249,7 +292,7 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
         });
       for (const w of route.waypoints) {
         if (typeof w === "object" && "entityId" in w) {
-          if (!entityIds.has(w.entityId)) {
+          if (!ctx.entityIds.has(w.entityId)) {
             issues.push({
               severity: "warning",
               code: "route-waypoint-unresolved",
@@ -258,7 +301,7 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
               hint: "Fix the entity slug, create the markdown file, or replace the waypoint with raw coordinates.",
               scope: { mapId: m.id, entityId: w.entityId },
             });
-          } else if (route.visibility === "player" && dmEntityIds.has(w.entityId)) {
+          } else if (route.visibility === "player" && ctx.dmEntityIds.has(w.entityId)) {
             issues.push({
               severity: "blocking",
               code: "spoiler-leak-route",
@@ -272,12 +315,16 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
       }
     }
   }
+  return { issues };
+};
 
-  // 4. Entity visibility sanity, duplicate slugs, missing summaries/types
+// 4. Entity visibility sanity, duplicate slugs, missing summaries/types
+const checkEntities: Rule = (ctx) => {
+  const issues: Issue[] = [];
   const seenSlug = new Map<string, number>();
-  for (const e of project.entities) {
+  for (const e of ctx.project.entities) {
     seenSlug.set(e.id, (seenSlug.get(e.id) ?? 0) + 1);
-    if (!validVis.has(e.visibility)) {
+    if (!ctx.validVis.has(e.visibility)) {
       issues.push({
         severity: "blocking",
         code: "invalid-visibility",
@@ -310,7 +357,7 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
     // DM block leakage in body — %% ... %% should already be stripped by the
     // build, but if any literal "%%" pair remains in a player-visible entity
     // it will be visible. Flag it as a suggestion to encourage cleanup.
-    if (playerVisibleVis.has(e.visibility) && /%%[\s\S]+?%%/.test(e.body || "")) {
+    if (ctx.playerVisibleVis.has(e.visibility) && /%%[\s\S]+?%%/.test(e.body || "")) {
       issues.push({
         severity: "warning",
         code: "dm-block-in-player-body",
@@ -323,7 +370,7 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
     // Image embeds (![[image.ext]]) in player-visible body are silently dropped
     // by the player projection (no embed-to-img conversion there). Warn so the
     // DM can fix before publishing.
-    if (playerVisibleVis.has(e.visibility)) {
+    if (ctx.playerVisibleVis.has(e.visibility)) {
       for (const m of (e.body || "").matchAll(/!\[\[([^[\]\n]+?)\]\]/g)) {
         const target = m[1].split("|")[0].trim();
         if (/\.(?:png|jpe?g|gif|webp|svg|avif)$/i.test(target)) {
@@ -342,10 +389,10 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
 
     // Player-visible wikilinks pointing at DM-only entities leak titles via
     // tooltips / autocomplete. The strict build already drops them but warn.
-    if (playerVisibleVis.has(e.visibility) && Array.isArray(e.links)) {
+    if (ctx.playerVisibleVis.has(e.visibility) && Array.isArray(e.links)) {
       for (const link of e.links) {
-        if (link.resolvedId && dmEntityIds.has(link.resolvedId)) {
-          const target = entityById.get(link.resolvedId);
+        if (link.resolvedId && ctx.dmEntityIds.has(link.resolvedId)) {
+          const target = ctx.entityById.get(link.resolvedId);
           issues.push({
             severity: "warning",
             code: "wikilink-to-dm",
@@ -360,11 +407,14 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
     // Broken wikilinks in player-visible entities render as dead, non-clickable
     // text to players. Aggregate all broken targets into one suggestion per
     // entity so the Publish Check stays sleek (not one issue per link).
-    if (playerVisibleVis.has(e.visibility) && Array.isArray(e.links)) {
+    if (ctx.playerVisibleVis.has(e.visibility) && Array.isArray(e.links)) {
       const broken = e.links.filter((l) => l.broken);
       if (broken.length > 0) {
         const CAP = 3;
-        const listed = broken.slice(0, CAP).map((l) => `[[${l.target}]]`).join(", ");
+        const listed = broken
+          .slice(0, CAP)
+          .map((l) => `[[${l.target}]]`)
+          .join(", ");
         const extra = broken.length > CAP ? ` …and ${broken.length - CAP} more` : "";
         issues.push({
           severity: "suggestion",
@@ -378,16 +428,15 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
       }
     }
     // Player-visible relationships pointing at DM-only entities leak too.
-    if (playerVisibleVis.has(e.visibility) && Array.isArray(e.relationships)) {
+    if (ctx.playerVisibleVis.has(e.visibility) && Array.isArray(e.relationships)) {
       for (const rel of e.relationships) {
         // Schema field is `entity` (the target slug). Older code used `targetId`
         // — accept both for back-compat with any in-flight YAML.
         const targetId =
-          (rel as { entity?: string }).entity ??
-          (rel as { targetId?: string }).targetId;
+          (rel as { entity?: string }).entity ?? (rel as { targetId?: string }).targetId;
         const relVis = (rel as { visibility?: string }).visibility ?? "player";
         if (!targetId) continue;
-        if (!entityIds.has(targetId)) {
+        if (!ctx.entityIds.has(targetId)) {
           issues.push({
             severity: "warning",
             code: "relationship-unresolved",
@@ -395,7 +444,7 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
             message: `Entity "${e.title}" has relationship to unknown "${targetId}"`,
             scope: { entityId: e.id },
           });
-        } else if (playerVisibleVis.has(relVis) && dmEntityIds.has(targetId)) {
+        } else if (ctx.playerVisibleVis.has(relVis) && ctx.dmEntityIds.has(targetId)) {
           issues.push({
             severity: "blocking",
             code: "spoiler-leak-relationship",
@@ -420,10 +469,14 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
       });
     }
   }
+  return { issues };
+};
 
-  // 5. Draft placement checks: known map, in-bounds coords
-  for (const p of draftPlacements) {
-    if (!mapIds.has(p.mapId)) {
+// 5. Draft placement checks: known map, in-bounds coords
+const checkDraftPlacements: Rule = (ctx) => {
+  const issues: Issue[] = [];
+  for (const p of ctx.draftPlacements) {
+    if (!ctx.mapIds.has(p.mapId)) {
       issues.push({
         severity: "blocking",
         code: "unknown-map",
@@ -433,7 +486,7 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
       });
       continue;
     }
-    if (!entityIds.has(p.entityId)) {
+    if (!ctx.entityIds.has(p.entityId)) {
       issues.push({
         severity: "warning",
         code: "unknown-entity",
@@ -453,7 +506,7 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
       });
       continue;
     }
-    const m = project.maps.find((mm) => mm.id === p.mapId)!;
+    const m = ctx.project.maps.find((mm) => mm.id === p.mapId)!;
     if (p.x < 0 || p.y < 0 || p.x > m.width || p.y > m.height) {
       issues.push({
         severity: "warning",
@@ -465,17 +518,21 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
       });
     }
   }
+  return { issues };
+};
 
-  // 6. Draft layer asset checks
-  if (draftMap && draftLocalLayers.length) {
-    for (const l of draftLocalLayers) {
+// 6. Draft layer asset checks
+const checkDraftLayers: Rule = (ctx) => {
+  const issues: Issue[] = [];
+  if (ctx.draftMap && ctx.draftLocalLayers.length) {
+    for (const l of ctx.draftLocalLayers) {
       if (l.origin === "upload" && !l.dataUrl && !l.src.startsWith("blob:")) {
         issues.push({
           severity: "warning",
           code: "missing-asset",
           category: "map",
           message: `Uploaded layer "${l.id}" has no preview data — re-upload before exporting`,
-          scope: { mapId: draftMap.id },
+          scope: { mapId: ctx.draftMap.id },
         });
       }
       if (/^https?:\/\//i.test(l.src)) {
@@ -484,17 +541,21 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
           code: "external-asset-draft",
           category: "map",
           message: `Layer "${l.id}" uses an external URL — won't work offline`,
-          scope: { mapId: draftMap.id },
+          scope: { mapId: ctx.draftMap.id },
         });
       }
     }
   }
+  return { issues };
+};
 
-  // 7. (Removed) Draft/export staleness. The Export Patch flow was removed —
-  // the unified Save writes drafts straight to disk, so a "not exported"
-  // warning would point at a button that no longer exists. Surfacing unsaved
-  // draft state is the job of the save-status UI, not the validator.
-  if (draftLocalLayers.some((l) => l.origin === "upload")) {
+// 7. (Removed) Draft/export staleness. The Export Patch flow was removed —
+// the unified Save writes drafts straight to disk, so a "not exported"
+// warning would point at a button that no longer exists. Surfacing unsaved
+// draft state is the job of the save-status UI, not the validator.
+const checkUploadedAssetsPending: Rule = (ctx) => {
+  const issues: Issue[] = [];
+  if (ctx.draftLocalLayers.some((l) => l.origin === "upload")) {
     issues.push({
       severity: "suggestion",
       code: "uploaded-assets-pending",
@@ -503,14 +564,62 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
       hint: "Click Save — the image files are written alongside world.yaml.",
     });
   }
+  return { issues };
+};
 
-  // 8. Build-report-derived passed checks (atlas was built recently / safe)
-  const br = project.buildReport;
+// 8. Build-report-derived passed checks (atlas was built recently / safe)
+const checkBuildReport: Rule = (ctx) => {
+  const passed: string[] = [];
+  const br = ctx.project.buildReport;
   if (br) {
-    if (br.brokenLinks === 0) passedChecks.push("No broken wikilinks in build");
-    if ((br.duplicateSlugs ?? 0) === 0) passedChecks.push("No duplicate slugs in build");
-    if ((br.missingAssets ?? 0) === 0) passedChecks.push("All map assets present in build");
-    if ((br.externalAssets ?? 0) === 0) passedChecks.push("No external map assets in build");
+    if (br.brokenLinks === 0) passed.push("No broken wikilinks in build");
+    if ((br.duplicateSlugs ?? 0) === 0) passed.push("No duplicate slugs in build");
+    if ((br.missingAssets ?? 0) === 0) passed.push("All map assets present in build");
+    if ((br.externalAssets ?? 0) === 0) passed.push("No external map assets in build");
+  }
+  return { passed };
+};
+
+/**
+ * Ordered list of checks. Order matters: it fixes the order issues appear in
+ * the report and the report markdown, so keep new rules in a sensible slot
+ * rather than appending blindly.
+ */
+const RULES: Rule[] = [
+  checkMapIdUniqueness,
+  checkMapLayers,
+  checkRegionsAndRoutes,
+  checkEntities,
+  checkDraftPlacements,
+  checkDraftLayers,
+  checkUploadedAssetsPending,
+  checkBuildReport,
+];
+
+export function validateProject(opts: ValidateProjectOpts): ValidationReport {
+  const { project, draftPlacements, draftMap, draftLocalLayers = [] } = opts;
+
+  const ctx: ValidationContext = {
+    project,
+    draftPlacements,
+    draftMap,
+    draftLocalLayers,
+    mapIds: new Set(project.maps.map((m) => m.id)),
+    entityIds: new Set(project.entities.map((e) => e.id)),
+    dmEntityIds: new Set(
+      project.entities.filter((e) => isSecretVisibility(e.visibility)).map((e) => e.id),
+    ),
+    playerVisibleVis: new Set<string>(PLAYER_VISIBLE_VISIBILITY),
+    validVis: new Set<string>(VALID_VISIBILITY),
+    entityById: new Map(project.entities.map((e) => [e.id, e] as const)),
+  };
+
+  const issues: Issue[] = [];
+  const passedChecks: string[] = [];
+  for (const rule of RULES) {
+    const out = rule(ctx);
+    if (out.issues) issues.push(...out.issues);
+    if (out.passed) passedChecks.push(...out.passed);
   }
 
   const counts = {
@@ -521,7 +630,8 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
 
   if (counts.blocking === 0) passedChecks.push("No blocking issues");
   if (counts.warning === 0) passedChecks.push("No warnings");
-  if (!issues.some((i) => i.code.startsWith("spoiler-leak"))) passedChecks.push("No DM-content leakage detected");
+  if (!issues.some((i) => i.code.startsWith("spoiler-leak")))
+    passedChecks.push("No DM-content leakage detected");
 
   return {
     issues,
@@ -548,9 +658,13 @@ export function buildPublishReport(report: ValidationReport): string {
   if (report.meta.atlasVersion) lines.push(`Atlas version: \`${report.meta.atlasVersion}\``);
   if (report.meta.builtAt) lines.push(`Built at: ${report.meta.builtAt}`);
   lines.push(`Entities: ${report.meta.entityCount} · Maps: ${report.meta.mapCount}`);
-  lines.push(`Draft placements: ${report.meta.draftPlacementCount} · Pending uploads: ${report.meta.pendingAssetCount}`);
+  lines.push(
+    `Draft placements: ${report.meta.draftPlacementCount} · Pending uploads: ${report.meta.pendingAssetCount}`,
+  );
   lines.push("");
-  lines.push(`**${report.counts.blocking} blocking · ${report.counts.warning} warnings · ${report.counts.suggestion} suggestions**`);
+  lines.push(
+    `**${report.counts.blocking} blocking · ${report.counts.warning} warnings · ${report.counts.suggestion} suggestions**`,
+  );
   lines.push("");
   for (const sev of ["blocking", "warning", "suggestion"] as const) {
     const list = report.issues.filter((i) => i.severity === sev);
@@ -558,7 +672,11 @@ export function buildPublishReport(report: ValidationReport): string {
     lines.push(`## ${sev.charAt(0).toUpperCase()}${sev.slice(1)} (${list.length})`);
     lines.push("");
     for (const i of list) {
-      const where = i.scope?.mapId ? ` _(map: ${i.scope.mapId})_` : i.scope?.entityId ? ` _(entity: ${i.scope.entityId})_` : "";
+      const where = i.scope?.mapId
+        ? ` _(map: ${i.scope.mapId})_`
+        : i.scope?.entityId
+          ? ` _(entity: ${i.scope.entityId})_`
+          : "";
       lines.push(`- **[${i.code}]** ${i.message}${where}`);
       if (i.hint) lines.push(`  - ${i.hint}`);
     }
@@ -579,4 +697,3 @@ export const CATEGORY_LABELS: Record<IssueCategory, string> = {
   map: "Maps & Geometry",
   draft: "Drafts & Export",
 };
-

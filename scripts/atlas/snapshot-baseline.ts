@@ -20,7 +20,9 @@ const DST = path.resolve(ROOT, "public/atlas/.last-published.json");
 
 function main() {
   if (!fs.existsSync(SRC)) {
-    console.log("snapshot-baseline: public/atlas/atlas.json not present yet — nothing to snapshot.");
+    console.log(
+      "snapshot-baseline: public/atlas/atlas.json not present yet — nothing to snapshot.",
+    );
     return;
   }
   try {

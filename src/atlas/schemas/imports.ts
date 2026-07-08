@@ -74,10 +74,7 @@ const overrideSlotSchema = z.union([overrideValueSchema, z.null()]);
  * or a bare `entityId` for legacy v1 — both formats are accepted; we just
  * cap key length and reject non-object roots.
  */
-export const overridesSchema = z.record(
-  z.string().min(1).max(400),
-  overrideSlotSchema
-);
+export const overridesSchema = z.record(z.string().min(1).max(400), overrideSlotSchema);
 
 export type ParsedOverrides = z.infer<typeof overridesSchema>;
 
@@ -98,13 +95,9 @@ export function formatZodError(err: z.ZodError): string {
  * branch on `.ok` and surface `.error` directly to the user.
  */
 export type SafeParseResult<T> =
-  | { ok: true; data: T; error?: undefined }
-  | { ok: false; data?: undefined; error: string };
+  { ok: true; data: T; error?: undefined } | { ok: false; data?: undefined; error: string };
 
-export function safeParseInput<T>(
-  schema: z.ZodType<T>,
-  raw: unknown
-): SafeParseResult<T> {
+export function safeParseInput<T>(schema: z.ZodType<T>, raw: unknown): SafeParseResult<T> {
   const result = schema.safeParse(raw);
   if (result.success) return { ok: true, data: result.data };
   return { ok: false, error: formatZodError(result.error) };

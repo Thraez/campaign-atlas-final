@@ -26,6 +26,9 @@ export interface FogDraftAPI {
   fog: FogOverlay;
   /** True if local edits diverge from canon. */
   dirty: boolean;
+  /** Pending-change count (0 or 1 — fog is a single overlay). Mirrors the
+   *  routes/regions `dirtyCount` so all three tabs read one uniform field. */
+  dirtyCount: number;
   setEnabled: (v: boolean) => void;
   setColor: (v: string | undefined) => void;
   // Reveal authoring
@@ -34,7 +37,7 @@ export interface FogDraftAPI {
   draftPoints: Point[];
   addDraftPoint: (p: Point) => void;
   removeLastDraftPoint: () => void;
-  cancelDraft: () => void;
+  cancelDraw: () => void;
   finishDraftPolygon: () => boolean;
   /** Draw a circle by anchor + radius (in map units). Adds polygon approximation. */
   finishDraftCircle: (radius: number) => boolean;
@@ -67,33 +70,54 @@ function circlePolygon(cx: number, cy: number, r: number, segs = CIRCLE_SEGMENTS
 
 function bboxAroundLine(points: Point[], padding: number): Point[] {
   if (!points.length) return [];
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
   for (const [x, y] of points) {
-    if (x < minX) minX = x; if (y < minY) minY = y;
-    if (x > maxX) maxX = x; if (y > maxY) maxY = y;
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
   }
-  minX -= padding; minY -= padding; maxX += padding; maxY += padding;
-  return [[minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY]];
+  minX -= padding;
+  minY -= padding;
+  maxX += padding;
+  maxY += padding;
+  return [
+    [minX, minY],
+    [maxX, minY],
+    [maxX, maxY],
+    [minX, maxY],
+  ];
 }
 
 const DEFAULT_FOG = (mapId: string): FogOverlay => ({
-  mapId, enabled: false, color: DEFAULT_COLOR, reveals: [],
+  mapId,
+  enabled: false,
+  color: DEFAULT_COLOR,
+  reveals: [],
 });
 
 export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackAPI): FogDraftAPI {
-  const base: FogOverlay = useMemo(
+  // Named `baseFog` to mirror `baseRoutes`/`baseRegions` in the sibling draft
+  // hooks — one greppable convention for "the canon value this draft overrides".
+  const baseFog: FogOverlay = useMemo(
     () => map?.fog ?? (map ? DEFAULT_FOG(map.id) : DEFAULT_FOG("")),
-    [map]
+    [map],
   );
   const [override, setOverride] = useState<FogOverlay | null>(null);
-  const fog = override ?? base;
+  const fog = override ?? baseFog;
   const dirty = override !== null;
+  const dirtyCount = dirty ? 1 : 0;
 
   const [tool, setTool] = useState<FogTool>(null);
   const [draftPoints, setDraftPoints] = useState<Point[]>([]);
 
   const overrideRef = useRef(override);
-  useEffect(() => { overrideRef.current = override; }, [override]);
+  useEffect(() => {
+    overrideRef.current = override;
+  }, [override]);
 
   const applyOverride = useCallback((next: FogOverlay | null) => {
     overrideRef.current = next;
@@ -104,40 +128,59 @@ export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackA
    * Apply a partial change to the fog overlay and (optionally) record an
    * undo entry. Records the snapshot pair (prior override, next override)
    * so Cmd+Z reverts both the visible flag and any reveal change at once.
+   *
+   * Named `mutateDraft` to match the undo-aware mutation primitive in the
+   * sibling route/region draft hooks (fog patches a single overlay rather than
+   * a collection, so it takes a partial instead of a compute callback).
    */
-  const mutate = useCallback((p: Partial<FogOverlay>) => {
-    const before = overrideRef.current;
-    const cur = before ?? base;
-    const next: FogOverlay = { ...cur, ...p };
-    // No real change → no-op.
-    if (before && (Object.keys(p) as (keyof FogOverlay)[]).every((k) => before[k] === next[k])) return;
-    applyOverride(next);
-    if (undoStack) {
-      undoStack.push({
-        undo: () => applyOverride(before),
-        redo: () => applyOverride(next),
-        label: "fog",
-      });
-    }
-  }, [base, applyOverride, undoStack]);
+  const mutateDraft = useCallback(
+    (p: Partial<FogOverlay>) => {
+      const before = overrideRef.current;
+      const cur = before ?? baseFog;
+      const next: FogOverlay = { ...cur, ...p };
+      // No real change → no-op.
+      if (before && (Object.keys(p) as (keyof FogOverlay)[]).every((k) => before[k] === next[k]))
+        return;
+      applyOverride(next);
+      if (undoStack) {
+        undoStack.push({
+          undo: () => applyOverride(before),
+          redo: () => applyOverride(next),
+          label: "fog",
+        });
+      }
+    },
+    [baseFog, applyOverride, undoStack],
+  );
 
-  const setEnabled = useCallback((v: boolean) => mutate({ enabled: v }), [mutate]);
-  const setColor = useCallback((v: string | undefined) => mutate({ color: v }), [mutate]);
+  const setEnabled = useCallback((v: boolean) => mutateDraft({ enabled: v }), [mutateDraft]);
+  const setColor = useCallback((v: string | undefined) => mutateDraft({ color: v }), [mutateDraft]);
 
   const addDraftPoint = useCallback((p: Point) => setDraftPoints((s) => [...s, p]), []);
   const removeLastDraftPoint = useCallback(() => setDraftPoints((s) => s.slice(0, -1)), []);
-  const cancelDraft = useCallback(() => { setTool(null); setDraftPoints([]); }, []);
+  const cancelDraw = useCallback(() => {
+    setTool(null);
+    setDraftPoints([]);
+  }, []);
 
-  const addReveal = useCallback((poly: Point[]) => {
-    mutate({ reveals: [...fog.reveals, poly] });
-  }, [mutate, fog.reveals]);
+  const addReveal = useCallback(
+    (poly: Point[]) => {
+      mutateDraft({ reveals: [...fog.reveals, poly] });
+    },
+    [mutateDraft, fog.reveals],
+  );
 
-  const addConceal = useCallback((poly: Point[]) => {
-    mutate({ conceals: [...(fog.conceals ?? []), poly] });
-  }, [mutate, fog.conceals]);
+  const addConceal = useCallback(
+    (poly: Point[]) => {
+      mutateDraft({ conceals: [...(fog.conceals ?? []), poly] });
+    },
+    [mutateDraft, fog.conceals],
+  );
 
   const finishDraftPolygon = useCallback((): boolean => {
-    if (draftPoints.length < 3) { return false; }
+    if (draftPoints.length < 3) {
+      return false;
+    }
     if (tool === "fog-polygon") {
       addConceal(draftPoints);
     } else {
@@ -148,74 +191,133 @@ export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackA
     return true;
   }, [draftPoints, tool, addReveal, addConceal]);
 
-  const finishDraftCircle = useCallback((radius: number): boolean => {
-    if (draftPoints.length < 1 || radius <= 0) return false;
-    const [cx, cy] = draftPoints[0];
-    if (tool === "fog-circle") {
-      addConceal(circlePolygon(cx, cy, radius));
-    } else {
-      addReveal(circlePolygon(cx, cy, radius));
-    }
-    setDraftPoints([]);
-    setTool(null);
-    return true;
-  }, [draftPoints, tool, addReveal, addConceal]);
+  const finishDraftCircle = useCallback(
+    (radius: number): boolean => {
+      if (draftPoints.length < 1 || radius <= 0) return false;
+      const [cx, cy] = draftPoints[0];
+      if (tool === "fog-circle") {
+        addConceal(circlePolygon(cx, cy, radius));
+      } else {
+        addReveal(circlePolygon(cx, cy, radius));
+      }
+      setDraftPoints([]);
+      setTool(null);
+      return true;
+    },
+    [draftPoints, tool, addReveal, addConceal],
+  );
 
-  const removeReveal = useCallback((index: number) => {
-    mutate({ reveals: fog.reveals.filter((_, i) => i !== index) });
-  }, [mutate, fog.reveals]);
+  const removeReveal = useCallback(
+    (index: number) => {
+      mutateDraft({ reveals: fog.reveals.filter((_, i) => i !== index) });
+    },
+    [mutateDraft, fog.reveals],
+  );
 
-  const clearReveals = useCallback(() => mutate({ reveals: [] }), [mutate]);
+  const clearReveals = useCallback(() => mutateDraft({ reveals: [] }), [mutateDraft]);
 
-  const setFeatherPx = useCallback((n: number) => mutate({ featherPx: n }), [mutate]);
+  const setFeatherPx = useCallback((n: number) => mutateDraft({ featherPx: n }), [mutateDraft]);
 
-  const removeConceal = useCallback((index: number) => {
-    mutate({ conceals: (fog.conceals ?? []).filter((_, i) => i !== index) });
-  }, [mutate, fog.conceals]);
+  const removeConceal = useCallback(
+    (index: number) => {
+      mutateDraft({ conceals: (fog.conceals ?? []).filter((_, i) => i !== index) });
+    },
+    [mutateDraft, fog.conceals],
+  );
 
-  const clearConceals = useCallback(() => mutate({ conceals: [] }), [mutate]);
+  const clearConceals = useCallback(() => mutateDraft({ conceals: [] }), [mutateDraft]);
 
-  const revealRegion = useCallback((r: Region) => {
-    if (r.points.length >= 3) addReveal(r.points);
-  }, [addReveal]);
+  const revealRegion = useCallback(
+    (r: Region) => {
+      if (r.points.length >= 3) addReveal(r.points);
+    },
+    [addReveal],
+  );
 
-  const revealAroundRoute = useCallback((_r: Route, points: Point[], padding: number) => {
-    const poly = bboxAroundLine(points, padding);
-    if (poly.length >= 3) addReveal(poly);
-  }, [addReveal]);
+  const revealAroundRoute = useCallback(
+    (_r: Route, points: Point[], padding: number) => {
+      const poly = bboxAroundLine(points, padding);
+      if (poly.length >= 3) addReveal(poly);
+    },
+    [addReveal],
+  );
 
-  const revealAroundPin = useCallback((center: Point, radius: number) => {
-    addReveal(circlePolygon(center[0], center[1], radius));
-  }, [addReveal]);
+  const revealAroundPin = useCallback(
+    (center: Point, radius: number) => {
+      addReveal(circlePolygon(center[0], center[1], radius));
+    },
+    [addReveal],
+  );
 
   // reset() bypasses the undo stack — see comment in useRegionDraft.ts.
-  const reset = useCallback(() => { applyOverride(null); cancelDraft(); }, [applyOverride, cancelDraft]);
+  const reset = useCallback(() => {
+    applyOverride(null);
+    cancelDraw();
+  }, [applyOverride, cancelDraw]);
 
   const issues = useMemo<FogIssue[]>(() => {
     const out: FogIssue[] = [];
-    if (map && fog.mapId !== map.id) out.push({ severity: "warning", code: "fog-wrong-map", message: `Fog mapId "${fog.mapId}" doesn't match active map.` });
+    if (map && fog.mapId !== map.id)
+      out.push({
+        severity: "warning",
+        code: "fog-wrong-map",
+        message: `Fog mapId "${fog.mapId}" doesn't match active map.`,
+      });
     fog.reveals.forEach((poly, i) => {
-      if (poly.length < 3) out.push({ severity: "blocking", code: "fog-reveal-too-few-points", message: `Reveal #${i + 1} has fewer than 3 points`, index: i });
+      if (poly.length < 3)
+        out.push({
+          severity: "blocking",
+          code: "fog-reveal-too-few-points",
+          message: `Reveal #${i + 1} has fewer than 3 points`,
+          index: i,
+        });
       if (map) {
         const oob = poly.some(([x, y]) => x < 0 || y < 0 || x > map.width || y > map.height);
-        if (oob) out.push({ severity: "warning", code: "fog-reveal-out-of-bounds", message: `Reveal #${i + 1} extends outside map bounds`, index: i });
+        if (oob)
+          out.push({
+            severity: "warning",
+            code: "fog-reveal-out-of-bounds",
+            message: `Reveal #${i + 1} extends outside map bounds`,
+            index: i,
+          });
       }
     });
     return out;
   }, [fog, map]);
 
   const snapshot = useCallback((): FogOverlay | null => overrideRef.current, []);
-  const applySnapshot = useCallback((snap: FogOverlay | null) => { applyOverride(snap); }, [applyOverride]);
+  const applySnapshot = useCallback(
+    (snap: FogOverlay | null) => {
+      applyOverride(snap);
+    },
+    [applyOverride],
+  );
 
   return {
-    fog, dirty, setEnabled, setColor,
-    tool, setTool, draftPoints, addDraftPoint, removeLastDraftPoint, cancelDraft,
-    finishDraftPolygon, finishDraftCircle,
-    removeReveal, clearReveals,
-    setFeatherPx, removeConceal, clearConceals,
-    revealRegion, revealAroundRoute, revealAroundPin,
+    fog,
+    dirty,
+    dirtyCount,
+    setEnabled,
+    setColor,
+    tool,
+    setTool,
+    draftPoints,
+    addDraftPoint,
+    removeLastDraftPoint,
+    cancelDraw,
+    finishDraftPolygon,
+    finishDraftCircle,
+    removeReveal,
+    clearReveals,
+    setFeatherPx,
+    removeConceal,
+    clearConceals,
+    revealRegion,
+    revealAroundRoute,
+    revealAroundPin,
     reset,
-    snapshot, applySnapshot,
+    snapshot,
+    applySnapshot,
     issues,
   };
 }
@@ -227,7 +329,8 @@ export function fogToYamlObject(f: FogOverlay): Record<string, unknown> {
     reveals: f.reveals.map((poly) => poly.map(([x, y]) => [Math.round(x), Math.round(y)])),
   };
   if (f.color) out.color = f.color;
-  if (f.conceals?.length) out.conceals = f.conceals.map((poly) => poly.map(([x, y]) => [Math.round(x), Math.round(y)]));
+  if (f.conceals?.length)
+    out.conceals = f.conceals.map((poly) => poly.map(([x, y]) => [Math.round(x), Math.round(y)]));
   if (f.featherPx !== undefined) out.featherPx = Math.round(f.featherPx);
   return out;
 }

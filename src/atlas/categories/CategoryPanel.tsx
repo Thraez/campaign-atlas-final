@@ -30,9 +30,7 @@ export function CategoryPanel({
     const filtered = q.trim()
       ? inCat.filter((e) => e.title.toLowerCase().includes(q.toLowerCase()))
       : inCat;
-    return [...filtered].sort(
-      (a, b) => ((b as any).dateValue ?? 0) - ((a as any).dateValue ?? 0),
-    );
+    return [...filtered].sort((a, b) => (b.dateValue ?? 0) - (a.dateValue ?? 0));
   }, [entities, category, q]);
 
   return (
@@ -88,11 +86,7 @@ export function CategoryPanel({
         >
           ＋ New {meta.singular}
         </button>
-        <button
-          type="button"
-          onClick={onImport}
-          className="h-8 text-xs rounded border"
-        >
+        <button type="button" onClick={onImport} className="h-8 text-xs rounded border">
           Import .md / paste
         </button>
       </div>

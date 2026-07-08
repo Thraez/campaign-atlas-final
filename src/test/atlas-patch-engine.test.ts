@@ -10,7 +10,16 @@ const map: MapDocument = {
   width: 1000,
   height: 800,
   layers: [
-    { id: "base", src: "/atlas/assets/maps/base.jpg", x: 0, y: 0, width: 1000, height: 800, opacity: 1, zIndex: 1 },
+    {
+      id: "base",
+      src: "/atlas/assets/maps/base.jpg",
+      x: 0,
+      y: 0,
+      width: 1000,
+      height: 800,
+      opacity: 1,
+      zIndex: 1,
+    },
   ],
 };
 
@@ -20,8 +29,36 @@ const project: AtlasProject = {
   worlds: [{ id: "w1", name: "World", defaultMapId: "m1" }],
   maps: [map],
   entities: [
-    { id: "town", title: "Town", type: "settlement", visibility: "player", aliases: [], tags: [], images: [], body: "", bodyHtml: "", frontmatter: {}, sourcePath: "town.md", links: [], backlinks: [] },
-    { id: "lair", title: "Lair", type: "dungeon", visibility: "dm", aliases: [], tags: [], images: [], body: "", bodyHtml: "", frontmatter: {}, sourcePath: "lair.md", links: [], backlinks: [] },
+    {
+      id: "town",
+      title: "Town",
+      type: "settlement",
+      visibility: "player",
+      aliases: [],
+      tags: [],
+      images: [],
+      body: "",
+      bodyHtml: "",
+      frontmatter: {},
+      sourcePath: "town.md",
+      links: [],
+      backlinks: [],
+    },
+    {
+      id: "lair",
+      title: "Lair",
+      type: "dungeon",
+      visibility: "dm",
+      aliases: [],
+      tags: [],
+      images: [],
+      body: "",
+      bodyHtml: "",
+      frontmatter: {},
+      sourcePath: "lair.md",
+      links: [],
+      backlinks: [],
+    },
   ] as Entity[],
   placements: [],
   assets: [],
@@ -53,7 +90,8 @@ describe("validatePatchYaml entity-frontmatter", () => {
 
 describe("validatePatchYaml map patch", () => {
   it("accepts a well-formed map patch", () => {
-    const patch = "maps:\n  - id: dungeon-level-1\n    name: Level 1\n    width: 4000\n    height: 3000\n";
+    const patch =
+      "maps:\n  - id: dungeon-level-1\n    name: Level 1\n    width: 4000\n    height: 3000\n";
     const r = validatePatchYaml(patch, "map");
     expect(r.ok).toBe(true);
     expect(r.errors).toHaveLength(0);
@@ -151,13 +189,19 @@ describe("validatePatchYaml entity-frontmatter — uncovered branches", () => {
   });
 
   it("warns when a placement entry is missing mapId", () => {
-    const r = validatePatchYaml("atlas:\n  placements:\n    - x: 0.5\n      y: 0.3\n", "entity-frontmatter");
+    const r = validatePatchYaml(
+      "atlas:\n  placements:\n    - x: 0.5\n      y: 0.3\n",
+      "entity-frontmatter",
+    );
     expect(r.ok).toBe(true);
     expect(r.warnings.join(" ")).toMatch(/mapId/);
   });
 
   it("rejects when a placement entry has non-numeric coordinates", () => {
-    const r = validatePatchYaml("atlas:\n  placements:\n    - mapId: m1\n      x: left\n      y: top\n", "entity-frontmatter");
+    const r = validatePatchYaml(
+      "atlas:\n  placements:\n    - mapId: m1\n      x: left\n      y: top\n",
+      "entity-frontmatter",
+    );
     expect(r.ok).toBe(false);
     expect(r.errors.join(" ")).toMatch(/numeric.*x.*y|x.*y.*numeric/i);
   });
@@ -200,17 +244,26 @@ describe("validatePatchYaml placement kind", () => {
 
 describe("validateProject", () => {
   it("passes a clean project", () => {
-    const r = validateProject({ project, draftPlacements: [{ entityId: "town", mapId: "m1", x: 100, y: 200 }] });
+    const r = validateProject({
+      project,
+      draftPlacements: [{ entityId: "town", mapId: "m1", x: 100, y: 200 }],
+    });
     expect(r.counts.blocking).toBe(0);
   });
 
   it("flags out-of-bounds placements", () => {
-    const r = validateProject({ project, draftPlacements: [{ entityId: "town", mapId: "m1", x: 99999, y: 0 }] });
+    const r = validateProject({
+      project,
+      draftPlacements: [{ entityId: "town", mapId: "m1", x: 99999, y: 0 }],
+    });
     expect(r.issues.some((i) => i.code === "pin-out-of-bounds")).toBe(true);
   });
 
   it("flags unknown map id as blocking", () => {
-    const r = validateProject({ project, draftPlacements: [{ entityId: "town", mapId: "missing", x: 0, y: 0 }] });
+    const r = validateProject({
+      project,
+      draftPlacements: [{ entityId: "town", mapId: "missing", x: 0, y: 0 }],
+    });
     expect(r.counts.blocking).toBeGreaterThan(0);
   });
 
@@ -223,7 +276,25 @@ describe("validateProject", () => {
   it("flags player region linking to DM-only entity (spoiler leak)", () => {
     const leaky = {
       ...project,
-      maps: [{ ...map, regions: [{ id: "r1", mapId: "m1", name: "Leak", visibility: "player" as const, points: [[0,0],[1,0],[1,1]] as [number,number][], entityId: "lair" }] }],
+      maps: [
+        {
+          ...map,
+          regions: [
+            {
+              id: "r1",
+              mapId: "m1",
+              name: "Leak",
+              visibility: "player" as const,
+              points: [
+                [0, 0],
+                [1, 0],
+                [1, 1],
+              ] as [number, number][],
+              entityId: "lair",
+            },
+          ],
+        },
+      ],
     };
     const r = validateProject({ project: leaky, draftPlacements: [] });
     expect(r.issues.some((i) => i.code.startsWith("spoiler-leak"))).toBe(true);
@@ -232,7 +303,23 @@ describe("validateProject", () => {
   it("flags region with too few points", () => {
     const bad = {
       ...project,
-      maps: [{ ...map, regions: [{ id: "r1", mapId: "m1", name: "Bad", visibility: "player" as const, points: [[0,0],[1,1]] as [number,number][] }] }],
+      maps: [
+        {
+          ...map,
+          regions: [
+            {
+              id: "r1",
+              mapId: "m1",
+              name: "Bad",
+              visibility: "player" as const,
+              points: [
+                [0, 0],
+                [1, 1],
+              ] as [number, number][],
+            },
+          ],
+        },
+      ],
     };
     const r = validateProject({ project: bad, draftPlacements: [] });
     expect(r.issues.some((i) => i.code === "region-too-few-points")).toBe(true);

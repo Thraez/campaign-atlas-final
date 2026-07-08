@@ -61,6 +61,7 @@ function makeMockApi(fogOverrides: Partial<FogDraftAPI["fog"]> = {}): FogDraftAP
   return {
     fog,
     dirty: false,
+    dirtyCount: 0,
     setEnabled: vi.fn(),
     setColor: vi.fn(),
     tool: null,
@@ -68,7 +69,7 @@ function makeMockApi(fogOverrides: Partial<FogDraftAPI["fog"]> = {}): FogDraftAP
     draftPoints: [],
     addDraftPoint: vi.fn(),
     removeLastDraftPoint: vi.fn(),
-    cancelDraft: vi.fn(),
+    cancelDraw: vi.fn(),
     finishDraftPolygon: vi.fn(() => true),
     finishDraftCircle: vi.fn(() => true),
     removeReveal: vi.fn(),
@@ -100,7 +101,7 @@ describe("FogTab — Draw fog section", () => {
         api={api}
         showFogPreview={false}
         setShowFogPreview={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText(/draw fog/i)).toBeInTheDocument();
@@ -115,16 +116,35 @@ describe("FogTab — Draw fog section", () => {
 describe("FogTab — Fog shapes list", () => {
   it("renders Fog shapes list when conceals are present", () => {
     const api = makeMockApi({
-      conceals: [[[0, 0], [10, 0], [10, 10]]],
+      conceals: [
+        [
+          [0, 0],
+          [10, 0],
+          [10, 10],
+        ],
+      ],
     });
     render(
       <FogTab
-        map={makeMap({ fog: { mapId: "map-1", enabled: true, reveals: [], conceals: [[[0, 0], [10, 0], [10, 10]]] } })}
+        map={makeMap({
+          fog: {
+            mapId: "map-1",
+            enabled: true,
+            reveals: [],
+            conceals: [
+              [
+                [0, 0],
+                [10, 0],
+                [10, 10],
+              ],
+            ],
+          },
+        })}
         project={makeProject()}
         api={api}
         showFogPreview={false}
         setShowFogPreview={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText(/fog shapes/i)).toBeInTheDocument();
@@ -140,10 +160,73 @@ describe("FogTab — Fog shapes list", () => {
         api={api}
         showFogPreview={false}
         setShowFogPreview={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.queryByText(/fog shapes/i)).toBeNull();
+  });
+});
+
+describe("FogTab — drawing keyboard shortcuts", () => {
+  function renderWithTool(tool: FogDraftAPI["tool"]) {
+    const api = { ...makeMockApi(), tool };
+    render(
+      <FogTab
+        map={makeMap()}
+        project={makeProject()}
+        api={api}
+        showFogPreview={false}
+        setShowFogPreview={vi.fn()}
+      />,
+    );
+    return api;
+  }
+
+  it("Enter finishes the polygon for polygon-type tools", () => {
+    const api = renderWithTool("polygon");
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(api.finishDraftPolygon).toHaveBeenCalledTimes(1);
+    expect(api.finishDraftCircle).not.toHaveBeenCalled();
+  });
+
+  it("Enter finishes the circle for circle-type tools", () => {
+    const api = renderWithTool("circle");
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(api.finishDraftCircle).toHaveBeenCalledTimes(1);
+    expect(api.finishDraftPolygon).not.toHaveBeenCalled();
+  });
+
+  it("Backspace removes the last point for polygon-type tools", () => {
+    const api = renderWithTool("polygon");
+    fireEvent.keyDown(window, { key: "Backspace" });
+    expect(api.removeLastDraftPoint).toHaveBeenCalledTimes(1);
+  });
+
+  it("Backspace is a no-op for circle-type tools (single anchor, nothing to undo)", () => {
+    const api = renderWithTool("circle");
+    fireEvent.keyDown(window, { key: "Backspace" });
+    expect(api.removeLastDraftPoint).not.toHaveBeenCalled();
+  });
+
+  it("fog-polygon behaves like polygon (Backspace removes last point)", () => {
+    const api = renderWithTool("fog-polygon");
+    fireEvent.keyDown(window, { key: "Backspace" });
+    expect(api.removeLastDraftPoint).toHaveBeenCalledTimes(1);
+  });
+
+  it("Escape cancels the draft for any active tool", () => {
+    const api = renderWithTool("fog-circle");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(api.cancelDraw).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores keys when no tool is active", () => {
+    const api = renderWithTool(null);
+    fireEvent.keyDown(window, { key: "Enter" });
+    fireEvent.keyDown(window, { key: "Backspace" });
+    expect(api.finishDraftPolygon).not.toHaveBeenCalled();
+    expect(api.finishDraftCircle).not.toHaveBeenCalled();
+    expect(api.removeLastDraftPoint).not.toHaveBeenCalled();
   });
 });
 
@@ -157,7 +240,7 @@ describe("FogTab — Feather control", () => {
         api={api}
         showFogPreview={false}
         setShowFogPreview={vi.fn()}
-      />
+      />,
     );
 
     const featherInput = screen.getByLabelText(/soft edge/i) as HTMLInputElement;
@@ -173,7 +256,7 @@ describe("FogTab — Feather control", () => {
         api={api}
         showFogPreview={false}
         setShowFogPreview={vi.fn()}
-      />
+      />,
     );
 
     const featherInput = screen.getByLabelText(/soft edge/i) as HTMLInputElement;
@@ -189,7 +272,7 @@ describe("FogTab — Feather control", () => {
         api={api}
         showFogPreview={false}
         setShowFogPreview={vi.fn()}
-      />
+      />,
     );
 
     const featherInput = screen.getByLabelText(/soft edge/i);

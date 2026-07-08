@@ -22,6 +22,8 @@ import { parseFrontmatter } from "./frontmatter";
 import type { ImportFolderConfig } from "../content/schema";
 import { inferTypeFromTags } from "./inferTypeFromTags";
 import { inferTypeFromPath } from "./inferType";
+import { slugify } from "@/atlas/content/slugify";
+import { isValidVisibility } from "@/atlas/content/visibility";
 
 /**
  * Inferred entity-type (from frontmatter / fallback) → destination folder.
@@ -29,18 +31,6 @@ import { inferTypeFromPath } from "./inferType";
  */
 export function inferTargetFolder(type: string, cfg: ImportFolderConfig): string {
   return cfg.folders[type] ?? cfg.defaultFolder;
-}
-
-/** Slug rules mirror scripts/atlas/slugify.ts exactly — keep derivation identical to build. */
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/['']/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
 }
 
 export function computeTargetPath(worldId: string, folder: string, stem: string): string {
@@ -54,7 +44,7 @@ export function computeTargetPath(worldId: string, folder: string, stem: string)
 export function isAllowedTargetPath(
   worldId: string,
   path: string,
-  allowedFolders: ReadonlySet<string>
+  allowedFolders: ReadonlySet<string>,
 ): boolean {
   if (typeof path !== "string" || path.length === 0) return false;
   if (path.startsWith("/") || path.startsWith("./") || path.startsWith("\\")) return false;
@@ -107,8 +97,6 @@ export interface StagingRow {
   rowKind: "create" | "update" | "path-collision";
   included: boolean;
   parseError?: string;
-  /** Full file body (text). Preserved verbatim through the commit. */
-  content: string;
   typeWasExplicit: boolean;
   /**
    * True when the type fell through to the silent lore-fallback because the note had no
@@ -119,6 +107,7 @@ export interface StagingRow {
    */
   typeWasGuessed: boolean;
   resolvedVisibility: string;
+  /** Full file body (text). Preserved verbatim through the commit. */
   rawContent: string;
 }
 
@@ -135,7 +124,10 @@ function deriveTitle(filename: string, fmTitle: unknown): string {
     .replace(/(^|\s)(\p{L})/gu, (_m, sp, ch) => sp + ch.toUpperCase());
 }
 
-function extractStagingFields(raw: string, relPath: string): {
+function extractStagingFields(
+  raw: string,
+  relPath: string,
+): {
   type: string;
   typeWasExplicit: boolean;
   typeWasGuessed: boolean;
@@ -156,27 +148,37 @@ function extractStagingFields(raw: string, relPath: string): {
         : undefined;
     const fromTags = explicit ? null : inferTypeFromTags(data.tags);
     const fromFolder = explicit || fromTags ? null : inferTypeFromPath(relPath);
-    const type = explicit ?? fromTags ?? (fromFolder && fromFolder !== "note" ? fromFolder : "lore");
+    const type =
+      explicit ?? fromTags ?? (fromFolder && fromFolder !== "note" ? fromFolder : "lore");
     // Guessed = no explicit type, no recognized tag, and the folder gave no useful signal.
     const typeWasGuessed = !explicit && !fromTags && fromFolder === "note";
 
     const visRaw = typeof atlas.visibility === "string" ? atlas.visibility : undefined;
-    const validVis = ["player", "dm", "hidden", "rumor"];
-    const visibility = visRaw && validVis.includes(visRaw)
-      ? visRaw
-      : atlas.publish === true ? "player" : "dm";
+    const visibility =
+      visRaw && isValidVisibility(visRaw) ? visRaw : atlas.publish === true ? "player" : "dm";
 
     const id = typeof atlas.id === "string" ? atlas.id : undefined;
     const fmTitle = typeof data.title === "string" ? data.title : undefined;
     const frontmatterPath = typeof data.path === "string" ? data.path : undefined;
     return {
-      type, typeWasExplicit: !!explicit, typeWasGuessed, id, visibility,
-      fmTitle, frontmatterPath, parseError: undefined,
+      type,
+      typeWasExplicit: !!explicit,
+      typeWasGuessed,
+      id,
+      visibility,
+      fmTitle,
+      frontmatterPath,
+      parseError: undefined,
     };
   } catch (e) {
     return {
-      type: "lore", typeWasExplicit: false, typeWasGuessed: false, id: undefined, visibility: "dm",
-      fmTitle: undefined, frontmatterPath: undefined,
+      type: "lore",
+      typeWasExplicit: false,
+      typeWasGuessed: false,
+      id: undefined,
+      visibility: "dm",
+      fmTitle: undefined,
+      frontmatterPath: undefined,
       parseError: e instanceof Error ? e.message : String(e),
     };
   }
@@ -189,8 +191,16 @@ function nextRowId(filename: string): string {
 }
 
 export function buildStagingRow(input: RawImportFile, ctx: StagingContext): StagingRow {
-  const { type, typeWasExplicit, typeWasGuessed, id, visibility, fmTitle, frontmatterPath, parseError } =
-    extractStagingFields(input.raw, input.filename);
+  const {
+    type,
+    typeWasExplicit,
+    typeWasGuessed,
+    id,
+    visibility,
+    fmTitle,
+    frontmatterPath,
+    parseError,
+  } = extractStagingFields(input.raw, input.filename);
 
   // Compute resolvedId matching build-atlas.ts logic exactly:
   // build uses: parsed.atlas.id || slugify(deriveTitle(file, fm.title))
@@ -229,7 +239,6 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     rowKind,
     included,
     parseError,
-    content: input.raw,
     typeWasExplicit,
     typeWasGuessed,
     resolvedVisibility: visibility,
@@ -275,7 +284,11 @@ export function updateStagingRow(
     // Only reroute for non-update rows — update rows are anchored to existing file location
     if (row.rowKind !== "update") {
       const stem = row.resolvedId;
-      nextPath = computeTargetPath(ctx.worldId, inferTargetFolder(nextType, ctx.importConfig), stem);
+      nextPath = computeTargetPath(
+        ctx.worldId,
+        inferTargetFolder(nextType, ctx.importConfig),
+        stem,
+      );
     }
   }
   if (patch.targetPath !== undefined && patch.targetPath !== nextPath) {

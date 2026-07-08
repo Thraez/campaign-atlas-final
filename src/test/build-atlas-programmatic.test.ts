@@ -22,13 +22,17 @@ function writeMinimalVault(root: string) {
   fs.mkdirSync(path.join(root, "content/test-world/notes"), { recursive: true });
   fs.writeFileSync(
     path.join(root, "atlas.config.json"),
-    JSON.stringify({
-      contentRoot: "content",
-      outputDir: "out",
-      defaultWorld: "test-world",
-      include: ["**/*.md"],
-      exclude: [],
-    }, null, 2),
+    JSON.stringify(
+      {
+        contentRoot: "content",
+        outputDir: "out",
+        defaultWorld: "test-world",
+        include: ["**/*.md"],
+        exclude: [],
+      },
+      null,
+      2,
+    ),
     "utf8",
   );
   fs.writeFileSync(

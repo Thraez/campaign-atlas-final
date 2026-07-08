@@ -23,7 +23,8 @@ describe("isIgnoredPath", () => {
 
 describe("generateAutoSummary", () => {
   it("strips headings, callouts, embeds", () => {
-    const body = "# Title\n\n> [!note] hidden\n\n![[map.png]]\n\nThis is the real intro paragraph for the entity, long enough to count.";
+    const body =
+      "# Title\n\n> [!note] hidden\n\n![[map.png]]\n\nThis is the real intro paragraph for the entity, long enough to count.";
     const s = generateAutoSummary(body);
     expect(s).toMatch(/real intro/);
   });
@@ -38,7 +39,10 @@ describe("parseObsidianFile", () => {
   });
 
   it("respects atlas.publish:true to upgrade to player", () => {
-    const f = parseObsidianFile("---\natlas:\n  publish: true\n---\nA published town.", "settlements/X.md");
+    const f = parseObsidianFile(
+      "---\natlas:\n  publish: true\n---\nA published town.",
+      "settlements/X.md",
+    );
     expect(f.effectiveVisibility).toBe("player");
     expect(f.level).toBe("player-published");
   });
@@ -57,7 +61,7 @@ describe("parseObsidianFile", () => {
   it("extracts wikilinks and embeds", () => {
     const f = parseObsidianFile(
       "Link [[Sunhaven]] and [[Vale|the Vale]]. ![[map.png]]",
-      "notes/X.md"
+      "notes/X.md",
     );
     expect(f.wikilinks.map((w) => w.target)).toContain("Sunhaven");
     expect(f.wikilinks.map((w) => w.target)).toContain("Vale");
@@ -97,17 +101,18 @@ describe("generateAutoSummary — edge cases", () => {
 describe("parseObsidianFile — uncovered branches", () => {
   it("classifies dm-visibility settlement as level='placeable'", () => {
     // dm + mappable type → placeable (not wiki-only)
-    const f = parseObsidianFile("---\natlas:\n  visibility: dm\n---\nbody", "settlements/Thornwall.md");
+    const f = parseObsidianFile(
+      "---\natlas:\n  visibility: dm\n---\nbody",
+      "settlements/Thornwall.md",
+    );
     expect(f.level).toBe("placeable");
     expect(f.effectiveVisibility).toBe("dm");
   });
 
   it("marks wikilinks as broken when target not in knownEntityNames", () => {
-    const f = parseObsidianFile(
-      "The [[Ghost Town]] lies east of [[Thornwall]].",
-      "lore/Rumor.md",
-      { knownEntityNames: new Set(["thornwall"]) }
-    );
+    const f = parseObsidianFile("The [[Ghost Town]] lies east of [[Thornwall]].", "lore/Rumor.md", {
+      knownEntityNames: new Set(["thornwall"]),
+    });
     const ghost = f.wikilinks.find((w) => w.target === "Ghost Town");
     const known = f.wikilinks.find((w) => w.target === "Thornwall");
     expect(ghost?.broken).toBe(true);
@@ -118,7 +123,7 @@ describe("parseObsidianFile — uncovered branches", () => {
     const f = parseObsidianFile(
       "---\natlas:\n  visibility: player\n---\nSee [[MissingNPC]].",
       "npcs/Hero.md",
-      { knownEntityNames: new Set() }
+      { knownEntityNames: new Set() },
     );
     expect(f.warnings.some((w) => /unresolved wikilinks/i.test(w))).toBe(true);
   });
@@ -131,10 +136,7 @@ describe("parseObsidianFile — uncovered branches", () => {
   });
 
   it("resolves https:// attachment as resolved=true without rewriting", () => {
-    const f = parseObsidianFile(
-      "![[https://example.com/map.png]]",
-      "notes/X.md"
-    );
+    const f = parseObsidianFile("![[https://example.com/map.png]]", "notes/X.md");
     const att = f.attachments.find((a) => a.rawSrc === "https://example.com/map.png");
     expect(att).toBeDefined();
     expect(att!.resolved).toBe(true);
@@ -151,13 +153,20 @@ describe("parseObsidianFile — uncovered branches", () => {
 describe("buildEntityFrontmatterPatch", () => {
   it("produces parseable YAML blocks", () => {
     const a = buildEntityFrontmatterPatch([
-      { sourcePath: "settlements/X.md", title: "X", atlas: { id: "x", type: "settlement", visibility: "dm", summary: "A town." } },
+      {
+        sourcePath: "settlements/X.md",
+        title: "X",
+        atlas: { id: "x", type: "settlement", visibility: "dm", summary: "A town." },
+      },
     ]);
     // Each '---' frontmatter block is parseable on its own.
     const v = validatePatchYaml(a.content.replace(/---/g, ""), "placement");
     // Doesn't have to pass placement-specific shape, just no fences / parse errors.
     // The body (non-comment lines) must not contain markdown code fences.
-    const body = a.content.split("\n").filter((l) => !l.trim().startsWith("#")).join("\n");
+    const body = a.content
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("#"))
+      .join("\n");
     expect(a.content).toMatch(/atlas:/);
     expect(body).not.toMatch(/```/);
     expect(v.errors.filter((e) => /code fence/i.test(e))).toHaveLength(0);

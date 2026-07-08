@@ -3,7 +3,10 @@
 # (git sets GIT_DIR when invoking hooks; vitest --changed calls git internally.)
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 
-npx tsc --noEmit || exit 1
+# `npm run typecheck` targets tsconfig.app.json directly. Plain `tsc --noEmit`
+# resolves the solution-style root tsconfig (files:[], project references) and
+# type-checks NOTHING, so it must not be used as the gate.
+npm run typecheck || exit 1
 npx eslint . || exit 1
 
 # Vitest exits 1 for both test failures AND unhandled worker-communication

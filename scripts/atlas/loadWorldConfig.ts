@@ -23,8 +23,8 @@ import type {
   WaterConfig,
   WorldCalendar,
 } from "../../src/atlas/content/schema";
+import { isValidVisibility } from "./visibility";
 
-const VALID_VIS: EntityVisibility[] = ["player", "dm", "hidden", "rumor"];
 const VALID_MODES: RouteMode[] = ["foot", "horse", "ship", "cart", "fly", "custom"];
 
 export type WaypointSpec = Point | { entityId: string };
@@ -35,26 +35,30 @@ export interface RawRoute extends Omit<Route, "waypoints" | "resolvedPoints"> {
 
 interface WorldYaml {
   schemaVersion?: number;
-  maps?: Array<Partial<MapDocument> & {
-    layers?: Array<Partial<MapLayer> & { src: string; id: string }>;
-    scale?: MapScale;
-    grid?: GridOverlay;
-    /** Editor-friendly nested geometry. mapId may be omitted (inferred from parent). */
-    regions?: Array<Partial<Region> & { id: string; name: string; points: Point[]; mapId?: string }>;
-    routes?: Array<{
-      id: string;
-      mapId?: string;
-      name: string;
-      mode?: string;
-      speed?: number;
-      color?: string;
-      weight?: number;
-      dashed?: boolean;
-      visibility?: string;
-      waypoints: Array<Point | { entityId: string } | string>;
-    }>;
-    fog?: Partial<FogOverlay> & { mapId?: string; reveals?: Point[][]; enabled?: boolean };
-  }>;
+  maps?: Array<
+    Partial<MapDocument> & {
+      layers?: Array<Partial<MapLayer> & { src: string; id: string }>;
+      scale?: MapScale;
+      grid?: GridOverlay;
+      /** Editor-friendly nested geometry. mapId may be omitted (inferred from parent). */
+      regions?: Array<
+        Partial<Region> & { id: string; name: string; points: Point[]; mapId?: string }
+      >;
+      routes?: Array<{
+        id: string;
+        mapId?: string;
+        name: string;
+        mode?: string;
+        speed?: number;
+        color?: string;
+        weight?: number;
+        dashed?: boolean;
+        visibility?: string;
+        waypoints: Array<Point | { entityId: string } | string>;
+      }>;
+      fog?: Partial<FogOverlay> & { mapId?: string; reveals?: Point[][]; enabled?: boolean };
+    }
+  >;
   regions?: Array<Partial<Region> & { id: string; mapId: string; name: string; points: Point[] }>;
   fog?: Array<Partial<FogOverlay> & { mapId: string; reveals?: Point[][]; enabled?: boolean }>;
   routes?: Array<{
@@ -106,7 +110,7 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
   // cryptic.
   if (/^\s*```/m.test(raw)) {
     throw new WorldConfigError(
-      `${rel}: contains markdown code fences (\`\`\`). world.yaml must be PURE YAML — paste only the YAML inside any patch fence, not the wrapper.`
+      `${rel}: contains markdown code fences (\`\`\`). world.yaml must be PURE YAML — paste only the YAML inside any patch fence, not the wrapper.`,
     );
   }
 
@@ -183,51 +187,58 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
   // explicitly sets a different mapId, we warn (likely a paste mistake).
   type RawRegion = Partial<Region> & { id: string; name: string; points: Point[]; mapId?: string };
   const rawRegions: RawRegion[] = [];
-  for (const r of (data.regions ?? [])) rawRegions.push(r as RawRegion);
-  for (const m of (data.maps ?? [])) {
+  for (const r of data.regions ?? []) rawRegions.push(r as RawRegion);
+  for (const m of data.maps ?? []) {
     const parentId = m.id ?? "";
-    for (const r of (m.regions ?? [])) {
+    for (const r of m.regions ?? []) {
       if (r.mapId && parentId && r.mapId !== parentId) {
-        warnings.push(`region "${r.id}" nested under map "${parentId}" but declares mapId "${r.mapId}" — using "${parentId}"`);
+        warnings.push(
+          `region "${r.id}" nested under map "${parentId}" but declares mapId "${r.mapId}" — using "${parentId}"`,
+        );
       }
       rawRegions.push({ ...r, mapId: parentId || r.mapId });
     }
   }
   const seenRegionIds = new Set<string>();
-  const regions: Region[] = rawRegions.map((r) => {
-    if (seenRegionIds.has(r.id)) {
-      warnings.push(`duplicate region id "${r.id}" — keeping first definition`);
-    }
-    seenRegionIds.add(r.id);
-    const visibility = normalizeVis(r.visibility, warnings, `region "${r.id}"`);
-    if (!Array.isArray(r.points) || r.points.length < 3) {
-      warnings.push(`region "${r.id}" has fewer than 3 points — skipping`);
-    }
-    return {
-      id: r.id,
-      mapId: r.mapId ?? "",
-      name: r.name,
-      entityId: r.entityId,
-      color: r.color,
-      fillOpacity: r.fillOpacity ?? 0.18,
-      strokeOpacity: r.strokeOpacity ?? 0.85,
-      points: (r.points ?? []) as Point[],
-      visibility,
-    };
-  })
+  const regions: Region[] = rawRegions
+    .map((r) => {
+      if (seenRegionIds.has(r.id)) {
+        warnings.push(`duplicate region id "${r.id}" — keeping first definition`);
+      }
+      seenRegionIds.add(r.id);
+      const visibility = normalizeVis(r.visibility, warnings, `region "${r.id}"`);
+      if (!Array.isArray(r.points) || r.points.length < 3) {
+        warnings.push(`region "${r.id}" has fewer than 3 points — skipping`);
+      }
+      return {
+        id: r.id,
+        mapId: r.mapId ?? "",
+        name: r.name,
+        entityId: r.entityId,
+        color: r.color,
+        fillOpacity: r.fillOpacity ?? 0.18,
+        strokeOpacity: r.strokeOpacity ?? 0.85,
+        points: (r.points ?? []) as Point[],
+        visibility,
+      };
+    })
     // Drop duplicates (keep first) and invalid geometry.
     .filter((r, idx, arr) => arr.findIndex((x) => x.id === r.id) === idx)
     .filter((r) => r.points.length >= 3);
 
   // Fog: top-level array + nested per-map block. Warn on duplicate mapId.
-  const rawFogs: Array<Partial<FogOverlay> & { mapId: string; reveals?: Point[][]; enabled?: boolean }> = [];
-  for (const f of (data.fog ?? [])) rawFogs.push(f);
-  for (const m of (data.maps ?? [])) {
+  const rawFogs: Array<
+    Partial<FogOverlay> & { mapId: string; reveals?: Point[][]; enabled?: boolean }
+  > = [];
+  for (const f of data.fog ?? []) rawFogs.push(f);
+  for (const m of data.maps ?? []) {
     if (!m.fog) continue;
     const parentId = m.id ?? "";
     const f = m.fog;
     if (f.mapId && parentId && f.mapId !== parentId) {
-      warnings.push(`fog nested under map "${parentId}" but declares mapId "${f.mapId}" — using "${parentId}"`);
+      warnings.push(
+        `fog nested under map "${parentId}" but declares mapId "${f.mapId}" — using "${parentId}"`,
+      );
     }
     rawFogs.push({ ...f, mapId: parentId || (f.mapId ?? "") });
   }
@@ -238,27 +249,38 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
       return [];
     }
     seenFogMaps.add(f.mapId);
-    return [{
-      mapId: f.mapId,
-      enabled: f.enabled !== false,
-      color: f.color ?? "rgba(8, 12, 20, 0.55)",
-      reveals: (f.reveals ?? []) as Point[][],
-    }];
+    return [
+      {
+        mapId: f.mapId,
+        enabled: f.enabled !== false,
+        color: f.color ?? "rgba(8, 12, 20, 0.55)",
+        reveals: (f.reveals ?? []) as Point[][],
+      },
+    ];
   });
 
   // Routes: top-level + nested under maps[].routes.
   type RawRouteSpec = {
-    id: string; mapId?: string; name: string; mode?: string; speed?: number;
-    color?: string; weight?: number; dashed?: boolean; visibility?: string;
+    id: string;
+    mapId?: string;
+    name: string;
+    mode?: string;
+    speed?: number;
+    color?: string;
+    weight?: number;
+    dashed?: boolean;
+    visibility?: string;
     waypoints: Array<Point | { entityId: string } | string>;
   };
   const rawRoutes: RawRouteSpec[] = [];
-  for (const r of (data.routes ?? [])) rawRoutes.push(r);
-  for (const m of (data.maps ?? [])) {
+  for (const r of data.routes ?? []) rawRoutes.push(r);
+  for (const m of data.maps ?? []) {
     const parentId = m.id ?? "";
-    for (const r of (m.routes ?? [])) {
+    for (const r of m.routes ?? []) {
       if (r.mapId && parentId && r.mapId !== parentId) {
-        warnings.push(`route "${r.id}" nested under map "${parentId}" but declares mapId "${r.mapId}" — using "${parentId}"`);
+        warnings.push(
+          `route "${r.id}" nested under map "${parentId}" but declares mapId "${r.mapId}" — using "${parentId}"`,
+        );
       }
       rawRoutes.push({ ...r, mapId: parentId || r.mapId });
     }
@@ -276,32 +298,47 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
       if (VALID_MODES.includes(r.mode as RouteMode)) mode = r.mode as RouteMode;
       else warnings.push(`route "${r.id}": invalid mode "${r.mode}", ignoring`);
     }
-    const waypoints: WaypointSpec[] = (r.waypoints ?? []).map((w) => {
-      if (typeof w === "string") return { entityId: w };
-      if (Array.isArray(w) && w.length === 2 && typeof w[0] === "number" && typeof w[1] === "number") return [w[0], w[1]] as Point;
-      if (typeof w === "object" && w !== null && typeof (w as { entityId?: string }).entityId === "string") return { entityId: (w as { entityId: string }).entityId };
-      warnings.push(`route "${r.id}": skipped invalid waypoint ${JSON.stringify(w)}`);
-      return null as unknown as WaypointSpec;
-    }).filter(Boolean) as WaypointSpec[];
+    const waypoints: WaypointSpec[] = (r.waypoints ?? [])
+      .map((w) => {
+        if (typeof w === "string") return { entityId: w };
+        if (
+          Array.isArray(w) &&
+          w.length === 2 &&
+          typeof w[0] === "number" &&
+          typeof w[1] === "number"
+        )
+          return [w[0], w[1]] as Point;
+        if (
+          typeof w === "object" &&
+          w !== null &&
+          typeof (w as { entityId?: string }).entityId === "string"
+        )
+          return { entityId: (w as { entityId: string }).entityId };
+        warnings.push(`route "${r.id}": skipped invalid waypoint ${JSON.stringify(w)}`);
+        return null as unknown as WaypointSpec;
+      })
+      .filter(Boolean) as WaypointSpec[];
 
-    return [{
-      id: r.id,
-      mapId: r.mapId ?? "",
-      name: r.name,
-      mode,
-      speed: typeof r.speed === "number" ? r.speed : undefined,
-      color: r.color,
-      weight: r.weight,
-      dashed: r.dashed,
-      visibility,
-      waypoints,
-    }];
+    return [
+      {
+        id: r.id,
+        mapId: r.mapId ?? "",
+        name: r.name,
+        mode,
+        speed: typeof r.speed === "number" ? r.speed : undefined,
+        color: r.color,
+        weight: r.weight,
+        dashed: r.dashed,
+        visibility,
+        waypoints,
+      },
+    ];
   });
 
   let calendar: WorldCalendar | undefined;
   if (data.calendar) {
     const months = (data.calendar.months ?? []).filter(
-      (m) => m && typeof m.name === "string" && typeof m.days === "number" && m.days > 0
+      (m) => m && typeof m.name === "string" && typeof m.days === "number" && m.days > 0,
     );
     if (months.length === 0) {
       warnings.push(`calendar: no valid months defined — calendar ignored`);
@@ -309,7 +346,8 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
       calendar = {
         name: data.calendar.name,
         epochName: data.calendar.epochName,
-        daysPerWeek: typeof data.calendar.daysPerWeek === "number" ? data.calendar.daysPerWeek : undefined,
+        daysPerWeek:
+          typeof data.calendar.daysPerWeek === "number" ? data.calendar.daysPerWeek : undefined,
         months,
       };
     }
@@ -317,10 +355,23 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
 
   const importConfig = sanitizeImportConfig(data.import, warnings);
 
-  return { maps, regions, fogs, routes, calendar, schemaVersion: resolvedVersion, warnings, importConfig };
+  return {
+    maps,
+    regions,
+    fogs,
+    routes,
+    calendar,
+    schemaVersion: resolvedVersion,
+    warnings,
+    importConfig,
+  };
 }
 
-function sanitizeScale(s: MapScale | undefined, warnings: string[], where: string): MapScale | undefined {
+function sanitizeScale(
+  s: MapScale | undefined,
+  warnings: string[],
+  where: string,
+): MapScale | undefined {
   if (!s) return undefined;
   if (typeof s.unitsPerPixel !== "number" || s.unitsPerPixel <= 0) {
     warnings.push(`${where}: scale.unitsPerPixel must be a positive number`);
@@ -329,7 +380,11 @@ function sanitizeScale(s: MapScale | undefined, warnings: string[], where: strin
   return { unitsPerPixel: s.unitsPerPixel, unitLabel: s.unitLabel || "units" };
 }
 
-function sanitizeGrid(g: GridOverlay | undefined, warnings: string[], where: string): GridOverlay | undefined {
+function sanitizeGrid(
+  g: GridOverlay | undefined,
+  warnings: string[],
+  where: string,
+): GridOverlay | undefined {
   if (!g) return undefined;
   if (g.kind !== "square" && g.kind !== "hex") {
     warnings.push(`${where}: grid.kind must be "square" or "hex"`);
@@ -342,7 +397,11 @@ function sanitizeGrid(g: GridOverlay | undefined, warnings: string[], where: str
   return { kind: g.kind, size: g.size, color: g.color, enabled: g.enabled !== false };
 }
 
-function sanitizeWater(w: WaterConfig | undefined, _warnings: string[], _where: string): WaterConfig | undefined {
+function sanitizeWater(
+  w: WaterConfig | undefined,
+  _warnings: string[],
+  _where: string,
+): WaterConfig | undefined {
   if (!w) return undefined;
   const out: WaterConfig = {};
   if (w.enabled === false) out.enabled = false;
@@ -356,32 +415,23 @@ function sanitizeWater(w: WaterConfig | undefined, _warnings: string[], _where: 
 }
 
 function normalizeVis(v: unknown, warnings: string[], where: string): EntityVisibility {
-  if (typeof v === "string" && VALID_VIS.includes(v as EntityVisibility)) return v as EntityVisibility;
+  if (isValidVisibility(v)) return v;
   if (v !== undefined) warnings.push(`${where}: invalid visibility "${v}", defaulting to "player"`);
   return "player";
 }
 
 const SAFE_SEGMENT = /^[A-Za-z0-9_\-. ]+$/;
 
-function sanitizeImportConfig(
-  raw: WorldYaml["import"],
-  warnings: string[]
-): ImportFolderConfig {
+function sanitizeImportConfig(raw: WorldYaml["import"], warnings: string[]): ImportFolderConfig {
   const folders: Record<string, string> = {};
   for (const [type, val] of Object.entries(raw?.folders ?? {})) {
     if (typeof type !== "string" || type.length === 0) continue;
     const seg = typeof val === "string" ? val : null;
-    if (
-      seg !== null &&
-      seg !== "." &&
-      seg !== ".." &&
-      seg !== "_atlas" &&
-      SAFE_SEGMENT.test(seg)
-    ) {
+    if (seg !== null && seg !== "." && seg !== ".." && seg !== "_atlas" && SAFE_SEGMENT.test(seg)) {
       folders[type] = seg;
     } else {
       warnings.push(
-        `world.yaml import.folders["${type}"]: invalid folder "${String(val)}" — ignored`
+        `world.yaml import.folders["${type}"]: invalid folder "${String(val)}" — ignored`,
       );
     }
   }
@@ -395,9 +445,7 @@ function sanitizeImportConfig(
       ? defRaw
       : null;
   if (defRaw !== undefined && defSeg === null) {
-    warnings.push(
-      `world.yaml import.defaultFolder: invalid "${String(defRaw)}" — using "imports"`
-    );
+    warnings.push(`world.yaml import.defaultFolder: invalid "${String(defRaw)}" — using "imports"`);
   }
   return { folders, defaultFolder: defSeg ?? "imports" };
 }

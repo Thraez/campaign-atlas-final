@@ -1,7 +1,14 @@
 import { Link } from "react-router-dom";
 import { Menu, Compass, LayoutGrid, CalendarClock, MapPin, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 
 interface AtlasNavMenuProps {
@@ -24,7 +31,12 @@ export function AtlasNavMenu({ publishedAt, footer }: AtlasNavMenuProps) {
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="lg:hidden -ml-1" aria-label="Open navigation menu">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden -ml-1"
+          aria-label="Open navigation menu"
+        >
           <Menu className="h-5 w-5" aria-hidden="true" />
         </Button>
       </SheetTrigger>
@@ -39,9 +51,7 @@ export function AtlasNavMenu({ publishedAt, footer }: AtlasNavMenuProps) {
           <NavItem to="/atlas" icon={MapPin} label="Map" />
           <NavItem to="/atlas/browse" icon={LayoutGrid} label="Browse" />
           <NavItem to="/atlas/timeline" icon={CalendarClock} label="Timeline" />
-          {editorEnabled && (
-            <NavItem to="/atlas/edit" icon={MapPin} label="Edit pins" badge="DM" />
-          )}
+          {editorEnabled && <NavItem to="/atlas/edit" icon={MapPin} label="Edit pins" badge="DM" />}
         </nav>
         {(publishedAt || footer) && (
           <div className="px-4 py-3 border-t border-border space-y-2">

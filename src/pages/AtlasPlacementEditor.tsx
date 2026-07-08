@@ -3,15 +3,47 @@ import { MapContainer, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Compass, Crosshair, RotateCcw, MapPin, Target, Trash2, Layers as LayersIcon, Settings2, Upload, Save as SaveIcon, Undo2, Redo2, Plus, X, Menu as MenuIcon, Ruler } from "lucide-react";
+import {
+  ArrowLeft,
+  Compass,
+  Crosshair,
+  RotateCcw,
+  MapPin,
+  Target,
+  Trash2,
+  Layers as LayersIcon,
+  Settings2,
+  Upload,
+  Save as SaveIcon,
+  Undo2,
+  Redo2,
+  Plus,
+  X,
+  Menu as MenuIcon,
+  Ruler,
+} from "lucide-react";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
+import { isSecretVisibility } from "@/atlas/content/visibility";
 import { loadAtlasContent } from "@/atlas/content/loader";
-import type { AtlasProject, Entity, ImportFolderConfig, MapDocument, MapLayer } from "@/atlas/content/schema";
+import type {
+  AtlasProject,
+  Entity,
+  ImportFolderConfig,
+  MapDocument,
+  MapLayer,
+} from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useMapLayers } from "@/atlas/useMapLayers";
 import { MapLayerPanel } from "@/atlas/MapLayerPanel";
@@ -19,7 +51,6 @@ import { MapLayerEditableOverlay } from "@/atlas/MapLayerEditableOverlay";
 import { MapSettingsPanel } from "@/atlas/MapSettingsPanel";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { OceanBackground } from "@/atlas/ocean/OceanBackground";
-import { overridesSchema } from "@/atlas/schemas/imports";
 import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
 import { buildSavePlan } from "@/atlas/editor/saveGate";
@@ -56,6 +87,15 @@ import { EntitySurface } from "@/atlas/entity/EntitySurface";
 import { resolvePinClickIntent } from "@/atlas/editor/pinClickIntent";
 import { resolveEntityCloseIntent } from "@/atlas/editor/entityCloseIntent";
 import { mapClickToAtlasCoord } from "@/atlas/editor/mapClickCoord";
+import {
+  type Overrides,
+  type OverrideValue,
+  overrideKey,
+  loadOverrides,
+  finishLegacyMigration,
+  persistOverrides,
+  LEGACY_STORAGE_KEY_V1,
+} from "@/atlas/editor/placementOverrides";
 import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { MapImportWizard } from "@/atlas/import/MapImportWizard";
@@ -89,41 +129,12 @@ import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
 
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
-// Bumped to v3: storage shape now carries label + pin override per placement.
-// v1/v2 entries (just x/y) are still readable — extra fields are simply absent.
-const STORAGE_KEY = "atlas-placement-overrides-v3";
-const LEGACY_STORAGE_KEY_V1 = "atlas-placement-overrides-v1";
-const LEGACY_STORAGE_KEY_V2 = "atlas-placement-overrides-v2";
 
-/** Local-draft override shape. `null` = explicitly removed from this map. */
-type OverrideValue = { x: number; y: number; label?: string; pin?: PinOverride };
-type Override = OverrideValue | null;
-
-interface Overrides {
-  [mapEntityKey: string]: Override; // key = `${mapId}:${entityId}`
-}
-
-const overrideKey = (mapId: string, entityId: string) => `${mapId}:${entityId}`;
-
-/**
- * Boundary-validate an overrides JSON string from localStorage. Malformed
- * entries (corrupt browser storage, hand-edited DevTools) are dropped per
- * key rather than crashing the editor. Returns an empty object on total
- * failure.
- */
-function safeParseOverrides(raw: string): Overrides {
-  let json: unknown;
-  try { json = JSON.parse(raw); } catch { return {}; }
-  const parsed = overridesSchema.safeParse(json);
-  if (!parsed.success) return {};
-  const out: Overrides = {};
-  for (const [k, v] of Object.entries(parsed.data)) {
-    out[k] = v as Override;
-  }
-  return out;
-}
-
-function pinDivIcon(color: string, shape: import("@/atlas/pins/presets").PinShape, opts?: { pulse?: boolean }): L.DivIcon {
+function pinDivIcon(
+  color: string,
+  shape: import("@/atlas/pins/presets").PinShape,
+  opts?: { pulse?: boolean },
+): L.DivIcon {
   return L.divIcon({
     className: "atlas-edit-pin",
     html: pinSvg({ color, shape }, { pulse: opts?.pulse }),
@@ -153,13 +164,29 @@ function ViewModeToggle() {
   const { mode, setMode } = useViewMode();
   return (
     <div className="flex items-center gap-2">
-      <div className="inline-flex rounded border overflow-hidden text-xs" role="group" aria-label="View mode">
-        <button type="button"
+      <div
+        className="inline-flex rounded border overflow-hidden text-xs"
+        role="group"
+        aria-label="View mode"
+      >
+        <button
+          type="button"
           className={mode === "dm" ? "px-2 py-1 bg-primary text-primary-foreground" : "px-2 py-1"}
-          aria-pressed={mode === "dm"} onClick={() => setMode("dm")}>DM view</button>
-        <button type="button"
-          className={mode === "player" ? "px-2 py-1 bg-primary text-primary-foreground" : "px-2 py-1"}
-          aria-pressed={mode === "player"} onClick={() => setMode("player")}>Player view</button>
+          aria-pressed={mode === "dm"}
+          onClick={() => setMode("dm")}
+        >
+          DM view
+        </button>
+        <button
+          type="button"
+          className={
+            mode === "player" ? "px-2 py-1 bg-primary text-primary-foreground" : "px-2 py-1"
+          }
+          aria-pressed={mode === "player"}
+          onClick={() => setMode("player")}
+        >
+          Player view
+        </button>
       </div>
       {mode === "player" && (
         <span
@@ -176,23 +203,7 @@ function ViewModeToggle() {
 function AtlasPlacementEditorInner() {
   const [project, setProject] = useState<AtlasProject | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [overrides, setOverrides] = useState<Overrides>(() => {
-    try {
-      const v3 = localStorage.getItem(STORAGE_KEY);
-      if (v3) return safeParseOverrides(v3);
-      // Forward-migration: v2 entries are already keyed by `${mapId}:${entityId}`
-      // and only carry x/y — directly compatible with the v3 shape.
-      const v2raw = localStorage.getItem(LEGACY_STORAGE_KEY_V2);
-      if (v2raw) return safeParseOverrides(v2raw);
-      // v1 was entityId-keyed; defer mapId resolution until project loads.
-      const v1raw = localStorage.getItem(LEGACY_STORAGE_KEY_V1);
-      if (!v1raw) return {};
-      const v1 = safeParseOverrides(v1raw);
-      const migrated: Overrides = {};
-      Object.entries(v1).forEach(([eid, val]) => { migrated[`__legacy__:${eid}`] = val; });
-      return migrated;
-    } catch { return {}; }
-  });
+  const [overrides, setOverrides] = useState<Overrides>(loadOverrides);
   const [activeMapId, setActiveMapId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null); // entity awaiting click-to-place
   const [filter, setFilter] = useState("");
@@ -206,26 +217,19 @@ function AtlasPlacementEditorInner() {
   const [lockAspectRatio, setLockAspectRatio] = useState(true);
 
   useEffect(() => {
-    loadAtlasContent(true).then((p) => {
-      setProject(p);
-      const defaultMap = p.worlds[0]?.defaultMapId ?? p.maps[0]?.id ?? null;
-      setActiveMapId(defaultMap);
-      // Finish v1 → v2 migration now that we know the default mapId.
-      setOverrides((o) => {
-        const out: Overrides = {};
-        let migrated = false;
-        for (const [k, v] of Object.entries(o)) {
-          if (k.startsWith("__legacy__:") && defaultMap) {
-            out[overrideKey(defaultMap, k.slice("__legacy__:".length))] = v;
-            migrated = true;
-          } else {
-            out[k] = v;
-          }
-        }
-        if (migrated) localStorage.removeItem(LEGACY_STORAGE_KEY_V1);
-        return migrated ? out : o;
-      });
-    }).catch((e: Error) => setError(e.message));
+    loadAtlasContent(true)
+      .then((p) => {
+        setProject(p);
+        const defaultMap = p.worlds[0]?.defaultMapId ?? p.maps[0]?.id ?? null;
+        setActiveMapId(defaultMap);
+        // Finish v1 → v2 migration now that we know the default mapId.
+        setOverrides((o) => {
+          const { overrides: next, migrated } = finishLegacyMigration(o, defaultMap);
+          if (migrated) localStorage.removeItem(LEGACY_STORAGE_KEY_V1);
+          return next;
+        });
+      })
+      .catch((e: Error) => setError(e.message));
   }, []);
 
   // Save-conflict detector: poll atlas.json every 30s while the editor is
@@ -244,14 +248,21 @@ function AtlasPlacementEditorInner() {
       try {
         const fresh = await loadAtlasContent(true);
         if (cancelled) return;
-        if (fresh.publishedAt && fresh.publishedAt !== loadedAt && fresh.publishedAt !== externalRebuildAt) {
+        if (
+          fresh.publishedAt &&
+          fresh.publishedAt !== loadedAt &&
+          fresh.publishedAt !== externalRebuildAt
+        ) {
           setExternalRebuildAt(fresh.publishedAt);
           toast.warning("Canon rebuilt externally", {
-            description: "Atlas was regenerated since you opened the editor. Reload to see the new canon before saving.",
+            description:
+              "Atlas was regenerated since you opened the editor. Reload to see the new canon before saving.",
             duration: 8000,
           });
         }
-      } catch { /* network blip; retry next tick */ }
+      } catch (err) {
+        logger.debug("[editor] background atlas refresh failed; retrying next tick", err);
+      }
       timer = window.setTimeout(tick, 30_000);
     };
     timer = window.setTimeout(tick, 30_000);
@@ -300,14 +311,16 @@ function AtlasPlacementEditorInner() {
   });
   const [pasteOpen, setPasteOpen] = useState(false);
   const mdFileInputRef = useRef<HTMLInputElement>(null);
-  const triggerMdImport = useCallback(() => { mdFileInputRef.current?.click(); }, []);
+  const triggerMdImport = useCallback(() => {
+    mdFileInputRef.current?.click();
+  }, []);
   const { isDragging: isDraggingMd } = useMdDropZone({
     onDrop: importFlow.openWithFiles,
     enabled: !importFlow.open && !pasteOpen,
   });
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
+    persistOverrides(overrides);
   }, [overrides]);
 
   // Stamp a local edit timestamp on every override mutation AFTER mount.
@@ -326,7 +339,7 @@ function AtlasPlacementEditorInner() {
 
   const baseMap: MapDocument | undefined = useMemo(
     () => project?.maps.find((m) => m.id === activeMapId),
-    [project, activeMapId]
+    [project, activeMapId],
   );
   const activeMap: MapDocument | undefined = useMemo(() => {
     if (!baseMap) return undefined;
@@ -348,10 +361,11 @@ function AtlasPlacementEditorInner() {
   };
   const resetMap = () => {
     if (!baseMap) return;
-    setMapOverrideUndoable(
-      (s) => { const n = { ...s }; delete n[baseMap.id]; return n; },
-      `reset map metadata ${baseMap.id}`,
-    );
+    setMapOverrideUndoable((s) => {
+      const n = { ...s };
+      delete n[baseMap.id];
+      return n;
+    }, `reset map metadata ${baseMap.id}`);
   };
 
   // Phase 1B — session undo stack. In-memory only; cleared on tab close.
@@ -372,11 +386,23 @@ function AtlasPlacementEditorInner() {
   // Region draft state — shared between RegionsTab (form) and the map (RegionLayer).
   const entityIdSet = useMemo(() => new Set((project?.entities ?? []).map((e) => e.id)), [project]);
   const dmEntityIdSet = useMemo(
-    () => new Set((project?.entities ?? []).filter((e) => e.visibility === "dm" || e.visibility === "hidden").map((e) => e.id)),
-    [project]
+    () =>
+      new Set(
+        (project?.entities ?? []).filter((e) => isSecretVisibility(e.visibility)).map((e) => e.id),
+      ),
+    [project],
   );
-  const regionDraft = useRegionDraft(activeMap, { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet }, undoStack);
-  const routeDraft = useRouteDraft(project, activeMap, { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet }, undoStack);
+  const regionDraft = useRegionDraft(
+    activeMap,
+    { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet },
+    undoStack,
+  );
+  const routeDraft = useRouteDraft(
+    project,
+    activeMap,
+    { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet },
+    undoStack,
+  );
   const fogDraft = useFogDraft(activeMap, undoStack);
   const entityEditDraft = useEntityEditDraft();
   const entitiesById = useMemo(
@@ -389,9 +415,13 @@ function AtlasPlacementEditorInner() {
   // read these to compute (before, after) snapshots without waiting for
   // React batching to settle.
   const overridesRef = useRef(overrides);
-  useEffect(() => { overridesRef.current = overrides; }, [overrides]);
+  useEffect(() => {
+    overridesRef.current = overrides;
+  }, [overrides]);
   const mapOverrideRef = useRef(mapOverride);
-  useEffect(() => { mapOverrideRef.current = mapOverride; }, [mapOverride]);
+  useEffect(() => {
+    mapOverrideRef.current = mapOverride;
+  }, [mapOverride]);
 
   /** Undo-recording setter for pin overrides. Skip-recording mode is just
    *  raw setOverrides; use that for post-save cleanup. */
@@ -419,7 +449,10 @@ function AtlasPlacementEditorInner() {
 
   /** Undo-recording setter for map metadata. */
   const setMapOverrideUndoable = useCallback(
-    (compute: (prev: Record<string, Partial<MapDocument>>) => Record<string, Partial<MapDocument>>, label: string) => {
+    (
+      compute: (prev: Record<string, Partial<MapDocument>>) => Record<string, Partial<MapDocument>>,
+      label: string,
+    ) => {
       const before = mapOverrideRef.current;
       const after = compute(before);
       if (after === before) return;
@@ -442,8 +475,7 @@ function AtlasPlacementEditorInner() {
 
   // Shell state: which rail panel is open (null = closed).
   const [activePanel, setActivePanel] = useState<string | null>(null);
-  const selectPanel = (id: string) =>
-    setActivePanel((cur) => (cur === id ? null : id));
+  const selectPanel = (id: string) => setActivePanel((cur) => (cur === id ? null : id));
   const dismissPanel = () => setActivePanel(null);
 
   // ☰ menu open/close state
@@ -462,28 +494,37 @@ function AtlasPlacementEditorInner() {
   const [editingEntityId, setEditingEntityId] = useState<string | null>(null);
 
   /** Read-only canon placement (built YAML value) for an entity on a map. */
-  const canonPlacement = useCallback((mapId: string, entityId: string) => {
-    if (!project) return null;
-    return project.placements.find((p) => p.entityId === entityId && p.mapId === mapId) ?? null;
-  }, [project]);
+  const canonPlacement = useCallback(
+    (mapId: string, entityId: string) => {
+      if (!project) return null;
+      return project.placements.find((p) => p.entityId === entityId && p.mapId === mapId) ?? null;
+    },
+    [project],
+  );
 
   /** Resolve effective placement values on the active map: local override wins, else canon. */
-  const effectivePlacement = useCallback((entityId: string): OverrideValue | null => {
-    if (!activeMap) return null;
-    const k = overrideKey(activeMap.id, entityId);
-    if (k in overrides) {
-      const v = overrides[k];
-      return v;
-    }
-    const p = canonPlacement(activeMap.id, entityId);
-    if (!p) return null;
-    return { x: p.x, y: p.y, label: p.label, pin: p.pin as PinOverride | undefined };
-  }, [overrides, canonPlacement, activeMap]);
+  const effectivePlacement = useCallback(
+    (entityId: string): OverrideValue | null => {
+      if (!activeMap) return null;
+      const k = overrideKey(activeMap.id, entityId);
+      if (k in overrides) {
+        const v = overrides[k];
+        return v;
+      }
+      const p = canonPlacement(activeMap.id, entityId);
+      if (!p) return null;
+      return { x: p.x, y: p.y, label: p.label, pin: p.pin as PinOverride | undefined };
+    },
+    [overrides, canonPlacement, activeMap],
+  );
 
-  const effectiveCoord = useCallback((entityId: string): { x: number; y: number } | null => {
-    const e = effectivePlacement(entityId);
-    return e ? { x: e.x, y: e.y } : null;
-  }, [effectivePlacement]);
+  const effectiveCoord = useCallback(
+    (entityId: string): { x: number; y: number } | null => {
+      const e = effectivePlacement(entityId);
+      return e ? { x: e.x, y: e.y } : null;
+    },
+    [effectivePlacement],
+  );
 
   const entitiesForWorld = useMemo(() => {
     if (!project || !activeMap) return [] as Entity[];
@@ -493,17 +534,25 @@ function AtlasPlacementEditorInner() {
 
   const allTypes = useMemo(
     () => Array.from(new Set(entitiesForWorld.map((e) => e.type))).sort(),
-    [entitiesForWorld]
+    [entitiesForWorld],
   );
   const allTags = useMemo(
     () => Array.from(new Set(entitiesForWorld.flatMap((e) => e.tags ?? []))).sort(),
-    [entitiesForWorld]
+    [entitiesForWorld],
   );
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
     return entitiesForWorld.filter((e) => {
-      if (q && !(e.title.toLowerCase().includes(q) || e.type.toLowerCase().includes(q) || e.aliases.some((a) => a.toLowerCase().includes(q)))) return false;
+      if (
+        q &&
+        !(
+          e.title.toLowerCase().includes(q) ||
+          e.type.toLowerCase().includes(q) ||
+          e.aliases.some((a) => a.toLowerCase().includes(q))
+        )
+      )
+        return false;
       if (visFilter !== "all" && e.visibility !== visFilter) return false;
       if (typeFilter !== "all" && e.type !== typeFilter) return false;
       if (tagFilter !== "all" && !(e.tags ?? []).includes(tagFilter)) return false;
@@ -565,34 +614,43 @@ function AtlasPlacementEditorInner() {
    *  baseline (and silently no-op without one, since they have nothing to
    *  attach to). The earlier behaviour dropped create-from-scratch on the
    *  floor while still firing the "Placed X" toast — see plan §2. */
-  const mutateOverride = useCallback((entityId: string, patch: Partial<OverrideValue>, label?: string) => {
-    if (!activeMap) return;
-    setOverridesUndoable((o) => {
-      const k = overrideKey(activeMap.id, entityId);
-      const current = (k in o ? o[k] : null) ?? canonPlacement(activeMap.id, entityId);
-      if (!current) {
-        if (typeof patch.x !== "number" || typeof patch.y !== "number") return o;
-        const fresh: OverrideValue = {
-          x: patch.x,
-          y: patch.y,
-          label: patch.label,
-          pin: patch.pin,
-        };
-        return { ...o, [k]: fresh };
-      }
-      const merged: OverrideValue = {
-        x: patch.x ?? current.x,
-        y: patch.y ?? current.y,
-        label: patch.label !== undefined ? patch.label : (current as OverrideValue).label,
-        pin: patch.pin !== undefined ? patch.pin : (current as OverrideValue).pin,
-      };
-      return { ...o, [k]: merged };
-    }, label ?? `pin ${entityId}`);
-  }, [activeMap, canonPlacement, setOverridesUndoable]);
+  const mutateOverride = useCallback(
+    (entityId: string, patch: Partial<OverrideValue>, label?: string) => {
+      if (!activeMap) return;
+      setOverridesUndoable(
+        (o) => {
+          const k = overrideKey(activeMap.id, entityId);
+          const current = (k in o ? o[k] : null) ?? canonPlacement(activeMap.id, entityId);
+          if (!current) {
+            if (typeof patch.x !== "number" || typeof patch.y !== "number") return o;
+            const fresh: OverrideValue = {
+              x: patch.x,
+              y: patch.y,
+              label: patch.label,
+              pin: patch.pin,
+            };
+            return { ...o, [k]: fresh };
+          }
+          const merged: OverrideValue = {
+            x: patch.x ?? current.x,
+            y: patch.y ?? current.y,
+            label: patch.label !== undefined ? patch.label : (current as OverrideValue).label,
+            pin: patch.pin !== undefined ? patch.pin : (current as OverrideValue).pin,
+          };
+          return { ...o, [k]: merged };
+        },
+        label ?? `pin ${entityId}`,
+      );
+    },
+    [activeMap, canonPlacement, setOverridesUndoable],
+  );
 
-  const setCoord = (entityId: string, coord: { x: number; y: number }) => mutateOverride(entityId, coord, `move pin ${entityId}`);
-  const setLabel = (entityId: string, label: string | undefined) => mutateOverride(entityId, { label }, `label pin ${entityId}`);
-  const setPinOverride = (entityId: string, pin: PinOverride | undefined) => mutateOverride(entityId, { pin }, `style pin ${entityId}`);
+  const setCoord = (entityId: string, coord: { x: number; y: number }) =>
+    mutateOverride(entityId, coord, `move pin ${entityId}`);
+  const setLabel = (entityId: string, label: string | undefined) =>
+    mutateOverride(entityId, { label }, `label pin ${entityId}`);
+  const setPinOverride = (entityId: string, pin: PinOverride | undefined) =>
+    mutateOverride(entityId, { pin }, `style pin ${entityId}`);
   const nudge = (entityId: string, dx: number, dy: number) => {
     const c = effectiveCoord(entityId);
     if (!c) return;
@@ -608,27 +666,40 @@ function AtlasPlacementEditorInner() {
   const clearOverride = (entityId: string) => {
     if (!activeMap) return;
     const k = overrideKey(activeMap.id, entityId);
-    setOverridesUndoable(
-      (o) => { const next = { ...o }; delete next[k]; return next; },
-      `discard local pin edit ${entityId}`,
-    );
+    setOverridesUndoable((o) => {
+      const next = { ...o };
+      delete next[k];
+      return next;
+    }, `discard local pin edit ${entityId}`);
   };
   /** Duplicate a placement to another map: writes the same coords as a draft. Undoable. */
   const duplicateToMap = (entityId: string, targetMapId: string) => {
     const src = effectivePlacement(entityId);
     if (!src) return;
     setOverridesUndoable(
-      (o) => ({ ...o, [overrideKey(targetMapId, entityId)]: { x: src.x, y: src.y, label: src.label, pin: src.pin } }),
+      (o) => ({
+        ...o,
+        [overrideKey(targetMapId, entityId)]: {
+          x: src.x,
+          y: src.y,
+          label: src.label,
+          pin: src.pin,
+        },
+      }),
       `duplicate pin ${entityId} → ${targetMapId}`,
     );
-    toast.success(`Duplicated to ${project?.maps.find((m) => m.id === targetMapId)?.name ?? targetMapId}`);
+    toast.success(
+      `Duplicated to ${project?.maps.find((m) => m.id === targetMapId)?.name ?? targetMapId}`,
+    );
   };
 
   const onMapClick = (lng: number, lat: number) => {
     if (!pendingId || !activeMap) return;
     const { x, y } = mapClickToAtlasCoord(lng, lat, activeMap.height);
     setCoord(pendingId, { x, y });
-    toast.success(`Placed "${project?.entities.find((e) => e.id === pendingId)?.title}" at ${x},${y} on ${activeMap.name}`);
+    toast.success(
+      `Placed "${project?.entities.find((e) => e.id === pendingId)?.title}" at ${x},${y} on ${activeMap.name}`,
+    );
     if (chainPlaceMode) {
       const next = unplaced.find((e) => e.id !== pendingId);
       setPendingId(next?.id ?? null);
@@ -690,14 +761,14 @@ function AtlasPlacementEditorInner() {
   // "world.yaml is dirty" boolean. Each per-tab draft hook already exposes a
   // .dirty flag; layers/map-metadata don't, so we derive those from state
   // existence. The post-save clean-up at onSaved clears each of these.
-  const mapMetadataDirty = !!(baseMap && mapOverride[baseMap.id] && Object.keys(mapOverride[baseMap.id]).length > 0);
+  const mapMetadataDirty = !!(
+    baseMap &&
+    mapOverride[baseMap.id] &&
+    Object.keys(mapOverride[baseMap.id]).length > 0
+  );
   const layersDirty = layerEditor.localLayers.length > 0;
   const worldYamlDirty =
-    mapMetadataDirty ||
-    layersDirty ||
-    regionDraft.dirty ||
-    routeDraft.dirty ||
-    fogDraft.dirty;
+    mapMetadataDirty || layersDirty || regionDraft.dirty || routeDraft.dirty || fogDraft.dirty;
 
   /**
    * Compose the full world.yaml content for the active world by overlaying
@@ -743,7 +814,16 @@ function AtlasPlacementEditorInner() {
       schemaVersion: project.schemaVersion,
       existing: worldYamlBaseline.raw,
     });
-  }, [project, activeMap, layerEditor.mergedLayers, layerEditor.localLayers, regionDraft.effective, routeDraft.effective, fogDraft.fog, worldYamlBaseline.raw]);
+  }, [
+    project,
+    activeMap,
+    layerEditor.mergedLayers,
+    layerEditor.localLayers,
+    regionDraft.effective,
+    routeDraft.effective,
+    fogDraft.fog,
+    worldYamlBaseline.raw,
+  ]);
 
   /**
    * Build the asset-binary FileChange entries for every upload-origin layer
@@ -836,12 +916,17 @@ function AtlasPlacementEditorInner() {
         // Surface uploads that have lost their dataUrl (localStorage quota
         // pressure clears it on reload). The world.yaml will reference them
         // but the binary won't land — the next build will flag missing assets.
-        const droppedUploads = layerEditor.localLayers.filter((l) => l.origin === "upload" && !l.dataUrl).length;
+        const droppedUploads = layerEditor.localLayers.filter(
+          (l) => l.origin === "upload" && !l.dataUrl,
+        ).length;
         if (droppedUploads > 0) {
-          toast.warning(`${droppedUploads} uploaded image${droppedUploads === 1 ? "" : "s"} have no in-memory bytes`, {
-            description: "Likely cleared by localStorage quota. Re-upload before saving.",
-            duration: 8000,
-          });
+          toast.warning(
+            `${droppedUploads} uploaded image${droppedUploads === 1 ? "" : "s"} have no in-memory bytes`,
+            {
+              description: "Likely cleared by localStorage quota. Re-upload before saving.",
+              duration: 8000,
+            },
+          );
         }
         fileChanges.push(...assetChanges);
         fileChanges.push({
@@ -863,9 +948,13 @@ function AtlasPlacementEditorInner() {
       setPendingChanges(fileChanges);
       setSaveModalOpen(true);
     } catch (err) {
-      const msg = err instanceof CanonicalSaveError
-        ? err.message
-        : err instanceof Error ? err.message : String(err);
+      const msg =
+        err instanceof CanonicalSaveError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : String(err);
+      logger.error("Save preparation failed", err);
       session.markFailed(msg);
       toast.error(`Could not prepare save: ${msg}`);
     }
@@ -876,23 +965,28 @@ function AtlasPlacementEditorInner() {
    * entity .md file and routes it straight through the unified Save modal.
    * worldRoot is derived from the active world's id (e.g. content/astrath-deeprealm).
    */
-  const onCreateEntity = useCallback((draft: NewEntityDraft) => {
-    const activeWorld = project?.worlds.find((w) => w.id === importWorldId);
-    const worldRoot = activeWorld ? `content/${activeWorld.id}` : "content";
-    const change = buildNewEntityChange({
-      worldRoot,
-      category: draft.category,
-      title: draft.title,
-      summary: draft.summary,
-      visibility: draft.visibility,
-      kind: draft.kind,
-    });
-    setPendingChanges((cur) => [...cur, change]);
-    setSaveModalOpen(true);
-    setCreatingIn(null);
-  }, [project, importWorldId]);
+  const onCreateEntity = useCallback(
+    (draft: NewEntityDraft) => {
+      const activeWorld = project?.worlds.find((w) => w.id === importWorldId);
+      const worldRoot = activeWorld ? `content/${activeWorld.id}` : "content";
+      const change = buildNewEntityChange({
+        worldRoot,
+        category: draft.category,
+        title: draft.title,
+        summary: draft.summary,
+        visibility: draft.visibility,
+        kind: draft.kind,
+      });
+      setPendingChanges((cur) => [...cur, change]);
+      setSaveModalOpen(true);
+      setCreatingIn(null);
+    },
+    [project, importWorldId],
+  );
 
-  const dirtyCount = Object.keys(overrides).filter((k) => activeMap && k.startsWith(`${activeMap.id}:`)).length;
+  const dirtyCount = Object.keys(overrides).filter(
+    (k) => activeMap && k.startsWith(`${activeMap.id}:`),
+  ).length;
   // Unsaved-changes signal: there are local pin overrides OR a dirty
   // world.yaml signal. The pin-side gate also waits for an edit since the
   // last successful save so a hydrated-but-clean session doesn't nag; the
@@ -913,16 +1007,41 @@ function AtlasPlacementEditorInner() {
     holders: {
       overrides: {
         get: () => overridesRef.current as import("@/atlas/session/sessionSnapshot").Overrides,
-        set: (o) => { overridesRef.current = o as Overrides; setOverrides(o as Overrides); },
+        set: (o) => {
+          overridesRef.current = o as Overrides;
+          setOverrides(o as Overrides);
+        },
       },
       mapOverride: {
         get: () => mapOverrideRef.current as Record<string, unknown>,
-        set: (m) => { mapOverrideRef.current = m as Record<string, Partial<MapDocument>>; setMapOverride(m as Record<string, Partial<MapDocument>>); },
+        set: (m) => {
+          mapOverrideRef.current = m as Record<string, Partial<MapDocument>>;
+          setMapOverride(m as Record<string, Partial<MapDocument>>);
+        },
       },
-      region: { snapshot: regionDraft.snapshot, applySnapshot: regionDraft.applySnapshot },
-      route: { snapshot: routeDraft.snapshot, applySnapshot: routeDraft.applySnapshot },
-      fog: { snapshot: fogDraft.snapshot, applySnapshot: fogDraft.applySnapshot },
-      layer: { snapshot: layerEditor.snapshot, applySnapshot: layerEditor.applySnapshot },
+      // The session stores each holder's snapshot as `unknown` and restores it
+      // through a `(s: unknown) => void`, so coerce back to each draft's own
+      // snapshot type at the registration boundary.
+      region: {
+        snapshot: regionDraft.snapshot,
+        applySnapshot: (s) =>
+          regionDraft.applySnapshot(s as Parameters<typeof regionDraft.applySnapshot>[0]),
+      },
+      route: {
+        snapshot: routeDraft.snapshot,
+        applySnapshot: (s) =>
+          routeDraft.applySnapshot(s as Parameters<typeof routeDraft.applySnapshot>[0]),
+      },
+      fog: {
+        snapshot: fogDraft.snapshot,
+        applySnapshot: (s) =>
+          fogDraft.applySnapshot(s as Parameters<typeof fogDraft.applySnapshot>[0]),
+      },
+      layer: {
+        snapshot: layerEditor.snapshot,
+        applySnapshot: (s) =>
+          layerEditor.applySnapshot(s as Parameters<typeof layerEditor.applySnapshot>[0]),
+      },
       editorEntity: {
         get: () => entityEditDraft.snapshot(),
         set: (v) => entityEditDraft.applySnapshot(v as never),
@@ -931,7 +1050,7 @@ function AtlasPlacementEditorInner() {
     perMapDirtyCount: () =>
       regionDraft.dirtyCount +
       routeDraft.dirtyCount +
-      (fogDraft.dirty ? 1 : 0) +
+      fogDraft.dirtyCount +
       layerEditor.localLayers.length +
       (mapMetadataDirty ? 1 : 0) +
       dirtyCount +
@@ -985,50 +1104,82 @@ function AtlasPlacementEditorInner() {
   }, [undoStack]);
 
   // Project-wide validation, scoped per tab so each tab badge shows its own counts.
-  const draftPlacementsForValidation = useMemo(() => buildDraftPlacements(), [buildDraftPlacements]);
-  const validation = useMemo(
-    () => project && activeMap
-      ? validateProject({
-          project,
-          draftPlacements: draftPlacementsForValidation,
-          draftMap: activeMap,
-          draftLocalLayers: layerEditor.localLayers,
-        })
-      : null,
-    [project, activeMap, draftPlacementsForValidation, layerEditor.localLayers]
+  const draftPlacementsForValidation = useMemo(
+    () => buildDraftPlacements(),
+    [buildDraftPlacements],
   );
-  const issuesByScope = (predicate: (i: import("@/atlas/yaml/validateProject").Issue) => boolean) => {
+  const validation = useMemo(
+    () =>
+      project && activeMap
+        ? validateProject({
+            project,
+            draftPlacements: draftPlacementsForValidation,
+            draftMap: activeMap,
+            draftLocalLayers: layerEditor.localLayers,
+          })
+        : null,
+    [project, activeMap, draftPlacementsForValidation, layerEditor.localLayers],
+  );
+  const issuesByScope = (
+    predicate: (i: import("@/atlas/yaml/validateProject").Issue) => boolean,
+  ) => {
     const list = validation?.issues.filter(predicate) ?? [];
     return {
       blocking: list.filter((i) => i.severity === "blocking").length,
       warning: list.filter((i) => i.severity === "warning").length,
     };
   };
-  const pinIssues = issuesByScope((i) => i.code.includes("placement") || i.code === "pin-out-of-bounds" || i.code === "invalid-coord");
-  const mapIssues = issuesByScope((i) => i.code === "duplicate-layer-id" || i.code === "empty-map" || i.code === "missing-asset" || i.code === "external-asset" || i.code === "invalid-layer-size" || i.code === "missing-layer-src" || i.code === "route-no-scale");
-  const regionIssues = issuesByScope((i) => i.code.includes("region") || i.code === "spoiler-leak-region");
+  const pinIssues = issuesByScope(
+    (i) =>
+      i.code.includes("placement") || i.code === "pin-out-of-bounds" || i.code === "invalid-coord",
+  );
+  const mapIssues = issuesByScope(
+    (i) =>
+      i.code === "duplicate-layer-id" ||
+      i.code === "empty-map" ||
+      i.code === "missing-asset" ||
+      i.code === "external-asset" ||
+      i.code === "invalid-layer-size" ||
+      i.code === "missing-layer-src" ||
+      i.code === "route-no-scale",
+  );
+  const regionIssues = issuesByScope(
+    (i) => i.code.includes("region") || i.code === "spoiler-leak-region",
+  );
   const routeIssues = issuesByScope((i) => i.code.includes("route"));
 
-  // eslint-disable-next-line react-hooks/refs -- onSaveClick is an async function, not a ref; rule fires as a false positive here
-  const paletteIndex = useMemo(() => buildPaletteIndex({
-    entities: project?.entities ?? [],
-    maps: (project?.maps ?? []).map((m) => ({ id: m.id, name: m.name ?? m.id })),
-    commands: [
-      { id: "cmd.save", title: "Save", run: onSaveClick },
-      { id: "cmd.publish", title: "Publish player site", run: () => setActivePanel("publish") },
-      { id: "cmd.import", title: "Import .md files", run: triggerMdImport },
-      { id: "cmd.paste", title: "Paste markdown — quick capture", run: () => setPasteOpen(true) },
-      ...CATEGORIES.map((c) => ({
-        id: `cmd.new.${c.id}`, title: `New ${c.singular}`,
-        run: () => { setActivePanel(c.id); setCreatingIn(c.id as CategoryId); },
-      })),
-    ],
-    settings: [
-      { id: "set.map", title: "Map settings" },
-      { id: "set.world", title: "World details" },
-    ],
-    recent: [],
-  }), [project, onSaveClick]);
+  const paletteIndex = useMemo(
+    () =>
+      // eslint-disable-next-line react-hooks/refs -- onSaveClick is an async function, not a ref; rule fires as a false positive here
+      buildPaletteIndex({
+        entities: project?.entities ?? [],
+        maps: (project?.maps ?? []).map((m) => ({ id: m.id, name: m.name ?? m.id })),
+        commands: [
+          { id: "cmd.save", title: "Save", run: onSaveClick },
+          { id: "cmd.publish", title: "Publish player site", run: () => setActivePanel("publish") },
+          { id: "cmd.import", title: "Import .md files", run: triggerMdImport },
+          {
+            id: "cmd.paste",
+            title: "Paste markdown — quick capture",
+            run: () => setPasteOpen(true),
+          },
+          ...CATEGORIES.map((c) => ({
+            id: `cmd.new.${c.id}`,
+            title: `New ${c.singular}`,
+            run: () => {
+              setActivePanel(c.id);
+              setCreatingIn(c.id as CategoryId);
+            },
+          })),
+        ],
+        settings: [
+          { id: "set.map", title: "Map settings" },
+          { id: "set.world", title: "World details" },
+        ],
+        recent: [],
+      }),
+    [project, onSaveClick],
+  );
 
   if (error) {
     return (
@@ -1039,13 +1190,22 @@ function AtlasPlacementEditorInner() {
           <p className="text-xs text-muted-foreground">
             Run <code className="px-1.5 py-0.5 rounded bg-muted">npm run atlas:build</code> first.
           </p>
-          <Button asChild variant="secondary"><Link to="/"><ArrowLeft className="h-4 w-4 mr-1" />Back</Link></Button>
+          <Button asChild variant="secondary">
+            <Link to="/">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Link>
+          </Button>
         </div>
       </div>
     );
   }
   if (!project || !activeMap) {
-    return <div className="h-screen w-screen flex items-center justify-center bg-background text-muted-foreground">Loading…</div>;
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-background text-muted-foreground">
+        Loading…
+      </div>
+    );
   }
 
   return (
@@ -1055,10 +1215,16 @@ function AtlasPlacementEditorInner() {
           <span className="flex items-center gap-2 min-w-0">
             <span aria-hidden>↩</span>
             <span className="truncate">
-              <strong>Unsaved edits restored</strong> — your last session&apos;s work was recovered automatically.
+              <strong>Unsaved edits restored</strong> — your last session&apos;s work was recovered
+              automatically.
             </span>
           </span>
-          <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={session.dismissRestoredNotice}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-[10px]"
+            onClick={session.dismissRestoredNotice}
+          >
             Dismiss
           </Button>
         </div>
@@ -1068,9 +1234,10 @@ function AtlasPlacementEditorInner() {
         <div className="px-3 py-2 text-[11px] bg-destructive/15 text-red-200 border-b border-destructive/40 flex items-center gap-2">
           <span aria-hidden>🔴</span>
           <span className="flex-1 min-w-0">
-            <strong>Player atlas loaded — Save won't work.</strong>{" "}
-            Run <code className="font-mono bg-black/30 px-1 rounded">npm run atlas:build</code> in your terminal,
-            then reload this page. The dev server must serve the DM atlas for saving to work.
+            <strong>Player atlas loaded — Save won't work.</strong> Run{" "}
+            <code className="font-mono bg-black/30 px-1 rounded">npm run atlas:build</code> in your
+            terminal, then reload this page. The dev server must serve the DM atlas for saving to
+            work.
           </span>
         </div>
       )}
@@ -1079,14 +1246,18 @@ function AtlasPlacementEditorInner() {
           <span className="flex items-center gap-2 min-w-0">
             <span aria-hidden>⚠</span>
             <span className="truncate">
-              <strong>Canon rebuilt externally</strong> — atlas.json changed on disk since you opened the editor.
-              {hasUnsavedChanges
-                ? " Save your local changes first, or "
-                : " "}
+              <strong>Canon rebuilt externally</strong> — atlas.json changed on disk since you
+              opened the editor.
+              {hasUnsavedChanges ? " Save your local changes first, or " : " "}
               reload to see the latest canon before editing.
             </span>
           </span>
-          <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={reloadCanon}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-[10px]"
+            onClick={reloadCanon}
+          >
             Reload canon
           </Button>
         </div>
@@ -1097,37 +1268,62 @@ function AtlasPlacementEditorInner() {
           title="YAML canon (committed) → local draft (this browser) → Save (dev plugin writes canon + rebuilds atlas) → git commit"
         >
           <span className="truncate">
-            <strong>YAML is canon.</strong> Save writes directly to your entity .md files and rebuilds the atlas — commit with git when ready.
+            <strong>YAML is canon.</strong> Save writes directly to your entity .md files and
+            rebuilds the atlas — commit with git when ready.
           </span>
         </span>
-        <Link to="/" className="text-primary hover:underline shrink-0">← Back</Link>
+        <Link to="/" className="text-primary hover:underline shrink-0">
+          ← Back
+        </Link>
       </div>
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
-        <Link to="/" className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2">
+        <Link
+          to="/"
+          className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2"
+        >
           <Compass className="h-5 w-5" /> <span className="hidden sm:inline">Placement Editor</span>
         </Link>
-        <Badge variant="outline" className="ml-2 hidden sm:inline-flex">DM only</Badge>
+        <Badge variant="outline" className="ml-2 hidden sm:inline-flex">
+          DM only
+        </Badge>
         <div className="flex-1" />
         <ViewModeToggle />
         {project.maps.length > 1 && (
-          <Select value={activeMap.id} onValueChange={(v) => {
-            if (v === activeMap.id) return;
-            session.onMapWillChange(v);
-            setActiveMapId(v);
-            setPendingId(null);
-          }}>
-            <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue /></SelectTrigger>
+          <Select
+            value={activeMap.id}
+            onValueChange={(v) => {
+              if (v === activeMap.id) return;
+              session.onMapWillChange(v);
+              setActiveMapId(v);
+              setPendingId(null);
+            }}
+          >
+            <SelectTrigger className="h-8 w-[180px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {project.maps.map((m) => (
-                <SelectItem key={m.id} value={m.id} className="text-xs">{m.name}</SelectItem>
+                <SelectItem key={m.id} value={m.id} className="text-xs">
+                  {m.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         )}
-        <Button variant={showLayers ? "secondary" : "ghost"} size="sm" onClick={() => setShowLayers((v) => !v)} title="Toggle map layers">
+        <Button
+          variant={showLayers ? "secondary" : "ghost"}
+          size="sm"
+          onClick={() => setShowLayers((v) => !v)}
+          title="Toggle map layers"
+        >
           Layers
         </Button>
-        <Button variant={showRegions ? "secondary" : "ghost"} size="sm" onClick={() => setShowRegions((v) => !v)} title="Toggle region overlays">
+        <Button
+          variant={showRegions ? "secondary" : "ghost"}
+          size="sm"
+          onClick={() => setShowRegions((v) => !v)}
+          title="Toggle region overlays"
+        >
           Regions
         </Button>
         <Button
@@ -1194,7 +1390,8 @@ function AtlasPlacementEditorInner() {
           className="gap-1"
           title="Write canonical .md frontmatter and rebuild the atlas. Commit with git when ready."
         >
-          <SaveIcon className="h-4 w-4" /><span className="hidden md:inline">Save</span>
+          <SaveIcon className="h-4 w-4" />
+          <span className="hidden md:inline">Save</span>
         </Button>
         <Button asChild variant="ghost" size="sm">
           <Link to="/atlas">View as player →</Link>
@@ -1220,9 +1417,18 @@ function AtlasPlacementEditorInner() {
               <div className="absolute right-0 top-full mt-1 z-50">
                 <EditorMenu
                   open
-                  onWorldDetails={() => { setMenuOpen(false); setActivePanel("world"); }}
-                  onMapDetails={() => { setMenuOpen(false); setActivePanel("maps"); }}
-                  onHelp={() => { setMenuOpen(false); window.open("https://github.com", "_blank"); }}
+                  onWorldDetails={() => {
+                    setMenuOpen(false);
+                    setActivePanel("world");
+                  }}
+                  onMapDetails={() => {
+                    setMenuOpen(false);
+                    setActivePanel("maps");
+                  }}
+                  onHelp={() => {
+                    setMenuOpen(false);
+                    window.open("https://github.com", "_blank");
+                  }}
                 />
               </div>
             </>
@@ -1259,7 +1465,10 @@ function AtlasPlacementEditorInner() {
                       sourcePath={editingEntity.sourcePath!}
                       draftApi={entityEditDraft}
                       onClose={() => setEditingEntityId(null)}
-                      onSaved={() => { setEditingEntityId(null); void reloadCanon(); }}
+                      onSaved={() => {
+                        setEditingEntityId(null);
+                        void reloadCanon();
+                      }}
                     />
                   )}
                 />
@@ -1271,109 +1480,214 @@ function AtlasPlacementEditorInner() {
           const panels: Record<string, React.ReactNode> = {
             // Six content categories — wired to CategoryPanel (browse) or
             // EntityEditorPanel (create). Phase 2 EntitiesTab stopgap removed.
-            characters: creatingIn === "characters" ? (
-              <EntityEditorPanel mode="create" category="characters"
-                onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
-            ) : renderCategory("characters", (
-              <CategoryPanel category="characters" entities={displayEntities}
-                onOpen={(id) => setEditingEntityId(id)}
-                onNew={() => setCreatingIn("characters")}
-                onImport={triggerMdImport}
-                hasPlacement={(id) => !!effectiveCoord(id)}
-                onShowOnMap={(id) => goTo(id)} />
-            )),
-            locations: creatingIn === "locations" ? (
-              <EntityEditorPanel mode="create" category="locations"
-                onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
-            ) : renderCategory("locations", (
-              <CategoryPanel category="locations" entities={displayEntities}
-                onOpen={(id) => setEditingEntityId(id)}
-                onNew={() => setCreatingIn("locations")}
-                onImport={triggerMdImport}
-                hasPlacement={(id) => !!effectiveCoord(id)}
-                onShowOnMap={(id) => goTo(id)} />
-            )),
-            factions: creatingIn === "factions" ? (
-              <EntityEditorPanel mode="create" category="factions"
-                onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
-            ) : renderCategory("factions", (
-              <CategoryPanel category="factions" entities={displayEntities}
-                onOpen={(id) => setEditingEntityId(id)}
-                onNew={() => setCreatingIn("factions")}
-                onImport={triggerMdImport}
-                hasPlacement={(id) => !!effectiveCoord(id)}
-                onShowOnMap={(id) => goTo(id)} />
-            )),
-            events: creatingIn === "events" ? (
-              <EntityEditorPanel mode="create" category="events"
-                onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
-            ) : renderCategory("events", (
-              <CategoryPanel category="events" entities={displayEntities}
-                onOpen={(id) => setEditingEntityId(id)}
-                onNew={() => setCreatingIn("events")}
-                onImport={triggerMdImport}
-                hasPlacement={(id) => !!effectiveCoord(id)}
-                onShowOnMap={(id) => goTo(id)} />
-            )),
-            items: creatingIn === "items" ? (
-              <EntityEditorPanel mode="create" category="items"
-                onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
-            ) : renderCategory("items", (
-              <CategoryPanel category="items" entities={displayEntities}
-                onOpen={(id) => setEditingEntityId(id)}
-                onNew={() => setCreatingIn("items")}
-                onImport={triggerMdImport}
-                hasPlacement={(id) => !!effectiveCoord(id)}
-                onShowOnMap={(id) => goTo(id)} />
-            )),
-            lore: creatingIn === "lore" ? (
-              <EntityEditorPanel mode="create" category="lore"
-                onCreate={onCreateEntity} onCancel={() => setCreatingIn(null)} />
-            ) : renderCategory("lore", (
-              <CategoryPanel category="lore" entities={displayEntities}
-                onOpen={(id) => setEditingEntityId(id)}
-                onNew={() => setCreatingIn("lore")}
-                onImport={triggerMdImport}
-                hasPlacement={(id) => !!effectiveCoord(id)}
-                onShowOnMap={(id) => goTo(id)} />
-            )),
+            characters:
+              creatingIn === "characters" ? (
+                <EntityEditorPanel
+                  mode="create"
+                  category="characters"
+                  onCreate={onCreateEntity}
+                  onCancel={() => setCreatingIn(null)}
+                />
+              ) : (
+                renderCategory(
+                  "characters",
+                  <CategoryPanel
+                    category="characters"
+                    entities={displayEntities}
+                    onOpen={(id) => setEditingEntityId(id)}
+                    onNew={() => setCreatingIn("characters")}
+                    onImport={triggerMdImport}
+                    hasPlacement={(id) => !!effectiveCoord(id)}
+                    onShowOnMap={(id) => goTo(id)}
+                  />,
+                )
+              ),
+            locations:
+              creatingIn === "locations" ? (
+                <EntityEditorPanel
+                  mode="create"
+                  category="locations"
+                  onCreate={onCreateEntity}
+                  onCancel={() => setCreatingIn(null)}
+                />
+              ) : (
+                renderCategory(
+                  "locations",
+                  <CategoryPanel
+                    category="locations"
+                    entities={displayEntities}
+                    onOpen={(id) => setEditingEntityId(id)}
+                    onNew={() => setCreatingIn("locations")}
+                    onImport={triggerMdImport}
+                    hasPlacement={(id) => !!effectiveCoord(id)}
+                    onShowOnMap={(id) => goTo(id)}
+                  />,
+                )
+              ),
+            factions:
+              creatingIn === "factions" ? (
+                <EntityEditorPanel
+                  mode="create"
+                  category="factions"
+                  onCreate={onCreateEntity}
+                  onCancel={() => setCreatingIn(null)}
+                />
+              ) : (
+                renderCategory(
+                  "factions",
+                  <CategoryPanel
+                    category="factions"
+                    entities={displayEntities}
+                    onOpen={(id) => setEditingEntityId(id)}
+                    onNew={() => setCreatingIn("factions")}
+                    onImport={triggerMdImport}
+                    hasPlacement={(id) => !!effectiveCoord(id)}
+                    onShowOnMap={(id) => goTo(id)}
+                  />,
+                )
+              ),
+            events:
+              creatingIn === "events" ? (
+                <EntityEditorPanel
+                  mode="create"
+                  category="events"
+                  onCreate={onCreateEntity}
+                  onCancel={() => setCreatingIn(null)}
+                />
+              ) : (
+                renderCategory(
+                  "events",
+                  <CategoryPanel
+                    category="events"
+                    entities={displayEntities}
+                    onOpen={(id) => setEditingEntityId(id)}
+                    onNew={() => setCreatingIn("events")}
+                    onImport={triggerMdImport}
+                    hasPlacement={(id) => !!effectiveCoord(id)}
+                    onShowOnMap={(id) => goTo(id)}
+                  />,
+                )
+              ),
+            items:
+              creatingIn === "items" ? (
+                <EntityEditorPanel
+                  mode="create"
+                  category="items"
+                  onCreate={onCreateEntity}
+                  onCancel={() => setCreatingIn(null)}
+                />
+              ) : (
+                renderCategory(
+                  "items",
+                  <CategoryPanel
+                    category="items"
+                    entities={displayEntities}
+                    onOpen={(id) => setEditingEntityId(id)}
+                    onNew={() => setCreatingIn("items")}
+                    onImport={triggerMdImport}
+                    hasPlacement={(id) => !!effectiveCoord(id)}
+                    onShowOnMap={(id) => goTo(id)}
+                  />,
+                )
+              ),
+            lore:
+              creatingIn === "lore" ? (
+                <EntityEditorPanel
+                  mode="create"
+                  category="lore"
+                  onCreate={onCreateEntity}
+                  onCancel={() => setCreatingIn(null)}
+                />
+              ) : (
+                renderCategory(
+                  "lore",
+                  <CategoryPanel
+                    category="lore"
+                    entities={displayEntities}
+                    onOpen={(id) => setEditingEntityId(id)}
+                    onNew={() => setCreatingIn("lore")}
+                    onImport={triggerMdImport}
+                    hasPlacement={(id) => !!effectiveCoord(id)}
+                    onShowOnMap={(id) => goTo(id)}
+                  />,
+                )
+              ),
             // Map tools — exact JSX from former TabsContent bodies
             pins: (
               <TabFrame
                 title="Pins"
-                builtFromYamlCount={project.placements.filter((p) => p.mapId === activeMap.id).length}
+                builtFromYamlCount={
+                  project.placements.filter((p) => p.mapId === activeMap.id).length
+                }
                 localDraftCount={dirtyCount}
                 blockingCount={pinIssues.blocking}
                 warningCount={pinIssues.warning}
               >
                 <div>
                   <div className="p-3 border-b border-border space-y-2">
-                    <Input placeholder="Filter entities…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+                    <Input
+                      placeholder="Filter entities…"
+                      value={filter}
+                      onChange={(e) => setFilter(e.target.value)}
+                    />
                     <div className="flex flex-wrap gap-1">
-                      {(["all","unplaced","placed"] as const).map((s) => (
-                        <Button key={s} size="sm" variant={stateFilter === s ? "secondary" : "ghost"} className="h-6 px-2 text-[10px] uppercase" onClick={() => setStateFilter(s)}>{s}</Button>
+                      {(["all", "unplaced", "placed"] as const).map((s) => (
+                        <Button
+                          key={s}
+                          size="sm"
+                          variant={stateFilter === s ? "secondary" : "ghost"}
+                          className="h-6 px-2 text-[10px] uppercase"
+                          onClick={() => setStateFilter(s)}
+                        >
+                          {s}
+                        </Button>
                       ))}
                     </div>
                     <div className="flex flex-wrap gap-1.5 text-[10px]">
-                      <Select value={visFilter} onValueChange={(v) => setVisFilter(v as typeof visFilter)}>
-                        <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1"><SelectValue placeholder="visibility" /></SelectTrigger>
+                      <Select
+                        value={visFilter}
+                        onValueChange={(v) => setVisFilter(v as typeof visFilter)}
+                      >
+                        <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1">
+                          <SelectValue placeholder="visibility" />
+                        </SelectTrigger>
                         <SelectContent>
-                          {["all","player","rumor","dm","hidden"].map((v) => <SelectItem key={v} value={v} className="text-xs">{v}</SelectItem>)}
+                          {["all", "player", "rumor", "dm", "hidden"].map((v) => (
+                            <SelectItem key={v} value={v} className="text-xs">
+                              {v}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <Select value={typeFilter} onValueChange={setTypeFilter}>
-                        <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1"><SelectValue placeholder="type" /></SelectTrigger>
+                        <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1">
+                          <SelectValue placeholder="type" />
+                        </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all" className="text-xs">all types</SelectItem>
-                          {allTypes.map((t) => <SelectItem key={t} value={t} className="text-xs">{t}</SelectItem>)}
+                          <SelectItem value="all" className="text-xs">
+                            all types
+                          </SelectItem>
+                          {allTypes.map((t) => (
+                            <SelectItem key={t} value={t} className="text-xs">
+                              {t}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       {allTags.length > 0 && (
                         <Select value={tagFilter} onValueChange={setTagFilter}>
-                          <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1"><SelectValue placeholder="tag" /></SelectTrigger>
+                          <SelectTrigger className="h-6 w-auto px-2 text-[10px] gap-1">
+                            <SelectValue placeholder="tag" />
+                          </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all" className="text-xs">all tags</SelectItem>
-                            {allTags.map((t) => <SelectItem key={t} value={t} className="text-xs">#{t}</SelectItem>)}
+                            <SelectItem value="all" className="text-xs">
+                              all tags
+                            </SelectItem>
+                            {allTags.map((t) => (
+                              <SelectItem key={t} value={t} className="text-xs">
+                                #{t}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       )}
@@ -1394,15 +1708,25 @@ function AtlasPlacementEditorInner() {
                   </div>
                   <Section title={`Unplaced (${unplaced.length})`}>
                     {unplaced.map((e) => (
-                      <EntityRow key={e.id} entity={e} state="unplaced" isPending={pendingId === e.id} onPlace={() => setPendingId(e.id)} />
+                      <EntityRow
+                        key={e.id}
+                        entity={e}
+                        state="unplaced"
+                        isPending={pendingId === e.id}
+                        onPlace={() => setPendingId(e.id)}
+                      />
                     ))}
-                    {unplaced.length === 0 && <Empty text="No unplaced entities match these filters." />}
+                    {unplaced.length === 0 && (
+                      <Empty text="No unplaced entities match these filters." />
+                    )}
                   </Section>
                   <Section title={`Placed (${placed.length})`}>
                     {placed.map((e) => {
                       const eff = effectivePlacement(e.id)!;
                       const overridden = overrideKey(activeMap.id, e.id) in overrides;
-                      const otherMaps = project.maps.filter((m) => m.id !== activeMap.id).map((m) => ({ id: m.id, name: m.name }));
+                      const otherMaps = project.maps
+                        .filter((m) => m.id !== activeMap.id)
+                        .map((m) => ({ id: m.id, name: m.name }));
                       return (
                         <EntityRow
                           key={e.id}
@@ -1426,7 +1750,9 @@ function AtlasPlacementEditorInner() {
                         />
                       );
                     })}
-                    {placed.length === 0 && <Empty text="No placed entities match these filters." />}
+                    {placed.length === 0 && (
+                      <Empty text="No placed entities match these filters." />
+                    )}
                   </Section>
                 </div>
               </TabFrame>
@@ -1477,16 +1803,30 @@ function AtlasPlacementEditorInner() {
             maps: (
               <>
                 <div className="px-3 pt-2">
-                  <Button size="sm" variant="outline" className="w-full gap-1 h-8 text-xs" onClick={() => setMapImportOpen(true)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full gap-1 h-8 text-xs"
+                    onClick={() => setMapImportOpen(true)}
+                  >
                     <Upload className="h-3.5 w-3.5" /> Import Maps (batch wizard)
                   </Button>
                 </div>
                 <Tabs defaultValue="layers" className="flex-1 flex flex-col min-h-0">
                   <TabsList className="mx-3 mt-2 grid grid-cols-2">
-                    <TabsTrigger value="layers" className="text-[11px]"><LayersIcon className="h-3.5 w-3.5 mr-1" />Layers</TabsTrigger>
-                    <TabsTrigger value="settings" className="text-[11px]"><Settings2 className="h-3.5 w-3.5 mr-1" />Settings</TabsTrigger>
+                    <TabsTrigger value="layers" className="text-[11px]">
+                      <LayersIcon className="h-3.5 w-3.5 mr-1" />
+                      Layers
+                    </TabsTrigger>
+                    <TabsTrigger value="settings" className="text-[11px]">
+                      <Settings2 className="h-3.5 w-3.5 mr-1" />
+                      Settings
+                    </TabsTrigger>
                   </TabsList>
-                  <TabsContent value="layers" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
+                  <TabsContent
+                    value="layers"
+                    className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex"
+                  >
                     <MapLayerPanel
                       map={activeMap}
                       mergedLayers={layerEditor.mergedLayers}
@@ -1507,8 +1847,18 @@ function AtlasPlacementEditorInner() {
                       setLockAspect={setLockAspectRatio}
                     />
                   </TabsContent>
-                  <TabsContent value="settings" className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex">
-                    {baseMap && <MapSettingsPanel map={activeMap} baseMap={baseMap} onPatch={patchMap} onReset={resetMap} />}
+                  <TabsContent
+                    value="settings"
+                    className="flex-1 flex-col min-h-0 m-0 hidden data-[state=active]:flex"
+                  >
+                    {baseMap && (
+                      <MapSettingsPanel
+                        map={activeMap}
+                        baseMap={baseMap}
+                        onPatch={patchMap}
+                        onReset={resetMap}
+                      />
+                    )}
                   </TabsContent>
                 </Tabs>
               </>
@@ -1519,7 +1869,10 @@ function AtlasPlacementEditorInner() {
                 draftMap={activeMap}
                 draftPlacements={draftPlacementsForValidation}
                 draftLocalLayers={layerEditor.localLayers}
-                onGoToMap={(mid) => { setActiveMapId(mid); toast.info(`Switched to ${project.maps.find((m) => m.id === mid)?.name ?? mid}`); }}
+                onGoToMap={(mid) => {
+                  setActiveMapId(mid);
+                  toast.info(`Switched to ${project.maps.find((m) => m.id === mid)?.name ?? mid}`);
+                }}
                 onGoToEntity={(eid) => {
                   const c = effectiveCoord(eid);
                   if (c && activeMap) setFlyTo({ lat: activeMap.height - c.y, lng: c.x });
@@ -1528,7 +1881,17 @@ function AtlasPlacementEditorInner() {
               />
             ),
             import: (
-              <ImportPanel knownEntityNames={new Set(project.entities.flatMap((e) => [e.id.toLowerCase(), e.title.toLowerCase(), ...e.aliases.map((a) => a.toLowerCase())]))} />
+              <ImportPanel
+                knownEntityNames={
+                  new Set(
+                    project.entities.flatMap((e) => [
+                      e.id.toLowerCase(),
+                      e.title.toLowerCase(),
+                      ...e.aliases.map((a) => a.toLowerCase()),
+                    ]),
+                  )
+                }
+              />
             ),
             // Menu-reachable panels (no rail icon — opened via ☰ menu or CommandPalette).
             world: (
@@ -1537,7 +1900,7 @@ function AtlasPlacementEditorInner() {
                 onPatch={(p) => {
                   // The world name is hardcoded in build-atlas.ts (not in world.yaml),
                   // so there is no live write path here yet. Log for DM awareness.
-                  console.warn("WorldDetailsPanel.onPatch: world name patch not yet persisted", p);
+                  logger.warn("WorldDetailsPanel.onPatch: world name patch not yet persisted", p);
                 }}
               />
             ),
@@ -1553,129 +1916,161 @@ function AtlasPlacementEditorInner() {
                 items={railItems}
                 activeId={activePanel}
                 onSelect={(id) => {
-                  if (id === "save") { void onSaveClick(); return; }
+                  if (id === "save") {
+                    void onSaveClick();
+                    return;
+                  }
                   selectPanel(id);
                 }}
               />
               <div className="relative flex-1 min-h-0">
-          <OceanBackground map={activeMap} />
-          <MapContainer
-            crs={FlatCRS}
-            center={[activeMap.height / 2, activeMap.width / 2]}
-            zoom={-2}
-            minZoom={-6}
-            maxZoom={4}
-            attributionControl={false}
-            style={{ width: "100%", height: "100%", background: activeMap.water?.enabled === false ? (activeMap.oceanColor ?? "#18313f") : "transparent", cursor: (pendingId || regionDraft.drawing || rulerActive) ? "crosshair" : undefined }}
-          >
-            <FlyTo target={flyTo} />
-            <RulerLayer
-              active={rulerActive && !pendingId && !regionDraft.drawing}
-              mapHeight={activeMap.height}
-              scale={activeMap.scale}
-              wrapX={activeMap.wrapX}
-              mapWidth={activeMap.width}
-            />
-            <MapClickCapture onClick={onMapClick} />
+                <OceanBackground map={activeMap} />
+                <MapContainer
+                  crs={FlatCRS}
+                  center={[activeMap.height / 2, activeMap.width / 2]}
+                  zoom={-2}
+                  minZoom={-6}
+                  maxZoom={4}
+                  attributionControl={false}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    background:
+                      activeMap.water?.enabled === false
+                        ? (activeMap.oceanColor ?? "#18313f")
+                        : "transparent",
+                    cursor:
+                      pendingId || regionDraft.drawing || rulerActive ? "crosshair" : undefined,
+                  }}
+                >
+                  <FlyTo target={flyTo} />
+                  <RulerLayer
+                    active={rulerActive && !pendingId && !regionDraft.drawing}
+                    mapHeight={activeMap.height}
+                    scale={activeMap.scale}
+                    wrapX={activeMap.wrapX}
+                    mapWidth={activeMap.width}
+                  />
+                  <MapClickCapture onClick={onMapClick} />
 
-            {/* Map base image layers — built-in + locally edited/uploaded.
+                  {/* Map base image layers — built-in + locally edited/uploaded.
                 In edit-geometry mode + when this layer is selected, the
                 overlay grows drag handles and the body becomes draggable.
                 The component handles its own undo recording by calling
                 layerEditor.updateLayer via onCommit. */}
-            {showLayers && layerEditor.mergedLayers.map((layer) => {
-              const isSelected = layerEditor.selectedId === layer.id;
-              return (
-                <MapLayerEditableOverlay
-                  key={layer.id}
-                  layer={layer}
-                  mapDoc={activeMap}
-                  editMode={editGeometry}
-                  isSelected={isSelected}
-                  lockAspect={lockAspectRatio}
-                  onSelect={() => layerEditor.setSelectedId(layer.id)}
-                  onBackgroundClick={handleLayerBackgroundClick}
-                  onCommit={(patch) => {
-                    // Promote built-in to a local "edit" before mutating,
-                    // matching MapLayerPanel.patch() behavior.
-                    const isLocal = layerEditor.localLayers.some((l) => l.id === layer.id);
-                    if (!isLocal) layerEditor.editBuiltinLayer(layer.id);
-                    layerEditor.updateLayer(layer.id, patch);
-                  }}
-                />
-              );
-            })}
+                  {showLayers &&
+                    layerEditor.mergedLayers.map((layer) => {
+                      const isSelected = layerEditor.selectedId === layer.id;
+                      return (
+                        <MapLayerEditableOverlay
+                          key={layer.id}
+                          layer={layer}
+                          mapDoc={activeMap}
+                          editMode={editGeometry}
+                          isSelected={isSelected}
+                          locked={
+                            layerEditor.localLayers.find((l) => l.id === layer.id)?.locked ?? false
+                          }
+                          lockAspect={lockAspectRatio}
+                          onSelect={() => layerEditor.setSelectedId(layer.id)}
+                          onBackgroundClick={handleLayerBackgroundClick}
+                          onCommit={(patch) => {
+                            // Promote built-in to a local "edit" before mutating,
+                            // matching MapLayerPanel.patch() behavior.
+                            const isLocal = layerEditor.localLayers.some((l) => l.id === layer.id);
+                            if (!isLocal) layerEditor.editBuiltinLayer(layer.id);
+                            layerEditor.updateLayer(layer.id, patch);
+                          }}
+                        />
+                      );
+                    })}
 
-            {/* Z-order: layers → regions → routes → fog → pins → handles. */}
-            {showRegions && <RegionLayer map={activeMap} api={regionDraft} visible={showRegions} />}
-            <RouteLayer map={activeMap} api={routeDraft} />
-            <FogLayer map={activeMap} api={fogDraft} preview={showFogPreview} playerMode={mode === "player"} />
+                  {/* Z-order: layers → regions → routes → fog → pins → handles. */}
+                  {showRegions && (
+                    <RegionLayer map={activeMap} api={regionDraft} visible={showRegions} />
+                  )}
+                  <RouteLayer map={activeMap} api={routeDraft} />
+                  <FogLayer
+                    map={activeMap}
+                    api={fogDraft}
+                    preview={showFogPreview}
+                    playerMode={mode === "player"}
+                  />
 
-            {placedForLens.map((e) => {
-              const eff = effectivePlacement(e.id);
-              if (!eff) return null;
-              const style = resolvePinStyle(e.type, eff.pin);
-              return (
-                <Marker
-                  key={e.id}
-                  position={[activeMap.height - eff.y, eff.x]}
-                  icon={pinDivIcon(style.color, style.shape, { pulse: pendingId === e.id })}
-                  draggable
-                  eventHandlers={{
-                    dragend: (ev) => {
-                      const ll = (ev.target as L.Marker).getLatLng();
-                      setCoord(e.id, { x: Math.round(ll.lng), y: Math.round(activeMap.height - ll.lat) });
-                    },
-                    click: (ev) => {
-                      const intent = resolvePinClickIntent({ pending: !!pendingId, entityId: e.id });
-                      if (intent.kind === "place-anchor") {
-                        const ll = (ev.target as L.Marker).getLatLng();
-                        onMapClick(ll.lng, ll.lat);
-                        return;
-                      }
-                      // Open the entity in Reading via EntitySurface (player parity).
-                      // setActivePanel must come first so the panel host is open
-                      // before renderCategory checks which category is active.
-                      setActivePanel(categoryForType(e.type));
-                      setEditingEntityId(intent.entityId);
-                    },
-                    dblclick: () => {
-                      if (pendingId) return;
-                      setActivePanel(categoryForType(e.type));
-                      setEditingEntityId(e.id);
-                    },
-                  }}
-                />
-              );
-            })}
-            <AtlasMinimap map={activeMap} layers={layerEditor.mergedLayers} />
-          </MapContainer>
+                  {placedForLens.map((e) => {
+                    const eff = effectivePlacement(e.id);
+                    if (!eff) return null;
+                    const style = resolvePinStyle(e.type, eff.pin);
+                    return (
+                      <Marker
+                        key={e.id}
+                        position={[activeMap.height - eff.y, eff.x]}
+                        icon={pinDivIcon(style.color, style.shape, { pulse: pendingId === e.id })}
+                        draggable
+                        eventHandlers={{
+                          dragend: (ev) => {
+                            const ll = (ev.target as L.Marker).getLatLng();
+                            setCoord(e.id, {
+                              x: Math.round(ll.lng),
+                              y: Math.round(activeMap.height - ll.lat),
+                            });
+                          },
+                          click: (ev) => {
+                            const intent = resolvePinClickIntent({
+                              pending: !!pendingId,
+                              entityId: e.id,
+                            });
+                            if (intent.kind === "place-anchor") {
+                              const ll = (ev.target as L.Marker).getLatLng();
+                              onMapClick(ll.lng, ll.lat);
+                              return;
+                            }
+                            // Open the entity in Reading via EntitySurface (player parity).
+                            // setActivePanel must come first so the panel host is open
+                            // before renderCategory checks which category is active.
+                            setActivePanel(categoryForType(e.type));
+                            setEditingEntityId(intent.entityId);
+                          },
+                          dblclick: () => {
+                            if (pendingId) return;
+                            setActivePanel(categoryForType(e.type));
+                            setEditingEntityId(e.id);
+                          },
+                        }}
+                      />
+                    );
+                  })}
+                  <AtlasMinimap map={activeMap} layers={layerEditor.mergedLayers} />
+                </MapContainer>
 
-          {pendingId && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs shadow-lg flex items-center gap-2">
-              <Crosshair className="h-3.5 w-3.5" />
-              <span>Click on the map to place "{project.entities.find((e) => e.id === pendingId)?.title}"</span>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="ml-1 h-5 px-1.5 text-[10px] gap-1 text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
-                onClick={() => setPendingId(null)}
-                title="Cancel placement (Esc)"
-              >
-                <X className="h-3 w-3" />
-                Cancel
-              </Button>
-            </div>
-          )}
-          <EditorPanelHost
-            activeId={activePanel}
-            title={active?.label ?? ""}
-            onDismiss={dismissPanel}
-          >
-            {active?.panel}
-          </EditorPanelHost>
-        </div>
-              </>
+                {pendingId && (
+                  <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs shadow-lg flex items-center gap-2">
+                    <Crosshair className="h-3.5 w-3.5" />
+                    <span>
+                      Click on the map to place "
+                      {project.entities.find((e) => e.id === pendingId)?.title}"
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="ml-1 h-5 px-1.5 text-[10px] gap-1 text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
+                      onClick={() => setPendingId(null)}
+                      title="Cancel placement (Esc)"
+                    >
+                      <X className="h-3 w-3" />
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+                <EditorPanelHost
+                  activeId={activePanel}
+                  title={active?.label ?? ""}
+                  onDismiss={dismissPanel}
+                >
+                  {active?.panel}
+                </EditorPanelHost>
+              </div>
+            </>
           );
         })()}
       </div>
@@ -1723,9 +2118,7 @@ function AtlasPlacementEditorInner() {
           // cleanup as one atomic step.
           const writtenPaths = new Set(result.paths);
           const writtenEntityIds = new Set(
-            project.entities
-              .filter((e) => writtenPaths.has(e.sourcePath))
-              .map((e) => e.id),
+            project.entities.filter((e) => writtenPaths.has(e.sourcePath)).map((e) => e.id),
           );
           // Drafted Entities-tab edits for written files now live in canon —
           // drop them so the tab and the unsaved banner reset.
@@ -1751,7 +2144,9 @@ function AtlasPlacementEditorInner() {
           // All clears go through the *non-undoable* applySnapshot path so
           // the only undo entry we add for this save is the single
           // save-boundary entry below.
-          const worldYamlWritten = !!(activeWorldId && writtenPaths.has(worldYamlPath(activeWorldId)));
+          const worldYamlWritten = !!(
+            activeWorldId && writtenPaths.has(worldYamlPath(activeWorldId))
+          );
           let nextMapOverride = preSave.mapOverride;
           let nextLayerByMap = preSave.layerByMap;
           const cleanRegionDraft = { edits: {}, added: [], deleted: [] };
@@ -1805,9 +2200,13 @@ function AtlasPlacementEditorInner() {
 
           // Refresh canon (only meaningful if rebuild succeeded).
           if (result.build?.ok !== false) {
-            loadAtlasContent(true).then((p) => {
-              setProject(p);
-            }).catch(() => { /* keep current; user can reload manually */ });
+            loadAtlasContent(true)
+              .then((p) => {
+                setProject(p);
+              })
+              .catch(() => {
+                /* keep current; user can reload manually */
+              });
           }
         }}
         onClose={() => {
@@ -1822,13 +2221,18 @@ function AtlasPlacementEditorInner() {
       <DiscardConfirmModal
         open={discardOpen}
         count={session.unsavedCount}
-        onConfirm={() => { void session.discardAll(); }}
+        onConfirm={() => {
+          void session.discardAll();
+        }}
         onClose={() => setDiscardOpen(false)}
       />
       <CommandPalette
         index={paletteIndex}
         onChoose={(r) => {
-          if (r.run) { r.run(); return; }
+          if (r.run) {
+            r.run();
+            return;
+          }
           if (r.kind === "entity") {
             const ent = project.entities.find((e) => e.id === r.id);
             setActivePanel(categoryForType(ent?.type));
@@ -1913,10 +2317,11 @@ function PlacePinPopover({
   const VISIBLE_CAP = 40;
   const q = filter.trim().toLowerCase();
   const filtered = q
-    ? unplaced.filter((e) =>
-        e.title.toLowerCase().includes(q)
-        || e.type.toLowerCase().includes(q)
-        || e.aliases.some((a) => a.toLowerCase().includes(q))
+    ? unplaced.filter(
+        (e) =>
+          e.title.toLowerCase().includes(q) ||
+          e.type.toLowerCase().includes(q) ||
+          e.aliases.some((a) => a.toLowerCase().includes(q)),
       )
     : unplaced;
   const overflow = filtered.length - VISIBLE_CAP;
@@ -1972,7 +2377,9 @@ function PlacePinPopover({
                   <span
                     className="shrink-0"
                     aria-hidden
-                    dangerouslySetInnerHTML={{ __html: pinSvg({ color: style.color, shape: style.shape }) }}
+                    dangerouslySetInnerHTML={{
+                      __html: pinSvg({ color: style.color, shape: style.shape }),
+                    }}
                   />
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-medium truncate">{e.title}</div>
@@ -1996,7 +2403,9 @@ function PlacePinPopover({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="px-3 py-2">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-1 py-1">{title}</div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-1 py-1">
+        {title}
+      </div>
       <div className="space-y-1">{children}</div>
     </div>
   );
@@ -2029,12 +2438,30 @@ interface RowProps {
 }
 
 function EntityRow({
-  entity, state, coord, overridden, isPending, pinOverride, label, otherMaps,
-  onPlace, onMove, onGoTo, onRemove, onReset, onNudge, onChangeXY, onChangeLabel, onChangePin, onDuplicateToMap,
+  entity,
+  state,
+  coord,
+  overridden,
+  isPending,
+  pinOverride,
+  label,
+  otherMaps,
+  onPlace,
+  onMove,
+  onGoTo,
+  onRemove,
+  onReset,
+  onNudge,
+  onChangeXY,
+  onChangeLabel,
+  onChangePin,
+  onDuplicateToMap,
 }: RowProps) {
   const style = resolvePinStyle(entity.type, pinOverride);
   return (
-    <div className={`group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/40 ${isPending ? "ring-1 ring-primary bg-accent/30" : ""}`}>
+    <div
+      className={`group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/40 ${isPending ? "ring-1 ring-primary bg-accent/30" : ""}`}
+    >
       <span
         className="shrink-0"
         aria-hidden
@@ -2044,22 +2471,43 @@ function EntityRow({
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium truncate flex items-center gap-1.5">
           {label || entity.title}
-          {overridden && <Badge variant="secondary" className="h-4 text-[9px] px-1">edited</Badge>}
+          {overridden && (
+            <Badge variant="secondary" className="h-4 text-[9px] px-1">
+              edited
+            </Badge>
+          )}
         </div>
         <div className="text-[10px] text-muted-foreground truncate flex items-center gap-1.5">
-          {entity.type}{coord ? ` · ${coord.x}, ${coord.y}` : ""}
+          {entity.type}
+          {coord ? ` · ${coord.x}, ${coord.y}` : ""}
           <PinStateBadge placed={state === "placed"} />
         </div>
       </div>
       {state === "unplaced" && (
-        <Button size="sm" variant={isPending ? "default" : "ghost"} onClick={onPlace} className="h-7 px-2" title="Click on the map to place">
+        <Button
+          size="sm"
+          variant={isPending ? "default" : "ghost"}
+          onClick={onPlace}
+          className="h-7 px-2"
+          title="Click on the map to place"
+        >
           <Crosshair className="h-3.5 w-3.5" />
         </Button>
       )}
       {state === "placed" && coord && (
         <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition">
-          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={onGoTo} title="Fly to"><Target className="h-3.5 w-3.5" /></Button>
-          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={onMove} title="Re-place"><MapPin className="h-3.5 w-3.5" /></Button>
+          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={onGoTo} title="Fly to">
+            <Target className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            onClick={onMove}
+            title="Re-place"
+          >
+            <MapPin className="h-3.5 w-3.5" />
+          </Button>
           <Popover>
             <PopoverTrigger asChild>
               <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Style + advanced">
@@ -2105,21 +2553,53 @@ function EntityRow({
                 <Label className="text-[11px]">Nudge</Label>
                 <div className="grid grid-cols-3 gap-1 w-28">
                   <span />
-                  <Button size="sm" variant="outline" className="h-6 text-xs p-0" onClick={() => onNudge?.(0, 100)}>↑</Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-xs p-0"
+                    onClick={() => onNudge?.(0, 100)}
+                  >
+                    ↑
+                  </Button>
                   <span />
-                  <Button size="sm" variant="outline" className="h-6 text-xs p-0" onClick={() => onNudge?.(-100, 0)}>←</Button>
-                  <Button size="sm" variant="outline" className="h-6 text-xs p-0" onClick={() => onNudge?.(0, -100)}>↓</Button>
-                  <Button size="sm" variant="outline" className="h-6 text-xs p-0" onClick={() => onNudge?.(100, 0)}>→</Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-xs p-0"
+                    onClick={() => onNudge?.(-100, 0)}
+                  >
+                    ←
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-xs p-0"
+                    onClick={() => onNudge?.(0, -100)}
+                  >
+                    ↓
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-xs p-0"
+                    onClick={() => onNudge?.(100, 0)}
+                  >
+                    →
+                  </Button>
                 </div>
               </div>
               {otherMaps && otherMaps.length > 0 && onDuplicateToMap && (
                 <div className="space-y-1 pt-1 border-t border-border">
                   <Label className="text-[11px]">Duplicate to map</Label>
                   <Select onValueChange={(v) => onDuplicateToMap(v)}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Choose map…" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Choose map…" />
+                    </SelectTrigger>
                     <SelectContent>
                       {otherMaps.map((m) => (
-                        <SelectItem key={m.id} value={m.id} className="text-xs">{m.name}</SelectItem>
+                        <SelectItem key={m.id} value={m.id} className="text-xs">
+                          {m.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -2127,8 +2607,28 @@ function EntityRow({
               )}
             </PopoverContent>
           </Popover>
-          {onReset && <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={onReset} title="Discard local edit" aria-label="Discard local edit"><RotateCcw className="h-3.5 w-3.5" /></Button>}
-          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={onRemove} title="Remove placement" aria-label="Remove placement"><Trash2 className="h-3.5 w-3.5" /></Button>
+          {onReset && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7 p-0"
+              onClick={onReset}
+              title="Discard local edit"
+              aria-label="Discard local edit"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 text-destructive"
+            onClick={onRemove}
+            title="Remove placement"
+            aria-label="Remove placement"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
         </div>
       )}
     </div>
@@ -2160,10 +2660,14 @@ function PinStyleEditor({
       <div>
         <Label className="text-[11px]">Pin preset</Label>
         <Select value={presetId} onValueChange={(v) => update({ preset: v as PinPresetId })}>
-          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent className="max-h-72">
             {(Object.keys(PIN_PRESETS) as PinPresetId[]).map((id) => (
-              <SelectItem key={id} value={id} className="text-xs">{PIN_PRESETS[id].label}</SelectItem>
+              <SelectItem key={id} value={id} className="text-xs">
+                {PIN_PRESETS[id].label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -2171,15 +2675,27 @@ function PinStyleEditor({
       <div className="grid grid-cols-2 gap-2">
         <div>
           <Label className="text-[11px]">Color</Label>
-          <Input type="color" className="h-8 p-1" value={merged.color} onChange={(e) => update({ color: e.target.value })} />
+          <Input
+            type="color"
+            className="h-8 p-1"
+            value={merged.color}
+            onChange={(e) => update({ color: e.target.value })}
+          />
         </div>
         <div>
           <Label className="text-[11px]">Shape</Label>
-          <Select value={merged.shape} onValueChange={(v) => update({ shape: v as typeof merged.shape })}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+          <Select
+            value={merged.shape}
+            onValueChange={(v) => update({ shape: v as typeof merged.shape })}
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {["teardrop","circle","square","diamond","shield","star"].map((s) => (
-                <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
+              {["teardrop", "circle", "square", "diamond", "shield", "star"].map((s) => (
+                <SelectItem key={s} value={s} className="text-xs">
+                  {s}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -2187,29 +2703,58 @@ function PinStyleEditor({
       </div>
       <div>
         <Label className="text-[11px]">Label mode</Label>
-        <Select value={merged.labelMode} onValueChange={(v) => update({ labelMode: v as typeof merged.labelMode })}>
-          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+        <Select
+          value={merged.labelMode}
+          onValueChange={(v) => update({ labelMode: v as typeof merged.labelMode })}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
-            {["auto","always","hover","never"].map((m) => (
-              <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
+            {["auto", "always", "hover", "never"].map((m) => (
+              <SelectItem key={m} value={m} className="text-xs">
+                {m}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
       <div>
-        <div className="flex justify-between"><Label className="text-[11px]">Priority</Label><span className="text-[10px] text-muted-foreground">{merged.priority}</span></div>
-        <Slider min={0} max={10} step={1} value={[merged.priority]} onValueChange={([v]) => update({ priority: v })} />
+        <div className="flex justify-between">
+          <Label className="text-[11px]">Priority</Label>
+          <span className="text-[10px] text-muted-foreground">{merged.priority}</span>
+        </div>
+        <Slider
+          min={0}
+          max={10}
+          step={1}
+          value={[merged.priority]}
+          onValueChange={([v]) => update({ priority: v })}
+        />
       </div>
       <div>
-        <div className="flex justify-between"><Label className="text-[11px]">Min zoom</Label><span className="text-[10px] text-muted-foreground">{merged.labelMinZoom}</span></div>
-        <Slider min={-6} max={4} step={1} value={[merged.labelMinZoom]} onValueChange={([v]) => update({ labelMinZoom: v })} />
+        <div className="flex justify-between">
+          <Label className="text-[11px]">Min zoom</Label>
+          <span className="text-[10px] text-muted-foreground">{merged.labelMinZoom}</span>
+        </div>
+        <Slider
+          min={-6}
+          max={4}
+          step={1}
+          value={[merged.labelMinZoom]}
+          onValueChange={([v]) => update({ labelMinZoom: v })}
+        />
       </div>
       {value && Object.keys(value).length > 0 && (
-        <Button size="sm" variant="ghost" className="h-7 text-xs w-full" onClick={() => onChange(undefined)}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 text-xs w-full"
+          onClick={() => onChange(undefined)}
+        >
           Reset to "{preset.label}" preset
         </Button>
       )}
     </div>
   );
 }
-

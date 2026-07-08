@@ -43,41 +43,46 @@ export function useWorldYamlBaseline(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (id: string) => {
-    const relPath = worldYamlPath(id);
-    if (!isWritableSourcePath(relPath)) {
-      setError(`Path not in source allowlist: ${relPath}`);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const fetchFn = deps?.fetchFn ?? fetch;
-      const res = await fetchFn(`/__atlas/read?path=${encodeURIComponent(relPath)}`, { method: "GET" });
-      if (res.status === 404) {
-        // New world: file doesn't exist yet. Treat as a create-only write target.
-        setRaw(null);
-        setHash(null);
+  const load = useCallback(
+    async (id: string) => {
+      const relPath = worldYamlPath(id);
+      if (!isWritableSourcePath(relPath)) {
+        setError(`Path not in source allowlist: ${relPath}`);
         return;
       }
-      if (!res.ok) {
-        setError(`Failed to read ${relPath}: status ${res.status}`);
-        return;
+      setLoading(true);
+      setError(null);
+      try {
+        const fetchFn = deps?.fetchFn ?? fetch;
+        const res = await fetchFn(`/__atlas/read?path=${encodeURIComponent(relPath)}`, {
+          method: "GET",
+        });
+        if (res.status === 404) {
+          // New world: file doesn't exist yet. Treat as a create-only write target.
+          setRaw(null);
+          setHash(null);
+          return;
+        }
+        if (!res.ok) {
+          setError(`Failed to read ${relPath}: status ${res.status}`);
+          return;
+        }
+        const body = (await res.json()) as { contents?: unknown };
+        if (typeof body.contents !== "string") {
+          setError(`Malformed read response for ${relPath}`);
+          return;
+        }
+        const h = await hashContent(body.contents);
+        setRaw(body.contents);
+        setHash(h);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setLoading(false);
       }
-      const body = (await res.json()) as { contents?: unknown };
-      if (typeof body.contents !== "string") {
-        setError(`Malformed read response for ${relPath}`);
-        return;
-      }
-      const h = await hashContent(body.contents);
-      setRaw(body.contents);
-      setHash(h);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [deps?.fetchFn]);
+    },
+    [deps?.fetchFn],
+  );
 
   useEffect(() => {
     if (!worldId) {

@@ -29,7 +29,11 @@ const ROOT = path.resolve(__dirname, "../..");
 const SCRIPT = path.resolve(ROOT, "scripts/atlas/audit-assets.ts");
 const IS_WIN = process.platform === "win32";
 
-interface RunResult { status: number; stdout: string; stderr: string; }
+interface RunResult {
+  status: number;
+  stdout: string;
+  stderr: string;
+}
 
 function run(args: string[], opts: ExecFileSyncOptions = {}): RunResult {
   try {
@@ -43,7 +47,11 @@ function run(args: string[], opts: ExecFileSyncOptions = {}): RunResult {
     return { status: 0, stdout: String(stdout), stderr: "" };
   } catch (e) {
     const err = e as { status?: number; stdout?: Buffer | string; stderr?: Buffer | string };
-    return { status: err.status ?? 1, stdout: String(err.stdout ?? ""), stderr: String(err.stderr ?? "") };
+    return {
+      status: err.status ?? 1,
+      stdout: String(err.stdout ?? ""),
+      stderr: String(err.stderr ?? ""),
+    };
   }
 }
 
@@ -95,10 +103,7 @@ describe("auditAssets — clean path", () => {
 describe("auditAssets — size budget", () => {
   it("warns when a single asset exceeds the 1 MB soft threshold", () => {
     writeAsset("atlas/assets/maps/big.jpg", SIZE_WARN_BYTES + 1024);
-    writeContent(
-      "world/note.md",
-      "---\natlas:\n  images:\n    - atlas/assets/maps/big.jpg\n---\n",
-    );
+    writeContent("world/note.md", "---\natlas:\n  images:\n    - atlas/assets/maps/big.jpg\n---\n");
     const report = auditAssets({ assetsDir, publicDir, contentDir });
     expect(report.oversize).toHaveLength(1);
     expect(report.oversize[0].severity).toBe("warning");
@@ -128,10 +133,7 @@ describe("auditAssets — orphans", () => {
 
   it("does not flag an asset that is referenced via a markdown image", () => {
     writeAsset("atlas/assets/portraits/elf.png", 512);
-    writeContent(
-      "world/note.md",
-      "Look at this elf: ![elf](atlas/assets/portraits/elf.png)",
-    );
+    writeContent("world/note.md", "Look at this elf: ![elf](atlas/assets/portraits/elf.png)");
     const report = auditAssets({ assetsDir, publicDir, contentDir });
     expect(report.orphans).toEqual([]);
   });
@@ -193,7 +195,13 @@ describe("extractor helpers", () => {
   it("extractWorldYamlLayerSrcs walks every map > layers > src", () => {
     const doc = {
       maps: [
-        { id: "m1", layers: [{ id: "a", src: "one.jpg" }, { id: "b", src: "two.jpg" }] },
+        {
+          id: "m1",
+          layers: [
+            { id: "a", src: "one.jpg" },
+            { id: "b", src: "two.jpg" },
+          ],
+        },
         { id: "m2", layers: [{ id: "c", src: "three.jpg" }] },
       ],
     };
@@ -208,10 +216,7 @@ describe.sequential("audit-assets CLI", () => {
       "world/note.md",
       "---\natlas:\n  images:\n    - atlas/assets/maps/main.jpg\n---\n",
     );
-    const r = run([
-      "--assets-dir", assetsDir,
-      "--content-dir", contentDir,
-    ]);
+    const r = run(["--assets-dir", assetsDir, "--content-dir", contentDir]);
     expect(r.status, r.stderr + r.stdout).toBe(0);
     expect(r.stdout).toContain("atlas:audit-assets: clean");
   });
@@ -222,29 +227,16 @@ describe.sequential("audit-assets CLI", () => {
       "world/note.md",
       "---\natlas:\n  images:\n    - atlas/assets/maps/huge.jpg\n---\n",
     );
-    const r = run([
-      "--assets-dir", assetsDir,
-      "--content-dir", contentDir,
-    ]);
+    const r = run(["--assets-dir", assetsDir, "--content-dir", contentDir]);
     expect(r.status).toBe(13);
   });
 
   it("exits 0 by default but 13 under --strict when only warnings exist", () => {
     writeAsset("atlas/assets/maps/big.jpg", SIZE_WARN_BYTES + 1024);
-    writeContent(
-      "world/note.md",
-      "---\natlas:\n  images:\n    - atlas/assets/maps/big.jpg\n---\n",
-    );
-    const lax = run([
-      "--assets-dir", assetsDir,
-      "--content-dir", contentDir,
-    ]);
+    writeContent("world/note.md", "---\natlas:\n  images:\n    - atlas/assets/maps/big.jpg\n---\n");
+    const lax = run(["--assets-dir", assetsDir, "--content-dir", contentDir]);
     expect(lax.status, lax.stderr + lax.stdout).toBe(0);
-    const strict = run([
-      "--assets-dir", assetsDir,
-      "--content-dir", contentDir,
-      "--strict",
-    ]);
+    const strict = run(["--assets-dir", assetsDir, "--content-dir", contentDir, "--strict"]);
     expect(strict.status).toBe(13);
   });
 

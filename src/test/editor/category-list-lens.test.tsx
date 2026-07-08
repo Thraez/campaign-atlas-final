@@ -3,8 +3,21 @@ import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
 import type { Entity } from "@/atlas/content/schema";
 
 const mk = (id: string, visibility: Entity["visibility"]) =>
-  ({ id, title: id, type: "npc", visibility, aliases: [], tags: [], images: [],
-     body: "", bodyHtml: "", frontmatter: {}, sourcePath: "", links: [], backlinks: [] } as Entity);
+  ({
+    id,
+    title: id,
+    type: "npc",
+    visibility,
+    aliases: [],
+    tags: [],
+    images: [],
+    body: "",
+    bodyHtml: "",
+    frontmatter: {},
+    sourcePath: "",
+    links: [],
+    backlinks: [],
+  }) as Entity;
 
 describe("filterEntitiesForLens", () => {
   const all = [mk("a", "player"), mk("b", "rumor"), mk("c", "dm"), mk("d", "hidden")];

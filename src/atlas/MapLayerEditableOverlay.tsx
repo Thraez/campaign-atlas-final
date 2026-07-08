@@ -30,10 +30,25 @@ import { ImageOverlay, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
-import { clampLayerToCanvas } from "@/atlas/layerGeometry";
+import { clampLayerToCanvas, resizeFromCornerDrag } from "@/atlas/layerGeometry";
 
 export function overlayInteractive(editMode: boolean): boolean {
   return editMode;
+}
+
+/**
+ * Build the Leaflet bounds for an atlas-space layer rect. The single place the
+ * `lat = mapHeight - y` coordinate flip lives (drag preview, resize preview,
+ * and the declarative overlay bounds all route through here).
+ */
+function latLngBoundsForRect(
+  rect: { x: number; y: number; width: number; height: number },
+  mapHeight: number,
+): L.LatLngBounds {
+  return L.latLngBounds(
+    L.latLng(mapHeight - (rect.y + rect.height), rect.x),
+    L.latLng(mapHeight - rect.y, rect.x + rect.width),
+  );
 }
 
 interface Props {
@@ -41,6 +56,8 @@ interface Props {
   mapDoc: MapDocument;
   editMode: boolean;
   isSelected: boolean;
+  /** When true the layer is pinned: no body drag, no resize handles. */
+  locked?: boolean;
   /** Force a uniform aspect ratio on corner resize (also forced by Shift). */
   lockAspect?: boolean;
   onSelect: () => void;
@@ -71,7 +88,15 @@ function handleDivIcon(): L.DivIcon {
 }
 
 export function MapLayerEditableOverlay({
-  layer, mapDoc, editMode, isSelected, lockAspect, onSelect, onCommit, onBackgroundClick,
+  layer,
+  mapDoc,
+  editMode,
+  isSelected,
+  locked,
+  lockAspect,
+  onSelect,
+  onCommit,
+  onBackgroundClick,
 }: Props) {
   const lmap = useMap();
   const overlayRef = useRef<L.ImageOverlay | null>(null);
@@ -80,11 +105,8 @@ export function MapLayerEditableOverlay({
   const ly = layer.y;
   const lw = layer.width;
   const lh = layer.height;
-  const bounds = useMemo<L.LatLngBoundsLiteral>(
-    () => [
-      [mapDoc.height - (ly + lh), lx],
-      [mapDoc.height - ly, lx + lw],
-    ],
+  const bounds = useMemo<L.LatLngBounds>(
+    () => latLngBoundsForRect({ x: lx, y: ly, width: lw, height: lh }, mapDoc.height),
     [lx, ly, lw, lh, mapDoc.height],
   );
 
@@ -92,7 +114,8 @@ export function MapLayerEditableOverlay({
   // B1 — body drag.
   // -----------------------------------------------------------------------
   useEffect(() => {
-    if (!editMode || !isSelected) return;
+    // A locked layer is not draggable — bail before wiring any mouse handlers.
+    if (!editMode || !isSelected || locked) return;
     const overlay = overlayRef.current;
     if (!overlay) return;
     const img = overlay.getElement() as HTMLImageElement | undefined;
@@ -104,10 +127,12 @@ export function MapLayerEditableOverlay({
     let startY = layer.y;
 
     const setBoundsFor = (nx: number, ny: number) => {
-      overlay.setBounds(L.latLngBounds(
-        L.latLng(mapDoc.height - (ny + layer.height), nx),
-        L.latLng(mapDoc.height - ny, nx + layer.width),
-      ));
+      overlay.setBounds(
+        latLngBoundsForRect(
+          { x: nx, y: ny, width: layer.width, height: layer.height },
+          mapDoc.height,
+        ),
+      );
     };
 
     const onMouseDown = (e: MouseEvent) => {
@@ -175,7 +200,18 @@ export function MapLayerEditableOverlay({
       document.removeEventListener("keydown", onKey);
       lmap.dragging.enable();
     };
-  }, [editMode, isSelected, lmap, mapDoc, layer.x, layer.y, layer.width, layer.height, onCommit]);
+  }, [
+    editMode,
+    isSelected,
+    locked,
+    lmap,
+    mapDoc,
+    layer.x,
+    layer.y,
+    layer.width,
+    layer.height,
+    onCommit,
+  ]);
 
   // -----------------------------------------------------------------------
   // B2 — corner handle positions (in Leaflet lat/lng).
@@ -183,7 +219,7 @@ export function MapLayerEditableOverlay({
   const corners = useMemo(() => {
     const left = layer.x;
     const right = layer.x + layer.width;
-    const top = mapDoc.height - layer.y;            // lat of top (atlas y=0)
+    const top = mapDoc.height - layer.y; // lat of top (atlas y=0)
     const bottom = mapDoc.height - (layer.y + layer.height); // lat of bottom
     return {
       nw: L.latLng(top, left),
@@ -213,7 +249,7 @@ export function MapLayerEditableOverlay({
           },
         }}
       />
-      {editMode && isSelected && (
+      {editMode && isSelected && !locked && (
         <>
           {(["nw", "ne", "sw", "se"] as const).map((corner) => (
             <ResizeHandle
@@ -249,7 +285,15 @@ interface HandleProps {
  * the underlying mouse event, which the React onDrag handler does not
  * expose cleanly.
  */
-function ResizeHandle({ corner, position, layer, mapDoc, lockAspect, overlayRef, onCommit }: HandleProps) {
+function ResizeHandle({
+  corner,
+  position,
+  layer,
+  mapDoc,
+  lockAspect,
+  overlayRef,
+  onCommit,
+}: HandleProps) {
   const lmap = useMap();
   const markerRef = useRef<L.Marker | null>(null);
 
@@ -264,84 +308,32 @@ function ResizeHandle({ corner, position, layer, mapDoc, lockAspect, overlayRef,
     let startW = layer.width;
     let startH = layer.height;
     let startMouse: L.LatLng | null = null;
-    let aspect = startH === 0 ? 1 : startW / startH;
     let modShift = false;
     let modAlt = false;
 
     const setBoundsFor = (nx: number, ny: number, nw: number, nh: number) => {
       const overlay = overlayRef.current;
       if (!overlay) return;
-      overlay.setBounds(L.latLngBounds(
-        L.latLng(mapDoc.height - (ny + nh), nx),
-        L.latLng(mapDoc.height - ny, nx + nw),
-      ));
+      overlay.setBounds(
+        latLngBoundsForRect({ x: nx, y: ny, width: nw, height: nh }, mapDoc.height),
+      );
     };
 
-    const computeFromDrag = (current: L.LatLng): { x: number; y: number; width: number; height: number } => {
+    const computeFromDrag = (
+      current: L.LatLng,
+    ): { x: number; y: number; width: number; height: number } => {
       if (!startMouse) return { x: startX, y: startY, width: startW, height: startH };
-      // Convert Leaflet delta to atlas delta.
-      // dx_atlas = dLng; dy_atlas = -dLat (atlas y is measured downward, lat upward).
-      const dxLng = current.lng - startMouse.lng;
-      const dyLat = current.lat - startMouse.lat;
-      const dx = dxLng;
-      const dy = -dyLat;
-
-      // For non-center modes, one corner stays put. The corner that stays
-      // put is the *opposite* of the corner being dragged.
-      const isN = corner === "nw" || corner === "ne";
-      const isW = corner === "nw" || corner === "sw";
-
-      let nx = startX;
-      let ny = startY;
-      let nw = startW;
-      let nh = startH;
-
-      if (modAlt) {
-        // Center-anchored: every corner moves. dx grows width on the side
-        // being dragged; the symmetric side gets the same growth. Net:
-        // width changes by 2*|dx| in the corner's drag direction.
-        const wScale = isW ? -2 * dx : 2 * dx; // dragging W shrinks when dx>0
-        const hScale = isN ? -2 * dy : 2 * dy; // dragging N shrinks when dy>0
-        nw = Math.max(1, startW + wScale);
-        nh = Math.max(1, startH + hScale);
-        if (modShift || lockAspect) {
-          // Constrain to startW/startH ratio.
-          if (nw / aspect > nh) nh = nw / aspect;
-          else nw = nh * aspect;
-        }
-        // Center stays put — reposition top-left so center is unchanged.
-        nx = startX + (startW - nw) / 2;
-        ny = startY + (startH - nh) / 2;
-      } else {
-        // Opposite-corner anchored.
-        if (isW) {
-          nx = startX + dx;
-          nw = Math.max(1, startW - dx);
-        } else {
-          nw = Math.max(1, startW + dx);
-        }
-        if (isN) {
-          ny = startY + dy;
-          nh = Math.max(1, startH - dy);
-        } else {
-          nh = Math.max(1, startH + dy);
-        }
-        if (modShift || lockAspect) {
-          // Lock to aspect — drive the smaller delta off the larger one.
-          const widthDriven = Math.abs(nw - startW) > Math.abs(nh - startH);
-          if (widthDriven) {
-            const newH = nw / aspect;
-            if (isN) ny = startY + (startH - newH);
-            nh = newH;
-          } else {
-            const newW = nh * aspect;
-            if (isW) nx = startX + (startW - newW);
-            nw = newW;
-          }
-        }
-      }
-
-      return { x: nx, y: ny, width: nw, height: nh };
+      // Convert the Leaflet delta to an atlas delta (atlas y is measured
+      // downward, lat upward) and defer to the pure resize math.
+      const dx = current.lng - startMouse.lng;
+      const dy = -(current.lat - startMouse.lat);
+      return resizeFromCornerDrag({
+        corner,
+        start: { x: startX, y: startY, width: startW, height: startH },
+        delta: { dx, dy },
+        centerAnchored: modAlt,
+        aspectLocked: modShift || lockAspect,
+      });
     };
 
     const onDragStart = (ev: L.LeafletEvent) => {
@@ -352,8 +344,7 @@ function ResizeHandle({ corner, position, layer, mapDoc, lockAspect, overlayRef,
       startY = layer.y;
       startW = layer.width;
       startH = layer.height;
-      aspect = startH === 0 ? 1 : startW / startH;
-      startMouse = (marker.getLatLng());
+      startMouse = marker.getLatLng();
       lmap.dragging.disable();
     };
 
@@ -405,7 +396,19 @@ function ResizeHandle({ corner, position, layer, mapDoc, lockAspect, overlayRef,
       marker.off("dragend", onDragEnd);
       document.removeEventListener("keydown", onKey);
     };
-  }, [corner, layer.x, layer.y, layer.width, layer.height, lmap, lockAspect, mapDoc, onCommit, overlayRef, position]);
+  }, [
+    corner,
+    layer.x,
+    layer.y,
+    layer.width,
+    layer.height,
+    lmap,
+    lockAspect,
+    mapDoc,
+    onCommit,
+    overlayRef,
+    position,
+  ]);
 
   return (
     <Marker
@@ -415,7 +418,9 @@ function ResizeHandle({ corner, position, layer, mapDoc, lockAspect, overlayRef,
       draggable
       // Bubble click through to the underlying layer so selection survives.
       eventHandlers={{
-        click: (e) => { L.DomEvent.stopPropagation(e.originalEvent); },
+        click: (e) => {
+          L.DomEvent.stopPropagation(e.originalEvent);
+        },
       }}
     />
   );
