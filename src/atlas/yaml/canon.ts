@@ -15,8 +15,8 @@
  *     - Includes pin overrides, uploaded layer images (data URLs), map-setting
  *       tweaks, etc.
  *     - NEVER read by the runtime atlas. NEVER committed automatically.
- *     - Lifecycle: edit → "Ready to export" → exported patch → committed →
- *       (next build) folded back into YAML canon.
+ *     - Lifecycle: edit → Save writes the change straight into the entity `.md`
+ *       frontmatter (YAML canon) and rebuilds the runtime atlas → DM commits.
  *
  *  3. GENERATED RUNTIME DATA  (player-facing artifacts)
  *     - `public/atlas/atlas.json`

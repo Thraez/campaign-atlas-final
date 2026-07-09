@@ -66,7 +66,11 @@ export default function Landing() {
             <code className="px-1 py-0.5 bg-muted rounded">content/</code>, builds a player-safe
             JSON, and serves it from{" "}
             <code className="px-1 py-0.5 bg-muted rounded">public/atlas/</code>. The browser never
-            writes to GitHub directly — DM edits happen here, then export → commit → publish.
+            writes to GitHub directly — DM edits happen here, then Save writes the{" "}
+            <code className="px-1 py-0.5 bg-muted rounded">.md</code> frontmatter and rebuilds the
+            atlas, you commit with git, and{" "}
+            <code className="px-1 py-0.5 bg-muted rounded">npm run atlas:publish</code> (or the
+            GitHub Action) publishes the player-safe site.
           </p>
         </section>
 

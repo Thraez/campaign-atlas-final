@@ -32,7 +32,7 @@ const DEFAULT_HEADER = `# World atlas — map / region / fog / route / calendar 
 # edit them by hand.
 #
 # IMPORTANT: This file must be PURE YAML. Do NOT paste markdown code fences
-# (\`\`\`yaml) from exported patch files.
+# (\`\`\`yaml) into it.
 
 `;
 
