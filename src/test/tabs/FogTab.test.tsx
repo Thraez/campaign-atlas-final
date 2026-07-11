@@ -320,8 +320,16 @@ describe("FogTab — Reveals section (N62)", () => {
       mapId: "map-1",
       enabled: true,
       reveals: [
-        [[0, 0], [100, 0], [100, 100]],
-        [[0, 0], [50, 0], [50, 50]],
+        [
+          [0, 0],
+          [100, 0],
+          [100, 100],
+        ],
+        [
+          [0, 0],
+          [50, 0],
+          [50, 50],
+        ],
       ],
     };
     render(
@@ -354,7 +362,13 @@ describe("FogTab — Reveals section (N62)", () => {
     const fog: FogOverlay = {
       mapId: "map-1",
       enabled: true,
-      reveals: [[[0, 0], [100, 0], [100, 100]]],
+      reveals: [
+        [
+          [0, 0],
+          [100, 0],
+          [100, 100],
+        ],
+      ],
     };
     render(
       <FogTab
@@ -385,7 +399,11 @@ describe("FogTab — Validation issues (N62)", () => {
 
   it("blocking issue message rendered", () => {
     const issues: FogIssue[] = [
-      { severity: "blocking", code: "too-few-points", message: "Reveal #1 needs at least 3 points." },
+      {
+        severity: "blocking",
+        code: "too-few-points",
+        message: "Reveal #1 needs at least 3 points.",
+      },
     ];
     render(
       <FogTab
@@ -519,7 +537,15 @@ describe("FogTab — Cross-tab convenience reveals (N62)", () => {
 
   it("shows 'Reveal around route' button when routeApi.selectedId is set", () => {
     const routeApi = {
-      effective: [{ id: "rt1", name: "Road North", waypoints: [], visibility: "player" as const, mode: "straight" as const }],
+      effective: [
+        {
+          id: "rt1",
+          name: "Road North",
+          waypoints: [],
+          visibility: "player" as const,
+          mode: "straight" as const,
+        },
+      ],
       selectedId: "rt1",
       setSelectedId: vi.fn(),
       draft: { routes: [] },
@@ -545,7 +571,10 @@ describe("FogTab — Cross-tab convenience reveals (N62)", () => {
       applySnapshot: vi.fn(),
       issues: [],
       resolveWaypoint: vi.fn(),
-      resolveRoute: vi.fn().mockReturnValue([[100, 100], [200, 200]]),
+      resolveRoute: vi.fn().mockReturnValue([
+        [100, 100],
+        [200, 200],
+      ]),
     } as unknown as RouteDraftAPI;
     render(
       <FogTab

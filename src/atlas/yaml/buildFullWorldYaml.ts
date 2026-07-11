@@ -127,7 +127,14 @@ function soundscapeToYamlObject(s: SoundscapeConfig): Record<string, unknown> {
   if (s.masterGain !== undefined) out.masterGain = s.masterGain;
   if (s.areas && s.areas.length > 0) {
     out.areas = s.areas.map((a) => {
-      const area: Record<string, unknown> = { id: a.id, bed: { src: a.bed.src, ...(a.bed.srcFallback ? { srcFallback: a.bed.srcFallback } : {}), ...(a.bed.gain !== undefined ? { gain: a.bed.gain } : {}) } };
+      const area: Record<string, unknown> = {
+        id: a.id,
+        bed: {
+          src: a.bed.src,
+          ...(a.bed.srcFallback ? { srcFallback: a.bed.srcFallback } : {}),
+          ...(a.bed.gain !== undefined ? { gain: a.bed.gain } : {}),
+        },
+      };
       if (a.regionId) area.regionId = a.regionId;
       if (a.points && a.points.length > 0) area.points = a.points;
       if (a.visibility) area.visibility = a.visibility;

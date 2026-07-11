@@ -123,7 +123,8 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
       }
       const params = new URLSearchParams({ vaultRoot });
       for (const g of ignoreGlobs) params.append("ignore", g);
-      let data: { ok: true; files: Record<string, string> } | { ok: false; status: number; error: string };
+      let data:
+        { ok: true; files: Record<string, string> } | { ok: false; status: number; error: string };
       try {
         const resp = await fetch(`/__atlas/vault-scan?${params.toString()}`);
         data = (await resp.json()) as typeof data;

@@ -11,13 +11,10 @@ describe("classifyGitFailure", () => {
     expect(classifyGitFailure("fatal: Authentication failed for 'https://…'")).toBe("auth"));
 
   it("behind", () =>
-    expect(
-      classifyGitFailure("! [rejected]  main -> main (non-fast-forward)"),
-    ).toBe("behind"));
+    expect(classifyGitFailure("! [rejected]  main -> main (non-fast-forward)")).toBe("behind"));
 
   it("conflict", () =>
     expect(classifyGitFailure("CONFLICT (content): Merge conflict in x")).toBe("conflict"));
 
-  it("unknown", () =>
-    expect(classifyGitFailure("some other git noise")).toBe("unknown"));
+  it("unknown", () => expect(classifyGitFailure("some other git noise")).toBe("unknown"));
 });

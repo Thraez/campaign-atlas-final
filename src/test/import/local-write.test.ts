@@ -49,16 +49,9 @@ describe("handleLocalWriteRequest", () => {
 
   it("accepts sync-map.json and writes to .local-atlas/", async () => {
     const syncMap = { "notes/corven.md": { id: "corven", baseType: "npc" } };
-    const r = await handleLocalWriteRequest(
-      "sync-map.json",
-      JSON.stringify(syncMap),
-      tmpDir,
-    );
+    const r = await handleLocalWriteRequest("sync-map.json", JSON.stringify(syncMap), tmpDir);
     expect(r.ok).toBe(true);
-    const written = await fs.readFile(
-      path.join(tmpDir, ".local-atlas", "sync-map.json"),
-      "utf8",
-    );
+    const written = await fs.readFile(path.join(tmpDir, ".local-atlas", "sync-map.json"), "utf8");
     expect(JSON.parse(written)).toEqual(syncMap);
   });
 

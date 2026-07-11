@@ -106,9 +106,7 @@ describe("buildCanonicalEntityChanges — placement + frontmatter seam", () => {
 
 describe("worldYamlPath", () => {
   it("returns the correct content-relative path for a world id", () => {
-    expect(worldYamlPath("astrath-deeprealm")).toBe(
-      "content/astrath-deeprealm/_atlas/world.yaml",
-    );
+    expect(worldYamlPath("astrath-deeprealm")).toBe("content/astrath-deeprealm/_atlas/world.yaml");
   });
 
   it("handles a single-segment world id without extra separators", () => {
@@ -120,10 +118,9 @@ describe("worldYamlPath", () => {
 
 describe("entityFrontmatterPatches — edge cases", () => {
   it("silently omits a draft whose entity id is not in the entities list", () => {
-    const patches = entityFrontmatterPatches(
-      { "ghost-id": { summary: "should not appear" } },
-      [hero],
-    );
+    const patches = entityFrontmatterPatches({ "ghost-id": { summary: "should not appear" } }, [
+      hero,
+    ]);
     expect(patches).toHaveLength(0);
   });
 
@@ -142,10 +139,9 @@ describe("entityFrontmatterPatches — edge cases", () => {
 
   it("draft aliases override the entity's existing aliases", () => {
     const entityWithAliases = { ...hero, aliases: ["Old Alias"] } as unknown as Entity;
-    const [patch] = entityFrontmatterPatches(
-      { hero: { aliases: ["New Alias"] } },
-      [entityWithAliases],
-    );
+    const [patch] = entityFrontmatterPatches({ hero: { aliases: ["New Alias"] } }, [
+      entityWithAliases,
+    ]);
     expect(patch.atlas.aliases).toEqual(["New Alias"]);
   });
 });

@@ -6,5 +6,9 @@ export function resolvePeekEntityId(el: HTMLElement | null): string | null {
   const href = link.getAttribute("href") ?? "";
   const m = href.match(/#\/entity\/(.+)$/);
   if (!m) return null;
-  try { return decodeURIComponent(m[1]); } catch { return m[1]; }
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return m[1];
+  }
 }

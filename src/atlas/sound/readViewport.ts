@@ -1,13 +1,19 @@
 import type { ViewRect } from "@/atlas/sound/resolveSoundscape";
 
-interface LatLngLike { lat: number; lng: number }
+interface LatLngLike {
+  lat: number;
+  lng: number;
+}
 export interface LeafletViewLike {
   getCenter(): LatLngLike;
   getBounds(): { getSouthWest(): LatLngLike; getNorthEast(): LatLngLike };
 }
 
 /** Convert Leaflet's flipped-lat view state into top-left-origin map coords. */
-export function readViewport(map: LeafletViewLike, mapHeight: number): { cx: number; cy: number; view: ViewRect } {
+export function readViewport(
+  map: LeafletViewLike,
+  mapHeight: number,
+): { cx: number; cy: number; view: ViewRect } {
   const c = map.getCenter();
   const cx = c.lng;
   const cy = mapHeight - c.lat;

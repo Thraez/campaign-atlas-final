@@ -56,7 +56,10 @@ export class AudioEngine {
     this.muted = muted;
     if (this.ctx && this.master) {
       this.master.gain.cancelScheduledValues(this.ctx.currentTime);
-      this.master.gain.linearRampToValueAtTime(muted ? 0 : this.masterGain, this.ctx.currentTime + 0.2);
+      this.master.gain.linearRampToValueAtTime(
+        muted ? 0 : this.masterGain,
+        this.ctx.currentTime + 0.2,
+      );
     }
   }
 
@@ -77,7 +80,10 @@ export class AudioEngine {
 
     if (!area) return;
 
-    const src = this.deps.canPlay(area.bed.src) || !area.bed.srcFallback ? area.bed.src : area.bed.srcFallback;
+    const src =
+      this.deps.canPlay(area.bed.src) || !area.bed.srcFallback
+        ? area.bed.src
+        : area.bed.srcFallback;
     const buffer = await this.loadBuffer(src);
     if (!buffer || !this.ctx || !this.master) return;
     if (this.active) return; // a newer crossfade superseded us while decoding
@@ -108,14 +114,17 @@ export class AudioEngine {
     } catch {
       /* already stopped */
     }
-    setTimeout(() => {
-      try {
-        bed.source.disconnect();
-        bed.gain.disconnect();
-      } catch {
-        /* ignore */
-      }
-    }, (CROSSFADE_S + 0.1) * 1000);
+    setTimeout(
+      () => {
+        try {
+          bed.source.disconnect();
+          bed.gain.disconnect();
+        } catch {
+          /* ignore */
+        }
+      },
+      (CROSSFADE_S + 0.1) * 1000,
+    );
   }
 
   private async loadBuffer(src: string): Promise<AudioBuffer | null> {

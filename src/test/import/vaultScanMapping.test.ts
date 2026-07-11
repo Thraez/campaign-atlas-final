@@ -11,7 +11,11 @@ describe("vaultScanResultToInputs", () => {
     expect(inputs).toHaveLength(2);
 
     const note = inputs.find((i) => i.vaultRelPath === "note.md");
-    expect(note).toMatchObject({ filename: "note.md", raw: "hello world", vaultRelPath: "note.md" });
+    expect(note).toMatchObject({
+      filename: "note.md",
+      raw: "hello world",
+      vaultRelPath: "note.md",
+    });
 
     const nested = inputs.find((i) => i.vaultRelPath === "sub/nested.md");
     expect(nested).toMatchObject({

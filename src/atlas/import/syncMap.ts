@@ -15,11 +15,6 @@ export function lookupByPath(map: SyncMap, relPath: string): SyncMapEntry | unde
 }
 
 /** Return a new SyncMap with the given entry added or updated (pure — does not mutate the original). */
-export function recordSync(
-  map: SyncMap,
-  relPath: string,
-  id: string,
-  baseType: string,
-): SyncMap {
+export function recordSync(map: SyncMap, relPath: string, id: string, baseType: string): SyncMap {
   return { ...map, [relPath]: { id, baseType } };
 }

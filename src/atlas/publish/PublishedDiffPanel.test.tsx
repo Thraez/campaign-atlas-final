@@ -76,7 +76,15 @@ describe("PublishedDiffPanel with precomputed diff", () => {
       hasChanges: true,
       counts: { entities: 0, placements: 1, maps: 0, overlays: 0 },
       entities: [],
-      placements: [{ entityId: "e1", entityTitle: "Corven", mapId: "map1", kind: "added", after: { x: 100, y: 200 } }],
+      placements: [
+        {
+          entityId: "e1",
+          entityTitle: "Corven",
+          mapId: "map1",
+          kind: "added",
+          after: { x: 100, y: 200 },
+        },
+      ],
       maps: [],
       overlays: [],
       ...META,
@@ -91,10 +99,16 @@ describe("PublishedDiffPanel with precomputed diff", () => {
       hasChanges: true,
       counts: { entities: 0, placements: 1, maps: 0, overlays: 0 },
       entities: [],
-      placements: [{
-        entityId: "e1", entityTitle: "Guard Post", mapId: "dungeon",
-        kind: "moved", before: { x: 10, y: 20 }, after: { x: 30, y: 40 },
-      }],
+      placements: [
+        {
+          entityId: "e1",
+          entityTitle: "Guard Post",
+          mapId: "dungeon",
+          kind: "moved",
+          before: { x: 10, y: 20 },
+          after: { x: 30, y: 40 },
+        },
+      ],
       maps: [],
       overlays: [],
       ...META,
@@ -108,7 +122,15 @@ describe("PublishedDiffPanel with precomputed diff", () => {
       hasChanges: true,
       counts: { entities: 0, placements: 1, maps: 0, overlays: 0 },
       entities: [],
-      placements: [{ entityId: "e1", entityTitle: "Old Camp", mapId: "overworld", kind: "removed", before: { x: 5, y: 5 } }],
+      placements: [
+        {
+          entityId: "e1",
+          entityTitle: "Old Camp",
+          mapId: "overworld",
+          kind: "removed",
+          before: { x: 5, y: 5 },
+        },
+      ],
       maps: [],
       overlays: [],
       ...META,
@@ -152,7 +174,9 @@ describe("PublishedDiffPanel with precomputed diff", () => {
     const d: AtlasDiff = {
       hasChanges: true,
       counts: { entities: 1, placements: 0, maps: 0, overlays: 0 },
-      entities: [{ id: "e1", title: "Aldric", kind: "visibility-changed", before: "dm", after: "player" }],
+      entities: [
+        { id: "e1", title: "Aldric", kind: "visibility-changed", before: "dm", after: "player" },
+      ],
       placements: [],
       maps: [],
       overlays: [],
@@ -166,7 +190,15 @@ describe("PublishedDiffPanel with precomputed diff", () => {
     const d: AtlasDiff = {
       hasChanges: true,
       counts: { entities: 1, placements: 0, maps: 0, overlays: 0 },
-      entities: [{ id: "e1", title: "New Name", kind: "title-changed", before: "Old Name", after: "New Name" }],
+      entities: [
+        {
+          id: "e1",
+          title: "New Name",
+          kind: "title-changed",
+          before: "Old Name",
+          after: "New Name",
+        },
+      ],
       placements: [],
       maps: [],
       overlays: [],
@@ -198,16 +230,22 @@ describe("PublishedDiffPanel — fetch-based states", () => {
   });
 
   it("shows loading text while baseline fetch is pending", () => {
-    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise(() => {})),
+    );
     render(<PublishedDiffPanel current={undefined} />);
     expect(screen.getByText(/loading baseline/i)).toBeInTheDocument();
   });
 
   it("shows no-baseline message when fetch returns a non-OK response", async () => {
-    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({ ok: false })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: false })),
+    );
     render(<PublishedDiffPanel current={undefined} />);
     await waitFor(() =>
-      expect(screen.getByText(/no baseline snapshot found/i)).toBeInTheDocument()
+      expect(screen.getByText(/no baseline snapshot found/i)).toBeInTheDocument(),
     );
   });
 });

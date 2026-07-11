@@ -88,9 +88,7 @@ export async function buildImportChanges(
       // create/path-collision: new entities always default to dm-only unless
       // the DM explicitly approved a secrecy-increase row (Phase 2 populates needsReview).
       const safeVisibility =
-        row.needsReview?.reason === "secrecy-increase"
-          ? row.resolvedVisibility
-          : "dm";
+        row.needsReview?.reason === "secrecy-increase" ? row.resolvedVisibility : "dm";
       content = rewriteFrontmatter(row.rawContent, {
         id: row.resolvedId,
         type: row.inferredType,

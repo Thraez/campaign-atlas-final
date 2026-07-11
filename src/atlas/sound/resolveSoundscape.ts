@@ -1,5 +1,11 @@
 import type { MapDocument, Point, SoundBed } from "@/atlas/content/schema";
-import { type BBox, bboxOf, pointInPolygon, rectArea, rectIntersectArea } from "@/atlas/geometry/polygon";
+import {
+  type BBox,
+  bboxOf,
+  pointInPolygon,
+  rectArea,
+  rectIntersectArea,
+} from "@/atlas/geometry/polygon";
 
 export interface PreparedArea {
   id: string;

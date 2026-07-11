@@ -839,7 +839,12 @@ export async function runPlayerBuildWithTimeout(): Promise<{ ok: boolean; error?
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<BuildResult>((resolve) => {
     timer = setTimeout(
-      () => resolve({ ok: false, durationMs: timeoutMs, stderr: `player build timed out after ${timeoutMs}ms` }),
+      () =>
+        resolve({
+          ok: false,
+          durationMs: timeoutMs,
+          stderr: `player build timed out after ${timeoutMs}ms`,
+        }),
       timeoutMs,
     );
   });
@@ -956,8 +961,7 @@ export async function handleVaultScanRequest(
   vaultRoot: string,
   ignoreGlobs: string[],
 ): Promise<
-  | { ok: true; files: Record<string, string> }
-  | { ok: false; status: number; error: string }
+  { ok: true; files: Record<string, string> } | { ok: false; status: number; error: string }
 > {
   try {
     const s = await fs.stat(vaultRoot);
@@ -971,7 +975,9 @@ export async function handleVaultScanRequest(
   const files: Record<string, string> = {};
   let aggregateBytes = 0;
 
-  async function processFile(absPath: string): Promise<{ ok: false; status: number; error: string } | null> {
+  async function processFile(
+    absPath: string,
+  ): Promise<{ ok: false; status: number; error: string } | null> {
     const relPosix = path.relative(rootResolved, absPath).split(path.sep).join("/");
     if (!isReadableVaultPath(rootResolved, absPath)) return null;
     if (isIgnored(relPosix)) return null;
@@ -1005,11 +1011,19 @@ export async function handleVaultScanRequest(
       const abs = path.join(dir, entry.name);
       if (entry.isSymbolicLink()) {
         let real: string;
-        try { real = await fs.realpath(abs); } catch { continue; }
+        try {
+          real = await fs.realpath(abs);
+        } catch {
+          continue;
+        }
         // Symlink escape guard: resolved path must still be within vault root
         if (!real.startsWith(rootResolved + path.sep)) continue;
         let realStat: Awaited<ReturnType<typeof fs.stat>>;
-        try { realStat = await fs.stat(real); } catch { continue; }
+        try {
+          realStat = await fs.stat(real);
+        } catch {
+          continue;
+        }
         if (realStat.isDirectory()) {
           const r = await walk(real);
           if (r) return r;
@@ -1237,7 +1251,9 @@ export function atlasSavePlugin(): Plugin {
         if (rejectNonLoopback(req, res)) return;
         let raw = "";
         req.setEncoding("utf8");
-        req.on("data", (chunk: string) => { raw += chunk; });
+        req.on("data", (chunk: string) => {
+          raw += chunk;
+        });
         req.on("end", async () => {
           let body: { name?: unknown; contents?: unknown };
           try {

@@ -10,11 +10,22 @@
 import fs from "node:fs";
 import path from "node:path";
 
-export interface RunOpts { dir: string }
+export interface RunOpts {
+  dir: string;
+}
 
 const TEXT_EXTENSIONS = new Set([
-  ".html", ".js", ".mjs", ".cjs", ".css", ".json",
-  ".txt", ".xml", ".webmanifest", ".svg", ".md",
+  ".html",
+  ".js",
+  ".mjs",
+  ".cjs",
+  ".css",
+  ".json",
+  ".txt",
+  ".xml",
+  ".webmanifest",
+  ".svg",
+  ".md",
 ]);
 
 /** Fields that must not appear on a PlayerSecret object in any player artifact. */
@@ -44,7 +55,8 @@ function scanEntity(entity: Record<string, unknown>): string[] {
   for (const s of secrets as PlayerSecret[]) {
     if (typeof s !== "object" || s === null) continue;
     for (const key of FORBIDDEN_KEYS) {
-      if (key in s) hits.push(`entity "${entity.id}": secret "${s.id}" has forbidden field "${key}"`);
+      if (key in s)
+        hits.push(`entity "${entity.id}": secret "${s.id}" has forbidden field "${key}"`);
     }
   }
   return hits;
@@ -113,12 +125,17 @@ export function run(opts: RunOpts): number {
   const walk = (d: string) => {
     for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
       const full = path.join(d, entry.name);
-      if (entry.isDirectory()) { walk(full); continue; }
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
       if (!TEXT_EXTENSIONS.has(path.extname(entry.name))) continue;
       if (full === atlasJson || full === searchIndex) continue;
       try {
         allHits.push(...scanTextFile(full, fs.readFileSync(full, "utf8")));
-      } catch { /* unreadable file — skip */ }
+      } catch {
+        /* unreadable file — skip */
+      }
     }
   };
   walk(dir);
@@ -131,7 +148,10 @@ export function run(opts: RunOpts): number {
   return 0;
 }
 
-if (process.argv[1]?.endsWith("check-player-secrets.ts") || process.argv[1]?.endsWith("check-player-secrets.js")) {
+if (
+  process.argv[1]?.endsWith("check-player-secrets.ts") ||
+  process.argv[1]?.endsWith("check-player-secrets.js")
+) {
   const dirArg = process.argv[2] ?? "public/atlas";
   process.exit(run({ dir: dirArg }));
 }

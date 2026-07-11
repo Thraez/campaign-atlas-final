@@ -268,7 +268,8 @@ describe("validatePatchYaml — N91 gaps (YAML parse error, entity: separator, k
   });
 
   it("accepts a valid map patch using the settings kind alias", () => {
-    const patch = "maps:\n  - id: dungeon-level-1\n    name: Level 1\n    width: 4000\n    height: 3000\n";
+    const patch =
+      "maps:\n  - id: dungeon-level-1\n    name: Level 1\n    width: 4000\n    height: 3000\n";
     const r = validatePatchYaml(patch, "settings");
     expect(r.ok).toBe(true);
     expect(r.errors).toHaveLength(0);

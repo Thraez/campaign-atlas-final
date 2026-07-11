@@ -64,7 +64,13 @@ describe("filterSoundscapeForPlayer", () => {
 
   it("preserves bed src, gain, and other safe fields", () => {
     const sc: SoundscapeConfig = {
-      areas: [{ id: "x", bed: { src: "audio/x.ogg", gain: 0.5, srcFallback: "audio/x.mp3" }, visibility: "player" }],
+      areas: [
+        {
+          id: "x",
+          bed: { src: "audio/x.ogg", gain: 0.5, srcFallback: "audio/x.mp3" },
+          visibility: "player",
+        },
+      ],
     };
     const result = filterSoundscapeForPlayer(sc);
     expect(result?.areas![0].bed.src).toBe("audio/x.ogg");
@@ -112,16 +118,30 @@ describe("filterSoundscapeForPlayer", () => {
 
   it("preserves regionId through the ...rest spread (ride-on link must survive neutralisation)", () => {
     const sc: SoundscapeConfig = {
-      areas: [{ id: "forest-bed", regionId: "region-forest", bed: { src: "audio/forest.ogg" }, visibility: "player" }],
+      areas: [
+        {
+          id: "forest-bed",
+          regionId: "region-forest",
+          bed: { src: "audio/forest.ogg" },
+          visibility: "player",
+        },
+      ],
     };
     const result = filterSoundscapeForPlayer(sc);
     expect(result?.areas![0].regionId).toBe("region-forest");
   });
 
   it("preserves own points through the ...rest spread (sound-only polygon shape must survive)", () => {
-    const pts: [number, number][] = [[0, 0], [50, 0], [50, 50], [0, 50]];
+    const pts: [number, number][] = [
+      [0, 0],
+      [50, 0],
+      [50, 50],
+      [0, 50],
+    ];
     const sc: SoundscapeConfig = {
-      areas: [{ id: "cave-zone", points: pts, bed: { src: "audio/cave.ogg" }, visibility: "player" }],
+      areas: [
+        { id: "cave-zone", points: pts, bed: { src: "audio/cave.ogg" }, visibility: "player" },
+      ],
     };
     const result = filterSoundscapeForPlayer(sc);
     expect(result?.areas![0].points).toEqual(pts);

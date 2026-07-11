@@ -12,8 +12,14 @@ beforeEach(() => {
   // Create fake public/atlas/assets/audio dir structure
   fs.mkdirSync(path.join(tmpDir, "atlas", "assets", "maps"), { recursive: true });
   // Create a fake audio file in the public dir
-  fs.writeFileSync(path.join(tmpDir, "atlas", "assets", "maps", "tavern.ogg"), "fake-audio-content-tavern");
-  fs.writeFileSync(path.join(tmpDir, "atlas", "assets", "maps", "forest.ogg"), "fake-audio-content-forest");
+  fs.writeFileSync(
+    path.join(tmpDir, "atlas", "assets", "maps", "tavern.ogg"),
+    "fake-audio-content-tavern",
+  );
+  fs.writeFileSync(
+    path.join(tmpDir, "atlas", "assets", "maps", "forest.ogg"),
+    "fake-audio-content-forest",
+  );
 });
 
 afterEach(() => {
@@ -86,7 +92,12 @@ describe("rewriteAudioSrcs", () => {
   });
 
   it("rewrites srcFallback when rewrite map contains it", () => {
-    const areas = [{ id: "a", bed: { src: "atlas/assets/maps/foo.ogg", srcFallback: "atlas/assets/maps/foo.mp3" } }];
+    const areas = [
+      {
+        id: "a",
+        bed: { src: "atlas/assets/maps/foo.ogg", srcFallback: "atlas/assets/maps/foo.mp3" },
+      },
+    ];
     const rewrite = new Map([
       ["atlas/assets/maps/foo.ogg", "atlas/assets/audio/abc.ogg"],
       ["atlas/assets/maps/foo.mp3", "atlas/assets/audio/abc.mp3"],
@@ -95,7 +106,12 @@ describe("rewriteAudioSrcs", () => {
   });
 
   it("keeps original srcFallback when rewrite map does not contain it", () => {
-    const areas = [{ id: "a", bed: { src: "atlas/assets/maps/foo.ogg", srcFallback: "atlas/assets/maps/foo.mp3" } }];
+    const areas = [
+      {
+        id: "a",
+        bed: { src: "atlas/assets/maps/foo.ogg", srcFallback: "atlas/assets/maps/foo.mp3" },
+      },
+    ];
     const rewrite = new Map([["atlas/assets/maps/foo.ogg", "atlas/assets/audio/abc.ogg"]]);
     expect(rewriteAudioSrcs(areas, rewrite)[0].bed.srcFallback).toBe("atlas/assets/maps/foo.mp3");
   });

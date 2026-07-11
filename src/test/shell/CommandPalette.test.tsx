@@ -18,7 +18,10 @@ const navIndex = buildPaletteIndex({
     { id: "corven", title: "Corven", type: "npc" },
     { id: "thornhold", title: "Thornhold", type: "settlement" },
   ] as never,
-  maps: [], commands: [], settings: [], recent: [],
+  maps: [],
+  commands: [],
+  settings: [],
+  recent: [],
 });
 
 describe("CommandPalette", () => {
@@ -67,8 +70,8 @@ describe("CommandPalette", () => {
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
     const input = screen.getByPlaceholderText(/search everything/i);
     fireEvent.keyDown(input, { key: "ArrowDown" }); // sel → 1
-    fireEvent.keyDown(input, { key: "ArrowUp" });   // sel → 0
-    fireEvent.keyDown(input, { key: "ArrowUp" });   // would be −1; clamped at 0
+    fireEvent.keyDown(input, { key: "ArrowUp" }); // sel → 0
+    fireEvent.keyDown(input, { key: "ArrowUp" }); // would be −1; clamped at 0
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onChoose).toHaveBeenCalledWith(expect.objectContaining({ id: "corven" }));
   });

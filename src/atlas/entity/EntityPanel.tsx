@@ -455,7 +455,9 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
                       <button
                         className="hover:underline truncate text-left"
                         onClick={() => onOpenEntity(r.entity)}
-                        onMouseEnter={(e) => onPeek?.(r.entity, e.currentTarget.getBoundingClientRect())}
+                        onMouseEnter={(e) =>
+                          onPeek?.(r.entity, e.currentTarget.getBoundingClientRect())
+                        }
                         onMouseLeave={() => onPeekLeave?.()}
                         onFocus={(e) => onPeek?.(r.entity, e.currentTarget.getBoundingClientRect())}
                         onBlur={() => onPeekLeave?.()}

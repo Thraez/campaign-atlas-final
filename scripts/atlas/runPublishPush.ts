@@ -92,9 +92,7 @@ export async function runPublishPush(
   // 2. Stage the scoped pathspec (world source + built player atlas).
   //    Filter to paths that actually exist — git add errors on missing pathspecs.
   //    If none of the scoped paths exist yet, there is nothing to publish.
-  const existingPaths = COMMIT_PATHSPEC.filter((p) =>
-    fs.existsSync(path.resolve(repoRoot, p)),
-  );
+  const existingPaths = COMMIT_PATHSPEC.filter((p) => fs.existsSync(path.resolve(repoRoot, p)));
   if (!existingPaths.length) return { status: "nothing-to-publish" };
 
   const add = await git(repoRoot, ["add", "--", ...existingPaths]);

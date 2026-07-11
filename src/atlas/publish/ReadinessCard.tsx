@@ -20,9 +20,7 @@ export function ReadinessCard({ result, onConfirm, onGoToEntity, busy }: Props) 
       {/* Safety verdict banner */}
       <div
         className={`rounded-md border p-3 text-xs ${
-          safe
-            ? "border-primary/30 bg-primary/5"
-            : "border-destructive/40 bg-destructive/5"
+          safe ? "border-primary/30 bg-primary/5" : "border-destructive/40 bg-destructive/5"
         }`}
       >
         <div className="flex items-center gap-2 font-medium">
@@ -34,8 +32,8 @@ export function ReadinessCard({ result, onConfirm, onGoToEntity, busy }: Props) 
           {safe
             ? "Safe to publish — no DM-only content is exposed."
             : buildFailed
-            ? "Couldn't build your world."
-            : "Publishing is blocked — fix the items below, then re-check."}
+              ? "Couldn't build your world."
+              : "Publishing is blocked — fix the items below, then re-check."}
         </div>
         {buildFailed && result.buildError && (
           <pre className="mt-2 max-h-32 overflow-auto rounded bg-muted/40 p-2 text-[10px] whitespace-pre-wrap">
@@ -48,7 +46,10 @@ export function ReadinessCard({ result, onConfirm, onGoToEntity, busy }: Props) 
       {!safe && !buildFailed && (
         <ul className="space-y-1.5">
           {result.reasons.map((r, i) => (
-            <li key={i} className="rounded-md border border-border bg-card/50 p-2 text-xs space-y-1">
+            <li
+              key={i}
+              className="rounded-md border border-border bg-card/50 p-2 text-xs space-y-1"
+            >
               <div className="flex items-start gap-2">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-destructive" />
                 <div className="flex-1 min-w-0 space-y-1">
@@ -80,17 +81,13 @@ export function ReadinessCard({ result, onConfirm, onGoToEntity, busy }: Props) 
 
       {/* Public-repo notice (D9) */}
       <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-[10px] text-muted-foreground">
-        Your source notes (including DM-only ones) are public on GitHub. Only the published site is scrubbed.
+        Your source notes (including DM-only ones) are public on GitHub. Only the published site is
+        scrubbed.
       </div>
 
       {/* Confirm button — shown only when safe */}
       {safe && (
-        <Button
-          size="sm"
-          onClick={onConfirm}
-          disabled={busy}
-          className="h-8 gap-1 text-xs"
-        >
+        <Button size="sm" onClick={onConfirm} disabled={busy} className="h-8 gap-1 text-xs">
           {busy ? "Re-checking safety before publishing…" : "Publish now"}
         </Button>
       )}

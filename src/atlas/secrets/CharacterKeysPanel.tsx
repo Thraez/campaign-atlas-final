@@ -4,9 +4,14 @@ import { Key, Copy, Check, Trash2, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { saveAtlasPatchToLocalFs, hashContent } from "@/atlas/save/localFsSave";
 
-interface CharacterRow { name: string; key: string }
+interface CharacterRow {
+  name: string;
+  key: string;
+}
 
-interface Props { worldDir: string }
+interface Props {
+  worldDir: string;
+}
 
 export function CharacterKeysPanel({ worldDir }: Props) {
   const keysPath = `${worldDir}/_dm/character-keys.yaml`;
@@ -45,7 +50,9 @@ export function CharacterKeysPanel({ worldDir }: Props) {
     }
   }, [keysPath]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const generate = (): string =>
     Array.from(crypto.getRandomValues(new Uint8Array(10)))
@@ -65,12 +72,14 @@ export function CharacterKeysPanel({ worldDir }: Props) {
     const content = yaml.dump(obj);
     setSaving(true);
     try {
-      await saveAtlasPatchToLocalFs([{
-        path: keysPath,
-        content,
-        kind: "world-yaml",
-        baseHash,
-      }]);
+      await saveAtlasPatchToLocalFs([
+        {
+          path: keysPath,
+          content,
+          kind: "world-yaml",
+          baseHash,
+        },
+      ]);
       const h = await hashContent(content);
       setBaseHash(h);
       toast.success("Character keys saved");
@@ -110,14 +119,16 @@ export function CharacterKeysPanel({ worldDir }: Props) {
           <Key className="h-3.5 w-3.5" /> Character Keys
         </div>
         <div className="text-[10px] text-muted-foreground">
-          Each player gets one key for their character. Share it privately out-of-band.
-          If they lose it, come back here — the same key is always shown again.
+          Each player gets one key for their character. Share it privately out-of-band. If they lose
+          it, come back here — the same key is always shown again.
         </div>
       </div>
 
       <div className="flex-1 overflow-auto p-3 space-y-3">
         {rows.length === 0 && (
-          <div className="text-[10px] text-muted-foreground py-2">No characters yet — add one below.</div>
+          <div className="text-[10px] text-muted-foreground py-2">
+            No characters yet — add one below.
+          </div>
         )}
         {rows.map((row, i) => (
           <div key={i} className="space-y-1">
@@ -154,9 +165,11 @@ export function CharacterKeysPanel({ worldDir }: Props) {
                 title="Copy key to clipboard"
                 aria-label="Copy key"
               >
-                {copiedIdx === i
-                  ? <Check className="h-3 w-3 text-green-400" />
-                  : <Copy className="h-3 w-3" />}
+                {copiedIdx === i ? (
+                  <Check className="h-3 w-3 text-green-400" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
               </button>
               <button
                 type="button"

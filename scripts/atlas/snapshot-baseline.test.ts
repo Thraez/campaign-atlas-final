@@ -16,7 +16,9 @@ describe("snapshotBaseline", () => {
     fs.writeFileSync(path.join(root, "public/atlas/atlas.json"), '{"v":1}');
     const result = snapshotBaseline(root);
     expect(result).toBe(true);
-    expect(fs.readFileSync(path.join(root, "public/atlas/.last-published.json"), "utf8")).toBe('{"v":1}');
+    expect(fs.readFileSync(path.join(root, "public/atlas/.last-published.json"), "utf8")).toBe(
+      '{"v":1}',
+    );
   });
 
   it("returns false (no throw) when atlas.json is absent", () => {

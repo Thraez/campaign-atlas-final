@@ -46,24 +46,34 @@ describe("detectExposureIncrease", () => {
 
 describe("resolveType (two-way, base = last-synced vault type)", () => {
   it("no base recorded → vault wins (first sync)", () => {
-    expect(resolveType({ diskType: "npc", vaultType: "faction", baseType: undefined }))
-      .toEqual({ type: "faction", conflict: false });
+    expect(resolveType({ diskType: "npc", vaultType: "faction", baseType: undefined })).toEqual({
+      type: "faction",
+      conflict: false,
+    });
   });
   it("vault changed, disk unchanged → vault wins", () => {
-    expect(resolveType({ diskType: "npc", vaultType: "faction", baseType: "npc" }))
-      .toEqual({ type: "faction", conflict: false });
+    expect(resolveType({ diskType: "npc", vaultType: "faction", baseType: "npc" })).toEqual({
+      type: "faction",
+      conflict: false,
+    });
   });
   it("disk changed, vault unchanged → disk kept", () => {
-    expect(resolveType({ diskType: "location", vaultType: "npc", baseType: "npc" }))
-      .toEqual({ type: "location", conflict: false });
+    expect(resolveType({ diskType: "location", vaultType: "npc", baseType: "npc" })).toEqual({
+      type: "location",
+      conflict: false,
+    });
   });
   it("neither changed → disk (no-op)", () => {
-    expect(resolveType({ diskType: "npc", vaultType: "npc", baseType: "npc" }))
-      .toEqual({ type: "npc", conflict: false });
+    expect(resolveType({ diskType: "npc", vaultType: "npc", baseType: "npc" })).toEqual({
+      type: "npc",
+      conflict: false,
+    });
   });
   it("both changed → conflict, disk kept unless ticked", () => {
-    expect(resolveType({ diskType: "location", vaultType: "faction", baseType: "npc" }))
-      .toEqual({ type: "location", conflict: true });
+    expect(resolveType({ diskType: "location", vaultType: "faction", baseType: "npc" })).toEqual({
+      type: "location",
+      conflict: true,
+    });
   });
 });
 
@@ -73,22 +83,30 @@ const fm = (data: Record<string, unknown>, content = "body") => ({ data, content
 
 describe("mergeImportFrontmatter (disk-base merge)", () => {
   it("preserves atlas-owned keys verbatim incl. unknown + legacy x/y", () => {
-    const disk = fm({
-      atlas: {
-        id: "corven", type: "npc", visibility: "dm",
-        placements: [{ mapId: "m1", x: 1, y: 2 }],
-        relationships: [{ to: "x" }], profile: { dm: { secret: "A" } },
-        x: 9, y: 9,
-        fooBar: "keep-me",
+    const disk = fm(
+      {
+        atlas: {
+          id: "corven",
+          type: "npc",
+          visibility: "dm",
+          placements: [{ mapId: "m1", x: 1, y: 2 }],
+          relationships: [{ to: "x" }],
+          profile: { dm: { secret: "A" } },
+          x: 9,
+          y: 9,
+          fooBar: "keep-me",
+        },
       },
-    }, "OLD BODY");
+      "OLD BODY",
+    );
     const vault = fm({ atlas: { summary: "new summary" } }, "NEW BODY");
     const r = mergeImportFrontmatter({ disk, vault, inferredType: "npc", baseType: "npc" });
     const a = r.data.atlas as Record<string, unknown>;
     expect(a.placements).toEqual([{ mapId: "m1", x: 1, y: 2 }]);
     expect(a.relationships).toEqual([{ to: "x" }]);
     expect(a.profile).toEqual({ dm: { secret: "A" } });
-    expect(a.x).toBe(9); expect(a.y).toBe(9);
+    expect(a.x).toBe(9);
+    expect(a.y).toBe(9);
     expect(a.fooBar).toBe("keep-me");
     expect(a.id).toBe("corven");
     expect(a.summary).toBe("new summary");

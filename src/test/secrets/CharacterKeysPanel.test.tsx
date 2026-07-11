@@ -49,9 +49,7 @@ describe("CharacterKeysPanel — load/add/remove/persist contract (N36)", () => 
   it("shows empty state when no characters exist (404)", async () => {
     stubFetch404();
     render(<CharacterKeysPanel worldDir="/world" />);
-    await waitFor(() =>
-      expect(screen.getByText(/No characters yet/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/No characters yet/i)).toBeInTheDocument());
   });
 
   it("populates rows from saved YAML on mount", async () => {
@@ -102,9 +100,7 @@ describe("CharacterKeysPanel — load/add/remove/persist contract (N36)", () => 
     render(<CharacterKeysPanel worldDir="/world" />);
     await waitFor(() => screen.getByDisplayValue("Aria"));
     fireEvent.click(screen.getByRole("button", { name: /Save keys/i }));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Saving/i })).toBeDisabled(),
-    );
+    await waitFor(() => expect(screen.getByRole("button", { name: /Saving/i })).toBeDisabled());
   });
 
   it("blank-name rows are excluded from the saved YAML", async () => {

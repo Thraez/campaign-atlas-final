@@ -1,7 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { AudioEngine, type AudioDeps } from "@/atlas/sound/AudioEngine";
 import { realAudioDeps } from "@/atlas/sound/realAudioDeps";
-import { DEFAULT_PREFS, loadSoundPrefs, saveSoundPrefs, type SoundPrefs } from "@/atlas/sound/soundPrefs";
+import {
+  DEFAULT_PREFS,
+  loadSoundPrefs,
+  saveSoundPrefs,
+  type SoundPrefs,
+} from "@/atlas/sound/soundPrefs";
 
 interface SoundSettings extends SoundPrefs {
   engine: AudioEngine;
@@ -18,8 +23,16 @@ export function useSoundSettings(): SoundSettings {
   return v;
 }
 
-export function SoundSettingsProvider({ children, deps = realAudioDeps }: { children: React.ReactNode; deps?: AudioDeps }) {
-  const [prefs, setPrefs] = useState<SoundPrefs>(() => (typeof window === "undefined" ? DEFAULT_PREFS : loadSoundPrefs()));
+export function SoundSettingsProvider({
+  children,
+  deps = realAudioDeps,
+}: {
+  children: React.ReactNode;
+  deps?: AudioDeps;
+}) {
+  const [prefs, setPrefs] = useState<SoundPrefs>(() =>
+    typeof window === "undefined" ? DEFAULT_PREFS : loadSoundPrefs(),
+  );
   // deps is a constant (realAudioDeps or a test stub) — stable across renders.
   const [engine] = useState(() => new AudioEngine(deps));
 

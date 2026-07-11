@@ -32,7 +32,9 @@ export function WanderControl({ discovered, total, canWander, onWander }: Wander
         <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
           <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
         </div>
-        <span className="whitespace-nowrap text-xs text-muted-foreground">{discovered} of {total} places</span>
+        <span className="whitespace-nowrap text-xs text-muted-foreground">
+          {discovered} of {total} places
+        </span>
       </div>
     </div>
   );

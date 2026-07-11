@@ -40,7 +40,10 @@ function makeCtx(overrides?: {
   existingById?: ReadonlyMap<string, string>;
   existingPaths?: ReadonlySet<string>;
   syncMap?: SyncMap;
-  entityMeta?: ReadonlyMap<string, { visibility: EntityVisibility; type: string; sourcePath: string }>;
+  entityMeta?: ReadonlyMap<
+    string,
+    { visibility: EntityVisibility; type: string; sourcePath: string }
+  >;
 }): StagingContext {
   return {
     worldId: WORLD,
@@ -506,7 +509,11 @@ describe("Task 1.6 — needsReview: defaults to included=false, DM can opt in", 
       makeCtx(),
     );
     // Phase 2 sets needsReview + flips included; inject directly to test the contract
-    const flagged: StagingRow = { ...base, needsReview: { reason: "secrecy-increase" }, included: false };
+    const flagged: StagingRow = {
+      ...base,
+      needsReview: { reason: "secrecy-increase" },
+      included: false,
+    };
     expect(flagged.included).toBe(false);
   });
 
@@ -515,7 +522,11 @@ describe("Task 1.6 — needsReview: defaults to included=false, DM can opt in", 
       { filename: "shadow.md", raw: "---\natlas:\n  type: npc\n  id: shadow\n---\n" },
       makeCtx(),
     );
-    const flagged: StagingRow = { ...base, needsReview: { reason: "secrecy-increase" }, included: false };
+    const flagged: StagingRow = {
+      ...base,
+      needsReview: { reason: "secrecy-increase" },
+      included: false,
+    };
     const opted = updateStagingRow(flagged, { included: true }, makeCtx());
     expect(opted.included).toBe(true);
     // needsReview preserved so the UI can still show the warning even when opted in
@@ -621,7 +632,10 @@ describe("Task 2.3 — needsReview from entityMeta", () => {
 
   function metaCtx(overrides: {
     existingById: ReadonlyMap<string, string>;
-    entityMeta: ReadonlyMap<string, { visibility: EntityVisibility; type: string; sourcePath: string }>;
+    entityMeta: ReadonlyMap<
+      string,
+      { visibility: EntityVisibility; type: string; sourcePath: string }
+    >;
     syncMap?: SyncMap;
   }): StagingContext {
     return {
@@ -638,11 +652,21 @@ describe("Task 2.3 — needsReview from entityMeta", () => {
   it("dm entity + vault publish:true → secrecy-increase, included=false", () => {
     const existingById = new Map([["villain", "content/w/npcs/villain.md"]]);
     const entityMeta = new Map([
-      ["villain", { visibility: "dm" as EntityVisibility, type: "npc", sourcePath: "content/w/npcs/villain.md" }],
+      [
+        "villain",
+        {
+          visibility: "dm" as EntityVisibility,
+          type: "npc",
+          sourcePath: "content/w/npcs/villain.md",
+        },
+      ],
     ]);
     const ctx = metaCtx({ existingById, entityMeta });
     const row = buildStagingRow(
-      { filename: "villain.md", raw: "---\natlas:\n  id: villain\n  type: npc\n  publish: true\n---\n" },
+      {
+        filename: "villain.md",
+        raw: "---\natlas:\n  id: villain\n  type: npc\n  publish: true\n---\n",
+      },
       ctx,
     );
     expect(row.needsReview?.reason).toBe("secrecy-increase");
@@ -652,11 +676,21 @@ describe("Task 2.3 — needsReview from entityMeta", () => {
   it("dm entity + vault visibility:player → secrecy-increase", () => {
     const existingById = new Map([["hidden-npc", "content/w/npcs/hidden-npc.md"]]);
     const entityMeta = new Map([
-      ["hidden-npc", { visibility: "dm" as EntityVisibility, type: "npc", sourcePath: "content/w/npcs/hidden-npc.md" }],
+      [
+        "hidden-npc",
+        {
+          visibility: "dm" as EntityVisibility,
+          type: "npc",
+          sourcePath: "content/w/npcs/hidden-npc.md",
+        },
+      ],
     ]);
     const ctx = metaCtx({ existingById, entityMeta });
     const row = buildStagingRow(
-      { filename: "hidden-npc.md", raw: "---\natlas:\n  id: hidden-npc\n  type: npc\n  visibility: player\n---\n" },
+      {
+        filename: "hidden-npc.md",
+        raw: "---\natlas:\n  id: hidden-npc\n  type: npc\n  visibility: player\n---\n",
+      },
       ctx,
     );
     expect(row.needsReview?.reason).toBe("secrecy-increase");
@@ -667,12 +701,23 @@ describe("Task 2.3 — needsReview from entityMeta", () => {
     // baseType="npc", disk changed to "location", vault changed to "faction" → conflict
     const existingById = new Map([["hero", "content/w/npcs/hero.md"]]);
     const entityMeta = new Map([
-      ["hero", { visibility: "player" as EntityVisibility, type: "location", sourcePath: "content/w/npcs/hero.md" }],
+      [
+        "hero",
+        {
+          visibility: "player" as EntityVisibility,
+          type: "location",
+          sourcePath: "content/w/npcs/hero.md",
+        },
+      ],
     ]);
     const syncMap: SyncMap = { "notes/hero.md": { id: "hero", baseType: "npc" } };
     const ctx = metaCtx({ existingById, entityMeta, syncMap });
     const row = buildStagingRow(
-      { filename: "hero.md", raw: "---\natlas:\n  id: hero\n  type: faction\n---\n", vaultRelPath: "notes/hero.md" },
+      {
+        filename: "hero.md",
+        raw: "---\natlas:\n  id: hero\n  type: faction\n---\n",
+        vaultRelPath: "notes/hero.md",
+      },
       ctx,
     );
     expect(row.needsReview?.reason).toBe("type-conflict");
@@ -682,11 +727,21 @@ describe("Task 2.3 — needsReview from entityMeta", () => {
   it("no exposure increase and no type conflict → needsReview remains undefined, included=true", () => {
     const existingById = new Map([["npc-a", "content/w/npcs/npc-a.md"]]);
     const entityMeta = new Map([
-      ["npc-a", { visibility: "dm" as EntityVisibility, type: "npc", sourcePath: "content/w/npcs/npc-a.md" }],
+      [
+        "npc-a",
+        {
+          visibility: "dm" as EntityVisibility,
+          type: "npc",
+          sourcePath: "content/w/npcs/npc-a.md",
+        },
+      ],
     ]);
     const ctx = metaCtx({ existingById, entityMeta });
     const row = buildStagingRow(
-      { filename: "npc-a.md", raw: "---\natlas:\n  id: npc-a\n  type: npc\n  visibility: dm\n---\n" },
+      {
+        filename: "npc-a.md",
+        raw: "---\natlas:\n  id: npc-a\n  type: npc\n  visibility: dm\n---\n",
+      },
       ctx,
     );
     expect(row.needsReview).toBeUndefined();
@@ -696,11 +751,21 @@ describe("Task 2.3 — needsReview from entityMeta", () => {
   it("player entity + vault wanting player visibility → no secrecy-increase (already exposed)", () => {
     const existingById = new Map([["pub-npc", "content/w/npcs/pub-npc.md"]]);
     const entityMeta = new Map([
-      ["pub-npc", { visibility: "player" as EntityVisibility, type: "npc", sourcePath: "content/w/npcs/pub-npc.md" }],
+      [
+        "pub-npc",
+        {
+          visibility: "player" as EntityVisibility,
+          type: "npc",
+          sourcePath: "content/w/npcs/pub-npc.md",
+        },
+      ],
     ]);
     const ctx = metaCtx({ existingById, entityMeta });
     const row = buildStagingRow(
-      { filename: "pub-npc.md", raw: "---\natlas:\n  id: pub-npc\n  type: npc\n  publish: true\n---\n" },
+      {
+        filename: "pub-npc.md",
+        raw: "---\natlas:\n  id: pub-npc\n  type: npc\n  publish: true\n---\n",
+      },
       ctx,
     );
     expect(row.needsReview).toBeUndefined();
@@ -709,7 +774,14 @@ describe("Task 2.3 — needsReview from entityMeta", () => {
 
   it("create row: entityMeta not consulted, needsReview stays undefined", () => {
     const entityMeta = new Map([
-      ["unrelated", { visibility: "dm" as EntityVisibility, type: "npc", sourcePath: "content/w/npcs/unrelated.md" }],
+      [
+        "unrelated",
+        {
+          visibility: "dm" as EntityVisibility,
+          type: "npc",
+          sourcePath: "content/w/npcs/unrelated.md",
+        },
+      ],
     ]);
     const ctx = metaCtx({ existingById: new Map(), entityMeta });
     const row = buildStagingRow(

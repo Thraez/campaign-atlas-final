@@ -75,8 +75,10 @@ describe("buildNewEntityChange", () => {
 
   it("omits summary from atlas block when summary is not provided", () => {
     const change = buildNewEntityChange({
-      worldRoot: "content/w", category: "characters",
-      title: "Unnamed Scout", visibility: "dm",
+      worldRoot: "content/w",
+      category: "characters",
+      title: "Unnamed Scout",
+      visibility: "dm",
     });
     const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
     expect(Object.prototype.hasOwnProperty.call(atlas, "summary")).toBe(false);
@@ -84,8 +86,10 @@ describe("buildNewEntityChange", () => {
 
   it("uses folder 'settlements' and type 'settlement' for locations category", () => {
     const change = buildNewEntityChange({
-      worldRoot: "content/w", category: "locations",
-      title: "Iron Gate", visibility: "player",
+      worldRoot: "content/w",
+      category: "locations",
+      title: "Iron Gate",
+      visibility: "player",
     });
     expect(change.path).toBe("content/w/settlements/iron-gate.md");
     const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
@@ -94,8 +98,11 @@ describe("buildNewEntityChange", () => {
 
   it("trims whitespace from kind before writing atlas.type", () => {
     const change = buildNewEntityChange({
-      worldRoot: "content/w", category: "characters",
-      title: "Scout", visibility: "dm", kind: "  ranger  ",
+      worldRoot: "content/w",
+      category: "characters",
+      title: "Scout",
+      visibility: "dm",
+      kind: "  ranger  ",
     });
     const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
     expect(atlas.type).toBe("ranger");
@@ -103,8 +110,10 @@ describe("buildNewEntityChange", () => {
 
   it("persists visibility 'rumor' in the atlas block", () => {
     const change = buildNewEntityChange({
-      worldRoot: "content/w", category: "lore",
-      title: "Hidden Pact", visibility: "rumor",
+      worldRoot: "content/w",
+      category: "lore",
+      title: "Hidden Pact",
+      visibility: "rumor",
     });
     const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
     expect(atlas.visibility).toBe("rumor");

@@ -37,7 +37,11 @@ atlas:
 ---
 body`);
     expect(warnings).toHaveLength(0);
-    expect(atlas.secrets![0]).toMatchObject({ id: "signet", for: "vesper", reveal: "you know the ring" });
+    expect(atlas.secrets![0]).toMatchObject({
+      id: "signet",
+      for: "vesper",
+      reveal: "you know the ring",
+    });
     expect(atlas.secrets![0].teaser).toBeUndefined();
   });
 

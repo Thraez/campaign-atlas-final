@@ -88,7 +88,10 @@ function makeRoute(overrides: Partial<Route> = {}): Route {
     mapId: "map-1",
     name: "King's Road",
     visibility: "player",
-    waypoints: [[0, 0], [100, 100]],
+    waypoints: [
+      [0, 0],
+      [100, 100],
+    ],
     mode: "foot",
     color: "#cfd6dc",
     weight: 3,
@@ -104,11 +107,7 @@ function makeRoute(overrides: Partial<Route> = {}): Route {
 describe("RoutesTab — Empty state", () => {
   it("shows 'No routes yet' message when effective is empty", () => {
     render(
-      <RoutesTab
-        project={makeProject()}
-        map={makeMap()}
-        api={makeMockApi({ effective: [] })}
-      />
+      <RoutesTab project={makeProject()} map={makeMap()} api={makeMockApi({ effective: [] })} />,
     );
     expect(screen.getByText(/No routes yet/)).toBeTruthy();
   });
@@ -116,13 +115,20 @@ describe("RoutesTab — Empty state", () => {
 
 describe("RoutesTab — Route list", () => {
   it("renders route name and waypoint count when routes are present", () => {
-    const route = makeRoute({ name: "Merchant Path", waypoints: [[0, 0], [50, 50], [100, 100]] });
+    const route = makeRoute({
+      name: "Merchant Path",
+      waypoints: [
+        [0, 0],
+        [50, 50],
+        [100, 100],
+      ],
+    });
     render(
       <RoutesTab
         project={makeProject()}
         map={makeMap()}
         api={makeMockApi({ effective: [route] })}
-      />
+      />,
     );
     expect(screen.getByText("Merchant Path")).toBeTruthy();
     expect(screen.getByText("3 wp")).toBeTruthy();
@@ -136,20 +142,24 @@ describe("RoutesTab — Route list", () => {
         project={makeProject()}
         map={makeMap()}
         api={makeMockApi({ effective: [route], draft })}
-      />
+      />,
     );
     expect(screen.getByText("new")).toBeTruthy();
   });
 
   it("renders 'edit' badge for a route with edits (not in draft.added)", () => {
     const route = makeRoute({ id: "r-edit", name: "Edited Road" });
-    const draft: RouteDraft = { edits: { "r-edit": { name: "Edited Road" } }, added: [], deleted: [] };
+    const draft: RouteDraft = {
+      edits: { "r-edit": { name: "Edited Road" } },
+      added: [],
+      deleted: [],
+    };
     render(
       <RoutesTab
         project={makeProject()}
         map={makeMap()}
         api={makeMockApi({ effective: [route], draft })}
-      />
+      />,
     );
     expect(screen.getByText("edit")).toBeTruthy();
   });
@@ -163,7 +173,7 @@ describe("RoutesTab — Selected route form", () => {
         project={makeProject()}
         map={makeMap()}
         api={makeMockApi({ effective: [route], selectedId: "route-1" })}
-      />
+      />,
     );
     expect(screen.getByDisplayValue("Highland Pass")).toBeTruthy();
   });
@@ -175,7 +185,7 @@ describe("RoutesTab — Selected route form", () => {
         project={makeProject()}
         map={makeMap()}
         api={makeMockApi({ effective: [route], selectedId: null })}
-      />
+      />,
     );
     expect(screen.queryByDisplayValue("Highland Pass")).toBeNull();
   });
@@ -183,41 +193,31 @@ describe("RoutesTab — Selected route form", () => {
 
 describe("RoutesTab — Validation chips", () => {
   it("validation chips absent when issues list is empty", () => {
-    render(
-      <RoutesTab
-        project={makeProject()}
-        map={makeMap()}
-        api={makeMockApi({ issues: [] })}
-      />
-    );
+    render(<RoutesTab project={makeProject()} map={makeMap()} api={makeMockApi({ issues: [] })} />);
     expect(screen.queryByText(/blocking/i)).toBeNull();
   });
 
   it("blocking issue message rendered", () => {
     const issues: RouteIssue[] = [
-      { severity: "blocking", code: "route-too-few-waypoints", message: "Route needs at least 2 waypoints." },
+      {
+        severity: "blocking",
+        code: "route-too-few-waypoints",
+        message: "Route needs at least 2 waypoints.",
+      },
     ];
-    render(
-      <RoutesTab
-        project={makeProject()}
-        map={makeMap()}
-        api={makeMockApi({ issues })}
-      />
-    );
+    render(<RoutesTab project={makeProject()} map={makeMap()} api={makeMockApi({ issues })} />);
     expect(screen.getByText("Route needs at least 2 waypoints.")).toBeTruthy();
   });
 
   it("warning issue message rendered", () => {
     const issues: RouteIssue[] = [
-      { severity: "warning", code: "route-wrong-map", message: "Route mapId doesn't match active map." },
+      {
+        severity: "warning",
+        code: "route-wrong-map",
+        message: "Route mapId doesn't match active map.",
+      },
     ];
-    render(
-      <RoutesTab
-        project={makeProject()}
-        map={makeMap()}
-        api={makeMockApi({ issues })}
-      />
-    );
+    render(<RoutesTab project={makeProject()} map={makeMap()} api={makeMockApi({ issues })} />);
     expect(screen.getByText("Route mapId doesn't match active map.")).toBeTruthy();
   });
 });
@@ -225,11 +225,7 @@ describe("RoutesTab — Validation chips", () => {
 describe("RoutesTab — Dirty state", () => {
   it("Discard button absent when not dirty", () => {
     render(
-      <RoutesTab
-        project={makeProject()}
-        map={makeMap()}
-        api={makeMockApi({ dirty: false })}
-      />
+      <RoutesTab project={makeProject()} map={makeMap()} api={makeMockApi({ dirty: false })} />,
     );
     expect(screen.queryByText(/Discard local/)).toBeNull();
   });
@@ -241,7 +237,7 @@ describe("RoutesTab — Dirty state", () => {
         project={makeProject()}
         map={makeMap()}
         api={makeMockApi({ dirty: true, reset })}
-      />
+      />,
     );
     const btn = screen.getByText(/Discard local/);
     expect(btn).toBeTruthy();
@@ -253,11 +249,7 @@ describe("RoutesTab — Dirty state", () => {
 describe("RoutesTab — Drawing mode", () => {
   it("shows 'Draw route' button when not drawing", () => {
     render(
-      <RoutesTab
-        project={makeProject()}
-        map={makeMap()}
-        api={makeMockApi({ drawing: false })}
-      />
+      <RoutesTab project={makeProject()} map={makeMap()} api={makeMockApi({ drawing: false })} />,
     );
     expect(screen.getByRole("button", { name: /Draw route/ })).toBeTruthy();
   });
@@ -267,8 +259,14 @@ describe("RoutesTab — Drawing mode", () => {
       <RoutesTab
         project={makeProject()}
         map={makeMap()}
-        api={makeMockApi({ drawing: true, draftWaypoints: [[0, 0], [50, 50]] })}
-      />
+        api={makeMockApi({
+          drawing: true,
+          draftWaypoints: [
+            [0, 0],
+            [50, 50],
+          ],
+        })}
+      />,
     );
     expect(screen.getByText(/Drawing.*2 wp/)).toBeTruthy();
   });

@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { loadSoundPrefs, saveSoundPrefs, DEFAULT_PREFS, _resetSoundPrefsForTests } from "@/atlas/sound/soundPrefs";
+import {
+  loadSoundPrefs,
+  saveSoundPrefs,
+  DEFAULT_PREFS,
+  _resetSoundPrefsForTests,
+} from "@/atlas/sound/soundPrefs";
 
 describe("soundPrefs", () => {
   beforeEach(() => _resetSoundPrefsForTests());
@@ -34,7 +39,10 @@ describe("soundPrefs", () => {
   });
 
   it("falls back per-field to defaults when stored fields are non-boolean", () => {
-    localStorage.setItem("atlas-player-sound-v1", JSON.stringify({ soundEnabled: "yes", muted: 1, calmMode: null }));
+    localStorage.setItem(
+      "atlas-player-sound-v1",
+      JSON.stringify({ soundEnabled: "yes", muted: 1, calmMode: null }),
+    );
     expect(loadSoundPrefs()).toEqual(DEFAULT_PREFS);
   });
 });

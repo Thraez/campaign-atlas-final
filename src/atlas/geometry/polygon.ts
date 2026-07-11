@@ -12,8 +12,9 @@ export function pointInPolygon(x: number, y: number, poly: Point[]): boolean {
   if (poly.length < 3) return false;
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [xi, yi] = poly[i], [xj, yj] = poly[j];
-    const hit = (yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+    const [xi, yi] = poly[i],
+      [xj, yj] = poly[j];
+    const hit = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
     if (hit) inside = !inside;
   }
   return inside;
@@ -21,7 +22,10 @@ export function pointInPolygon(x: number, y: number, poly: Point[]): boolean {
 
 export function bboxOf(points: Point[]): BBox | null {
   if (points.length === 0) return null;
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
   for (const [x, y] of points) {
     if (x < minX) minX = x;
     if (y < minY) minY = y;

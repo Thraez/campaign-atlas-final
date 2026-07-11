@@ -41,7 +41,13 @@ export function resolveType(args: {
 }
 
 const VAULT_CONTENT_KEYS = [
-  "summary", "race", "date", "dateValue", "images", "canon", "world",
+  "summary",
+  "race",
+  "date",
+  "dateValue",
+  "images",
+  "canon",
+  "world",
 ] as const;
 
 function unionStrings(...sources: unknown[]): string[] {

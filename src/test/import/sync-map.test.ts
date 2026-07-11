@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  lookupByPath,
-  recordSync,
-  type SyncMap,
-} from "@/atlas/import/syncMap";
+import { lookupByPath, recordSync, type SyncMap } from "@/atlas/import/syncMap";
 
 describe("lookupByPath", () => {
   it("returns the entry when the path exists in the map", () => {

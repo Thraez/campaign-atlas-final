@@ -12,8 +12,8 @@ export interface SecretBlob {
   id: string;
   lockType: "password" | "character";
   teaser?: string;
-  salt: string;       // base64, 16 random bytes
-  iv: string;         // base64, 12 random bytes
+  salt: string; // base64, 16 random bytes
+  iv: string; // base64, 12 random bytes
   ciphertext: string; // base64( AES-GCM output || 16-byte auth tag )
 }
 
@@ -29,13 +29,9 @@ function b64ToBytes(b64: string): Uint8Array {
 
 async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
   const enc = new TextEncoder();
-  const baseKey = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(passphrase),
-    "PBKDF2",
-    false,
-    ["deriveKey"],
-  );
+  const baseKey = await crypto.subtle.importKey("raw", enc.encode(passphrase), "PBKDF2", false, [
+    "deriveKey",
+  ]);
   return crypto.subtle.deriveKey(
     { name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
     baseKey,

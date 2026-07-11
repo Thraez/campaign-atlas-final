@@ -5,7 +5,24 @@ import { SoundControl } from "@/atlas/sound/SoundControl";
 import { _resetSoundPrefsForTests } from "@/atlas/sound/soundPrefs";
 
 const stubDeps = {
-  createContext: () => ({ state: "suspended", currentTime: 0, destination: {}, createGain: () => ({ gain: { value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, cancelScheduledValues() {} }, connect() {}, disconnect() {} }), resume: async () => {}, suspend: async () => {} }) as any,
+  createContext: () =>
+    ({
+      state: "suspended",
+      currentTime: 0,
+      destination: {},
+      createGain: () => ({
+        gain: {
+          value: 0,
+          setValueAtTime() {},
+          linearRampToValueAtTime() {},
+          cancelScheduledValues() {},
+        },
+        connect() {},
+        disconnect() {},
+      }),
+      resume: async () => {},
+      suspend: async () => {},
+    }) as any,
   fetchAudio: async () => new ArrayBuffer(8),
   canPlay: () => true,
 };

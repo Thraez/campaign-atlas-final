@@ -70,7 +70,7 @@ function renderTab(opts: RenderOpts = {}) {
       onDraftsChange={onDraftsChange}
       onImportMdFiles={opts.onImportMdFiles}
       onPasteMarkdown={opts.onPasteMarkdown}
-    />
+    />,
   );
 }
 
@@ -124,7 +124,7 @@ describe("EntitiesTab — Discard button", () => {
         project={makeProject([entity])}
         drafts={{ "entity-1": { summary: "changed" } }}
         onDraftsChange={onDraftsChange}
-      />
+      />,
     );
     fireEvent.click(screen.getByText(/Discard all local changes/));
     expect(onDraftsChange).toHaveBeenCalledWith({});

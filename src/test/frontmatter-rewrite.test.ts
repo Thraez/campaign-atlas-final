@@ -24,8 +24,7 @@ describe("rewriteFrontmatter — atlas field patching", () => {
   });
 
   it("overwrites existing atlas.summary", () => {
-    const file =
-      "---\natlas:\n  id: xyz\n  summary: \"Old summary.\"\n---\n# Entity\n";
+    const file = '---\natlas:\n  id: xyz\n  summary: "Old summary."\n---\n# Entity\n';
     const result = rewriteFrontmatter(file, { summary: "New summary." });
     expect(result).toContain("summary: New summary.");
     expect(result).not.toContain("Old summary.");
@@ -66,14 +65,14 @@ describe("rewriteFrontmatter — normaliseTags (string input branch)", () => {
   });
 
   it("trims whitespace from a string tag", () => {
-    const file = "---\natlas:\n  id: xyz\ntags: \"  arcane  \"\n---\n# Entity\n";
+    const file = '---\natlas:\n  id: xyz\ntags: "  arcane  "\n---\n# Entity\n';
     const result = rewriteFrontmatter(file, { tagsAdd: ["wizard"] });
     expect(result).toContain("arcane");
     expect(result).not.toContain("  arcane  ");
   });
 
   it("ignores an empty-string tags value (returns [] → new tag added alone)", () => {
-    const file = "---\natlas:\n  id: xyz\ntags: \"\"\n---\n# Entity\n";
+    const file = '---\natlas:\n  id: xyz\ntags: ""\n---\n# Entity\n';
     const result = rewriteFrontmatter(file, { tagsAdd: ["landmark"] });
     expect(result).toContain("landmark");
     // Should not contain the empty-string tag.

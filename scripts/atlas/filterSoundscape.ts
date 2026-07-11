@@ -11,7 +11,9 @@ import { PLAYER_VISIBLE } from "./visibility";
  * - Preserves all other fields (bed src, gain, points, regionId, etc.).
  *   Audio filename content-hashing is handled separately (Task 14).
  */
-export function filterSoundscapeForPlayer(sc: SoundscapeConfig | undefined): SoundscapeConfig | undefined {
+export function filterSoundscapeForPlayer(
+  sc: SoundscapeConfig | undefined,
+): SoundscapeConfig | undefined {
   if (!sc) return undefined;
 
   const kept: SoundArea[] = (sc.areas ?? [])

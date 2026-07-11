@@ -103,9 +103,9 @@ describe("runPublishPush (integration — no network)", () => {
       }
 
       // Snapshot was written after the push
-      expect(
-        fs.existsSync(path.join(repoDir, "public", "atlas", ".last-published.json")),
-      ).toBe(true);
+      expect(fs.existsSync(path.join(repoDir, "public", "atlas", ".last-published.json"))).toBe(
+        true,
+      );
 
       // The commit staged only scoped paths
       const committed = git(repoDir, "show", "--name-only", "--format=", "HEAD");

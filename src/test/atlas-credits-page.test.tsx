@@ -60,10 +60,12 @@ describe("AtlasCredits page", () => {
   });
 
   it("lists a credited entity alphabetically", async () => {
-    renderCredits(makeProject([
-      makeEntity({ id: "beta", title: "Beta", credit: "Art by B" }),
-      makeEntity({ id: "alpha", title: "Alpha", credit: "Art by A" }),
-    ]));
+    renderCredits(
+      makeProject([
+        makeEntity({ id: "beta", title: "Beta", credit: "Art by B" }),
+        makeEntity({ id: "alpha", title: "Alpha", credit: "Art by A" }),
+      ]),
+    );
     await screen.findByText("Alpha");
     const items = screen.getAllByRole("listitem");
     expect(items[0].textContent).toContain("Alpha");
@@ -71,19 +73,28 @@ describe("AtlasCredits page", () => {
   });
 
   it("does not list entities without a credit", async () => {
-    renderCredits(makeProject([
-      makeEntity({ id: "credited", title: "Credited", credit: "Art by X" }),
-      makeEntity({ id: "uncredited", title: "Uncredited" }),
-    ]));
+    renderCredits(
+      makeProject([
+        makeEntity({ id: "credited", title: "Credited", credit: "Art by X" }),
+        makeEntity({ id: "uncredited", title: "Uncredited" }),
+      ]),
+    );
     await screen.findByText("Credited");
     expect(screen.queryByText("Uncredited")).not.toBeInTheDocument();
   });
 
   it("SECRECY REGRESSION: dm-only entity credit absent from credits page", async () => {
-    renderCredits(makeProject([
-      makeEntity({ id: "dm-secret", title: "DM Secret", visibility: "dm", credit: "DM_CREDIT_LEAK" }),
-      makeEntity({ id: "public-npc", title: "Public NPC", credit: "Art by P" }),
-    ]));
+    renderCredits(
+      makeProject([
+        makeEntity({
+          id: "dm-secret",
+          title: "DM Secret",
+          visibility: "dm",
+          credit: "DM_CREDIT_LEAK",
+        }),
+        makeEntity({ id: "public-npc", title: "Public NPC", credit: "Art by P" }),
+      ]),
+    );
     await screen.findByText("Public NPC");
     expect(screen.queryByText(/DM_CREDIT_LEAK/)).not.toBeInTheDocument();
     expect(screen.queryByText("DM Secret")).not.toBeInTheDocument();

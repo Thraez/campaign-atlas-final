@@ -9,8 +9,16 @@ const FAKE_OBJECT_URL = "blob:mock-download-abc";
 // jsdom does not implement URL.createObjectURL / revokeObjectURL — define them.
 const createObjectURL = vi.fn((_blob: Blob | MediaSource) => FAKE_OBJECT_URL);
 const revokeObjectURL = vi.fn();
-Object.defineProperty(URL, "createObjectURL", { value: createObjectURL, writable: true, configurable: true });
-Object.defineProperty(URL, "revokeObjectURL", { value: revokeObjectURL, writable: true, configurable: true });
+Object.defineProperty(URL, "createObjectURL", {
+  value: createObjectURL,
+  writable: true,
+  configurable: true,
+});
+Object.defineProperty(URL, "revokeObjectURL", {
+  value: revokeObjectURL,
+  writable: true,
+  configurable: true,
+});
 
 beforeEach(() => {
   createObjectURL.mockClear();

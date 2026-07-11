@@ -1,6 +1,9 @@
 import type { MapPlacement } from "../content/schema";
 
-export interface MeterCounts { discovered: number; total: number }
+export interface MeterCounts {
+  discovered: number;
+  total: number;
+}
 
 /** "X of Y places" — Y = distinct placed entities, X = those the player has opened. */
 export function discoveryMeter(placements: MapPlacement[], visited: Set<string>): MeterCounts {

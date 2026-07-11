@@ -92,14 +92,21 @@ export function EntityEditPanel({
         const names: string[] = [];
         for (const line of content.split("\n")) {
           const trimmed = line.trim();
-          if (trimmed && !trimmed.startsWith("#") && !trimmed.startsWith(" ") && trimmed.includes(":")) {
+          if (
+            trimmed &&
+            !trimmed.startsWith("#") &&
+            !trimmed.startsWith(" ") &&
+            trimmed.includes(":")
+          ) {
             const name = trimmed.split(":")[0].trim();
             if (name) names.push(name);
           }
         }
         setCharNames(names);
       })
-      .catch(() => {/* non-fatal — keys file may not exist yet */});
+      .catch(() => {
+        /* non-fatal — keys file may not exist yet */
+      });
   }, [sourcePath]);
 
   useEffect(() => {
@@ -488,7 +495,9 @@ export function EntityEditPanel({
                         >
                           <option value="">— pick a character —</option>
                           {charNames.map((n) => (
-                            <option key={n} value={n}>{n}</option>
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
                           ))}
                         </select>
                       ) : (
@@ -514,7 +523,9 @@ export function EntityEditPanel({
                           value={s.password ?? ""}
                           onChange={(e) =>
                             setDraftSecrets((prev) =>
-                              prev.map((x, j) => (j === i ? { ...x, password: e.target.value } : x)),
+                              prev.map((x, j) =>
+                                j === i ? { ...x, password: e.target.value } : x,
+                              ),
                             )
                           }
                         />
