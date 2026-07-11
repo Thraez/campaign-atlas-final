@@ -43,4 +43,13 @@ describe("railRegistry", () => {
     const pins = items.find((i) => i.id === "pins")!;
     expect(pins.badge?.()).toBe(3);
   });
+
+  it("registers a Sound item in the map group with a panel", () => {
+    const items = buildRailItems({ panels: { sound: <div /> }, counts: {} });
+    const sound = items.find((i) => i.id === "sound");
+    expect(sound).toBeDefined();
+    expect(sound!.group).toBe("map");
+    expect(sound!.label).toBe("Sound");
+    expect(sound!.panel).toBeDefined();
+  });
 });
