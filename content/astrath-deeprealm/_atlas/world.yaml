@@ -25,6 +25,41 @@ maps:
       size: 5000
       color: rgba(255,255,255,0.06)
       enabled: false
+    soundscape:
+      areas:
+        - id: deep-hum
+          name: Deep hum
+          visibility: player
+          points:
+            - [-20000, -20000]
+            - [220000, -20000]
+            - [220000, 170000]
+            - [-20000, 170000]
+          bed:
+            src: atlas/assets/audio/cavern-drone.wav
+            gain: 0.5
+        - id: howling-reaches
+          name: Howling reaches
+          visibility: player
+          points:
+            - [155000, 5000]
+            - [201000, 5000]
+            - [201000, 45000]
+            - [155000, 45000]
+          bed:
+            src: atlas/assets/audio/wind-hollow.wav
+            gain: 0.6
+        - id: springs
+          name: Springs
+          visibility: player
+          points:
+            - [8000, 80000]
+            - [36000, 80000]
+            - [36000, 104000]
+            - [8000, 104000]
+          bed:
+            src: atlas/assets/audio/water-trickle.wav
+            gain: 0.55
     layers:
       - id: upload-1778790358938-0-chatgpt-image-may-4-2026
         src: atlas/assets/maps/chatgpt-image-may-4-2026-09_15_31-pm-4-.png

@@ -12,10 +12,7 @@ const AUDIO_OUT_DIR = "atlas/assets/audio";
  * External URLs (http/https) are skipped — they keep their original src.
  * Duplicate srcs produce one output file (same hash = same bytes).
  */
-export function hashAudioAssets(
-  areas: SoundArea[],
-  publicDir: string
-): Map<string, string> {
+export function hashAudioAssets(areas: SoundArea[], publicDir: string): Map<string, string> {
   const rewrite = new Map<string, string>();
   const srcs = new Set<string>();
 
@@ -43,6 +40,29 @@ export function hashAudioAssets(
   }
 
   return rewrite;
+}
+
+const AUDIO_EXT = /\.(ogg|mp3|aac|m4a|wav)$/i;
+/** Hashed copies produced above: 8 hex chars + extension. A DM source file
+ * named like one (e.g. "deadbeef.ogg") would be hidden from the picker —
+ * acceptable, it stays fully usable via the panel's free-text fallback. */
+const HASHED_NAME = /^[0-9a-f]{8}\.[a-z0-9]+$/i;
+
+/**
+ * Refresh `public/atlas/assets/audio/manifest.json` — the static listing the
+ * editor's sound panel reads to populate its file picker. Lists source audio
+ * basenames only (hashed copies and non-audio files excluded), sorted.
+ * No-op when the audio dir does not exist. Returns what was listed.
+ */
+export function writeAudioManifest(publicDir: string): string[] {
+  const dir = path.join(publicDir, AUDIO_OUT_DIR);
+  if (!fs.existsSync(dir)) return [];
+  const names = fs
+    .readdirSync(dir)
+    .filter((n) => AUDIO_EXT.test(n) && !HASHED_NAME.test(n))
+    .sort();
+  fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify(names, null, 2) + "\n");
+  return names;
 }
 
 /** Apply a rewrite map to all bed.src / bed.srcFallback fields in a SoundArea array. */
