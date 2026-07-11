@@ -123,9 +123,15 @@ export function useSoundscapeDraft(
   const baseAreas = useMemo(() => canon.areas ?? [], [canon]);
 
   const effectiveAreas: SoundArea[] = useMemo(() => {
+    // The editor persistence loop feeds the panel's patched config back into
+    // `map.soundscape`, so an area added this session can also appear in
+    // canon. The draft copy is the live one — skip the fed-back canon copy so
+    // `effective` (and the issues scan) always hold one entry per id.
+    const addedIds = new Set(draft.added.map((a) => a.id));
     const out: SoundArea[] = [];
     for (const a of baseAreas) {
       if (draft.deleted.includes(a.id)) continue;
+      if (addedIds.has(a.id)) continue;
       const e = draft.edits[a.id];
       out.push(e ? { ...a, ...e } : a);
     }

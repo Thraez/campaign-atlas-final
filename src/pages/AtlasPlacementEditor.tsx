@@ -105,6 +105,10 @@ import { useRouteDraft } from "@/atlas/routes/useRouteDraft";
 import { RouteLayer } from "@/atlas/routes/RouteLayer";
 import { useFogDraft } from "@/atlas/fog/useFogDraft";
 import { FogLayer } from "@/atlas/fog/FogLayer";
+import { SoundscapeTab } from "@/atlas/tabs/SoundscapeTab";
+import { useSoundscapeDraft } from "@/atlas/sound-editor/useSoundscapeDraft";
+import { SoundAreaLayer } from "@/atlas/sound-editor/SoundAreaLayer";
+import { loadAvailableAudio } from "@/atlas/sound-editor/listAvailableAudio";
 import { projectMapForPlayer } from "@/atlas/content/projectMapForPlayer";
 import {
   PIN_PRESETS,
@@ -405,6 +409,25 @@ function AtlasPlacementEditorInner() {
     undoStack,
   );
   const fogDraft = useFogDraft(activeMap, undoStack);
+  // Soundscape draft — shared between SoundscapeTab (panel) and the map
+  // (SoundAreaLayer), exactly as regionDraft is shared with RegionLayer.
+  // Persistence rides the patchMap seam: the panel writes { soundscape } into
+  // the map override, which activeMap folds in and the unified Save spreads
+  // into world.yaml via buildFullWorldYaml → soundscapeToYamlObject.
+  const soundscapeDraft = useSoundscapeDraft(activeMap, undoStack);
+  // Audio files the Sound panel can offer (basenames under
+  // public/atlas/assets/audio/). Loaded once; empty is fine — the panel
+  // falls back to a free-text file field.
+  const [availableAudio, setAvailableAudio] = useState<string[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void loadAvailableAudio().then((files) => {
+      if (!cancelled) setAvailableAudio(files);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const entityEditDraft = useEntityEditDraft();
   const entitiesById = useMemo(
     () => new Map((project?.entities ?? []).map((e) => [e.id, e])),
@@ -1801,6 +1824,15 @@ function AtlasPlacementEditorInner() {
                 warningCount={mapIssues.warning}
               />
             ),
+            sound: (
+              <SoundscapeTab
+                map={activeMap}
+                onPatch={patchMap}
+                availableAudioFiles={availableAudio}
+                undoStack={undoStack}
+                api={soundscapeDraft}
+              />
+            ),
             maps: (
               <>
                 <div className="px-3 pt-2">
@@ -1936,12 +1968,16 @@ function AtlasPlacementEditorInner() {
                         ? (activeMap.oceanColor ?? "#18313f")
                         : "transparent",
                     cursor:
-                      pendingId || regionDraft.drawing || rulerActive ? "crosshair" : undefined,
+                      pendingId || regionDraft.drawing || soundscapeDraft.drawing || rulerActive
+                        ? "crosshair"
+                        : undefined,
                   }}
                 >
                   <FlyTo target={flyTo} />
                   <RulerLayer
-                    active={rulerActive && !pendingId && !regionDraft.drawing}
+                    active={
+                      rulerActive && !pendingId && !regionDraft.drawing && !soundscapeDraft.drawing
+                    }
                     mapHeight={activeMap.height}
                     scale={activeMap.scale}
                     wrapX={activeMap.wrapX}
@@ -1981,7 +2017,7 @@ function AtlasPlacementEditorInner() {
                       );
                     })}
 
-                  {/* Z-order: layers → regions → routes → fog → pins → handles. */}
+                  {/* Z-order: layers → regions → routes → fog → sound → pins → handles. */}
                   {showRegions && (
                     <RegionLayer map={activeMap} api={regionDraft} visible={showRegions} />
                   )}
@@ -1992,6 +2028,10 @@ function AtlasPlacementEditorInner() {
                     preview={showFogPreview}
                     playerMode={mode === "player"}
                   />
+                  {/* Sound-area outlines + draw capture. Always mounted (its
+                      click capture no-ops unless the shared draft is drawing),
+                      above fog so draft points stay visible while drawing. */}
+                  <SoundAreaLayer map={activeMap} api={soundscapeDraft} />
 
                   {placedForLens.map((e) => {
                     const eff = effectivePlacement(e.id);

@@ -98,6 +98,42 @@ describe("useSoundscapeDraft", () => {
     expect(result.current.effective.masterGain).toBe(0.8);
   });
 
+  it("keeps one copy per id after the panel's patch feeds back into map.soundscape", () => {
+    // The editor persistence loop: SoundscapeTab pushes the effective config
+    // through patchMap({ soundscape }) which lands back on the SAME map this
+    // hook reads (mapOverride → activeMap.soundscape). The draft's added copy
+    // must supersede the fed-back canon copy — one entry per id, no spurious
+    // duplicate-id issue, and later edits still land on the live copy.
+    const region = {
+      id: "r1",
+      mapId: "m",
+      name: "R",
+      points: [
+        [0, 0],
+        [10, 0],
+        [10, 10],
+      ],
+      visibility: "player",
+    } as never;
+    const base = map({ regions: [region] });
+    const { result, rerender } = renderHook(({ m }: { m: MapDocument }) => useSoundscapeDraft(m), {
+      initialProps: { m: base },
+    });
+    act(() => result.current.addRideOn("r1"));
+    const id = result.current.effective.areas![0].id;
+    // Feed the patched config back, as the live editor does.
+    const fedBack = map({
+      regions: [region],
+      soundscape: { areas: result.current.effective.areas },
+    });
+    rerender({ m: fedBack });
+    expect(result.current.effective.areas!.filter((a) => a.id === id)).toHaveLength(1);
+    expect(result.current.issues.filter((i) => i.code === "duplicate-sound-area-id")).toEqual([]);
+    // The draft copy still wins for subsequent edits.
+    act(() => result.current.patchBed(id, { src: "wind.ogg" }));
+    expect(result.current.effective.areas!.find((a) => a.id === id)!.bed.src).toBe("wind.ogg");
+  });
+
   it("removes an area and reset() clears all local changes", () => {
     const { result } = renderHook(() =>
       useSoundscapeDraft(
