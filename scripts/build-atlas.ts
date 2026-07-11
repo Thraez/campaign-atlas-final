@@ -38,7 +38,7 @@ import { PLAYER_VISIBLE } from "./atlas/visibility";
 import { isLit } from "../src/atlas/fog/effectiveLit";
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
 import { filterSoundscapeForPlayer } from "./atlas/filterSoundscape";
-import { hashAudioAssets, rewriteAudioSrcs } from "./atlas/hashAudioAssets";
+import { hashAudioAssets, rewriteAudioSrcs, writeAudioManifest } from "./atlas/hashAudioAssets";
 import {
   stripDmProfile,
   filterRelationshipsForPlayer,
@@ -826,6 +826,12 @@ async function runBuildCore(flags: BuildFlags) {
       });
     }
   }
+
+  // -------- Audio picker manifest --------
+  // Refresh the static listing the editor's sound panel reads. Runs in every
+  // build mode so the picker sees files the DM drops in before any area
+  // exists; hashed copies are excluded so only source files are listed.
+  writeAudioManifest(path.join(ROOT, "public"));
 
   // -------- Profile + relationship player-strip --------
   // The DM half of `profile` and DM-only relationships must NEVER reach a

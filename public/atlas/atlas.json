@@ -1,7 +1,7 @@
 {
-  "version": "2026-07-11T15-27-30-934Z",
+  "version": "2026-07-11T17-57-36-658Z",
   "schemaVersion": 1,
-  "publishedAt": "2026-07-11T15:27:30.934Z",
+  "publishedAt": "2026-07-11T17:57:36.658Z",
   "worlds": [
     {
       "id": "astrath-deeprealm",
@@ -21,6 +21,88 @@
       "width": 200000,
       "height": 150000,
       "oceanColor": "#18313f",
+      "soundscape": {
+        "areas": [
+          {
+            "id": "area-0",
+            "visibility": "player",
+            "points": [
+              [
+                -20000,
+                -20000
+              ],
+              [
+                220000,
+                -20000
+              ],
+              [
+                220000,
+                170000
+              ],
+              [
+                -20000,
+                170000
+              ]
+            ],
+            "bed": {
+              "src": "atlas/assets/audio/fb96ecf7.wav",
+              "gain": 0.5
+            }
+          },
+          {
+            "id": "area-1",
+            "visibility": "player",
+            "points": [
+              [
+                155000,
+                5000
+              ],
+              [
+                201000,
+                5000
+              ],
+              [
+                201000,
+                45000
+              ],
+              [
+                155000,
+                45000
+              ]
+            ],
+            "bed": {
+              "src": "atlas/assets/audio/fd34e278.wav",
+              "gain": 0.6
+            }
+          },
+          {
+            "id": "area-2",
+            "visibility": "player",
+            "points": [
+              [
+                8000,
+                80000
+              ],
+              [
+                36000,
+                80000
+              ],
+              [
+                36000,
+                104000
+              ],
+              [
+                8000,
+                104000
+              ]
+            ],
+            "bed": {
+              "src": "atlas/assets/audio/011fb234.wav",
+              "gain": 0.55
+            }
+          }
+        ]
+      },
       "wrapX": false,
       "scale": {
         "unitsPerPixel": 0.05,
