@@ -4,9 +4,7 @@ import { soundAreaDraftToConfig } from "@/atlas/sound-editor/soundAreaDraftToCon
 describe("soundAreaDraftToConfig", () => {
   it("returns undefined when there are no areas (drops the key)", () => {
     expect(soundAreaDraftToConfig({ areas: [] })).toBeUndefined();
-    expect(
-      soundAreaDraftToConfig({ enabled: true, masterGain: 0.6, areas: [] }),
-    ).toBeUndefined();
+    expect(soundAreaDraftToConfig({ enabled: true, masterGain: 0.6, areas: [] })).toBeUndefined();
   });
 
   it("keeps a populated soundscape and preserves ride-on + sound-only shapes", () => {

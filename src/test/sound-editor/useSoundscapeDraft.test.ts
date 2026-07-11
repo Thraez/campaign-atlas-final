@@ -4,7 +4,15 @@ import { useSoundscapeDraft } from "@/atlas/sound-editor/useSoundscapeDraft";
 import type { MapDocument } from "@/atlas/content/schema";
 
 const map = (over: Partial<MapDocument> = {}): MapDocument =>
-  ({ id: "m", name: "M", width: 1000, height: 1000, layers: [], regions: [], ...over }) as MapDocument;
+  ({
+    id: "m",
+    name: "M",
+    width: 1000,
+    height: 1000,
+    layers: [],
+    regions: [],
+    ...over,
+  }) as MapDocument;
 
 describe("useSoundscapeDraft", () => {
   it("starts empty when the map has no soundscape", () => {

@@ -107,10 +107,7 @@ export function SoundscapeTab({ map, onPatch, availableAudioFiles, undoStack, ap
   // ---- Persistence: push every local change through the editor's patchMap seam.
   // `soundAreaDraftToConfig` folds the draft into a save-ready config
   // (undefined when there are no areas, which drops `soundscape` from YAML).
-  const config = useMemo(
-    () => soundAreaDraftToConfig({ ...effective, areas }),
-    [effective, areas],
-  );
+  const config = useMemo(() => soundAreaDraftToConfig({ ...effective, areas }), [effective, areas]);
   const configKey = JSON.stringify(config ?? null);
   const canonKey = JSON.stringify(map.soundscape ?? null);
   const sentRef = useRef<string | null>(null);
@@ -259,7 +256,12 @@ export function SoundscapeTab({ map, onPatch, availableAudioFiles, undoStack, ap
             >
               Finish (Enter)
             </Button>
-            <Button size="sm" variant="ghost" onClick={removeLastDraftPoint} className="h-7 text-xs">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={removeLastDraftPoint}
+              className="h-7 text-xs"
+            >
               Undo (⌫)
             </Button>
             <Button size="sm" variant="ghost" onClick={cancelDraw} className="h-7 text-xs">
@@ -342,9 +344,7 @@ export function SoundscapeTab({ map, onPatch, availableAudioFiles, undoStack, ap
               <Label className="text-[10px]">Sound: choose a file</Label>
               {availableAudioFiles.length > 0 && (
                 <Select
-                  value={
-                    availableAudioFiles.includes(selected.bed.src) ? selected.bed.src : ""
-                  }
+                  value={availableAudioFiles.includes(selected.bed.src) ? selected.bed.src : ""}
                   onValueChange={(v) => patchBed(selected.id, { src: v })}
                 >
                   <SelectTrigger className="h-7 text-xs">

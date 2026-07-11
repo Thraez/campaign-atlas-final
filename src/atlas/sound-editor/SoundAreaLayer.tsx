@@ -35,10 +35,7 @@ const SOUND_COLOR = "#5eb1e8";
  * lat→y against the map height, and round to integer map pixels
  * (matches `RegionLayer`'s draw capture).
  */
-export function clickToMapPoint(
-  latlng: { lat: number; lng: number },
-  mapHeight: number,
-): Point {
+export function clickToMapPoint(latlng: { lat: number; lng: number }, mapHeight: number): Point {
   return [Math.round(latlng.lng), Math.round(mapHeight - latlng.lat)];
 }
 

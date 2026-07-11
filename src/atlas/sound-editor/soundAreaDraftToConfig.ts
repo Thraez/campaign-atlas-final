@@ -15,9 +15,7 @@
  */
 import type { SoundArea, SoundscapeConfig } from "@/atlas/content/schema";
 
-export function soundAreaDraftToConfig(
-  sc: SoundscapeConfig,
-): SoundscapeConfig | undefined {
+export function soundAreaDraftToConfig(sc: SoundscapeConfig): SoundscapeConfig | undefined {
   const areas = sc.areas ?? [];
   if (areas.length === 0) return undefined;
 
