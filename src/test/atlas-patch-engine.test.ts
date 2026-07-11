@@ -242,6 +242,45 @@ describe("validatePatchYaml placement kind", () => {
   });
 });
 
+describe("validatePatchYaml — N91 gaps (YAML parse error, entity: separator, kind aliases)", () => {
+  it("reports YAML parse error when yaml.loadAll throws on malformed input", () => {
+    // Unclosed flow mapping — js-yaml throws on parse, triggering the catch block
+    const r = validatePatchYaml("key: {unclosed: bracket\n", "map");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/YAML parse error/i);
+  });
+
+  it("accepts a multi-chunk entity-frontmatter patch separated by # entity: headers", () => {
+    // splitYamlChunks has a separate branch for '# entity:' vs '# file:' — test it
+    const patch = [
+      "# entity: Thornhold",
+      "title: Thornhold",
+      "atlas:",
+      "  visibility: player",
+      "# entity: Blackwood Keep",
+      "title: Blackwood Keep",
+      "atlas:",
+      "  visibility: dm",
+    ].join("\n");
+    const r = validatePatchYaml(patch, "entity-frontmatter");
+    expect(r.ok).toBe(true);
+    expect(r.errors).toHaveLength(0);
+  });
+
+  it("accepts a valid map patch using the settings kind alias", () => {
+    const patch = "maps:\n  - id: dungeon-level-1\n    name: Level 1\n    width: 4000\n    height: 3000\n";
+    const r = validatePatchYaml(patch, "settings");
+    expect(r.ok).toBe(true);
+    expect(r.errors).toHaveLength(0);
+  });
+
+  it("rejects a patch with no maps: array using the world-map kind alias", () => {
+    const r = validatePatchYaml("title: My World\n", "world-map");
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/maps/i);
+  });
+});
+
 describe("validateProject", () => {
   it("passes a clean project", () => {
     const r = validateProject({

@@ -22,6 +22,7 @@ import { run as checkImagePrivacy } from "../check-image-privacy.js";
 import { run as checkFogSafety } from "../check-fog-safety.js";
 import { run as checkArtifactShape } from "../check-artifact-shape.js";
 import { run as auditAssets } from "./audit-assets.js";
+import { run as checkPlayerSecrets } from "../check-player-secrets.js";
 
 interface Config {
   contentRoot: string;
@@ -70,6 +71,11 @@ async function main(): Promise<number> {
     },
     { label: "check-fog public/atlas", fn: () => checkFogSafety({ dir: "public/atlas" }) },
     { label: "check-fog dist", fn: () => checkFogSafety({ dir: "dist" }) },
+    { label: "check-player-secrets dist", fn: () => checkPlayerSecrets({ dir: "dist" }) },
+    {
+      label: "check-player-secrets public/atlas",
+      fn: () => checkPlayerSecrets({ dir: "public/atlas" }),
+    },
   ];
 
   const results = await Promise.all(

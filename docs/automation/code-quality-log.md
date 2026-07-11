@@ -35,6 +35,20 @@ behavior. Clear an item once you've dealt with it.)*
 ## Run history
 *(Each daily run appends one line: what was fixed, or "clean run — nothing safe to fix".)*
 
+- 2026-06-16 (run qa-20260616) — **Fixed (tests only, no behavior change):** added regression tests for
+  the part of Publish Check that explains *why* publishing is blocked. When the safety scans catch a
+  problem (a DM-only note about to go public, a hidden person/place name leaking, a malformed world file),
+  the editor turns each into a plain-language reason — and it must never echo the secret itself. The
+  existing tests covered the main messages and the "never show the secret" rule, but not the quiet
+  *de-duplication* behind them: several leaks from the same source note collapse to a single reason,
+  several problems on the same entity collapse to one, and a malformed-file problem with no entity shows
+  one reason with no pin-point locator. The 8 new cases lock all of that in — plus "a DM leak and an
+  editor-code leak produce two separate reasons" and the empty-scan cases — so a future tweak can't
+  silently start double-counting blockers or leak a secret name into a reason. Baseline was fully green
+  first (lint clean — 0 errors, 16 known warnings; types clean; 1469 tests across the four shards). Source
+  untouched. Commit `299e0bf4`, merged `7ba9b5d4`. Test count 1469 → 1477. (Note for the human: the run
+  worktree was removed cleanly; the merged branch `run/qa-20260616` was kept, not auto-deleted, per the
+  safe-cleanup protocol — delete it at your discretion.)
 - 2026-06-15 (run qa-20260615) — **Clean run — nothing changed (stopped on a lock collision).** Confirmed
   `auto/continuous-dev` (@ `08a55c5e`) is fully healthy: lint clean (0 errors, 16 known warnings), types
   clean, and **all 1402 tests pass** across the four shards (350 + 394 + 336 + 322). The branch grew since the

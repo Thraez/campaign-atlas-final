@@ -19,7 +19,9 @@ import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { printEntityHandout } from "@/atlas/printHandout";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 import { logger } from "@/lib/logger";
-import type { Entity, MapPlacement } from "@/atlas/content/schema";
+import type { CreditsConfig, Entity, MapPlacement } from "@/atlas/content/schema";
+import { CreditBadge } from "./CreditBadge";
+import { mountSecretBlock } from "@/atlas/secrets/secretBlockView";
 
 export interface EntityPanelProps {
   entity: Entity | null;
@@ -32,6 +34,10 @@ export interface EntityPanelProps {
   /** Player-personal affordances (private notes, PDF handout). Default true =
    *  the player site is unchanged. The DM editor passes false. */
   readerAffordances?: boolean;
+  onPeek?: (entityId: string, rect: DOMRect) => void;
+  onPeekLeave?: () => void;
+  /** Site-wide credits config from world.credits; defaults both on when absent. */
+  credits?: CreditsConfig;
 }
 
 function CopyLinkButton() {
@@ -231,7 +237,7 @@ function ImageThumb({ src, alt, onClick }: { src: string; alt: string; onClick: 
   return (
     <button
       onClick={onClick}
-      className="flex-shrink-0 rounded border border-border overflow-hidden hover:border-primary transition focus:outline-none focus:ring-2 focus:ring-primary"
+      className="rounded border border-border overflow-hidden hover:border-primary transition focus:outline-none focus:ring-2 focus:ring-primary block"
     >
       <img
         src={src}
@@ -245,10 +251,47 @@ function ImageThumb({ src, alt, onClick }: { src: string; alt: string; onClick: 
 }
 
 export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function EntityPanel(
-  { entity, placements, entityById, onOpenEntity, onClose, onShowOnMap, readerAffordances = true },
+  {
+    entity,
+    placements,
+    entityById,
+    onOpenEntity,
+    onClose,
+    onShowOnMap,
+    readerAffordances = true,
+    onPeek,
+    onPeekLeave,
+    credits,
+  },
   ref,
 ) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  // Merge the forwarded ref (used by callers) and the local bodyRef (used by the secret effect).
+  const setBodyRefs = useCallback(
+    (el: HTMLDivElement | null) => {
+      (bodyRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+      if (typeof ref === "function") ref(el);
+      else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = el;
+    },
+    [ref],
+  );
+
+  // Post-render: mount SecretBlock DOM views into placeholder spans.
+  // Runs whenever the entity body changes (new entity or re-render after edit).
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el || !entity) return;
+    const nodes = el.querySelectorAll<HTMLElement>("[data-secret-id]");
+    if (nodes.length === 0) return;
+    const byId = new Map((entity.secrets ?? []).map((s) => [s.id, s]));
+    nodes.forEach((node) => {
+      const id = node.getAttribute("data-secret-id");
+      const secret = id ? byId.get(id) : undefined;
+      if (secret) mountSecretBlock(node, secret);
+    });
+  }, [entity]);
 
   if (!entity) {
     return (
@@ -324,12 +367,16 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
           {entity.images.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
               {entity.images.map((src, i) => (
-                <ImageThumb
-                  key={`${src}-${i}`}
-                  src={imageUrl(src)}
-                  alt={`${entity.title} image ${i + 1}`}
-                  onClick={() => setLightboxSrc(imageUrl(src))}
-                />
+                <div key={`${src}-${i}`} className="relative flex-shrink-0">
+                  <ImageThumb
+                    src={imageUrl(src)}
+                    alt={`${entity.title} image ${i + 1}`}
+                    onClick={() => setLightboxSrc(imageUrl(src))}
+                  />
+                  {credits?.badges !== false && entity.credit && (
+                    <CreditBadge credit={entity.credit} />
+                  )}
+                </div>
               ))}
             </div>
           )}
@@ -351,7 +398,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
           )}
 
           <div
-            ref={ref}
+            ref={setBodyRefs}
             className="atlas-prose prose prose-sm max-w-none dark:prose-invert"
             dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(entity.bodyHtml) }}
           />
@@ -381,6 +428,10 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
                     key={b.id}
                     className="text-xs px-2 py-1 rounded bg-muted hover:bg-accent transition"
                     onClick={() => onOpenEntity(b.id)}
+                    onMouseEnter={(e) => onPeek?.(b.id, e.currentTarget.getBoundingClientRect())}
+                    onMouseLeave={() => onPeekLeave?.()}
+                    onFocus={(e) => onPeek?.(b.id, e.currentTarget.getBoundingClientRect())}
+                    onBlur={() => onPeekLeave?.()}
                   >
                     {b.title}
                   </button>
@@ -404,6 +455,10 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
                       <button
                         className="hover:underline truncate text-left"
                         onClick={() => onOpenEntity(r.entity)}
+                        onMouseEnter={(e) => onPeek?.(r.entity, e.currentTarget.getBoundingClientRect())}
+                        onMouseLeave={() => onPeekLeave?.()}
+                        onFocus={(e) => onPeek?.(r.entity, e.currentTarget.getBoundingClientRect())}
+                        onBlur={() => onPeekLeave?.()}
                       >
                         {target ? (
                           target.title

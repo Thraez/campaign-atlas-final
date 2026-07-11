@@ -11,6 +11,21 @@ export interface AtlasPlacementSpec {
   label?: string;
   /** Optional per-placement pin styling override (preset/color/icon/...). */
   pin?: PinPlacementStyle;
+  /** References a secret id on the entity. Character-secret pins are stripped from player builds. */
+  secretId?: string;
+}
+
+/** Raw secret spec from entity frontmatter (atlas.secrets[]). Never shipped to players. */
+export interface AtlasSecretSpec {
+  id: string;
+  /** Character name whose key unlocks this secret (character type). Mutually exclusive with password. */
+  for?: string;
+  /** Passphrase that unlocks this secret (password type). Mutually exclusive with for. */
+  password?: string;
+  /** Public hint shown on the sealed box (password type only). */
+  teaser?: string;
+  /** The plaintext to reveal. Never shipped. */
+  reveal: string;
 }
 
 export interface AtlasFrontmatter {
@@ -31,6 +46,8 @@ export interface AtlasFrontmatter {
   profile?: EntityProfile;
   relationships?: EntityRelationship[];
   race?: string;
+  credit?: string;
+  secrets?: AtlasSecretSpec[];
 }
 
 export interface ParsedFile {
@@ -68,6 +85,11 @@ export function parseFrontmatter(raw: string, sourcePath: string): ParsedFile {
     profile: parseProfile(atlasRaw.profile, sourcePath, warnings),
     relationships: parseRelationships(atlasRaw.relationships, sourcePath, warnings),
     race: pickString(atlasRaw.race, data.race),
+    credit:
+      typeof atlasRaw.credit === "string" && atlasRaw.credit.trim().length > 0
+        ? atlasRaw.credit.trim()
+        : undefined,
+    secrets: parseSecrets(atlasRaw.secrets, sourcePath, warnings),
   };
 
   if (typeof atlasRaw.visibility === "string") {
@@ -129,6 +151,7 @@ function parsePlacements(
       y: p.y,
       label: typeof p.label === "string" ? p.label : undefined,
       pin: parsePinStyle(p.pin, sourcePath, i, warnings),
+      secretId: typeof p.secretId === "string" ? p.secretId : undefined,
     });
   }
   return out.length > 0 ? out : undefined;
@@ -202,6 +225,66 @@ function parseProfile(
     if (Object.keys(dm).length > 0) out.dm = dm;
   }
   return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function parseSecrets(
+  v: unknown,
+  sourcePath: string,
+  warnings: string[],
+): AtlasSecretSpec[] | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (!Array.isArray(v)) {
+    warnings.push(`${sourcePath}: atlas.secrets must be an array — ignored`);
+    return undefined;
+  }
+  const out: AtlasSecretSpec[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < v.length; i++) {
+    const s = v[i] as Record<string, unknown> | null;
+    if (!s || typeof s !== "object") {
+      warnings.push(`${sourcePath}: atlas.secrets[${i}] is not an object — skipped`);
+      continue;
+    }
+    const id = typeof s.id === "string" ? s.id.trim() : "";
+    if (!id) {
+      warnings.push(`${sourcePath}: atlas.secrets[${i}] missing required 'id' — skipped`);
+      continue;
+    }
+    if (seen.has(id)) {
+      warnings.push(
+        `${sourcePath}: atlas.secrets[${i}] id "${id}" is not unique within this entity — skipped`,
+      );
+      continue;
+    }
+    const hasFor = typeof s.for === "string" && s.for.trim().length > 0;
+    const hasPwd = typeof s.password === "string" && (s.password as string).length > 0;
+    if (hasFor && hasPwd) {
+      warnings.push(
+        `${sourcePath}: secret "${id}" has both 'for' and 'password' — exactly one required — skipped`,
+      );
+      continue;
+    }
+    if (!hasFor && !hasPwd) {
+      warnings.push(
+        `${sourcePath}: secret "${id}" has neither 'for' nor 'password' — exactly one required — skipped`,
+      );
+      continue;
+    }
+    const reveal = typeof s.reveal === "string" ? s.reveal : "";
+    if (!reveal) {
+      warnings.push(`${sourcePath}: secret "${id}" missing required 'reveal' text — skipped`);
+      continue;
+    }
+    seen.add(id);
+    out.push({
+      id,
+      for: hasFor ? (s.for as string).trim() : undefined,
+      password: hasPwd ? (s.password as string) : undefined,
+      teaser: hasPwd && typeof s.teaser === "string" ? s.teaser : undefined,
+      reveal,
+    });
+  }
+  return out;
 }
 
 function parseRelationships(

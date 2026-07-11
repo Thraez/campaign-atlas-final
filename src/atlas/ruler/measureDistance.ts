@@ -6,7 +6,7 @@ export function measureDistance(
   scale: MapScale | undefined,
 ): { distPx: number; label: string } {
   const distPx = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-  const label = scale
+  const label = scale && scale.unitsPerPixel !== 0
     ? `${(distPx * scale.unitsPerPixel).toFixed(1)} ${scale.unitLabel}`
     : `${Math.round(distPx)} px`;
   return { distPx, label };

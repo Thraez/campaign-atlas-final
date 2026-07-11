@@ -1,3 +1,5 @@
+import path from "node:path";
+
 /**
  * Path allowlist for the dev-only local FS save endpoint.
  *
@@ -59,11 +61,17 @@ export function isWritableSourcePath(input: string): boolean {
     return true;
   }
 
+  // Single fixed DM-only keys file. The _dm folder stays build-excluded; only
+  // this exact filename is writable, so it can never become a general _dm write.
+  if (secondLast === "_dm" && last === "character-keys.yaml") {
+    return parts.length >= 4; // content/<world>/_dm/character-keys.yaml
+  }
+
   // .md branch — last segment must end .md (case-sensitive)
   if (!/^[A-Za-z0-9_\-. ]+\.md$/.test(last)) return false;
-  // Disallow _atlas anywhere in the middle for .md files (atlas dir is yaml-only)
+  // Disallow _atlas or _dm anywhere in the middle for .md files
   for (let i = 1; i < parts.length - 1; i++) {
-    if (parts[i] === "_atlas") return false;
+    if (parts[i] === "_atlas" || parts[i] === "_dm") return false;
   }
   return true;
 }
@@ -81,6 +89,35 @@ export function isWritableSourcePath(input: string): boolean {
  * public/atlas/assets/ are served as static public assets; there is no
  * per-image visibility or DM/player distinction.
  */
+/**
+ * Read-only allowlist for vault .md files. Both arguments must be absolute
+ * paths (already path.resolve'd). Returns true iff candidateAbs is strictly
+ * inside vaultRoot and ends with .md (case-insensitive).
+ *
+ * The sep-based boundary (root + path.sep) prevents prefix collisions:
+ * /vault-secrets/x.md cannot match /vault/.
+ * Symlink escape is the caller's responsibility: realpath each file and
+ * re-check containment before calling this function.
+ */
+export function isReadableVaultPath(vaultRoot: string, candidateAbs: string): boolean {
+  const root = path.resolve(vaultRoot);
+  const cand = path.resolve(candidateAbs);
+  const within = cand === root || cand.startsWith(root + path.sep);
+  if (!within) return false;
+  return /\.md$/i.test(cand);
+}
+
+/**
+ * Read-only allowlist for machine-local config files in .local-atlas/.
+ * Accepts ONLY the two known filenames; everything else is rejected.
+ */
+export function isReadableLocalAtlasPath(relPath: string): boolean {
+  return (
+    relPath === ".local-atlas/editor-settings.json" ||
+    relPath === ".local-atlas/sync-map.json"
+  );
+}
+
 export function isWritableAssetPath(input: string): boolean {
   if (typeof input !== "string" || input.length === 0) return false;
   if (input.startsWith("/") || input.startsWith("./") || input.startsWith("\\")) return false;

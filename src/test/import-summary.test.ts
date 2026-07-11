@@ -28,6 +28,7 @@ describe("summarizeImport", () => {
       replaced: 0,
       skipped: 0,
       couldntBeRead: 0,
+      needsReview: 0,
     });
   });
 
@@ -87,6 +88,7 @@ describe("summarizeImport", () => {
       replaced: 1,
       skipped: 2,
       couldntBeRead: 2,
+      needsReview: 0,
     });
   });
 });
@@ -94,19 +96,40 @@ describe("summarizeImport", () => {
 describe("formatImportSummaryLine", () => {
   it("returns empty string when all buckets are zero", () => {
     expect(
-      formatImportSummaryLine({ added: 0, updated: 0, replaced: 0, skipped: 0, couldntBeRead: 0 }),
+      formatImportSummaryLine({
+        added: 0,
+        updated: 0,
+        replaced: 0,
+        skipped: 0,
+        couldntBeRead: 0,
+        needsReview: 0,
+      }),
     ).toBe("");
   });
 
   it("shows only non-zero buckets joined by ·", () => {
     expect(
-      formatImportSummaryLine({ added: 3, updated: 1, replaced: 0, skipped: 2, couldntBeRead: 0 }),
+      formatImportSummaryLine({
+        added: 3,
+        updated: 1,
+        replaced: 0,
+        skipped: 2,
+        couldntBeRead: 0,
+        needsReview: 0,
+      }),
     ).toBe("3 added · 1 updated · 2 skipped");
   });
 
   it("shows a single bucket without separators", () => {
     expect(
-      formatImportSummaryLine({ added: 5, updated: 0, replaced: 0, skipped: 0, couldntBeRead: 0 }),
+      formatImportSummaryLine({
+        added: 5,
+        updated: 0,
+        replaced: 0,
+        skipped: 0,
+        couldntBeRead: 0,
+        needsReview: 0,
+      }),
     ).toBe("5 added");
   });
 });

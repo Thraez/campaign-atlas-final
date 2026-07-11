@@ -55,19 +55,11 @@ jobs:
           ATLAS_BASE: /${{ github.event.repository.name }}/
         run: npm run build
 
-      - name: Scan built artifact for sentinel and shape leaks
-        run: |
-          npm run atlas:check-secrets dist
-          npm run atlas:check-secrets public/atlas
-          npm run atlas:check-shape public/atlas/atlas.json
-
-      - name: Scan built artifact for derived-secret leaks
-        # Names/aliases of dm/hidden entities derived from the source vault
-        # must not appear in the player artifact. Catches the gap that static
-        # sentinels can't: real campaign secret names introduced by the DM.
-        run: |
-          npm run atlas:check-derived dist
-          npm run atlas:check-derived public/atlas
+      - name: Scan built artifacts (full safety set)
+        # D13: run the same orchestrator the local one-click check runs, so a
+        # green local check implies a green CI run. This adds image-privacy,
+        # fog-safety, and audit-assets, which CI previously did not run.
+        run: npm run atlas:scan
 
       - name: Add SPA 404 fallback
         # GitHub Pages serves 404.html for any unknown path. Cloning index.html

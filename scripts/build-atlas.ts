@@ -31,9 +31,14 @@ import {
   type SvgPolicy,
 } from "./atlas/validateAsset";
 import { parseAtlasDate } from "./atlas/calendarDate";
+import { stripSecretMarkers } from "./atlas/stripSecretMarkers";
+import { buildEntitySecrets } from "./atlas/buildSecrets";
+import yaml from "js-yaml";
 import { PLAYER_VISIBLE } from "./atlas/visibility";
 import { isLit } from "../src/atlas/fog/effectiveLit";
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
+import { filterSoundscapeForPlayer } from "./atlas/filterSoundscape";
+import { hashAudioAssets, rewriteAudioSrcs } from "./atlas/hashAudioAssets";
 import {
   stripDmProfile,
   filterRelationshipsForPlayer,
@@ -41,6 +46,7 @@ import {
 } from "../src/atlas/profiles/profileBuild";
 import type {
   AtlasProject,
+  CreditsConfig,
   Entity,
   MapDocument,
   MapPlacement,
@@ -345,6 +351,24 @@ async function runBuildCore(flags: BuildFlags) {
     throw new BuildError(1, msg);
   }
 
+  // Load character keys file if present (content/_dm/character-keys.yaml).
+  // Keys are used only at encrypt time; they never appear in any build output.
+  const charKeys = new Map<string, string>();
+  try {
+    const keysPath = path.join(contentDir, "_dm", "character-keys.yaml");
+    if (fs.existsSync(keysPath)) {
+      const raw = fs.readFileSync(keysPath, "utf8");
+      const parsed = yaml.load(raw) as Record<string, string> | null;
+      if (parsed && typeof parsed === "object") {
+        for (const [k, v] of Object.entries(parsed)) {
+          if (typeof v === "string") charKeys.set(k, v);
+        }
+      }
+    }
+  } catch {
+    // No keys file → character secrets will be warned and skipped per-secret below.
+  }
+
   const warnings: string[] = [];
   const errors: string[] = [];
   let strippedDmBlocks = 0;
@@ -360,6 +384,11 @@ async function runBuildCore(flags: BuildFlags) {
 
   const pending: Pending[] = [];
   const slugSeen = new Map<string, string>();
+  const secretSpecsByEntity = new Map<
+    string,
+    import("./atlas/parseFrontmatter").AtlasSecretSpec[]
+  >();
+  const secretLockType = new Map<string, "password" | "character">();
 
   // PASS 1: parse every file regardless of visibility, so that we can build a
   // full name index for cross-reference leak detection. A `[[Vampire Lord]]`
@@ -472,6 +501,25 @@ async function runBuildCore(flags: BuildFlags) {
     strippedDmBlocks += built.strippedDmBlocks;
     if (built.unbalancedError) errors.push(built.unbalancedError);
     pending.push(built.pending);
+
+    // Capture secret specs for the async encrypt pass below.
+    const entitySpecs = item.parsed.atlas.secrets ?? [];
+    if (entitySpecs.length > 0) {
+      secretSpecsByEntity.set(item.id, entitySpecs);
+      // Check the RAW body (before marker stripping) so we correctly detect
+      // secrets that have no placement marker in the authored text.
+      const markerIds = new Set(
+        [...item.parsed.body.matchAll(/\{\{secret:([^}]+)\}\}/g)].map((m) => m[1]),
+      );
+      for (const s of entitySpecs) {
+        if (!markerIds.has(s.id)) {
+          warnings.push(
+            `${item.rel} (entity "${item.id}"): secret "${s.id}" has no inline marker in the body — it will only appear in the secrets tab`,
+          );
+        }
+        secretLockType.set(`${item.id}::${s.id}`, s.for ? "character" : "password");
+      }
+    }
   }
 
   // Wikilink resolution uses the FULL cross-reference index (including
@@ -650,6 +698,11 @@ async function runBuildCore(flags: BuildFlags) {
         secretPlacementsExcluded += 1;
         continue;
       }
+      const secId = (p as { secretId?: string }).secretId;
+      if (flags.player && secId && secretLockType.get(`${entity.id}::${secId}`) === "character") {
+        secretPlacementsExcluded += 1;
+        continue;
+      }
       const rawLabel = (p as { label?: string }).label;
       const cleanLabel = flags.player ? stripDmFromShippingString(rawLabel) : rawLabel;
       placements.push({
@@ -661,6 +714,7 @@ async function runBuildCore(flags: BuildFlags) {
         label: cleanLabel ?? entity.title,
         visibility: entity.visibility,
         pin: (p as { pin?: import("../src/atlas/content/schema").PinPlacementStyle }).pin,
+        secretId: secId,
       });
     }
   }
@@ -749,6 +803,28 @@ async function runBuildCore(flags: BuildFlags) {
   // (See docs/superpowers/specs/2026-05-19-fog-player-mechanic-design.md.)
   if (flags.player) {
     maps = await redactMapsForPlayer(maps, ROOT, warnings);
+  }
+
+  // -------- Soundscape player-strip --------
+  // Drop DM-visibility areas, neutralise area IDs, strip names so DM location
+  // labels never reach the player artifact. Then content-hash audio filenames
+  // so the original DM file paths never appear in the player build.
+  if (flags.player) {
+    maps = maps.map((m) => {
+      if (!m.soundscape) return m;
+      return { ...m, soundscape: filterSoundscapeForPlayer(m.soundscape) };
+    });
+    const allAreas = maps.flatMap((m) => m.soundscape?.areas ?? []);
+    if (allAreas.length > 0) {
+      const rewrite = hashAudioAssets(allAreas, path.join(ROOT, "public"));
+      maps = maps.map((m) => {
+        if (!m.soundscape?.areas?.length) return m;
+        return {
+          ...m,
+          soundscape: { ...m.soundscape, areas: rewriteAudioSrcs(m.soundscape.areas, rewrite) },
+        };
+      });
+    }
   }
 
   // -------- Profile + relationship player-strip --------
@@ -845,6 +921,17 @@ async function runBuildCore(flags: BuildFlags) {
     if (f.severity === "warning") warnings.push(`${f.owner}: ${f.message} — ${f.suggestion}`);
   }
 
+  // Async encrypt pass: convert raw AtlasSecretSpec entries into ciphertext blobs.
+  // DM builds skip encryption (plaintext stays in the vault only).
+  // Character secrets whose keys are missing are warned and dropped here.
+  for (const { entity } of pending) {
+    const specs = secretSpecsByEntity.get(entity.id);
+    if (!specs || specs.length === 0) continue;
+    const { secrets, warnings: secWarn } = await buildEntitySecrets(entity.id, specs, charKeys);
+    if (secrets.length > 0) entity.secrets = secrets;
+    for (const w of secWarn) warnings.push(w);
+  }
+
   const project: AtlasProject = {
     version: new Date().toISOString().replace(/[:.]/g, "-"),
     schemaVersion: worldCfg?.schemaVersion ?? CURRENT_ATLAS_SCHEMA_VERSION,
@@ -857,6 +944,7 @@ async function runBuildCore(flags: BuildFlags) {
         ...(flags.player
           ? {}
           : { importFolders: worldCfg?.importConfig ?? { folders: {}, defaultFolder: "imports" } }),
+        credits: worldCfg?.credits ?? ({ badges: true, page: true } satisfies CreditsConfig),
       },
     ],
     maps,
@@ -978,7 +1066,9 @@ function buildEntity(
   if (unbalanced) {
     unbalancedError = `${rel}: body has an unbalanced DM delimiter — likely an unclosed %%...%% block or an unclosed :::dm...::: callout. Add the closing fence (or remove the stray opener).`;
   }
-  const noDm = player ? noDmStripped : parsed.body;
+  // Secret placement markers ({{secret:id}}) never ship in either mode — the
+  // secrets tab and encrypted blobs carry that content instead.
+  const noDm = stripSecretMarkers(player ? noDmStripped : parsed.body);
   const strippedDmBlocks = player ? cStripped : 0;
 
   // Shipping-field sanitization: every string that lands in atlas.json must
@@ -1023,6 +1113,7 @@ function buildEntity(
     tags: scrubTags(stripArr(parsed.atlas.tags ?? [])),
     summary: sanitizeShippingField(parsed.atlas.summary),
     race: sanitizeShippingField(parsed.atlas.race),
+    credit: parsed.atlas.credit,
     images: (parsed.atlas.images ?? []).map(relImage),
     body: noDm,
     bodyHtml: "",
@@ -1175,7 +1266,7 @@ function buildSearchIndex(pending: Pending[]) {
       aliases: entity.aliases,
       tags: entity.tags,
       summary: entity.summary,
-      excerpt: entity.body.replace(/\s+/g, " ").trim().slice(0, 240),
+      excerpt: stripSecretMarkers(entity.body).replace(/\s+/g, " ").trim().slice(0, 240),
       body: stripped.toLowerCase(),
       bodyText: stripped,
       dateRaw: entity.dateRaw,

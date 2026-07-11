@@ -25,6 +25,9 @@ const KEYFRAMES = `
 @media(prefers-reduced-motion:reduce){
   .ocean-wave-1,.ocean-wave-2,.ocean-wave-3{animation:none!important}
 }
+:root[data-calm="true"] .ocean-wave-1,
+:root[data-calm="true"] .ocean-wave-2,
+:root[data-calm="true"] .ocean-wave-3{animation:none!important}
 `;
 
 export function OceanBackground({ map }: Props) {

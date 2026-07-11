@@ -23,7 +23,8 @@ import { Button } from "@/components/ui/button";
 import { TabFrame } from "./TabFrame";
 import { downloadText } from "./download";
 import { BuildReportPanel } from "@/atlas/publish/BuildReportPanel";
-import { PublishedDiffPanel } from "@/atlas/publish/PublishedDiffPanel";
+import { ReadinessCard } from "@/atlas/publish/ReadinessCard";
+import { usePublishFlow } from "@/atlas/publish/usePublishFlow";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -33,6 +34,8 @@ import {
   ChevronRight,
   ArrowRight,
   FileDown,
+  Loader2,
+  Upload,
 } from "lucide-react";
 
 interface Props {
@@ -79,13 +82,18 @@ export function PublishCheckTab({
     [project, draftPlacements, draftMap, draftLocalLayers],
   );
 
-  const ready = report.counts.blocking === 0;
+  const publish = usePublishFlow();
 
   const downloadReport = () => {
     const md = buildPublishReport(report);
     const filename = `atlas-publish-check-${new Date().toISOString().slice(0, 10)}.md`;
     downloadText(filename, md, "text/markdown");
   };
+
+  const isChecking = publish.state === "checking";
+  const isBusy = publish.state === "busy";
+  const isPublishing = publish.state === "publishing";
+  const buttonDisabled = isChecking || isBusy || isPublishing;
 
   return (
     <TabFrame
@@ -95,23 +103,95 @@ export function PublishCheckTab({
       blockingCount={report.counts.blocking}
       warningCount={report.counts.warning}
     >
-      {/* Top status banner */}
-      <div
-        className={`rounded-md border p-3 text-xs ${
-          ready ? "border-primary/30 bg-primary/5" : "border-destructive/40 bg-destructive/5"
-        }`}
-      >
-        <div className="flex items-center gap-2 font-medium">
-          {ready ? (
-            <CheckCircle2 className="h-4 w-4 text-primary" />
+      {/* Publish action surface */}
+      <div className="space-y-2">
+        <Button
+          size="sm"
+          onClick={() => { void publish.check(); }}
+          disabled={buttonDisabled}
+          className="h-8 gap-1.5 text-xs w-full"
+        >
+          {isChecking ? (
+            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking your world…</>
+          ) : isBusy ? (
+            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Busy — finishing the current build</>
+          ) : isPublishing ? (
+            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Publishing…</>
           ) : (
-            <ShieldAlert className="h-4 w-4 text-destructive" />
+            <><Upload className="h-3.5 w-3.5" /> Publish to players</>
           )}
-          {ready
-            ? "Player build is safe to publish."
-            : "Resolve blocking issues before publishing."}
+        </Button>
+
+        {publish.state === "idle" && (
+          <p className="text-[11px] text-muted-foreground text-center">
+            Run a check to see what&apos;s new and whether it&apos;s safe.
+          </p>
+        )}
+
+        {(publish.state === "ready" || publish.state === "blocked" ||
+          publish.state === "build-failed" || publish.state === "publishing") &&
+          publish.checkResult && (
+            <ReadinessCard
+              result={publish.checkResult}
+              onConfirm={() => { void publish.confirm(); }}
+              busy={isPublishing}
+              onGoToEntity={onGoToEntity}
+              onGoToMap={onGoToMap}
+            />
+          )}
+
+        {publish.state === "published" && (
+          <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs text-center space-y-0.5">
+            <div className="flex items-center justify-center gap-1.5 font-medium text-primary">
+              <CheckCircle2 className="h-4 w-4" /> Published ✓
+            </div>
+            <div className="text-muted-foreground">
+              Your players will see the changes in a couple of minutes.
+            </div>
+          </div>
+        )}
+
+        {publish.state === "nothing-to-publish" && (
+          <p className="text-[11px] text-muted-foreground text-center">
+            Already up to date — nothing new to publish.
+          </p>
+        )}
+
+        {publish.state === "git-failed" && (
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs space-y-1">
+            <div className="font-medium">
+              Couldn&apos;t publish automatically — finish in GitHub Desktop.
+            </div>
+            {publish.pushReason && (
+              <div className="text-[10px] text-muted-foreground">
+                {publish.pushReason === "offline"
+                  ? "You appear to be offline."
+                  : publish.pushReason === "auth"
+                  ? "Git needs you to sign in."
+                  : publish.pushReason === "behind"
+                  ? "Your branch is behind — pull first in GitHub Desktop."
+                  : publish.pushReason === "conflict"
+                  ? "There’s a merge conflict to resolve."
+                  : ""}
+              </div>
+            )}
+          </div>
+        )}
+
+        {publish.state === "error" && (
+          <p className="text-[11px] text-destructive text-center">
+            {publish.error ?? "Something went wrong — try again."}
+          </p>
+        )}
+      </div>
+
+      {/* Pre-flight notes (demoted validator — secondary, not the safety headline; §7.3) */}
+      <div className="rounded-md border border-border bg-card/30 p-2.5 text-xs space-y-1">
+        <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Pre-flight notes
         </div>
-        <div className="mt-1 text-[10px] text-muted-foreground">
+        <div className="text-[10px] text-muted-foreground">
           {report.counts.blocking} blocking · {report.counts.warning} warning ·{" "}
           {report.counts.suggestion} suggestion
         </div>
@@ -152,13 +232,6 @@ export function PublishCheckTab({
         <Button size="sm" variant="outline" onClick={downloadReport} className="h-7 gap-1 text-xs">
           <FileDown className="h-3.5 w-3.5" /> Download report
         </Button>
-      </div>
-
-      {/* Diff vs last published — fetches .last-published.json snapshot
-          written by `npm run atlas:snapshot` and compares to the loaded
-          atlas.json. Answers "what will players see that's new?" */}
-      <div className="pt-1">
-        <PublishedDiffPanel current={project} />
       </div>
 
       {/* Build/CI report (loaded from public/atlas/atlas.json buildReport).

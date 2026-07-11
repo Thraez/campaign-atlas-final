@@ -9,6 +9,7 @@ import path from "node:path";
 import yaml from "js-yaml";
 import { resolveAndMigrate, SchemaVersionError } from "./schemaVersion";
 import type {
+  CreditsConfig,
   EntityVisibility,
   FogOverlay,
   GridOverlay,
@@ -20,10 +21,23 @@ import type {
   Region,
   Route,
   RouteMode,
+  SoundscapeConfig,
   WaterConfig,
   WorldCalendar,
 } from "../../src/atlas/content/schema";
 import { isValidVisibility } from "./visibility";
+
+/** Pure helper: coerce a raw `credits` block to a CreditsConfig, defaulting both flags to true. */
+export function resolveCredits(raw: unknown): CreditsConfig {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    return { badges: true, page: true };
+  }
+  const r = raw as Record<string, unknown>;
+  return {
+    badges: r.badges === false ? false : true,
+    page: r.page === false ? false : true,
+  };
+}
 
 const VALID_MODES: RouteMode[] = ["foot", "horse", "ship", "cart", "fly", "custom"];
 
@@ -57,6 +71,7 @@ interface WorldYaml {
         waypoints: Array<Point | { entityId: string } | string>;
       }>;
       fog?: Partial<FogOverlay> & { mapId?: string; reveals?: Point[][]; enabled?: boolean };
+      soundscape?: SoundscapeConfig;
     }
   >;
   regions?: Array<Partial<Region> & { id: string; mapId: string; name: string; points: Point[] }>;
@@ -83,6 +98,7 @@ interface WorldYaml {
     folders?: Record<string, unknown>;
     defaultFolder?: unknown;
   };
+  credits?: unknown;
 }
 
 export interface WorldConfig {
@@ -94,6 +110,7 @@ export interface WorldConfig {
   schemaVersion: number;
   warnings: string[];
   importConfig: ImportFolderConfig; // always present — defaults applied here
+  credits: CreditsConfig; // always present — both default true
 }
 
 export class WorldConfigError extends Error {}
@@ -162,6 +179,7 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
       height: m.height ?? 100000,
       oceanColor: m.oceanColor ?? "#18313f",
       ...(water !== undefined ? { water } : {}),
+      ...(m.soundscape ? { soundscape: m.soundscape } : {}),
       wrapX: m.wrapX ?? false,
       scale,
       grid,
@@ -354,6 +372,7 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
   }
 
   const importConfig = sanitizeImportConfig(data.import, warnings);
+  const credits = resolveCredits(data.credits);
 
   return {
     maps,
@@ -364,6 +383,7 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
     schemaVersion: resolvedVersion,
     warnings,
     importConfig,
+    credits,
   };
 }
 

@@ -15,6 +15,7 @@ import { parseFrontmatter, stringifyFrontmatter } from "@/atlas/import/frontmatt
 import {
   buildCanonicalPlacementChanges,
   mergePlacementsIntoFrontmatter,
+  readSourceFile,
   CanonicalSaveError,
 } from "@/atlas/save/canonicalPlacementSave";
 import type { Entity } from "@/atlas/content/schema";
@@ -92,6 +93,17 @@ describe("mergePlacementsIntoFrontmatter", () => {
     expect(a.x).toBeUndefined();
     expect(a.y).toBeUndefined();
     expect(a.visibility).toBe("player");
+  });
+
+  it("creates the atlas block from scratch when data has no atlas key", () => {
+    const data: Record<string, unknown> = { title: "New Place" };
+    const next = mergePlacementsIntoFrontmatter(data, [
+      { entityId: "new-place", mapId: "overview", x: 10, y: 20 },
+    ]);
+    expect((next.atlas as { placements: unknown[] }).placements).toEqual([
+      { mapId: "overview", x: 10, y: 20 },
+    ]);
+    expect(next.title).toBe("New Place");
   });
 
   it("only emits label/pin when explicitly provided", () => {
@@ -231,6 +243,24 @@ describe("buildCanonicalPlacementChanges round-trip", () => {
         new Map([[ent.id, ent]]),
         { fetchFn: fetchFn as unknown as typeof fetch },
       ),
+    ).rejects.toBeInstanceOf(CanonicalSaveError);
+  });
+});
+
+describe("readSourceFile", () => {
+  const allowedPath = "content/astrath/settlements/Thornhold.md";
+
+  it("throws CanonicalSaveError for a non-404 server error response", async () => {
+    const fetchFn = vi.fn(async () => jsonResponse(500, { error: "Internal Server Error" }));
+    await expect(
+      readSourceFile(allowedPath, fetchFn as unknown as typeof fetch),
+    ).rejects.toBeInstanceOf(CanonicalSaveError);
+  });
+
+  it("throws CanonicalSaveError when response body has no string contents field", async () => {
+    const fetchFn = vi.fn(async () => jsonResponse(200, { contents: 42 }));
+    await expect(
+      readSourceFile(allowedPath, fetchFn as unknown as typeof fetch),
     ).rejects.toBeInstanceOf(CanonicalSaveError);
   });
 });

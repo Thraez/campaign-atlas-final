@@ -138,6 +138,72 @@ describe("buildImportChanges", () => {
   });
 });
 
+// ── Task 1.4 — update rows merge instead of overwrite ─────────────────────────
+
+describe("buildImportChanges — update rows use mergeImportFrontmatter", () => {
+  it("update row keeps placements/visibility from disk, takes prose from vault", async () => {
+    const diskRaw = [
+      "---",
+      "atlas:",
+      "  id: corven",
+      "  type: npc",
+      "  visibility: dm",
+      "  placements:",
+      "    - mapId: m1",
+      "      x: 10",
+      "      y: 20",
+      "---",
+      "OLD PROSE",
+    ].join("\n");
+    const vaultRaw = [
+      "---",
+      "atlas:",
+      "  summary: updated summary",
+      "---",
+      "NEW PROSE",
+    ].join("\n");
+
+    const row = {
+      id: "r1", filename: "corven.md", inferredType: "npc",
+      resolvedId: "corven", targetPath: "content/w/npcs/corven.md",
+      pathAllowed: true, rowKind: "update" as const,
+      included: true, content: vaultRaw, rawContent: vaultRaw,
+      typeWasExplicit: true, typeWasGuessed: false, resolvedVisibility: "dm",
+    };
+    const changes = await buildImportChanges([row as never], {
+      fetchFn: fakeReadFetch({ "content/w/npcs/corven.md": diskRaw }),
+    });
+    expect(changes).toHaveLength(1);
+    expect(changes[0].content).toContain("NEW PROSE");
+    expect(changes[0].content).not.toContain("OLD PROSE");
+    expect(changes[0].content).toContain("placements");
+    expect(changes[0].content).toContain("visibility: dm");
+    expect(changes[0].baseHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+  });
+
+  it("create row with vault publish:true still defaults to dm (no needsReview approval)", async () => {
+    const vaultRaw = [
+      "---",
+      "atlas:",
+      "  publish: true",
+      "  summary: public note",
+      "---",
+      "Content",
+    ].join("\n");
+    const row = {
+      id: "r1", filename: "newplace.md", inferredType: "location",
+      resolvedId: "newplace", targetPath: "content/w/places/newplace.md",
+      pathAllowed: true, rowKind: "create" as const,
+      included: true, content: vaultRaw, rawContent: vaultRaw,
+      typeWasExplicit: false, typeWasGuessed: false, resolvedVisibility: "player",
+    };
+    const [change] = await buildImportChanges([row as never]);
+    const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
+    expect(atlas.visibility).toBe("dm");
+    expect(change.baseHash).toBeNull();
+  });
+});
+
 describe("buildImportChanges persists inferred atlas fields", () => {
   it("rewrites frontmatter (not verbatim) for a create row with no atlas.type", async () => {
     const raw = `---\ntags:\n  - npc\n---\n# Corven\n\nbody\n`;
@@ -164,5 +230,60 @@ describe("buildImportChanges persists inferred atlas fields", () => {
     expect(atlas.visibility).toBe("dm");
     expect(parseFrontmatter(change.content).data.tags).toContain("npc");
     expect(change.baseHash).toBeNull(); // create-only
+  });
+});
+
+// ── N92 branch-coverage gaps ───────────────────────────────────────────────
+
+describe("buildImportChanges — readSourceFile branch coverage (N92)", () => {
+  it("throws ImportCommitError on non-404 server error in update row", async () => {
+    const raw = "---\natlas:\n  type: npc\n---\nbody\n";
+    const row = {
+      id: "r1", filename: "corven.md", inferredType: "npc",
+      resolvedId: "corven", targetPath: "content/w/npcs/corven.md",
+      pathAllowed: true, rowKind: "update" as const,
+      included: true, content: raw, rawContent: raw,
+      typeWasExplicit: true, typeWasGuessed: false, resolvedVisibility: "dm",
+    };
+    const serverErrorFetch: typeof fetch = async () =>
+      new Response("internal server error", { status: 500 }) as Response;
+    await expect(
+      buildImportChanges([row as never], { fetchFn: serverErrorFetch }),
+    ).rejects.toBeInstanceOf(ImportCommitError);
+  });
+
+  it("throws ImportCommitError when read response body has non-string contents", async () => {
+    const raw = "---\natlas:\n  type: settlement\n  id: thornhold\n---\nbody\n";
+    const row = {
+      id: "r1", filename: "thornhold.md", inferredType: "settlement",
+      resolvedId: "thornhold", targetPath: "content/w/settlements/thornhold.md",
+      pathAllowed: true, rowKind: "path-collision" as const,
+      included: true, content: raw, rawContent: raw,
+      typeWasExplicit: false, typeWasGuessed: false, resolvedVisibility: "dm",
+    };
+    const malformedFetch: typeof fetch = async () =>
+      new Response(JSON.stringify({ path: "content/w/settlements/thornhold.md", contents: 42 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }) as Response;
+    await expect(
+      buildImportChanges([row as never], { fetchFn: malformedFetch }),
+    ).rejects.toBeInstanceOf(ImportCommitError);
+  });
+
+  it("needsReview secrecy-increase bypasses the dm default and uses resolvedVisibility", async () => {
+    const raw = "---\natlas:\n  summary: public note\n---\nContent\n";
+    const row = {
+      id: "r1", filename: "newplace.md", inferredType: "location",
+      resolvedId: "newplace", targetPath: "content/w/places/newplace.md",
+      pathAllowed: true, rowKind: "create" as const,
+      included: true, content: raw, rawContent: raw,
+      typeWasExplicit: false, typeWasGuessed: false,
+      resolvedVisibility: "player",
+      needsReview: { reason: "secrecy-increase" as const },
+    };
+    const [change] = await buildImportChanges([row as never]);
+    const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
+    expect(atlas.visibility).toBe("player");
   });
 });
