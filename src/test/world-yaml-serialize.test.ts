@@ -32,6 +32,36 @@ describe("captureLeadingCommentBlock", () => {
     expect(captureLeadingCommentBlock(existing)).toBe("# header line 1\n# header line 2\n\n");
   });
 
+  it("captures an all-comment file with no YAML body (entire content is comments)", () => {
+    // Edge case: file has only comment lines and no YAML keys at all.
+    // captureLeadingCommentBlock should capture every comment line and normalise
+    // to exactly one trailing blank separator, even though there is no YAML body
+    // following it.
+    const existing = "# comment one\n# comment two\n";
+    expect(captureLeadingCommentBlock(existing)).toBe("# comment one\n# comment two\n\n");
+  });
+
+  it("captures leading blank lines that precede the first comment", () => {
+    // A blank line at the very top of the file also satisfies the blank-or-comment
+    // predicate and is included in the capture.
+    const existing = "\n# after blank\n\nschemaVersion: 1\n";
+    expect(captureLeadingCommentBlock(existing)).toBe("\n# after blank\n\n");
+  });
+
+  it("captures indented comment lines (leading whitespace before #)", () => {
+    // /^\s*#/ matches lines whose first non-space character is #, so indented
+    // comments at the top of the file are preserved alongside column-zero ones.
+    const existing = "  # indented note\nschemaVersion: 1\n";
+    expect(captureLeadingCommentBlock(existing)).toBe("  # indented note\n\n");
+  });
+
+  it("stops at a YAML key that has an inline comment (non-leading #)", () => {
+    // A line like "key: value # note" does not start with # — the scan stops
+    // immediately and returns "" because there is no leading comment block.
+    const existing = "key: value # inline\nmaps: []\n";
+    expect(captureLeadingCommentBlock(existing)).toBe("");
+  });
+
   it("captures the full 9-line astrath-deeprealm header exactly", () => {
     const existing =
       "# Astrath Deeprealm — map / region / fog / route / calendar config.\n" +
@@ -109,5 +139,24 @@ describe("serializeWorldYaml", () => {
     const out = serializeWorldYaml(newBody, existing);
     expect(out).toContain("# top header");
     expect(out).not.toContain("# inline comment");
+  });
+
+  it("all-comment existing file: comment block is preserved and new body follows (documented gap)", () => {
+    // The documented edge case: existing world.yaml contains only header comments
+    // and no YAML keys. captureLeadingCommentBlock captures the entire file as the
+    // comment block; serializeWorldYaml prepends it to the new body correctly.
+    const existing = "# Config header\n#\n# Doc line\n";
+    const newBody = "schemaVersion: 1\nmaps: []\n";
+    const out = serializeWorldYaml(newBody, existing);
+    expect(out).toBe("# Config header\n#\n# Doc line\n\nschemaVersion: 1\nmaps: []\n");
+  });
+
+  it("single comment line with no trailing newline still gets the blank-line separator", () => {
+    // A comment-only existing file that has no trailing newline should still
+    // produce exactly one blank line separating the comment from the YAML body.
+    const existing = "# single";
+    const newBody = "schemaVersion: 1\n";
+    const out = serializeWorldYaml(newBody, existing);
+    expect(out).toBe("# single\n\nschemaVersion: 1\n");
   });
 });

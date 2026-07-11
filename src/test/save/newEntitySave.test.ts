@@ -1,7 +1,25 @@
 // src/test/save/newEntitySave.test.ts
 import { describe, it, expect } from "vitest";
 import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
+import { slugify } from "@/atlas/content/slugify";
 import { parseFrontmatter } from "@/atlas/import/frontmatter";
+
+describe("slugify", () => {
+  it("strips leading and trailing non-alphanumeric characters", () => {
+    expect(slugify("!Hello World!")).toBe("hello-world");
+  });
+
+  it("removes apostrophes entirely so possessives stay joined", () => {
+    // Canonical rule (content/slugify): apostrophes are stripped, not
+    // converted to separators — same rule the build uses for ids.
+    expect(slugify("Dragon's Lair")).toBe("dragons-lair");
+  });
+
+  it("collapses multiple non-alphanumeric characters into a single dash", () => {
+    // "&" surrounded by spaces → three consecutive non-alphanumeric chars collapse to one "-"
+    expect(slugify("The Hilt & Flagon")).toBe("the-hilt-flagon");
+  });
+});
 
 describe("buildNewEntityChange", () => {
   it("creates a slugged .md in the category folder with baseHash null", () => {
@@ -53,5 +71,52 @@ describe("buildNewEntityChange", () => {
     expect(atlas.type).toBe("faction");
     expect(atlas.id).toBe("the-tide-court");
     expect(change.path).toBe("content/w/factions/the-tide-court.md");
+  });
+
+  it("omits summary from atlas block when summary is not provided", () => {
+    const change = buildNewEntityChange({
+      worldRoot: "content/w",
+      category: "characters",
+      title: "Unnamed Scout",
+      visibility: "dm",
+    });
+    const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(atlas, "summary")).toBe(false);
+  });
+
+  it("uses folder 'settlements' and type 'settlement' for locations category", () => {
+    const change = buildNewEntityChange({
+      worldRoot: "content/w",
+      category: "locations",
+      title: "Iron Gate",
+      visibility: "player",
+    });
+    expect(change.path).toBe("content/w/settlements/iron-gate.md");
+    const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
+    expect(atlas.type).toBe("settlement");
+  });
+
+  it("trims whitespace from kind before writing atlas.type", () => {
+    const change = buildNewEntityChange({
+      worldRoot: "content/w",
+      category: "characters",
+      title: "Scout",
+      visibility: "dm",
+      kind: "  ranger  ",
+    });
+    const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
+    expect(atlas.type).toBe("ranger");
+  });
+
+  it("persists visibility 'rumor' in the atlas block", () => {
+    const change = buildNewEntityChange({
+      worldRoot: "content/w",
+      category: "lore",
+      title: "Hidden Pact",
+      visibility: "rumor",
+    });
+    const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
+    expect(atlas.visibility).toBe("rumor");
+    expect(change.path).toBe("content/w/lore/hidden-pact.md");
   });
 });

@@ -19,11 +19,13 @@
  */
 
 import { parseFrontmatter } from "./frontmatter";
-import type { ImportFolderConfig } from "../content/schema";
+import type { ImportFolderConfig, EntityVisibility } from "../content/schema";
 import { inferTypeFromTags } from "./inferTypeFromTags";
 import { inferTypeFromPath } from "./inferType";
 import { slugify } from "@/atlas/content/slugify";
 import { isValidVisibility } from "@/atlas/content/visibility";
+import { lookupByPath, type SyncMap } from "./syncMap";
+import { detectExposureIncrease, resolveType } from "./mergeImportFrontmatter";
 
 /**
  * Inferred entity-type (from frontmatter / fallback) → destination folder.
@@ -64,6 +66,8 @@ export function isAllowedTargetPath(
 export interface RawImportFile {
   filename: string;
   raw: string;
+  /** Vault-relative POSIX path (e.g. "notes/corven.md"). Used for sync-map identity lookup. */
+  vaultRelPath?: string;
 }
 
 export interface StagingContext {
@@ -75,6 +79,13 @@ export interface StagingContext {
   existingById: ReadonlyMap<string, string>;
   /** Set of all existing on-disk sourcePaths. Derived from existingById.values(). */
   existingPaths: ReadonlySet<string>;
+  /** Vault-path → { id, baseType } from the last sync. Used for identity resolution when atlas.id is absent. */
+  syncMap?: SyncMap;
+  /** entity id → { visibility, type, sourcePath } from the DM atlas. Used to detect exposure/type conflicts. */
+  entityMeta?: ReadonlyMap<
+    string,
+    { visibility: EntityVisibility; type: string; sourcePath: string }
+  >;
 }
 
 export interface StagingRow {
@@ -109,6 +120,12 @@ export interface StagingRow {
   resolvedVisibility: string;
   /** Full file body (text). Preserved verbatim through the commit. */
   rawContent: string;
+  /** Last-synced vault type for this entity (from sync-map, §3.6). Undefined on first sync. */
+  baseType?: string;
+  /** Opt-in review flag: row defaults to included=false until the DM ticks it (Phase 2 populates). */
+  needsReview?: { reason: "secrecy-increase" | "rename-link" | "type-conflict" };
+  /** Vault-relative POSIX path — present when the row came from a vault scan (openWithVaultScan). */
+  vaultRelPath?: string;
 }
 
 /**
@@ -202,10 +219,13 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     parseError,
   } = extractStagingFields(input.raw, input.filename);
 
-  // Compute resolvedId matching build-atlas.ts logic exactly:
-  // build uses: parsed.atlas.id || slugify(deriveTitle(file, fm.title))
+  // ── Identity resolution (§5.3 precedence) ──────────────────────────────────
+  // Priority: (1) vault atlas.id; (2) sync-map[vaultRelPath]; (3) slugify(title)
+  const syncEntry =
+    input.vaultRelPath && ctx.syncMap ? lookupByPath(ctx.syncMap, input.vaultRelPath) : undefined;
   const title = deriveTitle(input.filename, fmTitle);
-  const resolvedId = id ?? slugify(title);
+  const resolvedId = id ?? syncEntry?.id ?? slugify(title);
+  const baseType = syncEntry?.baseType; // for two-way type resolution in §3.6
 
   // Stem for path computation: use resolvedId (same as build-atlas derivation)
   const stem = resolvedId;
@@ -225,8 +245,29 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
   }
 
   const pathAllowed = isAllowedTargetPath(ctx.worldId, targetPath, ctx.allowedFolders);
-  // create and update default ON; path-collision requires explicit opt-in (same as today's conflict)
-  const included = !parseError && pathAllowed && rowKind !== "path-collision";
+
+  // ── needsReview from DM-canon (§2.3) ────────────────────────────────────────
+  // Only computed for update rows; create/collision rows are never auto-exposed.
+  let needsReview: StagingRow["needsReview"] = undefined;
+  if (rowKind === "update" && ctx.entityMeta) {
+    const meta = ctx.entityMeta.get(resolvedId);
+    if (meta) {
+      // Check secrecy increase: canon is hidden-tier, vault wants player visibility
+      const vaultAtlas = parseError
+        ? {}
+        : ((parseFrontmatter(input.raw).data.atlas as Record<string, unknown>) ?? {});
+      if (detectExposureIncrease(meta.visibility, vaultAtlas)) {
+        needsReview = { reason: "secrecy-increase" };
+      } else if (baseType) {
+        // Check type conflict: both disk type and vault type diverged from last-synced base
+        const { conflict } = resolveType({ diskType: meta.type, vaultType: type, baseType });
+        if (conflict) needsReview = { reason: "type-conflict" };
+      }
+    }
+  }
+
+  // create and update default ON; path-collision requires explicit opt-in; needsReview rows default OFF
+  const included = !parseError && pathAllowed && rowKind !== "path-collision" && !needsReview;
 
   return {
     id: nextRowId(input.filename),
@@ -243,6 +284,9 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     typeWasGuessed,
     resolvedVisibility: visibility,
     rawContent: input.raw,
+    baseType,
+    needsReview,
+    vaultRelPath: input.vaultRelPath,
   };
 }
 

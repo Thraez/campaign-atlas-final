@@ -17,11 +17,13 @@
  * boilerplate header when there's no existing file).
  */
 import type {
+  CreditsConfig,
   FogOverlay,
   MapDocument,
   MapLayer,
   Region,
   Route,
+  SoundscapeConfig,
   WaterConfig,
   WorldCalendar,
 } from "@/atlas/content/schema";
@@ -43,6 +45,8 @@ export interface BuildFullWorldYamlOpts {
   /** Current on-disk file contents — used by serializeWorldYaml to preserve the leading comment block.
    *  Pass null when the file does not yet exist. */
   existing: string | null;
+  /** Optional site-wide credits config. When present, serialized as a top-level `credits:` block. */
+  credits?: CreditsConfig;
 }
 
 export function buildFullWorldYaml(opts: BuildFullWorldYamlOpts): string {
@@ -50,6 +54,7 @@ export function buildFullWorldYaml(opts: BuildFullWorldYamlOpts): string {
   if (opts.schemaVersion !== undefined) root.schemaVersion = opts.schemaVersion;
   root.maps = opts.maps.map(mapToYamlObject);
   if (opts.calendar) root.calendar = calendarToYamlObject(opts.calendar);
+  if (opts.credits) root.credits = creditsToYamlObject(opts.credits);
   const body = dumpYaml(root);
   return serializeWorldYaml(body, opts.existing);
 }
@@ -76,6 +81,7 @@ function mapToYamlObject(m: MapDocument): Record<string, unknown> {
     out.fog = fogToYamlObject(m.fog as FogOverlay);
   }
   if (m.water) out.water = waterToYamlObject(m.water);
+  if (m.soundscape) out.soundscape = soundscapeToYamlObject(m.soundscape);
   return out;
 }
 
@@ -114,6 +120,31 @@ function waterToYamlObject(w: WaterConfig): Record<string, unknown> {
   return out;
 }
 
+function soundscapeToYamlObject(s: SoundscapeConfig): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (s.enabled === false) out.enabled = false;
+  else if (s.enabled === true) out.enabled = true;
+  if (s.masterGain !== undefined) out.masterGain = s.masterGain;
+  if (s.areas && s.areas.length > 0) {
+    out.areas = s.areas.map((a) => {
+      const area: Record<string, unknown> = {
+        id: a.id,
+        bed: {
+          src: a.bed.src,
+          ...(a.bed.srcFallback ? { srcFallback: a.bed.srcFallback } : {}),
+          ...(a.bed.gain !== undefined ? { gain: a.bed.gain } : {}),
+        },
+      };
+      if (a.regionId) area.regionId = a.regionId;
+      if (a.points && a.points.length > 0) area.points = a.points;
+      if (a.visibility) area.visibility = a.visibility;
+      if (a.name) area.name = a.name;
+      return area;
+    });
+  }
+  return out;
+}
+
 function calendarToYamlObject(c: WorldCalendar): Record<string, unknown> {
   const out: Record<string, unknown> = {
     months: c.months.map((m) => ({ name: m.name, days: m.days })),
@@ -121,5 +152,12 @@ function calendarToYamlObject(c: WorldCalendar): Record<string, unknown> {
   if (c.name) out.name = c.name;
   if (c.epochName) out.epochName = c.epochName;
   if (c.daysPerWeek !== undefined) out.daysPerWeek = c.daysPerWeek;
+  return out;
+}
+
+function creditsToYamlObject(c: CreditsConfig): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (c.badges !== undefined) out.badges = c.badges;
+  if (c.page !== undefined) out.page = c.page;
   return out;
 }

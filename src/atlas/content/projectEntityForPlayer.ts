@@ -84,8 +84,19 @@ export function projectEntityForPlayer(entity: Entity, ctx: ProjectionContext): 
   // Use a separate variable so entity.body (returned as raw markdown) stays in parity with the build.
   const bodyForHtml = resolveImageEmbeds(body);
 
+  // 1c. Secret markers: replace {{secret:id}} with an inert placeholder span. The
+  // client (EntityPanel effect) resolves the matching entity.secrets blob and
+  // renders the sealed-box UI. Orphan markers (no matching secret blob) are dropped.
+  const knownSecretIds = new Set((entity.secrets ?? []).map((s) => s.id));
+  const bodyWithSecrets = bodyForHtml.replace(/\{\{secret:([^}]+)\}\}/g, (_m, rawId) => {
+    const id = String(rawId).trim();
+    if (!knownSecretIds.has(id)) return "";
+    const esc = id.replace(/"/g, "&quot;");
+    return `<span class="atlas-secret-block" data-secret-id="${esc}"></span>`;
+  });
+
   // 2. Tokenise wikilinks (from embed-resolved text so <img> appears in rendered HTML)
-  const { tokenized, links } = tokenizeWikilinks(bodyForHtml, { resolveByName: ctx.resolveByName });
+  const { tokenized, links } = tokenizeWikilinks(bodyWithSecrets, { resolveByName: ctx.resolveByName });
 
   // 3. Redact links to secret targets (redact in body string AND mark link as broken)
   for (const l of links) {

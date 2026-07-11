@@ -137,3 +137,29 @@ describe("entry template inserts", () => {
     }
   });
 });
+
+describe("secret insert actions", () => {
+  const SECRET_RE = /\{\{secret:s-[a-z0-9]+\}\}/;
+
+  it("secret:character inserts a {{secret:s-...}} block", () => {
+    const r = applyToolbarAction("secret:character", "body", 4, 4);
+    expect(r.value).toMatch(SECRET_RE);
+  });
+
+  it("secret:password inserts a {{secret:s-...}} block", () => {
+    const r = applyToolbarAction("secret:password", "body", 4, 4);
+    expect(r.value).toMatch(SECRET_RE);
+  });
+
+  it("secret:character inserts after existing content as a block", () => {
+    const r = applyToolbarAction("secret:character", "intro", 5, 5);
+    expect(r.value.startsWith("intro\n\n{{secret:s-")).toBe(true);
+    expect(r.value.endsWith("}}\n")).toBe(true);
+  });
+
+  it("two secret:character calls produce different ids", () => {
+    const r1 = applyToolbarAction("secret:character", "", 0, 0);
+    const r2 = applyToolbarAction("secret:character", "", 0, 0);
+    expect(r1.value).not.toBe(r2.value);
+  });
+});

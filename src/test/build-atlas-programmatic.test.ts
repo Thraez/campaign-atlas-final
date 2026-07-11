@@ -152,4 +152,32 @@ describe("deriveTitle", () => {
   it("falls back to slug-derived title when fmTitle is whitespace-only", () => {
     expect(deriveTitle("/notes/edric.md", "   ")).toBe("Edric");
   });
+
+  it("non-string fmTitle (number) falls through to slug-derived title", () => {
+    expect(deriveTitle("/notes/npc.md", 42)).toBe("Npc");
+  });
+
+  it("non-string fmTitle (boolean) falls through to slug-derived title", () => {
+    expect(deriveTitle("/notes/npc.md", true)).toBe("Npc");
+  });
+
+  it("non-string fmTitle (object) falls through to slug-derived title", () => {
+    expect(deriveTitle("/notes/npc.md", { title: "Npc" })).toBe("Npc");
+  });
+
+  it("collapses multiple consecutive hyphens into a single space", () => {
+    expect(deriveTitle("/notes/great---hall.md")).toBe("Great Hall");
+  });
+
+  it("collapses mixed hyphens and underscores into spaces", () => {
+    expect(deriveTitle("/notes/the-lost_city.md")).toBe("The Lost City");
+  });
+
+  it("capitalizes unicode first letter via \\p{L} regex", () => {
+    expect(deriveTitle("/notes/ñoño.md")).toBe("Ñoño");
+  });
+
+  it("trims space produced by a leading separator", () => {
+    expect(deriveTitle("/notes/-the-way.md")).toBe("The Way");
+  });
 });

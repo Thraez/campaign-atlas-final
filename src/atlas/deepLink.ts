@@ -25,9 +25,9 @@ export function parseDeepLink(search: string): DeepLinkState {
   const cyStr = params.get("cy");
   const czStr = params.get("cz");
 
-  const cx = cxStr !== null ? Number(cxStr) : NaN;
-  const cy = cyStr !== null ? Number(cyStr) : NaN;
-  const cz = czStr !== null ? Number(czStr) : NaN;
+  const cx = cxStr ? Number(cxStr) : NaN;
+  const cy = cyStr ? Number(cyStr) : NaN;
+  const cz = czStr ? Number(czStr) : NaN;
 
   return {
     mapId,

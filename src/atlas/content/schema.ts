@@ -44,11 +44,17 @@ export interface ImportFolderConfig {
   defaultFolder: string;
 }
 
+export interface CreditsConfig {
+  badges?: boolean; // default true — show corner credit badge on entity images
+  page?: boolean;   // default true — publish the /atlas/credits aggregate page
+}
+
 export interface World {
   id: string;
   name: string;
   defaultMapId?: string;
   importFolders?: ImportFolderConfig; // present in DM builds only; absent in player builds
+  credits?: CreditsConfig;            // both default true when absent
 }
 
 export interface MapDocument {
@@ -65,6 +71,7 @@ export interface MapDocument {
   grid?: GridOverlay;
   oceanColor?: string;
   water?: WaterConfig;
+  soundscape?: SoundscapeConfig;
   wrapX?: boolean;
 }
 
@@ -73,6 +80,41 @@ export interface WaterConfig {
   intensity?: number;   // 0..1, default 0.35 (gentle)
   speed?: number;       // 0..1, default 0.3 (slow)
   crestColor?: string;  // hex; default derived from oceanColor
+}
+
+/** One looping ambient bed. Two files so Safari (no Ogg) has a fallback. */
+export interface SoundBed {
+  /** Path under atlas/assets/audio/ (primary, e.g. .ogg). */
+  src: string;
+  /** Optional Safari-friendly twin (.mp3/.aac). */
+  srcFallback?: string;
+  /** Per-bed loudness, 0..1, default 0.7. */
+  gain?: number;
+}
+
+/** A place that makes sound. Either borrows a region's shape (regionId) or
+ *  carries its own polygon (points). Exactly one bed; zoom layering is by
+ *  nesting smaller areas, not by multiple beds. */
+export interface SoundArea {
+  id: string;
+  /** Ride-on: borrow this region's points + visibility. */
+  regionId?: string;
+  /** Sound-only zone: own polygon (used when regionId is absent). */
+  points?: Point[];
+  /** Sound-only zones only; ride-on areas inherit the region's visibility. */
+  visibility?: EntityVisibility;
+  /** Optional label (editor + credits). DM-strippable; never required to ship. */
+  name?: string;
+  bed: SoundBed;
+}
+
+/** Per-map soundscape config (sibling of `water`). */
+export interface SoundscapeConfig {
+  /** default true. false ⇒ no AudioContext, no control for this map. */
+  enabled?: boolean;
+  /** Overall loudness, 0..1, default 0.6. */
+  masterGain?: number;
+  areas?: SoundArea[];
 }
 
 export interface MapScale {
@@ -144,6 +186,16 @@ export interface MapLayer {
   tileSrc?: string;
 }
 
+/** Encrypted secret blob emitted to the player build. Plaintext never ships. */
+export interface PlayerSecret {
+  id: string;
+  lockType: "password" | "character";
+  teaser?: string;  // only for password type; intentionally public
+  salt: string;     // base64, 16 random bytes
+  iv: string;       // base64, 12 random bytes
+  ciphertext: string; // base64( AES-GCM ciphertext || 16-byte auth tag )
+}
+
 export interface ResolvedLink {
   target: string; // raw target text from [[...]]
   resolvedId?: string; // resolved entity id when known
@@ -178,6 +230,10 @@ export interface Entity {
   profile?: import("@/atlas/profiles/profileTypes").EntityProfile;
   /** Entity-to-entity relationships. Filtered by visibility in player builds. */
   relationships?: import("@/atlas/profiles/profileTypes").EntityRelationship[];
+  /** Optional attribution string for the entity's images (e.g. "Portrait by Evelyn K, CC BY 4.0"). */
+  credit?: string;
+  /** Encrypted secrets. Only ciphertext blobs ship in player builds — no plaintext, passphrase, or key. */
+  secrets?: PlayerSecret[];
 }
 
 /** Per-placement pin styling overrides. Stored under atlas.placements[].pin in YAML.
@@ -205,6 +261,8 @@ export interface MapPlacement {
   visibility: EntityVisibility;
   /** Optional pin-styling overrides; renderer falls back to entity.type preset. */
   pin?: PinPlacementStyle;
+  /** References a secret id on the entity; character-secret pins are omitted from player builds. */
+  secretId?: string;
 }
 
 export interface AssetRef {

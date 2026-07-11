@@ -379,3 +379,128 @@ describe("buildFullWorldYaml — schema version", () => {
     expect(out).not.toMatch(/^schemaVersion:/m);
   });
 });
+
+describe("buildFullWorldYaml — soundscape round-trip", () => {
+  it("round-trips soundscape config through YAML", () => {
+    const map = makeMap({
+      soundscape: {
+        enabled: true,
+        masterGain: 0.7,
+        areas: [
+          {
+            id: "area-tavern",
+            bed: { src: "audio/tavern.ogg", gain: 0.8 },
+            points: [
+              [0, 0],
+              [100, 0],
+              [100, 100],
+              [0, 100],
+            ],
+            visibility: "player" as const,
+          },
+        ],
+      },
+    });
+    const out = buildFullWorldYaml({ maps: [map], schemaVersion: 1, existing: null });
+    const cfg = loadEmitted(out)!;
+    const sc = cfg.maps[0].soundscape;
+    expect(sc).toBeDefined();
+    expect(sc!.enabled).toBe(true);
+    expect(sc!.masterGain).toBe(0.7);
+    expect(sc!.areas).toHaveLength(1);
+    expect(sc!.areas![0].id).toBe("area-tavern");
+    expect(sc!.areas![0].bed.src).toBe("audio/tavern.ogg");
+    expect(sc!.areas![0].bed.gain).toBe(0.8);
+  });
+
+  it("omits soundscape key when undefined", () => {
+    const out = buildFullWorldYaml({ maps: [makeMap()], schemaVersion: 1, existing: null });
+    expect(out).not.toMatch(/soundscape:/);
+  });
+});
+
+describe("buildFullWorldYaml — water round-trip", () => {
+  it("round-trips water config with all non-default fields", () => {
+    const map = makeMap({
+      water: { enabled: true, intensity: 0.8, speed: 0.6, crestColor: "#aabbcc" },
+    });
+    const out = buildFullWorldYaml({ maps: [map], schemaVersion: 1, existing: null });
+    const cfg = loadEmitted(out)!;
+    const w = cfg.maps[0].water;
+    expect(w).toBeDefined();
+    expect(w!.enabled).toBe(true);
+    expect(w!.intensity).toBe(0.8);
+    expect(w!.speed).toBe(0.6);
+    expect(w!.crestColor).toBe("#aabbcc");
+  });
+
+  it("round-trips water with enabled:false (and no intensity/speed)", () => {
+    const map = makeMap({ water: { enabled: false } });
+    const out = buildFullWorldYaml({ maps: [map], schemaVersion: 1, existing: null });
+    const cfg = loadEmitted(out)!;
+    const w = cfg.maps[0].water;
+    expect(w!.enabled).toBe(false);
+    expect(w!.intensity).toBeUndefined();
+    expect(w!.speed).toBeUndefined();
+  });
+
+  it("omits intensity/speed from YAML when they equal the defaults", () => {
+    // DEFAULT_WATER: { intensity: 0.35, speed: 0.3 } — waterToYamlObject skips them
+    const map = makeMap({ water: { enabled: true, intensity: 0.35, speed: 0.3 } });
+    const out = buildFullWorldYaml({ maps: [map], schemaVersion: 1, existing: null });
+    expect(out).not.toMatch(/intensity:/);
+    expect(out).not.toMatch(/speed:/);
+    // Round-trip: sanitizeWater only stores what's in the YAML, so intensity/speed are absent
+    const cfg = loadEmitted(out)!;
+    expect(cfg.maps[0].water!.intensity).toBeUndefined();
+    expect(cfg.maps[0].water!.speed).toBeUndefined();
+  });
+});
+
+describe("buildFullWorldYaml — credits round-trip", () => {
+  it("round-trips credits with explicit false values", () => {
+    const out = buildFullWorldYaml({
+      maps: [makeMap()],
+      schemaVersion: 1,
+      credits: { badges: false, page: false },
+      existing: null,
+    });
+    const cfg = loadEmitted(out)!;
+    expect(cfg.credits.badges).toBe(false);
+    expect(cfg.credits.page).toBe(false);
+  });
+
+  it("omits credits key from YAML when opts.credits is absent", () => {
+    const out = buildFullWorldYaml({ maps: [makeMap()], schemaVersion: 1, existing: null });
+    expect(out).not.toMatch(/^credits:/m);
+    // loadWorldConfig defaults both to true when the key is absent
+    const cfg = loadEmitted(out)!;
+    expect(cfg.credits.badges).toBe(true);
+    expect(cfg.credits.page).toBe(true);
+  });
+});
+
+describe("buildFullWorldYaml — layer optional fields", () => {
+  it("round-trips layer rotation and tileSrc", () => {
+    const map = makeMap({
+      layers: [
+        {
+          id: "L1",
+          src: "atlas/assets/maps/a.png",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 10,
+          rotation: 45,
+          tileSrc: "atlas/assets/maps/tile.png",
+        },
+      ],
+    });
+    const out = buildFullWorldYaml({ maps: [map], schemaVersion: 1, existing: null });
+    const cfg = loadEmitted(out)!;
+    expect(cfg.maps[0].layers[0].rotation).toBe(45);
+    expect(cfg.maps[0].layers[0].tileSrc).toBe("atlas/assets/maps/tile.png");
+  });
+});

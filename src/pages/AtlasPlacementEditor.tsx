@@ -64,7 +64,7 @@ import {
 } from "@/atlas/save/canonicalEntitySave";
 import { useWorldYamlBaseline, worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
 import { buildFullWorldYaml } from "@/atlas/yaml/buildFullWorldYaml";
-import { ImportPanel } from "@/atlas/import/ImportPanel";
+import { SyncPanel } from "@/atlas/sync/SyncPanel";
 import { ImportStagingModal } from "@/atlas/import/ImportStagingModal";
 import { PasteMarkdownDialog } from "@/atlas/import/PasteMarkdownDialog";
 import { useMdImportFlow } from "@/atlas/import/useMdImportFlow";
@@ -124,6 +124,7 @@ import { useEntityEditDraft } from "@/atlas/categories/useEntityEditDraft";
 import { EditorRail } from "@/atlas/shell/EditorRail";
 import { EditorPanelHost } from "@/atlas/shell/EditorPanelHost";
 import { buildRailItems } from "@/atlas/shell/railRegistry";
+import { CharacterKeysPanel } from "@/atlas/secrets/CharacterKeysPanel";
 import { ViewModeProvider, useViewMode } from "@/atlas/view/ViewModeProvider";
 import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
@@ -1880,18 +1881,8 @@ function AtlasPlacementEditorInner() {
                 }}
               />
             ),
-            import: (
-              <ImportPanel
-                knownEntityNames={
-                  new Set(
-                    project.entities.flatMap((e) => [
-                      e.id.toLowerCase(),
-                      e.title.toLowerCase(),
-                      ...e.aliases.map((a) => a.toLowerCase()),
-                    ]),
-                  )
-                }
-              />
+            sync: (
+              <SyncPanel onSync={(root, globs) => void importFlow.openWithVaultScan(root, globs)} />
             ),
             // Menu-reachable panels (no rail icon — opened via ☰ menu or CommandPalette).
             world: (
@@ -1904,6 +1895,9 @@ function AtlasPlacementEditorInner() {
                 }}
               />
             ),
+            characterKeys: activeWorldId ? (
+              <CharacterKeysPanel worldDir={`content/${activeWorldId}`} />
+            ) : null,
           };
           const counts: Record<string, number | undefined> = {
             pins: unplaced.length > 0 ? unplaced.length : undefined,

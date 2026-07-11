@@ -22,7 +22,9 @@ export type ToolbarActionId =
   | "template:npc"
   | "template:location"
   | "template:secrets"
-  | "template:readaloud";
+  | "template:readaloud"
+  | "secret:character"
+  | "secret:password";
 
 const TABLE_SKELETON = "| Column | Column |\n| --- | --- |\n| Cell | Cell |";
 
@@ -119,5 +121,14 @@ export function applyToolbarAction(
       return insertBlock(value, selStart, TEMPLATE_SECRETS);
     case "template:readaloud":
       return insertBlock(value, selStart, TEMPLATE_READALOUD);
+    case "secret:character":
+    case "secret:password": {
+      const id =
+        "s-" +
+        Array.from(crypto.getRandomValues(new Uint8Array(4)))
+          .map((b) => b.toString(36))
+          .join("");
+      return insertBlock(value, selStart, `{{secret:${id}}}`);
+    }
   }
 }

@@ -5,6 +5,12 @@
  * exactly ONE FileChange for that path; the /__atlas/save endpoint rejects
  * a batch with duplicate paths (400 duplicate-path), which would fail the
  * whole save. This test locks that contract.
+ *
+ * Also covers:
+ *   - worldYamlPath pure helper (useWorldYamlBaseline)
+ *   - entityFrontmatterPatches edge cases (unknown id, empty relationships,
+ *     relationships fallback, alias override)
+ *   - buildCanonicalEntityChanges error paths (unknown entity, no sourcePath)
  */
 import { describe, it, expect } from "vitest";
 import type { Entity } from "@/atlas/content/schema";
@@ -12,6 +18,8 @@ import {
   entityFrontmatterPatches,
   buildCanonicalEntityChanges,
 } from "@/atlas/save/canonicalEntitySave";
+import { CanonicalSaveError } from "@/atlas/save/canonicalPlacementSave";
+import { worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
 
 const hero = {
   id: "hero",
@@ -91,5 +99,76 @@ describe("buildCanonicalEntityChanges — placement + frontmatter seam", () => {
       { fetchFn: fetchReturning(currentMd) },
     );
     expect(changes).toHaveLength(0);
+  });
+});
+
+// ── worldYamlPath ────────────────────────────────────────────────────────────
+
+describe("worldYamlPath", () => {
+  it("returns the correct content-relative path for a world id", () => {
+    expect(worldYamlPath("astrath-deeprealm")).toBe("content/astrath-deeprealm/_atlas/world.yaml");
+  });
+
+  it("handles a single-segment world id without extra separators", () => {
+    expect(worldYamlPath("w")).toBe("content/w/_atlas/world.yaml");
+  });
+});
+
+// ── entityFrontmatterPatches — edge cases ────────────────────────────────────
+
+describe("entityFrontmatterPatches — edge cases", () => {
+  it("silently omits a draft whose entity id is not in the entities list", () => {
+    const patches = entityFrontmatterPatches({ "ghost-id": { summary: "should not appear" } }, [
+      hero,
+    ]);
+    expect(patches).toHaveLength(0);
+  });
+
+  it("entity with empty relationships produces atlas.relationships: undefined (no empty array noise)", () => {
+    const entityNoRels = { ...hero, relationships: [] } as unknown as Entity;
+    const [patch] = entityFrontmatterPatches({ hero: { summary: "x" } }, [entityNoRels]);
+    expect(patch.atlas.relationships).toBeUndefined();
+  });
+
+  it("entity with a relationship preserves it in the patch", () => {
+    const rel = { targetId: "villain", label: "antagonist", visibility: "player" as const };
+    const entityWithRel = { ...hero, relationships: [rel] } as unknown as Entity;
+    const [patch] = entityFrontmatterPatches({ hero: {} }, [entityWithRel]);
+    expect(patch.atlas.relationships).toEqual([rel]);
+  });
+
+  it("draft aliases override the entity's existing aliases", () => {
+    const entityWithAliases = { ...hero, aliases: ["Old Alias"] } as unknown as Entity;
+    const [patch] = entityFrontmatterPatches({ hero: { aliases: ["New Alias"] } }, [
+      entityWithAliases,
+    ]);
+    expect(patch.atlas.aliases).toEqual(["New Alias"]);
+  });
+});
+
+// ── buildCanonicalEntityChanges — error paths ────────────────────────────────
+
+describe("buildCanonicalEntityChanges — error paths", () => {
+  const currentMd = "---\natlas:\n  id: hero\n  summary: Old summary\n---\nThe hero body.\n";
+
+  it("throws CanonicalSaveError when a placement references an entity id not in entitiesById", async () => {
+    await expect(
+      buildCanonicalEntityChanges(
+        { placements: [{ entityId: "unknown-id", mapId: "m1", x: 1, y: 1 }], frontmatter: [] },
+        new Map([[hero.id, hero]]),
+        { fetchFn: fetchReturning(currentMd) },
+      ),
+    ).rejects.toBeInstanceOf(CanonicalSaveError);
+  });
+
+  it("throws CanonicalSaveError when an entity has no sourcePath (player-mode atlas)", async () => {
+    const noPath = { ...hero, sourcePath: undefined } as unknown as Entity;
+    await expect(
+      buildCanonicalEntityChanges(
+        { placements: [{ entityId: hero.id, mapId: "m1", x: 1, y: 1 }], frontmatter: [] },
+        new Map([[hero.id, noPath]]),
+        { fetchFn: fetchReturning(currentMd) },
+      ),
+    ).rejects.toBeInstanceOf(CanonicalSaveError);
   });
 });
