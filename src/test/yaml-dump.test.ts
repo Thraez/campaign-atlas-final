@@ -3,7 +3,11 @@ import { patchHeader, dumpYaml } from "@/atlas/yaml/dump";
 
 describe("patchHeader", () => {
   it("includes the title as a comment line", () => {
-    const out = patchHeader({ title: "Map Patch", subject: "entity:foo.md", applyTo: "content/foo.md" });
+    const out = patchHeader({
+      title: "Map Patch",
+      subject: "entity:foo.md",
+      applyTo: "content/foo.md",
+    });
     expect(out).toContain("# Map Patch");
   });
 
@@ -13,7 +17,11 @@ describe("patchHeader", () => {
   });
 
   it("includes the subject prefixed with '# Subject:'", () => {
-    const out = patchHeader({ title: "T", subject: "world.yaml > maps[id=astrath]", applyTo: "world.yaml" });
+    const out = patchHeader({
+      title: "T",
+      subject: "world.yaml > maps[id=astrath]",
+      applyTo: "world.yaml",
+    });
     expect(out).toContain("# Subject: world.yaml > maps[id=astrath]");
   });
 

@@ -11,8 +11,16 @@ export interface HoverPeekCardProps {
   onMouseLeave?: () => void;
 }
 
-export function HoverPeekCard({ entity, hasPlacement, onOpen, onFlyToMap, onMouseEnter, onMouseLeave }: HoverPeekCardProps) {
-  const img = entity.images.length > 0 && entity.images[0] ? normalizeAtlasAssetUrl(entity.images[0]) : null;
+export function HoverPeekCard({
+  entity,
+  hasPlacement,
+  onOpen,
+  onFlyToMap,
+  onMouseEnter,
+  onMouseLeave,
+}: HoverPeekCardProps) {
+  const img =
+    entity.images.length > 0 && entity.images[0] ? normalizeAtlasAssetUrl(entity.images[0]) : null;
   return (
     <div
       role="dialog"
@@ -23,10 +31,25 @@ export function HoverPeekCard({ entity, hasPlacement, onOpen, onFlyToMap, onMous
       className="atlas-peek-card w-60 rounded-lg border bg-background p-3 shadow-md"
     >
       <div className="flex items-start gap-2.5">
-        {img && <img src={img} alt={entity.title} className="flex-none rounded-md object-cover" style={{ height: 52, width: 52 }} />}
+        {img && (
+          <img
+            src={img}
+            alt={entity.title}
+            className="flex-none rounded-md object-cover"
+            style={{ height: 52, width: 52 }}
+          />
+        )}
         <div className="min-w-0 flex-1">
-          <span className="mb-1 inline-block rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{entity.type}</span>
-          <button type="button" onClick={onOpen} className="block text-left text-sm font-medium hover:underline">{entity.title}</button>
+          <span className="mb-1 inline-block rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+            {entity.type}
+          </span>
+          <button
+            type="button"
+            onClick={onOpen}
+            className="block text-left text-sm font-medium hover:underline"
+          >
+            {entity.title}
+          </button>
         </div>
         {hasPlacement && (
           <button
@@ -39,7 +62,9 @@ export function HoverPeekCard({ entity, hasPlacement, onOpen, onFlyToMap, onMous
           </button>
         )}
       </div>
-      {entity.summary && <p className="mt-2 text-xs leading-snug text-muted-foreground">{entity.summary}</p>}
+      {entity.summary && (
+        <p className="mt-2 text-xs leading-snug text-muted-foreground">{entity.summary}</p>
+      )}
     </div>
   );
 }

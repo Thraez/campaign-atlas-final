@@ -48,7 +48,7 @@ it("character lock — key present: reveals content in atlas-secret-open div", a
   expect(h.querySelector(".atlas-secret-open")!.textContent).toContain("hidden lore");
   expect(mockReveal).toHaveBeenCalledWith(
     expect.objectContaining({ lockType: "character" }),
-    "player-key"
+    "player-key",
   );
 });
 
@@ -109,10 +109,10 @@ it("password form submit — wrong passphrase shows 'The seal holds firm.'", asy
   input.value = "bad guess";
   form.dispatchEvent(new Event("submit", { cancelable: true }));
   await vi.waitFor(
-    () => (h.querySelector<HTMLElement>(".atlas-secret-msg")!.textContent ?? "") !== ""
+    () => (h.querySelector<HTMLElement>(".atlas-secret-msg")!.textContent ?? "") !== "",
   );
   expect(h.querySelector<HTMLElement>(".atlas-secret-msg")!.textContent).toBe(
-    "The seal holds firm."
+    "The seal holds firm.",
   );
   expect(mockMarkUnlocked).not.toHaveBeenCalled();
 });

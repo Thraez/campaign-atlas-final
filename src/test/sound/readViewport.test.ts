@@ -2,7 +2,11 @@ import { describe, it, expect } from "vitest";
 import { readViewport } from "@/atlas/sound/readViewport";
 
 // Mock just the slice of the Leaflet map API we use.
-const mockMap = (center: { lat: number; lng: number }, sw: { lat: number; lng: number }, ne: { lat: number; lng: number }) => ({
+const mockMap = (
+  center: { lat: number; lng: number },
+  sw: { lat: number; lng: number },
+  ne: { lat: number; lng: number },
+) => ({
   getCenter: () => center,
   getBounds: () => ({ getSouthWest: () => sw, getNorthEast: () => ne }),
 });
@@ -57,7 +61,7 @@ describe("readViewport", () => {
     expect(cx).toBe(200);
     expect(cy).toBe(100); // 500 - 400
     expect(view.minY).toBe(-100); // 500 - 600: negative, not clamped
-    expect(view.maxY).toBe(450);  // 500 - 50
+    expect(view.maxY).toBe(450); // 500 - 50
   });
 
   it("passes through maxY exceeding mapHeight when viewport extends beyond the south edge (no clamping)", () => {
@@ -77,7 +81,7 @@ describe("readViewport", () => {
     const mapHeight = 400;
     const map = mockMap({ lat: 200, lng: 0 }, { lat: -50, lng: -10 }, { lat: 450, lng: 10 });
     const { view } = readViewport(map, mapHeight);
-    expect(view.minY).toBe(-50);  // 400 - 450: negative
-    expect(view.maxY).toBe(450);  // 400 - (-50): > mapHeight
+    expect(view.minY).toBe(-50); // 400 - 450: negative
+    expect(view.maxY).toBe(450); // 400 - (-50): > mapHeight
   });
 });

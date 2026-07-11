@@ -243,7 +243,9 @@ function renderWithBadge(opts: { credit?: string | undefined; credits?: CreditsC
 describe("EntityPanel — credit badge", () => {
   it("renders badge when entity has credit and badges are not disabled", () => {
     renderWithBadge();
-    expect(screen.getByRole("note", { name: /Image credit: Art by Jane Doe/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("note", { name: /Image credit: Art by Jane Doe/i }),
+    ).toBeInTheDocument();
   });
 
   it("hides badge when credits.badges is false", () => {
@@ -659,6 +661,10 @@ describe("EntityPanel — CopyLinkButton copied state (N77)", () => {
     await waitFor(() => {
       expect(screen.getByTitle("Copy share link").querySelector(".text-green-500")).toBeTruthy();
     });
-    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true, writable: true });
+    Object.defineProperty(navigator, "clipboard", {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
   });
 });

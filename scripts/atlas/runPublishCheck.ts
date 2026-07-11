@@ -52,7 +52,8 @@ async function runPlayerBuildWithTimeout(): Promise<{ ok: boolean; error?: strin
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<{ ok: false; error: string }>((resolve) => {
     timer = setTimeout(
-      () => resolve({ ok: false, error: `player build timed out after ${PLAYER_BUILD_TIMEOUT_MS}ms` }),
+      () =>
+        resolve({ ok: false, error: `player build timed out after ${PLAYER_BUILD_TIMEOUT_MS}ms` }),
       PLAYER_BUILD_TIMEOUT_MS,
     );
   });

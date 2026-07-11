@@ -3,8 +3,9 @@ import { stripSecretMarkers } from "../../../scripts/atlas/stripSecretMarkers";
 
 describe("stripSecretMarkers", () => {
   it("removes a single marker and leaves surrounding text", () => {
-    expect(stripSecretMarkers("He keeps ledgers. {{secret:signet}} The rest trusts him."))
-      .toBe("He keeps ledgers.  The rest trusts him.");
+    expect(stripSecretMarkers("He keeps ledgers. {{secret:signet}} The rest trusts him.")).toBe(
+      "He keeps ledgers.  The rest trusts him.",
+    );
   });
 
   it("removes multiple markers", () => {

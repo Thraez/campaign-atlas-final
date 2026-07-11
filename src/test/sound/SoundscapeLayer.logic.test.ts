@@ -4,8 +4,25 @@ import { prepareAreas, FILL_MIN, HYSTERESIS } from "@/atlas/sound/resolveSoundsc
 import type { MapDocument } from "@/atlas/content/schema";
 
 const map = {
-  id: "m", name: "M", width: 1000, height: 1000, layers: [],
-  soundscape: { areas: [{ id: "s0", points: [[0, 0], [1000, 0], [1000, 1000], [0, 1000]], bed: { src: "a.ogg" } }] },
+  id: "m",
+  name: "M",
+  width: 1000,
+  height: 1000,
+  layers: [],
+  soundscape: {
+    areas: [
+      {
+        id: "s0",
+        points: [
+          [0, 0],
+          [1000, 0],
+          [1000, 1000],
+          [0, 1000],
+        ],
+        bed: { src: "a.ogg" },
+      },
+    ],
+  },
 } as unknown as MapDocument;
 
 const mockMap = (center: any, sw: any, ne: any) => ({
@@ -23,7 +40,20 @@ describe("computeActiveId", () => {
   it("returns null at overview-scale view (tiny coverage)", () => {
     const small = {
       ...map,
-      soundscape: { areas: [{ id: "s0", points: [[490, 490], [510, 490], [510, 510], [490, 510]], bed: { src: "a.ogg" } }] },
+      soundscape: {
+        areas: [
+          {
+            id: "s0",
+            points: [
+              [490, 490],
+              [510, 490],
+              [510, 510],
+              [490, 510],
+            ],
+            bed: { src: "a.ogg" },
+          },
+        ],
+      },
     } as unknown as MapDocument;
     const prepared = prepareAreas(small);
     const leaflet = mockMap({ lat: 500, lng: 500 }, { lat: 0, lng: 0 }, { lat: 1000, lng: 1000 });
@@ -43,7 +73,20 @@ describe("computeActiveId", () => {
     // but above FILL_MIN×HYSTERESIS (0.425), so prevId is kept; null prevId returns null.
     const narrow = {
       ...map,
-      soundscape: { areas: [{ id: "s0", points: [[0, 0], [450, 0], [450, 1000], [0, 1000]], bed: { src: "a.ogg" } }] },
+      soundscape: {
+        areas: [
+          {
+            id: "s0",
+            points: [
+              [0, 0],
+              [450, 0],
+              [450, 1000],
+              [0, 1000],
+            ],
+            bed: { src: "a.ogg" },
+          },
+        ],
+      },
     } as unknown as MapDocument;
     const prepared = prepareAreas(narrow);
     // center lng=225 → cx=225 (inside the 0-450 area); lat=500 → cy=500
@@ -51,8 +94,8 @@ describe("computeActiveId", () => {
     const coverage = 450 / 1000; // 0.45
     expect(coverage).toBeGreaterThanOrEqual(FILL_MIN * HYSTERESIS);
     expect(coverage).toBeLessThan(FILL_MIN);
-    expect(computeActiveId(prepared, leaflet as any, 1000, "s0")).toBe("s0");  // hysteresis keeps it
-    expect(computeActiveId(prepared, leaflet as any, 1000, null)).toBeNull();  // no hysteresis without prevId
+    expect(computeActiveId(prepared, leaflet as any, 1000, "s0")).toBe("s0"); // hysteresis keeps it
+    expect(computeActiveId(prepared, leaflet as any, 1000, null)).toBeNull(); // no hysteresis without prevId
   });
 
   it("switches to a strictly smaller nested area when the viewport is centred on it", () => {
@@ -64,8 +107,26 @@ describe("computeActiveId", () => {
       ...map,
       soundscape: {
         areas: [
-          { id: "s0", points: [[0, 0], [1000, 0], [1000, 1000], [0, 1000]], bed: { src: "outer.ogg" } },
-          { id: "s1", points: [[400, 400], [600, 400], [600, 600], [400, 600]], bed: { src: "inner.ogg" } },
+          {
+            id: "s0",
+            points: [
+              [0, 0],
+              [1000, 0],
+              [1000, 1000],
+              [0, 1000],
+            ],
+            bed: { src: "outer.ogg" },
+          },
+          {
+            id: "s1",
+            points: [
+              [400, 400],
+              [600, 400],
+              [600, 600],
+              [400, 600],
+            ],
+            bed: { src: "inner.ogg" },
+          },
         ],
       },
     } as unknown as MapDocument;

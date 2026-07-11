@@ -45,7 +45,7 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
     mockLoad.mockResolvedValue({ vaultPath: "/Vault" });
     render(<SyncPanel onSync={vi.fn()} />);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /sync now/i })).not.toBeDisabled()
+      expect(screen.getByRole("button", { name: /sync now/i })).not.toBeDisabled(),
     );
   });
 
@@ -56,8 +56,8 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
     fireEvent.click(screen.getByRole("button", { name: /save settings/i }));
     await waitFor(() =>
       expect(saveSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ vaultPath: "/My Vault", ignoreGlobs: ["Templates/**"] })
-      )
+        expect.objectContaining({ vaultPath: "/My Vault", ignoreGlobs: ["Templates/**"] }),
+      ),
     );
   });
 
@@ -66,7 +66,7 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
     mockLoad.mockResolvedValue({ vaultPath: "/MyVault", ignoreGlobs: ["_hidden/**"] });
     render(<SyncPanel onSync={onSync} />);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /sync now/i })).not.toBeDisabled()
+      expect(screen.getByRole("button", { name: /sync now/i })).not.toBeDisabled(),
     );
     fireEvent.click(screen.getByRole("button", { name: /sync now/i }));
     await waitFor(() => expect(onSync).toHaveBeenCalledWith("/MyVault", ["_hidden/**"]));

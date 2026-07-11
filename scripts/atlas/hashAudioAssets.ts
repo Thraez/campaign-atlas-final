@@ -12,10 +12,7 @@ const AUDIO_OUT_DIR = "atlas/assets/audio";
  * External URLs (http/https) are skipped — they keep their original src.
  * Duplicate srcs produce one output file (same hash = same bytes).
  */
-export function hashAudioAssets(
-  areas: SoundArea[],
-  publicDir: string
-): Map<string, string> {
+export function hashAudioAssets(areas: SoundArea[], publicDir: string): Map<string, string> {
   const rewrite = new Map<string, string>();
   const srcs = new Set<string>();
 

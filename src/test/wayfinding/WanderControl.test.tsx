@@ -16,6 +16,8 @@ it("shows an all-found state when everything is discovered", () => {
 });
 
 it("renders nothing when there are no places", () => {
-  const { container } = render(<WanderControl discovered={0} total={0} canWander={false} onWander={() => {}} />);
+  const { container } = render(
+    <WanderControl discovered={0} total={0} canWander={false} onWander={() => {}} />,
+  );
   expect(container.firstChild).toBeNull();
 });

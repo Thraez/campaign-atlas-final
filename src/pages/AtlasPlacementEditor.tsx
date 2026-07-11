@@ -1882,9 +1882,7 @@ function AtlasPlacementEditorInner() {
               />
             ),
             sync: (
-              <SyncPanel
-                onSync={(root, globs) => void importFlow.openWithVaultScan(root, globs)}
-              />
+              <SyncPanel onSync={(root, globs) => void importFlow.openWithVaultScan(root, globs)} />
             ),
             // Menu-reachable panels (no rail icon — opened via ☰ menu or CommandPalette).
             world: (

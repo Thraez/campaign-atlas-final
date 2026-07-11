@@ -1,15 +1,10 @@
 import { describe, it, expect } from "vitest";
-import {
-  DmBuildRequiredError,
-  assertDmBuildLoaded,
-} from "@/atlas/import/useMdImportFlow";
+import { DmBuildRequiredError, assertDmBuildLoaded } from "@/atlas/import/useMdImportFlow";
 
 describe("assertDmBuildLoaded (Task 2.4 DM-build precondition guard)", () => {
   it("throws DmBuildRequiredError when existingById is empty", () => {
     expect(() => assertDmBuildLoaded(new Map())).toThrow(DmBuildRequiredError);
-    expect(() => assertDmBuildLoaded(new Map())).toThrow(
-      "Rebuild in DM mode first",
-    );
+    expect(() => assertDmBuildLoaded(new Map())).toThrow("Rebuild in DM mode first");
   });
 
   it("does not throw when existingById has at least one entry", () => {

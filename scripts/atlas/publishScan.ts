@@ -23,13 +23,20 @@ import { run as runAuditAssets } from "./audit-assets";
 import type { PublishScanReason } from "./publishTypes";
 
 const MSG: Record<PublishScanReason["scan"], string> = {
-  "check-no-secrets-dm": "A DM-only note would have been visible to players. Publishing is blocked until it's hidden.",
-  "check-no-secrets-editor": "The editor itself leaked into the player build — this is a code bug, not a content problem. Publishing is blocked; this needs a developer.",
-  "check-derived-secrets": "The name of a hidden person or place would have leaked into the player site. Publishing is blocked.",
-  "check-image-privacy": "An image that's marked DM-only would have been published. Publishing is blocked.",
-  "check-fog-safety": "A map's hidden (fogged) area would have been revealed. Publishing is blocked.",
-  "check-artifact-shape": "The world file came out malformed — the build needs attention before publishing.",
-  "audit-assets": "An image is referenced but missing (or an unused image needs cleanup). Publishing is blocked.",
+  "check-no-secrets-dm":
+    "A DM-only note would have been visible to players. Publishing is blocked until it's hidden.",
+  "check-no-secrets-editor":
+    "The editor itself leaked into the player build — this is a code bug, not a content problem. Publishing is blocked; this needs a developer.",
+  "check-derived-secrets":
+    "The name of a hidden person or place would have leaked into the player site. Publishing is blocked.",
+  "check-image-privacy":
+    "An image that's marked DM-only would have been published. Publishing is blocked.",
+  "check-fog-safety":
+    "A map's hidden (fogged) area would have been revealed. Publishing is blocked.",
+  "check-artifact-shape":
+    "The world file came out malformed — the build needs attention before publishing.",
+  "audit-assets":
+    "An image is referenced but missing (or an unused image needs cleanup). Publishing is blocked.",
 };
 
 export function reasonsFromNoSecrets(r: ScanResult, target: string): PublishScanReason[] {
@@ -108,7 +115,10 @@ export async function runPublishScans(repoRoot: string): Promise<PublishScanReas
   const configPath = path.resolve(repoRoot, "atlas.config.json");
 
   // check-no-secrets — structured
-  for (const [dir, label] of [[dist, "dist"], [pub, "public/atlas"]] as const) {
+  for (const [dir, label] of [
+    [dist, "dist"],
+    [pub, "public/atlas"],
+  ] as const) {
     if (fs.existsSync(dir)) {
       reasons.push(...reasonsFromNoSecrets(scanDir(dir), label));
     }
@@ -116,7 +126,10 @@ export async function runPublishScans(repoRoot: string): Promise<PublishScanReas
 
   // check-derived-secrets — structured
   const secrets = deriveSecretsFromVault(configPath);
-  for (const [dir, label] of [[dist, "dist"], [pub, "public/atlas"]] as const) {
+  for (const [dir, label] of [
+    [dist, "dist"],
+    [pub, "public/atlas"],
+  ] as const) {
     if (fs.existsSync(dir)) {
       reasons.push(...reasonsFromDerived(scanArtifactForSecrets(dir, secrets), label));
     }

@@ -3,7 +3,7 @@ import { selectWanderTarget } from "@/atlas/wander/selectWanderTarget";
 import type { MapPlacement } from "@/atlas/content/schema";
 
 const P = (entityId: string, mapId = "m1", x = 0, y = 0): MapPlacement =>
-  ({ id: `${entityId}@${mapId}`, entityId, mapId, x, y, visibility: "player" } as MapPlacement);
+  ({ id: `${entityId}@${mapId}`, entityId, mapId, x, y, visibility: "player" }) as MapPlacement;
 
 it("returns an unvisited placement, never a visited one", () => {
   const placements = [P("a"), P("b"), P("c")];

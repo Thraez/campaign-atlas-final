@@ -48,7 +48,10 @@ it("loadAllNotes returns {} when localStorage contains corrupt JSON", () => {
 it("loadAllNotes skips entries missing text or updatedAt", () => {
   window.localStorage.setItem(
     STORAGE_KEY,
-    JSON.stringify({ good: { text: "hi", updatedAt: "2026-01-01T00:00:00Z" }, bad: { nope: true } }),
+    JSON.stringify({
+      good: { text: "hi", updatedAt: "2026-01-01T00:00:00Z" },
+      bad: { nope: true },
+    }),
   );
   const notes = loadAllNotes();
   expect(notes["good"]?.text).toBe("hi");

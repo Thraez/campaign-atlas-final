@@ -82,7 +82,10 @@ export interface StagingContext {
   /** Vault-path → { id, baseType } from the last sync. Used for identity resolution when atlas.id is absent. */
   syncMap?: SyncMap;
   /** entity id → { visibility, type, sourcePath } from the DM atlas. Used to detect exposure/type conflicts. */
-  entityMeta?: ReadonlyMap<string, { visibility: EntityVisibility; type: string; sourcePath: string }>;
+  entityMeta?: ReadonlyMap<
+    string,
+    { visibility: EntityVisibility; type: string; sourcePath: string }
+  >;
 }
 
 export interface StagingRow {
@@ -250,9 +253,9 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     const meta = ctx.entityMeta.get(resolvedId);
     if (meta) {
       // Check secrecy increase: canon is hidden-tier, vault wants player visibility
-      const vaultAtlas = (
-        parseError ? {} : (parseFrontmatter(input.raw).data.atlas as Record<string, unknown>) ?? {}
-      );
+      const vaultAtlas = parseError
+        ? {}
+        : ((parseFrontmatter(input.raw).data.atlas as Record<string, unknown>) ?? {});
       if (detectExposureIncrease(meta.visibility, vaultAtlas)) {
         needsReview = { reason: "secrecy-increase" };
       } else if (baseType) {

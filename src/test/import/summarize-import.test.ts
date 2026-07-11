@@ -61,13 +61,27 @@ describe("summarizeImport", () => {
 
 describe("formatImportSummaryLine", () => {
   it("shows needsReview when non-zero", () => {
-    const line = formatImportSummaryLine({ added: 0, updated: 2, replaced: 0, skipped: 0, couldntBeRead: 0, needsReview: 3 });
+    const line = formatImportSummaryLine({
+      added: 0,
+      updated: 2,
+      replaced: 0,
+      skipped: 0,
+      couldntBeRead: 0,
+      needsReview: 3,
+    });
     expect(line).toContain("2 updated");
     expect(line).toContain("3 need review");
   });
 
   it("omits needsReview when zero", () => {
-    const line = formatImportSummaryLine({ added: 1, updated: 0, replaced: 0, skipped: 0, couldntBeRead: 0, needsReview: 0 });
+    const line = formatImportSummaryLine({
+      added: 1,
+      updated: 0,
+      replaced: 0,
+      skipped: 0,
+      couldntBeRead: 0,
+      needsReview: 0,
+    });
     expect(line).toBe("1 added");
     expect(line).not.toContain("need review");
   });

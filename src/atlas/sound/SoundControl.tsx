@@ -9,15 +9,16 @@ export function SoundControl() {
     <div className="absolute bottom-4 right-4 z-[1000] flex items-center gap-2">
       {!soundEnabled && !dismissed && (
         <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 shadow-sm">
-          <button
-            type="button"
-            onClick={enableSound}
-            className="flex items-center gap-2 text-sm"
-          >
+          <button type="button" onClick={enableSound} className="flex items-center gap-2 text-sm">
             <span aria-hidden>🔊</span>
             Tap to bring the world to life
           </button>
-          <button type="button" aria-label="Dismiss" onClick={() => setDismissed(true)} className="text-muted-foreground">
+          <button
+            type="button"
+            aria-label="Dismiss"
+            onClick={() => setDismissed(true)}
+            className="text-muted-foreground"
+          >
             ✕
           </button>
         </div>

@@ -129,7 +129,9 @@ describe("PublishCheckTab — publish action surface", () => {
   it("busy: button text indicates busy and is disabled", () => {
     mockUsePublishFlow.mockReturnValue(makeFlow("busy"));
     render(<PublishCheckTab project={BASE_PROJECT} draftPlacements={[]} draftLocalLayers={[]} />);
-    const btn = screen.getByText(/busy.*finishing the current build/i).closest("button") as HTMLButtonElement;
+    const btn = screen
+      .getByText(/busy.*finishing the current build/i)
+      .closest("button") as HTMLButtonElement;
     expect(btn).not.toBeNull();
     expect(btn.disabled).toBe(true);
   });
@@ -175,13 +177,15 @@ describe("PublishCheckTab — issue rendering", () => {
     mockValidateProject.mockReturnValue({
       ...BASE_REPORT,
       counts: { blocking: 0, warning: 1, suggestion: 0 },
-      issues: [{
-        severity: "warning" as const,
-        code: "test-warning",
-        category: "yaml" as const,
-        message: "Something needs attention",
-        hint: "Try fixing the property in world.yaml",
-      }],
+      issues: [
+        {
+          severity: "warning" as const,
+          code: "test-warning",
+          category: "yaml" as const,
+          message: "Something needs attention",
+          hint: "Try fixing the property in world.yaml",
+        },
+      ],
     });
     render(<PublishCheckTab project={BASE_PROJECT} draftPlacements={[]} draftLocalLayers={[]} />);
     expect(screen.getByText("Try fixing the property in world.yaml")).toBeTruthy();
@@ -192,13 +196,15 @@ describe("PublishCheckTab — issue rendering", () => {
     mockValidateProject.mockReturnValue({
       ...BASE_REPORT,
       counts: { blocking: 1, warning: 0, suggestion: 0 },
-      issues: [{
-        severity: "blocking" as const,
-        code: "map-error",
-        category: "map" as const,
-        message: "Map has a problem",
-        scope: { mapId: "map-astrath" },
-      }],
+      issues: [
+        {
+          severity: "blocking" as const,
+          code: "map-error",
+          category: "map" as const,
+          message: "Map has a problem",
+          scope: { mapId: "map-astrath" },
+        },
+      ],
     });
     render(
       <PublishCheckTab
@@ -206,7 +212,7 @@ describe("PublishCheckTab — issue rendering", () => {
         draftPlacements={[]}
         draftLocalLayers={[]}
         onGoToMap={onGoToMap}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole("button", { name: /go to map/i }));
     expect(onGoToMap).toHaveBeenCalledWith("map-astrath");
@@ -217,13 +223,15 @@ describe("PublishCheckTab — issue rendering", () => {
     mockValidateProject.mockReturnValue({
       ...BASE_REPORT,
       counts: { blocking: 0, warning: 1, suggestion: 0 },
-      issues: [{
-        severity: "warning" as const,
-        code: "broken-link",
-        category: "yaml" as const,
-        message: "Entity has a broken link",
-        scope: { entityId: "npc-001" },
-      }],
+      issues: [
+        {
+          severity: "warning" as const,
+          code: "broken-link",
+          category: "yaml" as const,
+          message: "Entity has a broken link",
+          scope: { entityId: "npc-001" },
+        },
+      ],
     });
     render(
       <PublishCheckTab
@@ -231,7 +239,7 @@ describe("PublishCheckTab — issue rendering", () => {
         draftPlacements={[]}
         draftLocalLayers={[]}
         onGoToEntity={onGoToEntity}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole("button", { name: /go to entity/i }));
     expect(onGoToEntity).toHaveBeenCalledWith("npc-001");

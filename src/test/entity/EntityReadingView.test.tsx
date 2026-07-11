@@ -101,10 +101,15 @@ describe("EntityReadingView", () => {
         <ViewModeProvider>
           <EntityReadingView
             entity={corven}
-            entitiesById={new Map([[edric.id, edric], [corven.id, corven]])}
+            entitiesById={
+              new Map([
+                [edric.id, edric],
+                [corven.id, corven],
+              ])
+            }
           />
         </ViewModeProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     // "Edric" appears as the resolved wikilink text in Corven's rendered body (not in any header).
     expect(screen.getByText("Edric")).toBeInTheDocument();
@@ -119,10 +124,15 @@ describe("EntityReadingView", () => {
         <ViewModeProvider>
           <EntityReadingView
             entity={corven}
-            entitiesById={new Map([[edric.id, edric], [corven.id, corven]])}
+            entitiesById={
+              new Map([
+                [edric.id, edric],
+                [corven.id, corven],
+              ])
+            }
           />
         </ViewModeProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     // "Ed" is the wikilink display text, resolved via the alias map to edric's id.
     expect(screen.getByText("Ed")).toBeInTheDocument();
@@ -130,13 +140,18 @@ describe("EntityReadingView", () => {
 
   it("rumor entity in player mode has no 'not yet visible' banner", () => {
     localStorage.setItem("atlas.viewMode", "player");
-    const ghost = ent({ id: "ghost", title: "Ghost NPC", visibility: "rumor", body: "Whispers say..." });
+    const ghost = ent({
+      id: "ghost",
+      title: "Ghost NPC",
+      visibility: "rumor",
+      body: "Whispers say...",
+    });
     render(
       <MemoryRouter>
         <ViewModeProvider>
           <EntityReadingView entity={ghost} entitiesById={new Map([[ghost.id, ghost]])} />
         </ViewModeProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     // "rumor" is in PLAYER_VISIBLE so the pre-publish warning banner must be absent.
     expect(screen.queryByText(/not yet visible to players/i)).not.toBeInTheDocument();
@@ -150,7 +165,7 @@ describe("EntityReadingView", () => {
         <ViewModeProvider>
           <EntityReadingView entity={e} entitiesById={new Map([[e.id, e]])} />
         </ViewModeProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Silent Mage")).toBeInTheDocument();
   });
@@ -164,7 +179,7 @@ describe("EntityReadingView", () => {
         <ViewModeProvider>
           <EntityReadingView entity={e} entitiesById={new Map([[e.id, e]])} onClose={handleClose} />
         </ViewModeProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByRole("button", { name: /close panel/i }));
     expect(handleClose).toHaveBeenCalledTimes(1);
@@ -179,7 +194,7 @@ describe("EntityReadingView", () => {
         <ViewModeProvider>
           <EntityReadingView entity={e} entitiesById={new Map([[e.id, e]])} placements={[p]} />
         </ViewModeProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByRole("button", { name: /show on map/i })).toBeInTheDocument();
   });
@@ -199,7 +214,7 @@ describe("EntityReadingView", () => {
             onShowOnMap={handleShowOnMap}
           />
         </ViewModeProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByRole("button", { name: /show on map/i }));
     expect(handleShowOnMap).toHaveBeenCalledWith(p);

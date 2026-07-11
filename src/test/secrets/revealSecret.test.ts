@@ -27,7 +27,12 @@ it("neutralizes a script tag in a decrypted reveal", async () => {
 describe("revealToHtml teaser field is not included", () => {
   it("teaser on the blob does not appear in the output (it is the DM's hint, not the reveal)", async () => {
     const blob = await encryptSecret("actual content", "k");
-    const secret: PlayerSecret = { id: "s", lockType: "password", teaser: "a public hint", ...blob };
+    const secret: PlayerSecret = {
+      id: "s",
+      lockType: "password",
+      teaser: "a public hint",
+      ...blob,
+    };
     const html = await revealToHtml(secret, "k");
     expect(html).toContain("actual content");
     expect(html).not.toContain("a public hint");

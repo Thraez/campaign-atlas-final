@@ -1,5 +1,10 @@
 import { it, expect, beforeEach } from "vitest";
-import { loadVisited, markVisited, isVisited, _resetVisitedForTests } from "@/atlas/visited/visitedPlaces";
+import {
+  loadVisited,
+  markVisited,
+  isVisited,
+  _resetVisitedForTests,
+} from "@/atlas/visited/visitedPlaces";
 
 beforeEach(() => _resetVisitedForTests());
 

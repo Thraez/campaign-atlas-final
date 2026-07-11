@@ -22,14 +22,14 @@ describe("CreditBadge", () => {
     render(<CreditBadge credit="Photo by J. Smith" />);
     expect(screen.getByRole("note")).toHaveAttribute(
       "aria-label",
-      "Image credit: Photo by J. Smith"
+      "Image credit: Photo by J. Smith",
     );
   });
 
   it("exposes role=note so screen readers announce it as a note", () => {
     render(<CreditBadge credit="Art by Jane Doe" />);
     expect(
-      screen.getByRole("note", { name: /Image credit: Art by Jane Doe/i })
+      screen.getByRole("note", { name: /Image credit: Art by Jane Doe/i }),
     ).toBeInTheDocument();
   });
 });

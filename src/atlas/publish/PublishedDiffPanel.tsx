@@ -51,7 +51,10 @@ export function PublishedDiffPanel({ current, diff: providedDiff }: Props) {
   const [open, setOpen] = useState(true);
 
   useEffect(() => {
-    if (providedDiff) { setLoading(false); return; }
+    if (providedDiff) {
+      setLoading(false);
+      return;
+    }
     let mounted = true;
     setLoading(true);
     fetchBaseline().then((b) => {

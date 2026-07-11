@@ -20,9 +20,7 @@ describe("buildEntitySecrets", () => {
   });
 
   it("encrypts a character secret under that character's key", async () => {
-    const specs: AtlasSecretSpec[] = [
-      { id: "signet", for: "vesper", reveal: "you know the ring" },
-    ];
+    const specs: AtlasSecretSpec[] = [{ id: "signet", for: "vesper", reveal: "you know the ring" }];
     const { secrets } = await buildEntitySecrets("corven", specs, keys);
     expect(secrets[0].lockType).toBe("character");
     expect(secrets[0].teaser).toBeUndefined();

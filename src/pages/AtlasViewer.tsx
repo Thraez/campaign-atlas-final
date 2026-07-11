@@ -79,7 +79,10 @@ const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 import { resolvePinStyle, pinSvg, type PinPreset } from "@/atlas/pins/presets";
 import { shouldShowLabel } from "@/atlas/pins/labelVisibility";
 
-function pinIconForStyle(style: PinPreset, opts?: { dim?: boolean; extraClass?: string }): L.DivIcon {
+function pinIconForStyle(
+  style: PinPreset,
+  opts?: { dim?: boolean; extraClass?: string },
+): L.DivIcon {
   // iconSize defines the hit area Leaflet uses for click/touch dispatch. The
   // visual SVG is smaller (~22px) but we expose a 44x44 hit area so mobile
   // touch targets meet WCAG 2.5.5 (Target Size, Level AAA). The SVG centers
@@ -282,17 +285,29 @@ export default function AtlasViewer() {
   }, [data]);
 
   const worldCredits = data?.project.worlds[0]?.credits;
-  const showCredits = worldCredits?.page !== false && (data?.project.entities.some((e) => e.credit) ?? false);
+  const showCredits =
+    worldCredits?.page !== false && (data?.project.entities.some((e) => e.credit) ?? false);
 
   const { visited, mark: markVisitedEntity } = useVisitedPlaces();
 
-  const pointerFine = typeof window !== "undefined" && !!window.matchMedia?.("(pointer: fine)").matches;
+  const pointerFine =
+    typeof window !== "undefined" && !!window.matchMedia?.("(pointer: fine)").matches;
   const peekCtl = usePeekController({ pointerFine });
 
-  const onPinPeek = useCallback((id: string, ev: MouseEvent) => {
-    const r = { top: ev.clientY, bottom: ev.clientY + 1, left: ev.clientX, right: ev.clientX + 1, width: 1, height: 1 } as DOMRect;
-    peekCtl.onTriggerEnter(id, r);
-  }, [peekCtl]);
+  const onPinPeek = useCallback(
+    (id: string, ev: MouseEvent) => {
+      const r = {
+        top: ev.clientY,
+        bottom: ev.clientY + 1,
+        left: ev.clientX,
+        right: ev.clientX + 1,
+        width: 1,
+        height: 1,
+      } as DOMRect;
+      peekCtl.onTriggerEnter(id, r);
+    },
+    [peekCtl],
+  );
 
   const openEntity = useCallback(
     (id: string, fly = true) => {
@@ -339,7 +354,10 @@ export default function AtlasViewer() {
   const wander = useCallback(() => {
     if (!data) return;
     const target = selectWanderTarget(data.project.placements, visited);
-    if (!target) { setWanderEmpty(true); return; }
+    if (!target) {
+      setWanderEmpty(true);
+      return;
+    }
     setWanderEmpty(false);
     if (target.mapId !== activeMapId) setActiveMapId(target.mapId);
     const targetMap = data.project.maps.find((m) => m.id === target.mapId);
@@ -406,7 +424,10 @@ export default function AtlasViewer() {
         e.preventDefault();
         setSearchOpen(true);
       } else if (e.key === "Escape") {
-        if (peekCtl.peek) { peekCtl.dismiss(); return; }
+        if (peekCtl.peek) {
+          peekCtl.dismiss();
+          return;
+        }
         setSearchOpen(false);
       }
     };
@@ -497,295 +518,317 @@ export default function AtlasViewer() {
 
   return (
     <SoundSettingsProvider>
-    <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
-      <a href="#atlas-main" className="skip-to-main">
-        Skip to map
-      </a>
-      <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
-        <AtlasNavMenu publishedAt={data.project.publishedAt} showCredits={showCredits} />
-        <Link
-          to="/"
-          className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2"
-        >
-          <Compass className="h-5 w-5" aria-hidden="true" />{" "}
-          <span className="hidden sm:inline">Astrath Atlas</span>
-        </Link>
-        <div className="flex-1" />
-        {data.project.maps.length > 1 && (
-          <Select value={activeMap.id} onValueChange={setActiveMapId}>
-            <SelectTrigger className="h-8 w-[180px] text-xs" aria-label="Choose map">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {data.project.maps.map((m) => (
-                <SelectItem key={m.id} value={m.id} className="text-xs">
-                  {m.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        {activeMap.grid && (
-          <Button
-            variant={(showGrid ?? activeMap.grid.enabled !== false) ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setShowGrid((v) => !(v ?? activeMap.grid!.enabled !== false))}
-            title="Toggle grid"
-            aria-label="Toggle grid overlay"
-            aria-pressed={showGrid ?? activeMap.grid.enabled !== false}
+      <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
+        <a href="#atlas-main" className="skip-to-main">
+          Skip to map
+        </a>
+        <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
+          <AtlasNavMenu publishedAt={data.project.publishedAt} showCredits={showCredits} />
+          <Link
+            to="/"
+            className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2"
           >
-            <Grid3x3 className="h-4 w-4" aria-hidden="true" />
-          </Button>
-        )}
-        <Button
-          variant={rulerActive ? "secondary" : "ghost"}
-          size="sm"
-          onClick={() => setRulerActive((v) => !v)}
-          title="Measure distance (click two points)"
-          aria-label="Toggle distance ruler"
-          aria-pressed={rulerActive}
-        >
-          <Ruler className="h-4 w-4" aria-hidden="true" />
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => setSearchOpen(true)}
-          className="gap-2"
-          aria-label="Search atlas (Ctrl+K)"
-        >
-          <Search className="h-4 w-4" aria-hidden="true" />
-          <span className="hidden sm:inline">Search</span>
-          <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded bg-muted border border-border">
-            ⌘K
-          </kbd>
-        </Button>
-        <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
-          <Link to="/atlas/browse" title="Browse all entries">
-            <LayoutGrid className="h-4 w-4 mr-1" aria-hidden="true" />
-            Browse
+            <Compass className="h-5 w-5" aria-hidden="true" />{" "}
+            <span className="hidden sm:inline">Astrath Atlas</span>
           </Link>
-        </Button>
-        <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
-          <Link to="/atlas/timeline" title="Timeline of dated entries">
-            <CalendarClock className="h-4 w-4 mr-1" aria-hidden="true" />
-            Timeline
-          </Link>
-        </Button>
-        <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
-          <Link to="/atlas/secrets" title="Your character's secrets"><KeyRound className="h-4 w-4 mr-1" aria-hidden="true" />Secrets</Link>
-        </Button>
-        {showCredits && (
-          <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
-            <Link to="/atlas/credits" title="Image credits"><Star className="h-4 w-4 mr-1" aria-hidden="true" />Credits</Link>
+          <div className="flex-1" />
+          {data.project.maps.length > 1 && (
+            <Select value={activeMap.id} onValueChange={setActiveMapId}>
+              <SelectTrigger className="h-8 w-[180px] text-xs" aria-label="Choose map">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {data.project.maps.map((m) => (
+                  <SelectItem key={m.id} value={m.id} className="text-xs">
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {activeMap.grid && (
+            <Button
+              variant={(showGrid ?? activeMap.grid.enabled !== false) ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setShowGrid((v) => !(v ?? activeMap.grid!.enabled !== false))}
+              title="Toggle grid"
+              aria-label="Toggle grid overlay"
+              aria-pressed={showGrid ?? activeMap.grid.enabled !== false}
+            >
+              <Grid3x3 className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          )}
+          <Button
+            variant={rulerActive ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setRulerActive((v) => !v)}
+            title="Measure distance (click two points)"
+            aria-label="Toggle distance ruler"
+            aria-pressed={rulerActive}
+          >
+            <Ruler className="h-4 w-4" aria-hidden="true" />
           </Button>
-        )}
-        {__INCLUDE_EDITOR__ && isDmToolsEnabled() && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setSearchOpen(true)}
+            className="gap-2"
+            aria-label="Search atlas (Ctrl+K)"
+          >
+            <Search className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Search</span>
+            <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded bg-muted border border-border">
+              ⌘K
+            </kbd>
+          </Button>
           <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
-            <Link to="/atlas/edit" title="DM placement editor">
-              Edit pins
+            <Link to="/atlas/browse" title="Browse all entries">
+              <LayoutGrid className="h-4 w-4 mr-1" aria-hidden="true" />
+              Browse
             </Link>
           </Button>
-        )}
-        <OfflineMenu />
-        <span className="hidden lg:block text-[11px] text-muted-foreground ml-2">
-          Updated {new Date(data.project.publishedAt).toLocaleDateString()}
-        </span>
-      </header>
-      <OfflineStatus />
-
-      <div className="flex-1 flex relative min-h-0">
-        <main
-          id="atlas-main"
-          className="flex-1 relative min-h-0"
-          aria-label={`Interactive map: ${activeMap.name}. Use arrow keys to pan, plus and minus to zoom.`}
-        >
-          <OceanBackground map={activeMap} />
-          <MapContainer
-            crs={FlatCRS}
-            center={[activeMap.height / 2, activeMap.width / 2]}
-            zoom={-2}
-            minZoom={-6}
-            maxZoom={4}
-            zoomControl
-            keyboard
-            keyboardPanDelta={80}
-            attributionControl={false}
-            style={{
-              width: "100%",
-              height: "100%",
-              background:
-                activeMap.water?.enabled === false
-                  ? (activeMap.oceanColor ?? "#18313f")
-                  : "transparent",
-              cursor: rulerActive ? "crosshair" : undefined,
-            }}
-          >
-            <MapController flyTo={flyTarget} />
-            <ViewSyncController
-              mapId={activeMap.id}
-              mapHeight={activeMap.height}
-              onViewChange={handleViewChange}
-            />
-            <SoundscapeLayer map={activeMap} />
-            <RulerLayer
-              active={rulerActive}
-              mapHeight={activeMap.height}
-              scale={activeMap.scale}
-              wrapX={activeMap.wrapX}
-              mapWidth={activeMap.width}
-            />
-
-            {/* Horizontal wrap: render copies at -W, 0, +W when wrapX enabled */}
-            {(activeMap.wrapX ? [-activeMap.width, 0, activeMap.width] : [0]).map((dx) => (
-              <WrappedWorld
-                key={`wrap-${dx}`}
-                dx={dx}
-                map={activeMap}
-                placements={placementsOnMap}
-                entityById={entityById}
-                showGrid={showGrid}
-                onOpenEntity={openEntity}
-                visited={visited}
-                onPinPeek={onPinPeek}
-                onPinPeekLeave={peekCtl.onTriggerLeave}
-              />
-            ))}
-
-            {/* (markers, layers, regions, routes, fog, grid handled inside WrappedWorld) */}
-
-            <AtlasMinimap map={activeMap} layers={activeMap.layers} />
-          </MapContainer>
-
-          <SoundControl />
-
-          {/* Wander button + discovery meter — bottom-left map overlay */}
-          <WanderControl
-            discovered={meter.discovered}
-            total={meter.total}
-            canWander={meter.discovered < meter.total}
-            onWander={wander}
-          />
-          {wanderEmpty && (
-            <div className="atlas-wander-note absolute left-3 bottom-20 z-[500] max-w-xs rounded-lg border bg-background/95 px-3 py-2 text-xs text-muted-foreground">
-              You've explored everything you can reach — travel onward to uncover more.
-            </div>
+          <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
+            <Link to="/atlas/timeline" title="Timeline of dated entries">
+              <CalendarClock className="h-4 w-4 mr-1" aria-hidden="true" />
+              Timeline
+            </Link>
+          </Button>
+          <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
+            <Link to="/atlas/secrets" title="Your character's secrets">
+              <KeyRound className="h-4 w-4 mr-1" aria-hidden="true" />
+              Secrets
+            </Link>
+          </Button>
+          {showCredits && (
+            <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
+              <Link to="/atlas/credits" title="Image credits">
+                <Star className="h-4 w-4 mr-1" aria-hidden="true" />
+                Credits
+              </Link>
+            </Button>
           )}
-        </main>
+          {__INCLUDE_EDITOR__ && isDmToolsEnabled() && (
+            <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
+              <Link to="/atlas/edit" title="DM placement editor">
+                Edit pins
+              </Link>
+            </Button>
+          )}
+          <OfflineMenu />
+          <span className="hidden lg:block text-[11px] text-muted-foreground ml-2">
+            Updated {new Date(data.project.publishedAt).toLocaleDateString()}
+          </span>
+        </header>
+        <OfflineStatus />
 
-        {/* Desktop side panel — only mounts at lg+. Below that, the entity
+        <div className="flex-1 flex relative min-h-0">
+          <main
+            id="atlas-main"
+            className="flex-1 relative min-h-0"
+            aria-label={`Interactive map: ${activeMap.name}. Use arrow keys to pan, plus and minus to zoom.`}
+          >
+            <OceanBackground map={activeMap} />
+            <MapContainer
+              crs={FlatCRS}
+              center={[activeMap.height / 2, activeMap.width / 2]}
+              zoom={-2}
+              minZoom={-6}
+              maxZoom={4}
+              zoomControl
+              keyboard
+              keyboardPanDelta={80}
+              attributionControl={false}
+              style={{
+                width: "100%",
+                height: "100%",
+                background:
+                  activeMap.water?.enabled === false
+                    ? (activeMap.oceanColor ?? "#18313f")
+                    : "transparent",
+                cursor: rulerActive ? "crosshair" : undefined,
+              }}
+            >
+              <MapController flyTo={flyTarget} />
+              <ViewSyncController
+                mapId={activeMap.id}
+                mapHeight={activeMap.height}
+                onViewChange={handleViewChange}
+              />
+              <SoundscapeLayer map={activeMap} />
+              <RulerLayer
+                active={rulerActive}
+                mapHeight={activeMap.height}
+                scale={activeMap.scale}
+                wrapX={activeMap.wrapX}
+                mapWidth={activeMap.width}
+              />
+
+              {/* Horizontal wrap: render copies at -W, 0, +W when wrapX enabled */}
+              {(activeMap.wrapX ? [-activeMap.width, 0, activeMap.width] : [0]).map((dx) => (
+                <WrappedWorld
+                  key={`wrap-${dx}`}
+                  dx={dx}
+                  map={activeMap}
+                  placements={placementsOnMap}
+                  entityById={entityById}
+                  showGrid={showGrid}
+                  onOpenEntity={openEntity}
+                  visited={visited}
+                  onPinPeek={onPinPeek}
+                  onPinPeekLeave={peekCtl.onTriggerLeave}
+                />
+              ))}
+
+              {/* (markers, layers, regions, routes, fog, grid handled inside WrappedWorld) */}
+
+              <AtlasMinimap map={activeMap} layers={activeMap.layers} />
+            </MapContainer>
+
+            <SoundControl />
+
+            {/* Wander button + discovery meter — bottom-left map overlay */}
+            <WanderControl
+              discovered={meter.discovered}
+              total={meter.total}
+              canWander={meter.discovered < meter.total}
+              onWander={wander}
+            />
+            {wanderEmpty && (
+              <div className="atlas-wander-note absolute left-3 bottom-20 z-[500] max-w-xs rounded-lg border bg-background/95 px-3 py-2 text-xs text-muted-foreground">
+                You've explored everything you can reach — travel onward to uncover more.
+              </div>
+            )}
+          </main>
+
+          {/* Desktop side panel — only mounts at lg+. Below that, the entity
             bottom sheet handles entity viewing instead. The aside can be
             collapsed to a 28px re-expand strip via the chevron in its
             header; state is persisted in localStorage. */}
-        {asideExpanded ? (
-          <aside className="hidden lg:flex w-[400px] border-l border-border bg-card flex-col relative">
-            <button
-              type="button"
-              onClick={() => setAsideExpanded(false)}
-              className="absolute top-2 -left-3 z-10 h-6 w-6 rounded-full bg-card border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              aria-label="Collapse side panel"
-              title="Collapse side panel"
-            >
-              <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-            <EntityPanel
-              ref={panelRef}
-              entity={openEntity_}
-              placements={openPlacements}
-              entityById={entityById}
-              onOpenEntity={openEntity}
-              onClose={() => setOpenId(null)}
-              onShowOnMap={(p) => {
-                setActiveMapId(p.mapId);
-                const m = data.project.maps.find((mm) => mm.id === p.mapId);
-                if (m) setFlyTarget({ x: p.x, y: p.y, height: m.height });
-              }}
-              onPeek={(id, rect) => peekCtl.onTriggerEnter(id, rect)}
-              onPeekLeave={peekCtl.onTriggerLeave}
-              credits={worldCredits}
-            />
-          </aside>
-        ) : (
-          <aside className="hidden lg:flex w-7 border-l border-border bg-card items-start justify-center pt-2">
-            <button
-              type="button"
-              onClick={() => setAsideExpanded(true)}
-              className="h-6 w-6 rounded-full bg-card border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              aria-label="Expand side panel"
-              title="Expand side panel"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          </aside>
-        )}
-      </div>
+          {asideExpanded ? (
+            <aside className="hidden lg:flex w-[400px] border-l border-border bg-card flex-col relative">
+              <button
+                type="button"
+                onClick={() => setAsideExpanded(false)}
+                className="absolute top-2 -left-3 z-10 h-6 w-6 rounded-full bg-card border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                aria-label="Collapse side panel"
+                title="Collapse side panel"
+              >
+                <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+              <EntityPanel
+                ref={panelRef}
+                entity={openEntity_}
+                placements={openPlacements}
+                entityById={entityById}
+                onOpenEntity={openEntity}
+                onClose={() => setOpenId(null)}
+                onShowOnMap={(p) => {
+                  setActiveMapId(p.mapId);
+                  const m = data.project.maps.find((mm) => mm.id === p.mapId);
+                  if (m) setFlyTarget({ x: p.x, y: p.y, height: m.height });
+                }}
+                onPeek={(id, rect) => peekCtl.onTriggerEnter(id, rect)}
+                onPeekLeave={peekCtl.onTriggerLeave}
+                credits={worldCredits}
+              />
+            </aside>
+          ) : (
+            <aside className="hidden lg:flex w-7 border-l border-border bg-card items-start justify-center pt-2">
+              <button
+                type="button"
+                onClick={() => setAsideExpanded(true)}
+                className="h-6 w-6 rounded-full bg-card border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                aria-label="Expand side panel"
+                title="Expand side panel"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </aside>
+          )}
+        </div>
 
-      {/* Entity bottom sheet — used at every viewport below the desktop aside
+        {/* Entity bottom sheet — used at every viewport below the desktop aside
           breakpoint (1024px), including tablets. The Sheet (and its Radix
           overlay) only mounts here, so on desktop nothing dims the screen. */}
-      {!hasDesktopAside && (
-        <Sheet open={mobilePanelOpen && !!openEntity_} onOpenChange={setMobilePanelOpen}>
-          <SheetContent side="bottom" className="h-[80vh] p-0">
-            <EntityPanel
-              ref={panelRef}
-              entity={openEntity_}
-              placements={openPlacements}
-              entityById={entityById}
-              onOpenEntity={openEntity}
-              onClose={() => setMobilePanelOpen(false)}
-              onShowOnMap={(p) => {
-                setActiveMapId(p.mapId);
-                const m = data.project.maps.find((mm) => mm.id === p.mapId);
-                if (m) setFlyTarget({ x: p.x, y: p.y, height: m.height });
-                setMobilePanelOpen(false);
-              }}
-              onPeek={(id, rect) => peekCtl.onTriggerEnter(id, rect)}
-              onPeekLeave={peekCtl.onTriggerLeave}
-              credits={worldCredits}
-            />
-          </SheetContent>
-        </Sheet>
-      )}
-
-      {/* Search palette */}
-      {searchOpen && (
-        <SearchPalette
-          query={query}
-          setQuery={setQuery}
-          index={data.index}
-          placements={data.project.placements}
-          onPick={(id, fly) => {
-            setSearchOpen(false);
-            setQuery("");
-            openEntity(id, fly);
-          }}
-          onClose={() => setSearchOpen(false)}
-        />
-      )}
-      {peekCtl.peek && data && entityById.get(peekCtl.peek.entityId) &&
-        createPortal(
-          <div style={{ position: "fixed", left: peekCtl.peek.position.left, top: peekCtl.peek.position.top, zIndex: 1000 }}>
-            <HoverPeekCard
-              entity={entityById.get(peekCtl.peek.entityId)!}
-              hasPlacement={data.project.placements.some((p) => p.entityId === peekCtl.peek!.entityId)}
-              onOpen={() => { const id = peekCtl.peek!.entityId; peekCtl.dismiss(); openEntity(id); }}
-              onFlyToMap={() => {
-                const id = peekCtl.peek!.entityId; peekCtl.dismiss();
-                const pl = data.project.placements.find((p) => p.entityId === id);
-                if (pl) {
-                  if (pl.mapId !== activeMapId) setActiveMapId(pl.mapId);
-                  const m = data.project.maps.find((mm) => mm.id === pl.mapId);
-                  openEntity(id, false);
-                  if (m) setFlyTarget({ x: pl.x, y: pl.y, height: m.height });
-                }
-              }}
-              onMouseEnter={peekCtl.onCardEnter}
-              onMouseLeave={peekCtl.onCardLeave}
-            />
-          </div>,
-          document.body,
+        {!hasDesktopAside && (
+          <Sheet open={mobilePanelOpen && !!openEntity_} onOpenChange={setMobilePanelOpen}>
+            <SheetContent side="bottom" className="h-[80vh] p-0">
+              <EntityPanel
+                ref={panelRef}
+                entity={openEntity_}
+                placements={openPlacements}
+                entityById={entityById}
+                onOpenEntity={openEntity}
+                onClose={() => setMobilePanelOpen(false)}
+                onShowOnMap={(p) => {
+                  setActiveMapId(p.mapId);
+                  const m = data.project.maps.find((mm) => mm.id === p.mapId);
+                  if (m) setFlyTarget({ x: p.x, y: p.y, height: m.height });
+                  setMobilePanelOpen(false);
+                }}
+                onPeek={(id, rect) => peekCtl.onTriggerEnter(id, rect)}
+                onPeekLeave={peekCtl.onTriggerLeave}
+                credits={worldCredits}
+              />
+            </SheetContent>
+          </Sheet>
         )}
-    </div>
+
+        {/* Search palette */}
+        {searchOpen && (
+          <SearchPalette
+            query={query}
+            setQuery={setQuery}
+            index={data.index}
+            placements={data.project.placements}
+            onPick={(id, fly) => {
+              setSearchOpen(false);
+              setQuery("");
+              openEntity(id, fly);
+            }}
+            onClose={() => setSearchOpen(false)}
+          />
+        )}
+        {peekCtl.peek &&
+          data &&
+          entityById.get(peekCtl.peek.entityId) &&
+          createPortal(
+            <div
+              style={{
+                position: "fixed",
+                left: peekCtl.peek.position.left,
+                top: peekCtl.peek.position.top,
+                zIndex: 1000,
+              }}
+            >
+              <HoverPeekCard
+                entity={entityById.get(peekCtl.peek.entityId)!}
+                hasPlacement={data.project.placements.some(
+                  (p) => p.entityId === peekCtl.peek!.entityId,
+                )}
+                onOpen={() => {
+                  const id = peekCtl.peek!.entityId;
+                  peekCtl.dismiss();
+                  openEntity(id);
+                }}
+                onFlyToMap={() => {
+                  const id = peekCtl.peek!.entityId;
+                  peekCtl.dismiss();
+                  const pl = data.project.placements.find((p) => p.entityId === id);
+                  if (pl) {
+                    if (pl.mapId !== activeMapId) setActiveMapId(pl.mapId);
+                    const m = data.project.maps.find((mm) => mm.id === pl.mapId);
+                    openEntity(id, false);
+                    if (m) setFlyTarget({ x: pl.x, y: pl.y, height: m.height });
+                  }
+                }}
+                onMouseEnter={peekCtl.onCardEnter}
+                onMouseLeave={peekCtl.onCardLeave}
+              />
+            </div>,
+            document.body,
+          )}
+      </div>
     </SoundSettingsProvider>
   );
 }
@@ -1013,7 +1056,10 @@ function PlacementMarkers({
           <Marker
             key={`${p.id}-${dx}`}
             position={[H - p.y, p.x + dx]}
-            icon={pinIconForStyle(style, { dim, extraClass: pinDiscoveryClass(p.entityId, visited) })}
+            icon={pinIconForStyle(style, {
+              dim,
+              extraClass: pinDiscoveryClass(p.entityId, visited),
+            })}
             eventHandlers={{
               click: () => onOpenEntity(p.entityId, false),
               mouseover: (e) => onPinPeek?.(p.entityId, e.originalEvent as MouseEvent),

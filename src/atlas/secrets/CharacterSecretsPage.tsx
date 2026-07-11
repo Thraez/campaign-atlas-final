@@ -22,16 +22,33 @@ function SecretsBody({ entities }: { entities: Entity[] }) {
   const [tried, setTried] = useState(false);
 
   useEffect(() => {
-    if (!key) { setFound([]); setTried(false); return; }
+    if (!key) {
+      setFound([]);
+      setTried(false);
+      return;
+    }
     let alive = true;
     void collectCharacterSecrets(entities, key).then((r) => {
-      if (alive) { setFound(r); setTried(true); }
+      if (alive) {
+        setFound(r);
+        setTried(true);
+      }
     });
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [key, entities]);
 
-  const onSignIn = (value: string) => { setCharacterKey(value); setKey(value); };
-  const onForget = () => { forgetAll(); setKey(null); setFound([]); setTried(false); };
+  const onSignIn = (value: string) => {
+    setCharacterKey(value);
+    setKey(value);
+  };
+  const onForget = () => {
+    forgetAll();
+    setKey(null);
+    setFound([]);
+    setTried(false);
+  };
 
   if (!key) {
     return (
@@ -75,9 +92,7 @@ function SecretsBody({ entities }: { entities: Entity[] }) {
           Forget on this device
         </button>
       </div>
-      {!tried && (
-        <p className="text-sm text-muted-foreground">Searching…</p>
-      )}
+      {!tried && <p className="text-sm text-muted-foreground">Searching…</p>}
       {tried && found.length === 0 && (
         <p className="text-sm text-muted-foreground">
           No secrets found for that key. Check it with your DM.
@@ -105,7 +120,9 @@ export default function CharacterSecretsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadAtlasContent(true).then(setProject).catch((e: Error) => setError(e.message));
+    loadAtlasContent(true)
+      .then(setProject)
+      .catch((e: Error) => setError(e.message));
   }, []);
 
   if (error) {

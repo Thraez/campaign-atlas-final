@@ -124,7 +124,10 @@ describe("buildReportToMarkdown", () => {
   });
 
   it("includes atlasVersion and publishedAt when provided in meta", () => {
-    const md = buildReportToMarkdown(base, { atlasVersion: "v1.2.3", publishedAt: "2026-06-20T00:00:00Z" });
+    const md = buildReportToMarkdown(base, {
+      atlasVersion: "v1.2.3",
+      publishedAt: "2026-06-20T00:00:00Z",
+    });
     expect(md).toContain("v1.2.3");
     expect(md).toContain("2026-06-20T00:00:00Z");
   });

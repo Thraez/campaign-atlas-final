@@ -2,10 +2,20 @@ import { describe, it, expect } from "vitest";
 import { selectActiveBed, type PreparedArea } from "@/atlas/sound/resolveSoundscape";
 import type { BBox } from "@/atlas/geometry/polygon";
 
-const rect = (minX: number, minY: number, maxX: number, maxY: number): BBox => ({ minX, minY, maxX, maxY });
+const rect = (minX: number, minY: number, maxX: number, maxY: number): BBox => ({
+  minX,
+  minY,
+  maxX,
+  maxY,
+});
 const sq = (id: string, x0: number, y0: number, x1: number, y1: number): PreparedArea => ({
   id,
-  points: [[x0, y0], [x1, y0], [x1, y1], [x0, y1]],
+  points: [
+    [x0, y0],
+    [x1, y0],
+    [x1, y1],
+    [x0, y1],
+  ],
   bbox: rect(x0, y0, x1, y1),
   bboxArea: (x1 - x0) * (y1 - y0),
   bed: { src: `${id}.ogg` },

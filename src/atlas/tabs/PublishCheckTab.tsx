@@ -107,18 +107,28 @@ export function PublishCheckTab({
       <div className="space-y-2">
         <Button
           size="sm"
-          onClick={() => { void publish.check(); }}
+          onClick={() => {
+            void publish.check();
+          }}
           disabled={buttonDisabled}
           className="h-8 gap-1.5 text-xs w-full"
         >
           {isChecking ? (
-            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking your world…</>
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking your world…
+            </>
           ) : isBusy ? (
-            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Busy — finishing the current build</>
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Busy — finishing the current build
+            </>
           ) : isPublishing ? (
-            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Publishing…</>
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Publishing…
+            </>
           ) : (
-            <><Upload className="h-3.5 w-3.5" /> Publish to players</>
+            <>
+              <Upload className="h-3.5 w-3.5" /> Publish to players
+            </>
           )}
         </Button>
 
@@ -128,12 +138,16 @@ export function PublishCheckTab({
           </p>
         )}
 
-        {(publish.state === "ready" || publish.state === "blocked" ||
-          publish.state === "build-failed" || publish.state === "publishing") &&
+        {(publish.state === "ready" ||
+          publish.state === "blocked" ||
+          publish.state === "build-failed" ||
+          publish.state === "publishing") &&
           publish.checkResult && (
             <ReadinessCard
               result={publish.checkResult}
-              onConfirm={() => { void publish.confirm(); }}
+              onConfirm={() => {
+                void publish.confirm();
+              }}
               busy={isPublishing}
               onGoToEntity={onGoToEntity}
               onGoToMap={onGoToMap}
@@ -167,12 +181,12 @@ export function PublishCheckTab({
                 {publish.pushReason === "offline"
                   ? "You appear to be offline."
                   : publish.pushReason === "auth"
-                  ? "Git needs you to sign in."
-                  : publish.pushReason === "behind"
-                  ? "Your branch is behind — pull first in GitHub Desktop."
-                  : publish.pushReason === "conflict"
-                  ? "There’s a merge conflict to resolve."
-                  : ""}
+                    ? "Git needs you to sign in."
+                    : publish.pushReason === "behind"
+                      ? "Your branch is behind — pull first in GitHub Desktop."
+                      : publish.pushReason === "conflict"
+                        ? "There’s a merge conflict to resolve."
+                        : ""}
               </div>
             )}
           </div>

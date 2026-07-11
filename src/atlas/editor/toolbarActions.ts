@@ -123,7 +123,11 @@ export function applyToolbarAction(
       return insertBlock(value, selStart, TEMPLATE_READALOUD);
     case "secret:character":
     case "secret:password": {
-      const id = "s-" + Array.from(crypto.getRandomValues(new Uint8Array(4))).map((b) => b.toString(36)).join("");
+      const id =
+        "s-" +
+        Array.from(crypto.getRandomValues(new Uint8Array(4)))
+          .map((b) => b.toString(36))
+          .join("");
       return insertBlock(value, selStart, `{{secret:${id}}}`);
     }
   }

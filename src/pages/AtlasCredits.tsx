@@ -11,7 +11,9 @@ export default function AtlasCredits() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadAtlasContent(true).then(setProject).catch((e: Error) => setError(e.message));
+    loadAtlasContent(true)
+      .then(setProject)
+      .catch((e: Error) => setError(e.message));
   }, []);
 
   const credited = useMemo(
@@ -19,7 +21,7 @@ export default function AtlasCredits() {
       (project?.entities ?? [])
         .filter((e) => e.credit && e.visibility !== "dm")
         .sort((a, b) => a.title.localeCompare(b.title)),
-    [project]
+    [project],
   );
 
   if (error) {

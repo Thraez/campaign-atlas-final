@@ -84,7 +84,11 @@ function makeRegion(overrides: Partial<Region> = {}): Region {
     id: "r1",
     name: "Forest",
     mapId: "map-1",
-    points: [[0, 0], [100, 0], [100, 100]],
+    points: [
+      [0, 0],
+      [100, 0],
+      [100, 100],
+    ],
     visibility: "player",
     color: "#7fb069",
     fillOpacity: 0.18,
@@ -100,11 +104,7 @@ function makeRegion(overrides: Partial<Region> = {}): Region {
 describe("RegionsTab — Empty state", () => {
   it("shows 'No regions yet' message when effective is empty", () => {
     render(
-      <RegionsTab
-        project={makeProject()}
-        map={makeMap()}
-        api={makeMockApi({ effective: [] })}
-      />
+      <RegionsTab project={makeProject()} map={makeMap()} api={makeMockApi({ effective: [] })} />,
     );
     expect(screen.getByText(/No regions yet/)).toBeTruthy();
   });
@@ -112,13 +112,21 @@ describe("RegionsTab — Empty state", () => {
 
 describe("RegionsTab — Region list", () => {
   it("renders region name and point count when regions are present", () => {
-    const region = makeRegion({ name: "Dark Forest", points: [[0,0],[10,0],[10,10],[0,10]] });
+    const region = makeRegion({
+      name: "Dark Forest",
+      points: [
+        [0, 0],
+        [10, 0],
+        [10, 10],
+        [0, 10],
+      ],
+    });
     render(
       <RegionsTab
         project={makeProject()}
         map={makeMap()}
         api={makeMockApi({ effective: [region] })}
-      />
+      />,
     );
     expect(screen.getByText("Dark Forest")).toBeTruthy();
     expect(screen.getByText("4 pts")).toBeTruthy();
@@ -132,20 +140,24 @@ describe("RegionsTab — Region list", () => {
         project={makeProject()}
         map={makeMap()}
         api={makeMockApi({ effective: [region], draft })}
-      />
+      />,
     );
     expect(screen.getByText("new")).toBeTruthy();
   });
 
   it("renders 'edit' badge for a region with edits (not in draft.added)", () => {
     const region = makeRegion({ id: "r-edit", name: "Edited Zone" });
-    const draft: RegionDraft = { edits: { "r-edit": { name: "Edited Zone" } }, added: [], deleted: [] };
+    const draft: RegionDraft = {
+      edits: { "r-edit": { name: "Edited Zone" } },
+      added: [],
+      deleted: [],
+    };
     render(
       <RegionsTab
         project={makeProject()}
         map={makeMap()}
         api={makeMockApi({ effective: [region], draft })}
-      />
+      />,
     );
     expect(screen.getByText("edit")).toBeTruthy();
   });
@@ -159,7 +171,7 @@ describe("RegionsTab — Selected region form", () => {
         project={makeProject()}
         map={makeMap()}
         api={makeMockApi({ effective: [region], selectedId: "r1" })}
-      />
+      />,
     );
     // Name field populated with region name
     const input = screen.getByDisplayValue("Highland");
@@ -173,7 +185,7 @@ describe("RegionsTab — Selected region form", () => {
         project={makeProject()}
         map={makeMap()}
         api={makeMockApi({ effective: [region], selectedId: null })}
-      />
+      />,
     );
     expect(screen.queryByDisplayValue("Highland")).toBeNull();
   });
@@ -182,26 +194,20 @@ describe("RegionsTab — Selected region form", () => {
 describe("RegionsTab — Validation chips", () => {
   it("validation chips absent when issues list is empty", () => {
     render(
-      <RegionsTab
-        project={makeProject()}
-        map={makeMap()}
-        api={makeMockApi({ issues: [] })}
-      />
+      <RegionsTab project={makeProject()} map={makeMap()} api={makeMockApi({ issues: [] })} />,
     );
     expect(screen.queryByText(/blocking/i)).toBeNull();
   });
 
   it("blocking issue message rendered", () => {
     const issues: RegionIssue[] = [
-      { severity: "blocking", code: "too-few-points", message: "Region r1 needs at least 3 points." },
+      {
+        severity: "blocking",
+        code: "too-few-points",
+        message: "Region r1 needs at least 3 points.",
+      },
     ];
-    render(
-      <RegionsTab
-        project={makeProject()}
-        map={makeMap()}
-        api={makeMockApi({ issues })}
-      />
-    );
+    render(<RegionsTab project={makeProject()} map={makeMap()} api={makeMockApi({ issues })} />);
     expect(screen.getByText("Region r1 needs at least 3 points.")).toBeTruthy();
   });
 
@@ -209,13 +215,7 @@ describe("RegionsTab — Validation chips", () => {
     const issues: RegionIssue[] = [
       { severity: "warning", code: "small-area", message: "Region r1 covers a very small area." },
     ];
-    render(
-      <RegionsTab
-        project={makeProject()}
-        map={makeMap()}
-        api={makeMockApi({ issues })}
-      />
-    );
+    render(<RegionsTab project={makeProject()} map={makeMap()} api={makeMockApi({ issues })} />);
     expect(screen.getByText("Region r1 covers a very small area.")).toBeTruthy();
   });
 });
@@ -223,11 +223,7 @@ describe("RegionsTab — Validation chips", () => {
 describe("RegionsTab — Dirty state", () => {
   it("Discard button absent when not dirty", () => {
     render(
-      <RegionsTab
-        project={makeProject()}
-        map={makeMap()}
-        api={makeMockApi({ dirty: false })}
-      />
+      <RegionsTab project={makeProject()} map={makeMap()} api={makeMockApi({ dirty: false })} />,
     );
     expect(screen.queryByText(/Discard local/)).toBeNull();
   });
@@ -239,7 +235,7 @@ describe("RegionsTab — Dirty state", () => {
         project={makeProject()}
         map={makeMap()}
         api={makeMockApi({ dirty: true, reset })}
-      />
+      />,
     );
     const btn = screen.getByText(/Discard local/);
     expect(btn).toBeTruthy();
@@ -251,11 +247,7 @@ describe("RegionsTab — Dirty state", () => {
 describe("RegionsTab — Drawing mode", () => {
   it("shows 'Draw region' button when not drawing", () => {
     render(
-      <RegionsTab
-        project={makeProject()}
-        map={makeMap()}
-        api={makeMockApi({ drawing: false })}
-      />
+      <RegionsTab project={makeProject()} map={makeMap()} api={makeMockApi({ drawing: false })} />,
     );
     expect(screen.getByRole("button", { name: /Draw region/ })).toBeTruthy();
   });
@@ -265,8 +257,15 @@ describe("RegionsTab — Drawing mode", () => {
       <RegionsTab
         project={makeProject()}
         map={makeMap()}
-        api={makeMockApi({ drawing: true, draftPoints: [[0,0],[10,0],[10,10]] })}
-      />
+        api={makeMockApi({
+          drawing: true,
+          draftPoints: [
+            [0, 0],
+            [10, 0],
+            [10, 10],
+          ],
+        })}
+      />,
     );
     expect(screen.getByText(/Drawing.*3 pts/)).toBeTruthy();
   });

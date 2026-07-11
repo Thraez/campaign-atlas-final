@@ -69,5 +69,9 @@ export function markVisited(entityId: string): void {
 export function _resetVisitedForTests(): void {
   const s = getStorage();
   if (!s) return;
-  try { s.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+  try {
+    s.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
 }

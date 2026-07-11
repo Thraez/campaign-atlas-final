@@ -32,7 +32,11 @@ export function SyncPanel({ onSync }: SyncPanelProps) {
         .split("\n")
         .map((l) => l.trim())
         .filter(Boolean);
-      const next: SyncSettings = { ...settings, vaultPath: vaultPath.trim() || undefined, ignoreGlobs: globs };
+      const next: SyncSettings = {
+        ...settings,
+        vaultPath: vaultPath.trim() || undefined,
+        ignoreGlobs: globs,
+      };
       await saveSettings(next);
       setSettings(next);
     } finally {
@@ -55,9 +59,7 @@ export function SyncPanel({ onSync }: SyncPanelProps) {
     }
   }, [vaultPath, globsText, onSync]);
 
-  const lastSync = settings.lastSyncAt
-    ? new Date(settings.lastSyncAt).toLocaleString()
-    : null;
+  const lastSync = settings.lastSyncAt ? new Date(settings.lastSyncAt).toLocaleString() : null;
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -84,8 +86,8 @@ export function SyncPanel({ onSync }: SyncPanelProps) {
           className="text-xs font-mono resize-none"
         />
         <p className="text-[10px] text-muted-foreground">
-          Glob patterns for vault notes to skip. Built-in ignored folders
-          (Templates, Attachments, etc.) are always excluded.
+          Glob patterns for vault notes to skip. Built-in ignored folders (Templates, Attachments,
+          etc.) are always excluded.
         </p>
       </div>
 
@@ -111,11 +113,7 @@ export function SyncPanel({ onSync }: SyncPanelProps) {
         </Button>
       </div>
 
-      {lastSync && (
-        <p className="text-[10px] text-muted-foreground">
-          Last synced: {lastSync}
-        </p>
-      )}
+      {lastSync && <p className="text-[10px] text-muted-foreground">Last synced: {lastSync}</p>}
     </div>
   );
 }

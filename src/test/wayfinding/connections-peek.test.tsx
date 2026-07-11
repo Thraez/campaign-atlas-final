@@ -5,9 +5,18 @@ import { EntityPanel } from "@/atlas/entity/EntityPanel";
 import type { Entity } from "@/atlas/content/schema";
 
 const e: Entity = {
-  id: "corven", title: "Corven", type: "npc", visibility: "player",
-  aliases: [], tags: [], images: [], body: "", bodyHtml: "",
-  frontmatter: {}, sourcePath: "", links: [],
+  id: "corven",
+  title: "Corven",
+  type: "npc",
+  visibility: "player",
+  aliases: [],
+  tags: [],
+  images: [],
+  body: "",
+  bodyHtml: "",
+  frontmatter: {},
+  sourcePath: "",
+  links: [],
   backlinks: [{ id: "saltmere", title: "Saltmere" }],
 } as Entity;
 

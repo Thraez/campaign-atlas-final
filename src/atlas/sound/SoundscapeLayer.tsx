@@ -36,7 +36,12 @@ export function SoundscapeLayer({ map: mapDoc }: { map: MapDocument }) {
     const settle = () => {
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => {
-        const next = computeActiveId(prepared, leaflet as unknown as LeafletViewLike, mapDoc.height, activeId.current);
+        const next = computeActiveId(
+          prepared,
+          leaflet as unknown as LeafletViewLike,
+          mapDoc.height,
+          activeId.current,
+        );
         if (next === activeId.current) return;
         activeId.current = next;
         void engine.crossfadeTo(prepared.find((a) => a.id === next) ?? null);

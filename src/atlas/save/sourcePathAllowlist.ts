@@ -113,8 +113,7 @@ export function isReadableVaultPath(vaultRoot: string, candidateAbs: string): bo
  */
 export function isReadableLocalAtlasPath(relPath: string): boolean {
   return (
-    relPath === ".local-atlas/editor-settings.json" ||
-    relPath === ".local-atlas/sync-map.json"
+    relPath === ".local-atlas/editor-settings.json" || relPath === ".local-atlas/sync-map.json"
   );
 }
 

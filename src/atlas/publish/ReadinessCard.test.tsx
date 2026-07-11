@@ -31,7 +31,12 @@ describe("ReadinessCard", () => {
       ...base,
       verdict: "blocked",
       reasons: [
-        { scan: "check-derived-secrets", target: "dist", severity: "blocking", message: "Hidden name would leak" },
+        {
+          scan: "check-derived-secrets",
+          target: "dist",
+          severity: "blocking",
+          message: "Hidden name would leak",
+        },
       ],
     };
     render(<ReadinessCard result={result} onConfirm={vi.fn()} />);

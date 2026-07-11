@@ -1,5 +1,8 @@
 import { it, expect } from "vitest";
-import { projectEntityForPlayer, buildProjectionContext } from "@/atlas/content/projectEntityForPlayer";
+import {
+  projectEntityForPlayer,
+  buildProjectionContext,
+} from "@/atlas/content/projectEntityForPlayer";
 import type { Entity } from "@/atlas/content/schema";
 
 it("player projection seals secrets (placeholder only, no plaintext)", () => {

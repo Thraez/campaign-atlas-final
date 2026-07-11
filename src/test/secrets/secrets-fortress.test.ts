@@ -30,7 +30,11 @@ function runBuild(args: string[], cwd: string): { status: number; stdout: string
     return { status: 0, stdout: String(stdout), stderr: "" };
   } catch (e) {
     const err = e as { status?: number; stdout?: Buffer | string; stderr?: Buffer | string };
-    return { status: err.status ?? 1, stdout: String(err.stdout ?? ""), stderr: String(err.stderr ?? "") };
+    return {
+      status: err.status ?? 1,
+      stdout: String(err.stdout ?? ""),
+      stderr: String(err.stderr ?? ""),
+    };
   }
 }
 
@@ -43,66 +47,81 @@ function writeVault(dir: string) {
   fs.mkdirSync(atlasDir, { recursive: true });
   fs.mkdirSync(dmDir, { recursive: true });
 
-  fs.writeFileSync(path.join(dir, "atlas.config.json"), JSON.stringify({
-    contentRoot: "content",
-    outputDir: path.join(dir, "out"),
-    defaultWorld: "test-world",
-    include: ["**/*.md"],
-    exclude: ["**/_dm/**"],
-  }));
+  fs.writeFileSync(
+    path.join(dir, "atlas.config.json"),
+    JSON.stringify({
+      contentRoot: "content",
+      outputDir: path.join(dir, "out"),
+      defaultWorld: "test-world",
+      include: ["**/*.md"],
+      exclude: ["**/_dm/**"],
+    }),
+  );
 
-  fs.writeFileSync(path.join(atlasDir, "world.yaml"), [
-    "schemaVersion: 1",
-    "maps:",
-    "  - id: test-map",
-    "    name: Test Map",
-    "    width: 1000",
-    "    height: 500",
-    "    oceanColor: '#18313f'",
-    "    wrapX: false",
-    "    layers: []",
-  ].join("\n"));
+  fs.writeFileSync(
+    path.join(atlasDir, "world.yaml"),
+    [
+      "schemaVersion: 1",
+      "maps:",
+      "  - id: test-map",
+      "    name: Test Map",
+      "    width: 1000",
+      "    height: 500",
+      "    oceanColor: '#18313f'",
+      "    wrapX: false",
+      "    layers: []",
+    ].join("\n"),
+  );
 
   // Character keys file — only used at build time, never shipped.
   fs.writeFileSync(path.join(dmDir, "character-keys.yaml"), "vesper: vesper-secret-key-abc\n");
 
   // Entity with both a password secret and a character secret.
-  fs.writeFileSync(path.join(content, "corven.md"), [
-    "---",
-    "atlas:",
-    "  publish: true",
-    "  visibility: player",
-    "  secrets:",
-    "    - id: ward",
-    "      password: the tide",
-    "      teaser: a sealed box",
-    "      reveal: the ward answers",
-    "    - id: signet",
-    "      for: vesper",
-    "      reveal: you know the ring",
-    "---",
-    "He keeps ledgers. {{secret:ward}} {{secret:signet}}",
-  ].join("\n"));
+  fs.writeFileSync(
+    path.join(content, "corven.md"),
+    [
+      "---",
+      "atlas:",
+      "  publish: true",
+      "  visibility: player",
+      "  secrets:",
+      "    - id: ward",
+      "      password: the tide",
+      "      teaser: a sealed box",
+      "      reveal: the ward answers",
+      "    - id: signet",
+      "      for: vesper",
+      "      reveal: you know the ring",
+      "---",
+      "He keeps ledgers. {{secret:ward}} {{secret:signet}}",
+    ].join("\n"),
+  );
 }
 
 beforeAll(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "secrets-fortress-"));
   writeVault(root);
 });
-afterAll(() => { fs.rmSync(root, { recursive: true, force: true }); });
+afterAll(() => {
+  fs.rmSync(root, { recursive: true, force: true });
+});
 
 describe("secrets fortress", () => {
   it("clean player build of a secret vault passes the leak scan", () => {
     const out = path.join(root, "out");
-    const result = runBuild(["--player", "--config", path.join(root, "atlas.config.json"), "--out", out], root);
+    const result = runBuild(
+      ["--player", "--config", path.join(root, "atlas.config.json"), "--out", out],
+      root,
+    );
     expect(result.status, `Build failed:\n${result.stderr}\n${result.stdout}`).toBe(0);
     // Scan passes — no plaintext or markers in entity bodies / search index.
     expect(checkPlayerSecrets({ dir: out })).toBe(0);
 
     // Entity body must not contain plaintext reveal text or secret keys.
     const atlas = JSON.parse(fs.readFileSync(path.join(out, "atlas.json"), "utf8"));
-    const corven = (atlas.entities as Array<{ id: string; body?: string; secrets?: unknown[] }>)
-      .find((e) => e.id === "corven");
+    const corven = (
+      atlas.entities as Array<{ id: string; body?: string; secrets?: unknown[] }>
+    ).find((e) => e.id === "corven");
     expect(corven?.body?.includes("the ward answers")).toBe(false);
     expect(corven?.body?.includes("you know the ring")).toBe(false);
     expect(corven?.body?.includes("the tide")).toBe(false);
@@ -123,13 +142,28 @@ describe("secrets fortress", () => {
   it("scan catches a planted plaintext reveal field", () => {
     const bad = path.join(root, "bad");
     fs.mkdirSync(bad, { recursive: true });
-    fs.writeFileSync(path.join(bad, "atlas.json"), JSON.stringify({
-      entities: [{
-        id: "x", body: "x",
-        secrets: [{ id: "s", lockType: "password", reveal: "the ward answers", salt: "Q", iv: "Q", ciphertext: "Q" }],
-      }],
-      placements: [],
-    }));
+    fs.writeFileSync(
+      path.join(bad, "atlas.json"),
+      JSON.stringify({
+        entities: [
+          {
+            id: "x",
+            body: "x",
+            secrets: [
+              {
+                id: "s",
+                lockType: "password",
+                reveal: "the ward answers",
+                salt: "Q",
+                iv: "Q",
+                ciphertext: "Q",
+              },
+            ],
+          },
+        ],
+        placements: [],
+      }),
+    );
     fs.writeFileSync(path.join(bad, "search-index.json"), JSON.stringify([]));
     expect(checkPlayerSecrets({ dir: bad })).toBe(13);
   });
@@ -137,10 +171,13 @@ describe("secrets fortress", () => {
   it("scan catches an unstripped {{secret:}} marker in the body", () => {
     const bad2 = path.join(root, "bad2");
     fs.mkdirSync(bad2, { recursive: true });
-    fs.writeFileSync(path.join(bad2, "atlas.json"), JSON.stringify({
-      entities: [{ id: "y", body: "He keeps ledgers {{secret:ward}}" }],
-      placements: [],
-    }));
+    fs.writeFileSync(
+      path.join(bad2, "atlas.json"),
+      JSON.stringify({
+        entities: [{ id: "y", body: "He keeps ledgers {{secret:ward}}" }],
+        placements: [],
+      }),
+    );
     fs.writeFileSync(path.join(bad2, "search-index.json"), JSON.stringify([]));
     expect(checkPlayerSecrets({ dir: bad2 })).toBe(13);
   });

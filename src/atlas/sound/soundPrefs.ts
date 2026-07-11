@@ -30,7 +30,8 @@ export function loadSoundPrefs(): SoundPrefs {
     const p = JSON.parse(raw);
     if (!p || typeof p !== "object") return { ...DEFAULT_PREFS };
     return {
-      soundEnabled: typeof p.soundEnabled === "boolean" ? p.soundEnabled : DEFAULT_PREFS.soundEnabled,
+      soundEnabled:
+        typeof p.soundEnabled === "boolean" ? p.soundEnabled : DEFAULT_PREFS.soundEnabled,
       muted: typeof p.muted === "boolean" ? p.muted : DEFAULT_PREFS.muted,
       calmMode: typeof p.calmMode === "boolean" ? p.calmMode : DEFAULT_PREFS.calmMode,
     };

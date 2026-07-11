@@ -390,7 +390,12 @@ describe("buildFullWorldYaml — soundscape round-trip", () => {
           {
             id: "area-tavern",
             bed: { src: "audio/tavern.ogg", gain: 0.8 },
-            points: [[0, 0], [100, 0], [100, 100], [0, 100]],
+            points: [
+              [0, 0],
+              [100, 0],
+              [100, 100],
+              [0, 100],
+            ],
             visibility: "player" as const,
           },
         ],
@@ -482,8 +487,12 @@ describe("buildFullWorldYaml — layer optional fields", () => {
         {
           id: "L1",
           src: "atlas/assets/maps/a.png",
-          x: 0, y: 0, width: 100, height: 100,
-          opacity: 1, zIndex: 10,
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          opacity: 1,
+          zIndex: 10,
           rotation: 45,
           tileSrc: "atlas/assets/maps/tile.png",
         },

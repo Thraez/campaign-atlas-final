@@ -201,7 +201,9 @@ export function ImportStagingModal({
                       <Select
                         value={row.resolvedVisibility || "dm"}
                         onValueChange={(v) => onPatchRow(row.id, { resolvedVisibility: v })}
-                        disabled={!!row.parseError || (!!row.vaultRelPath && row.rowKind === "update")}
+                        disabled={
+                          !!row.parseError || (!!row.vaultRelPath && row.rowKind === "update")
+                        }
                       >
                         <SelectTrigger
                           className="h-7 text-[11px]"

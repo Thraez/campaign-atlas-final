@@ -44,7 +44,11 @@ describe("measureDistance", () => {
   it("falls back to px when unitsPerPixel is zero (degenerate scale)", () => {
     // A scale with unitsPerPixel:0 would produce "0.0 mi" for any distance —
     // treat it like no scale and show the raw pixel distance instead.
-    const r = measureDistance({ x: 0, y: 0 }, { x: 3, y: 4 }, { unitsPerPixel: 0, unitLabel: "mi" });
+    const r = measureDistance(
+      { x: 0, y: 0 },
+      { x: 3, y: 4 },
+      { unitsPerPixel: 0, unitLabel: "mi" },
+    );
     expect(r.distPx).toBeCloseTo(5);
     expect(r.label).toBe("5 px");
   });

@@ -27,7 +27,9 @@ export async function buildEntitySecrets(
     if (spec.for) {
       const key = charKeys.get(spec.for);
       if (!key) {
-        warnings.push(`entity "${entityId}": no character key for "${spec.for}" — secret "${spec.id}" skipped`);
+        warnings.push(
+          `entity "${entityId}": no character key for "${spec.for}" — secret "${spec.id}" skipped`,
+        );
         continue;
       }
       passphrase = key;

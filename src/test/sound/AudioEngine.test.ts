@@ -3,7 +3,12 @@ import { AudioEngine } from "@/atlas/sound/AudioEngine";
 
 function makeMockCtx() {
   const gainNode = () => ({
-    gain: { value: 1, setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn(), cancelScheduledValues: vi.fn() },
+    gain: {
+      value: 1,
+      setValueAtTime: vi.fn(),
+      linearRampToValueAtTime: vi.fn(),
+      cancelScheduledValues: vi.fn(),
+    },
     connect: vi.fn(),
     disconnect: vi.fn(),
   });
@@ -22,8 +27,12 @@ function makeMockCtx() {
       stop: vi.fn(),
       disconnect: vi.fn(),
     })),
-    resume: vi.fn(async () => { ctx.state = "running"; }),
-    suspend: vi.fn(async () => { ctx.state = "suspended"; }),
+    resume: vi.fn(async () => {
+      ctx.state = "running";
+    }),
+    suspend: vi.fn(async () => {
+      ctx.state = "suspended";
+    }),
     decodeAudioData: vi.fn(async () => ({ duration: 30 })),
     close: vi.fn(async () => {}),
   };

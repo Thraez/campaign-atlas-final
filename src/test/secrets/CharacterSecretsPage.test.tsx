@@ -63,7 +63,9 @@ describe("CharacterSecretsPage — SecretsBody state machine", () => {
     await screen.findByText("Your character's secrets");
     const input = screen.getByLabelText("Your character key") as HTMLInputElement;
     input.value = "vesper-key";
-    await act(async () => { fireEvent.submit(input.closest("form")!); });
+    await act(async () => {
+      fireEvent.submit(input.closest("form")!);
+    });
     expect(mockSetKey).toHaveBeenCalledWith("vesper-key");
   });
 

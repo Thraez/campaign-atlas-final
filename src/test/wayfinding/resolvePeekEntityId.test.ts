@@ -6,11 +6,17 @@ function anchor(html: string): HTMLElement {
 }
 
 it("reads data-entity-id when present", () => {
-  expect(resolvePeekEntityId(anchor('<a class="atlas-wikilink" data-entity-id="saltmere" href="#/entity/saltmere">x</a>'))).toBe("saltmere");
+  expect(
+    resolvePeekEntityId(
+      anchor('<a class="atlas-wikilink" data-entity-id="saltmere" href="#/entity/saltmere">x</a>'),
+    ),
+  ).toBe("saltmere");
 });
 
 it("falls back to decoding the href hash", () => {
-  expect(resolvePeekEntityId(anchor('<a class="atlas-wikilink" href="#/entity/old%20keep">x</a>'))).toBe("old keep");
+  expect(
+    resolvePeekEntityId(anchor('<a class="atlas-wikilink" href="#/entity/old%20keep">x</a>')),
+  ).toBe("old keep");
 });
 
 it("returns null for a non-link element", () => {
