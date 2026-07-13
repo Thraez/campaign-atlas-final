@@ -93,9 +93,9 @@ import { resolvePinClickIntent } from "@/atlas/editor/pinClickIntent";
 import { resolveEntityCloseIntent } from "@/atlas/editor/entityCloseIntent";
 import { mapClickToAtlasCoord } from "@/atlas/editor/mapClickCoord";
 import { usePinsTabFilters } from "@/atlas/editor/usePinsTabFilters";
+import { usePinOverrideMutations } from "@/atlas/editor/usePinOverrideMutations";
 import {
   type Overrides,
-  type OverrideValue,
   overrideKey,
   loadOverrides,
   finishLegacyMigration,
@@ -578,38 +578,19 @@ function AtlasPlacementEditorInner() {
   /** Entity currently open in the EntityEditPanel (null = none). */
   const [editingEntityId, setEditingEntityId] = useState<string | null>(null);
 
-  /** Read-only canon placement (built YAML value) for an entity on a map. */
-  const canonPlacement = useCallback(
-    (mapId: string, entityId: string) => {
-      if (!project) return null;
-      return project.placements.find((p) => p.entityId === entityId && p.mapId === mapId) ?? null;
-    },
-    [project],
-  );
-
-  /** Resolve effective placement values on the active map: local override wins, else canon. */
-  const effectivePlacement = useCallback(
-    (entityId: string): OverrideValue | null => {
-      if (!activeMap) return null;
-      const k = overrideKey(activeMap.id, entityId);
-      if (k in overrides) {
-        const v = overrides[k];
-        return v;
-      }
-      const p = canonPlacement(activeMap.id, entityId);
-      if (!p) return null;
-      return { x: p.x, y: p.y, label: p.label, pin: p.pin as PinOverride | undefined };
-    },
-    [overrides, canonPlacement, activeMap],
-  );
-
-  const effectiveCoord = useCallback(
-    (entityId: string): { x: number; y: number } | null => {
-      const e = effectivePlacement(entityId);
-      return e ? { x: e.x, y: e.y } : null;
-    },
-    [effectivePlacement],
-  );
+  const {
+    canonPlacement,
+    effectivePlacement,
+    effectiveCoord,
+    mutateOverride,
+    setCoord,
+    setLabel,
+    setPinOverride,
+    nudge,
+    removeCoord,
+    clearOverride,
+    duplicateToMap,
+  } = usePinOverrideMutations({ project, activeMap, overrides, setOverridesUndoable });
 
   const entitiesForWorld = useMemo(() => {
     if (!project || !activeMap) return [] as Entity[];
@@ -658,94 +639,6 @@ function AtlasPlacementEditorInner() {
     const keep = new Set(placements.map((p) => p.entityId));
     return placed.filter((e) => keep.has(e.id));
   }, [mode, placed, entitiesById, activeMap, fogDraft.fog, effectivePlacement]);
-
-  /** Merge a partial override into the local draft. Undoable.
-   *
-   *  A "current" baseline is normally either a prior override or the canon
-   *  placement. For a brand-new pin (no canon, no prior override), the caller
-   *  must supply both x AND y in the patch — that's the create-from-scratch
-   *  contract. Label-only / nudge / pin-style updates still require a
-   *  baseline (and silently no-op without one, since they have nothing to
-   *  attach to). The earlier behaviour dropped create-from-scratch on the
-   *  floor while still firing the "Placed X" toast — see plan §2. */
-  const mutateOverride = useCallback(
-    (entityId: string, patch: Partial<OverrideValue>, label?: string) => {
-      if (!activeMap) return;
-      setOverridesUndoable(
-        (o) => {
-          const k = overrideKey(activeMap.id, entityId);
-          const current = (k in o ? o[k] : null) ?? canonPlacement(activeMap.id, entityId);
-          if (!current) {
-            if (typeof patch.x !== "number" || typeof patch.y !== "number") return o;
-            const fresh: OverrideValue = {
-              x: patch.x,
-              y: patch.y,
-              label: patch.label,
-              pin: patch.pin,
-            };
-            return { ...o, [k]: fresh };
-          }
-          const merged: OverrideValue = {
-            x: patch.x ?? current.x,
-            y: patch.y ?? current.y,
-            label: patch.label !== undefined ? patch.label : (current as OverrideValue).label,
-            pin: patch.pin !== undefined ? patch.pin : (current as OverrideValue).pin,
-          };
-          return { ...o, [k]: merged };
-        },
-        label ?? `pin ${entityId}`,
-      );
-    },
-    [activeMap, canonPlacement, setOverridesUndoable],
-  );
-
-  const setCoord = (entityId: string, coord: { x: number; y: number }) =>
-    mutateOverride(entityId, coord, `move pin ${entityId}`);
-  const setLabel = (entityId: string, label: string | undefined) =>
-    mutateOverride(entityId, { label }, `label pin ${entityId}`);
-  const setPinOverride = (entityId: string, pin: PinOverride | undefined) =>
-    mutateOverride(entityId, { pin }, `style pin ${entityId}`);
-  const nudge = (entityId: string, dx: number, dy: number) => {
-    const c = effectiveCoord(entityId);
-    if (!c) return;
-    mutateOverride(entityId, { x: c.x + dx, y: c.y + dy }, `nudge pin ${entityId}`);
-  };
-  const removeCoord = (entityId: string) => {
-    if (!activeMap) return;
-    setOverridesUndoable(
-      (o) => ({ ...o, [overrideKey(activeMap.id, entityId)]: null }),
-      `remove pin ${entityId}`,
-    );
-  };
-  const clearOverride = (entityId: string) => {
-    if (!activeMap) return;
-    const k = overrideKey(activeMap.id, entityId);
-    setOverridesUndoable((o) => {
-      const next = { ...o };
-      delete next[k];
-      return next;
-    }, `discard local pin edit ${entityId}`);
-  };
-  /** Duplicate a placement to another map: writes the same coords as a draft. Undoable. */
-  const duplicateToMap = (entityId: string, targetMapId: string) => {
-    const src = effectivePlacement(entityId);
-    if (!src) return;
-    setOverridesUndoable(
-      (o) => ({
-        ...o,
-        [overrideKey(targetMapId, entityId)]: {
-          x: src.x,
-          y: src.y,
-          label: src.label,
-          pin: src.pin,
-        },
-      }),
-      `duplicate pin ${entityId} → ${targetMapId}`,
-    );
-    toast.success(
-      `Duplicated to ${project?.maps.find((m) => m.id === targetMapId)?.name ?? targetMapId}`,
-    );
-  };
 
   const onMapClick = (lng: number, lat: number) => {
     if (!pendingId || !activeMap) return;
