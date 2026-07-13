@@ -81,6 +81,7 @@ import { type CategoryId, CATEGORIES, categoryForType } from "@/atlas/content/en
 import { CommandPalette } from "@/atlas/shell/CommandPalette";
 import { buildPaletteIndex } from "@/atlas/shell/useCommandPalette";
 import { EditorMenu } from "@/atlas/shell/EditorMenu";
+import { useEditorKeyboardShortcuts } from "@/atlas/shell/useEditorKeyboardShortcuts";
 import { WorldDetailsPanel } from "@/atlas/settings/WorldDetailsPanel";
 import { AssetManagerPanel } from "@/atlas/assets/AssetManagerPanel";
 import { CategoryPanel } from "@/atlas/categories/CategoryPanel";
@@ -1144,51 +1145,7 @@ function AtlasPlacementEditorInner() {
       (entityEditDraft.isDirty() ? 1 : 0),
   });
 
-  // Phase 1B B4: Esc cancels in-progress pin placement (the "Click on the
-  // map to place X" banner has its own button; this just covers the same
-  // exit via the keyboard).
-  useEffect(() => {
-    if (!pendingId) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setPendingId(null);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [pendingId]);
-
-  // Phase 1B B0: keyboard shortcuts for Undo / Redo.
-  //   Cmd/Ctrl+Z       → undo
-  //   Cmd/Ctrl+Shift+Z → redo
-  //   Ctrl+Y           → redo (Windows alternate)
-  // Skips when focus is in an editable surface (input, textarea, select,
-  // contenteditable) so typing isn't hijacked.
-  useEffect(() => {
-    const isEditableTarget = (t: EventTarget | null): boolean => {
-      if (!(t instanceof HTMLElement)) return false;
-      const tag = t.tagName.toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return true;
-      if (t.isContentEditable) return true;
-      return false;
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (isEditableTarget(e.target)) return;
-      const mod = e.metaKey || e.ctrlKey;
-      if (!mod) return;
-      const k = e.key.toLowerCase();
-      if (k === "z" && !e.shiftKey) {
-        e.preventDefault();
-        undoStack.undo();
-      } else if ((k === "z" && e.shiftKey) || k === "y") {
-        e.preventDefault();
-        undoStack.redo();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [undoStack]);
+  useEditorKeyboardShortcuts({ undoStack, pendingId, setPendingId });
 
   // Project-wide validation, scoped per tab so each tab badge shows its own counts.
   const draftPlacementsForValidation = useMemo(
