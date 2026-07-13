@@ -66,6 +66,7 @@ import {
 } from "@/atlas/save/canonicalEntitySave";
 import { useWorldYamlBaseline, worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
 import { buildFullWorldYaml } from "@/atlas/yaml/buildFullWorldYaml";
+import { pointInPolygon } from "@/atlas/geometry/polygon";
 import { SyncPanel } from "@/atlas/sync/SyncPanel";
 import { ImportStagingModal } from "@/atlas/import/ImportStagingModal";
 import { PasteMarkdownDialog } from "@/atlas/import/PasteMarkdownDialog";
@@ -652,21 +653,6 @@ function AtlasPlacementEditorInner() {
 
   const placed = filtered.filter((e) => effectiveCoord(e.id));
   const unplaced = filtered.filter((e) => !effectiveCoord(e.id));
-
-  /**
-   * Ray-casting point-in-polygon: returns true if (px, py) is inside poly.
-   * Uses the standard even-odd rule. Coordinates are map-space (x right, y up).
-   */
-  function pointInPolygon(px: number, py: number, poly: [number, number][]): boolean {
-    let inside = false;
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const [xi, yi] = poly[i];
-      const [xj, yj] = poly[j];
-      const intersects = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
-      if (intersects) inside = !inside;
-    }
-    return inside;
-  }
 
   /** In player lens: filter placed entities through projectMapForPlayer. */
   const placedForLens = useMemo(() => {
