@@ -44,7 +44,8 @@ Offline PWA for production builds
 Print / PDF player handouts
 `/atlas/edit` Creator Cockpit for DM prep
 Visual editor tabs for pins, maps, regions, routes, fog, entities, import, and publish check
-Unified YAML patch export workflow
+Unified Save — writes edits straight back to the vault on disk (dev only)
+Ambient soundscapes — looping map audio players hear as they explore, with a mute/volume control
 Build and validation tests for spoiler safety and `world.yaml` behavior
 ---
 Core design model
@@ -66,8 +67,7 @@ Do not treat `atlas.json` as canon. It is generated output.
 Do not store secrets in the published player build. Anything shipped to GitHub Pages can be inspected.
 ---
 Most common mistake
-Do not paste an entire exported patch file into `world.yaml`.
-Exported patch files may contain comment headers explaining where a block goes. `world.yaml` itself must be pure YAML.
+Do not paste a fenced code block (the ```` ```yaml ```` wrapper and all) into `world.yaml`. `world.yaml` must be pure YAML — paste only the YAML itself, never the markdown fence around it.
 Also note: `/atlas/edit` no longer exists on the published player site. The editor route lives in `npm run dev` only — the player production build physically excludes it.
 Do not paste:
 ```markdown
@@ -799,9 +799,7 @@ Safety guards (always in place):
 - The endpoint refuses to write any path outside the source allowlist: `content/**/_atlas/*.yaml`, `content/**/_atlas/*.yml`, and `content/**/*.md`. Even a buggy or malicious payload cannot touch `package.json`, `public/atlas/`, `.github/`, or any generated file.
 - The editor route `/atlas/edit` is also excluded from production builds via `__INCLUDE_EDITOR__` gating.
 
-Scope: the Save button reuses the same payload as Export Patch. For data Export Patch doesn't handle (e.g., creating brand-new markdown lore files), edit those files directly in your editor of choice and commit them yourself, or use the existing Obsidian import flow.
-
-Fallback: Export Patch is still available. It downloads a `.yaml` patch file you can paste anywhere (GitHub web edit, Lovable chat, etc.). Use it when you're editing from a machine that doesn't have the repo cloned, or when you want a portable patch file for review.
+Scope: Save writes editor changes (placements, `world.yaml` settings, entity frontmatter) straight to the vault on disk. Creating brand-new markdown lore notes is still done in Obsidian or your editor of choice — commit those yourself — or via the existing Obsidian import flow.
 
 ---
 DM tools flag
@@ -1017,7 +1015,7 @@ Implemented:
 Foundation: schema, parser, wikilinks, build script, sample vault
 Map MVP: Leaflet viewer, placements, pins, side panel, search, mobile sheet
 Safe publishing: strict player build and GitHub Pages workflow
-Creator workflow: `/atlas/edit`, patch exports, asset zip
+Creator workflow: `/atlas/edit`, Unified Save, asset zip
 Layered maps: multi-map worlds and image layers
 Regions, fog, routes, grid, scale, minimap
 Timeline and calendar
