@@ -65,7 +65,10 @@ import {
   buildCanonicalEntityChanges,
 } from "@/atlas/save/canonicalEntitySave";
 import { useWorldYamlBaseline, worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
-import { buildFullWorldYaml } from "@/atlas/yaml/buildFullWorldYaml";
+import {
+  buildWorldYamlContent as pureBuildWorldYamlContent,
+  buildAssetBinaryChanges as pureBuildAssetBinaryChanges,
+} from "@/atlas/save/buildSaveBatch";
 import { pointInPolygon } from "@/atlas/geometry/polygon";
 import { SyncPanel } from "@/atlas/sync/SyncPanel";
 import { ImportStagingModal } from "@/atlas/import/ImportStagingModal";
@@ -745,31 +748,17 @@ function AtlasPlacementEditorInner() {
    */
   const buildWorldYamlContent = useCallback((): string | null => {
     if (!project || !activeMap) return null;
-    const remappedLayers: MapLayer[] = layerEditor.mergedLayers.map((l) => {
-      const local = layerEditor.localLayers.find((ll) => ll.id === l.id);
-      if (!local || local.origin !== "upload") return l;
-      // upload: rewrite src to the canonical "atlas/assets/maps/<file>" form
-      // (strip the public/ prefix). The actual binary is written by the
-      // asset-binary FileChange we add in onSaveClick.
-      const target = local.targetPath ?? `public/atlas/assets/maps/${l.id}.png`;
-      const src = target.replace(/^public\//, "");
-      return { ...l, src };
-    });
-    const updatedMaps: MapDocument[] = project.maps.map((m) => {
-      if (m.id !== activeMap.id) return m;
-      return {
-        ...activeMap,
-        layers: remappedLayers,
-        regions: regionDraft.effective,
-        routes: routeDraft.effective,
-        fog: fogDraft.fog,
-      };
-    });
-    return buildFullWorldYaml({
-      maps: updatedMaps,
+    return pureBuildWorldYamlContent({
+      activeMap,
+      maps: project.maps,
       calendar: project.calendar,
       schemaVersion: project.schemaVersion,
-      existing: worldYamlBaseline.raw,
+      mergedLayers: layerEditor.mergedLayers,
+      localLayers: layerEditor.localLayers,
+      regionsEffective: regionDraft.effective,
+      routesEffective: routeDraft.effective,
+      fog: fogDraft.fog,
+      existingRaw: worldYamlBaseline.raw,
       credits: effectiveWorld?.credits,
       assetCredits: effectiveWorld?.assetCredits,
     });
@@ -794,24 +783,10 @@ function AtlasPlacementEditorInner() {
    * the world.yaml emission still references them so the DM sees the
    * mismatch in the diff modal.
    */
-  const buildAssetBinaryChanges = useCallback((): FileChange[] => {
-    const changes: FileChange[] = [];
-    for (const local of layerEditor.localLayers) {
-      if (local.origin !== "upload") continue;
-      if (!local.dataUrl) continue;
-      const target = local.targetPath ?? `public/atlas/assets/maps/${local.id}.png`;
-      changes.push({
-        path: target,
-        content: local.dataUrl,
-        kind: "asset-binary",
-        // null = create-only. If the DM has uploaded a file that collides
-        // with an existing asset on disk, the endpoint returns 409
-        // already-exists and the toast surfaces the path.
-        baseHash: null,
-      });
-    }
-    return changes;
-  }, [layerEditor.localLayers]);
+  const buildAssetBinaryChanges = useCallback(
+    (): FileChange[] => pureBuildAssetBinaryChanges(layerEditor.localLayers),
+    [layerEditor.localLayers],
+  );
 
   /**
    * Save: rewrite the canonical entity .md frontmatter for every drafted
