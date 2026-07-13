@@ -81,6 +81,7 @@ import { CommandPalette } from "@/atlas/shell/CommandPalette";
 import { buildPaletteIndex } from "@/atlas/shell/useCommandPalette";
 import { EditorMenu } from "@/atlas/shell/EditorMenu";
 import { WorldDetailsPanel } from "@/atlas/settings/WorldDetailsPanel";
+import { AssetManagerPanel } from "@/atlas/assets/AssetManagerPanel";
 import { CategoryPanel } from "@/atlas/categories/CategoryPanel";
 import { PinStateBadge } from "@/atlas/pins/PinStateBadge";
 import { EntityEditorPanel, type NewEntityDraft } from "@/atlas/categories/EntityEditorPanel";
@@ -1275,6 +1276,7 @@ function AtlasPlacementEditorInner() {
         settings: [
           { id: "set.map", title: "Map settings" },
           { id: "set.world", title: "World details" },
+          { id: "set.assets", title: "Assets" },
         ],
         recent: [],
       }),
@@ -1524,6 +1526,10 @@ function AtlasPlacementEditorInner() {
                   onMapDetails={() => {
                     setMenuOpen(false);
                     setActivePanel("maps");
+                  }}
+                  onAssetManager={() => {
+                    setMenuOpen(false);
+                    setActivePanel("assets");
                   }}
                   onHelp={() => {
                     setMenuOpen(false);
@@ -2002,6 +2008,13 @@ function AtlasPlacementEditorInner() {
                 onPatch={patchWorld}
               />
             ),
+            assets: (
+              <AssetManagerPanel
+                project={project}
+                assetCredits={effectiveWorld?.assetCredits}
+                onPatch={(next) => patchWorld({ assetCredits: next })}
+              />
+            ),
             characterKeys: activeWorldId ? (
               <CharacterKeysPanel worldDir={`content/${activeWorldId}`} />
             ) : null,
@@ -2373,7 +2386,10 @@ function AtlasPlacementEditorInner() {
             if (ent) setEditingEntityId(ent.id);
           }
           if (r.kind === "map") setActiveMapId(r.id);
-          if (r.kind === "setting") setActivePanel(r.id === "set.world" ? "world" : "maps");
+          if (r.kind === "setting")
+            setActivePanel(
+              r.id === "set.world" ? "world" : r.id === "set.assets" ? "assets" : "maps",
+            );
         }}
       />
       <ImportStagingModal

@@ -7,6 +7,7 @@ describe("EditorMenu guardrail", () => {
   it("contains only the allow-listed items", () => {
     expect(EDITOR_MENU_ITEMS.map((i) => i.id).sort()).toEqual([
       "help",
+      "manage-assets",
       "map-details",
       "world-details",
     ]);
@@ -21,9 +22,18 @@ describe("EditorMenu guardrail", () => {
   });
 
   it("renders the allow-listed labels", () => {
-    render(<EditorMenu onWorldDetails={vi.fn()} onMapDetails={vi.fn()} onHelp={vi.fn()} open />);
+    render(
+      <EditorMenu
+        onWorldDetails={vi.fn()}
+        onMapDetails={vi.fn()}
+        onAssetManager={vi.fn()}
+        onHelp={vi.fn()}
+        open
+      />,
+    );
     expect(screen.getByText("Edit world details")).toBeInTheDocument();
     expect(screen.getByText("Edit map details")).toBeInTheDocument();
+    expect(screen.getByText("Manage assets")).toBeInTheDocument();
     expect(screen.getByText("Help")).toBeInTheDocument();
   });
 });
