@@ -36,7 +36,7 @@ export function makeEntity(over: Partial<Entity> = {}): Entity {
   return {
     id: "iron-tower",
     title: "Iron Tower",
-    type: "location",
+    type: "settlement", // maps to the "locations" category (see entityCategory.ts)
     visibility: "player",
     aliases: [],
     tags: [],
@@ -105,7 +105,7 @@ export function makeSearchIndex(): SearchIndexEntry[] {
     {
       id: "iron-tower",
       title: "Iron Tower",
-      type: "location",
+      type: "settlement",
       aliases: [],
       tags: [],
       summary: "A tower of black iron.",

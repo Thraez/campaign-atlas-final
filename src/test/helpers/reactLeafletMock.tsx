@@ -78,10 +78,15 @@ export const stableMap = STABLE_MAP;
 
 /** Build the mock module object passed to `vi.mock("react-leaflet", ...)`. */
 export function makeReactLeafletModule() {
+  // forwardRef so layers that attach a ref to an overlay (e.g.
+  // MapLayerEditableOverlay → ImageOverlay) don't trip React's
+  // "function components cannot be given refs" warning.
   const pass = (name: string) =>
-    function LeafletMock({ children }: { children?: React.ReactNode }) {
-      return React.createElement("div", { "data-leaflet": name }, children);
-    };
+    React.forwardRef<HTMLDivElement, { children?: React.ReactNode }>(
+      function LeafletMock({ children }, ref) {
+        return React.createElement("div", { "data-leaflet": name, ref }, children);
+      },
+    );
   return {
     MapContainer: pass("MapContainer"),
     TileLayer: pass("TileLayer"),
