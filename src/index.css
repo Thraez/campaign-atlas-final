@@ -309,6 +309,14 @@
   transition: opacity 0.1s ease;
 }
 
+/* Static variant — used inside the map's viewport-corner overlay, where
+   several credits stack in a flex column instead of pinning to one image. */
+.atlas-credit-badge--static {
+  position: static;
+  display: block;
+  max-width: 240px;
+}
+
 .atlas-prose blockquote {
   border-left: 3px solid hsl(var(--primary) / 0.6);
   padding-left: 0.75rem;

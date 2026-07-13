@@ -19,7 +19,7 @@ import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { printEntityHandout } from "@/atlas/printHandout";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 import { logger } from "@/lib/logger";
-import type { CreditsConfig, Entity, MapPlacement } from "@/atlas/content/schema";
+import type { AssetCredit, CreditsConfig, Entity, MapPlacement } from "@/atlas/content/schema";
 import { CreditBadge } from "./CreditBadge";
 import { mountSecretBlock } from "@/atlas/secrets/secretBlockView";
 
@@ -38,6 +38,27 @@ export interface EntityPanelProps {
   onPeekLeave?: () => void;
   /** Site-wide credits config from world.credits; defaults both on when absent. */
   credits?: CreditsConfig;
+  /** World-level per-asset credit registry, keyed by image src. Takes
+   *  precedence over `entity.credit` for any src with a registry entry. */
+  assetCredits?: Record<string, AssetCredit>;
+}
+
+/**
+ * Resolve which credit text (if any) to show for one image src. A registry
+ * entry (world.assetCredits[src]) takes precedence when present — shown only
+ * when `enabled` and non-empty. With no registry entry, fall back to the
+ * entity's coarse `credit` field. Returns null when nothing should show.
+ */
+function resolveImageCredit(
+  src: string,
+  assetCredits: Record<string, AssetCredit> | undefined,
+  entityCredit: string | undefined,
+): string | null {
+  const entry = assetCredits?.[src];
+  if (entry) {
+    return entry.enabled && entry.credit ? entry.credit : null;
+  }
+  return entityCredit ? entityCredit : null;
 }
 
 function CopyLinkButton() {
@@ -262,10 +283,11 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
     onPeek,
     onPeekLeave,
     credits,
+    assetCredits,
   },
   ref,
 ) {
-  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ src: string; url: string } | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   // Merge the forwarded ref (used by callers) and the local bodyRef (used by the secret effect).
@@ -305,6 +327,9 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
   }
 
   const imageUrl = (src: string) => normalizeAtlasAssetUrl(src);
+  const lightboxCredit = lightbox
+    ? resolveImageCredit(lightbox.src, assetCredits, entity.credit)
+    : null;
 
   return (
     <div className="flex flex-col h-full">
@@ -366,18 +391,19 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
 
           {entity.images.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
-              {entity.images.map((src, i) => (
-                <div key={`${src}-${i}`} className="relative flex-shrink-0">
-                  <ImageThumb
-                    src={imageUrl(src)}
-                    alt={`${entity.title} image ${i + 1}`}
-                    onClick={() => setLightboxSrc(imageUrl(src))}
-                  />
-                  {credits?.badges !== false && entity.credit && (
-                    <CreditBadge credit={entity.credit} />
-                  )}
-                </div>
-              ))}
+              {entity.images.map((src, i) => {
+                const imgCredit = resolveImageCredit(src, assetCredits, entity.credit);
+                return (
+                  <div key={`${src}-${i}`} className="relative flex-shrink-0">
+                    <ImageThumb
+                      src={imageUrl(src)}
+                      alt={`${entity.title} image ${i + 1}`}
+                      onClick={() => setLightbox({ src, url: imageUrl(src) })}
+                    />
+                    {credits?.badges !== false && imgCredit && <CreditBadge credit={imgCredit} />}
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -481,16 +507,21 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
       </ScrollArea>
 
       {/* Lightbox */}
-      <Dialog open={!!lightboxSrc} onOpenChange={(open) => !open && setLightboxSrc(null)}>
+      <Dialog open={!!lightbox} onOpenChange={(open) => !open && setLightbox(null)}>
         <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 bg-black/90 border-none overflow-hidden">
           <DialogTitle className="sr-only">{entity.title} image</DialogTitle>
-          {lightboxSrc && (
-            <img
-              src={lightboxSrc}
-              alt={`${entity.title}`}
-              className="max-w-full max-h-[85vh] object-contain mx-auto"
-              onClick={() => setLightboxSrc(null)}
-            />
+          {lightbox && (
+            <div className="relative">
+              <img
+                src={lightbox.url}
+                alt={`${entity.title}`}
+                className="max-w-full max-h-[85vh] object-contain mx-auto"
+                onClick={() => setLightbox(null)}
+              />
+              {credits?.badges !== false && lightboxCredit && (
+                <CreditBadge credit={lightboxCredit} />
+              )}
+            </div>
           )}
         </DialogContent>
       </Dialog>

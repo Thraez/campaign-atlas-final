@@ -100,3 +100,83 @@ describe("AtlasCredits page", () => {
     expect(screen.queryByText("DM Secret")).not.toBeInTheDocument();
   });
 });
+
+// ── Phase 3 — widened source: world.assetCredits registry ────────────────────
+
+describe("AtlasCredits page — assetCredits registry aggregation", () => {
+  it("lists an enabled, non-empty registry credit for an asset with no entity.credit", async () => {
+    renderCredits(
+      makeProject(
+        [makeEntity({ id: "npc", title: "NPC With Portrait", images: ["portrait.png"] })],
+        {
+          id: "w1",
+          name: "World",
+          assetCredits: { "portrait.png": { credit: "Portrait by Registry Artist", enabled: true } },
+        },
+      ),
+    );
+    await screen.findByText("NPC With Portrait");
+    expect(screen.getByText("Portrait by Registry Artist")).toBeInTheDocument();
+  });
+
+  it("does not list a disabled registry entry", async () => {
+    renderCredits(
+      makeProject(
+        [makeEntity({ id: "npc", title: "NPC With Portrait", images: ["portrait.png"] })],
+        {
+          id: "w1",
+          name: "World",
+          assetCredits: { "portrait.png": { credit: "Should Not Ship", enabled: false } },
+        },
+      ),
+    );
+    await screen.findByText(/No image credits/i);
+    expect(screen.queryByText("Should Not Ship")).not.toBeInTheDocument();
+  });
+
+  it("does not list an enabled registry entry with empty credit text", async () => {
+    renderCredits(
+      makeProject(
+        [makeEntity({ id: "npc", title: "NPC With Portrait", images: ["portrait.png"] })],
+        { id: "w1", name: "World", assetCredits: { "portrait.png": { credit: "", enabled: true } } },
+      ),
+    );
+    await screen.findByText(/No image credits/i);
+  });
+
+  it("does not duplicate a row when the registry repeats an entity's own credit text for the same image", async () => {
+    renderCredits(
+      makeProject(
+        [
+          makeEntity({
+            id: "npc",
+            title: "NPC With Portrait",
+            images: ["portrait.png"],
+            credit: "Art by Same Artist",
+          }),
+        ],
+        {
+          id: "w1",
+          name: "World",
+          assetCredits: { "portrait.png": { credit: "Art by Same Artist", enabled: true } },
+        },
+      ),
+    );
+    await screen.findByText("NPC With Portrait");
+    expect(screen.getAllByText("Art by Same Artist")).toHaveLength(1);
+  });
+
+  it("shows a registry credit for a map-layer asset (no owning entity) using the asset filename as the label", async () => {
+    renderCredits(
+      makeProject([makeEntity()], {
+        id: "w1",
+        name: "World",
+        assetCredits: {
+          "atlas/assets/maps/overview.png": { credit: "Cartography by Map Artist", enabled: true },
+        },
+      }),
+    );
+    await screen.findByText("overview.png");
+    expect(screen.getByText("Cartography by Map Artist")).toBeInTheDocument();
+  });
+});

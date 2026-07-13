@@ -294,6 +294,209 @@ describe("EntityPanel — credit badge", () => {
   });
 });
 
+// ── Phase 3 — assetCredits registry gating ───────────────────────────────────
+
+describe("EntityPanel — asset credit registry", () => {
+  it("registry entry takes precedence over entity.credit when enabled", () => {
+    const entity = {
+      ...entityWithImage,
+      images: ["thumb.png"],
+      credit: "Fallback credit",
+    } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={new Map([[entity.id, entity]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+          assetCredits={{ "thumb.png": { credit: "Registry credit", enabled: true } }}
+        />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByRole("note", { name: /Image credit: Registry credit/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Fallback credit")).not.toBeInTheDocument();
+  });
+
+  it("hides the badge when the registry entry is disabled, even with text present (no fallback)", () => {
+    const entity = {
+      ...entityWithImage,
+      images: ["thumb.png"],
+      credit: "Fallback credit",
+    } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={new Map([[entity.id, entity]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+          assetCredits={{ "thumb.png": { credit: "Registry credit", enabled: false } }}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole("note", { name: /Image credit/i })).not.toBeInTheDocument();
+  });
+
+  it("hides the badge when the registry entry is enabled but has empty credit text", () => {
+    const entity = {
+      ...entityWithImage,
+      images: ["thumb.png"],
+      credit: "Fallback credit",
+    } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={new Map([[entity.id, entity]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+          assetCredits={{ "thumb.png": { credit: "", enabled: true } }}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole("note", { name: /Image credit/i })).not.toBeInTheDocument();
+  });
+
+  it("falls back to entity.credit for a src with no registry entry", () => {
+    const entity = {
+      ...entityWithImage,
+      images: ["thumb.png", "other.png"],
+      credit: "Fallback credit",
+    } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={new Map([[entity.id, entity]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+          assetCredits={{ "thumb.png": { credit: "Registry credit", enabled: true } }}
+        />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByRole("note", { name: /Image credit: Registry credit/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("note", { name: /Image credit: Fallback credit/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("master switch (credits.badges === false) suppresses an enabled registry credit too", () => {
+    const entity = { ...entityWithImage, images: ["thumb.png"] } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={new Map([[entity.id, entity]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+          credits={{ badges: false }}
+          assetCredits={{ "thumb.png": { credit: "Registry credit", enabled: true } }}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole("note", { name: /Image credit/i })).not.toBeInTheDocument();
+  });
+});
+
+// ── Phase 3 — lightbox credit badge ───────────────────────────────────────────
+
+describe("EntityPanel — lightbox credit badge", () => {
+  it("shows the resolved entity.credit badge on the lightbox image when opened", async () => {
+    const entity = {
+      ...entityWithImage,
+      images: ["thumb.png"],
+      credit: "Art by Jane Doe",
+    } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={new Map([[entity.id, entity]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      // The thumbnail badge is still in the DOM but the modal marks the rest
+      // of the page aria-hidden while open, so only the lightbox badge is
+      // reachable by role here — that's correct modal a11y behavior.
+      expect(
+        screen.getByRole("note", { name: /Image credit: Art by Jane Doe/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows the registry credit (not the entity fallback) in the lightbox when a registry entry resolves", async () => {
+    const entity = {
+      ...entityWithImage,
+      images: ["thumb.png"],
+      credit: "Fallback credit",
+    } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={new Map([[entity.id, entity]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+          assetCredits={{ "thumb.png": { credit: "Registry credit", enabled: true } }}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      expect(
+        screen.getAllByRole("note", { name: /Image credit: Registry credit/i }).length,
+      ).toBeGreaterThan(0);
+    });
+    expect(
+      screen.queryByRole("note", { name: /Image credit: Fallback credit/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("no badge in the lightbox when nothing resolves", async () => {
+    const entity = { ...entityWithImage, images: ["thumb.png"], credit: undefined } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={new Map([[entity.id, entity]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("note", { name: /Image credit/i })).not.toBeInTheDocument();
+  });
+});
+
 // ── N47 — hover-peek prop bindings ───────────────────────────────────────────
 
 const entityWithBacklink: Entity = {

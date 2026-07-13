@@ -52,6 +52,7 @@ import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 import { SearchPalette } from "@/atlas/search/SearchPalette";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
+import { MapCreditOverlay } from "@/atlas/map/MapCreditOverlay";
 import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -285,6 +286,7 @@ export default function AtlasViewer() {
   }, [data]);
 
   const worldCredits = data?.project.worlds[0]?.credits;
+  const worldAssetCredits = data?.project.worlds[0]?.assetCredits;
   const showCredits =
     worldCredits?.page !== false && (data?.project.entities.some((e) => e.credit) ?? false);
 
@@ -684,6 +686,12 @@ export default function AtlasViewer() {
               <AtlasMinimap map={activeMap} layers={activeMap.layers} />
             </MapContainer>
 
+            <MapCreditOverlay
+              map={activeMap}
+              assetCredits={worldAssetCredits}
+              credits={worldCredits}
+            />
+
             <SoundControl />
 
             {/* Wander button + discovery meter — bottom-left map overlay */}
@@ -730,6 +738,7 @@ export default function AtlasViewer() {
                 onPeek={(id, rect) => peekCtl.onTriggerEnter(id, rect)}
                 onPeekLeave={peekCtl.onTriggerLeave}
                 credits={worldCredits}
+                assetCredits={worldAssetCredits}
               />
             </aside>
           ) : (
@@ -769,6 +778,7 @@ export default function AtlasViewer() {
                 onPeek={(id, rect) => peekCtl.onTriggerEnter(id, rect)}
                 onPeekLeave={peekCtl.onTriggerLeave}
                 credits={worldCredits}
+                assetCredits={worldAssetCredits}
               />
             </SheetContent>
           </Sheet>
