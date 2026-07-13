@@ -92,6 +92,7 @@ import { EntitySurface } from "@/atlas/entity/EntitySurface";
 import { resolvePinClickIntent } from "@/atlas/editor/pinClickIntent";
 import { resolveEntityCloseIntent } from "@/atlas/editor/entityCloseIntent";
 import { mapClickToAtlasCoord } from "@/atlas/editor/mapClickCoord";
+import { usePinsTabFilters } from "@/atlas/editor/usePinsTabFilters";
 import {
   type Overrides,
   type OverrideValue,
@@ -217,7 +218,6 @@ function AtlasPlacementEditorInner() {
   const [overrides, setOverrides] = useState<Overrides>(loadOverrides);
   const [activeMapId, setActiveMapId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null); // entity awaiting click-to-place
-  const [filter, setFilter] = useState("");
   const [flyTo, setFlyTo] = useState<{ lat: number; lng: number } | null>(null);
   const [showLayers, setShowLayers] = useState(true);
   const [showRegions, setShowRegions] = useState(true);
@@ -571,11 +571,6 @@ function AtlasPlacementEditorInner() {
   // ☰ menu open/close state
   const [menuOpen, setMenuOpen] = useState(false);
 
-  /** Per-tab filter state (placed/unplaced/visibility/type/tag). */
-  const [stateFilter, setStateFilter] = useState<"all" | "placed" | "unplaced">("all");
-  const [visFilter, setVisFilter] = useState<"all" | "player" | "rumor" | "dm" | "hidden">("all");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [tagFilter, setTagFilter] = useState<string>("all");
   /** When true, finishing a placement automatically queues the next unplaced entity. */
   const [chainPlaceMode, setChainPlaceMode] = useState(false);
   /** Which category panel is in "create new entity" mode (null = browsing). */
@@ -622,39 +617,23 @@ function AtlasPlacementEditorInner() {
     return project.entities.filter((e) => !e.world || e.world === worldId);
   }, [project, activeMap]);
 
-  const allTypes = useMemo(
-    () => Array.from(new Set(entitiesForWorld.map((e) => e.type))).sort(),
-    [entitiesForWorld],
-  );
-  const allTags = useMemo(
-    () => Array.from(new Set(entitiesForWorld.flatMap((e) => e.tags ?? []))).sort(),
-    [entitiesForWorld],
-  );
-
-  const filtered = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    return entitiesForWorld.filter((e) => {
-      if (
-        q &&
-        !(
-          e.title.toLowerCase().includes(q) ||
-          e.type.toLowerCase().includes(q) ||
-          e.aliases.some((a) => a.toLowerCase().includes(q))
-        )
-      )
-        return false;
-      if (visFilter !== "all" && e.visibility !== visFilter) return false;
-      if (typeFilter !== "all" && e.type !== typeFilter) return false;
-      if (tagFilter !== "all" && !(e.tags ?? []).includes(tagFilter)) return false;
-      const hasCoord = !!effectiveCoord(e.id);
-      if (stateFilter === "placed" && !hasCoord) return false;
-      if (stateFilter === "unplaced" && hasCoord) return false;
-      return true;
-    });
-  }, [entitiesForWorld, filter, visFilter, typeFilter, tagFilter, stateFilter, effectiveCoord]);
-
-  const placed = filtered.filter((e) => effectiveCoord(e.id));
-  const unplaced = filtered.filter((e) => !effectiveCoord(e.id));
+  const {
+    filter,
+    setFilter,
+    stateFilter,
+    setStateFilter,
+    visFilter,
+    setVisFilter,
+    typeFilter,
+    setTypeFilter,
+    tagFilter,
+    setTagFilter,
+    allTypes,
+    allTags,
+    filtered,
+    placed,
+    unplaced,
+  } = usePinsTabFilters({ entities: entitiesForWorld, effectiveCoord });
 
   /** In player lens: filter placed entities through projectMapForPlayer. */
   const placedForLens = useMemo(() => {
