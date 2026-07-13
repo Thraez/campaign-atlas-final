@@ -128,6 +128,7 @@ If `npm run atlas:publish` fails, fix the canon. **Never hand-edit `public/atlas
 
 - [Visibility and player safety](VISIBILITY_AND_PLAYER_SAFETY.md) — how DM content is hidden from the public build.
 - [Workflows](WORKFLOWS.md) — session prep cycle, save plugin, save-conflict handling.
+- [Ambient sound](WORKFLOWS.md#ambient-sound) — add looping atmosphere that plays as players explore the map.
 - [Import / export](IMPORT_EXPORT.md) — bringing in an existing Obsidian vault, patches, backups.
 - [Known limitations](KNOWN_LIMITATIONS.md) — what's intentionally not supported.
 - [Non-goals](NON_GOALS.md) — what we have decided not to build.

@@ -52,6 +52,16 @@ The atlas reads Obsidian-flavored markdown. Most Obsidian features work; a few d
 | `atlas.json` loaded whole | not yet | For 5+ maps with rich entity content, per-map data chunking is the planned scale-out. Today the whole atlas loads on first visit. |
 | Pin clustering at low zoom | not yet | At 200+ pins on the overview map, the cluster gets unreadable. Add Leaflet markercluster or priority-based culling. The schema's `pin.priority` is already in place. |
 
+## Soundscapes
+
+Ambient audio is authored in the editor's **Sound** tab and plays in the player viewer as visitors pan into a sound area. See [WORKFLOWS.md](WORKFLOWS.md#ambient-sound) for the authoring flow.
+
+| Limitation | Status | Notes |
+|---|---|---|
+| Audio needs a user gesture before it can start | by design (browser policy) | Browsers block autoplay until the visitor interacts with the page. The viewer surfaces an "enable sound" control; ambience begins on that first gesture, not on page load (`AudioEngine.unlock()` must run from a user-gesture handler). |
+| Starter loops ship uncompressed | not yet — planned | The three seed loops (`wind-hollow`, `water-trickle`, `cavern-drone`) ship as uncompressed WAV, which makes the audio payload large. Compressing to Ogg/Opus with an AAC/M4A fallback twin is planned. |
+| Codec support varies by browser | partial | The schema supports a primary bed (`src`) plus a `srcFallback` twin so a browser that can't decode one codec uses the other. Safari, in particular, does not decode Ogg/Vorbis — beds that use Ogg need an AAC/M4A fallback authored. |
+
 ## Editor limitations
 
 | Limitation | Status |

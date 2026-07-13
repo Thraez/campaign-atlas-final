@@ -30,7 +30,7 @@ Typical session-prep loop, 5–15 minutes:
 1. Open Obsidian, type up the night's plans into `content/<world>/`.
 2. `npm run dev` (if not already running).
 3. Visit `/atlas/edit` to drop new pins, draw a region for the goblin warband, route the chase scene.
-4. The editor produces YAML patches. The dev-mode `/__atlas/save` endpoint writes them straight to disk.
+4. The editor writes your pins, regions, and edits; the dev-mode `/__atlas/save` endpoint saves them straight to disk.
 5. Switch to `/atlas` (still in dev). Click the new pins. Do they look right?
 6. `npm run atlas:publish` to confirm the strict build is green.
 7. `git add . && git commit -m "session prep: red tower job" && git push`.
@@ -38,7 +38,7 @@ Typical session-prep loop, 5–15 minutes:
 
 ## The Creator Cockpit (`/atlas/edit`)
 
-Seven tabs. Each is a focused tool.
+Each tab is a focused tool.
 
 | Tab | What it does |
 |---|---|
@@ -47,19 +47,18 @@ Seven tabs. Each is a focused tool.
 | **Regions** | Draw polygon regions, color them, set per-region visibility. |
 | **Routes** | Draw waypoint-based routes (foot/horse/ship/fly), with travel-time speed. |
 | **Fog** | Paint reveals + draw fog (conceals) over a map; set a soft-edge width. When fog is enabled on a map, the player build redacts that map's image layers behind a feathered alpha mask, strips the fog geometry from the player atlas, and excludes any pins/routes/regions that fall in fog. The player viewer paints the map's ocean color behind the redacted image. |
+| **Sound** | Draw sound areas over a map and attach a looping ambience to each; set volume and visibility. See [Ambient sound](#ambient-sound) below. |
 | **Entities** | Edit entity frontmatter, profile, relationships. One-click `:::dm` insert for field-level visibility. |
 | **Import** | Drop in a folder of markdown, classify into ignored/wiki-only/placeable/published, get patches. |
 | **Publish Check** | Pre-flight dashboard: counts, warnings, last-publish diff, strict-build summary. |
 
-### Save plugin (the patch-paste alternative)
+### Save plugin (writes to disk)
 
-Without the save plugin, the editor produces YAML you must paste into the matching `.md` file's frontmatter. With it, the editor writes to disk directly:
+Save writes your editor changes straight back to the vault on disk:
 
 - The save endpoint is `/__atlas/save` and is **on by default in `npm run dev`** via `scripts/vite-plugin-atlas-save.ts`.
 - It only writes inside `content/` and `public/atlas/assets/`. Anything outside the configured `contentRoot` is rejected.
 - It does **not** ship to production. The plugin is excluded from `npm run build`.
-
-If you'd rather use the patch-paste workflow, the editor exports `.txt` patch files you can paste manually.
 
 ### Save-conflict handling
 
@@ -74,8 +73,6 @@ For the safest workflow:
 - When the external-rebuild banner appears, reload before continuing.
 - Use git as the canonical undo.
 
-The patch-paste workflow has no merge logic at all — pasting over a changed file fully overwrites Obsidian edits. Use the save plugin for active editing, the patch-paste flow only for one-off batch operations.
-
 ## Undo in the editor
 
 There is no in-editor undo/redo stack yet. The canonical undo is git:
@@ -85,6 +82,12 @@ There is no in-editor undo/redo stack yet. The canonical undo is git:
 3. Click **Reload canon** in the editor (the orange banner) to pick up the reverted file.
 
 Unsaved drafts (pins you've dragged but not clicked Save on) live in `localStorage` under `atlas-placement-overrides-v3`. Closing the tab keeps them; clearing browser data discards them. The yellow "unsaved changes" banner at the top of the editor surfaces this.
+
+## Ambient sound
+
+The **Sound** tab (rail shortcut `S`) adds looping atmosphere to a map. Draw a sound area over part of the map — or attach one to an existing region — then pick a loop from the audio picker (it lists the files in `public/atlas/assets/audio/`), and set its volume and visibility. Three seamless starter loops ship: `wind-hollow`, `water-trickle`, and `cavern-drone`. Give an area a **player-visible** visibility and players hear it when they pan into that part of the map; keep it **DM-only** and it never reaches the player build. Save writes the sound areas into `world.yaml` alongside every other placement.
+
+In the player viewer, a mute/volume control persists the visitor's preference. Because browsers block audio autoplay, ambience does not start on page load — it begins on the visitor's first interaction with the page (the viewer surfaces an "enable sound" control for that first gesture).
 
 ## Import wizard (`/atlas/edit` → Import tab)
 
