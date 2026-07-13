@@ -103,6 +103,7 @@ import {
 } from "@/atlas/editor/placementOverrides";
 import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
 import { validateProject } from "@/atlas/yaml/validateProject";
+import { buildValidationScopes } from "@/atlas/yaml/validationScopes";
 import { MapImportWizard } from "@/atlas/import/MapImportWizard";
 import { useRegionDraft } from "@/atlas/regions/useRegionDraft";
 import { RegionLayer } from "@/atlas/regions/RegionLayer";
@@ -1164,33 +1165,9 @@ function AtlasPlacementEditorInner() {
         : null,
     [project, activeMap, draftPlacementsForValidation, layerEditor.localLayers],
   );
-  const issuesByScope = (
-    predicate: (i: import("@/atlas/yaml/validateProject").Issue) => boolean,
-  ) => {
-    const list = validation?.issues.filter(predicate) ?? [];
-    return {
-      blocking: list.filter((i) => i.severity === "blocking").length,
-      warning: list.filter((i) => i.severity === "warning").length,
-    };
-  };
-  const pinIssues = issuesByScope(
-    (i) =>
-      i.code.includes("placement") || i.code === "pin-out-of-bounds" || i.code === "invalid-coord",
+  const { pinIssues, mapIssues, regionIssues, routeIssues } = buildValidationScopes(
+    validation?.issues ?? [],
   );
-  const mapIssues = issuesByScope(
-    (i) =>
-      i.code === "duplicate-layer-id" ||
-      i.code === "empty-map" ||
-      i.code === "missing-asset" ||
-      i.code === "external-asset" ||
-      i.code === "invalid-layer-size" ||
-      i.code === "missing-layer-src" ||
-      i.code === "route-no-scale",
-  );
-  const regionIssues = issuesByScope(
-    (i) => i.code.includes("region") || i.code === "spoiler-leak-region",
-  );
-  const routeIssues = issuesByScope((i) => i.code.includes("route"));
 
   const paletteIndex = useMemo(
     () =>
