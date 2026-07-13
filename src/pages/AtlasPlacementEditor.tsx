@@ -910,6 +910,7 @@ function AtlasPlacementEditorInner() {
       schemaVersion: project.schemaVersion,
       existing: worldYamlBaseline.raw,
       credits: effectiveWorld?.credits,
+      assetCredits: effectiveWorld?.assetCredits,
     });
   }, [
     project,

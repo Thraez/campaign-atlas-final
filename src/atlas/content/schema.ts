@@ -49,12 +49,25 @@ export interface CreditsConfig {
   page?: boolean;   // default true — publish the /atlas/credits aggregate page
 }
 
+/** One asset's credit entry in the world-level registry. `enabled` is the
+ *  per-asset on/off toggle, kept separate from the text so a DM can hide a
+ *  badge without losing the attribution. A disabled or empty credit is never
+ *  emitted into the player build. */
+export interface AssetCredit {
+  credit: string;
+  enabled: boolean;
+}
+
 export interface World {
   id: string;
   name: string;
   defaultMapId?: string;
   importFolders?: ImportFolderConfig; // present in DM builds only; absent in player builds
   credits?: CreditsConfig;            // both default true when absent
+  /** Per-asset credit registry keyed by asset src path (entity images AND map
+   *  layer images). Only ENABLED, non-empty entries are emitted to the player
+   *  build. Authored via the editor's Asset Manager. */
+  assetCredits?: Record<string, AssetCredit>;
 }
 
 export interface MapDocument {

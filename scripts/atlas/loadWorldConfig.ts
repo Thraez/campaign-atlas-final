@@ -9,6 +9,7 @@ import path from "node:path";
 import yaml from "js-yaml";
 import { resolveAndMigrate, SchemaVersionError } from "./schemaVersion";
 import type {
+  AssetCredit,
   CreditsConfig,
   EntityVisibility,
   FogOverlay,
@@ -37,6 +38,40 @@ export function resolveCredits(raw: unknown): CreditsConfig {
     badges: r.badges === false ? false : true,
     page: r.page === false ? false : true,
   };
+}
+
+/** Pure helper: coerce a raw `assetCredits` block into a sanitized registry.
+ *  `enabled` defaults to false unless explicitly true (conservative: an
+ *  unrecognized entry never ships a badge). Returns undefined when absent. */
+export function resolveAssetCredits(raw: unknown): Record<string, AssetCredit> | undefined {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const out: Record<string, AssetCredit> = {};
+  for (const [src, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (v === null || typeof v !== "object" || Array.isArray(v)) continue;
+    const r = v as Record<string, unknown>;
+    out[src] = {
+      credit: typeof r.credit === "string" ? r.credit : "",
+      enabled: r.enabled === true,
+    };
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/** Project the per-asset registry for a build target. Player builds keep ONLY
+ *  enabled, non-empty entries — a DM-typed-but-disabled (or empty) attribution
+ *  must never reach the player atlas.json. DM builds keep everything. Returns
+ *  undefined when nothing remains. */
+export function projectAssetCredits(
+  reg: Record<string, AssetCredit> | undefined,
+  player: boolean,
+): Record<string, AssetCredit> | undefined {
+  if (!reg) return undefined;
+  if (!player) return reg;
+  const out: Record<string, AssetCredit> = {};
+  for (const [src, c] of Object.entries(reg)) {
+    if (c.enabled && c.credit.trim() !== "") out[src] = c;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 const VALID_MODES: RouteMode[] = ["foot", "horse", "ship", "cart", "fly", "custom"];
@@ -99,6 +134,7 @@ interface WorldYaml {
     defaultFolder?: unknown;
   };
   credits?: unknown;
+  assetCredits?: unknown;
 }
 
 export interface WorldConfig {
@@ -111,6 +147,7 @@ export interface WorldConfig {
   warnings: string[];
   importConfig: ImportFolderConfig; // always present — defaults applied here
   credits: CreditsConfig; // always present — both default true
+  assetCredits?: Record<string, AssetCredit>; // per-asset registry; undefined when absent
 }
 
 export class WorldConfigError extends Error {}
@@ -373,6 +410,7 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
 
   const importConfig = sanitizeImportConfig(data.import, warnings);
   const credits = resolveCredits(data.credits);
+  const assetCredits = resolveAssetCredits(data.assetCredits);
 
   return {
     maps,
@@ -384,6 +422,7 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
     warnings,
     importConfig,
     credits,
+    assetCredits,
   };
 }
 

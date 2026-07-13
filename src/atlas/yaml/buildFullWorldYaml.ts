@@ -17,6 +17,7 @@
  * boilerplate header when there's no existing file).
  */
 import type {
+  AssetCredit,
   CreditsConfig,
   FogOverlay,
   MapDocument,
@@ -47,6 +48,9 @@ export interface BuildFullWorldYamlOpts {
   existing: string | null;
   /** Optional site-wide credits config. When present, serialized as a top-level `credits:` block. */
   credits?: CreditsConfig;
+  /** Optional per-asset credit registry. Serialized in full (disabled entries
+   *  included) — the player-build projection strips disabled/empty ones. */
+  assetCredits?: Record<string, AssetCredit>;
 }
 
 export function buildFullWorldYaml(opts: BuildFullWorldYamlOpts): string {
@@ -55,6 +59,9 @@ export function buildFullWorldYaml(opts: BuildFullWorldYamlOpts): string {
   root.maps = opts.maps.map(mapToYamlObject);
   if (opts.calendar) root.calendar = calendarToYamlObject(opts.calendar);
   if (opts.credits) root.credits = creditsToYamlObject(opts.credits);
+  if (opts.assetCredits && Object.keys(opts.assetCredits).length > 0) {
+    root.assetCredits = assetCreditsToYamlObject(opts.assetCredits);
+  }
   const body = dumpYaml(root);
   return serializeWorldYaml(body, opts.existing);
 }
@@ -159,5 +166,18 @@ function creditsToYamlObject(c: CreditsConfig): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (c.badges !== undefined) out.badges = c.badges;
   if (c.page !== undefined) out.page = c.page;
+  return out;
+}
+
+/** Serialize the per-asset registry in full (including disabled entries — the
+ *  DM's text is preserved on disk). Player-safety stripping happens in the
+ *  build projection, not here. */
+function assetCreditsToYamlObject(
+  reg: Record<string, AssetCredit>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [src, c] of Object.entries(reg)) {
+    out[src] = { credit: c.credit, enabled: c.enabled };
+  }
   return out;
 }

@@ -21,7 +21,7 @@ import { parseFrontmatter, type ParsedFile } from "./atlas/parseFrontmatter";
 import { stripDmBlocks, stripDmFromShippingString } from "./atlas/stripDmBlocks";
 import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
 import { slugify } from "./atlas/slugify";
-import { loadWorldConfig } from "./atlas/loadWorldConfig";
+import { loadWorldConfig, projectAssetCredits } from "./atlas/loadWorldConfig";
 import { CURRENT_ATLAS_SCHEMA_VERSION } from "./atlas/schemaVersion";
 import { sanitizeAtlasHtml } from "../src/atlas/sanitizeHtml";
 import {
@@ -45,6 +45,8 @@ import {
   compactProfile,
 } from "../src/atlas/profiles/profileBuild";
 import type {
+  AssetCredit,
+  AssetRef,
   AtlasProject,
   CreditsConfig,
   Entity,
@@ -55,6 +57,7 @@ import type {
   Route,
   Point,
 } from "../src/atlas/content/schema";
+import { collectAssets } from "../src/atlas/assets/collectAssets";
 
 interface Config {
   contentRoot: string;
@@ -938,6 +941,19 @@ async function runBuildCore(flags: BuildFlags) {
     for (const w of secWarn) warnings.push(w);
   }
 
+  // Per-asset credit registry. In player builds, strip disabled/empty entries
+  // so a DM-typed-but-disabled attribution never ships. DM builds keep all.
+  const assetCredits: Record<string, AssetCredit> | undefined = projectAssetCredits(
+    worldCfg?.assetCredits,
+    flags.player,
+  );
+
+  // Live asset inventory: every entity image + map layer src, deduped.
+  const assetList: AssetRef[] = collectAssets({
+    entities: pending.map((p) => p.entity),
+    maps,
+  }).map((a, i) => ({ id: `asset-${i}`, src: a.src, type: "image" as const }));
+
   const project: AtlasProject = {
     version: new Date().toISOString().replace(/[:.]/g, "-"),
     schemaVersion: worldCfg?.schemaVersion ?? CURRENT_ATLAS_SCHEMA_VERSION,
@@ -951,12 +967,13 @@ async function runBuildCore(flags: BuildFlags) {
           ? {}
           : { importFolders: worldCfg?.importConfig ?? { folders: {}, defaultFolder: "imports" } }),
         credits: worldCfg?.credits ?? ({ badges: true, page: true } satisfies CreditsConfig),
+        ...(assetCredits ? { assetCredits } : {}),
       },
     ],
     maps,
     entities: pending.map((p) => p.entity),
     placements,
-    assets: [],
+    assets: assetList,
     calendar: worldCfg?.calendar,
     buildReport: {
       scanned: files.length + scanInfo.excludedFiles,
