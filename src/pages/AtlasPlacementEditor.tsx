@@ -28,10 +28,12 @@ import { isSecretVisibility } from "@/atlas/content/visibility";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type {
   AtlasProject,
+  CreditsConfig,
   Entity,
   ImportFolderConfig,
   MapDocument,
   MapLayer,
+  World,
 } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -342,6 +344,11 @@ function AtlasPlacementEditorInner() {
   // Optional in-session, per-map settings override (size + ocean + wrapX + grid).
   const [mapOverride, setMapOverride] = useState<Record<string, Partial<MapDocument>>>({});
 
+  // Optional in-session, per-world settings override (credits, assetCredits).
+  // Mirrors mapOverride — the editor had no world-level save path before, which
+  // is why the credits toggle (L1 Increment 2) was stuck. Keyed by world id.
+  const [worldOverride, setWorldOverride] = useState<Record<string, Partial<World>>>({});
+
   const baseMap: MapDocument | undefined = useMemo(
     () => project?.maps.find((m) => m.id === activeMapId),
     [project, activeMapId],
@@ -387,6 +394,20 @@ function AtlasPlacementEditorInner() {
   // buildFullWorldYaml can preserve the leading comment block.
   const activeWorldId = activeMap?.worldId ?? null;
   const worldYamlBaseline = useWorldYamlBaseline(activeWorldId);
+
+  // Active world settings + the session override folded on top. buildWorldYaml
+  // serializes effectiveWorld.credits (+ assetCredits) so world-level edits
+  // persist through Save. Falls back to worlds[0] when the active map's world
+  // isn't resolvable.
+  const baseWorld: World | undefined = useMemo(
+    () => project?.worlds.find((w) => w.id === activeWorldId) ?? project?.worlds?.[0],
+    [project, activeWorldId],
+  );
+  const effectiveWorld: World | undefined = useMemo(() => {
+    if (!baseWorld) return undefined;
+    const o = worldOverride[baseWorld.id];
+    return o ? { ...baseWorld, ...o } : baseWorld;
+  }, [baseWorld, worldOverride]);
 
   // Region draft state — shared between RegionsTab (form) and the map (RegionLayer).
   const entityIdSet = useMemo(() => new Set((project?.entities ?? []).map((e) => e.id)), [project]);
@@ -446,6 +467,10 @@ function AtlasPlacementEditorInner() {
   useEffect(() => {
     mapOverrideRef.current = mapOverride;
   }, [mapOverride]);
+  const worldOverrideRef = useRef(worldOverride);
+  useEffect(() => {
+    worldOverrideRef.current = worldOverride;
+  }, [worldOverride]);
 
   /** Undo-recording setter for pin overrides. Skip-recording mode is just
    *  raw setOverrides; use that for post-save cleanup. */
@@ -496,6 +521,43 @@ function AtlasPlacementEditorInner() {
     },
     [undoStack],
   );
+
+  /** Undo-recording setter for world-level settings (credits, assetCredits). */
+  const setWorldOverrideUndoable = useCallback(
+    (
+      compute: (prev: Record<string, Partial<World>>) => Record<string, Partial<World>>,
+      label: string,
+    ) => {
+      const before = worldOverrideRef.current;
+      const after = compute(before);
+      if (after === before) return;
+      worldOverrideRef.current = after;
+      setWorldOverride(after);
+      undoStack.push({
+        undo: () => {
+          worldOverrideRef.current = before;
+          setWorldOverride(before);
+        },
+        redo: () => {
+          worldOverrideRef.current = after;
+          setWorldOverride(after);
+        },
+        label,
+      });
+    },
+    [undoStack],
+  );
+
+  /** Merge a partial into the active world's session override (undo-tracked).
+   *  This is the world-level equivalent of patchMap — the save path that lets
+   *  credits / assetCredits changes reach world.yaml. */
+  const patchWorld = (patch: Partial<World>) => {
+    if (!baseWorld) return;
+    setWorldOverrideUndoable(
+      (s) => ({ ...s, [baseWorld.id]: { ...(s[baseWorld.id] ?? {}), ...patch } }),
+      `world settings ${baseWorld.id}`,
+    );
+  };
 
   // Shell state: which rail panel is open (null = closed).
   const [activePanel, setActivePanel] = useState<string | null>(null);
@@ -791,8 +853,18 @@ function AtlasPlacementEditorInner() {
     Object.keys(mapOverride[baseMap.id]).length > 0
   );
   const layersDirty = layerEditor.localLayers.length > 0;
+  const worldSettingsDirty = !!(
+    baseWorld &&
+    worldOverride[baseWorld.id] &&
+    Object.keys(worldOverride[baseWorld.id]).length > 0
+  );
   const worldYamlDirty =
-    mapMetadataDirty || layersDirty || regionDraft.dirty || routeDraft.dirty || fogDraft.dirty;
+    mapMetadataDirty ||
+    layersDirty ||
+    regionDraft.dirty ||
+    routeDraft.dirty ||
+    fogDraft.dirty ||
+    worldSettingsDirty;
 
   /**
    * Compose the full world.yaml content for the active world by overlaying
@@ -837,6 +909,7 @@ function AtlasPlacementEditorInner() {
       calendar: project.calendar,
       schemaVersion: project.schemaVersion,
       existing: worldYamlBaseline.raw,
+      credits: effectiveWorld?.credits,
     });
   }, [
     project,
@@ -847,6 +920,7 @@ function AtlasPlacementEditorInner() {
     routeDraft.effective,
     fogDraft.fog,
     worldYamlBaseline.raw,
+    effectiveWorld,
   ]);
 
   /**
@@ -1077,6 +1151,7 @@ function AtlasPlacementEditorInner() {
       fogDraft.dirtyCount +
       layerEditor.localLayers.length +
       (mapMetadataDirty ? 1 : 0) +
+      (worldSettingsDirty ? 1 : 0) +
       dirtyCount +
       (entityEditDraft.isDirty() ? 1 : 0),
   });
@@ -1919,12 +1994,11 @@ function AtlasPlacementEditorInner() {
             // Menu-reachable panels (no rail icon — opened via ☰ menu or CommandPalette).
             world: (
               <WorldDetailsPanel
-                world={{ name: project.worlds?.[0]?.name ?? "" }}
-                onPatch={(p) => {
-                  // The world name is hardcoded in build-atlas.ts (not in world.yaml),
-                  // so there is no live write path here yet. Log for DM awareness.
-                  logger.warn("WorldDetailsPanel.onPatch: world name patch not yet persisted", p);
+                world={{
+                  name: baseWorld?.name ?? project.worlds?.[0]?.name ?? "",
+                  credits: effectiveWorld?.credits,
                 }}
+                onPatch={patchWorld}
               />
             ),
             characterKeys: activeWorldId ? (
@@ -1936,6 +2010,17 @@ function AtlasPlacementEditorInner() {
           };
           const railItems = buildRailItems({ panels, counts });
           const active = railItems.find((i) => i.id === activePanel);
+          // Menu-reachable panels (world/maps/assets) live in `panels` but have
+          // no rail icon, so `active` is undefined for them. Fall back to the
+          // panels record + a title map so they still render in the flyout host.
+          const menuPanelTitle: Record<string, string> = {
+            world: "World details",
+            maps: "Map details",
+            assets: "Assets",
+          };
+          const activePanelNode = active?.panel ?? (activePanel ? panels[activePanel] : null);
+          const activePanelTitle =
+            active?.label ?? (activePanel ? (menuPanelTitle[activePanel] ?? "") : "");
           return (
             <>
               <EditorRail
@@ -2098,10 +2183,10 @@ function AtlasPlacementEditorInner() {
                 )}
                 <EditorPanelHost
                   activeId={activePanel}
-                  title={active?.label ?? ""}
+                  title={activePanelTitle}
                   onDismiss={dismissPanel}
                 >
-                  {active?.panel}
+                  {activePanelNode}
                 </EditorPanelHost>
               </div>
             </>
@@ -2140,6 +2225,7 @@ function AtlasPlacementEditorInner() {
           const preSave = {
             overrides: overridesRef.current,
             mapOverride: mapOverrideRef.current,
+            worldOverride: worldOverrideRef.current,
             regionDraft: regionDraft.snapshot(),
             routeDraft: routeDraft.snapshot(),
             fogDraft: fogDraft.snapshot(),
@@ -2182,6 +2268,7 @@ function AtlasPlacementEditorInner() {
             activeWorldId && writtenPaths.has(worldYamlPath(activeWorldId))
           );
           let nextMapOverride = preSave.mapOverride;
+          let nextWorldOverride = preSave.worldOverride;
           let nextLayerByMap = preSave.layerByMap;
           const cleanRegionDraft = { edits: {}, added: [], deleted: [] };
           const cleanRouteDraft = { edits: {}, added: [], deleted: [] };
@@ -2195,6 +2282,14 @@ function AtlasPlacementEditorInner() {
             delete nextMapOverride[activeMap.id];
             mapOverrideRef.current = nextMapOverride;
             setMapOverride(nextMapOverride);
+            // World-level settings (credits, assetCredits) now live in canon —
+            // drop the session override so the editor returns to clean.
+            if (baseWorld) {
+              nextWorldOverride = { ...preSave.worldOverride };
+              delete nextWorldOverride[baseWorld.id];
+              worldOverrideRef.current = nextWorldOverride;
+              setWorldOverride(nextWorldOverride);
+            }
             void worldYamlBaseline.refresh();
           }
 
@@ -2212,6 +2307,8 @@ function AtlasPlacementEditorInner() {
               if (worldYamlWritten) {
                 mapOverrideRef.current = preSave.mapOverride;
                 setMapOverride(preSave.mapOverride);
+                worldOverrideRef.current = preSave.worldOverride;
+                setWorldOverride(preSave.worldOverride);
                 regionDraft.applySnapshot(preSave.regionDraft);
                 routeDraft.applySnapshot(preSave.routeDraft);
                 fogDraft.applySnapshot(preSave.fogDraft);
@@ -2224,6 +2321,8 @@ function AtlasPlacementEditorInner() {
               if (worldYamlWritten) {
                 mapOverrideRef.current = nextMapOverride;
                 setMapOverride(nextMapOverride);
+                worldOverrideRef.current = nextWorldOverride;
+                setWorldOverride(nextWorldOverride);
                 regionDraft.applySnapshot(cleanRegionDraft);
                 routeDraft.applySnapshot(cleanRouteDraft);
                 fogDraft.applySnapshot(null);
