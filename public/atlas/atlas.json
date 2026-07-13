@@ -1,7 +1,7 @@
 {
-  "version": "2026-07-11T17-57-36-658Z",
+  "version": "2026-07-13T21-00-25-830Z",
   "schemaVersion": 1,
-  "publishedAt": "2026-07-11T17:57:36.658Z",
+  "publishedAt": "2026-07-13T21:00:25.830Z",
   "worlds": [
     {
       "id": "astrath-deeprealm",
@@ -511,7 +511,38 @@
       "visibility": "player"
     }
   ],
-  "assets": [],
+  "assets": [
+    {
+      "id": "asset-0",
+      "src": "atlas/assets/maps/chatgpt-image-may-4-2026-09_15_31-pm-4-.png",
+      "type": "image"
+    },
+    {
+      "id": "asset-1",
+      "src": "atlas/assets/maps/chatgpt-image-may-4-2026-09_15_32-pm-5-.png",
+      "type": "image"
+    },
+    {
+      "id": "asset-2",
+      "src": "atlas/assets/maps/chatgpt-image-may-4-2026-09_15_32-pm-6-.png",
+      "type": "image"
+    },
+    {
+      "id": "asset-3",
+      "src": "atlas/assets/maps/chatgpt-image-may-4-2026-09_15_30-pm-1-.png",
+      "type": "image"
+    },
+    {
+      "id": "asset-4",
+      "src": "atlas/assets/maps/chatgpt-image-may-4-2026-09_15_30-pm-2-.png",
+      "type": "image"
+    },
+    {
+      "id": "asset-5",
+      "src": "atlas/assets/maps/chatgpt-image-may-4-2026-09_15_31-pm-3-.png",
+      "type": "image"
+    }
+  ],
   "buildReport": {
     "scanned": 7,
     "included": 6,
