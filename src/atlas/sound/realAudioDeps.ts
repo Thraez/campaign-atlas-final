@@ -6,7 +6,7 @@ export const realAudioDeps: AudioDeps = {
   canPlay: (src) => {
     if (!src.endsWith(".ogg")) return true;
     try {
-      return new Audio().canPlayType('audio/ogg; codecs="vorbis"') !== "";
+      return new Audio().canPlayType('audio/ogg; codecs="opus"') !== "";
     } catch {
       return false;
     }

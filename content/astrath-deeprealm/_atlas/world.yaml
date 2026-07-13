@@ -36,7 +36,8 @@ maps:
             - [220000, 170000]
             - [-20000, 170000]
           bed:
-            src: atlas/assets/audio/cavern-drone.wav
+            src: atlas/assets/audio/cavern-drone.ogg
+            srcFallback: atlas/assets/audio/cavern-drone.m4a
             gain: 0.5
         - id: howling-reaches
           name: Howling reaches
@@ -47,7 +48,8 @@ maps:
             - [201000, 45000]
             - [155000, 45000]
           bed:
-            src: atlas/assets/audio/wind-hollow.wav
+            src: atlas/assets/audio/wind-hollow.ogg
+            srcFallback: atlas/assets/audio/wind-hollow.m4a
             gain: 0.6
         - id: springs
           name: Springs
@@ -58,7 +60,8 @@ maps:
             - [36000, 104000]
             - [8000, 104000]
           bed:
-            src: atlas/assets/audio/water-trickle.wav
+            src: atlas/assets/audio/water-trickle.ogg
+            srcFallback: atlas/assets/audio/water-trickle.m4a
             gain: 0.55
     layers:
       - id: upload-1778790358938-0-chatgpt-image-may-4-2026

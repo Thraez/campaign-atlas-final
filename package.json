@@ -31,6 +31,7 @@
     "atlas:check-shape": "tsx scripts/check-artifact-shape.ts",
     "atlas:audit-assets": "tsx scripts/atlas/audit-assets.ts",
     "atlas:backup": "tsx scripts/atlas/backup.ts",
+    "audio:transcode": "node scripts/dev/transcode-audio.mjs",
     "prepare": "simple-git-hooks"
   },
   "simple-git-hooks": {
@@ -86,6 +87,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.4.20",
     "fake-indexeddb": "^6.2.5",
+    "ffmpeg-static": "^5.3.0",
     "globals": "^15.15.0",
     "jsdom": "^20.0.3",
     "lovable-tagger": "^1.1.13",

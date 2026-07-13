@@ -1,7 +1,7 @@
 {
-  "version": "2026-07-13T21-00-25-830Z",
+  "version": "2026-07-13T21-17-18-176Z",
   "schemaVersion": 1,
-  "publishedAt": "2026-07-13T21:00:25.830Z",
+  "publishedAt": "2026-07-13T21:17:18.176Z",
   "worlds": [
     {
       "id": "astrath-deeprealm",
@@ -45,7 +45,8 @@
               ]
             ],
             "bed": {
-              "src": "atlas/assets/audio/fb96ecf7.wav",
+              "src": "atlas/assets/audio/ce5af482.ogg",
+              "srcFallback": "atlas/assets/audio/82635d4e.m4a",
               "gain": 0.5
             }
           },
@@ -71,7 +72,8 @@
               ]
             ],
             "bed": {
-              "src": "atlas/assets/audio/fd34e278.wav",
+              "src": "atlas/assets/audio/33a29b91.ogg",
+              "srcFallback": "atlas/assets/audio/e36223af.m4a",
               "gain": 0.6
             }
           },
@@ -97,7 +99,8 @@
               ]
             ],
             "bed": {
-              "src": "atlas/assets/audio/011fb234.wav",
+              "src": "atlas/assets/audio/003bd929.ogg",
+              "srcFallback": "atlas/assets/audio/eda0f382.m4a",
               "gain": 0.55
             }
           }

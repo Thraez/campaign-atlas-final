@@ -1,5 +1,8 @@
 // Starter-ambience generator: seamless-looping WAV files, pure Node.
 // 22.05 kHz mono 16-bit PCM, 30 s, circular crossfade so the loop point is inaudible.
+// These WAVs are an intermediate authoring format only — they are NOT shipped to
+// players. Run `npm run audio:transcode` (scripts/dev/transcode-audio.mjs) to produce
+// the compressed .ogg (Opus) + .m4a (AAC) twins that world.yaml actually references.
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
