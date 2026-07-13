@@ -23,7 +23,10 @@ describe("WorldDetailsPanel", () => {
   it("toggling credit badges off emits a credits patch (preserving page)", () => {
     const onPatch = vi.fn();
     render(
-      <WorldDetailsPanel world={{ name: "Astrath", credits: { badges: true, page: true } }} onPatch={onPatch} />,
+      <WorldDetailsPanel
+        world={{ name: "Astrath", credits: { badges: true, page: true } }}
+        onPatch={onPatch}
+      />,
     );
     fireEvent.click(screen.getByLabelText("Show credit badges"));
     expect(onPatch).toHaveBeenCalledWith({ credits: { badges: false, page: true } });

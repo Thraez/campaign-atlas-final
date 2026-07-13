@@ -82,11 +82,12 @@ export function makeReactLeafletModule() {
   // MapLayerEditableOverlay → ImageOverlay) don't trip React's
   // "function components cannot be given refs" warning.
   const pass = (name: string) =>
-    React.forwardRef<HTMLDivElement, { children?: React.ReactNode }>(
-      function LeafletMock({ children }, ref) {
-        return React.createElement("div", { "data-leaflet": name, ref }, children);
-      },
-    );
+    React.forwardRef<HTMLDivElement, { children?: React.ReactNode }>(function LeafletMock(
+      { children },
+      ref,
+    ) {
+      return React.createElement("div", { "data-leaflet": name, ref }, children);
+    });
   return {
     MapContainer: pass("MapContainer"),
     TileLayer: pass("TileLayer"),

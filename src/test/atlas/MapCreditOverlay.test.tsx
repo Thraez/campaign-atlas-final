@@ -6,9 +6,9 @@ import { makeMap, makeLayer } from "../helpers/makeProject";
 
 describe("activeMapCredits (pure)", () => {
   it("returns [] when the map is absent", () => {
-    expect(activeMapCredits(undefined, { "a.png": { credit: "X", enabled: true } }, undefined)).toEqual(
-      [],
-    );
+    expect(
+      activeMapCredits(undefined, { "a.png": { credit: "X", enabled: true } }, undefined),
+    ).toEqual([]);
   });
 
   it("returns [] when assetCredits is absent", () => {
@@ -18,19 +18,25 @@ describe("activeMapCredits (pure)", () => {
 
   it("returns [] when the world master switch (credits.badges) is false", () => {
     const map = makeMap({ layers: [makeLayer({ src: "a.png" })] });
-    const registry: Record<string, AssetCredit> = { "a.png": { credit: "Art by A", enabled: true } };
+    const registry: Record<string, AssetCredit> = {
+      "a.png": { credit: "Art by A", enabled: true },
+    };
     expect(activeMapCredits(map, registry, { badges: false })).toEqual([]);
   });
 
   it("includes an enabled, non-empty layer credit", () => {
     const map = makeMap({ layers: [makeLayer({ src: "a.png" })] });
-    const registry: Record<string, AssetCredit> = { "a.png": { credit: "Art by A", enabled: true } };
+    const registry: Record<string, AssetCredit> = {
+      "a.png": { credit: "Art by A", enabled: true },
+    };
     expect(activeMapCredits(map, registry, undefined)).toEqual(["Art by A"]);
   });
 
   it("excludes a disabled layer credit", () => {
     const map = makeMap({ layers: [makeLayer({ src: "a.png" })] });
-    const registry: Record<string, AssetCredit> = { "a.png": { credit: "Art by A", enabled: false } };
+    const registry: Record<string, AssetCredit> = {
+      "a.png": { credit: "Art by A", enabled: false },
+    };
     expect(activeMapCredits(map, registry, undefined)).toEqual([]);
   });
 
@@ -42,7 +48,9 @@ describe("activeMapCredits (pure)", () => {
 
   it("excludes a layer with no registry entry", () => {
     const map = makeMap({ layers: [makeLayer({ src: "untracked.png" })] });
-    const registry: Record<string, AssetCredit> = { "a.png": { credit: "Art by A", enabled: true } };
+    const registry: Record<string, AssetCredit> = {
+      "a.png": { credit: "Art by A", enabled: true },
+    };
     expect(activeMapCredits(map, registry, undefined)).toEqual([]);
   });
 
@@ -85,7 +93,9 @@ describe("MapCreditOverlay (component)", () => {
 
   it("renders nothing when credits.badges is false", () => {
     const map = makeMap({ layers: [makeLayer({ src: "a.png" })] });
-    const registry: Record<string, AssetCredit> = { "a.png": { credit: "Art by A", enabled: true } };
+    const registry: Record<string, AssetCredit> = {
+      "a.png": { credit: "Art by A", enabled: true },
+    };
     const { container } = render(
       <MapCreditOverlay map={map} assetCredits={registry} credits={{ badges: false }} />,
     );

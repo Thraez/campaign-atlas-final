@@ -28,10 +28,18 @@ beforeEach(() => {
       // The world.yaml baseline read: 404 => fresh world (create-only), a valid
       // non-error baseline so onSaveClick proceeds to write world.yaml.
       if (u.includes("/__atlas/read")) {
-        return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) } as unknown as Response);
+        return Promise.resolve({
+          ok: false,
+          status: 404,
+          json: () => Promise.resolve({}),
+        } as unknown as Response);
       }
       const body = u.includes("search-index") ? makeSearchIndex() : makeProject();
-      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) } as unknown as Response);
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(body),
+      } as unknown as Response);
     }),
   );
 });
@@ -68,16 +76,15 @@ describe("world-level save path (patchWorld → world.yaml credits)", () => {
     fireEvent.click(screen.getByTitle("Save (Ctrl+S)"));
 
     // The diff modal opens and lists the world.yaml write.
-    await waitFor(() =>
-      expect(screen.getByText(/_atlas\/world\.yaml/)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/_atlas\/world\.yaml/)).toBeInTheDocument());
 
     // Expand the diff and confirm the disabled badge switch is serialized.
     fireEvent.click(screen.getByRole("button", { name: /show diff/i }));
     await waitFor(() =>
       expect(
         screen.getByText(
-          (_content, el) => el?.tagName === "PRE" && (el.textContent ?? "").includes("badges: false"),
+          (_content, el) =>
+            el?.tagName === "PRE" && (el.textContent ?? "").includes("badges: false"),
         ),
       ).toBeInTheDocument(),
     );

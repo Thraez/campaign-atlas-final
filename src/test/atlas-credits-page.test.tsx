@@ -111,7 +111,9 @@ describe("AtlasCredits page — assetCredits registry aggregation", () => {
         {
           id: "w1",
           name: "World",
-          assetCredits: { "portrait.png": { credit: "Portrait by Registry Artist", enabled: true } },
+          assetCredits: {
+            "portrait.png": { credit: "Portrait by Registry Artist", enabled: true },
+          },
         },
       ),
     );
@@ -138,7 +140,11 @@ describe("AtlasCredits page — assetCredits registry aggregation", () => {
     renderCredits(
       makeProject(
         [makeEntity({ id: "npc", title: "NPC With Portrait", images: ["portrait.png"] })],
-        { id: "w1", name: "World", assetCredits: { "portrait.png": { credit: "", enabled: true } } },
+        {
+          id: "w1",
+          name: "World",
+          assetCredits: { "portrait.png": { credit: "", enabled: true } },
+        },
       ),
     );
     await screen.findByText(/No image credits/i);

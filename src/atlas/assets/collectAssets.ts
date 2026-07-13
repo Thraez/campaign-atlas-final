@@ -21,9 +21,7 @@ export interface CollectedAsset {
  * Insertion order is preserved (entity images first, then layer srcs), so the
  * output is deterministic.
  */
-export function collectAssets(
-  project: Pick<AtlasProject, "entities" | "maps">,
-): CollectedAsset[] {
+export function collectAssets(project: Pick<AtlasProject, "entities" | "maps">): CollectedAsset[] {
   const bySrc = new Map<string, CollectedAsset>();
   const add = (src: string | undefined | null, use: AssetUse) => {
     if (!src) return;

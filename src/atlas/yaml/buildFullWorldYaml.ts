@@ -172,9 +172,7 @@ function creditsToYamlObject(c: CreditsConfig): Record<string, unknown> {
 /** Serialize the per-asset registry in full (including disabled entries — the
  *  DM's text is preserved on disk). Player-safety stripping happens in the
  *  build projection, not here. */
-function assetCreditsToYamlObject(
-  reg: Record<string, AssetCredit>,
-): Record<string, unknown> {
+function assetCreditsToYamlObject(reg: Record<string, AssetCredit>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [src, c] of Object.entries(reg)) {
     out[src] = { credit: c.credit, enabled: c.enabled };
