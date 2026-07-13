@@ -4,6 +4,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 import { atlasSavePlugin } from "./scripts/vite-plugin-atlas-save";
+import { prunePlayerAudioPlugin } from "./scripts/vite-plugin-prune-player-audio";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -137,6 +138,11 @@ export default defineConfig(({ mode }) => {
         ],
       },
     }),
+    // Player builds only: strip the source-named audio beds from dist/ (the
+    // player references content-hashed copies; the source names exist solely
+    // for the DM picker in public/). Runs last so it fires after the public
+    // copy + PWA precache generation. See the plugin for the full rationale.
+    !includeEditor && prunePlayerAudioPlugin(),
   ].filter(Boolean),
   resolve: {
     alias: {
