@@ -60,10 +60,7 @@ import type { FileChange } from "@/atlas/save/localFsSave";
 import { SaveStatus } from "@/atlas/session/SaveStatus";
 import { DiscardConfirmModal } from "@/atlas/session/DiscardConfirmModal";
 import { CanonicalSaveError } from "@/atlas/save/canonicalPlacementSave";
-import {
-  type FrontmatterDraft,
-  buildCanonicalEntityChanges,
-} from "@/atlas/save/canonicalEntitySave";
+import { buildCanonicalEntityChanges } from "@/atlas/save/canonicalEntitySave";
 import { useWorldYamlBaseline, worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
 import {
   buildWorldYamlContent as pureBuildWorldYamlContent,
@@ -699,9 +696,6 @@ function AtlasPlacementEditorInner() {
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<FileChange[]>([]);
   const [discardOpen, setDiscardOpen] = useState(false);
-  // Entities-tab frontmatter drafts, lifted here so the unified Save writes
-  // them to disk (Export Patch removed). Keyed by entity id.
-  const [entityDrafts, setEntityDrafts] = useState<Record<string, FrontmatterDraft>>({});
   // Timestamp of the most recent local edit, and of the most recent successful
   // canonical save. When editAt > saveAt, the unsaved-changes banner shows.
   const [lastLocalEditAt, setLastLocalEditAt] = useState<number | null>(null);
@@ -809,7 +803,10 @@ function AtlasPlacementEditorInner() {
       allDraftPlacements: buildDraftPlacements(),
       overrides,
       activeMapId: activeMap.id,
-      entityDrafts,
+      // Entities-tab frontmatter drafts are not wired into this page — entity
+      // edits go through EntityEditPanel/useEntityEditDraft — so supply none.
+      // buildSavePlan keeps the param for its other (tested) callers.
+      entityDrafts: {},
       projectEntities: project.entities,
       worldYamlDirty,
     });
@@ -931,10 +928,7 @@ function AtlasPlacementEditorInner() {
     dirtyCount > 0 &&
     lastLocalEditAt !== null &&
     (lastSavedAt === null || lastLocalEditAt > lastSavedAt);
-  // Entities-tab edits are dirty the moment a draft exists (like the
-  // world.yaml gate) — they fire immediately so the unsaved banner shows.
-  const entityDraftsDirty = Object.keys(entityDrafts).length > 0;
-  const hasUnsavedChanges = pinSideUnsaved || worldYamlDirty || entityDraftsDirty;
+  const hasUnsavedChanges = pinSideUnsaved || worldYamlDirty;
 
   const session = useEditorSession({
     activeMapId: activeMap?.id ?? null,
@@ -2021,15 +2015,6 @@ function AtlasPlacementEditorInner() {
           const writtenEntityIds = new Set(
             project.entities.filter((e) => writtenPaths.has(e.sourcePath)).map((e) => e.id),
           );
-          // Drafted Entities-tab edits for written files now live in canon —
-          // drop them so the tab and the unsaved banner reset.
-          if (writtenEntityIds.size > 0) {
-            setEntityDrafts((prev) => {
-              const next = { ...prev };
-              for (const id of writtenEntityIds) delete next[id];
-              return next;
-            });
-          }
           const nextOverrides: Overrides = { ...preSave.overrides };
           for (const k of Object.keys(nextOverrides)) {
             const [mid, eid] = k.split(":");
