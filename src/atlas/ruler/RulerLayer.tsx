@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useMapEvents, CircleMarker, Polyline, Tooltip } from "react-leaflet";
+import { createPortal } from "react-dom";
+import { useMapEvents, useMap, CircleMarker, Polyline, Tooltip } from "react-leaflet";
 import type { MapScale } from "@/atlas/content/schema";
 import { mapClickToAtlasCoord } from "@/atlas/editor/mapClickCoord";
 import { measureDistance } from "./measureDistance";
@@ -24,6 +25,7 @@ export function RulerLayer({
   onClear,
 }: RulerLayerProps) {
   const [points, setPoints] = useState<RulerPoints>(null);
+  const map = useMap();
 
   const prevActiveRef = useRef(active);
   useEffect(() => {
@@ -39,6 +41,19 @@ export function RulerLayer({
     onClearRef.current = onClear;
   }, [onClear]);
 
+  // Escape clears the current measurement
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPoints(null);
+        onClearRef.current?.();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active]);
+
   useMapEvents({
     click(e) {
       if (!active) return;
@@ -53,12 +68,35 @@ export function RulerLayer({
           onClearRef.current?.();
           return { ...prev, p2: { x, y } };
         }
-        return prev;
+        // Third click: start a fresh measurement
+        return { p1: { x, y } };
       });
     },
   });
 
-  if (!points) return null;
+  // Hint overlay: show while active and fewer than two points are placed
+  const showHint = active && (!points || !points.p2);
+  const hint = showHint
+    ? createPortal(
+        <div
+          data-testid="ruler-hint"
+          style={{
+            position: "absolute",
+            bottom: "2.5rem",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 500,
+            pointerEvents: "none",
+          }}
+          className="text-xs bg-black/60 text-white px-3 py-1.5 rounded-full whitespace-nowrap"
+        >
+          Click two points to measure
+        </div>,
+        map.getContainer()
+      )
+    : null;
+
+  if (!points) return hint;
 
   const toLatLng = (p: { x: number; y: number }): [number, number] => [mapHeight - p.y, p.x];
   const { p1, p2 } = points;
@@ -66,6 +104,7 @@ export function RulerLayer({
 
   return (
     <>
+      {hint}
       <CircleMarker
         center={toLatLng(p1)}
         radius={5}
