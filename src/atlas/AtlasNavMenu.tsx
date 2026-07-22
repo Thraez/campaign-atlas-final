@@ -27,6 +27,8 @@ interface AtlasNavMenuProps {
   footer?: React.ReactNode;
   /** When true, show the Credits nav link. Only shown when credits.page is on AND ≥1 credit exists. */
   showCredits?: boolean;
+  /** The world's display name. Falls back to "Atlas" when absent. */
+  worldName?: string;
 }
 
 /**
@@ -37,7 +39,7 @@ interface AtlasNavMenuProps {
  * Embedded in the toolbar of `AtlasViewer`, `AtlasBrowse`, `AtlasTimeline`
  * with `lg:hidden` so it disappears once the inline buttons fit naturally.
  */
-export function AtlasNavMenu({ publishedAt, footer, showCredits }: AtlasNavMenuProps) {
+export function AtlasNavMenu({ publishedAt, footer, showCredits, worldName }: AtlasNavMenuProps) {
   const editorEnabled = __INCLUDE_EDITOR__ && isDmToolsEnabled();
   return (
     <Sheet>
@@ -54,7 +56,7 @@ export function AtlasNavMenu({ publishedAt, footer, showCredits }: AtlasNavMenuP
       <SheetContent side="left" className="w-72 p-0 flex flex-col">
         <SheetHeader className="px-4 py-3 border-b border-border text-left">
           <SheetTitle className="flex items-center gap-2 font-display text-lg text-primary">
-            <Compass className="h-5 w-5" aria-hidden="true" /> Astrath Atlas
+            <Compass className="h-5 w-5" aria-hidden="true" /> {worldName ?? "Atlas"}
           </SheetTitle>
           <SheetDescription className="sr-only">Atlas navigation menu</SheetDescription>
         </SheetHeader>
