@@ -37,6 +37,7 @@ const bounds = {
 (bounds as unknown as { extend: () => unknown }).extend = () => bounds;
 
 const STABLE_MAP = {
+  options: {} as Record<string, unknown>,
   getBounds: () => bounds,
   getZoom: () => 0,
   getMinZoom: () => -5,

@@ -178,6 +178,34 @@ function FitBoundsController({
   return null;
 }
 
+function MaxBoundsController({
+  mapId,
+  mapWidth,
+  mapHeight,
+  wrapX,
+}: {
+  mapId: string;
+  mapWidth: number;
+  mapHeight: number;
+  wrapX?: boolean;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    if (wrapX) {
+      // Horizontal scrolling is intentional on wrap maps; clear any bounds.
+      map.setMaxBounds(undefined);
+      return;
+    }
+    const pad = Math.max(mapWidth, mapHeight) * 0.1;
+    map.options.maxBoundsViscosity = 0.75;
+    map.setMaxBounds([
+      [-pad, -pad],
+      [mapHeight + pad, mapWidth + pad],
+    ]);
+  }, [mapId, mapWidth, mapHeight, wrapX, map]);
+  return null;
+}
+
 interface ViewerState {
   project: AtlasProject;
   index: SearchIndexEntry[];
@@ -698,6 +726,12 @@ export default function AtlasViewer() {
                 mapHeight={activeMap.height}
                 flyTarget={flyTarget}
                 fitRef={fitMapRef}
+              />
+              <MaxBoundsController
+                mapId={activeMap.id}
+                mapWidth={activeMap.width}
+                mapHeight={activeMap.height}
+                wrapX={activeMap.wrapX}
               />
               <ViewSyncController
                 mapId={activeMap.id}
