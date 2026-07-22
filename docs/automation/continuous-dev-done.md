@@ -755,3 +755,13 @@ Render/styling parity only — **not** interactivity.
   called with 0.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2465 tests green (4 shards).
 
+- [x] **Q12. Style GFM tables, ordered lists, inline code/pre, hr, and h4–h6 in entity prose.** ✅ DONE 2026-07-22 — commit 254671df
+  Added `.atlas-prose` CSS rules in `src/index.css` for every element that was emitted by the GFM
+  renderer but previously unstyled: bordered/striped tables with padded th/td, decimal ordered lists,
+  inline `<code>` (monospace, muted bg, border, rounded), `<pre>` fenced-code blocks (dark bg, border,
+  horizontal scroll; `pre code` resets to inherit the block), a themed `<hr>` rule, and h4/h5/h6
+  with progressively smaller sizes and muted colors. Also removed the dead `prose prose-sm
+  dark:prose-invert` classes from `EntityPanel.tsx:503` — `@tailwindcss/typography` is not installed
+  so those classes were inert.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2465 tests green (4 shards).
+

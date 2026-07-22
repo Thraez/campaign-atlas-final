@@ -103,12 +103,6 @@ is for sequencing, not the whole spec.
   - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
   ~1 run.
 
-- [ ] **Q12. Style GFM tables, ordered lists, inline code/pre, hr, and h4–h6 in entity prose.**
-  `@tailwindcss/typography` is not installed (no entry in `package.json`/tailwind config), so the `prose prose-sm dark:prose-invert` classes on the body div in `src/atlas/entity/EntityPanel.tsx` (line ~428) are inert — only `.atlas-prose` rules in `src/index.css` apply, and those omit tables, `ol`, `code`/`pre`, `hr`, and `h4`–`h6`. `markdownCore.ts` runs marked with `gfm:true`, so those elements ARE emitted but unstyled. Add `.atlas-prose` rules: bordered/striped tables with padded `th/td`, decimal `ol` with padding, styled inline `<code>` and `<pre>` blocks, a themed `<hr>`, and `h4`–`h6` sizing. Optionally drop the dead `prose prose-sm dark:prose-invert` classes.
-  - **Done when:** a lore entry containing a markdown table, ordered list, inline/fenced code, a `---` rule, and an h4 all render with visible, theme-consistent (dark) styling, with no reliance on the typography plugin.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  ~1 run.
-
 - [ ] **Q13. "On this page" section-jump list for long entity entries.**
   In `src/atlas/entity/EntityPanel.tsx`, call `buildAnchors(entity.body)` (from `src/atlas/entity/paneScrollSync.ts`, already tested) and render a small collapsible "On this page" list at the top of the reading panel, shown only when there are 2+ headings. Inject `data-anchor-id` onto the rendered body headings after mount — mirror the exact pattern in `src/atlas/entity/EntityPanes.tsx` lines 124–131 (`querySelectorAll("h1,h2,h3,h4,h5,h6")` → `setAttribute("data-anchor-id", anchor.id)`). Clicking a list item scrolls the Radix viewport so the matching `[data-anchor-id]` heading is at the top (as `scrollToAnchor` does in EntityPanes).
   - **Done when:** an entity body with ≥2 headings shows a collapsible jump list whose items scroll the reader to the corresponding heading; bodies with <2 headings show no list; covered by a test in `src/test/entity/EntityPanel.test.tsx`.
