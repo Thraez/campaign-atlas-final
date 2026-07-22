@@ -683,3 +683,13 @@ Render/styling parity only — **not** interactivity.
   dedup, multi-preset, unknown-entity fallback).
   Gate: typecheck clean · eslint 0 errors (18 pre-existing) · 2436 tests green (4 shards).
 
+- [x] **Q5. Use the real world name instead of hardcoded "Astrath Atlas".** ✅ DONE 2026-07-22 — commit d954e7d7
+  `AtlasNavMenu.tsx`: added `worldName?: string` prop; sheet title renders `{worldName ?? "Atlas"}`.
+  `AtlasViewer.tsx`: derive `worldName = data.project.worlds[0]?.name ?? "Atlas"`, pass to
+  `AtlasNavMenu` and replace hardcoded span in toolbar logo link.
+  `AtlasBrowse.tsx`, `AtlasTimeline.tsx`: extract `worldName` after null-project guard, pass to
+  `AtlasNavMenu` and inline toolbar link.
+  `src/test/atlas/AtlasNavMenu.test.tsx`: 3 unit tests (worldName renders, omitted falls back to
+  "Atlas", undefined falls back to "Atlas").
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing) · 2432 tests green (4 shards).
+

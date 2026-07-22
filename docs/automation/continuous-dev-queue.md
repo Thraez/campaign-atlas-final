@@ -78,11 +78,6 @@ is for sequencing, not the whole spec.
 
 - [x] **Q4. Add a collapsible pin legend for the active map.** ✅ DONE 2026-07-22 — commit cb83354c; `PinLegend.tsx` derives distinct presets via `resolvePinStyle` + dedup by id; top-right corner overlay, default collapsed, re-derives on map switch; 7 unit tests; 2436 tests green (4 shards).
 
-- [ ] **Q5. Use the real world name instead of hardcoded "Astrath Atlas".**
-  The atlas title is hardcoded as `Astrath Atlas` in `AtlasViewer.tsx:534` and `AtlasNavMenu.tsx:57`, so any DM with a differently-named world sees the wrong header and mobile-nav title. Render `data.project.worlds[0]?.name` instead: add a `worldName` prop to `AtlasNavMenu` (props today are `{ publishedAt, footer, showCredits }` at `:40`) and pass it from every call site that embeds it — `AtlasViewer`, plus `AtlasBrowse` and `AtlasTimeline` (both embed `AtlasNavMenu` per its docstring) — falling back to a generic `"Atlas"` when the name is absent.
-  - **Done when:** a world named e.g. "Astrath Deeprealm" shows that name in the header and the mobile nav sheet, a nameless world shows "Atlas", and no "Astrath Atlas" literal remains in the player surfaces.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  ~1 run.
 
 - [ ] **Q6. Constrain panning with `maxBounds` so players can't get lost in the void.**
   `MapContainer` (`AtlasViewer.tsx:633-651`) sets no `maxBounds`, so a player can pan far into empty ocean with no easy way back. Add a `useMap` controller effect keyed on `activeMap.id` that calls `map.setMaxBounds` on the map extent `[[0,0],[activeMap.height, activeMap.width]]` plus a modest padding, with a gentle `maxBoundsViscosity`. Skip the horizontal clamp when `activeMap.wrapX` is true (the world wraps). Ensure deep-link/`flyTo` targets (set via `flyTarget`/`MapController` at `:100-116`) inside the bounds still resolve.
