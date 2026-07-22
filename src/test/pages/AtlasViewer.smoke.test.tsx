@@ -34,6 +34,7 @@ beforeEach(() => {
   stubFetch();
   vi.mocked(stableMap.fitBounds).mockClear();
   vi.mocked(stableMap.flyTo).mockClear();
+  vi.mocked(stableMap.setMaxBounds).mockClear();
   // Reset location to no query params
   window.history.pushState({}, "", "/");
 });
@@ -122,5 +123,54 @@ describe("FitBoundsController (Q2)", () => {
     expect(document.querySelector('[aria-label="Choose map"]')).toBeInTheDocument();
     // fitBounds fires for the initial map load (map-a: 600×800)
     expect(stableMap.fitBounds).toHaveBeenCalledWith([[0, 0], [600, 800]], expect.anything());
+  });
+});
+
+describe("MaxBoundsController (Q6)", () => {
+  it("calls setMaxBounds on initial load with map extent plus 10% padding", async () => {
+    // Default map: 1000×1000; pad = 100
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(stableMap.setMaxBounds).toHaveBeenCalled());
+    expect(stableMap.setMaxBounds).toHaveBeenCalledWith([
+      [-100, -100],
+      [1100, 1100],
+    ]);
+  });
+
+  it("calls setMaxBounds with correct padding for a non-square map", async () => {
+    // 800×600 map; pad = max(800,600)*0.1 = 80
+    const project = makeProject({
+      maps: [makeMap({ id: "overview", width: 800, height: 600 })],
+    });
+    stubFetch(project);
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(stableMap.setMaxBounds).toHaveBeenCalled());
+    expect(stableMap.setMaxBounds).toHaveBeenCalledWith([
+      [-80, -80],
+      [680, 880],
+    ]);
+  });
+
+  it("calls setMaxBounds(null) when wrapX is true", async () => {
+    const project = makeProject({
+      maps: [makeMap({ id: "overview", width: 1000, height: 1000, wrapX: true })],
+    });
+    stubFetch(project);
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(document.querySelector("main#atlas-main")).toBeInTheDocument());
+    await waitFor(() => expect(stableMap.setMaxBounds).toHaveBeenCalled());
+    expect(stableMap.setMaxBounds).toHaveBeenCalledWith(undefined);
   });
 });
