@@ -1112,7 +1112,7 @@ function WrappedWorld({
 /** Renders pin markers with preset-derived shape/color, and computes which
  *  labels are permanently visible based on per-pin priority + labelMinZoom +
  *  a screen-space collision pass (higher priority wins). */
-function PlacementMarkers({
+export function PlacementMarkers({
   dx,
   H,
   placements,
@@ -1195,6 +1195,8 @@ function PlacementMarkers({
                 .filter(Boolean)
                 .join(" "),
             })}
+            riseOnHover
+            riseOffset={250}
             eventHandlers={{
               click: () => onOpenEntity(p.entityId, false),
               mouseover: (e) => onPinPeek?.(p.entityId, e.originalEvent as MouseEvent),
