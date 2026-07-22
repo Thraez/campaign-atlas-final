@@ -88,7 +88,7 @@ is for sequencing, not the whole spec.
 
 - [x] **Q7. Fix ruler so a third click starts a fresh measurement (plus active-mode hint).** ✅ DONE 2026-07-22 — commit e68bedf6; `RulerLayer.tsx`: third-click branch returns `{ p1: {x,y} }` instead of `prev`; Escape keydown effect clears state + fires onClear; hint overlay portaled into map container when active and < 2 points placed; 7 new unit tests in `src/test/ruler/RulerLayer.test.tsx`; 2442 tests green (4 shards).
 
-- [ ] **Q8. Bring hovered pins to the front so they don't hide behind neighbors.**
+- [x] **Q8. Bring hovered pins to the front so they don't hide behind neighbors.** ✅ DONE 2026-07-22 — commit 96e3ae20; `PlacementMarkers` `<Marker>` gains `riseOnHover` + `riseOffset={250}`; `PlacementMarkers` exported for testability; 4 unit tests in `src/test/placement-markers.test.tsx`; 2446 tests green (4 shards).
   Markers in `PlacementMarkers` (`AtlasViewer.tsx:1066-1090`) set `key`/`position`/`icon`/`eventHandlers` but not Leaflet's `riseOnHover`, so in dense clusters a hovered pin and its label can be occluded by adjacent pins/labels. Add `riseOnHover` (and a suitable `riseOffset`) to each `<Marker>` so the pin under the pointer lifts to the top of the marker pane.
   - **Done when:** hovering a pin in a crowded area raises it (and its label) above adjacent markers, with no other behavior change.
   - **Gate:** standard gate (typecheck + ESLint + sharded vitest).

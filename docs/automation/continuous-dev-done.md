@@ -712,3 +712,11 @@ Render/styling parity only — **not** interactivity.
   hidden at p2; third-click resets; Escape restores hint; Escape fires onClear).
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2442 tests green (4 shards).
 
+- [x] **Q8. Bring hovered pins to the front so they don't hide behind neighbors.** ✅ DONE 2026-07-22 — commit 96e3ae20
+  `src/pages/AtlasViewer.tsx`: added `riseOnHover` and `riseOffset={250}` to every `<Marker>` in
+  `PlacementMarkers`; also exported `PlacementMarkers` so it can be unit-tested directly.
+  `src/test/placement-markers.test.tsx`: 4 new unit tests verifying `data-rise-on-hover="true"` and
+  a positive `data-rise-offset` are present on every rendered marker (via a custom Marker mock that
+  forwards those props as data attributes).
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2446 tests green (4 shards).
+
