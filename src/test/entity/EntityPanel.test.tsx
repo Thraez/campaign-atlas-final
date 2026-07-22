@@ -1110,3 +1110,55 @@ describe("EntityPanel — lightbox navigation (Q10)", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("EntityPanel — scroll-to-top on entity change (Q11)", () => {
+  it("resets the reading-panel viewport scrollTop to 0 when entity id changes", () => {
+    const entityA: Entity = { ...e, id: "entity-a", title: "Entity A" };
+    const entityB: Entity = { ...e, id: "entity-b", title: "Entity B" };
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityA}
+          placements={[]}
+          entityById={new Map([[entityA.id, entityA]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    const viewport = document.querySelector(
+      "[data-radix-scroll-area-viewport]",
+    ) as HTMLElement;
+    expect(viewport).not.toBeNull();
+
+    // Spy on scrollTop assignment to verify our effect sets it to 0.
+    let assignedScrollTop: number | undefined;
+    Object.defineProperty(viewport, "scrollTop", {
+      set(v: number) {
+        assignedScrollTop = v;
+      },
+      get() {
+        return assignedScrollTop ?? 0;
+      },
+      configurable: true,
+    });
+
+    rerender(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityB}
+          placements={[]}
+          entityById={new Map([[entityB.id, entityB]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(assignedScrollTop).toBe(0);
+  });
+});

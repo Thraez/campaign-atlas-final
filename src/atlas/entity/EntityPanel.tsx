@@ -327,6 +327,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
 ) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // Merge the forwarded ref (used by callers) and the local bodyRef (used by the secret effect).
   const setBodyRefs = useCallback(
@@ -374,6 +375,14 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [lightboxIndex, goNext, goPrev]);
+
+  // Reset the reading panel to the top whenever the displayed entity changes.
+  useEffect(() => {
+    const viewport = scrollAreaRef.current?.querySelector<HTMLElement>(
+      "[data-radix-scroll-area-viewport]",
+    );
+    if (viewport) viewport.scrollTop = 0;
+  }, [entity?.id]);
 
   if (!entity) {
     return (
@@ -443,7 +452,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea ref={scrollAreaRef} className="flex-1">
         <div className="p-4 space-y-4">
           {entity.summary && (
             <p className="text-sm italic text-muted-foreground border-l-2 border-primary pl-3">
