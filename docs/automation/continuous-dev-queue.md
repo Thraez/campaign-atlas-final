@@ -86,12 +86,7 @@ is for sequencing, not the whole spec.
   Stock Leaflet `maxBounds` (no tiling); bounds cross into Leaflet so preserve lat = height − y, lng = x. Complements Q2 (both add `useMap` controllers keyed on `activeMap.id`).
   ~1 run.
 
-- [ ] **Q7. Fix ruler so a third click starts a fresh measurement (plus active-mode hint).**
-  In `src/atlas/ruler/RulerLayer.tsx` the click handler (`:50-57`) returns `prev` unchanged once both `p1` and `p2` exist (`:56`), so measuring a second distance forces the player to toggle the ruler off and back on. Make the third click reset to a fresh `{ p1 }`. While bundling: show a small on-screen hint ("Click two points to measure") while the ruler is active and fewer than two points are placed, and let `Escape` clear the current measurement (the module already has an `onClear` prop and an active→inactive reset effect at `:28-40`).
-  - **Done when:** with the ruler active, click→click measures, a third click begins a new measurement without toggling the tool, a hint shows until two points are placed, and Escape clears the current measurement.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Pure ruler-module state (coords already flow through `mapClickToAtlasCoord`, which owns the lat=height−y flip).
-  ~1 run.
+- [x] **Q7. Fix ruler so a third click starts a fresh measurement (plus active-mode hint).** ✅ DONE 2026-07-22 — commit e68bedf6; `RulerLayer.tsx`: third-click branch returns `{ p1: {x,y} }` instead of `prev`; Escape keydown effect clears state + fires onClear; hint overlay portaled into map container when active and < 2 points placed; 7 new unit tests in `src/test/ruler/RulerLayer.test.tsx`; 2442 tests green (4 shards).
 
 - [ ] **Q8. Bring hovered pins to the front so they don't hide behind neighbors.**
   Markers in `PlacementMarkers` (`AtlasViewer.tsx:1066-1090`) set `key`/`position`/`icon`/`eventHandlers` but not Leaflet's `riseOnHover`, so in dense clusters a hovered pin and its label can be occluded by adjacent pins/labels. Add `riseOnHover` (and a suitable `riseOffset`) to each `<Marker>` so the pin under the pointer lifts to the top of the marker pane.

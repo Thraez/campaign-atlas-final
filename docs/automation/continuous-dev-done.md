@@ -693,3 +693,22 @@ Render/styling parity only — **not** interactivity.
   "Atlas", undefined falls back to "Atlas").
   Gate: typecheck clean · eslint 0 errors (18 pre-existing) · 2432 tests green (4 shards).
 
+- [x] **Q6. Constrain panning with `maxBounds` so players can't get lost in the void.** ✅ DONE 2026-07-22 — commit 2c96305c
+  `src/pages/AtlasViewer.tsx`: new `MaxBoundsController` component inside `<MapContainer>`, keyed on
+  `mapId`. Sets `map.setMaxBounds` to full extent plus 10 % padding (based on larger dimension) with
+  `maxBoundsViscosity: 0.75`. `wrapX: true` maps call `setMaxBounds(undefined)` to clear bounds.
+  `src/test/helpers/reactLeafletMock.tsx`: added `options: {}` to `STABLE_MAP`.
+  `src/test/pages/AtlasViewer.smoke.test.tsx`: 3 new smoke tests (standard padding, asymmetric map,
+  wrapX clears bounds).
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing) · 2435 tests green (4 shards).
+
+- [x] **Q7. Fix ruler so a third click starts a fresh measurement (plus active-mode hint).** ✅ DONE 2026-07-22 — commit e68bedf6
+  `src/atlas/ruler/RulerLayer.tsx`: third-click branch in the `setPoints` updater now returns
+  `{ p1: { x, y } }` instead of `prev`, so measuring is continuous without toggling the tool.
+  Added `useMap` + `createPortal` to render a "Click two points to measure" hint overlay in the
+  Leaflet container while the ruler is active and fewer than two points are placed. Added a
+  `keydown` Escape handler (registered only while active) that clears state and fires `onClear`.
+  `src/test/ruler/RulerLayer.test.tsx`: 7 new unit tests (hint on active/p1-set/inactive; hint
+  hidden at p2; third-click resets; Escape restores hint; Escape fires onClear).
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2442 tests green (4 shards).
+
