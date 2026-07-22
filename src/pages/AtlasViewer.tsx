@@ -327,6 +327,7 @@ export default function AtlasViewer() {
 
   const worldCredits = data?.project.worlds[0]?.credits;
   const worldAssetCredits = data?.project.worlds[0]?.assetCredits;
+  const worldName = data?.project.worlds[0]?.name ?? "Atlas";
   const showCredits =
     worldCredits?.page !== false && (data?.project.entities.some((e) => e.credit) ?? false);
 
@@ -565,13 +566,13 @@ export default function AtlasViewer() {
           Skip to map
         </a>
         <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
-          <AtlasNavMenu publishedAt={data.project.publishedAt} showCredits={showCredits} />
+          <AtlasNavMenu publishedAt={data.project.publishedAt} showCredits={showCredits} worldName={worldName} />
           <Link
             to="/"
             className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2"
           >
             <Compass className="h-5 w-5" aria-hidden="true" />{" "}
-            <span className="hidden sm:inline">Astrath Atlas</span>
+            <span className="hidden sm:inline">{worldName}</span>
           </Link>
           <div className="flex-1" />
           {data.project.maps.length > 1 && (

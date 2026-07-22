@@ -114,15 +114,17 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
     );
   }
 
+  const worldName = project.worlds[0]?.name ?? "Atlas";
+
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
-        <AtlasNavMenu publishedAt={project.publishedAt} />
+        <AtlasNavMenu publishedAt={project.publishedAt} worldName={worldName} />
         <Link
           to="/atlas"
           className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2"
         >
-          <Compass className="h-5 w-5" /> <span className="hidden sm:inline">Astrath Atlas</span>
+          <Compass className="h-5 w-5" /> <span className="hidden sm:inline">{worldName}</span>
         </Link>
         <span className="text-muted-foreground">/</span>
         <span className="flex items-center gap-1.5 text-sm font-medium min-w-0 truncate">
