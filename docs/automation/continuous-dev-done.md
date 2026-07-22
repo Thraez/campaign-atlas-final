@@ -808,3 +808,16 @@ Render/styling parity only — **not** interactivity.
   appears once, both targets present); two-label separate-row rendering.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2482 tests green (4 shards;
   pre-existing onTaskUpdate RPC flake in shard 3).
+
+
+- [x] **Q16. Replace the handout pop-up-blocked `alert()` with an app toast + pre-flight guard.** ✅ DONE 2026-07-23 — commit 9a8fd856
+  `src/atlas/printHandout.ts`: added `import { toast } from "sonner"`; `openPrintWindow` now calls
+  `toast.error("Pop-ups are blocked. Please allow pop-ups for this site to download the handout.")`
+  instead of `window.alert()` when `window.open` returns null, and returns `boolean` (false = blocked,
+  true = opened). `printEntityHandout` and `printEntityBundle` both updated to return `boolean`.
+  `buildHandoutHtml` is unchanged.
+  `src/test/printHandout.test.ts`: 4 new tests in "Q16: pop-up guard — toast instead of alert" describe
+  block — blocked path calls toast.error + returns false (printEntityHandout); allowed path skips toast +
+  returns true + writes HTML; same two for printEntityBundle.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2486 tests green (4 shards;
+  pre-existing onTaskUpdate RPC flake in shard 3).

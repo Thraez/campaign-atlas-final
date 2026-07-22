@@ -103,7 +103,7 @@ is for sequencing, not the whole spec.
   - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
   ~1 run.
 
-- [ ] **Q16. Replace the handout pop-up-blocked `alert()` with an app toast + pre-flight guard.**
+- [x] **Q16. Replace the handout pop-up-blocked `alert()` with an app toast + pre-flight guard.** ✅ DONE 2026-07-23 `9a8fd856`
   `openPrintWindow` in `src/atlas/printHandout.ts` (line ~149) calls raw `window.alert("Pop-up blocked…")` when `window.open` returns null. Route this through the app's sonner toast — `import { toast } from "sonner"` (already used in `EntityPanel.tsx`) and call `toast.error(...)` with a clear "allow pop-ups to download the handout" hint. Keep the pure `buildHandoutHtml` unchanged. Optionally have `printEntityHandout`/`printEntityBundle` return a boolean so callers can react.
   - **Done when:** a blocked pop-up shows a non-blocking sonner toast (no `window.alert`); `buildHandoutHtml` stays untouched; `src/test/printHandout.test.ts` still passes and, if a return value is added, a test asserts the blocked path.
   - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
