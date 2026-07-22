@@ -79,6 +79,20 @@
 .atlas-pin--undiscovered { opacity: 0.55; }
 .atlas-pin--discovered   { opacity: 1; }
 
+/* Active-entity ring: highlights the open entity's pin(s) on the map. */
+@keyframes atlas-pin-active-ring {
+  0%   { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.7); }
+  70%  { box-shadow: 0 0 0 8px hsl(var(--primary) / 0); }
+  100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+}
+.atlas-viewer-pin--active > svg {
+  filter: drop-shadow(0 0 4px hsl(var(--primary)));
+}
+.atlas-viewer-pin--active {
+  animation: atlas-pin-active-ring 1.4s ease-out infinite;
+  border-radius: 50%;
+}
+
 /* Leaflet overrides for fantasy theme */
 .leaflet-container {
   background: hsl(var(--ocean));
