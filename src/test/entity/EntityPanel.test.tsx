@@ -1162,3 +1162,137 @@ describe("EntityPanel — scroll-to-top on entity change (Q11)", () => {
     expect(assignedScrollTop).toBe(0);
   });
 });
+
+// ── Q13 — "On this page" section-jump list ────────────────────────────────────
+
+const entityWithTwoHeadings: Entity = {
+  ...e,
+  body: "## Overview\n\nSome text.\n\n## History\n\nMore text.",
+  bodyHtml: "<h2>Overview</h2><p>Some text.</p><h2>History</h2><p>More text.</p>",
+};
+
+const entityWithOneHeading: Entity = {
+  ...e,
+  body: "## Overview\n\nSome text.",
+  bodyHtml: "<h2>Overview</h2><p>Some text.</p>",
+};
+
+const entityNoHeadings: Entity = {
+  ...e,
+  body: "Just a paragraph.",
+  bodyHtml: "<p>Just a paragraph.</p>",
+};
+
+function renderWithBody(entity: Entity) {
+  return render(
+    <MemoryRouter>
+      <EntityPanel
+        entity={entity}
+        placements={[]}
+        entityById={new Map([[entity.id, entity]])}
+        onOpenEntity={() => {}}
+        onClose={() => {}}
+        onShowOnMap={() => {}}
+      />
+    </MemoryRouter>,
+  );
+}
+
+describe("EntityPanel — 'On this page' jump list (Q13)", () => {
+  it("renders the jump list when entity has ≥2 headings", () => {
+    renderWithBody(entityWithTwoHeadings);
+    expect(screen.getByTestId("on-this-page")).toBeInTheDocument();
+    // TOC items render as buttons with the heading text
+    expect(screen.getByRole("button", { name: "Overview" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "History" })).toBeInTheDocument();
+  });
+
+  it("does not render the jump list when entity has exactly 1 heading", () => {
+    renderWithBody(entityWithOneHeading);
+    expect(screen.queryByTestId("on-this-page")).not.toBeInTheDocument();
+  });
+
+  it("does not render the jump list when entity has no headings", () => {
+    renderWithBody(entityNoHeadings);
+    expect(screen.queryByTestId("on-this-page")).not.toBeInTheDocument();
+  });
+
+  it("collapses the list when the toggle button is clicked", () => {
+    renderWithBody(entityWithTwoHeadings);
+    const toggle = screen.getByRole("button", { name: /on this page/i });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    // TOC item buttons gone; body h2 may still be in the DOM but TOC buttons are not
+    expect(screen.queryByRole("button", { name: "Overview" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "History" })).not.toBeInTheDocument();
+  });
+
+  it("re-expands the list when the toggle is clicked again after collapsing", () => {
+    renderWithBody(entityWithTwoHeadings);
+    const toggle = screen.getByRole("button", { name: /on this page/i });
+    fireEvent.click(toggle);
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Overview" })).toBeInTheDocument();
+  });
+
+  it("injects data-anchor-id onto rendered body headings", () => {
+    renderWithBody(entityWithTwoHeadings);
+    const headings = document.querySelectorAll("[data-anchor-id]");
+    expect(headings.length).toBe(2);
+    expect(headings[0]).toHaveAttribute("data-anchor-id", "overview");
+    expect(headings[1]).toHaveAttribute("data-anchor-id", "history");
+  });
+
+  it("scrolling click does not crash (viewport delta computed, scrollTop assigned)", () => {
+    renderWithBody(entityWithTwoHeadings);
+    const viewport = document.querySelector("[data-radix-scroll-area-viewport]") as HTMLElement;
+    let assigned: number | undefined;
+    Object.defineProperty(viewport, "scrollTop", {
+      set(v: number) { assigned = v; },
+      get() { return assigned ?? 0; },
+      configurable: true,
+    });
+    // Click the "Overview" jump link — should not throw
+    const jumpLinks = screen.getAllByRole("button", { name: "Overview" });
+    fireEvent.click(jumpLinks[0]);
+    // jsdom gives zero-rects so delta = 0, but scrollTop setter was called
+    expect(assigned).toBeDefined();
+  });
+
+  it("resets the TOC to open when navigating to a new entity", () => {
+    const entityA = { ...entityWithTwoHeadings, id: "ent-a", title: "Ent A" };
+    const entityB = { ...entityWithTwoHeadings, id: "ent-b", title: "Ent B" };
+    const { rerender } = render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityA}
+          placements={[]}
+          entityById={new Map([[entityA.id, entityA]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    // Collapse the TOC on entity A
+    fireEvent.click(screen.getByRole("button", { name: /on this page/i }));
+    expect(screen.getByRole("button", { name: /on this page/i })).toHaveAttribute("aria-expanded", "false");
+
+    // Navigate to entity B — TOC should re-open
+    rerender(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityB}
+          placements={[]}
+          entityById={new Map([[entityB.id, entityB]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("button", { name: /on this page/i })).toHaveAttribute("aria-expanded", "true");
+  });
+});
