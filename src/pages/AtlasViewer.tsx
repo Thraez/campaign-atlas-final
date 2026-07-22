@@ -81,6 +81,7 @@ const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 
 import { resolvePinStyle, pinSvg, type PinPreset } from "@/atlas/pins/presets";
 import { shouldShowLabel } from "@/atlas/pins/labelVisibility";
+import { PinLegend } from "@/atlas/pins/PinLegend";
 
 function pinIconForStyle(
   style: PinPreset,
@@ -740,6 +741,9 @@ export default function AtlasViewer() {
               assetCredits={worldAssetCredits}
               credits={worldCredits}
             />
+
+            {/* Pin legend — top-right map corner, collapsed by default */}
+            <PinLegend placements={placementsOnMap} entityById={entityById} />
 
             <SoundControl />
 
