@@ -97,12 +97,6 @@ is for sequencing, not the whole spec.
 
 #### Q-B — Player entity & reading experience
 
-- [ ] **Q10. Prev/next + keyboard nav + image counter in the entity lightbox.**
-  In `src/atlas/entity/EntityPanel.tsx`, change the lightbox state from `{ src, url } | null` (line ~290) to an index into `entity.images` (`number | null`). Add left/right buttons, ArrowLeft/ArrowRight key handling (clamp or wrap), and an "n / total" counter overlay inside the Radix `DialogContent`. Recompute `resolveImageCredit(entity.images[index], assetCredits, entity.credit)` per index so the `CreditBadge` follows the current image. Preserve the existing Escape / click-to-close from the Radix `Dialog`.
-  - **Done when:** opening any thumbnail lets the player page through all `entity.images` via buttons and arrow keys, the counter shows position/total, the credit badge tracks the shown image, and Escape still closes; covered by a test in `src/test/entity/EntityPanel.test.tsx`.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  ~1 run.
-
 - [ ] **Q11. Reset the reading-panel scroll to top when the open entity changes.**
   The `ScrollArea` in `src/atlas/entity/EntityPanel.tsx` (line ~384) wraps a Radix viewport that is a persistent DOM node, so navigating from a deep scroll in entity A into entity B (via a Connection, backlink, or wikilink) leaves B scrolled partway down. Add a `useEffect` keyed on `entity.id` that finds the panel's viewport (`[data-radix-scroll-area-viewport]`) and sets `scrollTop = 0` on entity change. `src/components/ui/scroll-area.tsx` confirms the Radix `Viewport` emits that data-attribute.
   - **Done when:** opening a different entity resets the reader to the top; a test in `src/test/entity/EntityPanel.test.tsx` asserts the viewport `scrollTop` is reset on `entity.id` change.

@@ -731,3 +731,17 @@ Render/styling parity only — **not** interactivity.
   no `profile.dm` value surfaces in the output.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2454 tests green (4 shards).
 
+- [x] **Q10. Prev/next + keyboard nav + image counter in the entity lightbox.** ✅ DONE 2026-07-22 — commit 401bc2d0
+  `src/atlas/entity/EntityPanel.tsx`: changed lightbox state from `{ src, url } | null` to
+  `number | null` (index into `entity.images`). Added `goNext`/`goPrev` `useCallback`s with
+  wrap-around modulo logic; a `useEffect` that registers an `ArrowRight`/`ArrowLeft` `keydown`
+  listener on `window` only while the lightbox is open (cleaned up on close). Left/right chevron
+  buttons (`ChevronLeft`/`ChevronRight` from lucide-react) appear only when `imageCount > 1`.
+  An "n / total" counter overlay (`data-testid="lightbox-counter"`) sits absolute top-right.
+  `resolveImageCredit` is now called with the current-index src so `CreditBadge` tracks the
+  displayed image across navigation. Single-image behavior (no buttons, no counter) unchanged.
+  `src/test/entity/EntityPanel.test.tsx`: 10 new tests — open, buttons shown/hidden for multi/single
+  image, counter text, next/prev click, wrap-around from last to first, ArrowRight/ArrowLeft
+  keydown, and credit-badge tracking across navigation.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2464 tests green (4 shards).
+
