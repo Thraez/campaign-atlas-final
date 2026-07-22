@@ -97,7 +97,7 @@ is for sequencing, not the whole spec.
 
 #### Q-B — Player entity & reading experience
 
-- [ ] **Q11. Reset the reading-panel scroll to top when the open entity changes.**
+- [x] **Q11. Reset the reading-panel scroll to top when the open entity changes.** ✅ DONE 2026-07-22 — commit 352559ac; `scrollAreaRef` wired to `<ScrollArea>`; `useEffect` keyed on `entity?.id` finds `[data-radix-scroll-area-viewport]` and sets `scrollTop = 0`; 1 new test asserts viewport scrollTop reset on entity id change; 2465 tests green (4 shards).
   The `ScrollArea` in `src/atlas/entity/EntityPanel.tsx` (line ~384) wraps a Radix viewport that is a persistent DOM node, so navigating from a deep scroll in entity A into entity B (via a Connection, backlink, or wikilink) leaves B scrolled partway down. Add a `useEffect` keyed on `entity.id` that finds the panel's viewport (`[data-radix-scroll-area-viewport]`) and sets `scrollTop = 0` on entity change. `src/components/ui/scroll-area.tsx` confirms the Radix `Viewport` emits that data-attribute.
   - **Done when:** opening a different entity resets the reader to the top; a test in `src/test/entity/EntityPanel.test.tsx` asserts the viewport `scrollTop` is reset on `entity.id` change.
   - **Gate:** standard gate (typecheck + ESLint + sharded vitest).

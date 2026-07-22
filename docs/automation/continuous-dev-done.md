@@ -745,3 +745,13 @@ Render/styling parity only — **not** interactivity.
   keydown, and credit-badge tracking across navigation.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2464 tests green (4 shards).
 
+- [x] **Q11. Reset the reading-panel scroll to top when the open entity changes.** ✅ DONE 2026-07-22 — commit 352559ac
+  `src/atlas/entity/EntityPanel.tsx`: added `scrollAreaRef = useRef<HTMLDivElement>(null)` and wired
+  it to the `<ScrollArea>` element. Added a `useEffect` keyed on `entity?.id` that queries
+  `[data-radix-scroll-area-viewport]` within the ref and sets `scrollTop = 0`, resetting the reader
+  to the top whenever the DM or player navigates to a different entity.
+  `src/test/entity/EntityPanel.test.tsx`: 1 new test — uses `Object.defineProperty` to spy on the
+  viewport `scrollTop` setter, rerenders with a different entity id, and asserts the setter was
+  called with 0.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2465 tests green (4 shards).
+
