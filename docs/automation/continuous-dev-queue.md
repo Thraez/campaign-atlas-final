@@ -103,12 +103,6 @@ is for sequencing, not the whole spec.
   - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
   ~1 run.
 
-- [ ] **Q13. "On this page" section-jump list for long entity entries.**
-  In `src/atlas/entity/EntityPanel.tsx`, call `buildAnchors(entity.body)` (from `src/atlas/entity/paneScrollSync.ts`, already tested) and render a small collapsible "On this page" list at the top of the reading panel, shown only when there are 2+ headings. Inject `data-anchor-id` onto the rendered body headings after mount — mirror the exact pattern in `src/atlas/entity/EntityPanes.tsx` lines 124–131 (`querySelectorAll("h1,h2,h3,h4,h5,h6")` → `setAttribute("data-anchor-id", anchor.id)`). Clicking a list item scrolls the Radix viewport so the matching `[data-anchor-id]` heading is at the top (as `scrollToAnchor` does in EntityPanes).
-  - **Done when:** an entity body with ≥2 headings shows a collapsible jump list whose items scroll the reader to the corresponding heading; bodies with <2 headings show no list; covered by a test in `src/test/entity/EntityPanel.test.tsx`.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  ~2–3 runs.
-
 - [ ] **Q14. Include a Connections section in the printable handout.**
   `renderEntitySection` in `src/atlas/printHandout.ts` renders kicker/title/aliases/hero/summary/body/gallery/tags but drops `entity.relationships`. Add a "Connections" block listing each relationship's label (`r.label ?? r.type`) and target title, resolving the target from an `entitiesById: Map<string, Entity>` threaded through `buildHandoutHtml` (add it as a second param defaulting to an empty map so existing tests and `printEntityBundle` keep compiling). Update `printEntityHandout` and its call site in `EntityPanel.tsx` (line ~370) to pass the panel's `entityById`. Escape all inserted text via the existing `escapeHtml`.
   - **Done when:** a handout for an entity with relationships shows a Connections block (label + resolved target title, falling back to the raw id when unresolved); entities without relationships omit the block; `src/test/printHandout.test.ts` covers presence/absence and HTML-escaping.

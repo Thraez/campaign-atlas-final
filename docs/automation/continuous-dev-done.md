@@ -765,3 +765,18 @@ Render/styling parity only — **not** interactivity.
   so those classes were inert.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2465 tests green (4 shards).
 
+- [x] **Q13. "On this page" section-jump list for long entity entries.** ✅ DONE 2026-07-22 — commit a8cbfedd
+  `src/atlas/entity/paneScrollSync.ts`: exported new `TocItem` interface + `buildToc(text)` function
+  that pairs each `buildAnchors` id with the raw heading display text (same slug/dedup logic, line-
+  aligned with buildAnchors so index positions match the DOM order).
+  `src/atlas/entity/EntityPanel.tsx`: `tocItems` memoized via `buildToc(entity.body)` keyed on
+  `entity.body`; a `useEffect` keyed on `tocItems` injects `data-anchor-id` attributes onto rendered
+  body headings (mirrors the EntityPanes.tsx pattern); `scrollToAnchorById` uses
+  `getBoundingClientRect` delta to set the Radix viewport's `scrollTop`; a `[tocOpen, setTocOpen]`
+  state (reset to true on entity change) drives a collapsible `<nav aria-label="On this page">` that
+  renders only when `tocItems.length >= 2`.
+  `src/test/entity/EntityPanel.test.tsx`: 7 new tests — renders list when ≥2 headings, hidden for <2
+  headings or none, collapse/expand toggle, data-anchor-id injection verified in DOM, scroll click
+  assigns scrollTop without throwing, and TOC resets to open on entity navigation.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2473 tests green (4 shards).
+
