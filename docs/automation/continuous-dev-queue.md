@@ -103,12 +103,6 @@ is for sequencing, not the whole spec.
   - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
   ~1 run.
 
-- [ ] **Q15. De-duplicate and group Connections vs "Mentioned in".**
-  In `src/atlas/entity/EntityPanel.tsx`, the "Mentioned in" backlink chips (lines ~446–467, from `entity.backlinks`) and the "Connections" list (lines ~469–505, from `entity.relationships`) can both show the same related entity. Group the Connections rows by relationship type/label for readability, and filter the backlink chips to drop any whose `id` already appears as a Connection target (`r.entity`), so each related entity surfaces once.
-  - **Done when:** an entity that is both a relationship target and a backlink appears only under Connections; Connections are grouped by type/label; a test in `src/test/entity/EntityPanel.test.tsx` asserts the dedup and grouping.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  ~1 run.
-
 - [ ] **Q16. Replace the handout pop-up-blocked `alert()` with an app toast + pre-flight guard.**
   `openPrintWindow` in `src/atlas/printHandout.ts` (line ~149) calls raw `window.alert("Pop-up blocked…")` when `window.open` returns null. Route this through the app's sonner toast — `import { toast } from "sonner"` (already used in `EntityPanel.tsx`) and call `toast.error(...)` with a clear "allow pop-ups to download the handout" hint. Keep the pure `buildHandoutHtml` unchanged. Optionally have `printEntityHandout`/`printEntityBundle` return a boolean so callers can react.
   - **Done when:** a blocked pop-up shows a non-blocking sonner toast (no `window.alert`); `buildHandoutHtml` stays untouched; `src/test/printHandout.test.ts` still passes and, if a return value is added, a test asserts the blocked path.

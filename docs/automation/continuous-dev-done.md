@@ -794,3 +794,17 @@ Render/styling parity only — **not** interactivity.
   title, label override, raw-id fallback, and HTML-escaping of both label and target.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2478 tests green (4 shards;
   pre-existing onTaskUpdate RPC flake in shard 3).
+
+
+- [x] **Q15. De-duplicate and group Connections vs "Mentioned in".** ✅ DONE 2026-07-23 — commit a63ff812
+  `src/atlas/entity/EntityPanel.tsx`: two new `useMemo` values — `connectionTargetIds` (Set of
+  relationship target entity IDs) and `connectionGroups` (array of `{label, rels}` preserving
+  insertion order). The "Mentioned in" backlink chips now filter out any backlink whose `id` is in
+  `connectionTargetIds`, so entities already shown under Connections are not repeated. The Connections
+  section renders grouped rows: all relationship targets sharing the same `r.label ?? r.type` appear
+  on one row under that label, instead of repeating the label for each target.
+  `src/test/entity/EntityPanel.test.tsx`: 4 new tests — overlap suppressed + "Mentioned in" heading
+  hidden when all backlinks deduped; non-overlapping backlink kept; same-label grouping (label
+  appears once, both targets present); two-label separate-row rendering.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2482 tests green (4 shards;
+  pre-existing onTaskUpdate RPC flake in shard 3).
