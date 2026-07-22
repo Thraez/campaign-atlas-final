@@ -76,12 +76,7 @@ is for sequencing, not the whole spec.
   z-500, bottom-centre). Maps without `scale` render nothing.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2429 tests green (4 shards).
 
-- [ ] **Q4. Add a collapsible pin legend for the active map.**
-  There is no legend explaining pin shapes/colors. Derive the distinct pin presets present among `placementsOnMap` (`AtlasViewer.tsx:277`) by mapping each placement to `resolvePinStyle(entity.type, p.pin)` (`src/atlas/pins/presets.ts:265`) and deduping by preset `id`; render a small collapsible map-corner legend (default collapsed) listing each present type's `pinSvg` swatch (`presets.ts:304`) + `preset.label`. Reuse `pinSvg` for the swatches so legend and map stay in sync. Pure derivation from existing placements + presets — no new data model, no persisted config.
-  - **Done when:** the legend lists exactly the pin types present on the active map with matching glyph + label, defaults to collapsed, and re-derives when the active map changes.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Legend is a named in-scope affordance; keep it a single small toggle with no config and no DM-secret surface (reads only already-projected player placements).
-  ~2–3 runs.
+- [x] **Q4. Add a collapsible pin legend for the active map.** ✅ DONE 2026-07-22 — commit cb83354c; `PinLegend.tsx` derives distinct presets via `resolvePinStyle` + dedup by id; top-right corner overlay, default collapsed, re-derives on map switch; 7 unit tests; 2436 tests green (4 shards).
 
 - [ ] **Q5. Use the real world name instead of hardcoded "Astrath Atlas".**
   The atlas title is hardcoded as `Astrath Atlas` in `AtlasViewer.tsx:534` and `AtlasNavMenu.tsx:57`, so any DM with a differently-named world sees the wrong header and mobile-nav title. Render `data.project.worlds[0]?.name` instead: add a `worldName` prop to `AtlasNavMenu` (props today are `{ publishedAt, footer, showCredits }` at `:40`) and pass it from every call site that embeds it — `AtlasViewer`, plus `AtlasBrowse` and `AtlasTimeline` (both embed `AtlasNavMenu` per its docstring) — falling back to a generic `"Atlas"` when the name is absent.

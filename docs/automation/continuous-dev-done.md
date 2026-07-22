@@ -670,3 +670,16 @@ Render/styling parity only — **not** interactivity.
   - Done when: checkboxes look consistent on all surfaces, non-interactive in read/player; gates green. ~1 run.
   - ✅ DONE (pre-queue) — commit bf188e0f; parity fixture verifies `atlas-task-item`/`atlas-task-done` classes, no `<input>` emitted
 
+---
+
+### Q — Refuel 2026-07-14 (100-task QoL / feature / infra / refactor backlog)
+
+- [x] **Q4. Add a collapsible pin legend for the active map.** ✅ DONE 2026-07-22 — commit cb83354c
+  New `src/atlas/pins/PinLegend.tsx`: derives distinct pin presets from `placementsOnMap` via
+  `resolvePinStyle` + dedup by preset id; renders a collapsible top-right corner overlay (default
+  collapsed) with `pinSvg` swatches + preset labels; re-derives on map switch via `useMemo`.
+  `AtlasViewer.tsx`: import + `<PinLegend placements={placementsOnMap} entityById={entityById} />`.
+  `src/test/pins/PinLegend.test.tsx`: 7 unit tests (no-placements null, expand/collapse toggle,
+  dedup, multi-preset, unknown-entity fallback).
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing) · 2436 tests green (4 shards).
+
