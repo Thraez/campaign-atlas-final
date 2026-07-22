@@ -20,6 +20,7 @@ import { printEntityHandout } from "@/atlas/printHandout";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 import { logger } from "@/lib/logger";
 import type { AssetCredit, CreditsConfig, Entity, MapPlacement } from "@/atlas/content/schema";
+import type { PlayerProfile } from "@/atlas/profiles/profileTypes";
 import { CreditBadge } from "./CreditBadge";
 import { mountSecretBlock } from "@/atlas/secrets/secretBlockView";
 
@@ -271,6 +272,43 @@ function ImageThumb({ src, alt, onClick }: { src: string; alt: string; onClick: 
   );
 }
 
+function PlayerProfileBlock({ profile }: { profile: PlayerProfile }) {
+  const hasKnownFor = !!profile.known_for;
+  const hasTraits = (profile.visible_traits?.length ?? 0) > 0;
+  const hasRumors = (profile.rumors?.length ?? 0) > 0;
+  if (!hasKnownFor && !hasTraits && !hasRumors) return null;
+  return (
+    <div className="atlas-player-profile space-y-2 pt-1" data-testid="player-profile-block">
+      {hasKnownFor && (
+        <div className="text-sm">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Known for</span>
+          <p className="mt-0.5">{profile.known_for}</p>
+        </div>
+      )}
+      {hasTraits && (
+        <div className="text-sm">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Visible traits</span>
+          <ul className="mt-0.5 list-disc list-inside space-y-0.5">
+            {profile.visible_traits!.map((t, i) => (
+              <li key={i}>{t}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {hasRumors && (
+        <div className="text-sm">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Rumors</span>
+          <ul className="mt-0.5 list-disc list-inside space-y-0.5">
+            {profile.rumors!.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function EntityPanel(
   {
     entity,
@@ -387,6 +425,10 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
             <p className="text-sm italic text-muted-foreground border-l-2 border-primary pl-3">
               {entity.summary}
             </p>
+          )}
+
+          {entity.profile?.player && (
+            <PlayerProfileBlock profile={entity.profile.player} />
           )}
 
           {entity.images.length > 0 && (

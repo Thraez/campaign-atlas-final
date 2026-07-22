@@ -871,3 +871,88 @@ describe("EntityPanel — CopyLinkButton copied state (N77)", () => {
     });
   });
 });
+
+// ── Q9 — Player profile block ────────────────────────────────────────────────
+
+describe("EntityPanel — player profile block (Q9)", () => {
+  function renderWithProfile(overrides: Partial<Entity>) {
+    return render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={{ ...e, ...overrides }}
+          placements={[]}
+          entityById={new Map([[e.id, e]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+  }
+
+  it("renders nothing when profile is absent", () => {
+    renderWithProfile({});
+    expect(screen.queryByTestId("player-profile-block")).not.toBeInTheDocument();
+  });
+
+  it("renders nothing when profile.player is absent", () => {
+    renderWithProfile({ profile: {} });
+    expect(screen.queryByTestId("player-profile-block")).not.toBeInTheDocument();
+  });
+
+  it("renders nothing when profile.player is empty (all fields absent)", () => {
+    renderWithProfile({ profile: { player: {} } });
+    expect(screen.queryByTestId("player-profile-block")).not.toBeInTheDocument();
+  });
+
+  it("renders known_for when present", () => {
+    renderWithProfile({ profile: { player: { known_for: "A master smuggler" } } });
+    expect(screen.getByTestId("player-profile-block")).toBeInTheDocument();
+    expect(screen.getByText("A master smuggler")).toBeInTheDocument();
+    expect(screen.getByText(/known for/i)).toBeInTheDocument();
+  });
+
+  it("renders visible_traits as a bulleted list", () => {
+    renderWithProfile({
+      profile: { player: { visible_traits: ["Wears a red cloak", "Speaks with an accent"] } },
+    });
+    expect(screen.getByText("Wears a red cloak")).toBeInTheDocument();
+    expect(screen.getByText("Speaks with an accent")).toBeInTheDocument();
+    expect(screen.getByText(/visible traits/i)).toBeInTheDocument();
+  });
+
+  it("renders rumors as a list", () => {
+    renderWithProfile({
+      profile: { player: { rumors: ["Said to have fought a dragon", "Rumored to be nobility"] } },
+    });
+    expect(screen.getByText("Said to have fought a dragon")).toBeInTheDocument();
+    expect(screen.getByText("Rumored to be nobility")).toBeInTheDocument();
+    expect(screen.getByText(/rumors/i)).toBeInTheDocument();
+  });
+
+  it("renders all three fields together", () => {
+    renderWithProfile({
+      profile: {
+        player: {
+          known_for: "Quick wit",
+          visible_traits: ["Scarred cheek"],
+          rumors: ["May be a spy"],
+        },
+      },
+    });
+    expect(screen.getByText("Quick wit")).toBeInTheDocument();
+    expect(screen.getByText("Scarred cheek")).toBeInTheDocument();
+    expect(screen.getByText("May be a spy")).toBeInTheDocument();
+  });
+
+  it("does not render profile.dm content in the output", () => {
+    renderWithProfile({
+      profile: {
+        player: { known_for: "Quick wit" },
+        dm: { secret_motive: "DM_SECRET_MOTIVE" },
+      },
+    });
+    expect(screen.queryByText("DM_SECRET_MOTIVE")).not.toBeInTheDocument();
+    expect(screen.queryByText(/secret_motive/i)).not.toBeInTheDocument();
+  });
+});
