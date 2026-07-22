@@ -79,7 +79,7 @@ is for sequencing, not the whole spec.
 - [x] **Q4. Add a collapsible pin legend for the active map.** ✅ DONE 2026-07-22 — commit cb83354c; `PinLegend.tsx` derives distinct presets via `resolvePinStyle` + dedup by id; top-right corner overlay, default collapsed, re-derives on map switch; 7 unit tests; 2436 tests green (4 shards).
 
 
-- [ ] **Q6. Constrain panning with `maxBounds` so players can't get lost in the void.**
+- [x] **Q6. Constrain panning with `maxBounds` so players can't get lost in the void.** ✅ DONE 2026-07-22 — commit 2c96305c; MaxBoundsController sets extent+10% padding with viscosity 0.75; wrapX maps clear bounds; stableMap mock gains `options`; 3 new smoke tests; 2435 tests green (4 shards).
   `MapContainer` (`AtlasViewer.tsx:633-651`) sets no `maxBounds`, so a player can pan far into empty ocean with no easy way back. Add a `useMap` controller effect keyed on `activeMap.id` that calls `map.setMaxBounds` on the map extent `[[0,0],[activeMap.height, activeMap.width]]` plus a modest padding, with a gentle `maxBoundsViscosity`. Skip the horizontal clamp when `activeMap.wrapX` is true (the world wraps). Ensure deep-link/`flyTo` targets (set via `flyTarget`/`MapController` at `:100-116`) inside the bounds still resolve.
   - **Done when:** players can't pan far past the map edge (bounds gently resist and snap back), `wrapX` maps still scroll horizontally, and deep-linked jumps within the map still land.
   - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
