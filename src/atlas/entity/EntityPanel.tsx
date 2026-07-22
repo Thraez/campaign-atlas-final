@@ -333,6 +333,26 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
 
   const tocItems = useMemo(() => buildToc(entity?.body ?? ""), [entity?.body]);
 
+  const connectionTargetIds = useMemo(
+    () => new Set((entity?.relationships ?? []).map((r) => r.entity)),
+    [entity?.relationships],
+  );
+
+  const connectionGroups = useMemo(() => {
+    const rels = entity?.relationships ?? [];
+    const order: string[] = [];
+    const groups = new Map<string, typeof rels>();
+    for (const r of rels) {
+      const label = r.label ?? r.type;
+      if (!groups.has(label)) {
+        order.push(label);
+        groups.set(label, []);
+      }
+      groups.get(label)!.push(r);
+    }
+    return order.map((label) => ({ label, rels: groups.get(label)! }));
+  }, [entity?.relationships]);
+
   // Reset TOC to open when navigating to a different entity.
   useEffect(() => {
     setTocOpen(true);
@@ -578,63 +598,70 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
             </div>
           )}
 
-          {entity.backlinks.length > 0 && (
+          {entity.backlinks.filter((b) => !connectionTargetIds.has(b.id)).length > 0 && (
             <div className="pt-3 border-t border-border">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
                 Mentioned in
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {entity.backlinks.map((b) => (
-                  <button
-                    key={b.id}
-                    className="text-xs px-2 py-1 rounded bg-muted hover:bg-accent transition"
-                    onClick={() => onOpenEntity(b.id)}
-                    onMouseEnter={(e) => onPeek?.(b.id, e.currentTarget.getBoundingClientRect())}
-                    onMouseLeave={() => onPeekLeave?.()}
-                    onFocus={(e) => onPeek?.(b.id, e.currentTarget.getBoundingClientRect())}
-                    onBlur={() => onPeekLeave?.()}
-                  >
-                    {b.title}
-                  </button>
-                ))}
+                {entity.backlinks
+                  .filter((b) => !connectionTargetIds.has(b.id))
+                  .map((b) => (
+                    <button
+                      key={b.id}
+                      className="text-xs px-2 py-1 rounded bg-muted hover:bg-accent transition"
+                      onClick={() => onOpenEntity(b.id)}
+                      onMouseEnter={(e) => onPeek?.(b.id, e.currentTarget.getBoundingClientRect())}
+                      onMouseLeave={() => onPeekLeave?.()}
+                      onFocus={(e) => onPeek?.(b.id, e.currentTarget.getBoundingClientRect())}
+                      onBlur={() => onPeekLeave?.()}
+                    >
+                      {b.title}
+                    </button>
+                  ))}
               </div>
             </div>
           )}
 
-          {(entity.relationships ?? []).length > 0 && (
+          {connectionGroups.length > 0 && (
             <div className="pt-3 border-t border-border" data-testid="connections-section">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
                 Connections
               </div>
               <div className="flex flex-col gap-1">
-                {(entity.relationships ?? []).map((r, i) => {
-                  const target = entityById.get(r.entity);
-                  const displayLabel = r.label ?? r.type;
-                  return (
-                    <div key={`${r.entity}-${i}`} className="flex items-center gap-1.5 text-xs">
-                      <span className="text-muted-foreground shrink-0">{displayLabel}:</span>
-                      <button
-                        className="hover:underline truncate text-left"
-                        onClick={() => onOpenEntity(r.entity)}
-                        onMouseEnter={(e) =>
-                          onPeek?.(r.entity, e.currentTarget.getBoundingClientRect())
-                        }
-                        onMouseLeave={() => onPeekLeave?.()}
-                        onFocus={(e) => onPeek?.(r.entity, e.currentTarget.getBoundingClientRect())}
-                        onBlur={() => onPeekLeave?.()}
-                      >
-                        {target ? (
-                          target.title
-                        ) : (
-                          <span className="text-muted-foreground">{r.entity}</span>
-                        )}
-                      </button>
-                      {r.visibility === "dm" && (
-                        <span className="text-[10px] text-muted-foreground shrink-0">(DM)</span>
-                      )}
-                    </div>
-                  );
-                })}
+                {connectionGroups.map(({ label, rels }) => (
+                  <div key={label} className="flex flex-wrap items-center gap-1.5 text-xs">
+                    <span className="text-muted-foreground shrink-0">{label}:</span>
+                    {rels.map((r, i) => {
+                      const target = entityById.get(r.entity);
+                      return (
+                        <span key={`${r.entity}-${i}`} className="inline-flex items-center gap-1">
+                          <button
+                            className="hover:underline truncate text-left"
+                            onClick={() => onOpenEntity(r.entity)}
+                            onMouseEnter={(e) =>
+                              onPeek?.(r.entity, e.currentTarget.getBoundingClientRect())
+                            }
+                            onMouseLeave={() => onPeekLeave?.()}
+                            onFocus={(e) =>
+                              onPeek?.(r.entity, e.currentTarget.getBoundingClientRect())
+                            }
+                            onBlur={() => onPeekLeave?.()}
+                          >
+                            {target ? (
+                              target.title
+                            ) : (
+                              <span className="text-muted-foreground">{r.entity}</span>
+                            )}
+                          </button>
+                          {r.visibility === "dm" && (
+                            <span className="text-[10px] text-muted-foreground shrink-0">(DM)</span>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
             </div>
           )}

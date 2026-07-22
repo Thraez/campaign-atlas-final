@@ -1296,3 +1296,115 @@ describe("EntityPanel — 'On this page' jump list (Q13)", () => {
     expect(screen.getByRole("button", { name: /on this page/i })).toHaveAttribute("aria-expanded", "true");
   });
 });
+
+// ── Q15 — Connections dedup and grouping ─────────────────────────────────────
+
+describe("EntityPanel — Connections dedup and grouping (Q15)", () => {
+  it("filters backlink chips for entities that are also Connection targets", () => {
+    const entity: Entity = {
+      ...e,
+      backlinks: [{ id: "ally-npc", title: "Ally NPC" }],
+      relationships: [{ entity: "ally-npc", type: "allied_with", visibility: "player" as const }],
+    } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={baseEntityById}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    // "Ally NPC" appears once (Connections), not twice
+    expect(screen.getAllByText("Ally NPC")).toHaveLength(1);
+    // "Mentioned in" heading is gone — no remaining backlinks
+    expect(screen.queryByText(/Mentioned in/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps backlink chips for entities not appearing in Connections", () => {
+    const other: Entity = {
+      ...e,
+      id: "other-npc",
+      title: "Other NPC",
+    } as Entity;
+    const entity: Entity = {
+      ...e,
+      backlinks: [{ id: "other-npc", title: "Other NPC" }],
+      relationships: [{ entity: "ally-npc", type: "allied_with", visibility: "player" as const }],
+    } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={new Map([[e.id, e], [ally.id, ally], [other.id, other]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    // Backlink for "Other NPC" (not a Connection target) still shows
+    expect(screen.getByText("Other NPC")).toBeInTheDocument();
+    expect(screen.getByText(/Mentioned in/i)).toBeInTheDocument();
+  });
+
+  it("groups multiple relationships sharing the same label into one row", () => {
+    const cityA: Entity = { ...e, id: "city-a", title: "City A" } as Entity;
+    const cityB: Entity = { ...e, id: "city-b", title: "City B" } as Entity;
+    const entity: Entity = {
+      ...e,
+      relationships: [
+        { entity: "city-a", label: "Controls", type: "controls", visibility: "player" as const },
+        { entity: "city-b", label: "Controls", type: "controls", visibility: "player" as const },
+      ],
+    } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={new Map([[e.id, e], [cityA.id, cityA], [cityB.id, cityB]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("City A")).toBeInTheDocument();
+    expect(screen.getByText("City B")).toBeInTheDocument();
+    // Label appears exactly once — both targets grouped under it
+    expect(screen.getAllByText(/^Controls:$/)).toHaveLength(1);
+  });
+
+  it("renders different label groups as separate rows", () => {
+    const cityA: Entity = { ...e, id: "city-a", title: "City A" } as Entity;
+    const entity: Entity = {
+      ...e,
+      relationships: [
+        { entity: "ally-npc", type: "allied_with", visibility: "player" as const },
+        { entity: "city-a", label: "Controls", type: "controls", visibility: "player" as const },
+      ],
+    } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={new Map([[e.id, e], [ally.id, ally], [cityA.id, cityA]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Ally NPC")).toBeInTheDocument();
+    expect(screen.getByText("City A")).toBeInTheDocument();
+    // Two distinct label spans
+    expect(screen.getByText(/^allied_with:$/)).toBeInTheDocument();
+    expect(screen.getByText(/^Controls:$/)).toBeInTheDocument();
+  });
+});
