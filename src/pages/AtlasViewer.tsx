@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback, type MutableRefObject } from "react";
 import {
   MapContainer,
   Marker,
@@ -33,6 +33,7 @@ import {
   Ruler,
   Star,
   KeyRound,
+  Maximize2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -57,6 +58,7 @@ import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
+import { ScaleBarController, type ScaleBarState } from "@/atlas/scale/ScaleBar";
 import { serializeDeepLink, parseDeepLink } from "@/atlas/deepLink";
 import {
   ROUTE_MODE_LABEL,
@@ -79,6 +81,7 @@ const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
 
 import { resolvePinStyle, pinSvg, type PinPreset } from "@/atlas/pins/presets";
 import { shouldShowLabel } from "@/atlas/pins/labelVisibility";
+import { PinLegend } from "@/atlas/pins/PinLegend";
 
 function pinIconForStyle(
   style: PinPreset,
@@ -140,6 +143,42 @@ function ViewSyncController({
   return null;
 }
 
+function FitBoundsController({
+  mapId,
+  mapWidth,
+  mapHeight,
+  flyTarget,
+  fitRef,
+}: {
+  mapId: string;
+  mapWidth: number;
+  mapHeight: number;
+  flyTarget: { x: number; y: number; height: number; zoom?: number } | null;
+  fitRef: MutableRefObject<(() => void) | null>;
+}) {
+  const map = useMap();
+  const seenMapIdRef = useRef<string | null>(null);
+
+  // Keep the reset-view callback current after every render in which deps change
+  useLayoutEffect(() => {
+    fitRef.current = () => {
+      map.fitBounds([[0, 0], [mapHeight, mapWidth]], { animate: true, duration: 0.5 });
+    };
+    return () => {
+      fitRef.current = null;
+    };
+  }, [map, mapHeight, mapWidth, fitRef]);
+
+  useEffect(() => {
+    if (seenMapIdRef.current === mapId) return;
+    seenMapIdRef.current = mapId;
+    if (flyTarget !== null) return; // fly already pending; MapController handles it
+    map.fitBounds([[0, 0], [mapHeight, mapWidth]], { animate: false });
+  }, [mapId, mapWidth, mapHeight, flyTarget, map]);
+
+  return null;
+}
+
 interface ViewerState {
   project: AtlasProject;
   index: SearchIndexEntry[];
@@ -178,6 +217,8 @@ export default function AtlasViewer() {
 
   const [viewCenter, setViewCenter] = useState<{ x: number; y: number; zoom: number } | null>(null);
   const viewCenterRef = useRef<{ x: number; y: number; zoom: number } | null>(null);
+  const fitMapRef = useRef<(() => void) | null>(null);
+  const [scaleBar, setScaleBar] = useState<ScaleBarState | null>(null);
 
   const handleViewChange = useCallback((cx: number, cy: number, cz: number) => {
     const vc = { x: cx, y: cy, zoom: cz };
@@ -535,7 +576,7 @@ export default function AtlasViewer() {
           </Link>
           <div className="flex-1" />
           {data.project.maps.length > 1 && (
-            <Select value={activeMap.id} onValueChange={setActiveMapId}>
+            <Select value={activeMap.id} onValueChange={(id) => { setActiveMapId(id); setFlyTarget(null); }}>
               <SelectTrigger className="h-8 w-[180px] text-xs" aria-label="Choose map">
                 <SelectValue />
               </SelectTrigger>
@@ -651,11 +692,19 @@ export default function AtlasViewer() {
               }}
             >
               <MapController flyTo={flyTarget} />
+              <FitBoundsController
+                mapId={activeMap.id}
+                mapWidth={activeMap.width}
+                mapHeight={activeMap.height}
+                flyTarget={flyTarget}
+                fitRef={fitMapRef}
+              />
               <ViewSyncController
                 mapId={activeMap.id}
                 mapHeight={activeMap.height}
                 onViewChange={handleViewChange}
               />
+              <ScaleBarController scale={activeMap.scale} onChange={setScaleBar} />
               <SoundscapeLayer map={activeMap} />
               <RulerLayer
                 active={rulerActive}
@@ -676,6 +725,7 @@ export default function AtlasViewer() {
                   showGrid={showGrid}
                   onOpenEntity={openEntity}
                   visited={visited}
+                  openId={openId}
                   onPinPeek={onPinPeek}
                   onPinPeekLeave={peekCtl.onTriggerLeave}
                 />
@@ -692,6 +742,9 @@ export default function AtlasViewer() {
               credits={worldCredits}
             />
 
+            {/* Pin legend — top-right map corner, collapsed by default */}
+            <PinLegend placements={placementsOnMap} entityById={entityById} />
+
             <SoundControl />
 
             {/* Wander button + discovery meter — bottom-left map overlay */}
@@ -706,6 +759,37 @@ export default function AtlasViewer() {
                 You've explored everything you can reach — travel onward to uncover more.
               </div>
             )}
+
+            {/* Scale bar — bottom-center map overlay */}
+            {scaleBar && (
+              <div
+                className="atlas-scale-bar absolute bottom-3 left-1/2 -translate-x-1/2 z-[500] pointer-events-none select-none"
+                role="note"
+                aria-label={`Map scale: ${scaleBar.label}`}
+              >
+                <div className="rounded bg-background/90 border border-border px-2 pb-1 pt-1 shadow-sm text-center">
+                  <div
+                    className="mx-auto border-b border-l border-r border-foreground/60 h-1.5 mb-0.5"
+                    style={{ width: `${scaleBar.barWidth}px` }}
+                    aria-hidden="true"
+                  />
+                  <span className="text-[10px] text-muted-foreground leading-none">
+                    {scaleBar.label}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Reset view — bottom-right map corner */}
+            <button
+              type="button"
+              onClick={() => fitMapRef.current?.()}
+              className="absolute bottom-3 right-3 z-[500] h-8 w-8 rounded bg-background/90 border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="Reset map view"
+              title="Reset view (fit map to screen)"
+            >
+              <Maximize2 className="h-4 w-4" aria-hidden="true" />
+            </button>
           </main>
 
           {/* Desktop side panel — only mounts at lg+. Below that, the entity
@@ -851,6 +935,7 @@ interface WrappedWorldProps {
   showGrid: boolean | null;
   onOpenEntity: (id: string, fly?: boolean) => void;
   visited: Set<string>;
+  openId: string | null;
   onPinPeek?: (id: string, ev: MouseEvent) => void;
   onPinPeekLeave?: () => void;
 }
@@ -863,6 +948,7 @@ function WrappedWorld({
   showGrid,
   onOpenEntity,
   visited,
+  openId,
   onPinPeek,
   onPinPeekLeave,
 }: WrappedWorldProps) {
@@ -984,6 +1070,7 @@ function WrappedWorld({
         entityById={entityById}
         onOpenEntity={onOpenEntity}
         visited={visited}
+        openId={openId}
         onPinPeek={onPinPeek}
         onPinPeekLeave={onPinPeekLeave}
       />
@@ -1001,6 +1088,7 @@ function PlacementMarkers({
   entityById,
   onOpenEntity,
   visited,
+  openId,
   onPinPeek,
   onPinPeekLeave,
 }: {
@@ -1010,6 +1098,7 @@ function PlacementMarkers({
   entityById: Map<string, Entity>;
   onOpenEntity: (id: string, fly?: boolean) => void;
   visited: Set<string>;
+  openId: string | null;
   onPinPeek?: (id: string, ev: MouseEvent) => void;
   onPinPeekLeave?: () => void;
 }) {
@@ -1068,7 +1157,12 @@ function PlacementMarkers({
             position={[H - p.y, p.x + dx]}
             icon={pinIconForStyle(style, {
               dim,
-              extraClass: pinDiscoveryClass(p.entityId, visited),
+              extraClass: [
+                pinDiscoveryClass(p.entityId, visited),
+                p.entityId === openId ? "atlas-viewer-pin--active" : null,
+              ]
+                .filter(Boolean)
+                .join(" "),
             })}
             eventHandlers={{
               click: () => onOpenEntity(p.entityId, false),
