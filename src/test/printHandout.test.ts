@@ -5,6 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { buildHandoutHtml } from "../atlas/printHandout";
 import type { Entity } from "../atlas/content/schema";
+import type { EntityRelationship } from "../atlas/profiles/profileTypes";
 
 function entity(over: Partial<Entity> & { id: string; title: string }): Entity {
   return {
@@ -22,6 +23,17 @@ function entity(over: Partial<Entity> & { id: string; title: string }): Entity {
     links: over.links ?? [],
     backlinks: over.backlinks ?? [],
     summary: over.summary,
+    relationships: over.relationships,
+  };
+}
+
+function rel(over: Partial<EntityRelationship> & { entity: string; type: string }): EntityRelationship {
+  return {
+    entity: over.entity,
+    type: over.type,
+    label: over.label,
+    description: over.description,
+    visibility: over.visibility ?? "player",
   };
 }
 
@@ -103,5 +115,73 @@ describe("buildHandoutHtml", () => {
     ]);
     expect(html).toContain('class="hero"');
     expect(html).toMatch(/src="[^"]*atlas\/assets\/img\.jpg"/);
+  });
+
+  it("omits Connections block when entity has no relationships", () => {
+    const html = buildHandoutHtml([entity({ id: "a", title: "Alice" })]);
+    expect(html).not.toContain("Connections");
+    expect(html).not.toContain('class="connections"');
+  });
+
+  it("renders Connections block with resolved target title", () => {
+    const bob = entity({ id: "bob", title: "Bob the Merchant" });
+    const entitiesById = new Map([["bob", bob]]);
+    const html = buildHandoutHtml(
+      [entity({ id: "alice", title: "Alice", relationships: [rel({ entity: "bob", type: "ally" })] })],
+      entitiesById,
+    );
+    expect(html).toContain("Connections");
+    expect(html).toContain("Bob the Merchant");
+    expect(html).toContain("ally");
+  });
+
+  it("uses r.label over r.type in Connections when label is present", () => {
+    const entitiesById = new Map([["bob", entity({ id: "bob", title: "Bob" })]]);
+    const html = buildHandoutHtml(
+      [
+        entity({
+          id: "alice",
+          title: "Alice",
+          relationships: [rel({ entity: "bob", type: "ally", label: "Trade partner" })],
+        }),
+      ],
+      entitiesById,
+    );
+    expect(html).toContain("Trade partner");
+    expect(html).not.toContain(">ally<");
+  });
+
+  it("falls back to raw entity id when target is not in entitiesById", () => {
+    const html = buildHandoutHtml(
+      [
+        entity({
+          id: "alice",
+          title: "Alice",
+          relationships: [rel({ entity: "unknown-id", type: "rival" })],
+        }),
+      ],
+      new Map(),
+    );
+    expect(html).toContain("unknown-id");
+    expect(html).toContain("rival");
+  });
+
+  it("escapes HTML in relationship label and target title", () => {
+    const evil = entity({ id: "evil", title: "<script>evil()</script>" });
+    const entitiesById = new Map([["evil", evil]]);
+    const html = buildHandoutHtml(
+      [
+        entity({
+          id: "alice",
+          title: "Alice",
+          relationships: [rel({ entity: "evil", type: "rival", label: "<b>enemy</b>" })],
+        }),
+      ],
+      entitiesById,
+    );
+    expect(html).not.toContain("<script>evil()</script>");
+    expect(html).not.toContain("<b>enemy</b>");
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).toContain("&lt;b&gt;");
   });
 });
