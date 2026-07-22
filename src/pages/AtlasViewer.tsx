@@ -676,6 +676,7 @@ export default function AtlasViewer() {
                   showGrid={showGrid}
                   onOpenEntity={openEntity}
                   visited={visited}
+                  openId={openId}
                   onPinPeek={onPinPeek}
                   onPinPeekLeave={peekCtl.onTriggerLeave}
                 />
@@ -851,6 +852,7 @@ interface WrappedWorldProps {
   showGrid: boolean | null;
   onOpenEntity: (id: string, fly?: boolean) => void;
   visited: Set<string>;
+  openId: string | null;
   onPinPeek?: (id: string, ev: MouseEvent) => void;
   onPinPeekLeave?: () => void;
 }
@@ -863,6 +865,7 @@ function WrappedWorld({
   showGrid,
   onOpenEntity,
   visited,
+  openId,
   onPinPeek,
   onPinPeekLeave,
 }: WrappedWorldProps) {
@@ -984,6 +987,7 @@ function WrappedWorld({
         entityById={entityById}
         onOpenEntity={onOpenEntity}
         visited={visited}
+        openId={openId}
         onPinPeek={onPinPeek}
         onPinPeekLeave={onPinPeekLeave}
       />
@@ -1001,6 +1005,7 @@ function PlacementMarkers({
   entityById,
   onOpenEntity,
   visited,
+  openId,
   onPinPeek,
   onPinPeekLeave,
 }: {
@@ -1010,6 +1015,7 @@ function PlacementMarkers({
   entityById: Map<string, Entity>;
   onOpenEntity: (id: string, fly?: boolean) => void;
   visited: Set<string>;
+  openId: string | null;
   onPinPeek?: (id: string, ev: MouseEvent) => void;
   onPinPeekLeave?: () => void;
 }) {
@@ -1068,7 +1074,12 @@ function PlacementMarkers({
             position={[H - p.y, p.x + dx]}
             icon={pinIconForStyle(style, {
               dim,
-              extraClass: pinDiscoveryClass(p.entityId, visited),
+              extraClass: [
+                pinDiscoveryClass(p.entityId, visited),
+                p.entityId === openId ? "atlas-viewer-pin--active" : null,
+              ]
+                .filter(Boolean)
+                .join(" "),
             })}
             eventHandlers={{
               click: () => onOpenEntity(p.entityId, false),
