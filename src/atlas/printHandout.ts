@@ -7,6 +7,7 @@
  * chrome, sidebars, and toolbars never bleed into the output. The HTML
  * builder is pure (no DOM, no window) so it can be unit tested.
  */
+import { toast } from "sonner";
 import type { Entity } from "./content/schema";
 import { playerTypeLabel } from "./content/typeLabel";
 import { normalizeAtlasAssetUrl } from "./url";
@@ -168,25 +169,26 @@ export function buildHandoutHtml(
 </html>`;
 }
 
-function openPrintWindow(html: string): void {
+function openPrintWindow(html: string): boolean {
   const w = window.open("", "_blank", "noopener,noreferrer,width=900,height=1100");
   if (!w) {
-    alert("Pop-up blocked. Please allow pop-ups to print handouts.");
-    return;
+    toast.error("Pop-ups are blocked. Please allow pop-ups for this site to download the handout.");
+    return false;
   }
   w.document.open();
   w.document.write(html);
   w.document.close();
+  return true;
 }
 
 export function printEntityHandout(
   entity: Entity,
   entitiesById: Map<string, Entity> = EMPTY_ENTITIES,
-): void {
-  openPrintWindow(buildHandoutHtml([entity], entitiesById));
+): boolean {
+  return openPrintWindow(buildHandoutHtml([entity], entitiesById));
 }
 
 /** Print a bundle of entities as a single PDF, one entity per page. */
-export function printEntityBundle(entities: Entity[]): void {
-  openPrintWindow(buildHandoutHtml(entities));
+export function printEntityBundle(entities: Entity[]): boolean {
+  return openPrintWindow(buildHandoutHtml(entities));
 }
