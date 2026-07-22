@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
-import type { CreditsConfig, Entity, MapPlacement } from "@/atlas/content/schema";
+import type { AssetCredit, CreditsConfig, Entity, MapPlacement } from "@/atlas/content/schema";
 import type { EntityRelationship } from "@/atlas/profiles/profileTypes";
 
 const e: Entity = {
@@ -954,5 +954,159 @@ describe("EntityPanel — player profile block (Q9)", () => {
     });
     expect(screen.queryByText("DM_SECRET_MOTIVE")).not.toBeInTheDocument();
     expect(screen.queryByText(/secret_motive/i)).not.toBeInTheDocument();
+  });
+});
+
+// ── Q10 — Lightbox prev/next + keyboard nav + counter ───────────────────────
+
+const entityWith3Images: Entity = {
+  ...e,
+  images: ["img1.png", "img2.png", "img3.png"],
+  credit: "Art by Jane",
+} as Entity;
+
+const entityWith1Image: Entity = {
+  ...e,
+  images: ["solo.png"],
+} as Entity;
+
+function renderLightboxPanel(entity: Entity, assetCredits?: Record<string, AssetCredit>) {
+  return render(
+    <MemoryRouter>
+      <EntityPanel
+        entity={entity}
+        placements={[]}
+        entityById={new Map([[entity.id, entity]])}
+        onOpenEntity={() => {}}
+        onClose={() => {}}
+        onShowOnMap={() => {}}
+        assetCredits={assetCredits}
+      />
+    </MemoryRouter>,
+  );
+}
+
+describe("EntityPanel — lightbox navigation (Q10)", () => {
+  it("opens the lightbox when a thumbnail is clicked", async () => {
+    renderLightboxPanel(entityWith3Images);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+  });
+
+  it("shows prev/next buttons when entity has multiple images", async () => {
+    renderLightboxPanel(entityWith3Images);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("Previous image")).toBeInTheDocument();
+      expect(screen.getByLabelText("Next image")).toBeInTheDocument();
+    });
+  });
+
+  it("hides prev/next buttons when entity has a single image", async () => {
+    renderLightboxPanel(entityWith1Image);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+    expect(screen.queryByLabelText("Previous image")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Next image")).not.toBeInTheDocument();
+  });
+
+  it("shows the n/total counter in the lightbox for multi-image entities", async () => {
+    renderLightboxPanel(entityWith3Images);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("1 / 3");
+    });
+  });
+
+  it("advances to the next image when the Next button is clicked", async () => {
+    renderLightboxPanel(entityWith3Images);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("1 / 3");
+    });
+    fireEvent.click(screen.getByLabelText("Next image"));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("2 / 3");
+    });
+  });
+
+  it("goes to the previous image when the Prev button is clicked", async () => {
+    renderLightboxPanel(entityWith3Images);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 2/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("2 / 3");
+    });
+    fireEvent.click(screen.getByLabelText("Previous image"));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("1 / 3");
+    });
+  });
+
+  it("wraps from last image to first on Next", async () => {
+    renderLightboxPanel(entityWith3Images);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 3/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("3 / 3");
+    });
+    fireEvent.click(screen.getByLabelText("Next image"));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("1 / 3");
+    });
+  });
+
+  it("advances on ArrowRight keydown", async () => {
+    renderLightboxPanel(entityWith3Images);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("1 / 3");
+    });
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("2 / 3");
+    });
+  });
+
+  it("goes back on ArrowLeft keydown", async () => {
+    renderLightboxPanel(entityWith3Images);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 2/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("2 / 3");
+    });
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("1 / 3");
+    });
+  });
+
+  it("credit badge tracks the current image when navigating", async () => {
+    const entity: Entity = {
+      ...e,
+      images: ["img1.png", "img2.png"],
+    } as Entity;
+    const assetCredits: Record<string, AssetCredit> = {
+      "img1.png": { credit: "Credit for img1", enabled: true },
+      "img2.png": { credit: "Credit for img2", enabled: true },
+    };
+    renderLightboxPanel(entity, assetCredits);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      // Modal aria-hides the rest of the page; only the lightbox badge is accessible
+      expect(
+        screen.getAllByRole("note", { name: /Image credit: Credit for img1/i }).length,
+      ).toBeGreaterThan(0);
+    });
+    fireEvent.click(screen.getByLabelText("Next image"));
+    await waitFor(() => {
+      expect(
+        screen.getAllByRole("note", { name: /Image credit: Credit for img2/i }).length,
+      ).toBeGreaterThan(0);
+    });
+    expect(
+      screen.queryByRole("note", { name: /Image credit: Credit for img1/i }),
+    ).not.toBeInTheDocument();
   });
 });

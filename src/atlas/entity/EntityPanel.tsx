@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef, forwardRef } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { MapPin, X, Link2, Check, Printer } from "lucide-react";
+import { MapPin, X, Link2, Check, Printer, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -325,7 +325,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
   },
   ref,
 ) {
-  const [lightbox, setLightbox] = useState<{ src: string; url: string } | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   // Merge the forwarded ref (used by callers) and the local bodyRef (used by the secret effect).
@@ -353,6 +353,28 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
     });
   }, [entity]);
 
+  const imageCount = entity?.images.length ?? 0;
+
+  const goNext = useCallback(() => {
+    setLightboxIndex((i) => (i !== null && imageCount > 0 ? (i + 1) % imageCount : null));
+  }, [imageCount]);
+
+  const goPrev = useCallback(() => {
+    setLightboxIndex((i) =>
+      i !== null && imageCount > 0 ? (i - 1 + imageCount) % imageCount : null,
+    );
+  }, [imageCount]);
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") goNext();
+      else if (e.key === "ArrowLeft") goPrev();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightboxIndex, goNext, goPrev]);
+
   if (!entity) {
     return (
       <div className="flex-1 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
@@ -365,8 +387,10 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
   }
 
   const imageUrl = (src: string) => normalizeAtlasAssetUrl(src);
-  const lightboxCredit = lightbox
-    ? resolveImageCredit(lightbox.src, assetCredits, entity.credit)
+  const lightboxSrc = lightboxIndex !== null ? entity.images[lightboxIndex] : null;
+  const lightboxUrl = lightboxSrc ? imageUrl(lightboxSrc) : null;
+  const lightboxCredit = lightboxSrc
+    ? resolveImageCredit(lightboxSrc, assetCredits, entity.credit)
     : null;
 
   return (
@@ -440,7 +464,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
                     <ImageThumb
                       src={imageUrl(src)}
                       alt={`${entity.title} image ${i + 1}`}
-                      onClick={() => setLightbox({ src, url: imageUrl(src) })}
+                      onClick={() => setLightboxIndex(i)}
                     />
                     {credits?.badges !== false && imgCredit && <CreditBadge credit={imgCredit} />}
                   </div>
@@ -549,17 +573,42 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
       </ScrollArea>
 
       {/* Lightbox */}
-      <Dialog open={!!lightbox} onOpenChange={(open) => !open && setLightbox(null)}>
+      <Dialog open={lightboxIndex !== null} onOpenChange={(open) => !open && setLightboxIndex(null)}>
         <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 bg-black/90 border-none overflow-hidden">
           <DialogTitle className="sr-only">{entity.title} image</DialogTitle>
-          {lightbox && (
+          {lightboxIndex !== null && lightboxUrl && (
             <div className="relative">
               <img
-                src={lightbox.url}
+                src={lightboxUrl}
                 alt={`${entity.title}`}
                 className="max-w-full max-h-[85vh] object-contain mx-auto"
-                onClick={() => setLightbox(null)}
+                onClick={() => setLightboxIndex(null)}
               />
+              {imageCount > 1 && (
+                <>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); goPrev(); }}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 hover:bg-black/70 text-white p-2 transition"
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); goNext(); }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 hover:bg-black/70 text-white p-2 transition"
+                    aria-label="Next image"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                  <div
+                    className="absolute top-2 right-2 text-xs text-white/80 bg-black/50 px-2 py-0.5 rounded"
+                    aria-label={`Image ${lightboxIndex + 1} of ${imageCount}`}
+                    data-testid="lightbox-counter"
+                  >
+                    {lightboxIndex + 1} / {imageCount}
+                  </div>
+                </>
+              )}
               {credits?.badges !== false && lightboxCredit && (
                 <CreditBadge credit={lightboxCredit} />
               )}
