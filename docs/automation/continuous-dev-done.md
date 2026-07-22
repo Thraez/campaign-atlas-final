@@ -720,3 +720,14 @@ Render/styling parity only — **not** interactivity.
   forwards those props as data attributes).
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2446 tests green (4 shards).
 
+- [x] **Q9. Surface the player profile block (known_for / visible_traits / rumors) in the reading panel.** ✅ DONE 2026-07-22 — commit e32cea9e
+  `src/atlas/entity/EntityPanel.tsx`: added `PlayerProfileBlock` component that reads
+  `entity.profile?.player` and renders three sub-sections — "Known for" (single line), "Visible
+  traits" (bulleted list), and "Rumors" (bulleted list) — beneath the entity summary. Renders
+  nothing when `profile.player` is absent or all three fields are empty. Only `profile.player` is
+  read; `profile.dm` is never referenced. Import of `PlayerProfile` type added from profileTypes.
+  `src/test/entity/EntityPanel.test.tsx`: 8 new unit tests covering absent profile, absent
+  profile.player, empty profile.player, each field individually, all three together, and asserting
+  no `profile.dm` value surfaces in the output.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2454 tests green (4 shards).
+

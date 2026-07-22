@@ -97,13 +97,6 @@ is for sequencing, not the whole spec.
 
 #### Q-B — Player entity & reading experience
 
-- [ ] **Q9. Surface the player profile block (known_for / visible_traits / rumors) in the reading panel.**
-  In `src/atlas/entity/EntityPanel.tsx`, render `entity.profile?.player` as a compact block in the scroll body (near the summary `<p>` around line 386): a "Known for" line (`known_for`), a bulleted "Visible traits" list (`visible_traits`), and a "Rumors" list (`rumors`) — the `PlayerProfile` shape in `src/atlas/profiles/profileTypes.ts`. Render nothing when `profile.player` is absent/empty. Read `profile.player` ONLY; never reference `profile.dm`. Add light styling in `src/index.css` if needed and a unit test in `src/test/entity/EntityPanel.test.tsx` asserting the three fields render and that no `profile.dm` value appears in output.
-  - **Done when:** an entity with a populated `profile.player` shows all three sub-sections; an empty/absent profile renders nothing; a test asserts render plus that `profile.dm` data never surfaces.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Player-facing: `EntityPanel` always receives an already-projected entity (`projectEntityForPlayer` runs `stripDmProfile`), so operate only on `profile.player` — no DM-secret surface.
-  ~2–3 runs.
-
 - [ ] **Q10. Prev/next + keyboard nav + image counter in the entity lightbox.**
   In `src/atlas/entity/EntityPanel.tsx`, change the lightbox state from `{ src, url } | null` (line ~290) to an index into `entity.images` (`number | null`). Add left/right buttons, ArrowLeft/ArrowRight key handling (clamp or wrap), and an "n / total" counter overlay inside the Radix `DialogContent`. Recompute `resolveImageCredit(entity.images[index], assetCredits, entity.credit)` per index so the `CreditBadge` follows the current image. Preserve the existing Escape / click-to-close from the Radix `Dialog`.
   - **Done when:** opening any thumbnail lets the player page through all `entity.images` via buttons and arrow keys, the counter shows position/total, the credit badge tracks the shown image, and Escape still closes; covered by a test in `src/test/entity/EntityPanel.test.tsx`.
