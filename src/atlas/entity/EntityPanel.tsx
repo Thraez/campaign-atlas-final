@@ -23,6 +23,7 @@ import type { AssetCredit, CreditsConfig, Entity, MapPlacement } from "@/atlas/c
 import type { PlayerProfile } from "@/atlas/profiles/profileTypes";
 import { CreditBadge } from "./CreditBadge";
 import { mountSecretBlock } from "@/atlas/secrets/secretBlockView";
+import { buildToc } from "@/atlas/entity/paneScrollSync";
 
 export interface EntityPanelProps {
   entity: Entity | null;
@@ -326,8 +327,38 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
   ref,
 ) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [tocOpen, setTocOpen] = useState(true);
   const bodyRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  const tocItems = useMemo(() => buildToc(entity?.body ?? ""), [entity?.body]);
+
+  // Reset TOC to open when navigating to a different entity.
+  useEffect(() => {
+    setTocOpen(true);
+  }, [entity?.id]);
+
+  // Inject data-anchor-id onto rendered body headings so TOC clicks can find them.
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el || tocItems.length === 0) return;
+    el.querySelectorAll("h1,h2,h3,h4,h5,h6").forEach((h, i) => {
+      const item = tocItems[i];
+      if (item) h.setAttribute("data-anchor-id", item.id);
+    });
+  }, [tocItems]);
+
+  const scrollToAnchorById = useCallback((anchorId: string) => {
+    const viewport = scrollAreaRef.current?.querySelector<HTMLElement>(
+      "[data-radix-scroll-area-viewport]",
+    );
+    const heading = bodyRef.current?.querySelector<HTMLElement>(
+      `[data-anchor-id="${CSS.escape(anchorId)}"]`,
+    );
+    if (!viewport || !heading) return;
+    const delta = heading.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+    viewport.scrollTop += delta;
+  }, []);
 
   // Merge the forwarded ref (used by callers) and the local bodyRef (used by the secret effect).
   const setBodyRefs = useCallback(
@@ -454,6 +485,35 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
 
       <ScrollArea ref={scrollAreaRef} className="flex-1">
         <div className="p-4 space-y-4">
+          {tocItems.length >= 2 && (
+            <nav aria-label="On this page" data-testid="on-this-page">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition"
+                onClick={() => setTocOpen((v) => !v)}
+                aria-expanded={tocOpen}
+              >
+                <span>On this page</span>
+                <span aria-hidden="true">{tocOpen ? "−" : "+"}</span>
+              </button>
+              {tocOpen && (
+                <ul className="mt-2 space-y-0.5 list-none pl-0">
+                  {tocItems.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        className="text-xs text-left text-muted-foreground hover:text-foreground hover:underline transition w-full truncate"
+                        onClick={() => scrollToAnchorById(item.id)}
+                      >
+                        {item.text}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </nav>
+          )}
+
           {entity.summary && (
             <p className="text-sm italic text-muted-foreground border-l-2 border-primary pl-3">
               {entity.summary}
