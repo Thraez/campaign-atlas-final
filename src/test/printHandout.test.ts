@@ -2,10 +2,13 @@
  * Tests for the handout HTML builder used by single-entity printing
  * (player viewer) and the multi-entity bundle (DM editor).
  */
-import { describe, it, expect } from "vitest";
-import { buildHandoutHtml } from "../atlas/printHandout";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { toast } from "sonner";
+import { buildHandoutHtml, printEntityHandout, printEntityBundle } from "../atlas/printHandout";
 import type { Entity } from "../atlas/content/schema";
 import type { EntityRelationship } from "../atlas/profiles/profileTypes";
+
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
 function entity(over: Partial<Entity> & { id: string; title: string }): Entity {
   return {
@@ -183,5 +186,55 @@ describe("buildHandoutHtml", () => {
     expect(html).not.toContain("<b>enemy</b>");
     expect(html).toContain("&lt;script&gt;");
     expect(html).toContain("&lt;b&gt;");
+  });
+});
+
+describe("Q16: pop-up guard — toast instead of alert", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  function mockPopupBlocked() {
+    vi.spyOn(window, "open").mockReturnValue(null);
+  }
+
+  function mockPopupAllowed() {
+    const fakeDoc = { open: vi.fn(), write: vi.fn(), close: vi.fn() };
+    const fakeWin = { document: fakeDoc } as unknown as Window;
+    vi.spyOn(window, "open").mockReturnValue(fakeWin);
+    return fakeDoc;
+  }
+
+  it("calls toast.error and returns false when the pop-up is blocked", () => {
+    mockPopupBlocked();
+    const e = entity({ id: "a", title: "Alpha" });
+    const result = printEntityHandout(e);
+    expect(result).toBe(false);
+    expect(vi.mocked(toast.error)).toHaveBeenCalledOnce();
+    expect(vi.mocked(toast.error).mock.calls[0][0]).toMatch(/pop-up/i);
+  });
+
+  it("does not call toast.error and returns true when the pop-up opens", () => {
+    const fakeDoc = mockPopupAllowed();
+    const e = entity({ id: "a", title: "Alpha" });
+    const result = printEntityHandout(e);
+    expect(result).toBe(true);
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
+    expect(fakeDoc.write).toHaveBeenCalledOnce();
+  });
+
+  it("printEntityBundle returns false and toasts when blocked", () => {
+    mockPopupBlocked();
+    const result = printEntityBundle([entity({ id: "a", title: "Alpha" })]);
+    expect(result).toBe(false);
+    expect(vi.mocked(toast.error)).toHaveBeenCalledOnce();
+  });
+
+  it("printEntityBundle returns true and writes HTML when allowed", () => {
+    const fakeDoc = mockPopupAllowed();
+    const result = printEntityBundle([entity({ id: "a", title: "Alpha" })]);
+    expect(result).toBe(true);
+    expect(fakeDoc.write).toHaveBeenCalledOnce();
   });
 });
