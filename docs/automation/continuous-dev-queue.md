@@ -103,13 +103,6 @@ is for sequencing, not the whole spec.
   - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
   ~1 run.
 
-- [ ] **Q14. Include a Connections section in the printable handout.**
-  `renderEntitySection` in `src/atlas/printHandout.ts` renders kicker/title/aliases/hero/summary/body/gallery/tags but drops `entity.relationships`. Add a "Connections" block listing each relationship's label (`r.label ?? r.type`) and target title, resolving the target from an `entitiesById: Map<string, Entity>` threaded through `buildHandoutHtml` (add it as a second param defaulting to an empty map so existing tests and `printEntityBundle` keep compiling). Update `printEntityHandout` and its call site in `EntityPanel.tsx` (line ~370) to pass the panel's `entityById`. Escape all inserted text via the existing `escapeHtml`.
-  - **Done when:** a handout for an entity with relationships shows a Connections block (label + resolved target title, falling back to the raw id when unresolved); entities without relationships omit the block; `src/test/printHandout.test.ts` covers presence/absence and HTML-escaping.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Player-facing: `printEntityHandout` receives the already-player-projected entity (relationships pre-filtered by `projectEntityForPlayer`); pass only the projected entity/ids, never raw DM relationships.
-  ~2–3 runs.
-
 - [ ] **Q15. De-duplicate and group Connections vs "Mentioned in".**
   In `src/atlas/entity/EntityPanel.tsx`, the "Mentioned in" backlink chips (lines ~446–467, from `entity.backlinks`) and the "Connections" list (lines ~469–505, from `entity.relationships`) can both show the same related entity. Group the Connections rows by relationship type/label for readability, and filter the backlink chips to drop any whose `id` already appears as a Connection target (`r.entity`), so each related entity surfaces once.
   - **Done when:** an entity that is both a relationship target and a backlink appears only under Connections; Connections are grouped by type/label; a test in `src/test/entity/EntityPanel.test.tsx` asserts the dedup and grouping.

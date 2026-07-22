@@ -780,3 +780,17 @@ Render/styling parity only — **not** interactivity.
   assigns scrollTop without throwing, and TOC resets to open on entity navigation.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2473 tests green (4 shards).
 
+
+- [x] **Q14. Include a Connections section in the printable handout.** ✅ DONE 2026-07-22 — commit 6b64f993
+  `src/atlas/printHandout.ts`: `renderEntitySection` gains an `entitiesById: Map<string, Entity>`
+  param; when `entity.relationships?.length`, a `<div class="connections">` block is appended after
+  the gallery listing each relationship's `r.label ?? r.type` and the resolved target title (falling
+  back to the raw entity id). `buildHandoutHtml` gains the same param defaulting to an empty map
+  constant so existing call sites and `printEntityBundle` compile unchanged. `printEntityHandout`
+  exposes the param and forwards it through. Connections CSS added to `HANDOUT_CSS`.
+  `src/atlas/entity/EntityPanel.tsx`: call site updated to pass `entityById` prop so the panel's
+  pre-loaded entity map drives title resolution.
+  `src/test/printHandout.test.ts`: 5 new tests — no block when no relationships, resolved target
+  title, label override, raw-id fallback, and HTML-escaping of both label and target.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2478 tests green (4 shards;
+  pre-existing onTaskUpdate RPC flake in shard 3).
