@@ -68,12 +68,13 @@ is for sequencing, not the whole spec.
   Bounds cross into Leaflet, so preserve lat = height − y, lng = x (full extent = `[[0,0],[height,width]]`). Uses stock Leaflet `fitBounds` only (no tiling/chunking).
   ~2–3 runs.
 
-- [ ] **Q3. Add a dynamic scale bar overlay driven by `map.scale`.**
-  `MapScale` (`unitsPerPixel` + `unitLabel`, `src/atlas/content/schema.ts:133`) is today consumed only by the ruler (`measureDistance`) and route tooltips (`AtlasViewer.tsx:927-930`). Add a persistent bottom-corner scale bar (Leaflet-`L.control.scale`-style) that recomputes on `zoomend`: measure a fixed screen-pixel span via `map.containerPointToLatLng` on two horizontally-separated container points, multiply the resulting map-pixel delta by `scale.unitsPerPixel`, snap to a nice round number (1/2/5 × 10^n), and render `──── 10 mi` using `scale.unitLabel`. Render nothing when `activeMap.scale` is absent.
-  - **Done when:** maps with a `scale` show a live scale bar that updates on zoom and reads a round number + unit label; maps without `scale` render nothing; a unit test covers the 1/2/5×10^n round-number snapping.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Read-only overlay; coords cross into Leaflet so keep lat = height − y, lng = x.
-  ~2–3 runs.
+- [x] **Q3. Add a dynamic scale bar overlay driven by `map.scale`.** ✅ DONE 2026-07-22 (`0f338883` feat; `d4502eb1` merge)
+  Scale bar appears at bottom-centre of the viewer when `activeMap.scale` is set, recomputes on every
+  `zoomend`. New modules: `src/atlas/scale/scaleBarUtils.ts` (`niceScaleNumber` pure fn, 7 tests) +
+  `src/atlas/scale/ScaleBar.tsx` (`ScaleBarController` inside MapContainer, lifts state via `onChange`).
+  AtlasViewer wires both: controller inside MapContainer, visual overlay outside (pointer-events-none,
+  z-500, bottom-centre). Maps without `scale` render nothing.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2429 tests green (4 shards).
 
 - [ ] **Q4. Add a collapsible pin legend for the active map.**
   There is no legend explaining pin shapes/colors. Derive the distinct pin presets present among `placementsOnMap` (`AtlasViewer.tsx:277`) by mapping each placement to `resolvePinStyle(entity.type, p.pin)` (`src/atlas/pins/presets.ts:265`) and deduping by preset `id`; render a small collapsible map-corner legend (default collapsed) listing each present type's `pinSvg` swatch (`presets.ts:304`) + `preset.label`. Reuse `pinSvg` for the swatches so legend and map stay in sync. Pure derivation from existing placements + presets — no new data model, no persisted config.
