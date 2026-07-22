@@ -469,7 +469,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => printEntityHandout(entity)}
+              onClick={() => printEntityHandout(entity, entityById)}
               title="Download as printable handout (PDF)"
               aria-label="Download handout as PDF"
             >

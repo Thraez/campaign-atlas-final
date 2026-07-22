@@ -11,6 +11,8 @@ import type { Entity } from "./content/schema";
 import { playerTypeLabel } from "./content/typeLabel";
 import { normalizeAtlasAssetUrl } from "./url";
 
+const EMPTY_ENTITIES: Map<string, Entity> = new Map();
+
 const escapeHtml = (s: string): string =>
   s.replace(
     /[&<>"']/g,
@@ -45,6 +47,11 @@ const HANDOUT_CSS = `
   .body blockquote { border-left: 3px solid #b08d3a; margin: 0.8em 0; padding: 0.1em 0 0.1em 12px; color: #555; font-style: italic; }
   .body ul, .body ol { padding-left: 1.4em; margin: 0.5em 0; }
   .body a, .body a.atlas-wikilink { color: #5d4a1a; text-decoration: none; border-bottom: 1px dotted #b08d3a; }
+  .connections { margin-top: 18px; border-top: 1px solid #e0d4b0; padding-top: 12px; }
+  .conn-heading { font-family: "Cinzel", Georgia, serif; font-size: 15px; color: #1a1a1a; margin: 0 0 8px; }
+  .connections ul { margin: 0; padding-left: 1.2em; font-size: 13px; }
+  .connections li { margin-bottom: 3px; }
+  .conn-label { color: #8a6a1f; font-style: italic; }
   .tags { margin-top: 18px; font-size: 11px; color: #6c6c6c; font-family: "Helvetica Neue", Arial, sans-serif; }
   .tags span { display: inline-block; margin-right: 8px; }
   footer.handout-foot { margin-top: 26px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 10px; color: #888; font-family: "Helvetica Neue", Arial, sans-serif; display: flex; justify-content: space-between; }
@@ -60,7 +67,11 @@ const HANDOUT_CSS = `
 
 /** Render one entity as a self-contained <article>. Page break is applied by
  *  the caller (so the last entity in a bundle doesn't get a trailing blank). */
-function renderEntitySection(entity: Entity, withPageBreak: boolean): string {
+function renderEntitySection(
+  entity: Entity,
+  withPageBreak: boolean,
+  entitiesById: Map<string, Entity>,
+): string {
   const heroImg = entity.images[0] ? normalizeAtlasAssetUrl(entity.images[0]) : null;
   const galleryImgs = entity.images.slice(1).map((src) => normalizeAtlasAssetUrl(src));
   const tagsHtml = entity.tags.length
@@ -74,6 +85,16 @@ function renderEntitySection(entity: Entity, withPageBreak: boolean): string {
   // <a class="atlas-wikilink"> tokens; render as-is for the handout.
   const body = entity.bodyHtml || `<p>${escapeHtml(entity.body || "")}</p>`;
   const cls = withPageBreak ? "handout page-break" : "handout";
+  const connectionsHtml = entity.relationships?.length
+    ? `<div class="connections"><h2 class="conn-heading">Connections</h2><ul>${entity.relationships
+        .map((r) => {
+          const label = escapeHtml(r.label ?? r.type);
+          const target = entitiesById.get(r.entity);
+          const targetTitle = escapeHtml(target?.title ?? r.entity);
+          return `<li><span class="conn-label">${label}:</span> ${targetTitle}</li>`;
+        })
+        .join("")}</ul></div>`
+    : "";
 
   return `<article class="${cls}">
     <header class="handout-head">
@@ -89,6 +110,7 @@ function renderEntitySection(entity: Entity, withPageBreak: boolean): string {
     ${summary}
     <div class="body">${body}</div>
     ${galleryImgs.length ? `<div class="gallery">${galleryImgs.map((src) => `<img src="${escapeHtml(src)}" alt="" />`).join("")}</div>` : ""}
+    ${connectionsHtml}
     ${tagsHtml}
     <footer class="handout-foot">
       <span>Astrath Atlas — player handout</span>
@@ -98,7 +120,10 @@ function renderEntitySection(entity: Entity, withPageBreak: boolean): string {
 }
 
 /** Pure builder for the print-window HTML. Exported for testing. */
-export function buildHandoutHtml(entities: Entity[]): string {
+export function buildHandoutHtml(
+  entities: Entity[],
+  entitiesById: Map<string, Entity> = EMPTY_ENTITIES,
+): string {
   const docTitle =
     entities.length === 0
       ? "Atlas handout"
@@ -109,7 +134,7 @@ export function buildHandoutHtml(entities: Entity[]): string {
   const sections =
     entities.length === 0
       ? `<div class="empty">No entities selected for this handout.</div>`
-      : entities.map((e, i) => renderEntitySection(e, i < entities.length - 1)).join("\n");
+      : entities.map((e, i) => renderEntitySection(e, i < entities.length - 1, entitiesById)).join("\n");
 
   return `<!doctype html>
 <html lang="en">
@@ -154,8 +179,11 @@ function openPrintWindow(html: string): void {
   w.document.close();
 }
 
-export function printEntityHandout(entity: Entity): void {
-  openPrintWindow(buildHandoutHtml([entity]));
+export function printEntityHandout(
+  entity: Entity,
+  entitiesById: Map<string, Entity> = EMPTY_ENTITIES,
+): void {
+  openPrintWindow(buildHandoutHtml([entity], entitiesById));
 }
 
 /** Print a bundle of entities as a single PDF, one entity per page. */
