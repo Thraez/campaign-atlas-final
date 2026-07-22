@@ -58,6 +58,7 @@ import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
+import { ScaleBarController, type ScaleBarState } from "@/atlas/scale/ScaleBar";
 import { serializeDeepLink, parseDeepLink } from "@/atlas/deepLink";
 import {
   ROUTE_MODE_LABEL,
@@ -216,6 +217,7 @@ export default function AtlasViewer() {
   const [viewCenter, setViewCenter] = useState<{ x: number; y: number; zoom: number } | null>(null);
   const viewCenterRef = useRef<{ x: number; y: number; zoom: number } | null>(null);
   const fitMapRef = useRef<(() => void) | null>(null);
+  const [scaleBar, setScaleBar] = useState<ScaleBarState | null>(null);
 
   const handleViewChange = useCallback((cx: number, cy: number, cz: number) => {
     const vc = { x: cx, y: cy, zoom: cz };
@@ -701,6 +703,7 @@ export default function AtlasViewer() {
                 mapHeight={activeMap.height}
                 onViewChange={handleViewChange}
               />
+              <ScaleBarController scale={activeMap.scale} onChange={setScaleBar} />
               <SoundscapeLayer map={activeMap} />
               <RulerLayer
                 active={rulerActive}
@@ -750,6 +753,26 @@ export default function AtlasViewer() {
             {wanderEmpty && (
               <div className="atlas-wander-note absolute left-3 bottom-20 z-[500] max-w-xs rounded-lg border bg-background/95 px-3 py-2 text-xs text-muted-foreground">
                 You've explored everything you can reach — travel onward to uncover more.
+              </div>
+            )}
+
+            {/* Scale bar — bottom-center map overlay */}
+            {scaleBar && (
+              <div
+                className="atlas-scale-bar absolute bottom-3 left-1/2 -translate-x-1/2 z-[500] pointer-events-none select-none"
+                role="note"
+                aria-label={`Map scale: ${scaleBar.label}`}
+              >
+                <div className="rounded bg-background/90 border border-border px-2 pb-1 pt-1 shadow-sm text-center">
+                  <div
+                    className="mx-auto border-b border-l border-r border-foreground/60 h-1.5 mb-0.5"
+                    style={{ width: `${scaleBar.barWidth}px` }}
+                    aria-hidden="true"
+                  />
+                  <span className="text-[10px] text-muted-foreground leading-none">
+                    {scaleBar.label}
+                  </span>
+                </div>
               </div>
             )}
 
