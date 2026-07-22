@@ -54,7 +54,7 @@ is for sequencing, not the whole spec.
 
 #### Q-A — Player map & wayfinding
 
-- [ ] **Q1. Highlight the currently-open entity's pin on the map.**
+- [x] **Q1. Highlight the currently-open entity's pin on the map.** ✅ DONE 2026-07-22 — commit 2ae89c5d; `openId` threaded through WrappedWorld→PlacementMarkers; `atlas-viewer-pin--active` CSS ring+drop-shadow in index.css; 2417 tests green.
   Thread the open entity's id (`openId` state, `AtlasViewer.tsx:152`) down through `WrappedWorld` (rendered at ~`:669`) into `PlacementMarkers` (`:997`), and when `p.entityId === openId` pass an `"atlas-viewer-pin--active"` extraClass into `pinIconForStyle` (`:83`, which merges extraClass into the DivIcon className). Add an `.atlas-viewer-pin--active` ring/glow rule in `src/index.css` next to the `.atlas-viewer-pin` block (`:69`). Do NOT reuse `pinSvg`'s `pulse` option (`src/atlas/pins/presets.ts:311`): its `atlas-pulse` keyframe is defined only inside `AtlasPlacementEditor.tsx:1971` and is tree-shaken out of player builds, so it would be inert for players — define the ring (and any keyframe) in `index.css`, which ships to players.
   - **Done when:** opening a place via search/wander/deep-link visibly rings that entity's marker(s) on the active map, clearing selection removes the ring, and it renders in the player build (no reliance on editor-only CSS).
   - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
