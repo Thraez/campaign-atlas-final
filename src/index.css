@@ -419,6 +419,82 @@
   color: hsl(var(--accent));
 }
 
+/* Atlas viewer: GFM table styling */
+.atlas-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  font-size: 0.9em;
+}
+.atlas-prose th, .atlas-prose td {
+  border: 1px solid hsl(var(--border));
+  padding: 0.35rem 0.65rem;
+  text-align: left;
+}
+.atlas-prose th {
+  background: hsl(var(--muted) / 0.6);
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+.atlas-prose tbody tr:nth-child(even) {
+  background: hsl(var(--muted) / 0.25);
+}
+
+/* Atlas viewer: ordered lists, inline code, fenced code, hr, h4–h6 */
+.atlas-prose ol { list-style: decimal; padding-left: 1.25rem; }
+.atlas-prose li { margin: 0.2em 0; }
+.atlas-prose code {
+  font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  font-size: 0.85em;
+  background: hsl(var(--muted) / 0.7);
+  border: 1px solid hsl(var(--border));
+  border-radius: 3px;
+  padding: 0.1em 0.35em;
+}
+.atlas-prose pre {
+  background: hsl(var(--muted) / 0.5);
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  font-size: 0.85em;
+}
+.atlas-prose pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 1em;
+}
+.atlas-prose hr {
+  border: none;
+  border-top: 1px solid hsl(var(--border));
+  margin: 1.25rem 0;
+}
+.atlas-prose h4 {
+  font-family: var(--font-display, serif);
+  color: hsl(var(--foreground));
+  margin-top: 0.85em;
+  font-size: 1em;
+  font-weight: 600;
+}
+.atlas-prose h5 {
+  font-family: var(--font-display, serif);
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.75em;
+  font-size: 0.9em;
+  font-weight: 600;
+}
+.atlas-prose h6 {
+  font-family: var(--font-display, serif);
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.75em;
+  font-size: 0.85em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 /* Accessibility: respect users who prefer reduced motion. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

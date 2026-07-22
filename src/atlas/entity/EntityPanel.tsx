@@ -500,7 +500,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
 
           <div
             ref={setBodyRefs}
-            className="atlas-prose prose prose-sm max-w-none dark:prose-invert"
+            className="atlas-prose max-w-none"
             dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(entity.bodyHtml) }}
           />
 
