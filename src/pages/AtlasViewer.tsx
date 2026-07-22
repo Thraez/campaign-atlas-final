@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback, type MutableRefObject } from "react";
 import {
   MapContainer,
   Marker,
@@ -33,6 +33,7 @@ import {
   Ruler,
   Star,
   KeyRound,
+  Maximize2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -140,6 +141,42 @@ function ViewSyncController({
   return null;
 }
 
+function FitBoundsController({
+  mapId,
+  mapWidth,
+  mapHeight,
+  flyTarget,
+  fitRef,
+}: {
+  mapId: string;
+  mapWidth: number;
+  mapHeight: number;
+  flyTarget: { x: number; y: number; height: number; zoom?: number } | null;
+  fitRef: MutableRefObject<(() => void) | null>;
+}) {
+  const map = useMap();
+  const seenMapIdRef = useRef<string | null>(null);
+
+  // Keep the reset-view callback current after every render in which deps change
+  useLayoutEffect(() => {
+    fitRef.current = () => {
+      map.fitBounds([[0, 0], [mapHeight, mapWidth]], { animate: true, duration: 0.5 });
+    };
+    return () => {
+      fitRef.current = null;
+    };
+  }, [map, mapHeight, mapWidth, fitRef]);
+
+  useEffect(() => {
+    if (seenMapIdRef.current === mapId) return;
+    seenMapIdRef.current = mapId;
+    if (flyTarget !== null) return; // fly already pending; MapController handles it
+    map.fitBounds([[0, 0], [mapHeight, mapWidth]], { animate: false });
+  }, [mapId, mapWidth, mapHeight, flyTarget, map]);
+
+  return null;
+}
+
 interface ViewerState {
   project: AtlasProject;
   index: SearchIndexEntry[];
@@ -178,6 +215,7 @@ export default function AtlasViewer() {
 
   const [viewCenter, setViewCenter] = useState<{ x: number; y: number; zoom: number } | null>(null);
   const viewCenterRef = useRef<{ x: number; y: number; zoom: number } | null>(null);
+  const fitMapRef = useRef<(() => void) | null>(null);
 
   const handleViewChange = useCallback((cx: number, cy: number, cz: number) => {
     const vc = { x: cx, y: cy, zoom: cz };
@@ -535,7 +573,7 @@ export default function AtlasViewer() {
           </Link>
           <div className="flex-1" />
           {data.project.maps.length > 1 && (
-            <Select value={activeMap.id} onValueChange={setActiveMapId}>
+            <Select value={activeMap.id} onValueChange={(id) => { setActiveMapId(id); setFlyTarget(null); }}>
               <SelectTrigger className="h-8 w-[180px] text-xs" aria-label="Choose map">
                 <SelectValue />
               </SelectTrigger>
@@ -651,6 +689,13 @@ export default function AtlasViewer() {
               }}
             >
               <MapController flyTo={flyTarget} />
+              <FitBoundsController
+                mapId={activeMap.id}
+                mapWidth={activeMap.width}
+                mapHeight={activeMap.height}
+                flyTarget={flyTarget}
+                fitRef={fitMapRef}
+              />
               <ViewSyncController
                 mapId={activeMap.id}
                 mapHeight={activeMap.height}
@@ -707,6 +752,17 @@ export default function AtlasViewer() {
                 You've explored everything you can reach — travel onward to uncover more.
               </div>
             )}
+
+            {/* Reset view — bottom-right map corner */}
+            <button
+              type="button"
+              onClick={() => fitMapRef.current?.()}
+              className="absolute bottom-3 right-3 z-[500] h-8 w-8 rounded bg-background/90 border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="Reset map view"
+              title="Reset view (fit map to screen)"
+            >
+              <Maximize2 className="h-4 w-4" aria-hidden="true" />
+            </button>
           </main>
 
           {/* Desktop side panel — only mounts at lg+. Below that, the entity
