@@ -17,6 +17,12 @@ import {
 
 type Mode = "browse" | "tag" | "type";
 
+const ALL_LETTERS = [...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i)), "#"];
+
+function sectionId(letter: string) {
+  return letter === "#" ? "section-hash" : `section-${letter}`;
+}
+
 export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
   const params = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -77,6 +83,8 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
     return Array.from(groups.entries());
   }, [entries]);
 
+  const activeLetters = useMemo(() => new Set(grouped.map(([l]) => l)), [grouped]);
+
   const placedIds = useMemo(
     () => new Set((project?.placements ?? []).map((p) => p.entityId)),
     [project],
@@ -97,6 +105,10 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
     ) : (
       <LayoutGrid className="h-5 w-5" />
     );
+
+  const scrollToSection = (letter: string) => {
+    document.getElementById(sectionId(letter))?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   if (error) {
     return (
@@ -199,67 +211,93 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
               )}
             </div>
           ) : (
-            <div className="space-y-6">
-              {grouped.map(([letter, list]) => (
-                <section key={letter}>
-                  <h2 className="font-display text-2xl text-primary border-b border-border pb-1 mb-3">
-                    {letter}
-                  </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {list.map((e) => (
-                      <div
-                        key={e.id}
-                        className="relative rounded border border-border bg-card hover:bg-accent/40 transition px-3 py-2"
-                      >
-                        <div className="flex items-baseline gap-2">
-                          {/* Stretched link: the title link's ::after overlay makes
-                              the whole card navigate to the entity, while the type
-                              and tag chips below stay as separate, non-nested links
-                              (z-10 lifts them above the overlay). Nesting <a> in <a>
-                              is invalid HTML and breaks the chip clicks. */}
-                          <Link
-                            to={`/atlas?entity=${encodeURIComponent(e.id)}`}
-                            className="font-medium text-sm truncate after:absolute after:inset-0 after:content-['']"
-                          >
-                            {e.title}
-                          </Link>
-                          {playerTypeLabel(e.type) && (
+            <div className="flex gap-2 items-start">
+              <div className="flex-1 min-w-0 space-y-6">
+                {grouped.map(([letter, list]) => (
+                  <section key={letter} id={sectionId(letter)}>
+                    <h2 className="font-display text-2xl text-primary border-b border-border pb-1 mb-3">
+                      {letter}
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {list.map((e) => (
+                        <div
+                          key={e.id}
+                          className="relative rounded border border-border bg-card hover:bg-accent/40 transition px-3 py-2"
+                        >
+                          <div className="flex items-baseline gap-2">
+                            {/* Stretched link: the title link's ::after overlay makes
+                                the whole card navigate to the entity, while the type
+                                and tag chips below stay as separate, non-nested links
+                                (z-10 lifts them above the overlay). Nesting <a> in <a>
+                                is invalid HTML and breaks the chip clicks. */}
                             <Link
-                              to={`/atlas/type/${encodeURIComponent(e.type)}`}
-                              className="relative z-10 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                              to={`/atlas?entity=${encodeURIComponent(e.id)}`}
+                              className="font-medium text-sm truncate after:absolute after:inset-0 after:content-['']"
                             >
-                              {playerTypeLabel(e.type)}
+                              {e.title}
                             </Link>
+                            {playerTypeLabel(e.type) && (
+                              <Link
+                                to={`/atlas/type/${encodeURIComponent(e.type)}`}
+                                className="relative z-10 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                              >
+                                {playerTypeLabel(e.type)}
+                              </Link>
+                            )}
+                            {placedIds.has(e.id) && (
+                              <MapPin className="h-3 w-3 text-primary ml-auto flex-shrink-0" />
+                            )}
+                          </div>
+                          {e.summary && (
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                              {e.summary}
+                            </p>
                           )}
-                          {placedIds.has(e.id) && (
-                            <MapPin className="h-3 w-3 text-primary ml-auto flex-shrink-0" />
+                          {e.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {e.tags.slice(0, 5).map((t) => (
+                                <Link
+                                  key={t}
+                                  to={`/atlas/tag/${encodeURIComponent(t)}`}
+                                  className="relative z-10"
+                                >
+                                  <Badge variant="outline" className="text-[10px] hover:bg-accent">
+                                    #{t}
+                                  </Badge>
+                                </Link>
+                              ))}
+                            </div>
                           )}
                         </div>
-                        {e.summary && (
-                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                            {e.summary}
-                          </p>
-                        )}
-                        {e.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            {e.tags.slice(0, 5).map((t) => (
-                              <Link
-                                key={t}
-                                to={`/atlas/tag/${encodeURIComponent(t)}`}
-                                className="relative z-10"
-                              >
-                                <Badge variant="outline" className="text-[10px] hover:bg-accent">
-                                  #{t}
-                                </Badge>
-                              </Link>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ))}
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+
+              <nav
+                aria-label="Jump to letter"
+                className="sticky top-6 self-start hidden sm:flex flex-col items-center gap-0.5 text-[10px] select-none"
+              >
+                {ALL_LETTERS.map((letter) => {
+                  const isActive = activeLetters.has(letter);
+                  return (
+                    <button
+                      key={letter}
+                      disabled={!isActive}
+                      aria-label={`Jump to ${letter}`}
+                      onClick={() => scrollToSection(letter)}
+                      className={`w-6 h-5 flex items-center justify-center rounded font-mono ${
+                        isActive
+                          ? "text-primary hover:bg-accent cursor-pointer"
+                          : "text-muted-foreground/30 cursor-default"
+                      }`}
+                    >
+                      {letter}
+                    </button>
+                  );
+                })}
+              </nav>
             </div>
           )}
         </div>
