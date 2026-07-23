@@ -47,10 +47,10 @@ function makeProject(entities: Entity[]): AtlasProject {
   } as unknown as AtlasProject;
 }
 
-function renderTimeline(project: AtlasProject) {
+function renderTimeline(project: AtlasProject, initialUrl = "/atlas/timeline") {
   vi.mocked(loadAtlasContent).mockResolvedValue(project);
   return render(
-    <MemoryRouter initialEntries={["/atlas/timeline"]}>
+    <MemoryRouter initialEntries={[initialUrl]}>
       <AtlasTimeline />
     </MemoryRouter>,
   );
@@ -84,5 +84,58 @@ describe("AtlasTimeline — empty state", () => {
     fireEvent.click(clearBtn);
     await screen.findByText("Battle of Stone Bridge");
     expect(screen.queryByText(/No events match your filter/i)).toBeNull();
+  });
+});
+
+describe("AtlasTimeline — URL filter state", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("restores the query filter from ?q= on mount", async () => {
+    const battle = makeEntity({ id: "battle", title: "Battle of Stone Bridge", type: "event" });
+    const treaty = makeEntity({
+      id: "treaty",
+      title: "Treaty of Thornwall",
+      type: "event",
+      dateValue: 1100,
+      dateYear: 1100,
+      dateRaw: "1100 AE",
+      summary: "A diplomatic agreement.",
+    });
+    renderTimeline(makeProject([battle, treaty]), "/atlas/timeline?q=Battle");
+    const input = await screen.findByPlaceholderText("Filter events…");
+    expect((input as HTMLInputElement).value).toBe("Battle");
+    expect(screen.getByText("Battle of Stone Bridge")).toBeTruthy();
+    expect(screen.queryByText("Treaty of Thornwall")).toBeNull();
+  });
+
+  it("updating the filter input keeps the view consistent", async () => {
+    const battle = makeEntity({ id: "battle", title: "Battle of Stone Bridge", type: "event" });
+    const treaty = makeEntity({
+      id: "treaty",
+      title: "Treaty of Thornwall",
+      type: "event",
+      dateValue: 1100,
+      dateYear: 1100,
+      dateRaw: "1100 AE",
+      summary: "A diplomatic agreement.",
+    });
+    renderTimeline(makeProject([battle, treaty]));
+    await screen.findByText("Battle of Stone Bridge");
+    const input = screen.getByPlaceholderText("Filter events…");
+    fireEvent.change(input, { target: { value: "Treaty" } });
+    expect(screen.getByText("Treaty of Thornwall")).toBeTruthy();
+    expect(screen.queryByText("Battle of Stone Bridge")).toBeNull();
+  });
+
+  it("the clear-X button on the input clears the query", async () => {
+    const battle = makeEntity();
+    renderTimeline(makeProject([battle]), "/atlas/timeline?q=Battle");
+    const input = await screen.findByPlaceholderText("Filter events…");
+    expect((input as HTMLInputElement).value).toBe("Battle");
+    const clearX = screen.getByLabelText("Clear filter");
+    fireEvent.click(clearX);
+    expect((input as HTMLInputElement).value).toBe("");
   });
 });

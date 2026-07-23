@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Compass, Hash, LayoutGrid, MapPin, Tag } from "lucide-react";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity } from "@/atlas/content/schema";
@@ -10,18 +10,35 @@ import { Badge } from "@/components/ui/badge";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { entityMatchesQuery } from "@/atlas/search/entityMatchesQuery";
+import {
+  parseBrowseFilterParams,
+  serializeBrowseFilterParams,
+} from "@/atlas/browse/browseFilterParams";
 
 type Mode = "browse" | "tag" | "type";
 
 export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
   const params = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const facet = (mode === "tag" ? params.tag : mode === "type" ? params.type : undefined) ?? "";
   const facetDecoded = decodeURIComponent(facet);
 
   const [project, setProject] = useState<AtlasProject | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [activeType, setActiveType] = useState<string | null>(null);
+
+  const { q: query, type: activeType } = parseBrowseFilterParams(searchParams);
+
+  const setQuery = (v: string) =>
+    setSearchParams(
+      (prev) => serializeBrowseFilterParams({ q: v, type: prev.get("type") || null }),
+      { replace: true },
+    );
+
+  const setActiveType = (t: string | null) =>
+    setSearchParams(
+      (prev) => serializeBrowseFilterParams({ q: prev.get("q") ?? "", type: t }),
+      { replace: true },
+    );
 
   useEffect(() => {
     loadAtlasContent(true)
