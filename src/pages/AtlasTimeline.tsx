@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CalendarClock, Compass, Filter, X } from "lucide-react";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity } from "@/atlas/content/schema";
@@ -10,6 +10,10 @@ import { Input } from "@/components/ui/input";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { entityMatchesQuery } from "@/atlas/search/entityMatchesQuery";
+import {
+  parseBrowseFilterParams,
+  serializeBrowseFilterParams,
+} from "@/atlas/browse/browseFilterParams";
 
 interface YearGroup {
   year: number;
@@ -18,10 +22,23 @@ interface YearGroup {
 }
 
 export default function AtlasTimeline() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [project, setProject] = useState<AtlasProject | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [activeType, setActiveType] = useState<string | null>(null);
+
+  const { q: query, type: activeType } = parseBrowseFilterParams(searchParams);
+
+  const setQuery = (v: string) =>
+    setSearchParams(
+      (prev) => serializeBrowseFilterParams({ q: v, type: prev.get("type") || null }),
+      { replace: true },
+    );
+
+  const setActiveType = (t: string | null) =>
+    setSearchParams(
+      (prev) => serializeBrowseFilterParams({ q: prev.get("q") ?? "", type: t }),
+      { replace: true },
+    );
 
   useEffect(() => {
     loadAtlasContent(true)
@@ -170,10 +187,12 @@ export default function AtlasTimeline() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => {
-                  setQuery("");
-                  setActiveType(null);
-                }}
+                onClick={() =>
+                  setSearchParams(
+                    serializeBrowseFilterParams({ q: "", type: null }),
+                    { replace: true },
+                  )
+                }
               >
                 Clear filter
               </Button>
