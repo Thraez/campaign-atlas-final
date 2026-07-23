@@ -102,12 +102,25 @@
 .leaflet-container {
   background: hsl(var(--ocean));
   font-family: inherit;
+}
+.leaflet-container:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: -2px;
+}
+.leaflet-container:focus:not(:focus-visible) {
   outline: none;
 }
 .leaflet-control-zoom a {
   background: hsl(var(--card)) !important;
   color: hsl(var(--foreground)) !important;
   border-color: hsl(var(--border)) !important;
+}
+.leaflet-control-zoom a:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: -2px;
+}
+.leaflet-control-zoom a:focus:not(:focus-visible) {
+  outline: none;
 }
 .leaflet-control-attribution {
   background: hsl(var(--card) / 0.7) !important;
