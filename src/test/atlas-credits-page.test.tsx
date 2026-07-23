@@ -186,3 +186,25 @@ describe("AtlasCredits page — assetCredits registry aggregation", () => {
     expect(screen.getByText("Cartography by Map Artist")).toBeInTheDocument();
   });
 });
+
+describe("AtlasCredits page — skip link and main landmark", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders a <main id='credits-main'> landmark", async () => {
+    renderCredits(makeProject([makeEntity({ credit: "Art by X" })]));
+    await screen.findByText("Test Entity");
+    const main = screen.getByRole("main");
+    expect(main).toBeInTheDocument();
+    expect(main.id).toBe("credits-main");
+  });
+
+  it("renders a skip link targeting #credits-main", async () => {
+    renderCredits(makeProject([makeEntity({ credit: "Art by X" })]));
+    await screen.findByText("Test Entity");
+    const skipLink = document.querySelector('a[href="#credits-main"]');
+    expect(skipLink).not.toBeNull();
+    expect(skipLink).toHaveClass("skip-to-main");
+  });
+});

@@ -99,8 +99,11 @@ export default function AtlasCredits() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <a href="#credits-main" className="skip-to-main">
+        Skip to content
+      </a>
       <AtlasNavMenu publishedAt={project.publishedAt} />
-      <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
+      <main id="credits-main" className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
         <div className="flex items-center gap-2 mb-6">
           <Link
             to="/"
@@ -146,7 +149,7 @@ export default function AtlasCredits() {
             ))}
           </ul>
         )}
-      </div>
+      </main>
     </div>
   );
 }

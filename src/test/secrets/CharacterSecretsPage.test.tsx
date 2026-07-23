@@ -102,3 +102,27 @@ describe("CharacterSecretsPage — SecretsBody state machine", () => {
     expect(mockForgetAll).toHaveBeenCalledOnce();
   });
 });
+
+describe("CharacterSecretsPage — skip link and main landmark", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetKey.mockReturnValue(null);
+    mockCollect.mockResolvedValue([]);
+  });
+
+  it("renders a <main id='secrets-main'> landmark", async () => {
+    renderPage();
+    await screen.findByText("Your character's secrets");
+    const main = screen.getByRole("main");
+    expect(main).toBeInTheDocument();
+    expect(main.id).toBe("secrets-main");
+  });
+
+  it("renders a skip link targeting #secrets-main", async () => {
+    renderPage();
+    await screen.findByText("Your character's secrets");
+    const skipLink = document.querySelector('a[href="#secrets-main"]');
+    expect(skipLink).not.toBeNull();
+    expect(skipLink).toHaveClass("skip-to-main");
+  });
+});

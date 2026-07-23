@@ -155,6 +155,9 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
+      <a href="#browse-main" className="skip-to-main">
+        Skip to content
+      </a>
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
         <AtlasNavMenu publishedAt={project.publishedAt} worldName={worldName} />
         <Link
@@ -233,7 +236,8 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
         </div>
       )}
 
-      <ScrollArea className="flex-1">
+      <main id="browse-main" className="flex-1 min-h-0" aria-label="Browse entities">
+      <ScrollArea className="h-full">
         <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
           {grouped.length === 0 ? (
             <div className="text-center text-sm text-muted-foreground py-16">
@@ -343,6 +347,7 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
           )}
         </div>
       </ScrollArea>
+      </main>
     </div>
   );
 }

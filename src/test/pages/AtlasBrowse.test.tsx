@@ -170,3 +170,26 @@ describe("AtlasBrowse — URL filter state", () => {
     expect(screen.getByText("Mira")).toBeTruthy();
   });
 });
+
+describe("AtlasBrowse — skip link and main landmark", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  it("renders a <main id='browse-main'> landmark", async () => {
+    renderBrowse("/atlas/browse", makeProject([makeEntity()]));
+    await screen.findByText("Tideshore");
+    const main = screen.getByRole("main");
+    expect(main).toBeInTheDocument();
+    expect(main.id).toBe("browse-main");
+  });
+
+  it("renders a skip link targeting #browse-main", async () => {
+    renderBrowse("/atlas/browse", makeProject([makeEntity()]));
+    await screen.findByText("Tideshore");
+    const skipLink = document.querySelector('a[href="#browse-main"]');
+    expect(skipLink).not.toBeNull();
+    expect(skipLink).toHaveClass("skip-to-main");
+  });
+});

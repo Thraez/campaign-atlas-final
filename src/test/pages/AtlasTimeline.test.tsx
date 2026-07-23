@@ -139,3 +139,25 @@ describe("AtlasTimeline — URL filter state", () => {
     expect((input as HTMLInputElement).value).toBe("");
   });
 });
+
+describe("AtlasTimeline — skip link and main landmark", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders a <main id='timeline-main'> landmark", async () => {
+    renderTimeline(makeProject([makeEntity()]));
+    await screen.findByText("Battle of Stone Bridge");
+    const main = screen.getByRole("main");
+    expect(main).toBeInTheDocument();
+    expect(main.id).toBe("timeline-main");
+  });
+
+  it("renders a skip link targeting #timeline-main", async () => {
+    renderTimeline(makeProject([makeEntity()]));
+    await screen.findByText("Battle of Stone Bridge");
+    const skipLink = document.querySelector('a[href="#timeline-main"]');
+    expect(skipLink).not.toBeNull();
+    expect(skipLink).toHaveClass("skip-to-main");
+  });
+});
