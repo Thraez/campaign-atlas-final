@@ -75,6 +75,7 @@ import { createPortal } from "react-dom";
 import { HoverPeekCard } from "@/atlas/peek/HoverPeekCard";
 import { usePeekController } from "@/atlas/peek/usePeekController";
 import { resolvePeekEntityId } from "@/atlas/peek/resolvePeekEntityId";
+import { playerTypeLabel } from "@/atlas/content/typeLabel";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
@@ -84,16 +85,24 @@ import { shouldShowLabel } from "@/atlas/pins/labelVisibility";
 
 function pinIconForStyle(
   style: PinPreset,
-  opts?: { dim?: boolean; extraClass?: string },
+  opts?: { dim?: boolean; extraClass?: string; ariaLabel?: string },
 ): L.DivIcon {
   // iconSize defines the hit area Leaflet uses for click/touch dispatch. The
   // visual SVG is smaller (~22px) but we expose a 44x44 hit area so mobile
   // touch targets meet WCAG 2.5.5 (Target Size, Level AAA). The SVG centers
   // visually inside the box via the `atlas-viewer-pin` CSS rule.
   const cls = opts?.extraClass ? `atlas-viewer-pin ${opts.extraClass}` : "atlas-viewer-pin";
+  const svgHtml = pinSvg({ color: style.color, shape: style.shape }, { dim: opts?.dim });
+  // Inject role + aria-label into the SVG so screen readers announce the pin name.
+  const html = opts?.ariaLabel
+    ? svgHtml.replace(
+        "<svg ",
+        `<svg role="img" aria-label="${opts.ariaLabel.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}" `,
+      )
+    : svgHtml;
   return L.divIcon({
     className: cls,
-    html: pinSvg({ color: style.color, shape: style.shape }, { dim: opts?.dim }),
+    html,
     iconSize: [44, 44],
     iconAnchor: [22, 36],
   });
@@ -1184,6 +1193,8 @@ export function PlacementMarkers({
         const dim = ent.visibility === "rumor";
         const labelMode = labelDecisions.get(`${p.id}-${dx}`) ?? "none";
         const labelText = p.label ?? ent.title;
+        const typeLabel = playerTypeLabel(ent.type);
+        const a11yLabel = typeLabel ? `${ent.title}, ${typeLabel}` : ent.title;
         return (
           <Marker
             key={`${p.id}-${dx}`}
@@ -1196,9 +1207,11 @@ export function PlacementMarkers({
               ]
                 .filter(Boolean)
                 .join(" "),
+              ariaLabel: a11yLabel,
             })}
             riseOnHover
             riseOffset={250}
+            title={a11yLabel}
             eventHandlers={{
               click: () => onOpenEntity(p.entityId, false),
               mouseover: (e) => onPinPeek?.(p.entityId, e.originalEvent as MouseEvent),
