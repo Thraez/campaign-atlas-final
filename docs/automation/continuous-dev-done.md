@@ -1109,3 +1109,31 @@ updated to skip the resume() call while muted/calm so the two suspend paths don'
 
 **Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2586 tests green
 (4 shards; pre-existing onTaskUpdate RPC flake in shard 4).
+
+---
+
+### Q35 — Add player-safe 'ambience playing' now-playing affordance (2026-07-23)
+
+**Commit:** `574f3dbb` · **Merge:** `ad719e19` · **Branch:** `run/q35`
+
+**What shipped:** Players now see a subtle "♪ Ambience playing" pill in the sound controls while
+a soundscape bed is actually playing (sound enabled, not muted, not calm). When they mute or enable
+calm mode the indicator disappears instantly. An always-rendered `role="status" aria-live="polite"`
+region announces the same state change to screen readers. No DM-derived area name is used — the label
+is a hardcoded generic string, keeping filterSoundscape.ts's area-name stripping intact.
+
+**Implementation:**
+- `src/atlas/sound/SoundSettingsProvider.tsx`: added `ambiencePlaying: boolean` + `setAmbiencePlaying`
+  to the `SoundSettings` interface and context. State is initialized false; `ambiencePlaying` is
+  included in the `useMemo` deps so the context value updates on change.
+- `src/atlas/sound/SoundscapeLayer.tsx`: calls `setAmbiencePlaying(next !== null)` in the settle timer
+  when the active bed changes. Cleanup paths (soundEnabled change, map switch) call
+  `setAmbiencePlaying(false)`. Both effects updated with `setAmbiencePlaying` in their deps arrays.
+- `src/atlas/sound/SoundControl.tsx`: derives `ambienceActive = soundEnabled && ambiencePlaying &&
+  !muted && !calmMode`. Renders an always-present sr-only `role="status" aria-live="polite"` span
+  (text: "Ambience playing" or empty) and a visible pill inside the `soundEnabled` block when active.
+- 4 new tests in `src/test/sound/SoundControl.test.tsx` (Q35 describe block): live region announces
+  when active, clears on mute, stays empty before sound is enabled, contains only the generic label.
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2590 tests green
+(4 shards; pre-existing onTaskUpdate RPC flake in shard 4).
