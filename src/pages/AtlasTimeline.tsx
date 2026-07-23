@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
+import { entityMatchesQuery } from "@/atlas/search/entityMatchesQuery";
 
 interface YearGroup {
   year: number;
@@ -40,15 +41,9 @@ export default function AtlasTimeline() {
   }, [dated]);
 
   const groups = useMemo<YearGroup[]>(() => {
-    const q = query.trim().toLowerCase();
     const filtered = dated.filter((e) => {
       if (activeType && e.type !== activeType) return false;
-      if (!q) return true;
-      return (
-        e.title.toLowerCase().includes(q) ||
-        (e.summary ?? "").toLowerCase().includes(q) ||
-        e.tags.some((t) => t.toLowerCase().includes(q))
-      );
+      return entityMatchesQuery(e, query);
     });
     const sorted = [...filtered].sort((a, b) => a.dateValue! - b.dateValue!);
     const byYear = new Map<number, Entity[]>();
