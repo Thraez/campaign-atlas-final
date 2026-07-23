@@ -1086,3 +1086,26 @@ instead of the raw map gain, so both player preference and DM-authored scene gai
 
 **Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2583 tests green
 (4 shards; pre-existing onTaskUpdate RPC flake in shard 4).
+
+---
+
+### Q34 — Suspend AudioContext when muted, calm, or hidden (2026-07-23)
+
+**Commit:** `9343e7d2` · **Merge:** `e113543c` · **Branch:** `run/q34`
+
+**What shipped:** The AudioContext is now suspended after the 0.2 s gain ramp settles whenever the
+player mutes or enables calm mode, so the browser can reclaim CPU/battery while silent. Unmuting
+resumes the context immediately (if the page is visible). The existing visibilitychange handler was
+updated to skip the resume() call while muted/calm so the two suspend paths don't interfere.
+
+**Implementation:**
+- `src/atlas/sound/SoundSettingsProvider.tsx`: replaced the single `engine.setMuted(silenced)` call
+  in the mute/calm effect with a branch: when silenced, a 250 ms `setTimeout` calls `engine.suspend()`
+  after the ramp; when unsilenced, calls `engine.resume()` immediately (only if page is visible).
+  The `visibilitychange` handler gains `prefs.muted && prefs.calmMode` deps and guards its `resume()`
+  behind `!prefs.muted && !prefs.calmMode`.
+- 3 new tests in `src/test/sound/SoundSettingsProvider.test.tsx` (Q34 describe block): suspend fires
+  after ramp delay (fake timers), resume fires on unmute, visibilitychange skips resume while muted.
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2586 tests green
+(4 shards; pre-existing onTaskUpdate RPC flake in shard 4).

@@ -143,11 +143,7 @@ is for sequencing, not the whole spec.
 
 - [x] **Q33. Add a persisted player volume slider.** ✅ DONE 2026-07-23 — commit 0e496814
 
-- [ ] **Q34. Suspend the AudioContext when muted, calm, or hidden.**
-  The provider's mute/calm effect in `src/atlas/sound/SoundSettingsProvider.tsx:54-57` only calls `engine.setMuted(muted||calmMode)`, which ramps master gain to 0 but leaves the AudioContext and its looping source running. After the 0.2s mute ramp settles, call `engine.suspend()` (already defined at `AudioEngine.ts:51`) whenever muted or calm; call `engine.resume()` before the next unmute/crossfade. Keep the existing `visibilitychange` suspend/resume (SoundSettingsProvider.tsx:60-67) intact and ensure the unmute-resume path does not fight the hide-suspend.
-  - **Done when:** enabling mute or calm suspends the context after the ramp and unmuting resumes it; a unit test with the stub AudioContext (src/test/sound/SoundControl.test.tsx style deps) asserts `engine.suspend`/`engine.resume` are invoked on mute/unmute.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Battery/CPU health only; player-facing, no DM-secret surface. ~1 run.
+- [x] **Q34. Suspend the AudioContext when muted, calm, or hidden.** ✅ DONE 2026-07-23 — commit 9343e7d2
 
 - [ ] **Q35. Add a player-safe 'ambience playing' now-playing affordance.**
   RESCOPED — the original seed assumed `SoundArea.name` ships to players, but `scripts/atlas/filterSoundscape.ts:19-24` deliberately STRIPS `name` and rewrites area ids to `area-N` so DM labels never reach the player artifact; a name-based label would render nothing in player builds and re-shipping the name would reopen a closed leak. Instead surface a generic indicator: have `src/atlas/sound/SoundscapeLayer.tsx` report whether a bed is currently active (its `activeId.current !== null` after `crossfadeTo`) up to `SoundSettingsProvider.tsx` via a new context flag (e.g. `ambiencePlaying`), and show a subtle 'Ambience playing' label near `SoundControl.tsx` inside an `aria-live="polite"` region, hidden when silent or muted.
