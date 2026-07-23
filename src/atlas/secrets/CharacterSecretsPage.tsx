@@ -143,8 +143,11 @@ export default function CharacterSecretsPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <a href="#secrets-main" className="skip-to-main">
+        Skip to content
+      </a>
       <AtlasNavMenu publishedAt={project.publishedAt} />
-      <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
+      <main id="secrets-main" className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
         <div className="flex items-center gap-2 mb-6">
           <Link
             to="/atlas"
@@ -156,7 +159,7 @@ export default function CharacterSecretsPage() {
           <h1 className="text-2xl font-display">Your character's secrets</h1>
         </div>
         <SecretsBody entities={project.entities} />
-      </div>
+      </main>
     </div>
   );
 }

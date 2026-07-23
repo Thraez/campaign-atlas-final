@@ -106,6 +106,9 @@ export default function AtlasTimeline() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
+      <a href="#timeline-main" className="skip-to-main">
+        Skip to content
+      </a>
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
         <AtlasNavMenu publishedAt={project.publishedAt} worldName={worldName} />
         <Link
@@ -172,7 +175,8 @@ export default function AtlasTimeline() {
         </div>
       )}
 
-      <ScrollArea className="flex-1">
+      <main id="timeline-main" className="flex-1 min-h-0" aria-label="Timeline events">
+      <ScrollArea className="h-full">
         <div className="max-w-3xl mx-auto px-4 md:px-6 py-6">
           {project.calendar?.name && (
             <p className="text-xs text-muted-foreground mb-4">
@@ -252,6 +256,7 @@ export default function AtlasTimeline() {
           )}
         </div>
       </ScrollArea>
+      </main>
     </div>
   );
 }
