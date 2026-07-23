@@ -821,3 +821,15 @@ Render/styling parity only — **not** interactivity.
   returns true + writes HTML; same two for printEntityBundle.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2486 tests green (4 shards;
   pre-existing onTaskUpdate RPC flake in shard 3).
+
+
+- [x] **Q17. Fix Timeline zero-results empty state (filter vs. no-dates).** ✅ DONE 2026-07-23 — commit ee719cd5
+  `src/pages/AtlasTimeline.tsx`: the single `groups.length === 0` branch is replaced with two distinct
+  states: when `dated.length > 0` but `groups.length === 0` (filter excluded everything), shows "No events
+  match your filter." plus a "Clear filter" Button that calls `setQuery("")` and `setActiveType(null)`;
+  when `dated.length === 0` shows the existing onboarding copy ("No dated entries yet. Add atlas.date…").
+  `src/test/pages/AtlasTimeline.test.tsx`: new test file with 3 tests — onboarding copy shows when no
+  dated entries, filter-no-match message shows when entries exist but filter excludes all, clear-filter
+  button resets query and restores entries.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2489 tests green (4 shards;
+  pre-existing onTaskUpdate RPC flake in shard 3).

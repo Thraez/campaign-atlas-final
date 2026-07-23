@@ -112,12 +112,7 @@ is for sequencing, not the whole spec.
 
 #### Q-C — Player search, timeline & browse
 
-- [ ] **Q17. Fix Timeline zero-results empty state (filter vs. no-dates).**
-  In `src/pages/AtlasTimeline.tsx`, the `groups.length === 0` branch (line ~170) always renders the onboarding copy "No dated entries yet. Add `atlas.date`…" even when dated entries exist (`dated`, line ~31) and the query/type filter simply excluded them all. Split the empty state: when `dated.length > 0` but filtered `groups` is empty, show "No events match your filter" plus a clear-filter action (reset `query` and `activeType`); keep the current onboarding copy only when `dated.length === 0`.
-  - **Done when:** with dated entries present and a non-matching filter, the panel shows the "no match" message + a working clear action; with genuinely zero dated entries the onboarding copy still shows; a render test covers both branches.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Player-facing browse copy only; no data-model or visibility change.
-  ~1 run.
+- [x] **Q17. Fix Timeline zero-results empty state (filter vs. no-dates).** ✅ DONE 2026-07-23 — commit ee719cd5
 
 - [ ] **Q18. Unify entity text-match across Search, Timeline, and Browse filters.**
   The three player-search surfaces match inconsistent fields: `AtlasTimeline.tsx` (lines ~44-52) matches title/summary/tags but NOT aliases; `AtlasBrowse.tsx` (lines ~37-45) matches title/summary/aliases but NOT tags; SearchPalette scores all. Extract a pure `entityMatchesQuery(entity, q)` helper (matching title + aliases + summary + tags, case-insensitive) into a new `src/atlas/search/entityMatchesQuery.ts`, unit-test it, and route the Timeline and Browse simple-filter paths through it so all surfaces search the same fields. Leave SearchPalette's richer phrase/scoring ranking untouched.
