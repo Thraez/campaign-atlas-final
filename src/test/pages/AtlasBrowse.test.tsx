@@ -53,6 +53,70 @@ function renderBrowse(initialUrl: string, project: AtlasProject) {
   );
 }
 
+describe("AtlasBrowse — A–Z jump rail", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // jsdom doesn't implement scrollIntoView; stub it so click tests don't throw
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  it("renders an enabled button for letters that have entries", async () => {
+    const project = makeProject([
+      makeEntity({ id: "tideshore", title: "Tideshore", type: "location" }),
+    ]);
+    renderBrowse("/atlas/browse", project);
+    await screen.findByText("Tideshore");
+    // T is present → button enabled
+    const tBtn = screen.getByRole("button", { name: "Jump to T" });
+    expect(tBtn).not.toBeDisabled();
+  });
+
+  it("renders a disabled button for letters that have no entries", async () => {
+    const project = makeProject([
+      makeEntity({ id: "tideshore", title: "Tideshore", type: "location" }),
+    ]);
+    renderBrowse("/atlas/browse", project);
+    await screen.findByText("Tideshore");
+    // A is absent → button disabled
+    const aBtn = screen.getByRole("button", { name: "Jump to A" });
+    expect(aBtn).toBeDisabled();
+  });
+
+  it("clicking an active letter calls scrollIntoView on the matching section", async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const project = makeProject([
+      makeEntity({ id: "tideshore", title: "Tideshore", type: "location" }),
+    ]);
+    renderBrowse("/atlas/browse", project);
+    await screen.findByText("Tideshore");
+    fireEvent.click(screen.getByRole("button", { name: "Jump to T" }));
+    expect(scrollIntoView).toHaveBeenCalled();
+  });
+
+  it("renders the # bucket as active when entries start with non-letters", async () => {
+    const project = makeProject([
+      makeEntity({ id: "area51", title: "1st Legion", type: "faction" }),
+    ]);
+    renderBrowse("/atlas/browse", project);
+    await screen.findByText("1st Legion");
+    const hashBtn = screen.getByRole("button", { name: "Jump to #" });
+    expect(hashBtn).not.toBeDisabled();
+    // A should be absent
+    const aBtn = screen.getByRole("button", { name: "Jump to A" });
+    expect(aBtn).toBeDisabled();
+  });
+
+  it("sections carry the expected id attributes", async () => {
+    const project = makeProject([
+      makeEntity({ id: "tideshore", title: "Tideshore", type: "location" }),
+    ]);
+    renderBrowse("/atlas/browse", project);
+    await screen.findByText("Tideshore");
+    expect(document.getElementById("section-T")).not.toBeNull();
+  });
+});
+
 describe("AtlasBrowse — URL filter state", () => {
   beforeEach(() => {
     vi.clearAllMocks();
