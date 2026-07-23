@@ -289,7 +289,7 @@ export function SearchPalette({
         <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-border/50 bg-muted/20">
           <button
             onClick={() => setThisMapOnly((v) => !v)}
-            className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded inline-flex items-center gap-1 ${thisMapOnly ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+            className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded inline-flex items-center gap-1 ${thisMapOnly ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
             title={
               thisMapOnly
                 ? "Showing only entities placed on the current map"
@@ -302,7 +302,7 @@ export function SearchPalette({
           {recentlyRevealed && recentlyRevealed.size > 0 && (
             <button
               onClick={() => setRecentOnly((v) => !v)}
-              className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded inline-flex items-center gap-1 ${recentOnly ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+              className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded inline-flex items-center gap-1 ${recentOnly ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
               title={`${recentlyRevealed.size} entities revealed since the last publish`}
               aria-pressed={recentOnly}
             >
@@ -314,7 +314,7 @@ export function SearchPalette({
             <>
               <button
                 onClick={() => setActiveType(null)}
-                className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === null ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+                className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded ${activeType === null ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
               >
                 all
               </button>
@@ -325,7 +325,7 @@ export function SearchPalette({
                   <button
                     key={t}
                     onClick={() => setActiveType(activeType === t ? null : t)}
-                    className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+                    className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
                   >
                     {label} <span className="opacity-60">{n}</span>
                   </button>
@@ -336,7 +336,7 @@ export function SearchPalette({
                 <button
                   key={t}
                   onClick={() => setActiveTag(activeTag === t ? null : t)}
-                  className={`text-[10px] px-2 py-0.5 rounded ${activeTag === t ? "bg-secondary text-secondary-foreground" : "bg-muted/60 hover:bg-accent"}`}
+                  className={`text-[10px] filter-chip px-2 py-0.5 rounded ${activeTag === t ? "bg-secondary text-secondary-foreground" : "bg-muted/60 hover:bg-accent"}`}
                 >
                   #{t} <span className="opacity-60">{n}</span>
                 </button>
