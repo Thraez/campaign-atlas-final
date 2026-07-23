@@ -18,6 +18,7 @@ import React from "react";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { MapLayerPanel } from "@/atlas/MapLayerPanel";
 import { EntitiesTab } from "@/atlas/tabs/EntitiesTab";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import type { AtlasProject, Entity, MapDocument, MapLayer } from "@/atlas/content/schema";
 
 // AtlasMinimap uses useMap() which requires a MapContainer context at runtime.
@@ -186,5 +187,19 @@ describe("E1 — accessible names for icon-only controls", () => {
       );
       expect(screen.getByRole("button", { name: "Remove link" })).toBeInTheDocument();
     });
+  });
+});
+
+describe("Q25 — mobile entity bottom sheet accessible name", () => {
+  it("sheet dialog has an accessible name equal to the open entity title", () => {
+    render(
+      <Sheet open>
+        <SheetContent side="bottom" className="h-[80vh] p-0">
+          <SheetTitle className="sr-only">Tideshore</SheetTitle>
+          <SheetDescription className="sr-only">Entity details</SheetDescription>
+        </SheetContent>
+      </Sheet>,
+    );
+    expect(screen.getByRole("dialog", { name: "Tideshore" })).toBeInTheDocument();
   });
 });

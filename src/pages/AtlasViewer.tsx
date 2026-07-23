@@ -22,7 +22,7 @@ import type {
   MapScale,
 } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import {
   Search,
   ArrowLeft,
@@ -877,6 +877,8 @@ export default function AtlasViewer() {
         {!hasDesktopAside && (
           <Sheet open={mobilePanelOpen && !!openEntity_} onOpenChange={setMobilePanelOpen}>
             <SheetContent side="bottom" className="h-[80vh] p-0">
+              <SheetTitle className="sr-only">{openEntity_?.title ?? ""}</SheetTitle>
+              <SheetDescription className="sr-only">Entity details</SheetDescription>
               <EntityPanel
                 ref={panelRef}
                 entity={openEntity_}
