@@ -917,3 +917,15 @@ Render/styling parity only — **not** interactivity.
   since `getByText` cannot traverse `<mark>`-split text nodes.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2540 tests green (4 shards;
   pre-existing onTaskUpdate RPC flake in shard 3).
+
+- [x] **Q24. Add a discoverable tag-facet row to the Browse page.** ✅ DONE 2026-07-23 — commit 39584075
+  `src/pages/AtlasBrowse.tsx`: added `TAG_FACET_CAP = 15` / `TAG_FACET_INITIAL = 8` module constants;
+  `allTags` useMemo tallies all entity tags in browse mode (sorted by frequency, capped at 15);
+  `showAllTags` state; a new tag-facet row renders only in `mode === "browse"` showing the first 8 chips
+  as `<Link to="/atlas/tag/:tag">` links, plus a "+N more" button that reveals the rest on click.
+  `src/test/atlas-browse-links.test.tsx`: 4 new tests — facet row visible in browse mode with correct
+  tag hrefs; row absent in tag mode; row absent in type mode; "+N more" expand reveals hidden chips
+  (verified via `within()` scoping to the facet row). Existing card-chip test updated to
+  `getAllByRole` (facet row adds a second chip link for the same tag).
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2544 tests green (4 shards;
+  pre-existing onTaskUpdate RPC flake in shard 3).

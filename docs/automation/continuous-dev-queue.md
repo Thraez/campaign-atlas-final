@@ -118,12 +118,7 @@ is for sequencing, not the whole spec.
 
 - [x] **Q23. Highlight the matched substring in search result titles.** ✅ DONE 2026-07-23 — commit a73d0dff
 
-- [ ] **Q24. Add a discoverable tag-facet row to the Browse page.**
-  Tag pages exist at `/atlas/tag/:tag` (`AtlasBrowse.tsx` `mode="tag"`), but nothing lets a player discover which tags exist. In Browse `mode === "browse"` only, add a top-N tag chip row computed like SearchPalette's `allTags` (lines ~96-102: tally across `playerTypeLabel`-visible entities, sort by count, slice to a cap), each chip a `<Link to={"/atlas/tag/"+encodeURIComponent(t)}>`. Keep it collapsible / capped so it stays compact.
-  - **Done when:** Browse mode shows a capped, sorted tag-chip row that links into `/atlas/tag/:tag`; tag/type modes do not show it; a render test asserts the top tags and links.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Flat clickable tag list into existing tag routes — NOT a relationship-graph surface.
-  ~2-3 runs.
+- [x] **Q24. Add a discoverable tag-facet row to the Browse page.** ✅ DONE 2026-07-23 — commit 39584075
 
 
 #### Q-D — Player accessibility
