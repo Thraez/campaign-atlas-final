@@ -954,3 +954,12 @@ Render/styling parity only — **not** interactivity.
   present (e.g. "Goblin Cave, Dungeon"), title is entity title only when playerTypeLabel returns "".
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2547 tests green (4 shards;
   pre-existing onTaskUpdate RPC flake in shard 3).
+
+- [x] **Q27. Restore a visible keyboard-focus outline on the map container and controls.** ✅ DONE 2026-07-23 — commit a0c93798
+  `src/index.css`: removed blanket `outline: none` from `.leaflet-container`; added
+  `.leaflet-container:focus-visible` (2px `--ring` outline, -2px offset) and
+  `.leaflet-container:focus:not(:focus-visible) { outline: none }` so mouse drags stay clean.
+  Same `:focus-visible`/`:focus:not(:focus-visible)` pattern applied to `.leaflet-control-zoom a`
+  (the +/– zoom buttons). Pure CSS, no new surface. Satisfies WCAG 2.4.7.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2547 tests green (4 shards;
+  pre-existing onTaskUpdate RPC flake in shard 3).

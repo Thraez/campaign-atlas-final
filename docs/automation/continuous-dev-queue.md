@@ -127,12 +127,7 @@ is for sequencing, not the whole spec.
 
 - [x] **Q26. Give map pins accessible names for keyboard and screen-reader users.** ✅ DONE 2026-07-23 — commit 1e71e809
 
-- [ ] **Q27. Restore a visible keyboard-focus outline on the map container and controls.**
-  `src/index.css` sets `.leaflet-container { outline: none }` (lines 83-86), which strips the WCAG 2.4.7 focus ring from the focusable map, its zoom controls, and markers — keyboard users can't tell what's focused. Replace the blanket `outline: none` with a `:focus-visible`-scoped outline (e.g. `.leaflet-container:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }` and `.leaflet-container:focus:not(:focus-visible) { outline: none; }`) so the ring shows on keyboard focus but not during mouse drag. Keep it themed with the existing `--ring`/`--primary` tokens.
-  - **Done when:** keyboard-focusing the map (and its controls) shows a visible outline, a mouse drag does not, and no dashed-outline regressions appear elsewhere.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Player-facing map only; pure CSS, no new surface.
-  ~1 run.
+- [x] **Q27. Restore a visible keyboard-focus outline on the map container and controls.** ✅ DONE 2026-07-23 — commit a0c93798
 
 - [ ] **Q28. Make map fly animations respect prefers-reduced-motion.**
   `MapController` in `src/pages/AtlasViewer.tsx:100-114` uses `map.flyTo([lat, lng], targetZoom, { duration: 0.6 })`; Leaflet's fly is requestAnimationFrame-driven, so the global reduced-motion CSS (`src/index.css:409,494`) does not disable it for motion-sensitive players. Create `src/hooks/use-prefers-reduced-motion.ts` (a small `matchMedia('(prefers-reduced-motion: reduce)')` hook modeled on `src/hooks/use-has-desktop-aside.tsx`), and in `MapController` switch to `map.setView([lat, lng], targetZoom, { animate: false })` when reduce is preferred, keeping `flyTo` otherwise. Preserve the existing coordinate flip (`lat = flyTo.height - flyTo.y`, `lng = flyTo.x`, lines 108-109).
