@@ -116,13 +116,6 @@ is for sequencing, not the whole spec.
 
 - [x] **Q18. Unify entity text-match across Search, Timeline, and Browse filters.** ✅ DONE 2026-07-23 — commit e8310c10
 
-- [ ] **Q22. Sticky A–Z jump rail on the Browse page.**
-  `AtlasBrowse.tsx` already groups entries into A–Z sections with a `#` bucket for non-letters (`grouped`, lines ~59-69). Add a compact sticky vertical alphabet rail listing only the letters that have entries; clicking a letter scroll-jumps to that section via a section `id`/ref + `scrollIntoView`. Letters (and `#`) with no entries render as disabled/non-clickable.
-  - **Done when:** the rail shows on Browse, disables empty letters, and clicking an active letter scrolls to its section; a render test asserts present-vs-absent letter states.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Builds on the existing grouping; no new data or persistence.
-  ~2-3 runs.
-
 - [ ] **Q23. Highlight the matched substring in search result titles.**
   `snippet()` marks the matched term inside the body snippet, but in `SearchPalette.tsx` a title/alias match renders the plain title (line ~282) with no highlight, so it's unclear why a result matched. Add a small pure `highlightMatch(text, q)` in `src/atlas/search/snippet.ts` that reuses its existing HTML-escape + `<mark class="bg-primary/30…">` styling (export the currently-private `escapeHtml`, or factor a shared internal), and apply it to the result title (via `sanitizeAtlasHtml`, as the snippet already is) when the query hits the title. Unit-test the helper (match, no-match, HTML-escaping of special chars).
   - **Done when:** a title-matching query renders the matched span wrapped in `<mark>`; non-title matches render the plain title; the helper escapes HTML and has unit tests.

@@ -889,3 +889,15 @@ Render/styling parity only — **not** interactivity.
   filters consistently, clear-X button clears query.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2531 tests green (4 shards;
   pre-existing onTaskUpdate RPC flake in shard 3).
+
+- [x] **Q22. Sticky A–Z jump rail on the Browse page.** ✅ DONE 2026-07-23 — commit 20c96de5
+  `src/pages/AtlasBrowse.tsx`: added `ALL_LETTERS` constant (A–Z + #) and `sectionId()` helper;
+  derived `activeLetters` set from `grouped`; added `scrollToSection()` using `scrollIntoView`;
+  attached `id` attributes to each `<section>`; rendered a `<nav>` rail in a flex row alongside the
+  content (hidden on < 640 px via `hidden sm:flex`). Disabled letter buttons are dimmed and
+  non-clickable; active letters jump to their section on click. No new data or persistence.
+  `src/test/pages/AtlasBrowse.test.tsx`: 5 new tests — active letter enabled, absent letter disabled,
+  click calls scrollIntoView, # bucket active for non-letter titles, section id present; all 4
+  pre-existing URL-state tests preserved.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2533 tests green (4 shards;
+  pre-existing onTaskUpdate RPC flake in shard 3).
