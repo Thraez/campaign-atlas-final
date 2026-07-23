@@ -19,6 +19,9 @@ type Mode = "browse" | "tag" | "type";
 
 const ALL_LETTERS = [...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i)), "#"];
 
+const TAG_FACET_CAP = 15;
+const TAG_FACET_INITIAL = 8;
+
 function sectionId(letter: string) {
   return letter === "#" ? "section-hash" : `section-${letter}`;
 }
@@ -31,6 +34,7 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
 
   const [project, setProject] = useState<AtlasProject | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showAllTags, setShowAllTags] = useState(false);
 
   const { q: query, type: activeType } = parseBrowseFilterParams(searchParams);
 
@@ -70,6 +74,18 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
     });
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
   }, [project, mode, facetDecoded]);
+
+  const allTags = useMemo(() => {
+    if (mode !== "browse") return [];
+    const m = new Map<string, number>();
+    (project?.entities ?? []).forEach((e) =>
+      e.tags.forEach((t) => m.set(t, (m.get(t) ?? 0) + 1)),
+    );
+    return Array.from(m.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, TAG_FACET_CAP)
+      .map(([t]) => t);
+  }, [project, mode]);
 
   const grouped = useMemo(() => {
     const sorted = [...entries].sort((a, b) => a.title.localeCompare(b.title));
@@ -189,6 +205,31 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
               </button>
             );
           })}
+        </div>
+      )}
+
+      {mode === "browse" && allTags.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1 px-3 md:px-4 py-2 border-b border-border/50">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground mr-1 shrink-0">
+            Tags:
+          </span>
+          {(showAllTags ? allTags : allTags.slice(0, TAG_FACET_INITIAL)).map((t) => (
+            <Link
+              key={t}
+              to={`/atlas/tag/${encodeURIComponent(t)}`}
+              className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-muted hover:bg-accent"
+            >
+              #{t}
+            </Link>
+          ))}
+          {!showAllTags && allTags.length > TAG_FACET_INITIAL && (
+            <button
+              onClick={() => setShowAllTags(true)}
+              className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-muted hover:bg-accent text-muted-foreground"
+            >
+              +{allTags.length - TAG_FACET_INITIAL} more
+            </button>
+          )}
         </div>
       )}
 
