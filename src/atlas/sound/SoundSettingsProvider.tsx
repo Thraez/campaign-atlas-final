@@ -55,9 +55,21 @@ export function SoundSettingsProvider({
     else root.removeAttribute("data-calm");
   }, [prefs.calmMode]);
 
-  // Mirror mute/calm into the engine.
+  // Mirror mute/calm into the engine; suspend the AudioContext after the gain
+  // ramp settles so the browser can reclaim CPU/battery while silent.
   useEffect(() => {
-    engine.setMuted(prefs.muted || prefs.calmMode);
+    const silenced = prefs.muted || prefs.calmMode;
+    engine.setMuted(silenced);
+    if (silenced) {
+      // 0.2s ramp + 50ms headroom, then suspend.
+      const t = setTimeout(() => void engine.suspend(), 250);
+      return () => clearTimeout(t);
+    } else {
+      // Resume before sound can play again, but only if the page is visible
+      // (the visibilitychange handler owns suspend/resume while hidden).
+      if (document.visibilityState === "visible") void engine.resume();
+      return undefined;
+    }
   }, [engine, prefs.muted, prefs.calmMode]);
 
   // Push combined effective master gain = playerVolume × mapMasterGain.
@@ -66,14 +78,18 @@ export function SoundSettingsProvider({
   }, [engine, prefs.volume, mapMasterGain]);
 
   // iOS: resume on return to foreground; suspend on hide for battery.
+  // Skip resume while muted/calm — the mute effect owns the context in that case.
   useEffect(() => {
     const onVis = () => {
-      if (document.visibilityState === "visible") void engine.resume();
-      else void engine.suspend();
+      if (document.visibilityState === "visible") {
+        if (!prefs.muted && !prefs.calmMode) void engine.resume();
+      } else {
+        void engine.suspend();
+      }
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [engine]);
+  }, [engine, prefs.muted, prefs.calmMode]);
 
   const enableSound = useCallback(() => {
     void engine.unlock();
