@@ -10,8 +10,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { render, screen, fireEvent, within } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import AtlasBrowse from "@/pages/AtlasBrowse";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity } from "@/atlas/content/schema";
@@ -63,6 +63,88 @@ function renderBrowse(project: AtlasProject) {
   );
 }
 
+describe("AtlasBrowse — tag facet row (Q24)", () => {
+  function makeTaggedProject() {
+    return makeProject([
+      makeEntity({ id: "e1", title: "Aldric", type: "npc", tags: ["npc", "smuggler"], summary: "" }),
+      makeEntity({ id: "e2", title: "Bridget", type: "npc", tags: ["npc", "city"], summary: "" }),
+      makeEntity({ id: "e3", title: "Calder", type: "npc", tags: ["npc", "quest"], summary: "" }),
+      makeEntity({
+        id: "e4",
+        title: "Dawnport",
+        type: "location",
+        tags: ["city", "port"],
+        summary: "",
+      }),
+    ]);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("shows a Tags: facet row in browse mode with chip links to tag pages", async () => {
+    vi.mocked(loadAtlasContent).mockResolvedValue(makeTaggedProject());
+    render(
+      <MemoryRouter initialEntries={["/atlas/browse"]}>
+        <AtlasBrowse mode="browse" />
+      </MemoryRouter>,
+    );
+    await screen.findByText("Aldric");
+    expect(screen.getByText("Tags:")).toBeInTheDocument();
+    // "npc" appears on 3 entities (top by frequency); its chip links to /atlas/tag/npc
+    const npcLinks = screen.getAllByRole("link", { name: "#npc" });
+    expect(npcLinks.some((l) => l.getAttribute("href") === "/atlas/tag/npc")).toBe(true);
+  });
+
+  it("does not show the tag facet row in tag mode", async () => {
+    vi.mocked(loadAtlasContent).mockResolvedValue(makeTaggedProject());
+    render(
+      <MemoryRouter initialEntries={["/atlas/tag/npc"]}>
+        <Routes>
+          <Route path="/atlas/tag/:tag" element={<AtlasBrowse mode="tag" />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByText("Aldric");
+    expect(screen.queryByText("Tags:")).toBeNull();
+  });
+
+  it("does not show the tag facet row in type mode", async () => {
+    vi.mocked(loadAtlasContent).mockResolvedValue(makeTaggedProject());
+    render(
+      <MemoryRouter initialEntries={["/atlas/type/npc"]}>
+        <Routes>
+          <Route path="/atlas/type/:type" element={<AtlasBrowse mode="type" />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByText("Aldric");
+    expect(screen.queryByText("Tags:")).toBeNull();
+  });
+
+  it("shows '+N more' button when tags exceed initial cap and reveals all on click", async () => {
+    // 10 unique-tag entities → 2 tags overflow TAG_FACET_INITIAL (8)
+    const entities = Array.from({ length: 10 }, (_, i) =>
+      makeEntity({ id: `ent${i}`, title: `Vertex${i}`, tags: [`facettag${i}`], summary: "" }),
+    );
+    vi.mocked(loadAtlasContent).mockResolvedValue(makeProject(entities));
+    render(
+      <MemoryRouter initialEntries={["/atlas/browse"]}>
+        <AtlasBrowse mode="browse" />
+      </MemoryRouter>,
+    );
+    await screen.findByText("Vertex0");
+    const moreBtn = screen.getByRole("button", { name: "+2 more" });
+    expect(moreBtn).toBeInTheDocument();
+    fireEvent.click(moreBtn);
+    expect(screen.queryByRole("button", { name: "+2 more" })).toBeNull();
+    // all chips now in the facet row — spot-check one that was hidden before expand
+    const facetRow = screen.getByText("Tags:").parentElement!;
+    expect(within(facetRow).getAllByRole("link", { name: "#facettag8" })).toHaveLength(1);
+  });
+});
+
 describe("AtlasBrowse — entity card links", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -83,8 +165,8 @@ describe("AtlasBrowse — entity card links", () => {
   it("renders each tag chip as a real link to its tag page", async () => {
     renderBrowse(makeProject([makeEntity({ tags: ["smuggler"] })]));
     await screen.findByText("Corven");
-    const tagLink = screen.getByRole("link", { name: /#smuggler/i });
-    expect(tagLink).toHaveAttribute("href", "/atlas/tag/smuggler");
+    const tagLinks = screen.getAllByRole("link", { name: /#smuggler/i });
+    expect(tagLinks.every((l) => l.getAttribute("href") === "/atlas/tag/smuggler")).toBe(true);
   });
 
   it("renders the type badge as a real link to its type page", async () => {
