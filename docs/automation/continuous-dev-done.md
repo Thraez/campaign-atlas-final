@@ -901,3 +901,19 @@ Render/styling parity only — **not** interactivity.
   pre-existing URL-state tests preserved.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2533 tests green (4 shards;
   pre-existing onTaskUpdate RPC flake in shard 3).
+
+- [x] **Q23. Highlight the matched substring in search result titles.** ✅ DONE 2026-07-23 — commit a73d0dff
+  `src/atlas/search/snippet.ts`: exported `escapeHtml`; factored the mark class into a shared `MARK`
+  constant; added `export function highlightMatch(text, q)` that wraps every case-insensitive
+  occurrence of `q` in `<mark class="bg-primary/30 text-foreground rounded-sm px-0.5">` (same
+  styling as the body snippet). `snippet()` updated to use the shared constant.
+  `src/atlas/search/SearchPalette.tsx`: imported `highlightMatch`; added `titleHtml` alongside `snip`
+  in the scored-results branch of the `useMemo`; render title via `dangerouslySetInnerHTML` +
+  `sanitizeAtlasHtml` when `titleHtml` is non-null, plain `{r.title}` otherwise (empty-query and
+  recently-viewed lists stay plain text).
+  `src/test/atlas-viewer-snippet.test.ts`: 7 new `highlightMatch` tests — match, no-match,
+  case-insensitivity, empty text, empty query, HTML-escaping of `&`, multiple occurrences.
+  `src/test/search/SearchPalette.test.tsx`: updated "typing a query" test to use `toHaveTextContent`
+  since `getByText` cannot traverse `<mark>`-split text nodes.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2540 tests green (4 shards;
+  pre-existing onTaskUpdate RPC flake in shard 3).

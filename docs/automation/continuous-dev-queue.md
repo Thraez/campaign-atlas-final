@@ -116,12 +116,7 @@ is for sequencing, not the whole spec.
 
 - [x] **Q18. Unify entity text-match across Search, Timeline, and Browse filters.** ✅ DONE 2026-07-23 — commit e8310c10
 
-- [ ] **Q23. Highlight the matched substring in search result titles.**
-  `snippet()` marks the matched term inside the body snippet, but in `SearchPalette.tsx` a title/alias match renders the plain title (line ~282) with no highlight, so it's unclear why a result matched. Add a small pure `highlightMatch(text, q)` in `src/atlas/search/snippet.ts` that reuses its existing HTML-escape + `<mark class="bg-primary/30…">` styling (export the currently-private `escapeHtml`, or factor a shared internal), and apply it to the result title (via `sanitizeAtlasHtml`, as the snippet already is) when the query hits the title. Unit-test the helper (match, no-match, HTML-escaping of special chars).
-  - **Done when:** a title-matching query renders the matched span wrapped in `<mark>`; non-title matches render the plain title; the helper escapes HTML and has unit tests.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Reuse existing escape/`<mark>` styling — no new sanitize surface.
-  ~1 run.
+- [x] **Q23. Highlight the matched substring in search result titles.** ✅ DONE 2026-07-23 — commit a73d0dff
 
 - [ ] **Q24. Add a discoverable tag-facet row to the Browse page.**
   Tag pages exist at `/atlas/tag/:tag` (`AtlasBrowse.tsx` `mode="tag"`), but nothing lets a player discover which tags exist. In Browse `mode === "browse"` only, add a top-N tag chip row computed like SearchPalette's `allTags` (lines ~96-102: tally across `playerTypeLabel`-visible entities, sort by count, slice to a cap), each chip a `<Link to={"/atlas/tag/"+encodeURIComponent(t)}>`. Keep it collapsible / capped so it stays compact.
