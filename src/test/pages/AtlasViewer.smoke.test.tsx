@@ -126,6 +126,62 @@ describe("FitBoundsController (Q2)", () => {
   });
 });
 
+describe("MapController reduced-motion (Q28)", () => {
+  const originalMatchMedia = window.matchMedia;
+
+  function stubMatchMedia(reduceMotion: boolean) {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        matches: query.includes("prefers-reduced-motion") ? reduceMotion : false,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+  }
+
+  afterEach(() => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: originalMatchMedia,
+    });
+    vi.mocked(stableMap.setView).mockClear();
+  });
+
+  it("uses setView (no animation) when prefers-reduced-motion is active", async () => {
+    stubMatchMedia(true);
+    window.history.pushState({}, "", "/?map=overview&cx=300&cy=400&cz=1");
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(stableMap.setView).toHaveBeenCalled());
+    expect(stableMap.setView).toHaveBeenCalledWith([600, 300], expect.any(Number), { animate: false });
+    expect(stableMap.flyTo).not.toHaveBeenCalled();
+  });
+
+  it("uses flyTo (animated) when prefers-reduced-motion is not set", async () => {
+    stubMatchMedia(false);
+    window.history.pushState({}, "", "/?map=overview&cx=300&cy=400&cz=1");
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(stableMap.flyTo).toHaveBeenCalled());
+    expect(stableMap.flyTo).toHaveBeenCalledWith([600, 300], expect.any(Number), { duration: 0.6 });
+    expect(stableMap.setView).not.toHaveBeenCalled();
+  });
+});
+
 describe("MaxBoundsController (Q6)", () => {
   it("calls setMaxBounds on initial load with map extent plus 10% padding", async () => {
     // Default map: 1000×1000; pad = 100
