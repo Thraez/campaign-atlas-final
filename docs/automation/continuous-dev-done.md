@@ -1059,3 +1059,30 @@ used. Keyboard and screen-reader users can now bypass the repeated toolbar on ev
 
 **Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2573 tests green
 (4 shards; pre-existing onTaskUpdate RPC flake in shard 4).
+
+---
+
+### Q33 — Add a persisted player volume slider (2026-07-23)
+
+**Commit:** `0e496814` · **Merge:** `991296c3` · **Branch:** `run/q33-volume`
+
+**What shipped:** Players can now control loudness with a compact range slider that persists across
+page reloads. The effective master gain the AudioEngine uses is now `playerVolume × mapMasterGain`
+instead of the raw map gain, so both player preference and DM-authored scene gain compose correctly.
+
+**Implementation:**
+- `src/atlas/sound/soundPrefs.ts`: added `volume: number` (0..1, default 0.8) to `SoundPrefs`,
+  `DEFAULT_PREFS`, and `loadSoundPrefs` (range-guarded: must be a number in [0, 1]).
+- `src/atlas/sound/SoundSettingsProvider.tsx`: added `mapMasterGain` state (internal, not persisted,
+  default 0.6); new `setVolume` and `setMapMasterGain` on the context interface; new effect pushes
+  `engine.setMasterGain(prefs.volume × mapMasterGain)` whenever either changes.
+- `src/atlas/sound/SoundscapeLayer.tsx`: replaced `engine.setMasterGain(...)` with
+  `setMapMasterGain(...)` so the provider (not the layer) owns the combined gain computation.
+- `src/atlas/sound/SoundControl.tsx`: renders a compact `<input type="range">` (aria-label "Volume")
+  alongside the mute button when sound is enabled; onChange calls `setVolume`.
+- 10 new tests: soundPrefs (+5 — persistence, boundary values, out-of-range/non-number degradation);
+  SoundControl (+3 — slider absent before enable, default value, change persists); SoundSettingsProvider
+  (+2 — setVolume persists, combined-gain effect calls engine.setMasterGain(volume × mapGain)).
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2583 tests green
+(4 shards; pre-existing onTaskUpdate RPC flake in shard 4).

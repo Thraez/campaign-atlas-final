@@ -141,11 +141,7 @@ is for sequencing, not the whole spec.
 
 #### Q-E — Player soundscape polish
 
-- [ ] **Q33. Add a persisted player volume slider.**
-  Add a `volume: number` (0..1, default ~0.8) field to `SoundPrefs` in `src/atlas/sound/soundPrefs.ts`, validated on load exactly like the existing booleans (loadSoundPrefs) and written by saveSoundPrefs. Render a compact slider in `src/atlas/sound/SoundControl.tsx` that calls a new `setVolume` on `SoundSettingsProvider.tsx`. The provider must own the effective master gain = `playerVolume × map masterGain` and push it to `engine.setMasterGain`; today `SoundscapeLayer.tsx:30` calls `engine.setMasterGain(mapDoc.soundscape?.masterGain ?? 0.6)` directly, so change SoundscapeLayer to report the map's masterGain up to the provider (e.g. a `setMapMasterGain` in context) and let the provider compute+apply the combined value instead of stomping the raw map gain.
-  - **Done when:** dragging the slider changes loudness live, the value persists across reload, and SoundscapeLayer no longer sets raw master gain (effective master = volume × map gain); a unit test asserts persistence and the combined-gain math.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Player-facing only; no DM-secret surface. ~2–3 runs.
+- [x] **Q33. Add a persisted player volume slider.** ✅ DONE 2026-07-23 — commit 0e496814
 
 - [ ] **Q34. Suspend the AudioContext when muted, calm, or hidden.**
   The provider's mute/calm effect in `src/atlas/sound/SoundSettingsProvider.tsx:54-57` only calls `engine.setMuted(muted||calmMode)`, which ramps master gain to 0 but leaves the AudioContext and its looping source running. After the 0.2s mute ramp settles, call `engine.suspend()` (already defined at `AudioEngine.ts:51`) whenever muted or calm; call `engine.resume()` before the next unmute/crossfade. Keep the existing `visibilitychange` suspend/resume (SoundSettingsProvider.tsx:60-67) intact and ensure the unmute-resume path does not fight the hide-suspend.
