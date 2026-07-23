@@ -245,6 +245,12 @@ export function SearchPalette({
   const countLabel =
     resultTotal === 1 ? "1 match" : `${resultTotal} matches`;
 
+  // Stable option id for the currently active result — used for aria-activedescendant.
+  const activeResultId =
+    activeIndex >= 0 && results[activeIndex]
+      ? `sp-result-${results[activeIndex].e.id}`
+      : undefined;
+
   return (
     <div
       className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm flex items-start justify-center pt-[10vh] px-4"
@@ -264,6 +270,8 @@ export function SearchPalette({
           <Input
             autoFocus
             aria-label="Search"
+            aria-activedescendant={activeResultId}
+            aria-controls="sp-results-listbox"
             placeholder='Search titles, lore body, tags… "exact phrase"'
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -344,7 +352,24 @@ export function SearchPalette({
           </div>
         )}
 
-        <div ref={listRef} className="max-h-[60vh] overflow-y-auto">
+        {/* Polite live region announces result count to screen readers when the query changes.
+            Uses "result/results" (not "match/matches") to keep text distinct from the visible
+            count label, so tests can target each element unambiguously. */}
+        <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+          {!isRecentlyViewed
+            ? results.length === 0
+              ? "No results"
+              : `${resultTotal} ${resultTotal === 1 ? "result" : "results"}`
+            : ""}
+        </div>
+
+        <div
+          ref={listRef}
+          id="sp-results-listbox"
+          role="listbox"
+          aria-label="Search results"
+          className="max-h-[60vh] overflow-y-auto"
+        >
           {results.length === 0 ? (
             <div className="p-6 text-sm text-muted-foreground text-center">No matches.</div>
           ) : (
@@ -360,6 +385,9 @@ export function SearchPalette({
               return (
                 <button
                   key={r.id}
+                  id={`sp-result-${r.id}`}
+                  role="option"
+                  aria-selected={active}
                   data-index={i}
                   onClick={() => onPick(r.id, placed)}
                   onMouseEnter={() => setActiveIndex(i)}
