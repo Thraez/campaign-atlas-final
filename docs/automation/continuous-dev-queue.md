@@ -129,12 +129,7 @@ is for sequencing, not the whole spec.
 
 - [x] **Q27. Restore a visible keyboard-focus outline on the map container and controls.** ✅ DONE 2026-07-23 — commit a0c93798
 
-- [ ] **Q28. Make map fly animations respect prefers-reduced-motion.**
-  `MapController` in `src/pages/AtlasViewer.tsx:100-114` uses `map.flyTo([lat, lng], targetZoom, { duration: 0.6 })`; Leaflet's fly is requestAnimationFrame-driven, so the global reduced-motion CSS (`src/index.css:409,494`) does not disable it for motion-sensitive players. Create `src/hooks/use-prefers-reduced-motion.ts` (a small `matchMedia('(prefers-reduced-motion: reduce)')` hook modeled on `src/hooks/use-has-desktop-aside.tsx`), and in `MapController` switch to `map.setView([lat, lng], targetZoom, { animate: false })` when reduce is preferred, keeping `flyTo` otherwise. Preserve the existing coordinate flip (`lat = flyTo.height - flyTo.y`, `lng = flyTo.x`, lines 108-109).
-  - **Done when:** with `prefers-reduced-motion: reduce`, deep-link/wander/`onShowOnMap` jumps snap without animation (via `setView`), otherwise animate as before; a unit test covers both branches using the react-leaflet mock (`setView`/`flyTo` are stubbed in `src/test/helpers/reactLeafletMock.tsx`).
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Scope to the player viewer's `MapController` only (leave the editor's `flyTo` untouched). Player-facing.
-  ~2–3 runs.
+- [x] **Q28. Make map fly animations respect prefers-reduced-motion.** ✅ DONE 2026-07-23 — commit f0120c0b
 
 - [ ] **Q29. Add dialog semantics and a focus trap to the search palette.**
   `src/atlas/search/SearchPalette.tsx` is a plain `<div>` overlay (line ~178): no `role="dialog"`, no `aria-modal`, the input (lines ~189-195) is placeholder-only with no accessible label, Tab escapes to the page behind it, and focus is not returned to the trigger on close. Add `role="dialog"` + `aria-modal="true"` + an `aria-label` (e.g. "Search the atlas") to the inner palette container, an `aria-label` on the `<Input>`, focus trapping so Tab/Shift+Tab cycle within the palette, and restore focus to the Search button (in `src/pages/AtlasViewer.tsx`) when the palette closes.

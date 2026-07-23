@@ -963,3 +963,17 @@ Render/styling parity only — **not** interactivity.
   (the +/– zoom buttons). Pure CSS, no new surface. Satisfies WCAG 2.4.7.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2547 tests green (4 shards;
   pre-existing onTaskUpdate RPC flake in shard 3).
+
+- [x] **Q28. Make map fly animations respect prefers-reduced-motion.** ✅ DONE 2026-07-23 — commit f0120c0b
+  New `src/hooks/use-prefers-reduced-motion.ts`: reads `matchMedia('(prefers-reduced-motion: reduce)')`
+  and updates reactively on change, following the `useHasDesktopAside` pattern.
+  `src/pages/AtlasViewer.tsx`: `MapController` imports `usePrefersReducedMotion`; when reduced motion
+  is preferred, uses `map.setView([lat, lng], targetZoom, { animate: false })` instead of
+  `map.flyTo([lat, lng], targetZoom, { duration: 0.6 })`. Coordinate flip (lat = height − y) preserved.
+  Editor `flyTo` is untouched (scope: player viewer `MapController` only).
+  `src/test/use-prefers-reduced-motion.test.ts`: 4 unit tests — false when no preference, true when
+  active, reactive update to reduced, reactive update back to no-preference.
+  `src/test/pages/AtlasViewer.smoke.test.tsx`: 2 new smoke tests — `setView({animate:false})` called
+  (not `flyTo`) when reduced motion active; `flyTo({duration:0.6})` called (not `setView`) when absent.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2553 tests green (4 shards;
+  pre-existing onTaskUpdate RPC flake in shard 4).
