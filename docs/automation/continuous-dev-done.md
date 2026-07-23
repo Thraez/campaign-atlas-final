@@ -845,3 +845,14 @@ Render/styling parity only — **not** interactivity.
   individually, no-match, undefined summary, and whitespace trimming.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2497 tests green (4 shards;
   pre-existing onTaskUpdate RPC flake in shard 3).
+
+- [x] **Q19. Show result count in the search palette.** ✅ DONE 2026-07-23 — commit 904e8873
+  `src/atlas/search/SearchPalette.tsx`: results useMemo restructured from a plain array to
+  `{ items, total }` — `items` is the capped display list (≤40), `total` is the pre-slice pool
+  size. `countLabel` helper produces "1 match" or "N matches". A thin count line renders between
+  the filter bar and the results list; it is hidden when there are no results. The "(showing first
+  40)" note appears only when total > 40.
+  `src/test/search/SearchPalette.test.tsx`: 4 new tests — pool-under-cap count, singular "1 match",
+  pool-over-40 cap note, no count on no-results screen.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2501 tests green (4 shards;
+  pre-existing onTaskUpdate RPC flake in shard 3).
