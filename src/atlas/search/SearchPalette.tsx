@@ -87,6 +87,12 @@ export function SearchPalette({
   const [recentOnly, setRecentOnly] = useState(false);
   const recentlyRevealed = useRecentlyRevealedIds();
   const listRef = useRef<HTMLDivElement>(null);
+  // Capture the element that had focus before the palette opened so it can be
+  // restored when the palette closes (regardless of how it closes).
+  const triggerRef = useRef<HTMLElement | null>(
+    typeof document !== "undefined" ? (document.activeElement as HTMLElement) : null,
+  );
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const allTypes = useMemo(() => {
     const m = new Map<string, number>();
@@ -190,7 +196,38 @@ export function SearchPalette({
     if (el) el.scrollIntoView({ block: "nearest" });
   }, [activeIndex]);
 
+  // Restore focus to whatever was focused before the palette opened.
+  useEffect(() => {
+    const trigger = triggerRef.current;
+    return () => {
+      trigger?.focus();
+    };
+  }, []);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Tab") {
+      if (!dialogRef.current) return;
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+      return;
+    }
     if (results.length === 0) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -214,6 +251,10 @@ export function SearchPalette({
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search the atlas"
         className="w-full max-w-2xl bg-card border border-border rounded-lg shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
@@ -222,6 +263,7 @@ export function SearchPalette({
           <Search className="h-4 w-4 text-muted-foreground" />
           <Input
             autoFocus
+            aria-label="Search"
             placeholder='Search titles, lore body, tags… "exact phrase"'
             value={query}
             onChange={(e) => setQuery(e.target.value)}

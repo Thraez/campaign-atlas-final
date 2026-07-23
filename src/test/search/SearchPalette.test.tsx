@@ -6,6 +6,7 @@
  * filters, keyboard selection, and dismissal. No react-leaflet needed.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act } from "@testing-library/react";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { SearchPalette } from "@/atlas/search/SearchPalette";
@@ -218,6 +219,67 @@ describe("result count (Q19)", () => {
   it("shows no count line when there are no results", () => {
     renderPalette({ query: "zzzznope" });
     expect(screen.queryByText(/\d+ match/)).not.toBeInTheDocument();
+  });
+});
+
+describe("dialog semantics and focus trap (Q29)", () => {
+  it("exposes dialog role, aria-modal, and accessible name on the palette container", () => {
+    renderPalette();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveAttribute("aria-label", "Search the atlas");
+  });
+
+  it("exposes an accessible label on the search input", () => {
+    renderPalette();
+    expect(screen.getByRole("textbox", { name: "Search" })).toBeInTheDocument();
+  });
+
+  it("wraps Tab from the last focusable element back to the first", () => {
+    renderPalette({ query: "" });
+    const dialog = screen.getByRole("dialog");
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>(
+        'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    expect(focusable.length).toBeGreaterThan(1);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    last.focus();
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: false });
+    expect(document.activeElement).toBe(first);
+  });
+
+  it("wraps Shift+Tab from the first focusable element to the last", () => {
+    renderPalette({ query: "" });
+    const dialog = screen.getByRole("dialog");
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>(
+        'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    expect(focusable.length).toBeGreaterThan(1);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    first.focus();
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(last);
+  });
+
+  it("restores focus to the trigger element when the palette unmounts", () => {
+    const trigger = document.createElement("button");
+    document.body.appendChild(trigger);
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    const { unmount } = renderPalette();
+    act(() => unmount());
+
+    expect(document.activeElement).toBe(trigger);
+    document.body.removeChild(trigger);
   });
 });
 
