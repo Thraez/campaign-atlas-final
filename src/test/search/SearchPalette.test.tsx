@@ -276,7 +276,9 @@ describe("recently viewed (Q20)", () => {
     seedVisited(["silver-lake"]);
     renderPalette({ query: "iron" });
     expect(screen.queryByText("Recently viewed")).not.toBeInTheDocument();
-    expect(screen.getByText("Iron Tower")).toBeInTheDocument();
+    // Title "Iron Tower" has "Iron" highlighted in a <mark>; use toHaveTextContent
+    // since getByText won't match text split across child elements.
+    expect(resultButtons()[0]).toHaveTextContent("Iron Tower");
     expect(screen.queryByText("Silver Lake")).not.toBeInTheDocument();
   });
 });

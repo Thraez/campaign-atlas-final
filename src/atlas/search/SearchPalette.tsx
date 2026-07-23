@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Search, MapPin, CalendarClock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
-import { snippet } from "@/atlas/search/snippet";
+import { snippet, highlightMatch } from "@/atlas/search/snippet";
 import { parseSearchQuery, matchesPhrases } from "@/atlas/search/parseSearchQuery";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 import { loadVisitedOrdered } from "@/atlas/visited/visitedPlaces";
@@ -123,12 +123,12 @@ export function SearchPalette({
           const idMap = new Map(pool.map((e) => [e.id, e]));
           const items = visitedInPool
             .slice(0, 40)
-            .map((id) => ({ e: idMap.get(id)!, snip: null as string | null }));
+            .map((id) => ({ e: idMap.get(id)!, snip: null as string | null, titleHtml: null as string | null }));
           return { items, total: visitedInPool.length, isRecentlyViewed: true };
         }
       }
       return {
-        items: pool.slice(0, 40).map((e) => ({ e, snip: null as string | null })),
+        items: pool.slice(0, 40).map((e) => ({ e, snip: null as string | null, titleHtml: null as string | null })),
         total: pool.length,
         isRecentlyViewed: false,
       };
@@ -166,7 +166,11 @@ export function SearchPalette({
     return {
       items: scored
         .slice(0, 40)
-        .map(({ e }) => ({ e, snip: snippet(e.bodyText ?? e.body, e.body, snippetQuery) })),
+        .map(({ e }) => ({
+          e,
+          snip: snippet(e.bodyText ?? e.body, e.body, snippetQuery),
+          titleHtml: highlightMatch(e.title, snippetQuery),
+        })),
       total: scored.length,
       isRecentlyViewed: false,
     };
@@ -308,7 +312,7 @@ export function SearchPalette({
                   Recently viewed
                 </div>
               )}
-              {results.map(({ e: r, snip }, i) => {
+              {results.map(({ e: r, snip, titleHtml }, i) => {
               const placed = placedIds.has(r.id);
               const active = i === activeIndex;
               return (
@@ -322,7 +326,14 @@ export function SearchPalette({
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{r.title}</span>
+                    {titleHtml ? (
+                      <span
+                        className="font-medium text-sm"
+                        dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(titleHtml) }}
+                      />
+                    ) : (
+                      <span className="font-medium text-sm">{r.title}</span>
+                    )}
                     {playerTypeLabel(r.type) && (
                       <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
                         {playerTypeLabel(r.type)}
