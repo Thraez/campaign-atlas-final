@@ -1014,3 +1014,25 @@ each element unambiguously via role or text.
 
 **Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2565 tests green
 (4 shards; pre-existing onTaskUpdate RPC flake in shard 4).
+
+---
+
+### Q31 — Enforce a 24px minimum tap target on filter chips (2026-07-23)
+
+**Commit:** `64d4487c` · **Merge:** `a606fbb3` · **Branch:** `run/q31-tap-targets`
+
+**What shipped:** Every interactive filter chip on the three player-facing surfaces (Search palette,
+Browse, Timeline) now meets the WCAG 2.5.8 AA 24 px minimum tap target requirement. Previously the
+chips used `py-0.5` (2 px vertical padding) giving ~18 px height — too small on phones.
+
+**Implementation:**
+- `src/index.css`: new `.filter-chip` utility class — `display: inline-flex; align-items: center;
+  justify-content: center; min-height: 1.5rem` (24 px).
+- `src/atlas/search/SearchPalette.tsx`: class applied to all 5 chip variants (this-map, recent, all,
+  type, tag).
+- `src/pages/AtlasBrowse.tsx`: class applied to type chip buttons, tag Link chips, and "+N more" button.
+- `src/pages/AtlasTimeline.tsx`: class applied to type chip buttons.
+- Inline `<code>` spans (`px-1 py-0.5`) left untouched per spec.
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2565 tests green
+(4 shards; pre-existing onTaskUpdate RPC flake in shard 4).
