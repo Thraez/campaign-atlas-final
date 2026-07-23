@@ -116,20 +116,6 @@ is for sequencing, not the whole spec.
 
 - [x] **Q18. Unify entity text-match across Search, Timeline, and Browse filters.** ✅ DONE 2026-07-23 — commit e8310c10
 
-- [ ] **Q19. Show a result count in the search palette.**
-  `src/atlas/search/SearchPalette.tsx` caps results with `.slice(0, 40)` (lines ~112 and ~143) with no indication, so a player can't tell whether the list is complete. Capture the pre-slice filtered length and render a small count line (palette header or footer): total matches, plus a "(showing first 40)" note only when the pool exceeds the 40 cap.
-  - **Done when:** the palette shows the true match count; when >40 match, the "showing first 40" note appears; when ≤40 it does not; a render test asserts both.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Compute from the pre-slice length; do not change ranking or the cap value.
-  ~1 run.
-
-- [ ] **Q20. Search palette empty state surfaces 'Recently viewed'.**
-  When the query is empty and no filters are active, `SearchPalette.tsx` lists the first 40 index entries in arbitrary index order (line ~112). Add `loadVisitedOrdered()` to `src/atlas/visited/visitedPlaces.ts` returning ids newest-first from the stored `visitedAt` timestamps (line ~62), and use it in the empty-query path to surface recently-viewed entities first under a small "Recently viewed" label; fall back to the current index order when nothing has been visited. Filter to ids present in the current index so stale ids are dropped.
-  - **Done when:** with visited history, the empty-query palette lists those entities newest-first under a "Recently viewed" heading; with none visited it matches today's order; `loadVisitedOrdered` has a unit test.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Reuses the existing browser-local visited store — no new persistence, no server.
-  ~2-3 runs.
-
 - [ ] **Q21. Persist Browse/Timeline filter state in the URL.**
   `AtlasBrowse.tsx` and `AtlasTimeline.tsx` hold `query` and `activeType` only in local `useState` (lines ~22-23 in each), so a shared/bookmarked link and the Back button lose the filter. Sync `q` and `type` to the URL via `URLSearchParams` — read on mount, `replaceState` (or `useSearchParams` with `{replace:true}`) on change — mirroring the map viewer's deep-link ergonomics in `src/atlas/deepLink.ts`. Add a small pure parse/serialize helper (e.g. `browseFilterParams.ts`) with unit tests; leave the map-mode `tag`/`type` route params unchanged.
   - **Done when:** changing a Browse/Timeline filter updates the URL without a history entry per keystroke; loading that URL restores the filter; Back restores the prior filter; the helper has round-trip unit tests.

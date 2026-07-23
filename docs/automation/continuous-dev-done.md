@@ -856,3 +856,19 @@ Render/styling parity only — **not** interactivity.
   pool-over-40 cap note, no count on no-results screen.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2501 tests green (4 shards;
   pre-existing onTaskUpdate RPC flake in shard 3).
+
+- [x] **Q20. Search palette empty state surfaces 'Recently viewed'.** ✅ DONE 2026-07-23 — commit 4a65c5e8
+  `src/atlas/visited/visitedPlaces.ts`: new `loadVisitedOrdered()` returns entity ids newest-first
+  from stored `visitedAt` ISO timestamps; stale ids are filtered at the call site.
+  `src/atlas/search/SearchPalette.tsx`: empty-query path checks `loadVisitedOrdered()`, builds a
+  recently-viewed pool filtered to the current index, and returns `isRecentlyViewed: true`. The
+  count bar is suppressed in this mode; a "Recently viewed" section label is rendered at the top of
+  the list instead. When no entities have been visited the existing index-order fallback is used
+  unchanged. Typed query always bypasses the recently-viewed path.
+  `src/test/wayfinding/visitedPlaces.test.ts`: 2 new tests for `loadVisitedOrdered` newest-first
+  ordering and empty-store fallback.
+  `src/test/search/SearchPalette.test.tsx`: 5 new Q20 tests — label shown + correct order, count
+  bar suppressed, index-order fallback when no history, stale-id filtering, query dismissal.
+  Existing Q19 count-bar tests unaffected (no visited history seeded in beforeEach).
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2508 tests green (4 shards;
+  pre-existing onTaskUpdate RPC flake in shard 3).
