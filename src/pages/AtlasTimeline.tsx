@@ -169,7 +169,21 @@ export default function AtlasTimeline() {
             </p>
           )}
 
-          {groups.length === 0 ? (
+          {groups.length === 0 && dated.length > 0 ? (
+            <div className="text-center text-sm text-muted-foreground py-16 space-y-3">
+              <p>No events match your filter.</p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setQuery("");
+                  setActiveType(null);
+                }}
+              >
+                Clear filter
+              </Button>
+            </div>
+          ) : groups.length === 0 ? (
             <div className="text-center text-sm text-muted-foreground py-16">
               No dated entries yet. Add{" "}
               <code className="px-1 py-0.5 rounded bg-muted">atlas.date</code> to a markdown file's
