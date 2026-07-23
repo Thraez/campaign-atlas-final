@@ -5,7 +5,7 @@
  * proper-case text even though matching happens on the lowercase index.
  */
 import { describe, it, expect } from "vitest";
-import { snippet } from "../atlas/search/snippet";
+import { snippet, highlightMatch } from "../atlas/search/snippet";
 
 describe("snippet()", () => {
   it("returns original-case text when a match is found", () => {
@@ -85,5 +85,46 @@ describe("snippet()", () => {
     expect(result).toContain("&lt;");
     expect(result).toContain("&gt;");
     expect(result).toMatch(/<mark[^>]*>Weapons<\/mark>/);
+  });
+});
+
+describe("highlightMatch()", () => {
+  it("wraps a matching substring in <mark>", () => {
+    const result = highlightMatch("Thornhold Keep", "thornhold");
+    expect(result).not.toBeNull();
+    expect(result).toMatch(/<mark[^>]*>Thornhold<\/mark>/);
+    expect(result).toContain(" Keep");
+  });
+
+  it("is case-insensitive and preserves original casing in output", () => {
+    const result = highlightMatch("Ruins of KARATH", "ruins of karath");
+    expect(result).not.toBeNull();
+    expect(result).toMatch(/<mark[^>]*>Ruins of KARATH<\/mark>/);
+  });
+
+  it("returns null when there is no match", () => {
+    expect(highlightMatch("Thornhold Keep", "goblin")).toBeNull();
+  });
+
+  it("returns null when query is empty", () => {
+    expect(highlightMatch("Thornhold Keep", "")).toBeNull();
+  });
+
+  it("returns null when text is empty", () => {
+    expect(highlightMatch("", "thornhold")).toBeNull();
+  });
+
+  it("HTML-escapes special characters in the title text", () => {
+    const result = highlightMatch("Armor & Blades", "blades");
+    expect(result).not.toBeNull();
+    expect(result).toContain("&amp;");
+    expect(result).toMatch(/<mark[^>]*>Blades<\/mark>/);
+  });
+
+  it("highlights multiple occurrences", () => {
+    const result = highlightMatch("Port of Port Karath", "port");
+    expect(result).not.toBeNull();
+    const matches = result!.match(/<mark[^>]*>/g) ?? [];
+    expect(matches.length).toBe(2);
   });
 });

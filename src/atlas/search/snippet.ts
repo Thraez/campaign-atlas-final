@@ -1,8 +1,19 @@
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s.replace(
     /[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string,
   );
+}
+
+const MARK = `<mark class="bg-primary/30 text-foreground rounded-sm px-0.5">`;
+
+// Wrap every case-insensitive occurrence of `q` in `text` with a <mark> tag.
+// Returns null when `q` is empty or has no match in `text`.
+export function highlightMatch(text: string, q: string): string | null {
+  if (!text || !q) return null;
+  if (!text.toLowerCase().includes(q.toLowerCase())) return null;
+  const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+  return escapeHtml(text).replace(re, (m) => `${MARK}${escapeHtml(m)}</mark>`);
 }
 
 // Build a 140-char snippet around the first match of `q` in `lower`,
@@ -22,8 +33,5 @@ export function snippet(
   const slice =
     (start > 0 ? "…" : "") + display.slice(start, end) + (end < display.length ? "…" : "");
   const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-  return escapeHtml(slice).replace(
-    re,
-    (m) => `<mark class="bg-primary/30 text-foreground rounded-sm px-0.5">${escapeHtml(m)}</mark>`,
-  );
+  return escapeHtml(slice).replace(re, (m) => `${MARK}${escapeHtml(m)}</mark>`);
 }
