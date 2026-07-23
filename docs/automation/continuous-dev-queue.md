@@ -145,11 +145,7 @@ is for sequencing, not the whole spec.
 
 - [x] **Q34. Suspend the AudioContext when muted, calm, or hidden.** ✅ DONE 2026-07-23 — commit 9343e7d2
 
-- [ ] **Q36. Hide sound controls when the active map has no soundscape.**
-  `src/atlas/sound/SoundControl.tsx` always renders the invite + mute + calm buttons even when the active map has `soundscape.enabled === false` or zero areas, promising ambience that never plays. Plumb a `hasSoundscape` boolean from `AtlasViewer.tsx` (which holds `activeMap` and renders SoundControl at line 695; compute `activeMap.soundscape?.enabled !== false && (activeMap.soundscape?.areas?.length ?? 0) > 0`) into SoundControl and suppress the invite + mute button when it is false. Keep the Calm-mode toggle rendered (it also governs ocean motion), or gate only the audio controls.
-  - **Done when:** on a map with no/disabled soundscape the invite + mute controls are hidden while Calm mode stays available; on a sound-bearing map all controls render as today; a unit test covers both branches.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Player-facing conditional render only. ~1 run.
+- [x] **Q36. Hide sound controls when the active map has no soundscape.** ✅ DONE 2026-07-23 — commit 2b7e49ba
 
 - [ ] **Q37. Graceful fallback when Web Audio is unavailable.**
   `realAudioDeps.createContext` (`src/atlas/sound/realAudioDeps.ts:4`) throws when neither `window.AudioContext` nor `webkitAudioContext` exists, and `enableSound` in `SoundSettingsProvider.tsx:69-72` does `void engine.unlock()` with no `.catch`, so tapping the invite floats an unhandled rejection and leaves a dead mute button. Add a capability probe (a small helper returning whether an AudioContext constructor is present), wrap `engine.unlock()` in try/catch inside `enableSound`, and expose an `audioAvailable` flag so `SoundControl.tsx` suppresses the invite/mute (or marks them unavailable) when Web Audio can't run. The rest of the viewer must keep working.

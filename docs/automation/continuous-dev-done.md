@@ -1137,3 +1137,26 @@ is a hardcoded generic string, keeping filterSoundscape.ts's area-name stripping
 
 **Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2590 tests green
 (4 shards; pre-existing onTaskUpdate RPC flake in shard 4).
+
+### Q36 — Hide sound controls when the active map has no soundscape (2026-07-23)
+
+**Commit:** `2b7e49ba` · **Merge:** `08185731` · **Branch:** `run/q36`
+
+**What shipped:** `SoundControl` now accepts a `hasSoundscape` prop (default `true`). When `false`,
+the invite button, mute toggle, and volume slider are hidden — so maps with no soundscape config (or
+`soundscape.enabled === false`, or zero areas) no longer promise ambience that never plays. The Calm
+mode toggle stays visible on all maps because it also governs ocean motion. `AtlasViewer` computes
+`hasSoundscape` from `activeMap.soundscape` and passes it down.
+
+**Implementation:**
+- `src/atlas/sound/SoundControl.tsx`: added `SoundControlProps { hasSoundscape?: boolean }` (default
+  `true`). Both the invite block (`!soundEnabled && !dismissed`) and the active-sound block
+  (`soundEnabled`) are gated behind `hasSoundscape &&`. The Calm mode button is unconditional.
+- `src/pages/AtlasViewer.tsx`: computes `hasSoundscape = activeMap.soundscape?.enabled !== false &&
+  (activeMap.soundscape?.areas?.length ?? 0) > 0` and passes it to `<SoundControl>`.
+- `src/test/sound/SoundControl.test.tsx`: updated `renderControl()` helper to accept an optional
+  `{ hasSoundscape? }` prop spread; added Q36 describe block with 3 tests: invite + mute hidden when
+  false, Calm mode visible when false, all controls present when true.
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2593 tests green
+(4 shards; pre-existing onTaskUpdate RPC flake in shard 4).
