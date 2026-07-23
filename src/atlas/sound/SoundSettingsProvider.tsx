@@ -15,6 +15,8 @@ interface SoundSettings extends SoundPrefs {
   setCalmMode: (c: boolean) => void;
   setVolume: (v: number) => void;
   setMapMasterGain: (g: number) => void;
+  ambiencePlaying: boolean;
+  setAmbiencePlaying: (v: boolean) => void;
 }
 
 const Ctx = createContext<SoundSettings | null>(null);
@@ -39,6 +41,8 @@ export function SoundSettingsProvider({
   const [engine] = useState(() => new AudioEngine(deps));
   // mapMasterGain is reported by SoundscapeLayer and is not persisted.
   const [mapMasterGain, setMapMasterGain] = useState(0.6);
+  // ambiencePlaying is reported by SoundscapeLayer when a bed is active.
+  const [ambiencePlaying, setAmbiencePlaying] = useState(false);
 
   const update = useCallback((patch: Partial<SoundPrefs>) => {
     setPrefs((prev) => {
@@ -105,8 +109,10 @@ export function SoundSettingsProvider({
       setCalmMode: (c) => update({ calmMode: c }),
       setVolume: (v) => update({ volume: Math.min(1, Math.max(0, v)) }),
       setMapMasterGain,
+      ambiencePlaying,
+      setAmbiencePlaying,
     }),
-    [prefs, engine, enableSound, update],
+    [prefs, engine, enableSound, update, ambiencePlaying],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -20,7 +20,7 @@ export function computeActiveId(
 
 export function SoundscapeLayer({ map: mapDoc }: { map: MapDocument }) {
   const leaflet = useMap();
-  const { soundEnabled, engine, setMapMasterGain } = useSoundSettings();
+  const { soundEnabled, engine, setMapMasterGain, setAmbiencePlaying } = useSoundSettings();
   const prepared = useMemo(() => prepareAreas(mapDoc), [mapDoc]);
   const activeId = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
@@ -44,6 +44,7 @@ export function SoundscapeLayer({ map: mapDoc }: { map: MapDocument }) {
         );
         if (next === activeId.current) return;
         activeId.current = next;
+        setAmbiencePlaying(next !== null);
         void engine.crossfadeTo(prepared.find((a) => a.id === next) ?? null);
       }, DEBOUNCE_MS);
     };
@@ -55,16 +56,18 @@ export function SoundscapeLayer({ map: mapDoc }: { map: MapDocument }) {
       leaflet.off("moveend", settle);
       leaflet.off("zoomend", settle);
       if (timer.current) clearTimeout(timer.current);
+      setAmbiencePlaying(false);
     };
-  }, [leaflet, soundEnabled, prepared, engine, mapDoc.height, mapDoc.soundscape?.enabled]);
+  }, [leaflet, soundEnabled, prepared, engine, mapDoc.height, mapDoc.soundscape?.enabled, setAmbiencePlaying]);
 
   // Stop sound when switching maps.
   useEffect(() => {
     return () => {
       activeId.current = null;
+      setAmbiencePlaying(false);
       void engine.crossfadeTo(null);
     };
-  }, [engine, mapDoc.id]);
+  }, [engine, mapDoc.id, setAmbiencePlaying]);
 
   return null;
 }

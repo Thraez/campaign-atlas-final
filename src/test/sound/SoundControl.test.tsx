@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, act, fireEvent } from "@testing-library/react";
-import { SoundSettingsProvider } from "@/atlas/sound/SoundSettingsProvider";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { useEffect } from "react";
+import { render, screen, act, fireEvent, cleanup } from "@testing-library/react";
+import { SoundSettingsProvider, useSoundSettings } from "@/atlas/sound/SoundSettingsProvider";
 import { SoundControl } from "@/atlas/sound/SoundControl";
 import { _resetSoundPrefsForTests, loadSoundPrefs } from "@/atlas/sound/soundPrefs";
 
@@ -34,8 +35,25 @@ const renderControl = () =>
     </SoundSettingsProvider>,
   );
 
+function SimulateAmbience({ playing }: { playing: boolean }) {
+  const { setAmbiencePlaying } = useSoundSettings();
+  useEffect(() => {
+    setAmbiencePlaying(playing);
+  }, [setAmbiencePlaying, playing]);
+  return null;
+}
+
+const renderWithAmbience = (playing: boolean) =>
+  render(
+    <SoundSettingsProvider deps={stubDeps as any}>
+      <SoundControl />
+      <SimulateAmbience playing={playing} />
+    </SoundSettingsProvider>,
+  );
+
 describe("SoundControl", () => {
   beforeEach(() => _resetSoundPrefsForTests());
+  afterEach(() => cleanup());
 
   it("shows the invite first, then the speaker after enabling", () => {
     renderControl();
@@ -101,5 +119,37 @@ describe("SoundControl", () => {
     });
     expect(Number(slider.value)).toBeCloseTo(0.3);
     expect(loadSoundPrefs().volume).toBeCloseTo(0.3);
+  });
+});
+
+describe("Q35 — ambience playing indicator", () => {
+  beforeEach(() => _resetSoundPrefsForTests());
+  afterEach(() => cleanup());
+
+  it("live region announces 'Ambience playing' when a bed is active and sound is enabled", () => {
+    renderWithAmbience(true);
+    act(() => screen.getByRole("button", { name: /bring the world to life/i }).click());
+    expect(screen.getByRole("status").textContent).toBe("Ambience playing");
+  });
+
+  it("live region is empty when muted (indicator hidden)", () => {
+    renderWithAmbience(true);
+    act(() => screen.getByRole("button", { name: /bring the world to life/i }).click());
+    act(() => screen.getByRole("button", { name: "Mute sound" }).click());
+    expect(screen.getByRole("status").textContent).toBe("");
+  });
+
+  it("live region is empty before sound is enabled even if a bed would be active", () => {
+    renderWithAmbience(true);
+    // sound not yet enabled — indicator must not show
+    expect(screen.getByRole("status").textContent).toBe("");
+  });
+
+  it("no area name appears — only the generic label", () => {
+    renderWithAmbience(true);
+    act(() => screen.getByRole("button", { name: /bring the world to life/i }).click());
+    // The live region contains only the hardcoded generic string, no area name derived from soundscape
+    expect(screen.getByRole("status").textContent).toBe("Ambience playing");
+    expect(screen.queryByText(/area-\d/i)).toBeNull();
   });
 });
