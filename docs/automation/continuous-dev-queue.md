@@ -125,12 +125,7 @@ is for sequencing, not the whole spec.
 
 - [x] **Q25. Give the mobile entity bottom sheet an accessible name (SheetTitle/Description).** ✅ DONE 2026-07-23 — commit 3b0e9fe2
 
-- [ ] **Q26. Give map pins accessible names for keyboard and screen-reader users.**
-  Leaflet markers are keyboard-focusable by default, but the `<Marker>` in `PlacementMarkers` (`src/pages/AtlasViewer.tsx:1066-1090`) passes no accessible name, so tabbing to a pin announces nothing. Pass `title={ent.title}` (append `playerTypeLabel(ent.type)` when present) to each `<Marker>` — Leaflet applies `title` to the DivIcon element as an accessible name; for stronger SR coverage also inject an `aria-label` into the div-icon root produced by `pinIconForStyle` (line 83). Add a `:focus-visible` outline ring to `.atlas-viewer-pin` in `src/index.css` (line ~69) so focused pins are visible. Extend `src/test/accessibility-labels.test.tsx` with a guard asserting the accessible name resolves to the entity title.
-  - **Done when:** each rendered pin exposes its entity title (+ player type label) as an accessible name, a focus ring shows on keyboard focus, and the new guard test passes.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Visibility vocab stays sourced from `visibility.ts` (do not hardcode); use `playerTypeLabel` for the type text. Player-facing only.
-  ~2–3 runs.
+- [x] **Q26. Give map pins accessible names for keyboard and screen-reader users.** ✅ DONE 2026-07-23 — commit 1e71e809
 
 - [ ] **Q27. Restore a visible keyboard-focus outline on the map container and controls.**
   `src/index.css` sets `.leaflet-container { outline: none }` (lines 83-86), which strips the WCAG 2.4.7 focus ring from the focusable map, its zoom controls, and markers — keyboard users can't tell what's focused. Replace the blanket `outline: none` with a `:focus-visible`-scoped outline (e.g. `.leaflet-container:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }` and `.leaflet-container:focus:not(:focus-visible) { outline: none; }`) so the ring shows on keyboard focus but not during mouse drag. Keep it themed with the existing `--ring`/`--primary` tokens.

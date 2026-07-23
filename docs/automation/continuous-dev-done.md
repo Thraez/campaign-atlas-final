@@ -939,3 +939,18 @@ Render/styling parity only — **not** interactivity.
   describe block asserting `getByRole("dialog", { name: "Tideshore" })` resolves.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2545 tests green (4 shards;
   pre-existing onTaskUpdate RPC flake in shard 3).
+
+- [x] **Q26. Give map pins accessible names for keyboard and screen-reader users.** ✅ DONE 2026-07-23 — commit 1e71e809
+  `src/pages/AtlasViewer.tsx`: added `playerTypeLabel` import; updated `pinIconForStyle` to accept
+  `ariaLabel?: string` — when provided, injects `role="img"` and `aria-label` directly onto the SVG
+  element via string replace. In `PlacementMarkers`, builds `a11yLabel` from the entity title +
+  `playerTypeLabel(ent.type)` (appended with ", " when non-empty) and passes it as both `title` on
+  `<Marker>` (Leaflet applies this to the icon container for SR fallback) and `ariaLabel` in the icon.
+  `src/index.css`: added `.atlas-viewer-pin:focus-visible` outline rule (2px --ring token, 2px offset,
+  border-radius 50%) so keyboard-focused pins are visually distinct.
+  `src/test/accessibility-labels.test.tsx`: updated the react-leaflet mock to include `Marker` (exposes
+  `data-title`) and `Tooltip`; added top-level `await import("@/pages/AtlasViewer")` for PlacementMarkers;
+  added "Q26 — map pins accessible names" describe block with two guards: title includes type label when
+  present (e.g. "Goblin Cave, Dungeon"), title is entity title only when playerTypeLabel returns "".
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2547 tests green (4 shards;
+  pre-existing onTaskUpdate RPC flake in shard 3).
