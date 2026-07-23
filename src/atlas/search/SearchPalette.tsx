@@ -101,7 +101,7 @@ export function SearchPalette({
       .slice(0, 12);
   }, [index]);
 
-  const results = useMemo(() => {
+  const { items: results, total: resultTotal } = useMemo(() => {
     let pool = index;
     if (activeType) pool = pool.filter((e) => e.type === activeType);
     if (activeTag) pool = pool.filter((e) => e.tags.includes(activeTag));
@@ -109,7 +109,12 @@ export function SearchPalette({
     if (recentOnly && recentlyRevealed) pool = pool.filter((e) => recentlyRevealed.has(e.id));
 
     const raw = query.trim();
-    if (!raw) return pool.slice(0, 40).map((e) => ({ e, snip: null as string | null }));
+    if (!raw) {
+      return {
+        items: pool.slice(0, 40).map((e) => ({ e, snip: null as string | null })),
+        total: pool.length,
+      };
+    }
 
     const { phrases, rest } = parseSearchQuery(raw);
     const q = rest.toLowerCase();
@@ -136,12 +141,16 @@ export function SearchPalette({
     // When phrases-only, all phrase-matched entries are shown (sorted by phrase score).
     // When unquoted terms are present, the existing score > 0 gate still applies.
     const snippetQuery = phrases.length > 0 ? phrases[0] : scoreQuery;
-    return pool
+    const scored = pool
       .map((e) => ({ e, s: score(e) }))
       .filter((x) => phrasesOnly || x.s > 0)
-      .sort((a, b) => b.s - a.s)
-      .slice(0, 40)
-      .map(({ e }) => ({ e, snip: snippet(e.bodyText ?? e.body, e.body, snippetQuery) }));
+      .sort((a, b) => b.s - a.s);
+    return {
+      items: scored
+        .slice(0, 40)
+        .map(({ e }) => ({ e, snip: snippet(e.bodyText ?? e.body, e.body, snippetQuery) })),
+      total: scored.length,
+    };
   }, [query, index, activeType, activeTag, thisMapOnly, placedIds, recentOnly, recentlyRevealed]);
 
   // Reset selection when filters or query change.
@@ -173,6 +182,8 @@ export function SearchPalette({
       if (r) onPick(r.e.id, placedIds.has(r.e.id));
     }
   };
+  const countLabel =
+    resultTotal === 1 ? "1 match" : `${resultTotal} matches`;
 
   return (
     <div
@@ -260,6 +271,13 @@ export function SearchPalette({
             </>
           )}
         </div>
+
+        {results.length > 0 && (
+          <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border/50 bg-muted/10">
+            {countLabel}
+            {resultTotal > 40 && <span className="ml-1 opacity-70">(showing first 40)</span>}
+          </div>
+        )}
 
         <div ref={listRef} className="max-h-[60vh] overflow-y-auto">
           {results.length === 0 ? (

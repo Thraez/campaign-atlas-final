@@ -186,3 +186,32 @@ describe("SearchPalette", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("result count (Q19)", () => {
+  it("shows 'N matches' for the full pool when entries are under the 40-cap", () => {
+    // INDEX has 3 entries; all match an empty query → pool size 3, shown as 3 items.
+    renderPalette({ query: "" });
+    expect(screen.getByText(/3 matches/)).toBeInTheDocument();
+    expect(screen.queryByText(/showing first 40/)).not.toBeInTheDocument();
+  });
+
+  it("shows '1 match' (singular) when only one entry matches the query", () => {
+    renderPalette({ query: "silver" });
+    expect(screen.getByText(/1 match/)).toBeInTheDocument();
+    expect(screen.queryByText(/matches/)).not.toBeInTheDocument();
+  });
+
+  it("shows total + '(showing first 40)' when the pool exceeds 40", () => {
+    const bigIndex = Array.from({ length: 50 }, (_, i) =>
+      entry({ id: `e${i}`, title: `Entity ${i}` }),
+    );
+    renderPalette({ query: "", index: bigIndex });
+    expect(screen.getByText(/50 matches/)).toBeInTheDocument();
+    expect(screen.getByText(/showing first 40/)).toBeInTheDocument();
+  });
+
+  it("shows no count line when there are no results", () => {
+    renderPalette({ query: "zzzznope" });
+    expect(screen.queryByText(/\d+ match/)).not.toBeInTheDocument();
+  });
+});
