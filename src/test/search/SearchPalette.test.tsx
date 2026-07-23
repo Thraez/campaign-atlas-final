@@ -344,3 +344,62 @@ describe("recently viewed (Q20)", () => {
     expect(screen.queryByText("Silver Lake")).not.toBeInTheDocument();
   });
 });
+
+describe("listbox semantics and activedescendant (Q30)", () => {
+  it("results container has role='listbox' with accessible label", () => {
+    renderPalette({ query: "" });
+    const listbox = screen.getByRole("listbox");
+    expect(listbox).toHaveAttribute("aria-label", "Search results");
+    // Input advertises the listbox it controls.
+    const input = screen.getByRole("textbox", { name: "Search" });
+    expect(input).toHaveAttribute("aria-controls", "sp-results-listbox");
+    expect(listbox.id).toBe("sp-results-listbox");
+  });
+
+  it("each result row has role='option' and a stable entity-based id", () => {
+    renderPalette({ query: "" });
+    const options = screen.getAllByRole("option");
+    // INDEX order: IRON, GUARD, LAKE
+    expect(options[0]).toHaveAttribute("id", "sp-result-iron-tower");
+    expect(options[1]).toHaveAttribute("id", "sp-result-ancient-guard");
+    expect(options[2]).toHaveAttribute("id", "sp-result-silver-lake");
+  });
+
+  it("all options have aria-selected=false before any arrow navigation", () => {
+    renderPalette({ query: "" });
+    const options = screen.getAllByRole("option");
+    options.forEach((opt) => expect(opt).toHaveAttribute("aria-selected", "false"));
+    // Input has no activedescendant yet.
+    expect(screen.getByRole("textbox", { name: "Search" })).not.toHaveAttribute(
+      "aria-activedescendant",
+    );
+  });
+
+  it("ArrowDown updates aria-activedescendant on input and marks first option selected", () => {
+    renderPalette({ query: "" });
+    const input = screen.getByRole("textbox", { name: "Search" });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+
+    expect(input).toHaveAttribute("aria-activedescendant", "sp-result-iron-tower");
+    const options = screen.getAllByRole("option");
+    expect(options[0]).toHaveAttribute("aria-selected", "true");
+    expect(options[1]).toHaveAttribute("aria-selected", "false");
+  });
+
+  it("polite live region announces the result count when searching", () => {
+    renderPalette({ query: "iron" });
+    // "Iron" matches only Iron Tower → 1 result.
+    expect(screen.getByRole("status")).toHaveTextContent("1 result");
+  });
+
+  it("live region announces plural count and is silent in recently-viewed mode", () => {
+    // No visited history → not recently-viewed; all three entries shown.
+    renderPalette({ query: "" });
+    expect(screen.getByRole("status")).toHaveTextContent("3 results");
+  });
+
+  it("live region announces no results when the query has no matches", () => {
+    renderPalette({ query: "xyzzynoentity" });
+    expect(screen.getByRole("status")).toHaveTextContent("No results");
+  });
+});
