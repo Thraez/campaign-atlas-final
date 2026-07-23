@@ -4,9 +4,15 @@ export interface SoundPrefs {
   soundEnabled: boolean;
   muted: boolean;
   calmMode: boolean;
+  volume: number;
 }
 
-export const DEFAULT_PREFS: SoundPrefs = { soundEnabled: false, muted: false, calmMode: false };
+export const DEFAULT_PREFS: SoundPrefs = {
+  soundEnabled: false,
+  muted: false,
+  calmMode: false,
+  volume: 0.8,
+};
 
 function getStorage(): Storage | null {
   try {
@@ -34,6 +40,10 @@ export function loadSoundPrefs(): SoundPrefs {
         typeof p.soundEnabled === "boolean" ? p.soundEnabled : DEFAULT_PREFS.soundEnabled,
       muted: typeof p.muted === "boolean" ? p.muted : DEFAULT_PREFS.muted,
       calmMode: typeof p.calmMode === "boolean" ? p.calmMode : DEFAULT_PREFS.calmMode,
+      volume:
+        typeof p.volume === "number" && p.volume >= 0 && p.volume <= 1
+          ? p.volume
+          : DEFAULT_PREFS.volume,
     };
   } catch {
     return { ...DEFAULT_PREFS };

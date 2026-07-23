@@ -20,15 +20,15 @@ export function computeActiveId(
 
 export function SoundscapeLayer({ map: mapDoc }: { map: MapDocument }) {
   const leaflet = useMap();
-  const { soundEnabled, engine } = useSoundSettings();
+  const { soundEnabled, engine, setMapMasterGain } = useSoundSettings();
   const prepared = useMemo(() => prepareAreas(mapDoc), [mapDoc]);
   const activeId = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     if (mapDoc.soundscape?.enabled === false) return;
-    engine.setMasterGain(mapDoc.soundscape?.masterGain ?? 0.6);
-  }, [engine, mapDoc.soundscape?.enabled, mapDoc.soundscape?.masterGain]);
+    setMapMasterGain(mapDoc.soundscape?.masterGain ?? 0.6);
+  }, [setMapMasterGain, mapDoc.soundscape?.enabled, mapDoc.soundscape?.masterGain]);
 
   useEffect(() => {
     if (!soundEnabled || mapDoc.soundscape?.enabled === false || prepared.length === 0) return;

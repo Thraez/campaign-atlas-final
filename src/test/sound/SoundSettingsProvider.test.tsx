@@ -53,6 +53,26 @@ function MuteProbe() {
   return <button onClick={() => setMuted(!muted)}>{muted ? "muted" : "unmuted"}</button>;
 }
 
+function VolumeProbe() {
+  const { volume, setVolume } = useSoundSettings();
+  return (
+    <button onClick={() => setVolume(0.4)} data-volume={volume}>
+      volume-{volume}
+    </button>
+  );
+}
+
+function GainProbe() {
+  const { engine, setMapMasterGain, setVolume } = useSoundSettings();
+  return (
+    <>
+      <button id="vol" onClick={() => setVolume(0.5)}>set-vol</button>
+      <button id="gain" onClick={() => setMapMasterGain(0.6)}>set-gain</button>
+      <span data-testid="engine-ref">{String(!!engine)}</span>
+    </>
+  );
+}
+
 describe("SoundSettingsProvider", () => {
   beforeEach(() => {
     _resetSoundPrefsForTests();
@@ -135,5 +155,46 @@ describe("SoundSettingsProvider", () => {
     act(() => screen.getByRole("button").click());
     expect(engines.length).toBeGreaterThanOrEqual(2);
     expect(engines[engines.length - 1]).toBe(engines[0]);
+  });
+
+  it("setVolume updates volume in context and persists it", () => {
+    const { deps } = makeStubDeps();
+    render(
+      <SoundSettingsProvider deps={deps}>
+        <VolumeProbe />
+      </SoundSettingsProvider>,
+    );
+    const btn = screen.getByRole("button");
+    expect(btn.getAttribute("data-volume")).toBe("0.8");
+    act(() => btn.click());
+    expect(btn.getAttribute("data-volume")).toBe("0.4");
+    expect(loadSoundPrefs().volume).toBe(0.4);
+  });
+
+  it("combined effective gain = volume × mapMasterGain pushed to engine.setMasterGain", () => {
+    const { deps } = makeStubDeps();
+    const engines: any[] = [];
+    function CaptureEngine() {
+      const { engine, setVolume, setMapMasterGain } = useSoundSettings();
+      engines.push(engine);
+      return (
+        <>
+          <button id="vol" onClick={() => setVolume(0.5)}>vol</button>
+          <button id="gain" onClick={() => setMapMasterGain(0.6)}>gain</button>
+        </>
+      );
+    }
+    render(
+      <SoundSettingsProvider deps={deps}>
+        <CaptureEngine />
+      </SoundSettingsProvider>,
+    );
+    const spy = vi.spyOn(engines[0], "setMasterGain");
+    // Set volume to 0.5; mapMasterGain remains 0.6 → effective = 0.5 × 0.6 = 0.3
+    act(() => screen.getByText("vol").click());
+    expect(spy).toHaveBeenCalledWith(0.5 * 0.6);
+    // Set mapMasterGain to 0.6 again (already 0.6, but triggers effect); volume is 0.5
+    act(() => screen.getByText("gain").click());
+    expect(spy).toHaveBeenCalledWith(0.5 * 0.6);
   });
 });

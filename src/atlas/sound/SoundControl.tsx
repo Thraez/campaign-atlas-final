@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useSoundSettings } from "@/atlas/sound/SoundSettingsProvider";
 
 export function SoundControl() {
-  const { soundEnabled, muted, calmMode, enableSound, setMuted, setCalmMode } = useSoundSettings();
+  const { soundEnabled, muted, calmMode, volume, enableSound, setMuted, setCalmMode, setVolume } =
+    useSoundSettings();
   const [dismissed, setDismissed] = useState(false);
 
   return (
@@ -25,14 +26,28 @@ export function SoundControl() {
       )}
 
       {soundEnabled && (
-        <button
-          type="button"
-          aria-label={muted ? "Unmute sound" : "Mute sound"}
-          onClick={() => setMuted(!muted)}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-sm"
-        >
-          <span aria-hidden>{muted ? "🔈" : "🔊"}</span>
-        </button>
+        <>
+          <button
+            type="button"
+            aria-label={muted ? "Unmute sound" : "Mute sound"}
+            onClick={() => setMuted(!muted)}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-sm"
+          >
+            <span aria-hidden>{muted ? "🔈" : "🔊"}</span>
+          </button>
+          <div className="flex items-center gap-1 rounded-full border border-border bg-card px-3 py-2 shadow-sm">
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={volume}
+              onChange={(e) => setVolume(Number(e.target.value))}
+              aria-label="Volume"
+              className="w-20"
+            />
+          </div>
+        </>
       )}
 
       <button
