@@ -872,3 +872,20 @@ Render/styling parity only — **not** interactivity.
   Existing Q19 count-bar tests unaffected (no visited history seeded in beforeEach).
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2508 tests green (4 shards;
   pre-existing onTaskUpdate RPC flake in shard 3).
+
+- [x] **Q21. Persist Browse/Timeline filter state in the URL.** ✅ DONE 2026-07-23 — commit 7458aaf0
+  `src/atlas/browse/browseFilterParams.ts`: new pure parse/serialize helper for `q` and `type`
+  URL search params; round-trip tested (12 unit tests).
+  `src/pages/AtlasBrowse.tsx`: replaces `useState` for query/activeType with `useSearchParams`;
+  reads params on mount, writes with `{ replace: true }` (no history entry per keystroke); uses
+  functional updater form `(prev) => ...` to avoid stale-closure bugs when both params change in
+  one event handler.
+  `src/pages/AtlasTimeline.tsx`: same URL sync; the "Clear filter" button calls `setSearchParams`
+  once atomically so both params reset together without a stale-closure race.
+  `src/test/browse/browseFilterParams.test.ts`: 12 tests covering parse, serialize, and round-trip.
+  `src/test/pages/AtlasBrowse.test.tsx`: 4 integration tests — URL restore on mount for ?q= and
+  ?type=, filter interaction updates view, clearing type chip restores all entries.
+  `src/test/pages/AtlasTimeline.test.tsx`: 3 new URL-state tests — restore from ?q=, input change
+  filters consistently, clear-X button clears query.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2531 tests green (4 shards;
+  pre-existing onTaskUpdate RPC flake in shard 3).

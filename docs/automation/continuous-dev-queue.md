@@ -116,13 +116,6 @@ is for sequencing, not the whole spec.
 
 - [x] **Q18. Unify entity text-match across Search, Timeline, and Browse filters.** ✅ DONE 2026-07-23 — commit e8310c10
 
-- [ ] **Q21. Persist Browse/Timeline filter state in the URL.**
-  `AtlasBrowse.tsx` and `AtlasTimeline.tsx` hold `query` and `activeType` only in local `useState` (lines ~22-23 in each), so a shared/bookmarked link and the Back button lose the filter. Sync `q` and `type` to the URL via `URLSearchParams` — read on mount, `replaceState` (or `useSearchParams` with `{replace:true}`) on change — mirroring the map viewer's deep-link ergonomics in `src/atlas/deepLink.ts`. Add a small pure parse/serialize helper (e.g. `browseFilterParams.ts`) with unit tests; leave the map-mode `tag`/`type` route params unchanged.
-  - **Done when:** changing a Browse/Timeline filter updates the URL without a history entry per keystroke; loading that URL restores the filter; Back restores the prior filter; the helper has round-trip unit tests.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Purely client-side URL state; no new persistent surface.
-  ~2-3 runs.
-
 - [ ] **Q22. Sticky A–Z jump rail on the Browse page.**
   `AtlasBrowse.tsx` already groups entries into A–Z sections with a `#` bucket for non-letters (`grouped`, lines ~59-69). Add a compact sticky vertical alphabet rail listing only the letters that have entries; clicking a letter scroll-jumps to that section via a section `id`/ref + `scrollIntoView`. Letters (and `#`) with no entries render as disabled/non-clickable.
   - **Done when:** the rail shows on Browse, disables empty letters, and clicking an active letter scrolls to its section; a render test asserts present-vs-absent letter states.
