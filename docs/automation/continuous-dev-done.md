@@ -990,3 +990,27 @@ Render/styling parity only — **not** interactivity.
   Shift+Tab wraps first→last; focus restored to trigger on unmount. Total: 24 tests (19 pre-existing + 5 new).
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2558 tests green (4 shards;
   pre-existing onTaskUpdate RPC flake in shard 4).
+
+---
+
+### Q30 — Announce search palette results with listbox / aria-activedescendant (2026-07-23)
+
+**Commit:** `ea6229c9` · **Merge:** `1169146a` · **Branch:** `run/q30-20260723`
+
+**What shipped:** The search palette results overlay (`src/atlas/search/SearchPalette.tsx`) now
+has full screen-reader semantics for its keyboard-navigable list. The results container
+(`listRef` div) gains `role="listbox"` + `aria-label="Search results"` + `id="sp-results-listbox"`.
+Each result `<button>` gains `role="option"` + a stable `id` of the form `sp-result-<entityId>` +
+`aria-selected={i === activeIndex}`. The `<Input>` gains `aria-activedescendant` (pointing to the
+active option's id, undefined when nothing is selected) and `aria-controls="sp-results-listbox"`.
+
+A sr-only `role="status"` `aria-live="polite"` region announces the result count whenever it
+changes: "N result/results" or "No results". The live-region deliberately uses "result/results"
+(not "match/matches") to keep its text distinct from the visible count label, so tests can target
+each element unambiguously via role or text.
+
+**Tests:** 7 new tests in `describe("listbox semantics and activedescendant (Q30)")` in
+`src/test/search/SearchPalette.test.tsx`. Total: 31 tests.
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2565 tests green
+(4 shards; pre-existing onTaskUpdate RPC flake in shard 4).
