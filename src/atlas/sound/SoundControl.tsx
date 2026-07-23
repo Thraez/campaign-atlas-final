@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { useSoundSettings } from "@/atlas/sound/SoundSettingsProvider";
 
-export function SoundControl() {
+interface SoundControlProps {
+  hasSoundscape?: boolean;
+}
+
+export function SoundControl({ hasSoundscape = true }: SoundControlProps) {
   const {
     soundEnabled,
     muted,
@@ -22,7 +26,7 @@ export function SoundControl() {
       <span role="status" aria-live="polite" className="sr-only">
         {ambienceActive ? "Ambience playing" : ""}
       </span>
-      {!soundEnabled && !dismissed && (
+      {hasSoundscape && !soundEnabled && !dismissed && (
         <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 shadow-sm">
           <button type="button" onClick={enableSound} className="flex items-center gap-2 text-sm">
             <span aria-hidden>🔊</span>
@@ -39,7 +43,7 @@ export function SoundControl() {
         </div>
       )}
 
-      {soundEnabled && (
+      {hasSoundscape && soundEnabled && (
         <>
           {ambienceActive && (
             <span className="rounded-full border border-border bg-card px-3 py-2 text-xs shadow-sm text-muted-foreground">

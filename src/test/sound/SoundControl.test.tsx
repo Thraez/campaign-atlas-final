@@ -28,10 +28,10 @@ const stubDeps = {
   canPlay: () => true,
 };
 
-const renderControl = () =>
+const renderControl = (props: { hasSoundscape?: boolean } = {}) =>
   render(
     <SoundSettingsProvider deps={stubDeps as any}>
-      <SoundControl />
+      <SoundControl {...props} />
     </SoundSettingsProvider>,
   );
 
@@ -151,5 +151,28 @@ describe("Q35 — ambience playing indicator", () => {
     // The live region contains only the hardcoded generic string, no area name derived from soundscape
     expect(screen.getByRole("status").textContent).toBe("Ambience playing");
     expect(screen.queryByText(/area-\d/i)).toBeNull();
+  });
+});
+
+describe("Q36 — hide sound controls when map has no soundscape", () => {
+  beforeEach(() => _resetSoundPrefsForTests());
+  afterEach(() => cleanup());
+
+  it("invite and mute controls are hidden when hasSoundscape is false", () => {
+    renderControl({ hasSoundscape: false });
+    expect(screen.queryByRole("button", { name: /bring the world to life/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /mute sound|unmute sound/i })).toBeNull();
+    expect(screen.queryByRole("slider", { name: /volume/i })).toBeNull();
+  });
+
+  it("calm mode toggle remains visible when hasSoundscape is false", () => {
+    renderControl({ hasSoundscape: false });
+    expect(screen.getByRole("button", { name: /calm mode/i })).toBeTruthy();
+  });
+
+  it("all controls render when hasSoundscape is true", () => {
+    renderControl({ hasSoundscape: true });
+    expect(screen.getByRole("button", { name: /bring the world to life/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /calm mode/i })).toBeTruthy();
   });
 });

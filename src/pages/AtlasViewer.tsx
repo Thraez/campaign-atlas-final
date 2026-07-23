@@ -791,7 +791,12 @@ export default function AtlasViewer() {
               credits={worldCredits}
             />
 
-            <SoundControl />
+            <SoundControl
+              hasSoundscape={
+                activeMap.soundscape?.enabled !== false &&
+                (activeMap.soundscape?.areas?.length ?? 0) > 0
+              }
+            />
 
             {/* Wander button + discovery meter — bottom-left map overlay */}
             <WanderControl
