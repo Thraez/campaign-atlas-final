@@ -152,7 +152,7 @@ export default function AtlasTimeline() {
           <Filter className="h-3.5 w-3.5 text-muted-foreground mr-1" />
           <button
             onClick={() => setActiveType(null)}
-            className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === null ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+            className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded ${activeType === null ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
           >
             all
           </button>
@@ -163,7 +163,7 @@ export default function AtlasTimeline() {
               <button
                 key={t}
                 onClick={() => setActiveType(activeType === t ? null : t)}
-                className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+                className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
               >
                 {label} <span className="opacity-60">{n}</span>
               </button>

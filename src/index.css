@@ -548,6 +548,14 @@
   outline-offset: 2px;
 }
 
+/* Shared filter-chip: WCAG 2.5.8 24 px minimum tap target for all filter chip buttons. */
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.5rem;
+}
+
 /* Atlas viewer: player-secret sealed-box and reveal styles */
 .atlas-secret-sealed {
   border: 1px solid hsl(var(--border));

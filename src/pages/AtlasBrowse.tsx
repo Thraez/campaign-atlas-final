@@ -188,7 +188,7 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
         <div className="flex flex-wrap gap-1 px-3 md:px-4 py-2 border-b border-border/50 bg-muted/20">
           <button
             onClick={() => setActiveType(null)}
-            className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === null ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+            className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded ${activeType === null ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
           >
             all <span className="opacity-60">{entries.length}</span>
           </button>
@@ -199,7 +199,7 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
               <button
                 key={t}
                 onClick={() => setActiveType(activeType === t ? null : t)}
-                className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+                className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
               >
                 {label} <span className="opacity-60">{n}</span>
               </button>
@@ -217,7 +217,7 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
             <Link
               key={t}
               to={`/atlas/tag/${encodeURIComponent(t)}`}
-              className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-muted hover:bg-accent"
+              className="text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded bg-muted hover:bg-accent"
             >
               #{t}
             </Link>
@@ -225,7 +225,7 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
           {!showAllTags && allTags.length > TAG_FACET_INITIAL && (
             <button
               onClick={() => setShowAllTags(true)}
-              className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-muted hover:bg-accent text-muted-foreground"
+              className="text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded bg-muted hover:bg-accent text-muted-foreground"
             >
               +{allTags.length - TAG_FACET_INITIAL} more
             </button>
