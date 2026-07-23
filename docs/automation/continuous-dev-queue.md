@@ -114,12 +114,7 @@ is for sequencing, not the whole spec.
 
 - [x] **Q17. Fix Timeline zero-results empty state (filter vs. no-dates).** ✅ DONE 2026-07-23 — commit ee719cd5
 
-- [ ] **Q18. Unify entity text-match across Search, Timeline, and Browse filters.**
-  The three player-search surfaces match inconsistent fields: `AtlasTimeline.tsx` (lines ~44-52) matches title/summary/tags but NOT aliases; `AtlasBrowse.tsx` (lines ~37-45) matches title/summary/aliases but NOT tags; SearchPalette scores all. Extract a pure `entityMatchesQuery(entity, q)` helper (matching title + aliases + summary + tags, case-insensitive) into a new `src/atlas/search/entityMatchesQuery.ts`, unit-test it, and route the Timeline and Browse simple-filter paths through it so all surfaces search the same fields. Leave SearchPalette's richer phrase/scoring ranking untouched.
-  - **Done when:** Timeline and Browse both call `entityMatchesQuery`; a search term that hits on one page hits on all; the helper has direct unit tests covering each field.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Operates on already-player-projected entities; no DM-secret surface added.
-  ~2-3 runs.
+- [x] **Q18. Unify entity text-match across Search, Timeline, and Browse filters.** ✅ DONE 2026-07-23 — commit e8310c10
 
 - [ ] **Q19. Show a result count in the search palette.**
   `src/atlas/search/SearchPalette.tsx` caps results with `.slice(0, 40)` (lines ~112 and ~143) with no indication, so a player can't tell whether the list is complete. Capture the pre-slice filtered length and render a small count line (palette header or footer): total matches, plus a "(showing first 40)" note only when the pool exceeds the 40 cap.

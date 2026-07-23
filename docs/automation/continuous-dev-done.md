@@ -833,3 +833,15 @@ Render/styling parity only — **not** interactivity.
   button resets query and restores entries.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2489 tests green (4 shards;
   pre-existing onTaskUpdate RPC flake in shard 3).
+
+- [x] **Q18. Unify entity text-match across Search, Timeline, and Browse filters.** ✅ DONE 2026-07-23 — commit e8310c10
+  New `src/atlas/search/entityMatchesQuery.ts`: pure `entityMatchesQuery(entity, q)` helper that
+  matches title, aliases, summary, and tags (case-insensitive substring); empty query always matches.
+  `src/pages/AtlasTimeline.tsx`: replaced inline 3-field filter (title/summary/tags, missing aliases)
+  with `entityMatchesQuery(e, query)`.
+  `src/pages/AtlasBrowse.tsx`: replaced inline 3-field filter (title/summary/aliases, missing tags)
+  with `entityMatchesQuery(e, query)`. SearchPalette's richer phrase/scoring path left untouched.
+  `src/test/search/entityMatchesQuery.test.ts`: 8 unit tests covering empty query, each field
+  individually, no-match, undefined summary, and whitespace trimming.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2497 tests green (4 shards;
+  pre-existing onTaskUpdate RPC flake in shard 3).
