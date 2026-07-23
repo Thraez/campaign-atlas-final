@@ -1036,3 +1036,26 @@ chips used `py-0.5` (2 px vertical padding) giving ~18 px height — too small o
 
 **Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2565 tests green
 (4 shards; pre-existing onTaskUpdate RPC flake in shard 4).
+
+---
+
+### Q32 — Add skip-links and `<main>` landmarks to Browse, Timeline, Secrets, Credits (2026-07-23)
+
+**Commit:** `8f21258a` · **Merge:** `bc9bface` · **Branch:** `run/q32-skip-links`
+
+**What shipped:** Four player-facing pages — Browse, Timeline, Character Secrets, and Credits — now have
+a keyboard-reachable skip link and a labelled `<main>` landmark, matching the pattern AtlasViewer already
+used. Keyboard and screen-reader users can now bypass the repeated toolbar on every page.
+
+**Implementation:**
+- `src/pages/AtlasBrowse.tsx`: `<a href="#browse-main" className="skip-to-main">` before `<header>`;
+  `<ScrollArea>` wrapped in `<main id="browse-main" aria-label="Browse entities">`.
+- `src/pages/AtlasTimeline.tsx`: same pattern — `#timeline-main`, `aria-label="Timeline events"`.
+- `src/atlas/secrets/CharacterSecretsPage.tsx`: skip link before `<AtlasNavMenu>`; content `<div>`
+  promoted to `<main id="secrets-main">`.
+- `src/pages/AtlasCredits.tsx`: same as Secrets — `<main id="credits-main">`.
+- All four reuse the existing `.skip-to-main` class from `src/index.css` (no new CSS surface).
+- 8 new tests (2 per page) asserting the landmark id and skip-link href + class; 2573 total.
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2573 tests green
+(4 shards; pre-existing onTaskUpdate RPC flake in shard 4).

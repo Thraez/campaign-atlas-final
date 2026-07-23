@@ -137,13 +137,7 @@ is for sequencing, not the whole spec.
 
 - [x] **Q31. Enforce a 24px minimum tap target on filter chips.** ✅ DONE 2026-07-23 — commit 64d4487c; `.filter-chip` class added to `src/index.css` (`inline-flex; align-items: center; justify-content: center; min-height: 1.5rem`); applied to all interactive filter chip buttons/links in SearchPalette.tsx, AtlasBrowse.tsx, AtlasTimeline.tsx; `<code>` spans (px-1) untouched; 2565 tests green.
 
-- [ ] **Q32. Add skip-links and <main> landmarks to Browse, Timeline, Secrets, Credits.**
-  Only `src/pages/AtlasViewer.tsx` has a bypass-block skip link (`<a href="#atlas-main" className="skip-to-main">`, line 524) and a labelled `<main id="atlas-main">` landmark (lines 627-631); `src/pages/AtlasBrowse.tsx`, `src/pages/AtlasTimeline.tsx`, `src/atlas/secrets/CharacterSecretsPage.tsx`, and `src/pages/AtlasCredits.tsx` render their scroll region with neither, forcing keyboard/SR users through the repeated toolbar each visit. Add a `skip-to-main` link (reusing the existing `.skip-to-main` class in `src/index.css:424`) targeting a page-unique id and wrap each page's primary content in a labelled `<main id="…">` landmark, matching AtlasViewer's pattern.
-  - **Done when:** each of the four pages has a keyboard-reachable skip link that jumps to a single labelled `<main>` landmark, ids are unique per page, and a test asserts the landmark + skip target exist.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Player-facing pages; reuse the existing `.skip-to-main` style (no new CSS surface).
-  ~2–3 runs.
-
+- [x] **Q32. Add skip-links and `<main>` landmarks to Browse, Timeline, Secrets, Credits.** ✅ DONE 2026-07-23 — commit 8f21258a; skip link + `<main>` added to AtlasBrowse (#browse-main), AtlasTimeline (#timeline-main), CharacterSecretsPage (#secrets-main), AtlasCredits (#credits-main); 8 new tests; 2573 tests green.
 
 #### Q-E — Player soundscape polish
 
