@@ -131,12 +131,7 @@ is for sequencing, not the whole spec.
 
 - [x] **Q28. Make map fly animations respect prefers-reduced-motion.** ✅ DONE 2026-07-23 — commit f0120c0b
 
-- [ ] **Q29. Add dialog semantics and a focus trap to the search palette.**
-  `src/atlas/search/SearchPalette.tsx` is a plain `<div>` overlay (line ~178): no `role="dialog"`, no `aria-modal`, the input (lines ~189-195) is placeholder-only with no accessible label, Tab escapes to the page behind it, and focus is not returned to the trigger on close. Add `role="dialog"` + `aria-modal="true"` + an `aria-label` (e.g. "Search the atlas") to the inner palette container, an `aria-label` on the `<Input>`, focus trapping so Tab/Shift+Tab cycle within the palette, and restore focus to the Search button (in `src/pages/AtlasViewer.tsx`) when the palette closes.
-  - **Done when:** the palette exposes dialog semantics with an accessible name, the input is labelled, Tab stays trapped inside while open, and closing returns focus to the Search trigger; a unit test asserts the roles/label and focus restore.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Player-facing search overlay; no ranking/behavior change.
-  ~2–3 runs.
+- [x] **Q29. Add dialog semantics and a focus trap to the search palette.** ✅ DONE 2026-07-23 — commit 277d2698; `role="dialog"` + `aria-modal="true"` + `aria-label="Search the atlas"` on inner palette div; `aria-label="Search"` on Input; Tab/Shift+Tab focus trap wraps within palette; focus restored to trigger on unmount; 5 new tests (24 total); 2558 tests green (4 shards).
 
 - [ ] **Q30. Announce search palette results with listbox / aria-activedescendant.**
   In `src/atlas/search/SearchPalette.tsx`, arrow-key navigation (`handleKeyDown`, lines 161-175) only moves a visual highlight (`active` → `bg-accent`); screen readers hear nothing as selection changes and the match count is never announced. Give the results container (`listRef` div, line ~264) `role="listbox"`, give each result row (lines ~272-303) `role="option"`, a stable `id`, and `aria-selected={i === activeIndex}`, point `aria-activedescendant` on the input at the active row's id, and add a polite `aria-live` region announcing the match count (compute from the pre-`.slice(0,40)` filtered length if surfacing a total).

@@ -977,3 +977,16 @@ Render/styling parity only — **not** interactivity.
   (not `flyTo`) when reduced motion active; `flyTo({duration:0.6})` called (not `setView`) when absent.
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2553 tests green (4 shards;
   pre-existing onTaskUpdate RPC flake in shard 4).
+
+- [x] **Q29. Add dialog semantics and a focus trap to the search palette.** ✅ DONE 2026-07-23 — commit 277d2698 (feat) + e5db120c (merge).
+  `src/atlas/search/SearchPalette.tsx`: inner palette `<div>` gains `role="dialog"` + `aria-modal="true"` +
+  `aria-label="Search the atlas"`; `<Input>` gains `aria-label="Search"`. Focus trap: `handleKeyDown`
+  intercepts Tab/Shift+Tab, queries all focusable descendants of the dialog `ref`, and wraps focus at
+  the edges (`last→first` on Tab, `first→last` on Shift+Tab). Focus restoration: `triggerRef` captures
+  `document.activeElement` at init time (before `autoFocus` fires); a cleanup-only `useEffect` restores
+  focus to that element on unmount.
+  `src/test/search/SearchPalette.test.tsx`: 5 new tests in `describe("dialog semantics and focus trap (Q29)")` —
+  dialog role/aria-modal/aria-label on container; accessible label on input; Tab wraps last→first;
+  Shift+Tab wraps first→last; focus restored to trigger on unmount. Total: 24 tests (19 pre-existing + 5 new).
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2558 tests green (4 shards;
+  pre-existing onTaskUpdate RPC flake in shard 4).
