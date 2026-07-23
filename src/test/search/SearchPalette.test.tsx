@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { SearchPalette } from "@/atlas/search/SearchPalette";
+import { _resetVisitedForTests } from "@/atlas/visited/visitedPlaces";
 import type { SearchIndexEntry } from "@/atlas/content/loader";
 import type { MapPlacement } from "@/atlas/content/schema";
 
@@ -95,10 +96,14 @@ beforeEach(() => {
     "fetch",
     vi.fn(async () => ({ ok: false }) as Response),
   );
+  // Ensure visited-place store starts clean so Q20 "recently viewed" path is
+  // only activated when tests explicitly populate it.
+  _resetVisitedForTests();
 });
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
+  _resetVisitedForTests();
 });
 
 describe("SearchPalette", () => {
@@ -213,5 +218,65 @@ describe("result count (Q19)", () => {
   it("shows no count line when there are no results", () => {
     renderPalette({ query: "zzzznope" });
     expect(screen.queryByText(/\d+ match/)).not.toBeInTheDocument();
+  });
+});
+
+describe("recently viewed (Q20)", () => {
+  function seedVisited(ids: string[]): void {
+    // Write a visited map with staggered timestamps so order is deterministic.
+    const map: Record<string, { visitedAt: string }> = {};
+    ids.forEach((id, i) => {
+      map[id] = { visitedAt: `2026-07-${String(20 - i).padStart(2, "0")}T12:00:00.000Z` };
+    });
+    window.localStorage.setItem("atlas-visited-v1", JSON.stringify(map));
+  }
+
+  it("shows 'Recently viewed' label and visited entity first when history exists", () => {
+    // Mark silver-lake as the most recently visited.
+    seedVisited(["silver-lake", "iron-tower"]);
+    renderPalette({ query: "" });
+    expect(screen.getByText("Recently viewed")).toBeInTheDocument();
+    const rows = resultButtons();
+    // silver-lake visited most recently → first row.
+    expect(rows[0]).toHaveTextContent("Silver Lake");
+    expect(rows[1]).toHaveTextContent("Iron Tower");
+    // ancient-guard was never visited → not in the list.
+    expect(screen.queryByText("Ancient Guard")).not.toBeInTheDocument();
+  });
+
+  it("hides the count bar and shows the section label when history is present", () => {
+    seedVisited(["iron-tower"]);
+    renderPalette({ query: "" });
+    expect(screen.getByText("Recently viewed")).toBeInTheDocument();
+    expect(screen.queryByText(/\d+ match/)).not.toBeInTheDocument();
+  });
+
+  it("falls back to index order (with count bar) when nothing has been visited", () => {
+    // No seedVisited call → localStorage empty.
+    renderPalette({ query: "" });
+    expect(screen.queryByText("Recently viewed")).not.toBeInTheDocument();
+    expect(screen.getByText(/3 matches/)).toBeInTheDocument();
+    expect(screen.getByText("Iron Tower")).toBeInTheDocument();
+    expect(screen.getByText("Ancient Guard")).toBeInTheDocument();
+    expect(screen.getByText("Silver Lake")).toBeInTheDocument();
+  });
+
+  it("drops stale visited ids that are absent from the current index", () => {
+    seedVisited(["stale-id-not-in-index", "silver-lake"]);
+    renderPalette({ query: "" });
+    // "stale-id-not-in-index" is absent from INDEX → filtered out.
+    // silver-lake is present → recently viewed section shows only silver-lake.
+    expect(screen.getByText("Recently viewed")).toBeInTheDocument();
+    const rows = resultButtons();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent("Silver Lake");
+  });
+
+  it("typing a query dismisses the recently-viewed section and shows scored results", () => {
+    seedVisited(["silver-lake"]);
+    renderPalette({ query: "iron" });
+    expect(screen.queryByText("Recently viewed")).not.toBeInTheDocument();
+    expect(screen.getByText("Iron Tower")).toBeInTheDocument();
+    expect(screen.queryByText("Silver Lake")).not.toBeInTheDocument();
   });
 });

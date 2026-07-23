@@ -17,6 +17,7 @@ import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { snippet } from "@/atlas/search/snippet";
 import { parseSearchQuery, matchesPhrases } from "@/atlas/search/parseSearchQuery";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
+import { loadVisitedOrdered } from "@/atlas/visited/visitedPlaces";
 
 interface SearchPaletteProps {
   query: string;
@@ -101,7 +102,11 @@ export function SearchPalette({
       .slice(0, 12);
   }, [index]);
 
-  const { items: results, total: resultTotal } = useMemo(() => {
+  const {
+    items: results,
+    total: resultTotal,
+    isRecentlyViewed,
+  } = useMemo(() => {
     let pool = index;
     if (activeType) pool = pool.filter((e) => e.type === activeType);
     if (activeTag) pool = pool.filter((e) => e.tags.includes(activeTag));
@@ -110,9 +115,22 @@ export function SearchPalette({
 
     const raw = query.trim();
     if (!raw) {
+      const visitedIds = loadVisitedOrdered();
+      if (visitedIds.length > 0) {
+        const indexIdSet = new Set(pool.map((e) => e.id));
+        const visitedInPool = visitedIds.filter((id) => indexIdSet.has(id));
+        if (visitedInPool.length > 0) {
+          const idMap = new Map(pool.map((e) => [e.id, e]));
+          const items = visitedInPool
+            .slice(0, 40)
+            .map((id) => ({ e: idMap.get(id)!, snip: null as string | null }));
+          return { items, total: visitedInPool.length, isRecentlyViewed: true };
+        }
+      }
       return {
         items: pool.slice(0, 40).map((e) => ({ e, snip: null as string | null })),
         total: pool.length,
+        isRecentlyViewed: false,
       };
     }
 
@@ -150,6 +168,7 @@ export function SearchPalette({
         .slice(0, 40)
         .map(({ e }) => ({ e, snip: snippet(e.bodyText ?? e.body, e.body, snippetQuery) })),
       total: scored.length,
+      isRecentlyViewed: false,
     };
   }, [query, index, activeType, activeTag, thisMapOnly, placedIds, recentOnly, recentlyRevealed]);
 
@@ -272,7 +291,7 @@ export function SearchPalette({
           )}
         </div>
 
-        {results.length > 0 && (
+        {results.length > 0 && !isRecentlyViewed && (
           <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border/50 bg-muted/10">
             {countLabel}
             {resultTotal > 40 && <span className="ml-1 opacity-70">(showing first 40)</span>}
@@ -283,7 +302,13 @@ export function SearchPalette({
           {results.length === 0 ? (
             <div className="p-6 text-sm text-muted-foreground text-center">No matches.</div>
           ) : (
-            results.map(({ e: r, snip }, i) => {
+            <>
+              {isRecentlyViewed && (
+                <div className="px-3 py-1 text-[10px] text-muted-foreground uppercase tracking-wider border-b border-border/50 bg-muted/10">
+                  Recently viewed
+                </div>
+              )}
+              {results.map(({ e: r, snip }, i) => {
               const placed = placedIds.has(r.id);
               const active = i === activeIndex;
               return (
@@ -320,7 +345,8 @@ export function SearchPalette({
                   )}
                 </button>
               );
-            })
+            })}
+            </>
           )}
         </div>
       </div>

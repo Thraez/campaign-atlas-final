@@ -66,6 +66,14 @@ export function markVisited(entityId: string): void {
   }
 }
 
+/** Returns entity ids the player has opened, newest-first by visitedAt. */
+export function loadVisitedOrdered(): string[] {
+  const map = loadMap();
+  return Object.entries(map)
+    .sort((a, b) => (b[1].visitedAt || "").localeCompare(a[1].visitedAt || ""))
+    .map(([id]) => id);
+}
+
 export function _resetVisitedForTests(): void {
   const s = getStorage();
   if (!s) return;
