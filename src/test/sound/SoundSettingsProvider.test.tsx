@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import { SoundSettingsProvider, useSoundSettings } from "@/atlas/sound/SoundSettingsProvider";
 import { _resetSoundPrefsForTests, loadSoundPrefs } from "@/atlas/sound/soundPrefs";
@@ -169,6 +169,93 @@ describe("SoundSettingsProvider", () => {
     act(() => btn.click());
     expect(btn.getAttribute("data-volume")).toBe("0.4");
     expect(loadSoundPrefs().volume).toBe(0.4);
+  });
+
+  describe("Q34 — AudioContext suspend/resume on mute/calm/visibility", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        value: "visible",
+      });
+    });
+
+    it("muting suspends the engine after the 0.2s ramp delay", async () => {
+      vi.useFakeTimers();
+      const { deps } = makeStubDeps();
+      const engines: any[] = [];
+      function MuteCapture() {
+        const { engine, muted, setMuted } = useSoundSettings();
+        engines.push(engine);
+        return <button onClick={() => setMuted(!muted)}>{muted ? "muted" : "unmuted"}</button>;
+      }
+      render(
+        <SoundSettingsProvider deps={deps}>
+          <MuteCapture />
+        </SoundSettingsProvider>,
+      );
+      const engine = engines[0];
+      const suspendSpy = vi.spyOn(engine, "suspend");
+      act(() => screen.getByRole("button").click()); // mute
+      expect(suspendSpy).not.toHaveBeenCalled(); // not yet — ramp still settling
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(suspendSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("unmuting resumes the engine immediately (page visible)", async () => {
+      vi.useFakeTimers();
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        value: "visible",
+      });
+      const { deps } = makeStubDeps();
+      const engines: any[] = [];
+      function MuteCapture() {
+        const { engine, muted, setMuted } = useSoundSettings();
+        engines.push(engine);
+        return <button onClick={() => setMuted(!muted)}>{muted ? "muted" : "unmuted"}</button>;
+      }
+      render(
+        <SoundSettingsProvider deps={deps}>
+          <MuteCapture />
+        </SoundSettingsProvider>,
+      );
+      const engine = engines[0];
+      // Mute then advance past the ramp so the context is suspended.
+      act(() => screen.getByRole("button").click());
+      await act(async () => { vi.advanceTimersByTime(300); });
+      const resumeSpy = vi.spyOn(engine, "resume");
+      // Unmute — should resume immediately.
+      act(() => screen.getByRole("button").click());
+      expect(resumeSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("visibilitychange does not resume when muted", () => {
+      const { deps } = makeStubDeps();
+      const engines: any[] = [];
+      function MuteCapture() {
+        const { engine, muted, setMuted } = useSoundSettings();
+        engines.push(engine);
+        return <button onClick={() => setMuted(!muted)}>{muted ? "muted" : "unmuted"}</button>;
+      }
+      render(
+        <SoundSettingsProvider deps={deps}>
+          <MuteCapture />
+        </SoundSettingsProvider>,
+      );
+      const engine = engines[0];
+      act(() => screen.getByRole("button").click()); // mute
+      const resumeSpy = vi.spyOn(engine, "resume");
+      // Simulate page becoming visible while muted.
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        value: "visible",
+      });
+      act(() => document.dispatchEvent(new Event("visibilitychange")));
+      expect(resumeSpy).not.toHaveBeenCalled();
+    });
   });
 
   it("combined effective gain = volume × mapMasterGain pushed to engine.setMasterGain", () => {
