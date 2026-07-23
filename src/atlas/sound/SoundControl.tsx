@@ -2,12 +2,26 @@ import { useState } from "react";
 import { useSoundSettings } from "@/atlas/sound/SoundSettingsProvider";
 
 export function SoundControl() {
-  const { soundEnabled, muted, calmMode, volume, enableSound, setMuted, setCalmMode, setVolume } =
-    useSoundSettings();
+  const {
+    soundEnabled,
+    muted,
+    calmMode,
+    volume,
+    enableSound,
+    setMuted,
+    setCalmMode,
+    setVolume,
+    ambiencePlaying,
+  } = useSoundSettings();
   const [dismissed, setDismissed] = useState(false);
+
+  const ambienceActive = soundEnabled && ambiencePlaying && !muted && !calmMode;
 
   return (
     <div className="absolute bottom-4 right-4 z-[1000] flex items-center gap-2">
+      <span role="status" aria-live="polite" className="sr-only">
+        {ambienceActive ? "Ambience playing" : ""}
+      </span>
       {!soundEnabled && !dismissed && (
         <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 shadow-sm">
           <button type="button" onClick={enableSound} className="flex items-center gap-2 text-sm">
@@ -27,6 +41,11 @@ export function SoundControl() {
 
       {soundEnabled && (
         <>
+          {ambienceActive && (
+            <span className="rounded-full border border-border bg-card px-3 py-2 text-xs shadow-sm text-muted-foreground">
+              <span aria-hidden="true">♪</span> Ambience playing
+            </span>
+          )}
           <button
             type="button"
             aria-label={muted ? "Unmute sound" : "Mute sound"}
