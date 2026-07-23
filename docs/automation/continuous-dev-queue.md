@@ -123,12 +123,7 @@ is for sequencing, not the whole spec.
 
 #### Q-D — Player accessibility
 
-- [ ] **Q25. Give the mobile entity bottom sheet an accessible name (SheetTitle/Description).**
-  In `src/pages/AtlasViewer.tsx` the entity `<Sheet><SheetContent side="bottom" className="h-[80vh] p-0">` (lines ~762-785) wraps `<EntityPanel>` directly with no title, so Radix (react-dialog) logs an a11y warning and the sheet has no accessible name for screen readers. Import `SheetTitle`/`SheetDescription` (already exported from `src/components/ui/sheet.tsx`) and add a visually-hidden `SheetTitle` bound to the open entity's title (`openEntity_.title`) plus an `sr-only` `SheetDescription` — mirror the pattern already used in `src/atlas/AtlasNavMenu.tsx:56-59`. Use the existing `sr-only`/visually-hidden approach (no new util).
-  - **Done when:** the bottom entity sheet has an accessible name equal to the open entity's title, the Radix missing-`Title` console warning is gone, and no visible layout change occurs.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Player mobile viewer only; reads the already-projected `openEntity_` — no DM-secret surface.
-  ~1 run.
+- [x] **Q25. Give the mobile entity bottom sheet an accessible name (SheetTitle/Description).** ✅ DONE 2026-07-23 — commit 3b0e9fe2
 
 - [ ] **Q26. Give map pins accessible names for keyboard and screen-reader users.**
   Leaflet markers are keyboard-focusable by default, but the `<Marker>` in `PlacementMarkers` (`src/pages/AtlasViewer.tsx:1066-1090`) passes no accessible name, so tabbing to a pin announces nothing. Pass `title={ent.title}` (append `playerTypeLabel(ent.type)` when present) to each `<Marker>` — Leaflet applies `title` to the DivIcon element as an accessible name; for stronger SR coverage also inject an `aria-label` into the div-icon root produced by `pinIconForStyle` (line 83). Add a `:focus-visible` outline ring to `.atlas-viewer-pin` in `src/index.css` (line ~69) so focused pins are visible. Extend `src/test/accessibility-labels.test.tsx` with a guard asserting the accessible name resolves to the entity title.

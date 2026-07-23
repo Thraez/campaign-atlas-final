@@ -929,3 +929,13 @@ Render/styling parity only — **not** interactivity.
   `getAllByRole` (facet row adds a second chip link for the same tag).
   Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2544 tests green (4 shards;
   pre-existing onTaskUpdate RPC flake in shard 3).
+
+- [x] **Q25. Give the mobile entity bottom sheet an accessible name (SheetTitle/Description).** ✅ DONE 2026-07-23 — commit 3b0e9fe2
+  `src/pages/AtlasViewer.tsx`: expanded Sheet import to include `SheetTitle` and `SheetDescription`;
+  added `<SheetTitle className="sr-only">{openEntity_?.title ?? ""}</SheetTitle>` and
+  `<SheetDescription className="sr-only">Entity details</SheetDescription>` inside `<SheetContent>`
+  before `<EntityPanel>`. Removes the Radix missing-Title console warning; no visible layout change.
+  `src/test/accessibility-labels.test.tsx`: new "Q25 — mobile entity bottom sheet accessible name"
+  describe block asserting `getByRole("dialog", { name: "Tideshore" })` resolves.
+  Gate: typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2545 tests green (4 shards;
+  pre-existing onTaskUpdate RPC flake in shard 3).
