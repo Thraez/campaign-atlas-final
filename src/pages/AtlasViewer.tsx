@@ -55,6 +55,7 @@ import { SearchPalette } from "@/atlas/search/SearchPalette";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
 import { MapCreditOverlay } from "@/atlas/map/MapCreditOverlay";
 import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
@@ -114,6 +115,7 @@ function MapController({
   flyTo: { x: number; y: number; height: number; zoom?: number } | null;
 }) {
   const map = useMap();
+  const prefersReducedMotion = usePrefersReducedMotion();
   useEffect(() => {
     if (!flyTo) return;
     const lat = flyTo.height - flyTo.y;
@@ -121,8 +123,12 @@ function MapController({
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
     const targetZoom =
       flyTo.zoom != null && Number.isFinite(flyTo.zoom) ? flyTo.zoom : Math.max(map.getZoom(), -1);
-    map.flyTo([lat, lng], targetZoom, { duration: 0.6 });
-  }, [flyTo, map]);
+    if (prefersReducedMotion) {
+      map.setView([lat, lng], targetZoom, { animate: false });
+    } else {
+      map.flyTo([lat, lng], targetZoom, { duration: 0.6 });
+    }
+  }, [flyTo, map, prefersReducedMotion]);
   return null;
 }
 
