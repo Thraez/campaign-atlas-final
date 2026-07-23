@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, fireEvent } from "@testing-library/react";
 import { SoundSettingsProvider } from "@/atlas/sound/SoundSettingsProvider";
 import { SoundControl } from "@/atlas/sound/SoundControl";
-import { _resetSoundPrefsForTests } from "@/atlas/sound/soundPrefs";
+import { _resetSoundPrefsForTests, loadSoundPrefs } from "@/atlas/sound/soundPrefs";
 
 const stubDeps = {
   createContext: () =>
@@ -77,5 +77,29 @@ describe("SoundControl", () => {
     act(() => screen.getByRole("button", { name: /bring the world to life/i }).click());
     expect(screen.queryByRole("button", { name: /bring the world to life/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /dismiss/i })).toBeNull();
+  });
+
+  it("volume slider is absent before enabling sound", () => {
+    renderControl();
+    expect(screen.queryByRole("slider", { name: /volume/i })).toBeNull();
+  });
+
+  it("volume slider appears after enabling sound with default value 0.8", () => {
+    renderControl();
+    act(() => screen.getByRole("button", { name: /bring the world to life/i }).click());
+    const slider = screen.getByRole("slider", { name: /volume/i });
+    expect(slider).toBeTruthy();
+    expect(Number((slider as HTMLInputElement).value)).toBeCloseTo(0.8);
+  });
+
+  it("dragging the volume slider persists the new value", () => {
+    renderControl();
+    act(() => screen.getByRole("button", { name: /bring the world to life/i }).click());
+    const slider = screen.getByRole("slider", { name: /volume/i }) as HTMLInputElement;
+    act(() => {
+      fireEvent.change(slider, { target: { value: "0.3" } });
+    });
+    expect(Number(slider.value)).toBeCloseTo(0.3);
+    expect(loadSoundPrefs().volume).toBeCloseTo(0.3);
   });
 });

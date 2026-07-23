@@ -13,6 +13,8 @@ interface SoundSettings extends SoundPrefs {
   enableSound: () => void;
   setMuted: (m: boolean) => void;
   setCalmMode: (c: boolean) => void;
+  setVolume: (v: number) => void;
+  setMapMasterGain: (g: number) => void;
 }
 
 const Ctx = createContext<SoundSettings | null>(null);
@@ -35,6 +37,8 @@ export function SoundSettingsProvider({
   );
   // deps is a constant (realAudioDeps or a test stub) — stable across renders.
   const [engine] = useState(() => new AudioEngine(deps));
+  // mapMasterGain is reported by SoundscapeLayer and is not persisted.
+  const [mapMasterGain, setMapMasterGain] = useState(0.6);
 
   const update = useCallback((patch: Partial<SoundPrefs>) => {
     setPrefs((prev) => {
@@ -55,6 +59,11 @@ export function SoundSettingsProvider({
   useEffect(() => {
     engine.setMuted(prefs.muted || prefs.calmMode);
   }, [engine, prefs.muted, prefs.calmMode]);
+
+  // Push combined effective master gain = playerVolume × mapMasterGain.
+  useEffect(() => {
+    engine.setMasterGain(prefs.volume * mapMasterGain);
+  }, [engine, prefs.volume, mapMasterGain]);
 
   // iOS: resume on return to foreground; suspend on hide for battery.
   useEffect(() => {
@@ -78,6 +87,8 @@ export function SoundSettingsProvider({
       enableSound,
       setMuted: (m) => update({ muted: m }),
       setCalmMode: (c) => update({ calmMode: c }),
+      setVolume: (v) => update({ volume: Math.min(1, Math.max(0, v)) }),
+      setMapMasterGain,
     }),
     [prefs, engine, enableSound, update],
   );
