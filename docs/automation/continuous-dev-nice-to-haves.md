@@ -1079,23 +1079,10 @@ was verified against the code at `origin/main` (identical to this branch's sourc
 (player-safety / data-loss / build-crash → content correctness → map/browse correctness → a11y → hygiene/docs).
 The per-pick design-check in `continuous-dev-routine.md` step 2a still binds — take the first that clearly passes.
 
-- [ ] **N96. Ambient sound 404s in every build — `audioUrl` double-prefixes an already-pathed `src`.**
-  The build writes `bed.src` as a full path (`rewriteAudioSrcs` → `atlas/assets/audio/<hash>.ogg`, `scripts/atlas/hashAudioAssets.ts:39`), and `public/atlas/atlas.json` confirms it. At runtime `prepareAreas` passes `bed` through unchanged (`src/atlas/sound/resolveSoundscape.ts:34`) and `AudioEngine.audioUrl()` (`src/atlas/sound/AudioEngine.ts:20-22`) re-prepends `atlas/assets/audio/` to any `src` not starting with `/` or `http` → `atlas/assets/audio/atlas/assets/audio/<hash>.ogg` → 404. Ambient audio never plays. Fix: make `audioUrl()` idempotent (don't prepend when `src` already contains the audio path or a slash).
-  - **Done when:** a player build's ambient beds fetch the correct URL and play; a unit test pins `audioUrl()` against both a bare filename and an already-pathed `atlas/assets/audio/...` src.
-  - **Gate:** standard gate (typecheck + ESLint + sharded Vitest); also `npm run atlas:publish:integrity-smoke`.
-  ~1 run.
-
-- [ ] **N97. A sound zone with no file chosen yet crashes the entire player build.**
-  A ride-on area and a fresh sound-only zone default to `bed: { src: "" }` (`src/atlas/sound-editor/useSoundscapeDraft.ts:207,193`), and a missing file is only a non-blocking warning. But `hashAudioAssets` does `readFileSync(path.join(publicDir, ""))` for an empty src — that resolves to the public dir itself and throws `EISDIR`, and `scripts/build-atlas.ts:822` has no try/catch around it, so the whole player build aborts.
-  - **Done when:** `hashAudioAssets` skips empty/whitespace `src` (and `srcFallback`); a player build with a half-configured sound zone completes and simply omits that bed; a test covers the empty-src case.
-  - **Gate:** standard gate; also `npm run atlas:publish:integrity-smoke`.
-  ~1 run.
-
-- [ ] **N98. A ride-on sound on a DM-only region can survive into the player build.**
-  `filterSoundscapeForPlayer` keeps any area where `!a.visibility || PLAYER_VISIBLE.has(a.visibility)` (`scripts/atlas/filterSoundscape.ts`), but ride-on areas are created with **no** `visibility` field (`{ id, regionId, bed }`, `useSoundscapeDraft.ts:207`) — the comment claims they "inherit the region's visibility," yet the filter never resolves the region. So ambient sound authored on a secret region isn't dropped for players (a subtle location/existence leak). Fix: resolve a ride-on area's effective visibility from its `regionId` and drop it when the region isn't player-visible; drop areas whose `regionId` no longer exists in the player build.
-  - **Done when:** a ride-on area on a `dm`/`hidden` region is stripped from the player soundscape; player-visible ride-ons still ship; a test in `filterSoundscape`'s suite covers both; `check-artifact-shape`/secrecy scans stay green.
-  - **Gate:** standard gate; **also `npm run atlas:publish` and confirm all player-safety scans pass** (this is a leak-surface fix).
-  ~2 runs.
+> **N96–N98 were promoted to the WANTS queue on 2026-07-19** — three confirmed shipped-and-broken bugs
+> (ambient audio 404s in every build; an empty-src sound zone crashes the player build; a ride-on sound on
+> a DM-only region can leak into the player build). They now live in section **X** of
+> `continuous-dev-queue.md` and build **first**. Numbers kept for traceability; this reserve resumes at N99.
 
 - [ ] **N99. Editing an existing secret's fields silently discards on Close — no dirty flag, no confirm.**
   `EntityEditPanel` keeps every secret in its own `draftSecrets` state (`src/atlas/categories/EntityEditPanel.tsx:59`), updated on every character/password/teaser/reveal edit. But the unsaved-changes check comes from `useEntityEditDraft.isDirty()`, which fingerprints only `fields` (type/visibility/summary) + `body` (`src/atlas/categories/useEntityEditDraft.ts:19-21,52-56`). So editing a secret's fields never flips dirty, and closing discards it with no warning. (Adding a secret mutates the body marker, so only *edits* to existing secrets are lost.)
