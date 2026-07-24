@@ -16,6 +16,7 @@ export function SoundControl({ hasSoundscape = true }: SoundControlProps) {
     setCalmMode,
     setVolume,
     ambiencePlaying,
+    audioAvailable,
   } = useSoundSettings();
   const [dismissed, setDismissed] = useState(false);
 
@@ -26,7 +27,7 @@ export function SoundControl({ hasSoundscape = true }: SoundControlProps) {
       <span role="status" aria-live="polite" className="sr-only">
         {ambienceActive ? "Ambience playing" : ""}
       </span>
-      {hasSoundscape && !soundEnabled && !dismissed && (
+      {hasSoundscape && audioAvailable && !soundEnabled && !dismissed && (
         <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 shadow-sm">
           <button type="button" onClick={enableSound} className="flex items-center gap-2 text-sm">
             <span aria-hidden>🔊</span>
@@ -43,7 +44,7 @@ export function SoundControl({ hasSoundscape = true }: SoundControlProps) {
         </div>
       )}
 
-      {hasSoundscape && soundEnabled && (
+      {hasSoundscape && audioAvailable && soundEnabled && (
         <>
           {ambienceActive && (
             <span className="rounded-full border border-border bg-card px-3 py-2 text-xs shadow-sm text-muted-foreground">

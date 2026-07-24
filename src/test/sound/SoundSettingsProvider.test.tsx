@@ -258,6 +258,52 @@ describe("SoundSettingsProvider", () => {
     });
   });
 
+  describe("Q37 — graceful Web Audio fallback", () => {
+    it("audioAvailable prop is exposed in context", () => {
+      const { deps } = makeStubDeps();
+      let captured: boolean | undefined;
+      function Probe() {
+        const { audioAvailable } = useSoundSettings();
+        captured = audioAvailable;
+        return null;
+      }
+      render(
+        <SoundSettingsProvider deps={deps} audioAvailable={false}>
+          <Probe />
+        </SoundSettingsProvider>,
+      );
+      expect(captured).toBe(false);
+    });
+
+    it("enableSound rolls back soundEnabled to false when unlock() rejects", async () => {
+      const failingDeps = {
+        createContext: () => { throw new Error("Web Audio not available"); },
+        fetchAudio: async () => new ArrayBuffer(0),
+        canPlay: () => true,
+      };
+      function Probe() {
+        const { soundEnabled, enableSound } = useSoundSettings();
+        return (
+          <button onClick={() => enableSound()}>
+            {soundEnabled ? "sound-on" : "sound-off"}
+          </button>
+        );
+      }
+      render(
+        <SoundSettingsProvider deps={failingDeps as any} audioAvailable={true}>
+          <Probe />
+        </SoundSettingsProvider>,
+      );
+      expect(screen.getByRole("button").textContent).toBe("sound-off");
+      await act(async () => {
+        screen.getByRole("button").click();
+        // Flush microtasks so the rejection + catch run
+        await Promise.resolve();
+      });
+      expect(screen.getByRole("button").textContent).toBe("sound-off");
+    });
+  });
+
   it("combined effective gain = volume × mapMasterGain pushed to engine.setMasterGain", () => {
     const { deps } = makeStubDeps();
     const engines: any[] = [];

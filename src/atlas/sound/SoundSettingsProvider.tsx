@@ -7,6 +7,7 @@ import {
   saveSoundPrefs,
   type SoundPrefs,
 } from "@/atlas/sound/soundPrefs";
+import { isWebAudioAvailable } from "@/atlas/sound/probeWebAudio";
 
 interface SoundSettings extends SoundPrefs {
   engine: AudioEngine;
@@ -17,6 +18,8 @@ interface SoundSettings extends SoundPrefs {
   setMapMasterGain: (g: number) => void;
   ambiencePlaying: boolean;
   setAmbiencePlaying: (v: boolean) => void;
+  /** False when the Web Audio API is unavailable in this environment. */
+  audioAvailable: boolean;
 }
 
 const Ctx = createContext<SoundSettings | null>(null);
@@ -30,9 +33,12 @@ export function useSoundSettings(): SoundSettings {
 export function SoundSettingsProvider({
   children,
   deps = realAudioDeps,
+  audioAvailable = isWebAudioAvailable(),
 }: {
   children: React.ReactNode;
   deps?: AudioDeps;
+  /** Injected in tests to simulate environments without Web Audio. */
+  audioAvailable?: boolean;
 }) {
   const [prefs, setPrefs] = useState<SoundPrefs>(() =>
     typeof window === "undefined" ? DEFAULT_PREFS : loadSoundPrefs(),
@@ -96,7 +102,11 @@ export function SoundSettingsProvider({
   }, [engine, prefs.muted, prefs.calmMode]);
 
   const enableSound = useCallback(() => {
-    void engine.unlock();
+    engine.unlock().catch(() => {
+      // Web Audio failed to initialise (e.g. browser policy or missing API).
+      // Leave soundEnabled false so the invite stays hidden on the next render.
+      update({ soundEnabled: false });
+    });
     update({ soundEnabled: true });
   }, [engine, update]);
 
@@ -111,8 +121,9 @@ export function SoundSettingsProvider({
       setMapMasterGain,
       ambiencePlaying,
       setAmbiencePlaying,
+      audioAvailable,
     }),
-    [prefs, engine, enableSound, update, ambiencePlaying],
+    [prefs, engine, enableSound, update, ambiencePlaying, audioAvailable],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
