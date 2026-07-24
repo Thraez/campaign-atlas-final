@@ -30,7 +30,7 @@ const stubDeps = {
 
 const renderControl = (props: { hasSoundscape?: boolean } = {}) =>
   render(
-    <SoundSettingsProvider deps={stubDeps as any}>
+    <SoundSettingsProvider deps={stubDeps as any} audioAvailable={true}>
       <SoundControl {...props} />
     </SoundSettingsProvider>,
   );
@@ -45,7 +45,7 @@ function SimulateAmbience({ playing }: { playing: boolean }) {
 
 const renderWithAmbience = (playing: boolean) =>
   render(
-    <SoundSettingsProvider deps={stubDeps as any}>
+    <SoundSettingsProvider deps={stubDeps as any} audioAvailable={true}>
       <SoundControl />
       <SimulateAmbience playing={playing} />
     </SoundSettingsProvider>,
@@ -151,6 +151,34 @@ describe("Q35 — ambience playing indicator", () => {
     // The live region contains only the hardcoded generic string, no area name derived from soundscape
     expect(screen.getByRole("status").textContent).toBe("Ambience playing");
     expect(screen.queryByText(/area-\d/i)).toBeNull();
+  });
+});
+
+describe("Q37 — graceful fallback when Web Audio is unavailable", () => {
+  beforeEach(() => _resetSoundPrefsForTests());
+  afterEach(() => cleanup());
+
+  const renderWithAudioAvailable = (audioAvailable: boolean) =>
+    render(
+      <SoundSettingsProvider deps={stubDeps as any} audioAvailable={audioAvailable}>
+        <SoundControl hasSoundscape={true} />
+      </SoundSettingsProvider>,
+    );
+
+  it("invite is hidden when audioAvailable is false", () => {
+    renderWithAudioAvailable(false);
+    expect(screen.queryByRole("button", { name: /bring the world to life/i })).toBeNull();
+  });
+
+  it("mute and volume controls are hidden when audioAvailable is false", () => {
+    renderWithAudioAvailable(false);
+    expect(screen.queryByRole("button", { name: /mute sound|unmute sound/i })).toBeNull();
+    expect(screen.queryByRole("slider", { name: /volume/i })).toBeNull();
+  });
+
+  it("calm mode toggle remains visible when audioAvailable is false", () => {
+    renderWithAudioAvailable(false);
+    expect(screen.getByRole("button", { name: /calm mode/i })).toBeTruthy();
   });
 });
 
