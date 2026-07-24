@@ -1160,3 +1160,34 @@ mode toggle stays visible on all maps because it also governs ocean motion. `Atl
 
 **Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2593 tests green
 (4 shards; pre-existing onTaskUpdate RPC flake in shard 4).
+
+### Q37 — Graceful fallback when Web Audio is unavailable (2026-07-24)
+
+**Commit:** `6ce33af0` · **Merge:** `e0467b21` · **Branch:** `run/q37-web-audio-fallback`
+
+**What shipped:** On browsers where neither `window.AudioContext` nor `webkitAudioContext` exists,
+the sound invite and mute/volume controls are now silently absent (instead of showing controls that
+throw an unhandled rejection when tapped). The Calm mode button (CSS-only ocean motion) remains
+visible on all maps. An `engine.unlock()` failure (e.g. context creation throws) now rolls back
+`soundEnabled` to false via a `.catch` handler, so tapping the invite on a partially-supported
+browser leaves a clean state instead of a dead mute button.
+
+**Implementation:**
+- `src/atlas/sound/probeWebAudio.ts` (new): `isWebAudioAvailable()` — checks for
+  `window.AudioContext || webkitAudioContext`, guarded for SSR.
+- `src/atlas/sound/SoundSettingsProvider.tsx`: imported probe; added `audioAvailable: boolean` to
+  `SoundSettings` interface; added `audioAvailable?` prop to provider (default = probe result,
+  injectable in tests); `enableSound` now calls `.catch(() => update({ soundEnabled: false }))` on
+  `engine.unlock()` so a failed unlock self-heals.
+- `src/atlas/sound/SoundControl.tsx`: destructures `audioAvailable` from context; both the invite
+  block and the active-sound block are gated behind `audioAvailable &&`; Calm mode unconditional.
+- `src/test/sound/probeWebAudio.test.ts` (new): 3 tests covering AudioContext present, only
+  webkitAudioContext present, and neither present.
+- `src/test/sound/SoundSettingsProvider.test.tsx`: added Q37 describe block — `audioAvailable` prop
+  exposed in context; `enableSound` rolls back soundEnabled when unlock() rejects (2 tests).
+- `src/test/sound/SoundControl.test.tsx`: updated `renderControl` and `renderWithAmbience` helpers
+  to pass `audioAvailable={true}` so existing tests are environment-independent; added Q37 describe
+  block — invite hidden, mute/volume hidden, Calm mode visible when audioAvailable false (3 tests).
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2601 tests green
+(4 shards; pre-existing shard-3 RPC flake; 33 targeted tests green).

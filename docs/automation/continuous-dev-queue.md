@@ -147,7 +147,7 @@ is for sequencing, not the whole spec.
 
 - [x] **Q36. Hide sound controls when the active map has no soundscape.** ✅ DONE 2026-07-23 — commit 2b7e49ba
 
-- [ ] **Q37. Graceful fallback when Web Audio is unavailable.**
+- [x] **Q37. Graceful fallback when Web Audio is unavailable.** ✅ DONE 2026-07-24 — commit 6ce33af0
   `realAudioDeps.createContext` (`src/atlas/sound/realAudioDeps.ts:4`) throws when neither `window.AudioContext` nor `webkitAudioContext` exists, and `enableSound` in `SoundSettingsProvider.tsx:69-72` does `void engine.unlock()` with no `.catch`, so tapping the invite floats an unhandled rejection and leaves a dead mute button. Add a capability probe (a small helper returning whether an AudioContext constructor is present), wrap `engine.unlock()` in try/catch inside `enableSound`, and expose an `audioAvailable` flag so `SoundControl.tsx` suppresses the invite/mute (or marks them unavailable) when Web Audio can't run. The rest of the viewer must keep working.
   - **Done when:** with no AudioContext available the invite/controls are suppressed and no unhandled rejection occurs (unlock failure caught); a unit test using deps whose `createContext` throws asserts the controls hide and `enableSound` does not reject.
   - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
