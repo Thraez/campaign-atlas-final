@@ -304,6 +304,71 @@ describe("SoundSettingsProvider", () => {
     });
   });
 
+  describe("Q38 — prefers-reduced-motion decoupled from audio", () => {
+    it("motionReduced=true sets data-calm on <html> without muting the engine", () => {
+      const { deps } = makeStubDeps();
+      const engines: any[] = [];
+      function EngineCapture() {
+        const { engine } = useSoundSettings();
+        engines.push(engine);
+        return null;
+      }
+      render(
+        <SoundSettingsProvider deps={deps} motionReduced={true}>
+          <EngineCapture />
+        </SoundSettingsProvider>,
+      );
+      expect(document.documentElement.getAttribute("data-calm")).toBe("true");
+      const spy = vi.spyOn(engines[0], "setMuted");
+      // engine.setMuted should have been called with false (muted=false, calmMode=false)
+      expect(spy).not.toHaveBeenCalledWith(true);
+    });
+
+    it("motionReduced=false with calmMode=false leaves data-calm absent", () => {
+      const { deps } = makeStubDeps();
+      render(
+        <SoundSettingsProvider deps={deps} motionReduced={false}>
+          <div />
+        </SoundSettingsProvider>,
+      );
+      expect(document.documentElement.getAttribute("data-calm")).toBeNull();
+    });
+
+    it("calmMode=true still mutes the engine even when motionReduced=true", () => {
+      const { deps } = makeStubDeps();
+      const engines: any[] = [];
+      function Probe() {
+        const { engine, calmMode, setCalmMode } = useSoundSettings();
+        engines.push(engine);
+        return <button onClick={() => setCalmMode(!calmMode)}>toggle</button>;
+      }
+      render(
+        <SoundSettingsProvider deps={deps} motionReduced={true}>
+          <Probe />
+        </SoundSettingsProvider>,
+      );
+      const spy = vi.spyOn(engines[0], "setMuted");
+      act(() => screen.getByRole("button").click()); // calmMode → true
+      expect(spy).toHaveBeenCalledWith(true);
+    });
+
+    it("motionReduced prop is exposed in context", () => {
+      const { deps } = makeStubDeps();
+      let captured: boolean | undefined;
+      function Probe() {
+        const { motionReduced } = useSoundSettings();
+        captured = motionReduced;
+        return null;
+      }
+      render(
+        <SoundSettingsProvider deps={deps} motionReduced={true}>
+          <Probe />
+        </SoundSettingsProvider>,
+      );
+      expect(captured).toBe(true);
+    });
+  });
+
   it("combined effective gain = volume × mapMasterGain pushed to engine.setMasterGain", () => {
     const { deps } = makeStubDeps();
     const engines: any[] = [];

@@ -8,6 +8,7 @@ import {
   type SoundPrefs,
 } from "@/atlas/sound/soundPrefs";
 import { isWebAudioAvailable } from "@/atlas/sound/probeWebAudio";
+import { readPrefersReducedMotion } from "@/atlas/sound/prefersReducedMotion";
 
 interface SoundSettings extends SoundPrefs {
   engine: AudioEngine;
@@ -20,6 +21,8 @@ interface SoundSettings extends SoundPrefs {
   setAmbiencePlaying: (v: boolean) => void;
   /** False when the Web Audio API is unavailable in this environment. */
   audioAvailable: boolean;
+  /** True when the OS reports prefers-reduced-motion: reduce. Audio is unaffected. */
+  motionReduced: boolean;
 }
 
 const Ctx = createContext<SoundSettings | null>(null);
@@ -34,11 +37,14 @@ export function SoundSettingsProvider({
   children,
   deps = realAudioDeps,
   audioAvailable = isWebAudioAvailable(),
+  motionReduced = readPrefersReducedMotion(),
 }: {
   children: React.ReactNode;
   deps?: AudioDeps;
   /** Injected in tests to simulate environments without Web Audio. */
   audioAvailable?: boolean;
+  /** Injected in tests to simulate a reduced-motion OS preference. */
+  motionReduced?: boolean;
 }) {
   const [prefs, setPrefs] = useState<SoundPrefs>(() =>
     typeof window === "undefined" ? DEFAULT_PREFS : loadSoundPrefs(),
@@ -58,12 +64,13 @@ export function SoundSettingsProvider({
     });
   }, []);
 
-  // Reflect calm mode onto <html> for the ocean CSS hook.
+  // Reflect calm mode or system reduced-motion onto <html> for the ocean CSS hook.
+  // Audio muting is driven only by prefs.muted || prefs.calmMode — never by motionReduced.
   useEffect(() => {
     const root = document.documentElement;
-    if (prefs.calmMode) root.setAttribute("data-calm", "true");
+    if (prefs.calmMode || motionReduced) root.setAttribute("data-calm", "true");
     else root.removeAttribute("data-calm");
-  }, [prefs.calmMode]);
+  }, [prefs.calmMode, motionReduced]);
 
   // Mirror mute/calm into the engine; suspend the AudioContext after the gain
   // ramp settles so the browser can reclaim CPU/battery while silent.
@@ -122,8 +129,9 @@ export function SoundSettingsProvider({
       ambiencePlaying,
       setAmbiencePlaying,
       audioAvailable,
+      motionReduced,
     }),
-    [prefs, engine, enableSound, update, ambiencePlaying, audioAvailable],
+    [prefs, engine, enableSound, update, ambiencePlaying, audioAvailable, motionReduced],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
