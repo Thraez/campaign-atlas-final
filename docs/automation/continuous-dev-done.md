@@ -1191,3 +1191,21 @@ browser leaves a clean state instead of a dead mute button.
 
 **Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2601 tests green
 (4 shards; pre-existing shard-3 RPC flake; 33 targeted tests green).
+
+- [x] **Q38. Honor prefers-reduced-motion for calm-mode motion without silencing sound.** ✅ DONE 2026-07-25 — commit 77149da6
+
+**Implementation:**
+- `src/atlas/sound/prefersReducedMotion.ts` (new): SSR-safe helper `readPrefersReducedMotion()` reads
+  `matchMedia('(prefers-reduced-motion: reduce)').matches` once at mount, guarded for SSR/missing
+  matchMedia.
+- `src/atlas/sound/SoundSettingsProvider.tsx`: added `motionReduced?: boolean` injectable prop
+  (default = probe result); `data-calm` effect now gates on `prefs.calmMode || motionReduced` so
+  the ocean stills for reduced-motion visitors; `engine.setMuted` remains driven by
+  `muted || calmMode` only — the motion flag never mutes audio. `motionReduced` added to
+  `SoundSettings` interface and exposed in context value.
+- `src/test/sound/SoundSettingsProvider.test.tsx`: added Q38 describe block — motionReduced=true sets
+  data-calm without muting engine; motionReduced=false leaves data-calm absent; calmMode=true still
+  mutes engine even when motionReduced=true; prop exposed in context (4 new tests; 16 total in file).
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2605 tests green
+(4 shards; pre-existing shard-3 RPC flake).

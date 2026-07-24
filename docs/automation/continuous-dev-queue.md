@@ -153,11 +153,7 @@ is for sequencing, not the whole spec.
   - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
   Player-facing hardening only. ~1 run.
 
-- [ ] **Q38. Honor prefers-reduced-motion for calm-mode motion without silencing sound.**
-  Today `calmMode` is one toggle that both stills the ocean (via `data-calm` in `SoundSettingsProvider.tsx:48-52`) AND mutes the engine (`engine.setMuted(muted||calmMode)` at line 56), and nothing reads `matchMedia`. Introduce a distinct motion-only flag: set `data-calm` on `<html>` when EITHER `calmMode` OR the reduced-motion flag is on, but keep `engine.setMuted` driven by `muted || calmMode` only (never the motion flag). Initialize the motion flag once from `matchMedia('(prefers-reduced-motion: reduce)')` when no stored pref exists (guard for SSR / missing matchMedia); leave the explicit Calm-mode master toggle and its persisted pref unchanged. No shared hook exists (`src/hooks/use-prefers-reduced-motion.ts` is absent) — read matchMedia directly in the provider.
-  - **Done when:** a first-time visitor with prefers-reduced-motion gets a still ocean (`data-calm` set) while sound still plays (engine NOT muted); toggling Calm mode still mutes audio; a unit test asserts reduced-motion sets the motion flag without muting the engine.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Guardrail: keep strictly to decoupling motion from audio and defaulting motion only — do NOT auto-silence audio for reduced-motion, and do NOT add a single calm/plain master switch or any weather/time-of-day surface. ~2–3 runs.
+- [x] **Q38. Honor prefers-reduced-motion for calm-mode motion without silencing sound.** ✅ DONE 2026-07-25 — commit 77149da6
 
 - [ ] **Q39. Fix AudioEngine buffer-cache leak and add engine unit tests.**
   In `src/atlas/sound/AudioEngine.ts` `touch()` (lines 155-163), when the LRU would evict the currently-active source's buffer it `continue`s AFTER already `shift()`-ing that src off `lru` (line 159), so the active buffer stays in the `buffers` map but is no longer tracked and is never re-added when it stops being active — `buffers` grows past `BUFFER_CAP` over a long session. Fix by re-pushing the skipped active src back onto `lru` (keeping it tracked at the tail) so the loop evicts a genuinely-inactive entry and terminates. Add direct `AudioEngine` tests with a stubbed AudioContext covering: a crossfade superseded while decoding (newer target wins), `canPlay` Ogg→fallback src selection, and the LRU cap holding steady across many loads including the active-buffer case.
