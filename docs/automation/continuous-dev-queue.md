@@ -34,6 +34,28 @@ is for sequencing, not the whole spec.
 > Each unit is self-contained and independently shippable; all prior sections (P, M, J, K, L, I, H, G,
 > F, E, D, A, B, C) are ✅ DONE. See section **Q**'s own banner for the guardrail recap.
 
+### ‼️ X — Critical bugfixes (promoted from nice-to-haves 2026-07-19 — BUILD THESE FIRST)
+
+> DM-directed: three confirmed shipped-and-broken bugs pulled out of the design-gated reserve so they get
+> fixed **before** the Q backlog resumes. Each premise was verified against the code. Build **X1 → X2 → X3,
+> then continue with Q2** (Q1 is already ✅ DONE). Same guardrails as every unit: one per run, full gate,
+> merge to `auto/continuous-dev` only, then move the finished unit to `continuous-dev-done.md`.
+
+- [ ] **X1. Ambient sound 404s in every build — `audioUrl` double-prefixes an already-pathed `src`.** _(was N96; ~1 run)_
+  The build writes `bed.src` as a full path (`rewriteAudioSrcs` → `atlas/assets/audio/<hash>.ogg`, `scripts/atlas/hashAudioAssets.ts:39`), and `public/atlas/atlas.json` confirms it. At runtime `prepareAreas` passes `bed` through unchanged (`src/atlas/sound/resolveSoundscape.ts:34`) and `AudioEngine.audioUrl()` (`src/atlas/sound/AudioEngine.ts:20-22`) re-prepends `atlas/assets/audio/` to any `src` not starting with `/` or `http` → `atlas/assets/audio/atlas/assets/audio/<hash>.ogg` → 404. Ambient audio never plays. Fix: make `audioUrl()` idempotent (don't prepend when `src` already contains the audio path or a slash).
+  - **Done when:** a player build's ambient beds fetch the correct URL and play; a unit test pins `audioUrl()` against both a bare filename and an already-pathed `atlas/assets/audio/...` src.
+  - **Gate:** standard gate (typecheck + ESLint + sharded Vitest); also `npm run atlas:publish:integrity-smoke`.
+
+- [ ] **X2. A sound zone with no file chosen yet crashes the entire player build.** _(was N97; ~1 run)_
+  A ride-on area and a fresh sound-only zone default to `bed: { src: "" }` (`src/atlas/sound-editor/useSoundscapeDraft.ts:207,193`), and a missing file is only a non-blocking warning. But `hashAudioAssets` does `readFileSync(path.join(publicDir, ""))` for an empty src — that resolves to the public dir itself and throws `EISDIR`, and `scripts/build-atlas.ts:822` has no try/catch around it, so the whole player build aborts.
+  - **Done when:** `hashAudioAssets` skips empty/whitespace `src` (and `srcFallback`); a player build with a half-configured sound zone completes and simply omits that bed; a test covers the empty-src case.
+  - **Gate:** standard gate; also `npm run atlas:publish:integrity-smoke`.
+
+- [ ] **X3. A ride-on sound on a DM-only region can survive into the player build.** _(was N98; ~2 runs)_
+  `filterSoundscapeForPlayer` keeps any area where `!a.visibility || PLAYER_VISIBLE.has(a.visibility)` (`scripts/atlas/filterSoundscape.ts`), but ride-on areas are created with **no** `visibility` field (`{ id, regionId, bed }`, `useSoundscapeDraft.ts:207`) — the comment claims they "inherit the region's visibility," yet the filter never resolves the region. So ambient sound authored on a secret region isn't dropped for players (a subtle location/existence leak). Fix: resolve a ride-on area's effective visibility from its `regionId` and drop it when the region isn't player-visible; drop areas whose `regionId` no longer exists in the player build.
+  - **Done when:** a ride-on area on a `dm`/`hidden` region is stripped from the player soundscape; player-visible ride-ons still ship; a test in `filterSoundscape`'s suite covers both; `check-artifact-shape`/secrecy scans stay green.
+  - **Gate:** standard gate; **also `npm run atlas:publish` and confirm all player-safety scans pass** (this is a leak-surface fix).
+
 ### Q — Refuel 2026-07-14 (100-task QoL / feature / infra / refactor backlog — blessed by the DM)
 
 > DM-directed refuel: a broad, grounded backlog of **100 bite-sized units** (Q1–Q100), each
