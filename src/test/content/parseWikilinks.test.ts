@@ -148,6 +148,63 @@ describe("renderLinkTokens — security invariant (player builds)", () => {
   });
 });
 
+describe("tokenizeWikilinks — heading-anchor wikilinks (Q48)", () => {
+  it("[[Note#Heading]] resolves via the file part only, display falls back to the file part", () => {
+    const { links } = tokenizeWikilinks("[[Corven#Backstory]]", { resolveByName: RESOLVE_KNOWN });
+    expect(links[0].target).toBe("Corven#Backstory");
+    expect(links[0].display).toBe("Corven");
+    expect(links[0].resolvedId).toBe("corven");
+    expect(links[0].broken).toBe(false);
+  });
+
+  it("[[Note#Heading|Alias]] keeps the explicit alias as display", () => {
+    const { links } = tokenizeWikilinks("[[Corven#Backstory|his past]]", { resolveByName: RESOLVE_KNOWN });
+    expect(links[0].target).toBe("Corven#Backstory");
+    expect(links[0].display).toBe("his past");
+    expect(links[0].resolvedId).toBe("corven");
+  });
+
+  it("[[UnknownNote#Heading]] with an unresolvable file part is broken (not an anchor)", () => {
+    const { links } = tokenizeWikilinks("[[Ghost Town#History]]", { resolveByName: RESOLVE_KNOWN });
+    expect(links[0].target).toBe("Ghost Town#History");
+    expect(links[0].resolvedId).toBeUndefined();
+    expect(links[0].broken).toBe(true);
+  });
+
+  it("[[#Heading]] (empty file part) is a same-note anchor: never resolved, never broken", () => {
+    const { links } = tokenizeWikilinks("[[#Backstory]]", { resolveByName: RESOLVE_KNOWN });
+    expect(links[0].target).toBe("#Backstory");
+    expect(links[0].resolvedId).toBeUndefined();
+    expect(links[0].broken).toBe(false);
+    expect(links[0].display).toBe("Backstory");
+  });
+
+  it("[[Note#^blockid]] resolves the note only — block ref is never used for resolution", () => {
+    const { links } = tokenizeWikilinks("[[Corven#^abc123]]", { resolveByName: RESOLVE_KNOWN });
+    expect(links[0].target).toBe("Corven#^abc123");
+    expect(links[0].resolvedId).toBe("corven");
+    expect(links[0].display).toBe("Corven");
+  });
+
+  it("renderLinkTokens: [[Note#Heading]] renders a navigable link to Note", () => {
+    const { tokenized, links } = tokenizeWikilinks("[[Corven#Backstory]]", { resolveByName: RESOLVE_KNOWN });
+    const html = renderLinkTokens(`<p>${tokenized}</p>`, links);
+    expect(html).toContain('class="atlas-wikilink"');
+    expect(html).toContain('data-entity-id="corven"');
+    expect(html).toContain("Corven");
+    expect(html).not.toContain("atlas-wikilink-anchor");
+  });
+
+  it("renderLinkTokens: [[#Heading]] renders an inert atlas-wikilink-anchor span, not a broken/planned link", () => {
+    const { tokenized, links } = tokenizeWikilinks("[[#Backstory]]", { resolveByName: RESOLVE_KNOWN });
+    const html = renderLinkTokens(`<p>${tokenized}</p>`, links);
+    expect(html).toContain('class="atlas-wikilink-anchor"');
+    expect(html).toContain("Backstory");
+    expect(html).not.toContain("atlas-planned-link");
+    expect(html).not.toContain("<a ");
+  });
+});
+
 describe("renderLinkTokens — planned-link cross-surface (N26)", () => {
   const RESOLVE = (n: string) => (n === "Corven" ? "corven" : undefined);
 

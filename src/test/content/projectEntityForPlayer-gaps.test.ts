@@ -28,6 +28,34 @@ describe("projectEntityForPlayer — branch gaps (N34)", () => {
     expect(p.bodyHtml).not.toContain("Shadow");
   });
 
+  it("heading-anchor wikilink to a dm-only note is redacted from body, bodyHtml, and links (Q48)", () => {
+    // [[SecretNote#Heading]] now resolves via the file part ("SecretNote") instead of
+    // being left permanently broken — must still be caught by the same secretIds redaction
+    // path so the DM-only note's name never leaks through the heading-anchor resolver seam.
+    const hidden = ent({ id: "secretnote", title: "SecretNote", visibility: "dm" });
+    const pub = ent({ id: "edric", title: "Edric", visibility: "player",
+      body: "See [[SecretNote#Heading]] for details." });
+    const all = new Map([[hidden.id, hidden], [pub.id, pub]]);
+    const ctx = buildProjectionContext(all);
+    const p = projectEntityForPlayer(pub, ctx);
+    expect(p.body).not.toContain("SecretNote");
+    expect(p.body).toContain("…");
+    expect(p.bodyHtml).not.toContain("SecretNote");
+    expect(p.links[0].target).toBe("");
+    expect(p.links[0].resolvedId).toBeUndefined();
+    expect(p.links[0].broken).toBe(true);
+  });
+
+  it("same-note anchor [[#Heading]] is never treated as a secret leak", () => {
+    const e = ent({ id: "npc", title: "NPC", visibility: "player",
+      body: "See [[#Backstory]] below." });
+    const ctx = buildProjectionContext(new Map([[e.id, e]]));
+    const p = projectEntityForPlayer(e, ctx);
+    expect(p.bodyHtml).toContain("atlas-wikilink-anchor");
+    expect(p.bodyHtml).toContain("Backstory");
+    expect(p.links[0].broken).toBe(false);
+  });
+
   it("rumor-visibility entity is NOT in secretIds — wikilink to it is preserved (security invariant)", () => {
     // PLAYER_VISIBLE = { "player", "rumor" }; rumor entities must not be redacted.
     const rumor = ent({ id: "ghost", title: "The Ghost", visibility: "rumor" });
