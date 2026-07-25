@@ -1422,3 +1422,34 @@ merge time, confirmed via `git fetch` immediately before merging).
 Clean merge into `auto/continuous-dev` (no concurrent runs — origin tip matched the run's fork point at
 merge time, confirmed via `git fetch` immediately before merging); typecheck re-verified on the merged
 tree before pushing.
+
+- [x] **Q45. Add Shift-coarse / default-fine nudge with a visible step.** ✅ DONE 2026-07-25 — commit 1f20968d
+
+**Implementation:**
+- `src/atlas/nudgeStep.ts` (new): `NUDGE_FINE = 100`, `NUDGE_COARSE = 500`, and a pure `nudgeStep(shiftKey)`
+  helper that resolves which one applies.
+- `src/atlas/NudgeButtons.tsx` (new): a shared arrow-pad control (label + 4-direction grid) that reads
+  `e.shiftKey` on each arrow's `onClick` and calls `onNudge(dx, dy)` already scaled by the resolved step,
+  preserving each direction's sign. Renders the active step sizes next to the label, e.g.
+  `Nudge (100 · ⇧500)`.
+- `src/pages/AtlasPlacementEditor.tsx`: the pin popover's inline 4-button nudge grid (hardcoded ±100)
+  replaced with `<NudgeButtons onNudge={(dx, dy) => onNudge?.(dx, dy)} />`.
+- `src/atlas/tabs/RegionsTab.tsx`: the "Nudge whole region" inline 4-button grid (same hardcoded ±100)
+  replaced with `<NudgeButtons label="Nudge whole region" onNudge={(dx, dy) => translate(selected.id, dx, dy)} />`.
+  Both call sites now share one implementation instead of two near-duplicate JSX blocks.
+- Coordinates stay in raw map units throughout — no Leaflet lat/lng flip in this path.
+- Tests: `src/test/nudgeStep.test.ts` (3 cases, the pure helper). `src/test/atlas/NudgeButtons.test.tsx`
+  (5 cases: step hint renders, default/custom label, plain-click fine step in all 4 directions,
+  Shift-click coarse step in all 4 directions). `src/test/tabs/RegionsTab.test.tsx` gained 2 integration
+  cases (plain click → `translate("r1", 0, 100)`; Shift-click → `translate("r1", 500, 0)`) proving the
+  RegionsTab wiring specifically. The pin-popover wiring is a one-line pass-through of the same
+  `NudgeButtons` component already covered directly, so no separate popover-interaction test was added
+  (would require driving the Radix `Popover` open state, which no existing test in this codebase does).
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2661 tests green (4 shards:
+666+577+821+597; pre-existing `onTaskUpdate` RPC flake in shard 3, and a one-off `buildSecrets.test.ts`
+cross-test-pollution flake in shard 2 that passed both standalone and on a shard re-run — no real
+failures). Editor-only (`__INCLUDE_EDITOR__`-gated) — no build/scan pipeline touched, so `atlas:publish`
+not required. `manifest.json` churned LF→CRLF only after running tests (no content diff) — reverted
+before commit. Clean merge into `auto/continuous-dev` (no concurrent runs — origin tip matched the run's
+fork point at merge time, confirmed via `git fetch` immediately before merging).

@@ -170,13 +170,6 @@ is for sequencing, not the whole spec.
 
 #### Q-F — DM editor ergonomics
 
-- [ ] **Q45. Add Shift-coarse / default-fine nudge with a visible step.**
-  The pin-popover nudge arrows hardcode a 100-unit step via `onNudge?.(dx,dy)` (AtlasPlacementEditor.tsx:2462,2471,2479,2487) and RegionsTab.tsx has an equivalent region-translate control. Introduce a shared step constant (e.g. `NUDGE_FINE=100`, `NUDGE_COARSE=500`) and read `e.shiftKey` in each arrow's `onClick` so Shift nudges by the coarse step and a plain click stays fine — scale the existing direction vectors (up=(0,+step), left=(−step,0), etc.) so signs are preserved. Show the active step next to the "Nudge" label (:2455), e.g. a static "Shift = 500" hint or a live "Nudge (100/500)" indicator.
-  - **Done when:** Shift+click on a nudge arrow moves by the coarse step and plain click by the fine step in both the pin popover and RegionsTab; the step size is visible in the UI; a test covers the fine-vs-coarse branch.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Editor-only; refines existing controls. Coordinates stay in raw map units — the Leaflet flip (lat = mapHeight − y) is not in this path and stays untouched.
-  ~2–3 runs.
-
 - [ ] **Q46. Show a '+N more' overflow indicator on validation chips.**
   `ValidationChips` (src/atlas/tabs/ValidationChips.tsx) does `issues.slice(0, limit)` (default 5) and silently drops the rest, so a DM with 8 blocking issues sees only 5. When `issues.length > limit`, append a muted "+N more" row after the sliced chips (N = `issues.length - limit`), styled to sit under the blocking/warning chips (e.g. `text-muted-foreground text-[11px]`), non-interactive.
   - **Done when:** rendering more than `limit` issues shows exactly `limit` chips plus a "+N more" row with the correct N; at or below the limit shows no extra row; a render test covers both cases.
