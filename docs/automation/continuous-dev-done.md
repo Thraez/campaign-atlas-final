@@ -1564,3 +1564,52 @@ the publish gate (`atlas.json`/`search-index.json`, audio `manifest.json` LF/CRL
 each commit — no artifact diff carried into the merge. Clean merge into `auto/continuous-dev` (no
 concurrent runs — origin tip matched the run's fork point at merge time, confirmed via `git fetch`
 immediately before merging).
+
+- [x] **Q50. Vault scan should only return .md files.** ~ SKIPPED 2026-07-25 — premise already false.
+  `isReadableVaultPath` (`src/atlas/save/sourcePathAllowlist.ts:102-108`) already enforces `/\.md$/i` on
+  every candidate path, and `processFile` (`scripts/vite-plugin-atlas-save.ts`) calls it BEFORE the
+  `fs.stat`/size accounting the queue entry worried about. Verified by temporarily reverting a
+  case-insensitive `.md` guard added at the top of `processFile` and re-running
+  `src/test/import/vault-scan.test.ts` — its existing "returns only .md files from the vault root" test
+  (writing `world.yaml`/`image.png` alongside `.md` files and asserting they're excluded) passed
+  identically with and without the guard, proving the exclusion already holds via
+  `isReadableVaultPath`, not something the queue entry's premise credited. The redundant guard was
+  reverted (never committed) rather than landed, per the routine's "don't add things beyond what's
+  needed" discipline. No code change, no gate run needed — the done-when criteria in the queue entry
+  were already satisfied by pre-existing code at the endpoint's original commit (`e2330aa7`).
+
+- [x] **Q51. Stop turning non-image ![[embeds]] into broken images.** ✅ DONE 2026-07-25 — commit 5d2aeaf3
+
+**What shipped:** `resolveImageEmbeds` (`src/atlas/content/renderEntityMarkdown.ts`) used to convert ANY
+`![[...]]` embed into a markdown `<img>`, so `![[Some Note]]` or `![[doc.pdf]]` rendered as a broken image
+in the DM build, the player build, and the editor's live preview (all three share this one function, via
+`build-atlas.ts:559` and `projectEntityForPlayer.ts:106`). Non-image embeds now render
+`<span class="atlas-embed-missing">embedded note not shown</span>` instead — an inert placeholder, not
+transclusion (an explicit non-goal). `![[image.png]]` (and jpg/jpeg/gif/webp/svg/avif, case-insensitive)
+is unaffected.
+
+**Implementation:**
+- `src/atlas/content/renderEntityMarkdown.ts`: `resolveImageEmbeds` gained an `IMAGE_EXT_RE` check on the
+  embed's filename (before the pipe-alias split's alt text is used) — image extensions still produce
+  `![alt](resolved/path)`; anything else short-circuits to the placeholder span, never calling
+  `resolveAsset`. `link.target`/filename handling for the image branch is byte-identical to before.
+- `src/index.css`: `.atlas-embed-missing` styled muted + italic, matching the existing
+  `.atlas-wikilink-anchor` inert-token pattern.
+- Tests: `src/test/content/renderEntityMarkdown.test.ts` gained 6 cases — non-image note embed →
+  placeholder (no `<img>`, no leftover `![`), `.pdf` embed → placeholder, pipe-alias on a non-image embed
+  still placeholders, case-insensitive `.PNG` still resolves as an image, the placeholder surviving the
+  full `renderEntityMarkdown` → sanitize pipeline, and a `%%`-wrapped `![[Secret Note]]` redaction
+  regression (proves `stripDmBlocks` running before `resolveImageEmbeds` — already the ordering in both
+  `build-atlas.ts` and `projectEntityForPlayer.ts` — means a DM-only note name never reaches the placeholder
+  or any other output).
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2691 tests green (4 shards:
+671+577+788+655; pre-existing `onTaskUpdate` RPC worker-communication timeout in shard 3, 0 tests failed —
+known flake signature, not a real failure). Touches the build pipeline (both builders call
+`resolveImageEmbeds`) — `npm run atlas:publish:integrity-smoke` (all 5 planted faults still caught) and
+`npm run atlas:publish` (all 12 orchestrator scans clean; player build unaffected — pre-existing
+oversize-map/orphan-asset warnings only) both green. Build artifacts regenerated during the publish gate
+and again by the pre-commit hook's `vitest run --changed` (`atlas.json`/`search-index.json`
+version/publishedAt stamp, audio `manifest.json` LF/CRLF) were reverted each time before/after commit — no
+artifact diff carried into the merge. Clean merge into `auto/continuous-dev` (no concurrent runs — origin
+tip matched the run's fork point at merge time, confirmed via `git fetch` immediately before merging).

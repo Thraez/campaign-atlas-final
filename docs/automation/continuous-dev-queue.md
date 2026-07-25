@@ -170,20 +170,6 @@ is for sequencing, not the whole spec.
 
 #### Q-G — DM import & Obsidian fidelity
 
-- [ ] **Q50. Vault scan should only return .md files.**
-  `handleVaultScanRequest.processFile` (`scripts/vite-plugin-atlas-save.ts:978-1001`) reads EVERY file as UTF-8 despite its docstring saying '.md files'. In `processFile`, after computing `relPosix`, add a case-insensitive `.md` extension guard (`if (!relPosix.toLowerCase().endsWith('.md')) return null;`) BEFORE the `fs.stat`/size accounting (line 986-991) so binaries/images are skipped, never read as mojibake into staging rows, and never counted against `MAX_VAULT_AGGREGATE_BYTES` (line 992-994). Optionally add `**/*.excalidraw.md` to the built-in ignores in `src/atlas/import/ignoreRules.ts` (`makeIgnore`) since those are base64 JSON, not prose.
-  - **Done when:** a vault containing `.png`/`.pdf`/`.canvas` files returns only `.md` entries; large binaries no longer blow the 25 MB aggregate budget; `src/test/import/vaultScanMapping.test.ts` is extended to assert non-`.md` files are excluded.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Read-only dev-server endpoint; this only narrows what is returned. Mirrors the drag/drop importer which already accepts `.md` only.
-  ~1 run.
-
-- [ ] **Q51. Stop turning non-image ![[embeds]] into broken images.**
-  `resolveImageEmbeds` (`src/atlas/content/renderEntityMarkdown.ts:17-27`) converts ANY `![[...]]` into a markdown `<img>`, so `![[Some Note]]` or `![[doc.pdf]]` render as broken images everywhere. Gate the `EMBED_RE`→img conversion on a recognized image extension (png/jpg/jpeg/gif/webp/svg/avif, case-insensitive) on the resolved filename; for non-image embeds emit an inert placeholder (e.g. `<span class="atlas-embed-missing">embedded note not shown</span>`) instead of a broken image. This single function feeds the build (`build-atlas.ts:536`), the player projection (`projectEntityForPlayer.ts:85`), and the editor preview (`renderEntityMarkdown.ts:37`), so all three fix together.
-  - **Done when:** `![[image.png]]` still renders an `<img>`; `![[Some Note]]` / `![[x.pdf]]` render the inert placeholder (no broken img) in DM, player, and build output; `src/test/content/renderEntityMarkdown.test.ts` covers both branches; a regression test proves a `%%`-wrapped `![[Secret Note]]` never surfaces in the player projection (stripDmBlocks runs upstream).
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest) + `npm run atlas:publish` + `atlas:publish:integrity-smoke` (runs on the player projection + shipped bodyHtml).
-  Does NOT add transclusion (explicit non-goal) — only replaces the broken image with an inert placeholder. Complements the existing image-extension-only dropped-embed publish check.
-  ~2–3 runs.
-
 - [ ] **Q52. Expand folder-name to entity-type inference coverage.**
   `FOLDER_TYPE_MAP` (`src/atlas/import/inferType.ts:9-31`) is missing many common vault folder names that `inferTypeFromTags` (`TAG_TYPE_MAP`) and `categoryForType` already understand. Add plural+singular mappings — cities→city, towns→town, villages→village, temples→temple, shops→shop, caves→cave, ports→port, people/persons→person, places/landmarks→location, capitals→capital, guilds/organizations→faction, deities/gods→deity — reusing the SAME type strings `TAG_TYPE_MAP` emits so folder and tag signals stay consistent. (Note: `deity`/`god` resolve to the `lore` category via `categoryForType`, which is acceptable; everything else maps to characters/locations/factions as expected.)
   - **Done when:** a note under `Cities/`, `Temples/`, `Ports/`, `People/`, etc. infers the mapped type instead of falling through to `note`; `src/test/infer-type.test.ts` is extended for the new folders; no change to `categoryForType`/`entityCategory.ts`.
