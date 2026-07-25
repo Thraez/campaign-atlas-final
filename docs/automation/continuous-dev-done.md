@@ -1711,3 +1711,31 @@ publish gate and the pre-commit hook's `vitest run --changed` (`atlas.json`/`sea
 version/publishedAt stamp, audio `manifest.json` LF/CRLF) were reverted before/after commit — no artifact
 diff carried into the merge. Clean merge into `auto/continuous-dev` (no concurrent runs — origin tip
 matched the run's fork point at merge time, confirmed via `git fetch` immediately before merging).
+
+- [x] **Q55. Tell the DM up front when Sync needs a DM build loaded.** ✅ DONE 2026-07-25 — commit
+  0da5f497
+
+**What shipped:** `openWithVaultScan` threw `DmBuildRequiredError` only AFTER the DM clicked "Sync now"
+when `existingById` was empty, surfacing as a late toast with no warning beforehand. `SyncPanel` now takes
+a `hasDmBuild` prop; when false it renders an inline amber note ("Rebuild in DM mode first — Sync merges
+against the full DM atlas.") right under the Sync button and disables the button, so the precondition is
+visible and actionable before the DM ever clicks Sync.
+
+**Implementation:**
+- `src/atlas/sync/SyncPanel.tsx`: new optional `hasDmBuild` prop (default `true`, so every existing
+  call site/test keeps its current behavior with zero changes). The Sync button's `disabled` condition
+  gained `|| !hasDmBuild`; the inline note renders only when `!hasDmBuild`.
+- `src/pages/AtlasPlacementEditor.tsx`: the `sync` panel mount now passes
+  `hasDmBuild={importExistingById.size > 0}` — reusing the same `existingById` map
+  `useMdImportFlow`'s `assertDmBuildLoaded` already checks, so the UI and the late-throw guard read the
+  identical signal.
+- Tests: `src/test/sync-panel.test.tsx` +2 cases (note shown + Sync disabled when `hasDmBuild=false`;
+  note absent + Sync enabled when `hasDmBuild=true`). The 7 pre-existing cases (none of which pass the new
+  prop) stayed green unmodified, confirming the default is backward-compatible.
+
+**Gate:** standard gate only (editor-only, `__INCLUDE_EDITOR__`-gated; no build/scan pipeline touched).
+typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2718 tests green (4 shards:
+676+581+794+667). Known non-real `onTaskUpdate` RPC worker-communication timeout in shard 3 (0 tests
+failed — same documented flake signature). Clean merge into `auto/continuous-dev` (no concurrent runs —
+origin tip matched the run's fork point at merge time, confirmed via `git fetch` immediately before
+merging).

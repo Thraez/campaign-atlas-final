@@ -170,13 +170,6 @@ is for sequencing, not the whole spec.
 
 #### Q-G — DM import & Obsidian fidelity
 
-- [ ] **Q55. Tell the DM up front when Sync needs a DM build loaded.**
-  `openWithVaultScan` throws `DmBuildRequiredError` only AFTER 'Sync now' is clicked when `existingById` is empty (`src/atlas/import/useMdImportFlow.ts:116-121`), surfacing as a late toast. Add a `hasDmBuild` boolean prop to `SyncPanel` (`src/atlas/sync/SyncPanel.tsx`) and thread it from `AtlasPlacementEditor` (mount at `AtlasPlacementEditor.tsx:1760`, which owns `existingById` → `existingById.size > 0`). When false, render an inline note near the Sync button: 'Rebuild in DM mode first — Sync merges against the full DM atlas.' Optionally disable the Sync button while false so the precondition is actionable before clicking.
-  - **Done when:** SyncPanel shows the inline precondition note when no DM build/entities are loaded, before the DM clicks Sync; `src/test/sync-panel.test.tsx` asserts the note renders for `hasDmBuild=false` and is absent for `true`.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Editor-only; no new capability — just moves the existing error message to where the DM can act on it.
-  ~1 run.
-
 
 #### Q-H — DM publish, backup & assets
 
