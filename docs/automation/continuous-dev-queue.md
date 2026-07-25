@@ -170,13 +170,6 @@ is for sequencing, not the whole spec.
 
 #### Q-F — DM editor ergonomics
 
-- [ ] **Q46. Show a '+N more' overflow indicator on validation chips.**
-  `ValidationChips` (src/atlas/tabs/ValidationChips.tsx) does `issues.slice(0, limit)` (default 5) and silently drops the rest, so a DM with 8 blocking issues sees only 5. When `issues.length > limit`, append a muted "+N more" row after the sliced chips (N = `issues.length - limit`), styled to sit under the blocking/warning chips (e.g. `text-muted-foreground text-[11px]`), non-interactive.
-  - **Done when:** rendering more than `limit` issues shows exactly `limit` chips plus a "+N more" row with the correct N; at or below the limit shows no extra row; a render test covers both cases.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Editor-only; single shared component used by the Regions/Routes/Fog tabs.
-  ~1 run.
-
 - [ ] **Q47. Add a 'No matches' empty state to the command palette.**
   `CommandPalette` (src/atlas/shell/CommandPalette.tsx) renders an empty `<ul>` (lines 61-78) when `results.length === 0`, leaving a blank void under the input. When `results.length === 0`, render a single muted row instead — e.g. `No matches for "{q}"` using `text-muted-foreground`, non-selectable — so the DM knows the search ran and found nothing. Keep the normal result list when there are matches.
   - **Done when:** typing a query with no matches shows the "No matches for …" row (query echoed) instead of an empty list; a render test asserts it appears only at zero results.

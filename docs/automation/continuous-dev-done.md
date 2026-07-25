@@ -1453,3 +1453,19 @@ failures). Editor-only (`__INCLUDE_EDITOR__`-gated) — no build/scan pipeline t
 not required. `manifest.json` churned LF→CRLF only after running tests (no content diff) — reverted
 before commit. Clean merge into `auto/continuous-dev` (no concurrent runs — origin tip matched the run's
 fork point at merge time, confirmed via `git fetch` immediately before merging).
+
+- [x] **Q46. Show a '+N more' overflow indicator on validation chips.** ✅ DONE 2026-07-25 — commit ae8021dd
+
+**Implementation:**
+- `src/atlas/tabs/ValidationChips.tsx`: after the sliced chip list, when `issues.length > limit` renders
+  a muted, non-interactive `+N more` row (`text-[11px] text-muted-foreground`) with `N = issues.length -
+  limit`. No row at or below the limit. Shared by all three call sites (Regions/Routes/Fog tabs) with no
+  per-tab change needed.
+- Tests: `src/test/atlas/ValidationChips.test.tsx` (2 cases — overflow row with correct N above the
+  limit; no row at or below the limit).
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2663 tests green (4 shards:
+666+577+771+649; pre-existing `onTaskUpdate` RPC flake in shard 3 confirmed via a clean re-run, 0 real
+failures both times). Editor-only (`__INCLUDE_EDITOR__`-gated) — no build/scan pipeline touched, so
+`atlas:publish` not required. Clean merge into `auto/continuous-dev` (no concurrent runs — origin tip
+matched the run's fork point at merge time, confirmed via `git fetch` immediately before merging).
