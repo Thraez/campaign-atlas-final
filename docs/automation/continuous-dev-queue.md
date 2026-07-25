@@ -170,13 +170,6 @@ is for sequencing, not the whole spec.
 
 #### Q-F — DM editor ergonomics
 
-- [ ] **Q44. Surface an undo/redo toast with the action label.**
-  `useUndoStack` records an optional per-action `label` (src/atlas/useUndoStack.ts:23-24, comment says "surfaced in tooltips") but `undo()`/`redo()` (lines 65-89) return `void` and never expose it. Change `undo()`/`redo()` to return the acted action's `label` (or undefined), and at the call sites — the undo/redo button handlers in AtlasPlacementEditor.tsx and the Ctrl+Z / Shift+Z path in useEditorKeyboardShortcuts.ts — show a brief sonner toast ("Undid: moved pin" / "Redid: draw region") when a label is present. Audit the existing `undoStack.push` sites and add a human `label` where missing.
-  - **Done when:** undoing/redoing a labelled action (button or keyboard) shows a toast with the label; unlabelled actions show a generic toast or none; a unit test asserts `undo()`/`redo()` return the acted label.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Editor-only; leverages the existing unused `label` field, low-risk.
-  ~2–3 runs.
-
 - [ ] **Q45. Add Shift-coarse / default-fine nudge with a visible step.**
   The pin-popover nudge arrows hardcode a 100-unit step via `onNudge?.(dx,dy)` (AtlasPlacementEditor.tsx:2462,2471,2479,2487) and RegionsTab.tsx has an equivalent region-translate control. Introduce a shared step constant (e.g. `NUDGE_FINE=100`, `NUDGE_COARSE=500`) and read `e.shiftKey` in each arrow's `onClick` so Shift nudges by the coarse step and a plain click stays fine — scale the existing direction vectors (up=(0,+step), left=(−step,0), etc.) so signs are preserved. Show the active step next to the "Nudge" label (:2455), e.g. a static "Shift = 500" hint or a live "Nudge (100/500)" indicator.
   - **Done when:** Shift+click on a nudge arrow moves by the coarse step and plain click by the fine step in both the pin popover and RegionsTab; the step size is visible in the UI; a test covers the fine-vs-coarse branch.

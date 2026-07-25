@@ -1390,3 +1390,35 @@ re-run on the merged tree (above) before pushing, not just on the pre-merge bran
 `manifest.json` churned LF→CRLF only after running tests (no content diff) — reverted before commit.
 Clean merge into `auto/continuous-dev` (no concurrent runs — origin tip matched the run's fork point at
 merge time, confirmed via `git fetch` immediately before merging).
+
+- [x] **Q44. Surface an undo/redo toast with the action label.** ✅ DONE 2026-07-25 — commit 7bc18bf8
+
+**Implementation:**
+- `src/atlas/useUndoStack.ts`: `undo()`/`redo()` now return the acted action's `label` (or `undefined`)
+  instead of `void`, so callers learn what was just undone/redone without any new state or duplicate
+  bookkeeping — the label was already recorded on `push`, just discarded at the read side.
+- `src/atlas/shell/useEditorKeyboardShortcuts.ts`: the Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z / Ctrl+Y handlers
+  now show a `sonner` `toast.info("Undid: <label>")` / `toast.info("Redid: <label>")` when a label is
+  present; unlabelled actions show no toast (keeps the noise-free stack entries, e.g. plain
+  `push({undo, redo})` calls in tests, silent).
+- `src/pages/AtlasPlacementEditor.tsx`: the toolbar Undo/Redo buttons' `onClick` handlers do the same —
+  capture the returned label and toast it, so the label surfaces identically whether the DM used the
+  keyboard or clicked the button.
+- Audited every `undoStack.push` site (`AtlasPlacementEditor.tsx`, `usePinOverrideMutations.ts`,
+  `useMapLayers.ts`, `useRouteDraft.ts`, `useRegionDraft.ts`, `useSoundscapeDraft.ts`, `useFogDraft.ts`):
+  all already pass a human label (`compute, label: string` is a required param at every wrapper, or a
+  fixed string like `"fog"`/`"save (cleared local drafts)"`) — no site needed a label added.
+- Tests: `src/test/use-undo-stack.test.tsx` gained 4 cases (undo/redo return the pushed label; both
+  return `undefined` for an unlabelled action and for an empty stack). `src/test/shell/
+  useEditorKeyboardShortcuts.test.ts` gained 3 cases (Ctrl+Z / Ctrl+Shift+Z toast the label via a mocked
+  `sonner`; Ctrl+Z shows no toast when the label is absent). The toolbar-button path reuses the identical
+  `undo()`/`redo()` contract already covered at the hook level, so no separate full-page render test was
+  added (`AtlasPlacementEditor.smoke.test.tsx` is deliberately kept shallow).
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2651 tests green (4 shards:
+663+572+769+647; pre-existing `onTaskUpdate` RPC flake in shards 1 and 3, no real failures). Editor-only
+(`__INCLUDE_EDITOR__`-gated) — no build/scan pipeline touched, so `atlas:publish` not required.
+`manifest.json` churned LF→CRLF only after running tests (no content diff) — reverted before commit.
+Clean merge into `auto/continuous-dev` (no concurrent runs — origin tip matched the run's fork point at
+merge time, confirmed via `git fetch` immediately before merging); typecheck re-verified on the merged
+tree before pushing.
