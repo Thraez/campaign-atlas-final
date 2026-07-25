@@ -68,11 +68,16 @@ export function parseFrontmatter(raw: string, sourcePath: string): ParsedFile {
     type: pickString(atlasRaw.type, data.type),
     world: typeof atlasRaw.world === "string" ? atlasRaw.world : undefined,
     visibility: undefined,
-    aliases: toStringArray(atlasRaw.aliases ?? data.aliases),
+    aliases: toStringArrayWarnIfCommaJammed(
+      atlasRaw.aliases ?? data.aliases,
+      "aliases",
+      sourcePath,
+      warnings,
+    ),
     images: toStringArray(atlasRaw.images),
     summary: pickString(atlasRaw.summary, data.summary),
     id: typeof atlasRaw.id === "string" ? atlasRaw.id : undefined,
-    tags: toStringArray(atlasRaw.tags ?? data.tags),
+    tags: toStringArrayWarnIfCommaJammed(atlasRaw.tags ?? data.tags, "tags", sourcePath, warnings),
     canon: typeof atlasRaw.canon === "string" ? atlasRaw.canon : undefined,
     date:
       typeof atlasRaw.date === "string"
@@ -113,6 +118,24 @@ function toStringArray(v: unknown): string[] {
   if (Array.isArray(v)) return v.filter((x) => typeof x === "string") as string[];
   if (typeof v === "string") return [v];
   return [];
+}
+
+// Same as toStringArray, but flags the common Obsidian authoring mistake of
+// writing a comma-separated scalar (`tags: npc, smuggler`) instead of a YAML
+// list — YAML parses that as ONE string, which silently becomes a single
+// bogus tag with no signal to the DM. Warn-only: the value is still wrapped
+// as a single-entry array (unchanged behavior) so nothing downstream needs to
+// tolerate a new split shape.
+function toStringArrayWarnIfCommaJammed(
+  v: unknown,
+  fieldName: string,
+  sourcePath: string,
+  warnings: string[],
+): string[] {
+  if (typeof v === "string" && v.includes(",")) {
+    warnings.push(`${sourcePath}: atlas.${fieldName} should be a YAML list — treated as one tag`);
+  }
+  return toStringArray(v);
 }
 
 // First non-empty string among candidates. Used to let vault files keep flat
