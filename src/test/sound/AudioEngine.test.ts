@@ -205,4 +205,59 @@ describe("AudioEngine", () => {
     // "e.ogg" (the most recent) is still in cache
     expect((eng as any).buffers.has("e.ogg")).toBe(true);
   });
+
+  it("keeps buffers capped at BUFFER_CAP even when the active buffer would otherwise be skipped from eviction", () => {
+    const ctx = makeMockCtx();
+    const eng = new AudioEngine(deps(ctx)) as any;
+
+    // Simulate an active bed whose buffer is the LEAST recently touched entry.
+    const activeBuffer = { duration: 30 };
+    eng.buffers.set("active.ogg", activeBuffer);
+    eng.lru.push("active.ogg");
+    eng.active = { id: "active-bed", source: { buffer: activeBuffer }, gain: {} };
+
+    // Load more distinct buffers than BUFFER_CAP (4) while the active bed is
+    // never re-touched — this is what pushes it to the front of the LRU.
+    for (const id of ["b", "c", "d", "e", "f", "g"]) {
+      eng.buffers.set(`${id}.ogg`, { duration: 30 });
+      eng.touch(`${id}.ogg`);
+    }
+
+    expect(eng.buffers.size).toBeLessThanOrEqual(4);
+    expect(eng.buffers.has("active.ogg")).toBe(true);
+    expect(eng.lru).toContain("active.ogg");
+  });
+
+  it("a crossfade superseded while decoding — the newer target wins", async () => {
+    const ctx = makeMockCtx();
+    let resolveA!: (v: ArrayBuffer) => void;
+    let resolveB!: (v: ArrayBuffer) => void;
+    const pendingA = new Promise<ArrayBuffer>((res) => {
+      resolveA = res;
+    });
+    const pendingB = new Promise<ArrayBuffer>((res) => {
+      resolveB = res;
+    });
+    const fetchAudio = vi.fn((url: string) => {
+      if (url.includes("a.ogg")) return pendingA;
+      if (url.includes("b.ogg")) return pendingB;
+      return Promise.resolve(new ArrayBuffer(8));
+    });
+    const d = { createContext: () => ctx, fetchAudio, canPlay: () => true };
+    const eng = new AudioEngine(d as any);
+    await eng.unlock();
+
+    const pA = eng.crossfadeTo({ id: "a", bed: { src: "a.ogg" } } as any);
+    const pB = eng.crossfadeTo({ id: "b", bed: { src: "b.ogg" } } as any);
+
+    // "b" resolves its decode first and becomes active...
+    resolveB(new ArrayBuffer(8));
+    await pB;
+    expect((eng as any).active?.id).toBe("b");
+
+    // ...then "a" resolves late and must be a no-op (superseded).
+    resolveA(new ArrayBuffer(8));
+    await pA;
+    expect((eng as any).active?.id).toBe("b");
+  });
 });
