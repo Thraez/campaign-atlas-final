@@ -312,6 +312,9 @@
   color: hsl(var(--muted-foreground));
   border-bottom: 1px dotted hsl(var(--muted-foreground) / 0.4);
 }
+.atlas-prose .atlas-wikilink-anchor {
+  color: inherit;
+}
 
 /* Credit badge — bottom-right corner over entity images */
 .atlas-credit-badge {
