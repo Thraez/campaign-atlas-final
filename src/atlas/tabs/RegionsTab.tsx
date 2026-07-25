@@ -25,6 +25,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { TabFrame } from "./TabFrame";
 import { ValidationChips } from "./ValidationChips";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { dumpYaml } from "@/atlas/yaml/dump";
 import type { RegionDraftAPI } from "@/atlas/regions/useRegionDraft";
 import { regionToYamlObject } from "@/atlas/regions/useRegionDraft";
@@ -232,17 +233,21 @@ export function RegionsTab({ project, map, api, blockingCount, warningCount, onF
                 >
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 w-6 p-0 text-destructive"
-                  title="Delete"
-                  onClick={() => {
-                    if (confirm(`Delete region "${selected.name}"?`)) remove(selected.id);
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                <ConfirmDialog
+                  trigger={
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0 text-destructive"
+                      title="Delete"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  }
+                  title={`Delete region "${selected.name}"?`}
+                  description="This can't be undone."
+                  onConfirm={() => remove(selected.id)}
+                />
               </div>
             </div>
 
