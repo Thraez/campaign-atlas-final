@@ -77,6 +77,27 @@ describe("hashAudioAssets", () => {
     const map = hashAudioAssets([], tmpDir);
     expect(map.size).toBe(0);
   });
+
+  it("skips an empty src without throwing (half-configured sound zone)", () => {
+    const areas = [area("")];
+    expect(() => hashAudioAssets(areas, tmpDir)).not.toThrow();
+    const map = hashAudioAssets(areas, tmpDir);
+    expect(map.size).toBe(0);
+  });
+
+  it("skips a whitespace-only src without throwing", () => {
+    const areas = [area("   ")];
+    expect(() => hashAudioAssets(areas, tmpDir)).not.toThrow();
+  });
+
+  it("skips a blank srcFallback without throwing", () => {
+    const areas: SoundArea[] = [
+      { id: "a", bed: { src: "atlas/assets/maps/tavern.ogg", srcFallback: "" } },
+    ];
+    const map = hashAudioAssets(areas, tmpDir);
+    expect(map.size).toBe(1);
+    expect(map.has("atlas/assets/maps/tavern.ogg")).toBe(true);
+  });
 });
 
 describe("rewriteAudioSrcs", () => {

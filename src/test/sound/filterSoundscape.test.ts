@@ -131,6 +131,26 @@ describe("filterSoundscapeForPlayer", () => {
     expect(result?.areas![0].regionId).toBe("region-forest");
   });
 
+  it("drops an area with no file chosen yet (blank bed.src)", () => {
+    const sc: SoundscapeConfig = {
+      areas: [
+        { id: "unconfigured", bed: { src: "" }, visibility: "player" },
+        makeArea("tavern", "player"),
+      ],
+    };
+    const result = filterSoundscapeForPlayer(sc);
+    expect(result?.areas).toHaveLength(1);
+    expect(result?.areas![0].id).toBe("area-0");
+  });
+
+  it("drops an area whose bed.src is whitespace-only", () => {
+    const sc: SoundscapeConfig = {
+      areas: [{ id: "unconfigured", bed: { src: "   " }, visibility: "player" }],
+    };
+    const result = filterSoundscapeForPlayer(sc);
+    expect(result?.areas).toHaveLength(0);
+  });
+
   it("preserves own points through the ...rest spread (sound-only polygon shape must survive)", () => {
     const pts: [number, number][] = [
       [0, 0],
