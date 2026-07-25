@@ -191,6 +191,36 @@ describe("RegionsTab — Selected region form", () => {
   });
 });
 
+describe("RegionsTab — Nudge whole region", () => {
+  it("plain click translates the selected region by the fine step", () => {
+    const region = makeRegion({ id: "r1", name: "Highland" });
+    const translate = vi.fn();
+    render(
+      <RegionsTab
+        project={makeProject()}
+        map={makeMap()}
+        api={makeMockApi({ effective: [region], selectedId: "r1", translate })}
+      />,
+    );
+    fireEvent.click(screen.getByText("↑"));
+    expect(translate).toHaveBeenCalledWith("r1", 0, 100);
+  });
+
+  it("Shift+click translates the selected region by the coarse step", () => {
+    const region = makeRegion({ id: "r1", name: "Highland" });
+    const translate = vi.fn();
+    render(
+      <RegionsTab
+        project={makeProject()}
+        map={makeMap()}
+        api={makeMockApi({ effective: [region], selectedId: "r1", translate })}
+      />,
+    );
+    fireEvent.click(screen.getByText("→"), { shiftKey: true });
+    expect(translate).toHaveBeenCalledWith("r1", 500, 0);
+  });
+});
+
 describe("RegionsTab — Validation chips", () => {
   it("validation chips absent when issues list is empty", () => {
     render(
