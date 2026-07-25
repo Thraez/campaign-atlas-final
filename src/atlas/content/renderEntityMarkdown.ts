@@ -8,11 +8,15 @@ export interface RenderOpts {
 
 const EMBED_RE = /!\[\[([^[\]\n]+?)\]\]/g;
 const WIKILINK_RE = /\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+?))?\]\]/g;
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|avif)$/i;
 
 export const DEFAULT_RESOLVE_ASSET = (n: string): string => `/atlas/assets/images/${n}`;
 
 /** Convert Obsidian image embed syntax to standard markdown img before the wikilink pass.
  *  Handles the optional pipe-alias: ![[image.png|Alt text]] → ![Alt text](resolved/image.png)
+ *  Non-image embeds (e.g. ![[Some Note]], ![[doc.pdf]]) are not transclusion — Obsidian note
+ *  embedding is an explicit non-goal — so they render an inert placeholder instead of a
+ *  broken <img> pointing at a note or document that was never an image asset.
  */
 export function resolveImageEmbeds(
   md: string,
@@ -22,6 +26,9 @@ export function resolveImageEmbeds(
     const pipeIdx = name.indexOf("|");
     const filename = (pipeIdx >= 0 ? name.slice(0, pipeIdx) : name).trim();
     const alt = (pipeIdx >= 0 ? name.slice(pipeIdx + 1) : name).trim();
+    if (!IMAGE_EXT_RE.test(filename)) {
+      return `<span class="atlas-embed-missing">embedded note not shown</span>`;
+    }
     return `![${alt}](${resolveAsset(filename)})`;
   });
 }
