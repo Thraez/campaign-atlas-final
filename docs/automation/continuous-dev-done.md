@@ -1486,3 +1486,40 @@ matched the run's fork point at merge time, confirmed via `git fetch` immediatel
 pipeline touched, `atlas:publish` not run. Clean merge into `auto/continuous-dev` (no concurrent runs —
 origin tip matched the run's fork point at merge time, confirmed via `git fetch` immediately before
 merging).
+
+- [x] **Q48. Resolve heading-anchor wikilinks in the navigable path (heading anchors only).** ✅ DONE 2026-07-25 — commit ddb9b3c3
+
+**Implementation:**
+- `src/atlas/content/parseWikilinks.ts` (`tokenizeWikilinks`): computes `filePart` = the target text
+  before the first `#` and resolves via `ctx.resolveByName(filePart)` instead of the full target, so
+  `[[Note#Heading]]` now renders a navigable `<a data-entity-id>` to Note in both player and DM builds
+  (all consumers — `build-atlas.ts`, `projectEntityForPlayer.ts`, `EntityPanes.tsx`,
+  `EntityReadingView.tsx` — share this one implementation, `scripts/atlas/parseWikilinks.ts` is just a
+  re-export). `[[Note#^blockid]]` resolves the note the same way — the block ref is never used for
+  resolution (explicit non-goal). `[[#Heading]]` (empty file part, same-note anchor) is never resolved
+  and renders an inert `<span class="atlas-wikilink-anchor">` (`renderLinkTokens`, keyed off
+  `link.target.startsWith("#")`) instead of the dead planned-link span. Display text falls back to the
+  file part (or the text after `#` for the empty-file-part anchor case) when no alias is given.
+  CRITICAL for safety: `link.target` is kept as the full original trimmed string (e.g.
+  `SecretNote#Heading`) unchanged, so the existing player leak-scan redaction regexes in
+  `build-atlas.ts:553-559` and `projectEntityForPlayer.ts:104-107` (both built from `l.target`) still
+  match and redact `[[SecretNote#Heading]]` verbatim.
+- `src/index.css`: added a minimal `.atlas-prose .atlas-wikilink-anchor { color: inherit; }` rule
+  alongside the existing planned-link styles.
+- Tests: `src/test/content/parseWikilinks.test.ts` gained 8 cases (heading-anchor resolve + alias +
+  unresolvable-file-part + same-note-anchor + block-ref + both render paths). `src/test/content/
+  projectEntityForPlayer-gaps.test.ts` gained 2 cases — a regression proving `[[SecretNote#Heading]]`
+  (dm-only) is redacted from `body`/`bodyHtml`/`links` through the player projection's existing
+  secret-leak path, and that a same-note `[[#Heading]]` anchor is never treated as a leak.
+  `parseWikilinks-parity.test.ts` and `projectEntityForPlayer-build-parity.test.ts` stayed green
+  unmodified.
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2674 tests green (4 shards:
+668+577+780+649; pre-existing `onTaskUpdate` RPC worker-communication timeout in shard 3, 0 tests failed
+— known flake signature, not a real failure). Touches the build pipeline (`parseWikilinks.ts` feeds
+`build-atlas.ts`) — `npm run atlas:publish:integrity-smoke` (all 5 planted faults still caught) and
+`npm run atlas:publish` (all 12 orchestrator scans clean; player build unaffected) both green. Build
+artifacts regenerated in the worktree during the publish gate (`atlas.json`/`search-index.json`
+version/publishedAt stamp, audio `manifest.json` LF/CRLF) were reverted before commit — no artifact
+diff carried into the merge. Clean merge into `auto/continuous-dev` (no concurrent runs — origin tip
+matched the run's fork point at merge time, confirmed via `git fetch` immediately before merging).
