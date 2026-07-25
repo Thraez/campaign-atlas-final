@@ -83,6 +83,7 @@ import { buildPaletteIndex } from "@/atlas/shell/useCommandPalette";
 import { EditorMenu } from "@/atlas/shell/EditorMenu";
 import { useEditorKeyboardShortcuts } from "@/atlas/shell/useEditorKeyboardShortcuts";
 import { WorldDetailsPanel } from "@/atlas/settings/WorldDetailsPanel";
+import { HelpPanel } from "@/atlas/shell/HelpPanel";
 import { AssetManagerPanel } from "@/atlas/assets/AssetManagerPanel";
 import { CategoryPanel } from "@/atlas/categories/CategoryPanel";
 import { PinStateBadge } from "@/atlas/pins/PinStateBadge";
@@ -1300,7 +1301,7 @@ function AtlasPlacementEditorInner() {
                   }}
                   onHelp={() => {
                     setMenuOpen(false);
-                    window.open("https://github.com", "_blank");
+                    setActivePanel("help");
                   }}
                 />
               </div>
@@ -1785,6 +1786,7 @@ function AtlasPlacementEditorInner() {
             characterKeys: activeWorldId ? (
               <CharacterKeysPanel worldDir={`content/${activeWorldId}`} />
             ) : null,
+            help: <HelpPanel />,
           };
           const counts: Record<string, number | undefined> = {
             pins: unplaced.length > 0 ? unplaced.length : undefined,
@@ -1798,6 +1800,7 @@ function AtlasPlacementEditorInner() {
             world: "World details",
             maps: "Map details",
             assets: "Assets",
+            help: "Keyboard shortcuts",
           };
           const activePanelNode = active?.panel ?? (activePanel ? panels[activePanel] : null);
           const activePanelTitle =
