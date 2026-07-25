@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { TabFrame } from "./TabFrame";
 import { ValidationChips } from "./ValidationChips";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { dumpYaml } from "@/atlas/yaml/dump";
 import { fogToYamlObject, type FogDraftAPI } from "@/atlas/fog/useFogDraft";
 
@@ -455,16 +456,17 @@ export function FogTab({
           <div className="flex items-center justify-between">
             <Label className="text-[10px]">Reveals ({fog.reveals.length})</Label>
             {fog.reveals.length > 0 && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 text-[10px] text-destructive"
-                onClick={() => {
-                  if (confirm("Clear all reveals?")) clearReveals();
-                }}
-              >
-                Clear all
-              </Button>
+              <ConfirmDialog
+                trigger={
+                  <Button size="sm" variant="ghost" className="h-6 text-[10px] text-destructive">
+                    Clear all
+                  </Button>
+                }
+                title="Clear all reveals?"
+                description="This can't be undone."
+                confirmLabel="Clear all"
+                onConfirm={clearReveals}
+              />
             )}
           </div>
           {fog.reveals.length === 0 && (
@@ -497,16 +499,17 @@ export function FogTab({
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <Label className="text-[10px]">Fog shapes ({fog.conceals!.length})</Label>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 text-[10px] text-destructive"
-                onClick={() => {
-                  if (confirm("Clear all fog shapes?")) clearConceals();
-                }}
-              >
-                Clear all
-              </Button>
+              <ConfirmDialog
+                trigger={
+                  <Button size="sm" variant="ghost" className="h-6 text-[10px] text-destructive">
+                    Clear all
+                  </Button>
+                }
+                title="Clear all fog shapes?"
+                description="This can't be undone."
+                confirmLabel="Clear all"
+                onConfirm={clearConceals}
+              />
             </div>
             {fog.conceals!.map((poly, i) => (
               <div
