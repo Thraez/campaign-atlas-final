@@ -1217,7 +1217,10 @@ function AtlasPlacementEditorInner() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => undoStack.undo()}
+          onClick={() => {
+            const label = undoStack.undo();
+            if (label) toast.info(`Undid: ${label}`);
+          }}
           disabled={!undoStack.canUndo}
           title="Undo (Ctrl/Cmd+Z)"
           aria-label="Undo"
@@ -1227,7 +1230,10 @@ function AtlasPlacementEditorInner() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => undoStack.redo()}
+          onClick={() => {
+            const label = undoStack.redo();
+            if (label) toast.info(`Redid: ${label}`);
+          }}
           disabled={!undoStack.canRedo}
           title="Redo (Ctrl/Cmd+Shift+Z)"
           aria-label="Redo"
