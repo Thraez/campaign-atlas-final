@@ -1,6 +1,7 @@
 // src/atlas/shell/useEditorKeyboardShortcuts.ts
 import { useEffect } from "react";
 import type { Dispatch, SetStateAction } from "react";
+import { toast } from "sonner";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
 
 export interface UseEditorKeyboardShortcutsArgs {
@@ -62,10 +63,12 @@ export function useEditorKeyboardShortcuts({
       const k = e.key.toLowerCase();
       if (k === "z" && !e.shiftKey) {
         e.preventDefault();
-        undoStack.undo();
+        const label = undoStack.undo();
+        if (label) toast.info(`Undid: ${label}`);
       } else if ((k === "z" && e.shiftKey) || k === "y") {
         e.preventDefault();
-        undoStack.redo();
+        const label = undoStack.redo();
+        if (label) toast.info(`Redid: ${label}`);
       }
     };
     window.addEventListener("keydown", onKey);

@@ -52,6 +52,46 @@ describe("useUndoStack", () => {
     expect(result.current.futureSize).toBe(0);
   });
 
+  it("undo() returns the acted action's label", () => {
+    const { result } = renderHook(() => useUndoStack());
+    act(() => result.current.push({ undo: () => {}, redo: () => {}, label: "moved pin" }));
+    let returned: string | undefined;
+    act(() => {
+      returned = result.current.undo();
+    });
+    expect(returned).toBe("moved pin");
+  });
+
+  it("redo() returns the acted action's label", () => {
+    const { result } = renderHook(() => useUndoStack());
+    act(() => result.current.push({ undo: () => {}, redo: () => {}, label: "moved pin" }));
+    act(() => result.current.undo());
+    let returned: string | undefined;
+    act(() => {
+      returned = result.current.redo();
+    });
+    expect(returned).toBe("moved pin");
+  });
+
+  it("undo() returns undefined for an unlabelled action", () => {
+    const { result } = renderHook(() => useUndoStack());
+    act(() => result.current.push({ undo: () => {}, redo: () => {} }));
+    let returned: string | undefined = "sentinel";
+    act(() => {
+      returned = result.current.undo();
+    });
+    expect(returned).toBeUndefined();
+  });
+
+  it("undo() returns undefined when the stack is empty", () => {
+    const { result } = renderHook(() => useUndoStack());
+    let returned: string | undefined = "sentinel";
+    act(() => {
+      returned = result.current.undo();
+    });
+    expect(returned).toBeUndefined();
+  });
+
   it("a new push clears the future stack (no more redo after a new branch)", () => {
     const { result } = renderHook(() => useUndoStack());
     const a = { undo: vi.fn(), redo: vi.fn(), label: "a" };
