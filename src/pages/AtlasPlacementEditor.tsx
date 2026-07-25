@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useMapLayers } from "@/atlas/useMapLayers";
+import { NudgeButtons } from "@/atlas/NudgeButtons";
 import { MapLayerPanel } from "@/atlas/MapLayerPanel";
 import { MapLayerEditableOverlay } from "@/atlas/MapLayerEditableOverlay";
 import { MapSettingsPanel } from "@/atlas/MapSettingsPanel";
@@ -2466,45 +2467,7 @@ function EntityRow({
                   />
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <Label className="text-[11px]">Nudge</Label>
-                <div className="grid grid-cols-3 gap-1 w-28">
-                  <span />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 text-xs p-0"
-                    onClick={() => onNudge?.(0, 100)}
-                  >
-                    ↑
-                  </Button>
-                  <span />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 text-xs p-0"
-                    onClick={() => onNudge?.(-100, 0)}
-                  >
-                    ←
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 text-xs p-0"
-                    onClick={() => onNudge?.(0, -100)}
-                  >
-                    ↓
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 text-xs p-0"
-                    onClick={() => onNudge?.(100, 0)}
-                  >
-                    →
-                  </Button>
-                </div>
-              </div>
+              <NudgeButtons onNudge={(dx, dy) => onNudge?.(dx, dy)} />
               {otherMaps && otherMaps.length > 0 && onDuplicateToMap && (
                 <div className="space-y-1 pt-1 border-t border-border">
                   <Label className="text-[11px]">Duplicate to map</Label>
