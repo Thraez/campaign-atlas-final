@@ -987,7 +987,13 @@ function AtlasPlacementEditorInner() {
       (entityEditDraft.isDirty() ? 1 : 0),
   });
 
-  useEditorKeyboardShortcuts({ undoStack, pendingId, setPendingId });
+  useEditorKeyboardShortcuts({
+    undoStack,
+    pendingId,
+    setPendingId,
+    onSave: onSaveClick,
+    canSave: !(saveModalOpen || session.status === "clean"),
+  });
 
   // Project-wide validation, scoped per tab so each tab badge shows its own counts.
   const draftPlacementsForValidation = useMemo(
