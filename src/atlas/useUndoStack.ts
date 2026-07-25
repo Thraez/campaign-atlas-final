@@ -20,17 +20,19 @@ export interface UndoAction {
   undo: () => void;
   /** Re-applies the mutation. */
   redo: () => void;
-  /** Optional debug label, surfaced in tooltips. */
+  /** Optional human label, surfaced in the undo/redo toast. */
   label?: string;
 }
 
 export interface UndoStackAPI {
   /** Record a new action and clear any pending redo entries. */
   push: (action: UndoAction) => void;
-  /** Pop the most recent past action, invoke its undo(), park it in future. */
-  undo: () => void;
-  /** Pop the most recent future action, invoke its redo(), park it in past. */
-  redo: () => void;
+  /** Pop the most recent past action, invoke its undo(), park it in future.
+   *  Returns the acted action's label, if it had one. */
+  undo: () => string | undefined;
+  /** Pop the most recent future action, invoke its redo(), park it in past.
+   *  Returns the acted action's label, if it had one. */
+  redo: () => string | undefined;
   /** Wipe both stacks. */
   clear: () => void;
   canUndo: boolean;
@@ -64,7 +66,7 @@ export function useUndoStack(cap: number = DEFAULT_CAP): UndoStackAPI {
 
   const undo = useCallback(() => {
     const stack = pastRef.current;
-    if (stack.length === 0) return;
+    if (stack.length === 0) return undefined;
     const last = stack[stack.length - 1];
     const nextPast = stack.slice(0, -1);
     const nextFuture = [...futureRef.current, last];
@@ -73,11 +75,12 @@ export function useUndoStack(cap: number = DEFAULT_CAP): UndoStackAPI {
     setPast(nextPast);
     setFuture(nextFuture);
     last.undo();
+    return last.label;
   }, []);
 
   const redo = useCallback(() => {
     const stack = futureRef.current;
-    if (stack.length === 0) return;
+    if (stack.length === 0) return undefined;
     const last = stack[stack.length - 1];
     const nextFuture = stack.slice(0, -1);
     const nextPast = [...pastRef.current, last];
@@ -86,6 +89,7 @@ export function useUndoStack(cap: number = DEFAULT_CAP): UndoStackAPI {
     setPast(nextPast);
     setFuture(nextFuture);
     last.redo();
+    return last.label;
   }, []);
 
   const clear = useCallback(() => {
