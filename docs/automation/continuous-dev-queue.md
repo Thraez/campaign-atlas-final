@@ -170,13 +170,6 @@ is for sequencing, not the whole spec.
 
 #### Q-F — DM editor ergonomics
 
-- [ ] **Q42. Replace native confirm() dialogs with an in-app confirm.**
-  Extract a reusable `ConfirmDialog` (model it on `DiscardConfirmModal`, src/atlas/session/DiscardConfirmModal.tsx — safe/cancel action default-focused, Esc dismisses) and swap it in for the four browser `confirm()` guards on destructive actions: delete region (RegionsTab.tsx:241), delete route (RoutesTab.tsx:294), clear all reveals (FogTab.tsx:463), clear all fog shapes (FogTab.tsx:505). Each action must run only after in-app confirmation.
-  - **Done when:** none of those four sites call `window.confirm`; each shows the in-app `ConfirmDialog` and only deletes/clears on confirm; a render test covers confirm + cancel for at least one site.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Editor-only; the FogTab swap is pure confirmation UI — no fog redaction logic or shipped artifact changes, so no atlas:publish needed.
-  ~2–3 runs.
-
 - [ ] **Q43. Replace placeholder Help link with an in-editor shortcuts panel.**
   The Help menu currently does `window.open("https://github.com","_blank")` (AtlasPlacementEditor.tsx:1297). Change the `onHelp` handler to `setActivePanel("help")`, add a `"help"` key to the `panels` record (src/pages/AtlasPlacementEditor.tsx:1347) rendering a small Help panel node, and a title in `menuPanelTitle` (:1791, e.g. `help: "Keyboard shortcuts"`). EditorMenu already exposes the `help` id wired to `onHelp` (EditorMenu.tsx:16,37) and `EditorPanelHost` already renders `panels[activePanel]`. The panel lists the editor shortcuts (Cmd+K palette, Cmd+Z / Shift+Cmd+Z / Ctrl+Y undo/redo, Esc cancel placement, plus any new Save/format shortcuts) and a few quick-start tips.
   - **Done when:** clicking Help opens an in-editor panel (no external browser tab); the panel lists the current shortcuts; `window.open` is removed from `onHelp`.

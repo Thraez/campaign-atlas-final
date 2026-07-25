@@ -1331,3 +1331,38 @@ competing for CPU at the same time; no real failures). Editor-only (`__INCLUDE_E
 build/scan pipeline touched, so `atlas:publish` not required. Same worktree deviation as Q40 (built
 directly in the main working copy); confirmed via `git worktree list` that the concurrent scheduled run
 was isolated in its own worktree/directory, so no filesystem collision occurred.
+
+- [x] **Q42. Replace native confirm() dialogs with an in-app confirm.** ✅ DONE 2026-07-25 — commit 702c6067
+
+**Implementation:**
+- `src/atlas/tabs/ConfirmDialog.tsx` (new): a reusable confirm built on the existing Radix
+  `AlertDialog` primitives (`src/components/ui/alert-dialog.tsx`, already used once in
+  `MapLayerPanel.tsx`) rather than hand-rolled like `DiscardConfirmModal` — this gets default-focus on
+  Cancel and Escape-to-dismiss for free from Radix (verified: `AlertDialogContent`'s
+  `onOpenAutoFocus` focuses the Cancel ref; Escape closes via the underlying Dialog primitive), which
+  neither reinvents nor inherits the gap flagged in nice-to-have N128 (`DiscardConfirmModal` itself has
+  no Escape handler / focus trap). Takes `trigger`, `title`, `description`, optional
+  `confirmLabel`/`cancelLabel`, and `onConfirm`; wraps `AlertDialog` + `AlertDialogTrigger asChild` so
+  each call site just swaps its old `<Button onClick={() => confirm(...) && action()}>` for
+  `<ConfirmDialog trigger={<Button .../>} .../>` with no local open-state needed.
+- Swapped in at all four cited sites: `RegionsTab.tsx` (delete region), `RoutesTab.tsx` (delete route),
+  `FogTab.tsx` (clear all reveals, clear all fog shapes). No `window.confirm` calls remain in any of
+  the four.
+- Tests: `src/test/tabs/ConfirmDialog.test.tsx` (new) — closed until trigger click, title/description
+  render, Cancel closes without calling `onConfirm`, confirm action calls `onConfirm`, Escape dismisses
+  without calling `onConfirm`, custom confirm/cancel labels render. `src/test/tabs/RegionsTab.test.tsx`
+  gained an integration pair on the delete-region site — trigger opens the dialog and Cancel leaves
+  `remove` uncalled; trigger then confirm calls `remove(id)`.
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2641 tests green (4 shards:
+663+568+769+641; pre-existing `onTaskUpdate` RPC flake in shards 1 and 3, no real failures — re-run
+after merging Q41 on top since this run forked its worktree from the pre-Q41 tip). Editor-only
+(`__INCLUDE_EDITOR__`-gated) — no build/scan pipeline touched, so `atlas:publish` not required.
+
+**Concurrency note:** this run's worktree (`run/q42-confirm-dialog`) forked from `auto/continuous-dev`
+before an interactive session merged Q41 on top. Confirmed via `git worktree list` there was no
+filesystem collision (separate directories); re-fetched origin before merging and merged
+`run/q42-confirm-dialog` onto the current `a4f92fbe` tip (post-Q41) rather than the stale fork point —
+a clean 3-way merge with no conflicts (Q41 touched `EntityEditPanel.tsx`/`FormatToolbar.tsx`; Q42
+touched `ConfirmDialog.tsx`/`RegionsTab.tsx`/`RoutesTab.tsx`/`FogTab.tsx` — disjoint). Full gate
+re-run on the merged tree (above) before pushing, not just on the pre-merge branch.
