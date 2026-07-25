@@ -1225,3 +1225,20 @@ browser leaves a clean state instead of a dead mute button.
 **Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2607 tests green (4 shards;
 pre-existing `onTaskUpdate` RPC flake in shards 1 and 3) · `npm run atlas:publish:integrity-smoke`
 5/5 scans green.
+
+- [x] **X2. A sound zone with no file chosen yet crashes the entire player build.** ✅ DONE 2026-07-25 — commit 617789e9
+
+**Implementation:**
+- `scripts/atlas/hashAudioAssets.ts`: `hashAudioAssets` now skips blank/whitespace `bed.src` and
+  `bed.srcFallback` when collecting files to copy/hash, instead of trying to read them (the previous
+  `path.join(publicDir, "")` resolved to the public dir itself and threw `EISDIR`).
+- `scripts/atlas/filterSoundscape.ts`: `filterSoundscapeForPlayer` now also drops any area with no
+  file chosen yet (blank/whitespace `bed.src`) before it ever reaches `hashAudioAssets`, so a
+  half-configured sound zone is simply omitted from the player build.
+- `src/test/sound/hashAudioAssets.test.ts` + `src/test/sound/filterSoundscape.test.ts`: new tests
+  cover the empty/whitespace-src cases; reproduced the `EISDIR` crash first (TDD), confirmed the fix
+  after.
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2612 tests green (4 shards;
+pre-existing `onTaskUpdate` RPC flake in shard 3) · `npm run atlas:publish:integrity-smoke` 5/5
+scans green.

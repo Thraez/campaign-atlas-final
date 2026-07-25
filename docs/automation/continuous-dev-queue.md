@@ -43,10 +43,7 @@ is for sequencing, not the whole spec.
 
 - [x] **X1. Ambient sound 404s in every build — `audioUrl` double-prefixes an already-pathed `src`.** ✅ DONE 2026-07-25 — commit d82d8ba9
 
-- [ ] **X2. A sound zone with no file chosen yet crashes the entire player build.** _(was N97; ~1 run)_
-  A ride-on area and a fresh sound-only zone default to `bed: { src: "" }` (`src/atlas/sound-editor/useSoundscapeDraft.ts:207,193`), and a missing file is only a non-blocking warning. But `hashAudioAssets` does `readFileSync(path.join(publicDir, ""))` for an empty src — that resolves to the public dir itself and throws `EISDIR`, and `scripts/build-atlas.ts:822` has no try/catch around it, so the whole player build aborts.
-  - **Done when:** `hashAudioAssets` skips empty/whitespace `src` (and `srcFallback`); a player build with a half-configured sound zone completes and simply omits that bed; a test covers the empty-src case.
-  - **Gate:** standard gate; also `npm run atlas:publish:integrity-smoke`.
+- [x] **X2. A sound zone with no file chosen yet crashes the entire player build.** ✅ DONE 2026-07-25 — commit 617789e9
 
 - [ ] **X3. A ride-on sound on a DM-only region can survive into the player build.** _(was N98; ~2 runs)_
   `filterSoundscapeForPlayer` keeps any area where `!a.visibility || PLAYER_VISIBLE.has(a.visibility)` (`scripts/atlas/filterSoundscape.ts`), but ride-on areas are created with **no** `visibility` field (`{ id, regionId, bed }`, `useSoundscapeDraft.ts:207`) — the comment claims they "inherit the region's visibility," yet the filter never resolves the region. So ambient sound authored on a secret region isn't dropped for players (a subtle location/existence leak). Fix: resolve a ride-on area's effective visibility from its `regionId` and drop it when the region isn't player-visible; drop areas whose `regionId` no longer exists in the player build.
