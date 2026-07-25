@@ -205,6 +205,95 @@ describe("tokenizeWikilinks — heading-anchor wikilinks (Q48)", () => {
   });
 });
 
+describe("tokenizeWikilinks — folder-path wikilinks resolve by basename (Q49)", () => {
+  const RESOLVE_BY_BASENAME_UNIQUE = (n: string): string | undefined =>
+    n.toLowerCase() === "tidemarrow" ? "tidemarrow" : undefined;
+
+  it("[[Folder/Note]] with an unresolved full string rescues via resolveByBasename", () => {
+    const { links } = tokenizeWikilinks("[[02_Regions/Tidemarrow]]", {
+      resolveByName: RESOLVE_KNOWN,
+      resolveByBasename: RESOLVE_BY_BASENAME_UNIQUE,
+    });
+    expect(links[0].target).toBe("02_Regions/Tidemarrow");
+    expect(links[0].display).toBe("02_Regions/Tidemarrow");
+    expect(links[0].resolvedId).toBe("tidemarrow");
+    expect(links[0].broken).toBe(false);
+  });
+
+  it("no resolveByBasename provided → folder-path link stays broken (backward compatible)", () => {
+    const { links } = tokenizeWikilinks("[[02_Regions/Tidemarrow]]", { resolveByName: RESOLVE_KNOWN });
+    expect(links[0].resolvedId).toBeUndefined();
+    expect(links[0].broken).toBe(true);
+  });
+
+  it("resolveByBasename returning undefined (ambiguous basename) leaves the link broken — no wrong-note resolution", () => {
+    const { links } = tokenizeWikilinks("[[02_Regions/Tidemarrow]]", {
+      resolveByName: RESOLVE_KNOWN,
+      resolveByBasename: () => undefined,
+    });
+    expect(links[0].resolvedId).toBeUndefined();
+    expect(links[0].broken).toBe(true);
+    expect(links[0].target).toBe("02_Regions/Tidemarrow");
+  });
+
+  it("already-resolving full-string target is unaffected by resolveByBasename (never called)", () => {
+    let basenameCalls = 0;
+    const { links } = tokenizeWikilinks("[[Corven]]", {
+      resolveByName: RESOLVE_KNOWN,
+      resolveByBasename: () => {
+        basenameCalls += 1;
+        return undefined;
+      },
+    });
+    expect(links[0].resolvedId).toBe("corven");
+    expect(basenameCalls).toBe(0);
+  });
+
+  it("a target with no '/' never triggers the basename fallback, even when unresolved", () => {
+    let basenameCalls = 0;
+    const { links } = tokenizeWikilinks("[[Ghost Town]]", {
+      resolveByName: RESOLVE_KNOWN,
+      resolveByBasename: () => {
+        basenameCalls += 1;
+        return "should-not-be-used";
+      },
+    });
+    expect(links[0].resolvedId).toBeUndefined();
+    expect(links[0].broken).toBe(true);
+    expect(basenameCalls).toBe(0);
+  });
+
+  it("[[Folder/Note|Alias]] keeps the explicit alias as display when rescued via basename", () => {
+    const { links } = tokenizeWikilinks("[[02_Regions/Tidemarrow|the coastal city]]", {
+      resolveByName: RESOLVE_KNOWN,
+      resolveByBasename: RESOLVE_BY_BASENAME_UNIQUE,
+    });
+    expect(links[0].display).toBe("the coastal city");
+    expect(links[0].resolvedId).toBe("tidemarrow");
+  });
+
+  it("nested folder path resolves via the trailing segment only", () => {
+    const { links } = tokenizeWikilinks("[[World/02_Regions/Tidemarrow]]", {
+      resolveByName: RESOLVE_KNOWN,
+      resolveByBasename: RESOLVE_BY_BASENAME_UNIQUE,
+    });
+    expect(links[0].resolvedId).toBe("tidemarrow");
+  });
+
+  it("target is a bare trailing slash ([[Folder/]]) never calls resolveByBasename with an empty string", () => {
+    let seenArg: string | undefined;
+    const { links } = tokenizeWikilinks("[[Folder/]]", {
+      resolveByName: RESOLVE_KNOWN,
+      resolveByBasename: (n) => {
+        seenArg = n;
+        return undefined;
+      },
+    });
+    expect(seenArg).toBeUndefined();
+    expect(links[0].broken).toBe(true);
+  });
+});
+
 describe("renderLinkTokens — planned-link cross-surface (N26)", () => {
   const RESOLVE = (n: string) => (n === "Corven" ? "corven" : undefined);
 
