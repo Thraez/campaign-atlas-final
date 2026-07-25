@@ -170,13 +170,6 @@ is for sequencing, not the whole spec.
 
 #### Q-G — DM import & Obsidian fidelity
 
-- [ ] **Q53. Don't offer a visibility choice on new-import rows that is silently ignored.**
-  `buildImportChanges` (`src/atlas/import/buildImportChanges.ts:88-91`) forces create/path-collision rows to visibility `dm` unless `row.needsReview?.reason === 'secrecy-increase'`, but the modal's Visibility `<Select>` (`src/atlas/import/ImportStagingModal.tsx:201-221`) is only disabled for `update` rows (line 204-206) — so a DM who picks `player` on a create row is silently overwritten to `dm`. Extend the `disabled` condition to also disable the Select for `create` AND `path-collision` rows EXCEPT secrecy-increase-review rows, and add a title/tooltip: 'New imports are saved DM-only for safety — publish later in the editor.'
-  - **Done when:** the Visibility Select is disabled (with tooltip) on create/path-collision rows and still enabled on secrecy-increase review rows; the write logic in `buildImportChanges` is unchanged; `src/test/import-staging-modal.test.tsx` asserts the disabled state + tooltip.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  UI-only and strictly tightens the player-secrecy line — never lets a create row ship as `player`. Visibility option list stays sourced from `visibility.ts`.
-  ~1 run.
-
 - [ ] **Q54. Warn when frontmatter tags/aliases are a comma-jammed scalar string.**
   `toStringArray` (`scripts/atlas/parseFrontmatter.ts:111-116`) turns a scalar like `tags: npc, smuggler` into a single bogus tag `['npc, smuggler']` with no signal, silently corrupting tag-based filtering/inference. In `parseFrontmatter`, when `atlas.tags` / `data.tags` (line 75) or `aliases` (line 71) arrive as a single comma-containing string, push a build warning into the existing `warnings` array (e.g. 'atlas.tags should be a YAML list — treated as one tag'); optionally split on commas, kept behind the warning. Surface the same signal in the import staging extraction (`src/atlas/import/stagingState.ts`).
   - **Done when:** a comma-jammed tags/aliases scalar produces a build warning; already-list tags/aliases are untouched (test); `src/test/atlas-import.test.ts` covers the warning (and the split, if implemented).

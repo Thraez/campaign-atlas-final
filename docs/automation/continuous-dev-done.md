@@ -1641,3 +1641,32 @@ worker-communication timeout appeared in shard 1 this run (0 tests failed — sa
 signature as prior runs, just a different shard this time). Clean merge into `auto/continuous-dev` (no
 concurrent runs — origin tip matched the run's fork point at merge time, confirmed via `git fetch`
 immediately before merging).
+
+- [x] **Q53. Don't offer a visibility choice on new-import rows that is silently ignored.** ✅ DONE
+  2026-07-25 — commit 75ef0b58
+
+**What shipped:** `buildImportChanges` forces create/path-collision rows to `dm` visibility unless the row
+was flagged `needsReview.reason === "secrecy-increase"`, but `ImportStagingModal`'s Visibility `<Select>`
+was only disabled for `update` rows — a DM who picked `player` on a create row had it silently overwritten
+back to `dm` at commit time with no indication. The Select is now also disabled on `create` and
+`path-collision` rows (unless flagged for secrecy-increase review), with a `title` tooltip: "New imports
+are saved DM-only for safety — publish later in the editor." Update-row behavior (including the existing
+secrecy-increase-review enabled case) is unchanged.
+
+**Implementation:**
+- `src/atlas/import/ImportStagingModal.tsx`: the Visibility `<Select>` cell now computes
+  `visibilityLocked = (rowKind === "create" || rowKind === "path-collision") &&
+  needsReview?.reason !== "secrecy-increase"` and adds it to the existing `disabled` condition; the
+  `SelectTrigger` gets a conditional `title` when locked. `buildImportChanges` (the write path) is
+  untouched — this is purely surfacing the existing forced-visibility rule in the UI.
+- Tests: `src/test/import-staging-modal.test.tsx` +2 cases (create row disabled + tooltip text,
+  path-collision row disabled + tooltip text). The pre-existing 13 cases (including the "regular
+  (non-vault) update row — visibility select is enabled" and "needsReview row" cases) stayed green
+  unmodified.
+
+**Gate:** standard gate only (editor-only, `__INCLUDE_EDITOR__`-gated; no build/scan pipeline touched).
+typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2705 tests green (4 shards:
+671+579+788+667). Known non-real `onTaskUpdate` RPC worker-communication timeout appeared in shard 1
+again this run (0 tests failed — same documented flake signature). Clean merge into `auto/continuous-dev`
+(no concurrent runs — origin tip matched the run's fork point at merge time, confirmed via `git fetch`
+immediately before merging).
