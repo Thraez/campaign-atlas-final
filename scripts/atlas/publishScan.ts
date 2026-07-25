@@ -22,7 +22,7 @@ import { run as runFogSafety } from "../check-fog-safety";
 import { run as runAuditAssets } from "./audit-assets";
 import type { PublishScanReason } from "./publishTypes";
 
-const MSG: Record<PublishScanReason["scan"], string> = {
+export const MSG: Record<PublishScanReason["scan"], string> = {
   "check-no-secrets-dm":
     "A DM-only note would have been visible to players. Publishing is blocked until it's hidden.",
   "check-no-secrets-editor":
@@ -36,7 +36,7 @@ const MSG: Record<PublishScanReason["scan"], string> = {
   "check-artifact-shape":
     "The world file came out malformed — the build needs attention before publishing.",
   "audit-assets":
-    "An image is referenced but missing (or an unused image needs cleanup). Publishing is blocked.",
+    "An image is larger than the 4 MB limit and must be optimized before publishing.",
 };
 
 export function reasonsFromNoSecrets(r: ScanResult, target: string): PublishScanReason[] {
