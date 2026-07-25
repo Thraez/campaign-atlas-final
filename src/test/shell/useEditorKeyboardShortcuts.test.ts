@@ -1,10 +1,13 @@
 // src/test/shell/useEditorKeyboardShortcuts.test.ts
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
+import { toast } from "sonner";
 import { useEditorKeyboardShortcuts } from "@/atlas/shell/useEditorKeyboardShortcuts";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
 
-function fakeUndoStack(): UndoStackAPI {
+vi.mock("sonner", () => ({ toast: { info: vi.fn() } }));
+
+function fakeUndoStack(overrides: Partial<UndoStackAPI> = {}): UndoStackAPI {
   return {
     push: vi.fn(),
     undo: vi.fn(),
@@ -14,6 +17,7 @@ function fakeUndoStack(): UndoStackAPI {
     canRedo: false,
     pastSize: 0,
     futureSize: 0,
+    ...overrides,
   };
 }
 
@@ -94,6 +98,39 @@ describe("useEditorKeyboardShortcuts", () => {
     dispatchKey({ key: "y", ctrlKey: true });
     expect(undoStack.redo).toHaveBeenCalledTimes(1);
     expect(undoStack.undo).not.toHaveBeenCalled();
+  });
+
+  it("Ctrl+Z shows a toast with the undone action's label", () => {
+    const undoStack = fakeUndoStack({ undo: vi.fn().mockReturnValue("moved pin") });
+    const setPendingId = vi.fn();
+    const onSave = vi.fn();
+    renderHook(() =>
+      useEditorKeyboardShortcuts({ undoStack, pendingId: null, setPendingId, onSave, canSave: true }),
+    );
+    dispatchKey({ key: "z", ctrlKey: true });
+    expect(toast.info).toHaveBeenCalledWith("Undid: moved pin");
+  });
+
+  it("Ctrl+Shift+Z shows a toast with the redone action's label", () => {
+    const undoStack = fakeUndoStack({ redo: vi.fn().mockReturnValue("moved pin") });
+    const setPendingId = vi.fn();
+    const onSave = vi.fn();
+    renderHook(() =>
+      useEditorKeyboardShortcuts({ undoStack, pendingId: null, setPendingId, onSave, canSave: true }),
+    );
+    dispatchKey({ key: "z", ctrlKey: true, shiftKey: true });
+    expect(toast.info).toHaveBeenCalledWith("Redid: moved pin");
+  });
+
+  it("Ctrl+Z shows no toast when the undone action has no label", () => {
+    const undoStack = fakeUndoStack({ undo: vi.fn().mockReturnValue(undefined) });
+    const setPendingId = vi.fn();
+    const onSave = vi.fn();
+    renderHook(() =>
+      useEditorKeyboardShortcuts({ undoStack, pendingId: null, setPendingId, onSave, canSave: true }),
+    );
+    dispatchKey({ key: "z", ctrlKey: true });
+    expect(toast.info).not.toHaveBeenCalled();
   });
 
   it("skips undo/redo when the event target is an editable element (input)", () => {
