@@ -80,4 +80,22 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
     render(<SyncPanel onSync={vi.fn()} />);
     await waitFor(() => expect(screen.getByText(/Last synced:/i)).toBeTruthy());
   });
+
+  it("shows a DM-build-required note and disables Sync when hasDmBuild is false", async () => {
+    mockLoad.mockResolvedValue({ vaultPath: "/Vault" });
+    render(<SyncPanel onSync={vi.fn()} hasDmBuild={false} />);
+    await waitFor(() =>
+      expect(screen.getByText(/Rebuild in DM mode first/i)).toBeTruthy(),
+    );
+    expect(screen.getByRole("button", { name: /sync now/i })).toBeDisabled();
+  });
+
+  it("does not show the DM-build-required note when hasDmBuild is true", async () => {
+    mockLoad.mockResolvedValue({ vaultPath: "/Vault" });
+    render(<SyncPanel onSync={vi.fn()} hasDmBuild={true} />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /sync now/i })).not.toBeDisabled(),
+    );
+    expect(screen.queryByText(/Rebuild in DM mode first/i)).toBeNull();
+  });
 });
