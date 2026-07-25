@@ -1613,3 +1613,31 @@ and again by the pre-commit hook's `vitest run --changed` (`atlas.json`/`search-
 version/publishedAt stamp, audio `manifest.json` LF/CRLF) were reverted each time before/after commit — no
 artifact diff carried into the merge. Clean merge into `auto/continuous-dev` (no concurrent runs — origin
 tip matched the run's fork point at merge time, confirmed via `git fetch` immediately before merging).
+
+- [x] **Q52. Expand folder-name to entity-type inference coverage.** ✅ DONE 2026-07-25 — commit 3a6c98d7
+
+**What shipped:** `FOLDER_TYPE_MAP` (`src/atlas/import/inferType.ts`) was missing many common vault folder
+names that `TAG_TYPE_MAP` (`inferTypeFromTags.ts`) and `categoryForType` (`entityCategory.ts`) already
+understand, so notes under folders like `Cities/`, `Temples/`, `People/` fell through to the generic
+`"note"` type instead of a specific one. Added plural+singular mappings: cities/city→city,
+towns/town→town, villages/village→village, temples/temple→temple, shops/shop→shop, caves/cave→cave,
+ports/port→port, people/persons/person→person, places/place/landmarks/landmark→location,
+capitals/capital→capital, guilds/guild/organizations/organization/organisations/organisation→faction,
+deities/deity/gods/god→deity — reusing the exact same type strings `categoryForType` already recognizes
+(`person` and `deity` are literal type keys there; `deity`/`god` fall through to the default `lore`
+category, which the queue entry called out as acceptable). No change to `categoryForType`/
+`entityCategory.ts` itself.
+
+**Implementation:**
+- `src/atlas/import/inferType.ts`: 30 new entries added to `FOLDER_TYPE_MAP`; `inferTypeFromPath`'s
+  walk-parents-closest-wins logic is untouched.
+- Tests: `src/test/infer-type.test.ts` gained 13 new cases, one per new type group, each covering both the
+  plural and singular (and British-spelling, for faction) folder spellings.
+
+**Gate:** standard gate only (no build-pipeline change — `inferType.ts` is import/editor-side, not
+consumed by `build-atlas.ts` or `projectEntityForPlayer.ts`). typecheck clean · eslint 0 errors (18
+pre-existing warnings) · 2703 tests green (4 shards: 671+577+788+667). Known non-real `onTaskUpdate` RPC
+worker-communication timeout appeared in shard 1 this run (0 tests failed — same documented flake
+signature as prior runs, just a different shard this time). Clean merge into `auto/continuous-dev` (no
+concurrent runs — origin tip matched the run's fork point at merge time, confirmed via `git fetch`
+immediately before merging).

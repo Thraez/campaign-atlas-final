@@ -170,12 +170,6 @@ is for sequencing, not the whole spec.
 
 #### Q-G — DM import & Obsidian fidelity
 
-- [ ] **Q52. Expand folder-name to entity-type inference coverage.**
-  `FOLDER_TYPE_MAP` (`src/atlas/import/inferType.ts:9-31`) is missing many common vault folder names that `inferTypeFromTags` (`TAG_TYPE_MAP`) and `categoryForType` already understand. Add plural+singular mappings — cities→city, towns→town, villages→village, temples→temple, shops→shop, caves→cave, ports→port, people/persons→person, places/landmarks→location, capitals→capital, guilds/organizations→faction, deities/gods→deity — reusing the SAME type strings `TAG_TYPE_MAP` emits so folder and tag signals stay consistent. (Note: `deity`/`god` resolve to the `lore` category via `categoryForType`, which is acceptable; everything else maps to characters/locations/factions as expected.)
-  - **Done when:** a note under `Cities/`, `Temples/`, `Ports/`, `People/`, etc. infers the mapped type instead of falling through to `note`; `src/test/infer-type.test.ts` is extended for the new folders; no change to `categoryForType`/`entityCategory.ts`.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  ~1 run.
-
 - [ ] **Q53. Don't offer a visibility choice on new-import rows that is silently ignored.**
   `buildImportChanges` (`src/atlas/import/buildImportChanges.ts:88-91`) forces create/path-collision rows to visibility `dm` unless `row.needsReview?.reason === 'secrecy-increase'`, but the modal's Visibility `<Select>` (`src/atlas/import/ImportStagingModal.tsx:201-221`) is only disabled for `update` rows (line 204-206) — so a DM who picks `player` on a create row is silently overwritten to `dm`. Extend the `disabled` condition to also disable the Select for `create` AND `path-collision` rows EXCEPT secrecy-increase-review rows, and add a title/tooltip: 'New imports are saved DM-only for safety — publish later in the editor.'
   - **Done when:** the Visibility Select is disabled (with tooltip) on create/path-collision rows and still enabled on secrecy-increase review rows; the write logic in `buildImportChanges` is unchanged; `src/test/import-staging-modal.test.tsx` asserts the disabled state + tooltip.
