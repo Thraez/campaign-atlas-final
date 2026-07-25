@@ -1366,3 +1366,27 @@ filesystem collision (separate directories); re-fetched origin before merging an
 a clean 3-way merge with no conflicts (Q41 touched `EntityEditPanel.tsx`/`FormatToolbar.tsx`; Q42
 touched `ConfirmDialog.tsx`/`RegionsTab.tsx`/`RoutesTab.tsx`/`FogTab.tsx` — disjoint). Full gate
 re-run on the merged tree (above) before pushing, not just on the pre-merge branch.
+
+- [x] **Q43. Replace placeholder Help link with an in-editor shortcuts panel.** ✅ DONE 2026-07-25 — commit 0d7483b6
+
+**Implementation:**
+- `src/atlas/shell/HelpPanel.tsx` (new): a static panel listing the editor's current keyboard
+  shortcuts (⌘/Ctrl K command palette, ⌘/Ctrl S save, ⌘/Ctrl Z undo, ⌘/Ctrl Shift Z / Ctrl Y redo, Esc
+  cancel placement, and the Q41 body-editor formatting shortcuts — ⌘/Ctrl B bold, ⌘/Ctrl I italic,
+  ⌘/Ctrl K wikilink) plus a short "Quick tips" list, styled to match the existing small side panels
+  (`CharacterKeysPanel.tsx`-style header/body/footer layout).
+- `src/pages/AtlasPlacementEditor.tsx`: `onHelp` now calls `setActivePanel("help")` instead of
+  `window.open("https://github.com", "_blank")`; added a `"help": <HelpPanel />` entry to the `panels`
+  record and a `help: "Keyboard shortcuts"` entry to `menuPanelTitle` so the existing menu-reachable-panel
+  fallback (used by `world`/`maps`/`assets`) renders it with a title in the flyout host. No new rail icon
+  — reached only via the ☰ menu, same as before.
+- Tests: `src/test/shell/HelpPanel.test.tsx` (new, 3 cases) — all shortcut descriptions render, the
+  quick-tips list renders, and the panel heading is present. No existing test depended on the old
+  `window.open` behavior (`EditorMenu.guardrail.test.tsx` only asserts the menu label/handlers wiring).
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2644 tests green (4 shards:
+663+568+769+644; pre-existing `onTaskUpdate` RPC flake in shard 3, no real failures). Editor-only
+(`__INCLUDE_EDITOR__`-gated) — no build/scan pipeline touched, so `atlas:publish` not required.
+`manifest.json` churned LF→CRLF only after running tests (no content diff) — reverted before commit.
+Clean merge into `auto/continuous-dev` (no concurrent runs — origin tip matched the run's fork point at
+merge time, confirmed via `git fetch` immediately before merging).

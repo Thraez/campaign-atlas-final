@@ -170,13 +170,6 @@ is for sequencing, not the whole spec.
 
 #### Q-F — DM editor ergonomics
 
-- [ ] **Q43. Replace placeholder Help link with an in-editor shortcuts panel.**
-  The Help menu currently does `window.open("https://github.com","_blank")` (AtlasPlacementEditor.tsx:1297). Change the `onHelp` handler to `setActivePanel("help")`, add a `"help"` key to the `panels` record (src/pages/AtlasPlacementEditor.tsx:1347) rendering a small Help panel node, and a title in `menuPanelTitle` (:1791, e.g. `help: "Keyboard shortcuts"`). EditorMenu already exposes the `help` id wired to `onHelp` (EditorMenu.tsx:16,37) and `EditorPanelHost` already renders `panels[activePanel]`. The panel lists the editor shortcuts (Cmd+K palette, Cmd+Z / Shift+Cmd+Z / Ctrl+Y undo/redo, Esc cancel placement, plus any new Save/format shortcuts) and a few quick-start tips.
-  - **Done when:** clicking Help opens an in-editor panel (no external browser tab); the panel lists the current shortcuts; `window.open` is removed from `onHelp`.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Editor-only; reuses the existing menu + panel-host seam. Best sequenced after Q40/Q41 so the new shortcuts appear in the list.
-  ~2–3 runs.
-
 - [ ] **Q44. Surface an undo/redo toast with the action label.**
   `useUndoStack` records an optional per-action `label` (src/atlas/useUndoStack.ts:23-24, comment says "surfaced in tooltips") but `undo()`/`redo()` (lines 65-89) return `void` and never expose it. Change `undo()`/`redo()` to return the acted action's `label` (or undefined), and at the call sites — the undo/redo button handlers in AtlasPlacementEditor.tsx and the Ctrl+Z / Shift+Z path in useEditorKeyboardShortcuts.ts — show a brief sonner toast ("Undid: moved pin" / "Redid: draw region") when a label is present. Audit the existing `undoStack.push` sites and add a human `label` where missing.
   - **Done when:** undoing/redoing a labelled action (button or keyboard) shows a toast with the label; unlabelled actions show a generic toast or none; a unit test asserts `undo()`/`redo()` return the acted label.
