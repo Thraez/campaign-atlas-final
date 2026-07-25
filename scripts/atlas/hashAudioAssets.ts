@@ -17,8 +17,8 @@ export function hashAudioAssets(areas: SoundArea[], publicDir: string): Map<stri
   const srcs = new Set<string>();
 
   for (const a of areas) {
-    srcs.add(a.bed.src);
-    if (a.bed.srcFallback) srcs.add(a.bed.srcFallback);
+    if (a.bed.src.trim()) srcs.add(a.bed.src);
+    if (a.bed.srcFallback?.trim()) srcs.add(a.bed.srcFallback);
   }
 
   const outDir = path.join(publicDir, AUDIO_OUT_DIR);
