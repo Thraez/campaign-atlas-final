@@ -142,6 +142,96 @@ it("formatting toolbar wraps the textarea selection and updates the body", async
   );
 });
 
+it("Ctrl+B wraps the selection in bold via the keyboard shortcut", async () => {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (String(url).includes("/__atlas/read")) {
+      return new Response(JSON.stringify({ contents: RAW }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ saved: 1, paths: [] }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(
+    <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={() => {}} />,
+  );
+  await waitFor(() => screen.getByDisplayValue(/old body/i));
+  const ta = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
+  const start = ta.value.indexOf("Corven");
+  ta.focus();
+  ta.setSelectionRange(start, start + "Corven".length);
+  fireEvent.keyDown(ta, { key: "b", ctrlKey: true });
+  await waitFor(() =>
+    expect((screen.getByLabelText(/body/i) as HTMLTextAreaElement).value).toContain("**Corven**"),
+  );
+});
+
+it("Ctrl+K wraps the selection as a wikilink via the keyboard shortcut", async () => {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (String(url).includes("/__atlas/read")) {
+      return new Response(JSON.stringify({ contents: RAW }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ saved: 1, paths: [] }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(
+    <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={() => {}} />,
+  );
+  await waitFor(() => screen.getByDisplayValue(/old body/i));
+  const ta = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
+  const start = ta.value.indexOf("Corven");
+  ta.focus();
+  ta.setSelectionRange(start, start + "Corven".length);
+  fireEvent.keyDown(ta, { key: "k", ctrlKey: true });
+  await waitFor(() =>
+    expect((screen.getByLabelText(/body/i) as HTMLTextAreaElement).value).toContain("[[Corven]]"),
+  );
+});
+
+it("Cmd+I (metaKey) applies italic via the keyboard shortcut", async () => {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (String(url).includes("/__atlas/read")) {
+      return new Response(JSON.stringify({ contents: RAW }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ saved: 1, paths: [] }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(
+    <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={() => {}} />,
+  );
+  await waitFor(() => screen.getByDisplayValue(/old body/i));
+  const ta = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
+  const start = ta.value.indexOf("Corven");
+  ta.focus();
+  ta.setSelectionRange(start, start + "Corven".length);
+  fireEvent.keyDown(ta, { key: "i", metaKey: true });
+  await waitFor(() =>
+    expect((screen.getByLabelText(/body/i) as HTMLTextAreaElement).value).toContain("*Corven*"),
+  );
+});
+
+it("Ctrl+B does not format while the wikilink autocomplete popover is open", async () => {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (String(url).includes("/__atlas/read")) {
+      return new Response(JSON.stringify({ contents: RAW }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ saved: 1, paths: [] }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(
+    <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={() => {}} />,
+  );
+  await waitFor(() => screen.getByDisplayValue(/old body/i));
+  const ta = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
+  // Opens the entity-autocomplete popover (acCtx becomes non-null).
+  fireEvent.change(ta, { target: { value: ta.value + "[[" } });
+  const beforeValue = (screen.getByLabelText(/body/i) as HTMLTextAreaElement).value;
+  fireEvent.keyDown(screen.getByLabelText(/body/i), { key: "b", ctrlKey: true });
+  expect((screen.getByLabelText(/body/i) as HTMLTextAreaElement).value).toBe(beforeValue);
+});
+
 it("edit panel has no embedded preview or DM-notes toggle (superseded by global lens)", async () => {
   const fetchMock = vi.fn(async (url: string) => {
     if (String(url).includes("/__atlas/read")) {

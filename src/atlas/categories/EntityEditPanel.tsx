@@ -330,6 +330,20 @@ export function EntityEditPanel({
   };
 
   const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Q41: Cmd/Ctrl+B/I/K formatting shortcuts, routed through the same
+    // toolbar pipeline as the buttons. Only when the autocomplete popover is
+    // closed — with it open, the modifier combo is reserved for navigating
+    // suggestions.
+    if (!acCtx && (e.metaKey || e.ctrlKey)) {
+      const key = e.key.toLowerCase();
+      const actionId: ToolbarActionId | undefined =
+        key === "b" ? "bold" : key === "i" ? "italic" : key === "k" ? "wikilink" : undefined;
+      if (actionId) {
+        e.preventDefault();
+        handleToolbarAction(actionId);
+        return;
+      }
+    }
     if (!acCtx) return;
     const filtered =
       acCtx.type === "entity"
