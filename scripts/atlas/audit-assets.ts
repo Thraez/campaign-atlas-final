@@ -29,11 +29,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import yaml from "js-yaml";
+import { SIZE_WARN_BYTES, SIZE_ERROR_BYTES, formatBytes } from "../../src/atlas/assets/assetSize";
 
-/** Soft warning threshold for a single asset. */
-export const SIZE_WARN_BYTES = 1 * 1024 * 1024;
-/** Hard error threshold for a single asset. */
-export const SIZE_ERROR_BYTES = 4 * 1024 * 1024;
+export { SIZE_WARN_BYTES, SIZE_ERROR_BYTES };
 
 /** Extensions that count as image/asset files when walking the assets dir. */
 const ASSET_EXTENSIONS = new Set([
@@ -389,12 +387,6 @@ export function auditAssets(opts: AuditOptions): AuditReport {
       brokenRefCount: brokenRefs.length,
     },
   };
-}
-
-function formatBytes(n: number): string {
-  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(2)} MB`;
-  if (n >= 1024) return `${(n / 1024).toFixed(2)} KB`;
-  return `${n} B`;
 }
 
 interface CliFlags {
