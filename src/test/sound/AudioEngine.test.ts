@@ -159,6 +159,26 @@ describe("AudioEngine", () => {
     expect(calledUrl).not.toContain("a.ogg");
   });
 
+  it("audioUrl() prefixes a bare filename with the audio dir", async () => {
+    const ctx = makeMockCtx();
+    const d = deps(ctx);
+    const eng = new AudioEngine(d);
+    await eng.unlock();
+    await eng.crossfadeTo({ id: "a", bed: { src: "ocean.ogg" } } as any);
+    const calledUrl: string = d.fetchAudio.mock.calls[0][0];
+    expect(calledUrl).toBe("atlas/assets/audio/ocean.ogg");
+  });
+
+  it("audioUrl() is idempotent — does not double-prefix an already-pathed src", async () => {
+    const ctx = makeMockCtx();
+    const d = deps(ctx);
+    const eng = new AudioEngine(d);
+    await eng.unlock();
+    await eng.crossfadeTo({ id: "a", bed: { src: "atlas/assets/audio/deadbeef.ogg" } } as any);
+    const calledUrl: string = d.fetchAudio.mock.calls[0][0];
+    expect(calledUrl).toBe("atlas/assets/audio/deadbeef.ogg");
+  });
+
   it("dispose() clears the context and buffer cache", async () => {
     const ctx = makeMockCtx();
     const eng = new AudioEngine(deps(ctx));

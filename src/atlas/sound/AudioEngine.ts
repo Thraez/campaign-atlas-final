@@ -16,9 +16,14 @@ interface ActiveBed {
   gain: GainNode;
 }
 
-/** Resolve the asset URL for the player build. */
+const AUDIO_DIR_PREFIX = "atlas/assets/audio/";
+
+/** Resolve the asset URL for the player build. Idempotent: a src that is
+ * already absolute, remote, or already under the audio dir is left alone. */
 function audioUrl(src: string): string {
-  return src.startsWith("/") || src.startsWith("http") ? src : `atlas/assets/audio/${src}`;
+  return src.startsWith("/") || src.startsWith("http") || src.startsWith(AUDIO_DIR_PREFIX)
+    ? src
+    : `${AUDIO_DIR_PREFIX}${src}`;
 }
 
 export class AudioEngine {
