@@ -1805,3 +1805,45 @@ tests failed — same documented flake signature). Build artifacts regenerated d
 before the commit — no artifact diff reached `auto/continuous-dev`. Clean merge (no concurrent runs —
 origin tip matched the run's fork point at merge time, confirmed via `git fetch` immediately before
 merging).
+
+- [x] **Q58. Show real file size and an oversize flag per image in the Asset Manager.** ✅ DONE
+  2026-07-26 — commit 3d5ae23d
+
+**What shipped:** `AssetManagerPanel.tsx` (editor-only) now fetches each listed asset's served byte size,
+caches it in local state keyed by src, and renders it next to the row (e.g. "3.18 MB"). Rows over the
+existing audit thresholds (1 MB warn / 4 MB error) get a colored size line plus an inline "— optimize
+this image (over 1 MB / over the 4 MB limit)" hint. A failed fetch is caught and simply omits the size —
+never crashes the panel or shows a stale/error value.
+
+**Implementation:**
+- Rescoped from the queue's literal suggestion of importing `SIZE_WARN_BYTES`/`SIZE_ERROR_BYTES` straight
+  from `scripts/atlas/audit-assets.ts`: that module imports `node:fs`/`node:path`/`js-yaml` at the top
+  level, so pulling it into browser-bundled editor code would try to ship Node built-ins to the client.
+  Instead extracted a new dependency-free `src/atlas/assets/assetSize.ts` (`SIZE_WARN_BYTES`,
+  `SIZE_ERROR_BYTES`, `formatBytes` — the exact same values/logic `audit-assets.ts` used to define
+  locally) and had `audit-assets.ts` import from it instead, re-exporting the two constants for backward
+  compatibility with its one existing consumer (`src/test/asset-audit.test.ts`). This matches the
+  established direction in this codebase — `scripts/atlas/*.ts` already import pure logic from `src/`
+  (e.g. `parseFrontmatter.ts` imports schema types via a relative path) — rather than the reverse.
+- `AssetManagerPanel.tsx`: new local `useAssetSizes(srcs)` hook — one `fetch(normalizeAtlasAssetUrl(src))
+  .then(blob).size` per asset on mount/src-list-change, async/await + try/catch so both a synchronous
+  fetch throw (e.g. an unparseable relative URL under Node) and a rejected promise land in the same error
+  path; a `cancelled` flag from the effect cleanup prevents a late `setSizes` after unmount. A small
+  `AssetSizeInfo` component renders the size + oversize hint, or nothing while pending/on error.
+- Tests: `src/test/assets/AssetManagerPanel.test.tsx` +2 cases (mocked oversize fetch → size + hint shown
+  on both fixture rows; mocked fetch rejection → no size text, panel still renders normally). The 4
+  pre-existing cases now get a `beforeEach` that stubs `global.fetch` with a never-resolving promise by
+  default (restored via `afterEach: vi.unstubAllGlobals()`) so they don't attempt a real network fetch or
+  produce an act-wrapping warning from an unrelated async state update; the two new tests override the
+  stub per-test.
+
+**Gate:** touches `scripts/atlas/audit-assets.ts` (part of the publish safety-scan pipeline), so both
+`npm run atlas:publish:integrity-smoke` (all 5 planted faults caught) and `npm run atlas:publish` (all 12
+orchestrator scans clean, output identical in shape to Q57's run — pre-existing oversize-map/orphan-asset
+warnings only) were run in addition to the standard gate. typecheck clean · eslint 0 errors (18
+pre-existing warnings, no new ones) · 2731 tests green (4 shards: 686+583+794+668). Known non-real
+`onTaskUpdate` RPC worker-communication timeout in shard 3 (0 tests failed — same documented flake
+signature). Build artifacts regenerated during the publish gate (`atlas.json`/`search-index.json`, audio
+`manifest.json` LF/CRLF) were reverted with `git checkout --` before the commit — no artifact diff reached
+`auto/continuous-dev`. Clean merge (no concurrent runs — origin tip matched the run's fork point at merge
+time, confirmed via `git fetch` immediately before merging).

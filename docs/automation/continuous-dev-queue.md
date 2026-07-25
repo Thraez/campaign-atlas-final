@@ -173,13 +173,6 @@ is for sequencing, not the whole spec.
 
 #### Q-H — DM publish, backup & assets
 
-- [ ] **Q58. Show real file size and an oversize flag per image in the Asset Manager.**
-  `src/atlas/assets/AssetManagerPanel.tsx` (editor-only) lists each asset from `collectAssets(project)` but never shows byte size. For each row, fetch the served asset (`fetch(normalizeAtlasAssetUrl(a.src)).then(r=>r.blob()).then(b=>b.size)`), cache the size in local state, render it (e.g. "1.8 MB"), and flag rows over the audit thresholds — import `SIZE_WARN_BYTES` (1 MB) / `SIZE_ERROR_BYTES` (4 MB) from `scripts/atlas/audit-assets.ts` — with an inline "optimize this image" hint. Handle a failed fetch gracefully (render no size, never crash the panel).
-  - **Done when:** each asset row shows its size, oversize rows show the warn/error hint, and `src/test/assets/AssetManagerPanel.test.tsx` covers a mocked oversize fetch (size shown + hint) and a fetch failure.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Editor-only panel (`__INCLUDE_EDITOR__`-gated, tree-shaken from player builds); no player surface.
-  ~2-3 runs.
-
 - [ ] **Q59. Add bulk credit actions to the Asset Manager and fix the uncontrolled credit input.**
   In `src/atlas/assets/AssetManagerPanel.tsx` the credit `<input>` uses `defaultValue={entry.credit}` (line 64), so a programmatic bulk-apply or external `assetCredits` update won't reflect in the field — convert it to a controlled `value={entry.credit}`. Add three bulk controls that call `onPatch` over the whole registry: "apply this credit to all" (copy one row's credit string onto every asset), "enable all badges", and "disable all badges" (flip every entry's `enabled`). Preserve the existing per-asset `setEntry` merge semantics and the `EMPTY` default.
   - **Done when:** typing in one field then "apply to all" fills every row's controlled input; enable/disable-all flip every badge; `src/test/assets/AssetManagerPanel.test.tsx` covers bulk-apply and controlled-value reflection.
