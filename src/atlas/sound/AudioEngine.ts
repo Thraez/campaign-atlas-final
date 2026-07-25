@@ -162,7 +162,13 @@ export class AudioEngine {
     this.lru.push(src);
     while (this.lru.length > BUFFER_CAP) {
       const evict = this.lru.shift()!;
-      if (this.active && this.buffers.get(evict) === this.active.source.buffer) continue;
+      if (this.active && this.buffers.get(evict) === this.active.source.buffer) {
+        // Keep the active buffer tracked (moved to the tail) so it isn't
+        // silently dropped from the LRU while still in use; evict the next
+        // genuinely inactive entry instead.
+        this.lru.push(evict);
+        continue;
+      }
       this.buffers.delete(evict);
     }
   }
