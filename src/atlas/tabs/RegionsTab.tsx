@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { NudgeButtons } from "@/atlas/NudgeButtons";
 import { TabFrame } from "./TabFrame";
 import { ValidationChips } from "./ValidationChips";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -366,44 +367,11 @@ export function RegionsTab({ project, map, api, blockingCount, warningCount, onF
               />
             </div>
 
-            <div className="flex items-center justify-between gap-2 pt-1 border-t border-border">
-              <Label className="text-[10px]">Nudge whole region</Label>
-              <div className="grid grid-cols-3 gap-1 w-28">
-                <span />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-6 text-xs p-0"
-                  onClick={() => translate(selected.id, 0, 100)}
-                >
-                  ↑
-                </Button>
-                <span />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-6 text-xs p-0"
-                  onClick={() => translate(selected.id, -100, 0)}
-                >
-                  ←
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-6 text-xs p-0"
-                  onClick={() => translate(selected.id, 0, -100)}
-                >
-                  ↓
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-6 text-xs p-0"
-                  onClick={() => translate(selected.id, 100, 0)}
-                >
-                  →
-                </Button>
-              </div>
+            <div className="pt-1 border-t border-border">
+              <NudgeButtons
+                label="Nudge whole region"
+                onNudge={(dx, dy) => translate(selected.id, dx, dy)}
+              />
             </div>
 
             <p className="text-[10px] text-muted-foreground italic">
