@@ -315,6 +315,10 @@
 .atlas-prose .atlas-wikilink-anchor {
   color: inherit;
 }
+.atlas-prose .atlas-embed-missing {
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
 
 /* Credit badge — bottom-right corner over entity images */
 .atlas-credit-badge {

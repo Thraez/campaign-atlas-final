@@ -30,6 +30,11 @@ A [[Tidemarrow|home]] city.
     expect(html).toContain('<img');
     expect(html).toContain("corven.png");
   });
+  it("renders a non-image ![[Note]] embed as the inert placeholder (survives sanitization)", () => {
+    const html = renderEntityMarkdown("![[Some Note]]", { showDmNotes: false });
+    expect(html).toContain('<span class="atlas-embed-missing">embedded note not shown</span>');
+    expect(html).not.toContain("<img");
+  });
   it("renders [[wikilink|alias]] as a styled reference (alias text)", () => {
     const html = renderEntityMarkdown(body, { showDmNotes: false });
     expect(html).toContain("home");
@@ -87,6 +92,17 @@ describe("resolveImageEmbeds", () => {
     expect(resolved).not.toContain("![[");
     expect(resolved).toContain("Public text.");
   });
+  it("secrecy: a non-image note embed inside %% never surfaces (name or placeholder)", () => {
+    // Same ordering guarantee as above, for the new non-image placeholder branch:
+    // a %%-wrapped ![[Secret Note]] must never leak the note's name into player output.
+    const rawBody = "%%\n![[Secret Note]]\n%%\n\nPublic text.";
+    const { text: stripped } = stripDmBlocks(rawBody);
+    const resolved = resolveImageEmbeds(stripped);
+    expect(resolved).not.toContain("Secret Note");
+    expect(resolved).not.toContain("![[");
+    expect(resolved).not.toContain("atlas-embed-missing");
+    expect(resolved).toContain("Public text.");
+  });
   it("![[image.png|Alt text]] uses alias as alt and filename as src", () => {
     const out = resolveImageEmbeds("![[Portrait.png|Lord Corven]]");
     expect(out).toBe("![Lord Corven](/atlas/assets/images/Portrait.png)");
@@ -94,6 +110,24 @@ describe("resolveImageEmbeds", () => {
   it("![[image.png]] without alias uses filename as alt text (unchanged behavior)", () => {
     const out = resolveImageEmbeds("![[Portrait.png]]");
     expect(out).toBe("![Portrait.png](/atlas/assets/images/Portrait.png)");
+  });
+  it("![[Some Note]] (no extension) renders an inert placeholder, not a broken img", () => {
+    const out = resolveImageEmbeds("![[Some Note]]");
+    expect(out).toBe('<span class="atlas-embed-missing">embedded note not shown</span>');
+    expect(out).not.toContain("<img");
+    expect(out).not.toContain("![");
+  });
+  it("![[doc.pdf]] (non-image extension) renders an inert placeholder", () => {
+    const out = resolveImageEmbeds("![[doc.pdf]]");
+    expect(out).toBe('<span class="atlas-embed-missing">embedded note not shown</span>');
+  });
+  it("![[Some Note|alias]] (non-image, pipe-alias) still renders the placeholder", () => {
+    const out = resolveImageEmbeds("![[Some Note|shown as]]");
+    expect(out).toBe('<span class="atlas-embed-missing">embedded note not shown</span>');
+  });
+  it("image extensions stay case-insensitive (uppercase .PNG still resolves as an image)", () => {
+    const out = resolveImageEmbeds("![[Portrait.PNG]]");
+    expect(out).toBe("![Portrait.PNG](/atlas/assets/images/Portrait.PNG)");
   });
 });
 
