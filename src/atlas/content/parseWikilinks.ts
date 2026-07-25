@@ -5,6 +5,11 @@ const WIKILINK = /\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+?))?\]\]/g;
 export interface ResolveContext {
   // Map of normalized title/alias -> entity id
   resolveByName: (name: string) => string | undefined;
+  // Fallback used only for folder-path targets (`Folder/Note`) whose full
+  // string didn't resolve: resolves the trailing path segment (basename)
+  // against the title/alias index, but must return undefined when that name
+  // is ambiguous (owned by more than one entity) rather than guessing.
+  resolveByBasename?: (basename: string) => string | undefined;
 }
 
 const TOKEN_OPEN = "⁣LINK[";
@@ -27,7 +32,13 @@ export function tokenizeWikilinks(
     const hashIdx = t.indexOf("#");
     const filePart = hashIdx === -1 ? t : t.slice(0, hashIdx).trim();
     const isAnchor = hashIdx === 0;
-    const resolved = filePart ? ctx.resolveByName(filePart) : undefined;
+    let resolved = filePart ? ctx.resolveByName(filePart) : undefined;
+    // Folder-path fallback: `[[Folder/Note]]` whose full string didn't
+    // resolve rescues to Note via its basename, but only when unambiguous.
+    if (!resolved && filePart.includes("/")) {
+      const basename = filePart.slice(filePart.lastIndexOf("/") + 1).trim();
+      if (basename) resolved = ctx.resolveByBasename?.(basename);
+    }
     const d = (display ?? (filePart || t.slice(1))).trim();
     const link: ResolvedLink = {
       target: t,

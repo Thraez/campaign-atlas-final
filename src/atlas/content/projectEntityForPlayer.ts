@@ -54,17 +54,33 @@ export interface ProjectionContext {
   secretIds: Set<string>;
   /** lowercase title/alias → id (build's crossRefNameIndex). */
   resolveByName: (name: string) => string | undefined;
+  /** Folder-path basename fallback (build's resolveByBasename) — undefined when ambiguous. */
+  resolveByBasename: (basename: string) => string | undefined;
   /** entityVisibility map for filterRelationshipsForPlayer. */
   entityVisibility: Map<string, EntityVisibility>;
 }
 
 export function buildProjectionContext(entitiesById: Map<string, Entity>): ProjectionContext {
   const nameIndex = new Map<string, string>();
+  // Mirrors build-atlas.ts's nameOwners: tracks every distinct entity id a
+  // name has been registered under, so basename resolution can refuse to
+  // guess when a name is ambiguous.
+  const nameOwners = new Map<string, Set<string>>();
+  const registerName = (name: string, id: string) => {
+    const key = name.toLowerCase();
+    nameIndex.set(key, id);
+    let owners = nameOwners.get(key);
+    if (!owners) {
+      owners = new Set();
+      nameOwners.set(key, owners);
+    }
+    owners.add(id);
+  };
   const secretIds = new Set<string>();
   const entityVisibility = new Map<string, EntityVisibility>();
   for (const e of entitiesById.values()) {
-    nameIndex.set(e.title.toLowerCase(), e.id);
-    for (const a of e.aliases ?? []) nameIndex.set(a.toLowerCase(), e.id);
+    registerName(e.title, e.id);
+    for (const a of e.aliases ?? []) registerName(a, e.id);
     if (!PLAYER_VISIBLE.has(e.visibility)) secretIds.add(e.id);
     entityVisibility.set(e.id, e.visibility);
   }
@@ -72,6 +88,11 @@ export function buildProjectionContext(entitiesById: Map<string, Entity>): Proje
     entitiesById,
     secretIds,
     resolveByName: (n) => nameIndex.get(n.trim().toLowerCase()),
+    resolveByBasename: (n) => {
+      const key = n.trim().toLowerCase();
+      if ((nameOwners.get(key)?.size ?? 0) > 1) return undefined;
+      return nameIndex.get(key);
+    },
     entityVisibility,
   };
 }
@@ -96,7 +117,10 @@ export function projectEntityForPlayer(entity: Entity, ctx: ProjectionContext): 
   });
 
   // 2. Tokenise wikilinks (from embed-resolved text so <img> appears in rendered HTML)
-  const { tokenized, links } = tokenizeWikilinks(bodyWithSecrets, { resolveByName: ctx.resolveByName });
+  const { tokenized, links } = tokenizeWikilinks(bodyWithSecrets, {
+    resolveByName: ctx.resolveByName,
+    resolveByBasename: ctx.resolveByBasename,
+  });
 
   // 3. Redact links to secret targets (redact in body string AND mark link as broken)
   for (const l of links) {

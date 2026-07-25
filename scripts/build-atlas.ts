@@ -431,6 +431,21 @@ async function runBuildCore(flags: BuildFlags) {
   // (player-visible and DM/hidden). Used for wikilink resolution so we can
   // detect cross-ref leaks (a public-entry link to a DM-only target).
   const crossRefNameIndex = new Map<string, string>();
+  // Tracks every distinct entity id a name (lowercased title/alias) has been
+  // registered under, so folder-path basename resolution (Q49) can refuse to
+  // guess when a name is ambiguous instead of silently picking the
+  // last-registered owner.
+  const nameOwners = new Map<string, Set<string>>();
+  const registerName = (name: string, id: string) => {
+    const key = name.toLowerCase();
+    crossRefNameIndex.set(key, id);
+    let owners = nameOwners.get(key);
+    if (!owners) {
+      owners = new Set();
+      nameOwners.set(key, owners);
+    }
+    owners.add(id);
+  };
   const allEntityVisibility = new Map<
     string,
     import("../src/atlas/content/schema").EntityVisibility
@@ -440,9 +455,9 @@ async function runBuildCore(flags: BuildFlags) {
   // entity. Used to scrub warning text before it ships in a player build.
   const secretNames = new Set<string>();
   for (const p of allParsed) {
-    crossRefNameIndex.set(p.title.toLowerCase(), p.id);
+    registerName(p.title, p.id);
     for (const a of p.parsed.atlas.aliases ?? []) {
-      crossRefNameIndex.set(a.toLowerCase(), p.id);
+      registerName(a, p.id);
     }
     allEntityVisibility.set(p.id, p.visibility);
     if (p.isSecret) {
@@ -472,9 +487,9 @@ async function runBuildCore(flags: BuildFlags) {
     const id = parsed.atlas.id || slugify(title);
     if (slugSeen.has(id) || excludedIdSeen.has(id)) continue;
     excludedIdSeen.add(id);
-    crossRefNameIndex.set(title.toLowerCase(), id);
+    registerName(title, id);
     for (const a of parsed.atlas.aliases ?? []) {
-      crossRefNameIndex.set(a.toLowerCase(), id);
+      registerName(a, id);
     }
     // Folder-excluded files have no published visibility, but for cross-ref
     // purposes they're DM-equivalent: anything wikilinking to them from a
@@ -528,13 +543,21 @@ async function runBuildCore(flags: BuildFlags) {
   // Wikilink resolution uses the FULL cross-reference index (including
   // DM/hidden entities) so we can detect public-entry → DM-target leaks.
   const resolveByName = (n: string) => crossRefNameIndex.get(n.trim().toLowerCase());
+  // Folder-path fallback (Q49): resolves a basename against the same index,
+  // but refuses (returns undefined) when that name is owned by more than one
+  // distinct entity — an ambiguous basename must stay broken, never guessed.
+  const resolveByBasename = (n: string) => {
+    const key = n.trim().toLowerCase();
+    if ((nameOwners.get(key)?.size ?? 0) > 1) return undefined;
+    return crossRefNameIndex.get(key);
+  };
 
   const backlinkMap = new Map<string, Map<string, string>>();
   for (const item of pending) {
     const { entity, rawBody } = item;
     // Resolve ![[image.ext]] AFTER DM stripping (rawBody is already noDm) so embeds in %% blocks are absent.
     const resolvedBody = resolveImageEmbeds(rawBody, DEFAULT_RESOLVE_ASSET);
-    const { tokenized, links } = tokenizeWikilinks(resolvedBody, { resolveByName });
+    const { tokenized, links } = tokenizeWikilinks(resolvedBody, { resolveByName, resolveByBasename });
     entity.links = links;
     for (const l of links) {
       // Cross-reference spoiler leak detection (player builds only). The link
