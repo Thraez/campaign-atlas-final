@@ -260,6 +260,23 @@ export function ImportStagingModal({
                             Outside allowlist
                           </Badge>
                         )}
+                        {!row.parseError && row.frontmatterWarning && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge className="bg-amber-500/20 text-amber-200 border-amber-500/40 text-[10px] gap-1 cursor-help">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  Comma-separated tags/aliases
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-[320px] break-all text-[11px]">
+                                  {row.frontmatterWarning}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                         {/* update: entity already exists — will overwrite in place */}
                         {row.rowKind === "update" && !blocked && (
                           <Badge className="bg-sky-500/20 text-sky-200 border-sky-500/40 text-[10px] gap-1">

@@ -91,6 +91,50 @@ describe("parseFrontmatter visibility safety", () => {
   });
 });
 
+describe("parseFrontmatter comma-jammed tags/aliases warning", () => {
+  it("warns when atlas.tags is a comma-jammed scalar string", () => {
+    const raw = `---\natlas:\n  tags: "npc, smuggler"\n---\n`;
+    const p = parseFrontmatter(raw, "x.md");
+    expect(p.atlas.tags).toEqual(["npc, smuggler"]);
+    expect(p.warnings.join(" ")).toMatch(/tags should be a YAML list/);
+  });
+
+  it("warns when flat top-level tags is a comma-jammed scalar string", () => {
+    const raw = `---\ntags: "one, two"\n---\n`;
+    const p = parseFrontmatter(raw, "x.md");
+    expect(p.warnings.join(" ")).toMatch(/tags should be a YAML list/);
+  });
+
+  it("warns when aliases is a comma-jammed scalar string", () => {
+    const raw = `---\natlas:\n  aliases: "Kellan, Kellan Brecht"\n---\n`;
+    const p = parseFrontmatter(raw, "x.md");
+    expect(p.atlas.aliases).toEqual(["Kellan, Kellan Brecht"]);
+    expect(p.warnings.join(" ")).toMatch(/aliases should be a YAML list/);
+  });
+
+  it("does NOT warn when tags is already a proper YAML list", () => {
+    const raw = `---\natlas:\n  tags: [npc, smuggler]\n---\n`;
+    const p = parseFrontmatter(raw, "x.md");
+    expect(p.atlas.tags).toEqual(["npc", "smuggler"]);
+    expect(p.warnings.join(" ")).not.toMatch(/YAML list/);
+  });
+
+  it("does NOT warn on a single tag with no comma", () => {
+    const raw = `---\natlas:\n  tags: "npc"\n---\n`;
+    const p = parseFrontmatter(raw, "x.md");
+    expect(p.atlas.tags).toEqual(["npc"]);
+    expect(p.warnings.join(" ")).not.toMatch(/YAML list/);
+  });
+
+  it("already-list tags/aliases stay byte-identical across both branches", () => {
+    const raw = `---\natlas:\n  tags: [a, b, c]\n  aliases: [x, y]\n---\n`;
+    const p = parseFrontmatter(raw, "x.md");
+    expect(p.atlas.tags).toEqual(["a", "b", "c"]);
+    expect(p.atlas.aliases).toEqual(["x", "y"]);
+    expect(p.warnings).toEqual([]);
+  });
+});
+
 describe("stripDmBlocks", () => {
   it("removes single-line %% block %%", () => {
     const r = stripDmBlocks("hello %% secret %% world");

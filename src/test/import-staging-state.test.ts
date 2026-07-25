@@ -169,6 +169,39 @@ describe("buildStagingRow", () => {
     expect(row.included).toBe(true);
   });
 
+  it("flags frontmatterWarning when atlas.tags is a comma-jammed scalar string", () => {
+    const row = buildStagingRow(
+      {
+        filename: "garron.md",
+        raw: "---\natlas:\n  type: npc\n  id: garron\n  tags: \"npc, smuggler\"\n---\n",
+      },
+      makeCtx(),
+    );
+    expect(row.frontmatterWarning).toMatch(/tags should be a YAML list/);
+  });
+
+  it("flags frontmatterWarning when aliases is a comma-jammed scalar string", () => {
+    const row = buildStagingRow(
+      {
+        filename: "garron.md",
+        raw: "---\naliases: \"Garron, The Smuggler\"\natlas:\n  type: npc\n  id: garron\n---\n",
+      },
+      makeCtx(),
+    );
+    expect(row.frontmatterWarning).toMatch(/aliases should be a YAML list/);
+  });
+
+  it("no frontmatterWarning when tags/aliases are already proper YAML lists", () => {
+    const row = buildStagingRow(
+      {
+        filename: "garron.md",
+        raw: "---\natlas:\n  type: npc\n  id: garron\n  tags: [npc, smuggler]\n---\n",
+      },
+      makeCtx(),
+    );
+    expect(row.frontmatterWarning).toBeUndefined();
+  });
+
   it("IGNORES frontmatter `path` field — only exposes it as a suggestion", () => {
     const row = buildStagingRow(
       {
