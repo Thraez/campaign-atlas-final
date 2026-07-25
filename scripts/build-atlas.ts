@@ -815,7 +815,7 @@ async function runBuildCore(flags: BuildFlags) {
   if (flags.player) {
     maps = maps.map((m) => {
       if (!m.soundscape) return m;
-      return { ...m, soundscape: filterSoundscapeForPlayer(m.soundscape) };
+      return { ...m, soundscape: filterSoundscapeForPlayer(m.soundscape, m.regions) };
     });
     const allAreas = maps.flatMap((m) => m.soundscape?.areas ?? []);
     if (allAreas.length > 0) {
