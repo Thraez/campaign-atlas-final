@@ -59,22 +59,28 @@ export function CommandPalette({
           }}
         />
         <ul className="max-h-[50vh] overflow-auto">
-          {results.map((r, i) => (
-            <li key={`${r.kind}:${r.id}`}>
-              <button
-                type="button"
-                className={`w-full text-left px-4 py-2 text-sm flex justify-between ${i === sel ? "bg-muted" : ""}`}
-                onMouseEnter={() => setSel(i)}
-                onClick={() => {
-                  onChoose(r);
-                  setOpen(false);
-                }}
-              >
-                <span>{r.title}</span>
-                <span className="text-[10px] uppercase text-muted-foreground">{r.kind}</span>
-              </button>
+          {results.length === 0 ? (
+            <li className="px-4 py-2 text-sm text-muted-foreground">
+              No matches for &quot;{q}&quot;
             </li>
-          ))}
+          ) : (
+            results.map((r, i) => (
+              <li key={`${r.kind}:${r.id}`}>
+                <button
+                  type="button"
+                  className={`w-full text-left px-4 py-2 text-sm flex justify-between ${i === sel ? "bg-muted" : ""}`}
+                  onMouseEnter={() => setSel(i)}
+                  onClick={() => {
+                    onChoose(r);
+                    setOpen(false);
+                  }}
+                >
+                  <span>{r.title}</span>
+                  <span className="text-[10px] uppercase text-muted-foreground">{r.kind}</span>
+                </button>
+              </li>
+            ))
+          )}
         </ul>
       </div>
     </div>

@@ -94,4 +94,20 @@ describe("CommandPalette", () => {
     expect(onChoose).toHaveBeenCalledWith(expect.objectContaining({ id: "corven" }));
     expect(screen.queryByPlaceholderText(/search everything/i)).toBeNull();
   });
+
+  it("shows a 'No matches' row echoing the query when a search finds nothing", () => {
+    render(<CommandPalette index={navIndex} onChoose={vi.fn()} />);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    const input = screen.getByPlaceholderText(/search everything/i);
+    fireEvent.change(input, { target: { value: "nonexistentxyz" } });
+    expect(screen.getByText(/no matches for "nonexistentxyz"/i)).toBeInTheDocument();
+  });
+
+  it("does not show the 'No matches' row when there are results", () => {
+    render(<CommandPalette index={navIndex} onChoose={vi.fn()} />);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    const input = screen.getByPlaceholderText(/search everything/i);
+    fireEvent.change(input, { target: { value: "corv" } });
+    expect(screen.queryByText(/no matches for/i)).toBeNull();
+  });
 });
