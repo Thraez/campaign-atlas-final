@@ -1261,3 +1261,23 @@ scans green.
 **Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2620 tests green (4 shards;
 pre-existing `onTaskUpdate` RPC flake in shards 1 and 3) · `npm run atlas:publish` 12/12 scans green
 (leak-surface fix, full publish gate per spec).
+
+- [x] **Q39. Fix AudioEngine buffer-cache leak and add engine unit tests.** ✅ DONE 2026-07-25 — commit b5226da7
+
+**Implementation:**
+- `src/atlas/sound/AudioEngine.ts` `touch()`: when the LRU eviction loop would shift the currently
+  active source's buffer off `lru`, it now pushes that entry back onto the tail (keeping it tracked)
+  instead of `continue`-ing without re-adding it — the old code let the active buffer fall out of
+  `lru` permanently while staying in the `buffers` map, so the cache grew past `BUFFER_CAP` over a
+  long session. The loop now evicts a genuinely inactive entry each pass and still terminates.
+- `src/test/sound/AudioEngine.test.ts`: 2 new tests — one drives `touch()` directly with a simulated
+  active buffer that would otherwise be the least-recently-touched entry, loading more than
+  `BUFFER_CAP` other buffers and asserting `buffers.size` stays capped and the active buffer remains
+  tracked in `lru` (reproduced the leak red before the fix, green after); one locks in the existing
+  "a newer crossfade supersedes an older one that resolves its decode late" behavior with
+  controlled/deferred `fetchAudio` promises (already correct, now covered). `canPlay` Ogg→fallback
+  selection was already covered by an existing test.
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2622 tests green (4 shards;
+pre-existing `onTaskUpdate` RPC flake in shard 3). Codebase-health only — no build/scan pipeline
+touched, so `atlas:publish` not required.

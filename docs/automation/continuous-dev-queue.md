@@ -168,13 +168,6 @@ is for sequencing, not the whole spec.
 
 - [x] **Q38. Honor prefers-reduced-motion for calm-mode motion without silencing sound.** ✅ DONE 2026-07-25 — commit 77149da6
 
-- [ ] **Q39. Fix AudioEngine buffer-cache leak and add engine unit tests.**
-  In `src/atlas/sound/AudioEngine.ts` `touch()` (lines 155-163), when the LRU would evict the currently-active source's buffer it `continue`s AFTER already `shift()`-ing that src off `lru` (line 159), so the active buffer stays in the `buffers` map but is no longer tracked and is never re-added when it stops being active — `buffers` grows past `BUFFER_CAP` over a long session. Fix by re-pushing the skipped active src back onto `lru` (keeping it tracked at the tail) so the loop evicts a genuinely-inactive entry and terminates. Add direct `AudioEngine` tests with a stubbed AudioContext covering: a crossfade superseded while decoding (newer target wins), `canPlay` Ogg→fallback src selection, and the LRU cap holding steady across many loads including the active-buffer case.
-  - **Done when:** after loading more than BUFFER_CAP distinct beds with one kept active, `buffers.size` stays ≤ BUFFER_CAP and the active buffer is retained; the new AudioEngine tests pass.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Codebase-health, self-contained to AudioEngine. ~2–3 runs.
-
-
 #### Q-F — DM editor ergonomics
 
 - [ ] **Q40. Add Cmd/Ctrl+S keyboard shortcut to save.**
