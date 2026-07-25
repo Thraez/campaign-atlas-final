@@ -1523,3 +1523,44 @@ artifacts regenerated in the worktree during the publish gate (`atlas.json`/`sea
 version/publishedAt stamp, audio `manifest.json` LF/CRLF) were reverted before commit — no artifact
 diff carried into the merge. Clean merge into `auto/continuous-dev` (no concurrent runs — origin tip
 matched the run's fork point at merge time, confirmed via `git fetch` immediately before merging).
+
+- [x] **Q49. Resolve folder-path wikilinks [[Folder/Note]] by basename.** ✅ DONE 2026-07-25 — commit 4c132233
+
+**Implementation:**
+- `src/atlas/content/parseWikilinks.ts` (`tokenizeWikilinks`): when `ctx.resolveByName(filePart)` is
+  undefined and `filePart` contains `/`, falls back to `ctx.resolveByBasename?.(basename)` where
+  `basename` is the trailing path segment. `ResolveContext` gained an optional `resolveByBasename` field
+  so existing callers that only pass `resolveByName` (e.g. `EntityPanes.tsx`, `EntityReadingView.tsx`)
+  are unaffected. The fallback is only attempted when the full-string resolution failed AND the target
+  contains `/` — an already-resolving link never triggers it.
+- `scripts/build-atlas.ts` + `src/atlas/content/projectEntityForPlayer.ts`: both builders now track
+  `nameOwners` (a `Map<lowercase name, Set<entity id>>`) alongside their existing
+  `crossRefNameIndex`/`nameIndex` construction, via an identical `registerName` helper. `resolveByBasename`
+  looks up the name in the index but returns `undefined` when `nameOwners.get(key).size > 1` — an
+  ambiguous basename (owned by more than one distinct entity) never resolves, so a folder-path link with
+  a duplicate-title target stays broken rather than guessing the wrong note. Both builders construct this
+  identically, keeping the parity contract that locks build/client wikilink resolution together.
+  CRITICAL for safety: `link.target` is unchanged (still the full original string, e.g.
+  `02_Regions/SecretNote`), so the existing player leak-scan redaction regexes in
+  `build-atlas.ts:553-559`/`projectEntityForPlayer.ts:104-107` still match and redact
+  `[[Folder/SecretNote]]` verbatim.
+- Tests: `src/test/content/parseWikilinks.test.ts` gained 8 cases (unique-basename rescue, no-fallback
+  backward-compat, ambiguous-basename-stays-broken, fallback never called when already resolved or when
+  the target has no `/`, alias display preserved, nested folder path, and the `[[Folder/]]` empty-basename
+  edge case). `src/test/content/projectEntityForPlayer-gaps.test.ts` gained 3 cases — the critical
+  `[[Folder/SecretNote]]` (dm-only) redaction regression through the player projection's existing
+  secret-leak path, an ambiguous-basename case (two player-visible entities sharing a title never resolve
+  via the fallback), and an unambiguous folder-path link resolving normally with no redaction.
+  `parseWikilinks-parity.test.ts` and `projectEntityForPlayer-build-parity.test.ts` stayed green
+  unmodified.
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2685 tests green (4 shards:
+671+577+788+649; pre-existing `onTaskUpdate` RPC worker-communication timeout in shard 3, 0 tests failed
+— known flake signature, not a real failure). Touches the build pipeline (`parseWikilinks.ts` feeds
+`build-atlas.ts`) — `npm run atlas:publish:integrity-smoke` (all 5 planted faults still caught) and
+`npm run atlas:publish` (all 12 orchestrator scans clean; player build unaffected — pre-existing
+oversize-map/orphan-asset warnings only) both green. Build artifacts regenerated in the worktree during
+the publish gate (`atlas.json`/`search-index.json`, audio `manifest.json` LF/CRLF) were reverted before
+each commit — no artifact diff carried into the merge. Clean merge into `auto/continuous-dev` (no
+concurrent runs — origin tip matched the run's fork point at merge time, confirmed via `git fetch`
+immediately before merging).

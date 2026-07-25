@@ -170,13 +170,6 @@ is for sequencing, not the whole spec.
 
 #### Q-G — DM import & Obsidian fidelity
 
-- [ ] **Q49. Resolve folder-path wikilinks [[Folder/Note]] by basename.**
-  When `ctx.resolveByName(filePart)` is undefined and `filePart` contains `/`, fall back to resolving the trailing path segment (basename) against the title/alias index in `tokenizeWikilinks` (`src/atlas/content/parseWikilinks.ts`), so `[[02_Regions/Tidemarrow]]` rescues to the Tidemarrow entity. Guard against ambiguity: build a Set of names mapped by >1 distinct entity id alongside `crossRefNameIndex` (`scripts/build-atlas.ts:530`) and `nameIndex` (`projectEntityForPlayer.ts:62-70`), extend `ResolveContext` with a basename-safe resolve that returns undefined for ambiguous basenames, and construct it identically in both builders (parity tests lock them). Keep `link.target` = the full original string so the leak-scan redaction regex still matches `[[Folder/SecretNote]]` verbatim.
-  - **Done when:** an unresolved `[[Folder/Note]]` rescues to Note only when the basename is unique; ambiguous basenames stay broken (no wrong-note resolution); already-resolving links are unchanged; a regression test proves `[[Folder/SecretNote]]` (dm-only) is redacted in player output; parity tests + `src/test/wayfinding/wikilink-aria.test.ts` stay green.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest) + `npm run atlas:publish` + `atlas:publish:integrity-smoke` (shared player-safety leak-scan resolver + shipped artifacts).
-  Rule = 'only when the full target is unresolved AND the basename is unique'. Shares the resolver seam with Q48.
-  ~2–3 runs.
-
 - [ ] **Q50. Vault scan should only return .md files.**
   `handleVaultScanRequest.processFile` (`scripts/vite-plugin-atlas-save.ts:978-1001`) reads EVERY file as UTF-8 despite its docstring saying '.md files'. In `processFile`, after computing `relPosix`, add a case-insensitive `.md` extension guard (`if (!relPosix.toLowerCase().endsWith('.md')) return null;`) BEFORE the `fs.stat`/size accounting (line 986-991) so binaries/images are skipped, never read as mojibake into staging rows, and never counted against `MAX_VAULT_AGGREGATE_BYTES` (line 992-994). Optionally add `**/*.excalidraw.md` to the built-in ignores in `src/atlas/import/ignoreRules.ts` (`makeIgnore`) since those are base64 JSON, not prose.
   - **Done when:** a vault containing `.png`/`.pdf`/`.canvas` files returns only `.md` entries; large binaries no longer blow the 25 MB aggregate budget; `src/test/import/vaultScanMapping.test.ts` is extended to assert non-`.md` files are excluded.
