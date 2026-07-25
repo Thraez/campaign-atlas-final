@@ -1739,3 +1739,39 @@ typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2718 tests gree
 failed — same documented flake signature). Clean merge into `auto/continuous-dev` (no concurrent runs —
 origin tip matched the run's fork point at merge time, confirmed via `git fetch` immediately before
 merging).
+
+- [x] **Q56. Fix false-orphan warnings for `![[embed]]` images in the asset auditor.** ✅ DONE 2026-07-25 —
+  commit 929cbe46
+
+**What shipped:** `collectReferences` in `scripts/atlas/audit-assets.ts` only harvested `![alt](path)`
+and frontmatter `atlas.images` refs, so an image referenced solely via an Obsidian `![[image.png|alt]]`
+embed was reported as an orphan. A new `extractEmbedImageRefs` helper mirrors the `EMBED_RE`/
+`IMAGE_EXT_RE`/`DEFAULT_RESOLVE_ASSET` trio in `src/atlas/content/renderEntityMarkdown.ts` (the Q51
+non-image-embed change is the direct prior art) so the reference matches exactly what the build ships:
+strips any `|alt` suffix, resolves via `/atlas/assets/images/<filename>`, and skips any embed whose
+target lacks an image extension — so note transclusions (`![[Some Note]]`) and other non-image embeds
+are never swept up as asset references.
+
+**Implementation:**
+- `scripts/atlas/audit-assets.ts`: local `EMBED_RE`/`IMAGE_EXT_RE` consts (kept as a local copy, not
+  imported, matching this file's existing self-contained-extractor pattern) + `extractEmbedImageRefs`,
+  wired into `collectReferences`'s per-file `raws` array alongside the two existing extractors.
+- Tests: `src/test/asset-audit.test.ts` +10 cases — 4 orphan-integration cases (plain embed, pipe-alias,
+  subfolder embed, and a transclusion-alongside-a-real-embed case asserting only the image embed is
+  collected) + 6 extractor-level unit cases (plain, pipe-alias, subfolder, case-insensitive extension,
+  non-image-only ignored, mixed image/non-image collects only images).
+
+**Gate:** touches the build/scan pipeline (`audit-assets.ts` runs inside `publish-orchestrator.ts`), so
+both `npm run atlas:publish:integrity-smoke` (all 5 planted faults caught) and `npm run atlas:publish`
+(all 12 orchestrator scans clean) were run in addition to the standard gate. typecheck clean · eslint 0
+errors (18 pre-existing warnings) · 2728 tests green (4 shards: 686+581+794+667). Known non-real
+`onTaskUpdate` RPC worker-communication timeout in shard 3 (0 tests failed — same documented flake
+signature). The real vault content surfaced two previously-invisible embed references
+(`content/astrath-deeprealm/imports/corven.md` → `Corven.png`, `edric.md` → `Edric.png`) as info-level
+"BROKEN REF" lines during the publish gate — confirming the extractor now tracks embeds that were
+silently invisible to the auditor before, without blocking the build (broken-ref reporting stays
+info-only per the auditor's existing design). Build artifacts regenerated during the publish gate
+(`atlas.json`/`search-index.json` version/publishedAt stamp, audio `manifest.json` LF/CRLF) were reverted
+with `git checkout --` before the merge — no artifact diff reached `auto/continuous-dev`. Clean merge (no
+concurrent runs — origin tip matched the run's fork point at merge time, confirmed via `git fetch`
+immediately before merging).

@@ -173,13 +173,6 @@ is for sequencing, not the whole spec.
 
 #### Q-H — DM publish, backup & assets
 
-- [ ] **Q56. Fix false-orphan warnings for `![[embed]]` images in the asset auditor.**
-  In `scripts/atlas/audit-assets.ts`, `collectReferences` (line 252) harvests only `![alt](path)` (`extractMarkdownImageRefs`, line 163) and frontmatter `atlas.images` refs, so an image referenced solely via an Obsidian `![[image.png|alt]]` embed is reported as an orphan/unused. Add an `extractEmbedImageRefs` helper that applies the same `EMBED_RE = /!\[\[([^[\]\n]+?)\]\]/g` used by `src/atlas/content/renderEntityMarkdown.ts` (line 9), strips any `|alt` suffix, resolves the filename to an asset the way `DEFAULT_RESOLVE_ASSET` does, and pushes the result through `normalizeRefPath` into the reference list. Only count embeds whose target has an image extension.
-  - **Done when:** an entity body containing only `![[foo.png]]` no longer lists `foo.png` as an orphan; a new case in `src/test/asset-audit.test.ts` covers pipe-alias and subfolder embeds, and note transclusions (`![[SomeNote]]`) are NOT collected.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest) + `npm run atlas:publish` + `npm run atlas:publish:integrity-smoke` (modifies a publish safety scan).
-  Scanner logic only, no new surface; keep the extractor image-extension-scoped so it can't sweep up `![[note]]` transclusions.
-  ~1 run.
-
 - [ ] **Q57. Correct the audit-assets publish-block message to match its real trigger.**
   In `scripts/atlas/publishScan.ts`, `runPublishScans` calls `runAuditAssets` non-strict (lines 172-176), and `audit-assets.run()` returns the blocking `13` ONLY when an image exceeds the 4 MB hard cap (`sizeErrors.length > 0`, audit-assets.ts line 458) — orphans and broken refs are warn/info in non-strict mode. But `MSG["audit-assets"]` (line 38-39) says "referenced but missing (or an unused image needs cleanup)", which is never the actual block reason. Rewrite it to describe the oversize block (e.g. "An image is larger than the 4 MB limit and must be optimized before publishing."). Optionally add an `audit-assets-oversize` value to the `PublishScanReason["scan"]` union in `src/atlas/publish/publishTypes.ts` (updating the MSG map) so the DM learns which file is too big.
   - **Done when:** the audit-assets block message describes an oversize image, not a missing/unused one; `scripts/atlas/publishScan.test.ts` asserts the new copy.
