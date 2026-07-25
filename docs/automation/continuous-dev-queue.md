@@ -45,10 +45,7 @@ is for sequencing, not the whole spec.
 
 - [x] **X2. A sound zone with no file chosen yet crashes the entire player build.** ✅ DONE 2026-07-25 — commit 617789e9
 
-- [ ] **X3. A ride-on sound on a DM-only region can survive into the player build.** _(was N98; ~2 runs)_
-  `filterSoundscapeForPlayer` keeps any area where `!a.visibility || PLAYER_VISIBLE.has(a.visibility)` (`scripts/atlas/filterSoundscape.ts`), but ride-on areas are created with **no** `visibility` field (`{ id, regionId, bed }`, `useSoundscapeDraft.ts:207`) — the comment claims they "inherit the region's visibility," yet the filter never resolves the region. So ambient sound authored on a secret region isn't dropped for players (a subtle location/existence leak). Fix: resolve a ride-on area's effective visibility from its `regionId` and drop it when the region isn't player-visible; drop areas whose `regionId` no longer exists in the player build.
-  - **Done when:** a ride-on area on a `dm`/`hidden` region is stripped from the player soundscape; player-visible ride-ons still ship; a test in `filterSoundscape`'s suite covers both; `check-artifact-shape`/secrecy scans stay green.
-  - **Gate:** standard gate; **also `npm run atlas:publish` and confirm all player-safety scans pass** (this is a leak-surface fix).
+- [x] **X3. A ride-on sound on a DM-only region can survive into the player build.** ✅ DONE 2026-07-25 — commit 613e718a
 
 ### Q — Refuel 2026-07-14 (100-task QoL / feature / infra / refactor backlog — blessed by the DM)
 

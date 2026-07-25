@@ -1242,3 +1242,22 @@ pre-existing `onTaskUpdate` RPC flake in shards 1 and 3) · `npm run atlas:publi
 **Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2612 tests green (4 shards;
 pre-existing `onTaskUpdate` RPC flake in shard 3) · `npm run atlas:publish:integrity-smoke` 5/5
 scans green.
+
+- [x] **X3. A ride-on sound on a DM-only region can survive into the player build.** ✅ DONE 2026-07-25 — commit 613e718a
+
+**Implementation:**
+- `scripts/atlas/filterSoundscape.ts`: `filterSoundscapeForPlayer` now accepts the map's `regions`
+  array. For any area with a `regionId` (a ride-on area, which never carries its own `visibility`
+  field), it resolves effective visibility by looking the region up in `regions` and drops the area
+  if the region is `dm`/`hidden` or the `regionId` no longer resolves to any region. Sound-only areas
+  (own polygon + own `visibility` field) are filtered exactly as before.
+- `scripts/build-atlas.ts`: the player-strip call site now passes `m.regions` (already attached to
+  each map earlier in the build) alongside `m.soundscape`.
+- `src/test/sound/filterSoundscape.test.ts`: 8 new cases cover dm/hidden/player/rumor region
+  resolution, a dangling `regionId`, an area's own `visibility` being ignored when `regionId` is
+  set (region wins), and the no-regions-passed defensive default; one pre-existing test updated to
+  pass a matching region instead of relying on the area's own (now-ignored) `visibility` field.
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2620 tests green (4 shards;
+pre-existing `onTaskUpdate` RPC flake in shards 1 and 3) · `npm run atlas:publish` 12/12 scans green
+(leak-surface fix, full publish gate per spec).
