@@ -377,6 +377,36 @@ describe("ImportStagingModal", () => {
     expect(visSelect.getAttribute("aria-disabled")).not.toBe("true");
   });
 
+  it("create row — visibility select is disabled with a DM-only-safety tooltip", () => {
+    const rows = buildStagingRows(
+      [{ filename: "new-npc.md", raw: "---\natlas: { type: npc, id: new-npc }\n---\n" }],
+      makeCtx(),
+    );
+    render(<Harness initial={rows} />);
+    const visSelect = screen.getByLabelText(/visibility for new-npc\.md/i) as HTMLButtonElement;
+    expect(
+      visSelect.hasAttribute("disabled") || visSelect.getAttribute("aria-disabled") === "true",
+    ).toBe(true);
+    expect(visSelect.getAttribute("title")).toMatch(/saved DM-only for safety/i);
+  });
+
+  it("path-collision row — visibility select is disabled with a DM-only-safety tooltip", () => {
+    const existingPaths = new Set(["content/astrath-deeprealm/settlements/thornhold.md"]);
+    const ctx = makeCtx({ existingPaths });
+    const rows = buildStagingRows(
+      [{ filename: "thornhold.md", raw: "---\natlas: { type: settlement, id: thornhold }\n---\n" }],
+      ctx,
+    );
+    render(<Harness initial={rows} ctx={ctx} />);
+    const visSelect = screen.getByLabelText(
+      /visibility for thornhold\.md/i,
+    ) as HTMLButtonElement;
+    expect(
+      visSelect.hasAttribute("disabled") || visSelect.getAttribute("aria-disabled") === "true",
+    ).toBe(true);
+    expect(visSelect.getAttribute("title")).toMatch(/saved DM-only for safety/i);
+  });
+
   it("needsReview row shows plain-language reason badge", () => {
     const reviewRow = {
       id: "r8",
