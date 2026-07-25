@@ -168,16 +168,6 @@ is for sequencing, not the whole spec.
 
 - [x] **Q38. Honor prefers-reduced-motion for calm-mode motion without silencing sound.** ✅ DONE 2026-07-25 — commit 77149da6
 
-#### Q-F — DM editor ergonomics
-
-- [ ] **Q47. Add a 'No matches' empty state to the command palette.**
-  `CommandPalette` (src/atlas/shell/CommandPalette.tsx) renders an empty `<ul>` (lines 61-78) when `results.length === 0`, leaving a blank void under the input. When `results.length === 0`, render a single muted row instead — e.g. `No matches for "{q}"` using `text-muted-foreground`, non-selectable — so the DM knows the search ran and found nothing. Keep the normal result list when there are matches.
-  - **Done when:** typing a query with no matches shows the "No matches for …" row (query echoed) instead of an empty list; a render test asserts it appears only at zero results.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Editor-only; one-component change on the command palette.
-  ~1 run.
-
-
 #### Q-G — DM import & Obsidian fidelity
 
 - [ ] **Q48. Resolve heading-anchor wikilinks in the navigable path (heading anchors only).**

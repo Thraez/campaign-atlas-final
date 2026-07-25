@@ -1469,3 +1469,20 @@ fork point at merge time, confirmed via `git fetch` immediately before merging).
 failures both times). Editor-only (`__INCLUDE_EDITOR__`-gated) — no build/scan pipeline touched, so
 `atlas:publish` not required. Clean merge into `auto/continuous-dev` (no concurrent runs — origin tip
 matched the run's fork point at merge time, confirmed via `git fetch` immediately before merging).
+
+- [x] **Q47. Add a 'No matches' empty state to the command palette.** ✅ DONE 2026-07-25 — commit 2f15a7b8
+
+**Implementation:**
+- `src/atlas/shell/CommandPalette.tsx`: the results `<ul>` now renders a single muted, non-selectable
+  row (`No matches for "<query>"`, `text-muted-foreground`) when `results.length === 0`, instead of an
+  empty list. The normal result buttons render unchanged whenever there's at least one match.
+- Tests: `src/test/shell/CommandPalette.test.tsx` gained 2 cases — the empty-state row appears with the
+  query echoed on a no-match search, and is absent when results exist. The other 7 pre-existing cases
+  stayed green untouched.
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2665 tests green (4 shards:
+666+577+773+649; pre-existing `onTaskUpdate` RPC worker-communication timeout in shard 3, 0 tests failed
+— known flake signature, not a real failure). Editor-only (`__INCLUDE_EDITOR__`-gated) — no build/scan
+pipeline touched, `atlas:publish` not run. Clean merge into `auto/continuous-dev` (no concurrent runs —
+origin tip matched the run's fork point at merge time, confirmed via `git fetch` immediately before
+merging).
