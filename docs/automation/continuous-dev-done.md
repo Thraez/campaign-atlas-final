@@ -1775,3 +1775,33 @@ info-only per the auditor's existing design). Build artifacts regenerated during
 with `git checkout --` before the merge — no artifact diff reached `auto/continuous-dev`. Clean merge (no
 concurrent runs — origin tip matched the run's fork point at merge time, confirmed via `git fetch`
 immediately before merging).
+
+- [x] **Q57. Correct the audit-assets publish-block message to match its real oversize trigger.** ✅ DONE
+  2026-07-26 — commit 753c36b9
+
+**What shipped:** `runPublishScans` (`scripts/atlas/publishScan.ts`) calls `runAuditAssets` non-strict, so
+the only path that returns the blocking exit code `13` is `sizeErrors.length > 0` — an image over the
+4 MB hard cap (`audit-assets.ts` line 493). Orphans and broken refs are warn/info only in this mode. But
+`MSG["audit-assets"]` said "referenced but missing (or an unused image needs cleanup)", which never
+describes the actual block reason a DM would see. Rewritten to "An image is larger than the 4 MB limit
+and must be optimized before publishing."
+
+**Implementation:**
+- `scripts/atlas/publishScan.ts`: `MSG` exported (was module-private) so the new message string is
+  directly testable without mocking the scan pipeline; only the `audit-assets` entry's text changed.
+- Tests: `scripts/atlas/publishScan.test.ts` +1 case asserting the message mentions the 4 MB limit and
+  does NOT mention "missing"/"unused".
+- Scoped rescope from the queue's own "optionally add an `audit-assets-oversize` reason variant" —
+  skipped as genuinely optional; the done-when criteria only required the message text and a test, and
+  adding a second `PublishScanReason["scan"]` value would touch `publishTypes.ts` plus every consumer of
+  the union for no behavior change this run needs.
+
+**Gate:** touches the publish safety-scan adapter, so both `npm run atlas:publish:integrity-smoke` (all 5
+planted faults caught) and `npm run atlas:publish` (all 12 orchestrator scans clean) were run in addition
+to the standard gate. typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2729 tests green (4
+shards: 686+581+794+668). Known non-real `onTaskUpdate` RPC worker-communication timeout in shard 3 (0
+tests failed — same documented flake signature). Build artifacts regenerated during the publish gate
+(`atlas.json`/`search-index.json`, audio `manifest.json` LF/CRLF) were reverted with `git checkout --`
+before the commit — no artifact diff reached `auto/continuous-dev`. Clean merge (no concurrent runs —
+origin tip matched the run's fork point at merge time, confirmed via `git fetch` immediately before
+merging).

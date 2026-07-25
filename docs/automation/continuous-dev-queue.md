@@ -173,13 +173,6 @@ is for sequencing, not the whole spec.
 
 #### Q-H — DM publish, backup & assets
 
-- [ ] **Q57. Correct the audit-assets publish-block message to match its real trigger.**
-  In `scripts/atlas/publishScan.ts`, `runPublishScans` calls `runAuditAssets` non-strict (lines 172-176), and `audit-assets.run()` returns the blocking `13` ONLY when an image exceeds the 4 MB hard cap (`sizeErrors.length > 0`, audit-assets.ts line 458) — orphans and broken refs are warn/info in non-strict mode. But `MSG["audit-assets"]` (line 38-39) says "referenced but missing (or an unused image needs cleanup)", which is never the actual block reason. Rewrite it to describe the oversize block (e.g. "An image is larger than the 4 MB limit and must be optimized before publishing."). Optionally add an `audit-assets-oversize` value to the `PublishScanReason["scan"]` union in `src/atlas/publish/publishTypes.ts` (updating the MSG map) so the DM learns which file is too big.
-  - **Done when:** the audit-assets block message describes an oversize image, not a missing/unused one; `scripts/atlas/publishScan.test.ts` asserts the new copy.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest) + `npm run atlas:publish` + `npm run atlas:publish:integrity-smoke` (touches the publish safety-scan adapter).
-  Message stays generated from the static template (D8: never echoes a secret).
-  ~1 run.
-
 - [ ] **Q58. Show real file size and an oversize flag per image in the Asset Manager.**
   `src/atlas/assets/AssetManagerPanel.tsx` (editor-only) lists each asset from `collectAssets(project)` but never shows byte size. For each row, fetch the served asset (`fetch(normalizeAtlasAssetUrl(a.src)).then(r=>r.blob()).then(b=>b.size)`), cache the size in local state, render it (e.g. "1.8 MB"), and flag rows over the audit thresholds — import `SIZE_WARN_BYTES` (1 MB) / `SIZE_ERROR_BYTES` (4 MB) from `scripts/atlas/audit-assets.ts` — with an inline "optimize this image" hint. Handle a failed fetch gracefully (render no size, never crash the panel).
   - **Done when:** each asset row shows its size, oversize rows show the warn/error hint, and `src/test/assets/AssetManagerPanel.test.tsx` covers a mocked oversize fetch (size shown + hint) and a fetch failure.
