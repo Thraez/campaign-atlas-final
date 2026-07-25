@@ -170,13 +170,6 @@ is for sequencing, not the whole spec.
 
 #### Q-F — DM editor ergonomics
 
-- [ ] **Q40. Add Cmd/Ctrl+S keyboard shortcut to save.**
-  In `useEditorKeyboardShortcuts` (src/atlas/shell/useEditorKeyboardShortcuts.ts) add a third global `keydown` effect that intercepts Cmd/Ctrl+S: call `e.preventDefault()` (suppresses the browser Save dialog) then invoke a new `onSave` callback. Thread `onSave` through `UseEditorKeyboardShortcutsArgs` and wire it from AtlasPlacementEditor.tsx at the existing hook call (line ~990) as `onSave={onSaveClick}` — `onSaveClick` is defined at line 797. No-op when the session is clean or already saving (guard inside `onSaveClick`, or pass a `canSave` flag). Unlike the undo/redo effect, Save must fire even when focus is in an input/textarea, so do NOT gate it on the `isEditableTarget` check.
-  - **Done when:** pressing Cmd/Ctrl+S in the editor triggers a save and never opens the browser Save dialog; a hook unit test asserts preventDefault + onSave fired, and that it no-ops when clean/saving.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Editor-only (`__INCLUDE_EDITOR__`-gated); no player surface.
-  ~1 run.
-
 - [ ] **Q41. Wire Cmd+B / Cmd+I / Cmd+K formatting shortcuts in the body editor.**
   In `EntityEditPanel.handleBodyKeyDown` (src/atlas/categories/EntityEditPanel.tsx:332) the first line `if (!acCtx) return;` bails when the autocomplete popover is closed. BEFORE that guard, when `(e.metaKey||e.ctrlKey)` and the popover is closed, map `b→"bold"`, `i→"italic"`, `k→"wikilink"` (real `ToolbarActionId`s in src/atlas/editor/toolbarActions.ts), `e.preventDefault()`, and route through the existing `handleToolbarAction(id)` (lines 215-231, which calls `applyToolbarAction` against the live selection). Also add `title` tooltips ("Bold (Ctrl+B)" / "Italic (Ctrl+I)" / "Wikilink (Ctrl+K)") to the matching `ALWAYS` buttons in FormatToolbar.tsx (lines 80-84).
   - **Done when:** with the popover closed, Cmd/Ctrl+B/I/K apply bold/italic/wikilink to the selection via the toolbar pipeline; the toolbar buttons show the shortcut in their tooltip; a test asserts the keydown → applyToolbarAction wiring.

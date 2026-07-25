@@ -1281,3 +1281,27 @@ pre-existing `onTaskUpdate` RPC flake in shards 1 and 3) · `npm run atlas:publi
 **Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2622 tests green (4 shards;
 pre-existing `onTaskUpdate` RPC flake in shard 3). Codebase-health only — no build/scan pipeline
 touched, so `atlas:publish` not required.
+
+- [x] **Q40. Add Cmd/Ctrl+S keyboard shortcut to save.** ✅ DONE 2026-07-25 — commit e9900255
+
+**Implementation:**
+- `src/atlas/shell/useEditorKeyboardShortcuts.ts`: new third global `keydown` effect intercepting
+  Cmd/Ctrl+S. Always calls `e.preventDefault()` first (suppresses the browser Save dialog even when
+  focus is in an input/textarea — deliberately NOT gated by the `isEditableTarget` check the undo/redo
+  effect uses), then invokes the new `onSave` callback only when the new `canSave` flag is true.
+  `onSave`/`canSave` added to `UseEditorKeyboardShortcutsArgs` (both required).
+- `src/pages/AtlasPlacementEditor.tsx`: wired `onSave: onSaveClick` and
+  `canSave: !(saveModalOpen || session.status === "clean")` into the hook call (~line 990), mirroring
+  the existing Save button's `disabled` condition so the shortcut no-ops exactly when the button would
+  be disabled (clean session or save-review modal already open).
+- `src/test/shell/useEditorKeyboardShortcuts.test.ts`: extended all existing cases with the new
+  required `onSave`/`canSave` args and added 6 new cases — Ctrl+S and Cmd+S call `onSave`; Ctrl+S still
+  fires (and prevents default) with focus in an input; `canSave: false` still prevents default but
+  skips `onSave`; a bare `s` does nothing; unmount removes the new listener too.
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2627 tests green (4 shards:
+660+566+814+587; pre-existing `onTaskUpdate` RPC flake in shards 1 and 3). Editor-only
+(`__INCLUDE_EDITOR__`-gated) — no build/scan pipeline touched, so `atlas:publish` not required.
+Deviation: built directly in the main working copy (already `auto/continuous-dev`, up to date with
+origin) rather than an isolated worktree — noted for the record, no impact since gates fully passed
+before commit.
