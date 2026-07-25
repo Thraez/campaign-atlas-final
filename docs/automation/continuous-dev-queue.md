@@ -170,13 +170,6 @@ is for sequencing, not the whole spec.
 
 #### Q-F — DM editor ergonomics
 
-- [ ] **Q41. Wire Cmd+B / Cmd+I / Cmd+K formatting shortcuts in the body editor.**
-  In `EntityEditPanel.handleBodyKeyDown` (src/atlas/categories/EntityEditPanel.tsx:332) the first line `if (!acCtx) return;` bails when the autocomplete popover is closed. BEFORE that guard, when `(e.metaKey||e.ctrlKey)` and the popover is closed, map `b→"bold"`, `i→"italic"`, `k→"wikilink"` (real `ToolbarActionId`s in src/atlas/editor/toolbarActions.ts), `e.preventDefault()`, and route through the existing `handleToolbarAction(id)` (lines 215-231, which calls `applyToolbarAction` against the live selection). Also add `title` tooltips ("Bold (Ctrl+B)" / "Italic (Ctrl+I)" / "Wikilink (Ctrl+K)") to the matching `ALWAYS` buttons in FormatToolbar.tsx (lines 80-84).
-  - **Done when:** with the popover closed, Cmd/Ctrl+B/I/K apply bold/italic/wikilink to the selection via the toolbar pipeline; the toolbar buttons show the shortcut in their tooltip; a test asserts the keydown → applyToolbarAction wiring.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Editor-only; reuses the already-tested pure `applyToolbarAction` transforms, no new logic invented.
-  ~2–3 runs.
-
 - [ ] **Q42. Replace native confirm() dialogs with an in-app confirm.**
   Extract a reusable `ConfirmDialog` (model it on `DiscardConfirmModal`, src/atlas/session/DiscardConfirmModal.tsx — safe/cancel action default-focused, Esc dismisses) and swap it in for the four browser `confirm()` guards on destructive actions: delete region (RegionsTab.tsx:241), delete route (RoutesTab.tsx:294), clear all reveals (FogTab.tsx:463), clear all fog shapes (FogTab.tsx:505). Each action must run only after in-app confirmation.
   - **Done when:** none of those four sites call `window.confirm`; each shows the in-app `ConfirmDialog` and only deletes/clears on confirm; a render test covers confirm + cancel for at least one site.

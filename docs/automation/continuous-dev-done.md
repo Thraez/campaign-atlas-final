@@ -1305,3 +1305,29 @@ touched, so `atlas:publish` not required.
 Deviation: built directly in the main working copy (already `auto/continuous-dev`, up to date with
 origin) rather than an isolated worktree — noted for the record, no impact since gates fully passed
 before commit.
+
+- [x] **Q41. Wire Cmd+B / Cmd+I / Cmd+K formatting shortcuts in the body editor.** ✅ DONE 2026-07-25 — commit 3eaf3393
+
+**Implementation:**
+- `src/atlas/categories/EntityEditPanel.tsx` `handleBodyKeyDown`: before the existing
+  `if (!acCtx) return;` guard, when the autocomplete popover is closed (`!acCtx`) and a Cmd/Ctrl
+  modifier is held, maps `b→"bold"`, `i→"italic"`, `k→"wikilink"` (existing `ToolbarActionId`s),
+  calls `e.preventDefault()`, and routes through the existing `handleToolbarAction(id)` — the same
+  pipeline the toolbar buttons use (`applyToolbarAction` against the live textarea selection). With
+  the popover open the combo is left alone so it doesn't fight suggestion navigation (ArrowUp/Down,
+  Enter/Tab, Escape).
+- `src/atlas/editor/FormatToolbar.tsx`: `ALWAYS` entries for Bold/Italic/Wikilink gained an optional
+  `title` ("Bold (Ctrl+B)" / "Italic (Ctrl+I)" / "Wikilink (Ctrl+K)"), rendered as the button's `title`
+  attribute; buttons without a defined shortcut render no `title`.
+- Tests: `src/test/categories/EntityEditPanel.test.tsx` — Ctrl+B wraps the selection bold, Ctrl+K wraps
+  as a wikilink, Cmd+I (metaKey) applies italic, and Ctrl+B is a no-op while the wikilink-autocomplete
+  popover is open (typed `[[` first). `src/test/editor/FormatToolbar.test.tsx` — asserts the tooltip
+  text on Bold/Italic/Wikilink and that untouched buttons (Highlight, Callout) get no `title`.
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2633 tests green (4 shards:
+660+568+818+587; pre-existing `onTaskUpdate` RPC flake, seen twice in shard 3 this run — likely more
+frequent because a concurrent scheduled run (`run/q42-confirm-dialog`, its own isolated worktree) was
+competing for CPU at the same time; no real failures). Editor-only (`__INCLUDE_EDITOR__`-gated) — no
+build/scan pipeline touched, so `atlas:publish` not required. Same worktree deviation as Q40 (built
+directly in the main working copy); confirmed via `git worktree list` that the concurrent scheduled run
+was isolated in its own worktree/directory, so no filesystem collision occurred.
