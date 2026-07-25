@@ -170,13 +170,6 @@ is for sequencing, not the whole spec.
 
 #### Q-G — DM import & Obsidian fidelity
 
-- [ ] **Q54. Warn when frontmatter tags/aliases are a comma-jammed scalar string.**
-  `toStringArray` (`scripts/atlas/parseFrontmatter.ts:111-116`) turns a scalar like `tags: npc, smuggler` into a single bogus tag `['npc, smuggler']` with no signal, silently corrupting tag-based filtering/inference. In `parseFrontmatter`, when `atlas.tags` / `data.tags` (line 75) or `aliases` (line 71) arrive as a single comma-containing string, push a build warning into the existing `warnings` array (e.g. 'atlas.tags should be a YAML list — treated as one tag'); optionally split on commas, kept behind the warning. Surface the same signal in the import staging extraction (`src/atlas/import/stagingState.ts`).
-  - **Done when:** a comma-jammed tags/aliases scalar produces a build warning; already-list tags/aliases are untouched (test); `src/test/atlas-import.test.ts` covers the warning (and the split, if implemented).
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest) + `npm run atlas:publish` (`parseFrontmatter` is in the build pipeline and tags ship in atlas.json).
-  Additive warning only; if auto-splitting is added, test that already-list tags stay byte-identical.
-  ~1 run.
-
 - [ ] **Q55. Tell the DM up front when Sync needs a DM build loaded.**
   `openWithVaultScan` throws `DmBuildRequiredError` only AFTER 'Sync now' is clicked when `existingById` is empty (`src/atlas/import/useMdImportFlow.ts:116-121`), surfacing as a late toast. Add a `hasDmBuild` boolean prop to `SyncPanel` (`src/atlas/sync/SyncPanel.tsx`) and thread it from `AtlasPlacementEditor` (mount at `AtlasPlacementEditor.tsx:1760`, which owns `existingById` → `existingById.size > 0`). When false, render an inline note near the Sync button: 'Rebuild in DM mode first — Sync merges against the full DM atlas.' Optionally disable the Sync button while false so the precondition is actionable before clicking.
   - **Done when:** SyncPanel shows the inline precondition note when no DM build/entities are loaded, before the DM clicks Sync; `src/test/sync-panel.test.tsx` asserts the note renders for `hasDmBuild=false` and is absent for `true`.

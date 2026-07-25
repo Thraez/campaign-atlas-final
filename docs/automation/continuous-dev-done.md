@@ -1670,3 +1670,44 @@ typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2705 tests gree
 again this run (0 tests failed — same documented flake signature). Clean merge into `auto/continuous-dev`
 (no concurrent runs — origin tip matched the run's fork point at merge time, confirmed via `git fetch`
 immediately before merging).
+
+- [x] **Q54. Warn when frontmatter tags/aliases are a comma-jammed scalar string.** ✅ DONE 2026-07-25 —
+  commit 5c696246
+
+**What shipped:** `toStringArray` (`scripts/atlas/parseFrontmatter.ts`) silently turned a scalar like
+`tags: npc, smuggler` into a single bogus tag `['npc, smuggler']` with no signal to the DM, corrupting
+tag-based filtering/inference. `parseFrontmatter` now pushes a build warning
+(`"<path>: atlas.tags should be a YAML list, not a comma-separated string — treated as one value"`) when
+`atlas.tags`/`data.tags` or `atlas.aliases`/`data.aliases` arrive as a comma-containing string.
+Warn-only — the value is still wrapped as a single-entry array exactly as before (no split), so nothing
+downstream needs a new shape and already-list tags/aliases are provably byte-identical. The same signal
+is surfaced in the import staging flow (`src/atlas/import/stagingState.ts`) as a
+`frontmatterWarning` field on `StagingRow`, shown in `ImportStagingModal` as an amber badge + tooltip
+("Comma-separated tags/aliases").
+
+**Implementation:**
+- `scripts/atlas/parseFrontmatter.ts`: new `toStringArrayWarnIfCommaJammed` wraps the existing
+  `toStringArray`, used at the `aliases` and `tags` call sites only (`images` stays on the original
+  `toStringArray` — untouched, not in scope).
+- `src/atlas/import/stagingState.ts`: new `commaJammedWarning(rawTags, rawAliases)` helper mirrors the
+  same detection; `extractStagingFields`/`buildStagingRow` thread it onto a new
+  `StagingRow.frontmatterWarning` field. `updateStagingRow` already spreads `...row` first, so the field
+  survives DM edits with no extra wiring needed.
+- `src/atlas/import/ImportStagingModal.tsx`: renders the warning as a `Tooltip`-wrapped amber `Badge`
+  in the row's status column, alongside the existing parse-error/allowlist/collision/review badges.
+- Tests: `src/test/atlas-parser.test.ts` +6 cases (warns on comma-jammed `atlas.tags`, flat `tags`, and
+  `atlas.aliases`; does NOT warn on a proper list or a single no-comma tag; already-list tags/aliases stay
+  byte-identical with zero warnings). `src/test/import-staging-state.test.ts` +3 cases (flags
+  `frontmatterWarning` for jammed tags, jammed aliases, and absent for a clean list).
+  `src/test/import-staging-modal.test.tsx` +2 cases (badge shown/absent).
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2716 tests green (4 shards:
+674+581+794+667). Known non-real `onTaskUpdate` RPC worker-communication timeout in shard 3 (0 tests
+failed — same documented flake signature). Touches the build pipeline (`parseFrontmatter.ts` feeds
+`build-atlas.ts` and tags ship in `atlas.json`) — `npm run atlas:publish:integrity-smoke` (all 5 planted
+faults caught) and `npm run atlas:publish` (all 12 orchestrator scans clean; player build unaffected —
+pre-existing oversize-map/orphan-asset warnings only) both green. Build artifacts regenerated during the
+publish gate and the pre-commit hook's `vitest run --changed` (`atlas.json`/`search-index.json`
+version/publishedAt stamp, audio `manifest.json` LF/CRLF) were reverted before/after commit — no artifact
+diff carried into the merge. Clean merge into `auto/continuous-dev` (no concurrent runs — origin tip
+matched the run's fork point at merge time, confirmed via `git fetch` immediately before merging).
