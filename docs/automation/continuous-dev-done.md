@@ -1209,3 +1209,19 @@ browser leaves a clean state instead of a dead mute button.
 
 **Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · ~2605 tests green
 (4 shards; pre-existing shard-3 RPC flake).
+
+- [x] **X1. Ambient sound 404s in every build — `audioUrl` double-prefixes an already-pathed `src`.** ✅ DONE 2026-07-25 — commit d82d8ba9
+
+**Implementation:**
+- `src/atlas/sound/AudioEngine.ts`: `audioUrl()` now also treats a src already starting with the
+  `atlas/assets/audio/` dir prefix as already-resolved (alongside the existing absolute-path and
+  `http`/`https` checks), so the hashed src `rewriteAudioSrcs` writes at build time is no longer
+  re-prefixed a second time at playback — the previous 404 (`atlas/assets/audio/atlas/assets/audio/<hash>.ogg`)
+  is fixed.
+- `src/test/sound/AudioEngine.test.ts`: 2 new tests — a bare filename (`ocean.ogg`) still gets
+  prefixed once; an already-pathed src (`atlas/assets/audio/deadbeef.ogg`) is left unchanged
+  (reproduced the double-prefix before the fix, confirmed the fix after).
+
+**Gate:** typecheck clean · eslint 0 errors (18 pre-existing warnings) · 2607 tests green (4 shards;
+pre-existing `onTaskUpdate` RPC flake in shards 1 and 3) · `npm run atlas:publish:integrity-smoke`
+5/5 scans green.

@@ -41,10 +41,7 @@ is for sequencing, not the whole spec.
 > then continue with Q2** (Q1 is already ✅ DONE). Same guardrails as every unit: one per run, full gate,
 > merge to `auto/continuous-dev` only, then move the finished unit to `continuous-dev-done.md`.
 
-- [ ] **X1. Ambient sound 404s in every build — `audioUrl` double-prefixes an already-pathed `src`.** _(was N96; ~1 run)_
-  The build writes `bed.src` as a full path (`rewriteAudioSrcs` → `atlas/assets/audio/<hash>.ogg`, `scripts/atlas/hashAudioAssets.ts:39`), and `public/atlas/atlas.json` confirms it. At runtime `prepareAreas` passes `bed` through unchanged (`src/atlas/sound/resolveSoundscape.ts:34`) and `AudioEngine.audioUrl()` (`src/atlas/sound/AudioEngine.ts:20-22`) re-prepends `atlas/assets/audio/` to any `src` not starting with `/` or `http` → `atlas/assets/audio/atlas/assets/audio/<hash>.ogg` → 404. Ambient audio never plays. Fix: make `audioUrl()` idempotent (don't prepend when `src` already contains the audio path or a slash).
-  - **Done when:** a player build's ambient beds fetch the correct URL and play; a unit test pins `audioUrl()` against both a bare filename and an already-pathed `atlas/assets/audio/...` src.
-  - **Gate:** standard gate (typecheck + ESLint + sharded Vitest); also `npm run atlas:publish:integrity-smoke`.
+- [x] **X1. Ambient sound 404s in every build — `audioUrl` double-prefixes an already-pathed `src`.** ✅ DONE 2026-07-25 — commit d82d8ba9
 
 - [ ] **X2. A sound zone with no file chosen yet crashes the entire player build.** _(was N97; ~1 run)_
   A ride-on area and a fresh sound-only zone default to `bed: { src: "" }` (`src/atlas/sound-editor/useSoundscapeDraft.ts:207,193`), and a missing file is only a non-blocking warning. But `hashAudioAssets` does `readFileSync(path.join(publicDir, ""))` for an empty src — that resolves to the public dir itself and throws `EISDIR`, and `scripts/build-atlas.ts:822` has no try/catch around it, so the whole player build aborts.
