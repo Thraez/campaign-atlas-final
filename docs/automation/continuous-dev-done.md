@@ -2576,3 +2576,28 @@ across the 4 shards (689+620+843+623; shards 1 and 3 hit the documented `onTaskU
 branch `run/q81-download-blob` to be cleaned up after merge. No concurrency this run — origin tip
 matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
 before each).
+
+- [x] **Q82. Extract useExternalRebuildDetector hook from the editor.** ✅ DONE
+  2026-07-26 — commit 03de35af
+
+**What shipped:** new `src/atlas/session/useExternalRebuildDetector.ts` exporting
+`useExternalRebuildDetector(project, setProject)` → `{ externalRebuildAt, reloadCanon }`. Moved the
+30s `publishedAt`-diff poller (with its `cancelled` flag + timer cleanup and the
+`// eslint-disable-next-line react-hooks/exhaustive-deps` on `[project?.publishedAt]`) and
+`reloadCanon()` out of `AtlasPlacementEditor.tsx` verbatim — same toast copy ("Canon rebuilt
+externally" / "Canon reloaded from disk" / reload-failure), same 30s cadence, same behavior. The
+editor now consumes the hook via one destructuring line in place of the ~50-line inline block.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — pure refactor, no build/scan/fog/
+artifact touch, so `atlas:publish` wasn't required. `npm run typecheck` clean · `npm run lint` 0
+errors (18 pre-existing warnings, no new ones) · 2775 tests green across the 4 shards
+(689+620+843+623; shard 3 hit the documented `onTaskUpdate` RPC flake as an "Errors" count with every
+test in that shard still green). Pre-commit hook also passed.
+
+**Commits:** `03de35af` (refactor, on `run/q82-external-rebuild-hook`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q82` and
+branch `run/q82-external-rebuild-hook` to be cleaned up after merge. No concurrency this run — origin
+tip matched the fork point at worktree creation and at merge time (confirmed via `git fetch`
+immediately before each).

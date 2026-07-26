@@ -181,13 +181,6 @@ is for sequencing, not the whole spec.
 
 #### Q-K — Code health & refactor
 
-- [ ] **Q82. Extract useExternalRebuildDetector hook from the editor.**
-  Move the self-contained rebuild-conflict unit out of `AtlasPlacementEditor.tsx` (lines ~251-297): the `externalRebuildAt` state, the 30s polling `useEffect` that compares `loadAtlasContent(true).publishedAt` against the loaded `project.publishedAt` and toasts "Canon rebuilt externally", and `reloadCanon()`. Create `src/atlas/session/useExternalRebuildDetector.ts` taking the loaded project + a `setProject` callback and returning `{ externalRebuildAt, reloadCanon }`. Preserve the `// eslint-disable-next-line react-hooks/exhaustive-deps` on the `[project?.publishedAt]` dep and the `cancelled` flag + timer cleanup exactly.
-  - **Done when:** editor behavior is identical (background rebuild toast + Reload-canon still work), the polling logic lives in the new hook, the editor consumes it, and tests pass.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Editor-only: keep the hook under src/atlas/session and import it only from the editor entry so it stays tree-shaken from player builds (invariant 4).
-  ~1 run.
-
 - [ ] **Q83. Tighten webkitAudioContext window cast off `any`.**
   In `src/atlas/sound/realAudioDeps.ts:4`, replace `(window as any).webkitAudioContext` with a narrow typed cast: `(window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext`. No runtime change — `createContext` still prefers `window.AudioContext` and falls back to the webkit-prefixed constructor.
   - **Done when:** the module has no non-test `as any`, typecheck + lint pass, and AudioContext creation behavior is unchanged.
