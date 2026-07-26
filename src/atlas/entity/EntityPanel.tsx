@@ -15,6 +15,7 @@ import {
   importNotesJson,
 } from "@/atlas/notes/playerNotes";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
+import { downloadBlob } from "@/atlas/tabs/download";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { printEntityHandout } from "@/atlas/printHandout";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
@@ -135,14 +136,9 @@ function NotesPanel({ entityId, entityTitle }: { entityId: string; entityTitle: 
   const handleExport = useCallback(() => {
     const json = exportNotesJson();
     const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `atlas-player-notes-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    downloadBlob(`atlas-player-notes-${new Date().toISOString().slice(0, 10)}.json`, blob, {
+      toast: false,
+    });
   }, []);
 
   const handleImport = useCallback(

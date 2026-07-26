@@ -26,6 +26,7 @@ import {
   Package,
 } from "lucide-react";
 import { fileToDataUrl, readImageSize } from "@/atlas/content/browserFile";
+import { downloadBlob } from "@/atlas/tabs/download";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -174,7 +175,7 @@ export function MapImportWizard({
       if (m) zip.file(a.targetPath, m[1], { base64: true });
     }
     const blob = await zip.generateAsync({ type: "blob" });
-    triggerBlob("atlas-map-import.zip", blob);
+    downloadBlob("atlas-map-import.zip", blob, { toast: false });
     toast.success("Map import package downloaded.");
   };
 
@@ -787,12 +788,3 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-// ---------- Browser helpers --------------------------------------------------
-
-function triggerBlob(filename: string, blob: Blob) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
