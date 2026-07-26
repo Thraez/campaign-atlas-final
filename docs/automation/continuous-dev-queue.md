@@ -181,13 +181,6 @@ is for sequencing, not the whole spec.
 
 #### Q-K — Code health & refactor
 
-- [ ] **Q81. Add downloadBlob() and dedupe blob-download call sites.**
-  In `src/atlas/tabs/download.ts` add `downloadBlob(filename, blob, opts?: { toast?: boolean })` (createObjectURL → anchor → click → revokeObjectURL; `toast.success` only when `opts.toast`), and refactor the existing `downloadText` (download.ts:4) to build the Blob and delegate to it with `{ toast: true }`. Replace MapImportWizard's private `triggerBlob` (MapImportWizard.tsx:809) and EntityPanel's inline export block (EntityPanel.tsx:135-143) with `downloadBlob(name, blob, { toast: false })` — both currently download silently.
-  - **Done when:** `triggerBlob` and the inline anchor block are gone, `downloadText` still toasts, and the MapImportWizard/EntityPanel exports still download without a toast; tests green.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  EntityPanel's handler appends the anchor to `document.body` before click and removes it (Firefox safeguard) — have `downloadBlob` append+remove so that path is preserved.
-  ~1 run.
-
 - [ ] **Q82. Extract useExternalRebuildDetector hook from the editor.**
   Move the self-contained rebuild-conflict unit out of `AtlasPlacementEditor.tsx` (lines ~251-297): the `externalRebuildAt` state, the 30s polling `useEffect` that compares `loadAtlasContent(true).publishedAt` against the loaded `project.publishedAt` and toasts "Canon rebuilt externally", and `reloadCanon()`. Create `src/atlas/session/useExternalRebuildDetector.ts` taking the loaded project + a `setProject` callback and returning `{ externalRebuildAt, reloadCanon }`. Preserve the `// eslint-disable-next-line react-hooks/exhaustive-deps` on the `[project?.publishedAt]` dep and the `cancelled` flag + timer cleanup exactly.
   - **Done when:** editor behavior is identical (background rebuild toast + Reload-canon still work), the polling logic lives in the new hook, the editor consumes it, and tests pass.

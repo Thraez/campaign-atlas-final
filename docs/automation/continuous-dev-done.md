@@ -2544,3 +2544,35 @@ before committing. Pre-commit hook also passed.
 branch `run/q80-browser-file-helpers` to be cleaned up after merge. No concurrency this run — origin
 tip matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
 before each).
+
+- [x] **Q81. Add downloadBlob() and dedupe blob-download call sites.** ✅ DONE
+  2026-07-26 — commit 9446b7b2
+
+**What shipped:** `downloadBlob(filename, blob, opts?: { toast?: boolean })` added to
+`src/atlas/tabs/download.ts` (createObjectURL → anchor appended to `document.body` → click → remove →
+revokeObjectURL; `toast.success` only when `opts.toast`). `downloadText` now builds the Blob and
+delegates to it with `{ toast: true }` — unchanged observable behavior, confirmed by the existing
+`src/test/tabs/download.test.ts` (2 tests) still passing unmodified. Replaced MapImportWizard's private
+`triggerBlob` with `downloadBlob(name, blob, { toast: false })` (the wizard keeps its own distinct
+"Map import package downloaded." toast right after, so the shared helper's toast stays off to avoid a
+double toast). Replaced EntityPanel's inline anchor-append/click/remove/revoke block (`handleExport`)
+with `downloadBlob(filename, blob, { toast: false })` — both call sites download silently, as before.
+
+**Preserved subtlety:** EntityPanel's original block appended the anchor to `document.body` before
+`click()` and removed it after (a Firefox safeguard) — `downloadBlob` does this unconditionally now, so
+MapImportWizard's `triggerBlob` (which previously did NOT append to the DOM) gained that safeguard too,
+a harmless behavior superset.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — pure refactor, no build/scan/fog/
+artifact touch, so `atlas:publish` wasn't required. `npm run typecheck:all` clean · `npm run lint` 0
+errors (18 pre-existing warnings, no new ones) · `download.test.ts` green standalone · 2775 tests green
+across the 4 shards (689+620+843+623; shards 1 and 3 hit the documented `onTaskUpdate` RPC flake as an
+"Errors" count with every test in those shards still green). Pre-commit hook also passed.
+
+**Commits:** `9446b7b2` (refactor, on `run/q81-download-blob`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q81` and
+branch `run/q81-download-blob` to be cleaned up after merge. No concurrency this run — origin tip
+matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
+before each).
