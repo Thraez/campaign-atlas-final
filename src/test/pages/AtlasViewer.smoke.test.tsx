@@ -182,6 +182,61 @@ describe("MapController reduced-motion (Q28)", () => {
   });
 });
 
+describe("Lazy search-index loading (Q66)", () => {
+  it("does not fetch search-index.json on initial load", async () => {
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(document.querySelector("main#atlas-main")).toBeInTheDocument());
+    const fetchMock = vi.mocked(fetch);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("search-index"))).toBe(false);
+  });
+
+  it("fetches search-index.json once on first search-open, showing a loading state first", async () => {
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(document.querySelector("main#atlas-main")).toBeInTheDocument());
+    const fetchMock = vi.mocked(fetch);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("search-index"))).toBe(false);
+
+    fireEvent.click(document.querySelector('[aria-label="Search atlas (Ctrl+K)"]')!);
+    expect(
+      Array.from(document.querySelectorAll('[role="status"]')).some((el) =>
+        el.textContent?.includes("Loading search"),
+      ),
+    ).toBe(true);
+
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeInTheDocument());
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("search-index")).length).toBe(1);
+  });
+
+  it("does not re-fetch search-index.json when search is closed and reopened", async () => {
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(document.querySelector("main#atlas-main")).toBeInTheDocument());
+
+    fireEvent.click(document.querySelector('[aria-label="Search atlas (Ctrl+K)"]')!);
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).not.toBeInTheDocument());
+
+    fireEvent.click(document.querySelector('[aria-label="Search atlas (Ctrl+K)"]')!);
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeInTheDocument());
+
+    const fetchMock = vi.mocked(fetch);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("search-index")).length).toBe(1);
+  });
+});
+
 describe("MaxBoundsController (Q6)", () => {
   it("calls setMaxBounds on initial load with map extent plus 10% padding", async () => {
     // Default map: 1000×1000; pad = 100
