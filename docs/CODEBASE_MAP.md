@@ -306,11 +306,12 @@ must wrap the tree (it's mounted at `App.tsx` root).
 | `vitest.config.ts` | jsdom env, `setupFiles`, globals, coverage scope, `__INCLUDE_EDITOR__` define |
 | `src/test/setup.ts` | jsdom shims: `ResizeObserver`, `scrollIntoView`, `matchMedia` |
 | `tsconfig.app.json` | src typecheck config (`strict`, `@/*` alias) — `typecheck` must use `-p` on this |
+| `tsconfig.scripts.json` | `scripts/**` typecheck config (`strict`, `@/*` alias, DOM lib for Web Crypto types) — `typecheck:scripts` uses `-p` on this |
 | `tsconfig.json` / `tsconfig.node.json` | solution root (refs) / vite.config config |
 | `eslint.config.js` | flat config; bans `require()` in ESM |
 | `.prettierrc.json` | 100 cols, double quotes, trailing commas |
-| `scripts/pre-commit.sh` | typecheck + eslint + `vitest --changed`; filters infra noise |
-| `.github/workflows/atlas-pr-check.yml` | PR CI: typecheck, format:check, player build, secret/shape scans |
+| `scripts/pre-commit.sh` | `typecheck:all` (app + scripts) + eslint + `vitest --changed`; filters infra noise |
+| `.github/workflows/atlas-pr-check.yml` | PR CI: `typecheck:all`, format:check, player build, secret/shape scans |
 | `src/test/fixtures/{atlas-build,sentinel-vault}` | integration test vaults |
 
 **Traps (the ones that cost time):**
@@ -318,7 +319,8 @@ must wrap the tree (it's mounted at `App.tsx` root).
   Bisect to the offending *file* before blaming memory. A shard can exit 1 on a
   `Timeout calling "onTaskUpdate"` RPC flake with all tests green — re-run it alone.
 - `typecheck` **must** pass `-p tsconfig.app.json`; bare `tsc` resolves the solution root
-  and checks nothing.
+  and checks nothing. Same rule for `scripts/**`: use `npm run typecheck:scripts` (`-p tsconfig.scripts.json`),
+  or `npm run typecheck:all` for both in one shot.
 - `require()` is ESLint-banned (vite.config is esbuild-bundled) — use `import` / `await import()`.
 - jsdom lacks `ResizeObserver`/`scrollIntoView`/`matchMedia`; add shims to `setup.ts`,
   not per-test.
@@ -335,7 +337,7 @@ must wrap the tree (it's mounted at `App.tsx` root).
 | `npm run atlas:build:player` | Strict player atlas | **`public/atlas/`** ⚠️ |
 | `npm run atlas:publish` | Snapshot + player build + prod build + all scans | `public/atlas/`, `dist/` |
 | `npm run atlas:check-secrets <dir>` / `:check-derived <dir>` | Leak scans against an output dir | — |
-| `npm run typecheck` / `lint` / `format:check` | Static gates | — |
+| `npm run typecheck` / `typecheck:scripts` / `typecheck:all` / `lint` / `format:check` | Static gates | — |
 | `npm test` | Vitest (**shard it — see above**) | — |
 
 > ⚠️ `atlas:build:player` and `atlas:publish` regenerate `public/atlas/*.json`. If you
