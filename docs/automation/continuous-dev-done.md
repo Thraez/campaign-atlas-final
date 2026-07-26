@@ -2601,3 +2601,25 @@ test in that shard still green). Pre-commit hook also passed.
 branch `run/q82-external-rebuild-hook` to be cleaned up after merge. No concurrency this run — origin
 tip matched the fork point at worktree creation and at merge time (confirmed via `git fetch`
 immediately before each).
+
+- [x] **Q83. Tighten webkitAudioContext window cast off `any`.** ✅ DONE
+  2026-07-26 — commit 3970e3bd
+
+**What shipped:** `src/atlas/sound/realAudioDeps.ts:4` — replaced `(window as any).webkitAudioContext`
+with `(window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext`. No
+runtime change: `createContext` still prefers `window.AudioContext` and falls back to the
+webkit-prefixed constructor.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — pure type-tightening, no build/scan/
+fog/artifact touch, so `atlas:publish` wasn't required. `npm run typecheck` clean · `npm run lint` 0
+errors (18 pre-existing warnings, no new ones) · 2775 tests green across the 4 shards
+(689+620+843+623; shards 1 and 3 hit the documented `onTaskUpdate` RPC flake as an "Errors" count with
+every test in those shards still green). Pre-commit hook also passed.
+
+**Commits:** `3970e3bd` (refactor, on `run/q83-webkit-audiocontext-cast`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree
+`../campaign-atlas-final-run-q83` and branch `run/q83-webkit-audiocontext-cast` to be cleaned up
+after merge. No concurrency this run — origin tip matched the fork point at worktree creation and at
+merge time (confirmed via `git fetch` immediately before each).

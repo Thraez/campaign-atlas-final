@@ -181,12 +181,6 @@ is for sequencing, not the whole spec.
 
 #### Q-K — Code health & refactor
 
-- [ ] **Q83. Tighten webkitAudioContext window cast off `any`.**
-  In `src/atlas/sound/realAudioDeps.ts:4`, replace `(window as any).webkitAudioContext` with a narrow typed cast: `(window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext`. No runtime change — `createContext` still prefers `window.AudioContext` and falls back to the webkit-prefixed constructor.
-  - **Done when:** the module has no non-test `as any`, typecheck + lint pass, and AudioContext creation behavior is unchanged.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  ~1 run.
-
 - [ ] **Q84. Extract shared draft-mutation core from region/route draft hooks.**
   `useRegionDraft.ts` (draftRef + applyDraft :92-100, mutateDraft :107-122, dirty/dirtyCount :143-145) and `useRouteDraft.ts` (:82-90, :92-107) hold near-identical undo-integrated draft machinery over a `{ edits, added, deleted }` shape. Extract a generic `useDraftCore<T extends { edits: Record<string, unknown>; added: unknown[]; deleted: string[] }>(initial, undoStack?)` into `src/atlas/editor/useDraftCore.ts` exposing `{ draft, applyDraft, mutateDraft, dirty, dirtyCount }` (mutateDraft keeps the before/after snapshot + `undoStack.push({ undo, redo, label })` pattern verbatim). Have both hooks consume it; keep collection-specific logic (points vs waypoints, resolveWaypoint, centroid, effective/issues) in the callers.
   - **Done when:** both hooks delegate draftRef/mutateDraft/dirty computation to useDraftCore, the public RegionDraftAPI/RouteDraftAPI are unchanged, and the region/route draft + undo tests stay green.
