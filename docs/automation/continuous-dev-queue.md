@@ -179,12 +179,6 @@ is for sequencing, not the whole spec.
 
 #### Q-J — CI/CD & developer experience
 
-- [ ] **Q72. Run the full safety-scan orchestrator on pull requests.**
-  `.github/workflows/atlas-pr-check.yml` (the `scan` job, steps at lines 45–56) only runs `atlas:check-secrets`, `atlas:check-shape`, and `atlas:check-derived` — 3 of the 12 scans. Replace those two ad-hoc `run:` steps with a single `npm run atlas:scan` step (the publish-orchestrator at `scripts/atlas/publish-orchestrator.ts`, already used post-merge in `publish-atlas.yml:62`), so fog-safety, image-privacy, player-secrets, and audit-assets leaks are caught pre-merge too. The existing 'Build player-safe atlas' + 'Build site' steps (lines 37–43) already populate `public/atlas` and `dist` before the scan, and the orchestrator resolves `contentRoot` from `atlas.config.json` in the checkout (`resolveContentDir`).
-  - **Done when:** the PR scan job invokes `npm run atlas:scan` in place of the individual check-secrets/check-shape/check-derived steps; all 12 orchestrator scans execute against `dist` and `public/atlas`; `npm run atlas:publish` passes locally on a fresh build.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest) + npm run atlas:publish.
-  Reinforces the safety-scan invariant rather than weakening it; no product surface change. ~1 run.
-
 - [ ] **Q73. Add a sharded vitest job to CI.**
   Neither `.github/workflows/atlas-pr-check.yml` nor `publish-atlas.yml` runs the test suite (~2400 tests across ~150 files), so failing tests can merge. Add a matrix job to `atlas-pr-check.yml` with `strategy.matrix.shard: [1,2,3,4]` running `npx vitest run --pool=forks --poolOptions.forks.maxForks=3 --shard=${{ matrix.shard }}/4` — the exact OOM-avoiding invocation documented in `docs/CODEBASE_MAP.md` (Invariant 7, line 317) — with all four shards required green. Reuse the existing `actions/checkout` + `npm ci` setup.
   - **Done when:** a 4-way shard matrix job runs on every PR; each shard is a required check; a deliberately failing test turns the job red.

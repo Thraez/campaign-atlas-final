@@ -2277,3 +2277,37 @@ running tests reverted with `git checkout --` before committing — only the two
 branch `run/q71-incremental-typecheck` cleaned up after merge. No concurrency this run — origin tip
 matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
 before each).
+
+- [x] **Q72. Run the full safety-scan orchestrator on pull requests.** ✅ DONE
+  2026-07-26 — commit 52dc3c1b
+
+**What shipped:** `.github/workflows/atlas-pr-check.yml`'s `scan` job's two ad-hoc steps ("Scan built
+artifact for sentinel and shape leaks" running `atlas:check-secrets` x2 + `atlas:check-shape`, and "Scan
+built artifact for derived-secret leaks" running `atlas:check-derived` x2 — 3 of 12 scans) are replaced
+with a single "Run full safety-scan orchestrator" step invoking `npm run atlas:scan`
+(`scripts/atlas/publish-orchestrator.ts`), the same 12-scan parallel orchestrator `publish-atlas.yml`
+already runs post-merge. The job's prior "Build player-safe atlas (strict)" + "Build site" steps already
+populate `public/atlas` and `dist` before this step, and the orchestrator resolves `contentRoot` from
+`atlas.config.json` in the checkout, so no other step needed to change.
+
+**Verified end-to-end:** ran `npm run atlas:publish` locally in the run worktree — all 12 orchestrator
+scans (check-secrets x2, check-shape, check-derived x2, check-image-privacy x2, audit-assets,
+check-fog-safety x2, check-player-secrets x2) reported clean, with only pre-existing warnings (6 oversize
+map PNGs, 1 orphan asset, 2 broken image refs — unrelated to this change, same as prior runs).
+`public/atlas/atlas.json`'s version/publishedAt stamp and `manifest.json`'s line-ending churn from the
+publish run reverted with `git checkout --` before committing — only the workflow YAML reached
+`auto/continuous-dev`.
+
+**Gate:** standard gate + `npm run atlas:publish` locally (this touches CI workflow YAML, not app code,
+so there's nothing to run the CI job itself against except a local `atlas:publish` pass, per the queue
+spec). typecheck clean · eslint 0 errors (18 pre-existing warnings, no new ones) · 2775 tests green
+across 4 shards (689+620+843+623 — shard 1 and shard 3 each hit the documented `onTaskUpdate` RPC
+worker-communication flake, 0 real failures). Pre-commit hook's `vitest run --changed` found no test
+files to run for the CI-YAML-only diff (exit 0, expected).
+
+**Commits:** `52dc3c1b` (feat, on `run/q72-pr-scan`), fast-forward merge into `auto/continuous-dev` (no
+separate merge commit — `auto/continuous-dev` was still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q72` and
+branch `run/q72-pr-scan` cleaned up after merge. No concurrency this run — origin tip matched the fork
+point at worktree creation and at merge time (confirmed via `git fetch` immediately before each).
