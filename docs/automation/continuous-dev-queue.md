@@ -181,13 +181,6 @@ is for sequencing, not the whole spec.
 
 #### Q-K — Code health & refactor
 
-- [ ] **Q84. Extract shared draft-mutation core from region/route draft hooks.**
-  `useRegionDraft.ts` (draftRef + applyDraft :92-100, mutateDraft :107-122, dirty/dirtyCount :143-145) and `useRouteDraft.ts` (:82-90, :92-107) hold near-identical undo-integrated draft machinery over a `{ edits, added, deleted }` shape. Extract a generic `useDraftCore<T extends { edits: Record<string, unknown>; added: unknown[]; deleted: string[] }>(initial, undoStack?)` into `src/atlas/editor/useDraftCore.ts` exposing `{ draft, applyDraft, mutateDraft, dirty, dirtyCount }` (mutateDraft keeps the before/after snapshot + `undoStack.push({ undo, redo, label })` pattern verbatim). Have both hooks consume it; keep collection-specific logic (points vs waypoints, resolveWaypoint, centroid, effective/issues) in the callers.
-  - **Done when:** both hooks delegate draftRef/mutateDraft/dirty computation to useDraftCore, the public RegionDraftAPI/RouteDraftAPI are unchanged, and the region/route draft + undo tests stay green.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Editor-only hooks — keep useDraftCore under src/atlas/editor; no player-entry import.
-  ~2–3 runs.
-
 - [ ] **Q85. Centralize atlas↔latlng flat-CRS coordinate helpers.**
   Add `src/atlas/map/coords.ts` with `atlasToLatLng(x, y, height): [number, number]` (returns `[height - y, x]`) and `latLngToAtlas(lng, lat, height): { x: number; y: number }` (returns `{ x: lng, y: height - lat }`) as the single home of the flat-CRS convention (lng = x, lat = mapHeight − y — invariant 3). Route the three existing sites through it: editor's `mapClickToAtlasCoord` (mapClickCoord.ts:6) delegates to `latLngToAtlas` then rounds; viewer FlyTo `lat = flyTo.height - flyTo.y` (AtlasViewer.tsx:108) uses `atlasToLatLng`; geometry.ts gridLines' hex vertex `[map.height - vy, vx]` (:79) uses `atlasToLatLng`. Pure math, no rendering — keep coords.ts dependency-free so the player viewer imports it safely.
   - **Done when:** all three sites compute their flip via coords.ts, the flip direction is byte-for-byte unchanged, existing geometry/mapClickCoord tests pass, and a small round-trip unit test is added.

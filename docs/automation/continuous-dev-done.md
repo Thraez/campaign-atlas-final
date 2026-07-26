@@ -2623,3 +2623,30 @@ every test in those shards still green). Pre-commit hook also passed.
 `../campaign-atlas-final-run-q83` and branch `run/q83-webkit-audiocontext-cast` to be cleaned up
 after merge. No concurrency this run — origin tip matched the fork point at worktree creation and at
 merge time (confirmed via `git fetch` immediately before each).
+
+- [x] **Q84. Extract shared draft-mutation core from region/route draft hooks.** ✅ DONE
+  2026-07-26 — commit 8c18bb6f
+
+**What shipped:** new `src/atlas/editor/useDraftCore.ts` exporting a generic
+`useDraftCore<T extends { edits, added, deleted }>(initial, undoStack?)` → `{ draft, getDraft,
+applyDraft, mutateDraft, dirty, dirtyCount }`. Both `useRegionDraft.ts` and `useRouteDraft.ts` now
+delegate their draftRef/applyDraft/mutateDraft/dirty/dirtyCount machinery to it verbatim (same
+before/after-snapshot + `undoStack.push({ undo, redo, label })` pattern), keeping collection-specific
+logic (points vs waypoints, resolveWaypoint, centroid, effective/issues) in the callers. The
+`snapshot()` API in both hooks (used for save-boundary undo entries) now reads via the core's
+`getDraft()` instead of a locally-held ref, preserving the same synchronous mid-tick read semantics.
+Public `RegionDraftAPI`/`RouteDraftAPI` unchanged.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — pure refactor, no build/scan/fog/
+artifact touch, so `atlas:publish` wasn't required. `npm run typecheck` clean · `npm run lint` 0
+errors (18 pre-existing warnings, no new ones) · 2775 tests green across the 4 shards
+(689+620+843+623; shard 3 hit the documented `onTaskUpdate` RPC flake as an "Errors" count with every
+test in that shard still green). Pre-commit hook also passed.
+
+**Commits:** `8c18bb6f` (refactor, on `run/q84-draft-core`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q84`
+and branch `run/q84-draft-core` to be cleaned up after merge. No concurrency this run — origin tip
+matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
+before each).
