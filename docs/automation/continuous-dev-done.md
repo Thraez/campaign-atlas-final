@@ -2210,3 +2210,37 @@ pre-existing warnings, no new ones) · 2774 tests green in one unsharded run. Pr
 **Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q69` and
 branch `run/q69-vitest-pool` cleaned up after merge. No concurrency this run — origin tip matched the
 fork point at worktree creation and at merge time (confirmed via `git fetch` immediately before each).
+
+- [x] **Q70. Clean up stale `.fog.png` outputs before regenerating redacted maps.** ✅ DONE
+  2026-07-26 — commit 5b7a89fe
+
+**What shipped:** `redactMapsForPlayer` in `scripts/build-atlas.ts` now tracks every `.fog.png` path it
+(re-)writes this build in an `emittedFogPaths` set, and after the loop calls a new
+`pruneStaleFogOutputs(dir, keep)` helper against `public/atlas/assets/maps`: it deletes any file
+matching `*.fog.png` in that directory that wasn't freshly emitted this build. The prune is scoped
+strictly to the `.fog.png` naming (a plain regex test before `unlinkSync`), so it can never delete a
+source map image even if the emitted set were empty or wrong.
+
+**Verified end-to-end:** added a third test to `src/test/fog/redactBuild.test.ts` — after the existing
+test writes `world.fog.png`, it adds a second source image, repoints the map's only layer at it (a
+rename), rebuilds, and asserts the fresh `world2.fog.png` exists while the orphaned `world.fog.png` is
+gone and both original source PNGs (`world.png`, `world2.png`) are untouched. All 3 tests in the file
+pass, including the pre-existing "writes redacted PNG" and "throws for tiled layer" cases.
+
+**Gate:** standard gate + `npm run atlas:publish` + `npm run atlas:publish:integrity-smoke` (fog
+redaction path, per the queue spec). typecheck clean · eslint 0 errors (18 pre-existing warnings, no
+new ones) · 2775 tests green across 4 shards (689+620+843+623 — shard 3's lone `onTaskUpdate` RPC
+timeout is the documented worker-communication flake, confirmed by an identical-signature re-run, 0
+real failures). `atlas:publish:integrity-smoke` — all 5 active scans caught their planted fault.
+`atlas:publish` — all 12 orchestrator scans clean (only pre-existing oversized-map/orphan-asset/broken-ref
+warnings, no new findings; the real world.yaml has 0 fog-enabled maps today so the prune path ran as a
+no-op against real content, exercised only by the new unit test). `public/atlas/atlas.json`'s
+version/publishedAt stamp and `public/atlas/assets/audio/manifest.json`'s line-ending churn from the
+publish verification reverted with `git checkout --` before committing.
+
+**Commits:** `5b7a89fe` (feat, on `run/q70-fog-prune`), fast-forward merge into `auto/continuous-dev`
+(no separate merge commit — `auto/continuous-dev` was still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q70` and
+branch `run/q70-fog-prune` cleaned up after merge. No concurrency this run — origin tip matched the fork
+point at worktree creation and at merge time (confirmed via `git fetch` immediately before each).

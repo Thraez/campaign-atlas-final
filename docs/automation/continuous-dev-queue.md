@@ -176,13 +176,6 @@ is for sequencing, not the whole spec.
 
 #### Q-I — Build & runtime performance
 
-- [ ] **Q70. Clean up stale `.fog.png` outputs before regenerating redacted maps.**
-  `redactMapsForPlayer` in `scripts/build-atlas.ts` writes `${base}.fog.png` (lines 1247-1248) but never removes prior redacted outputs, so renaming/removing a map layer orphans a `.fog.png` in `public/atlas/assets/maps` that vite still copies into `dist` and ships to players forever. Before writing, prune the map's previously-generated `.fog.*` files (or write this build's fog outputs into a tracked set and delete any `.fog.*` not re-emitted). Scope the delete strictly to the `.fog.*` output naming so it can never touch a source map image.
-  - **Done when:** a build that drops or renames a fogged layer leaves no orphan `.fog.png` behind; freshly emitted redacted maps are byte-identical to before; `check-fog-safety`/`check-derived` stay green.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest) + `npm run atlas:publish` + `npm run atlas:publish:integrity-smoke`.
-  Fog redaction path — delete only regenerated `.fog.*` outputs (never source images), and prune before re-emitting.
-  ~2–3 runs.
-
 - [ ] **Q71. Enable incremental typecheck (tsBuildInfoFile) for the gate's tsc pass.**
   `tsconfig.app.json` sets `skipLibCheck`/`isolatedModules`/`noEmit` but not `incremental`/`tsBuildInfoFile`, so `npm run typecheck` (`tsc --noEmit -p tsconfig.app.json`) does a full cold check on every gate run. Add `incremental: true` + an explicit `tsBuildInfoFile` (TypeScript 5.8, per package.json, writes the buildinfo even under `noEmit`) so repeated typechecks in the hourly routine reuse prior results; apply the same to `tsconfig.node.json` if it feeds a checked pass. Gitignore the buildinfo path so it doesn't pollute the tree or perturb CI (which starts cold anyway).
   - **Done when:** a second consecutive `npm run typecheck` reuses the buildinfo and is measurably faster, the `.tsbuildinfo` file is gitignored, `git status` stays clean, and typecheck results are unchanged.
