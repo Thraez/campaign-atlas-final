@@ -6,10 +6,11 @@
  * for the active map so the live polyline preview matches what the player
  * runtime would render.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { AtlasProject, MapDocument, Point, Route, RouteMode } from "@/atlas/content/schema";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
 import { slugify as toSlug, uniqueId } from "@/atlas/content/slugify";
+import { useDraftCore } from "@/atlas/editor/useDraftCore";
 
 export type Waypoint = Point | { entityId: string };
 
@@ -74,36 +75,13 @@ export function useRouteDraft(
   opts: { entityIds?: Set<string>; dmEntityIds?: Set<string> } = {},
   undoStack?: UndoStackAPI,
 ): RouteDraftAPI {
-  const [draft, setDraft] = useState<RouteDraft>(EMPTY);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [draftWaypoints, setDraftWaypoints] = useState<Waypoint[]>([]);
 
-  const draftRef = useRef(draft);
-  useEffect(() => {
-    draftRef.current = draft;
-  }, [draft]);
-
-  const applyDraft = useCallback((next: RouteDraft) => {
-    draftRef.current = next;
-    setDraft(next);
-  }, []);
-
-  const mutateDraft = useCallback(
-    (compute: (prev: RouteDraft) => RouteDraft, label: string) => {
-      const before = draftRef.current;
-      const after = compute(before);
-      if (after === before) return;
-      applyDraft(after);
-      if (undoStack) {
-        undoStack.push({
-          undo: () => applyDraft(before),
-          redo: () => applyDraft(after),
-          label,
-        });
-      }
-    },
-    [applyDraft, undoStack],
+  const { draft, getDraft, applyDraft, mutateDraft, dirty, dirtyCount } = useDraftCore<RouteDraft>(
+    EMPTY,
+    undoStack,
   );
 
   const baseRoutes = map?.routes ?? [];
@@ -154,10 +132,6 @@ export function useRouteDraft(
     },
     [resolveWaypoint],
   );
-
-  const dirty =
-    draft.added.length > 0 || draft.deleted.length > 0 || Object.keys(draft.edits).length > 0;
-  const dirtyCount = draft.added.length + draft.deleted.length + Object.keys(draft.edits).length;
 
   const startDraw = useCallback(() => {
     setDrawing(true);
@@ -385,7 +359,7 @@ export function useRouteDraft(
     return out;
   }, [effective, map, opts.entityIds, opts.dmEntityIds, placementByEntity]);
 
-  const snapshot = useCallback((): RouteDraft => draftRef.current, []);
+  const snapshot = useCallback((): RouteDraft => getDraft(), [getDraft]);
   const applySnapshot = useCallback(
     (snap: RouteDraft) => {
       applyDraft(snap);
