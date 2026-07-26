@@ -144,5 +144,26 @@ export default defineConfig(({ mode }) => {
     },
     dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query", "@tanstack/query-core"],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Group stable third-party deps into their own chunks so repeat
+        // visitors only re-download changed app/content chunks, not the
+        // whole vendor graph, when unrelated app code changes.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) {
+            return "vendor-react";
+          }
+          if (/[\\/]node_modules[\\/](leaflet|react-leaflet)[\\/]/.test(id)) {
+            return "vendor-leaflet";
+          }
+          if (/[\\/]node_modules[\\/]@radix-ui[\\/]/.test(id)) {
+            return "vendor-radix";
+          }
+        },
+      },
+    },
+  },
   };
 });
