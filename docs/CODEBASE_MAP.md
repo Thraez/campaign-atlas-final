@@ -339,7 +339,9 @@ must wrap the tree (it's mounted at `App.tsx` root).
 | `npm run atlas:check-secrets <dir>` / `:check-derived <dir>` | Leak scans against an output dir | — |
 | `npm run typecheck` / `typecheck:scripts` / `typecheck:all` / `lint` / `format:check` | Static gates | — |
 | `npm test` | Vitest (**shard it — see above**) | — |
+| `npm run test:ci` | Sharded vitest runner (all 4 shards, aggregated) | — |
+| `npm run verify` | The whole merge gate in one command: `typecheck:all` → `lint` → `test:ci`, fails fast | — |
 
 > ⚠️ `atlas:build:player` and `atlas:publish` regenerate `public/atlas/*.json`. If you
 > have uncommitted atlas WIP there, they'll overwrite it. For a pure code-change QA gate,
-> prefer `npm run build` (writes only `dist/`) + typecheck + lint + sharded tests.
+> prefer `npm run verify` (typecheck + lint + sharded tests, no atlas rebuild — writes nothing).

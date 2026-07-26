@@ -124,6 +124,14 @@ git add . && git commit -m "session prep" && git push
 
 If `npm run atlas:publish` fails, fix the canon. **Never hand-edit `public/atlas/atlas.json`** — it's generated. A pre-tool hook blocks this for AI agents; humans should respect the same rule.
 
+If you changed source code (not just canon content), run the full merge gate before pushing:
+
+```bash
+npm run verify
+```
+
+This chains typecheck (app + `scripts/`) → lint → the sharded test suite, and stops at the first failing stage.
+
 ## What to read next
 
 - [Visibility and player safety](VISIBILITY_AND_PLAYER_SAFETY.md) — how DM content is hidden from the public build.
