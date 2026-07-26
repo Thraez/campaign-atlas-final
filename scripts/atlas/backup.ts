@@ -15,9 +15,14 @@
  *   - .git  (use `git bundle` for git history)
  *
  * Output: backups/<ISO timestamp>.zip
+ *
+ * Retention: pass `--keep N` to delete the oldest .zip files in backups/
+ * beyond the newest N after writing. Omit the flag to keep every backup
+ * (current default behavior, unchanged).
  */
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import JSZip from "jszip";
 
 const ROOT = process.cwd();
@@ -69,6 +74,35 @@ function walkDir(zip: JSZip, abs: string, rel: string): void {
   }
 }
 
+/** Parse `--keep N` out of CLI args. Returns undefined when the flag is absent
+ *  or its value isn't a valid non-negative integer. */
+export function parseKeepFlag(argv: string[]): number | undefined {
+  const i = argv.indexOf("--keep");
+  if (i === -1) return undefined;
+  const n = Number(argv[i + 1]);
+  return Number.isInteger(n) && n >= 0 ? n : undefined;
+}
+
+/** Given a directory listing, return the `.zip` filenames to delete so only
+ *  the newest `keep` remain. ISO-timestamp filenames sort lexicographically
+ *  in chronological order, so a plain string sort orders oldest-first.
+ *  Non-.zip entries are ignored (never selected for pruning). */
+export function zipsToPrune(filenames: string[], keep: number): string[] {
+  const zips = filenames.filter((f) => f.endsWith(".zip")).sort();
+  if (keep >= zips.length) return [];
+  return zips.slice(0, zips.length - Math.max(keep, 0));
+}
+
+/** Delete the oldest .zip files in `dir` beyond the newest `keep`. Only ever
+ *  unlinks files inside `dir` that `zipsToPrune` selected. */
+function pruneOldBackups(dir: string, keep: number): void {
+  const toPrune = zipsToPrune(fs.readdirSync(dir), keep);
+  for (const name of toPrune) {
+    fs.unlinkSync(path.join(dir, name));
+    console.log(`  ✗ pruned ${name} (retention: keep ${keep})`);
+  }
+}
+
 async function main(): Promise<void> {
   console.log(`atlas:backup — bundling ${INCLUDE_PATHS.length} path(s)…`);
   const zip = new JSZip();
@@ -104,9 +138,19 @@ async function main(): Promise<void> {
   console.log(
     `\n✓ Wrote ${path.relative(ROOT, OUT_FILE)} (${sizeMb} MB, ${fileNames.length} files)`,
   );
+
+  const keep = parseKeepFlag(process.argv.slice(2));
+  if (keep !== undefined) {
+    pruneOldBackups(OUT_DIR, keep);
+  }
 }
 
-main().catch((e) => {
-  console.error(`atlas:backup failed: ${e instanceof Error ? e.message : String(e)}`);
-  process.exit(1);
-});
+// CLI shim: only runs when invoked directly, never on import (so tests can
+// import zipsToPrune/parseKeepFlag without triggering a real backup).
+const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
+if (isMainModule) {
+  main().catch((e) => {
+    console.error(`atlas:backup failed: ${e instanceof Error ? e.message : String(e)}`);
+    process.exit(1);
+  });
+}
