@@ -179,12 +179,6 @@ is for sequencing, not the whole spec.
 
 #### Q-J — CI/CD & developer experience
 
-- [ ] **Q75. Add .gitattributes to normalize line endings to LF.**
-  There is no `.gitattributes`, and `.prettierrc.json` sets no `endOfLine` (prettier defaults to `lf`), so on Windows `core.autocrlf` checks source out as CRLF while the index stores LF and local `npm run format:check` reports ~200 false positives (documented in memory). Add a `.gitattributes` with `* text=auto eol=lf` plus binary rules (`*.png *.jpg *.jpeg *.webp *.ogg *.mp3 *.woff2 *.fog.png` → `binary`) so the working tree matches what CI's `prettier --check` expects.
-  - **Done when:** `.gitattributes` exists with `eol=lf` for text and `binary` rules for image/audio/fog asset types; `git add --renormalize .` produces no content diff (the index is already LF).
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Keep it to adding the file — do NOT run `npm run format` or mass-rewrite committed content. ~1 run.
-
 - [ ] **Q76. Codify the sharded test invocation as a `test:ci` npm script.**
   The OOM-avoiding shard command exists only as prose in `docs/CODEBASE_MAP.md` (line 317) and the code-quality routine doc — `scripts/dev/` holds only `generate-starter-ambience.mjs` and `transcode-audio.mjs`, and `package.json` has no `test:ci`. Add a cross-platform runner `scripts/dev/run-sharded-tests.mjs` (Node, spawns the four shards with `npx vitest run --pool=forks --poolOptions.forks.maxForks=3 --shard=N/4`, aggregates pass/fail, exits non-zero if any shard fails) plus a `"test:ci": "node scripts/dev/run-sharded-tests.mjs"` script, so humans, CI, and the routine share one command instead of copy-pasting four.
   - **Done when:** `npm run test:ci` runs all four shards and returns the aggregate exit code; a failing test makes it exit non-zero.

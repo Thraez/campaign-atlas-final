@@ -2365,3 +2365,34 @@ separate merge commit — `auto/continuous-dev` was still at the fork point).
 **Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q74` and
 branch `run/q74-eslint-ci` cleaned up after merge. No concurrency this run — origin tip matched the fork
 point at worktree creation and at merge time (confirmed via `git fetch` immediately before each).
+
+- [x] **Q75. Add .gitattributes to normalize line endings to LF.** ✅ DONE
+  2026-07-26 — commit cc032665
+
+**What shipped:** new `.gitattributes` at repo root with `* text=auto eol=lf` plus explicit `binary`
+rules for `*.png *.jpg *.jpeg *.webp *.ogg *.mp3 *.woff2 *.fog.png`, so Windows checkouts normalize
+text files to LF instead of `core.autocrlf` producing CRLF working-tree copies that don't match the
+LF index — the root cause of the ~200 false positives from local `npm run format:check` documented in
+memory (`format-check-crlf-gap.md`).
+
+**Verified end-to-end:** ran `git add --renormalize .` after adding the file — `git status` showed
+only the new `.gitattributes` itself as untracked, no content diff on any existing tracked file,
+confirming the index was already LF-only as expected. No `npm run format` was run and no committed
+content was rewritten.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — metadata-only change, not a
+scripts/fog/soundscape/artifact touch, so `atlas:publish` wasn't required per the queue spec. typecheck
+clean · eslint 0 errors (18 pre-existing warnings, no new ones) · 2775 tests green (4 shards:
+689+620+843+623 — shard 1 and shard 3 each hit the documented `onTaskUpdate` RPC worker-communication
+flake, 0 real failures). Pre-commit hook's `vitest run --changed` found no test files for the
+`.gitattributes`-only diff (exit 0, expected). `public/atlas/assets/audio/manifest.json` line-ending
+churn from running tests reverted with `git checkout --` before committing — only `.gitattributes`
+reached `auto/continuous-dev`.
+
+**Commits:** `cc032665` (feat, on `run/q75-gitattributes`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — `auto/continuous-dev` was still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q75` and
+branch `run/q75-gitattributes` to be cleaned up after merge. No concurrency this run — origin tip
+matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
+before each).
