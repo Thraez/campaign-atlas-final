@@ -181,13 +181,6 @@ is for sequencing, not the whole spec.
 
 #### Q-K — Code health & refactor
 
-- [ ] **Q85. Centralize atlas↔latlng flat-CRS coordinate helpers.**
-  Add `src/atlas/map/coords.ts` with `atlasToLatLng(x, y, height): [number, number]` (returns `[height - y, x]`) and `latLngToAtlas(lng, lat, height): { x: number; y: number }` (returns `{ x: lng, y: height - lat }`) as the single home of the flat-CRS convention (lng = x, lat = mapHeight − y — invariant 3). Route the three existing sites through it: editor's `mapClickToAtlasCoord` (mapClickCoord.ts:6) delegates to `latLngToAtlas` then rounds; viewer FlyTo `lat = flyTo.height - flyTo.y` (AtlasViewer.tsx:108) uses `atlasToLatLng`; geometry.ts gridLines' hex vertex `[map.height - vy, vx]` (:79) uses `atlasToLatLng`. Pure math, no rendering — keep coords.ts dependency-free so the player viewer imports it safely.
-  - **Done when:** all three sites compute their flip via coords.ts, the flip direction is byte-for-byte unchanged, existing geometry/mapClickCoord tests pass, and a small round-trip unit test is added.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Preserve invariant 3 exactly (lat = mapHeight − y, lng = x) — this is a consolidation, not a behavior change.
-  ~1 run.
-
 - [ ] **Q86. Split MapImportWizard step components into modules.**
   `src/atlas/import/MapImportWizard.tsx` (815 lines) defines every wizard step inline: `SelectStep` (:312), `ModeStep` (:377), `ConfigureStep` (:443), `SizingStep` (:561), `PreviewStep` (:643), `ExportStep` (:706), plus helpers `IssueList` (:749) and `Field` (:780). Move each into its own file under `src/atlas/import/wizard-steps/`, keeping props and behavior byte-for-byte, and re-import them into the orchestrator. The shared browser helpers (`readDataUrl`/`readImageDimensions`/`triggerBlob`, :791-815) must be imported by the steps that need them, not copied per-file.
   - **Done when:** MapImportWizard.tsx holds only the orchestrator + step wiring, each step lives in its own module, and the import-wizard tests pass unchanged.

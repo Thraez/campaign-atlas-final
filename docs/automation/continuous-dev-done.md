@@ -2650,3 +2650,30 @@ test in that shard still green). Pre-commit hook also passed.
 and branch `run/q84-draft-core` to be cleaned up after merge. No concurrency this run — origin tip
 matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
 before each).
+
+- [x] **Q85. Centralize atlas↔latlng flat-CRS coordinate helpers.** ✅ DONE
+  2026-07-27 — commit 8b32bc40
+
+**What shipped:** new `src/atlas/map/coords.ts` exporting `atlasToLatLng(x, y, height): [number,
+number]` (returns `[height - y, x]`) and `latLngToAtlas(lng, lat, height): { x, y }` (returns `{ x:
+lng, y: height - lat }`) — dependency-free, so it's safe for the player viewer to import. Routed all
+three cited sites through it: `mapClickToAtlasCoord` (`src/atlas/editor/mapClickCoord.ts`) delegates
+to `latLngToAtlas` then rounds; `AtlasViewer.tsx`'s FlyTo `MapController` uses `atlasToLatLng`;
+`geometry.ts`'s `gridLines` hex-vertex computation uses `atlasToLatLng`. Flip direction preserved
+byte-for-byte (existing `mapClickCoord.test.ts` and `map-geometry.test.ts` assertions unchanged); new
+`src/test/atlas/map-coords.test.ts` adds direct unit coverage plus a round-trip test.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — pure consolidation, no build/scan/
+fog/artifact touch, so `atlas:publish` wasn't required. `npm run typecheck` clean · `npm run lint` 0
+errors (18 pre-existing warnings, no new ones) · 2779 tests green across the 4 shards
+(689+595+820+675 — 4 new coords tests over the 2775 baseline; shard 3 hit the documented
+`onTaskUpdate` RPC flake as an "Errors" count with every test in that shard still green). Pre-commit
+hook also passed.
+
+**Commits:** `8b32bc40` (refactor, on `run/q85-coords`), fast-forward merge into `auto/continuous-dev`
+(no separate merge commit — still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q85`
+and branch `run/q85-coords` to be cleaned up after merge. No concurrency this run — origin tip matched
+the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately before
+each).
