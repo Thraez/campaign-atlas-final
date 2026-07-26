@@ -67,6 +67,7 @@ import {
   formatTravelTime,
   gridLines,
 } from "@/atlas/map/geometry";
+import { atlasToLatLng } from "@/atlas/map/coords";
 import { useVisitedPlaces } from "@/atlas/visited/useVisitedPlaces";
 import { pinDiscoveryClass } from "@/atlas/wander/pinDiscoveryClass";
 import { selectWanderTarget } from "@/atlas/wander/selectWanderTarget";
@@ -118,8 +119,7 @@ function MapController({
   const prefersReducedMotion = usePrefersReducedMotion();
   useEffect(() => {
     if (!flyTo) return;
-    const lat = flyTo.height - flyTo.y;
-    const lng = flyTo.x;
+    const [lat, lng] = atlasToLatLng(flyTo.x, flyTo.y, flyTo.height);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
     const targetZoom =
       flyTo.zoom != null && Number.isFinite(flyTo.zoom) ? flyTo.zoom : Math.max(map.getZoom(), -1);
