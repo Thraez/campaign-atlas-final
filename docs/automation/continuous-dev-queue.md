@@ -176,12 +176,6 @@ is for sequencing, not the whole spec.
 
 #### Q-I — Build & runtime performance
 
-- [ ] **Q69. Bound vitest fork count/memory in `vitest.config.ts` so `npm test` stops OOMing.**
-  `vitest.config.ts` sets no `poolOptions`; the whole-suite `npm test` (vitest run) OOMs the 4GB coordinator on ~200 files and currently needs ad-hoc `--shard` / `--poolOptions.forks.maxForks=3` to survive. Bake sane defaults into the `test` block: `pool: 'forks'` with a bounded `poolOptions.forks.maxForks` (plus matching minForks/isolate settings) so the plain `npm test` gate is robust without flags; document the memory rationale inline. Confirm wall-time doesn't regress meaningfully.
-  - **Done when:** `npm test` with no extra flags runs the full suite to completion without OOM on a 4GB budget, and total runtime stays within a reasonable margin of the sharded run.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest) — this change hardens that gate itself.
-  ~1 run.
-
 - [ ] **Q70. Clean up stale `.fog.png` outputs before regenerating redacted maps.**
   `redactMapsForPlayer` in `scripts/build-atlas.ts` writes `${base}.fog.png` (lines 1247-1248) but never removes prior redacted outputs, so renaming/removing a map layer orphans a `.fog.png` in `public/atlas/assets/maps` that vite still copies into `dist` and ships to players forever. Before writing, prune the map's previously-generated `.fog.*` files (or write this build's fog outputs into a tracked set and delete any `.fog.*` not re-emitted). Scope the delete strictly to the `.fog.*` output naming so it can never touch a source map image.
   - **Done when:** a build that drops or renames a fogged layer leaves no orphan `.fog.png` behind; freshly emitted redacted maps are byte-identical to before; `check-fog-safety`/`check-derived` stay green.

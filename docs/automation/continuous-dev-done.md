@@ -2179,3 +2179,34 @@ publish verification reverted with `git checkout --` before committing — only 
 **Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q67` and
 branch `run/q67-maps-optimize` cleaned up after merge. No concurrency this run — origin tip matched the
 fork point at worktree creation and at merge time (confirmed via `git fetch` immediately before each).
+
+- [x] **Q69. Bound vitest fork count/memory in `vitest.config.ts` so `npm test` stops OOMing.** ✅ DONE
+  2026-07-26 — commit 00888fd8
+
+**What shipped:** `vitest.config.ts`'s `test` block gained `pool: "forks"` with
+`poolOptions.forks: { maxForks: 3, minForks: 1, isolate: true }`, baking in the same bound the routine's
+ad-hoc `--pool=forks --poolOptions.forks.maxForks=3` shard invocation has needed to survive the 4GB
+coordinator budget. An inline comment documents the memory rationale (forks reclaim memory on exit,
+unlike threads sharing one V8 heap; unbounded per-core forks pile up enough concurrent jsdom heaps
+across ~270 files to OOM).
+
+**Verified end-to-end:** ran plain `npm test` (no shard/pool flags) in a fresh worktree — completed the
+full 269-file / 2774-test suite in 202.93s with zero OOM, all tests green. Two "Unhandled Errors" in
+the output are the documented `onTaskUpdate` RPC worker-communication flake (0 real test failures) —
+same known signature as every prior sharded run. Wall-time (202.93s single invocation) is in line with
+the sharded approach's total (no regression) and avoids paying vitest's process-startup cost four times
+over.
+
+**Gate:** standard gate only (typecheck + ESLint + `npm test`) — this change hardens the gate itself, no
+`atlas:publish` needed (no build-pipeline/artifact touch). typecheck clean · eslint 0 errors (18
+pre-existing warnings, no new ones) · 2774 tests green in one unsharded run. Pre-commit hook's
+`vitest run --changed` found no changed test files for a config-only diff (exit 0, expected).
+`public/atlas/assets/audio/manifest.json` LF/CRLF churn from running tests reverted with
+`git checkout --` before committing — only `vitest.config.ts` reached `auto/continuous-dev`.
+
+**Commits:** `00888fd8` (feat, on `run/q69-vitest-pool`), merge into `auto/continuous-dev` (see
+`git log auto/continuous-dev` for the merge-commit hash).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q69` and
+branch `run/q69-vitest-pool` cleaned up after merge. No concurrency this run — origin tip matched the
+fork point at worktree creation and at merge time (confirmed via `git fetch` immediately before each).
