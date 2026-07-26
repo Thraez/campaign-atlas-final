@@ -1024,10 +1024,16 @@ async function runBuildCore(flags: BuildFlags) {
   const defaultOut = flags.player ? cfg.outputDir : ".local-atlas";
   const outDir = path.resolve(ROOT, flags.outDir ?? defaultOut);
   fs.mkdirSync(outDir, { recursive: true });
-  fs.writeFileSync(path.join(outDir, "atlas.json"), JSON.stringify(project, null, 2));
+  // Player builds ship minified (smaller payload for players); DM/.local-atlas
+  // builds stay 2-space-indented so human diffs against them are readable.
+  const jsonIndent = flags.player ? undefined : 2;
+  fs.writeFileSync(path.join(outDir, "atlas.json"), JSON.stringify(project, null, jsonIndent));
 
   const searchIndex = buildSearchIndex(pending);
-  fs.writeFileSync(path.join(outDir, "search-index.json"), JSON.stringify(searchIndex, null, 2));
+  fs.writeFileSync(
+    path.join(outDir, "search-index.json"),
+    JSON.stringify(searchIndex, null, jsonIndent),
+  );
 
   const r = project.buildReport!;
   console.log(
