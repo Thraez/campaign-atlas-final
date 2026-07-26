@@ -25,6 +25,7 @@ import { downloadText } from "./download";
 import { BuildReportPanel } from "@/atlas/publish/BuildReportPanel";
 import { ReadinessCard } from "@/atlas/publish/ReadinessCard";
 import { usePublishFlow } from "@/atlas/publish/usePublishFlow";
+import { formatPublishSummary } from "@/atlas/publish/publishSummary";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -158,6 +159,12 @@ export function PublishCheckTab({
           <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs text-center space-y-0.5">
             <div className="flex items-center justify-center gap-1.5 font-medium text-primary">
               <CheckCircle2 className="h-4 w-4" /> Published ✓
+            </div>
+            <div className="text-foreground">
+              {formatPublishSummary(
+                publish.checkResult?.diff.counts ?? { entities: 0, placements: 0 },
+                publish.pushResult?.commit,
+              )}
             </div>
             <div className="text-muted-foreground">
               Your players will see the changes in a couple of minutes.
