@@ -179,12 +179,6 @@ is for sequencing, not the whole spec.
 
 #### Q-J — CI/CD & developer experience
 
-- [ ] **Q76. Codify the sharded test invocation as a `test:ci` npm script.**
-  The OOM-avoiding shard command exists only as prose in `docs/CODEBASE_MAP.md` (line 317) and the code-quality routine doc — `scripts/dev/` holds only `generate-starter-ambience.mjs` and `transcode-audio.mjs`, and `package.json` has no `test:ci`. Add a cross-platform runner `scripts/dev/run-sharded-tests.mjs` (Node, spawns the four shards with `npx vitest run --pool=forks --poolOptions.forks.maxForks=3 --shard=N/4`, aggregates pass/fail, exits non-zero if any shard fails) plus a `"test:ci": "node scripts/dev/run-sharded-tests.mjs"` script, so humans, CI, and the routine share one command instead of copy-pasting four.
-  - **Done when:** `npm run test:ci` runs all four shards and returns the aggregate exit code; a failing test makes it exit non-zero.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  ~1 run.
-
 - [ ] **Q77. Type-check the `scripts/` build pipeline.**
   No tsconfig includes `scripts/**`: `tsconfig.app.json` covers only `src`, `tsconfig.node.json` only `vite.config.ts`, so `build-atlas.ts`, the `check-*.ts` scanners, `scripts/atlas/*.ts`, and `vite-plugin-atlas-save.ts` are transpile-only via tsx and never type-checked. Add `tsconfig.scripts.json` (`include: ["scripts/**/*.ts"]`, `noEmit`, `strict`, node/bundler settings mirroring `tsconfig.node.json`), register it as a project reference in `tsconfig.json`, add `"typecheck:scripts"` and a `"typecheck:all"` (app + scripts) to `package.json`, and wire `typecheck:all` into `scripts/pre-commit.sh` and the `atlas-pr-check.yml` typecheck step. Fix any latent type errors surfaced.
   - **Done when:** `npm run typecheck:scripts` type-checks all of `scripts/**` and passes; pre-commit and PR CI run it; `noEmit` holds (no JS written).

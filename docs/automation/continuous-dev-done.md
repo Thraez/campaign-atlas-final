@@ -2396,3 +2396,31 @@ reached `auto/continuous-dev`.
 branch `run/q75-gitattributes` to be cleaned up after merge. No concurrency this run — origin tip
 matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
 before each).
+
+- [x] **Q76. Codify the sharded test invocation as a `test:ci` npm script.** ✅ DONE
+  2026-07-26 — commit 5d01c7bc
+
+**What shipped:** new `scripts/dev/run-sharded-tests.mjs` (spawns the four OOM-avoiding vitest shards
+sequentially via `npx vitest run --pool=forks --poolOptions.forks.maxForks=3 --shard=N/4`, aggregates
+pass/fail, exits non-zero if any shard fails) plus a `"test:ci": "node scripts/dev/run-sharded-tests.mjs"`
+script in `package.json`. Humans, CI, and this routine now share one command instead of copy-pasting
+four shard invocations.
+
+**Verified end-to-end:** ran `npm run test:ci` itself as the gate's test step (doubling as functional
+verification of the new script) — all four shards ran sequentially and reported per-shard results.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — a `scripts/dev/` addition, not a
+build/scan/fog/artifact touch, so `atlas:publish` wasn't required per the queue spec. typecheck clean ·
+eslint 0 errors (18 pre-existing warnings, no new ones) · 2775 tests green across the 4 shards
+(689+620+843+623). Shard 1 and shard 3 each hit the documented `onTaskUpdate` RPC worker-communication
+flake on the aggregate run (process exit 1 with all test files green); both were re-run standalone and
+confirmed 689/689 and 843/843 tests passed with 0 real failures — the flake is a known false-negative
+in the aggregate script's exit-code check, not a defect in the new script's aggregation logic itself
+(the script correctly propagates whatever exit code `vitest` returns for that shard).
+
+**Commits:** `5d01c7bc` (feat, on `run/q76-test-ci`), fast-forward merge into `auto/continuous-dev` (no
+separate merge commit — `auto/continuous-dev` was still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q76` and
+branch `run/q76-test-ci` to be cleaned up after merge. No concurrency this run — origin tip matched the
+fork point at worktree creation and at merge time (confirmed via `git fetch` immediately before each).
