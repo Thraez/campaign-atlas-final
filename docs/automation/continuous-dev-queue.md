@@ -173,13 +173,6 @@ is for sequencing, not the whole spec.
 
 #### Q-H — DM publish, backup & assets
 
-- [ ] **Q63. Add a non-destructive restore that extracts a backup into a fresh folder.**
-  `scripts/atlas/backup.ts` has no restore counterpart. Add a `--restore <zip> --out <dir>` mode (branch in `main()` on argv before the current backup path): unzip the chosen backup into `<dir>`, REFUSING if `<dir>` exists and is non-empty (write nothing, exit with a clear message), then verify the extracted file count against the `MANIFEST.md` "Files:" line the backup already writes (line 82-94). Add an `atlas:restore` script to `package.json` (currently only `atlas:backup` at line 33). Keep the manifest count-check as a pure helper so it's testable.
-  - **Done when:** `--restore x.zip --out newdir` extracts into an empty `newdir` and reports a verified file count; a non-empty `--out` aborts without writing; `scripts/atlas/backup.test.ts` covers the manifest count-verify helper and the non-empty-dir refusal.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Writes only into a caller-named empty output dir and refuses to overwrite; never restores over `content/`. Depends on / coordinate with Q62 (both add argv parsing to `backup.ts` and share `backup.test.ts`) — land after or bundle with it.
-  ~2-3 runs.
-
 
 #### Q-I — Build & runtime performance
 

@@ -1983,3 +1983,43 @@ worker-communication timeout in shard 3 (0 tests failed both times it was run �
 signature). `public/atlas/assets/audio/manifest.json` LF/CRLF churn from running tests reverted with
 `git checkout --` before the merge. Clean merge — no concurrent runs (origin tip matched the run's fork
 point at both worktree-creation and merge time, confirmed via `git fetch` immediately before each).
+
+- [x] **Q63. Add a non-destructive restore that extracts a backup into a fresh folder.** ✅ DONE
+  2026-07-26 — commit ce8f3ef8
+
+**What shipped:** `scripts/atlas/backup.ts` had no restore counterpart to `atlas:backup`. Added
+`--restore <zip> --out <dir>`: extracts the chosen backup into `<dir>`, refusing to write anything if
+`<dir>` already exists and is non-empty, then reports the extracted file count verified against the
+backup's own MANIFEST.md "Files:" line. New `atlas:restore` npm script.
+
+**Implementation:**
+- `scripts/atlas/backup.ts`: new exported pure `parseRestoreFlag(argv)` (reads `--restore <zip> --out
+  <dir>`, `undefined` unless both flags are present with a value — a lone flag falls through to the
+  normal backup path) and `parseManifestFileCount(manifestText)` (extracts the `Files: N` line,
+  `undefined` if missing/malformed). New exported `restoreBackup(zipAbsPath, outAbsDir)` takes absolute
+  paths (mirroring `snapshot-baseline.ts`'s injectable-root pattern so it's testable via `mkdtempSync`
+  without touching the real repo): throws before any write if the zip is missing or the output dir
+  exists non-empty, otherwise extracts every zip entry (MANIFEST.md excluded from the returned count, to
+  match how the manifest itself is written) and returns `{ extracted, expected }` for the caller to
+  compare. `main()` checks `parseRestoreFlag` first and branches into a new `runRestoreCli` before the
+  existing backup path runs; the top-level CLI-shim catch message widened to "atlas:backup/restore
+  failed" since it now covers both modes.
+- Tests: `scripts/atlas/backup.test.ts` extended (not replaced) — `parseRestoreFlag` (absent, one-flag,
+  both-flags in either order, missing/flag-shaped values), `parseManifestFileCount` (valid, missing,
+  malformed), and `restoreBackup` integration tests against real `mkdtempSync` dirs + real JSZip fixture
+  zips (extracts + verifies count, refuses a non-empty out dir with nothing written, succeeds into an
+  existing-but-empty dir, missing-zip error, and an unmanifested zip reporting `expected: undefined`).
+
+**Gate:** standard gate only per the queue spec (backup tooling, not the shipped build/scan/artifact
+pipeline — no `atlas:publish`). typecheck clean · eslint 0 errors (18 pre-existing warnings, no new ones)
+· 2767 tests green (4 shards: 687+588+815+677; baseline 2755 + 12 new). Known non-real `onTaskUpdate` RPC
+worker-communication timeout in shard 3 (0 tests failed — documented flake signature, not re-run).
+`public/atlas/assets/audio/manifest.json` LF/CRLF churn from running tests reverted with `git checkout --`
+twice (once pre-commit, once after the pre-commit hook's own `vitest run --changed` re-touched it) — no
+artifact diff reached `auto/continuous-dev`. Clean merge (no concurrent runs — origin tip matched the
+run's fork point at both worktree-creation and merge time, confirmed via `git fetch` immediately before
+each). Fresh worktree's `npm install` initially produced a truncated `node_modules/@types/leaflet/
+index.d.ts` (2229 lines vs. the main copy's 3160), which broke `typecheck` with a stray-`/*` parse error
+unrelated to this change — a clean `rm -rf node_modules && npm install` in the worktree fixed it before
+the gate ran; worth a heads-up if a future run hits an inexplicable typecheck error in unrelated
+`node_modules` types right after a fresh worktree.
