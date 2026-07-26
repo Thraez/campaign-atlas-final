@@ -42,15 +42,8 @@ jobs:
           ATLAS_BASE: /${{ github.event.repository.name }}/
         run: npm run build
 
-      - name: Scan built artifact for sentinel and shape leaks
-        run: |
-          npm run atlas:check-secrets dist
-          npm run atlas:check-secrets public/atlas
-          npm run atlas:check-shape public/atlas/atlas.json
-
-      - name: Scan built artifact for derived-secret leaks
-        # Names/aliases of dm/hidden entities derived from the source vault
-        # must not appear in the player artifact.
-        run: |
-          npm run atlas:check-derived dist
-          npm run atlas:check-derived public/atlas
+      - name: Run full safety-scan orchestrator
+        # All 12 scans (secrets, derived-secrets, shape, image-privacy,
+        # fog-safety, player-secrets, audit-assets) against both dist and
+        # public/atlas — the same orchestrator publish-atlas.yml runs post-merge.
+        run: npm run atlas:scan
