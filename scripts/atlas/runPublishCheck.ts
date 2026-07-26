@@ -21,6 +21,7 @@ const SITE_BUILD_TIMEOUT_MS = 180_000;
 
 const EMPTY_DIFF: AtlasDiff = {
   hasChanges: false,
+  hadBaseline: true,
   counts: { entities: 0, placements: 0, maps: 0, overlays: 0 },
   entities: [],
   placements: [],

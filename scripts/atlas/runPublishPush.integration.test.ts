@@ -24,6 +24,7 @@ const SAFE_CHECK: PublishCheckResult = {
   reasons: [],
   diff: {
     hasChanges: false,
+    hadBaseline: true,
     counts: { entities: 0, placements: 0, maps: 0, overlays: 0 },
     entities: [],
     placements: [],
