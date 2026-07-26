@@ -2677,3 +2677,31 @@ hook also passed.
 and branch `run/q85-coords` to be cleaned up after merge. No concurrency this run — origin tip matched
 the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately before
 each).
+
+- [x] **Q86. Split MapImportWizard step components into modules.** ✅ DONE
+  2026-07-27 — commit 64441ef5
+
+**What shipped:** moved all six inline wizard steps (`SelectStep`, `ModeStep`, `ConfigureStep`,
+`SizingStep`, `PreviewStep`, `ExportStep`) plus the two shared presentational helpers (`IssueList`,
+`Field`) out of `MapImportWizard.tsx` into their own files under `src/atlas/import/wizard-steps/`,
+byte-for-byte. `mapImport.ts`'s `readDataUrl`/`readImageDimensions`/`triggerBlob`-equivalent browser
+helpers were already shared via `browserFile.ts`/`download.ts` from Q80/Q81, so no additional
+extraction was needed there. `MapImportWizard.tsx` shrank from ~790 lines to the orchestrator +
+step-wiring only (509 lines removed); each step imports only what it uses (icons, UI primitives,
+`mapImport.ts` types) rather than sharing the orchestrator's now-trimmed import list.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — pure structural split, no build/scan/
+fog/artifact touch, so `atlas:publish` wasn't required. `npm run typecheck` clean · `npm run lint` 0
+errors (18 pre-existing warnings, no new ones) · 2779 tests green across the 4 shards
+(689+595+820+675 — unchanged from the Q85 baseline since no tests were added/removed; shard 3 hit the
+documented `onTaskUpdate` RPC flake as an "Errors" count with every test in that shard still green).
+The only existing wizard-related test (`atlas-map-import.test.ts`) imports solely from `mapImport.ts`,
+which was untouched, and stayed green. Pre-commit hook also passed.
+
+**Commits:** `64441ef5` (refactor, on `run/q86-wizard-split`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q86`
+and branch `run/q86-wizard-split` to be cleaned up after merge. No concurrency this run — origin tip
+matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
+before each).

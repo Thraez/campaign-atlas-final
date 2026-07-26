@@ -181,13 +181,6 @@ is for sequencing, not the whole spec.
 
 #### Q-K — Code health & refactor
 
-- [ ] **Q86. Split MapImportWizard step components into modules.**
-  `src/atlas/import/MapImportWizard.tsx` (815 lines) defines every wizard step inline: `SelectStep` (:312), `ModeStep` (:377), `ConfigureStep` (:443), `SizingStep` (:561), `PreviewStep` (:643), `ExportStep` (:706), plus helpers `IssueList` (:749) and `Field` (:780). Move each into its own file under `src/atlas/import/wizard-steps/`, keeping props and behavior byte-for-byte, and re-import them into the orchestrator. The shared browser helpers (`readDataUrl`/`readImageDimensions`/`triggerBlob`, :791-815) must be imported by the steps that need them, not copied per-file.
-  - **Done when:** MapImportWizard.tsx holds only the orchestrator + step wiring, each step lives in its own module, and the import-wizard tests pass unchanged.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Editor-only file — keep new modules under src/atlas/import so they stay tree-shaken from player builds (invariant 4). Loosely depends on Q80/Q81 if the shared helpers have been extracted.
-  ~2–3 runs.
-
 - [ ] **Q87. Split EntitiesTab section components into modules.**
   `src/atlas/tabs/EntitiesTab.tsx` (762 lines) inlines `EntityForm` (:198), `ProfileSection` (:336), `ListField` (:403), `RelationshipSection` (:454), and `HandoutBundleSection` (:638) alongside the tab shell (`EntitiesTab` :69). Extract each into its own file under `src/atlas/tabs/entities/`, keeping props and behavior byte-for-byte, and import them back into EntitiesTab.
   - **Done when:** EntitiesTab.tsx holds only the tab shell + imports, each section is its own module, and the EntitiesTab / entity-editing tests pass unchanged.
