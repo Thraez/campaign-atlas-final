@@ -6,6 +6,7 @@ import { parseFrontmatter, stringifyFrontmatter } from "@/atlas/import/frontmatt
 import { useEntityEditDraft, type EntityEditDraftAPI } from "./useEntityEditDraft";
 import { saveAtlasPatchToLocalFs, hashContent, type FileChange } from "@/atlas/save/localFsSave";
 import { slugify } from "@/atlas/content/slugify";
+import { fileToDataUrl } from "@/atlas/content/browserFile";
 import { readSourceFile } from "@/atlas/save/canonicalPlacementSave";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import {
@@ -257,28 +258,25 @@ export function EntityEditPanel({
   };
 
   const handleImageImport = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const ext = file.name.includes(".")
-        ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase()
-        : "";
-      const stem = file.name.slice(0, file.name.length - ext.length);
-      const safeName = (slugify(stem) || "image") + ext;
-      const imgPath = `public/atlas/assets/images/${safeName}`;
-      saveAtlasPatchToLocalFs([
-        { path: imgPath, content: dataUrl, kind: "asset-binary", baseHash: null },
-      ])
-        .then(() => {
+    fileToDataUrl(file)
+      .then((dataUrl) => {
+        const ext = file.name.includes(".")
+          ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase()
+          : "";
+        const stem = file.name.slice(0, file.name.length - ext.length);
+        const safeName = (slugify(stem) || "image") + ext;
+        const imgPath = `public/atlas/assets/images/${safeName}`;
+        return saveAtlasPatchToLocalFs([
+          { path: imgPath, content: dataUrl, kind: "asset-binary", baseHash: null },
+        ]).then(() => {
           setImages((prev) => (prev.includes(safeName) ? prev : [...prev, safeName].sort()));
           applySelection(safeName);
-        })
-        .catch((e: unknown) => {
-          logger.error("Image upload failed", e);
-          toast.error(`Image upload failed: ${e instanceof Error ? e.message : String(e)}`);
         });
-    };
-    reader.readAsDataURL(file);
+      })
+      .catch((e: unknown) => {
+        logger.error("Image upload failed", e);
+        toast.error(`Image upload failed: ${e instanceof Error ? e.message : String(e)}`);
+      });
   };
 
   const handleImageDelete = (name: string) => {

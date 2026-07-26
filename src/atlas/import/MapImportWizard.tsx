@@ -25,6 +25,7 @@ import {
   FileCode,
   Package,
 } from "lucide-react";
+import { fileToDataUrl, readImageSize } from "@/atlas/content/browserFile";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -97,8 +98,8 @@ export function MapImportWizard({
           continue;
         }
         try {
-          const dataUrl = await readDataUrl(file);
-          const dim = await readImageDimensions(dataUrl);
+          const dataUrl = await fileToDataUrl(file);
+          const dim = await readImageSize(dataUrl);
           const safe = safeFilename(file.name);
           next.push({
             id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -787,24 +788,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 // ---------- Browser helpers --------------------------------------------------
-
-function readDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result as string);
-    r.onerror = () => reject(r.error ?? new Error("read failed"));
-    r.readAsDataURL(file);
-  });
-}
-
-function readImageDimensions(dataUrl: string): Promise<{ w: number; h: number }> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-    img.onerror = () => reject(new Error("could not decode image"));
-    img.src = dataUrl;
-  });
-}
 
 function triggerBlob(filename: string, blob: Blob) {
   const a = document.createElement("a");
