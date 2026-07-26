@@ -181,13 +181,6 @@ is for sequencing, not the whole spec.
 
 #### Q-K — Code health & refactor
 
-- [ ] **Q80. Extract shared browser file/image read helpers.**
-  Create `src/atlas/content/browserFile.ts` exporting `fileToDataUrl(file: File): Promise<string>` (FileReader → readAsDataURL) and `readImageSize(src: string): Promise<{w:number;h:number}>` (Image.onload → naturalWidth/Height), then replace the duplicated copies: MapImportWizard's `readDataUrl` (MapImportWizard.tsx:791) and `readImageDimensions` (:800), and useMapLayers' `fileToDataUrl` (useMapLayers.ts:114) + `readImageSize` (:104). Also route EntityEditPanel's inline `handleImageImport` readAsDataURL (EntityEditPanel.tsx:259-267) through `fileToDataUrl`. Two subtleties to preserve: useMapLayers' readImageSize sets `img.crossOrigin = "anonymous"` (line 107) while the wizard copy does not — unify on setting it (harmless for data URLs, required for URL-added layers). EntityPanel.tsx:146-163 `handleImport` uses `readAsText` (notes JSON) — a different read; leave it OUT of scope, do not force it through the dataURL helper.
-  - **Done when:** the four dataURL/image-size copies are gone, all call sites import from browserFile.ts, crossOrigin behavior is retained, and tests are green.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Keep browserFile.ts dependency-free (pure DOM) so it pulls in no editor modules and stays player-safe.
-  ~1 run.
-
 - [ ] **Q81. Add downloadBlob() and dedupe blob-download call sites.**
   In `src/atlas/tabs/download.ts` add `downloadBlob(filename, blob, opts?: { toast?: boolean })` (createObjectURL → anchor → click → revokeObjectURL; `toast.success` only when `opts.toast`), and refactor the existing `downloadText` (download.ts:4) to build the Blob and delegate to it with `{ toast: true }`. Replace MapImportWizard's private `triggerBlob` (MapImportWizard.tsx:809) and EntityPanel's inline export block (EntityPanel.tsx:135-143) with `downloadBlob(name, blob, { toast: false })` — both currently download silently.
   - **Done when:** `triggerBlob` and the inline anchor block are gone, `downloadText` still toasts, and the MapImportWizard/EntityPanel exports still download without a toast; tests green.

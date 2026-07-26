@@ -2514,3 +2514,33 @@ flake as an "Errors" count with all 843 tests in that shard still green). Pre-co
 branch `run/q79-eslint-editor-guard` to be cleaned up after merge. No concurrency this run — origin tip
 matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
 before each).
+
+- [x] **Q80. Extract shared browser file/image read helpers.** ✅ DONE
+  2026-07-26 — commit f5f05cee
+
+**What shipped:** new `src/atlas/content/browserFile.ts` exporting `fileToDataUrl(file)` (FileReader →
+readAsDataURL) and `readImageSize(src)` (Image.onload → naturalWidth/Height, `crossOrigin = "anonymous"`
+set unconditionally — unifying useMapLayers' behavior, which the wizard copy previously lacked).
+Replaced the four duplicated copies: MapImportWizard's `readDataUrl`/`readImageDimensions` (call sites
+at the former lines 100-101), useMapLayers' `fileToDataUrl`/`readImageSize`, and EntityEditPanel's
+inline `handleImageImport` FileReader block — rewritten as a `fileToDataUrl(file).then(...)` chain that
+folds the read failure into the same `.catch` as the existing save-failure toast (previously a read
+error was silently swallowed with no `reader.onerror` at all; now it surfaces via the same
+"Image upload failed" toast path used for save failures — a minor, in-scope hardening of the routing,
+not a new behavior). `EntityPanel.tsx`'s `handleImport` (`readAsText`, a different read entirely) was
+left untouched, per spec.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — pure refactor, no build/scan/fog/
+artifact touch, so `atlas:publish` wasn't required. `npm run typecheck:all` clean · `npm run lint` 0
+errors (18 pre-existing warnings, no new ones) · 2775 tests green across the 4 shards (689+620+843+623;
+shards 1 and 3 hit the documented `onTaskUpdate` RPC flake as an "Errors" count with every test in those
+shards still green). Confirmed no stray references to the four old function names anywhere in `src/`
+before committing. Pre-commit hook also passed.
+
+**Commits:** `f5f05cee` (refactor, on `run/q80-browser-file-helpers`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q80` and
+branch `run/q80-browser-file-helpers` to be cleaned up after merge. No concurrency this run — origin
+tip matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
+before each).
