@@ -95,4 +95,81 @@ describe("AssetManagerPanel", () => {
     expect(screen.queryByText(/MB|KB/)).not.toBeInTheDocument();
     expect(screen.getByLabelText("Credit for assets/pics/a.png")).toBeInTheDocument();
   });
+
+  it("reflects an external assetCredits update in the controlled credit input", () => {
+    const { rerender } = render(
+      <AssetManagerPanel
+        project={fixture()}
+        assetCredits={{ "assets/pics/a.png": { credit: "", enabled: false } }}
+        onPatch={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText("Credit for assets/pics/a.png")).toHaveValue("");
+    rerender(
+      <AssetManagerPanel
+        project={fixture()}
+        assetCredits={{ "assets/pics/a.png": { credit: "Applied by bulk action", enabled: false } }}
+        onPatch={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText("Credit for assets/pics/a.png")).toHaveValue("Applied by bulk action");
+  });
+
+  it("'apply to all' copies one row's credit onto every asset, preserving each enabled state", () => {
+    const onPatch = vi.fn();
+    render(
+      <AssetManagerPanel
+        project={fixture()}
+        assetCredits={{
+          "assets/pics/a.png": { credit: "Art by A", enabled: true },
+          "assets/maps/o.png": { credit: "", enabled: false },
+        }}
+        onPatch={onPatch}
+      />,
+    );
+    // Row order follows collectAssets: entity images first, so index 0 is "assets/pics/a.png".
+    fireEvent.click(screen.getAllByRole("button", { name: "Apply to all" })[0]);
+    expect(onPatch).toHaveBeenCalledWith({
+      "assets/pics/a.png": { credit: "Art by A", enabled: true },
+      "assets/maps/o.png": { credit: "Art by A", enabled: false },
+    });
+  });
+
+  it("'enable all badges' flips every asset's enabled flag on, preserving credit text", () => {
+    const onPatch = vi.fn();
+    render(
+      <AssetManagerPanel
+        project={fixture()}
+        assetCredits={{
+          "assets/pics/a.png": { credit: "Art by A", enabled: false },
+          "assets/maps/o.png": { credit: "", enabled: false },
+        }}
+        onPatch={onPatch}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Enable all badges" }));
+    expect(onPatch).toHaveBeenCalledWith({
+      "assets/pics/a.png": { credit: "Art by A", enabled: true },
+      "assets/maps/o.png": { credit: "", enabled: true },
+    });
+  });
+
+  it("'disable all badges' flips every asset's enabled flag off, preserving credit text", () => {
+    const onPatch = vi.fn();
+    render(
+      <AssetManagerPanel
+        project={fixture()}
+        assetCredits={{
+          "assets/pics/a.png": { credit: "Art by A", enabled: true },
+          "assets/maps/o.png": { credit: "Art by O", enabled: true },
+        }}
+        onPatch={onPatch}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Disable all badges" }));
+    expect(onPatch).toHaveBeenCalledWith({
+      "assets/pics/a.png": { credit: "Art by A", enabled: false },
+      "assets/maps/o.png": { credit: "Art by O", enabled: false },
+    });
+  });
 });
