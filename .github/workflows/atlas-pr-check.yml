@@ -47,3 +47,22 @@ jobs:
         # fog-safety, player-secrets, audit-assets) against both dist and
         # public/atlas — the same orchestrator publish-atlas.yml runs post-merge.
         run: npm run atlas:scan
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test shard ${{ matrix.shard }}/4
+        run: npx vitest run --pool=forks --poolOptions.forks.maxForks=3 --shard=${{ matrix.shard }}/4
