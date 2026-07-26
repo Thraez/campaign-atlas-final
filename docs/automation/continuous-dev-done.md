@@ -2023,3 +2023,29 @@ index.d.ts` (2229 lines vs. the main copy's 3160), which broke `typecheck` with 
 unrelated to this change — a clean `rm -rf node_modules && npm install` in the worktree fixed it before
 the gate ran; worth a heads-up if a future run hits an inexplicable typecheck error in unrelated
 `node_modules` types right after a fresh worktree.
+
+- [x] **Q64. Minify player atlas.json + search-index.json (keep DM build pretty-printed).** ✅ DONE
+  2026-07-26 — commit 9c82d00b
+
+**What shipped:** `scripts/build-atlas.ts` wrote both shipped artifacts with `JSON.stringify(..., null,
+2)` on every build, DM and player alike. Player builds now write single-line minified JSON (smaller
+payload for players); DM/`.local-atlas` builds keep the 2-space pretty form so human diffs against them
+stay readable.
+
+**Implementation:** a single `jsonIndent = flags.player ? undefined : 2` local, used for both the
+`atlas.json` and `search-index.json` `JSON.stringify` calls (around line 1024-1030). No consumer change
+needed — the client loader, `check-artifact-shape.ts`'s `JSON.parse` calls, and the SW cache all parse
+JSON regardless of whitespace.
+
+**Gate:** full gate including `npm run atlas:publish` per the queue spec (touches shipped player
+artifacts). typecheck clean · eslint 0 errors (18 pre-existing warnings, no new ones) · 2767 tests green
+(4 shards: 687+588+815+677, unchanged from baseline — no new tests needed). Known non-real
+`onTaskUpdate` RPC worker-communication timeout in shard 3, re-run once to confirm (815/815 both times,
+0 failed — documented flake signature). `npm run atlas:publish` → build + all 12 orchestrator scans
+clean on the minified output (check-secrets, check-shape, check-derived-secrets, audit-assets,
+check-fog-safety, check-image-privacy). Verified directly: player `public/atlas/atlas.json` is a single
+line after the build; a DM build (`npm run atlas:build`) still emits 842 lines of pretty-printed JSON.
+`public/atlas/assets/audio/manifest.json` LF/CRLF churn from running tests reverted with `git checkout
+--` before committing — no artifact diff beyond the two intended files reached `auto/continuous-dev`.
+Clean merge — no concurrent runs (origin tip matched the run's fork point at both worktree-creation and
+merge time, confirmed via `git fetch` immediately before each).

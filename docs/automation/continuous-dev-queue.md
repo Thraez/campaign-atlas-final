@@ -176,13 +176,6 @@ is for sequencing, not the whole spec.
 
 #### Q-I — Build & runtime performance
 
-- [ ] **Q64. Minify player atlas.json + search-index.json (keep DM build pretty-printed).**
-  In `scripts/build-atlas.ts`, both shipped artifacts are written with `JSON.stringify(project, null, 2)` (line 1004) and `JSON.stringify(searchIndex, null, 2)` (line 1007) for every build. Gate the indent on `flags.player`: write minified (drop the `null, 2`) for player/strict-player output, keep the 2-space pretty form for DM/`.local-atlas` builds so human diffs stay readable. Every consumer parses JSON regardless of whitespace — the client `loader.ts`, `scanArtifactShape`/`scanSearchIndex` in `scripts/check-artifact-shape.ts` (both `JSON.parse` the file at lines 261/271), and the SW cache — so nothing else changes.
-  - **Done when:** a player build (`npm run atlas:build:player`) emits single-line `atlas.json` + `search-index.json`, a DM build (`npm run atlas:build`) still emits 2-space-indented files, and all safety scans stay green.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest) + `npm run atlas:publish`.
-  Touches shipped player artifacts — confirm `atlas:check-shape`/`check-secrets`/`check-derived` all still pass on the minified output.
-  ~1 run.
-
 - [ ] **Q65. Stop shipping the duplicated lowercased body in the search index; derive it at load.**
   `buildSearchIndex` in `scripts/build-atlas.ts` (lines 1284-1294) emits both `body: stripped.toLowerCase()` (for matching) and `bodyText: stripped` (for snippets) — the same (≤4000-char) stripped text differing only in case, a redundant copy in every entry. Ship only `bodyText`, and in `src/atlas/content/loader.ts` `loadSearchIndex` derive `body = bodyText.toLowerCase()` after `parseSearchIndex` so `parseSearchQuery.ts:48` and `SearchPalette.tsx` keep reading `e.body` unchanged. CRITICAL: `scanSearchIndex` in `scripts/check-artifact-shape.ts:221` secret-scans the raw `body` field — repoint that field entry to scan `bodyText` (the surviving field) so leak coverage isn't lost. `parseSearchIndex` (atlasGuard.ts:70) only requires id/title/type, so the absent `body` won't fail the guard.
   - **Done when:** shipped `search-index.json` entries carry `bodyText` but no `body`; in-app search still matches body text; `scanSearchIndex` scans `bodyText`; all scans green.
