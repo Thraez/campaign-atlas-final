@@ -2079,3 +2079,30 @@ fault. `npm run atlas:publish` → build + all 12 orchestrator scans clean. Veri
 `search-index.json` shape change reached `auto/continuous-dev`. Clean merge — no concurrent runs (origin
 tip matched the run's fork point at both worktree-creation and merge time, confirmed via `git fetch`
 immediately before each).
+
+- [x] **Q66. Lazy-load search-index.json on first search instead of at viewer startup.** ✅ DONE
+  2026-07-26 — commit caaf8f96
+
+**What shipped:** `AtlasViewer.tsx` used to fetch `search-index.json` in the same `Promise.all` as
+`atlas.json` at mount, so every `/atlas` visit downloaded+parsed the full search index even for players
+who never open search. The initial-load effect now only calls `loadAtlasContent`; a new effect keyed on
+`searchOpen` calls `loadSearchIndex()` the first time the palette opens, storing the result in a new
+`searchIndex` state. A `useRef<Promise<void> | null>` guards against re-fetching on subsequent opens
+(the promise itself, not a boolean, is stored so a fetch already in flight is never started twice).
+While `searchIndex` is still null, the search overlay renders a small "Loading search…" placeholder
+(`role="status"`, same overlay chrome) in place of `SearchPalette`; `SearchPalette`'s own prop contract
+and existing tests are untouched. On fetch failure the error routes through the existing page-level
+`setError` state, matching the pre-change behavior (a `loadSearchIndex` failure inside the original
+`Promise.all().catch()` also surfaced as the page error).
+
+**Gate:** standard gate (no `atlas:publish` needed — runtime-only, no shipped-artifact change, per the
+queue spec). typecheck clean · eslint 0 errors (18 pre-existing warnings, no new ones) · 2774 tests green
+(4 shards: 689+620+842+623; baseline 2771 + 3 new, all in
+`src/test/pages/AtlasViewer.smoke.test.tsx`: initial load fetches no search-index; first search-open
+fetches it exactly once and shows the loading placeholder first; closing and reopening does not
+re-fetch). Known non-real `onTaskUpdate` RPC worker-communication timeout in shard 3, re-run once to
+confirm (842/842 both times, 0 failed — documented flake signature). `public/atlas/assets/audio/manifest.json`
+LF/CRLF churn from running tests reverted with `git checkout --` before committing — no artifact diff
+beyond the two intended files reached `auto/continuous-dev`. Clean merge — no concurrent runs (origin tip
+matched the run's fork point at both worktree-creation and merge time, confirmed via `git fetch`
+immediately before each).

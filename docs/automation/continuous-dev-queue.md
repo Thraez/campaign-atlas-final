@@ -176,13 +176,6 @@ is for sequencing, not the whole spec.
 
 #### Q-I — Build & runtime performance
 
-- [ ] **Q66. Lazy-load search-index.json on first search instead of at viewer startup.**
-  `src/pages/AtlasViewer.tsx:232` eagerly runs `Promise.all([loadAtlasContent(true), loadSearchIndex()])` at mount, so every `/atlas` visit downloads+parses the full search index even for players who never open search. Keep `loadAtlasContent` on the critical path but defer `loadSearchIndex` (`src/atlas/content/loader.ts:34`) until the CommandPalette/SearchPalette first opens; add a lightweight loading state to the palette while the index resolves and memoize so it fetches only once. Behavior once open is identical to today.
-  - **Done when:** initial `/atlas` load performs no search-index fetch (assert via test/network); the first search-open triggers the fetch once, shows a loading state, then behaves as before; reopening does not re-fetch.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Player-facing runtime only; no shipped-artifact change and no DM-secret surface.
-  ~2–3 runs.
-
 - [ ] **Q67. Add a dev `maps:optimize` tool (PNG→WebP source) mirroring `audio:transcode`.**
   Source map PNGs under `public/atlas/assets/maps` are the repo's heaviest files. Add `scripts/dev/optimize-maps.mjs` + a `maps:optimize` npm script mirroring the existing `scripts/dev/transcode-audio.mjs` / `audio:transcode` pattern (package.json:34): for each oversized source PNG, emit a `.webp` twin via `sharp` (already a devDependency) and rewrite the matching `layers[].src` in `public/atlas/assets/maps/world.yaml`. `.webp` is already allowlisted (`ALLOWED_IMAGE_EXTS` in `scripts/atlas/validateAsset.ts:32`). This is a DM-run dev step, explicitly NOT part of the gated build.
   - **Done when:** `npm run maps:optimize` converts oversized map PNGs to `.webp`, updates the matching `world.yaml` srcs, skips already-webp/small sources, and a subsequent `npm run atlas:build:player` still validates (webp allowlisted).
