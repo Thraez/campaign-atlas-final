@@ -12,6 +12,8 @@
     "build:editor": "vite build --mode editor",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
+    "typecheck:all": "npm run typecheck && npm run typecheck:scripts",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"scripts/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"scripts/**/*.{ts,tsx}\"",
     "preview": "vite preview",
