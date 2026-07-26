@@ -1847,3 +1847,34 @@ signature). Build artifacts regenerated during the publish gate (`atlas.json`/`s
 `manifest.json` LF/CRLF) were reverted with `git checkout --` before the commit — no artifact diff reached
 `auto/continuous-dev`. Clean merge (no concurrent runs — origin tip matched the run's fork point at merge
 time, confirmed via `git fetch` immediately before merging).
+
+- [x] **Q59. Add bulk credit actions to the Asset Manager and fix the uncontrolled credit input.** ✅ DONE
+  2026-07-26 — commit 321c109c
+
+**What shipped:** `AssetManagerPanel.tsx`'s credit `<input>` used `defaultValue={entry.credit}`, so a
+programmatic bulk-apply or external `assetCredits` update never reflected in the field once the input had
+mounted — converted to a controlled `value={entry.credit}`. Added three bulk controls, all calling
+`onPatch` over the whole registry: a per-row "Apply to all" button (copies that row's current credit
+string onto every asset, preserving each asset's own `enabled` flag) and two panel-wide buttons, "Enable
+all badges" / "Disable all badges" (flip every entry's `enabled`, preserving each asset's own credit
+text).
+
+**Implementation:**
+- `AssetManagerPanel.tsx`: `applyCreditToAll(credit)` and `setAllEnabled(enabled)` helpers alongside the
+  existing per-row `setEntry`, each building the full next registry and calling `onPatch` once. Reused the
+  shared `Button` component (`@/components/ui/button`, already used elsewhere in the editor) for the three
+  new controls instead of raw `<button>` tags, matching the codebase's existing convention.
+- No `AssetCredit` schema change — `src/atlas/content/schema.ts` untouched, per the queue entry.
+- Tests: `src/test/assets/AssetManagerPanel.test.tsx` +4 cases (controlled input reflects an external
+  `assetCredits` prop update across a rerender; "Apply to all" copies one row's credit onto every asset
+  while preserving each `enabled` flag; "Enable all badges" / "Disable all badges" flip every `enabled`
+  flag while preserving each credit string). The 6 pre-existing cases stayed green unmodified.
+
+**Gate:** editor-only panel, no build/scan pipeline touched — standard gate only (no `atlas:publish`).
+typecheck clean · eslint 0 errors (18 pre-existing warnings, no new ones) · 2735 tests green (4 shards:
+686+587+794+668). Known non-real `onTaskUpdate` RPC worker-communication timeout in shard 3 (0 tests
+failed — same documented flake signature, not re-run). No build artifacts touched by this run (editor-only
+change never invoked the build pipeline) — the `public/atlas/assets/audio/manifest.json` LF/CRLF churn
+that running tests produced was reverted with `git checkout --` before the commit. Clean merge (no
+concurrent runs — origin tip matched the run's fork point at merge time, confirmed via `git fetch`
+immediately before merging).

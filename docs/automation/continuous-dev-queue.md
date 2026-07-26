@@ -173,13 +173,6 @@ is for sequencing, not the whole spec.
 
 #### Q-H — DM publish, backup & assets
 
-- [ ] **Q59. Add bulk credit actions to the Asset Manager and fix the uncontrolled credit input.**
-  In `src/atlas/assets/AssetManagerPanel.tsx` the credit `<input>` uses `defaultValue={entry.credit}` (line 64), so a programmatic bulk-apply or external `assetCredits` update won't reflect in the field — convert it to a controlled `value={entry.credit}`. Add three bulk controls that call `onPatch` over the whole registry: "apply this credit to all" (copy one row's credit string onto every asset), "enable all badges", and "disable all badges" (flip every entry's `enabled`). Preserve the existing per-asset `setEntry` merge semantics and the `EMPTY` default.
-  - **Done when:** typing in one field then "apply to all" fills every row's controlled input; enable/disable-all flip every badge; `src/test/assets/AssetManagerPanel.test.tsx` covers bulk-apply and controlled-value reflection.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Editor-only panel; `AssetCredit` shape in `src/atlas/content/schema.ts` is unchanged.
-  ~2-3 runs.
-
 - [ ] **Q60. Distinguish a first-ever publish from "no changes" in the diff panel.**
   `computeAtlasDiff(null, current)` returns `EMPTY_DIFF` with `hasChanges:false` (`src/atlas/publish/computeAtlasDiff.ts` lines 130-140), so `PublishedDiffPanel` shows "No changes since last publish." (line 137-138) on a first publish when the whole world is genuinely new. Add a `hadBaseline: boolean` field to `AtlasDiff` (false when `baseline` is null, true otherwise) and, in `PublishedDiffPanel.tsx`, when `!hasChanges && !hadBaseline` render "First publish — your whole world will go live." instead of the no-changes copy. `ReadinessCard.tsx` just forwards `result.diff` to the panel, so no change is needed there.
   - **Done when:** a null baseline renders the first-publish message; a genuine no-op diff still renders "No changes"; `src/atlas/publish/computeAtlasDiff.test.ts` asserts `hadBaseline` for both the null-baseline and populated-baseline cases.
