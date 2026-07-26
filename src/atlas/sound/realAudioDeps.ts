@@ -1,7 +1,9 @@
 import type { AudioDeps } from "@/atlas/sound/AudioEngine";
 
 export const realAudioDeps: AudioDeps = {
-  createContext: () => new (window.AudioContext || (window as any).webkitAudioContext)(),
+  createContext: () =>
+    new (window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)(),
   fetchAudio: (url) => fetch(url).then((r) => r.arrayBuffer()),
   canPlay: (src) => {
     if (!src.endsWith(".ogg")) return true;
