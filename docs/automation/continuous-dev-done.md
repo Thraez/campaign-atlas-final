@@ -1916,3 +1916,39 @@ merge (no concurrent runs — origin tip matched the run's fork point at merge t
 directly in the main working copy before creating the worktree. Caught before any commit — the
 uncommitted edits were `git stash push -u`'d, a fresh worktree was created from the (unaffected) main
 copy's clean tip, and the stash was popped there. No incorrect state reached any commit or the remote.
+
+- [x] **Q61. Post-publish confirmation: show what shipped plus the commit id.** ✅ DONE
+  2026-07-26 — commit c1e3f3c4
+
+**What shipped:** `usePublishFlow.confirm()` discarded `data.pushedAt`/`data.commit` from a successful
+`/__atlas/publish-push` response, so `PublishCheckTab`'s "published" panel only ever said "Your players
+will see the changes in a couple of minutes." with no sign of what actually shipped. The hook now captures
+a `pushResult` field (`{ pushedAt, commit }`) on a `"published"` result, and the panel renders a concrete
+summary built from the check's `diff.counts` plus the short commit sha, e.g. "Published 5 entities and 3
+pins (commit a1b2c3d)." Degrades gracefully: a zero count is omitted from the list (all-zero → bare
+"Published."), and a missing commit drops the parenthetical entirely.
+
+**Implementation:**
+- `src/atlas/publish/usePublishFlow.ts`: new `PublishPushSummary` type + `pushResult` state, set from
+  `data.pushedAt`/`data.commit` in the `"published"` branch of `confirm()`, returned from the hook.
+- `src/atlas/publish/publishSummary.ts` (new): pure `shortCommit(commit)` (7-char abbreviation) and
+  `formatPublishSummary(counts, commit?)` — singularizes "1 entity"/"1 pin", omits a zero count, and drops
+  the commit parenthetical when absent.
+- `src/atlas/tabs/PublishCheckTab.tsx`: the `state === "published"` block gained a summary line calling
+  `formatPublishSummary(publish.checkResult?.diff.counts ?? { entities: 0, placements: 0 },
+  publish.pushResult?.commit)`, above the existing "couple of minutes" copy (kept unchanged).
+- Tests: `src/atlas/publish/publishSummary.test.ts` (new, 7 cases covering truncation, pluralization,
+  zero-count omission, all-zero degrade, and missing-commit degrade). `usePublishFlow.test.ts` +2 cases
+  (pushResult captured on published; stays `null` when confirm() resolves to a non-published status).
+  `src/test/publish-check-tab.test.tsx` +1 case (checkResult counts + pushResult commit render the exact
+  summary string) and one existing assertion (`/published/i`) tightened to `/published ✓/i` to disambiguate
+  from the new summary text, which also contains the word "Published".
+
+**Gate:** editor-only publish UI + a diff/hook module used only by the dev-server publish-check endpoint —
+standard gate only (no `atlas:publish`; nothing in the shipped build/scan pipeline touched). typecheck
+clean · eslint 0 errors (18 pre-existing warnings, no new ones) · 2747 tests green (4 shards:
+687+588+797+675). Known non-real `onTaskUpdate` RPC worker-communication timeout in shard 3 (0 tests
+failed — documented flake signature, not re-run). `public/atlas/assets/audio/manifest.json` LF/CRLF churn
+from running tests reverted with `git checkout --` before the merge — no artifact diff reached
+`auto/continuous-dev`. Clean merge (no concurrent runs — origin tip matched the run's fork point at both
+worktree-creation and merge time, confirmed via `git fetch` immediately before each).

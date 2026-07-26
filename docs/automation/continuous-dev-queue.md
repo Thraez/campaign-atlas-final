@@ -173,13 +173,6 @@ is for sequencing, not the whole spec.
 
 #### Q-H — DM publish, backup & assets
 
-- [ ] **Q61. Post-publish confirmation: show what shipped plus the commit id.**
-  In `src/atlas/publish/usePublishFlow.ts`, `confirm()` sets state to `"published"` (line 70) but discards `data.pushedAt` and `data.commit`, which the `PublishPushResult` "published" variant carries (`src/atlas/publish/publishTypes.ts` line 39). Capture the push result in a new hook field (e.g. `pushResult`) and, in `src/atlas/tabs/PublishCheckTab.tsx` (the `state === "published"` block, line 157-163 — today only "in a couple of minutes"), render a concrete summary from `checkResult.diff.counts` plus the short commit, e.g. "Published 5 entities and 3 pins (commit a1b2c3d)." (map `counts.placements` to "pins"). Degrade gracefully when counts are zero.
-  - **Done when:** after a successful publish the panel shows the entity/pin counts and the short commit sha; `src/atlas/publish/usePublishFlow.test.ts` asserts the captured push result.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Editor-only publish UI; reuses data already returned by `/__atlas/publish-push`.
-  ~1 run.
-
 - [ ] **Q62. Add backup retention pruning (`--keep N`) to `atlas:backup`.**
   `scripts/atlas/backup.ts` writes `backups/<ISO-timestamp>.zip` on every run (line 24-26/102) with no cleanup, so the folder grows unbounded. Add a `--keep N` flag: after writing the new zip, delete the oldest `.zip` files in `backups/` beyond the newest N (the ISO-timestamp filenames sort lexicographically = chronologically). Extract the selection as a pure `zipsToPrune(filenames: string[], keep: number): string[]` helper (over a filename list) so it is unit-testable, and only ever unlink `.zip` files inside `backups/`. This requires branching `main()` on parsed argv (currently it runs unconditionally on import).
   - **Done when:** `--keep 3` keeps the 3 newest zips and removes older ones; omitting the flag preserves current behavior (no deletion); a new `scripts/atlas/backup.test.ts` covers `zipsToPrune` for keep=0, keep>=count, and ignoring non-`.zip` files.
