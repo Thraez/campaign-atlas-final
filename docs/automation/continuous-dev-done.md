@@ -1952,3 +1952,34 @@ failed — documented flake signature, not re-run). `public/atlas/assets/audio/m
 from running tests reverted with `git checkout --` before the merge — no artifact diff reached
 `auto/continuous-dev`. Clean merge (no concurrent runs — origin tip matched the run's fork point at both
 worktree-creation and merge time, confirmed via `git fetch` immediately before each).
+
+- [x] **Q62. Add backup retention pruning (`--keep N`) to `atlas:backup`.** ✅ DONE
+  2026-07-26 — commit ff5e2ec9
+
+**What shipped:** `scripts/atlas/backup.ts` wrote `backups/<ISO-timestamp>.zip` on every run with no
+cleanup, so the folder grew unbounded. Added an opt-in `--keep N` flag: after writing the new zip, the
+oldest `.zip` files in `backups/` beyond the newest N are deleted. Omitting the flag preserves the exact
+prior behavior (no deletion).
+
+**Implementation:**
+- `scripts/atlas/backup.ts`: new exported pure `zipsToPrune(filenames, keep)` (filters to `.zip`, sorts —
+  ISO-timestamp names sort lexicographically = chronologically — and slices off everything past the
+  newest `keep`) and `parseKeepFlag(argv)` (reads `--keep N`, `undefined` if absent/non-integer/negative).
+  New private `pruneOldBackups(dir, keep)` calls `zipsToPrune` over `fs.readdirSync(dir)` and unlinks only
+  the selected `.zip` names inside that directory. `main()` calls it after the write, only when
+  `parseKeepFlag` returned a value. The bare `main().catch(...)` at module scope (which ran unconditionally
+  on import, making the pure helpers untestable without triggering a real backup) is now gated behind an
+  `isMainModule` CLI-shim check (`process.argv[1] === fileURLToPath(import.meta.url)`), mirroring the
+  existing pattern in `snapshot-baseline.ts`.
+- Tests: `scripts/atlas/backup.test.ts` (new, 8 cases) — `zipsToPrune` for keep=0 (prunes all), keep≥count
+  (prunes none), keep=1/2 (keeps newest N), non-`.zip` entries ignored, and an unsorted input list;
+  `parseKeepFlag` for absent flag, valid values (including 0), and invalid values (missing, non-numeric,
+  negative, fractional).
+
+**Gate:** standard gate only per the queue spec (backup tooling, not the shipped build/scan/artifact
+pipeline — no `atlas:publish`). typecheck clean · eslint 0 errors (18 pre-existing warnings, no new ones)
+· 2755 tests green (4 shards: 687+588+803+677; baseline 2747 + 8 new). Known non-real `onTaskUpdate` RPC
+worker-communication timeout in shard 3 (0 tests failed both times it was run — documented flake
+signature). `public/atlas/assets/audio/manifest.json` LF/CRLF churn from running tests reverted with
+`git checkout --` before the merge. Clean merge — no concurrent runs (origin tip matched the run's fork
+point at both worktree-creation and merge time, confirmed via `git fetch` immediately before each).

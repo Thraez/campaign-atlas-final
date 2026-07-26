@@ -173,13 +173,6 @@ is for sequencing, not the whole spec.
 
 #### Q-H — DM publish, backup & assets
 
-- [ ] **Q62. Add backup retention pruning (`--keep N`) to `atlas:backup`.**
-  `scripts/atlas/backup.ts` writes `backups/<ISO-timestamp>.zip` on every run (line 24-26/102) with no cleanup, so the folder grows unbounded. Add a `--keep N` flag: after writing the new zip, delete the oldest `.zip` files in `backups/` beyond the newest N (the ISO-timestamp filenames sort lexicographically = chronologically). Extract the selection as a pure `zipsToPrune(filenames: string[], keep: number): string[]` helper (over a filename list) so it is unit-testable, and only ever unlink `.zip` files inside `backups/`. This requires branching `main()` on parsed argv (currently it runs unconditionally on import).
-  - **Done when:** `--keep 3` keeps the 3 newest zips and removes older ones; omitting the flag preserves current behavior (no deletion); a new `scripts/atlas/backup.test.ts` covers `zipsToPrune` for keep=0, keep>=count, and ignoring non-`.zip` files.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Deletes only regenerable `.zip` snapshots in `backups/`, never `content/` or `assets/`; pruning is opt-in via the flag.
-  ~1 run.
-
 - [ ] **Q63. Add a non-destructive restore that extracts a backup into a fresh folder.**
   `scripts/atlas/backup.ts` has no restore counterpart. Add a `--restore <zip> --out <dir>` mode (branch in `main()` on argv before the current backup path): unzip the chosen backup into `<dir>`, REFUSING if `<dir>` exists and is non-empty (write nothing, exit with a clear message), then verify the extracted file count against the `MANIFEST.md` "Files:" line the backup already writes (line 82-94). Add an `atlas:restore` script to `package.json` (currently only `atlas:backup` at line 33). Keep the manifest count-check as a pure helper so it's testable.
   - **Done when:** `--restore x.zip --out newdir` extracts into an empty `newdir` and reports a verified file count; a non-empty `--out` aborts without writing; `scripts/atlas/backup.test.ts` covers the manifest count-verify helper and the non-empty-dir refusal.
