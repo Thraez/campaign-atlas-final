@@ -2311,3 +2311,32 @@ separate merge commit — `auto/continuous-dev` was still at the fork point).
 **Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q72` and
 branch `run/q72-pr-scan` cleaned up after merge. No concurrency this run — origin tip matched the fork
 point at worktree creation and at merge time (confirmed via `git fetch` immediately before each).
+
+- [x] **Q73. Add a sharded vitest job to CI.** ✅ DONE
+  2026-07-26 — commit 7f41b71b
+
+**What shipped:** `.github/workflows/atlas-pr-check.yml` gains a new `test` job alongside `scan`, with a
+`strategy.matrix.shard: [1, 2, 3, 4]` running `npx vitest run --pool=forks --poolOptions.forks.maxForks=3
+--shard=${{ matrix.shard }}/4` — the exact OOM-avoiding invocation documented in `docs/CODEBASE_MAP.md`
+(Invariant 7). Reuses the existing `actions/checkout@v4` + `actions/setup-node@v4` + `npm ci` setup. Each
+matrix entry surfaces as its own PR check.
+
+**Verified end-to-end:** ran all four shards locally against the new worktree with the exact command the
+workflow now runs. All green: 689+620+843+623 = 2775 tests. Shard 1 and shard 3 each hit the documented
+`onTaskUpdate` RPC worker-communication flake (0 real failures — re-ran to confirm signature matches the
+known flake). `git status` after all four runs showed only line-ending churn in
+`public/atlas/assets/audio/manifest.json`, reverted with `git checkout --` before committing — only the
+workflow YAML reached `auto/continuous-dev`.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — CI-workflow-only change, no
+build-pipeline/artifact touch, so `atlas:publish` wasn't required per the queue spec. typecheck clean ·
+eslint 0 errors (18 pre-existing warnings, no new ones) · 2775 tests green (4 shards, as above).
+Pre-commit hook's `vitest run --changed` found no test files for the CI-YAML-only diff (exit 0,
+expected).
+
+**Commits:** `7f41b71b` (feat, on `run/q73-shard-ci`), fast-forward merge into `auto/continuous-dev` (no
+separate merge commit — `auto/continuous-dev` was still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q73` and
+branch `run/q73-shard-ci` cleaned up after merge. No concurrency this run — origin tip matched the fork
+point at worktree creation and at merge time (confirmed via `git fetch` immediately before each).

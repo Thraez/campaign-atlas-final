@@ -179,12 +179,6 @@ is for sequencing, not the whole spec.
 
 #### Q-J — CI/CD & developer experience
 
-- [ ] **Q73. Add a sharded vitest job to CI.**
-  Neither `.github/workflows/atlas-pr-check.yml` nor `publish-atlas.yml` runs the test suite (~2400 tests across ~150 files), so failing tests can merge. Add a matrix job to `atlas-pr-check.yml` with `strategy.matrix.shard: [1,2,3,4]` running `npx vitest run --pool=forks --poolOptions.forks.maxForks=3 --shard=${{ matrix.shard }}/4` — the exact OOM-avoiding invocation documented in `docs/CODEBASE_MAP.md` (Invariant 7, line 317) — with all four shards required green. Reuse the existing `actions/checkout` + `npm ci` setup.
-  - **Done when:** a 4-way shard matrix job runs on every PR; each shard is a required check; a deliberately failing test turns the job red.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  CI-remote result is only partially verifiable locally; if a lone shard exits 1 on a worker↔coordinator RPC timeout (not a real failure), re-run that shard alone to disambiguate, per CODEBASE_MAP. Can call `npm run test:ci` instead if Q76 has landed. ~2–3 runs.
-
 - [ ] **Q74. Add an ESLint step to PR CI.**
   CI never runs ESLint — only the pre-commit hook (`scripts/pre-commit.sh:10`, `npx eslint .`) and the autonomous routine do — so a contributor or merge without hooks installed can land lint errors, including a reintroduced dynamic `require()` that the custom `no-restricted-syntax` rule in `eslint.config.js` (lines 35–42) exists to block. Add a `npm run lint` step to the `scan` job in `.github/workflows/atlas-pr-check.yml`, after the typecheck step.
   - **Done when:** the PR workflow runs `npm run lint`; an introduced lint error fails the job; the 16 known warnings do NOT fail it.
