@@ -19,6 +19,11 @@
  * Retention: pass `--keep N` to delete the oldest .zip files in backups/
  * beyond the newest N after writing. Omit the flag to keep every backup
  * (current default behavior, unchanged).
+ *
+ * Restore: `npm run atlas:restore -- --restore <zip> --out <dir>` extracts a
+ * backup into a fresh directory. Refuses (writes nothing) if <dir> exists
+ * and is non-empty. Reports the extracted file count verified against the
+ * backup's own MANIFEST.md "Files:" line.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -103,7 +108,85 @@ function pruneOldBackups(dir: string, keep: number): void {
   }
 }
 
+/** Parse `--restore <zip> --out <dir>` out of CLI args. Returns undefined
+ *  unless both flags are present with a value (neither flag alone triggers
+ *  restore mode — falls through to the normal backup path). */
+export function parseRestoreFlag(argv: string[]): { zip: string; out: string } | undefined {
+  const ri = argv.indexOf("--restore");
+  const oi = argv.indexOf("--out");
+  if (ri === -1 || oi === -1) return undefined;
+  const zip = argv[ri + 1];
+  const out = argv[oi + 1];
+  if (!zip || zip.startsWith("--") || !out || out.startsWith("--")) return undefined;
+  return { zip, out };
+}
+
+/** Extract the "Files: N" count out of a backup's MANIFEST.md text. Returns
+ *  undefined if the line is missing or not a valid integer. */
+export function parseManifestFileCount(manifestText: string): number | undefined {
+  const m = manifestText.match(/^Files:\s*(\d+)\s*$/m);
+  if (!m) return undefined;
+  const n = Number(m[1]);
+  return Number.isInteger(n) ? n : undefined;
+}
+
+/** Extract a backup zip into `outAbsDir`. Refuses (throws, writes nothing)
+ *  if the zip doesn't exist or `outAbsDir` exists and already has entries.
+ *  Returns the extracted file count (MANIFEST.md itself excluded, matching
+ *  how backup.ts counts `Files:` when writing the manifest) alongside the
+ *  manifest's own expected count for the caller to compare. */
+export async function restoreBackup(
+  zipAbsPath: string,
+  outAbsDir: string,
+): Promise<{ extracted: number; expected: number | undefined }> {
+  if (!fs.existsSync(zipAbsPath)) {
+    throw new Error(`backup not found: ${zipAbsPath}`);
+  }
+  if (fs.existsSync(outAbsDir) && fs.readdirSync(outAbsDir).length > 0) {
+    throw new Error(`output directory is not empty: ${outAbsDir} — refusing to overwrite`);
+  }
+  const data = fs.readFileSync(zipAbsPath);
+  const zip = await JSZip.loadAsync(data);
+
+  fs.mkdirSync(outAbsDir, { recursive: true });
+  let extracted = 0;
+  for (const [relPath, entry] of Object.entries(zip.files)) {
+    if (entry.dir) continue;
+    const destPath = path.join(outAbsDir, relPath);
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+    const content = await entry.async("nodebuffer");
+    fs.writeFileSync(destPath, content);
+    if (relPath !== "MANIFEST.md") extracted++;
+  }
+
+  const manifestPath = path.join(outAbsDir, "MANIFEST.md");
+  const manifestText = fs.existsSync(manifestPath) ? fs.readFileSync(manifestPath, "utf8") : "";
+  const expected = parseManifestFileCount(manifestText);
+  return { extracted, expected };
+}
+
+async function runRestoreCli(zipArg: string, outArg: string): Promise<void> {
+  const zipAbs = path.resolve(ROOT, zipArg);
+  const outAbs = path.resolve(ROOT, outArg);
+  console.log(`atlas:restore — extracting ${path.relative(ROOT, zipAbs)} → ${path.relative(ROOT, outAbs)}…`);
+  const { extracted, expected } = await restoreBackup(zipAbs, outAbs);
+  console.log(`\n✓ Restored ${extracted} file(s) into ${path.relative(ROOT, outAbs)}`);
+  if (expected === undefined) {
+    console.warn(`  ! could not verify file count (no "Files:" line found in MANIFEST.md)`);
+  } else if (expected === extracted) {
+    console.log(`  ✓ verified: file count matches manifest (${expected})`);
+  } else {
+    console.warn(`  ! mismatch: manifest reports ${expected} file(s), extracted ${extracted}`);
+  }
+}
+
 async function main(): Promise<void> {
+  const restoreArgs = parseRestoreFlag(process.argv.slice(2));
+  if (restoreArgs) {
+    await runRestoreCli(restoreArgs.zip, restoreArgs.out);
+    return;
+  }
+
   console.log(`atlas:backup — bundling ${INCLUDE_PATHS.length} path(s)…`);
   const zip = new JSZip();
   for (const p of INCLUDE_PATHS) {
@@ -150,7 +233,7 @@ async function main(): Promise<void> {
 const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMainModule) {
   main().catch((e) => {
-    console.error(`atlas:backup failed: ${e instanceof Error ? e.message : String(e)}`);
+    console.error(`atlas:backup/restore failed: ${e instanceof Error ? e.message : String(e)}`);
     process.exit(1);
   });
 }

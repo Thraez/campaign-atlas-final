@@ -31,6 +31,7 @@
     "atlas:check-shape": "tsx scripts/check-artifact-shape.ts",
     "atlas:audit-assets": "tsx scripts/atlas/audit-assets.ts",
     "atlas:backup": "tsx scripts/atlas/backup.ts",
+    "atlas:restore": "tsx scripts/atlas/backup.ts",
     "audio:transcode": "node scripts/dev/transcode-audio.mjs",
     "prepare": "simple-git-hooks"
   },
