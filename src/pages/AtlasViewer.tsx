@@ -223,7 +223,6 @@ function MaxBoundsController({
 
 interface ViewerState {
   project: AtlasProject;
-  index: SearchIndexEntry[];
 }
 
 export default function AtlasViewer() {
@@ -239,6 +238,12 @@ export default function AtlasViewer() {
   } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // Search index is deliberately NOT part of the initial load — it's fetched
+  // lazily on first search-open so players who never search never pay for it.
+  // The ref dedupes: once a fetch has started, later opens reuse its result
+  // (or, while in flight, await the same promise) instead of re-fetching.
+  const [searchIndex, setSearchIndex] = useState<SearchIndexEntry[] | null>(null);
+  const searchIndexRequestRef = useRef<Promise<void> | null>(null);
   // The bottom sheet renders the entity panel at *every* viewport below the
   // desktop-aside breakpoint (1024px) — not just mobile. Otherwise tablets
   // sit in a dead zone where neither the aside nor the sheet is mounted.
@@ -312,9 +317,9 @@ export default function AtlasViewer() {
   }, [popStateHandler]);
 
   useEffect(() => {
-    Promise.all([loadAtlasContent(true), loadSearchIndex()])
-      .then(([project, index]) => {
-        setData({ project, index });
+    loadAtlasContent(true)
+      .then((project) => {
+        setData({ project });
         const defaultMapId = project.worlds[0]?.defaultMapId ?? project.maps[0]?.id ?? null;
         const dl = parseDeepLink(window.location.search);
         // Use map from deep link if valid, else fall back to default
@@ -502,6 +507,15 @@ export default function AtlasViewer() {
       el.removeEventListener("mousemove", move);
     };
   }, [openEntity, openId, pointerFine, peekCtl]);
+
+  // Fetch the search index on first search-open, not at mount. The ref guards
+  // against re-fetching on every reopen (searchOpen flips false/true a lot).
+  useEffect(() => {
+    if (!searchOpen || searchIndexRequestRef.current) return;
+    searchIndexRequestRef.current = loadSearchIndex()
+      .then((idx) => setSearchIndex(idx))
+      .catch((e: Error) => setError(e.message));
+  }, [searchOpen]);
 
   // Cmd/Ctrl-K opens search
   useEffect(() => {
@@ -922,20 +936,34 @@ export default function AtlasViewer() {
         )}
 
         {/* Search palette */}
-        {searchOpen && (
-          <SearchPalette
-            query={query}
-            setQuery={setQuery}
-            index={data.index}
-            placements={data.project.placements}
-            onPick={(id, fly) => {
-              setSearchOpen(false);
-              setQuery("");
-              openEntity(id, fly);
-            }}
-            onClose={() => setSearchOpen(false)}
-          />
-        )}
+        {searchOpen &&
+          (searchIndex ? (
+            <SearchPalette
+              query={query}
+              setQuery={setQuery}
+              index={searchIndex}
+              placements={data.project.placements}
+              onPick={(id, fly) => {
+                setSearchOpen(false);
+                setQuery("");
+                openEntity(id, fly);
+              }}
+              onClose={() => setSearchOpen(false)}
+            />
+          ) : (
+            <div
+              className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm flex items-start justify-center pt-[10vh] px-4"
+              onClick={() => setSearchOpen(false)}
+            >
+              <div
+                role="status"
+                aria-live="polite"
+                className="w-full max-w-2xl bg-card border border-border rounded-lg shadow-2xl p-6 text-sm text-muted-foreground text-center"
+              >
+                Loading search…
+              </div>
+            </div>
+          ))}
         {peekCtl.peek &&
           data &&
           entityById.get(peekCtl.peek.entityId) &&
