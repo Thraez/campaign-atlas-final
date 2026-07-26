@@ -2454,3 +2454,30 @@ into `auto/continuous-dev`.
 branch `run/q77-typecheck-scripts` to be cleaned up after merge. No concurrency this run — origin tip
 matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
 before each).
+
+- [x] **Q78. Add a single `verify` script that runs the whole merge gate.** ✅ DONE
+  2026-07-26 — commit 951e660c
+
+**What shipped:** `"verify": "npm run typecheck:all && npm run lint && npm run test:ci"` added to
+`package.json` (uses `typecheck:all`, not just app-only `typecheck`, per the Q77 handover note — the
+scripts pipeline is part of what ships, so the "whole merge gate" gates it too). Documented as the
+pre-push check in `docs/QUICK_START.md` (new paragraph in the "Daily workflow after setup" section,
+distinct from the `atlas:publish` canon-build check already there) and `docs/CODEBASE_MAP.md` (new
+`test:ci` + `verify` rows in the Command reference table; updated the "pure code-change QA gate" note
+to point at `npm run verify`).
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — package.json script + docs only, no
+build/scan/fog/artifact touch, so `atlas:publish` wasn't required. `npm run typecheck:all` clean ·
+`npm run lint` 0 errors (18 pre-existing warnings, no new ones) · 2775 tests green across the 4 shards
+run sequentially and standalone (689+620+843+623; two shards hit the documented `onTaskUpdate` RPC
+worker-communication flake as an "Errors" count with all tests in that shard still green — not a real
+failure). Pre-commit hook (`typecheck:all` + eslint + `vitest --changed`) also passed on the commit
+itself.
+
+**Commits:** `951e660c` (feat, on `run/q78-verify-script`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — `auto/continuous-dev` was still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q78` and
+branch `run/q78-verify-script` to be cleaned up after merge. No concurrency this run — origin tip
+matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
+before each).

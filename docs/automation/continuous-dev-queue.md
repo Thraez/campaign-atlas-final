@@ -179,12 +179,6 @@ is for sequencing, not the whole spec.
 
 #### Q-J — CI/CD & developer experience
 
-- [ ] **Q78. Add a single `verify` script that runs the whole merge gate.**
-  There is no one command that runs the full gate; contributors and the routine chain `typecheck` + `lint` + sharded tests by hand. Add `"verify": "npm run typecheck && npm run lint && npm run test:ci"` to `package.json` and document it as the pre-push check in `docs/QUICK_START.md` and `docs/CODEBASE_MAP.md`.
-  - **Done when:** `npm run verify` runs typecheck, then lint, then the sharded suite, and fails fast if any stage fails; both docs mention it as the pre-push command.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Depends on Q76 (`test:ci`) — land Q76 first or bundle the two. ~1 run.
-
 - [ ] **Q79. Add an ESLint guard against editor-only imports in player entry files.**
   Rescoped: a FLAT project-wide `no-restricted-imports` ban on `@/atlas/save/*` is unsafe — those modules are legitimately, statically imported by editor-internal code (`src/atlas/categories/EntityEditPanel.tsx`, `src/atlas/import/useMdImportFlow.ts` + `buildImportChanges.ts`, `src/atlas/editor/saveGate.ts`, `src/atlas/tabs/EntitiesTab.tsx`, `src/atlas/secrets/CharacterKeysPanel.tsx`) that all tree-shake together; a flat rule would error on every one. Instead add an `eslint.config.js` override block scoped (`files: [...]`) to the player-graph entry modules — `src/main.tsx`, `src/App.tsx`, and the lazy non-editor routes `src/pages/{Landing,AtlasViewer,AtlasTimeline,AtlasBrowse,AtlasCredits,NotFound}.tsx` plus `src/atlas/secrets/CharacterSecretsPage.tsx` — with `no-restricted-imports` patterns banning `@/pages/AtlasPlacementEditor` and `@/atlas/save/*`. This is a fast lint tripwire in front of the existing `EDITOR_CODE_FINGERPRINTS` build scan in `scripts/check-no-secrets.ts`. `App.tsx` loads the editor via dynamic `import()`, which `no-restricted-imports` does not match, so no false positive.
   - **Done when:** statically importing a banned editor module from any listed entry file is an ESLint error; `npm run lint` still passes on the current tree (none of the entry files import editor code today); test files are unaffected (not in the scoped `files` list).
