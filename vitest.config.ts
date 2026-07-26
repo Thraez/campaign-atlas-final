@@ -17,6 +17,20 @@ export default defineConfig({
     testTimeout: 60_000,
     hookTimeout: 60_000,
     teardownTimeout: 30_000,
+    // Fork pool with a bounded worker count: on a 4GB CI/dev-machine budget,
+    // vitest's default (one worker per CPU core, unbounded) piles up enough
+    // concurrent jsdom heaps across this suite's ~200 files to OOM the
+    // coordinator. Forks (separate processes, isolate: true) reclaim memory
+    // on exit unlike threads sharing one V8 heap, and capping at 3 keeps
+    // peak concurrent memory bounded without serializing the whole run.
+    pool: "forks",
+    poolOptions: {
+      forks: {
+        maxForks: 3,
+        minForks: 1,
+        isolate: true,
+      },
+    },
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
