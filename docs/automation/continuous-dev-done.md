@@ -2147,6 +2147,32 @@ documented flake signature). Pre-commit hook's `vitest run --changed` also ran t
 clean (same flake signature, 0 real failures). `public/atlas/assets/audio/manifest.json` LF/CRLF churn
 from running tests reverted with `git checkout --` before committing.
 
+- [x] **Q68. Configure `manualChunks` so vendor libs get a cache-stable hash.** ✅ DONE
+  2026-07-26 — commit 0454f354
+
+**What shipped:** `vite.config.ts` gained `build.rollupOptions.output.manualChunks`, a function grouping
+`node_modules` deps into three stable vendor chunks: `vendor-react` (react/react-dom/react-router/
+react-router-dom/scheduler), `vendor-leaflet` (leaflet + react-leaflet), and `vendor-radix` (all
+`@radix-ui/*` packages). Everything outside `node_modules` falls through to Rollup's default chunking
+(route-based, via the existing `lazy()` imports in `src/App.tsx`), so app/content code is untouched.
+
+**Verified end-to-end:** `npm run build` (player mode) emits distinct `vendor-react-*`, `vendor-leaflet-*`,
+`vendor-radix-*` chunks (163/156/118 KB respectively). Appended a no-op comment to `src/App.tsx` (app
+code only) and rebuilt — all three vendor chunk hashes (`BqnYlLYE`/`B0rfh9Np`/`CjGbd3dz`) were byte-for-byte
+identical before and after, confirming cache stability; reverted the test edit before committing. Grepped
+`dist/assets` for `AtlasPlacementEditor` and `atlas/save` — zero matches, confirming the
+`__INCLUDE_EDITOR__` tree-shake gate still holds and no vendor chunk pulls in editor code.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) + `npm run atlas:publish` (touches the
+bundler config that produces the player build, per the queue spec). typecheck clean · eslint 0 errors
+(18 pre-existing warnings, no new ones) · 2774 tests green (4 shards: 689+620+842+623). Known non-real
+`onTaskUpdate` RPC worker-communication timeout in shard 3, re-run once to confirm (842/842 both times,
+0 failed — documented flake signature). `atlas:publish` → all 12 orchestrator scans clean (pre-existing
+oversized-map warnings only, same as prior runs — no new findings). `public/atlas/atlas.json`'s
+version/publishedAt stamp and `public/atlas/assets/audio/manifest.json`'s line-ending churn from the
+publish verification reverted with `git checkout --` before committing — only `vite.config.ts` reached
+`auto/continuous-dev`.
+
 **Commits:** `9d96f9c0` (feat, on `run/q67-maps-optimize`), merge into `auto/continuous-dev` (see
 `git log auto/continuous-dev` for the merge-commit hash if needed).
 

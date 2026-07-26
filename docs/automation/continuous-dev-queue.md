@@ -176,13 +176,6 @@ is for sequencing, not the whole spec.
 
 #### Q-I — Build & runtime performance
 
-- [ ] **Q68. Configure `manualChunks` so vendor libs get a cache-stable hash.**
-  `vite.config.ts` sets no `build.rollupOptions.output.manualChunks`, so React, leaflet/react-leaflet, and the many `@radix-ui/*` packages are code-split only by route and re-hash whenever app code changes. Add `manualChunks` grouping stable vendors (react/react-dom/react-router, leaflet+react-leaflet, radix) into their own chunks so repeat-visit players re-download only changed app/content chunks. Because `__INCLUDE_EDITOR__` is a `define` replaced before tree-shaking, editor-only modules stay out of the player module graph — confirm no vendor chunk pulls `AtlasPlacementEditor`/editor modules into the player build.
-  - **Done when:** a player `npm run build` emits distinct react/leaflet/radix vendor chunks; a no-op app-code change leaves vendor chunk hashes stable; the editor is still absent from player output.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest) + `npm run atlas:publish`.
-  Touches the bundler config that produces the player build — verify the `__INCLUDE_EDITOR__` tree-shake gate still holds.
-  ~1 run.
-
 - [ ] **Q69. Bound vitest fork count/memory in `vitest.config.ts` so `npm test` stops OOMing.**
   `vitest.config.ts` sets no `poolOptions`; the whole-suite `npm test` (vitest run) OOMs the 4GB coordinator on ~200 files and currently needs ad-hoc `--shard` / `--poolOptions.forks.maxForks=3` to survive. Bake sane defaults into the `test` block: `pool: 'forks'` with a bounded `poolOptions.forks.maxForks` (plus matching minForks/isolate settings) so the plain `npm test` gate is robust without flags; document the memory rationale inline. Confirm wall-time doesn't regress meaningfully.
   - **Done when:** `npm test` with no extra flags runs the full suite to completion without OOM on a 4GB budget, and total runtime stays within a reasonable margin of the sharded run.
