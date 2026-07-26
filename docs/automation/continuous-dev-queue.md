@@ -173,12 +173,6 @@ is for sequencing, not the whole spec.
 
 #### Q-H — DM publish, backup & assets
 
-- [ ] **Q60. Distinguish a first-ever publish from "no changes" in the diff panel.**
-  `computeAtlasDiff(null, current)` returns `EMPTY_DIFF` with `hasChanges:false` (`src/atlas/publish/computeAtlasDiff.ts` lines 130-140), so `PublishedDiffPanel` shows "No changes since last publish." (line 137-138) on a first publish when the whole world is genuinely new. Add a `hadBaseline: boolean` field to `AtlasDiff` (false when `baseline` is null, true otherwise) and, in `PublishedDiffPanel.tsx`, when `!hasChanges && !hadBaseline` render "First publish — your whole world will go live." instead of the no-changes copy. `ReadinessCard.tsx` just forwards `result.diff` to the panel, so no change is needed there.
-  - **Done when:** a null baseline renders the first-publish message; a genuine no-op diff still renders "No changes"; `src/atlas/publish/computeAtlasDiff.test.ts` asserts `hadBaseline` for both the null-baseline and populated-baseline cases.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  ~1 run.
-
 - [ ] **Q61. Post-publish confirmation: show what shipped plus the commit id.**
   In `src/atlas/publish/usePublishFlow.ts`, `confirm()` sets state to `"published"` (line 70) but discards `data.pushedAt` and `data.commit`, which the `PublishPushResult` "published" variant carries (`src/atlas/publish/publishTypes.ts` line 39). Capture the push result in a new hook field (e.g. `pushResult`) and, in `src/atlas/tabs/PublishCheckTab.tsx` (the `state === "published"` block, line 157-163 — today only "in a couple of minutes"), render a concrete summary from `checkResult.diff.counts` plus the short commit, e.g. "Published 5 entities and 3 pins (commit a1b2c3d)." (map `counts.placements` to "pins"). Degrade gracefully when counts are zero.
   - **Done when:** after a successful publish the panel shows the entity/pin counts and the short commit sha; `src/atlas/publish/usePublishFlow.test.ts` asserts the captured push result.

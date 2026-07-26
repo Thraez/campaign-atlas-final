@@ -1878,3 +1878,41 @@ change never invoked the build pipeline) — the `public/atlas/assets/audio/mani
 that running tests produced was reverted with `git checkout --` before the commit. Clean merge (no
 concurrent runs — origin tip matched the run's fork point at merge time, confirmed via `git fetch`
 immediately before merging).
+
+- [x] **Q60. Distinguish a first-ever publish from "no changes" in the diff panel.** ✅ DONE
+  2026-07-26 — commit 3613c53f
+
+**What shipped:** `computeAtlasDiff(null, current)` returned the same `hasChanges:false` shape whether the
+publish had a genuine prior baseline to compare against or none at all (a first-ever publish), so
+`PublishedDiffPanel` told the DM "No changes since last publish." even when their whole world was about to
+go live for the first time. `AtlasDiff` gained a `hadBaseline: boolean` field (false only when the
+baseline snapshot passed to `computeAtlasDiff` was `null`); `PublishedDiffPanel.tsx` now renders "First
+publish — your whole world will go live." instead of the no-changes copy when `!hasChanges && !hadBaseline`.
+`ReadinessCard.tsx` needed no change — it already just forwards `result.diff` to the panel.
+
+**Implementation:**
+- `src/atlas/publish/computeAtlasDiff.ts`: `AtlasDiff.hadBaseline` added; the early-return branch (either
+  side null) sets it from `baseline != null`; the full-diff branch always sets it `true`.
+- `src/atlas/publish/PublishedDiffPanel.tsx`: the no-changes render branch split in two, gated on
+  `diff.hadBaseline`.
+- `scripts/atlas/runPublishCheck.ts`'s unrelated `EMPTY_DIFF` build-failure fallback and two integration
+  test fixtures (`ReadinessCard.test.tsx`, `runPublishPush.integration.test.ts`) gained `hadBaseline: true`
+  to keep typecheck green — none of those exercise the first-publish path.
+- Tests: `src/test/atlas-diff.test.ts` — the existing null-baseline case now asserts `hadBaseline` is
+  `false`, plus a new case asserting a genuine no-op diff between two populated snapshots keeps
+  `hadBaseline: true`. `PublishedDiffPanel.test.tsx` +1 case (first-publish message renders, and the
+  no-changes copy does not, when `hadBaseline: false`).
+
+**Gate:** editor-only UI + a diff-computation module used only by the (dev-server-only) publish-check
+endpoint — standard gate only (no `atlas:publish`; the shipped player build/scan pipeline is untouched).
+typecheck clean · eslint 0 errors (18 pre-existing warnings, no new ones) · 2737 tests green (4 shards:
+686+588+795+668). Known non-real `onTaskUpdate` RPC worker-communication timeout in shard 3 (0 tests
+failed — same documented flake signature, not re-run). The `public/atlas/assets/audio/manifest.json`
+LF/CRLF churn that running tests produced was reverted with `git checkout --` before the commit. Clean
+merge (no concurrent runs — origin tip matched the run's fork point at merge time, confirmed via
+`git fetch` immediately before merging).
+
+**Deviation note (self-correction, same recurring class as Q49/Q51/Q59's):** this run again edited files
+directly in the main working copy before creating the worktree. Caught before any commit — the
+uncommitted edits were `git stash push -u`'d, a fresh worktree was created from the (unaffected) main
+copy's clean tip, and the stash was popped there. No incorrect state reached any commit or the remote.
