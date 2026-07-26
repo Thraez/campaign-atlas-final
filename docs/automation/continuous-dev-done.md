@@ -2424,3 +2424,33 @@ separate merge commit — `auto/continuous-dev` was still at the fork point).
 **Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q76` and
 branch `run/q76-test-ci` to be cleaned up after merge. No concurrency this run — origin tip matched the
 fork point at worktree creation and at merge time (confirmed via `git fetch` immediately before each).
+
+- [x] **Q77. Type-check the `scripts/` build pipeline.** ✅ DONE
+  2026-07-26 — commit 559faf59 (+ 62019e7d docs)
+
+**What shipped:** new `tsconfig.scripts.json` (`include: ["scripts/**/*.ts"]`, `noEmit`, `strict`,
+mirrors `tsconfig.node.json`'s ES2022/ESNext/bundler settings) plus the `@/*` path alias and a `DOM`
+lib entry (needed only for `secretCrypto.ts`'s Web Crypto `CryptoKey` type, transitively pulled in via
+`scripts/atlas/buildSecrets.ts`). Registered as a project reference in `tsconfig.json`. Added
+`"typecheck:scripts"` and `"typecheck:all"` (app + scripts) to `package.json`; wired `typecheck:all`
+into `scripts/pre-commit.sh` and the PR CI type-check step (`.github/workflows/atlas-pr-check.yml`),
+replacing the app-only `typecheck`. Updated `docs/CODEBASE_MAP.md`'s config/gate references.
+
+**Latent errors surfaced:** none beyond the two config gaps above (missing `@/*` mapping and the
+missing `DOM` lib) — both are typecheck-config fixes, not source-code bugs; no `.ts` files under
+`scripts/` needed edits.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — config/typecheck only, no build/scan/fog/
+artifact touch, so `atlas:publish` wasn't required. `npm run typecheck:all` clean (app + scripts) ·
+eslint 0 errors (18 pre-existing warnings, no new ones) · 2775 tests green across the 4 shards
+(689+620+843+623, each verified individually after the aggregate `test:ci` run hit the documented
+`onTaskUpdate` RPC worker-communication flake — a false-negative exit code with all 4 shards' test files
+actually green, not a real failure).
+
+**Commits:** `559faf59` (feat, on `run/q77-typecheck-scripts`), `62019e7d` (docs), fast-forward merge
+into `auto/continuous-dev`.
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q77` and
+branch `run/q77-typecheck-scripts` to be cleaned up after merge. No concurrency this run — origin tip
+matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
+before each).

@@ -179,12 +179,6 @@ is for sequencing, not the whole spec.
 
 #### Q-J — CI/CD & developer experience
 
-- [ ] **Q77. Type-check the `scripts/` build pipeline.**
-  No tsconfig includes `scripts/**`: `tsconfig.app.json` covers only `src`, `tsconfig.node.json` only `vite.config.ts`, so `build-atlas.ts`, the `check-*.ts` scanners, `scripts/atlas/*.ts`, and `vite-plugin-atlas-save.ts` are transpile-only via tsx and never type-checked. Add `tsconfig.scripts.json` (`include: ["scripts/**/*.ts"]`, `noEmit`, `strict`, node/bundler settings mirroring `tsconfig.node.json`), register it as a project reference in `tsconfig.json`, add `"typecheck:scripts"` and a `"typecheck:all"` (app + scripts) to `package.json`, and wire `typecheck:all` into `scripts/pre-commit.sh` and the `atlas-pr-check.yml` typecheck step. Fix any latent type errors surfaced.
-  - **Done when:** `npm run typecheck:scripts` type-checks all of `scripts/**` and passes; pre-commit and PR CI run it; `noEmit` holds (no JS written).
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Config/typecheck only, no behavior change; if it surfaces many latent errors, fix them in the same task rather than splitting. ~2–3 runs.
-
 - [ ] **Q78. Add a single `verify` script that runs the whole merge gate.**
   There is no one command that runs the full gate; contributors and the routine chain `typecheck` + `lint` + sharded tests by hand. Add `"verify": "npm run typecheck && npm run lint && npm run test:ci"` to `package.json` and document it as the pre-push check in `docs/QUICK_START.md` and `docs/CODEBASE_MAP.md`.
   - **Done when:** `npm run verify` runs typecheck, then lint, then the sharded suite, and fails fast if any stage fails; both docs mention it as the pre-push command.
