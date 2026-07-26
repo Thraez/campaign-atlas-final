@@ -18,6 +18,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:ci": "node scripts/dev/run-sharded-tests.mjs",
     "atlas:build": "tsx scripts/build-atlas.ts",
     "atlas:build:player": "tsx scripts/build-atlas.ts --player --strict",
     "atlas:snapshot": "tsx scripts/atlas/snapshot-baseline.ts",
