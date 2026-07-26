@@ -45,7 +45,7 @@ export function matchesPhrases(e: SearchIndexEntry, phrases: string[]): boolean 
     e.title.toLowerCase(),
     ...e.aliases.map((a) => a.toLowerCase()),
     (e.summary ?? "").toLowerCase(),
-    e.body ?? "", // already lowercased in the index
+    e.body ?? "", // lowercased on load (loader.ts), from bodyText
   ].join(" ");
   return phrases.every((p) => haystack.includes(p));
 }

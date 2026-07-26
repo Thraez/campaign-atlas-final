@@ -10,7 +10,8 @@ import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { scanArtifactShape } from "../../scripts/check-artifact-shape";
+import { scanArtifactShape, scanSearchIndex } from "../../scripts/check-artifact-shape";
+import { DM_CONTENT_SENTINELS } from "../../scripts/check-no-secrets";
 
 const ROOT = path.resolve(__dirname, "../..");
 const SHAPE_SCRIPT = path.resolve(ROOT, "scripts/check-artifact-shape.ts");
@@ -202,5 +203,21 @@ describe("scanArtifactShape — soundscape assertions", () => {
     expect(
       r.violations.some((v) => v.field.includes("soundscape") && v.message.includes("name")),
     ).toBe(true);
+  });
+});
+
+describe("scanSearchIndex — leak coverage lives on bodyText, not the removed body field", () => {
+  it("flags a DM sentinel leaked in bodyText (the shipped field)", () => {
+    const r = scanSearchIndex([
+      { id: "leak", title: "Leak", type: "note", aliases: [], tags: [], bodyText: DM_CONTENT_SENTINELS[0] },
+    ]);
+    expect(r.violations.some((v) => v.field === "search.bodyText")).toBe(true);
+  });
+
+  it("does not scan a body field even if one is present (it is no longer shipped)", () => {
+    const r = scanSearchIndex([
+      { id: "clean", title: "Clean", type: "note", aliases: [], tags: [], body: DM_CONTENT_SENTINELS[0] },
+    ]);
+    expect(r.violations).toHaveLength(0);
   });
 });
