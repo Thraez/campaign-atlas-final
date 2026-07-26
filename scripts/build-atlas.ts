@@ -1226,11 +1226,33 @@ function buildEntity(
 }
 
 /**
+ * Delete any `*.fog.png` file in `dir` that isn't in `keep` (absolute paths).
+ * Scoped strictly to the `.fog.png` output naming so a source map image can
+ * never be touched, even if `keep` is wrong or empty.
+ */
+function pruneStaleFogOutputs(dir: string, keep: ReadonlySet<string>): void {
+  if (!fs.existsSync(dir)) return;
+  for (const name of fs.readdirSync(dir)) {
+    if (!/\.fog\.png$/i.test(name)) continue;
+    const fullPath = path.join(dir, name);
+    if (!keep.has(fullPath)) {
+      fs.unlinkSync(fullPath);
+    }
+  }
+}
+
+/**
  * Player-mode fog redaction. For each fog-enabled map, redact every raster
  * layer to a feathered alpha-mask PNG (written as <name>.fog.png next to the
  * source), rewrite the layer src to the redacted file, and strip fog geometry
  * so reveal polygons never ship. Returns a new maps array; pushes a warning
  * for any layer whose source image is missing.
+ *
+ * Before returning, prunes stale `.fog.png` outputs from prior builds: a
+ * renamed/removed layer or map (or fog disabled) otherwise orphans its old
+ * redacted file in `public/atlas/assets/maps` forever, since nothing else
+ * ever revisits or removes it. Only files freshly (re-)emitted this build
+ * are kept; scoped strictly to the `.fog.png` naming, never a source image.
  * (See docs/superpowers/specs/2026-05-19-fog-player-mechanic-design.md.)
  */
 async function redactMapsForPlayer(
@@ -1239,6 +1261,7 @@ async function redactMapsForPlayer(
   warnings: string[],
 ): Promise<MapDocument[]> {
   const redactedMaps: MapDocument[] = [];
+  const emittedFogPaths = new Set<string>();
   for (const m of maps) {
     if (!m.fog?.enabled) {
       redactedMaps.push(m);
@@ -1275,6 +1298,7 @@ async function redactMapsForPlayer(
       const base = srcAbs.slice(0, -ext.length);
       const outPath = `${base}.fog.png`;
       fs.writeFileSync(outPath, redacted);
+      emittedFogPaths.add(outPath);
       // Rewrite the layer src to the redacted file (relative to public/, forward slashes).
       const newSrcRel = path
         .relative(path.resolve(ROOT, "public"), outPath)
@@ -1288,6 +1312,7 @@ async function redactMapsForPlayer(
     const playerFog = { mapId: fog.mapId, enabled: true } as FogOverlay;
     redactedMaps.push({ ...m, layers: newLayers, fog: playerFog });
   }
+  pruneStaleFogOutputs(path.join(ROOT, "public", "atlas", "assets", "maps"), emittedFogPaths);
   return redactedMaps;
 }
 

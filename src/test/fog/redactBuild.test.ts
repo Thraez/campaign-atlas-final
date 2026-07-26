@@ -135,6 +135,60 @@ describe("D3: fog redaction wired into player build", () => {
     expect(await alphaAt(fogPng, 5, 5)).toBe(0); // outside reveal
   });
 
+  it("prunes a stale .fog.png when a fog-enabled map's layer is renamed", async () => {
+    process.chdir(tmpDir);
+    const mapsDir = path.join(tmpDir, "public", "atlas", "assets", "maps");
+
+    // The previous test's redacted output should exist before we rename away from it.
+    const staleFogPath = path.join(mapsDir, "world.fog.png");
+    expect(fs.existsSync(staleFogPath)).toBe(true);
+
+    // Add a second source image and repoint the layer at it.
+    const img2 = await sharp({
+      create: { width: 100, height: 100, channels: 3, background: { r: 0, g: 255, b: 0 } },
+    })
+      .png()
+      .toBuffer();
+    fs.writeFileSync(path.join(mapsDir, "world2.png"), img2);
+
+    const renamedYaml = `schemaVersion: 1
+maps:
+  - id: world
+    worldId: w
+    name: World
+    width: 100
+    height: 100
+    layers:
+      - id: lyr
+        src: atlas/assets/maps/world2.png
+        x: 0
+        "y": 0
+        width: 100
+        height: 100
+        opacity: 1
+        zIndex: 1
+fog:
+  - mapId: world
+    enabled: true
+    reveals:
+      - [[20, 20], [60, 20], [60, 60], [20, 60]]
+    featherPx: 4
+`;
+    fs.writeFileSync(path.join(tmpDir, "content", "w", "_atlas", "world.yaml"), renamedYaml);
+
+    const { runBuild } = await import("../../../scripts/build-atlas");
+    const r = await runBuild({ player: true, strict: false });
+    expect(r.ok, `build failed: ${r.error ?? ""}`).toBe(true);
+
+    // The freshly redacted output for the renamed-to source exists...
+    expect(fs.existsSync(path.join(mapsDir, "world2.fog.png"))).toBe(true);
+    // ...and the orphaned output from the renamed-away layer was pruned.
+    expect(fs.existsSync(staleFogPath)).toBe(false);
+    // Source images themselves are never touched by the prune.
+    expect(fs.existsSync(path.join(mapsDir, "world.png"))).toBe(true);
+    expect(fs.existsSync(path.join(mapsDir, "world2.png"))).toBe(true);
+  });
+
   it("throws FogRedactionError for a tiled layer on a fog-enabled map", async () => {
     process.chdir(tmpDir);
 
