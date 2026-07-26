@@ -179,12 +179,6 @@ is for sequencing, not the whole spec.
 
 #### Q-J — CI/CD & developer experience
 
-- [ ] **Q74. Add an ESLint step to PR CI.**
-  CI never runs ESLint — only the pre-commit hook (`scripts/pre-commit.sh:10`, `npx eslint .`) and the autonomous routine do — so a contributor or merge without hooks installed can land lint errors, including a reintroduced dynamic `require()` that the custom `no-restricted-syntax` rule in `eslint.config.js` (lines 35–42) exists to block. Add a `npm run lint` step to the `scan` job in `.github/workflows/atlas-pr-check.yml`, after the typecheck step.
-  - **Done when:** the PR workflow runs `npm run lint`; an introduced lint error fails the job; the 16 known warnings do NOT fail it.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Do not add `--max-warnings 0` — `eslint .` fails only on errors, and the known warnings must stay non-fatal. ~1 run.
-
 - [ ] **Q75. Add .gitattributes to normalize line endings to LF.**
   There is no `.gitattributes`, and `.prettierrc.json` sets no `endOfLine` (prettier defaults to `lf`), so on Windows `core.autocrlf` checks source out as CRLF while the index stores LF and local `npm run format:check` reports ~200 false positives (documented in memory). Add a `.gitattributes` with `* text=auto eol=lf` plus binary rules (`*.png *.jpg *.jpeg *.webp *.ogg *.mp3 *.woff2 *.fog.png` → `binary`) so the working tree matches what CI's `prettier --check` expects.
   - **Done when:** `.gitattributes` exists with `eol=lf` for text and `binary` rules for image/audio/fog asset types; `git add --renormalize .` produces no content diff (the index is already LF).

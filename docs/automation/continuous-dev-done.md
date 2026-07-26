@@ -2340,3 +2340,28 @@ separate merge commit — `auto/continuous-dev` was still at the fork point).
 **Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q73` and
 branch `run/q73-shard-ci` cleaned up after merge. No concurrency this run — origin tip matched the fork
 point at worktree creation and at merge time (confirmed via `git fetch` immediately before each).
+
+- [x] **Q74. Add an ESLint step to PR CI.** ✅ DONE
+  2026-07-26 — commit e1669436
+
+**What shipped:** `.github/workflows/atlas-pr-check.yml`'s `scan` job gains a `npm run lint` step,
+placed right after the existing type-check step and before `Check formatting`. No `--max-warnings 0` —
+`eslint .` fails the job only on errors, keeping the 18 known warnings non-fatal, per the spec.
+
+**Verified end-to-end:** ran `npm run lint` locally in the run worktree — 0 errors, 18 pre-existing
+warnings (same set as every recent run), exit 0. A contributor's lint error would now fail this step.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — CI-workflow-only change, no
+build-pipeline/artifact touch, so `atlas:publish` wasn't required per the queue spec. typecheck clean ·
+eslint 0 errors (18 pre-existing warnings, no new ones) · 2775 tests green (4 shards: 689+620+843+623 —
+shard 1 and shard 3 each hit the documented `onTaskUpdate` RPC worker-communication flake, 0 real
+failures). Pre-commit hook's `vitest run --changed` found no test files for the CI-YAML-only diff (exit
+0, expected). `public/atlas/assets/audio/manifest.json` line-ending churn from running tests reverted
+with `git checkout --` before committing — only the workflow YAML reached `auto/continuous-dev`.
+
+**Commits:** `e1669436` (feat, on `run/q74-eslint-ci`), fast-forward merge into `auto/continuous-dev` (no
+separate merge commit — `auto/continuous-dev` was still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q74` and
+branch `run/q74-eslint-ci` cleaned up after merge. No concurrency this run — origin tip matched the fork
+point at worktree creation and at merge time (confirmed via `git fetch` immediately before each).
