@@ -1294,8 +1294,9 @@ async function redactMapsForPlayer(
 /**
  * Build the client-side search index. Strips markdown from each entity body
  * (keeping it small enough for an in-browser full-text scan without shipping
- * a wasm search engine) and emits both a lowercased `body` for matching and a
- * cased `bodyText` for display.
+ * a wasm search engine) and emits the original-case `bodyText` for display;
+ * the lowercased `body` used for matching is derived client-side on load
+ * (loader.ts) rather than duplicated here.
  */
 function buildSearchIndex(pending: Pending[]) {
   // Strip markdown but preserve original case — used as bodyText for display.
@@ -1319,7 +1320,6 @@ function buildSearchIndex(pending: Pending[]) {
       tags: entity.tags,
       summary: entity.summary,
       excerpt: stripSecretMarkers(entity.body).replace(/\s+/g, " ").trim().slice(0, 240),
-      body: stripped.toLowerCase(),
       bodyText: stripped,
       dateRaw: entity.dateRaw,
       dateValue: entity.dateValue,

@@ -218,7 +218,7 @@ export function scanSearchIndex(records: unknown): SearchIndexResult {
       ["title", r.title],
       ["summary", r.summary],
       ["excerpt", r.excerpt],
-      ["body", r.body],
+      ["bodyText", r.bodyText],
       ["aliases", Array.isArray(r.aliases) ? (r.aliases as unknown[]).join(" ") : undefined],
       ["tags", Array.isArray(r.tags) ? (r.tags as unknown[]).join(" ") : undefined],
     ];
