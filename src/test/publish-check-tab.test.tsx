@@ -43,6 +43,7 @@ function makeFlow(state: PublishState, overrides: Record<string, unknown> = {}) 
     checkResult: null,
     error: null as string | null,
     pushReason: null as string | null,
+    pushResult: null as { pushedAt: string; commit: string } | null,
     check: vi.fn(),
     confirm: vi.fn(),
     ...overrides,
@@ -116,8 +117,22 @@ describe("PublishCheckTab — publish action surface", () => {
   it("published: success message is shown", () => {
     mockUsePublishFlow.mockReturnValue(makeFlow("published"));
     render(<PublishCheckTab project={BASE_PROJECT} draftPlacements={[]} draftLocalLayers={[]} />);
-    expect(screen.getByText(/published/i)).toBeTruthy();
+    expect(screen.getByText(/published ✓/i)).toBeTruthy();
     expect(screen.getByText(/your players will see/i)).toBeTruthy();
+  });
+
+  it("published + diff counts + pushResult: shows the entity/pin counts and short commit", () => {
+    mockUsePublishFlow.mockReturnValue(
+      makeFlow("published", {
+        checkResult: {
+          ...SAFE_CHECK_RESULT,
+          diff: { counts: { entities: 5, placements: 3, maps: 0, overlays: 0 } } as unknown as PublishCheckResult["diff"],
+        },
+        pushResult: { pushedAt: "2026-01-01T00:00:00Z", commit: "a1b2c3d4e5" },
+      }),
+    );
+    render(<PublishCheckTab project={BASE_PROJECT} draftPlacements={[]} draftLocalLayers={[]} />);
+    expect(screen.getByText("Published 5 entities and 3 pins (commit a1b2c3d).")).toBeTruthy();
   });
 
   it("error: error message is shown from publish.error", () => {

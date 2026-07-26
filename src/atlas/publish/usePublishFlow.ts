@@ -14,11 +14,17 @@ export type PublishState =
   | "nothing-to-publish"
   | "git-failed";
 
+export interface PublishPushSummary {
+  pushedAt: string;
+  commit: string;
+}
+
 export function usePublishFlow() {
   const [state, setState] = useState<PublishState>("idle");
   const [checkResult, setCheckResult] = useState<PublishCheckResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pushReason, setPushReason] = useState<string | null>(null);
+  const [pushResult, setPushResult] = useState<PublishPushSummary | null>(null);
 
   const check = useCallback(async () => {
     setState("checking");
@@ -68,6 +74,7 @@ export function usePublishFlow() {
       }
       const data = (await res.json()) as PublishPushResult;
       if (data.status === "published") {
+        setPushResult({ pushedAt: data.pushedAt, commit: data.commit });
         setState("published");
       } else if (data.status === "nothing-to-publish") {
         setState("nothing-to-publish");
@@ -83,5 +90,5 @@ export function usePublishFlow() {
     }
   }, []);
 
-  return { state, checkResult, error, check, confirm, pushReason };
+  return { state, checkResult, error, check, confirm, pushReason, pushResult };
 }
