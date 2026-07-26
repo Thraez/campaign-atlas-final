@@ -9,6 +9,7 @@ import type { AtlasProject, AssetCredit } from "@/atlas/content/schema";
 import { collectAssets } from "@/atlas/assets/collectAssets";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { SIZE_WARN_BYTES, SIZE_ERROR_BYTES, formatBytes } from "@/atlas/assets/assetSize";
+import { Button } from "@/components/ui/button";
 
 const EMPTY: AssetCredit = { credit: "", enabled: false };
 
@@ -79,6 +80,22 @@ export function AssetManagerPanel({
     onPatch({ ...assetCredits, [src]: { ...current, ...patch } });
   };
 
+  const applyCreditToAll = (credit: string) => {
+    const next: Record<string, AssetCredit> = { ...assetCredits };
+    for (const a of assets) {
+      next[a.src] = { ...(assetCredits?.[a.src] ?? EMPTY), credit };
+    }
+    onPatch(next);
+  };
+
+  const setAllEnabled = (enabled: boolean) => {
+    const next: Record<string, AssetCredit> = { ...assetCredits };
+    for (const a of assets) {
+      next[a.src] = { ...(assetCredits?.[a.src] ?? EMPTY), enabled };
+    }
+    onPatch(next);
+  };
+
   if (assets.length === 0) {
     return (
       <div className="p-3 text-xs text-muted-foreground">
@@ -93,6 +110,26 @@ export function AssetManagerPanel({
         Toggle a credit on and type an attribution. It shows as a faint badge in the bottom-right
         corner of the image.
       </p>
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-[11px]"
+          onClick={() => setAllEnabled(true)}
+        >
+          Enable all badges
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-[11px]"
+          onClick={() => setAllEnabled(false)}
+        >
+          Disable all badges
+        </Button>
+      </div>
       <ul className="space-y-3">
         {assets.map((a) => {
           const entry = assetCredits?.[a.src] ?? EMPTY;
@@ -111,13 +148,25 @@ export function AssetManagerPanel({
                   Used by: {a.usedBy.map((u) => `${u.kind} ${u.id}`).join(", ")}
                 </div>
                 <AssetSizeInfo state={sizes[a.src]} />
-                <input
-                  aria-label={`Credit for ${a.src}`}
-                  className="w-full h-7 px-2 rounded border bg-background"
-                  placeholder="e.g. Art by Evelyn K, CC BY 4.0"
-                  defaultValue={entry.credit}
-                  onChange={(e) => setEntry(a.src, { credit: e.target.value })}
-                />
+                <div className="flex gap-1.5">
+                  <input
+                    aria-label={`Credit for ${a.src}`}
+                    className="w-full h-7 px-2 rounded border bg-background"
+                    placeholder="e.g. Art by Evelyn K, CC BY 4.0"
+                    value={entry.credit}
+                    onChange={(e) => setEntry(a.src, { credit: e.target.value })}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-[11px] shrink-0"
+                    title="Copy this credit to every asset"
+                    onClick={() => applyCreditToAll(entry.credit)}
+                  >
+                    Apply to all
+                  </Button>
+                </div>
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
