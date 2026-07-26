@@ -176,13 +176,6 @@ is for sequencing, not the whole spec.
 
 #### Q-I — Build & runtime performance
 
-- [ ] **Q67. Add a dev `maps:optimize` tool (PNG→WebP source) mirroring `audio:transcode`.**
-  Source map PNGs under `public/atlas/assets/maps` are the repo's heaviest files. Add `scripts/dev/optimize-maps.mjs` + a `maps:optimize` npm script mirroring the existing `scripts/dev/transcode-audio.mjs` / `audio:transcode` pattern (package.json:34): for each oversized source PNG, emit a `.webp` twin via `sharp` (already a devDependency) and rewrite the matching `layers[].src` in `public/atlas/assets/maps/world.yaml`. `.webp` is already allowlisted (`ALLOWED_IMAGE_EXTS` in `scripts/atlas/validateAsset.ts:32`). This is a DM-run dev step, explicitly NOT part of the gated build.
-  - **Done when:** `npm run maps:optimize` converts oversized map PNGs to `.webp`, updates the matching `world.yaml` srcs, skips already-webp/small sources, and a subsequent `npm run atlas:build:player` still validates (webp allowlisted).
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Dev-only tool outside the gated pipeline; touches no player-build code path.
-  ~2–3 runs.
-
 - [ ] **Q68. Configure `manualChunks` so vendor libs get a cache-stable hash.**
   `vite.config.ts` sets no `build.rollupOptions.output.manualChunks`, so React, leaflet/react-leaflet, and the many `@radix-ui/*` packages are code-split only by route and re-hash whenever app code changes. Add `manualChunks` grouping stable vendors (react/react-dom/react-router, leaflet+react-leaflet, radix) into their own chunks so repeat-visit players re-download only changed app/content chunks. Because `__INCLUDE_EDITOR__` is a `define` replaced before tree-shaking, editor-only modules stay out of the player module graph — confirm no vendor chunk pulls `AtlasPlacementEditor`/editor modules into the player build.
   - **Done when:** a player `npm run build` emits distinct react/leaflet/radix vendor chunks; a no-op app-code change leaves vendor chunk hashes stable; the editor is still absent from player output.

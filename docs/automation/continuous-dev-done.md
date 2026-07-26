@@ -2106,3 +2106,50 @@ LF/CRLF churn from running tests reverted with `git checkout --` before committi
 beyond the two intended files reached `auto/continuous-dev`. Clean merge — no concurrent runs (origin tip
 matched the run's fork point at both worktree-creation and merge time, confirmed via `git fetch`
 immediately before each).
+
+- [x] **Q67. Add a dev `maps:optimize` tool (PNG→WebP source) mirroring `audio:transcode`.** ✅ DONE
+  2026-07-26 — commit 9d96f9c0
+
+**What shipped:** `scripts/dev/optimize-maps.mjs` + a `maps:optimize` npm script, mirroring
+`scripts/dev/transcode-audio.mjs`'s shape. For each PNG under `public/atlas/assets/maps` over 1 MB
+(`OVERSIZE_BYTES`, matching the existing `SIZE_WARN_BYTES` budget in `src/atlas/assets/assetSize.ts`),
+it emits a `.webp` twin via `sharp` at quality 85 (matching the quality already used by the save
+pipeline's metadata-strip step) and repoints the matching `layers[].src` line (regex-based text
+replace, not a full YAML re-serialize, so hand-authored formatting/comments in `world.yaml` survive
+untouched) in every `_atlas/world.yaml` found under `content/` and `examples/` — both known content
+roots — from `.png` to `.webp`. The source PNG is kept (twin, not replace), the same pattern
+`audio:transcode` uses for its source `.wav`.
+
+**Spec correction (verified before building):** the queue entry cited `public/atlas/assets/maps/world.yaml`
+as the file to repoint, but that file is dead/orphaned — it's not read by any script (`atlas.config.json`
+points `contentRoot` at `content`, and `loadWorldConfig` only ever loads `<contentRoot>/<world>/_atlas/world.yaml`)
+and its content (a `map.jpg` layer, `Raven's Vale`/`Thornhold Domain` regions) doesn't match the real
+world at all. The actual file governing the shipped maps is `content/astrath-deeprealm/_atlas/world.yaml`.
+Built the tool to search `_atlas/world.yaml` under both `content/` and `examples/` generically (so it
+also covers `examples/seed-world/_atlas/world.yaml` once Q99 gives it map layers) rather than
+hardcoding the stale path.
+
+**Verified end-to-end, then reverted the asset swap:** ran `npm run maps:optimize` against the real repo
+assets — all 6 map PNGs (~2.9–3.3 MB each) converted cleanly to `.webp` twins (343–464 KB, ~85–89%
+smaller) and `content/astrath-deeprealm/_atlas/world.yaml`'s six `layers[].src` entries were correctly
+repointed. Reverted that resulting diff (`git checkout --` on world.yaml, `git clean` on the new `.webp`
+files) before committing — swapping the shipped map images for lower-fidelity twins is a visual-quality
+call for the DM to make and run themselves when ready, not something the routine should force through
+unreviewed on a dev-tool task. Only the tool (script + npm script wiring) is committed.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — dev-only tool outside the gated pipeline,
+no shipped-artifact touch (the verification run's output was reverted), so no `atlas:publish` needed per
+the queue spec. typecheck clean · eslint 0 errors (18 pre-existing warnings, no new ones) · 2774 tests
+green (4 shards: 689+620+842+623; no new tests — `scripts/dev/*.mjs` dev tools have no test-file
+precedent in this repo, e.g. `transcode-audio.mjs` has zero coverage). Known non-real `onTaskUpdate` RPC
+worker-communication timeout in shard 3, re-run once to confirm (842/842 both times, 0 failed —
+documented flake signature). Pre-commit hook's `vitest run --changed` also ran the full 2774-test suite
+clean (same flake signature, 0 real failures). `public/atlas/assets/audio/manifest.json` LF/CRLF churn
+from running tests reverted with `git checkout --` before committing.
+
+**Commits:** `9d96f9c0` (feat, on `run/q67-maps-optimize`), merge into `auto/continuous-dev` (see
+`git log auto/continuous-dev` for the merge-commit hash if needed).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q67` and
+branch `run/q67-maps-optimize` cleaned up after merge. No concurrency this run — origin tip matched the
+fork point at worktree creation and at merge time (confirmed via `git fetch` immediately before each).
