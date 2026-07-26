@@ -2049,3 +2049,33 @@ line after the build; a DM build (`npm run atlas:build`) still emits 842 lines o
 --` before committing — no artifact diff beyond the two intended files reached `auto/continuous-dev`.
 Clean merge — no concurrent runs (origin tip matched the run's fork point at both worktree-creation and
 merge time, confirmed via `git fetch` immediately before each).
+
+- [x] **Q65. Stop shipping the duplicated lowercased body in the search index; derive it at load.** ✅
+  DONE 2026-07-26 — commit b29efe8c
+
+**What shipped:** `buildSearchIndex` in `scripts/build-atlas.ts` shipped both `body` (lowercased, for
+matching) and `bodyText` (original case, for snippets) in every `search-index.json` entry — the same
+stripped text differing only in case. Now only `bodyText` ships; `loadSearchIndex` in
+`src/atlas/content/loader.ts` derives `body = bodyText.toLowerCase()` on load, so `parseSearchQuery.ts`
+and `SearchPalette.tsx` keep reading `e.body` unchanged. `scanSearchIndex` in
+`scripts/check-artifact-shape.ts` (the secret-leak scan) is repointed from the removed `body` field to
+`bodyText`, the surviving shipped field, so leak coverage isn't lost.
+
+**Premise re-verified before building** (per Q64's handover note): confirmed via a fresh grep of
+`buildSearchIndex` that both `body` and `bodyText` were still shipped as of this run, so Q65's premise
+held exactly as specced — no adjustment needed.
+
+**Gate:** full gate including `npm run atlas:publish` + `npm run atlas:publish:integrity-smoke` (touches
+a shipped artifact + the shape safety scan). typecheck clean · eslint 0 errors (18 pre-existing warnings,
+no new ones) · 2771 tests green (4 shards: 689+617+842+623; baseline 2767 + 4 new — 2 in a new
+`src/test/content/loader.test.ts` covering the client-side derivation, 2 in `artifact-shape.test.ts`
+proving `scanSearchIndex` now flags a leak in `bodyText` and no longer scans a stray `body` field). Known
+non-real `onTaskUpdate` RPC worker-communication timeout in shard 3, re-run once to confirm (842/842 both
+times, 0 failed). `npm run atlas:publish:integrity-smoke` → all 5 active scans still catch their planted
+fault. `npm run atlas:publish` → build + all 12 orchestrator scans clean. Verified directly: shipped
+`public/atlas/search-index.json` entries carry `bodyText` on all 6 entries and `body` on none.
+`public/atlas/atlas.json` (publish-stamp churn only) and `public/atlas/assets/audio/manifest.json`
+(LF/CRLF churn) reverted with `git checkout --` before committing — only the intended
+`search-index.json` shape change reached `auto/continuous-dev`. Clean merge — no concurrent runs (origin
+tip matched the run's fork point at both worktree-creation and merge time, confirmed via `git fetch`
+immediately before each).

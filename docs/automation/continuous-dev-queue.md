@@ -176,13 +176,6 @@ is for sequencing, not the whole spec.
 
 #### Q-I — Build & runtime performance
 
-- [ ] **Q65. Stop shipping the duplicated lowercased body in the search index; derive it at load.**
-  `buildSearchIndex` in `scripts/build-atlas.ts` (lines 1284-1294) emits both `body: stripped.toLowerCase()` (for matching) and `bodyText: stripped` (for snippets) — the same (≤4000-char) stripped text differing only in case, a redundant copy in every entry. Ship only `bodyText`, and in `src/atlas/content/loader.ts` `loadSearchIndex` derive `body = bodyText.toLowerCase()` after `parseSearchIndex` so `parseSearchQuery.ts:48` and `SearchPalette.tsx` keep reading `e.body` unchanged. CRITICAL: `scanSearchIndex` in `scripts/check-artifact-shape.ts:221` secret-scans the raw `body` field — repoint that field entry to scan `bodyText` (the surviving field) so leak coverage isn't lost. `parseSearchIndex` (atlasGuard.ts:70) only requires id/title/type, so the absent `body` won't fail the guard.
-  - **Done when:** shipped `search-index.json` entries carry `bodyText` but no `body`; in-app search still matches body text; `scanSearchIndex` scans `bodyText`; all scans green.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest) + `npm run atlas:publish`.
-  Touches a shipped artifact + the shape safety scan. Independent of Q64 (minify) — the two compose if both land.
-  ~2–3 runs.
-
 - [ ] **Q66. Lazy-load search-index.json on first search instead of at viewer startup.**
   `src/pages/AtlasViewer.tsx:232` eagerly runs `Promise.all([loadAtlasContent(true), loadSearchIndex()])` at mount, so every `/atlas` visit downloads+parses the full search index even for players who never open search. Keep `loadAtlasContent` on the critical path but defer `loadSearchIndex` (`src/atlas/content/loader.ts:34`) until the CommandPalette/SearchPalette first opens; add a lightweight loading state to the palette while the index resolves and memoize so it fetches only once. Behavior once open is identical to today.
   - **Done when:** initial `/atlas` load performs no search-index fetch (assert via test/network); the first search-open triggers the fetch once, shows a loading state, then behaves as before; reopening does not re-fetch.
