@@ -2244,3 +2244,36 @@ publish verification reverted with `git checkout --` before committing.
 **Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q70` and
 branch `run/q70-fog-prune` cleaned up after merge. No concurrency this run — origin tip matched the fork
 point at worktree creation and at merge time (confirmed via `git fetch` immediately before each).
+
+- [x] **Q71. Enable incremental typecheck (tsBuildInfoFile) for the gate's tsc pass.** ✅ DONE
+  2026-07-26 — commit d01af5bc
+
+**What shipped:** `tsconfig.app.json` and `tsconfig.node.json` both gained `incremental: true` plus an
+explicit `tsBuildInfoFile` (`./node_modules/.tmp/tsconfig.app.tsbuildinfo` and
+`./node_modules/.tmp/tsconfig.node.tsbuildinfo`). No separate `.gitignore` entry was needed — the path
+lives under `node_modules/`, already covered by the repo's existing `node_modules` ignore rule.
+
+**Verified end-to-end:** a cold `npm run typecheck` took 11.7s and wrote the buildinfo file; a second,
+warm run reused it and completed in 3.1s — a measurable speedup with identical (clean) results.
+`git status` stayed clean after both runs (buildinfo never appears as untracked). Separately confirmed
+`tsc --noEmit -p tsconfig.node.json` standalone fails with pre-existing `@/*`-alias resolution errors
+unrelated to this change (that config has never had a `paths` entry and is never invoked standalone by
+any npm script — only referenced via the root `tsconfig.json` project-reference list for IDE tooling) —
+same failure reproduces against the original file from `HEAD`, confirming no regression.
+
+**Gate:** standard gate only (typecheck + ESLint + sharded vitest) — config-only change, no
+build-pipeline/artifact touch, so `atlas:publish` wasn't required per the queue spec. typecheck clean ·
+eslint 0 errors (18 pre-existing warnings, no new ones) · 2775 tests green across 4 shards
+(689+620+843+623 — shard 1 and shard 3 each hit the documented `onTaskUpdate` RPC worker-communication
+flake, 0 real failures). Pre-commit hook's `vitest run --changed` found no changed test files for the
+config-only diff (exit 0, expected). `public/atlas/assets/audio/manifest.json` line-ending churn from
+running tests reverted with `git checkout --` before committing — only the two tsconfig files reached
+`auto/continuous-dev`.
+
+**Commits:** `d01af5bc` (feat, on `run/q71-incremental-typecheck`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — `auto/continuous-dev` was still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q71` and
+branch `run/q71-incremental-typecheck` cleaned up after merge. No concurrency this run — origin tip
+matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
+before each).

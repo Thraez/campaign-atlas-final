@@ -176,12 +176,6 @@ is for sequencing, not the whole spec.
 
 #### Q-I — Build & runtime performance
 
-- [ ] **Q71. Enable incremental typecheck (tsBuildInfoFile) for the gate's tsc pass.**
-  `tsconfig.app.json` sets `skipLibCheck`/`isolatedModules`/`noEmit` but not `incremental`/`tsBuildInfoFile`, so `npm run typecheck` (`tsc --noEmit -p tsconfig.app.json`) does a full cold check on every gate run. Add `incremental: true` + an explicit `tsBuildInfoFile` (TypeScript 5.8, per package.json, writes the buildinfo even under `noEmit`) so repeated typechecks in the hourly routine reuse prior results; apply the same to `tsconfig.node.json` if it feeds a checked pass. Gitignore the buildinfo path so it doesn't pollute the tree or perturb CI (which starts cold anyway).
-  - **Done when:** a second consecutive `npm run typecheck` reuses the buildinfo and is measurably faster, the `.tsbuildinfo` file is gitignored, `git status` stays clean, and typecheck results are unchanged.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  ~1 run.
-
 
 #### Q-J — CI/CD & developer experience
 
