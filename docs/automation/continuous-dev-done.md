@@ -2481,3 +2481,36 @@ itself.
 branch `run/q78-verify-script` to be cleaned up after merge. No concurrency this run — origin tip
 matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
 before each).
+
+- [x] **Q79. Add an ESLint guard against editor-only imports in player entry files.** ✅ DONE
+  2026-07-26 — commit 486ac715
+
+**What shipped:** a scoped `no-restricted-imports` override block in `eslint.config.js`, `files`-matched
+to the player-graph entry modules (`src/main.tsx`, `src/App.tsx`, the lazy non-editor routes
+`src/pages/{Landing,AtlasViewer,AtlasTimeline,AtlasBrowse,AtlasCredits,NotFound}.tsx`, and
+`src/atlas/secrets/CharacterSecretsPage.tsx`), banning static imports matching
+`*/pages/AtlasPlacementEditor` / `@/pages/AtlasPlacementEditor` and `*/atlas/save/*` / `@/atlas/save/*`.
+Per the rescoped spec (a flat project-wide ban was unsafe — editor-internal files legitimately import
+`@/atlas/save/*` statically), this is scoped only to the player entry files, not the whole project.
+
+**Verified the rule actually fires:** smoke-tested by temporarily appending
+`import { AtlasPlacementEditor } from "@/pages/AtlasPlacementEditor";` to `Landing.tsx` — `npx eslint`
+correctly reported it as a `no-restricted-imports` error with the custom message, then the test edit was
+reverted (`git checkout --`). Also confirmed editor-internal files (`EntityEditPanel.tsx`,
+`saveGate.ts`, `EntitiesTab.tsx`) still lint clean importing `@/atlas/save/*` — out of the scoped
+`files` list, so unaffected. `App.tsx`'s dynamic `import()` of the editor route is unaffected by design
+(the rule only matches static import specifiers).
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — lint-config-only, no build/scan/fog/
+artifact touch, so `atlas:publish` wasn't required. `npm run typecheck:all` clean · `npm run lint` 0
+errors (18 pre-existing warnings, no new ones — none of the entry files import editor code today) ·
+2775 tests green across the 4 shards (689+620+843+623; shard 3 hit the documented `onTaskUpdate` RPC
+flake as an "Errors" count with all 843 tests in that shard still green). Pre-commit hook also passed.
+
+**Commits:** `486ac715` (feat, on `run/q79-eslint-editor-guard`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q79` and
+branch `run/q79-eslint-editor-guard` to be cleaned up after merge. No concurrency this run — origin tip
+matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
+before each).
