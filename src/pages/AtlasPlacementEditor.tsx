@@ -107,6 +107,7 @@ import {
 } from "@/atlas/editor/placementOverrides";
 import { foreignMapDraftPlacements } from "@/atlas/editor/foreignMapDrafts";
 import { targetMapHasPlacement } from "@/atlas/editor/duplicateOverwriteCheck";
+import { useBeforeUnloadWarning } from "@/atlas/editor/useBeforeUnloadWarning";
 import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { buildValidationScopes } from "@/atlas/yaml/validationScopes";
@@ -904,6 +905,7 @@ function AtlasPlacementEditorInner() {
     lastLocalEditAt !== null &&
     (lastSavedAt === null || lastLocalEditAt > lastSavedAt);
   const hasUnsavedChanges = pinSideUnsaved || worldYamlDirty;
+  useBeforeUnloadWarning(hasUnsavedChanges);
 
   const session = useEditorSession({
     activeMapId: activeMap?.id ?? null,
