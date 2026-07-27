@@ -7,6 +7,10 @@ function Boom(): React.ReactElement {
   throw new Error("boom");
 }
 
+function Fine(): React.ReactElement {
+  return <div data-testid="child">ok</div>;
+}
+
 describe("ErrorBoundary", () => {
   // Suppress the expected console.error output from the boundary + React's own logging
   beforeEach(() => {
@@ -45,5 +49,42 @@ describe("ErrorBoundary", () => {
         </ErrorBoundary>,
       ),
     ).not.toThrow();
+  });
+
+  it("resets and renders new children when resetKeys change", () => {
+    const onReset = vi.fn();
+    const { rerender } = render(
+      <ErrorBoundary resetKeys={["a"]} onReset={onReset}>
+        <Boom />
+      </ErrorBoundary>,
+    );
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+
+    rerender(
+      <ErrorBoundary resetKeys={["b"]} onReset={onReset}>
+        <Fine />
+      </ErrorBoundary>,
+    );
+
+    expect(screen.getByTestId("child")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(onReset).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays crashed when resetKeys are unchanged", () => {
+    const { rerender } = render(
+      <ErrorBoundary resetKeys={["a"]}>
+        <Boom />
+      </ErrorBoundary>,
+    );
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+
+    rerender(
+      <ErrorBoundary resetKeys={["a"]}>
+        <Fine />
+      </ErrorBoundary>,
+    );
+
+    expect(screen.getByRole("alert")).toBeInTheDocument();
   });
 });
