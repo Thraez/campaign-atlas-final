@@ -154,6 +154,14 @@ describe("AssetManagerPanel", () => {
     });
   });
 
+  it("shows the shared 'Image missing' fallback when an asset preview 404s (Q93)", () => {
+    const { container } = render(<AssetManagerPanel project={fixture()} onPatch={vi.fn()} />);
+    const preview = container.querySelector("img");
+    expect(preview).not.toBeNull();
+    fireEvent.error(preview!);
+    expect(screen.getByText("Image missing")).toBeInTheDocument();
+  });
+
   it("'disable all badges' flips every asset's enabled flag off, preserving credit text", () => {
     const onPatch = vi.fn();
     render(

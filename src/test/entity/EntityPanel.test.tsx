@@ -840,6 +840,27 @@ describe("EntityPanel — ImageThumb broken-image placeholder (N77)", () => {
   });
 });
 
+describe("EntityPanel — lightbox broken-image fallback (Q93)", () => {
+  it("shows the shared 'Image missing' fallback in the lightbox when the full image 404s", () => {
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityWithPortrait}
+          placements={[]}
+          entityById={new Map()}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    fireEvent.error(screen.getByRole("img", { name: "Corven" }));
+    expect(screen.getAllByText("Image missing").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("img", { name: "Corven" })).not.toBeInTheDocument();
+  });
+});
+
 describe("EntityPanel — CopyLinkButton copied state (N77)", () => {
   it("shows the Check icon (text-green-500) after a successful clipboard write", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);

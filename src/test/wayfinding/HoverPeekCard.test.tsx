@@ -1,5 +1,5 @@
 import { it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { HoverPeekCard } from "@/atlas/peek/HoverPeekCard";
 import type { Entity } from "@/atlas/content/schema";
 
@@ -52,4 +52,18 @@ it("shows the map button only when a placement exists and fires onFlyToMap", () 
   expect(screen.getByText("A salt harbor.")).toBeTruthy();
   screen.getByRole("button", { name: /show saltmere on the map/i }).click();
   expect(onFly).toHaveBeenCalled();
+});
+
+it("shows the shared 'Image missing' fallback when the portrait 404s (Q93)", () => {
+  render(
+    <HoverPeekCard
+      entity={{ ...base, images: ["portrait.png"] }}
+      hasPlacement={false}
+      onOpen={() => {}}
+      onFlyToMap={() => {}}
+    />,
+  );
+  fireEvent.error(screen.getByRole("img"));
+  expect(screen.getByText("Image missing")).toBeInTheDocument();
+  expect(screen.queryByRole("img")).toBeNull();
 });

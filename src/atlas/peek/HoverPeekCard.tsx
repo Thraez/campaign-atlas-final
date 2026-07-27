@@ -1,6 +1,7 @@
 import { MapPin } from "lucide-react";
 import type { Entity } from "../content/schema";
 import { normalizeAtlasAssetUrl } from "../url";
+import { AtlasImage } from "../content/AtlasImage";
 
 export interface HoverPeekCardProps {
   entity: Entity;
@@ -32,10 +33,11 @@ export function HoverPeekCard({
     >
       <div className="flex items-start gap-2.5">
         {img && (
-          <img
+          <AtlasImage
             src={img}
             alt={entity.title}
             className="flex-none rounded-md object-cover"
+            fallbackClassName="flex-none rounded-md bg-muted/30 border border-dashed border-border flex items-center justify-center text-[9px] text-muted-foreground text-center leading-tight px-1"
             style={{ height: 52, width: 52 }}
           />
         )}

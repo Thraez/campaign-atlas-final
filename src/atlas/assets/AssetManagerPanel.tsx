@@ -10,6 +10,7 @@ import { collectAssets } from "@/atlas/assets/collectAssets";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { SIZE_WARN_BYTES, SIZE_ERROR_BYTES, formatBytes } from "@/atlas/assets/assetSize";
 import { Button } from "@/components/ui/button";
+import { AtlasImage } from "@/atlas/content/AtlasImage";
 
 const EMPTY: AssetCredit = { credit: "", enabled: false };
 
@@ -135,10 +136,11 @@ export function AssetManagerPanel({
           const entry = assetCredits?.[a.src] ?? EMPTY;
           return (
             <li key={a.src} className="flex gap-2 items-start border-t pt-3">
-              <img
+              <AtlasImage
                 src={normalizeAtlasAssetUrl(a.src)}
                 alt=""
                 className="w-12 h-12 object-cover rounded border shrink-0 bg-muted"
+                fallbackClassName="w-12 h-12 object-cover rounded border shrink-0 bg-muted flex items-center justify-center text-[8px] text-muted-foreground text-center leading-tight px-0.5"
               />
               <div className="min-w-0 flex-1 space-y-1.5">
                 <div className="font-mono truncate" title={a.src}>

@@ -25,6 +25,7 @@ import type { PlayerProfile } from "@/atlas/profiles/profileTypes";
 import { CreditBadge } from "./CreditBadge";
 import { mountSecretBlock } from "@/atlas/secrets/secretBlockView";
 import { buildToc } from "@/atlas/entity/paneScrollSync";
+import { AtlasImage } from "@/atlas/content/AtlasImage";
 
 export interface EntityPanelProps {
   entity: Entity | null;
@@ -242,28 +243,17 @@ function NotesPanel({ entityId, entityTitle }: { entityId: string; entityTitle: 
  * image is referenced but missing" instead of "this entity has no images."
  */
 function ImageThumb({ src, alt, onClick }: { src: string; alt: string; onClick: () => void }) {
-  const [broken, setBroken] = useState(false);
-  if (broken) {
-    return (
-      <div
-        className="flex-shrink-0 rounded border border-dashed border-border bg-muted/30 h-24 w-24 flex items-center justify-center text-[10px] text-muted-foreground text-center px-1.5 leading-tight"
-        title={`Image failed to load: ${src}`}
-      >
-        Image missing
-      </div>
-    );
-  }
   return (
     <button
       onClick={onClick}
-      className="rounded border border-border overflow-hidden hover:border-primary transition focus:outline-none focus:ring-2 focus:ring-primary block"
+      className="rounded border border-border overflow-hidden hover:border-primary transition focus:outline-none focus:ring-2 focus:ring-primary block flex-shrink-0"
     >
-      <img
+      <AtlasImage
         src={src}
         alt={alt}
         className="h-24 w-24 object-cover block"
+        fallbackClassName="h-24 w-24 flex items-center justify-center text-[10px] text-muted-foreground text-center px-1.5 leading-tight bg-muted/30"
         loading="lazy"
-        onError={() => setBroken(true)}
       />
     </button>
   );
@@ -670,10 +660,11 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
           <DialogTitle className="sr-only">{entity.title} image</DialogTitle>
           {lightboxIndex !== null && lightboxUrl && (
             <div className="relative">
-              <img
+              <AtlasImage
                 src={lightboxUrl}
                 alt={`${entity.title}`}
                 className="max-w-full max-h-[85vh] object-contain mx-auto"
+                fallbackClassName="flex items-center justify-center rounded border border-dashed border-white/30 bg-black/40 text-sm text-white/70 text-center px-6 py-16 min-w-[200px] mx-auto"
                 onClick={() => setLightboxIndex(null)}
               />
               {imageCount > 1 && (
