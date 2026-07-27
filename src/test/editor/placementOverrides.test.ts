@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   STORAGE_KEY,
   LEGACY_STORAGE_KEY_V1,
@@ -90,8 +90,20 @@ describe("finishLegacyMigration", () => {
 describe("persistOverrides", () => {
   it("writes the v3 key and round-trips through loadOverrides", () => {
     const data: Overrides = { "m1:e1": { x: 7, y: 8, label: "Inn" } };
-    persistOverrides(data);
+    expect(persistOverrides(data)).toBe(true);
     expect(localStorage.getItem(STORAGE_KEY)).toBe(JSON.stringify(data));
     expect(loadOverrides()).toEqual(data);
+  });
+
+  it("returns false instead of throwing when localStorage.setItem fails (quota / private-browsing)", () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("QuotaExceededError");
+    });
+    try {
+      expect(() => persistOverrides({ "m1:e1": { x: 1, y: 1 } })).not.toThrow();
+      expect(persistOverrides({ "m1:e1": { x: 1, y: 1 } })).toBe(false);
+    } finally {
+      setItemSpy.mockRestore();
+    }
   });
 });

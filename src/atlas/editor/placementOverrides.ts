@@ -20,6 +20,7 @@
  */
 import { overridesSchema } from "@/atlas/schemas/imports";
 import type { PinOverride } from "@/atlas/pins/presets";
+import { logger } from "@/lib/logger";
 
 /** Local-draft override shape. `null` = explicitly removed from this map. */
 export type OverrideValue = { x: number; y: number; label?: string; pin?: PinOverride };
@@ -120,7 +121,18 @@ export function finishLegacyMigration(
   return { overrides: migrated ? out : overrides, migrated };
 }
 
-/** Persist the current overrides to localStorage under the v3 key. */
-export function persistOverrides(overrides: Overrides): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
+/**
+ * Persist the current overrides to localStorage under the v3 key. Returns
+ * `false` (and logs) instead of throwing when the write fails — e.g. quota
+ * exceeded or storage blocked in private browsing — so the caller can
+ * surface it to the DM rather than letting the failure crash the editor.
+ */
+export function persistOverrides(overrides: Overrides): boolean {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
+    return true;
+  } catch (e) {
+    logger.error("Failed to persist placement overrides to localStorage", e);
+    return false;
+  }
 }

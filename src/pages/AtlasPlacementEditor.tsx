@@ -286,7 +286,11 @@ function AtlasPlacementEditorInner() {
   });
 
   useEffect(() => {
-    persistOverrides(overrides);
+    if (!persistOverrides(overrides)) {
+      toast.error("Couldn't save pin changes locally — your browser storage may be full or blocked.", {
+        id: "overrides-persist-failed",
+      });
+    }
   }, [overrides]);
 
   // Stamp a local edit timestamp on every override mutation AFTER mount.
