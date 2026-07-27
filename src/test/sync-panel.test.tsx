@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import { SyncPanel } from "@/atlas/sync/SyncPanel";
 import { loadSettings, saveSettings } from "@/atlas/sync/useSyncSettings";
+
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
 vi.mock("@/atlas/sync/useSyncSettings", () => ({
   loadSettings: vi.fn(),
@@ -57,6 +60,19 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
     await waitFor(() =>
       expect(saveSettings).toHaveBeenCalledWith(
         expect.objectContaining({ vaultPath: "/My Vault", ignoreGlobs: ["Templates/**"] }),
+      ),
+    );
+  });
+
+  it("shows an error toast when saveSettings rejects (write failure)", async () => {
+    mockSave.mockRejectedValue(new Error("POST /__atlas/local-write failed (500): disk full"));
+    mockLoad.mockResolvedValue({ vaultPath: "/My Vault" });
+    render(<SyncPanel onSync={vi.fn()} />);
+    await waitFor(() => expect(screen.getByDisplayValue("/My Vault")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /save settings/i }));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining("Couldn't save sync settings"),
       ),
     );
   });

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,6 +42,9 @@ export function SyncPanel({ onSync, hasDmBuild = true }: SyncPanelProps) {
       };
       await saveSettings(next);
       setSettings(next);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Couldn't save sync settings: ${msg}`);
     } finally {
       setIsSaving(false);
     }
