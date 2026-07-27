@@ -2732,3 +2732,41 @@ This unit was picked up mid-flight from a prior scheduled run whose 3-hour lock 
 (uncommitted WIP found already matching the spec byte-for-byte) — verified against the full gate
 before committing rather than discarded. No concurrency at merge/push time — origin tip matched the
 fork point (confirmed via `git fetch` immediately before merge).
+
+- [x] **Q88. Shared offline-aware atlas load-state across reader pages.** ✅ DONE
+  2026-07-27 — commit 0376122f
+
+**What shipped:** new `src/atlas/content/AtlasLoadState.tsx` (presentational, offline-aware: shows
+`offlineTitle` + a fixed "cache it for offline use" hint when `!navigator.onLine`, else `errorTitle` +
+the raw error, always with a Back link; renders the `loadingLabel` branch when `loading` and no error;
+an optional `extraHint` slot suppressed while offline) and `src/atlas/content/useAtlasContent.ts` (the
+shared `loadAtlasContent(true).then(setProject).catch(...)` load, returning `{ project, error }`).
+`AtlasBrowse.tsx`, `AtlasTimeline.tsx`, `AtlasCredits.tsx`, and `CharacterSecretsPage.tsx` now load via
+`useAtlasContent()` and render `<AtlasLoadState>` in place of their bespoke branches — Credits and
+Secrets previously dumped a bare error string with no title or Back link; both now get the full
+offline-aware UI. Timeline keeps its `errorTitle="Timeline unavailable"` / `loadingLabel="Loading
+timeline…"` overrides. `AtlasViewer.tsx` keeps its own load effect (deep-link handling untouched) but
+renders `<AtlasLoadState backHref="/" backLabel="Back to home" extraHint={…}>` for its error/loading
+branches, passing its dev-only `npm run atlas:build` guidance through the new `extraHint` prop (shown
+only while online-and-errored, matching prior behavior). New
+`src/test/atlas/AtlasLoadState.test.tsx` (6 tests) covers: loading branch, online-error branch,
+offline-vs-error branch (offline title replaces the raw error, hint text still shown), Back link
+href/label, and extraHint suppressed-offline / shown-online-errored.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — pure UI/hook extraction, no build/scan/
+fog/artifact touch, so `atlas:publish` wasn't required. `npm run typecheck` clean · `npm run lint` 0
+errors (18 pre-existing warnings, no new ones) · 2785 tests green across the 4 shards
+(689+596+823+677 — +6 over the Q87 baseline for the new `AtlasLoadState.test.tsx`; shard 3 hit the
+documented `onTaskUpdate` RPC flake as an "Errors" count with every test in that shard still green).
+Existing loader-mocking tests (`AtlasBrowse.test.tsx`, `AtlasTimeline.test.tsx`,
+`atlas-credits-page.test.tsx`, `CharacterSecretsPage.test.tsx`) mock `@/atlas/content/loader`'s
+`loadAtlasContent` directly, so they exercise the new `useAtlasContent()` hook transparently and needed
+no changes; none of them asserted the old bare-error-string UI. Pre-commit hook also passed.
+
+**Commits:** `0376122f` (feat, on `run/q88-load-state`), fast-forward merge into `auto/continuous-dev`
+(no separate merge commit — still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q88` and
+branch `run/q88-load-state` to be cleaned up after merge. No concurrency this run — origin tip matched
+the fork point at worktree creation, before the commit, and before the merge (confirmed via `git fetch`
+each time).

@@ -186,13 +186,6 @@ is for sequencing, not the whole spec.
 
 #### Q-L — Resilience & error handling
 
-- [ ] **Q88. Shared offline-aware atlas load-state across reader pages.**
-  Five reader pages each do `loadAtlasContent(true).then(setProject).catch(e=>setError(e.message))` with a bespoke loading/error render; only `src/pages/AtlasViewer.tsx` (error screen ~lines 440-465) is offline-aware, while `AtlasBrowse.tsx`, `AtlasTimeline.tsx`, `AtlasCredits.tsx` (dumps the raw string in `text-destructive`, line ~86) and `src/atlas/secrets/CharacterSecretsPage.tsx` (line ~130) show inconsistent, non-navigable failures. Extract a presentational `<AtlasLoadState>` (offline-aware copy: "Atlas not available offline yet" vs the error message, plus a Back link and a Loading… branch) under `src/atlas/content/`, and a `useAtlasContent()` hook wrapping the load for the four simple pages. Adopt the shared render in all five (AtlasViewer keeps its own `Promise.all` + deep-link effect but renders `<AtlasLoadState>` for its error/loading branches).
-  - **Done when:** all five pages render the same offline-aware loading + error UI via the shared component; the four non-viewer pages load through `useAtlasContent()`; no page dumps a bare error string; a unit test covers the `<AtlasLoadState>` offline-vs-error branch.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Player-facing; touches no generated artifacts. May land page-by-page (each adoption independently passes the gate). Coordinate with Q89/Q94, which also touch AtlasViewer's load effect.
-  ~2–3 runs.
-
 - [ ] **Q89. Degrade gracefully when search-index.json fails to load.**
   `src/pages/AtlasViewer.tsx:232` loads via `Promise.all([loadAtlasContent(true), loadSearchIndex()])`, so a missing/corrupt `search-index.json` rejects the whole promise and the full map + entities are replaced by the "Atlas not built yet" error screen even though `atlas.json` is fine. Decouple the two: treat `atlas.json` as primary (its failure → error screen) and load the search index separately; on search-index failure keep rendering the map/entity panels, fall back to an empty index (or a lightweight index derived from `project.entities`), and log the failure via `logger.error` (`src/lib/logger.ts`). Search degrades instead of blanking the app.
   - **Done when:** a rejected `loadSearchIndex()` no longer triggers the error screen; the map + entity panel still render; search silently falls back to an empty/derived index; the failure is logged through the logger seam; a test asserts the map renders when the search-index load rejects.
