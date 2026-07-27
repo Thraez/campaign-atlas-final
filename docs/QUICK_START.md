@@ -101,7 +101,7 @@ This writes `public/atlas/atlas.json` — what the player site will serve.
 The workflow at `.github/workflows/publish-atlas.yml` runs on every push to `main`:
 
 1. Builds the strict player atlas.
-2. Runs three safety scanners (`atlas:check-secrets`, `atlas:check-derived`, `atlas:check-shape`).
+2. Runs all six safety scanners plus the asset audit (`npm run atlas:scan`) — see [VISIBILITY_AND_PLAYER_SAFETY.md](VISIBILITY_AND_PLAYER_SAFETY.md#the-safety-scanners) for the full list.
 3. Deploys `dist/` to GitHub Pages.
 
 To enable: in your repo's Settings → Pages, set Source to "GitHub Actions". Push to `main`. Wait ~2 minutes.

@@ -38,7 +38,7 @@ Obsidian markdown + world.yaml          ← canon
 
 Two modes:
 
-- **Player build** — published. Strips `dm`/`hidden` entities, `profile.dm`, DM relationships, `%%` blocks, `:::dm` callouts. Cross-reference leak detection. Three safety scanners gate publish.
+- **Player build** — published. Strips `dm`/`hidden` entities, `profile.dm`, DM relationships, `%%` blocks, `:::dm` callouts. Cross-reference leak detection. Six safety scanners plus an asset audit gate publish.
 - **DM build** — local only. Writes to `.local-atlas/` (gitignored by default). Includes everything.
 
 ## What makes this different from other DM tools
