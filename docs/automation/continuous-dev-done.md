@@ -3234,3 +3234,37 @@ policy). Pure client-side editor logic — no `scripts/`, fog, soundscape, or sh
 wire `existingEntityIdsForWorld` into the six create-mode panels), on
 `run/n102-entity-name-collision`, fast-forward merged into `auto/continuous-dev` (no separate merge
 commit — still at the fork point).
+
+- [x] **N103. The DM editor's "World name" setting is a dead end — it never reaches world.yaml/atlas.json.** ✅ DONE 2026-07-27 —
+  commits 9b91dce6 + b6c0ef0b.
+
+The World Details panel's name input promises it's "Shown as the title across the editor and the player
+site" and calls `onPatch({ name })` → `patchWorld`, and `patchWorld` already wrote into the session's
+`worldOverride`, so `worldSettingsDirty`/`worldYamlDirty` correctly fired on a name edit. But the
+serialize step was missing on two levels: `buildWorldYamlContent`/`buildFullWorldYaml` never took a
+`name` input at all (only `credits`/`assetCredits` flowed through), and separately the build pipeline's
+`build-atlas.ts` hardcoded `worlds[0].name` to the literal string `"Astrath Deeprealm"`, ignoring
+world.yaml entirely — so even a correctly-written `name:` in world.yaml would never have reached
+atlas.json.
+
+Added an optional top-level `name` to `loadWorldConfig`'s `WorldYaml`/`WorldConfig` (read from
+world.yaml's `name:` key), had `build-atlas.ts` prefer `worldCfg?.name` over the hardcoded default, and
+had `buildFullWorldYaml` serialize `opts.name` the same way it already does `credits`/`assetCredits`
+(only when present, right after `schemaVersion`). `buildSaveBatch`'s `buildWorldYamlContent` forwards the
+new `name` input through unchanged, and `AtlasPlacementEditor.tsx` passes `effectiveWorld?.name` into
+that call alongside `credits`/`assetCredits`.
+
+**Gate:** `npm run typecheck:all` clean · `npm run lint` 0 errors (18 pre-existing, unchanged) · 2849
+tests green across the 4 shards (699+624+821+705, +4 over the N102 baseline of 2845 — 2 new
+`buildFullWorldYaml` name round-trip tests, 1 new `buildSaveBatch` drift-contract assertion on an
+existing test, 2 new `build-atlas` fallback/override tests). Shard 4 hit the documented `onTaskUpdate`
+RPC flake (0 real failures, all 705 tests + 70 files passed; not re-run per policy). This run touches
+`scripts/build-atlas.ts` and `scripts/atlas/loadWorldConfig.ts`, so `npm run atlas:publish:integrity-smoke`
+(5/5 scans) and `npm run atlas:publish` (12/12 scans) both ran green; the resulting
+`public/atlas/atlas.json` diff was CRLF-only line-ending churn (no content change, since this vault's
+world.yaml has no `name:` override) and was reverted with `git checkout --` before committing.
+
+**Commits:** `9b91dce6` (feat: `name` plumbing through `loadWorldConfig` → `build-atlas.ts` →
+`buildFullWorldYaml` → `buildSaveBatch`, with round-trip tests) and `b6c0ef0b` (fix: wire
+`effectiveWorld?.name` into the editor page's Save call), on `run/n103-world-name-persist`,
+fast-forward merged into `auto/continuous-dev` (no separate merge commit — still at the fork point).
