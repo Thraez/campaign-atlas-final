@@ -3293,3 +3293,30 @@ touch — so `npm run atlas:publish` wasn't required.
 **Commits:** `5c0757c6` (feat: `postJson` throws on non-OK response + 2 unit tests) and `88787ddc` (fix:
 `SyncPanel.handleSave` catches and toasts the failure + 1 unit test), on `run/n104-postjson-status`,
 fast-forward merged into `auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+- [x] **N105. Harden local persistence writes against quota / private-browsing throws.** ✅ DONE
+  2026-07-27 — commits 3b148582 + 6e58da4d.
+
+`persistOverrides` (`src/atlas/editor/placementOverrides.ts`) had no try/catch around
+`localStorage.setItem` at all, so a quota or Safari-private-mode throw could bubble up and break the
+editor mid-edit. The map-layer persist effect (`src/atlas/useMapLayers.ts`) did the opposite — it
+swallowed every failure in an empty catch block, so an uploaded layer that failed to persist was
+silently dropped with no log or toast.
+
+`persistOverrides` now returns `false` (instead of throwing) and logs via `logger.error` on failure;
+`AtlasPlacementEditor.tsx`'s persist effect toasts the DM (`sonner`, `id: "overrides-persist-failed"`)
+when a pin-position save couldn't be written locally. The map-layer persist effect's catch block now
+logs via `logger.error` and toasts (`id: "map-layers-persist-failed"`) instead of silently discarding
+the failure.
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing, unchanged) · 2854 tests
+green across the 4 shards (700+625+822+707, +2 over the N104 baseline of 2852 — 1 new `persistOverrides`
+quota-failure test, 1 new `useMapLayers` persist-failure toast test). Shard 4 hit the documented
+`onTaskUpdate` RPC flake (0 real failures, all 707 tests + 70 files passed; not re-run per policy). Pure
+client-side editor persistence logic — no `scripts/`, fog, soundscape, or shipped-artifact touch — so
+`npm run atlas:publish` wasn't required.
+
+**Commits:** `3b148582` (feat: `persistOverrides` fails gracefully + toast wiring in
+`AtlasPlacementEditor.tsx` + test) and `6e58da4d` (fix: `useMapLayers` persist effect logs/toasts
+instead of swallowing the failure + test), on `run/n105-persist-hardening`, fast-forward merged into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).
