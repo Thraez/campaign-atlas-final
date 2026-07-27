@@ -7,6 +7,7 @@ import { AtlasLoadState } from "@/atlas/content/AtlasLoadState";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { collectCharacterSecrets, type CollectedSecret } from "./collectCharacterSecrets";
 import { getCharacterKey, setCharacterKey, forgetAll } from "./playerSecretsStore";
+import { isSecureCryptoAvailable } from "./isSecureCryptoAvailable";
 
 function SafeHtml({ html }: { html: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -50,6 +51,14 @@ function SecretsBody({ entities }: { entities: Entity[] }) {
     setFound([]);
     setTried(false);
   };
+
+  if (!isSecureCryptoAvailable()) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Secrets need a secure https connection to unlock on this device.
+      </p>
+    );
+  }
 
   if (!key) {
     return (
