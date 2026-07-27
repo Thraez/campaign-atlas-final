@@ -1,4 +1,5 @@
 import type { ResolvedLink } from "./schema";
+import { replaceOutsideCode } from "./codeRegions";
 
 const WIKILINK = /\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+?))?\]\]/g;
 
@@ -22,7 +23,9 @@ export function tokenizeWikilinks(
   ctx: ResolveContext
 ): { tokenized: string; links: ResolvedLink[] } {
   const links: ResolvedLink[] = [];
-  const tokenized = body.replace(WIKILINK, (_m, target: string, display?: string) => {
+  const tokenized = replaceOutsideCode(body, WIKILINK, (...args: unknown[]) => {
+    const target = args[1] as string;
+    const display = args[2] as string | undefined;
     const t = target.trim();
     // Heading (and block-ref) anchors: only the part before the first `#` is
     // used to resolve the note. `[[Note#Heading]]` resolves to Note (the

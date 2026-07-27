@@ -1,5 +1,6 @@
 import { dropOrphanFootnoteRefs, renderMarkdownBodyToSafeHtml } from "./markdownCore";
 import { stripDmBlocks } from "./stripDmBlocks";
+import { replaceOutsideCode } from "./codeRegions";
 
 export interface RenderOpts {
   showDmNotes: boolean;
@@ -22,7 +23,8 @@ export function resolveImageEmbeds(
   md: string,
   resolveAsset: (name: string) => string = DEFAULT_RESOLVE_ASSET
 ): string {
-  return md.replace(EMBED_RE, (_m, name: string) => {
+  return replaceOutsideCode(md, EMBED_RE, (...args: unknown[]) => {
+    const name = args[1] as string;
     const pipeIdx = name.indexOf("|");
     const filename = (pipeIdx >= 0 ? name.slice(0, pipeIdx) : name).trim();
     const alt = (pipeIdx >= 0 ? name.slice(pipeIdx + 1) : name).trim();

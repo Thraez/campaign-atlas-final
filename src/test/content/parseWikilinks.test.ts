@@ -294,6 +294,31 @@ describe("tokenizeWikilinks — folder-path wikilinks resolve by basename (Q49)"
   });
 });
 
+describe("tokenizeWikilinks — code regions are left literal (N108)", () => {
+  it("a wikilink inside an inline code span is not tokenized", () => {
+    const body = "See `[[Corven]]` for syntax.";
+    const { tokenized, links } = tokenizeWikilinks(body, { resolveByName: RESOLVE_KNOWN });
+    expect(links).toHaveLength(0);
+    expect(tokenized).toBe(body);
+  });
+
+  it("a wikilink inside a fenced code block is not tokenized", () => {
+    const body = "```\n[[Corven]]\n```";
+    const { tokenized, links } = tokenizeWikilinks(body, { resolveByName: RESOLVE_KNOWN });
+    expect(links).toHaveLength(0);
+    expect(tokenized).toBe(body);
+  });
+
+  it("a real wikilink outside code still resolves even when code appears nearby", () => {
+    const body = "`[[Corven]]` is the syntax. See [[Corven]] for the page.";
+    const { tokenized, links } = tokenizeWikilinks(body, { resolveByName: RESOLVE_KNOWN });
+    expect(links).toHaveLength(1);
+    expect(links[0].resolvedId).toBe("corven");
+    expect(tokenized).toContain("`[[Corven]]`");
+    expect(tokenized).toContain("LINK[");
+  });
+});
+
 describe("renderLinkTokens — planned-link cross-surface (N26)", () => {
   const RESOLVE = (n: string) => (n === "Corven" ? "corven" : undefined);
 

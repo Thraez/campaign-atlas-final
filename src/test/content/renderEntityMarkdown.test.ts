@@ -129,6 +129,22 @@ describe("resolveImageEmbeds", () => {
     const out = resolveImageEmbeds("![[Portrait.PNG]]");
     expect(out).toBe("![Portrait.PNG](/atlas/assets/images/Portrait.PNG)");
   });
+
+  it("an embed inside an inline code span is not resolved (N108)", () => {
+    const body = "Shown as `![[Portrait.png]]` in docs.";
+    expect(resolveImageEmbeds(body)).toBe(body);
+  });
+
+  it("an embed inside a fenced code block is not resolved (N108)", () => {
+    const body = "```\n![[Portrait.png]]\n```";
+    expect(resolveImageEmbeds(body)).toBe(body);
+  });
+
+  it("a real embed outside code still resolves even when code appears nearby (N108)", () => {
+    const out = resolveImageEmbeds("`![[Portrait.png]]` is the syntax. ![[Portrait.png]]");
+    expect(out).toContain("`![[Portrait.png]]`");
+    expect(out).toContain("![Portrait.png](/atlas/assets/images/Portrait.png)");
+  });
 });
 
 describe("renderEntityMarkdown edge cases", () => {
