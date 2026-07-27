@@ -84,6 +84,7 @@ export interface RawRoute extends Omit<Route, "waypoints" | "resolvedPoints"> {
 
 interface WorldYaml {
   schemaVersion?: number;
+  name?: string;
   maps?: Array<
     Partial<MapDocument> & {
       layers?: Array<Partial<MapLayer> & { src: string; id: string }>;
@@ -144,6 +145,8 @@ export interface WorldConfig {
   routes: RawRoute[];
   calendar?: WorldCalendar;
   schemaVersion: number;
+  /** Optional world display name from world.yaml's top-level `name:` field. */
+  name?: string;
   warnings: string[];
   importConfig: ImportFolderConfig; // always present — defaults applied here
   credits: CreditsConfig; // always present — both default true
@@ -419,6 +422,7 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
     routes,
     calendar,
     schemaVersion: resolvedVersion,
+    name: typeof data.name === "string" ? data.name : undefined,
     warnings,
     importConfig,
     credits,

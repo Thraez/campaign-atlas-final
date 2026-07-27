@@ -457,6 +457,26 @@ describe("buildFullWorldYaml — water round-trip", () => {
   });
 });
 
+describe("buildFullWorldYaml — world name round-trip", () => {
+  it("round-trips a world name", () => {
+    const out = buildFullWorldYaml({
+      maps: [makeMap()],
+      schemaVersion: 1,
+      name: "Astrath Deeprealm",
+      existing: null,
+    });
+    const cfg = loadEmitted(out)!;
+    expect(cfg.name).toBe("Astrath Deeprealm");
+  });
+
+  it("omits the name key from YAML when opts.name is absent", () => {
+    const out = buildFullWorldYaml({ maps: [makeMap()], schemaVersion: 1, existing: null });
+    expect(out).not.toMatch(/^name:/m);
+    const cfg = loadEmitted(out)!;
+    expect(cfg.name).toBeUndefined();
+  });
+});
+
 describe("buildFullWorldYaml — credits round-trip", () => {
   it("round-trips credits with explicit false values", () => {
     const out = buildFullWorldYaml({

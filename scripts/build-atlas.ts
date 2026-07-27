@@ -984,7 +984,7 @@ async function runBuildCore(flags: BuildFlags) {
     worlds: [
       {
         id: worldId,
-        name: "Astrath Deeprealm",
+        name: worldCfg?.name ?? "Astrath Deeprealm",
         defaultMapId: primaryMapId,
         ...(flags.player
           ? {}

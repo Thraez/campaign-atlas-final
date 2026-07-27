@@ -82,7 +82,7 @@ beforeEach(() => {
 });
 
 describe("buildWorldYamlContent", () => {
-  it("forwards credits and assetCredits through to buildFullWorldYaml (drift contract)", () => {
+  it("forwards name, credits and assetCredits through to buildFullWorldYaml (drift contract)", () => {
     const activeMap = makeMap();
     const credits = { badges: true, page: false };
     const assetCredits = { "atlas/assets/maps/a.png": { credit: "Jane Doe", enabled: true } };
@@ -92,6 +92,7 @@ describe("buildWorldYamlContent", () => {
       maps: [activeMap],
       calendar: undefined,
       schemaVersion: 3,
+      name: "Astrath Deeprealm",
       mergedLayers: [],
       localLayers: [],
       regionsEffective: REGIONS,
@@ -104,6 +105,7 @@ describe("buildWorldYamlContent", () => {
 
     expect(buildFullWorldYamlMock).toHaveBeenCalledTimes(1);
     const call = buildFullWorldYamlMock.mock.calls[0][0];
+    expect(call.name).toBe("Astrath Deeprealm");
     expect(call.credits).toBe(credits);
     expect(call.assetCredits).toBe(assetCredits);
     expect(call.existing).toBe("# existing header\n");

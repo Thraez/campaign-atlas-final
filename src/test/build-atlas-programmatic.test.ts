@@ -126,6 +126,35 @@ describe("search index bodyText field", () => {
   });
 });
 
+describe("world name", () => {
+  it("falls back to the default world name when world.yaml has none", async () => {
+    const result = await runBuild({ player: false, strict: false });
+    expect(result.ok).toBe(true);
+    const atlasPath = path.join(tmpRoot, ".local-atlas", "atlas.json");
+    const project = JSON.parse(fs.readFileSync(atlasPath, "utf8")) as {
+      worlds: Array<{ name: string }>;
+    };
+    expect(project.worlds[0].name).toBe("Astrath Deeprealm");
+  });
+
+  it("uses world.yaml's top-level name when present", async () => {
+    const worldPath = path.join(tmpRoot, "content/test-world/_atlas/world.yaml");
+    const goodYaml = fs.readFileSync(worldPath, "utf8");
+    fs.writeFileSync(worldPath, `name: My Custom World\n${goodYaml}`, "utf8");
+    try {
+      const result = await runBuild({ player: false, strict: false });
+      expect(result.ok).toBe(true);
+      const atlasPath = path.join(tmpRoot, ".local-atlas", "atlas.json");
+      const project = JSON.parse(fs.readFileSync(atlasPath, "utf8")) as {
+        worlds: Array<{ name: string }>;
+      };
+      expect(project.worlds[0].name).toBe("My Custom World");
+    } finally {
+      fs.writeFileSync(worldPath, goodYaml, "utf8");
+    }
+  });
+});
+
 describe("deriveTitle", () => {
   it("title-cases a single-word slug when no fmTitle provided", () => {
     expect(deriveTitle("/notes/corven.md")).toBe("Corven");

@@ -43,6 +43,8 @@ export interface BuildFullWorldYamlOpts {
   calendar?: WorldCalendar;
   /** Schema version. When omitted, the field is left out and the loader's default applies. */
   schemaVersion?: number;
+  /** Optional world display name. When present, serialized as a top-level `name:` field. */
+  name?: string;
   /** Current on-disk file contents — used by serializeWorldYaml to preserve the leading comment block.
    *  Pass null when the file does not yet exist. */
   existing: string | null;
@@ -56,6 +58,7 @@ export interface BuildFullWorldYamlOpts {
 export function buildFullWorldYaml(opts: BuildFullWorldYamlOpts): string {
   const root: Record<string, unknown> = {};
   if (opts.schemaVersion !== undefined) root.schemaVersion = opts.schemaVersion;
+  if (opts.name) root.name = opts.name;
   root.maps = opts.maps.map(mapToYamlObject);
   if (opts.calendar) root.calendar = calendarToYamlObject(opts.calendar);
   if (opts.credits) root.credits = creditsToYamlObject(opts.credits);
