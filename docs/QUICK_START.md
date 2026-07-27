@@ -33,8 +33,8 @@ A generic seed world ships under `examples/seed-world/`. To run the build agains
 
 ```json
 {
-  "contentRoot": "examples/seed-world",
-  "defaultWorld": "seed"
+  "contentRoot": "examples",
+  "defaultWorld": "seed-world"
 }
 ```
 
@@ -68,7 +68,7 @@ This writes `public/atlas/atlas.json` — what the player site will serve.
        height: 3000
        layers:
          - id: overview
-           src: /atlas/assets/maps/my-map.png
+           src: atlas/assets/maps/my-map.png
            x: 0
            y: 0
            width: 4000
@@ -78,7 +78,7 @@ This writes `public/atlas/atlas.json` — what the player site will serve.
    ```
 5. Update `atlas.config.json`:
    ```json
-   { "contentRoot": "content/my-world", "defaultWorld": "my-world" }
+   { "contentRoot": "content", "defaultWorld": "my-world" }
    ```
 6. Create your first entity at `content/my-world/settlements/Foo.md`:
    ```markdown
