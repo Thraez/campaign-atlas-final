@@ -3,7 +3,11 @@ import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { isValidVisibility, ALL_VISIBILITY } from "@/atlas/content/visibility";
 import { parseFrontmatter, stringifyFrontmatter } from "@/atlas/import/frontmatter";
-import { useEntityEditDraft, type EntityEditDraftAPI } from "./useEntityEditDraft";
+import {
+  useEntityEditDraft,
+  type EntityEditDraftAPI,
+  type DraftSecret,
+} from "./useEntityEditDraft";
 import { saveAtlasPatchToLocalFs, hashContent, type FileChange } from "@/atlas/save/localFsSave";
 import { slugify } from "@/atlas/content/slugify";
 import { fileToDataUrl } from "@/atlas/content/browserFile";
@@ -21,14 +25,6 @@ import { WikilinkPopover } from "@/atlas/editor/WikilinkPopover";
 import { FormatToolbar } from "@/atlas/editor/FormatToolbar";
 import { ImagePickerPanel } from "@/atlas/editor/ImagePickerPanel";
 import { applyToolbarAction, type ToolbarActionId } from "@/atlas/editor/toolbarActions";
-
-interface DraftSecret {
-  id: string;
-  for?: string;
-  password?: string;
-  teaser?: string;
-  reveal: string;
-}
 
 export function EntityEditPanel({
   sourcePath,
@@ -57,7 +53,6 @@ export function EntityEditPanel({
   >([]);
   const [images, setImages] = useState<string[]>([]);
   const [showImagePicker, setShowImagePicker] = useState(false);
-  const [draftSecrets, setDraftSecrets] = useState<DraftSecret[]>([]);
   const [charNames, setCharNames] = useState<string[]>([]);
 
   // Load entity list once (cached by loadAtlasContent)
@@ -120,12 +115,12 @@ export function EntityEditPanel({
         rawRef.current = raw;
         const fm = parseFrontmatter(raw);
         const atlas = (fm.data.atlas as Record<string, unknown>) ?? {};
-        // Always initialize secret drafts from on-disk frontmatter so they survive re-mounts.
-        setDraftSecrets(Array.isArray(atlas.secrets) ? (atlas.secrets as DraftSecret[]) : []);
         // No-loss: if a live draft for THIS sourcePath already exists (the user
-        // was editing, left Edit, and came back), keep it. Only seed the draft
-        // from disk on a genuine first open. rawRef is still refreshed above so
-        // Save preserves untouched frontmatter.
+        // was editing, left Edit, and came back), keep it — including any
+        // in-progress secret edits, which now live on the shared draft instead
+        // of local state. Only seed the draft from disk on a genuine first
+        // open. rawRef is still refreshed above so Save preserves untouched
+        // frontmatter.
         const existing = api.snapshot();
         if (existing && existing.sourcePath === sourcePath) {
           setPhase("ready");
@@ -142,6 +137,7 @@ export function EntityEditPanel({
             summary: String(atlas.summary ?? ""),
           },
           body: fm.content,
+          secrets: Array.isArray(atlas.secrets) ? (atlas.secrets as DraftSecret[]) : [],
         });
         setPhase("ready");
       } catch (e) {
@@ -173,7 +169,7 @@ export function EntityEditPanel({
       } else {
         delete atlas.summary;
       }
-      const filteredSecrets = draftSecrets.filter((s) => s.reveal.trim().length > 0);
+      const filteredSecrets = api.draft.secrets.filter((s) => s.reveal.trim().length > 0);
       if (filteredSecrets.length > 0) {
         atlas.secrets = filteredSecrets;
       } else {
@@ -249,7 +245,7 @@ export function EntityEditPanel({
         type === "character"
           ? { id: newId, for: "", reveal: "" }
           : { id: newId, password: "", teaser: "", reveal: "" };
-      setDraftSecrets((prev) => [...prev, scaffold]);
+      api.setSecrets((prev) => [...prev, scaffold]);
     }
     requestAnimationFrame(() => {
       textareaRef.current?.setSelectionRange(result.selStart, result.selEnd);
@@ -476,9 +472,9 @@ export function EntityEditPanel({
         {/* Secrets section */}
         <div className="block">
           <span className="block mb-1 text-xs font-medium">Secrets</span>
-          {draftSecrets.length > 0 && (
+          {d.secrets.length > 0 && (
             <div className="space-y-2 mb-2">
-              {draftSecrets.map((s, i) => (
+              {d.secrets.map((s, i) => (
                 <div key={s.id} className="border rounded p-2 space-y-1 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-[10px] text-muted-foreground">{`{{secret:${s.id}}}`}</span>
@@ -486,7 +482,7 @@ export function EntityEditPanel({
                       type="button"
                       aria-label={`Remove secret ${s.id}`}
                       className="text-xs text-red-400 hover:text-red-600"
-                      onClick={() => setDraftSecrets((prev) => prev.filter((_, j) => j !== i))}
+                      onClick={() => api.setSecrets((prev) => prev.filter((_, j) => j !== i))}
                     >
                       Remove
                     </button>
@@ -500,7 +496,7 @@ export function EntityEditPanel({
                           className="w-full h-7 px-1 rounded border bg-background text-xs"
                           value={s.for ?? ""}
                           onChange={(e) =>
-                            setDraftSecrets((prev) =>
+                            api.setSecrets((prev) =>
                               prev.map((x, j) => (j === i ? { ...x, for: e.target.value } : x)),
                             )
                           }
@@ -518,7 +514,7 @@ export function EntityEditPanel({
                           placeholder="Character name"
                           value={s.for ?? ""}
                           onChange={(e) =>
-                            setDraftSecrets((prev) =>
+                            api.setSecrets((prev) =>
                               prev.map((x, j) => (j === i ? { ...x, for: e.target.value } : x)),
                             )
                           }
@@ -534,7 +530,7 @@ export function EntityEditPanel({
                           placeholder="the tide remembers"
                           value={s.password ?? ""}
                           onChange={(e) =>
-                            setDraftSecrets((prev) =>
+                            api.setSecrets((prev) =>
                               prev.map((x, j) =>
                                 j === i ? { ...x, password: e.target.value } : x,
                               ),
@@ -549,7 +545,7 @@ export function EntityEditPanel({
                           placeholder="Only a true fjordmark person knows this"
                           value={s.teaser ?? ""}
                           onChange={(e) =>
-                            setDraftSecrets((prev) =>
+                            api.setSecrets((prev) =>
                               prev.map((x, j) => (j === i ? { ...x, teaser: e.target.value } : x)),
                             )
                           }
@@ -565,7 +561,7 @@ export function EntityEditPanel({
                       placeholder="The reveal the player sees once unlocked…"
                       value={s.reveal}
                       onChange={(e) =>
-                        setDraftSecrets((prev) =>
+                        api.setSecrets((prev) =>
                           prev.map((x, j) => (j === i ? { ...x, reveal: e.target.value } : x)),
                         )
                       }
