@@ -1090,11 +1090,7 @@ The per-pick design-check in `continuous-dev-routine.md` step 2a still binds —
 
 - [x] **N101. Warn before closing the browser tab with unsaved editor changes.** ✅ DONE 2026-07-27 — commits 2756440d + 74c66f31; new `useBeforeUnloadWarning` hook (`src/atlas/editor/useBeforeUnloadWarning.ts`) wired to the existing `hasUnsavedChanges` signal; 4 unit tests cover add/remove-on-flag and the native-prompt trigger. 2843 tests green (4 shards). Full detail: `continuous-dev-done.md`.
 
-- [ ] **N102. Catch a colliding entity name before the Save round-trip, not after.**
-  Creating an entity goes straight from the Create button (only `disabled={!title.trim()}`, `src/atlas/categories/EntityEditorPanel.tsx:100-115`) to `onCreateEntity` (`AtlasPlacementEditor.tsx:900-917`), which only discovers a duplicate slug when the create-only write 409s server-side — after a full round-trip and a confusing failure. Check the target slug against the loaded project up front.
-  - **Done when:** typing a title that resolves to an existing entity's path disables Create (or shows an inline "already exists") before any save; a test covers the collision.
-  - **Gate:** standard gate.
-  ~1 run.
+- [x] **N102. Catch a colliding entity name before the Save round-trip, not after.** ✅ DONE 2026-07-27 — commits a51a4e04 + ef6ec19c; `EntityEditorPanel` gains an `existingIds` prop, disables Create + shows an inline "already exists" message on slug collision (create mode only); `AtlasPlacementEditor.tsx` wires `existingEntityIdsForWorld` (derived from the existing `entitiesForWorld` memo) into all six create-mode panels. 2845 tests green (4 shards). Full detail: `continuous-dev-done.md`.
 
 - [ ] **N103. The DM editor's "World name" setting is a dead end — it never reaches world.yaml/atlas.json.**
   The World Details panel's name input promises it's "Shown as the title across the editor and the player site" and calls `onPatch({ name })` → `patchWorld` (`src/atlas/settings/WorldDetailsPanel.tsx:23-31`, `AtlasPlacementEditor.tsx:558,1769`), but `patchWorld` only updates in-memory `project`. The `worldYamlDirty` signal is composed from the per-tab draft hooks (`AtlasPlacementEditor.tsx:719`), not the world name, so editing the name neither marks world.yaml dirty nor gets serialized by `buildWorldYamlContent`. (Complements Q5, which is the read/display side.)

@@ -3208,3 +3208,29 @@ client-side editor hook — no `scripts/`, fog, soundscape, or shipped-artifact 
 **Commits:** `2756440d` (feat: add the `useBeforeUnloadWarning` hook + its unit tests) and `74c66f31`
 (fix: wire it into the page), on `run/n101-beforeunload`, fast-forward merged into `auto/continuous-dev`
 (no separate merge commit — still at the fork point).
+
+- [x] **N102. Catch a colliding entity name before the Save round-trip, not after.** ✅ DONE 2026-07-27 —
+  commits a51a4e04 + ef6ec19c.
+
+Creating an entity went straight from the Create button (only `disabled={!title.trim()}`) to
+`onCreateEntity`, which only discovered a duplicate slug when the create-only write 409s server-side —
+after a full round-trip and a confusing failure.
+
+`EntityEditorPanel` now takes an optional `existingIds` set of slugs already in use in the target world.
+In create mode, when the trimmed title's `slugify()` result collides with `existingIds`, the Create
+button disables and an inline "An entity with this name already exists." message appears under the Name
+field — before any save. `AtlasPlacementEditor.tsx` derives `existingEntityIdsForWorld` from the
+already-existing `entitiesForWorld` memo (same world-scoping as the create write itself) and passes it to
+all six create-mode `EntityEditorPanel` instances.
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing, unchanged) · 2845 tests
+green across the 4 shards (697+624+821+703, +2 over the N101 baseline of 2843 — exactly the two new
+tests: collision disables Create + shows the warning, and a unique title shows neither). Shard 4 hit the
+documented `onTaskUpdate` RPC flake (0 real failures, all 703 tests + 70 files passed; not re-run per
+policy). Pure client-side editor logic — no `scripts/`, fog, soundscape, or shipped-artifact touch — so
+`npm run atlas:publish` wasn't required.
+
+**Commits:** `a51a4e04` (feat: `existingIds` prop + collision check + 2 unit tests) and `ef6ec19c` (fix:
+wire `existingEntityIdsForWorld` into the six create-mode panels), on
+`run/n102-entity-name-collision`, fast-forward merged into `auto/continuous-dev` (no separate merge
+commit — still at the fork point).
