@@ -2975,3 +2975,27 @@ found no test files to run (docs-only change) and passed cleanly.
 
 **Commits:** `e3428133` (docs, on `run/q95-scanner-count-docs`), fast-forward merge into
 `auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+- [x] **Q96. Refresh KNOWN_LIMITATIONS.md rows that shipped features contradict.** ✅ DONE
+  2026-07-27 — commit 36fd6178 — second unit of section **Q-M** (docs & authoring tooling).
+
+Five rows in `docs/KNOWN_LIMITATIONS.md` described features as unsupported/planned that had since
+shipped: image embeds `![[image.png]]` now read ✓ (image embeds only), cross-referenced to
+`MARKDOWN_PARITY.md`, with note/section embeds `![[Note]]`/`![[Note#Heading]]` explicitly called out as
+still out of scope; callouts `> [!type]` now read ✓ (foldable), matching the real core-type-set +
+aliases support; the "Reasoning for unsupported" list below the table was trimmed to match (block
+references only, plus the new note/section-embeds rationale); starter audio loops now read "shipped"
+(Ogg `src` + M4A/AAC `srcFallback`, confirmed against `content/astrath-deeprealm/_atlas/world.yaml`);
+phrase search now reads "shipped" (`parseSearchQuery.ts`'s quoted-span parsing + `matchesPhrases`); asset
+license tracking now reads "shipped" (the `assetCredits` registry in `loadWorldConfig.ts`, surfaced on
+`AtlasCredits.tsx`). The block-reference `[[Note#^id]]` row was left untouched (still unsupported, a
+stated non-goal) per the unit's done-when.
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing warnings, unchanged) ·
+2808 tests green across the 4 shards (694+607+826+681 — unchanged from Q95, no test-count change since
+this is docs-only). Shard 3 hit the documented `onTaskUpdate` RPC flake (0 real failures elsewhere). No
+build/scan/fog/artifact touch, so `atlas:publish` wasn't required. Pre-commit hook's `typecheck:all` +
+`eslint .` + `vitest run --changed` passed cleanly.
+
+**Commits:** `36fd6178` (docs, on `run/q96-known-limitations-refresh`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).

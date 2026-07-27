@@ -191,11 +191,7 @@ is for sequencing, not the whole spec.
 
 #### Q-M — Docs & authoring tooling
 
-- [ ] **Q96. Refresh KNOWN_LIMITATIONS.md rows that shipped features contradict.**
-  Five rows in `docs/KNOWN_LIMITATIONS.md` now contradict reality — update each: line 30 image embeds `![[image.png]]` (✗ unsupported → ✓ supported for IMAGE embeds, per `docs/MARKDOWN_PARITY.md` line 31; keep note/section embeds `![[Note]]` explicitly out of scope); line 31 callouts `> [!type]` (✗ blockquote → ✓ foldable, core type set + aliases, MARKDOWN_PARITY line 27); line 83 "No phrase search — not yet" (shipped — `src/atlas/search/parseSearchQuery.ts` exports quoted-phrase parsing + `matchesPhrases`); line 62 "Starter loops ship uncompressed WAV — planned" (shipped — `content/astrath-deeprealm/_atlas/world.yaml` beds use `.ogg` `src` + `.m4a` `srcFallback`); line 130 "Asset license tracking — not yet" (shipped as asset credits — `assetCredits` registry in `scripts/atlas/loadWorldConfig.ts` + `src/pages/AtlasCredits.tsx`).
-  - **Done when:** all five rows read accurately and are moved out of the "unsupported / not-yet" framing; no remaining KNOWN_LIMITATIONS row contradicts MARKDOWN_PARITY; the block-reference `[[Note#^id]]` row (line 32) is left as-is (still unsupported, a stated non-goal).
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Docs-only. ~1 run.
+- [x] **Q96. Refresh KNOWN_LIMITATIONS.md rows that shipped features contradict.** ✅ DONE 2026-07-27 — commit 36fd6178
 
 - [ ] **Q97. Fix QUICK_START seed-world config bug and leading-slash asset anti-pattern.**
   `docs/QUICK_START.md` step 3 (lines 36-37) tells the reader to set `contentRoot: "examples/seed-world"` and `defaultWorld: "seed"`, but `loadWorldConfig` joins `contentRoot/worldId/_atlas/world.yaml` (`scripts/atlas/loadWorldConfig.ts:156`), so that resolves to the non-existent `examples/seed-world/seed/_atlas/world.yaml`. Change it to `contentRoot: "examples"`, `defaultWorld: "seed-world"` (→ `examples/seed-world/_atlas/world.yaml`). Also step 4 line 71 teaches `src: /atlas/assets/maps/my-map.png`; the leading slash trips `scripts/atlas/validateAsset.ts`'s `absolute-path` warning (`raw.startsWith("/")`, line 110). Change it to the relative `atlas/assets/maps/my-map.png` form the real world.yaml configs use.
