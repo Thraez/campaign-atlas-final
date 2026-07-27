@@ -1086,11 +1086,7 @@ The per-pick design-check in `continuous-dev-routine.md` step 2a still binds —
 
 - [x] **N99. Editing an existing secret's fields silently discards on Close — no dirty flag, no confirm.** ✅ DONE 2026-07-27 — commits 83854176 + aca66f09; secrets folded into `useEntityEditDraft`'s draft + pristine fingerprint (new `setSecrets` API), `EntityEditPanel` rewired off local `draftSecrets` state onto the shared draft; bonus fix — also closes a remount data-loss gap for secret edits. 7 new tests (4 hook + 3 integration); 2826 tests green (4 shards). Full detail: `continuous-dev-done.md`.
 
-- [ ] **N100. "Duplicate to map" is never seen as unsaved, and can silently overwrite an existing placement.**
-  `duplicateToMap` writes an override keyed to the **target** map (`overrideKey(targetMapId, entityId)`, `src/atlas/editor/usePinOverrideMutations.ts:151-165`) and toasts success, but `dirtyCount` counts only keys starting with `${activeMap.id}:` (`src/pages/AtlasPlacementEditor.tsx:919-921`), so the duplicate never registers as unsaved on the current map and can be lost on navigate/save. Separately, the target-map dropdown excludes only the active map (`:1594-1596`), not maps where the entity already has a placement — so a duplicate can silently overwrite one.
-  - **Done when:** a cross-map duplicate marks the session unsaved (Save persists it), and duplicating onto a map that already has that entity warns/confirms before overwriting.
-  - **Gate:** standard gate.
-  ~2 runs.
+- [x] **N100. "Duplicate to map" is never seen as unsaved, and can silently overwrite an existing placement.** ✅ DONE 2026-07-27 — commits fbdfe389 + 19291287; `foreignMapDraftPlacements` + `targetMapHasPlacement` pure helpers, wired into the page's dirty signal, Save payload, and the duplicate dropdown (labelled "(has a pin)" + `window.confirm` before overwrite). 2839 tests green (4 shards). Full detail: `continuous-dev-done.md`.
 
 - [ ] **N101. Warn before closing the browser tab with unsaved editor changes.**
   `AtlasPlacementEditor` already computes `hasUnsavedChanges` (`src/pages/AtlasPlacementEditor.tsx:931`, = pin overrides ‖ dirty world.yaml). Nothing wires it to `beforeunload`, so a tab close / reload / accidental navigation drops all unsaved pin + world.yaml edits with no prompt.

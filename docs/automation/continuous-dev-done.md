@@ -3145,3 +3145,40 @@ real failures, all 878 tests + 70 files passed). Pure client-side React state ma
 **Commits:** `83854176` (feat: fold secrets into the draft fingerprint + hook tests) and `aca66f09`
 (fix: wire `EntityEditPanel` to the shared draft + integration test), on `run/n99-secrets-dirty`,
 fast-forward merged into `auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+- [x] **N100. "Duplicate to map" is never seen as unsaved, and can silently overwrite an existing
+  placement.** ✅ DONE 2026-07-27 — commits fbdfe389 + 19291287.
+
+`duplicateToMap` (usePinOverrideMutations.ts:151) writes a placement override keyed to the TARGET map
+regardless of which map is active, but the page's dirty signal (`dirtyCount`), the Save gate
+(`perMapDirtyCount` → `useEditorSession` status), and `onSaveClick`'s write payload (`buildSavePlan`,
+scoped to the active map only) all only ever look at the active map's own override keys. A duplicate
+onto another map therefore never registered as unsaved — the toolbar Save button stayed disabled
+("clean") — and even a save forced some other way would silently write nothing for that duplicate until
+the DM happened to visit the target map first. Separately, the "Duplicate to map" dropdown listed every
+other map with no indication the entity might already be placed there, so re-duplicating could silently
+clobber an existing placement.
+
+Added two small pure helpers: `foreignMapDraftPlacements` (`src/atlas/editor/foreignMapDrafts.ts`)
+gathers override entries keyed to a map other than the active one into proper `PlacementOverride`
+drafts (label stripped back to `undefined` when it just echoes the entity's own title, matching
+`buildDraftPlacements`'s existing convention), and `targetMapHasPlacement`
+(`src/atlas/editor/duplicateOverwriteCheck.ts`) checks canon + override state to say whether a
+candidate target map already has the entity placed. Wired both into `AtlasPlacementEditor.tsx`:
+`pinSideUnsaved`/`hasUnsavedChanges` and `useEditorSession`'s `perMapDirtyCount` now include foreign-map
+drafts, `onSaveClick` concatenates them into the actual save payload (and the "No changes to save" gate
+checks both), and the duplicate dropdown labels a map "(has a pin)" and confirms via `window.confirm`
+(matching this file's existing discard-confirm pattern) before overwriting.
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing, unchanged) · 2839 tests
+green across the 4 shards (702+616+835+686, +13 over the N99 baseline of 2826 — exactly the new tests:
+7 for `foreignMapDraftPlacements`, 5 for `targetMapHasPlacement`, 1 new render-level integration test
+proving a cross-map duplicate flips the session to "unsaved" and that Save actually queues it). Shard 3
+hit the documented `onTaskUpdate` RPC flake (0 real failures, all 835 tests + 70 files passed). Pure
+client-side editor logic — no `scripts/`, fog, soundscape, or shipped-artifact touch — so
+`npm run atlas:publish` wasn't required.
+
+**Commits:** `fbdfe389` (feat: add the two pure helpers + their unit tests) and `19291287` (fix: wire
+them into the page's dirty signal, Save, and the duplicate dropdown + extend the integration test), on
+`run/n100-cross-map-duplicate`, fast-forward merged into `auto/continuous-dev` (no separate merge
+commit — still at the fork point).
