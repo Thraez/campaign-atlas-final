@@ -3182,3 +3182,29 @@ client-side editor logic — no `scripts/`, fog, soundscape, or shipped-artifact
 them into the page's dirty signal, Save, and the duplicate dropdown + extend the integration test), on
 `run/n100-cross-map-duplicate`, fast-forward merged into `auto/continuous-dev` (no separate merge
 commit — still at the fork point).
+
+- [x] **N101. Warn before closing the browser tab with unsaved editor changes.** ✅ DONE 2026-07-27 —
+  commits 2756440d + 74c66f31.
+
+`AtlasPlacementEditor` already computed `hasUnsavedChanges` (pin overrides — including cross-map
+duplicates since N100 — or a dirty world.yaml) but nothing wired it to `beforeunload`, so a tab close,
+reload, or accidental navigation dropped all unsaved pin + world.yaml edits with no prompt.
+
+Added a small reusable hook, `useBeforeUnloadWarning` (`src/atlas/editor/useBeforeUnloadWarning.ts`):
+while its boolean argument is `true` it adds a `beforeunload` listener that calls `preventDefault()` and
+sets `event.returnValue` (for cross-browser support) to trigger the browser's native "leave site?"
+prompt; the listener is removed when the flag flips back to `false` or the component unmounts. Wired
+into `AtlasPlacementEditor.tsx` with a single `useBeforeUnloadWarning(hasUnsavedChanges)` call right
+after the existing `hasUnsavedChanges` derivation.
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing, unchanged) · 2843 tests
+green across the 4 shards (697+624+819+703, +4 over the N100 baseline of 2839 — exactly the new hook's 4
+unit tests: no-warn when clean, prevents default + native prompt when dirty, listener added on mount and
+removed on unmount, and stops warning once the flag flips back to clean). Shard 4 hit the documented
+`onTaskUpdate` RPC flake (0 real failures, all 703 tests + 70 files passed; not re-run per policy). Pure
+client-side editor hook — no `scripts/`, fog, soundscape, or shipped-artifact touch — so
+`npm run atlas:publish` wasn't required.
+
+**Commits:** `2756440d` (feat: add the `useBeforeUnloadWarning` hook + its unit tests) and `74c66f31`
+(fix: wire it into the page), on `run/n101-beforeunload`, fast-forward merged into `auto/continuous-dev`
+(no separate merge commit — still at the fork point).

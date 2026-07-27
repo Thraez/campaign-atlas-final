@@ -1088,11 +1088,7 @@ The per-pick design-check in `continuous-dev-routine.md` step 2a still binds —
 
 - [x] **N100. "Duplicate to map" is never seen as unsaved, and can silently overwrite an existing placement.** ✅ DONE 2026-07-27 — commits fbdfe389 + 19291287; `foreignMapDraftPlacements` + `targetMapHasPlacement` pure helpers, wired into the page's dirty signal, Save payload, and the duplicate dropdown (labelled "(has a pin)" + `window.confirm` before overwrite). 2839 tests green (4 shards). Full detail: `continuous-dev-done.md`.
 
-- [ ] **N101. Warn before closing the browser tab with unsaved editor changes.**
-  `AtlasPlacementEditor` already computes `hasUnsavedChanges` (`src/pages/AtlasPlacementEditor.tsx:931`, = pin overrides ‖ dirty world.yaml). Nothing wires it to `beforeunload`, so a tab close / reload / accidental navigation drops all unsaved pin + world.yaml edits with no prompt.
-  - **Done when:** while `hasUnsavedChanges` is true, a `beforeunload` handler triggers the browser's native "leave site?" prompt; it's removed when clean; a test asserts the listener is added/removed on the flag.
-  - **Gate:** standard gate.
-  ~1 run.
+- [x] **N101. Warn before closing the browser tab with unsaved editor changes.** ✅ DONE 2026-07-27 — commits 2756440d + 74c66f31; new `useBeforeUnloadWarning` hook (`src/atlas/editor/useBeforeUnloadWarning.ts`) wired to the existing `hasUnsavedChanges` signal; 4 unit tests cover add/remove-on-flag and the native-prompt trigger. 2843 tests green (4 shards). Full detail: `continuous-dev-done.md`.
 
 - [ ] **N102. Catch a colliding entity name before the Save round-trip, not after.**
   Creating an entity goes straight from the Create button (only `disabled={!title.trim()}`, `src/atlas/categories/EntityEditorPanel.tsx:100-115`) to `onCreateEntity` (`AtlasPlacementEditor.tsx:900-917`), which only discovers a duplicate slug when the create-only write 409s server-side — after a full round-trip and a confusing failure. Check the target slug against the loaded project up front.
