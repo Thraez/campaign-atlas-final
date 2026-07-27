@@ -26,6 +26,11 @@ const withHeadings = {
   body: "# Intro\n\nPublic intro.\n\n# History\n\nMore public.\n%%\nSECRET\n%%\n",
 } as Entity;
 
+const withImageEmbed = {
+  ...corven,
+  body: "Public line.\n\n![[portrait.png]]\n",
+} as Entity;
+
 const renderPanes = (mode: "reading" | "editing") =>
   render(
     <MemoryRouter>
@@ -83,6 +88,26 @@ describe("EntityPanes", () => {
     await waitFor(() => {
       expect(playerPane.querySelectorAll("[data-anchor-id]").length).toBeGreaterThan(0);
     });
+  });
+
+  it("DM pane renders an image embed as an <img>, mirroring the player pane", () => {
+    render(
+      <MemoryRouter>
+        <ViewModeProvider>
+          <EntityPanes
+            entity={withImageEmbed}
+            entitiesById={new Map([[withImageEmbed.id, withImageEmbed]])}
+            mode="reading"
+            renderEdit={() => null}
+          />
+        </ViewModeProvider>
+      </MemoryRouter>,
+    );
+    const dm = screen.getByTestId("entity-pane-dm");
+    const img = dm.querySelector("img");
+    expect(img).toBeInTheDocument();
+    expect(img?.getAttribute("src")).toBe("/atlas/assets/images/portrait.png");
+    expect(dm.textContent ?? "").not.toContain("[[portrait.png]]");
   });
 
   it("floor: a pane keeps its own scrollTop across collapse/expand of another pane", () => {
