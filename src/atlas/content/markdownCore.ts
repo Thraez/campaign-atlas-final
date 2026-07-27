@@ -64,7 +64,15 @@ function calloutExtension() {
       const m = src.match(/^ {0,3}> ?\[!/m);
       return m ? m.index : undefined;
     },
-    tokenizer(this: { lexer: { blockTokens: (s: string) => Token[] } }, src: string) {
+    tokenizer(
+      this: {
+        lexer: {
+          blockTokens: (s: string) => Token[];
+          inlineTokens: (s: string) => Token[];
+        };
+      },
+      src: string,
+    ) {
       const m = CALLOUT_BLOCK.exec(src);
       if (!m || m.index !== 0) return undefined;
       const [raw, typeRaw, fold, titleRaw, bodyRaw] = m;
@@ -83,21 +91,20 @@ function calloutExtension() {
         raw,
         calloutType: type,
         open: fold !== "-",
-        title,
+        titleTokens: this.lexer.inlineTokens(title),
         tokens: this.lexer.blockTokens(body),
       };
     },
     renderer(
-      this: { parser: { parse: (t: Token[]) => string } },
-      token: { calloutType: string; open: boolean; title: string; tokens: Token[] },
+      this: {
+        parser: { parse: (t: Token[]) => string; parseInline: (t: Token[]) => string };
+      },
+      token: { calloutType: string; open: boolean; titleTokens: Token[]; tokens: Token[] },
     ) {
       const inner = this.parser.parse(token.tokens);
       const openAttr = token.open ? " open" : "";
       const t = token.calloutType.replace(/[^a-z0-9-]/g, "");
-      const title = token.title
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+      const title = this.parser.parseInline(token.titleTokens);
       return (
         `<details class="atlas-callout atlas-callout-${t}" data-callout="${t}"${openAttr}>` +
         `<summary>${title}</summary>${inner}</details>`
