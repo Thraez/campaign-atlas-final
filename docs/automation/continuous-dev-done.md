@@ -2831,3 +2831,24 @@ hook also passed.
 branch `run/q89-search-index-resilience` to be cleaned up after merge. No concurrency this run — origin
 tip matched the fork point at worktree creation, before the commit, and before the merge (confirmed via
 `git fetch` each time).
+
+- [x] **Q91. Route uncaught async errors through the logger seam.** ✅ DONE
+  2026-07-27 — commit fdfdc233
+
+New `src/lib/installGlobalErrorHandlers.ts` exports `installGlobalErrorHandlers()` — registers
+`window.addEventListener('unhandledrejection', …)` and `window.addEventListener('error', …)`, both
+forwarding to `logger.error`; a module-level `installed` boolean guards double-registration. Called once
+from `src/main.tsx` before `createRoot(...).render(<App />)`. React render errors already reach the
+logger via `ErrorBoundary.componentDidCatch` — this closes the remaining gap so unhandled promise
+rejections and non-React runtime errors no longer bypass the seam.
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing warnings) · 2791 tests
+green across the 4 shards (691+597+809+694 — +3 over the Q90 baseline for the new test file); shard 4 hit
+the documented `onTaskUpdate` RPC flake (0 real failures elsewhere). No build/scan/fog/artifact touch, so
+`atlas:publish` wasn't required. New `src/test/installGlobalErrorHandlers.test.ts` (3 tests): forwards an
+`unhandledrejection` event to `logger.error`, forwards a window `error` event to `logger.error`, and
+confirms idempotency (three calls to `installGlobalErrorHandlers()` still register listeners exactly
+once). Pre-commit hook also passed.
+
+**Commits:** `fdfdc233` (feat, on `run/q91-global-error-handlers`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).

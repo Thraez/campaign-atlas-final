@@ -188,13 +188,6 @@ is for sequencing, not the whole spec.
 
 - [x] **Q89. Degrade gracefully when search-index.json fails to load.** ✅ DONE 2026-07-27 — commit 2b53e85e
 
-- [ ] **Q91. Route uncaught async errors through the logger seam.**
-  `src/lib/logger.ts` is documented as "the single seam for app diagnostics," but only React render errors reach it (via `ErrorBoundary.componentDidCatch`); unhandled promise rejections and non-React runtime errors bypass the seam and hit the console directly. Add a tiny `installGlobalErrorHandlers()` (new file under `src/lib/`) that registers `window.addEventListener('unhandledrejection', …)` and `window.addEventListener('error', …)` and forwards both to `logger.error`, and call it once from `src/main.tsx`. Guard against double-registration so it is idempotent.
-  - **Done when:** `main.tsx` installs the global handlers once at startup; an `unhandledrejection` and a window `error` event both forward to `logger.error`; a unit test asserts both events reach the logger (with a stubbed logger).
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Infra only; no UI surface, no artifact change.
-  ~1 run.
-
 - [ ] **Q92. Honest Secrets-page message when Web Crypto is unavailable.**
   `src/atlas/secrets/CharacterSecretsPage.tsx` decrypts via `decryptSecret` (`src/atlas/secrets/secretCrypto.ts`), which needs `crypto.subtle` — undefined in a non-secure context (a player opening the site over plain `http://` on a LAN/self-host). `decryptSecret` swallows the failure and returns null (secretCrypto.ts:72-74), so `collectCharacterSecrets` returns `[]` and the page shows the misleading "No secrets found for that key. Check it with your DM." (line ~98). Detect `window.isSecureContext === false` or a missing `globalThis.crypto?.subtle` up front (in the page or `SecretsBody`) and show an honest message ("Secrets need a secure https connection to unlock on this device") instead of the wrong-key copy.
   - **Done when:** when `crypto.subtle` is unavailable / the context is insecure, the page shows the secure-context message and NOT the "no secrets / check with your DM" copy; the normal wrong-key path is unchanged when crypto is available; a unit test covers the insecure-context branch.
