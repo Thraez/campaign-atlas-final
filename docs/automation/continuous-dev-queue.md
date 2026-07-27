@@ -188,13 +188,6 @@ is for sequencing, not the whole spec.
 
 - [x] **Q89. Degrade gracefully when search-index.json fails to load.** ✅ DONE 2026-07-27 — commit 2b53e85e
 
-- [ ] **Q90. Make ErrorBoundary route-scoped and resettable.**
-  `src/components/ErrorBoundary.tsx` is a single top-level boundary carrying only `hasError`; it wraps the whole `Suspense`/`Routes` subtree in `src/App.tsx:46`, and once it catches, recovery is only `window.location.reload()` or a hard `href="/atlas"` anchor — client-side navigation does NOT clear the error. Add `resetKeys`/`onReset` support to ErrorBoundary (reset `hasError` when a key changes) and wrap it inside `<BrowserRouter>` with a small `useLocation()`-keyed component so navigating to a new route clears a caught error. Optionally add a second boundary around the EntityPanel body so a malformed single entity doesn't nuke the whole map. Keep the existing fallback UI.
-  - **Done when:** ErrorBoundary accepts `resetKeys` and resets when they change; navigating to a different route after a caught error recovers without a full reload; `src/test/error-boundary.test.tsx` covers the reset-on-key-change path.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  ErrorBoundary is a class component — the location key must be supplied by a hook wrapper, not read inside the class.
-  ~2–3 runs.
-
 - [ ] **Q91. Route uncaught async errors through the logger seam.**
   `src/lib/logger.ts` is documented as "the single seam for app diagnostics," but only React render errors reach it (via `ErrorBoundary.componentDidCatch`); unhandled promise rejections and non-React runtime errors bypass the seam and hit the console directly. Add a tiny `installGlobalErrorHandlers()` (new file under `src/lib/`) that registers `window.addEventListener('unhandledrejection', …)` and `window.addEventListener('error', …)` and forwards both to `logger.error`, and call it once from `src/main.tsx`. Guard against double-registration so it is idempotent.
   - **Done when:** `main.tsx` installs the global handlers once at startup; an `unhandledrejection` and a window `error` event both forward to `logger.error`; a unit test asserts both events reach the logger (with a stubbed logger).

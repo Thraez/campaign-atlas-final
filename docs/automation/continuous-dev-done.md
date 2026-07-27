@@ -2802,6 +2802,31 @@ text appeared, and the search dialog still opened. Pre-commit hook also passed.
 **Commits:** `2b53e85e` (feat, on `run/q89-search-index-resilience`), fast-forward merge into
 `auto/continuous-dev` (no separate merge commit — still at the fork point).
 
+- [x] **Q90. Make ErrorBoundary route-scoped and resettable.** ✅ DONE
+  2026-07-27 — commit 173fa28b
+
+`src/components/ErrorBoundary.tsx` now accepts `resetKeys?: unknown[]` and `onReset?: () => void`; a
+new `componentDidUpdate` compares `resetKeys` against the previous render and clears `hasError` (calling
+`onReset` if given) when any entry changed. `src/App.tsx` adds a small `RouteErrorBoundary` functional
+wrapper — reads `useLocation()` and passes `resetKeys={[location.pathname]}` down to `ErrorBoundary` — in
+place of the bare `<ErrorBoundary>` around the `Suspense`/`Routes` subtree (was already inside
+`<BrowserRouter>`, so no restructuring needed there). Client-side navigation to a new route after a
+caught error now recovers automatically; the existing fallback UI (Reload button + "Back to the atlas"
+link) is unchanged for same-route errors. Did not add the optional second EntityPanel-scoped boundary —
+out of scope for this pass, left for a future unit if wanted.
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing warnings, unchanged) ·
+2788 tests green across the 4 shards (691+597+823+677 — +2 over the Q89 baseline for the two new
+reset-path tests); shard 3 hit the documented `onTaskUpdate` RPC flake (0 real failures). No
+build/scan/fog/artifact touch, so `atlas:publish` wasn't required. New tests added to the existing
+`src/test/error-boundary.test.tsx`: "resets and renders new children when resetKeys change" (asserts the
+fallback clears, new children render, and `onReset` fires once) and "stays crashed when resetKeys are
+unchanged" (asserts the fallback persists when the key array is unchanged across a rerender). Pre-commit
+hook also passed.
+
+**Commits:** `173fa28b` (feat, on `run/q90-error-boundary-reset`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).
+
 **Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q89` and
 branch `run/q89-search-index-resilience` to be cleaned up after merge. No concurrency this run — origin
 tip matched the fork point at worktree creation, before the commit, and before the merge (confirmed via
