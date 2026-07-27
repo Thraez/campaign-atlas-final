@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { fileToDataUrl, readImageSize } from "@/atlas/content/browserFile";
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
@@ -167,8 +168,11 @@ export function useMapLayers(map: MapDocument | undefined, undoStack?: UndoStack
     }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
-    } catch {
-      /* quota — skip */
+    } catch (e) {
+      logger.error("Failed to persist local map layers to localStorage", e);
+      toast.error("Couldn't save map layer changes locally — your browser storage may be full or blocked.", {
+        id: "map-layers-persist-failed",
+      });
     }
   }, [byMap]);
 
