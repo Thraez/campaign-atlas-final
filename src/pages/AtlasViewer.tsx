@@ -318,9 +318,12 @@ export default function AtlasViewer() {
     return () => window.removeEventListener("popstate", popStateHandler);
   }, [popStateHandler]);
 
-  useEffect(() => {
+  // Extracted so a failed load can be retried in place (Try again button,
+  // or auto-retry on the `online` event) without a full page reload.
+  const attemptLoad = useCallback(() => {
     loadAtlasContent(true)
       .then((project) => {
+        setError(null);
         setData({ project });
         const defaultMapId = project.worlds[0]?.defaultMapId ?? project.maps[0]?.id ?? null;
         const dl = parseDeepLink(window.location.search);
@@ -357,8 +360,25 @@ export default function AtlasViewer() {
         }
       })
       .catch((e: Error) => setError(e.message));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally runs once; URL-driven entity open should respect the viewport at load time
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally stable; URL-driven entity open should respect the viewport at call time, not re-derive on every hasDesktopAside change
   }, []);
+
+  useEffect(() => {
+    attemptLoad();
+  }, [attemptLoad]);
+
+  const retryLoad = useCallback(() => {
+    setError(null);
+    attemptLoad();
+  }, [attemptLoad]);
+
+  // Auto-retry once when connectivity returns — only bound while an error
+  // is showing, so it can't loop or fire once the load has succeeded.
+  useEffect(() => {
+    if (!error) return;
+    window.addEventListener("online", retryLoad);
+    return () => window.removeEventListener("online", retryLoad);
+  }, [error, retryLoad]);
 
   const activeMap: MapDocument | undefined = useMemo(
     () => data?.project.maps.find((m) => m.id === activeMapId),
@@ -551,6 +571,7 @@ export default function AtlasViewer() {
         backHref="/"
         backLabel="Back to home"
         loadingLabel="Loading atlas…"
+        onRetry={retryLoad}
         extraHint={
           <p className="text-xs text-muted-foreground">
             Run <code className="px-1.5 py-0.5 rounded bg-muted">npm run atlas:build</code> to

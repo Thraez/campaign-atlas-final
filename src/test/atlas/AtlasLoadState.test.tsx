@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AtlasLoadState } from "@/atlas/content/AtlasLoadState";
 
@@ -64,5 +64,25 @@ describe("AtlasLoadState", () => {
     setOnline(true);
     renderState({ error: "boom", extraHint: <p>Run npm run atlas:build</p> });
     expect(screen.getByText("Run npm run atlas:build")).toBeInTheDocument();
+  });
+
+  it("shows a Try again button when onRetry is given and online, and calls it on click", () => {
+    setOnline(true);
+    const onRetry = vi.fn();
+    renderState({ error: "boom", onRetry });
+    const retryBtn = screen.getByRole("button", { name: /try again/i });
+    fireEvent.click(retryBtn);
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it("omits the Try again button while offline even when onRetry is given", () => {
+    setOnline(false);
+    renderState({ error: "boom", onRetry: vi.fn() });
+    expect(screen.queryByRole("button", { name: /try again/i })).not.toBeInTheDocument();
+  });
+
+  it("omits the Try again button when onRetry is not given", () => {
+    renderState({ error: "boom" });
+    expect(screen.queryByRole("button", { name: /try again/i })).not.toBeInTheDocument();
   });
 });

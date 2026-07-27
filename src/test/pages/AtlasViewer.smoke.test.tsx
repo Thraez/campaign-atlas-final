@@ -72,6 +72,80 @@ describe("AtlasViewer smoke", () => {
   });
 });
 
+describe("Load-error Try again retry (Q94)", () => {
+  it("shows a Try again button on a failed load, and reaches the map after a successful retry", async () => {
+    let atlasCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (String(url).includes("search-index")) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(makeSearchIndex()),
+          } as unknown as Response);
+        }
+        atlasCalls++;
+        if (atlasCalls === 1) {
+          return Promise.resolve({
+            ok: false,
+            status: 500,
+            json: () => Promise.resolve(null),
+          } as unknown as Response);
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(makeProject()) } as unknown as Response);
+      }),
+    );
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    const retryBtn = await screen.findByRole("button", { name: /try again/i });
+    expect(screen.getByText(/failed to load atlas\.json/i)).toBeInTheDocument();
+
+    fireEvent.click(retryBtn);
+
+    await waitFor(() => expect(document.querySelector("main#atlas-main")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /try again/i })).not.toBeInTheDocument();
+    expect(atlasCalls).toBe(2);
+  });
+
+  it("clears the error and re-fetches once the browser comes back online", async () => {
+    let atlasCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (String(url).includes("search-index")) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(makeSearchIndex()),
+          } as unknown as Response);
+        }
+        atlasCalls++;
+        if (atlasCalls === 1) {
+          return Promise.resolve({
+            ok: false,
+            status: 500,
+            json: () => Promise.resolve(null),
+          } as unknown as Response);
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(makeProject()) } as unknown as Response);
+      }),
+    );
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    await screen.findByRole("button", { name: /try again/i });
+
+    fireEvent(window, new Event("online"));
+
+    await waitFor(() => expect(document.querySelector("main#atlas-main")).toBeInTheDocument());
+    expect(atlasCalls).toBe(2);
+  });
+});
+
 describe("FitBoundsController (Q2)", () => {
   it("calls fitBounds on initial load with no deep link", async () => {
     render(
