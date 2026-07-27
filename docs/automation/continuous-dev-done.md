@@ -3320,3 +3320,32 @@ client-side editor persistence logic — no `scripts/`, fog, soundscape, or ship
 `AtlasPlacementEditor.tsx` + test) and `6e58da4d` (fix: `useMapLayers` persist effect logs/toasts
 instead of swallowing the failure + test), on `run/n105-persist-hardening`, fast-forward merged into
 `auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+- [x] **N106. Prune stale content-hashed audio copies no longer emitted by a build.** ✅ DONE
+  2026-07-27 — commits 41354105 + 71969a20.
+
+`hashAudioAssets` (`scripts/atlas/hashAudioAssets.ts`) copied each live bed's audio to
+`public/atlas/assets/audio/<hash>.ext` but never removed a hashed file no current bed points at, so a
+bed dropped or renamed between builds left an orphaned copy shipping to players forever, invisible to
+the asset auditor (which only scans image extensions).
+
+`hashAudioAssets` now tracks the hashed filenames it emits each call and deletes any other file
+matching the strict `<8hex>.ext` hashed-name pattern from the output dir, leaving `manifest.json` and
+DM source files untouched. `build-atlas.ts` also now calls `hashAudioAssets` unconditionally (it was
+previously skipped entirely when a build had zero soundscape areas), so a build that removes all sound
+still prunes the previous build's orphaned hashed files instead of leaving them behind forever.
+
+**Gate:** `npm run typecheck` / `typecheck:scripts` clean · `npm run lint` 0 errors (18 pre-existing,
+unchanged) · 2858 tests green across the 4 shards (700+625+826+707, +4 over the N105 baseline of 2854 —
+4 new pruning tests: stale-file removal, zero-area full prune, still-referenced file kept,
+manifest.json/non-hashed-name files untouched). Shard 1 and shard 4 each hit the documented
+`onTaskUpdate` RPC flake (0 real failures; not re-run per policy). Touches the build pipeline, so
+`npm run atlas:publish:integrity-smoke` (all 5 scans caught their planted fault) and `npm run
+atlas:publish` (all 12 scans clean) were also run — `public/atlas/atlas.json`'s only diff was the
+per-build `version`/`publishedAt` timestamp (no audio-hash change, since the seed world's 3 sound areas
+all remained referenced), reverted with `git checkout --` before committing.
+
+**Commits:** `41354105` (feat: `hashAudioAssets` prunes stale hashed files + 4 tests) and `71969a20`
+(fix: `build-atlas.ts` calls `hashAudioAssets` unconditionally so a zero-area build still prunes), on
+`run/n106-audio-prune`, fast-forward merged into `auto/continuous-dev` (no separate merge commit — still
+at the fork point).

@@ -1096,12 +1096,6 @@ The per-pick design-check in `continuous-dev-routine.md` step 2a still binds —
 
 - [x] **N105. Harden local persistence writes against quota / private-browsing throws.** ✅ DONE 2026-07-27 — commits 3b148582 + 6e58da4d. Full detail: `continuous-dev-done.md`.
 
-- [ ] **N106. Content-hashed audio copies are never pruned, and the auditor can't see them.**
-  `hashAudioAssets` copies each live bed to `public/atlas/assets/audio/<hash>.ext` but never removes a hashed file no current bed points at (`scripts/atlas/hashAudioAssets.ts:15-43`), and `writeAudioManifest` / `audit-assets` exclude the `<8hex>.ext` naming, so stale hashed audio accumulates and ships to players forever, invisible to the orphan scan. Prune hashed outputs not re-emitted this build (scope the delete strictly to the `<8hex>.ext` pattern). Sibling of Q62/Q70's prune family.
-  - **Done when:** a build that drops/renames a bed leaves no orphan hashed audio behind; only files matching the hashed-name pattern are ever deleted; a test covers stale-file pruning.
-  - **Gate:** standard gate; also `npm run atlas:publish:integrity-smoke`.
-  ~1 run.
-
 - [ ] **N107. The DM reading pane renders image embeds as broken wikilinks.**
   `EntityPanes.tsx:45` tokenizes wikilinks on the raw body (`tokenizeWikilinks(entity.body ?? "", ...)`) with no `resolveImageEmbeds` pass first, whereas the player projection path (`projectEntityForPlayer.ts:85`) resolves `![[image.png]]` embeds before wikilink tokenization. So the DM's own reading pane shows a broken wikilink where the player sees the image. Run the embed resolve first, mirroring the player path. (Distinct from Q51, which gates non-image embeds in the shared resolver.)
   - **Done when:** `![[image.png]]` renders an `<img>` in the DM reading pane; a test covers the DM-pane embed path.
