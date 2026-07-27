@@ -13,6 +13,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { loadAtlasContent, loadSearchIndex, type SearchIndexEntry } from "@/atlas/content/loader";
 import { AtlasLoadState } from "@/atlas/content/AtlasLoadState";
+import { logger } from "@/lib/logger";
 import type {
   AtlasProject,
   Entity,
@@ -515,7 +516,13 @@ export default function AtlasViewer() {
     if (!searchOpen || searchIndexRequestRef.current) return;
     searchIndexRequestRef.current = loadSearchIndex()
       .then((idx) => setSearchIndex(idx))
-      .catch((e: Error) => setError(e.message));
+      .catch((e: Error) => {
+        // Search-index failure degrades search only — the map/entity panel
+        // already loaded fine and must stay up, so this must not go through
+        // setError (that would replace the whole page with the error screen).
+        logger.error("Failed to load search index", e);
+        setSearchIndex([]);
+      });
   }, [searchOpen]);
 
   // Cmd/Ctrl-K opens search

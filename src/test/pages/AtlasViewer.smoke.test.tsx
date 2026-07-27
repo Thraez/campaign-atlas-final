@@ -11,11 +11,12 @@ vi.mock("react-leaflet", async () => {
   return makeReactLeafletModule();
 });
 
-import { render, waitFor, cleanup, fireEvent } from "@testing-library/react";
+import { render, waitFor, cleanup, fireEvent, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import AtlasViewer from "@/pages/AtlasViewer";
 import { makeProject, makeMap, makeWorld, makeSearchIndex } from "../helpers/makeProject";
 import { stableMap } from "../helpers/reactLeafletMock";
+import { logger } from "@/lib/logger";
 
 function stubFetch(project = makeProject()) {
   vi.stubGlobal(
@@ -26,6 +27,18 @@ function stubFetch(project = makeProject()) {
         ok: true,
         json: () => Promise.resolve(body),
       } as unknown as Response);
+    }),
+  );
+}
+
+function stubFetchSearchIndexFails(project = makeProject()) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((url: string) => {
+      if (String(url).includes("search-index")) {
+        return Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve(null) } as unknown as Response);
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(project) } as unknown as Response);
     }),
   );
 }
@@ -234,6 +247,28 @@ describe("Lazy search-index loading (Q66)", () => {
 
     const fetchMock = vi.mocked(fetch);
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("search-index")).length).toBe(1);
+  });
+
+  it("keeps the map rendered and logs via the logger seam when the search index fails to load (Q89)", async () => {
+    stubFetchSearchIndexFails();
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(document.querySelector("main#atlas-main")).toBeInTheDocument());
+
+    fireEvent.click(document.querySelector('[aria-label="Search atlas (Ctrl+K)"]')!);
+
+    await waitFor(() => expect(errorSpy).toHaveBeenCalled());
+    // The failure must not blank the page — the map stays up, no error screen.
+    expect(document.querySelector("main#atlas-main")).toBeInTheDocument();
+    expect(screen.queryByText(/atlas not built yet/i)).not.toBeInTheDocument();
+    // Search degrades to a usable-but-empty palette instead of hanging on "Loading search…".
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeInTheDocument());
+
+    errorSpy.mockRestore();
   });
 });
 
