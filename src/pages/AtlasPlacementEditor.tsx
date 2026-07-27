@@ -509,7 +509,7 @@ function AtlasPlacementEditorInner() {
 
   /** Merge a partial into the active world's session override (undo-tracked).
    *  This is the world-level equivalent of patchMap — the save path that lets
-   *  credits / assetCredits changes reach world.yaml. */
+   *  name / credits / assetCredits changes reach world.yaml. */
   const patchWorld = (patch: Partial<World>) => {
     if (!baseWorld) return;
     setWorldOverrideUndoable(
@@ -714,6 +714,7 @@ function AtlasPlacementEditorInner() {
       routesEffective: routeDraft.effective,
       fog: fogDraft.fog,
       existingRaw: worldYamlBaseline.raw,
+      name: effectiveWorld?.name,
       credits: effectiveWorld?.credits,
       assetCredits: effectiveWorld?.assetCredits,
     });
