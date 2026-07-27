@@ -188,13 +188,6 @@ is for sequencing, not the whole spec.
 
 - [x] **Q89. Degrade gracefully when search-index.json fails to load.** ✅ DONE 2026-07-27 — commit 2b53e85e
 
-- [ ] **Q93. Unify broken-image fallback across lightbox, hover-peek, and asset previews.**
-  `src/atlas/entity/EntityPanel.tsx`'s `ImageThumb` (lines ~246-272) has a tidy dashed "Image missing" `onError` placeholder, but three sibling `<img>` renders don't: the EntityPanel lightbox img (line ~515 — a thumbnail that loads but whose full image 404s shows a blank black dialog), `src/atlas/peek/HoverPeekCard.tsx`'s thumbnail (line ~35, browser broken-image glyph), and `src/atlas/assets/AssetManagerPanel.tsx`'s preview (line ~48). Extract the `ImageThumb` fallback into a small reusable `<AtlasImage>` (or `useImgFallback`) in a player-safe module and use it in all three spots so every image degrades to the same "Image missing" box.
-  - **Done when:** the lightbox, HoverPeekCard, and AssetManagerPanel images all render the shared "Image missing" fallback on `onError`; `ImageThumb` is refactored onto the shared primitive (or kept behavior-identical); a unit test asserts the fallback appears on image error.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  `AssetManagerPanel` is editor-only (`__INCLUDE_EDITOR__`-gated): the shared `<AtlasImage>` must be a plain presentational component with NO editor imports, so the player entry points (EntityPanel, HoverPeekCard) can import it and it stays tree-shaken-safe.
-  ~2–3 runs.
-
 - [ ] **Q94. Add a Try-again retry to the atlas load-error screen.**
   When `atlas.json` fails to load, `src/pages/AtlasViewer.tsx`'s error screen (~lines 440-465) offers only "Back to home"; the sole retry path is a full browser reload. Add a "Try again" button that re-runs the load (`loadAtlasContent(true)` + `loadSearchIndex()`) in place and clears `error` on success without a page reload (reset the load effect, e.g. via a retry-nonce state or an extracted load callback). Optionally auto-retry once on the `window` `online` event — the error screen already reads `navigator.onLine`.
   - **Done when:** the error screen shows a "Try again" action that re-attempts the load and clears the error on success without a full reload; a failing-then-succeeding load reaches the map after clicking retry (unit test with a mocked loader).

@@ -2885,3 +2885,35 @@ confirms the normal no-key form still renders when crypto is available.
 
 **Commits:** `9ca5e2b4` (feat, on `run/q92-secrets-crypto-message`), fast-forward merge into
 `auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+- [x] **Q93. Unify broken-image fallback across lightbox, hover-peek, and asset previews.** ✅ DONE
+  2026-07-27 — commit a350f006
+
+New `src/atlas/content/AtlasImage.tsx` exports `AtlasImage({ src, alt, className, fallbackClassName,
+style, loading, onClick })` — a plain presentational `<img>` wrapper (no editor imports) that swaps to a
+"Image missing" box on `onError`, resetting the failed state via a `useEffect` keyed on `src` (needed
+because the lightbox reuses ONE instance across `goPrev`/`goNext` — without the reset, navigating from a
+broken image to a working one would stay stuck on the old fallback). Three previously-unhandled `<img>`
+renders now use it: the EntityPanel lightbox (`src/atlas/entity/EntityPanel.tsx` — was a blank black
+dialog when the full image 404s, even though the loaded thumbnail looked fine; now shows the fallback
+inside the dialog, with a dark-theme `fallbackClassName`), `HoverPeekCard.tsx`'s portrait thumbnail (was
+the browser's broken-image glyph), and `AssetManagerPanel.tsx`'s preview (same). `EntityPanel.tsx`'s
+existing `ImageThumb` is refactored onto the same primitive instead of its own local broken-image
+implementation — its fallback box is now always wrapped in the thumbnail's `<button>` (a small behavior
+change from before, where a broken thumbnail rendered unwrapped and unclickable; now clicking a broken
+thumbnail opens the lightbox, which correctly shows the same shared fallback there too instead of a
+blank dialog).
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing warnings, unchanged) ·
+2803 tests green across the 4 shards (694+602+826+681 — +6 over the Q92 baseline); shard 3 hit the
+documented `onTaskUpdate` RPC flake (0 real failures elsewhere). No build/scan/fog/artifact touch, so
+`atlas:publish` wasn't required. New `src/test/content/AtlasImage.test.tsx` (3 tests): renders normally
+with no fallback, swaps to the fallback with a `title` naming the failed src on error, and re-attempts
+loading a new `src` after a prior failure (the reset-on-src-change fix). New tests added to
+`EntityPanel.test.tsx` (lightbox fallback on a 404'd full image), `HoverPeekCard.test.tsx` (portrait
+fallback), and `AssetManagerPanel.test.tsx` (preview fallback, queried via `container.querySelector`
+since an `alt=""` image has no accessible `role="img"` name to query by). Pre-commit hook's
+`vitest run --changed` covered all 8 changed/new files (174/174 green, same lone flake elsewhere).
+
+**Commits:** `a350f006` (feat, on `run/q93-atlas-image-fallback`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).
