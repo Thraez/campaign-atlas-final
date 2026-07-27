@@ -552,6 +552,12 @@ function AtlasPlacementEditorInner() {
     const worldId = project.maps.find((m) => m.id === activeMap.id)?.worldId;
     return project.entities.filter((e) => !e.world || e.world === worldId);
   }, [project, activeMap]);
+  // N102: lets EntityEditorPanel catch a colliding slug before Create, instead
+  // of only discovering it when the create-only write 409s server-side.
+  const existingEntityIdsForWorld = useMemo(
+    () => new Set(entitiesForWorld.map((e) => e.id)),
+    [entitiesForWorld],
+  );
 
   const {
     filter,
@@ -1344,6 +1350,7 @@ function AtlasPlacementEditorInner() {
                   category="characters"
                   onCreate={onCreateEntity}
                   onCancel={() => setCreatingIn(null)}
+                  existingIds={existingEntityIdsForWorld}
                 />
               ) : (
                 renderCategory(
@@ -1366,6 +1373,7 @@ function AtlasPlacementEditorInner() {
                   category="locations"
                   onCreate={onCreateEntity}
                   onCancel={() => setCreatingIn(null)}
+                  existingIds={existingEntityIdsForWorld}
                 />
               ) : (
                 renderCategory(
@@ -1388,6 +1396,7 @@ function AtlasPlacementEditorInner() {
                   category="factions"
                   onCreate={onCreateEntity}
                   onCancel={() => setCreatingIn(null)}
+                  existingIds={existingEntityIdsForWorld}
                 />
               ) : (
                 renderCategory(
@@ -1410,6 +1419,7 @@ function AtlasPlacementEditorInner() {
                   category="events"
                   onCreate={onCreateEntity}
                   onCancel={() => setCreatingIn(null)}
+                  existingIds={existingEntityIdsForWorld}
                 />
               ) : (
                 renderCategory(
@@ -1432,6 +1442,7 @@ function AtlasPlacementEditorInner() {
                   category="items"
                   onCreate={onCreateEntity}
                   onCancel={() => setCreatingIn(null)}
+                  existingIds={existingEntityIdsForWorld}
                 />
               ) : (
                 renderCategory(
@@ -1454,6 +1465,7 @@ function AtlasPlacementEditorInner() {
                   category="lore"
                   onCreate={onCreateEntity}
                   onCancel={() => setCreatingIn(null)}
+                  existingIds={existingEntityIdsForWorld}
                 />
               ) : (
                 renderCategory(
