@@ -1084,11 +1084,7 @@ The per-pick design-check in `continuous-dev-routine.md` step 2a still binds —
 > a DM-only region can leak into the player build). They now live in section **X** of
 > `continuous-dev-queue.md` and build **first**. Numbers kept for traceability; this reserve resumes at N99.
 
-- [ ] **N99. Editing an existing secret's fields silently discards on Close — no dirty flag, no confirm.**
-  `EntityEditPanel` keeps every secret in its own `draftSecrets` state (`src/atlas/categories/EntityEditPanel.tsx:59`), updated on every character/password/teaser/reveal edit. But the unsaved-changes check comes from `useEntityEditDraft.isDirty()`, which fingerprints only `fields` (type/visibility/summary) + `body` (`src/atlas/categories/useEntityEditDraft.ts:19-21,52-56`). So editing a secret's fields never flips dirty, and closing discards it with no warning. (Adding a secret mutates the body marker, so only *edits* to existing secrets are lost.)
-  - **Done when:** editing any secret field marks the panel dirty; closing with secret edits routes through the same discard-confirm as other edits; a test covers "edit reveal text → isDirty".
-  - **Gate:** standard gate.
-  ~2 runs.
+- [x] **N99. Editing an existing secret's fields silently discards on Close — no dirty flag, no confirm.** ✅ DONE 2026-07-27 — commits 83854176 + aca66f09; secrets folded into `useEntityEditDraft`'s draft + pristine fingerprint (new `setSecrets` API), `EntityEditPanel` rewired off local `draftSecrets` state onto the shared draft; bonus fix — also closes a remount data-loss gap for secret edits. 7 new tests (4 hook + 3 integration); 2826 tests green (4 shards). Full detail: `continuous-dev-done.md`.
 
 - [ ] **N100. "Duplicate to map" is never seen as unsaved, and can silently overwrite an existing placement.**
   `duplicateToMap` writes an override keyed to the **target** map (`overrideKey(targetMapId, entityId)`, `src/atlas/editor/usePinOverrideMutations.ts:151-165`) and toasts success, but `dirtyCount` counts only keys starting with `${activeMap.id}:` (`src/pages/AtlasPlacementEditor.tsx:919-921`), so the duplicate never registers as unsaved on the current map and can be lost on navigate/save. Separately, the target-map dropdown excludes only the active map (`:1594-1596`), not maps where the entity already has a placement — so a duplicate can silently overwrite one.

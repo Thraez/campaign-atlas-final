@@ -3117,3 +3117,31 @@ Test-only change with no build/scan/fog/artifact touch, so `npm run atlas:publis
 
 **Commit:** `f37b3ef1` (on `run/q100-seed-smoke`), fast-forward merge into `auto/continuous-dev` (no
 separate merge commit — still at the fork point).
+
+- [x] **N99. Editing an existing secret's fields silently discards on Close — no dirty flag, no confirm.** ✅ DONE
+  2026-07-27 — commits 83854176 + aca66f09 — first unit picked from the "Refuel 2026-07-18" 45-unit
+  nice-to-have reserve after the Q1–Q100 backlog closed out.
+
+`EntityEditPanel` kept every secret in its own component-local `draftSecrets` state, while the DM
+editor's Close button checks `entityEditDraft.isDirty()` (which only fingerprinted `fields` + `body`)
+to decide whether to confirm-discard. Editing a secret's reveal text, password, teaser, or "for"
+character never flipped that fingerprint, so Close silently discarded the edit with no warning.
+(Adding a brand-new secret happened to mark dirty anyway, via its body marker — only edits to
+*existing* secrets were silently lost.)
+
+Folded `secrets` into `useEntityEditDraft`'s draft shape and pristine fingerprint, added a
+`setSecrets` API (value or updater, mirroring React's `setState`), and rewired `EntityEditPanel` to
+read/write secrets through the shared draft instead of local state. Bonus fix: because the old effect
+unconditionally re-seeded `draftSecrets` from disk on every mount, leaving and returning to Edit on the
+same entity also discarded in-flight secret edits (fields/body already survived that round-trip via the
+existing no-loss check) — moving secrets into the shared draft fixes that gap too, for free.
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing, unchanged) · 2826 tests
+green across the 4 shards (702+614+878+632, +7 over the Q100 baseline of 2819 — exactly the 7 new
+tests: 4 hook-level + 3 component-integration). Shard 3 hit the documented `onTaskUpdate` RPC flake (0
+real failures, all 878 tests + 70 files passed). Pure client-side React state management — no
+`scripts/`, fog, soundscape, or shipped-artifact touch — so `npm run atlas:publish` wasn't required.
+
+**Commits:** `83854176` (feat: fold secrets into the draft fingerprint + hook tests) and `aca66f09`
+(fix: wire `EntityEditPanel` to the shared draft + integration test), on `run/n99-secrets-dirty`,
+fast-forward merged into `auto/continuous-dev` (no separate merge commit — still at the fork point).
