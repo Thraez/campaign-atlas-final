@@ -3062,5 +3062,38 @@ Pre-commit hook's `vitest run --changed` ran the FULL suite (`package.json`/`pac
 for the new `ajv` devDependency, same trigger shape as Q92's `setup.ts` change) — all 2816 green, 1
 `onTaskUpdate` flake, confirming the dependency add didn't regress anything else.
 
+- [x] **Q99. Give the seed world a tiny placeholder map so the first build shows a map.** ✅ DONE
+  2026-07-27 — commit f5def3be — fifth unit of section **Q-M** (docs & authoring tooling).
+
+`examples/seed-world/_atlas/world.yaml` shipped `layers: []` on the `mistmoor-overview` map, so
+QUICK_START's "reload /atlas to see the seed map" step showed only empty ocean + grid. Added
+`public/atlas/assets/maps/seed-placeholder.png` — a small (1024×768, ~10.3 KB) generated PNG (vertical
+gradient + faint grid, no real geography, in the same generic-placeholder spirit as the existing
+`sample-overview.svg`), built with a ~90-line Node script using only built-in `zlib` (no new dependency,
+no network fetch). Wired it in as `layers[0]` with a relative `src` (`atlas/assets/maps/seed-placeholder.png`,
+no leading slash, matching the leading-slash-anti-pattern fix from Q97). Updated
+`examples/seed-world/README.md` (step 4 + the file table) and `docs/QUICK_START.md` (step 3) to mention
+the placeholder ships and how to swap it for a real map image.
+
+**Verification:** temporarily swapped `atlas.config.json` to `contentRoot: examples` /
+`defaultWorld: seed-world` in the worktree, ran `npm run atlas:build` (writes to gitignored
+`.local-atlas/`, never touches `public/atlas/`), and confirmed `.local-atlas/atlas.json`'s
+`mistmoor-overview` map carries the one resolved layer with "Missing local assets: 0" in the build
+report — then reverted `atlas.config.json` back to `astrath-deeprealm` before the real gate/commit, so
+the main content config was never actually changed.
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing, unchanged) · 2816 tests
+green across the 4 shards (699+607+827+683, unchanged from Q98 — docs/asset-only, no new test files).
+Shard 3 hit the documented `onTaskUpdate` RPC flake twice on re-run (0 real failures either time).
+Ships a new asset under `public/atlas/assets/`, so also ran `npm run atlas:publish:integrity-smoke`
+(all 5 planted faults still caught) and `npm run atlas:publish` (all 12 scans clean; `audit-assets`
+logs the new file as an ORPHAN — warn-only, expected, since it's referenced from `examples/`, not
+`content/`, matching the pre-existing `sample-overview.svg` orphan). `public/atlas/atlas.json` churned
+on rebuild — diffed and confirmed it was only the pre-existing CRLF→LF drift in unrelated entity bodies
+(Q65/Q98 caveat), reverted with `git checkout --` before committing.
+
+**Commit:** `f5def3be` (feat, on `run/q99-seed-placeholder-map`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).
+
 **Commits:** `0fd1998e` (feat, on `run/q98-world-schema`), fast-forward merge into `auto/continuous-dev`
 (no separate merge commit — still at the fork point).

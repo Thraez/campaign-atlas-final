@@ -195,12 +195,6 @@ is for sequencing, not the whole spec.
 
 - [x] **Q97. Fix QUICK_START seed-world config bug and leading-slash asset anti-pattern.** ✅ DONE 2026-07-27 — commit 1021dc2d
 
-- [ ] **Q99. Give the seed world a tiny placeholder map so the first build shows a map.**
-  `examples/seed-world/_atlas/world.yaml` ships `layers: []` (line 38), so QUICK_START's "reload /atlas to see the seed map" shows only empty ocean + grid — an anticlimactic first run. Add one small, generic, license-clean placeholder image (PNG or WEBP, well under `ASSET_SIZE_BUDGET_BYTES`) and wire a single layer into the `mistmoor-overview` map (2000×1500, relative `src` with NO leading slash, e.g. `atlas/assets/maps/seed-placeholder.png`). Commit the image where the build's asset resolver finds it (under `public/atlas/assets/...`, matching how `scripts/atlas/validateAsset.ts` / `audit-assets` resolve paths) so `atlas:build` and the asset scan pass. Update `examples/seed-world/README.md` and `docs/QUICK_START.md` to note a placeholder ships and how to swap it.
-  - **Done when:** the seed build renders a visible placeholder layer; the image is a generic allowed-extension file under the size budget; `atlas:publish` scans (secrets/derived/image-privacy/audit-assets) stay green; README + QUICK_START mention the placeholder and swap steps.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest) + npm run atlas:publish.
-  Player-facing shipped asset: must be generic (no DM/secret content), an allowed extension (png/jpg/webp), and under ASSET_SIZE_BUDGET_BYTES so the asset + secret scans stay green. ~2-3 runs.
-
 - [ ] **Q100. Add a build-smoke test that keeps the documented seed-world path green.**
   QUICK_START points onboarding users at `examples/seed-world`, but no test exercises that path, so a schema/loader change can silently break the advertised flow (no `src/test` file references seed-world today). Add a vitest under `src/test` that calls `loadWorldConfig("examples", "seed-world")` (`scripts/atlas/loadWorldConfig.ts`) and asserts it returns without throwing `WorldConfigError`, produces the `mistmoor-overview` map, and yields the "Calendar of the Hollow Year" calendar with its 4 months (Frostfall/Greenrise/Highsun/Emberfade). Optionally extend to a minimal `scripts/build-atlas.ts` pass over the seed folder.
   - **Done when:** a test loads `examples/seed-world/_atlas/world.yaml` via `loadWorldConfig` and asserts the map + calendar; it fails if the seed world.yaml or loader contract drifts.
