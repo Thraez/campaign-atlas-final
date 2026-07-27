@@ -1094,12 +1094,6 @@ The per-pick design-check in `continuous-dev-routine.md` step 2a still binds —
 
 - [x] **N103. The DM editor's "World name" setting is a dead end — it never reaches world.yaml/atlas.json.** ✅ DONE 2026-07-27 — commits 9b91dce6 + b6c0ef0b; `loadWorldConfig`/`WorldConfig` gain an optional top-level `name`, `build-atlas.ts` prefers `worldCfg?.name` over the hardcoded "Astrath Deeprealm" default, `buildFullWorldYaml` serializes `opts.name` the same way it already does `credits`/`assetCredits`, `buildSaveBatch`'s `buildWorldYamlContent` forwards it, and `AtlasPlacementEditor.tsx` passes `effectiveWorld?.name` through (worldSettingsDirty already fired on the name patch — only the serialize step was missing). 6 new/updated tests (2 buildFullWorldYaml round-trip, 1 buildSaveBatch drift-contract, 2 build-atlas fallback/override + 1 pre-existing extended); 2849 tests green (4 shards; shard 4 hit the documented onTaskUpdate RPC flake, 0 real failures). Touches `scripts/build-atlas.ts` + `scripts/atlas/loadWorldConfig.ts`, so `atlas:publish:integrity-smoke` and `atlas:publish` both ran green (12/12 scans clean).
 
-- [ ] **N104. `postJson` never checks response status — sync-map/settings write failures report as success.**
-  `postJson` in `src/atlas/sync/useSyncSettings.ts:19-25` fires the POST to `/__atlas/local-write` and returns without reading `resp.ok`, even though the endpoint returns 400/500 on failure (`scripts/vite-plugin-atlas-save.ts`). Both `saveSettings` and `saveSyncMap` therefore swallow real write failures and tell the DM it saved.
-  - **Done when:** `postJson` throws (or returns an error) on a non-OK response and callers surface it; a test asserts a 500 response rejects.
-  - **Gate:** standard gate.
-  ~1 run.
-
 - [ ] **N105. Harden local persistence writes against quota / private-browsing throws.**
   Two write paths call `localStorage.setItem` with no protection: `persistOverrides` (`src/atlas/editor/placementOverrides.ts:124-126`) has no try/catch at all — a quota or Safari-private-mode throw bubbles up and can break the editor mid-edit (the read side `loadOverrides` *is* wrapped). The map-layer persist effect (`src/atlas/useMapLayers.ts:186-190`) does the opposite — it swallows every failure silently, so an uploaded layer that failed to persist is lost with no log or toast. Make both fail gracefully *and* observably.
   - **Done when:** a throwing `setItem` no longer crashes `persistOverrides`; a failed map-layer persist logs/toasts instead of silently dropping; tests cover both.

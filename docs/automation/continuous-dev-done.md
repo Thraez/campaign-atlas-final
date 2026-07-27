@@ -3268,3 +3268,28 @@ world.yaml has no `name:` override) and was reverted with `git checkout --` befo
 `buildFullWorldYaml` → `buildSaveBatch`, with round-trip tests) and `b6c0ef0b` (fix: wire
 `effectiveWorld?.name` into the editor page's Save call), on `run/n103-world-name-persist`,
 fast-forward merged into `auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+- [x] **N104. `postJson` never checks response status — sync-map/settings write failures report as
+  success.** ✅ DONE 2026-07-27 — commits 5c0757c6 + 88787ddc.
+
+`postJson` in `src/atlas/sync/useSyncSettings.ts` fired the POST to `/__atlas/local-write` and returned
+without reading `resp.ok`, even though the endpoint (`scripts/vite-plugin-atlas-save.ts`) returns 400/500
+on a disallowed path or write error. Both `saveSettings` and `saveSyncMap` swallowed real write failures
+and told the DM the save succeeded.
+
+`postJson` now throws when `resp.ok` is false, with the status and response body in the message.
+`useMdImportFlow.ts`'s existing generic catch-all `toast.error` already surfaces the new throw for the
+import-triggered `saveSyncMap`/`saveSettings` calls unchanged. `SyncPanel.tsx`'s `handleSave` had no catch
+at all, so the new throw would have become an unhandled promise rejection — added a catch that shows a
+sonner `toast.error` with the failure message.
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing, unchanged) · 2852 tests
+green across the 4 shards (700+624+821+707, +3 over the N103 baseline of 2849 — 2 new `postJson`
+non-OK-rejects tests in `sync-settings.test.ts`, 1 new `SyncPanel` error-toast test). Shard 4 hit the
+documented `onTaskUpdate` RPC flake (0 real failures, all 707 tests + 70 files passed; not re-run per
+policy). Pure client-side sync-settings logic — no `scripts/`, fog, soundscape, or shipped-artifact
+touch — so `npm run atlas:publish` wasn't required.
+
+**Commits:** `5c0757c6` (feat: `postJson` throws on non-OK response + 2 unit tests) and `88787ddc` (fix:
+`SyncPanel.handleSave` catches and toasts the failure + 1 unit test), on `run/n104-postjson-status`,
+fast-forward merged into `auto/continuous-dev` (no separate merge commit — still at the fork point).
