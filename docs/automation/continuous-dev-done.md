@@ -2852,3 +2852,36 @@ once). Pre-commit hook also passed.
 
 **Commits:** `fdfdc233` (feat, on `run/q91-global-error-handlers`), fast-forward merge into
 `auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+- [x] **Q92. Honest Secrets-page message when Web Crypto is unavailable.** ✅ DONE
+  2026-07-27 — commit 9ca5e2b4
+
+New `src/atlas/secrets/isSecureCryptoAvailable.ts` exports `isSecureCryptoAvailable(): boolean` (`
+window.isSecureContext && !!globalThis.crypto?.subtle`) — kept in its own module rather than inline in
+`CharacterSecretsPage.tsx` so the page doesn't pick up a `react-refresh/only-export-components` lint
+warning from a second named export. `SecretsBody` in `CharacterSecretsPage.tsx` checks it right after the
+existing hooks and, when false, renders "Secrets need a secure https connection to unlock on this device"
+instead of ever reaching the key-entry form or the misleading "No secrets found for that key. Check it
+with your DM." message — `decryptSecret` (`secretCrypto.ts`) silently swallows the `crypto.subtle` failure
+and always returns null, so an insecure-context player was previously told to double-check their key when
+the real problem is the connection. Decryption logic itself is untouched. **Test-infra fix required**:
+jsdom never defines `window.isSecureContext` at all (reading it is `undefined`, not `true`), so the new
+check made every existing `CharacterSecretsPage` test fail by always taking the insecure branch;
+`src/test/setup.ts` now explicitly defaults `window.isSecureContext = true` (matching a real https/
+localhost deployment) via `Object.defineProperty`, and the tests that exercise the insecure path override
+it locally with a `try/finally` reset.
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing warnings, unchanged) · 2797
+tests green across the 4 shards (694+600+825+678 — +6 over the Q91 baseline for the two new test files);
+shard 3 hit the documented `onTaskUpdate` RPC flake (0 real failures elsewhere). The pre-commit hook's
+`vitest run --changed` picked up the `setup.ts` change and re-ran the FULL suite (2797/2797 green, same
+lone flake) rather than a narrow changed-file slice — confirms the global setup default didn't regress
+anything else. No build/scan/fog/artifact touch, so `atlas:publish` wasn't required. New
+`src/test/secrets/isSecureCryptoAvailable.test.ts` (3 tests): true in the default secure-context test
+environment, false when `isSecureContext` is false, false when `crypto.subtle` is missing. New tests
+added to `src/test/secrets/CharacterSecretsPage.test.tsx` (3 tests): shows the secure-context message
+(not the wrong-key copy) when `isSecureContext` is false, shows it when `crypto.subtle` is missing, and
+confirms the normal no-key form still renders when crypto is available.
+
+**Commits:** `9ca5e2b4` (feat, on `run/q92-secrets-crypto-message`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).

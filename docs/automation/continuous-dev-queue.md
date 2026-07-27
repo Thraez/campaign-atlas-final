@@ -188,13 +188,6 @@ is for sequencing, not the whole spec.
 
 - [x] **Q89. Degrade gracefully when search-index.json fails to load.** ✅ DONE 2026-07-27 — commit 2b53e85e
 
-- [ ] **Q92. Honest Secrets-page message when Web Crypto is unavailable.**
-  `src/atlas/secrets/CharacterSecretsPage.tsx` decrypts via `decryptSecret` (`src/atlas/secrets/secretCrypto.ts`), which needs `crypto.subtle` — undefined in a non-secure context (a player opening the site over plain `http://` on a LAN/self-host). `decryptSecret` swallows the failure and returns null (secretCrypto.ts:72-74), so `collectCharacterSecrets` returns `[]` and the page shows the misleading "No secrets found for that key. Check it with your DM." (line ~98). Detect `window.isSecureContext === false` or a missing `globalThis.crypto?.subtle` up front (in the page or `SecretsBody`) and show an honest message ("Secrets need a secure https connection to unlock on this device") instead of the wrong-key copy.
-  - **Done when:** when `crypto.subtle` is unavailable / the context is insecure, the page shows the secure-context message and NOT the "no secrets / check with your DM" copy; the normal wrong-key path is unchanged when crypto is available; a unit test covers the insecure-context branch.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Player-facing secrets surface: capability detection + message only — do NOT change decryption logic or ever surface secret content.
-  ~1 run.
-
 - [ ] **Q93. Unify broken-image fallback across lightbox, hover-peek, and asset previews.**
   `src/atlas/entity/EntityPanel.tsx`'s `ImageThumb` (lines ~246-272) has a tidy dashed "Image missing" `onError` placeholder, but three sibling `<img>` renders don't: the EntityPanel lightbox img (line ~515 — a thumbnail that loads but whose full image 404s shows a blank black dialog), `src/atlas/peek/HoverPeekCard.tsx`'s thumbnail (line ~35, browser broken-image glyph), and `src/atlas/assets/AssetManagerPanel.tsx`'s preview (line ~48). Extract the `ImageThumb` fallback into a small reusable `<AtlasImage>` (or `useImgFallback`) in a player-safe module and use it in all three spots so every image degrades to the same "Image missing" box.
   - **Done when:** the lightbox, HoverPeekCard, and AssetManagerPanel images all render the shared "Image missing" fallback on `onError`; `ImageThumb` is refactored onto the shared primitive (or kept behavior-identical); a unit test asserts the fallback appears on image error.
