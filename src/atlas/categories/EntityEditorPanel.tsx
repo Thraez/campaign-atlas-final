@@ -1,7 +1,8 @@
 // src/atlas/categories/EntityEditorPanel.tsx
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { CategoryId } from "@/atlas/content/entityCategory";
 import type { EntityVisibility } from "@/atlas/content/schema";
+import { slugify } from "@/atlas/content/slugify";
 
 export interface NewEntityDraft {
   category: CategoryId;
@@ -17,6 +18,7 @@ export function EntityEditorPanel({
   onCreate,
   onCancel,
   fullFields,
+  existingIds,
 }: {
   mode: "create" | "edit";
   category: CategoryId;
@@ -24,12 +26,20 @@ export function EntityEditorPanel({
   onCancel: () => void;
   /** Existing entity form node for edit mode / full-detail reveal. */
   fullFields?: React.ReactNode;
+  /** Slugs already in use in the target world, so a colliding name can be caught before Save. Create mode only. */
+  existingIds?: Set<string>;
 }) {
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [visibility, setVisibility] = useState<EntityVisibility>("dm");
   const [kind, setKind] = useState("");
   const [showMore, setShowMore] = useState(false);
+
+  const trimmedTitle = title.trim();
+  const collidesWithExisting = useMemo(
+    () => mode === "create" && !!trimmedTitle && !!existingIds?.has(slugify(trimmedTitle)),
+    [mode, trimmedTitle, existingIds],
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -42,6 +52,9 @@ export function EntityEditorPanel({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
+          {collidesWithExisting && (
+            <p className="text-destructive mt-1">An entity with this name already exists.</p>
+          )}
         </label>
         <label className="block">
           <span className="block mb-1">One-line summary</span>
@@ -100,7 +113,7 @@ export function EntityEditorPanel({
         <button
           type="button"
           className="h-8 px-3 text-xs rounded bg-primary text-primary-foreground"
-          disabled={!title.trim()}
+          disabled={!trimmedTitle || collidesWithExisting}
           onClick={() =>
             onCreate({
               category,
