@@ -181,12 +181,7 @@ is for sequencing, not the whole spec.
 
 #### Q-K — Code health & refactor
 
-- [ ] **Q87. Split EntitiesTab section components into modules.**
-  `src/atlas/tabs/EntitiesTab.tsx` (762 lines) inlines `EntityForm` (:198), `ProfileSection` (:336), `ListField` (:403), `RelationshipSection` (:454), and `HandoutBundleSection` (:638) alongside the tab shell (`EntitiesTab` :69). Extract each into its own file under `src/atlas/tabs/entities/`, keeping props and behavior byte-for-byte, and import them back into EntitiesTab.
-  - **Done when:** EntitiesTab.tsx holds only the tab shell + imports, each section is its own module, and the EntitiesTab / entity-editing tests pass unchanged.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Editor-only file — keep the new modules under src/atlas/tabs so they remain excluded from player builds (invariant 4).
-  ~2–3 runs.
+- [x] **Q87. Split EntitiesTab section components into modules.** ✅ DONE 2026-07-27 — commit db3e0b4a
 
 
 #### Q-L — Resilience & error handling

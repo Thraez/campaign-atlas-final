@@ -2705,3 +2705,30 @@ which was untouched, and stayed green. Pre-commit hook also passed.
 and branch `run/q86-wizard-split` to be cleaned up after merge. No concurrency this run — origin tip
 matched the fork point at worktree creation and at merge time (confirmed via `git fetch` immediately
 before each).
+
+- [x] **Q87. Split EntitiesTab section components into modules.** ✅ DONE
+  2026-07-27 — commit db3e0b4a
+
+**What shipped:** extracted `EntityForm`, `ProfileSection`, `ListField`, `RelationshipSection`, and
+`HandoutBundleSection` out of `EntitiesTab.tsx` into their own files under `src/atlas/tabs/entities/`,
+byte-for-byte. `EntitiesTab.tsx` shrank from 762 lines to 172 (tab shell + imports only); each new
+module imports only what it uses (UI primitives, `@/atlas/content/schema`, `@/atlas/profiles/*`,
+`@/atlas/save/canonicalEntitySave`) rather than sharing the orchestrator's trimmed import list.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — pure structural split, no build/scan/
+fog/artifact touch, so `atlas:publish` wasn't required. `npm run typecheck` clean · `npm run lint` 0
+errors (18 pre-existing warnings, no new ones) · 2779 tests green across the 4 shards
+(689+595+820+675 — unchanged from the Q86 baseline since no tests were added/removed; shards 1 and 3
+each hit the documented `onTaskUpdate` RPC flake as an "Errors" count with every test in those shards
+still green). `src/test/tabs/EntitiesTab.test.tsx` and `src/test/accessibility-labels.test.tsx` (both
+exercise `EntitiesTab`) stayed green. Pre-commit hook also passed.
+
+**Commits:** `db3e0b4a` (refactor, on `run/q87-entities-split`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree
+`../campaign-atlas-final-run-q87` and branch `run/q87-entities-split` to be cleaned up after merge.
+This unit was picked up mid-flight from a prior scheduled run whose 3-hour lock had gone stale
+(uncommitted WIP found already matching the spec byte-for-byte) — verified against the full gate
+before committing rather than discarded. No concurrency at merge/push time — origin tip matched the
+fork point (confirmed via `git fetch` immediately before merge).
