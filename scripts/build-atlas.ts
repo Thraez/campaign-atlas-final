@@ -834,23 +834,23 @@ async function runBuildCore(flags: BuildFlags) {
   // -------- Soundscape player-strip --------
   // Drop DM-visibility areas, neutralise area IDs, strip names so DM location
   // labels never reach the player artifact. Then content-hash audio filenames
-  // so the original DM file paths never appear in the player build.
+  // so the original DM file paths never appear in the player build. Runs
+  // unconditionally (even with zero areas) so a build that removes all sound
+  // still prunes previously-hashed files instead of leaving them orphaned.
   if (flags.player) {
     maps = maps.map((m) => {
       if (!m.soundscape) return m;
       return { ...m, soundscape: filterSoundscapeForPlayer(m.soundscape, m.regions) };
     });
     const allAreas = maps.flatMap((m) => m.soundscape?.areas ?? []);
-    if (allAreas.length > 0) {
-      const rewrite = hashAudioAssets(allAreas, path.join(ROOT, "public"));
-      maps = maps.map((m) => {
-        if (!m.soundscape?.areas?.length) return m;
-        return {
-          ...m,
-          soundscape: { ...m.soundscape, areas: rewriteAudioSrcs(m.soundscape.areas, rewrite) },
-        };
-      });
-    }
+    const rewrite = hashAudioAssets(allAreas, path.join(ROOT, "public"));
+    maps = maps.map((m) => {
+      if (!m.soundscape?.areas?.length) return m;
+      return {
+        ...m,
+        soundscape: { ...m.soundscape, areas: rewriteAudioSrcs(m.soundscape.areas, rewrite) },
+      };
+    });
   }
 
   // -------- Audio picker manifest --------
