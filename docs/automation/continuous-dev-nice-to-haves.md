@@ -1098,11 +1098,7 @@ The per-pick design-check in `continuous-dev-routine.md` step 2a still binds —
 
 - [x] **N107. The DM reading pane renders image embeds as broken wikilinks.** ✅ DONE 2026-07-27 — commit d4b0eb71; `EntityPanes.tsx`'s `dmHtml` memo now runs `resolveImageEmbeds` on the raw body before `tokenizeWikilinks`, mirroring `projectEntityForPlayer.ts`; 1 new test asserts the DM pane renders an `<img>` for `![[portrait.png]]`. 2859 tests green (4 shards; shard 4 hit the documented `onTaskUpdate` RPC flake, 0 real failures).
 
-- [ ] **N108. Wikilinks/embeds inside code spans and fenced code blocks become live links.**
-  `tokenizeWikilinks` does a blind `body.replace(WIKILINK, ...)` over the raw markdown before `marked` runs (`src/atlas/content/parseWikilinks.ts:15-35`), with no awareness of `` `code` `` spans or ``` fenced ``` blocks, so documentation that *shows* `[[Link]]` / `![[embed]]` syntax gets turned into real links/images. Skip wikilink substitution inside code regions.
-  - **Done when:** `[[X]]` and `![[Y]]` inside an inline code span or a fenced block render as literal text; live wikilinks outside code still resolve; tests cover both.
-  - **Gate:** standard gate.
-  ~2 runs.
+- [x] **N108. Wikilinks/embeds inside code spans and fenced code blocks become live links.** ✅ DONE 2026-07-27 — commit 86e6b845; new `src/atlas/content/codeRegions.ts` (`findCodeRanges`/`replaceOutsideCode`) locates fenced code blocks and inline code spans in the raw markdown; `tokenizeWikilinks` (`parseWikilinks.ts`) and `resolveImageEmbeds` (`renderEntityMarkdown.ts`) now route their blind regex replace through it, so `[[Link]]`/`![[embed]]` shown inside `` `code` `` or fenced blocks stay literal while real wikilinks/embeds elsewhere in the same body still resolve. 18 new tests (12 for `codeRegions.ts` + 3 each in `parseWikilinks.test.ts`/`renderEntityMarkdown.test.ts`); 2877 tests green (4 shards: 709+631+845+692; two shards hit the documented `onTaskUpdate` RPC flake, 0 real failures). Pure client-side/build-shared rendering change (no `scripts/`-only edit, no fog/soundscape/artifact touch) — `atlas:publish` wasn't required.
 
 - [ ] **N109. Render inline markdown (bold/italic/links) inside callout titles.**
   `calloutExtension` captures the title as a plain string and its renderer only HTML-escapes it (`src/atlas/content/markdownCore.ts:70-74,97-100`); the body is tokenized as inline markdown but the title isn't, so `> [!note] A **bold** title` shows literal asterisks. Tokenize the title through the same inline lexer as the body.
