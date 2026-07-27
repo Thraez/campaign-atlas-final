@@ -186,12 +186,7 @@ is for sequencing, not the whole spec.
 
 #### Q-L — Resilience & error handling
 
-- [ ] **Q89. Degrade gracefully when search-index.json fails to load.**
-  `src/pages/AtlasViewer.tsx:232` loads via `Promise.all([loadAtlasContent(true), loadSearchIndex()])`, so a missing/corrupt `search-index.json` rejects the whole promise and the full map + entities are replaced by the "Atlas not built yet" error screen even though `atlas.json` is fine. Decouple the two: treat `atlas.json` as primary (its failure → error screen) and load the search index separately; on search-index failure keep rendering the map/entity panels, fall back to an empty index (or a lightweight index derived from `project.entities`), and log the failure via `logger.error` (`src/lib/logger.ts`). Search degrades instead of blanking the app.
-  - **Done when:** a rejected `loadSearchIndex()` no longer triggers the error screen; the map + entity panel still render; search silently falls back to an empty/derived index; the failure is logged through the logger seam; a test asserts the map renders when the search-index load rejects.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Player-facing; no artifact change. Overlaps AtlasViewer's load effect with Q88/Q94.
-  ~2–3 runs.
+- [x] **Q89. Degrade gracefully when search-index.json fails to load.** ✅ DONE 2026-07-27 — commit 2b53e85e
 
 - [ ] **Q90. Make ErrorBoundary route-scoped and resettable.**
   `src/components/ErrorBoundary.tsx` is a single top-level boundary carrying only `hasError`; it wraps the whole `Suspense`/`Routes` subtree in `src/App.tsx:46`, and once it catches, recovery is only `window.location.reload()` or a hard `href="/atlas"` anchor — client-side navigation does NOT clear the error. Add `resetKeys`/`onReset` support to ErrorBoundary (reset `hasError` when a key changes) and wrap it inside `<BrowserRouter>` with a small `useLocation()`-keyed component so navigating to a new route clears a caught error. Optionally add a second boundary around the EntityPanel body so a malformed single entity doesn't nuke the whole map. Keep the existing fallback UI.

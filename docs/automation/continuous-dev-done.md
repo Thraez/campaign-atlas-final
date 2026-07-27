@@ -2770,3 +2770,39 @@ no changes; none of them asserted the old bare-error-string UI. Pre-commit hook 
 branch `run/q88-load-state` to be cleaned up after merge. No concurrency this run — origin tip matched
 the fork point at worktree creation, before the commit, and before the merge (confirmed via `git fetch`
 each time).
+
+- [x] **Q89. Degrade gracefully when search-index.json fails to load.** ✅ DONE
+  2026-07-27 — commit 2b53e85e
+
+**Premise drift note:** the queue's spec cited `Promise.all([loadAtlasContent(true), loadSearchIndex()])`
+at `AtlasViewer.tsx:232`, but Q66 (already shipped) had moved `loadSearchIndex()` to a lazy fetch on
+first search-open, so the two loads were already decoupled in timing. The substance of the bug
+survived that move unchanged: the search-index `.catch` still called `setError(e.message)`, reusing
+the same top-level `error` state that gates the full-page `<AtlasLoadState>` screen — so a search-index
+failure (even minutes after the map/entities loaded fine) would still blank the whole page. Built
+against the current code shape rather than skipping as stale.
+
+**What shipped:** `src/pages/AtlasViewer.tsx` — the `loadSearchIndex().catch` handler no longer calls
+`setError`. It now logs via the `logger.error` seam (`src/lib/logger.ts`, imported fresh into this
+file) and sets `searchIndex` to `[]` instead of leaving it `null`. Map/entity panels never see an
+error; the search palette itself still opens (empty array is truthy) and shows a normal "no results"
+state instead of hanging on the "Loading search…" placeholder or replacing the page.
+
+**Gate:** standard gate (typecheck + ESLint + sharded vitest) — no build/scan/fog/artifact touch, so
+`atlas:publish` wasn't required. `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing
+warnings, no new ones) · 2786 tests green across the 4 shards (689+597+823+677 — +1 over the Q88
+baseline for the new test). Shard 2 hit a one-off `buildSecrets.test.ts` assertion failure on the
+first run, confirmed a flake (passed in isolation and on a full shard-2 rerun, unrelated to this
+change's files) rather than a real failure; shard 3 hit the documented `onTaskUpdate` RPC flake. New
+test: `src/test/pages/AtlasViewer.smoke.test.tsx` — "keeps the map rendered and logs via the logger
+seam when the search index fails to load (Q89)" stubs a failing `search-index.json` fetch, opens
+search, and asserts `logger.error` fired, `main#atlas-main` stayed mounted, no "Atlas not built yet"
+text appeared, and the search dialog still opened. Pre-commit hook also passed.
+
+**Commits:** `2b53e85e` (feat, on `run/q89-search-index-resilience`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+**Pushed to origin:** see `ACTIVE.md` for confirmation. Worktree `../campaign-atlas-final-run-q89` and
+branch `run/q89-search-index-resilience` to be cleaned up after merge. No concurrency this run — origin
+tip matched the fork point at worktree creation, before the commit, and before the merge (confirmed via
+`git fetch` each time).
