@@ -2999,3 +2999,28 @@ build/scan/fog/artifact touch, so `atlas:publish` wasn't required. Pre-commit ho
 
 **Commits:** `36fd6178` (docs, on `run/q96-known-limitations-refresh`), fast-forward merge into
 `auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+- [x] **Q97. Fix QUICK_START seed-world config bug and leading-slash asset anti-pattern.** ✅ DONE
+  2026-07-27 — commit 1021dc2d — third unit of section **Q-M** (docs & authoring tooling).
+
+`docs/QUICK_START.md` step 3's `atlas.config.json` example (`contentRoot: "examples/seed-world"`,
+`defaultWorld: "seed"`) resolved via `loadWorldConfig`'s `contentRoot/worldId/_atlas/world.yaml` join
+(`scripts/atlas/loadWorldConfig.ts:156`) to the non-existent `examples/seed-world/seed/_atlas/world.yaml`.
+Corrected to `contentRoot: "examples"`, `defaultWorld: "seed-world"`, matching the real
+`examples/seed-world/_atlas/world.yaml` location. The same contentRoot/defaultWorld split bug was found
+(beyond the cited spec lines) repeated in step 5's "swap in your world" example
+(`contentRoot: "content/my-world"`, `defaultWorld: "my-world"`, which would resolve to
+`content/my-world/my-world/_atlas/world.yaml`) — fixed to `contentRoot: "content"`, matching the real
+`atlas.config.json` pattern (`contentRoot: "content"`, `defaultWorld: "astrath-deeprealm"`), since it's
+the identical defect in the same doc. Step 4's world.yaml layer example used a leading-slash asset `src`
+(`/atlas/assets/maps/my-map.png`), tripping `scripts/atlas/validateAsset.ts`'s `absolute-path` warning
+(`raw.startsWith("/")`, line 110) — changed to the relative form real world.yaml configs use.
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing warnings, unchanged) ·
+2808 tests green across the 4 shards (694+607+826+681 — unchanged from Q96, no test-count change since
+this is docs-only). Shard 3 hit the documented `onTaskUpdate` RPC flake (0 real failures elsewhere). No
+build/scan/fog/artifact touch, so `atlas:publish` wasn't required. Pre-commit hook's `typecheck:all` +
+`eslint .` + `vitest run --changed` passed cleanly (no test files matched the docs-only change).
+
+**Commits:** `1021dc2d` (docs, on `run/q97-quickstart-fix`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).

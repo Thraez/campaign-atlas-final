@@ -193,11 +193,7 @@ is for sequencing, not the whole spec.
 
 - [x] **Q96. Refresh KNOWN_LIMITATIONS.md rows that shipped features contradict.** ✅ DONE 2026-07-27 — commit 36fd6178
 
-- [ ] **Q97. Fix QUICK_START seed-world config bug and leading-slash asset anti-pattern.**
-  `docs/QUICK_START.md` step 3 (lines 36-37) tells the reader to set `contentRoot: "examples/seed-world"` and `defaultWorld: "seed"`, but `loadWorldConfig` joins `contentRoot/worldId/_atlas/world.yaml` (`scripts/atlas/loadWorldConfig.ts:156`), so that resolves to the non-existent `examples/seed-world/seed/_atlas/world.yaml`. Change it to `contentRoot: "examples"`, `defaultWorld: "seed-world"` (→ `examples/seed-world/_atlas/world.yaml`). Also step 4 line 71 teaches `src: /atlas/assets/maps/my-map.png`; the leading slash trips `scripts/atlas/validateAsset.ts`'s `absolute-path` warning (`raw.startsWith("/")`, line 110). Change it to the relative `atlas/assets/maps/my-map.png` form the real world.yaml configs use.
-  - **Done when:** the step-3 config resolves to the real seed world.yaml path; no asset `src` in QUICK_START starts with `/`.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Docs-only; overlaps `QUICK_START.md` with Q95 (line 104) — different lines, any order. ~1 run.
+- [x] **Q97. Fix QUICK_START seed-world config bug and leading-slash asset anti-pattern.** ✅ DONE 2026-07-27 — commit 1021dc2d
 
 - [ ] **Q98. Ship a world.yaml JSON Schema for editor autocomplete and validation.**
   No JSON Schema exists for world.yaml (no `*.schema.json` in the repo), so hand-authoring in VS Code/Obsidian gets no autocomplete or inline validation. Author a JSON Schema (e.g. `schemas/world.schema.json`) covering the shape `scripts/atlas/loadWorldConfig.ts` accepts: `schemaVersion`, `maps` (with `scale`, `grid`, `water`, `soundscape`, `layers`), `regions`, `routes` (+ `mode`/waypoints), `fog`, `calendar` (+ `months`), `import.folders`/`defaultFolder`, `credits`, `assetCredits`. Add a `# yaml-language-server: $schema=...` header line to `examples/seed-world/_atlas/world.yaml` and `content/astrath-deeprealm/_atlas/world.yaml`, and add a vitest that loads both real world.yaml files and validates them against the schema so it can't drift. Keep it permissive (allow extra keys where the loader tolerates them) so it never rejects a currently-valid file.
