@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { loadAtlasContent } from "@/atlas/content/loader";
-import type { AtlasProject, Entity } from "@/atlas/content/schema";
+import type { Entity } from "@/atlas/content/schema";
+import { useAtlasContent } from "@/atlas/content/useAtlasContent";
+import { AtlasLoadState } from "@/atlas/content/AtlasLoadState";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { collectCharacterSecrets, type CollectedSecret } from "./collectCharacterSecrets";
 import { getCharacterKey, setCharacterKey, forgetAll } from "./playerSecretsStore";
@@ -116,29 +117,10 @@ function SecretsBody({ entities }: { entities: Entity[] }) {
 }
 
 export default function CharacterSecretsPage() {
-  const [project, setProject] = useState<AtlasProject | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { project, error } = useAtlasContent();
 
-  useEffect(() => {
-    loadAtlasContent(true)
-      .then(setProject)
-      .catch((e: Error) => setError(e.message));
-  }, []);
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-destructive text-sm p-6">
-        {error}
-      </div>
-    );
-  }
-
-  if (!project) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-muted-foreground text-sm">
-        Loading…
-      </div>
-    );
+  if (error || !project) {
+    return <AtlasLoadState error={error} loading={!project} />;
   }
 
   return (

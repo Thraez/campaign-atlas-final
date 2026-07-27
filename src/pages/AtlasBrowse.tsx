@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Compass, Hash, LayoutGrid, MapPin, Tag } from "lucide-react";
-import { loadAtlasContent } from "@/atlas/content/loader";
-import type { AtlasProject, Entity } from "@/atlas/content/schema";
+import type { Entity } from "@/atlas/content/schema";
+import { useAtlasContent } from "@/atlas/content/useAtlasContent";
+import { AtlasLoadState } from "@/atlas/content/AtlasLoadState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -32,8 +33,7 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
   const facet = (mode === "tag" ? params.tag : mode === "type" ? params.type : undefined) ?? "";
   const facetDecoded = decodeURIComponent(facet);
 
-  const [project, setProject] = useState<AtlasProject | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { project, error } = useAtlasContent();
   const [showAllTags, setShowAllTags] = useState(false);
 
   const { q: query, type: activeType } = parseBrowseFilterParams(searchParams);
@@ -49,12 +49,6 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
       (prev) => serializeBrowseFilterParams({ q: prev.get("q") ?? "", type: t }),
       { replace: true },
     );
-
-  useEffect(() => {
-    loadAtlasContent(true)
-      .then(setProject)
-      .catch((e: Error) => setError(e.message));
-  }, []);
 
   const entries = useMemo(() => {
     const all = project?.entities ?? [];
@@ -126,29 +120,8 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
     document.getElementById(sectionId(letter))?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  if (error) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-background text-foreground p-6 text-center">
-        <div className="max-w-md space-y-3">
-          <h1 className="font-display text-2xl text-primary">Atlas not built yet</h1>
-          <p className="text-sm text-muted-foreground">{error}</p>
-          <Button asChild variant="secondary">
-            <Link to="/atlas">
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Back to atlas
-            </Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!project) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-background text-muted-foreground">
-        Loading…
-      </div>
-    );
+  if (error || !project) {
+    return <AtlasLoadState error={error} loading={!project} />;
   }
 
   const worldName = project.worlds[0]?.name ?? "Atlas";
