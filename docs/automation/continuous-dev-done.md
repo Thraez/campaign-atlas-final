@@ -3349,3 +3349,28 @@ all remained referenced), reverted with `git checkout --` before committing.
 (fix: `build-atlas.ts` calls `hashAudioAssets` unconditionally so a zero-area build still prunes), on
 `run/n106-audio-prune`, fast-forward merged into `auto/continuous-dev` (no separate merge commit — still
 at the fork point).
+
+- [x] **N107. The DM reading pane renders image embeds as broken wikilinks.** ✅ DONE
+  2026-07-27 — commit `d4b0eb71`.
+
+`EntityPanes.tsx`'s `dmHtml` memo (`:39-50`) tokenized wikilinks directly on the raw entity body with no
+image-embed resolution pass, while the player projection path (`projectEntityForPlayer.ts:106`) resolves
+`![[image.png]]` embeds before wikilink tokenization — so the DM's own reading pane showed a broken
+wikilink where the player pane showed the image.
+
+Added a `resolveImageEmbeds` call on the raw body ahead of `tokenizeWikilinks` in the `dmHtml` memo,
+mirroring the player path exactly (same default asset resolver, `/atlas/assets/images/<name>`).
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing, unchanged) · 2859 tests
+green across the 4 shards (700+625+826+708, +1 over the N106 baseline of 2858 — 1 new test asserting the
+DM pane renders an `<img>` for `![[portrait.png]]` with the correct `src` and no literal wikilink text).
+Shard 4 hit the documented `onTaskUpdate` RPC flake (0 real failures; not re-run per policy). Pure
+client-side entity-panel rendering — no `scripts/`, fog, soundscape, or shipped-artifact touch — so `npm
+run atlas:publish` wasn't required. (An unrelated side effect surfaced mid-run: the sharded test suite's
+build-pipeline tests deleted six content-hashed audio files under `public/atlas/assets/audio/` in the
+worktree; these were reverted with `git checkout --` before staging, since they weren't part of this
+change.)
+
+**Commits:** `d4b0eb71` (fix: resolve image embeds in `EntityPanes.tsx`'s DM pane + test), on
+`run/n107-dm-pane-image-embeds`, fast-forward merged into `auto/continuous-dev` (no separate merge
+commit — still at the fork point).

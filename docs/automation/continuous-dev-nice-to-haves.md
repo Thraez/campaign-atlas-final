@@ -1096,11 +1096,7 @@ The per-pick design-check in `continuous-dev-routine.md` step 2a still binds —
 
 - [x] **N105. Harden local persistence writes against quota / private-browsing throws.** ✅ DONE 2026-07-27 — commits 3b148582 + 6e58da4d. Full detail: `continuous-dev-done.md`.
 
-- [ ] **N107. The DM reading pane renders image embeds as broken wikilinks.**
-  `EntityPanes.tsx:45` tokenizes wikilinks on the raw body (`tokenizeWikilinks(entity.body ?? "", ...)`) with no `resolveImageEmbeds` pass first, whereas the player projection path (`projectEntityForPlayer.ts:85`) resolves `![[image.png]]` embeds before wikilink tokenization. So the DM's own reading pane shows a broken wikilink where the player sees the image. Run the embed resolve first, mirroring the player path. (Distinct from Q51, which gates non-image embeds in the shared resolver.)
-  - **Done when:** `![[image.png]]` renders an `<img>` in the DM reading pane; a test covers the DM-pane embed path.
-  - **Gate:** standard gate.
-  ~1 run.
+- [x] **N107. The DM reading pane renders image embeds as broken wikilinks.** ✅ DONE 2026-07-27 — commit d4b0eb71; `EntityPanes.tsx`'s `dmHtml` memo now runs `resolveImageEmbeds` on the raw body before `tokenizeWikilinks`, mirroring `projectEntityForPlayer.ts`; 1 new test asserts the DM pane renders an `<img>` for `![[portrait.png]]`. 2859 tests green (4 shards; shard 4 hit the documented `onTaskUpdate` RPC flake, 0 real failures).
 
 - [ ] **N108. Wikilinks/embeds inside code spans and fenced code blocks become live links.**
   `tokenizeWikilinks` does a blind `body.replace(WIKILINK, ...)` over the raw markdown before `marked` runs (`src/atlas/content/parseWikilinks.ts:15-35`), with no awareness of `` `code` `` spans or ``` fenced ``` blocks, so documentation that *shows* `[[Link]]` / `![[embed]]` syntax gets turned into real links/images. Skip wikilink substitution inside code regions.
