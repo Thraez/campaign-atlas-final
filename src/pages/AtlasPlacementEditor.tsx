@@ -105,6 +105,8 @@ import {
   persistOverrides,
   LEGACY_STORAGE_KEY_V1,
 } from "@/atlas/editor/placementOverrides";
+import { foreignMapDraftPlacements } from "@/atlas/editor/foreignMapDrafts";
+import { targetMapHasPlacement } from "@/atlas/editor/duplicateOverwriteCheck";
 import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { buildValidationScopes } from "@/atlas/yaml/validationScopes";
@@ -762,11 +764,13 @@ function AtlasPlacementEditorInner() {
       projectEntities: project.entities,
       worldYamlDirty,
     });
-    if (plan.isEmpty) {
+    if (plan.isEmpty && foreignMapDrafts.length === 0) {
       toast.info("No changes to save");
       return;
     }
-    const drafts = plan.dirtyPlacements;
+    // N100: fold in cross-map duplicates (overrides keyed to a map other
+    // than the active one) — buildSavePlan only ever sees the active map.
+    const drafts = [...plan.dirtyPlacements, ...foreignMapDrafts];
     const fmPatches = plan.frontmatterPatches;
     const entitiesById = new Map(project.entities.map((e) => [e.id, e]));
     try {
@@ -871,13 +875,32 @@ function AtlasPlacementEditorInner() {
   const dirtyCount = Object.keys(overrides).filter(
     (k) => activeMap && k.startsWith(`${activeMap.id}:`),
   ).length;
-  // Unsaved-changes signal: there are local pin overrides OR a dirty
-  // world.yaml signal. The pin-side gate also waits for an edit since the
-  // last successful save so a hydrated-but-clean session doesn't nag; the
-  // world.yaml gate fires immediately because the draft hooks already
-  // resolve to a "fresh state" on mount.
+  // N100: "Duplicate to map" (usePinOverrideMutations.ts:151) writes an
+  // override keyed to the TARGET map regardless of which map is active, so
+  // dirtyCount above (active-map-only) never sees it. Gather those foreign
+  // entries separately so a cross-map duplicate still counts as unsaved and
+  // Save (onSaveClick below) actually writes it instead of silently
+  // dropping it until the DM happens to visit the target map first.
+  const foreignMapDrafts = useMemo(
+    () =>
+      project && activeMap
+        ? foreignMapDraftPlacements(
+            overrides,
+            activeMap.id,
+            project.maps.map((m) => m.id),
+            project.entities,
+          )
+        : [],
+    [overrides, activeMap, project],
+  );
+  // Unsaved-changes signal: there are local pin overrides (on the active map
+  // OR duplicated onto another map) OR a dirty world.yaml signal. The
+  // pin-side gate also waits for an edit since the last successful save so a
+  // hydrated-but-clean session doesn't nag; the world.yaml gate fires
+  // immediately because the draft hooks already resolve to a "fresh state"
+  // on mount.
   const pinSideUnsaved =
-    dirtyCount > 0 &&
+    (dirtyCount > 0 || foreignMapDrafts.length > 0) &&
     lastLocalEditAt !== null &&
     (lastSavedAt === null || lastLocalEditAt > lastSavedAt);
   const hasUnsavedChanges = pinSideUnsaved || worldYamlDirty;
@@ -936,6 +959,7 @@ function AtlasPlacementEditorInner() {
       (mapMetadataDirty ? 1 : 0) +
       (worldSettingsDirty ? 1 : 0) +
       dirtyCount +
+      foreignMapDrafts.length +
       (entityEditDraft.isDirty() ? 1 : 0),
   });
 
@@ -1557,7 +1581,16 @@ function AtlasPlacementEditorInner() {
                       const overridden = overrideKey(activeMap.id, e.id) in overrides;
                       const otherMaps = project.maps
                         .filter((m) => m.id !== activeMap.id)
-                        .map((m) => ({ id: m.id, name: m.name }));
+                        .map((m) => ({
+                          id: m.id,
+                          name: m.name,
+                          hasExisting: targetMapHasPlacement(
+                            m.id,
+                            e.id,
+                            overrides,
+                            project.placements,
+                          ),
+                        }));
                       return (
                         <EntityRow
                           key={e.id}
@@ -1577,7 +1610,18 @@ function AtlasPlacementEditorInner() {
                           onChangeXY={(x, y) => setCoord(e.id, { x, y })}
                           onChangeLabel={(l) => setLabel(e.id, l)}
                           onChangePin={(p) => setPinOverride(e.id, p)}
-                          onDuplicateToMap={(mid) => duplicateToMap(e.id, mid)}
+                          onDuplicateToMap={(mid) => {
+                            const target = otherMaps.find((m) => m.id === mid);
+                            if (
+                              target?.hasExisting &&
+                              !window.confirm(
+                                `"${target.name}" already has a pin for "${e.title}". Overwrite it?`,
+                              )
+                            ) {
+                              return;
+                            }
+                            duplicateToMap(e.id, mid);
+                          }}
                         />
                       );
                     })}
@@ -2295,7 +2339,7 @@ interface RowProps {
   pinOverride?: PinOverride;
   label?: string;
   /** Other maps the entity could be duplicated to (excludes the active one). */
-  otherMaps?: { id: string; name: string }[];
+  otherMaps?: { id: string; name: string; hasExisting: boolean }[];
   onPlace?: () => void;
   onMove?: () => void;
   onGoTo?: () => void;
@@ -2432,6 +2476,7 @@ function EntityRow({
                       {otherMaps.map((m) => (
                         <SelectItem key={m.id} value={m.id} className="text-xs">
                           {m.name}
+                          {m.hasExisting ? " (has a pin)" : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
