@@ -3024,3 +3024,43 @@ build/scan/fog/artifact touch, so `atlas:publish` wasn't required. Pre-commit ho
 
 **Commits:** `1021dc2d` (docs, on `run/q97-quickstart-fix`), fast-forward merge into
 `auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+- [x] **Q98. Ship a world.yaml JSON Schema for editor autocomplete and validation.** ✅ DONE
+  2026-07-27 — commit 0fd1998e — fourth unit of section **Q-M** (docs & authoring tooling).
+
+New `schemas/world.schema.json` (JSON Schema draft-07) covers the shape `scripts/atlas/loadWorldConfig.ts`
+accepts: `schemaVersion`, `maps` (id/name/width/height/oceanColor/wrapX/scale/grid/water/soundscape/layers,
+plus nested `regions`/`routes`/`fog`), top-level `regions`/`routes`/`fog` (mapId required there, unlike the
+nested forms which inherit it), `calendar` (+ `months`), `import.folders`/`defaultFolder`, `credits`,
+`assetCredits`. `grid.kind` and route `mode` reuse the literal enums already owned by
+`loadWorldConfig.ts`/`schema.ts` (`"square"|"hex"`, the six `RouteMode` values) since those are core
+map-doc types, not the visibility vocab. Per the unit's own invariant, `visibility` stays a plain
+`"string"` in the schema — the loader/`src/atlas/content/visibility.ts` owns the canonical
+`player|dm|hidden|rumor` set, not forked here. Every object definition sets `additionalProperties: true`
+so the schema can never reject a currently-valid file (permissive by design, per the done-when).
+Both real `world.yaml` files (`examples/seed-world/_atlas/world.yaml`,
+`content/astrath-deeprealm/_atlas/world.yaml`) gained a first-line
+`# yaml-language-server: $schema=../../../schemas/world.schema.json` header (both are three directory
+levels below the schema file, so the relative path is identical for both).
+New `src/test/schemas/worldSchema.test.ts` compiles the schema with `ajv` (new devDependency — no JSON
+Schema validator existed in the repo; `ajv` was already present transitively via `eslint`/`workbox-build`
+but not as a direct dependency, so it's now pinned explicitly) and: validates both real world.yaml files
+green, confirms both still load via `loadWorldConfig` without throwing, asserts both carry the
+`$schema` header, and adds four drift-guard negative/permissive cases (empty `maps` rejected, a route
+missing `waypoints` rejected, an invalid `grid.kind` rejected, unrecognized extra keys at any level
+allowed).
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing warnings, unchanged) ·
+2816 tests green across the 4 shards (699+607+827+683 — +8 over the Q97 baseline for the new test file's
+8 cases). Shard 3 hit the documented `onTaskUpdate` RPC flake (0 real failures elsewhere). Touches two
+build-input `world.yaml` files (comment-only), so `npm run atlas:publish` was also run: all 12 scans
+clean (secrets/derived-secrets/shape/fog/image-privacy/audit-assets), player and DM builds both
+succeeded. The build's `public/atlas/atlas.json` churned on rebuild — diffed and confirmed it was ONLY
+pre-existing CRLF→LF line-ending drift in unrelated entity bodies (the Q65 caveat pattern), nothing
+caused by this change — reverted with `git checkout --` before committing so the diff stays clean.
+Pre-commit hook's `vitest run --changed` ran the FULL suite (`package.json`/`package-lock.json` changed
+for the new `ajv` devDependency, same trigger shape as Q92's `setup.ts` change) — all 2816 green, 1
+`onTaskUpdate` flake, confirming the dependency add didn't regress anything else.
+
+**Commits:** `0fd1998e` (feat, on `run/q98-world-schema`), fast-forward merge into `auto/continuous-dev`
+(no separate merge commit — still at the fork point).
