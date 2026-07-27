@@ -195,11 +195,7 @@ is for sequencing, not the whole spec.
 
 - [x] **Q97. Fix QUICK_START seed-world config bug and leading-slash asset anti-pattern.** ✅ DONE 2026-07-27 — commit 1021dc2d
 
-- [ ] **Q100. Add a build-smoke test that keeps the documented seed-world path green.**
-  QUICK_START points onboarding users at `examples/seed-world`, but no test exercises that path, so a schema/loader change can silently break the advertised flow (no `src/test` file references seed-world today). Add a vitest under `src/test` that calls `loadWorldConfig("examples", "seed-world")` (`scripts/atlas/loadWorldConfig.ts`) and asserts it returns without throwing `WorldConfigError`, produces the `mistmoor-overview` map, and yields the "Calendar of the Hollow Year" calendar with its 4 months (Frostfall/Greenrise/Highsun/Emberfade). Optionally extend to a minimal `scripts/build-atlas.ts` pass over the seed folder.
-  - **Done when:** a test loads `examples/seed-world/_atlas/world.yaml` via `loadWorldConfig` and asserts the map + calendar; it fails if the seed world.yaml or loader contract drifts.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Independent of Q99 (the seed loads fine with `layers: []` since `maps.length > 0`); complements it. ~1 run.
+- [x] **Q100. Add a build-smoke test that keeps the documented seed-world path green.** ✅ DONE 2026-07-27 — commit f37b3ef1
 
 ---
 

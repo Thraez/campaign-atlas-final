@@ -3097,3 +3097,23 @@ on rebuild — diffed and confirmed it was only the pre-existing CRLF→LF drift
 
 **Commits:** `0fd1998e` (feat, on `run/q98-world-schema`), fast-forward merge into `auto/continuous-dev`
 (no separate merge commit — still at the fork point).
+
+- [x] **Q100. Add a build-smoke test that keeps the documented seed-world path green.** ✅ DONE
+  2026-07-27 — commit f37b3ef1 — sixth and final unit of section **Q-M** (docs & authoring tooling).
+  This closes out the entire Q1–Q100 backlog.
+
+QUICK_START.md points onboarding users at `examples/seed-world`, but no test exercised that path — a
+schema/loader drift could have silently broken the advertised flow. Added
+`src/test/atlas/seedWorld.test.ts` with three assertions: `loadWorldConfig("examples", "seed-world")`
+doesn't throw, resolves the `mistmoor-overview` map (name "Overview"), and yields the "Calendar of the
+Hollow Year" calendar with its 4 months (Frostfall/Greenrise/Highsun/Emberfade) in order. No changes to
+`loadWorldConfig.ts` or the seed world.yaml itself — test-only, additive.
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing, unchanged) · 2819 tests
+green across the 4 shards (693+615+811+700, +3 over the Q99 baseline of 2816 — exactly the new test
+file). Shards 1 and 4 each hit the documented `onTaskUpdate` RPC flake (0 real failures either time).
+Test-only change with no build/scan/fog/artifact touch, so `npm run atlas:publish` wasn't required
+(same as Q97's precedent).
+
+**Commit:** `f37b3ef1` (on `run/q100-seed-smoke`), fast-forward merge into `auto/continuous-dev` (no
+separate merge commit — still at the fork point).
