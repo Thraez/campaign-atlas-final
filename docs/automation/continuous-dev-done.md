@@ -2917,3 +2917,32 @@ since an `alt=""` image has no accessible `role="img"` name to query by). Pre-co
 
 **Commits:** `a350f006` (feat, on `run/q93-atlas-image-fallback`), fast-forward merge into
 `auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+- [x] **Q94. Add a Try-again retry to the atlas load-error screen.** ✅ DONE
+  2026-07-27 — commit 64d93356
+
+`src/atlas/content/AtlasLoadState.tsx` gains an optional `onRetry?: () => void` prop — when given and
+the error occurs while online, a "Try again" button renders next to the existing Back link (omitted
+while offline, since a retry would just fail again and the offline copy already tells the reader what to
+do). `src/pages/AtlasViewer.tsx`'s load effect is extracted into a stable `attemptLoad()` (created once,
+same "intentionally runs once" semantics as before, now with an updated comment), reused for the initial
+mount, the new `retryLoad()` handler wired to `AtlasLoadState`'s `onRetry`, and a `window` `"online"`
+listener that's bound ONLY while `error` is truthy (so it can't loop — it unbinds the moment a retry
+succeeds or the error clears). A retry re-runs `loadAtlasContent(true)` in place, calling `setError(null)`
+first so the loading branch shows while the promise is in flight, and clearing/setting state on
+success/failure exactly like the original mount effect (including the deep-link handling).
+`useAtlasContent()`/the four simple reader pages were left untouched — Q94's done-when only covers
+AtlasViewer, which (per Q88) keeps its own richer load effect rather than using the shared hook.
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing warnings, unchanged) ·
+2808 tests green across the 4 shards (694+607+826+681 — +5 over the Q93 baseline); shard 3 hit the
+documented `onTaskUpdate` RPC flake (0 real failures elsewhere). No build/scan/fog/artifact touch, so
+`atlas:publish` wasn't required. New tests in `AtlasLoadState.test.tsx` (3): Try-again button shown +
+calls `onRetry` when online, omitted while offline, omitted when `onRetry` isn't passed. New tests in
+`AtlasViewer.smoke.test.tsx` (2): a failing-then-succeeding `atlas.json` fetch reaches the map after
+clicking Try Again (asserts the fetch was called exactly twice), and the same scenario resolves via a
+dispatched `window` `"online"` event instead of a click. Pre-commit hook's `vitest run --changed` covered
+all 4 changed files (89/89 green, same lone flake elsewhere).
+
+**Commits:** `64d93356` (feat, on `run/q94-atlas-load-retry`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).

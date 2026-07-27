@@ -188,13 +188,6 @@ is for sequencing, not the whole spec.
 
 - [x] **Q89. Degrade gracefully when search-index.json fails to load.** ✅ DONE 2026-07-27 — commit 2b53e85e
 
-- [ ] **Q94. Add a Try-again retry to the atlas load-error screen.**
-  When `atlas.json` fails to load, `src/pages/AtlasViewer.tsx`'s error screen (~lines 440-465) offers only "Back to home"; the sole retry path is a full browser reload. Add a "Try again" button that re-runs the load (`loadAtlasContent(true)` + `loadSearchIndex()`) in place and clears `error` on success without a page reload (reset the load effect, e.g. via a retry-nonce state or an extracted load callback). Optionally auto-retry once on the `window` `online` event — the error screen already reads `navigator.onLine`.
-  - **Done when:** the error screen shows a "Try again" action that re-attempts the load and clears the error on success without a full reload; a failing-then-succeeding load reaches the map after clicking retry (unit test with a mocked loader).
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest).
-  Depends on / overlaps Q88 & Q89 (all touch AtlasViewer's load): if Q88's shared load-state ships first, fold the retry into `<AtlasLoadState>`/`useAtlasContent()` rather than AtlasViewer directly.
-  ~1 run.
-
 
 #### Q-M — Docs & authoring tooling
 
