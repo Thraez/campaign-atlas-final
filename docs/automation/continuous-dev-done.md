@@ -2946,3 +2946,32 @@ all 4 changed files (89/89 green, same lone flake elsewhere).
 
 **Commits:** `64d93356` (feat, on `run/q94-atlas-load-retry`), fast-forward merge into
 `auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+- [x] **Q95. Correct the "three safety scanners" claim to the real count across all docs.** ✅ DONE
+  2026-07-27 — commit e3428133 — first unit of section **Q-M** (docs & authoring tooling); closes
+  section **Q-L** (resilience & error handling, Q90–Q94 all shipped).
+
+`docs/VISIBILITY_AND_PLAYER_SAFETY.md`'s "## The three safety scanners" section is rewritten as
+"## The safety scanners": the chained-command block now shows the real `atlas:publish` steps
+(`atlas:snapshot` → `atlas:build:player --strict` → `build` → `atlas:scan`, confirmed against
+`.github/workflows/publish-atlas.yml`'s actual CI steps) and a "what it catches" bullet for all six
+player-safety scanners (check-no-secrets, check-derived-secrets, check-artifact-shape,
+check-image-privacy, check-fog-safety, check-player-secrets — the last has no standalone
+`atlas:check-player-secrets` npm alias, confirmed against `package.json`), with `audit-assets` called
+out separately as a content-quality check rather than a safety gate. Descriptions for the newer three
+scanners were written from their own source-file doc comments
+(`check-image-privacy.ts`/`check-fog-safety.ts`/`check-player-secrets.ts`) rather than guessed.
+`docs/QUICK_START.md`, `docs/PRODUCT_SPEC.md`, and `docs/README.md` wording updated to match; the main
+`README.md` scripts table gains rows for `atlas:check-image-privacy`, `atlas:check-fog`,
+`atlas:audit-assets`, and `atlas:scan` itself. Also removed the now-redundant "Fix QUICK_START drift on
+the publish safety-scan set" entry from `continuous-dev-deferred-pool.md` — this unit already covers it,
+so it would otherwise sit in the pool as stale duplicate work.
+
+**Gate:** `npm run typecheck` clean · `npm run lint` 0 errors (18 pre-existing warnings, unchanged) ·
+2808 tests green across the 4 shards (694+607+826+681 — unchanged from Q94, no test-count change since
+this is docs-only). Shard 3 hit the documented `onTaskUpdate` RPC flake (0 real failures elsewhere). No
+build/scan/fog/artifact touch, so `atlas:publish` wasn't required. Pre-commit hook's `vitest run --changed`
+found no test files to run (docs-only change) and passed cleanly.
+
+**Commits:** `e3428133` (docs, on `run/q95-scanner-count-docs`), fast-forward merge into
+`auto/continuous-dev` (no separate merge commit — still at the fork point).
