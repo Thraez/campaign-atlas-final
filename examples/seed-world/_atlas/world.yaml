@@ -25,18 +25,19 @@ maps:
       kind: square
       size: 100
       enabled: true
-    # Drop your own map image into `public/atlas/assets/maps/` and add it as
-    # a layer here, e.g.:
-    #   layers:
-    #     - id: overview-map
-    #       src: atlas/assets/maps/mistmoor.jpg
-    #       x: 0
-    #       y: 0
-    #       width: 2000
-    #       height: 1500
-    #       opacity: 1
-    #       zIndex: 1
-    layers: []
+    # Ships with a small generic placeholder layer (gradient + grid, no real
+    # geography) so the first build isn't empty ocean. Swap it for your own
+    # map image under `public/atlas/assets/maps/` and update `src` below —
+    # see examples/seed-world/README.md.
+    layers:
+      - id: overview-map
+        src: atlas/assets/maps/seed-placeholder.png
+        x: 0
+        y: 0
+        width: 2000
+        height: 1500
+        opacity: 1
+        zIndex: 1
 
 # Add regions when you draw them in the editor. Example shape:
 #   - id: the-pinewood

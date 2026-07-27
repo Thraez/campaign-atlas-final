@@ -44,7 +44,7 @@ Then run:
 npm run atlas:build
 ```
 
-This writes `.local-atlas/atlas.json` — the full DM build (with secrets). Reload `/atlas` to see the seed map.
+This writes `.local-atlas/atlas.json` — the full DM build (with secrets). Reload `/atlas` to see the seed map — it ships with a small generic placeholder layer (gradient + grid, no real geography) so the first build isn't empty ocean. Swap in your own image later (see `examples/seed-world/README.md`).
 
 To produce a player-safe build (DM content stripped):
 
