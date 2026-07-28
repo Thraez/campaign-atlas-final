@@ -55,6 +55,11 @@ const HANDOUT_CSS = `
   .conn-label { color: #8a6a1f; font-style: italic; }
   .tags { margin-top: 18px; font-size: 11px; color: #6c6c6c; font-family: "Helvetica Neue", Arial, sans-serif; }
   .tags span { display: inline-block; margin-right: 8px; }
+  .body .footnotes { margin-top: 1.4em; border-top: 1px solid #e0d4b0; padding-top: 10px; font-size: 12px; color: #555; }
+  .body .footnotes ol { padding-left: 1.3em; margin: 0; }
+  .body .footnotes li { margin-bottom: 4px; }
+  .body a.footnote-ref { color: #8a6a1f; text-decoration: none; font-size: 0.75em; }
+  .body a.footnote-backref { color: #888; text-decoration: none; margin-left: 4px; }
   footer.handout-foot { margin-top: 26px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 10px; color: #888; font-family: "Helvetica Neue", Arial, sans-serif; display: flex; justify-content: space-between; }
   .body img { max-width: 100%; height: auto; }
   .empty { padding: 40px 20px; text-align: center; color: #666; font-style: italic; }
@@ -66,12 +71,26 @@ const HANDOUT_CSS = `
   .no-print button { font: 12px "Helvetica Neue", Arial, sans-serif; padding: 6px 12px; background: #1a1a1a; color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-left: 6px; }
 `;
 
+/** The footnote extension (`markdownCore.ts`) scopes ids only by the
+ *  footnote's own label (`fnref-{id}` / `fn-{id}`), which is fine for a
+ *  single rendered entity but collides when several entities' bodyHtml are
+ *  concatenated into one bundle and happen to share a label. Rewrite those
+ *  ids/hrefs to be unique per entity position in the bundle. */
+function scopeFootnoteIds(html: string, scope: number): string {
+  return html
+    .replace(/id="fnref-([^"]+)"/g, `id="fnref-${scope}-$1"`)
+    .replace(/href="#fnref-([^"]+)"/g, `href="#fnref-${scope}-$1"`)
+    .replace(/id="fn-([^"]+)"/g, `id="fn-${scope}-$1"`)
+    .replace(/href="#fn-([^"]+)"/g, `href="#fn-${scope}-$1"`);
+}
+
 /** Render one entity as a self-contained <article>. Page break is applied by
  *  the caller (so the last entity in a bundle doesn't get a trailing blank). */
 function renderEntitySection(
   entity: Entity,
   withPageBreak: boolean,
   entitiesById: Map<string, Entity>,
+  scope: number,
 ): string {
   const heroImg = entity.images[0] ? normalizeAtlasAssetUrl(entity.images[0]) : null;
   const galleryImgs = entity.images.slice(1).map((src) => normalizeAtlasAssetUrl(src));
@@ -83,8 +102,12 @@ function renderEntitySection(
     : "";
   const summary = entity.summary ? `<p class="summary">${escapeHtml(entity.summary)}</p>` : "";
   // entity.bodyHtml is sanitized server-side at build time and contains
-  // <a class="atlas-wikilink"> tokens; render as-is for the handout.
-  const body = entity.bodyHtml || `<p>${escapeHtml(entity.body || "")}</p>`;
+  // <a class="atlas-wikilink"> tokens; render as-is for the handout, except
+  // for footnote ids/hrefs, which are scoped per entity to avoid collisions
+  // when this section is concatenated into a multi-entity bundle.
+  const body = entity.bodyHtml
+    ? scopeFootnoteIds(entity.bodyHtml, scope)
+    : `<p>${escapeHtml(entity.body || "")}</p>`;
   const cls = withPageBreak ? "handout page-break" : "handout";
   const connectionsHtml = entity.relationships?.length
     ? `<div class="connections"><h2 class="conn-heading">Connections</h2><ul>${entity.relationships
@@ -135,7 +158,9 @@ export function buildHandoutHtml(
   const sections =
     entities.length === 0
       ? `<div class="empty">No entities selected for this handout.</div>`
-      : entities.map((e, i) => renderEntitySection(e, i < entities.length - 1, entitiesById)).join("\n");
+      : entities
+          .map((e, i) => renderEntitySection(e, i < entities.length - 1, entitiesById, i))
+          .join("\n");
 
   return `<!doctype html>
 <html lang="en">

@@ -189,6 +189,52 @@ describe("buildHandoutHtml", () => {
   });
 });
 
+describe("N111: footnote id scoping and styling", () => {
+  function footnoteBodyHtml(): string {
+    return (
+      '<p>See it here.<sup><a id="fnref-1" href="#fn-1" class="footnote-ref">[1]</a></sup></p>' +
+      '<section class="footnotes"><ol>\n' +
+      '<li id="fn-1"><p>A note. <a href="#fnref-1" class="footnote-backref">↩</a></p></li>\n' +
+      "</ol></section>\n"
+    );
+  }
+
+  it("keeps a single entity's footnote ref/def ids self-referential", () => {
+    const html = buildHandoutHtml([
+      entity({ id: "a", title: "Alpha", bodyHtml: footnoteBodyHtml() }),
+    ]);
+    expect(html).toContain('id="fnref-0-1"');
+    expect(html).toContain('href="#fn-0-1"');
+    expect(html).toContain('id="fn-0-1"');
+    expect(html).toContain('href="#fnref-0-1"');
+  });
+
+  it("scopes colliding footnote labels apart across entities in a bundle", () => {
+    const html = buildHandoutHtml([
+      entity({ id: "a", title: "Alpha", bodyHtml: footnoteBodyHtml() }),
+      entity({ id: "b", title: "Beta", bodyHtml: footnoteBodyHtml() }),
+    ]);
+    // Two distinct ref ids and two distinct def ids — not both "fnref-1"/"fn-1".
+    expect(html).toContain('id="fnref-0-1"');
+    expect(html).toContain('id="fnref-1-1"');
+    expect(html).toContain('id="fn-0-1"');
+    expect(html).toContain('id="fn-1-1"');
+    // Each ref points to its own entity's def, not the other entity's.
+    expect(html).toContain('href="#fn-0-1"');
+    expect(html).toContain('href="#fn-1-1"');
+    expect(html).not.toContain('id="fnref-1"');
+    expect(html).not.toContain('id="fn-1"');
+  });
+
+  it("embeds visible CSS styling for the footnotes section", () => {
+    const html = buildHandoutHtml([
+      entity({ id: "a", title: "Alpha", bodyHtml: footnoteBodyHtml() }),
+    ]);
+    expect(html).toMatch(/\.body \.footnotes\s*{/);
+    expect(html).toMatch(/\.body a\.footnote-ref\s*{/);
+  });
+});
+
 describe("Q16: pop-up guard — toast instead of alert", () => {
   afterEach(() => {
     vi.restoreAllMocks();
