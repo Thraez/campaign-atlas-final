@@ -802,6 +802,7 @@ export default function AtlasViewer() {
                   openId={openId}
                   onPinPeek={onPinPeek}
                   onPinPeekLeave={peekCtl.onTriggerLeave}
+                  rulerActive={rulerActive}
                 />
               ))}
 
@@ -1030,9 +1031,10 @@ interface WrappedWorldProps {
   openId: string | null;
   onPinPeek?: (id: string, ev: MouseEvent) => void;
   onPinPeekLeave?: () => void;
+  rulerActive?: boolean;
 }
 
-function WrappedWorld({
+export function WrappedWorld({
   dx,
   map,
   placements,
@@ -1043,6 +1045,7 @@ function WrappedWorld({
   openId,
   onPinPeek,
   onPinPeekLeave,
+  rulerActive,
 }: WrappedWorldProps) {
   const H = map.height;
   return (
@@ -1079,7 +1082,9 @@ function WrappedWorld({
               opacity: region.strokeOpacity ?? 0.85,
             }}
             eventHandlers={
-              region.entityId ? { click: () => onOpenEntity(region.entityId!, false) } : undefined
+              region.entityId && !rulerActive
+                ? { click: () => onOpenEntity(region.entityId!, false) }
+                : undefined
             }
           >
             {/* Hover label so users don't rely on fill color alone to identify
