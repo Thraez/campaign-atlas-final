@@ -130,6 +130,28 @@ describe("resolveImageEmbeds", () => {
     expect(out).toBe("![Portrait.PNG](/atlas/assets/images/Portrait.PNG)");
   });
 
+  it("![[image.png|300]] sets width instead of using '300' as alt text (N112)", () => {
+    const out = resolveImageEmbeds("![[Portrait.png|300]]");
+    expect(out).toBe('<img src="/atlas/assets/images/Portrait.png" width="300" alt="">');
+  });
+
+  it("![[image.png|300x200]] sets both width and height (N112)", () => {
+    const out = resolveImageEmbeds("![[Portrait.png|300x200]]");
+    expect(out).toBe(
+      '<img src="/atlas/assets/images/Portrait.png" width="300" height="200" alt="">'
+    );
+  });
+
+  it("![[image.png|Lord Corven]] (non-numeric pipe) still becomes alt text, not dimensions (N112)", () => {
+    const out = resolveImageEmbeds("![[Portrait.png|Lord Corven]]");
+    expect(out).toBe("![Lord Corven](/atlas/assets/images/Portrait.png)");
+  });
+
+  it("resolved <img width> survives sanitization in renderEntityMarkdown (N112)", () => {
+    const html = renderEntityMarkdown("![[Portrait.png|300]]", { showDmNotes: false });
+    expect(html).toContain('width="300"');
+  });
+
   it("an embed inside an inline code span is not resolved (N108)", () => {
     const body = "Shown as `![[Portrait.png]]` in docs.";
     expect(resolveImageEmbeds(body)).toBe(body);

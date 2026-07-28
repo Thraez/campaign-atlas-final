@@ -10,11 +10,15 @@ export interface RenderOpts {
 const EMBED_RE = /!\[\[([^[\]\n]+?)\]\]/g;
 const WIKILINK_RE = /\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+?))?\]\]/g;
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|avif)$/i;
+// Obsidian's image-resize pipe syntax: ![[image.png|300]] or ![[image.png|300x200]].
+const DIMENSION_RE = /^(\d+)(?:x(\d+))?$/i;
 
 export const DEFAULT_RESOLVE_ASSET = (n: string): string => `/atlas/assets/images/${n}`;
 
 /** Convert Obsidian image embed syntax to standard markdown img before the wikilink pass.
  *  Handles the optional pipe-alias: ![[image.png|Alt text]] → ![Alt text](resolved/image.png)
+ *  A pipe segment that is purely `W` or `WxH` is Obsidian's resize syntax, not a caption —
+ *  it renders `<img width height>` instead of using the digits as alt text.
  *  Non-image embeds (e.g. ![[Some Note]], ![[doc.pdf]]) are not transclusion — Obsidian note
  *  embedding is an explicit non-goal — so they render an inert placeholder instead of a
  *  broken <img> pointing at a note or document that was never an image asset.
@@ -30,6 +34,12 @@ export function resolveImageEmbeds(
     const alt = (pipeIdx >= 0 ? name.slice(pipeIdx + 1) : name).trim();
     if (!IMAGE_EXT_RE.test(filename)) {
       return `<span class="atlas-embed-missing">embedded note not shown</span>`;
+    }
+    const dims = pipeIdx >= 0 ? DIMENSION_RE.exec(alt) : null;
+    if (dims) {
+      const [, width, height] = dims;
+      const heightAttr = height ? ` height="${height}"` : "";
+      return `<img src="${resolveAsset(filename)}" width="${width}"${heightAttr} alt="">`;
     }
     return `![${alt}](${resolveAsset(filename)})`;
   });
