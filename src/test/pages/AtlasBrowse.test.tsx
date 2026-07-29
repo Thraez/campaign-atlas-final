@@ -171,6 +171,43 @@ describe("AtlasBrowse — URL filter state", () => {
   });
 });
 
+describe("AtlasBrowse — N119: chip counts", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("keeps the 'all' count at the unfiltered-by-type total when a type is selected", async () => {
+    const project = makeProject([
+      makeEntity({ id: "tideshore", title: "Tideshore", type: "location" }),
+      makeEntity({ id: "goblin", title: "Goblin Cave", type: "location" }),
+      makeEntity({ id: "mira", title: "Mira", type: "npc" }),
+    ]);
+    renderBrowse("/atlas/browse?type=npc", project);
+    await screen.findByText("Mira");
+    const allBtn = screen.getByText(/^all/i, { selector: "button" });
+    expect(allBtn).toHaveTextContent("all 3");
+  });
+
+  it("makes type chip counts reflect the active text query", async () => {
+    const project = makeProject([
+      makeEntity({
+        id: "tideshore",
+        title: "Tideshore",
+        type: "location",
+        summary: "xyzzy waterfront",
+      }),
+      makeEntity({ id: "goblin", title: "Goblin Cave", type: "location", summary: "unrelated" }),
+      makeEntity({ id: "mira", title: "Mira", type: "npc", summary: "xyzzy merchant" }),
+    ]);
+    renderBrowse("/atlas/browse?q=xyzzy", project);
+    await screen.findByText("Tideshore");
+    const locationBtn = screen.getByText(/location/i, { selector: "button" });
+    expect(locationBtn).toHaveTextContent("Location 1");
+    const allBtn = screen.getByText(/^all/i, { selector: "button" });
+    expect(allBtn).toHaveTextContent("all 2");
+  });
+});
+
 describe("AtlasBrowse — skip link and main landmark", () => {
   beforeEach(() => {
     vi.clearAllMocks();

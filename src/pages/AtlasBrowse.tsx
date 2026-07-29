@@ -50,24 +50,27 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
       { replace: true },
     );
 
-  const entries = useMemo(() => {
+  const facetFilteredEntries = useMemo(() => {
     const all = project?.entities ?? [];
     return all.filter((e) => {
       if (mode === "tag" && !e.tags.includes(facetDecoded)) return false;
       if (mode === "type" && e.type !== facetDecoded) return false;
-      if (activeType && e.type !== activeType) return false;
       return entityMatchesQuery(e, query);
     });
-  }, [project, mode, facetDecoded, activeType, query]);
+  }, [project, mode, facetDecoded, query]);
+
+  const entries = useMemo(
+    () => facetFilteredEntries.filter((e) => !activeType || e.type === activeType),
+    [facetFilteredEntries, activeType],
+  );
 
   const allTypes = useMemo(() => {
     const m = new Map<string, number>();
-    (project?.entities ?? []).forEach((e) => {
-      if (mode === "tag" && !e.tags.includes(facetDecoded)) return;
+    facetFilteredEntries.forEach((e) => {
       m.set(e.type, (m.get(e.type) ?? 0) + 1);
     });
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
-  }, [project, mode, facetDecoded]);
+  }, [facetFilteredEntries]);
 
   const allTags = useMemo(() => {
     if (mode !== "browse") return [];
@@ -166,7 +169,7 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
             onClick={() => setActiveType(null)}
             className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded ${activeType === null ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
           >
-            all <span className="opacity-60">{entries.length}</span>
+            all <span className="opacity-60">{facetFilteredEntries.length}</span>
           </button>
           {allTypes.map(([t, n]) => {
             const label = playerTypeLabel(t);
