@@ -55,9 +55,10 @@ export function gridLines(map: MapDocument, grid: GridOverlay): LatLngExpression
       ]);
     }
     for (let y = 0; y <= map.height; y += grid.size) {
+      const lat = map.height - y;
       lines.push([
-        [y, 0],
-        [y, map.width],
+        [lat, 0],
+        [lat, map.width],
       ]);
     }
     return lines;
