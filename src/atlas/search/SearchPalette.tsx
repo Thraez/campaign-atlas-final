@@ -182,9 +182,10 @@ export function SearchPalette({
     };
   }, [query, index, activeType, activeTag, thisMapOnly, placedIds, recentOnly, recentlyRevealed]);
 
-  // Reset selection when filters or query change.
+  // Reset selection and scroll position when filters or query change.
   useEffect(() => {
     setActiveIndex(-1);
+    if (listRef.current) listRef.current.scrollTop = 0;
   }, [query, activeType, activeTag, thisMapOnly, recentOnly]);
 
   // Scroll active item into view.

@@ -161,6 +161,34 @@ describe("SearchPalette", () => {
     expect(rows[0]).toHaveTextContent("Iron Tower");
   });
 
+  it("N122: scrolls the results list back to top when a type filter changes", () => {
+    renderPalette({ query: "" });
+    const list = document.querySelector(".max-h-\\[60vh\\]") as HTMLElement;
+    list.scrollTop = 200;
+    expect(list.scrollTop).toBe(200);
+    fireEvent.click(screen.getByRole("button", { name: /^Person\b/ }));
+    expect(list.scrollTop).toBe(0);
+  });
+
+  it("N122: scrolls the results list back to top when the query changes", () => {
+    const { rerender } = renderPalette({ query: "" });
+    const list = document.querySelector(".max-h-\\[60vh\\]") as HTMLElement;
+    list.scrollTop = 200;
+    rerender(
+      <MemoryRouter>
+        <SearchPalette
+          query="silver"
+          setQuery={vi.fn()}
+          index={INDEX}
+          placements={PLACEMENTS}
+          onPick={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(list.scrollTop).toBe(0);
+  });
+
   it("selects with ArrowDown and commits with Enter", () => {
     const onPick = vi.fn();
     renderPalette({ query: "", onPick });
