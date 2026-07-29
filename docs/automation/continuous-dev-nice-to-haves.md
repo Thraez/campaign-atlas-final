@@ -1144,11 +1144,8 @@ The per-pick design-check in `continuous-dev-routine.md` step 2a still binds —
 - [x] **N124. Add a Timeline link to Browse's desktop toolbar (the nav is one-way today).** ✅ DONE 2026-07-29 — commit e863096e
   From Timeline a DM can reach both Browse and Map, but Browse's toolbar rendered only a "Map" link. Added a symmetric Timeline link (`src/pages/AtlasBrowse.tsx`) next to the Map link, matching its style; test added to `AtlasBrowse.test.tsx`.
 
-- [ ] **N125. The recently-revealed filter re-downloads the whole atlas.json on every search open.**
-  `useRecentlyRevealedIds` does a bare `fetch(atlas.json, { cache: "no-cache" })` purely to build the set of current entity ids (`src/atlas/search/SearchPalette.tsx:37-69`), even though those ids already sit in the `index` prop the palette receives (`:71-79`). Derive the id set from the existing index instead of re-fetching.
-  - **Done when:** opening the palette with "recently revealed" no longer refetches atlas.json; the recently-revealed set is unchanged; a test asserts no fetch.
-  - **Gate:** standard gate.
-  ~1 run.
+- [x] **N125. The recently-revealed filter re-downloads the whole atlas.json on every search open.** ✅ DONE 2026-07-29 — commit 4594c071
+  `useRecentlyRevealedIds` fetched both `atlas.json` and `.last-published.json` on every palette mount purely to build the set of current entity ids, even though those ids already sit in the `index` prop the palette receives. Now it only fetches the publish-baseline snapshot and diffs it against `index` (kept current via a ref synced in its own effect, to avoid mutating a ref during render). Test added in `src/test/search/SearchPalette.test.tsx` asserts `atlas.json` is never fetched and the derived "recently revealed" count is correct.
 
 - [ ] **N126. The "already exists" import-conflict toast tells the DM to click a button that can't fix that row.**
   When a `.md` import 409s because the target file exists on disk but wasn't in the loaded atlas.json, `useMdImportFlow.commit`'s handler suggests "Select all overwrites" (`src/atlas/import/useMdImportFlow.ts:207-226`), but that control only acts on rows whose conflict was detected in-app (`ImportStagingModal.tsx:79-82`) — so the suggested fix does nothing for this row. Point the DM at an action that actually resolves it (e.g. reload/rescan, or mark this specific row overwrite).
