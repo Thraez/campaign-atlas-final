@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import AtlasBrowse from "@/pages/AtlasBrowse";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity } from "@/atlas/content/schema";
@@ -205,6 +205,55 @@ describe("AtlasBrowse — N119: chip counts", () => {
     expect(locationBtn).toHaveTextContent("Location 1");
     const allBtn = screen.getByText(/^all/i, { selector: "button" });
     expect(allBtn).toHaveTextContent("all 2");
+  });
+});
+
+describe("AtlasBrowse — N121: empty state blames the right cause", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function renderFacet(mode: "tag" | "type", facetValue: string, url: string, project: AtlasProject) {
+    vi.mocked(loadAtlasContent).mockResolvedValue(project);
+    const path = mode === "tag" ? "/atlas/tag/:tag" : "/atlas/type/:type";
+    return render(
+      <MemoryRouter initialEntries={[url]}>
+        <Routes>
+          <Route path={path} element={<AtlasBrowse mode={mode} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  it("blames the tag facet when truly nothing carries that tag", async () => {
+    const project = makeProject([makeEntity({ id: "e1", title: "Alpha", tags: ["other"] })]);
+    renderFacet("tag", "empty-tag", "/atlas/tag/empty-tag", project);
+    expect(await screen.findByText(/No entries tagged/)).toBeInTheDocument();
+    expect(screen.queryByText(/Clear filters/i)).toBeNull();
+  });
+
+  it("blames the filter, not the tag, when the tag has entries but the text query hides them", async () => {
+    const project = makeProject([makeEntity({ id: "e1", title: "Alpha", tags: ["goblin"] })]);
+    renderFacet("tag", "goblin", "/atlas/tag/goblin?q=nomatch", project);
+    expect(await screen.findByText(/No entries match your filters/)).toBeInTheDocument();
+    expect(screen.queryByText(/No entries tagged/)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /clear filters/i }));
+    expect(await screen.findByText("Alpha")).toBeInTheDocument();
+  });
+
+  it("blames the type facet when truly nothing carries that type", async () => {
+    const project = makeProject([makeEntity({ id: "e1", title: "Alpha", type: "location" })]);
+    renderFacet("type", "npc", "/atlas/type/npc", project);
+    expect(await screen.findByText(/No entries of type/)).toBeInTheDocument();
+    expect(screen.queryByText(/Clear filters/i)).toBeNull();
+  });
+
+  it("blames the filter, not the type, when the type has entries but the text query hides them", async () => {
+    const project = makeProject([makeEntity({ id: "e1", title: "Alpha", type: "npc" })]);
+    renderFacet("type", "npc", "/atlas/type/npc?q=nomatch", project);
+    expect(await screen.findByText(/No entries match your filters/)).toBeInTheDocument();
+    expect(screen.queryByText(/No entries of type/)).toBeNull();
   });
 });
 
