@@ -785,8 +785,6 @@ export default function AtlasViewer() {
                 mapId={activeMap.id}
                 mapHeight={activeMap.height}
                 scale={activeMap.scale}
-                wrapX={activeMap.wrapX}
-                mapWidth={activeMap.width}
               />
 
               {/* Horizontal wrap: render copies at -W, 0, +W when wrapX enabled */}

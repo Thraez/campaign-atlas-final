@@ -1871,8 +1871,6 @@ function AtlasPlacementEditorInner() {
                     mapId={activeMap.id}
                     mapHeight={activeMap.height}
                     scale={activeMap.scale}
-                    wrapX={activeMap.wrapX}
-                    mapWidth={activeMap.width}
                   />
                   <MapClickCapture onClick={onMapClick} />
 

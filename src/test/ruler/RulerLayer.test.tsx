@@ -3,13 +3,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
 
 // Capture the click handler registered via useMapEvents so tests can fire it.
-const { capturedHandlers } = vi.hoisted(() => {
+const { capturedHandlers, measureCalls } = vi.hoisted(() => {
   const capturedHandlers = {
     click: null as
       | ((e: { latlng: { lng: number; lat: number } }) => void)
       | null,
   };
-  return { capturedHandlers };
+  const measureCalls: Array<{ x: number; y: number }[]> = [];
+  return { capturedHandlers, measureCalls };
 });
 
 vi.mock("react-leaflet", async () => {
@@ -53,7 +54,10 @@ vi.mock("@/atlas/editor/mapClickCoord", () => ({
 }));
 
 vi.mock("@/atlas/ruler/measureDistance", () => ({
-  measureDistance: () => ({ label: "5.0 mi", px: 100 }),
+  measureDistance: (p1: { x: number; y: number }, p2: { x: number; y: number }) => {
+    measureCalls.push([p1, p2]);
+    return { label: "5.0 mi", px: 100 };
+  },
 }));
 
 // Import after mocks are set up.
@@ -127,6 +131,26 @@ describe("Q7 — RulerLayer: third-click reset, hint, Escape", () => {
   it("does not show hint when ruler is inactive", () => {
     renderRuler(false);
     expect(screen.queryByTestId("ruler-hint")).not.toBeInTheDocument();
+  });
+});
+
+describe("N116 — RulerLayer: wrap-around (wrapX) point placement", () => {
+  beforeEach(() => {
+    capturedHandlers.click = null;
+    measureCalls.length = 0;
+  });
+
+  it("keeps a click on a wrapped copy at its clicked lng instead of snapping to the canonical tile", () => {
+    render(<RulerLayer active mapId="map-1" mapHeight={1000} />);
+    // On a wrapX map, Leaflet renders wrapped tile copies at dx = -width, 0, +width,
+    // so a click on the left copy arrives with lng outside the canonical [0, width) range.
+    click(-50, 900); // p1, wrapped copy
+    click(30, 800); // p2, canonical copy
+
+    expect(measureCalls).toHaveLength(1);
+    const [p1, p2] = measureCalls[0];
+    expect(p1.x).toBe(-50);
+    expect(p2.x).toBe(30);
   });
 });
 

@@ -10,8 +10,6 @@ interface RulerLayerProps {
   mapId: string;
   mapHeight: number;
   scale?: MapScale;
-  wrapX?: boolean;
-  mapWidth?: number;
   onClear?: () => void;
 }
 
@@ -22,8 +20,6 @@ export function RulerLayer({
   mapId,
   mapHeight,
   scale,
-  wrapX,
-  mapWidth,
   onClear,
 }: RulerLayerProps) {
   const [points, setPoints] = useState<RulerPoints>(null);
@@ -69,11 +65,10 @@ export function RulerLayer({
   useMapEvents({
     click(e) {
       if (!active) return;
-      let lng = e.latlng.lng;
-      if (wrapX && mapWidth) {
-        lng = ((lng % mapWidth) + mapWidth) % mapWidth;
-      }
-      const { x, y } = mapClickToAtlasCoord(lng, e.latlng.lat, mapHeight);
+      // Use the raw clicked lng (not normalized into the canonical [0, width)
+      // range) so a point placed on a wrapX map's wrapped tile copy stays
+      // where it was clicked instead of jumping to the canonical tile.
+      const { x, y } = mapClickToAtlasCoord(e.latlng.lng, e.latlng.lat, mapHeight);
       setPoints((prev) => {
         if (!prev) return { p1: { x, y } };
         if (!prev.p2) {
