@@ -1141,11 +1141,8 @@ The per-pick design-check in `continuous-dev-routine.md` step 2a still binds —
 - [x] **N123. The hover-peek card shows the raw internal type slug, not the player label.** ✅ DONE 2026-07-29 — commit 3f4cdbb2
   `HoverPeekCard` rendered `{entity.type}` directly as the chip text (`src/atlas/peek/HoverPeekCard.tsx:45-46`), leaking internal slugs where the reading panel and map markers already use `playerTypeLabel` (`src/atlas/content/typeLabel.ts:17-28`). Now computes `typeLabel = playerTypeLabel(entity.type)` and renders it in place of the raw slug; the chip `<span>` is omitted entirely when `typeLabel` is `""` (e.g. type `"note"`), matching the suppression convention `playerTypeLabel` documents. Three tests in `src/test/wayfinding/HoverPeekCard.test.tsx`: updated the existing badge test to expect "Settlement" (capitalized, not raw), added an "npc" → "Person" slug→label case, and a "note" → chip omitted case. Gate: typecheck clean · lint 0 errors (18 pre-existing, unchanged) · 2909 tests green across the 4 shards (721+636+854+698 — +2 over the N122 baseline of 2907). One shard hit the documented `onTaskUpdate` RPC flake (0 real failures, not re-run per policy). Pure client-side change — no `atlas:publish` required.
 
-- [ ] **N124. Add a Timeline link to Browse's desktop toolbar (the nav is one-way today).**
-  From Timeline a DM can reach both Browse and Map (`src/pages/AtlasTimeline.tsx:125-133`), but Browse's desktop toolbar renders only a "Map" button (`src/pages/AtlasBrowse.tsx:140-145`) — there's no way back to Timeline without the menu. Add the symmetric Timeline link.
-  - **Done when:** Browse's desktop toolbar has a Timeline link matching the existing nav style; a test covers its presence.
-  - **Gate:** standard gate.
-  ~1 run.
+- [x] **N124. Add a Timeline link to Browse's desktop toolbar (the nav is one-way today).** ✅ DONE 2026-07-29 — commit e863096e
+  From Timeline a DM can reach both Browse and Map, but Browse's toolbar rendered only a "Map" link. Added a symmetric Timeline link (`src/pages/AtlasBrowse.tsx`) next to the Map link, matching its style; test added to `AtlasBrowse.test.tsx`.
 
 - [ ] **N125. The recently-revealed filter re-downloads the whole atlas.json on every search open.**
   `useRecentlyRevealedIds` does a bare `fetch(atlas.json, { cache: "no-cache" })` purely to build the set of current entity ids (`src/atlas/search/SearchPalette.tsx:37-69`), even though those ids already sit in the `index` prop the palette receives (`:71-79`). Derive the id set from the existing index instead of re-fetching.
