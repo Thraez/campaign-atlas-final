@@ -1152,11 +1152,8 @@ The per-pick design-check in `continuous-dev-routine.md` step 2a still binds —
 
 - [x] **N127. Show image credit/attribution in the printable handout.** ✅ DONE 2026-07-29 — commit e5d9eb1c
 
-- [ ] **N128. Make the Discard-changes confirm dialog close on Escape and trap Tab.**
-  `DiscardConfirmModal` declares `role="dialog" aria-modal="true"` and default-focuses "Keep editing", but it's a hand-rolled overlay with **no Escape handler and no focus trap** (`src/atlas/session/DiscardConfirmModal.tsx:14-47`) — so keyboard users can't dismiss it with Escape and Tab escapes to the page behind it. (Also makes Q42's "Esc dismisses" assumption actually true.)
-  - **Done when:** Escape triggers the safe "Keep editing" close and Tab is trapped within the dialog; a test covers Escape + focus containment.
-  - **Gate:** standard gate.
-  ~1 run.
+- [x] **N128. Make the Discard-changes confirm dialog close on Escape and trap Tab.** ✅ DONE 2026-07-29 — commit 800ee14f
+  Confirmed: `DiscardConfirmModal` (`src/atlas/session/DiscardConfirmModal.tsx:14-47`) declared `role="dialog" aria-modal="true"` and default-focused "Keep editing", but had no Escape handler and no focus trap. Added an `onKeyDown` handler on the overlay: Escape calls `onClose()` (the safe "Keep editing" path, matching the existing default-focus behavior), Tab/Shift+Tab wrap within the dialog's focusable elements (same pattern as `SearchPalette.tsx`'s Q29 focus trap). 3 new tests in `src/test/session/DiscardConfirmModal.test.tsx` cover Escape-closes-without-discarding, Tab-wraps-forward, and Shift+Tab-wraps-backward. Gate: typecheck clean · lint 0 errors (18 pre-existing, unchanged) · 2923 tests green across the 4 shards (729+635+841+718 — +3 over the N127 baseline of 2920). One shard hit the documented `onTaskUpdate` RPC flake (0 real failures, not re-run per policy). Pure client-side component + test change — no `atlas:publish` required.
 
 - [ ] **N129. Let Escape close the desktop entity reading panel.**
   On desktop `AtlasViewer` renders the entity reading panel as a plain `<aside>` (`src/pages/AtlasViewer.tsx:715-743`) rather than the Radix `Sheet` used on mobile (`:762-785`), so it gets no built-in Escape-to-close, and the global Escape handler only dismisses the peek then the search (`:423-438`) — never the entity panel. Make Escape close the open desktop reading panel.
