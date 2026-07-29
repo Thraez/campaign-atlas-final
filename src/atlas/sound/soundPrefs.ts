@@ -1,3 +1,5 @@
+import { getStorage } from "@/lib/safeStorage";
+
 const STORAGE_KEY = "atlas-player-sound-v1";
 
 export interface SoundPrefs {
@@ -13,19 +15,6 @@ export const DEFAULT_PREFS: SoundPrefs = {
   calmMode: false,
   volume: 0.8,
 };
-
-function getStorage(): Storage | null {
-  try {
-    if (typeof window === "undefined") return null;
-    const s = window.localStorage;
-    const probe = "__atlas_probe__";
-    s.setItem(probe, "1");
-    s.removeItem(probe);
-    return s;
-  } catch {
-    return null;
-  }
-}
 
 export function loadSoundPrefs(): SoundPrefs {
   const s = getStorage();

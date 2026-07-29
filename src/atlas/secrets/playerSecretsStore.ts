@@ -4,24 +4,13 @@
  * and the set of unlocked password-secret ids.
  * Mirrors notes/playerNotes.ts storage rules.
  */
+import { getStorage } from "@/lib/safeStorage";
+
 const STORAGE_KEY = "atlas-unlocked-secrets-v1";
 
 interface SecretState {
   characterKey: string | null;
   unlocked: string[];
-}
-
-function getStorage(): Storage | null {
-  try {
-    if (typeof window === "undefined") return null;
-    const s = window.localStorage;
-    const probe = "__atlas_probe__";
-    s.setItem(probe, "1");
-    s.removeItem(probe);
-    return s;
-  } catch {
-    return null;
-  }
 }
 
 function load(): SecretState {

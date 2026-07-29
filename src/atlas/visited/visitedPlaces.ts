@@ -4,22 +4,11 @@
  * Mirrors notes/playerNotes.ts storage rules: a probe-guarded getStorage(), every
  * read/write in try/catch, so private browsing / full quota degrades to empty.
  */
+import { getStorage } from "@/lib/safeStorage";
+
 const STORAGE_KEY = "atlas-visited-v1";
 
 type VisitedMap = Record<string, { visitedAt: string }>;
-
-function getStorage(): Storage | null {
-  try {
-    if (typeof window === "undefined") return null;
-    const s = window.localStorage;
-    const probe = "__atlas_probe__";
-    s.setItem(probe, "1");
-    s.removeItem(probe);
-    return s;
-  } catch {
-    return null;
-  }
-}
 
 function loadMap(): VisitedMap {
   const s = getStorage();
