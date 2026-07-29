@@ -503,7 +503,8 @@ function WaypointList({
         })}
       </div>
       <p className="text-[10px] text-muted-foreground italic">
-        Drag handles on the map to move coord waypoints. Right-click to delete.
+        Drag handles on the map to move coord waypoints. Right-click to delete. Click a segment's
+        dashed midpoint to insert a new waypoint there.
       </p>
     </div>
   );

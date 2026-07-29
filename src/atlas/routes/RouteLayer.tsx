@@ -27,6 +27,13 @@ const handleIcon = (kind: "coord" | "entity") =>
     iconAnchor: [5, 5],
   });
 
+const midpointIcon = L.divIcon({
+  className: "atlas-route-midpoint-handle",
+  html: `<div style="width:8px;height:8px;border-radius:9999px;background:hsl(var(--primary) / 0.25);border:1.5px dashed hsl(var(--primary));cursor:copy"></div>`,
+  iconSize: [8, 8],
+  iconAnchor: [4, 4],
+});
+
 function DrawingClicks({ api, map }: { api: RouteDraftAPI; map: MapDocument }) {
   useMapEvents({
     click(e) {
@@ -116,6 +123,32 @@ export function RouteLayer({ map, api, visible = true }: Props) {
                     }
                   : undefined
               }
+            />
+          );
+        })}
+
+      {/* Midpoints of the selected route's segments — click to insert a new coord
+          waypoint there via insertWaypointAfter, splitting the segment in two. */}
+      {visible &&
+        selected &&
+        !api.drawing &&
+        selected.waypoints.slice(0, -1).map((w, i) => {
+          const p1 = api.resolveWaypoint(w);
+          const p2 = api.resolveWaypoint(selected.waypoints[i + 1]);
+          if (!p1 || !p2) return null;
+          const midX = (p1[0] + p2[0]) / 2;
+          const midY = (p1[1] + p2[1]) / 2;
+          return (
+            <Marker
+              key={`mid-${selected.id}-${i}`}
+              position={xy2ll(midX, midY)}
+              icon={midpointIcon}
+              eventHandlers={{
+                click: (ev) => {
+                  L.DomEvent.stopPropagation(ev);
+                  api.insertWaypointAfter(selected.id, i, [Math.round(midX), Math.round(midY)]);
+                },
+              }}
             />
           );
         })}
