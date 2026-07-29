@@ -28,3 +28,47 @@ describe("DiscardConfirmModal", () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe("DiscardConfirmModal keyboard behavior (N128)", () => {
+  it("closes on Escape without discarding", () => {
+    const onConfirm = vi.fn();
+    const onClose = vi.fn();
+    render(<DiscardConfirmModal open count={3} onConfirm={onConfirm} onClose={onClose} />);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(onClose).toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("wraps Tab from the last focusable element back to the first", () => {
+    render(<DiscardConfirmModal open count={3} onConfirm={vi.fn()} onClose={vi.fn()} />);
+    const dialog = screen.getByRole("dialog");
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>(
+        'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    expect(focusable.length).toBeGreaterThan(1);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    last.focus();
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: false });
+    expect(document.activeElement).toBe(first);
+  });
+
+  it("wraps Shift+Tab from the first focusable element to the last", () => {
+    render(<DiscardConfirmModal open count={3} onConfirm={vi.fn()} onClose={vi.fn()} />);
+    const dialog = screen.getByRole("dialog");
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>(
+        'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    first.focus();
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(last);
+  });
+});
