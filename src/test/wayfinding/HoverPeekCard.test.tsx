@@ -24,7 +24,32 @@ it("renders a dialog with title + type badge", () => {
     <HoverPeekCard entity={base} hasPlacement={false} onOpen={() => {}} onFlyToMap={() => {}} />,
   );
   expect(screen.getByRole("dialog", { name: /saltmere preview/i })).toBeTruthy();
-  expect(screen.getByText("settlement")).toBeTruthy();
+  expect(screen.getByText("Settlement")).toBeTruthy();
+});
+
+it("N123: shows the player-facing type label, not the raw internal slug", () => {
+  render(
+    <HoverPeekCard
+      entity={{ ...base, type: "npc" }}
+      hasPlacement={false}
+      onOpen={() => {}}
+      onFlyToMap={() => {}}
+    />,
+  );
+  expect(screen.getByText("Person")).toBeTruthy();
+  expect(screen.queryByText("npc")).toBeNull();
+});
+
+it("N123: omits the type chip entirely when playerTypeLabel returns empty (e.g. 'note')", () => {
+  render(
+    <HoverPeekCard
+      entity={{ ...base, type: "note" }}
+      hasPlacement={false}
+      onOpen={() => {}}
+      onFlyToMap={() => {}}
+    />,
+  );
+  expect(screen.queryByText("note")).toBeNull();
 });
 
 it("omits the portrait when there is no image", () => {
