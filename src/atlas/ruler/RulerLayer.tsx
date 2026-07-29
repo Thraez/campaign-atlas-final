@@ -7,6 +7,7 @@ import { measureDistance } from "./measureDistance";
 
 interface RulerLayerProps {
   active: boolean;
+  mapId: string;
   mapHeight: number;
   scale?: MapScale;
   wrapX?: boolean;
@@ -18,6 +19,7 @@ type RulerPoints = null | { p1: { x: number; y: number }; p2?: { x: number; y: n
 
 export function RulerLayer({
   active,
+  mapId,
   mapHeight,
   scale,
   wrapX,
@@ -34,6 +36,16 @@ export function RulerLayer({
     }
     prevActiveRef.current = active;
   }, [active]);
+
+  // Switching the active map leaves stale points at meaningless coordinates
+  // on the new map, so reset any in-progress measurement.
+  const prevMapIdRef = useRef(mapId);
+  useEffect(() => {
+    if (prevMapIdRef.current !== mapId) {
+      setPoints(null);
+      prevMapIdRef.current = mapId;
+    }
+  }, [mapId]);
 
   // onClear ref so click handler doesn't become stale
   const onClearRef = useRef(onClear);

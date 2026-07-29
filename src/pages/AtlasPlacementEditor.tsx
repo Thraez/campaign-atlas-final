@@ -1868,6 +1868,7 @@ function AtlasPlacementEditorInner() {
                     active={
                       rulerActive && !pendingId && !regionDraft.drawing && !soundscapeDraft.drawing
                     }
+                    mapId={activeMap.id}
                     mapHeight={activeMap.height}
                     scale={activeMap.scale}
                     wrapX={activeMap.wrapX}

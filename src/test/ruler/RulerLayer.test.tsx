@@ -65,9 +65,9 @@ const click = (lng: number, lat: number) => {
   });
 };
 
-function renderRuler(active = true, onClear?: () => void) {
+function renderRuler(active = true, onClear?: () => void, mapId = "map-1") {
   const { rerender } = render(
-    <RulerLayer active={active} mapHeight={1000} onClear={onClear} />,
+    <RulerLayer active={active} mapId={mapId} mapHeight={1000} onClear={onClear} />,
   );
   return { rerender };
 }
@@ -127,5 +127,39 @@ describe("Q7 — RulerLayer: third-click reset, hint, Escape", () => {
   it("does not show hint when ruler is inactive", () => {
     renderRuler(false);
     expect(screen.queryByTestId("ruler-hint")).not.toBeInTheDocument();
+  });
+});
+
+describe("N114 — RulerLayer: reset on active map change", () => {
+  beforeEach(() => {
+    capturedHandlers.click = null;
+  });
+
+  it("clears an in-progress measurement when the active map changes", () => {
+    const { rerender } = renderRuler(true, undefined, "map-1");
+    click(100, 900); // p1
+    click(200, 800); // p2
+    expect(screen.getByText("5.0 mi")).toBeInTheDocument();
+    expect(screen.queryByTestId("ruler-hint")).not.toBeInTheDocument();
+
+    rerender(
+      <RulerLayer active mapId="map-2" mapHeight={1000} />,
+    );
+
+    expect(screen.queryByText("5.0 mi")).not.toBeInTheDocument();
+    expect(screen.getByTestId("ruler-hint")).toBeInTheDocument();
+  });
+
+  it("does not clear the measurement when re-rendering with the same map id", () => {
+    const { rerender } = renderRuler(true, undefined, "map-1");
+    click(100, 900); // p1
+    click(200, 800); // p2
+    expect(screen.getByText("5.0 mi")).toBeInTheDocument();
+
+    rerender(
+      <RulerLayer active mapId="map-1" mapHeight={1000} />,
+    );
+
+    expect(screen.getByText("5.0 mi")).toBeInTheDocument();
   });
 });

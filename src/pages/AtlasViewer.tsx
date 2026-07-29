@@ -782,6 +782,7 @@ export default function AtlasViewer() {
               <SoundscapeLayer map={activeMap} />
               <RulerLayer
                 active={rulerActive}
+                mapId={activeMap.id}
                 mapHeight={activeMap.height}
                 scale={activeMap.scale}
                 wrapX={activeMap.wrapX}
