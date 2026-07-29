@@ -19,7 +19,7 @@ import { downloadBlob } from "@/atlas/tabs/download";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { printEntityHandout } from "@/atlas/printHandout";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
-import { logger } from "@/lib/logger";
+import { copyToClipboard } from "@/lib/clipboard";
 import type { AssetCredit, CreditsConfig, Entity, MapPlacement } from "@/atlas/content/schema";
 import type { PlayerProfile } from "@/atlas/profiles/profileTypes";
 import { CreditBadge } from "./CreditBadge";
@@ -51,12 +51,11 @@ export interface EntityPanelProps {
 function CopyLinkButton() {
   const [copied, setCopied] = useState(false);
   const handle = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
+    const ok = await copyToClipboard(window.location.href);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch (e) {
-      logger.warn("Copy share link failed", e);
+    } else {
       toast.error("Could not copy link");
     }
   }, []);
