@@ -279,3 +279,19 @@ describe("AtlasBrowse — skip link and main landmark", () => {
     expect(skipLink).toHaveClass("skip-to-main");
   });
 });
+
+describe("AtlasBrowse — N124: Timeline link in the toolbar", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  it("renders a Timeline link alongside the Map link", async () => {
+    renderBrowse("/atlas/browse", makeProject([makeEntity()]));
+    await screen.findByText("Tideshore");
+    const timelineLink = screen.getByRole("link", { name: "Timeline" });
+    expect(timelineLink).toHaveAttribute("href", "/atlas/timeline");
+    const mapLink = screen.getByRole("link", { name: /Map/ });
+    expect(mapLink).toHaveAttribute("href", "/atlas");
+  });
+});

@@ -163,6 +163,9 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
           className="h-8 w-32 sm:w-64 min-w-0 text-sm"
         />
         <Button asChild variant="ghost" size="sm">
+          <Link to="/atlas/timeline">Timeline</Link>
+        </Button>
+        <Button asChild variant="ghost" size="sm">
           <Link to="/atlas">
             <ArrowLeft className="h-4 w-4 mr-1" />
             Map
