@@ -388,6 +388,8 @@ export function EntityEditPanel({
   const d = api.draft!;
   const filteredEntities = acCtx?.type === "entity" ? filterEntities(entities, acCtx.query) : [];
   const filteredImages = acCtx?.type === "image" ? filterImages(images, acCtx.query) : [];
+  const acItemCount = acCtx?.type === "entity" ? filteredEntities.length : filteredImages.length;
+  const acClampedIndex = Math.min(acIndex, Math.max(0, acItemCount - 1));
 
   return (
     <div className="flex flex-col h-full">
@@ -447,6 +449,10 @@ export function EntityEditPanel({
               aria-label="Body"
               aria-autocomplete="list"
               aria-expanded={acCtx !== null}
+              aria-controls={acCtx ? "wikilink-popover-listbox" : undefined}
+              aria-activedescendant={
+                acCtx && acItemCount > 0 ? `wikilink-option-${acClampedIndex}` : undefined
+              }
               rows={16}
               className="w-full px-2 py-1 rounded border bg-background font-mono text-[11px]"
               value={d.body}

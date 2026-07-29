@@ -248,3 +248,64 @@ it("edit panel has no embedded preview or DM-notes toggle (superseded by global 
   expect(screen.queryByText(/show dm notes/i)).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /focus mode/i })).not.toBeInTheDocument();
 });
+
+describe("wikilink autocomplete ARIA wiring (N132)", () => {
+  it("wires aria-controls/aria-activedescendant to the active popover option", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).includes("/__atlas/read")) {
+        return new Response(JSON.stringify({ contents: RAW }), { status: 200 });
+      }
+      if (String(url).includes("/__atlas/assets/images")) {
+        return new Response(JSON.stringify({ images: ["banner.png", "map.png"] }), {
+          status: 200,
+        });
+      }
+      return new Response(JSON.stringify({ saved: 1, paths: [] }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={() => {}} />,
+    );
+    await waitFor(() => screen.getByDisplayValue(/old body/i));
+    const ta = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
+
+    fireEvent.change(ta, { target: { value: ta.value + "![[" } });
+    const firstOption = await screen.findByRole("option", { name: /banner\.png/i });
+
+    expect(screen.getByRole("listbox")).toHaveAttribute("id", "wikilink-popover-listbox");
+    expect(firstOption).toHaveAttribute("id", "wikilink-option-0");
+    expect(ta).toHaveAttribute("aria-controls", "wikilink-popover-listbox");
+    expect(ta).toHaveAttribute("aria-activedescendant", "wikilink-option-0");
+
+    fireEvent.keyDown(ta, { key: "ArrowDown" });
+    await waitFor(() => expect(ta).toHaveAttribute("aria-activedescendant", "wikilink-option-1"));
+    expect(screen.getByRole("option", { name: /map\.png/i })).toHaveAttribute(
+      "id",
+      "wikilink-option-1",
+    );
+  });
+
+  it("keeps aria-controls but omits aria-activedescendant when the popover has no matches", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).includes("/__atlas/read")) {
+        return new Response(JSON.stringify({ contents: RAW }), { status: 200 });
+      }
+      // No entities/images configured — the popover renders "No matches".
+      return new Response(JSON.stringify({ saved: 1, paths: [] }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={() => {}} />,
+    );
+    await waitFor(() => screen.getByDisplayValue(/old body/i));
+    const ta = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
+
+    fireEvent.change(ta, { target: { value: ta.value + "[[" } });
+    await waitFor(() => expect(screen.getByText(/no matches/i)).toBeInTheDocument());
+
+    expect(ta).toHaveAttribute("aria-controls", "wikilink-popover-listbox");
+    expect(ta).not.toHaveAttribute("aria-activedescendant");
+  });
+});

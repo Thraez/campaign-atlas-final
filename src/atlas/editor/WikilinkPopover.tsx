@@ -44,6 +44,7 @@ export function WikilinkPopover({
 
   return (
     <div
+      id="wikilink-popover-listbox"
       className="absolute z-50 left-0 right-0 top-full mt-0.5 rounded border bg-background shadow-lg text-xs overflow-hidden"
       role="listbox"
       aria-label={isEntity ? "Entity suggestions" : "Image suggestions"}
@@ -54,6 +55,7 @@ export function WikilinkPopover({
       {items.map((item, i) => (
         <div
           key={item.value}
+          id={`wikilink-option-${i}`}
           role="option"
           aria-selected={i === clampedIndex}
           className={`flex items-baseline gap-2 px-2 py-1 cursor-pointer select-none ${
