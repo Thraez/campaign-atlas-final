@@ -955,7 +955,7 @@ export default function AtlasViewer() {
               query={query}
               setQuery={setQuery}
               index={searchIndex}
-              placements={data.project.placements}
+              placements={placementsOnMap}
               onPick={(id, fly) => {
                 setSearchOpen(false);
                 setQuery("");

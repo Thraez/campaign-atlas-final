@@ -11,10 +11,10 @@ vi.mock("react-leaflet", async () => {
   return makeReactLeafletModule();
 });
 
-import { render, waitFor, cleanup, fireEvent, screen } from "@testing-library/react";
+import { render, waitFor, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import AtlasViewer from "@/pages/AtlasViewer";
-import { makeProject, makeMap, makeWorld, makeSearchIndex } from "../helpers/makeProject";
+import { makeProject, makeMap, makeWorld, makeEntity, makePlacement, makeSearchIndex } from "../helpers/makeProject";
 import { stableMap } from "../helpers/reactLeafletMock";
 import { logger } from "@/lib/logger";
 
@@ -392,5 +392,68 @@ describe("MaxBoundsController (Q6)", () => {
     await waitFor(() => expect(document.querySelector("main#atlas-main")).toBeInTheDocument());
     await waitFor(() => expect(stableMap.setMaxBounds).toHaveBeenCalled());
     expect(stableMap.setMaxBounds).toHaveBeenCalledWith(undefined);
+  });
+});
+
+describe("Search 'this map only' filter is scoped to the active map (N115)", () => {
+  it("excludes an entity placed only on a different map", async () => {
+    const project = makeProject({
+      worlds: [makeWorld({ defaultMapId: "map-a" })],
+      maps: [
+        makeMap({ id: "map-a", name: "Map A" }),
+        makeMap({ id: "map-b", name: "Map B" }),
+      ],
+      entities: [
+        makeEntity({ id: "iron-tower", title: "Iron Tower" }),
+        makeEntity({ id: "silver-lake", title: "Silver Lake" }),
+      ],
+      placements: [
+        makePlacement({ id: "iron-tower@map-a", entityId: "iron-tower", mapId: "map-a" }),
+        makePlacement({ id: "silver-lake@map-b", entityId: "silver-lake", mapId: "map-b" }),
+      ],
+    });
+    const searchIndex = [
+      {
+        id: "iron-tower",
+        title: "Iron Tower",
+        type: "settlement",
+        aliases: [],
+        tags: [],
+        summary: "A tower of black iron.",
+        body: "a tower of black iron.",
+      },
+      {
+        id: "silver-lake",
+        title: "Silver Lake",
+        type: "settlement",
+        aliases: [],
+        tags: [],
+        summary: "A still silver lake.",
+        body: "a still silver lake.",
+      },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        const body = String(url).includes("search-index") ? searchIndex : project;
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(body) } as unknown as Response);
+      }),
+    );
+
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(document.querySelector("main#atlas-main")).toBeInTheDocument());
+
+    fireEvent.click(document.querySelector('[aria-label="Search atlas (Ctrl+K)"]')!);
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeInTheDocument());
+
+    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
+    fireEvent.click(within(dialog).getByRole("button", { name: /all maps/i }));
+
+    await waitFor(() => expect(within(dialog).getByText("Iron Tower")).toBeInTheDocument());
+    expect(within(dialog).queryByText("Silver Lake")).not.toBeInTheDocument();
   });
 });
