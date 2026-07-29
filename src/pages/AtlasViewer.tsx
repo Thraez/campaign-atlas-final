@@ -556,12 +556,21 @@ export default function AtlasViewer() {
           peekCtl.dismiss();
           return;
         }
-        setSearchOpen(false);
+        if (searchOpen) {
+          setSearchOpen(false);
+          return;
+        }
+        // Desktop entity panel is a plain <aside>, not a Radix Sheet, so it
+        // gets no built-in Escape-to-close. The mobile Sheet already closes
+        // on Escape on its own (Radix Dialog), so only handle this here.
+        if (hasDesktopAside && openId !== null) {
+          setOpenId(null);
+        }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [peekCtl]);
+  }, [peekCtl, searchOpen, hasDesktopAside, openId]);
 
   if (error || !data) {
     return (

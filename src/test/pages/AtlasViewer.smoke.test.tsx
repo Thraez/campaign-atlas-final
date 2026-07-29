@@ -346,6 +346,63 @@ describe("Lazy search-index loading (Q66)", () => {
   });
 });
 
+describe("Escape closes the desktop entity reading panel (N129)", () => {
+  it("closes the open entity panel on Escape when nothing else is open", async () => {
+    window.history.pushState({}, "", "/?entity=iron-tower");
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    await waitFor(() =>
+      expect(Array.from(document.querySelectorAll("h2")).some((h) => h.textContent === "Iron Tower")).toBe(
+        true,
+      ),
+    );
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() =>
+      expect(Array.from(document.querySelectorAll("h2")).some((h) => h.textContent === "Iron Tower")).toBe(
+        false,
+      ),
+    );
+    expect(document.querySelector('[aria-label="Close panel"]')).not.toBeInTheDocument();
+  });
+
+  it("closes search before the entity panel — Escape handles them in order, one per press", async () => {
+    window.history.pushState({}, "", "/?entity=iron-tower");
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    await waitFor(() =>
+      expect(Array.from(document.querySelectorAll("h2")).some((h) => h.textContent === "Iron Tower")).toBe(
+        true,
+      ),
+    );
+
+    fireEvent.click(document.querySelector('[aria-label="Search atlas (Ctrl+K)"]')!);
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeInTheDocument());
+
+    // First Escape closes search only — the entity panel stays open.
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).not.toBeInTheDocument());
+    expect(
+      Array.from(document.querySelectorAll("h2")).some((h) => h.textContent === "Iron Tower"),
+    ).toBe(true);
+
+    // Second Escape now closes the entity panel.
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() =>
+      expect(Array.from(document.querySelectorAll("h2")).some((h) => h.textContent === "Iron Tower")).toBe(
+        false,
+      ),
+    );
+  });
+});
+
 describe("MaxBoundsController (Q6)", () => {
   it("calls setMaxBounds on initial load with map extent plus 10% padding", async () => {
     // Default map: 1000×1000; pad = 100
