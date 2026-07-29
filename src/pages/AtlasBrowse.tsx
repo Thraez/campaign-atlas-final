@@ -64,6 +64,13 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
     [facetFilteredEntries, activeType],
   );
 
+  const facetOnlyCount = useMemo(() => {
+    const all = project?.entities ?? [];
+    if (mode === "tag") return all.filter((e) => e.tags.includes(facetDecoded)).length;
+    if (mode === "type") return all.filter((e) => e.type === facetDecoded).length;
+    return all.length;
+  }, [project, mode, facetDecoded]);
+
   const allTypes = useMemo(() => {
     const m = new Map<string, number>();
     facetFilteredEntries.forEach((e) => {
@@ -217,18 +224,35 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
         <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
           {grouped.length === 0 ? (
             <div className="text-center text-sm text-muted-foreground py-16">
-              {mode === "tag" ? (
-                <>
-                  No entries tagged{" "}
-                  <code className="px-1 py-0.5 rounded bg-muted">#{facetDecoded}</code> yet.
-                </>
-              ) : mode === "type" ? (
-                <>
-                  No entries of type{" "}
-                  <code className="px-1 py-0.5 rounded bg-muted">{facetDecoded}</code> yet.
-                </>
+              {mode !== "browse" && facetOnlyCount === 0 ? (
+                mode === "tag" ? (
+                  <>
+                    No entries tagged{" "}
+                    <code className="px-1 py-0.5 rounded bg-muted">#{facetDecoded}</code> yet.
+                  </>
+                ) : (
+                  <>
+                    No entries of type{" "}
+                    <code className="px-1 py-0.5 rounded bg-muted">{facetDecoded}</code> yet.
+                  </>
+                )
               ) : (
-                <>No entries match your filter.</>
+                <div className="space-y-3">
+                  <p>No entries match your filters.</p>
+                  {(query || activeType) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setSearchParams(serializeBrowseFilterParams({ q: "", type: null }), {
+                          replace: true,
+                        })
+                      }
+                    >
+                      Clear filters
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
           ) : (
