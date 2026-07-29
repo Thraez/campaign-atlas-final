@@ -209,13 +209,15 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
         // ConflictError on the import path means the on-disk state diverged
         // from what staging saw. For "already-exists" the most common cause
         // is a file with the same target path that wasn't yet in atlas.json
-        // (e.g. imports/ items the build pipeline hasn't ingested yet) —
-        // staging doesn't see it as a conflict, but the create-only write
-        // does. Tell the user what to do: re-open the modal and re-check the
-        // conflict row to opt into overwriting.
+        // (e.g. imports/ items the build pipeline hasn't ingested yet) — so
+        // staging never saw it as a conflict row, and simply re-opening the
+        // modal won't change that: existingById/existingPaths are still
+        // stale until the atlas is rebuilt and canon is reloaded. Tell the
+        // user the step that actually makes the row detectable again, not
+        // the checkbox that only works once it is.
         const summary =
           err.reason === "already-exists"
-            ? "Target file exists on disk but wasn't in the project. Re-open the modal and check 'Select all overwrites', or rename the target."
+            ? "Target file exists on disk but wasn't in the project yet. Run `npm run atlas:build` and reload canon, then re-open the modal and check 'Select all overwrites' — or rename the target to skip the collision."
             : err.reason === "stale-base"
               ? "File changed outside the editor between staging and commit. Reload canon and retry."
               : "File disappeared between staging and commit. Reload canon and retry.";
