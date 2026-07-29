@@ -90,9 +90,10 @@ function resultButtons(): HTMLElement[] {
 }
 
 beforeEach(() => {
-  // The "recently revealed" hook fetches atlas.json + the publish baseline on
-  // mount. Return not-ok so the filter stays unavailable and tests are
-  // deterministic (the "recent" chip is then absent).
+  // The "recently revealed" hook fetches the publish baseline on mount (N125:
+  // no longer atlas.json — current ids come from the `index` prop). Return
+  // not-ok so the filter stays unavailable and tests are deterministic (the
+  // "recent" chip is then absent).
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => ({ ok: false }) as Response),
@@ -308,6 +309,38 @@ describe("dialog semantics and focus trap (Q29)", () => {
 
     expect(document.activeElement).toBe(trigger);
     document.body.removeChild(trigger);
+  });
+});
+
+describe("recently revealed (N125)", () => {
+  it("derives the current-atlas id set from the index prop instead of re-fetching atlas.json", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes(".last-published.json")) {
+        return {
+          ok: true,
+          json: async () => ({ entities: [{ id: "iron-tower" }] }),
+        } as Response;
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderPalette({ query: "" });
+    // Let the baseline fetch's promise chain settle.
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const urls = fetchMock.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes(".last-published.json"))).toBe(true);
+    expect(urls.some((u) => u.endsWith("atlas/atlas.json"))).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // iron-tower is in the baseline; ancient-guard and silver-lake aren't →
+    // "recent" chip should report 2, derived purely from the INDEX prop.
+    expect(screen.getByRole("button", { name: /recent \(2\)/i })).toBeInTheDocument();
   });
 });
 

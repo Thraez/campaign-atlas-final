@@ -34,27 +34,32 @@ interface SearchPaletteProps {
  * the CURRENT atlas but did NOT exist in the previous published one — i.e.
  * "recently revealed" since the last publish. Returns null while loading or
  * if the baseline doesn't exist (in which case the filter is unavailable).
+ *
+ * The "current atlas" ids come from the `index` the palette was already given
+ * — no need to re-fetch atlas.json just to rebuild an id set that's already
+ * in memory. `indexRef` lets the effect (which only needs to run once, at
+ * mount) read the latest `index` without re-fetching on every re-render.
  */
-function useRecentlyRevealedIds(): Set<string> | null {
+function useRecentlyRevealedIds(index: SearchIndexEntry[]): Set<string> | null {
   const [ids, setIds] = useState<Set<string> | null>(null);
+  const indexRef = useRef(index);
+  useEffect(() => {
+    indexRef.current = index;
+  }, [index]);
   useEffect(() => {
     let mounted = true;
     const base = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "/");
-    Promise.all([
-      fetch(`${base}atlas/atlas.json`, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)),
-      fetch(`${base}atlas/.last-published.json`, { cache: "no-cache" }).then((r) =>
-        r.ok ? r.json() : null,
-      ),
-    ])
-      .then(([current, baseline]) => {
+    fetch(`${base}atlas/.last-published.json`, { cache: "no-cache" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((baseline) => {
         if (!mounted) return;
-        if (!current || !baseline) {
+        if (!baseline) {
           setIds(null);
           return;
         }
         const baseIds = new Set<string>((baseline.entities ?? []).map((e: { id: string }) => e.id));
         const out = new Set<string>();
-        for (const e of (current.entities ?? []) as Array<{ id: string }>) {
+        for (const e of indexRef.current) {
           if (!baseIds.has(e.id)) out.add(e.id);
         }
         setIds(out);
@@ -85,7 +90,7 @@ export function SearchPalette({
   const [thisMapOnly, setThisMapOnly] = useState(false);
   /** "Recently revealed" — entities not present in the previous publish snapshot. */
   const [recentOnly, setRecentOnly] = useState(false);
-  const recentlyRevealed = useRecentlyRevealedIds();
+  const recentlyRevealed = useRecentlyRevealedIds(index);
   const listRef = useRef<HTMLDivElement>(null);
   // Capture the element that had focus before the palette opened so it can be
   // restored when the palette closes (regardless of how it closes).
