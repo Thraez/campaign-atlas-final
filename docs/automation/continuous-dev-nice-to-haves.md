@@ -1112,11 +1112,8 @@ The per-pick design-check in `continuous-dev-routine.md` step 2a still binds —
 
 - [x] **N114. Reset the distance ruler when the active map changes.** ✅ DONE 2026-07-29 — commit 42aa69d2; `RulerLayer` now takes a required `mapId` prop (threaded from `activeMap.id` at both call sites — the player `AtlasViewer.tsx` and the DM `AtlasPlacementEditor.tsx`) and clears `points` via an effect keyed on it (mirrors the existing `FitBoundsController`/`MaxBoundsController` mapId-effect pattern rather than a remount-via-`key`). 2 new tests in `RulerLayer.test.tsx` (measurement clears on map-id change; unaffected by a same-map-id re-render). 2895 tests green across the 4 shards (718+631+848+698 — +2 over the N113 baseline of 2893; one shard hit the documented `onTaskUpdate` RPC flake, 0 real failures). Pure client-side rendering/interaction change — no `scripts/`-only edit, no fog/soundscape/artifact touch — so `atlas:publish` wasn't required.
 
-- [ ] **N115. The "this map" search filter doesn't actually scope to the current map.**
-  The palette's "this map only" toggle filters against `placedIds` built from the `placements` prop (`src/atlas/search/SearchPalette.tsx:79,83-84`), but that set isn't scoped to the active map, so the toggle's own doc-comment promise ("restricts results to entities placed on the current map") isn't kept. Build `placedIds` from placements on the active map only.
-  - **Done when:** with "this map" on, results include only entities placed on the current map; a test covers a two-map fixture.
-  - **Gate:** standard gate.
-  ~1 run.
+- [x] **N115. The "this map" search filter doesn't actually scope to the current map.** ✅ DONE 2026-07-29 — commit 76a4d5ed
+  `AtlasViewer.tsx` was passing `SearchPalette` the full `data.project.placements` instead of the already-computed `placementsOnMap` (filtered to `activeMap.id`), so the "this map only" toggle's `placedIds` set included entities placed on any map. Swapped the prop to `placementsOnMap`. New AtlasViewer-level test (two-map fixture) confirms an off-map entity is excluded once the toggle is on — the SearchPalette unit tests alone couldn't catch this, since they pass a correctly-scoped `placements` prop directly.
 
 - [ ] **N116. Ruler point mis-placement on wrap-around (`wrapX`) maps.**
   For a `wrapX: true` map (a supported field, `schema.ts:88`) the viewer tiles the image at `dx = -width, 0, +width` (`AtlasViewer.tsx:669-682`) but `RulerLayer` normalizes click lng into the canonical `[0,width)` (`RulerLayer.tsx:45-48`), so a point placed on a wrapped copy jumps to the canonical tile and the drawn segment doesn't follow the cursor. Keep ruler points in the clicked (possibly wrapped) space.
