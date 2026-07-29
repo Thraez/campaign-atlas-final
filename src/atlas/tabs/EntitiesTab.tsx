@@ -137,7 +137,11 @@ export function EntitiesTab({
           )}
         </div>
       )}
-      <HandoutBundleSection entities={project.entities} />
+      <HandoutBundleSection
+        entities={project.entities}
+        assetCredits={project.worlds[0]?.assetCredits}
+        credits={project.worlds[0]?.credits}
+      />
       <div>
         <Label className="text-[10px]">Entity</Label>
         <Select value={selectedId ?? ""} onValueChange={setSelectedId}>

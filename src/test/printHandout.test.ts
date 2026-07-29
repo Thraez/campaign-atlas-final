@@ -27,6 +27,7 @@ function entity(over: Partial<Entity> & { id: string; title: string }): Entity {
     backlinks: over.backlinks ?? [],
     summary: over.summary,
     relationships: over.relationships,
+    credit: over.credit,
   };
 }
 
@@ -186,6 +187,77 @@ describe("buildHandoutHtml", () => {
     expect(html).not.toContain("<b>enemy</b>");
     expect(html).toContain("&lt;script&gt;");
     expect(html).toContain("&lt;b&gt;");
+  });
+});
+
+describe("N127: image credit/attribution in the printed handout", () => {
+  it("shows the entity's coarse credit under the hero image", () => {
+    const html = buildHandoutHtml([
+      entity({ id: "a", title: "A", images: ["atlas/assets/img.jpg"], credit: "Art by Jane Doe" }),
+    ]);
+    expect(html).toContain('class="hero-credit"');
+    expect(html).toContain("Art by Jane Doe");
+  });
+
+  it("omits the credit line when the entity has no credit", () => {
+    const html = buildHandoutHtml([entity({ id: "a", title: "A", images: ["atlas/assets/img.jpg"] })]);
+    expect(html).not.toContain('class="hero-credit"');
+  });
+
+  it("prefers a registry entry over the entity's coarse credit", () => {
+    const html = buildHandoutHtml(
+      [entity({ id: "a", title: "A", images: ["atlas/assets/img.jpg"], credit: "Fallback credit" })],
+      new Map(),
+      { "atlas/assets/img.jpg": { credit: "Registry credit", enabled: true } },
+    );
+    expect(html).toContain("Registry credit");
+    expect(html).not.toContain("Fallback credit");
+  });
+
+  it("suppresses a disabled registry entry entirely (no fallback to entity.credit)", () => {
+    const html = buildHandoutHtml(
+      [entity({ id: "a", title: "A", images: ["atlas/assets/img.jpg"], credit: "Fallback credit" })],
+      new Map(),
+      { "atlas/assets/img.jpg": { credit: "Registry credit", enabled: false } },
+    );
+    expect(html).not.toContain('class="hero-credit"');
+    expect(html).not.toContain("Registry credit");
+    expect(html).not.toContain("Fallback credit");
+  });
+
+  it("shows a per-image figcaption credit in the gallery grid", () => {
+    const html = buildHandoutHtml([
+      entity({
+        id: "a",
+        title: "A",
+        images: ["atlas/assets/hero.jpg", "atlas/assets/gallery1.jpg"],
+      }),
+    ]);
+    expect(html).toContain("<figure>");
+  });
+
+  it("hides all image credits when world.credits.badges is false", () => {
+    const html = buildHandoutHtml(
+      [entity({ id: "a", title: "A", images: ["atlas/assets/img.jpg"], credit: "Art by Jane Doe" })],
+      new Map(),
+      undefined,
+      { badges: false },
+    );
+    expect(html).not.toContain('class="hero-credit"');
+    expect(html).not.toContain("Art by Jane Doe");
+  });
+
+  it("escapes HTML in the credit text", () => {
+    const html = buildHandoutHtml([
+      entity({
+        id: "a",
+        title: "A",
+        images: ["atlas/assets/img.jpg"],
+        credit: '<script>alert(1)</script>',
+      }),
+    ]);
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;");
   });
 });
 

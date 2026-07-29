@@ -1,12 +1,20 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Printer } from "lucide-react";
-import type { Entity } from "@/atlas/content/schema";
+import type { AssetCredit, CreditsConfig, Entity } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { printEntityBundle } from "@/atlas/printHandout";
 
-export function HandoutBundleSection({ entities }: { entities: Entity[] }) {
+export function HandoutBundleSection({
+  entities,
+  assetCredits,
+  credits,
+}: {
+  entities: Entity[];
+  assetCredits?: Record<string, AssetCredit>;
+  credits?: CreditsConfig;
+}) {
   const [open, setOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
@@ -42,7 +50,7 @@ export function HandoutBundleSection({ entities }: { entities: Entity[] }) {
       toast.warning("No entities selected.");
       return;
     }
-    printEntityBundle(ordered);
+    printEntityBundle(ordered, assetCredits, credits);
   };
 
   return (

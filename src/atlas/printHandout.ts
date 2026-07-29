@@ -8,9 +8,10 @@
  * builder is pure (no DOM, no window) so it can be unit tested.
  */
 import { toast } from "sonner";
-import type { Entity } from "./content/schema";
+import type { AssetCredit, CreditsConfig, Entity } from "./content/schema";
 import { playerTypeLabel } from "./content/typeLabel";
 import { normalizeAtlasAssetUrl } from "./url";
+import { resolveImageCredit } from "./content/imageCredit";
 
 const EMPTY_ENTITIES: Map<string, Entity> = new Map();
 
@@ -39,9 +40,12 @@ const HANDOUT_CSS = `
   h1.handout-title { font-family: "Cinzel", Georgia, serif; font-size: 30px; margin: 4px 0 0; color: #1a1a1a; }
   .aliases { font-size: 12px; color: #555; margin: 4px 0 0; font-style: italic; }
   .summary { font-size: 14px; font-style: italic; color: #444; border-left: 3px solid #b08d3a; padding-left: 10px; margin: 14px 0; }
-  .hero { width: 100%; max-height: 320px; object-fit: cover; border-radius: 4px; margin: 0 0 16px; }
+  .hero { width: 100%; max-height: 320px; object-fit: cover; border-radius: 4px; margin: 0; display: block; }
+  .hero-credit { font-size: 9px; color: #888; font-style: italic; text-align: right; margin: 2px 0 16px; font-family: "Helvetica Neue", Arial, sans-serif; }
   .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 12px 0 18px; page-break-inside: avoid; }
-  .gallery img { width: 100%; height: 110px; object-fit: cover; border-radius: 3px; }
+  .gallery figure { margin: 0; }
+  .gallery img { width: 100%; height: 110px; object-fit: cover; border-radius: 3px; display: block; }
+  .gallery figcaption { font-size: 8px; color: #888; font-style: italic; text-align: center; margin-top: 2px; font-family: "Helvetica Neue", Arial, sans-serif; }
   .body p { margin: 0.6em 0; }
   .body h1, .body h2, .body h3 { font-family: "Cinzel", Georgia, serif; color: #1a1a1a; margin: 1.2em 0 0.3em; }
   .body h1 { font-size: 22px; } .body h2 { font-size: 18px; } .body h3 { font-size: 15px; }
@@ -91,9 +95,17 @@ function renderEntitySection(
   withPageBreak: boolean,
   entitiesById: Map<string, Entity>,
   scope: number,
+  assetCredits: Record<string, AssetCredit> | undefined,
+  showCredits: boolean,
 ): string {
+  const creditFor = (src: string): string | null =>
+    showCredits ? resolveImageCredit(src, assetCredits, entity.credit) : null;
   const heroImg = entity.images[0] ? normalizeAtlasAssetUrl(entity.images[0]) : null;
-  const galleryImgs = entity.images.slice(1).map((src) => normalizeAtlasAssetUrl(src));
+  const heroCredit = entity.images[0] ? creditFor(entity.images[0]) : null;
+  const galleryImgs = entity.images.slice(1).map((src) => ({
+    url: normalizeAtlasAssetUrl(src),
+    credit: creditFor(src),
+  }));
   const tagsHtml = entity.tags.length
     ? `<div class="tags">${entity.tags.map((t) => `<span>#${escapeHtml(t)}</span>`).join("")}</div>`
     : "";
@@ -131,9 +143,19 @@ function renderEntitySection(
       ${aliases}
     </header>
     ${heroImg ? `<img class="hero" src="${escapeHtml(heroImg)}" alt="${escapeHtml(entity.title)}" />` : ""}
+    ${heroImg && heroCredit ? `<div class="hero-credit">${escapeHtml(heroCredit)}</div>` : ""}
     ${summary}
     <div class="body">${body}</div>
-    ${galleryImgs.length ? `<div class="gallery">${galleryImgs.map((src) => `<img src="${escapeHtml(src)}" alt="" />`).join("")}</div>` : ""}
+    ${
+      galleryImgs.length
+        ? `<div class="gallery">${galleryImgs
+            .map(
+              (img) =>
+                `<figure><img src="${escapeHtml(img.url)}" alt="" />${img.credit ? `<figcaption>${escapeHtml(img.credit)}</figcaption>` : ""}</figure>`,
+            )
+            .join("")}</div>`
+        : ""
+    }
     ${connectionsHtml}
     ${tagsHtml}
     <footer class="handout-foot">
@@ -147,6 +169,8 @@ function renderEntitySection(
 export function buildHandoutHtml(
   entities: Entity[],
   entitiesById: Map<string, Entity> = EMPTY_ENTITIES,
+  assetCredits?: Record<string, AssetCredit>,
+  credits?: CreditsConfig,
 ): string {
   const docTitle =
     entities.length === 0
@@ -155,11 +179,15 @@ export function buildHandoutHtml(
         ? `${entities[0].title} — Astrath Atlas handout`
         : `${entities.length} entities — Astrath Atlas handout bundle`;
 
+  const showCredits = credits?.badges !== false;
+
   const sections =
     entities.length === 0
       ? `<div class="empty">No entities selected for this handout.</div>`
       : entities
-          .map((e, i) => renderEntitySection(e, i < entities.length - 1, entitiesById, i))
+          .map((e, i) =>
+            renderEntitySection(e, i < entities.length - 1, entitiesById, i, assetCredits, showCredits),
+          )
           .join("\n");
 
   return `<!doctype html>
@@ -209,11 +237,17 @@ function openPrintWindow(html: string): boolean {
 export function printEntityHandout(
   entity: Entity,
   entitiesById: Map<string, Entity> = EMPTY_ENTITIES,
+  assetCredits?: Record<string, AssetCredit>,
+  credits?: CreditsConfig,
 ): boolean {
-  return openPrintWindow(buildHandoutHtml([entity], entitiesById));
+  return openPrintWindow(buildHandoutHtml([entity], entitiesById, assetCredits, credits));
 }
 
 /** Print a bundle of entities as a single PDF, one entity per page. */
-export function printEntityBundle(entities: Entity[]): boolean {
-  return openPrintWindow(buildHandoutHtml(entities));
+export function printEntityBundle(
+  entities: Entity[],
+  assetCredits?: Record<string, AssetCredit>,
+  credits?: CreditsConfig,
+): boolean {
+  return openPrintWindow(buildHandoutHtml(entities, EMPTY_ENTITIES, assetCredits, credits));
 }

@@ -23,6 +23,7 @@ import { logger } from "@/lib/logger";
 import type { AssetCredit, CreditsConfig, Entity, MapPlacement } from "@/atlas/content/schema";
 import type { PlayerProfile } from "@/atlas/profiles/profileTypes";
 import { CreditBadge } from "./CreditBadge";
+import { resolveImageCredit } from "@/atlas/content/imageCredit";
 import { mountSecretBlock } from "@/atlas/secrets/secretBlockView";
 import { buildToc } from "@/atlas/entity/paneScrollSync";
 import { AtlasImage } from "@/atlas/content/AtlasImage";
@@ -45,24 +46,6 @@ export interface EntityPanelProps {
   /** World-level per-asset credit registry, keyed by image src. Takes
    *  precedence over `entity.credit` for any src with a registry entry. */
   assetCredits?: Record<string, AssetCredit>;
-}
-
-/**
- * Resolve which credit text (if any) to show for one image src. A registry
- * entry (world.assetCredits[src]) takes precedence when present — shown only
- * when `enabled` and non-empty. With no registry entry, fall back to the
- * entity's coarse `credit` field. Returns null when nothing should show.
- */
-function resolveImageCredit(
-  src: string,
-  assetCredits: Record<string, AssetCredit> | undefined,
-  entityCredit: string | undefined,
-): string | null {
-  const entry = assetCredits?.[src];
-  if (entry) {
-    return entry.enabled && entry.credit ? entry.credit : null;
-  }
-  return entityCredit ? entityCredit : null;
 }
 
 function CopyLinkButton() {
@@ -475,7 +458,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => printEntityHandout(entity, entityById)}
+              onClick={() => printEntityHandout(entity, entityById, assetCredits, credits)}
               title="Download as printable handout (PDF)"
               aria-label="Download handout as PDF"
             >
