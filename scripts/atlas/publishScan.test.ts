@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { reasonsFromNoSecrets, reasonsFromDerived, reasonsFromShape } from "./publishScan";
+import { reasonsFromNoSecrets, reasonsFromDerived, reasonsFromShape, MSG } from "./publishScan";
 
 describe("publishScan reason mapping (D8: never echo secrets)", () => {
   it("maps a DM-content hit to a scan-level message with no secret", () => {
@@ -167,5 +167,11 @@ describe("publishScan dedup + fallback behavior", () => {
 
   it("no-secrets: a clean scan produces no reasons", () => {
     expect(reasonsFromNoSecrets({ files: 3, dmHits: [], editorHits: [] }, "dist")).toEqual([]);
+  });
+
+  it("audit-assets: message describes the real oversize trigger, not a missing/unused image", () => {
+    expect(MSG["audit-assets"]).toMatch(/larger than the 4 MB limit/i);
+    expect(MSG["audit-assets"]).not.toMatch(/missing/i);
+    expect(MSG["audit-assets"]).not.toMatch(/unused/i);
   });
 });

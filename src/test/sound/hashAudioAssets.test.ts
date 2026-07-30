@@ -77,6 +77,73 @@ describe("hashAudioAssets", () => {
     const map = hashAudioAssets([], tmpDir);
     expect(map.size).toBe(0);
   });
+
+  it("skips an empty src without throwing (half-configured sound zone)", () => {
+    const areas = [area("")];
+    expect(() => hashAudioAssets(areas, tmpDir)).not.toThrow();
+    const map = hashAudioAssets(areas, tmpDir);
+    expect(map.size).toBe(0);
+  });
+
+  it("skips a whitespace-only src without throwing", () => {
+    const areas = [area("   ")];
+    expect(() => hashAudioAssets(areas, tmpDir)).not.toThrow();
+  });
+
+  it("skips a blank srcFallback without throwing", () => {
+    const areas: SoundArea[] = [
+      { id: "a", bed: { src: "atlas/assets/maps/tavern.ogg", srcFallback: "" } },
+    ];
+    const map = hashAudioAssets(areas, tmpDir);
+    expect(map.size).toBe(1);
+    expect(map.has("atlas/assets/maps/tavern.ogg")).toBe(true);
+  });
+
+  it("prunes a hashed file whose bed was removed from the next build", () => {
+    const audioDir = path.join(tmpDir, "atlas", "assets", "audio");
+    const map1 = hashAudioAssets([area("atlas/assets/maps/tavern.ogg")], tmpDir);
+    const staleHashedName = path.basename(map1.get("atlas/assets/maps/tavern.ogg")!);
+    expect(fs.existsSync(path.join(audioDir, staleHashedName))).toBe(true);
+
+    hashAudioAssets([area("atlas/assets/maps/forest.ogg")], tmpDir);
+
+    expect(fs.existsSync(path.join(audioDir, staleHashedName))).toBe(false);
+  });
+
+  it("prunes all hashed files when a build has zero areas", () => {
+    const audioDir = path.join(tmpDir, "atlas", "assets", "audio");
+    hashAudioAssets([area("atlas/assets/maps/tavern.ogg")], tmpDir);
+    expect(fs.readdirSync(audioDir).length).toBe(1);
+
+    hashAudioAssets([], tmpDir);
+
+    expect(fs.readdirSync(audioDir).length).toBe(0);
+  });
+
+  it("keeps a still-referenced hashed file across builds", () => {
+    const audioDir = path.join(tmpDir, "atlas", "assets", "audio");
+    const areas = [area("atlas/assets/maps/tavern.ogg"), area("atlas/assets/maps/forest.ogg")];
+    hashAudioAssets(areas, tmpDir);
+    expect(fs.readdirSync(audioDir).length).toBe(2);
+
+    hashAudioAssets([area("atlas/assets/maps/tavern.ogg")], tmpDir);
+
+    const remaining = fs.readdirSync(audioDir);
+    expect(remaining.length).toBe(1);
+    expect(remaining[0]).toMatch(/^[a-f0-9]{8}\.ogg$/);
+  });
+
+  it("does not delete manifest.json or non-hashed-name files in the audio dir", () => {
+    const audioDir = path.join(tmpDir, "atlas", "assets", "audio");
+    fs.mkdirSync(audioDir, { recursive: true });
+    fs.writeFileSync(path.join(audioDir, "manifest.json"), "[]");
+    fs.writeFileSync(path.join(audioDir, "not-a-hash-name.ogg"), "keep-me");
+
+    hashAudioAssets([area("atlas/assets/maps/tavern.ogg")], tmpDir);
+
+    expect(fs.existsSync(path.join(audioDir, "manifest.json"))).toBe(true);
+    expect(fs.existsSync(path.join(audioDir, "not-a-hash-name.ogg"))).toBe(true);
+  });
 });
 
 describe("rewriteAudioSrcs", () => {

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
-import type { CreditsConfig, Entity, MapPlacement } from "@/atlas/content/schema";
+import type { AssetCredit, CreditsConfig, Entity, MapPlacement } from "@/atlas/content/schema";
 import type { EntityRelationship } from "@/atlas/profiles/profileTypes";
 
 const e: Entity = {
@@ -840,6 +840,27 @@ describe("EntityPanel — ImageThumb broken-image placeholder (N77)", () => {
   });
 });
 
+describe("EntityPanel — lightbox broken-image fallback (Q93)", () => {
+  it("shows the shared 'Image missing' fallback in the lightbox when the full image 404s", () => {
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityWithPortrait}
+          placements={[]}
+          entityById={new Map()}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    fireEvent.error(screen.getByRole("img", { name: "Corven" }));
+    expect(screen.getAllByText("Image missing").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("img", { name: "Corven" })).not.toBeInTheDocument();
+  });
+});
+
 describe("EntityPanel — CopyLinkButton copied state (N77)", () => {
   it("shows the Check icon (text-green-500) after a successful clipboard write", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
@@ -869,5 +890,542 @@ describe("EntityPanel — CopyLinkButton copied state (N77)", () => {
       configurable: true,
       writable: true,
     });
+  });
+});
+
+// ── Q9 — Player profile block ────────────────────────────────────────────────
+
+describe("EntityPanel — player profile block (Q9)", () => {
+  function renderWithProfile(overrides: Partial<Entity>) {
+    return render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={{ ...e, ...overrides }}
+          placements={[]}
+          entityById={new Map([[e.id, e]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+  }
+
+  it("renders nothing when profile is absent", () => {
+    renderWithProfile({});
+    expect(screen.queryByTestId("player-profile-block")).not.toBeInTheDocument();
+  });
+
+  it("renders nothing when profile.player is absent", () => {
+    renderWithProfile({ profile: {} });
+    expect(screen.queryByTestId("player-profile-block")).not.toBeInTheDocument();
+  });
+
+  it("renders nothing when profile.player is empty (all fields absent)", () => {
+    renderWithProfile({ profile: { player: {} } });
+    expect(screen.queryByTestId("player-profile-block")).not.toBeInTheDocument();
+  });
+
+  it("renders known_for when present", () => {
+    renderWithProfile({ profile: { player: { known_for: "A master smuggler" } } });
+    expect(screen.getByTestId("player-profile-block")).toBeInTheDocument();
+    expect(screen.getByText("A master smuggler")).toBeInTheDocument();
+    expect(screen.getByText(/known for/i)).toBeInTheDocument();
+  });
+
+  it("renders visible_traits as a bulleted list", () => {
+    renderWithProfile({
+      profile: { player: { visible_traits: ["Wears a red cloak", "Speaks with an accent"] } },
+    });
+    expect(screen.getByText("Wears a red cloak")).toBeInTheDocument();
+    expect(screen.getByText("Speaks with an accent")).toBeInTheDocument();
+    expect(screen.getByText(/visible traits/i)).toBeInTheDocument();
+  });
+
+  it("renders rumors as a list", () => {
+    renderWithProfile({
+      profile: { player: { rumors: ["Said to have fought a dragon", "Rumored to be nobility"] } },
+    });
+    expect(screen.getByText("Said to have fought a dragon")).toBeInTheDocument();
+    expect(screen.getByText("Rumored to be nobility")).toBeInTheDocument();
+    expect(screen.getByText(/rumors/i)).toBeInTheDocument();
+  });
+
+  it("renders all three fields together", () => {
+    renderWithProfile({
+      profile: {
+        player: {
+          known_for: "Quick wit",
+          visible_traits: ["Scarred cheek"],
+          rumors: ["May be a spy"],
+        },
+      },
+    });
+    expect(screen.getByText("Quick wit")).toBeInTheDocument();
+    expect(screen.getByText("Scarred cheek")).toBeInTheDocument();
+    expect(screen.getByText("May be a spy")).toBeInTheDocument();
+  });
+
+  it("does not render profile.dm content in the output", () => {
+    renderWithProfile({
+      profile: {
+        player: { known_for: "Quick wit" },
+        dm: { secret_motive: "DM_SECRET_MOTIVE" },
+      },
+    });
+    expect(screen.queryByText("DM_SECRET_MOTIVE")).not.toBeInTheDocument();
+    expect(screen.queryByText(/secret_motive/i)).not.toBeInTheDocument();
+  });
+});
+
+// ── Q10 — Lightbox prev/next + keyboard nav + counter ───────────────────────
+
+const entityWith3Images: Entity = {
+  ...e,
+  images: ["img1.png", "img2.png", "img3.png"],
+  credit: "Art by Jane",
+} as Entity;
+
+const entityWith1Image: Entity = {
+  ...e,
+  images: ["solo.png"],
+} as Entity;
+
+function renderLightboxPanel(entity: Entity, assetCredits?: Record<string, AssetCredit>) {
+  return render(
+    <MemoryRouter>
+      <EntityPanel
+        entity={entity}
+        placements={[]}
+        entityById={new Map([[entity.id, entity]])}
+        onOpenEntity={() => {}}
+        onClose={() => {}}
+        onShowOnMap={() => {}}
+        assetCredits={assetCredits}
+      />
+    </MemoryRouter>,
+  );
+}
+
+describe("EntityPanel — lightbox navigation (Q10)", () => {
+  it("opens the lightbox when a thumbnail is clicked", async () => {
+    renderLightboxPanel(entityWith3Images);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+  });
+
+  it("shows prev/next buttons when entity has multiple images", async () => {
+    renderLightboxPanel(entityWith3Images);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("Previous image")).toBeInTheDocument();
+      expect(screen.getByLabelText("Next image")).toBeInTheDocument();
+    });
+  });
+
+  it("hides prev/next buttons when entity has a single image", async () => {
+    renderLightboxPanel(entityWith1Image);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+    expect(screen.queryByLabelText("Previous image")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Next image")).not.toBeInTheDocument();
+  });
+
+  it("shows the n/total counter in the lightbox for multi-image entities", async () => {
+    renderLightboxPanel(entityWith3Images);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("1 / 3");
+    });
+  });
+
+  it("advances to the next image when the Next button is clicked", async () => {
+    renderLightboxPanel(entityWith3Images);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("1 / 3");
+    });
+    fireEvent.click(screen.getByLabelText("Next image"));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("2 / 3");
+    });
+  });
+
+  it("goes to the previous image when the Prev button is clicked", async () => {
+    renderLightboxPanel(entityWith3Images);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 2/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("2 / 3");
+    });
+    fireEvent.click(screen.getByLabelText("Previous image"));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("1 / 3");
+    });
+  });
+
+  it("wraps from last image to first on Next", async () => {
+    renderLightboxPanel(entityWith3Images);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 3/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("3 / 3");
+    });
+    fireEvent.click(screen.getByLabelText("Next image"));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("1 / 3");
+    });
+  });
+
+  it("advances on ArrowRight keydown", async () => {
+    renderLightboxPanel(entityWith3Images);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("1 / 3");
+    });
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("2 / 3");
+    });
+  });
+
+  it("goes back on ArrowLeft keydown", async () => {
+    renderLightboxPanel(entityWith3Images);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 2/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("2 / 3");
+    });
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    await waitFor(() => {
+      expect(screen.getByTestId("lightbox-counter")).toHaveTextContent("1 / 3");
+    });
+  });
+
+  it("credit badge tracks the current image when navigating", async () => {
+    const entity: Entity = {
+      ...e,
+      images: ["img1.png", "img2.png"],
+    } as Entity;
+    const assetCredits: Record<string, AssetCredit> = {
+      "img1.png": { credit: "Credit for img1", enabled: true },
+      "img2.png": { credit: "Credit for img2", enabled: true },
+    };
+    renderLightboxPanel(entity, assetCredits);
+    fireEvent.click(screen.getByRole("img", { name: /Corven image 1/i }));
+    await waitFor(() => {
+      // Modal aria-hides the rest of the page; only the lightbox badge is accessible
+      expect(
+        screen.getAllByRole("note", { name: /Image credit: Credit for img1/i }).length,
+      ).toBeGreaterThan(0);
+    });
+    fireEvent.click(screen.getByLabelText("Next image"));
+    await waitFor(() => {
+      expect(
+        screen.getAllByRole("note", { name: /Image credit: Credit for img2/i }).length,
+      ).toBeGreaterThan(0);
+    });
+    expect(
+      screen.queryByRole("note", { name: /Image credit: Credit for img1/i }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("EntityPanel — scroll-to-top on entity change (Q11)", () => {
+  it("resets the reading-panel viewport scrollTop to 0 when entity id changes", () => {
+    const entityA: Entity = { ...e, id: "entity-a", title: "Entity A" };
+    const entityB: Entity = { ...e, id: "entity-b", title: "Entity B" };
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityA}
+          placements={[]}
+          entityById={new Map([[entityA.id, entityA]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    const viewport = document.querySelector(
+      "[data-radix-scroll-area-viewport]",
+    ) as HTMLElement;
+    expect(viewport).not.toBeNull();
+
+    // Spy on scrollTop assignment to verify our effect sets it to 0.
+    let assignedScrollTop: number | undefined;
+    Object.defineProperty(viewport, "scrollTop", {
+      set(v: number) {
+        assignedScrollTop = v;
+      },
+      get() {
+        return assignedScrollTop ?? 0;
+      },
+      configurable: true,
+    });
+
+    rerender(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityB}
+          placements={[]}
+          entityById={new Map([[entityB.id, entityB]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(assignedScrollTop).toBe(0);
+  });
+});
+
+// ── Q13 — "On this page" section-jump list ────────────────────────────────────
+
+const entityWithTwoHeadings: Entity = {
+  ...e,
+  body: "## Overview\n\nSome text.\n\n## History\n\nMore text.",
+  bodyHtml: "<h2>Overview</h2><p>Some text.</p><h2>History</h2><p>More text.</p>",
+};
+
+const entityWithOneHeading: Entity = {
+  ...e,
+  body: "## Overview\n\nSome text.",
+  bodyHtml: "<h2>Overview</h2><p>Some text.</p>",
+};
+
+const entityNoHeadings: Entity = {
+  ...e,
+  body: "Just a paragraph.",
+  bodyHtml: "<p>Just a paragraph.</p>",
+};
+
+function renderWithBody(entity: Entity) {
+  return render(
+    <MemoryRouter>
+      <EntityPanel
+        entity={entity}
+        placements={[]}
+        entityById={new Map([[entity.id, entity]])}
+        onOpenEntity={() => {}}
+        onClose={() => {}}
+        onShowOnMap={() => {}}
+      />
+    </MemoryRouter>,
+  );
+}
+
+describe("EntityPanel — 'On this page' jump list (Q13)", () => {
+  it("renders the jump list when entity has ≥2 headings", () => {
+    renderWithBody(entityWithTwoHeadings);
+    expect(screen.getByTestId("on-this-page")).toBeInTheDocument();
+    // TOC items render as buttons with the heading text
+    expect(screen.getByRole("button", { name: "Overview" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "History" })).toBeInTheDocument();
+  });
+
+  it("does not render the jump list when entity has exactly 1 heading", () => {
+    renderWithBody(entityWithOneHeading);
+    expect(screen.queryByTestId("on-this-page")).not.toBeInTheDocument();
+  });
+
+  it("does not render the jump list when entity has no headings", () => {
+    renderWithBody(entityNoHeadings);
+    expect(screen.queryByTestId("on-this-page")).not.toBeInTheDocument();
+  });
+
+  it("collapses the list when the toggle button is clicked", () => {
+    renderWithBody(entityWithTwoHeadings);
+    const toggle = screen.getByRole("button", { name: /on this page/i });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    // TOC item buttons gone; body h2 may still be in the DOM but TOC buttons are not
+    expect(screen.queryByRole("button", { name: "Overview" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "History" })).not.toBeInTheDocument();
+  });
+
+  it("re-expands the list when the toggle is clicked again after collapsing", () => {
+    renderWithBody(entityWithTwoHeadings);
+    const toggle = screen.getByRole("button", { name: /on this page/i });
+    fireEvent.click(toggle);
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Overview" })).toBeInTheDocument();
+  });
+
+  it("injects data-anchor-id onto rendered body headings", () => {
+    renderWithBody(entityWithTwoHeadings);
+    const headings = document.querySelectorAll("[data-anchor-id]");
+    expect(headings.length).toBe(2);
+    expect(headings[0]).toHaveAttribute("data-anchor-id", "overview");
+    expect(headings[1]).toHaveAttribute("data-anchor-id", "history");
+  });
+
+  it("scrolling click does not crash (viewport delta computed, scrollTop assigned)", () => {
+    renderWithBody(entityWithTwoHeadings);
+    const viewport = document.querySelector("[data-radix-scroll-area-viewport]") as HTMLElement;
+    let assigned: number | undefined;
+    Object.defineProperty(viewport, "scrollTop", {
+      set(v: number) { assigned = v; },
+      get() { return assigned ?? 0; },
+      configurable: true,
+    });
+    // Click the "Overview" jump link — should not throw
+    const jumpLinks = screen.getAllByRole("button", { name: "Overview" });
+    fireEvent.click(jumpLinks[0]);
+    // jsdom gives zero-rects so delta = 0, but scrollTop setter was called
+    expect(assigned).toBeDefined();
+  });
+
+  it("resets the TOC to open when navigating to a new entity", () => {
+    const entityA = { ...entityWithTwoHeadings, id: "ent-a", title: "Ent A" };
+    const entityB = { ...entityWithTwoHeadings, id: "ent-b", title: "Ent B" };
+    const { rerender } = render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityA}
+          placements={[]}
+          entityById={new Map([[entityA.id, entityA]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    // Collapse the TOC on entity A
+    fireEvent.click(screen.getByRole("button", { name: /on this page/i }));
+    expect(screen.getByRole("button", { name: /on this page/i })).toHaveAttribute("aria-expanded", "false");
+
+    // Navigate to entity B — TOC should re-open
+    rerender(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entityB}
+          placements={[]}
+          entityById={new Map([[entityB.id, entityB]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("button", { name: /on this page/i })).toHaveAttribute("aria-expanded", "true");
+  });
+});
+
+// ── Q15 — Connections dedup and grouping ─────────────────────────────────────
+
+describe("EntityPanel — Connections dedup and grouping (Q15)", () => {
+  it("filters backlink chips for entities that are also Connection targets", () => {
+    const entity: Entity = {
+      ...e,
+      backlinks: [{ id: "ally-npc", title: "Ally NPC" }],
+      relationships: [{ entity: "ally-npc", type: "allied_with", visibility: "player" as const }],
+    } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={baseEntityById}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    // "Ally NPC" appears once (Connections), not twice
+    expect(screen.getAllByText("Ally NPC")).toHaveLength(1);
+    // "Mentioned in" heading is gone — no remaining backlinks
+    expect(screen.queryByText(/Mentioned in/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps backlink chips for entities not appearing in Connections", () => {
+    const other: Entity = {
+      ...e,
+      id: "other-npc",
+      title: "Other NPC",
+    } as Entity;
+    const entity: Entity = {
+      ...e,
+      backlinks: [{ id: "other-npc", title: "Other NPC" }],
+      relationships: [{ entity: "ally-npc", type: "allied_with", visibility: "player" as const }],
+    } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={new Map([[e.id, e], [ally.id, ally], [other.id, other]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    // Backlink for "Other NPC" (not a Connection target) still shows
+    expect(screen.getByText("Other NPC")).toBeInTheDocument();
+    expect(screen.getByText(/Mentioned in/i)).toBeInTheDocument();
+  });
+
+  it("groups multiple relationships sharing the same label into one row", () => {
+    const cityA: Entity = { ...e, id: "city-a", title: "City A" } as Entity;
+    const cityB: Entity = { ...e, id: "city-b", title: "City B" } as Entity;
+    const entity: Entity = {
+      ...e,
+      relationships: [
+        { entity: "city-a", label: "Controls", type: "controls", visibility: "player" as const },
+        { entity: "city-b", label: "Controls", type: "controls", visibility: "player" as const },
+      ],
+    } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={new Map([[e.id, e], [cityA.id, cityA], [cityB.id, cityB]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("City A")).toBeInTheDocument();
+    expect(screen.getByText("City B")).toBeInTheDocument();
+    // Label appears exactly once — both targets grouped under it
+    expect(screen.getAllByText(/^Controls:$/)).toHaveLength(1);
+  });
+
+  it("renders different label groups as separate rows", () => {
+    const cityA: Entity = { ...e, id: "city-a", title: "City A" } as Entity;
+    const entity: Entity = {
+      ...e,
+      relationships: [
+        { entity: "ally-npc", type: "allied_with", visibility: "player" as const },
+        { entity: "city-a", label: "Controls", type: "controls", visibility: "player" as const },
+      ],
+    } as Entity;
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={entity}
+          placements={[]}
+          entityById={new Map([[e.id, e], [ally.id, ally], [cityA.id, cityA]])}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Ally NPC")).toBeInTheDocument();
+    expect(screen.getByText("City A")).toBeInTheDocument();
+    // Two distinct label spans
+    expect(screen.getByText(/^allied_with:$/)).toBeInTheDocument();
+    expect(screen.getByText(/^Controls:$/)).toBeInTheDocument();
   });
 });

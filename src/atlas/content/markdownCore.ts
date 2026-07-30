@@ -64,7 +64,15 @@ function calloutExtension() {
       const m = src.match(/^ {0,3}> ?\[!/m);
       return m ? m.index : undefined;
     },
-    tokenizer(this: { lexer: { blockTokens: (s: string) => Token[] } }, src: string) {
+    tokenizer(
+      this: {
+        lexer: {
+          blockTokens: (s: string) => Token[];
+          inlineTokens: (s: string) => Token[];
+        };
+      },
+      src: string,
+    ) {
       const m = CALLOUT_BLOCK.exec(src);
       if (!m || m.index !== 0) return undefined;
       const [raw, typeRaw, fold, titleRaw, bodyRaw] = m;
@@ -83,21 +91,20 @@ function calloutExtension() {
         raw,
         calloutType: type,
         open: fold !== "-",
-        title,
+        titleTokens: this.lexer.inlineTokens(title),
         tokens: this.lexer.blockTokens(body),
       };
     },
     renderer(
-      this: { parser: { parse: (t: Token[]) => string } },
-      token: { calloutType: string; open: boolean; title: string; tokens: Token[] },
+      this: {
+        parser: { parse: (t: Token[]) => string; parseInline: (t: Token[]) => string };
+      },
+      token: { calloutType: string; open: boolean; titleTokens: Token[]; tokens: Token[] },
     ) {
       const inner = this.parser.parse(token.tokens);
       const openAttr = token.open ? " open" : "";
       const t = token.calloutType.replace(/[^a-z0-9-]/g, "");
-      const title = token.title
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+      const title = this.parser.parseInline(token.titleTokens);
       return (
         `<details class="atlas-callout atlas-callout-${t}" data-callout="${t}"${openAttr}>` +
         `<summary>${title}</summary>${inner}</details>`
@@ -119,6 +126,8 @@ let _fnCounter = 0;
 
 const FN_DEF_RE = /^\[\^([^\]]+)\]: *(.*)/;
 const FN_REF_RE = /^\[\^([^\]\s]+)\](?!:)/;
+// A continuation line of a `[^id]:` def: indented by 4+ spaces or a tab.
+const FN_CONT_RE = /^(?: {4}|\t)(.*)$/;
 
 function footnoteDefExtension() {
   return {
@@ -133,11 +142,26 @@ function footnoteDefExtension() {
     ) {
       const m = src.match(FN_DEF_RE);
       if (!m || m.index !== 0) return undefined;
+      let raw = m[0];
+      const parts = [m[2].trim()];
+      // Consume immediately-following indented lines as continuations, so a
+      // wrapped/soft-broken definition line isn't left for `marked` to see
+      // as a stray indented code block.
+      let rest = src.slice(raw.length);
+      while (rest.startsWith("\n")) {
+        const nlIdx = rest.indexOf("\n", 1);
+        const line = nlIdx === -1 ? rest.slice(1) : rest.slice(1, nlIdx);
+        const contMatch = FN_CONT_RE.exec(line);
+        if (!contMatch) break;
+        parts.push(contMatch[1].trim());
+        raw += "\n" + line;
+        rest = nlIdx === -1 ? "" : rest.slice(nlIdx);
+      }
       return {
         type: "footnote-def",
-        raw: m[0],
+        raw,
         id: m[1],
-        tokens: this.lexer.inlineTokens(m[2].trim()),
+        tokens: this.lexer.inlineTokens(parts.join(" ").trim()),
       };
     },
     renderer(

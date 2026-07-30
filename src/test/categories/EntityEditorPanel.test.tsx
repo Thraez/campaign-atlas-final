@@ -23,4 +23,40 @@ describe("EntityEditorPanel (create mode)", () => {
       expect.objectContaining({ title: "Mire Vale", category: "characters" }),
     );
   });
+
+  it("disables Create and shows an inline warning when the title collides with an existing entity", () => {
+    const onCreate = vi.fn();
+    render(
+      <EntityEditorPanel
+        mode="create"
+        category="characters"
+        onCreate={onCreate}
+        onCancel={vi.fn()}
+        existingIds={new Set(["mire-vale"])}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(/name/i), { target: { value: "Mire Vale" } });
+    expect(screen.getByText(/already exists/i)).toBeInTheDocument();
+    const createButton = screen.getByRole("button", { name: /create/i });
+    expect(createButton).toBeDisabled();
+    fireEvent.click(createButton);
+    expect(onCreate).not.toHaveBeenCalled();
+  });
+
+  it("does not warn when the title's slug is unique", () => {
+    const onCreate = vi.fn();
+    render(
+      <EntityEditorPanel
+        mode="create"
+        category="characters"
+        onCreate={onCreate}
+        onCancel={vi.fn()}
+        existingIds={new Set(["mire-vale"])}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(/name/i), { target: { value: "Ashford Keep" } });
+    expect(screen.queryByText(/already exists/i)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /create/i }));
+    expect(onCreate).toHaveBeenCalled();
+  });
 });

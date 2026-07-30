@@ -39,16 +39,17 @@ it up. Nothing here is part of any real build until you copy it into
    Then `npm run dev` to open the editor, or `npm run build` for a
    player-safe production bundle.
 
-4. **Add a map image.** The seed world ships with no map image (just the
-   ocean color and a 100-px square grid). Drop your own image into
-   `public/atlas/assets/maps/` and uncomment the `layers:` block in
-   `_atlas/world.yaml`.
+4. **Swap the placeholder map image.** The seed world ships with a small
+   generic placeholder layer (`public/atlas/assets/maps/seed-placeholder.png`
+   — a gradient with a grid, no real geography) so the first build isn't
+   empty ocean. Drop your own image into `public/atlas/assets/maps/` and
+   update the `layers[0].src` in `_atlas/world.yaml` to point at it.
 
 ## What each file demonstrates
 
 | File | What it shows |
 | --- | --- |
-| `_atlas/world.yaml` | World config: one 2000x1500 map with a square grid, an empty `regions`/`routes`/`fog`, and a simple 4-month calendar with epoch `AE`. Commented examples show region and route shapes. |
+| `_atlas/world.yaml` | World config: one 2000x1500 map with a square grid, a generic placeholder image layer, an empty `regions`/`routes`/`fog`, and a simple 4-month calendar with epoch `AE`. Commented examples show region and route shapes. |
 | `settlements/Pinemoot.md` | Player-visible settlement with a placement at (1000, 750), aliases, summary, tags, and a wikilink to `[[Captain Ren]]`. |
 | `npcs/Captain-Ren.md` | Player-visible NPC with no placement and a full `profile` block (player half plus DM half with a `secret:` field — the DM half is stripped from player builds). |
 | `factions/The-Watch.md` | Player-visible faction entity, no placement. |

@@ -134,8 +134,13 @@ export function PublishedDiffPanel({ current, diff: providedDiff }: Props) {
               </Button>
             </div>
           )}
-          {!loading && diff && !diff.hasChanges && (
+          {!loading && diff && !diff.hasChanges && diff.hadBaseline && (
             <div className="text-muted-foreground py-1">No changes since last publish.</div>
+          )}
+          {!loading && diff && !diff.hasChanges && !diff.hadBaseline && (
+            <div className="text-muted-foreground py-1">
+              First publish — your whole world will go live.
+            </div>
           )}
           {!loading && diff && diff.hasChanges && (
             <>

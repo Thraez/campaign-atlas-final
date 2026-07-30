@@ -198,27 +198,44 @@ export function ImportStagingModal({
                       </div>
                     </td>
                     <td className="py-2 pr-2">
-                      <Select
-                        value={row.resolvedVisibility || "dm"}
-                        onValueChange={(v) => onPatchRow(row.id, { resolvedVisibility: v })}
-                        disabled={
-                          !!row.parseError || (!!row.vaultRelPath && row.rowKind === "update")
-                        }
-                      >
-                        <SelectTrigger
-                          className="h-7 text-[11px]"
-                          aria-label={`Visibility for ${row.filename}`}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {["player", "dm", "hidden", "rumor"].map((v) => (
-                            <SelectItem key={v} value={v} className="text-[11px]">
-                              {v}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {(() => {
+                        const isNewImportRow =
+                          row.rowKind === "create" || row.rowKind === "path-collision";
+                        const isSecrecyIncreaseReview =
+                          row.needsReview?.reason === "secrecy-increase";
+                        const visibilityLocked =
+                          isNewImportRow && !isSecrecyIncreaseReview;
+                        return (
+                          <Select
+                            value={row.resolvedVisibility || "dm"}
+                            onValueChange={(v) => onPatchRow(row.id, { resolvedVisibility: v })}
+                            disabled={
+                              !!row.parseError ||
+                              (!!row.vaultRelPath && row.rowKind === "update") ||
+                              visibilityLocked
+                            }
+                          >
+                            <SelectTrigger
+                              className="h-7 text-[11px]"
+                              aria-label={`Visibility for ${row.filename}`}
+                              title={
+                                visibilityLocked
+                                  ? "New imports are saved DM-only for safety — publish later in the editor."
+                                  : undefined
+                              }
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {["player", "dm", "hidden", "rumor"].map((v) => (
+                                <SelectItem key={v} value={v} className="text-[11px]">
+                                  {v}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        );
+                      })()}
                     </td>
                     <td className="py-2 pr-2">
                       <Input
@@ -242,6 +259,23 @@ export function ImportStagingModal({
                             <AlertTriangle className="h-3 w-3" />
                             Outside allowlist
                           </Badge>
+                        )}
+                        {!row.parseError && row.frontmatterWarning && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge className="bg-amber-500/20 text-amber-200 border-amber-500/40 text-[10px] gap-1 cursor-help">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  Comma-separated tags/aliases
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-[320px] break-all text-[11px]">
+                                  {row.frontmatterWarning}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
                         {/* update: entity already exists — will overwrite in place */}
                         {row.rowKind === "update" && !blocked && (

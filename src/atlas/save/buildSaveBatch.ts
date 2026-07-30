@@ -31,6 +31,10 @@ export interface BuildWorldYamlContentInputs {
   maps: MapDocument[];
   calendar?: WorldCalendar;
   schemaVersion?: number;
+  /** Optional world display name; forwarded byte-for-byte, same drift-sensitivity
+   *  as `credits` — this is what lets the World Details panel's name edit reach
+   *  world.yaml at all. */
+  name?: string;
   /** The active map's layers with local edits/uploads/URL-adds merged in
    *  (`useMapLayers().mergedLayers`). */
   mergedLayers: MapLayer[];
@@ -73,6 +77,7 @@ export function buildWorldYamlContent(inputs: BuildWorldYamlContentInputs): stri
     maps,
     calendar,
     schemaVersion,
+    name,
     mergedLayers,
     localLayers,
     regionsEffective,
@@ -106,6 +111,7 @@ export function buildWorldYamlContent(inputs: BuildWorldYamlContentInputs): stri
     maps: updatedMaps,
     calendar,
     schemaVersion,
+    name,
     existing: existingRaw,
     credits,
     assetCredits,

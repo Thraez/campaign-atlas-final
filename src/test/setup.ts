@@ -13,6 +13,15 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {};
 }
 
+// jsdom does not define isSecureContext at all; default it to true (matching a
+// normal https/localhost deployment) so tests reflect real-world behavior.
+// Tests that specifically exercise the insecure-context path override this locally.
+Object.defineProperty(window, "isSecureContext", {
+  writable: true,
+  configurable: true,
+  value: true,
+});
+
 Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: (query: string) => ({

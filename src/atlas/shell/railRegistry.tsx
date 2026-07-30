@@ -12,7 +12,6 @@ import {
   Route,
   CloudFog,
   Volume2,
-  Save as SaveIcon,
   ShieldCheck,
   RefreshCw,
   Key,
@@ -69,9 +68,12 @@ export function buildRailItems({ panels, counts }: BuildRailArgs): RailItem[] {
     mk("routes", "map", "Routes", <Route className={ICON} />, "T"),
     mk("fog", "map", "Fog", <CloudFog className={ICON} />, "F"),
     mk("sound", "map", "Sound", <Volume2 className={ICON} />, "S"),
-    mk("save", "system", "Save", <SaveIcon className={ICON} />, "Ctrl+S"),
+    // No "Save" item: it had no panel behind it, so selecting it opened an
+    // empty flyout, and the toolbar's SaveStatus is the one real Save control.
     mk("publish", "system", "Publish", <ShieldCheck className={ICON} />),
-    mk("characterKeys", "system", "Character Keys", <Key className={ICON} />),
+    // "Character Keys" named the file, not the job. Each player gets one key to
+    // unlock their own character's secrets — so, keys for players.
+    mk("characterKeys", "system", "Player keys", <Key className={ICON} />),
     mk("sync", "system", "Sync from Obsidian", <RefreshCw className={ICON} />, "O"),
   ];
 }

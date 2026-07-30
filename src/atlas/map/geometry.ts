@@ -8,6 +8,7 @@
  */
 import type { LatLngExpression } from "leaflet";
 import type { GridOverlay, MapDocument, Point } from "@/atlas/content/schema";
+import { atlasToLatLng } from "@/atlas/map/coords";
 
 /** Human phrasing for a route's travel mode, e.g. "on foot". */
 export const ROUTE_MODE_LABEL: Record<string, string> = {
@@ -54,9 +55,10 @@ export function gridLines(map: MapDocument, grid: GridOverlay): LatLngExpression
       ]);
     }
     for (let y = 0; y <= map.height; y += grid.size) {
+      const lat = map.height - y;
       lines.push([
-        [y, 0],
-        [y, map.width],
+        [lat, 0],
+        [lat, map.width],
       ]);
     }
     return lines;
@@ -76,7 +78,7 @@ export function gridLines(map: MapDocument, grid: GridOverlay): LatLngExpression
         const ang = (Math.PI / 3) * i - Math.PI / 2;
         const vx = cx + r * Math.cos(ang);
         const vy = cy + r * Math.sin(ang);
-        verts.push([map.height - vy, vx]);
+        verts.push(atlasToLatLng(vx, vy, map.height));
       }
       verts.push(verts[0]);
       lines.push(verts);

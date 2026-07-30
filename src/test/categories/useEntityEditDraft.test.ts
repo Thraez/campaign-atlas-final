@@ -59,3 +59,46 @@ describe("useEntityEditDraft — applySnapshot(null)", () => {
     expect(result.current.isDirty()).toBe(false);
   });
 });
+
+describe("useEntityEditDraft — setSecrets (N99)", () => {
+  it("load() with no secrets defaults to an empty pristine array", () => {
+    const { result } = renderHook(() => useEntityEditDraft());
+    act(() => result.current.load(BASE_INIT));
+    expect(result.current.draft?.secrets).toEqual([]);
+    expect(result.current.isDirty()).toBe(false);
+  });
+
+  it("marks the draft dirty after editing an existing secret's field", () => {
+    const { result } = renderHook(() => useEntityEditDraft());
+    act(() =>
+      result.current.load({
+        ...BASE_INIT,
+        secrets: [{ id: "sec1", for: "Aria", reveal: "Old reveal text" }],
+      }),
+    );
+    expect(result.current.isDirty()).toBe(false);
+
+    act(() =>
+      result.current.setSecrets((prev) =>
+        prev.map((s) => (s.id === "sec1" ? { ...s, reveal: "New reveal text" } : s)),
+      ),
+    );
+    expect(result.current.isDirty()).toBe(true);
+    expect(result.current.draft?.secrets[0].reveal).toBe("New reveal text");
+  });
+
+  it("accepts a direct array (non-updater) value", () => {
+    const { result } = renderHook(() => useEntityEditDraft());
+    act(() => result.current.load(BASE_INIT));
+    act(() => result.current.setSecrets([{ id: "sec1", reveal: "r" }]));
+    expect(result.current.draft?.secrets).toEqual([{ id: "sec1", reveal: "r" }]);
+    expect(result.current.isDirty()).toBe(true);
+  });
+
+  it("is a no-op when no draft is loaded", () => {
+    const { result } = renderHook(() => useEntityEditDraft());
+    act(() => result.current.setSecrets([{ id: "sec1", reveal: "r" }]));
+    expect(result.current.draft).toBeNull();
+    expect(result.current.isDirty()).toBe(false);
+  });
+});

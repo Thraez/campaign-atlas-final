@@ -18,7 +18,8 @@ import React from "react";
 import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { MapLayerPanel } from "@/atlas/MapLayerPanel";
 import { EntitiesTab } from "@/atlas/tabs/EntitiesTab";
-import type { AtlasProject, Entity, MapDocument, MapLayer } from "@/atlas/content/schema";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import type { AtlasProject, Entity, MapDocument, MapLayer, MapPlacement } from "@/atlas/content/schema";
 
 // AtlasMinimap uses useMap() which requires a MapContainer context at runtime.
 // Stub the hook so we can render the component in isolation.
@@ -34,11 +35,35 @@ vi.mock("react-leaflet", () => {
       getSouthWest: () => ({ lng: 0, lat: 0 }),
       getNorthEast: () => ({ lng: 500, lat: 500 }),
     }),
+    getZoom: () => 0,
+    latLngToContainerPoint: () => ({ x: 0, y: 0 }),
     on: () => {},
     off: () => {},
   };
-  return { useMap: () => fakeMap };
+  return {
+    useMap: () => fakeMap,
+    Marker: React.forwardRef<HTMLDivElement, { children?: React.ReactNode; title?: string }>(
+      function MarkerMock({ children, title }, ref) {
+        return (
+          <div data-leaflet="Marker" data-title={title} ref={ref}>
+            {children}
+          </div>
+        );
+      },
+    ),
+    Tooltip: React.forwardRef<HTMLDivElement, { children?: React.ReactNode }>(
+      function TooltipMock({ children }, ref) {
+        return (
+          <div data-leaflet="Tooltip" ref={ref}>
+            {children}
+          </div>
+        );
+      },
+    ),
+  };
 });
+
+const { PlacementMarkers } = await import("@/pages/AtlasViewer");
 
 // ---------------------------------------------------------------------------
 // Minimal stubs
@@ -186,5 +211,111 @@ describe("E1 — accessible names for icon-only controls", () => {
       );
       expect(screen.getByRole("button", { name: "Remove link" })).toBeInTheDocument();
     });
+  });
+});
+
+describe("Q25 — mobile entity bottom sheet accessible name", () => {
+  it("sheet dialog has an accessible name equal to the open entity title", () => {
+    render(
+      <Sheet open>
+        <SheetContent side="bottom" className="h-[80vh] p-0">
+          <SheetTitle className="sr-only">Tideshore</SheetTitle>
+          <SheetDescription className="sr-only">Entity details</SheetDescription>
+        </SheetContent>
+      </Sheet>,
+    );
+    expect(screen.getByRole("dialog", { name: "Tideshore" })).toBeInTheDocument();
+  });
+});
+
+describe("Q26 — map pins accessible names", () => {
+  const ENTITY_WITH_TYPE: Entity = {
+    id: "pin-ent-1",
+    title: "Goblin Cave",
+    type: "dungeon",
+    visibility: "player",
+    aliases: [],
+    tags: [],
+    images: [],
+    body: "",
+    bodyHtml: "",
+    frontmatter: {},
+    sourcePath: "content/pin-ent-1.md",
+    links: [],
+    backlinks: [],
+    relationships: [],
+    profile: {},
+  } as unknown as Entity;
+
+  const ENTITY_NO_TYPE: Entity = {
+    id: "pin-ent-2",
+    title: "The Crossing",
+    type: "note",
+    visibility: "player",
+    aliases: [],
+    tags: [],
+    images: [],
+    body: "",
+    bodyHtml: "",
+    frontmatter: {},
+    sourcePath: "content/pin-ent-2.md",
+    links: [],
+    backlinks: [],
+    relationships: [],
+    profile: {},
+  } as unknown as Entity;
+
+  const PLACEMENT_1: MapPlacement = {
+    id: "pl-1",
+    entityId: "pin-ent-1",
+    mapId: "map-1",
+    x: 100,
+    y: 200,
+    visibility: "player",
+  } as unknown as MapPlacement;
+
+  const PLACEMENT_2: MapPlacement = {
+    id: "pl-2",
+    entityId: "pin-ent-2",
+    mapId: "map-1",
+    x: 300,
+    y: 400,
+    visibility: "player",
+  } as unknown as MapPlacement;
+
+  it("marker title includes entity title and player type label when type has a label", () => {
+    render(
+      <PlacementMarkers
+        dx={0}
+        H={1000}
+        placements={[PLACEMENT_1]}
+        entityById={new Map([["pin-ent-1", ENTITY_WITH_TYPE]])}
+        onOpenEntity={vi.fn()}
+        visited={new Set()}
+        openId={null}
+      />,
+    );
+    const marker = document.querySelector('[data-leaflet="Marker"]');
+    expect(marker).not.toBeNull();
+    // "dungeon" maps to "Dungeon" via playerTypeLabel
+    expect(marker?.getAttribute("data-title")).toBe("Goblin Cave, Dungeon");
+  });
+
+  it("marker title is just the entity title when playerTypeLabel returns empty string", () => {
+    render(
+      <PlacementMarkers
+        dx={0}
+        H={1000}
+        placements={[PLACEMENT_2]}
+        entityById={new Map([["pin-ent-2", ENTITY_NO_TYPE]])}
+        onOpenEntity={vi.fn()}
+        visited={new Set()}
+        openId={null}
+      />,
+    );
+    const marker = document.querySelector('[data-leaflet="Marker"]');
+    expect(marker).not.toBeNull();
+    // "note" has no player type label → title is just the entity title
+    expect(marker?.getAttribute("data-title")).toBe("The Crossing");
   });
 });

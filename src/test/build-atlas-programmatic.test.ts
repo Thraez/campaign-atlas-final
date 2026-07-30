@@ -108,7 +108,7 @@ describe("scripts/build-atlas runBuild() programmatic entry", () => {
 });
 
 describe("search index bodyText field", () => {
-  it("search-index.json entries carry bodyText (original case) alongside lowercased body", async () => {
+  it("search-index.json entries carry bodyText (original case) but not the redundant lowercased body", async () => {
     const result = await runBuild({ player: false, strict: false });
     expect(result.ok).toBe(true);
     const indexPath = path.join(tmpRoot, ".local-atlas", "search-index.json");
@@ -117,14 +117,41 @@ describe("search index bodyText field", () => {
       body?: string;
       bodyText?: string;
     }>;
-    // Every entry with a non-empty body must also carry bodyText.
-    const withBody = index.filter((e) => e.body && e.body.length > 0);
-    expect(withBody.length).toBeGreaterThan(0);
-    withBody.forEach((e) => {
-      expect(e.bodyText).toBeDefined();
-      // body must be the lowercased form of bodyText
-      expect(e.body).toBe(e.bodyText!.toLowerCase());
+    // body is derived client-side on load (loader.ts), not shipped in the artifact.
+    const withText = index.filter((e) => e.bodyText && e.bodyText.length > 0);
+    expect(withText.length).toBeGreaterThan(0);
+    withText.forEach((e) => {
+      expect(e.body).toBeUndefined();
     });
+  });
+});
+
+describe("world name", () => {
+  it("falls back to the default world name when world.yaml has none", async () => {
+    const result = await runBuild({ player: false, strict: false });
+    expect(result.ok).toBe(true);
+    const atlasPath = path.join(tmpRoot, ".local-atlas", "atlas.json");
+    const project = JSON.parse(fs.readFileSync(atlasPath, "utf8")) as {
+      worlds: Array<{ name: string }>;
+    };
+    expect(project.worlds[0].name).toBe("Astrath Deeprealm");
+  });
+
+  it("uses world.yaml's top-level name when present", async () => {
+    const worldPath = path.join(tmpRoot, "content/test-world/_atlas/world.yaml");
+    const goodYaml = fs.readFileSync(worldPath, "utf8");
+    fs.writeFileSync(worldPath, `name: My Custom World\n${goodYaml}`, "utf8");
+    try {
+      const result = await runBuild({ player: false, strict: false });
+      expect(result.ok).toBe(true);
+      const atlasPath = path.join(tmpRoot, ".local-atlas", "atlas.json");
+      const project = JSON.parse(fs.readFileSync(atlasPath, "utf8")) as {
+        worlds: Array<{ name: string }>;
+      };
+      expect(project.worlds[0].name).toBe("My Custom World");
+    } finally {
+      fs.writeFileSync(worldPath, goodYaml, "utf8");
+    }
   });
 });
 

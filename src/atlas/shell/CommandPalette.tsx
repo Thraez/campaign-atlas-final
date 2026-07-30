@@ -31,17 +31,26 @@ export function CommandPalette({
   const results = useMemo(() => queryPalette(index, q), [index, q]);
   if (!open) return null;
 
+  const activeOptionId = results[sel] ? `cp-result-${results[sel].kind}-${results[sel].id}` : undefined;
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center pt-[12vh]"
       onMouseDown={() => setOpen(false)}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
         className="w-[560px] max-w-[90vw] rounded-lg border bg-background shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <input
           autoFocus
+          aria-label="Command palette search"
+          aria-autocomplete="list"
+          aria-controls="cp-results-listbox"
+          aria-activedescendant={activeOptionId}
           className="w-full h-11 px-4 text-sm bg-transparent outline-none border-b"
           placeholder="Search everything — entities, commands, maps, settings"
           value={q}
@@ -58,23 +67,37 @@ export function CommandPalette({
             }
           }}
         />
-        <ul className="max-h-[50vh] overflow-auto">
-          {results.map((r, i) => (
-            <li key={`${r.kind}:${r.id}`}>
-              <button
-                type="button"
-                className={`w-full text-left px-4 py-2 text-sm flex justify-between ${i === sel ? "bg-muted" : ""}`}
-                onMouseEnter={() => setSel(i)}
-                onClick={() => {
-                  onChoose(r);
-                  setOpen(false);
-                }}
-              >
-                <span>{r.title}</span>
-                <span className="text-[10px] uppercase text-muted-foreground">{r.kind}</span>
-              </button>
+        <ul
+          id="cp-results-listbox"
+          role="listbox"
+          aria-label="Command palette results"
+          className="max-h-[50vh] overflow-auto"
+        >
+          {results.length === 0 ? (
+            <li role="presentation" className="px-4 py-2 text-sm text-muted-foreground">
+              No matches for &quot;{q}&quot;
             </li>
-          ))}
+          ) : (
+            results.map((r, i) => (
+              <li key={`${r.kind}:${r.id}`} role="presentation">
+                <button
+                  type="button"
+                  id={`cp-result-${r.kind}-${r.id}`}
+                  role="option"
+                  aria-selected={i === sel}
+                  className={`w-full text-left px-4 py-2 text-sm flex justify-between ${i === sel ? "bg-muted" : ""}`}
+                  onMouseEnter={() => setSel(i)}
+                  onClick={() => {
+                    onChoose(r);
+                    setOpen(false);
+                  }}
+                >
+                  <span>{r.title}</span>
+                  <span className="text-[10px] uppercase text-muted-foreground">{r.kind}</span>
+                </button>
+              </li>
+            ))
+          )}
         </ul>
       </div>
     </div>

@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { lazy, Suspense, type ReactNode } from "react";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Landing from "./pages/Landing.tsx";
@@ -26,6 +26,13 @@ import { isDmToolsEnabled } from "@/atlas/dmTools";
 const AtlasEditorRoute = () =>
   AtlasPlacementEditor && isDmToolsEnabled() ? <AtlasPlacementEditor /> : <NotFound />;
 
+// Resets the boundary whenever the route changes, so client-side navigation
+// away from a crashed page recovers without a full reload.
+const RouteErrorBoundary = ({ children }: { children: ReactNode }) => {
+  const location = useLocation();
+  return <ErrorBoundary resetKeys={[location.pathname]}>{children}</ErrorBoundary>;
+};
+
 const RouteFallback = () => (
   <div
     role="status"
@@ -43,7 +50,7 @@ const App = () => (
       basename={import.meta.env.BASE_URL.replace(/\/+$/, "") || "/"}
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
-      <ErrorBoundary>
+      <RouteErrorBoundary>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/" element={<Landing />} />
@@ -59,7 +66,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
-      </ErrorBoundary>
+      </RouteErrorBoundary>
     </BrowserRouter>
   </TooltipProvider>
 );

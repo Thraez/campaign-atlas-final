@@ -104,25 +104,29 @@ atlas:
 
 DM and hidden relationships are stripped. A player relationship pointing at a DM-only entity is treated as a spoiler leak (strict build fails with exit 5).
 
-## The three safety scanners
+## The safety scanners
 
 Every publish runs `npm run atlas:publish`, which chains:
 
 ```text
+atlas:snapshot                # copy the current atlas.json to .last-published.json as a rollback baseline
 atlas:build:player --strict   # the build itself; exits 3-9 on safety failures
 build                         # vite build (excludes editor via __INCLUDE_EDITOR__)
-atlas:check-secrets dist                 # scan compiled JS bundle for DM strings
-atlas:check-secrets public/atlas         # scan published atlas.json
-atlas:check-shape public/atlas/atlas.json # validate artifact structure
-atlas:check-derived dist                 # scan for DM strings in vite output
-atlas:check-derived public/atlas         # scan for DM strings in atlas.json
+atlas:scan                    # runs all six safety scanners + audit-assets in parallel (scripts/atlas/publish-orchestrator.ts)
 ```
 
-What each scanner does:
+`atlas:scan` runs `publish-orchestrator.ts`, which fans out to six player-safety scanners (each checked against both the `dist` bundle and `public/atlas`, except `check-shape` which only checks `public/atlas/atlas.json`) plus `audit-assets`.
 
-- **`check-no-secrets`** — greps the output for verbatim DM entity titles, ids, and aliases. Catches whole-name leaks.
-- **`check-derived-secrets`** — greps the output for DM-only profile values (e.g. the literal string from `profile.dm.secret`). Catches a content-fragment leak even if the entity name doesn't appear.
-- **`check-artifact-shape`** — validates the structure of `atlas.json`: no entity has visibility `dm`/`hidden`, no placement points at a missing entity, etc.
+What each scanner catches:
+
+- **`check-no-secrets`** (`npm run atlas:check-secrets`) — greps the output for verbatim DM entity titles, ids, and aliases. Catches whole-name leaks.
+- **`check-derived-secrets`** (`npm run atlas:check-derived`) — greps the output for DM-only profile values (e.g. the literal string from `profile.dm.secret`). Catches a content-fragment leak even if the entity name doesn't appear.
+- **`check-artifact-shape`** (`npm run atlas:check-shape`) — validates the structure of `atlas.json`: no entity has visibility `dm`/`hidden`, no placement points at a missing entity, etc.
+- **`check-image-privacy`** (`npm run atlas:check-image-privacy`) — catches two image-specific leak vectors a text scan can't see: leftover EXIF/IPTC/XMP metadata on a shipped image, and a filename that itself contains a derived-secret name.
+- **`check-fog-safety`** (`npm run atlas:check-fog`) — re-derives the fog boundary from the source `world.yaml` and asserts the player artifacts don't leak it: the original (un-redacted) layer PNG, unstripped fog geometry, a player pin/route/region inside the fogged area, or a redacted PNG that's still opaque at a fogged pixel.
+- **`check-player-secrets`** — verifies no secret plaintext, passphrase, character key, or unstripped `{{secret:}}` marker reached the player artifacts. Runs only inside the orchestrator — there is no standalone `atlas:check-player-secrets` npm alias.
+
+Separately, **`audit-assets`** (`npm run atlas:audit-assets`) isn't a safety scanner — it's a content-quality check: oversize images, orphaned files, and broken asset references.
 
 If any scanner finds a problem, the publish chain fails before deploy.
 

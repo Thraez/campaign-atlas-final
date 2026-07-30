@@ -28,6 +28,80 @@ describe("projectEntityForPlayer — branch gaps (N34)", () => {
     expect(p.bodyHtml).not.toContain("Shadow");
   });
 
+  it("heading-anchor wikilink to a dm-only note is redacted from body, bodyHtml, and links (Q48)", () => {
+    // [[SecretNote#Heading]] now resolves via the file part ("SecretNote") instead of
+    // being left permanently broken — must still be caught by the same secretIds redaction
+    // path so the DM-only note's name never leaks through the heading-anchor resolver seam.
+    const hidden = ent({ id: "secretnote", title: "SecretNote", visibility: "dm" });
+    const pub = ent({ id: "edric", title: "Edric", visibility: "player",
+      body: "See [[SecretNote#Heading]] for details." });
+    const all = new Map([[hidden.id, hidden], [pub.id, pub]]);
+    const ctx = buildProjectionContext(all);
+    const p = projectEntityForPlayer(pub, ctx);
+    expect(p.body).not.toContain("SecretNote");
+    expect(p.body).toContain("…");
+    expect(p.bodyHtml).not.toContain("SecretNote");
+    expect(p.links[0].target).toBe("");
+    expect(p.links[0].resolvedId).toBeUndefined();
+    expect(p.links[0].broken).toBe(true);
+  });
+
+  it("same-note anchor [[#Heading]] is never treated as a secret leak", () => {
+    const e = ent({ id: "npc", title: "NPC", visibility: "player",
+      body: "See [[#Backstory]] below." });
+    const ctx = buildProjectionContext(new Map([[e.id, e]]));
+    const p = projectEntityForPlayer(e, ctx);
+    expect(p.bodyHtml).toContain("atlas-wikilink-anchor");
+    expect(p.bodyHtml).toContain("Backstory");
+    expect(p.links[0].broken).toBe(false);
+  });
+
+  it("folder-path wikilink to a dm-only note is redacted from body, bodyHtml, and links (Q49)", () => {
+    // [[Folder/SecretNote]] now rescues via the trailing basename ("SecretNote") when the
+    // basename is unique — must still be caught by the same secretIds redaction path so the
+    // DM-only note's name never leaks through the folder-path resolver seam.
+    const hidden = ent({ id: "secretnote", title: "SecretNote", visibility: "dm" });
+    const pub = ent({ id: "edric", title: "Edric", visibility: "player",
+      body: "See [[02_Regions/SecretNote]] for details." });
+    const all = new Map([[hidden.id, hidden], [pub.id, pub]]);
+    const ctx = buildProjectionContext(all);
+    const p = projectEntityForPlayer(pub, ctx);
+    expect(p.body).not.toContain("SecretNote");
+    expect(p.body).toContain("…");
+    expect(p.bodyHtml).not.toContain("SecretNote");
+    expect(p.links[0].target).toBe("");
+    expect(p.links[0].resolvedId).toBeUndefined();
+    expect(p.links[0].broken).toBe(true);
+  });
+
+  it("ambiguous folder-path basename (two entities share the same title) never resolves — stays broken", () => {
+    // Two distinct entities both titled "Tidemarrow" in different folders: the basename
+    // "Tidemarrow" is ambiguous, so buildProjectionContext's resolveByBasename must refuse
+    // rather than silently picking whichever entity happened to register last.
+    const a = ent({ id: "tidemarrow-a", title: "Tidemarrow", visibility: "player",
+      sourcePath: "content/w/regions/tidemarrow.md" });
+    const b = ent({ id: "tidemarrow-b", title: "Tidemarrow", visibility: "player",
+      sourcePath: "content/w/drafts/tidemarrow.md" });
+    const pub = ent({ id: "edric", title: "Edric", visibility: "player",
+      body: "Born in [[02_Regions/Tidemarrow]]." });
+    const all = new Map([[a.id, a], [b.id, b], [pub.id, pub]]);
+    const ctx = buildProjectionContext(all);
+    const p = projectEntityForPlayer(pub, ctx);
+    expect(p.links[0].resolvedId).toBeUndefined();
+    expect(p.links[0].broken).toBe(true);
+  });
+
+  it("unambiguous folder-path wikilink to a player-visible note resolves normally (no redaction)", () => {
+    const target = ent({ id: "tidemarrow", title: "Tidemarrow", visibility: "player" });
+    const pub = ent({ id: "edric", title: "Edric", visibility: "player",
+      body: "Born in [[02_Regions/Tidemarrow]]." });
+    const all = new Map([[target.id, target], [pub.id, pub]]);
+    const p = projectEntityForPlayer(pub, buildProjectionContext(all));
+    expect(p.links[0].resolvedId).toBe("tidemarrow");
+    expect(p.links[0].broken).toBe(false);
+    expect(p.bodyHtml).toContain("Tidemarrow");
+  });
+
   it("rumor-visibility entity is NOT in secretIds — wikilink to it is preserved (security invariant)", () => {
     // PLAYER_VISIBLE = { "player", "rumor" }; rumor entities must not be redacted.
     const rumor = ent({ id: "ghost", title: "The Ghost", visibility: "rumor" });

@@ -29,11 +29,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import yaml from "js-yaml";
+import { SIZE_WARN_BYTES, SIZE_ERROR_BYTES, formatBytes } from "../../src/atlas/assets/assetSize";
 
-/** Soft warning threshold for a single asset. */
-export const SIZE_WARN_BYTES = 1 * 1024 * 1024;
-/** Hard error threshold for a single asset. */
-export const SIZE_ERROR_BYTES = 4 * 1024 * 1024;
+export { SIZE_WARN_BYTES, SIZE_ERROR_BYTES };
 
 /** Extensions that count as image/asset files when walking the assets dir. */
 const ASSET_EXTENSIONS = new Set([
@@ -46,6 +44,14 @@ const ASSET_EXTENSIONS = new Set([
   ".avif",
   ".bmp",
 ]);
+
+/** Mirrors EMBED_RE / IMAGE_EXT_RE / DEFAULT_RESOLVE_ASSET in
+ *  src/atlas/content/renderEntityMarkdown.ts, which is the module that
+ *  actually turns `![[image.png]]` into a resolved `<img>` at render/build
+ *  time — kept as a local copy (not imported) to match this file's existing
+ *  pattern of self-contained extractors. */
+const EMBED_RE = /!\[\[([^[\]\n]+?)\]\]/g;
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|avif)$/i;
 
 interface Config {
   contentRoot: string;
@@ -171,6 +177,29 @@ export function extractMarkdownImageRefs(markdown: string): string[] {
 }
 
 /**
+ * Extract Obsidian image embed references: `![[image.png]]` or
+ * `![[image.png|Alt text]]`. Resolves the filename the same way
+ * `DEFAULT_RESOLVE_ASSET` does in renderEntityMarkdown.ts (`/atlas/assets/
+ * images/<filename>`) so the reference lines up with what the build actually
+ * ships. Non-image embeds — note transclusions (`![[Some Note]]`), PDFs,
+ * etc. — are not collected; renderEntityMarkdown.ts renders those as an
+ * inert placeholder, never a real asset reference.
+ */
+export function extractEmbedImageRefs(markdown: string): string[] {
+  const out: string[] = [];
+  EMBED_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = EMBED_RE.exec(markdown)) !== null) {
+    const raw = m[1];
+    const pipeIdx = raw.indexOf("|");
+    const filename = (pipeIdx >= 0 ? raw.slice(0, pipeIdx) : raw).trim();
+    if (!IMAGE_EXT_RE.test(filename)) continue;
+    out.push(`/atlas/assets/images/${filename}`);
+  }
+  return out;
+}
+
+/**
  * Extract `atlas.images: [...]` from a frontmatter YAML block.
  * Returns the raw path strings (not normalized). Best-effort: a missing or
  * malformed frontmatter block returns an empty array.
@@ -260,7 +289,11 @@ export function collectReferences(contentDir: string): AssetReference[] {
       continue;
     }
     const rel = path.relative(process.cwd(), file).replace(/\\/g, "/");
-    const raws = [...extractMarkdownImageRefs(text), ...extractFrontmatterImageRefs(text)];
+    const raws = [
+      ...extractMarkdownImageRefs(text),
+      ...extractFrontmatterImageRefs(text),
+      ...extractEmbedImageRefs(text),
+    ];
     for (const r of raws) {
       const norm = normalizeRefPath(r);
       if (!norm) continue;
@@ -354,12 +387,6 @@ export function auditAssets(opts: AuditOptions): AuditReport {
       brokenRefCount: brokenRefs.length,
     },
   };
-}
-
-function formatBytes(n: number): string {
-  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(2)} MB`;
-  if (n >= 1024) return `${(n / 1024).toFixed(2)} KB`;
-  return `${n} B`;
 }
 
 interface CliFlags {

@@ -71,6 +71,34 @@ describe("footnote extension", () => {
     expect(html).toContain("Orphan def.");
     expect(html).toContain("footnotes");
   });
+
+  it("multi-line def with an indented continuation joins into one footnote, no stray code block", () => {
+    const html = markdownToHtml(
+      "Text[^1].\n\n[^1]: First line\n    continued line.",
+    );
+    expect(html).toContain("First line continued line.");
+    expect(html).not.toContain("<pre>");
+    expect(html).not.toContain("<code>");
+  });
+
+  it("multi-line def with a tab-indented continuation is also joined", () => {
+    const html = markdownToHtml("Text[^1].\n\n[^1]: First line\n\tcontinued line.");
+    expect(html).toContain("First line continued line.");
+    expect(html).not.toContain("<pre>");
+  });
+
+  it("a non-indented line after the def starts a new block, not a continuation", () => {
+    const html = markdownToHtml(
+      "Text[^1].\n\n[^1]: First line\n    continued line.\nNext paragraph.",
+    );
+    expect(html).toContain("First line continued line.");
+    expect(html).toContain("Next paragraph.");
+  });
+
+  it("single-line footnote defs are unaffected by the continuation change", () => {
+    const html = markdownToHtml("See[^n].\n\n[^n]: **Bold** note.");
+    expect(html).toContain("<strong>Bold</strong>");
+  });
 });
 
 describe("dropOrphanFootnoteRefs", () => {

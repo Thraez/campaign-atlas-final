@@ -1,6 +1,8 @@
 import { MapPin } from "lucide-react";
 import type { Entity } from "../content/schema";
 import { normalizeAtlasAssetUrl } from "../url";
+import { AtlasImage } from "../content/AtlasImage";
+import { playerTypeLabel } from "../content/typeLabel";
 
 export interface HoverPeekCardProps {
   entity: Entity;
@@ -21,6 +23,7 @@ export function HoverPeekCard({
 }: HoverPeekCardProps) {
   const img =
     entity.images.length > 0 && entity.images[0] ? normalizeAtlasAssetUrl(entity.images[0]) : null;
+  const typeLabel = playerTypeLabel(entity.type);
   return (
     <div
       role="dialog"
@@ -32,17 +35,20 @@ export function HoverPeekCard({
     >
       <div className="flex items-start gap-2.5">
         {img && (
-          <img
+          <AtlasImage
             src={img}
             alt={entity.title}
             className="flex-none rounded-md object-cover"
+            fallbackClassName="flex-none rounded-md bg-muted/30 border border-dashed border-border flex items-center justify-center text-[9px] text-muted-foreground text-center leading-tight px-1"
             style={{ height: 52, width: 52 }}
           />
         )}
         <div className="min-w-0 flex-1">
-          <span className="mb-1 inline-block rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
-            {entity.type}
-          </span>
+          {typeLabel && (
+            <span className="mb-1 inline-block rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+              {typeLabel}
+            </span>
+          )}
           <button
             type="button"
             onClick={onOpen}

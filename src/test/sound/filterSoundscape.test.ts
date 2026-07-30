@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { filterSoundscapeForPlayer } from "../../../scripts/atlas/filterSoundscape";
-import type { SoundArea, SoundscapeConfig } from "@/atlas/content/schema";
+import type { Region, SoundArea, SoundscapeConfig } from "@/atlas/content/schema";
 
 function makeArea(id: string, visibility?: string, name?: string) {
   return {
@@ -8,6 +8,20 @@ function makeArea(id: string, visibility?: string, name?: string) {
     bed: { src: `audio/${id}.ogg` },
     ...(visibility ? { visibility: visibility as SoundArea["visibility"] } : {}),
     ...(name ? { name } : {}),
+  };
+}
+
+function makeRegion(id: string, visibility: Region["visibility"]): Region {
+  return {
+    id,
+    mapId: "m",
+    name: id,
+    points: [
+      [0, 0],
+      [10, 0],
+      [10, 10],
+    ],
+    visibility,
   };
 }
 
@@ -123,12 +137,31 @@ describe("filterSoundscapeForPlayer", () => {
           id: "forest-bed",
           regionId: "region-forest",
           bed: { src: "audio/forest.ogg" },
-          visibility: "player",
         },
       ],
     };
-    const result = filterSoundscapeForPlayer(sc);
+    const result = filterSoundscapeForPlayer(sc, [makeRegion("region-forest", "player")]);
     expect(result?.areas![0].regionId).toBe("region-forest");
+  });
+
+  it("drops an area with no file chosen yet (blank bed.src)", () => {
+    const sc: SoundscapeConfig = {
+      areas: [
+        { id: "unconfigured", bed: { src: "" }, visibility: "player" },
+        makeArea("tavern", "player"),
+      ],
+    };
+    const result = filterSoundscapeForPlayer(sc);
+    expect(result?.areas).toHaveLength(1);
+    expect(result?.areas![0].id).toBe("area-0");
+  });
+
+  it("drops an area whose bed.src is whitespace-only", () => {
+    const sc: SoundscapeConfig = {
+      areas: [{ id: "unconfigured", bed: { src: "   " }, visibility: "player" }],
+    };
+    const result = filterSoundscapeForPlayer(sc);
+    expect(result?.areas).toHaveLength(0);
   });
 
   it("preserves own points through the ...rest spread (sound-only polygon shape must survive)", () => {
@@ -145,5 +178,77 @@ describe("filterSoundscapeForPlayer", () => {
     };
     const result = filterSoundscapeForPlayer(sc);
     expect(result?.areas![0].points).toEqual(pts);
+  });
+
+  it("drops a ride-on area whose region is dm-only", () => {
+    const sc: SoundscapeConfig = {
+      areas: [{ id: "ride", regionId: "secret-region", bed: { src: "audio/ride.ogg" } }],
+    };
+    const result = filterSoundscapeForPlayer(sc, [makeRegion("secret-region", "dm")]);
+    expect(result?.areas).toHaveLength(0);
+  });
+
+  it("drops a ride-on area whose region is hidden", () => {
+    const sc: SoundscapeConfig = {
+      areas: [{ id: "ride", regionId: "secret-region", bed: { src: "audio/ride.ogg" } }],
+    };
+    const result = filterSoundscapeForPlayer(sc, [makeRegion("secret-region", "hidden")]);
+    expect(result?.areas).toHaveLength(0);
+  });
+
+  it("keeps a ride-on area whose region is player-visible", () => {
+    const sc: SoundscapeConfig = {
+      areas: [{ id: "ride", regionId: "public-region", bed: { src: "audio/ride.ogg" } }],
+    };
+    const result = filterSoundscapeForPlayer(sc, [makeRegion("public-region", "player")]);
+    expect(result?.areas).toHaveLength(1);
+    expect(result?.areas![0].regionId).toBe("public-region");
+  });
+
+  it("keeps a ride-on area whose region is rumor-visible", () => {
+    const sc: SoundscapeConfig = {
+      areas: [{ id: "ride", regionId: "rumor-region", bed: { src: "audio/ride.ogg" } }],
+    };
+    const result = filterSoundscapeForPlayer(sc, [makeRegion("rumor-region", "rumor")]);
+    expect(result?.areas).toHaveLength(1);
+  });
+
+  it("drops a ride-on area whose regionId no longer resolves to any region", () => {
+    const sc: SoundscapeConfig = {
+      areas: [{ id: "ride", regionId: "deleted-region", bed: { src: "audio/ride.ogg" } }],
+    };
+    const result = filterSoundscapeForPlayer(sc, [makeRegion("other-region", "player")]);
+    expect(result?.areas).toHaveLength(0);
+  });
+
+  it("ignores an area's own visibility field when it also has a regionId (region wins)", () => {
+    const sc: SoundscapeConfig = {
+      areas: [
+        {
+          id: "ride",
+          regionId: "secret-region",
+          visibility: "player",
+          bed: { src: "audio/ride.ogg" },
+        },
+      ],
+    };
+    const result = filterSoundscapeForPlayer(sc, [makeRegion("secret-region", "dm")]);
+    expect(result?.areas).toHaveLength(0);
+  });
+
+  it("still applies own-visibility filtering for sound-only areas when regions are passed", () => {
+    const sc: SoundscapeConfig = {
+      areas: [makeArea("tavern", "player"), makeArea("dungeon", "dm")],
+    };
+    const result = filterSoundscapeForPlayer(sc, [makeRegion("unrelated-region", "player")]);
+    expect(result?.areas).toHaveLength(1);
+  });
+
+  it("drops a ride-on area with no regions array passed at all (defensive default)", () => {
+    const sc: SoundscapeConfig = {
+      areas: [{ id: "ride", regionId: "some-region", bed: { src: "audio/ride.ogg" } }],
+    };
+    const result = filterSoundscapeForPlayer(sc);
+    expect(result?.areas).toHaveLength(0);
   });
 });

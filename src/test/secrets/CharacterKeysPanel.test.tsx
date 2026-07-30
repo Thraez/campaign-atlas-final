@@ -10,9 +10,19 @@ vi.mock("@/atlas/save/localFsSave", () => ({
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { saveAtlasPatchToLocalFs, hashContent } from "@/atlas/save/localFsSave";
+import { toast } from "sonner";
 
 const mockSave = vi.mocked(saveAtlasPatchToLocalFs);
 const mockHash = vi.mocked(hashContent);
+const mockToastError = vi.mocked(toast.error);
+
+function stubClipboard(writeText: (text: string) => Promise<void>) {
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText },
+    configurable: true,
+    writable: true,
+  });
+}
 
 function stubFetchOk(jsonBody: unknown) {
   vi.stubGlobal(
@@ -113,5 +123,20 @@ describe("CharacterKeysPanel — load/add/remove/persist contract (N36)", () => 
     const patches = mockSave.mock.calls[0][0];
     // js-yaml dumps an empty object as "{}\n" — no name: key entries
     expect(patches[0].content).not.toMatch(/\w+:\s+\S/);
+  });
+
+  it("shows an error toast when copying a key fails (N135)", async () => {
+    stubClipboard(vi.fn().mockRejectedValue(new Error("denied")));
+    stubFetchOk({ contents: "Aria: key123\n" });
+    render(<CharacterKeysPanel worldDir="/world" />);
+    await waitFor(() => screen.getByText("key123"));
+    fireEvent.click(screen.getByRole("button", { name: /Copy key/i }));
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith("Could not copy key"));
+    expect(screen.queryByRole("button", { name: /Copy key/i })?.querySelector(".text-green-400")).toBeFalsy();
+    Object.defineProperty(navigator, "clipboard", {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
   });
 });

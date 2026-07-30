@@ -142,6 +142,96 @@ it("formatting toolbar wraps the textarea selection and updates the body", async
   );
 });
 
+it("Ctrl+B wraps the selection in bold via the keyboard shortcut", async () => {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (String(url).includes("/__atlas/read")) {
+      return new Response(JSON.stringify({ contents: RAW }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ saved: 1, paths: [] }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(
+    <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={() => {}} />,
+  );
+  await waitFor(() => screen.getByDisplayValue(/old body/i));
+  const ta = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
+  const start = ta.value.indexOf("Corven");
+  ta.focus();
+  ta.setSelectionRange(start, start + "Corven".length);
+  fireEvent.keyDown(ta, { key: "b", ctrlKey: true });
+  await waitFor(() =>
+    expect((screen.getByLabelText(/body/i) as HTMLTextAreaElement).value).toContain("**Corven**"),
+  );
+});
+
+it("Ctrl+K wraps the selection as a wikilink via the keyboard shortcut", async () => {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (String(url).includes("/__atlas/read")) {
+      return new Response(JSON.stringify({ contents: RAW }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ saved: 1, paths: [] }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(
+    <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={() => {}} />,
+  );
+  await waitFor(() => screen.getByDisplayValue(/old body/i));
+  const ta = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
+  const start = ta.value.indexOf("Corven");
+  ta.focus();
+  ta.setSelectionRange(start, start + "Corven".length);
+  fireEvent.keyDown(ta, { key: "k", ctrlKey: true });
+  await waitFor(() =>
+    expect((screen.getByLabelText(/body/i) as HTMLTextAreaElement).value).toContain("[[Corven]]"),
+  );
+});
+
+it("Cmd+I (metaKey) applies italic via the keyboard shortcut", async () => {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (String(url).includes("/__atlas/read")) {
+      return new Response(JSON.stringify({ contents: RAW }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ saved: 1, paths: [] }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(
+    <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={() => {}} />,
+  );
+  await waitFor(() => screen.getByDisplayValue(/old body/i));
+  const ta = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
+  const start = ta.value.indexOf("Corven");
+  ta.focus();
+  ta.setSelectionRange(start, start + "Corven".length);
+  fireEvent.keyDown(ta, { key: "i", metaKey: true });
+  await waitFor(() =>
+    expect((screen.getByLabelText(/body/i) as HTMLTextAreaElement).value).toContain("*Corven*"),
+  );
+});
+
+it("Ctrl+B does not format while the wikilink autocomplete popover is open", async () => {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (String(url).includes("/__atlas/read")) {
+      return new Response(JSON.stringify({ contents: RAW }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ saved: 1, paths: [] }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(
+    <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={() => {}} />,
+  );
+  await waitFor(() => screen.getByDisplayValue(/old body/i));
+  const ta = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
+  // Opens the entity-autocomplete popover (acCtx becomes non-null).
+  fireEvent.change(ta, { target: { value: ta.value + "[[" } });
+  const beforeValue = (screen.getByLabelText(/body/i) as HTMLTextAreaElement).value;
+  fireEvent.keyDown(screen.getByLabelText(/body/i), { key: "b", ctrlKey: true });
+  expect((screen.getByLabelText(/body/i) as HTMLTextAreaElement).value).toBe(beforeValue);
+});
+
 it("edit panel has no embedded preview or DM-notes toggle (superseded by global lens)", async () => {
   const fetchMock = vi.fn(async (url: string) => {
     if (String(url).includes("/__atlas/read")) {
@@ -157,4 +247,65 @@ it("edit panel has no embedded preview or DM-notes toggle (superseded by global 
   await waitFor(() => screen.getByDisplayValue(/old body/i));
   expect(screen.queryByText(/show dm notes/i)).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /focus mode/i })).not.toBeInTheDocument();
+});
+
+describe("wikilink autocomplete ARIA wiring (N132)", () => {
+  it("wires aria-controls/aria-activedescendant to the active popover option", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).includes("/__atlas/read")) {
+        return new Response(JSON.stringify({ contents: RAW }), { status: 200 });
+      }
+      if (String(url).includes("/__atlas/assets/images")) {
+        return new Response(JSON.stringify({ images: ["banner.png", "map.png"] }), {
+          status: 200,
+        });
+      }
+      return new Response(JSON.stringify({ saved: 1, paths: [] }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={() => {}} />,
+    );
+    await waitFor(() => screen.getByDisplayValue(/old body/i));
+    const ta = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
+
+    fireEvent.change(ta, { target: { value: ta.value + "![[" } });
+    const firstOption = await screen.findByRole("option", { name: /banner\.png/i });
+
+    expect(screen.getByRole("listbox")).toHaveAttribute("id", "wikilink-popover-listbox");
+    expect(firstOption).toHaveAttribute("id", "wikilink-option-0");
+    expect(ta).toHaveAttribute("aria-controls", "wikilink-popover-listbox");
+    expect(ta).toHaveAttribute("aria-activedescendant", "wikilink-option-0");
+
+    fireEvent.keyDown(ta, { key: "ArrowDown" });
+    await waitFor(() => expect(ta).toHaveAttribute("aria-activedescendant", "wikilink-option-1"));
+    expect(screen.getByRole("option", { name: /map\.png/i })).toHaveAttribute(
+      "id",
+      "wikilink-option-1",
+    );
+  });
+
+  it("keeps aria-controls but omits aria-activedescendant when the popover has no matches", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).includes("/__atlas/read")) {
+        return new Response(JSON.stringify({ contents: RAW }), { status: 200 });
+      }
+      // No entities/images configured — the popover renders "No matches".
+      return new Response(JSON.stringify({ saved: 1, paths: [] }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={() => {}} />,
+    );
+    await waitFor(() => screen.getByDisplayValue(/old body/i));
+    const ta = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
+
+    fireEvent.change(ta, { target: { value: ta.value + "[[" } });
+    await waitFor(() => expect(screen.getByText(/no matches/i)).toBeInTheDocument());
+
+    expect(ta).toHaveAttribute("aria-controls", "wikilink-popover-listbox");
+    expect(ta).not.toHaveAttribute("aria-activedescendant");
+  });
 });

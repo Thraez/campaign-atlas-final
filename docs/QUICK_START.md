@@ -33,8 +33,8 @@ A generic seed world ships under `examples/seed-world/`. To run the build agains
 
 ```json
 {
-  "contentRoot": "examples/seed-world",
-  "defaultWorld": "seed"
+  "contentRoot": "examples",
+  "defaultWorld": "seed-world"
 }
 ```
 
@@ -44,7 +44,7 @@ Then run:
 npm run atlas:build
 ```
 
-This writes `.local-atlas/atlas.json` — the full DM build (with secrets). Reload `/atlas` to see the seed map.
+This writes `.local-atlas/atlas.json` — the full DM build (with secrets). Reload `/atlas` to see the seed map — it ships with a small generic placeholder layer (gradient + grid, no real geography) so the first build isn't empty ocean. Swap in your own image later (see `examples/seed-world/README.md`).
 
 To produce a player-safe build (DM content stripped):
 
@@ -68,7 +68,7 @@ This writes `public/atlas/atlas.json` — what the player site will serve.
        height: 3000
        layers:
          - id: overview
-           src: /atlas/assets/maps/my-map.png
+           src: atlas/assets/maps/my-map.png
            x: 0
            y: 0
            width: 4000
@@ -78,7 +78,7 @@ This writes `public/atlas/atlas.json` — what the player site will serve.
    ```
 5. Update `atlas.config.json`:
    ```json
-   { "contentRoot": "content/my-world", "defaultWorld": "my-world" }
+   { "contentRoot": "content", "defaultWorld": "my-world" }
    ```
 6. Create your first entity at `content/my-world/settlements/Foo.md`:
    ```markdown
@@ -101,7 +101,7 @@ This writes `public/atlas/atlas.json` — what the player site will serve.
 The workflow at `.github/workflows/publish-atlas.yml` runs on every push to `main`:
 
 1. Builds the strict player atlas.
-2. Runs three safety scanners (`atlas:check-secrets`, `atlas:check-derived`, `atlas:check-shape`).
+2. Runs all six safety scanners plus the asset audit (`npm run atlas:scan`) — see [VISIBILITY_AND_PLAYER_SAFETY.md](VISIBILITY_AND_PLAYER_SAFETY.md#the-safety-scanners) for the full list.
 3. Deploys `dist/` to GitHub Pages.
 
 To enable: in your repo's Settings → Pages, set Source to "GitHub Actions". Push to `main`. Wait ~2 minutes.
@@ -123,6 +123,14 @@ git add . && git commit -m "session prep" && git push
 ```
 
 If `npm run atlas:publish` fails, fix the canon. **Never hand-edit `public/atlas/atlas.json`** — it's generated. A pre-tool hook blocks this for AI agents; humans should respect the same rule.
+
+If you changed source code (not just canon content), run the full merge gate before pushing:
+
+```bash
+npm run verify
+```
+
+This chains typecheck (app + `scripts/`) → lint → the sharded test suite, and stops at the first failing stage.
 
 ## What to read next
 

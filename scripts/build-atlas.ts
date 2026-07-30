@@ -431,6 +431,21 @@ async function runBuildCore(flags: BuildFlags) {
   // (player-visible and DM/hidden). Used for wikilink resolution so we can
   // detect cross-ref leaks (a public-entry link to a DM-only target).
   const crossRefNameIndex = new Map<string, string>();
+  // Tracks every distinct entity id a name (lowercased title/alias) has been
+  // registered under, so folder-path basename resolution (Q49) can refuse to
+  // guess when a name is ambiguous instead of silently picking the
+  // last-registered owner.
+  const nameOwners = new Map<string, Set<string>>();
+  const registerName = (name: string, id: string) => {
+    const key = name.toLowerCase();
+    crossRefNameIndex.set(key, id);
+    let owners = nameOwners.get(key);
+    if (!owners) {
+      owners = new Set();
+      nameOwners.set(key, owners);
+    }
+    owners.add(id);
+  };
   const allEntityVisibility = new Map<
     string,
     import("../src/atlas/content/schema").EntityVisibility
@@ -440,9 +455,9 @@ async function runBuildCore(flags: BuildFlags) {
   // entity. Used to scrub warning text before it ships in a player build.
   const secretNames = new Set<string>();
   for (const p of allParsed) {
-    crossRefNameIndex.set(p.title.toLowerCase(), p.id);
+    registerName(p.title, p.id);
     for (const a of p.parsed.atlas.aliases ?? []) {
-      crossRefNameIndex.set(a.toLowerCase(), p.id);
+      registerName(a, p.id);
     }
     allEntityVisibility.set(p.id, p.visibility);
     if (p.isSecret) {
@@ -472,9 +487,9 @@ async function runBuildCore(flags: BuildFlags) {
     const id = parsed.atlas.id || slugify(title);
     if (slugSeen.has(id) || excludedIdSeen.has(id)) continue;
     excludedIdSeen.add(id);
-    crossRefNameIndex.set(title.toLowerCase(), id);
+    registerName(title, id);
     for (const a of parsed.atlas.aliases ?? []) {
-      crossRefNameIndex.set(a.toLowerCase(), id);
+      registerName(a, id);
     }
     // Folder-excluded files have no published visibility, but for cross-ref
     // purposes they're DM-equivalent: anything wikilinking to them from a
@@ -528,13 +543,21 @@ async function runBuildCore(flags: BuildFlags) {
   // Wikilink resolution uses the FULL cross-reference index (including
   // DM/hidden entities) so we can detect public-entry → DM-target leaks.
   const resolveByName = (n: string) => crossRefNameIndex.get(n.trim().toLowerCase());
+  // Folder-path fallback (Q49): resolves a basename against the same index,
+  // but refuses (returns undefined) when that name is owned by more than one
+  // distinct entity — an ambiguous basename must stay broken, never guessed.
+  const resolveByBasename = (n: string) => {
+    const key = n.trim().toLowerCase();
+    if ((nameOwners.get(key)?.size ?? 0) > 1) return undefined;
+    return crossRefNameIndex.get(key);
+  };
 
   const backlinkMap = new Map<string, Map<string, string>>();
   for (const item of pending) {
     const { entity, rawBody } = item;
     // Resolve ![[image.ext]] AFTER DM stripping (rawBody is already noDm) so embeds in %% blocks are absent.
     const resolvedBody = resolveImageEmbeds(rawBody, DEFAULT_RESOLVE_ASSET);
-    const { tokenized, links } = tokenizeWikilinks(resolvedBody, { resolveByName });
+    const { tokenized, links } = tokenizeWikilinks(resolvedBody, { resolveByName, resolveByBasename });
     entity.links = links;
     for (const l of links) {
       // Cross-reference spoiler leak detection (player builds only). The link
@@ -811,23 +834,23 @@ async function runBuildCore(flags: BuildFlags) {
   // -------- Soundscape player-strip --------
   // Drop DM-visibility areas, neutralise area IDs, strip names so DM location
   // labels never reach the player artifact. Then content-hash audio filenames
-  // so the original DM file paths never appear in the player build.
+  // so the original DM file paths never appear in the player build. Runs
+  // unconditionally (even with zero areas) so a build that removes all sound
+  // still prunes previously-hashed files instead of leaving them orphaned.
   if (flags.player) {
     maps = maps.map((m) => {
       if (!m.soundscape) return m;
-      return { ...m, soundscape: filterSoundscapeForPlayer(m.soundscape) };
+      return { ...m, soundscape: filterSoundscapeForPlayer(m.soundscape, m.regions) };
     });
     const allAreas = maps.flatMap((m) => m.soundscape?.areas ?? []);
-    if (allAreas.length > 0) {
-      const rewrite = hashAudioAssets(allAreas, path.join(ROOT, "public"));
-      maps = maps.map((m) => {
-        if (!m.soundscape?.areas?.length) return m;
-        return {
-          ...m,
-          soundscape: { ...m.soundscape, areas: rewriteAudioSrcs(m.soundscape.areas, rewrite) },
-        };
-      });
-    }
+    const rewrite = hashAudioAssets(allAreas, path.join(ROOT, "public"));
+    maps = maps.map((m) => {
+      if (!m.soundscape?.areas?.length) return m;
+      return {
+        ...m,
+        soundscape: { ...m.soundscape, areas: rewriteAudioSrcs(m.soundscape.areas, rewrite) },
+      };
+    });
   }
 
   // -------- Audio picker manifest --------
@@ -961,7 +984,7 @@ async function runBuildCore(flags: BuildFlags) {
     worlds: [
       {
         id: worldId,
-        name: "Astrath Deeprealm",
+        name: worldCfg?.name ?? "Astrath Deeprealm",
         defaultMapId: primaryMapId,
         ...(flags.player
           ? {}
@@ -1001,10 +1024,16 @@ async function runBuildCore(flags: BuildFlags) {
   const defaultOut = flags.player ? cfg.outputDir : ".local-atlas";
   const outDir = path.resolve(ROOT, flags.outDir ?? defaultOut);
   fs.mkdirSync(outDir, { recursive: true });
-  fs.writeFileSync(path.join(outDir, "atlas.json"), JSON.stringify(project, null, 2));
+  // Player builds ship minified (smaller payload for players); DM/.local-atlas
+  // builds stay 2-space-indented so human diffs against them are readable.
+  const jsonIndent = flags.player ? undefined : 2;
+  fs.writeFileSync(path.join(outDir, "atlas.json"), JSON.stringify(project, null, jsonIndent));
 
   const searchIndex = buildSearchIndex(pending);
-  fs.writeFileSync(path.join(outDir, "search-index.json"), JSON.stringify(searchIndex, null, 2));
+  fs.writeFileSync(
+    path.join(outDir, "search-index.json"),
+    JSON.stringify(searchIndex, null, jsonIndent),
+  );
 
   const r = project.buildReport!;
   console.log(
@@ -1197,11 +1226,33 @@ function buildEntity(
 }
 
 /**
+ * Delete any `*.fog.png` file in `dir` that isn't in `keep` (absolute paths).
+ * Scoped strictly to the `.fog.png` output naming so a source map image can
+ * never be touched, even if `keep` is wrong or empty.
+ */
+function pruneStaleFogOutputs(dir: string, keep: ReadonlySet<string>): void {
+  if (!fs.existsSync(dir)) return;
+  for (const name of fs.readdirSync(dir)) {
+    if (!/\.fog\.png$/i.test(name)) continue;
+    const fullPath = path.join(dir, name);
+    if (!keep.has(fullPath)) {
+      fs.unlinkSync(fullPath);
+    }
+  }
+}
+
+/**
  * Player-mode fog redaction. For each fog-enabled map, redact every raster
  * layer to a feathered alpha-mask PNG (written as <name>.fog.png next to the
  * source), rewrite the layer src to the redacted file, and strip fog geometry
  * so reveal polygons never ship. Returns a new maps array; pushes a warning
  * for any layer whose source image is missing.
+ *
+ * Before returning, prunes stale `.fog.png` outputs from prior builds: a
+ * renamed/removed layer or map (or fog disabled) otherwise orphans its old
+ * redacted file in `public/atlas/assets/maps` forever, since nothing else
+ * ever revisits or removes it. Only files freshly (re-)emitted this build
+ * are kept; scoped strictly to the `.fog.png` naming, never a source image.
  * (See docs/superpowers/specs/2026-05-19-fog-player-mechanic-design.md.)
  */
 async function redactMapsForPlayer(
@@ -1210,6 +1261,7 @@ async function redactMapsForPlayer(
   warnings: string[],
 ): Promise<MapDocument[]> {
   const redactedMaps: MapDocument[] = [];
+  const emittedFogPaths = new Set<string>();
   for (const m of maps) {
     if (!m.fog?.enabled) {
       redactedMaps.push(m);
@@ -1246,6 +1298,7 @@ async function redactMapsForPlayer(
       const base = srcAbs.slice(0, -ext.length);
       const outPath = `${base}.fog.png`;
       fs.writeFileSync(outPath, redacted);
+      emittedFogPaths.add(outPath);
       // Rewrite the layer src to the redacted file (relative to public/, forward slashes).
       const newSrcRel = path
         .relative(path.resolve(ROOT, "public"), outPath)
@@ -1259,14 +1312,16 @@ async function redactMapsForPlayer(
     const playerFog = { mapId: fog.mapId, enabled: true } as FogOverlay;
     redactedMaps.push({ ...m, layers: newLayers, fog: playerFog });
   }
+  pruneStaleFogOutputs(path.join(ROOT, "public", "atlas", "assets", "maps"), emittedFogPaths);
   return redactedMaps;
 }
 
 /**
  * Build the client-side search index. Strips markdown from each entity body
  * (keeping it small enough for an in-browser full-text scan without shipping
- * a wasm search engine) and emits both a lowercased `body` for matching and a
- * cased `bodyText` for display.
+ * a wasm search engine) and emits the original-case `bodyText` for display;
+ * the lowercased `body` used for matching is derived client-side on load
+ * (loader.ts) rather than duplicated here.
  */
 function buildSearchIndex(pending: Pending[]) {
   // Strip markdown but preserve original case — used as bodyText for display.
@@ -1290,7 +1345,6 @@ function buildSearchIndex(pending: Pending[]) {
       tags: entity.tags,
       summary: entity.summary,
       excerpt: stripSecretMarkers(entity.body).replace(/\s+/g, " ").trim().slice(0, 240),
-      body: stripped.toLowerCase(),
       bodyText: stripped,
       dateRaw: entity.dateRaw,
       dateValue: entity.dateValue,

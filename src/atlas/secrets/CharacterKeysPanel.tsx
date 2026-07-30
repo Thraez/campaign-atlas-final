@@ -3,6 +3,7 @@ import yaml from "js-yaml";
 import { Key, Copy, Check, Trash2, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { saveAtlasPatchToLocalFs, hashContent } from "@/atlas/save/localFsSave";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface CharacterRow {
   name: string;
@@ -101,7 +102,11 @@ export function CharacterKeysPanel({ worldDir }: Props) {
   const removeRow = (i: number) => setRows((r) => r.filter((_, idx) => idx !== i));
 
   const copyKey = (i: number) => {
-    void navigator.clipboard.writeText(rows[i].key).then(() => {
+    void copyToClipboard(rows[i].key).then((ok) => {
+      if (!ok) {
+        toast.error("Could not copy key");
+        return;
+      }
       setCopiedIdx(i);
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => setCopiedIdx(null), 2000);

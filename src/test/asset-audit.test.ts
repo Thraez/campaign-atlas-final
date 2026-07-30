@@ -23,6 +23,7 @@ import {
   extractMarkdownImageRefs,
   extractFrontmatterImageRefs,
   extractWorldYamlLayerSrcs,
+  extractEmbedImageRefs,
 } from "../../scripts/atlas/audit-assets";
 
 const ROOT = path.resolve(__dirname, "../..");
@@ -148,6 +149,37 @@ describe("auditAssets — orphans", () => {
     const report = auditAssets({ assetsDir, publicDir, contentDir });
     expect(report.orphans).toEqual([]);
   });
+
+  it("does not flag an asset referenced only via an Obsidian ![[embed]]", () => {
+    writeAsset("atlas/assets/images/foo.png", 512);
+    writeContent("world/note.md", "Here it is: ![[foo.png]]");
+    const report = auditAssets({ assetsDir, publicDir, contentDir });
+    expect(report.orphans).toEqual([]);
+  });
+
+  it("does not flag an asset referenced via a pipe-aliased ![[embed|alt]]", () => {
+    writeAsset("atlas/assets/images/foo.png", 512);
+    writeContent("world/note.md", "Here it is: ![[foo.png|The Foo]]");
+    const report = auditAssets({ assetsDir, publicDir, contentDir });
+    expect(report.orphans).toEqual([]);
+  });
+
+  it("does not flag a subfolder asset referenced via ![[sub/embed.png]]", () => {
+    writeAsset("atlas/assets/images/sub/foo.png", 512);
+    writeContent("world/note.md", "![[sub/foo.png]]");
+    const report = auditAssets({ assetsDir, publicDir, contentDir });
+    expect(report.orphans).toEqual([]);
+  });
+
+  it("does NOT treat a note transclusion ![[Some Note]] as an asset reference", () => {
+    writeAsset("atlas/assets/images/foo.png", 512);
+    writeContent("world/note.md", "See also ![[Some Note]] for background. Also ![[foo.png]]");
+    const report = auditAssets({ assetsDir, publicDir, contentDir });
+    // "Some Note" has no image extension, so it must not appear as a reference
+    // or resolve to any asset — only foo.png should be matched.
+    expect(report.references.map((r) => r.refPath)).toEqual(["atlas/assets/images/foo.png"]);
+    expect(report.orphans).toEqual([]);
+  });
 });
 
 describe("auditAssets — broken references", () => {
@@ -190,6 +222,33 @@ describe("extractor helpers", () => {
   it("extractFrontmatterImageRefs reads atlas.images from frontmatter", () => {
     const md = "---\natlas:\n  images:\n    - a.png\n    - b.jpg\n---\nbody";
     expect(extractFrontmatterImageRefs(md)).toEqual(["a.png", "b.jpg"]);
+  });
+
+  it("extractEmbedImageRefs resolves a plain image embed to /atlas/assets/images/<file>", () => {
+    expect(extractEmbedImageRefs("![[foo.png]]")).toEqual(["/atlas/assets/images/foo.png"]);
+  });
+
+  it("extractEmbedImageRefs strips a pipe-alias before resolving", () => {
+    expect(extractEmbedImageRefs("![[foo.png|The Foo]]")).toEqual(["/atlas/assets/images/foo.png"]);
+  });
+
+  it("extractEmbedImageRefs preserves a subfolder path in the embed target", () => {
+    expect(extractEmbedImageRefs("![[sub/foo.png]]")).toEqual(["/atlas/assets/images/sub/foo.png"]);
+  });
+
+  it("extractEmbedImageRefs is case-insensitive on the extension", () => {
+    expect(extractEmbedImageRefs("![[FOO.PNG]]")).toEqual(["/atlas/assets/images/FOO.PNG"]);
+  });
+
+  it("extractEmbedImageRefs ignores non-image embeds (note transclusion, pdf)", () => {
+    expect(extractEmbedImageRefs("![[Some Note]] and ![[doc.pdf]]")).toEqual([]);
+  });
+
+  it("extractEmbedImageRefs collects only the image embeds among multiple", () => {
+    expect(extractEmbedImageRefs("![[Some Note]] ![[a.png]] ![[doc.pdf]] ![[b.jpg|B]]")).toEqual([
+      "/atlas/assets/images/a.png",
+      "/atlas/assets/images/b.jpg",
+    ]);
   });
 
   it("extractWorldYamlLayerSrcs walks every map > layers > src", () => {

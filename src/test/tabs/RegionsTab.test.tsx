@@ -11,7 +11,7 @@
  *   - Drawing mode: Draw button shown; drawing indicators shown
  */
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { RegionsTab } from "@/atlas/tabs/RegionsTab";
 import type { RegionDraftAPI, RegionDraft, RegionIssue } from "@/atlas/regions/useRegionDraft";
 import type { AtlasProject, MapDocument, Region } from "@/atlas/content/schema";
@@ -191,6 +191,36 @@ describe("RegionsTab — Selected region form", () => {
   });
 });
 
+describe("RegionsTab — Nudge whole region", () => {
+  it("plain click translates the selected region by the fine step", () => {
+    const region = makeRegion({ id: "r1", name: "Highland" });
+    const translate = vi.fn();
+    render(
+      <RegionsTab
+        project={makeProject()}
+        map={makeMap()}
+        api={makeMockApi({ effective: [region], selectedId: "r1", translate })}
+      />,
+    );
+    fireEvent.click(screen.getByText("↑"));
+    expect(translate).toHaveBeenCalledWith("r1", 0, 100);
+  });
+
+  it("Shift+click translates the selected region by the coarse step", () => {
+    const region = makeRegion({ id: "r1", name: "Highland" });
+    const translate = vi.fn();
+    render(
+      <RegionsTab
+        project={makeProject()}
+        map={makeMap()}
+        api={makeMockApi({ effective: [region], selectedId: "r1", translate })}
+      />,
+    );
+    fireEvent.click(screen.getByText("→"), { shiftKey: true });
+    expect(translate).toHaveBeenCalledWith("r1", 500, 0);
+  });
+});
+
 describe("RegionsTab — Validation chips", () => {
   it("validation chips absent when issues list is empty", () => {
     render(
@@ -241,6 +271,41 @@ describe("RegionsTab — Dirty state", () => {
     expect(btn).toBeTruthy();
     fireEvent.click(btn);
     expect(reset).toHaveBeenCalledOnce();
+  });
+});
+
+describe("RegionsTab — Delete confirm", () => {
+  it("delete trigger opens an in-app confirm; cancel leaves the region intact", () => {
+    const remove = vi.fn();
+    const region = makeRegion({ id: "r1", name: "Highland" });
+    render(
+      <RegionsTab
+        project={makeProject()}
+        map={makeMap()}
+        api={makeMockApi({ effective: [region], selectedId: "r1", remove })}
+      />,
+    );
+    fireEvent.click(screen.getByTitle("Delete"));
+    const dialog = screen.getByRole("alertdialog");
+    expect(within(dialog).getByText('Delete region "Highland"?')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it("delete trigger then confirm calls remove with the region id", () => {
+    const remove = vi.fn();
+    const region = makeRegion({ id: "r1", name: "Highland" });
+    render(
+      <RegionsTab
+        project={makeProject()}
+        map={makeMap()}
+        api={makeMockApi({ effective: [region], selectedId: "r1", remove })}
+      />,
+    );
+    fireEvent.click(screen.getByTitle("Delete"));
+    const dialog = screen.getByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+    expect(remove).toHaveBeenCalledWith("r1");
   });
 });
 

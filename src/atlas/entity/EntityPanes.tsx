@@ -7,6 +7,7 @@ import {
   buildProjectionContext,
 } from "@/atlas/content/projectEntityForPlayer";
 import { tokenizeWikilinks, renderLinkTokens } from "@/atlas/content/parseWikilinks";
+import { resolveImageEmbeds } from "@/atlas/content/renderEntityMarkdown";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 import { buildAnchors, mapScroll } from "@/atlas/entity/paneScrollSync";
 import { useViewMode } from "@/atlas/view/ViewModeProvider";
@@ -42,7 +43,7 @@ export function EntityPanes({
       byName.set(e.title.toLowerCase(), e.id);
       for (const a of e.aliases ?? []) byName.set(a.toLowerCase(), e.id);
     }
-    const { tokenized, links } = tokenizeWikilinks(entity.body ?? "", {
+    const { tokenized, links } = tokenizeWikilinks(resolveImageEmbeds(entity.body ?? ""), {
       resolveByName: (n) => byName.get(n.trim().toLowerCase()),
     });
     const html = markdownToHtml(tokenized);

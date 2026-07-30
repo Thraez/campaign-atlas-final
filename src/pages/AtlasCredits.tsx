@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Star } from "lucide-react";
-import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity } from "@/atlas/content/schema";
+import { useAtlasContent } from "@/atlas/content/useAtlasContent";
+import { AtlasLoadState } from "@/atlas/content/AtlasLoadState";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
 
@@ -70,37 +71,21 @@ function buildCreditRows(project: AtlasProject | null): CreditRow[] {
 }
 
 export default function AtlasCredits() {
-  const [project, setProject] = useState<AtlasProject | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    loadAtlasContent(true)
-      .then(setProject)
-      .catch((e: Error) => setError(e.message));
-  }, []);
+  const { project, error } = useAtlasContent();
 
   const rows = useMemo(() => buildCreditRows(project), [project]);
 
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-destructive text-sm p-6">
-        {error}
-      </div>
-    );
-  }
-
-  if (!project) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-muted-foreground text-sm">
-        Loading…
-      </div>
-    );
+  if (error || !project) {
+    return <AtlasLoadState error={error} loading={!project} />;
   }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <a href="#credits-main" className="skip-to-main">
+        Skip to content
+      </a>
       <AtlasNavMenu publishedAt={project.publishedAt} />
-      <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
+      <main id="credits-main" className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
         <div className="flex items-center gap-2 mb-6">
           <Link
             to="/"
@@ -146,7 +131,7 @@ export default function AtlasCredits() {
             ))}
           </ul>
         )}
-      </div>
+      </main>
     </div>
   );
 }

@@ -19,9 +19,11 @@ import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import AtlasPlacementEditor from "@/pages/AtlasPlacementEditor";
 import { makeProject } from "../helpers/makeProject";
+import { clearEditorSession } from "../helpers/clearEditorSession";
 
-beforeEach(() => {
+beforeEach(async () => {
   localStorage.clear();
+  await clearEditorSession();
   vi.stubGlobal(
     "fetch",
     vi.fn(() =>
@@ -45,10 +47,10 @@ describe("AtlasPlacementEditor smoke", () => {
         <AtlasPlacementEditor />
       </MemoryRouter>,
     );
-    // Editor chrome renders once canon loads: at least one Save control exists.
-    await waitFor(() =>
-      expect(screen.getAllByRole("button", { name: /save/i }).length).toBeGreaterThan(0),
-    );
+    // Editor chrome renders once canon loads. Assert the save-status surface,
+    // which is always present — the Save *button* only appears when there is
+    // something to write, so a clean fixture legitimately has none.
+    await waitFor(() => expect(screen.getByText("All changes saved")).toBeInTheDocument());
     // Prove the fixture canon actually flowed through: open the Locations rail
     // section and find the placed fixture entity (type "location").
     fireEvent.click(screen.getByRole("button", { name: "Locations" }));

@@ -102,3 +102,69 @@ describe("CharacterSecretsPage — SecretsBody state machine", () => {
     expect(mockForgetAll).toHaveBeenCalledOnce();
   });
 });
+
+describe("CharacterSecretsPage — insecure context / missing Web Crypto", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCollect.mockResolvedValue([]);
+  });
+
+  it("shows the secure-context message and not the wrong-key copy when isSecureContext is false", async () => {
+    mockGetKey.mockReturnValue("some-key");
+    Object.defineProperty(window, "isSecureContext", { value: false, configurable: true });
+    try {
+      renderPage();
+      await screen.findByText(/secure https connection to unlock/i);
+      expect(screen.queryByText(/No secrets found for that key/i)).not.toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, "isSecureContext", { value: true, configurable: true });
+    }
+  });
+
+  it("shows the secure-context message when crypto.subtle is missing", async () => {
+    mockGetKey.mockReturnValue("some-key");
+    const originalCrypto = globalThis.crypto;
+    Object.defineProperty(globalThis, "crypto", {
+      value: { ...originalCrypto, subtle: undefined },
+      configurable: true,
+    });
+    try {
+      renderPage();
+      await screen.findByText(/secure https connection to unlock/i);
+    } finally {
+      Object.defineProperty(globalThis, "crypto", { value: originalCrypto, configurable: true });
+    }
+  });
+
+  it("shows the normal no-key form when crypto is available (secure context)", async () => {
+    mockGetKey.mockReturnValue(null);
+    renderPage();
+    await screen.findByText("Your character's secrets");
+    expect(screen.getByLabelText("Your character key")).toBeInTheDocument();
+    expect(screen.queryByText(/secure https connection to unlock/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("CharacterSecretsPage — skip link and main landmark", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetKey.mockReturnValue(null);
+    mockCollect.mockResolvedValue([]);
+  });
+
+  it("renders a <main id='secrets-main'> landmark", async () => {
+    renderPage();
+    await screen.findByText("Your character's secrets");
+    const main = screen.getByRole("main");
+    expect(main).toBeInTheDocument();
+    expect(main.id).toBe("secrets-main");
+  });
+
+  it("renders a skip link targeting #secrets-main", async () => {
+    renderPage();
+    await screen.findByText("Your character's secrets");
+    const skipLink = document.querySelector('a[href="#secrets-main"]');
+    expect(skipLink).not.toBeNull();
+    expect(skipLink).toHaveClass("skip-to-main");
+  });
+});

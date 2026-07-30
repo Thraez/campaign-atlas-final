@@ -96,7 +96,7 @@ export function ImagePickerPanel({
                   type="button"
                   aria-label={`Delete ${name}`}
                   title={`Delete ${name}`}
-                  className="absolute top-0.5 right-0.5 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[9px] leading-none"
+                  className="absolute top-0.5 right-0.5 flex items-center justify-center w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[9px] leading-none opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
                   onClick={(e) => {
                     e.stopPropagation();
                     onDelete(name);

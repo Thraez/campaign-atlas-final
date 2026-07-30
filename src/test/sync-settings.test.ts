@@ -6,9 +6,11 @@
  *   - loadSettings: non-ok response → empty object
  *   - loadSettings: fetch throws → empty object (network error path)
  *   - saveSettings: POSTs with correct name + serialized contents
+ *   - saveSettings: non-ok response → rejects (write failure surfaces, not swallowed)
  *   - loadSyncMap: successful fetch → parsed map
  *   - loadSyncMap: non-ok response → empty object
  *   - saveSyncMap: POSTs with correct name + serialized contents
+ *   - saveSyncMap: non-ok response → rejects (write failure surfaces, not swallowed)
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
@@ -76,6 +78,14 @@ describe("saveSettings", () => {
       }),
     );
   });
+
+  it("rejects when the response is not ok (e.g. 500)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => "disk full" }),
+    );
+    await expect(saveSettings({ vaultPath: "/vault" })).rejects.toThrow(/500/);
+  });
 });
 
 // ── loadSyncMap ───────────────────────────────────────────────────────────────
@@ -115,5 +125,13 @@ describe("saveSyncMap", () => {
         }),
       }),
     );
+  });
+
+  it("rejects when the response is not ok (e.g. 500)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => "disk full" }),
+    );
+    await expect(saveSyncMap({})).rejects.toThrow(/500/);
   });
 });

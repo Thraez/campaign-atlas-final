@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { PublishedDiffPanel } from "./PublishedDiffPanel";
 import type { AtlasDiff } from "./computeAtlasDiff";
 
-const META = { meta: {} };
+const META = { meta: {}, hadBaseline: true };
 
 const diff: AtlasDiff = {
   hasChanges: true,
@@ -33,6 +33,22 @@ describe("PublishedDiffPanel with precomputed diff", () => {
     };
     render(<PublishedDiffPanel diff={emptyDiff} />);
     expect(screen.getByText(/no changes since last publish/i)).toBeInTheDocument();
+  });
+
+  it("shows first-publish message instead of no-changes when there was no baseline", () => {
+    const noBaselineDiff: AtlasDiff = {
+      hasChanges: false,
+      hadBaseline: false,
+      counts: { entities: 0, placements: 0, maps: 0, overlays: 0 },
+      entities: [],
+      placements: [],
+      maps: [],
+      overlays: [],
+      meta: {},
+    };
+    render(<PublishedDiffPanel diff={noBaselineDiff} />);
+    expect(screen.getByText(/first publish.*your whole world will go live/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no changes since last publish/i)).not.toBeInTheDocument();
   });
 
   it("shows entity count badge in the panel header", () => {

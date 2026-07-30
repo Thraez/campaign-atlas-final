@@ -3,9 +3,14 @@ import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { isValidVisibility, ALL_VISIBILITY } from "@/atlas/content/visibility";
 import { parseFrontmatter, stringifyFrontmatter } from "@/atlas/import/frontmatter";
-import { useEntityEditDraft, type EntityEditDraftAPI } from "./useEntityEditDraft";
+import {
+  useEntityEditDraft,
+  type EntityEditDraftAPI,
+  type DraftSecret,
+} from "./useEntityEditDraft";
 import { saveAtlasPatchToLocalFs, hashContent, type FileChange } from "@/atlas/save/localFsSave";
 import { slugify } from "@/atlas/content/slugify";
+import { fileToDataUrl } from "@/atlas/content/browserFile";
 import { readSourceFile } from "@/atlas/save/canonicalPlacementSave";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import {
@@ -21,24 +26,23 @@ import { FormatToolbar } from "@/atlas/editor/FormatToolbar";
 import { ImagePickerPanel } from "@/atlas/editor/ImagePickerPanel";
 import { applyToolbarAction, type ToolbarActionId } from "@/atlas/editor/toolbarActions";
 
-interface DraftSecret {
-  id: string;
-  for?: string;
-  password?: string;
-  teaser?: string;
-  reveal: string;
-}
-
 export function EntityEditPanel({
   sourcePath,
   onClose,
   onSaved,
   draftApi,
+  initialType,
 }: {
   sourcePath: string;
   onClose: () => void;
   onSaved: () => void;
   draftApi?: EntityEditDraftAPI;
+  /**
+   * Pre-apply a type to the draft on open — used by the "File as …" action on a
+   * misfiled note. Applied *after* the draft is seeded from disk so `pristine`
+   * still reflects the file and the change registers as unsaved work.
+   */
+  initialType?: string;
 }) {
   const internal = useEntityEditDraft();
   const api = draftApi ?? internal;
@@ -56,7 +60,6 @@ export function EntityEditPanel({
   >([]);
   const [images, setImages] = useState<string[]>([]);
   const [showImagePicker, setShowImagePicker] = useState(false);
-  const [draftSecrets, setDraftSecrets] = useState<DraftSecret[]>([]);
   const [charNames, setCharNames] = useState<string[]>([]);
 
   // Load entity list once (cached by loadAtlasContent)
@@ -119,14 +122,20 @@ export function EntityEditPanel({
         rawRef.current = raw;
         const fm = parseFrontmatter(raw);
         const atlas = (fm.data.atlas as Record<string, unknown>) ?? {};
-        // Always initialize secret drafts from on-disk frontmatter so they survive re-mounts.
-        setDraftSecrets(Array.isArray(atlas.secrets) ? (atlas.secrets as DraftSecret[]) : []);
         // No-loss: if a live draft for THIS sourcePath already exists (the user
-        // was editing, left Edit, and came back), keep it. Only seed the draft
-        // from disk on a genuine first open. rawRef is still refreshed above so
-        // Save preserves untouched frontmatter.
+        // was editing, left Edit, and came back), keep it — including any
+        // in-progress secret edits, which now live on the shared draft instead
+        // of local state. Only seed the draft from disk on a genuine first
+        // open. rawRef is still refreshed above so Save preserves untouched
+        // frontmatter.
+        const diskType = String(atlas.type ?? "");
         const existing = api.snapshot();
         if (existing && existing.sourcePath === sourcePath) {
+          // Re-filing an entity the DM already had open: still honour the
+          // requested type, but keep the rest of their in-progress draft.
+          if (initialType && initialType !== existing.fields.type) {
+            api.setField("type", initialType);
+          }
           setPhase("ready");
           return;
         }
@@ -136,12 +145,16 @@ export function EntityEditPanel({
           baseHash,
           fields: {
             id: String(atlas.id ?? ""),
-            type: String(atlas.type ?? ""),
+            type: diskType,
             visibility: isValidVisibility(atlas.visibility) ? atlas.visibility : "dm",
             summary: String(atlas.summary ?? ""),
           },
           body: fm.content,
+          secrets: Array.isArray(atlas.secrets) ? (atlas.secrets as DraftSecret[]) : [],
         });
+        // Seeded from disk above so `pristine` is the file's state; applying the
+        // type now makes it a genuine unsaved change the DM can see and Save.
+        if (initialType && initialType !== diskType) api.setField("type", initialType);
         setPhase("ready");
       } catch (e) {
         if (!alive) return;
@@ -172,7 +185,7 @@ export function EntityEditPanel({
       } else {
         delete atlas.summary;
       }
-      const filteredSecrets = draftSecrets.filter((s) => s.reveal.trim().length > 0);
+      const filteredSecrets = api.draft.secrets.filter((s) => s.reveal.trim().length > 0);
       if (filteredSecrets.length > 0) {
         atlas.secrets = filteredSecrets;
       } else {
@@ -248,7 +261,7 @@ export function EntityEditPanel({
         type === "character"
           ? { id: newId, for: "", reveal: "" }
           : { id: newId, password: "", teaser: "", reveal: "" };
-      setDraftSecrets((prev) => [...prev, scaffold]);
+      api.setSecrets((prev) => [...prev, scaffold]);
     }
     requestAnimationFrame(() => {
       textareaRef.current?.setSelectionRange(result.selStart, result.selEnd);
@@ -257,28 +270,25 @@ export function EntityEditPanel({
   };
 
   const handleImageImport = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const ext = file.name.includes(".")
-        ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase()
-        : "";
-      const stem = file.name.slice(0, file.name.length - ext.length);
-      const safeName = (slugify(stem) || "image") + ext;
-      const imgPath = `public/atlas/assets/images/${safeName}`;
-      saveAtlasPatchToLocalFs([
-        { path: imgPath, content: dataUrl, kind: "asset-binary", baseHash: null },
-      ])
-        .then(() => {
+    fileToDataUrl(file)
+      .then((dataUrl) => {
+        const ext = file.name.includes(".")
+          ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase()
+          : "";
+        const stem = file.name.slice(0, file.name.length - ext.length);
+        const safeName = (slugify(stem) || "image") + ext;
+        const imgPath = `public/atlas/assets/images/${safeName}`;
+        return saveAtlasPatchToLocalFs([
+          { path: imgPath, content: dataUrl, kind: "asset-binary", baseHash: null },
+        ]).then(() => {
           setImages((prev) => (prev.includes(safeName) ? prev : [...prev, safeName].sort()));
           applySelection(safeName);
-        })
-        .catch((e: unknown) => {
-          logger.error("Image upload failed", e);
-          toast.error(`Image upload failed: ${e instanceof Error ? e.message : String(e)}`);
         });
-    };
-    reader.readAsDataURL(file);
+      })
+      .catch((e: unknown) => {
+        logger.error("Image upload failed", e);
+        toast.error(`Image upload failed: ${e instanceof Error ? e.message : String(e)}`);
+      });
   };
 
   const handleImageDelete = (name: string) => {
@@ -330,6 +340,20 @@ export function EntityEditPanel({
   };
 
   const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Q41: Cmd/Ctrl+B/I/K formatting shortcuts, routed through the same
+    // toolbar pipeline as the buttons. Only when the autocomplete popover is
+    // closed — with it open, the modifier combo is reserved for navigating
+    // suggestions.
+    if (!acCtx && (e.metaKey || e.ctrlKey)) {
+      const key = e.key.toLowerCase();
+      const actionId: ToolbarActionId | undefined =
+        key === "b" ? "bold" : key === "i" ? "italic" : key === "k" ? "wikilink" : undefined;
+      if (actionId) {
+        e.preventDefault();
+        handleToolbarAction(actionId);
+        return;
+      }
+    }
     if (!acCtx) return;
     const filtered =
       acCtx.type === "entity"
@@ -380,6 +404,8 @@ export function EntityEditPanel({
   const d = api.draft!;
   const filteredEntities = acCtx?.type === "entity" ? filterEntities(entities, acCtx.query) : [];
   const filteredImages = acCtx?.type === "image" ? filterImages(images, acCtx.query) : [];
+  const acItemCount = acCtx?.type === "entity" ? filteredEntities.length : filteredImages.length;
+  const acClampedIndex = Math.min(acIndex, Math.max(0, acItemCount - 1));
 
   return (
     <div className="flex flex-col h-full">
@@ -439,6 +465,10 @@ export function EntityEditPanel({
               aria-label="Body"
               aria-autocomplete="list"
               aria-expanded={acCtx !== null}
+              aria-controls={acCtx ? "wikilink-popover-listbox" : undefined}
+              aria-activedescendant={
+                acCtx && acItemCount > 0 ? `wikilink-option-${acClampedIndex}` : undefined
+              }
               rows={16}
               className="w-full px-2 py-1 rounded border bg-background font-mono text-[11px]"
               value={d.body}
@@ -464,9 +494,9 @@ export function EntityEditPanel({
         {/* Secrets section */}
         <div className="block">
           <span className="block mb-1 text-xs font-medium">Secrets</span>
-          {draftSecrets.length > 0 && (
+          {d.secrets.length > 0 && (
             <div className="space-y-2 mb-2">
-              {draftSecrets.map((s, i) => (
+              {d.secrets.map((s, i) => (
                 <div key={s.id} className="border rounded p-2 space-y-1 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-[10px] text-muted-foreground">{`{{secret:${s.id}}}`}</span>
@@ -474,7 +504,7 @@ export function EntityEditPanel({
                       type="button"
                       aria-label={`Remove secret ${s.id}`}
                       className="text-xs text-red-400 hover:text-red-600"
-                      onClick={() => setDraftSecrets((prev) => prev.filter((_, j) => j !== i))}
+                      onClick={() => api.setSecrets((prev) => prev.filter((_, j) => j !== i))}
                     >
                       Remove
                     </button>
@@ -488,7 +518,7 @@ export function EntityEditPanel({
                           className="w-full h-7 px-1 rounded border bg-background text-xs"
                           value={s.for ?? ""}
                           onChange={(e) =>
-                            setDraftSecrets((prev) =>
+                            api.setSecrets((prev) =>
                               prev.map((x, j) => (j === i ? { ...x, for: e.target.value } : x)),
                             )
                           }
@@ -506,7 +536,7 @@ export function EntityEditPanel({
                           placeholder="Character name"
                           value={s.for ?? ""}
                           onChange={(e) =>
-                            setDraftSecrets((prev) =>
+                            api.setSecrets((prev) =>
                               prev.map((x, j) => (j === i ? { ...x, for: e.target.value } : x)),
                             )
                           }
@@ -522,7 +552,7 @@ export function EntityEditPanel({
                           placeholder="the tide remembers"
                           value={s.password ?? ""}
                           onChange={(e) =>
-                            setDraftSecrets((prev) =>
+                            api.setSecrets((prev) =>
                               prev.map((x, j) =>
                                 j === i ? { ...x, password: e.target.value } : x,
                               ),
@@ -537,7 +567,7 @@ export function EntityEditPanel({
                           placeholder="Only a true fjordmark person knows this"
                           value={s.teaser ?? ""}
                           onChange={(e) =>
-                            setDraftSecrets((prev) =>
+                            api.setSecrets((prev) =>
                               prev.map((x, j) => (j === i ? { ...x, teaser: e.target.value } : x)),
                             )
                           }
@@ -553,7 +583,7 @@ export function EntityEditPanel({
                       placeholder="The reveal the player sees once unlocked…"
                       value={s.reveal}
                       onChange={(e) =>
-                        setDraftSecrets((prev) =>
+                        api.setSecrets((prev) =>
                           prev.map((x, j) => (j === i ? { ...x, reveal: e.target.value } : x)),
                         )
                       }

@@ -14,7 +14,7 @@ Focused docs for the campaign atlas. The root [README.md](../README.md) is the l
 ## Authoring and shipping
 
 - [WORKFLOWS.md](WORKFLOWS.md) — session-prep cycle, Creator Cockpit, save plugin, rollback flow, cache invalidation.
-- [VISIBILITY_AND_PLAYER_SAFETY.md](VISIBILITY_AND_PLAYER_SAFETY.md) — visibility states, `%%` blocks, `:::dm` callouts, the three safety scanners, rumor semantics.
+- [VISIBILITY_AND_PLAYER_SAFETY.md](VISIBILITY_AND_PLAYER_SAFETY.md) — visibility states, `%%` blocks, `:::dm` callouts, the safety scanners, rumor semantics.
 - [IMPORT_EXPORT.md](IMPORT_EXPORT.md) — Obsidian vault import, import-batch tracking, handouts, backups.
 
 ## Reference

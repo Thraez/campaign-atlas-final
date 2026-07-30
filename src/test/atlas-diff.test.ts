@@ -68,14 +68,23 @@ describe("computeAtlasDiff", () => {
     const p = project([entity({ id: "a", title: "A" })], [map({ id: "m" })]);
     const diff = computeAtlasDiff(p, p);
     expect(diff.hasChanges).toBe(false);
+    expect(diff.hadBaseline).toBe(true);
     expect(diff.counts).toEqual({ entities: 0, placements: 0, maps: 0, overlays: 0 });
   });
 
-  it("returns empty diff when baseline is null", () => {
+  it("returns empty diff with hadBaseline false when baseline is null (first-ever publish)", () => {
     const p = project([entity({ id: "a", title: "A" })], [map({ id: "m" })]);
     const diff = computeAtlasDiff(null, p);
     expect(diff.hasChanges).toBe(false);
+    expect(diff.hadBaseline).toBe(false);
     expect(diff.meta.currentVersion).toBe("v1");
+  });
+
+  it("returns hadBaseline true for a genuine no-op diff between populated snapshots", () => {
+    const p = project([entity({ id: "a", title: "A" })], [map({ id: "m" })]);
+    const diff = computeAtlasDiff(p, p);
+    expect(diff.hasChanges).toBe(false);
+    expect(diff.hadBaseline).toBe(true);
   });
 
   it("detects added entities", () => {

@@ -43,4 +43,18 @@ describe("callout extension", () => {
     expect(h).toContain("<blockquote>");
     expect(h).not.toContain("data-callout");
   });
+
+  it("renders inline markdown (bold/italic/links) inside the title", () => {
+    const h = markdownToHtml(
+      "> [!note] A **bold** and *italic* [link](https://example.com) title\n> body",
+    );
+    expect(h).toContain("<summary>A <strong>bold</strong> and <em>italic</em> " +
+      '<a href="https://example.com">link</a> title</summary>');
+  });
+
+  it("still HTML-escapes literal angle brackets/ampersands in the title", () => {
+    const h = markdownToHtml("> [!note] Tom & Jerry <script>\n> body");
+    expect(h).toContain("<summary>Tom &amp; Jerry");
+    expect(h).not.toContain("<summary>Tom & Jerry <script>");
+  });
 });

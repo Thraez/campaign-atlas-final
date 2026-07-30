@@ -5,6 +5,7 @@ import type { PublishCheckResult } from "./publishTypes";
 
 const baseDiff = {
   hasChanges: false,
+  hadBaseline: true,
   counts: { entities: 0, placements: 0, maps: 0, overlays: 0 },
   entities: [],
   placements: [],

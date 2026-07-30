@@ -105,4 +105,10 @@ describe("matchesPhrases", () => {
   it("returns true for an empty phrase list (vacuously all match)", () => {
     expect(matchesPhrases(entry(), [])).toBe(true);
   });
+
+  it("matches against tags (lowercased) — N118", () => {
+    expect(
+      matchesPhrases(entry({ tags: ["Ancient Ruins"], body: "" }), ["ancient ruins"]),
+    ).toBe(true);
+  });
 });

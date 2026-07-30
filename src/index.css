@@ -75,20 +75,52 @@
 .atlas-viewer-pin > svg {
   pointer-events: none;
 }
+.atlas-viewer-pin:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: 50%;
+}
 /* Discovered pins appear fully opaque; undiscovered are slightly dimmed. */
 .atlas-pin--undiscovered { opacity: 0.55; }
 .atlas-pin--discovered   { opacity: 1; }
+
+/* Active-entity ring: highlights the open entity's pin(s) on the map. */
+@keyframes atlas-pin-active-ring {
+  0%   { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.7); }
+  70%  { box-shadow: 0 0 0 8px hsl(var(--primary) / 0); }
+  100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+}
+.atlas-viewer-pin--active > svg {
+  filter: drop-shadow(0 0 4px hsl(var(--primary)));
+}
+.atlas-viewer-pin--active {
+  animation: atlas-pin-active-ring 1.4s ease-out infinite;
+  border-radius: 50%;
+}
 
 /* Leaflet overrides for fantasy theme */
 .leaflet-container {
   background: hsl(var(--ocean));
   font-family: inherit;
+}
+.leaflet-container:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: -2px;
+}
+.leaflet-container:focus:not(:focus-visible) {
   outline: none;
 }
 .leaflet-control-zoom a {
   background: hsl(var(--card)) !important;
   color: hsl(var(--foreground)) !important;
   border-color: hsl(var(--border)) !important;
+}
+.leaflet-control-zoom a:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: -2px;
+}
+.leaflet-control-zoom a:focus:not(:focus-visible) {
+  outline: none;
 }
 .leaflet-control-attribution {
   background: hsl(var(--card) / 0.7) !important;
@@ -280,6 +312,13 @@
   color: hsl(var(--muted-foreground));
   border-bottom: 1px dotted hsl(var(--muted-foreground) / 0.4);
 }
+.atlas-prose .atlas-wikilink-anchor {
+  color: inherit;
+}
+.atlas-prose .atlas-embed-missing {
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
 
 /* Credit badge — bottom-right corner over entity images */
 .atlas-credit-badge {
@@ -405,6 +444,82 @@
   color: hsl(var(--accent));
 }
 
+/* Atlas viewer: GFM table styling */
+.atlas-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  font-size: 0.9em;
+}
+.atlas-prose th, .atlas-prose td {
+  border: 1px solid hsl(var(--border));
+  padding: 0.35rem 0.65rem;
+  text-align: left;
+}
+.atlas-prose th {
+  background: hsl(var(--muted) / 0.6);
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+.atlas-prose tbody tr:nth-child(even) {
+  background: hsl(var(--muted) / 0.25);
+}
+
+/* Atlas viewer: ordered lists, inline code, fenced code, hr, h4–h6 */
+.atlas-prose ol { list-style: decimal; padding-left: 1.25rem; }
+.atlas-prose li { margin: 0.2em 0; }
+.atlas-prose code {
+  font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  font-size: 0.85em;
+  background: hsl(var(--muted) / 0.7);
+  border: 1px solid hsl(var(--border));
+  border-radius: 3px;
+  padding: 0.1em 0.35em;
+}
+.atlas-prose pre {
+  background: hsl(var(--muted) / 0.5);
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  font-size: 0.85em;
+}
+.atlas-prose pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 1em;
+}
+.atlas-prose hr {
+  border: none;
+  border-top: 1px solid hsl(var(--border));
+  margin: 1.25rem 0;
+}
+.atlas-prose h4 {
+  font-family: var(--font-display, serif);
+  color: hsl(var(--foreground));
+  margin-top: 0.85em;
+  font-size: 1em;
+  font-weight: 600;
+}
+.atlas-prose h5 {
+  font-family: var(--font-display, serif);
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.75em;
+  font-size: 0.9em;
+  font-weight: 600;
+}
+.atlas-prose h6 {
+  font-family: var(--font-display, serif);
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.75em;
+  font-size: 0.85em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 /* Accessibility: respect users who prefer reduced motion. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -438,6 +553,14 @@
   top: 8px;
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
+}
+
+/* Shared filter-chip: WCAG 2.5.8 24 px minimum tap target for all filter chip buttons. */
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.5rem;
 }
 
 /* Atlas viewer: player-secret sealed-box and reveal styles */

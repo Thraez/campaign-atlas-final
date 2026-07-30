@@ -126,6 +126,8 @@ export interface StagingRow {
   needsReview?: { reason: "secrecy-increase" | "rename-link" | "type-conflict" };
   /** Vault-relative POSIX path — present when the row came from a vault scan (openWithVaultScan). */
   vaultRelPath?: string;
+  /** Set when tags/aliases arrived as a comma-jammed scalar string instead of a YAML list. */
+  frontmatterWarning?: string;
 }
 
 /**
@@ -141,6 +143,18 @@ function deriveTitle(filename: string, fmTitle: unknown): string {
     .replace(/(^|\s)(\p{L})/gu, (_m, sp, ch) => sp + ch.toUpperCase());
 }
 
+// The common Obsidian authoring mistake of writing a comma-separated scalar
+// (`tags: npc, smuggler`) instead of a YAML list — YAML parses that as ONE
+// string, silently corrupting tag/alias-based filtering with no signal to
+// the DM. Mirrors the same detection in scripts/atlas/parseFrontmatter.ts.
+function commaJammedWarning(rawTags: unknown, rawAliases: unknown): string | undefined {
+  const jammed: string[] = [];
+  if (typeof rawTags === "string" && rawTags.includes(",")) jammed.push("tags");
+  if (typeof rawAliases === "string" && rawAliases.includes(",")) jammed.push("aliases");
+  if (jammed.length === 0) return undefined;
+  return `${jammed.join(" and ")} should be a YAML list, not a comma-separated string — treated as one value`;
+}
+
 function extractStagingFields(
   raw: string,
   relPath: string,
@@ -153,6 +167,7 @@ function extractStagingFields(
   fmTitle: string | undefined;
   frontmatterPath: string | undefined;
   parseError: string | undefined;
+  frontmatterWarning: string | undefined;
 } {
   try {
     const fm = parseFrontmatter(raw);
@@ -177,6 +192,10 @@ function extractStagingFields(
     const id = typeof atlas.id === "string" ? atlas.id : undefined;
     const fmTitle = typeof data.title === "string" ? data.title : undefined;
     const frontmatterPath = typeof data.path === "string" ? data.path : undefined;
+    const frontmatterWarning = commaJammedWarning(
+      atlas.tags ?? data.tags,
+      atlas.aliases ?? data.aliases,
+    );
     return {
       type,
       typeWasExplicit: !!explicit,
@@ -186,6 +205,7 @@ function extractStagingFields(
       fmTitle,
       frontmatterPath,
       parseError: undefined,
+      frontmatterWarning,
     };
   } catch (e) {
     return {
@@ -197,6 +217,7 @@ function extractStagingFields(
       fmTitle: undefined,
       frontmatterPath: undefined,
       parseError: e instanceof Error ? e.message : String(e),
+      frontmatterWarning: undefined,
     };
   }
 }
@@ -217,6 +238,7 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     fmTitle,
     frontmatterPath,
     parseError,
+    frontmatterWarning,
   } = extractStagingFields(input.raw, input.filename);
 
   // ── Identity resolution (§5.3 precedence) ──────────────────────────────────
@@ -287,6 +309,7 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     baseType,
     needsReview,
     vaultRelPath: input.vaultRelPath,
+    frontmatterWarning,
   };
 }
 

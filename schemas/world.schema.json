@@ -1,0 +1,344 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://campaign-atlas/schemas/world.schema.json",
+  "title": "Campaign Atlas world.yaml",
+  "description": "Schema for content/<world>/_atlas/world.yaml — the YAML source of truth for a world's maps, regions, routes, fog, and calendar. Mirrors the shape scripts/atlas/loadWorldConfig.ts accepts. Permissive by design: unknown/extra keys are allowed wherever the loader itself tolerates them, so this schema should never reject a currently-valid file.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "description": "world.yaml schema version understood by loadWorldConfig/schemaVersion.ts. Current: 1."
+    },
+    "maps": {
+      "type": "array",
+      "minItems": 1,
+      "description": "At least one map is required.",
+      "items": { "$ref": "#/definitions/map" }
+    },
+    "regions": {
+      "type": "array",
+      "description": "Top-level regions (legacy/canonical form). May instead be nested under maps[].regions.",
+      "items": { "$ref": "#/definitions/topLevelRegion" }
+    },
+    "routes": {
+      "type": "array",
+      "description": "Top-level routes. May instead be nested under maps[].routes.",
+      "items": { "$ref": "#/definitions/topLevelRoute" }
+    },
+    "fog": {
+      "type": "array",
+      "description": "Top-level fog overlays, one per mapId. May instead be nested under maps[].fog.",
+      "items": { "$ref": "#/definitions/topLevelFog" }
+    },
+    "calendar": { "$ref": "#/definitions/calendar" },
+    "import": { "$ref": "#/definitions/importConfig" },
+    "credits": { "$ref": "#/definitions/credits" },
+    "assetCredits": {
+      "type": "object",
+      "description": "Per-asset attribution registry keyed by asset src path (map layers and entity images).",
+      "additionalProperties": { "$ref": "#/definitions/assetCredit" }
+    }
+  },
+  "definitions": {
+    "point": {
+      "type": "array",
+      "description": "[x, y] in map coordinates (top-left origin).",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "waypoint": {
+      "description": "A route waypoint: explicit [x, y], a bare entity id string, or { entityId }.",
+      "oneOf": [
+        { "$ref": "#/definitions/point" },
+        { "type": "string" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["entityId"],
+          "properties": { "entityId": { "type": "string" } }
+        }
+      ]
+    },
+    "mapScale": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["unitsPerPixel"],
+      "properties": {
+        "unitsPerPixel": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "e.g. 0.05 means 1 px = 0.05 units."
+        },
+        "unitLabel": { "type": "string", "description": "\"mi\" | \"km\" | \"leagues\" | ..." }
+      }
+    },
+    "gridOverlay": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["kind", "size"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["square", "hex"] },
+        "size": { "type": "number", "exclusiveMinimum": 0, "description": "Cell size in map pixels." },
+        "color": { "type": "string" },
+        "enabled": { "type": "boolean", "description": "Default true." }
+      }
+    },
+    "waterConfig": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Default true." },
+        "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "speed": { "type": "number", "minimum": 0, "maximum": 1 },
+        "crestColor": { "type": "string", "description": "Hex color, e.g. #a0c8e0." }
+      }
+    },
+    "soundBed": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["src"],
+      "properties": {
+        "src": { "type": "string", "description": "Path under atlas/assets/audio/ (no leading slash)." },
+        "srcFallback": { "type": "string", "description": "Safari-friendly twin (.m4a/.mp3/.aac)." },
+        "gain": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "soundArea": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "bed"],
+      "properties": {
+        "id": { "type": "string" },
+        "regionId": { "type": "string", "description": "Ride-on: borrow this region's points + visibility." },
+        "points": {
+          "type": "array",
+          "description": "Sound-only zone's own polygon (used when regionId is absent).",
+          "items": { "$ref": "#/definitions/point" }
+        },
+        "visibility": { "type": "string" },
+        "name": { "type": "string" },
+        "bed": { "$ref": "#/definitions/soundBed" }
+      }
+    },
+    "soundscapeConfig": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Default true." },
+        "masterGain": { "type": "number", "minimum": 0, "maximum": 1 },
+        "areas": { "type": "array", "items": { "$ref": "#/definitions/soundArea" } }
+      }
+    },
+    "mapLayer": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "src"],
+      "properties": {
+        "id": { "type": "string" },
+        "src": {
+          "type": "string",
+          "description": "Relative path under atlas/assets/... (no leading slash)."
+        },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "zIndex": { "type": "number" },
+        "rotation": { "type": "number" },
+        "tileSrc": { "type": "string" }
+      }
+    },
+    "nestedRegion": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "name", "points"],
+      "properties": {
+        "id": { "type": "string" },
+        "mapId": { "type": "string", "description": "Optional here — inferred from the parent map." },
+        "name": { "type": "string" },
+        "entityId": { "type": "string" },
+        "color": { "type": "string" },
+        "fillOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "strokeOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "points": { "type": "array", "minItems": 3, "items": { "$ref": "#/definitions/point" } },
+        "visibility": { "type": "string" }
+      }
+    },
+    "topLevelRegion": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "mapId", "name", "points"],
+      "properties": {
+        "id": { "type": "string" },
+        "mapId": { "type": "string" },
+        "name": { "type": "string" },
+        "entityId": { "type": "string" },
+        "color": { "type": "string" },
+        "fillOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "strokeOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "points": { "type": "array", "minItems": 3, "items": { "$ref": "#/definitions/point" } },
+        "visibility": { "type": "string" }
+      }
+    },
+    "nestedRoute": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "name", "waypoints"],
+      "properties": {
+        "id": { "type": "string" },
+        "mapId": { "type": "string", "description": "Optional here — inferred from the parent map." },
+        "name": { "type": "string" },
+        "mode": { "type": "string", "enum": ["foot", "horse", "ship", "cart", "fly", "custom"] },
+        "speed": { "type": "number", "description": "Units per hour, using the map's MapScale unitLabel." },
+        "color": { "type": "string" },
+        "weight": { "type": "number", "description": "Stroke width in px." },
+        "dashed": { "type": "boolean" },
+        "visibility": { "type": "string" },
+        "waypoints": { "type": "array", "items": { "$ref": "#/definitions/waypoint" } },
+        "description": { "type": "string" }
+      }
+    },
+    "topLevelRoute": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "mapId", "name", "waypoints"],
+      "properties": {
+        "id": { "type": "string" },
+        "mapId": { "type": "string" },
+        "name": { "type": "string" },
+        "mode": { "type": "string", "enum": ["foot", "horse", "ship", "cart", "fly", "custom"] },
+        "speed": { "type": "number" },
+        "color": { "type": "string" },
+        "weight": { "type": "number" },
+        "dashed": { "type": "boolean" },
+        "visibility": { "type": "string" },
+        "waypoints": { "type": "array", "items": { "$ref": "#/definitions/waypoint" } },
+        "description": { "type": "string" }
+      }
+    },
+    "nestedFog": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "mapId": { "type": "string", "description": "Optional here — inferred from the parent map." },
+        "enabled": { "type": "boolean", "description": "Default true." },
+        "color": { "type": "string", "description": "Default rgba(8, 12, 20, 0.55)." },
+        "reveals": {
+          "type": "array",
+          "description": "Polygons the players can see through.",
+          "items": { "type": "array", "items": { "$ref": "#/definitions/point" } }
+        },
+        "conceals": {
+          "type": "array",
+          "description": "Fog polygons subtracted from reveals.",
+          "items": { "type": "array", "items": { "$ref": "#/definitions/point" } }
+        },
+        "featherPx": { "type": "number", "description": "Soft-edge band width." }
+      }
+    },
+    "topLevelFog": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["mapId"],
+      "properties": {
+        "mapId": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "color": { "type": "string" },
+        "reveals": {
+          "type": "array",
+          "items": { "type": "array", "items": { "$ref": "#/definitions/point" } }
+        },
+        "conceals": {
+          "type": "array",
+          "items": { "type": "array", "items": { "$ref": "#/definitions/point" } }
+        },
+        "featherPx": { "type": "number" }
+      }
+    },
+    "map": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string", "description": "Defaults to \"<worldId>-map-<index>\" when omitted." },
+        "name": { "type": "string" },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "oceanColor": { "type": "string", "description": "CSS color, default #18313f." },
+        "wrapX": { "type": "boolean", "description": "Horizontal world wrap. Default false." },
+        "scale": { "$ref": "#/definitions/mapScale" },
+        "grid": { "$ref": "#/definitions/gridOverlay" },
+        "water": { "$ref": "#/definitions/waterConfig" },
+        "soundscape": { "$ref": "#/definitions/soundscapeConfig" },
+        "layers": { "type": "array", "items": { "$ref": "#/definitions/mapLayer" } },
+        "regions": {
+          "type": "array",
+          "description": "Editor-friendly nested regions for this map (Creator Cockpit export shape).",
+          "items": { "$ref": "#/definitions/nestedRegion" }
+        },
+        "routes": {
+          "type": "array",
+          "description": "Editor-friendly nested routes for this map.",
+          "items": { "$ref": "#/definitions/nestedRoute" }
+        },
+        "fog": { "$ref": "#/definitions/nestedFog" }
+      }
+    },
+    "calendarMonth": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["name", "days"],
+      "properties": {
+        "name": { "type": "string" },
+        "days": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "calendar": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Ignored entirely (with a build warning) if no valid months are present.",
+      "properties": {
+        "name": { "type": "string" },
+        "epochName": { "type": "string", "description": "e.g. \"After Sundering\" -> rendered as \"1247 AS\"." },
+        "daysPerWeek": { "type": "number" },
+        "months": { "type": "array", "items": { "$ref": "#/definitions/calendarMonth" } }
+      }
+    },
+    "importConfig": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "folders": {
+          "type": "object",
+          "description": "Maps an entity's atlas.type value to a destination folder name (a single safe path segment).",
+          "additionalProperties": { "type": "string" }
+        },
+        "defaultFolder": {
+          "type": "string",
+          "description": "Destination folder for unknown/typeless entities. Default \"imports\"."
+        }
+      }
+    },
+    "credits": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "badges": { "type": "boolean", "description": "Show corner credit badge on entity images. Default true." },
+        "page": { "type": "boolean", "description": "Publish the /atlas/credits aggregate page. Default true." }
+      }
+    },
+    "assetCredit": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "credit": { "type": "string" },
+        "enabled": {
+          "type": "boolean",
+          "description": "Defaults to false — an unrecognized/omitted entry never ships a badge."
+        }
+      }
+    }
+  }
+}

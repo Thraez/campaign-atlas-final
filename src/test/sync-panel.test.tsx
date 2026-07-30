@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import { SyncPanel } from "@/atlas/sync/SyncPanel";
 import { loadSettings, saveSettings } from "@/atlas/sync/useSyncSettings";
+
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
 vi.mock("@/atlas/sync/useSyncSettings", () => ({
   loadSettings: vi.fn(),
@@ -61,6 +64,19 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
     );
   });
 
+  it("shows an error toast when saveSettings rejects (write failure)", async () => {
+    mockSave.mockRejectedValue(new Error("POST /__atlas/local-write failed (500): disk full"));
+    mockLoad.mockResolvedValue({ vaultPath: "/My Vault" });
+    render(<SyncPanel onSync={vi.fn()} />);
+    await waitFor(() => expect(screen.getByDisplayValue("/My Vault")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /save settings/i }));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining("Couldn't save sync settings"),
+      ),
+    );
+  });
+
   it("Sync now button calls onSync with vault root and parsed globs", async () => {
     const onSync = vi.fn().mockResolvedValue(undefined);
     mockLoad.mockResolvedValue({ vaultPath: "/MyVault", ignoreGlobs: ["_hidden/**"] });
@@ -79,5 +95,23 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
     });
     render(<SyncPanel onSync={vi.fn()} />);
     await waitFor(() => expect(screen.getByText(/Last synced:/i)).toBeTruthy());
+  });
+
+  it("shows a DM-build-required note and disables Sync when hasDmBuild is false", async () => {
+    mockLoad.mockResolvedValue({ vaultPath: "/Vault" });
+    render(<SyncPanel onSync={vi.fn()} hasDmBuild={false} />);
+    await waitFor(() =>
+      expect(screen.getByText(/Rebuild in DM mode first/i)).toBeTruthy(),
+    );
+    expect(screen.getByRole("button", { name: /sync now/i })).toBeDisabled();
+  });
+
+  it("does not show the DM-build-required note when hasDmBuild is true", async () => {
+    mockLoad.mockResolvedValue({ vaultPath: "/Vault" });
+    render(<SyncPanel onSync={vi.fn()} hasDmBuild={true} />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /sync now/i })).not.toBeDisabled(),
+    );
+    expect(screen.queryByText(/Rebuild in DM mode first/i)).toBeNull();
   });
 });

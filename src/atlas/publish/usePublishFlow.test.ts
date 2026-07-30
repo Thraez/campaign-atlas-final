@@ -255,6 +255,29 @@ describe("usePublishFlow (push half)", () => {
     expect(result.current.error).toBe("Connection refused");
   });
 
+  it("confirm() captures pushResult (pushedAt + commit) on published", async () => {
+    const { result } = await reachReady();
+    mockPush({ status: "published", pushedAt: "2026-07-26T00:00:00Z", commit: "a1b2c3d4e5" });
+    act(() => {
+      result.current.confirm();
+    });
+    await waitFor(() => expect(result.current.state).toBe("published"));
+    expect(result.current.pushResult).toEqual({
+      pushedAt: "2026-07-26T00:00:00Z",
+      commit: "a1b2c3d4e5",
+    });
+  });
+
+  it("pushResult stays null when confirm() doesn't reach published", async () => {
+    const { result } = await reachReady();
+    mockPush({ status: "nothing-to-publish" });
+    act(() => {
+      result.current.confirm();
+    });
+    await waitFor(() => expect(result.current.state).toBe("nothing-to-publish"));
+    expect(result.current.pushResult).toBeNull();
+  });
+
   it("confirm() transitions to publishing immediately (before fetch resolves)", async () => {
     const { result } = await reachReady();
     let resolveFetch!: (v: unknown) => void;

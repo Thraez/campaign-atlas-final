@@ -7,13 +7,21 @@ export function EntitySurface({
   entitiesById,
   renderEdit,
   onClose,
+  startInEdit = false,
 }: {
   entity: Entity;
   entitiesById: Map<string, Entity>;
   renderEdit: () => React.ReactNode;
   onClose: () => void;
+  /**
+   * Open straight into Edit rather than Reading. Used by the "File as …" action
+   * on a misfiled note: reading mode never mounts the edit panel, so the
+   * requested type would not be applied and the click would appear to do
+   * nothing. Reading stays the default for every other way in.
+   */
+  startInEdit?: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startInEdit);
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 px-3 py-1.5 border-b text-xs">

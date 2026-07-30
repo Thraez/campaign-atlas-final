@@ -13,14 +13,14 @@ interface FormatToolbarProps {
  * live textarea selection.
  */
 
-const ALWAYS: Array<{ id: ToolbarActionId; label: string }> = [
-  { id: "bold", label: "Bold" },
-  { id: "italic", label: "Italic" },
+const ALWAYS: Array<{ id: ToolbarActionId; label: string; title?: string }> = [
+  { id: "bold", label: "Bold", title: "Bold (Ctrl+B)" },
+  { id: "italic", label: "Italic", title: "Italic (Ctrl+I)" },
   { id: "highlight", label: "Highlight" },
   { id: "heading", label: "Heading" },
   { id: "list", label: "List" },
   { id: "quote", label: "Quote" },
-  { id: "wikilink", label: "Wikilink" },
+  { id: "wikilink", label: "Wikilink", title: "Wikilink (Ctrl+K)" },
   { id: "callout", label: "Callout" },
 ];
 
@@ -78,7 +78,13 @@ export function FormatToolbar({ onAction, onInsertImage }: FormatToolbarProps) {
     <div className="relative mb-1">
       <div className="flex flex-wrap gap-1 items-center" role="toolbar" aria-label="Formatting">
         {ALWAYS.map((a) => (
-          <button key={a.id} type="button" className={BTN} onClick={() => fire(a.id)}>
+          <button
+            key={a.id}
+            type="button"
+            className={BTN}
+            title={a.title}
+            onClick={() => fire(a.id)}
+          >
             {a.label}
           </button>
         ))}

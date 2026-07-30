@@ -377,6 +377,59 @@ describe("ImportStagingModal", () => {
     expect(visSelect.getAttribute("aria-disabled")).not.toBe("true");
   });
 
+  it("create row — visibility select is disabled with a DM-only-safety tooltip", () => {
+    const rows = buildStagingRows(
+      [{ filename: "new-npc.md", raw: "---\natlas: { type: npc, id: new-npc }\n---\n" }],
+      makeCtx(),
+    );
+    render(<Harness initial={rows} />);
+    const visSelect = screen.getByLabelText(/visibility for new-npc\.md/i) as HTMLButtonElement;
+    expect(
+      visSelect.hasAttribute("disabled") || visSelect.getAttribute("aria-disabled") === "true",
+    ).toBe(true);
+    expect(visSelect.getAttribute("title")).toMatch(/saved DM-only for safety/i);
+  });
+
+  it("shows a comma-separated tags/aliases warning badge when frontmatterWarning is set", () => {
+    const rows = buildStagingRows(
+      [
+        {
+          filename: "garron.md",
+          raw: "---\natlas:\n  type: npc\n  id: garron\n  tags: \"npc, smuggler\"\n---\n",
+        },
+      ],
+      makeCtx(),
+    );
+    render(<Harness initial={rows} />);
+    expect(screen.getByText(/Comma-separated tags\/aliases/i)).toBeTruthy();
+  });
+
+  it("does not show the comma-separated warning badge for a clean row", () => {
+    const rows = buildStagingRows(
+      [{ filename: "garron.md", raw: "---\natlas: { type: npc, id: garron }\n---\n" }],
+      makeCtx(),
+    );
+    render(<Harness initial={rows} />);
+    expect(screen.queryByText(/Comma-separated tags\/aliases/i)).toBeNull();
+  });
+
+  it("path-collision row — visibility select is disabled with a DM-only-safety tooltip", () => {
+    const existingPaths = new Set(["content/astrath-deeprealm/settlements/thornhold.md"]);
+    const ctx = makeCtx({ existingPaths });
+    const rows = buildStagingRows(
+      [{ filename: "thornhold.md", raw: "---\natlas: { type: settlement, id: thornhold }\n---\n" }],
+      ctx,
+    );
+    render(<Harness initial={rows} ctx={ctx} />);
+    const visSelect = screen.getByLabelText(
+      /visibility for thornhold\.md/i,
+    ) as HTMLButtonElement;
+    expect(
+      visSelect.hasAttribute("disabled") || visSelect.getAttribute("aria-disabled") === "true",
+    ).toBe(true);
+    expect(visSelect.getAttribute("title")).toMatch(/saved DM-only for safety/i);
+  });
+
   it("needsReview row shows plain-language reason badge", () => {
     const reviewRow = {
       id: "r8",

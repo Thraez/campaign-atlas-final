@@ -28,8 +28,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Type-check (whole app)
-        run: npm run typecheck
+      - name: Type-check (app + scripts)
+        run: npm run typecheck:all
+
+      - name: Lint
+        run: npm run lint
 
       - name: Check formatting
         run: npm run format:check
@@ -42,15 +45,27 @@ jobs:
           ATLAS_BASE: /${{ github.event.repository.name }}/
         run: npm run build
 
-      - name: Scan built artifact for sentinel and shape leaks
-        run: |
-          npm run atlas:check-secrets dist
-          npm run atlas:check-secrets public/atlas
-          npm run atlas:check-shape public/atlas/atlas.json
+      - name: Run full safety-scan orchestrator
+        # All 12 scans (secrets, derived-secrets, shape, image-privacy,
+        # fog-safety, player-secrets, audit-assets) against both dist and
+        # public/atlas — the same orchestrator publish-atlas.yml runs post-merge.
+        run: npm run atlas:scan
 
-      - name: Scan built artifact for derived-secret leaks
-        # Names/aliases of dm/hidden entities derived from the source vault
-        # must not appear in the player artifact.
-        run: |
-          npm run atlas:check-derived dist
-          npm run atlas:check-derived public/atlas
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test shard ${{ matrix.shard }}/4
+        run: npx vitest run --pool=forks --poolOptions.forks.maxForks=3 --shard=${{ matrix.shard }}/4

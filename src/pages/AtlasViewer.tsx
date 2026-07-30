@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback, type MutableRefObject } from "react";
 import {
   MapContainer,
   Marker,
@@ -12,6 +12,8 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { loadAtlasContent, loadSearchIndex, type SearchIndexEntry } from "@/atlas/content/loader";
+import { AtlasLoadState } from "@/atlas/content/AtlasLoadState";
+import { logger } from "@/lib/logger";
 import type {
   AtlasProject,
   Entity,
@@ -22,7 +24,7 @@ import type {
   MapScale,
 } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import {
   Search,
   ArrowLeft,
@@ -33,6 +35,7 @@ import {
   Ruler,
   Star,
   KeyRound,
+  Maximize2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -52,11 +55,15 @@ import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 import { SearchPalette } from "@/atlas/search/SearchPalette";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
+import { ReadingPanelWelcome } from "@/atlas/entity/ReadingPanelWelcome";
+import { pickStarters } from "@/atlas/entity/pickStarters";
 import { MapCreditOverlay } from "@/atlas/map/MapCreditOverlay";
 import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
+import { ScaleBarController, type ScaleBarState } from "@/atlas/scale/ScaleBar";
 import { serializeDeepLink, parseDeepLink } from "@/atlas/deepLink";
 import {
   ROUTE_MODE_LABEL,
@@ -64,6 +71,7 @@ import {
   formatTravelTime,
   gridLines,
 } from "@/atlas/map/geometry";
+import { atlasToLatLng } from "@/atlas/map/coords";
 import { useVisitedPlaces } from "@/atlas/visited/useVisitedPlaces";
 import { pinDiscoveryClass } from "@/atlas/wander/pinDiscoveryClass";
 import { selectWanderTarget } from "@/atlas/wander/selectWanderTarget";
@@ -73,6 +81,7 @@ import { createPortal } from "react-dom";
 import { HoverPeekCard } from "@/atlas/peek/HoverPeekCard";
 import { usePeekController } from "@/atlas/peek/usePeekController";
 import { resolvePeekEntityId } from "@/atlas/peek/resolvePeekEntityId";
+import { playerTypeLabel } from "@/atlas/content/typeLabel";
 
 // Flat CRS for non-globe world (top-left origin via lat = height - y)
 const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
@@ -82,16 +91,24 @@ import { shouldShowLabel } from "@/atlas/pins/labelVisibility";
 
 function pinIconForStyle(
   style: PinPreset,
-  opts?: { dim?: boolean; extraClass?: string },
+  opts?: { dim?: boolean; extraClass?: string; ariaLabel?: string },
 ): L.DivIcon {
   // iconSize defines the hit area Leaflet uses for click/touch dispatch. The
   // visual SVG is smaller (~22px) but we expose a 44x44 hit area so mobile
   // touch targets meet WCAG 2.5.5 (Target Size, Level AAA). The SVG centers
   // visually inside the box via the `atlas-viewer-pin` CSS rule.
   const cls = opts?.extraClass ? `atlas-viewer-pin ${opts.extraClass}` : "atlas-viewer-pin";
+  const svgHtml = pinSvg({ color: style.color, shape: style.shape }, { dim: opts?.dim });
+  // Inject role + aria-label into the SVG so screen readers announce the pin name.
+  const html = opts?.ariaLabel
+    ? svgHtml.replace(
+        "<svg ",
+        `<svg role="img" aria-label="${opts.ariaLabel.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}" `,
+      )
+    : svgHtml;
   return L.divIcon({
     className: cls,
-    html: pinSvg({ color: style.color, shape: style.shape }, { dim: opts?.dim }),
+    html,
     iconSize: [44, 44],
     iconAnchor: [22, 36],
   });
@@ -103,15 +120,19 @@ function MapController({
   flyTo: { x: number; y: number; height: number; zoom?: number } | null;
 }) {
   const map = useMap();
+  const prefersReducedMotion = usePrefersReducedMotion();
   useEffect(() => {
     if (!flyTo) return;
-    const lat = flyTo.height - flyTo.y;
-    const lng = flyTo.x;
+    const [lat, lng] = atlasToLatLng(flyTo.x, flyTo.y, flyTo.height);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
     const targetZoom =
       flyTo.zoom != null && Number.isFinite(flyTo.zoom) ? flyTo.zoom : Math.max(map.getZoom(), -1);
-    map.flyTo([lat, lng], targetZoom, { duration: 0.6 });
-  }, [flyTo, map]);
+    if (prefersReducedMotion) {
+      map.setView([lat, lng], targetZoom, { animate: false });
+    } else {
+      map.flyTo([lat, lng], targetZoom, { duration: 0.6 });
+    }
+  }, [flyTo, map, prefersReducedMotion]);
   return null;
 }
 
@@ -140,9 +161,72 @@ function ViewSyncController({
   return null;
 }
 
+function FitBoundsController({
+  mapId,
+  mapWidth,
+  mapHeight,
+  flyTarget,
+  fitRef,
+}: {
+  mapId: string;
+  mapWidth: number;
+  mapHeight: number;
+  flyTarget: { x: number; y: number; height: number; zoom?: number } | null;
+  fitRef: MutableRefObject<(() => void) | null>;
+}) {
+  const map = useMap();
+  const seenMapIdRef = useRef<string | null>(null);
+
+  // Keep the reset-view callback current after every render in which deps change
+  useLayoutEffect(() => {
+    fitRef.current = () => {
+      map.fitBounds([[0, 0], [mapHeight, mapWidth]], { animate: true, duration: 0.5 });
+    };
+    return () => {
+      fitRef.current = null;
+    };
+  }, [map, mapHeight, mapWidth, fitRef]);
+
+  useEffect(() => {
+    if (seenMapIdRef.current === mapId) return;
+    seenMapIdRef.current = mapId;
+    if (flyTarget !== null) return; // fly already pending; MapController handles it
+    map.fitBounds([[0, 0], [mapHeight, mapWidth]], { animate: false });
+  }, [mapId, mapWidth, mapHeight, flyTarget, map]);
+
+  return null;
+}
+
+function MaxBoundsController({
+  mapId,
+  mapWidth,
+  mapHeight,
+  wrapX,
+}: {
+  mapId: string;
+  mapWidth: number;
+  mapHeight: number;
+  wrapX?: boolean;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    if (wrapX) {
+      // Horizontal scrolling is intentional on wrap maps; clear any bounds.
+      map.setMaxBounds(undefined);
+      return;
+    }
+    const pad = Math.max(mapWidth, mapHeight) * 0.1;
+    map.options.maxBoundsViscosity = 0.75;
+    map.setMaxBounds([
+      [-pad, -pad],
+      [mapHeight + pad, mapWidth + pad],
+    ]);
+  }, [mapId, mapWidth, mapHeight, wrapX, map]);
+  return null;
+}
+
 interface ViewerState {
   project: AtlasProject;
-  index: SearchIndexEntry[];
 }
 
 export default function AtlasViewer() {
@@ -158,6 +242,12 @@ export default function AtlasViewer() {
   } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // Search index is deliberately NOT part of the initial load — it's fetched
+  // lazily on first search-open so players who never search never pay for it.
+  // The ref dedupes: once a fetch has started, later opens reuse its result
+  // (or, while in flight, await the same promise) instead of re-fetching.
+  const [searchIndex, setSearchIndex] = useState<SearchIndexEntry[] | null>(null);
+  const searchIndexRequestRef = useRef<Promise<void> | null>(null);
   // The bottom sheet renders the entity panel at *every* viewport below the
   // desktop-aside breakpoint (1024px) — not just mobile. Otherwise tablets
   // sit in a dead zone where neither the aside nor the sheet is mounted.
@@ -178,6 +268,8 @@ export default function AtlasViewer() {
 
   const [viewCenter, setViewCenter] = useState<{ x: number; y: number; zoom: number } | null>(null);
   const viewCenterRef = useRef<{ x: number; y: number; zoom: number } | null>(null);
+  const fitMapRef = useRef<(() => void) | null>(null);
+  const [scaleBar, setScaleBar] = useState<ScaleBarState | null>(null);
 
   const handleViewChange = useCallback((cx: number, cy: number, cz: number) => {
     const vc = { x: cx, y: cy, zoom: cz };
@@ -228,10 +320,13 @@ export default function AtlasViewer() {
     return () => window.removeEventListener("popstate", popStateHandler);
   }, [popStateHandler]);
 
-  useEffect(() => {
-    Promise.all([loadAtlasContent(true), loadSearchIndex()])
-      .then(([project, index]) => {
-        setData({ project, index });
+  // Extracted so a failed load can be retried in place (Try again button,
+  // or auto-retry on the `online` event) without a full page reload.
+  const attemptLoad = useCallback(() => {
+    loadAtlasContent(true)
+      .then((project) => {
+        setError(null);
+        setData({ project });
         const defaultMapId = project.worlds[0]?.defaultMapId ?? project.maps[0]?.id ?? null;
         const dl = parseDeepLink(window.location.search);
         // Use map from deep link if valid, else fall back to default
@@ -267,8 +362,25 @@ export default function AtlasViewer() {
         }
       })
       .catch((e: Error) => setError(e.message));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally runs once; URL-driven entity open should respect the viewport at load time
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally stable; URL-driven entity open should respect the viewport at call time, not re-derive on every hasDesktopAside change
   }, []);
+
+  useEffect(() => {
+    attemptLoad();
+  }, [attemptLoad]);
+
+  const retryLoad = useCallback(() => {
+    setError(null);
+    attemptLoad();
+  }, [attemptLoad]);
+
+  // Auto-retry once when connectivity returns — only bound while an error
+  // is showing, so it can't loop or fire once the load has succeeded.
+  useEffect(() => {
+    if (!error) return;
+    window.addEventListener("online", retryLoad);
+    return () => window.removeEventListener("online", retryLoad);
+  }, [error, retryLoad]);
 
   const activeMap: MapDocument | undefined = useMemo(
     () => data?.project.maps.find((m) => m.id === activeMapId),
@@ -287,6 +399,14 @@ export default function AtlasViewer() {
 
   const worldCredits = data?.project.worlds[0]?.credits;
   const worldAssetCredits = data?.project.worlds[0]?.assetCredits;
+  const worldName = data?.project.worlds[0]?.name ?? "Atlas";
+
+  /** A few entries to offer in the reading panel before anything is opened. */
+  const starterEntries = useMemo(() => {
+    if (!data) return [];
+    const placed = new Set(data.project.placements.map((p) => p.entityId));
+    return pickStarters(data.project.entities, (id) => placed.has(id));
+  }, [data]);
   const showCredits =
     worldCredits?.page !== false && (data?.project.entities.some((e) => e.credit) ?? false);
 
@@ -419,6 +539,21 @@ export default function AtlasViewer() {
     };
   }, [openEntity, openId, pointerFine, peekCtl]);
 
+  // Fetch the search index on first search-open, not at mount. The ref guards
+  // against re-fetching on every reopen (searchOpen flips false/true a lot).
+  useEffect(() => {
+    if (!searchOpen || searchIndexRequestRef.current) return;
+    searchIndexRequestRef.current = loadSearchIndex()
+      .then((idx) => setSearchIndex(idx))
+      .catch((e: Error) => {
+        // Search-index failure degrades search only — the map/entity panel
+        // already loaded fine and must stay up, so this must not go through
+        // setError (that would replace the whole page with the error screen).
+        logger.error("Failed to load search index", e);
+        setSearchIndex([]);
+      });
+  }, [searchOpen]);
+
   // Cmd/Ctrl-K opens search
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -430,46 +565,38 @@ export default function AtlasViewer() {
           peekCtl.dismiss();
           return;
         }
-        setSearchOpen(false);
+        if (searchOpen) {
+          setSearchOpen(false);
+          return;
+        }
+        // Desktop entity panel is a plain <aside>, not a Radix Sheet, so it
+        // gets no built-in Escape-to-close. The mobile Sheet already closes
+        // on Escape on its own (Radix Dialog), so only handle this here.
+        if (hasDesktopAside && openId !== null) {
+          setOpenId(null);
+        }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [peekCtl]);
+  }, [peekCtl, searchOpen, hasDesktopAside, openId]);
 
-  if (error) {
-    const offline = typeof navigator !== "undefined" && !navigator.onLine;
+  if (error || !data) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-background text-foreground p-6 text-center">
-        <div className="max-w-md space-y-3">
-          <h1 className="font-display text-2xl text-primary">
-            {offline ? "Atlas not available offline yet" : "Atlas not built yet"}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {offline ? "Open the atlas once while online to cache it for offline use." : error}
+      <AtlasLoadState
+        error={error}
+        loading={!data}
+        backHref="/"
+        backLabel="Back to home"
+        loadingLabel="Loading atlas…"
+        onRetry={retryLoad}
+        extraHint={
+          <p className="text-xs text-muted-foreground">
+            Run <code className="px-1.5 py-0.5 rounded bg-muted">npm run atlas:build</code> to
+            generate <code>public/atlas/atlas.json</code>.
           </p>
-          {!offline && (
-            <p className="text-xs text-muted-foreground">
-              Run <code className="px-1.5 py-0.5 rounded bg-muted">npm run atlas:build</code> to
-              generate <code>public/atlas/atlas.json</code>.
-            </p>
-          )}
-          <Button asChild variant="secondary">
-            <Link to="/">
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Back to home
-            </Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-background text-muted-foreground">
-        Loading atlas…
-      </div>
+        }
+      />
     );
   }
 
@@ -525,17 +652,20 @@ export default function AtlasViewer() {
           Skip to map
         </a>
         <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
-          <AtlasNavMenu publishedAt={data.project.publishedAt} showCredits={showCredits} />
+          <AtlasNavMenu publishedAt={data.project.publishedAt} showCredits={showCredits} worldName={worldName} />
+          {/* The name used to be `hidden sm:inline`, so a phone showed only the
+              compass — someone opening a shared link couldn't see which world
+              they were looking at. Truncate instead of hiding. */}
           <Link
             to="/"
-            className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2"
+            className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2 min-w-0"
           >
-            <Compass className="h-5 w-5" aria-hidden="true" />{" "}
-            <span className="hidden sm:inline">Astrath Atlas</span>
+            <Compass className="h-5 w-5 shrink-0" aria-hidden="true" />
+            <span className="truncate max-w-[8.5rem] sm:max-w-none">{worldName}</span>
           </Link>
           <div className="flex-1" />
           {data.project.maps.length > 1 && (
-            <Select value={activeMap.id} onValueChange={setActiveMapId}>
+            <Select value={activeMap.id} onValueChange={(id) => { setActiveMapId(id); setFlyTarget(null); }}>
               <SelectTrigger className="h-8 w-[180px] text-xs" aria-label="Choose map">
                 <SelectValue />
               </SelectTrigger>
@@ -651,18 +781,31 @@ export default function AtlasViewer() {
               }}
             >
               <MapController flyTo={flyTarget} />
+              <FitBoundsController
+                mapId={activeMap.id}
+                mapWidth={activeMap.width}
+                mapHeight={activeMap.height}
+                flyTarget={flyTarget}
+                fitRef={fitMapRef}
+              />
+              <MaxBoundsController
+                mapId={activeMap.id}
+                mapWidth={activeMap.width}
+                mapHeight={activeMap.height}
+                wrapX={activeMap.wrapX}
+              />
               <ViewSyncController
                 mapId={activeMap.id}
                 mapHeight={activeMap.height}
                 onViewChange={handleViewChange}
               />
+              <ScaleBarController scale={activeMap.scale} onChange={setScaleBar} />
               <SoundscapeLayer map={activeMap} />
               <RulerLayer
                 active={rulerActive}
+                mapId={activeMap.id}
                 mapHeight={activeMap.height}
                 scale={activeMap.scale}
-                wrapX={activeMap.wrapX}
-                mapWidth={activeMap.width}
               />
 
               {/* Horizontal wrap: render copies at -W, 0, +W when wrapX enabled */}
@@ -676,8 +819,10 @@ export default function AtlasViewer() {
                   showGrid={showGrid}
                   onOpenEntity={openEntity}
                   visited={visited}
+                  openId={openId}
                   onPinPeek={onPinPeek}
                   onPinPeekLeave={peekCtl.onTriggerLeave}
+                  rulerActive={rulerActive}
                 />
               ))}
 
@@ -692,7 +837,12 @@ export default function AtlasViewer() {
               credits={worldCredits}
             />
 
-            <SoundControl />
+            <SoundControl
+              hasSoundscape={
+                activeMap.soundscape?.enabled !== false &&
+                (activeMap.soundscape?.areas?.length ?? 0) > 0
+              }
+            />
 
             {/* Wander button + discovery meter — bottom-left map overlay */}
             <WanderControl
@@ -706,6 +856,37 @@ export default function AtlasViewer() {
                 You've explored everything you can reach — travel onward to uncover more.
               </div>
             )}
+
+            {/* Scale bar — bottom-center map overlay */}
+            {scaleBar && (
+              <div
+                className="atlas-scale-bar absolute bottom-3 left-1/2 -translate-x-1/2 z-[500] pointer-events-none select-none"
+                role="note"
+                aria-label={`Map scale: ${scaleBar.label}`}
+              >
+                <div className="rounded bg-background/90 border border-border px-2 pb-1 pt-1 shadow-sm text-center">
+                  <div
+                    className="mx-auto border-b border-l border-r border-foreground/60 h-1.5 mb-0.5"
+                    style={{ width: `${scaleBar.barWidth}px` }}
+                    aria-hidden="true"
+                  />
+                  <span className="text-[10px] text-muted-foreground leading-none">
+                    {scaleBar.label}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Reset view — bottom-right map corner */}
+            <button
+              type="button"
+              onClick={() => fitMapRef.current?.()}
+              className="absolute bottom-3 right-3 z-[500] h-8 w-8 rounded bg-background/90 border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="Reset map view"
+              title="Reset view (fit map to screen)"
+            >
+              <Maximize2 className="h-4 w-4" aria-hidden="true" />
+            </button>
           </main>
 
           {/* Desktop side panel — only mounts at lg+. Below that, the entity
@@ -737,6 +918,15 @@ export default function AtlasViewer() {
                 }}
                 onPeek={(id, rect) => peekCtl.onTriggerEnter(id, rect)}
                 onPeekLeave={peekCtl.onTriggerLeave}
+                // Desktop only: the mobile sheet opens because an entity was
+                // picked, so its empty state is never on screen.
+                emptyState={
+                  <ReadingPanelWelcome
+                    worldName={worldName}
+                    starters={starterEntries}
+                    onOpenEntity={openEntity}
+                  />
+                }
                 credits={worldCredits}
                 assetCredits={worldAssetCredits}
               />
@@ -762,6 +952,8 @@ export default function AtlasViewer() {
         {!hasDesktopAside && (
           <Sheet open={mobilePanelOpen && !!openEntity_} onOpenChange={setMobilePanelOpen}>
             <SheetContent side="bottom" className="h-[80vh] p-0">
+              <SheetTitle className="sr-only">{openEntity_?.title ?? ""}</SheetTitle>
+              <SheetDescription className="sr-only">Entity details</SheetDescription>
               <EntityPanel
                 ref={panelRef}
                 entity={openEntity_}
@@ -785,20 +977,34 @@ export default function AtlasViewer() {
         )}
 
         {/* Search palette */}
-        {searchOpen && (
-          <SearchPalette
-            query={query}
-            setQuery={setQuery}
-            index={data.index}
-            placements={data.project.placements}
-            onPick={(id, fly) => {
-              setSearchOpen(false);
-              setQuery("");
-              openEntity(id, fly);
-            }}
-            onClose={() => setSearchOpen(false)}
-          />
-        )}
+        {searchOpen &&
+          (searchIndex ? (
+            <SearchPalette
+              query={query}
+              setQuery={setQuery}
+              index={searchIndex}
+              placements={placementsOnMap}
+              onPick={(id, fly) => {
+                setSearchOpen(false);
+                setQuery("");
+                openEntity(id, fly);
+              }}
+              onClose={() => setSearchOpen(false)}
+            />
+          ) : (
+            <div
+              className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm flex items-start justify-center pt-[10vh] px-4"
+              onClick={() => setSearchOpen(false)}
+            >
+              <div
+                role="status"
+                aria-live="polite"
+                className="w-full max-w-2xl bg-card border border-border rounded-lg shadow-2xl p-6 text-sm text-muted-foreground text-center"
+              >
+                Loading search…
+              </div>
+            </div>
+          ))}
         {peekCtl.peek &&
           data &&
           entityById.get(peekCtl.peek.entityId) &&
@@ -851,11 +1057,13 @@ interface WrappedWorldProps {
   showGrid: boolean | null;
   onOpenEntity: (id: string, fly?: boolean) => void;
   visited: Set<string>;
+  openId: string | null;
   onPinPeek?: (id: string, ev: MouseEvent) => void;
   onPinPeekLeave?: () => void;
+  rulerActive?: boolean;
 }
 
-function WrappedWorld({
+export function WrappedWorld({
   dx,
   map,
   placements,
@@ -863,8 +1071,10 @@ function WrappedWorld({
   showGrid,
   onOpenEntity,
   visited,
+  openId,
   onPinPeek,
   onPinPeekLeave,
+  rulerActive,
 }: WrappedWorldProps) {
   const H = map.height;
   return (
@@ -901,7 +1111,9 @@ function WrappedWorld({
               opacity: region.strokeOpacity ?? 0.85,
             }}
             eventHandlers={
-              region.entityId ? { click: () => onOpenEntity(region.entityId!, false) } : undefined
+              region.entityId && !rulerActive
+                ? { click: () => onOpenEntity(region.entityId!, false) }
+                : undefined
             }
           >
             {/* Hover label so users don't rely on fill color alone to identify
@@ -984,6 +1196,7 @@ function WrappedWorld({
         entityById={entityById}
         onOpenEntity={onOpenEntity}
         visited={visited}
+        openId={openId}
         onPinPeek={onPinPeek}
         onPinPeekLeave={onPinPeekLeave}
       />
@@ -994,13 +1207,14 @@ function WrappedWorld({
 /** Renders pin markers with preset-derived shape/color, and computes which
  *  labels are permanently visible based on per-pin priority + labelMinZoom +
  *  a screen-space collision pass (higher priority wins). */
-function PlacementMarkers({
+export function PlacementMarkers({
   dx,
   H,
   placements,
   entityById,
   onOpenEntity,
   visited,
+  openId,
   onPinPeek,
   onPinPeekLeave,
 }: {
@@ -1010,6 +1224,7 @@ function PlacementMarkers({
   entityById: Map<string, Entity>;
   onOpenEntity: (id: string, fly?: boolean) => void;
   visited: Set<string>;
+  openId: string | null;
   onPinPeek?: (id: string, ev: MouseEvent) => void;
   onPinPeekLeave?: () => void;
 }) {
@@ -1046,7 +1261,7 @@ function PlacementMarkers({
     if (style.labelMode === "never") mode = "none";
     else if (style.labelMode === "hover") mode = "hover";
     else if (style.labelMode === "always") mode = "always";
-    else mode = shouldShowLabel(zoom, style.priority) ? "always" : "hover";
+    else mode = shouldShowLabel(zoom, style.priority, enriched.length) ? "always" : "hover";
     if (mode === "always") {
       const pt = map.latLngToContainerPoint([H - p.y, p.x + dx]);
       const collides = taken.some((t) => Math.hypot(t.x - pt.x, t.y - pt.y) < 70);
@@ -1062,14 +1277,25 @@ function PlacementMarkers({
         const dim = ent.visibility === "rumor";
         const labelMode = labelDecisions.get(`${p.id}-${dx}`) ?? "none";
         const labelText = p.label ?? ent.title;
+        const typeLabel = playerTypeLabel(ent.type);
+        const a11yLabel = typeLabel ? `${ent.title}, ${typeLabel}` : ent.title;
         return (
           <Marker
             key={`${p.id}-${dx}`}
             position={[H - p.y, p.x + dx]}
             icon={pinIconForStyle(style, {
               dim,
-              extraClass: pinDiscoveryClass(p.entityId, visited),
+              extraClass: [
+                pinDiscoveryClass(p.entityId, visited),
+                p.entityId === openId ? "atlas-viewer-pin--active" : null,
+              ]
+                .filter(Boolean)
+                .join(" "),
+              ariaLabel: a11yLabel,
             })}
+            riseOnHover
+            riseOffset={250}
+            title={a11yLabel}
             eventHandlers={{
               click: () => onOpenEntity(p.entityId, false),
               mouseover: (e) => onPinPeek?.(p.entityId, e.originalEvent as MouseEvent),

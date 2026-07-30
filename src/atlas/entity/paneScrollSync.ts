@@ -28,6 +28,26 @@ export function buildAnchors(text: string): Anchor[] {
   return out;
 }
 
+export interface TocItem {
+  id: string;
+  text: string;
+}
+
+/** Ordered heading entries for "On this page" navigation. Pairs each anchor id with its display text. */
+export function buildToc(text: string): TocItem[] {
+  const anchors = buildAnchors(text);
+  const lines = (text ?? "").split("\n");
+  let anchorIdx = 0;
+  const out: TocItem[] = [];
+  lines.forEach((ln) => {
+    const m = /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(ln);
+    if (!m) return;
+    const a = anchors[anchorIdx++];
+    if (a) out.push({ id: a.id, text: m[1].trim() });
+  });
+  return out;
+}
+
 /**
  * Given the anchor at the top of `from`, find which anchor `to` should align
  * to: same id if shared; else the nearest preceding shared anchor (park);

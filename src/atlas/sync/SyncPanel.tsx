@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,9 +9,11 @@ import { loadSettings, saveSettings, type SyncSettings } from "./useSyncSettings
 
 export interface SyncPanelProps {
   onSync: (vaultRoot: string, ignoreGlobs: string[]) => void | Promise<void>;
+  /** False when no DM build/entities are loaded — Sync merges against the full DM atlas. */
+  hasDmBuild?: boolean;
 }
 
-export function SyncPanel({ onSync }: SyncPanelProps) {
+export function SyncPanel({ onSync, hasDmBuild = true }: SyncPanelProps) {
   const [settings, setSettings] = useState<SyncSettings>({});
   const [vaultPath, setVaultPath] = useState("");
   const [globsText, setGlobsText] = useState("");
@@ -39,6 +42,9 @@ export function SyncPanel({ onSync }: SyncPanelProps) {
       };
       await saveSettings(next);
       setSettings(next);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Couldn't save sync settings: ${msg}`);
     } finally {
       setIsSaving(false);
     }
@@ -105,13 +111,19 @@ export function SyncPanel({ onSync }: SyncPanelProps) {
           size="sm"
           variant="default"
           className="flex-1 gap-1.5"
-          disabled={!vaultPath.trim() || isSyncing}
+          disabled={!vaultPath.trim() || isSyncing || !hasDmBuild}
           onClick={() => void handleSync()}
         >
           <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`} />
           {isSyncing ? "Scanning…" : "Sync now"}
         </Button>
       </div>
+
+      {!hasDmBuild && (
+        <p className="text-[10px] text-amber-500">
+          Rebuild in DM mode first — Sync merges against the full DM atlas.
+        </p>
+      )}
 
       {lastSync && <p className="text-[10px] text-muted-foreground">Last synced: {lastSync}</p>}
     </div>

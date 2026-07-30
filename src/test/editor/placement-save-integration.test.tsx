@@ -31,6 +31,7 @@ import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
 import { useEditorSession, SESSION_IDB_KEY } from "@/atlas/session/useEditorSession";
 import { idbDelete } from "@/atlas/session/idbStore";
 import { buildSavePlan } from "@/atlas/editor/saveGate";
+import { foreignMapDraftPlacements } from "@/atlas/editor/foreignMapDrafts";
 import type { FileChange } from "@/atlas/save/localFsSave";
 
 // The harness drives toast.info for the "No changes to save" gate.
@@ -65,25 +66,43 @@ type Draft = { entityId: string; mapId: string; x: number; y: number };
  */
 function SaveHarness({
   mapId = "m1",
+  otherMapIds = [],
   initialOverrides = {},
   draftPlacements = [],
+  entities = [],
 }: {
   mapId?: string;
-  initialOverrides?: Record<string, { x: number; y: number }>;
+  /** N100: other maps in the world — lets a cross-map duplicate's foreign
+   *  override key be recognized instead of only the active map's own keys. */
+  otherMapIds?: string[];
+  initialOverrides?: Record<string, { x: number; y: number; label?: string }>;
   draftPlacements?: Draft[];
+  entities?: { id: string; title: string }[];
 }) {
   const [overrides, setOverrides] =
-    useState<Record<string, { x: number; y: number }>>(initialOverrides);
+    useState<Record<string, { x: number; y: number; label?: string } | null>>(initialOverrides);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<FileChange[]>([]);
+
+  // N100: mirrors AtlasPlacementEditor's foreignMapDrafts memo — overrides
+  // keyed to a map OTHER than the active one (written by duplicateToMap)
+  // that the active-map-only dirty gate below can't see on its own.
+  const foreignDrafts = foreignMapDraftPlacements(
+    overrides,
+    mapId,
+    [mapId, ...otherMapIds],
+    entities,
+  );
 
   // perMapDirtyCount closes over the current overrides state (recomputed when it
   // changes), mirroring how the page derives its honest dirty count. No refs —
   // useEditorSession reads holders/count from the latest render, exactly like
   // useEditorSession.test.tsx's fake-holder harness.
   const perMapDirtyCount = useCallback(
-    () => Object.keys(overrides).filter((k) => k.startsWith(`${mapId}:`)).length,
-    [overrides, mapId],
+    () =>
+      Object.keys(overrides).filter((k) => k.startsWith(`${mapId}:`)).length +
+      foreignDrafts.length,
+    [overrides, mapId, foreignDrafts.length],
   );
 
   const session = useEditorSession({
@@ -119,12 +138,12 @@ function SaveHarness({
       projectEntities: [],
       worldYamlDirty: false,
     });
-    if (plan.isEmpty) {
+    if (plan.isEmpty && foreignDrafts.length === 0) {
       toast.info("No changes to save");
       return;
     }
     setPendingChanges(
-      plan.dirtyPlacements.map((d) => ({
+      [...plan.dirtyPlacements, ...foreignDrafts].map((d) => ({
         path: `content/${d.entityId}.md`,
         content: "stub",
         kind: "entity-md" as const,
@@ -162,6 +181,19 @@ function SaveHarness({
       >
         add override
       </button>
+
+      {/* N100: stand-in for "Duplicate to map" — writes an override keyed to
+          a DIFFERENT map while the DM stays on the active map. */}
+      {otherMapIds[0] && (
+        <button
+          data-testid="duplicate-to-other-map"
+          onClick={() =>
+            setOverrides((prev) => ({ ...prev, [`${otherMapIds[0]}:hero`]: { x: 9, y: 9 } }))
+          }
+        >
+          duplicate to other map
+        </button>
+      )}
 
       <DiffPreviewModal
         open={saveModalOpen}
@@ -266,6 +298,34 @@ describe("placement Save flow — render-level integration", () => {
 
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("unsaved"));
     expect(screen.getByTestId("toolbar-save")).toBeEnabled();
+  });
+
+  // N100: a "Duplicate to map" write targets a DIFFERENT map than the one
+  // active, so the active-map-only dirty gate must not miss it — the session
+  // has to flip to "unsaved" and a Save from the active map must actually
+  // queue that foreign placement instead of reporting nothing to save.
+  it("a cross-map duplicate marks the session unsaved and Save persists it", async () => {
+    render(
+      <SaveHarness
+        mapId="m1"
+        otherMapIds={["m2"]}
+        initialOverrides={{}}
+        draftPlacements={[]}
+        entities={[{ id: "hero", title: "Hero" }]}
+      />,
+    );
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("clean"));
+    expect(screen.getByTestId("toolbar-save")).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("duplicate-to-other-map"));
+
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("unsaved"));
+    expect(screen.getByTestId("toolbar-save")).toBeEnabled();
+
+    fireEvent.click(screen.getByTestId("toolbar-save"));
+
+    expect(toast.info).not.toHaveBeenCalledWith("No changes to save");
+    expect(screen.getByTestId("pending-count")).toHaveTextContent("1");
   });
 
   // B1: confirm then cancel must not strand the session on "saving".

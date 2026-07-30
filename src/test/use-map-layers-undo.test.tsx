@@ -1,8 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
+import { toast } from "sonner";
 import { useMapLayers } from "@/atlas/useMapLayers";
 import { useUndoStack } from "@/atlas/useUndoStack";
 import type { MapDocument } from "@/atlas/content/schema";
+
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
 const testMap: MapDocument = {
   id: "test-map",
@@ -342,5 +345,23 @@ describe("useMapLayers + undo", () => {
     });
     expect(result.current.mergedLayers.slice(0, 2).map((l) => l.id)).toEqual(["L1", "L2"]);
     expect(result.current.mergedLayers).toHaveLength(3);
+  });
+});
+
+describe("useMapLayers — persist failure (N105)", () => {
+  it("toasts instead of silently dropping the change when localStorage.setItem throws", () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("QuotaExceededError");
+    });
+    try {
+      const { result } = renderHook(() => useMapLayers(testMap));
+      act(() => result.current.editBuiltinLayer("builtin-1"));
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining("Couldn't save map layer changes"),
+        expect.objectContaining({ id: "map-layers-persist-failed" }),
+      );
+    } finally {
+      setItemSpy.mockRestore();
+    }
   });
 });

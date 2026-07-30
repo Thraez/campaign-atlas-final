@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { downloadText } from "@/atlas/tabs/download";
 import { toast } from "sonner";
+import { copyToClipboard } from "@/lib/clipboard";
 
 export type BuildReportSeverity = "error" | "warning" | "info";
 
@@ -245,10 +246,10 @@ function BuildReportPanelInner({
   );
 
   const onCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(md);
+    const ok = await copyToClipboard(md);
+    if (ok) {
       toast.success("Report copied as Markdown");
-    } catch {
+    } else {
       toast.error("Could not access clipboard");
     }
   };

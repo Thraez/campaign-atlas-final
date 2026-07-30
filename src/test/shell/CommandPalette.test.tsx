@@ -89,9 +89,84 @@ describe("CommandPalette", () => {
     const onChoose = vi.fn();
     render(<CommandPalette index={navIndex} onChoose={onChoose} />);
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-    const buttons = screen.getAllByRole("button");
-    fireEvent.click(buttons[0]);
+    const options = screen.getAllByRole("option");
+    fireEvent.click(options[0]);
     expect(onChoose).toHaveBeenCalledWith(expect.objectContaining({ id: "corven" }));
     expect(screen.queryByPlaceholderText(/search everything/i)).toBeNull();
+  });
+
+  it("shows a 'No matches' row echoing the query when a search finds nothing", () => {
+    render(<CommandPalette index={navIndex} onChoose={vi.fn()} />);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    const input = screen.getByPlaceholderText(/search everything/i);
+    fireEvent.change(input, { target: { value: "nonexistentxyz" } });
+    expect(screen.getByText(/no matches for "nonexistentxyz"/i)).toBeInTheDocument();
+  });
+
+  it("does not show the 'No matches' row when there are results", () => {
+    render(<CommandPalette index={navIndex} onChoose={vi.fn()} />);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    const input = screen.getByPlaceholderText(/search everything/i);
+    fireEvent.change(input, { target: { value: "corv" } });
+    expect(screen.queryByText(/no matches for/i)).toBeNull();
+  });
+});
+
+describe("dialog and listbox semantics (N130)", () => {
+  it("exposes dialog role, aria-modal, and an accessible name on the palette container", () => {
+    render(<CommandPalette index={navIndex} onChoose={vi.fn()} />);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveAttribute("aria-label", "Command palette");
+  });
+
+  it("exposes an accessible label on the search input", () => {
+    render(<CommandPalette index={navIndex} onChoose={vi.fn()} />);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    expect(screen.getByRole("textbox", { name: "Command palette search" })).toBeInTheDocument();
+  });
+
+  it("results container has role='listbox' with an accessible label the input references", () => {
+    render(<CommandPalette index={navIndex} onChoose={vi.fn()} />);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    const listbox = screen.getByRole("listbox");
+    expect(listbox).toHaveAttribute("aria-label", "Command palette results");
+    expect(listbox.id).toBe("cp-results-listbox");
+    expect(screen.getByRole("textbox", { name: "Command palette search" })).toHaveAttribute(
+      "aria-controls",
+      "cp-results-listbox",
+    );
+  });
+
+  it("each result row has role='option' and a stable kind+id-based id", () => {
+    render(<CommandPalette index={navIndex} onChoose={vi.fn()} />);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    const options = screen.getAllByRole("option");
+    expect(options[0]).toHaveAttribute("id", "cp-result-entity-corven");
+    expect(options[1]).toHaveAttribute("id", "cp-result-entity-thornhold");
+  });
+
+  it("the default selection (first result) is marked selected and referenced by aria-activedescendant", () => {
+    render(<CommandPalette index={navIndex} onChoose={vi.fn()} />);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    const options = screen.getAllByRole("option");
+    expect(options[0]).toHaveAttribute("aria-selected", "true");
+    expect(options[1]).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("textbox", { name: "Command palette search" })).toHaveAttribute(
+      "aria-activedescendant",
+      "cp-result-entity-corven",
+    );
+  });
+
+  it("ArrowDown moves aria-selected and aria-activedescendant to the next option", () => {
+    render(<CommandPalette index={navIndex} onChoose={vi.fn()} />);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    const input = screen.getByRole("textbox", { name: "Command palette search" });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(input).toHaveAttribute("aria-activedescendant", "cp-result-entity-thornhold");
+    const options = screen.getAllByRole("option");
+    expect(options[0]).toHaveAttribute("aria-selected", "false");
+    expect(options[1]).toHaveAttribute("aria-selected", "true");
   });
 });

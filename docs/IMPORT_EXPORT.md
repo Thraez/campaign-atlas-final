@@ -177,4 +177,4 @@ Reports:
 - Unreferenced assets in `public/atlas/assets/` (potential orphans).
 - Per-map asset size totals.
 
-Not chained into `atlas:publish` by default — it's advisory. Run it monthly or before a major release.
+Chained into `atlas:publish` via `atlas:scan` (`publish-orchestrator.ts` runs it as its `audit-assets` step), so every publish reports these numbers. Run `npm run atlas:audit-assets` directly for a quick standalone check between publishes.

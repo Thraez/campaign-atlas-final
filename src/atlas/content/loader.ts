@@ -24,8 +24,8 @@ export interface SearchIndexEntry {
   tags: string[];
   summary?: string;
   excerpt?: string;
-  body?: string;        // lowercased plain-text body for full-text search
-  bodyText?: string;   // original-case plain-text body for display (snippets)
+  body?: string;        // lowercased plain-text body for full-text search (derived from bodyText on load, not shipped)
+  bodyText?: string;   // original-case plain-text body for display (snippets) — the shipped field
   dateRaw?: string;
   dateValue?: number;
   dateYear?: number;
@@ -34,5 +34,8 @@ export interface SearchIndexEntry {
 export async function loadSearchIndex(): Promise<SearchIndexEntry[]> {
   const res = await fetch(url("search-index.json"), { cache: "no-cache" });
   if (!res.ok) throw new Error(`Failed to load search-index.json: ${res.status}`);
-  return parseSearchIndex(await res.json(), "search-index.json");
+  const entries = parseSearchIndex(await res.json(), "search-index.json");
+  // body (lowercased, for matching) is derived here rather than shipped — the
+  // artifact only carries bodyText (original case, for snippets).
+  return entries.map((e) => (e.bodyText ? { ...e, body: e.bodyText.toLowerCase() } : e));
 }

@@ -17,11 +17,15 @@ async function getJson<T>(url: string): Promise<T | null> {
 }
 
 async function postJson(url: string, body: unknown): Promise<void> {
-  await fetch(url, {
+  const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => "");
+    throw new Error(`POST ${url} failed (${resp.status})${detail ? `: ${detail}` : ""}`);
+  }
 }
 
 export async function loadSettings(): Promise<SyncSettings> {

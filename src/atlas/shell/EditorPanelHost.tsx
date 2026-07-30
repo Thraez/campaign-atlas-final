@@ -30,6 +30,8 @@ export function EditorPanelHost({
     );
   });
   const dragging = useRef(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!activeId) return;
@@ -39,6 +41,22 @@ export function EditorPanelHost({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [activeId, onDismiss]);
+
+  // On open (or switching to a different panel), remember whatever had focus
+  // (the rail button that triggered it) and move focus into the panel's first
+  // control. On close, restore focus to that trigger.
+  useEffect(() => {
+    if (!activeId) {
+      triggerRef.current?.focus();
+      triggerRef.current = null;
+      return;
+    }
+    triggerRef.current = document.activeElement as HTMLElement | null;
+    const focusable = bodyRef.current?.querySelector<HTMLElement>(
+      'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])',
+    );
+    focusable?.focus();
+  }, [activeId]);
 
   useEffect(() => {
     const move = (e: MouseEvent) => {
@@ -91,7 +109,9 @@ export function EditorPanelHost({
             <X className="h-4 w-4" />
           </button>
         </header>
-        <div className="flex-1 min-h-0 overflow-auto">{children}</div>
+        <div ref={bodyRef} className="flex-1 min-h-0 overflow-auto">
+          {children}
+        </div>
         <div
           role="separator"
           aria-orientation="vertical"

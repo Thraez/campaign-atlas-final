@@ -2,9 +2,13 @@
  * Tests for the handout HTML builder used by single-entity printing
  * (player viewer) and the multi-entity bundle (DM editor).
  */
-import { describe, it, expect } from "vitest";
-import { buildHandoutHtml } from "../atlas/printHandout";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { toast } from "sonner";
+import { buildHandoutHtml, printEntityHandout, printEntityBundle } from "../atlas/printHandout";
 import type { Entity } from "../atlas/content/schema";
+import type { EntityRelationship } from "../atlas/profiles/profileTypes";
+
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
 function entity(over: Partial<Entity> & { id: string; title: string }): Entity {
   return {
@@ -22,6 +26,18 @@ function entity(over: Partial<Entity> & { id: string; title: string }): Entity {
     links: over.links ?? [],
     backlinks: over.backlinks ?? [],
     summary: over.summary,
+    relationships: over.relationships,
+    credit: over.credit,
+  };
+}
+
+function rel(over: Partial<EntityRelationship> & { entity: string; type: string }): EntityRelationship {
+  return {
+    entity: over.entity,
+    type: over.type,
+    label: over.label,
+    description: over.description,
+    visibility: over.visibility ?? "player",
   };
 }
 
@@ -103,5 +119,240 @@ describe("buildHandoutHtml", () => {
     ]);
     expect(html).toContain('class="hero"');
     expect(html).toMatch(/src="[^"]*atlas\/assets\/img\.jpg"/);
+  });
+
+  it("omits Connections block when entity has no relationships", () => {
+    const html = buildHandoutHtml([entity({ id: "a", title: "Alice" })]);
+    expect(html).not.toContain("Connections");
+    expect(html).not.toContain('class="connections"');
+  });
+
+  it("renders Connections block with resolved target title", () => {
+    const bob = entity({ id: "bob", title: "Bob the Merchant" });
+    const entitiesById = new Map([["bob", bob]]);
+    const html = buildHandoutHtml(
+      [entity({ id: "alice", title: "Alice", relationships: [rel({ entity: "bob", type: "ally" })] })],
+      entitiesById,
+    );
+    expect(html).toContain("Connections");
+    expect(html).toContain("Bob the Merchant");
+    expect(html).toContain("ally");
+  });
+
+  it("uses r.label over r.type in Connections when label is present", () => {
+    const entitiesById = new Map([["bob", entity({ id: "bob", title: "Bob" })]]);
+    const html = buildHandoutHtml(
+      [
+        entity({
+          id: "alice",
+          title: "Alice",
+          relationships: [rel({ entity: "bob", type: "ally", label: "Trade partner" })],
+        }),
+      ],
+      entitiesById,
+    );
+    expect(html).toContain("Trade partner");
+    expect(html).not.toContain(">ally<");
+  });
+
+  it("falls back to raw entity id when target is not in entitiesById", () => {
+    const html = buildHandoutHtml(
+      [
+        entity({
+          id: "alice",
+          title: "Alice",
+          relationships: [rel({ entity: "unknown-id", type: "rival" })],
+        }),
+      ],
+      new Map(),
+    );
+    expect(html).toContain("unknown-id");
+    expect(html).toContain("rival");
+  });
+
+  it("escapes HTML in relationship label and target title", () => {
+    const evil = entity({ id: "evil", title: "<script>evil()</script>" });
+    const entitiesById = new Map([["evil", evil]]);
+    const html = buildHandoutHtml(
+      [
+        entity({
+          id: "alice",
+          title: "Alice",
+          relationships: [rel({ entity: "evil", type: "rival", label: "<b>enemy</b>" })],
+        }),
+      ],
+      entitiesById,
+    );
+    expect(html).not.toContain("<script>evil()</script>");
+    expect(html).not.toContain("<b>enemy</b>");
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).toContain("&lt;b&gt;");
+  });
+});
+
+describe("N127: image credit/attribution in the printed handout", () => {
+  it("shows the entity's coarse credit under the hero image", () => {
+    const html = buildHandoutHtml([
+      entity({ id: "a", title: "A", images: ["atlas/assets/img.jpg"], credit: "Art by Jane Doe" }),
+    ]);
+    expect(html).toContain('class="hero-credit"');
+    expect(html).toContain("Art by Jane Doe");
+  });
+
+  it("omits the credit line when the entity has no credit", () => {
+    const html = buildHandoutHtml([entity({ id: "a", title: "A", images: ["atlas/assets/img.jpg"] })]);
+    expect(html).not.toContain('class="hero-credit"');
+  });
+
+  it("prefers a registry entry over the entity's coarse credit", () => {
+    const html = buildHandoutHtml(
+      [entity({ id: "a", title: "A", images: ["atlas/assets/img.jpg"], credit: "Fallback credit" })],
+      new Map(),
+      { "atlas/assets/img.jpg": { credit: "Registry credit", enabled: true } },
+    );
+    expect(html).toContain("Registry credit");
+    expect(html).not.toContain("Fallback credit");
+  });
+
+  it("suppresses a disabled registry entry entirely (no fallback to entity.credit)", () => {
+    const html = buildHandoutHtml(
+      [entity({ id: "a", title: "A", images: ["atlas/assets/img.jpg"], credit: "Fallback credit" })],
+      new Map(),
+      { "atlas/assets/img.jpg": { credit: "Registry credit", enabled: false } },
+    );
+    expect(html).not.toContain('class="hero-credit"');
+    expect(html).not.toContain("Registry credit");
+    expect(html).not.toContain("Fallback credit");
+  });
+
+  it("shows a per-image figcaption credit in the gallery grid", () => {
+    const html = buildHandoutHtml([
+      entity({
+        id: "a",
+        title: "A",
+        images: ["atlas/assets/hero.jpg", "atlas/assets/gallery1.jpg"],
+      }),
+    ]);
+    expect(html).toContain("<figure>");
+  });
+
+  it("hides all image credits when world.credits.badges is false", () => {
+    const html = buildHandoutHtml(
+      [entity({ id: "a", title: "A", images: ["atlas/assets/img.jpg"], credit: "Art by Jane Doe" })],
+      new Map(),
+      undefined,
+      { badges: false },
+    );
+    expect(html).not.toContain('class="hero-credit"');
+    expect(html).not.toContain("Art by Jane Doe");
+  });
+
+  it("escapes HTML in the credit text", () => {
+    const html = buildHandoutHtml([
+      entity({
+        id: "a",
+        title: "A",
+        images: ["atlas/assets/img.jpg"],
+        credit: '<script>alert(1)</script>',
+      }),
+    ]);
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+});
+
+describe("N111: footnote id scoping and styling", () => {
+  function footnoteBodyHtml(): string {
+    return (
+      '<p>See it here.<sup><a id="fnref-1" href="#fn-1" class="footnote-ref">[1]</a></sup></p>' +
+      '<section class="footnotes"><ol>\n' +
+      '<li id="fn-1"><p>A note. <a href="#fnref-1" class="footnote-backref">↩</a></p></li>\n' +
+      "</ol></section>\n"
+    );
+  }
+
+  it("keeps a single entity's footnote ref/def ids self-referential", () => {
+    const html = buildHandoutHtml([
+      entity({ id: "a", title: "Alpha", bodyHtml: footnoteBodyHtml() }),
+    ]);
+    expect(html).toContain('id="fnref-0-1"');
+    expect(html).toContain('href="#fn-0-1"');
+    expect(html).toContain('id="fn-0-1"');
+    expect(html).toContain('href="#fnref-0-1"');
+  });
+
+  it("scopes colliding footnote labels apart across entities in a bundle", () => {
+    const html = buildHandoutHtml([
+      entity({ id: "a", title: "Alpha", bodyHtml: footnoteBodyHtml() }),
+      entity({ id: "b", title: "Beta", bodyHtml: footnoteBodyHtml() }),
+    ]);
+    // Two distinct ref ids and two distinct def ids — not both "fnref-1"/"fn-1".
+    expect(html).toContain('id="fnref-0-1"');
+    expect(html).toContain('id="fnref-1-1"');
+    expect(html).toContain('id="fn-0-1"');
+    expect(html).toContain('id="fn-1-1"');
+    // Each ref points to its own entity's def, not the other entity's.
+    expect(html).toContain('href="#fn-0-1"');
+    expect(html).toContain('href="#fn-1-1"');
+    expect(html).not.toContain('id="fnref-1"');
+    expect(html).not.toContain('id="fn-1"');
+  });
+
+  it("embeds visible CSS styling for the footnotes section", () => {
+    const html = buildHandoutHtml([
+      entity({ id: "a", title: "Alpha", bodyHtml: footnoteBodyHtml() }),
+    ]);
+    expect(html).toMatch(/\.body \.footnotes\s*{/);
+    expect(html).toMatch(/\.body a\.footnote-ref\s*{/);
+  });
+});
+
+describe("Q16: pop-up guard — toast instead of alert", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  function mockPopupBlocked() {
+    vi.spyOn(window, "open").mockReturnValue(null);
+  }
+
+  function mockPopupAllowed() {
+    const fakeDoc = { open: vi.fn(), write: vi.fn(), close: vi.fn() };
+    const fakeWin = { document: fakeDoc } as unknown as Window;
+    vi.spyOn(window, "open").mockReturnValue(fakeWin);
+    return fakeDoc;
+  }
+
+  it("calls toast.error and returns false when the pop-up is blocked", () => {
+    mockPopupBlocked();
+    const e = entity({ id: "a", title: "Alpha" });
+    const result = printEntityHandout(e);
+    expect(result).toBe(false);
+    expect(vi.mocked(toast.error)).toHaveBeenCalledOnce();
+    expect(vi.mocked(toast.error).mock.calls[0][0]).toMatch(/pop-up/i);
+  });
+
+  it("does not call toast.error and returns true when the pop-up opens", () => {
+    const fakeDoc = mockPopupAllowed();
+    const e = entity({ id: "a", title: "Alpha" });
+    const result = printEntityHandout(e);
+    expect(result).toBe(true);
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
+    expect(fakeDoc.write).toHaveBeenCalledOnce();
+  });
+
+  it("printEntityBundle returns false and toasts when blocked", () => {
+    mockPopupBlocked();
+    const result = printEntityBundle([entity({ id: "a", title: "Alpha" })]);
+    expect(result).toBe(false);
+    expect(vi.mocked(toast.error)).toHaveBeenCalledOnce();
+  });
+
+  it("printEntityBundle returns true and writes HTML when allowed", () => {
+    const fakeDoc = mockPopupAllowed();
+    const result = printEntityBundle([entity({ id: "a", title: "Alpha" })]);
+    expect(result).toBe(true);
+    expect(fakeDoc.write).toHaveBeenCalledOnce();
   });
 });

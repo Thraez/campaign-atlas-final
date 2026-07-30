@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import { fileToDataUrl, readImageSize } from "@/atlas/content/browserFile";
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
 import { logger } from "@/lib/logger";
@@ -101,25 +103,6 @@ function safeFilename(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-function readImageSize(src: string): Promise<{ w: number; h: number }> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-    img.onerror = () => reject(new Error("image load failed"));
-    img.src = src;
-  });
-}
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
-    r.onerror = () => reject(r.error ?? new Error("read failed"));
-    r.readAsDataURL(file);
-  });
-}
-
 /**
  * Manages per-map local layer overrides (uploads, URL adds, edits of built-in
  * layers). When an `undoStack` is supplied, every mutation pushes a
@@ -185,8 +168,11 @@ export function useMapLayers(map: MapDocument | undefined, undoStack?: UndoStack
     }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
-    } catch {
-      /* quota — skip */
+    } catch (e) {
+      logger.error("Failed to persist local map layers to localStorage", e);
+      toast.error("Couldn't save map layer changes locally — your browser storage may be full or blocked.", {
+        id: "map-layers-persist-failed",
+      });
     }
   }, [byMap]);
 

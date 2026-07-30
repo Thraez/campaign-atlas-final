@@ -38,14 +38,15 @@ export function parseSearchQuery(raw: string): ParsedQuery {
 
 /**
  * Returns true when every phrase appears as an exact contiguous case-insensitive
- * substring somewhere in the entry's title, aliases, summary, or body.
+ * substring somewhere in the entry's title, aliases, summary, tags, or body.
  */
 export function matchesPhrases(e: SearchIndexEntry, phrases: string[]): boolean {
   const haystack = [
     e.title.toLowerCase(),
     ...e.aliases.map((a) => a.toLowerCase()),
     (e.summary ?? "").toLowerCase(),
-    e.body ?? "", // already lowercased in the index
+    ...e.tags.map((t) => t.toLowerCase()),
+    e.body ?? "", // lowercased on load (loader.ts), from bodyText
   ].join(" ");
   return phrases.every((p) => haystack.includes(p));
 }

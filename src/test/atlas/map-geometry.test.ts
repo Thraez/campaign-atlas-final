@@ -88,6 +88,23 @@ describe("gridLines", () => {
     ]);
   });
 
+  it("N117 — square grid horizontals flip lat (height - y) like every other conversion, even on non-multiple heights", () => {
+    const grid: GridOverlay = { kind: "square", size: 30, enabled: true };
+    const lines = gridLines(makeMap(100, 100), grid);
+    // x = 0,30,60,90 (4 verticals) then y = 0,30,60,90 (4 horizontals) = 8.
+    expect(lines).toHaveLength(8);
+    // Horizontal at raw y=0 must sit at lat=height (100), not lat=0 (the pre-fix bug).
+    expect(lines[4]).toEqual([
+      [100, 0],
+      [100, 100],
+    ]);
+    // Horizontal at raw y=90 (the partial step, doesn't reach height=100) must sit at lat=10.
+    expect(lines[7]).toEqual([
+      [10, 0],
+      [10, 100],
+    ]);
+  });
+
   it("hex grid emits closed 7-vertex polylines (first === last)", () => {
     const grid: GridOverlay = { kind: "hex", size: 20, enabled: true };
     const lines = gridLines(makeMap(100, 100), grid);

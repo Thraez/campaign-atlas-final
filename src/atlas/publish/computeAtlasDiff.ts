@@ -76,6 +76,8 @@ export interface OverlayChange {
 export interface AtlasDiff {
   /** Whether there are any changes at all. */
   hasChanges: boolean;
+  /** False when there was no baseline snapshot to diff against (e.g. a first-ever publish). */
+  hadBaseline: boolean;
   /** Total counts for quick rendering. */
   counts: {
     entities: number;
@@ -98,6 +100,7 @@ export interface AtlasDiff {
 
 const EMPTY_DIFF: AtlasDiff = {
   hasChanges: false,
+  hadBaseline: true,
   counts: { entities: 0, placements: 0, maps: 0, overlays: 0 },
   entities: [],
   placements: [],
@@ -130,6 +133,7 @@ export function computeAtlasDiff(
   if (!baseline || !current) {
     return {
       ...EMPTY_DIFF,
+      hadBaseline: baseline != null,
       meta: {
         baselineVersion: baseline?.version,
         currentVersion: current?.version,
@@ -272,6 +276,7 @@ export function computeAtlasDiff(
 
   return {
     hasChanges: entities.length + placements.length + maps.length + overlays.length > 0,
+    hadBaseline: true,
     counts: {
       entities: new Set(entities.map((e) => e.id)).size,
       placements: new Set(placements.map((p) => `${p.entityId}@${p.mapId}`)).size,

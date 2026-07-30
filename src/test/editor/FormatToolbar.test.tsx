@@ -68,6 +68,25 @@ describe("FormatToolbar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Table" }));
     expect(screen.queryByRole("button", { name: "Footnote" })).not.toBeInTheDocument();
   });
+
+  it("shows the keyboard-shortcut hint in the tooltip for Bold, Italic, and Wikilink", () => {
+    render(<FormatToolbar onAction={() => {}} />);
+    expect(screen.getByRole("button", { name: "Bold" })).toHaveAttribute("title", "Bold (Ctrl+B)");
+    expect(screen.getByRole("button", { name: "Italic" })).toHaveAttribute(
+      "title",
+      "Italic (Ctrl+I)",
+    );
+    expect(screen.getByRole("button", { name: "Wikilink" })).toHaveAttribute(
+      "title",
+      "Wikilink (Ctrl+K)",
+    );
+  });
+
+  it("does not add a tooltip to buttons without a defined shortcut", () => {
+    render(<FormatToolbar onAction={() => {}} />);
+    expect(screen.getByRole("button", { name: "Highlight" })).not.toHaveAttribute("title");
+    expect(screen.getByRole("button", { name: "Callout" })).not.toHaveAttribute("title");
+  });
 });
 
 describe("entry template inserts", () => {

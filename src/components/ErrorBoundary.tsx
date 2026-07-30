@@ -3,10 +3,19 @@ import { logger } from "@/lib/logger";
 
 interface Props {
   children: ReactNode;
+  /** When any value in this array changes after a caught error, the boundary resets. */
+  resetKeys?: unknown[];
+  onReset?: () => void;
 }
 
 interface State {
   hasError: boolean;
+}
+
+function keysChanged(a?: unknown[], b?: unknown[]): boolean {
+  if (a === b) return false;
+  if (!a || !b || a.length !== b.length) return true;
+  return a.some((value, i) => value !== b[i]);
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -19,6 +28,13 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: ErrorInfo) {
     // Single seam: attach an error reporter here to capture every caught crash.
     logger.error("[ErrorBoundary] caught:", error, info.componentStack);
+  }
+
+  componentDidUpdate(prevProps: Props) {
+    if (this.state.hasError && keysChanged(prevProps.resetKeys, this.props.resetKeys)) {
+      this.setState({ hasError: false });
+      this.props.onReset?.();
+    }
   }
 
   render() {

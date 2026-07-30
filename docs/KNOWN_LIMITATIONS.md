@@ -27,8 +27,8 @@ The atlas reads Obsidian-flavored markdown. Most Obsidian features work; a few d
 
 | Feature | Status | Notes |
 |---|---|---|
-| Image embeds `![[image.png]]` | ✗ (unsupported) | Use explicit `atlas.images:` in frontmatter, or standard markdown `![alt](path)`. The build does not resolve `![[]]` image embeds. |
-| Callouts `> [!note]` | ✗ (rendered as blockquote) | Obsidian's `> [!note] Title` syntax is parsed as a plain blockquote. The title chip and color don't render. Use the project's own `:::dm` callout (which **is** parsed; see [VISIBILITY_AND_PLAYER_SAFETY.md](VISIBILITY_AND_PLAYER_SAFETY.md)). |
+| Image embeds `![[image.png]]` | ✓ (image embeds only) | Resolved and rendered at parity, per [MARKDOWN_PARITY.md](MARKDOWN_PARITY.md). Note/section embeds (`![[Note]]`, `![[Note#Heading]]`) are not — embeds are for images only; link to the note instead. |
+| Callouts `> [!type]` | ✓ (foldable) | Obsidian's `> [!type] Title` syntax renders as a foldable callout with the core type set and its aliases, at parity — see [MARKDOWN_PARITY.md](MARKDOWN_PARITY.md). The project's own `:::dm` callout remains the visibility-aware variant (see [VISIBILITY_AND_PLAYER_SAFETY.md](VISIBILITY_AND_PLAYER_SAFETY.md)). |
 | Block references `^block-id` | ✗ (preserved as text) | Block-reference anchors appear as plain text in the rendered output. The build does not resolve `[[Note#^id]]` block links. |
 | Math `$x^2$` | ✗ (rendered as text) | No KaTeX/MathJax. If you need math, render to an image and embed. |
 | Mermaid diagrams | ✗ | Not rendered. Same workaround. |
@@ -38,8 +38,7 @@ The atlas reads Obsidian-flavored markdown. Most Obsidian features work; a few d
 
 ### Reasoning for unsupported
 
-- **Image embeds (`![[]]`)** — Obsidian's image-embed syntax mixes wiki-resolution with image rendering; explicit `atlas.images:` makes player-vs-DM image filtering possible without parsing every embed.
-- **Callouts (`> [!note]`)** — would require a non-standard markdown extension; we use `:::dm` which is parser-controlled and visibility-aware.
+- **Note / section embeds (`![[Note]]`, `![[Note#Heading]]`)** — embeds are scoped to images only; transcluding another note's content raises the same player-vs-DM filtering question as a wikilink, without the benefit of a visible link. Link to the note instead.
 - **Block references** — they're heavyweight (every paragraph needs an id) and rare in the kind of prose-canon this tool serves.
 
 ## Map limitations
@@ -59,7 +58,7 @@ Ambient audio is authored in the editor's **Sound** tab and plays in the player 
 | Limitation | Status | Notes |
 |---|---|---|
 | Audio needs a user gesture before it can start | by design (browser policy) | Browsers block autoplay until the visitor interacts with the page. The viewer surfaces an "enable sound" control; ambience begins on that first gesture, not on page load (`AudioEngine.unlock()` must run from a user-gesture handler). |
-| Starter loops ship uncompressed | not yet — planned | The three seed loops (`wind-hollow`, `water-trickle`, `cavern-drone`) ship as uncompressed WAV, which makes the audio payload large. Compressing to Ogg/Opus with an AAC/M4A fallback twin is planned. |
+| Starter loops ship compressed | shipped | The three seed loops (`wind-hollow`, `water-trickle`, `cavern-drone`) ship as Ogg (`src`) with an M4A/AAC fallback twin (`srcFallback`) for browsers that can't decode Ogg/Vorbis (notably Safari). |
 | Codec support varies by browser | partial | The schema supports a primary bed (`src`) plus a `srcFallback` twin so a browser that can't decode one codec uses the other. Safari, in particular, does not decode Ogg/Vorbis — beds that use Ogg need an AAC/M4A fallback authored. |
 
 ## Editor limitations
@@ -80,7 +79,7 @@ Ambient audio is authored in the editor's **Sound** tab and plays in the player 
 | Substring matching only | by design | A typo (`Thornhld`) returns zero results. Fuzzy search is on the [non-goals list](NON_GOALS.md) until scale proves the current UX insufficient. |
 | Body indexed in full (capped at 4KB per entry) | by design | Long lore entries are truncated for the index. The side panel always shows the full body. |
 | Max 40 results | by design | Refine with the type/tag filter or be more specific. |
-| No phrase search ("...") | not yet | Possible enhancement. |
+| Phrase search (`"..."`) | shipped | Quoted spans (`"exact phrase"`) match only as an exact, case-insensitive contiguous substring; unquoted terms outside the quotes still match individually. |
 
 ## Theming
 
@@ -127,7 +126,7 @@ WCAG 1.4.1 says color must not be the *only* way to convey information. The map 
 | Limitation | Status |
 |---|---|
 | Service-worker cache invalidation requires a new build | by design — Vite content hashes handle JS/CSS; `atlas.json` is fetched at runtime. See [WORKFLOWS.md](WORKFLOWS.md#cache-invalidation). |
-| Asset license tracking | not yet — planned. A `licenses:` field on assets + a generated credits page is the design. |
+| Asset license tracking | shipped — the `assetCredits` registry in `world.yaml` (loaded by `scripts/atlas/loadWorldConfig.ts`) records per-asset source/license/author, surfaced on the published [Credits page](../src/pages/AtlasCredits.tsx). |
 | External URL assets are not scanned | by design — the safety scanners look at local files. Don't link DM-only images from external CDNs. |
 
 ## Things that have been considered and rejected

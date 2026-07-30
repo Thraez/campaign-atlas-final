@@ -12,6 +12,7 @@
  * observability; the expected private-browsing capability probe stays quiet.
  */
 import { logger } from "@/lib/logger";
+import { getStorage } from "@/lib/safeStorage";
 
 const STORAGE_KEY = "atlas-player-notes-v1";
 
@@ -23,21 +24,6 @@ export interface PlayerNote {
 }
 
 export type NoteMap = Record<string, PlayerNote>;
-
-function getStorage(): Storage | null {
-  try {
-    if (typeof window === "undefined") return null;
-    const s = window.localStorage;
-    // Touch the storage to confirm it's actually writable (private browsing
-    // sometimes exposes the API but throws on the first setItem).
-    const probe = "__atlas_probe__";
-    s.setItem(probe, "1");
-    s.removeItem(probe);
-    return s;
-  } catch {
-    return null;
-  }
-}
 
 export function loadAllNotes(): NoteMap {
   const s = getStorage();

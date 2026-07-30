@@ -60,6 +60,75 @@ describe("inferTypeFromPath", () => {
     // "extras" is unknown; "factions" is further up → wins
     expect(inferTypeFromPath("factions/extras/the-merchants-guild.md")).toBe("faction");
   });
+
+  it("infers 'city' from plural and singular folders", () => {
+    expect(inferTypeFromPath("cities/waterdeep.md")).toBe("city");
+    expect(inferTypeFromPath("city/waterdeep.md")).toBe("city");
+  });
+
+  it("infers 'town' from plural and singular folders", () => {
+    expect(inferTypeFromPath("towns/greenrest.md")).toBe("town");
+    expect(inferTypeFromPath("town/greenrest.md")).toBe("town");
+  });
+
+  it("infers 'village' from plural and singular folders", () => {
+    expect(inferTypeFromPath("villages/oakhurst.md")).toBe("village");
+    expect(inferTypeFromPath("village/oakhurst.md")).toBe("village");
+  });
+
+  it("infers 'temple' from plural and singular folders", () => {
+    expect(inferTypeFromPath("temples/shrine-of-light.md")).toBe("temple");
+    expect(inferTypeFromPath("temple/shrine-of-light.md")).toBe("temple");
+  });
+
+  it("infers 'shop' from plural and singular folders", () => {
+    expect(inferTypeFromPath("shops/the-rusty-blade.md")).toBe("shop");
+    expect(inferTypeFromPath("shop/the-rusty-blade.md")).toBe("shop");
+  });
+
+  it("infers 'cave' from plural and singular folders", () => {
+    expect(inferTypeFromPath("caves/whispering-hollow.md")).toBe("cave");
+    expect(inferTypeFromPath("cave/whispering-hollow.md")).toBe("cave");
+  });
+
+  it("infers 'port' from plural and singular folders", () => {
+    expect(inferTypeFromPath("ports/saltmarsh.md")).toBe("port");
+    expect(inferTypeFromPath("port/saltmarsh.md")).toBe("port");
+  });
+
+  it("infers 'person' from 'people', 'persons', and singular folders", () => {
+    expect(inferTypeFromPath("people/thalindra.md")).toBe("person");
+    expect(inferTypeFromPath("persons/thalindra.md")).toBe("person");
+    expect(inferTypeFromPath("person/thalindra.md")).toBe("person");
+  });
+
+  it("infers 'location' from 'places'/'place' and 'landmarks'/'landmark' folders", () => {
+    expect(inferTypeFromPath("places/the-sunken-pier.md")).toBe("location");
+    expect(inferTypeFromPath("place/the-sunken-pier.md")).toBe("location");
+    expect(inferTypeFromPath("landmarks/the-sunken-pier.md")).toBe("location");
+    expect(inferTypeFromPath("landmark/the-sunken-pier.md")).toBe("location");
+  });
+
+  it("infers 'capital' from plural and singular folders", () => {
+    expect(inferTypeFromPath("capitals/ironhold.md")).toBe("capital");
+    expect(inferTypeFromPath("capital/ironhold.md")).toBe("capital");
+  });
+
+  it("infers 'faction' from 'guilds'/'organizations' (and British spelling) folders", () => {
+    expect(inferTypeFromPath("guilds/the-merchants-guild.md")).toBe("faction");
+    expect(inferTypeFromPath("guild/the-merchants-guild.md")).toBe("faction");
+    expect(inferTypeFromPath("organizations/the-merchants-guild.md")).toBe("faction");
+    expect(inferTypeFromPath("organization/the-merchants-guild.md")).toBe("faction");
+    expect(inferTypeFromPath("organisations/the-merchants-guild.md")).toBe("faction");
+    expect(inferTypeFromPath("organisation/the-merchants-guild.md")).toBe("faction");
+  });
+
+  it("infers 'deity' from 'deities'/'gods' and singular folders", () => {
+    expect(inferTypeFromPath("deities/the-allmother.md")).toBe("deity");
+    expect(inferTypeFromPath("deity/the-allmother.md")).toBe("deity");
+    expect(inferTypeFromPath("gods/the-allmother.md")).toBe("deity");
+    expect(inferTypeFromPath("god/the-allmother.md")).toBe("deity");
+  });
 });
 
 // ---------------------------------------------------------------------------

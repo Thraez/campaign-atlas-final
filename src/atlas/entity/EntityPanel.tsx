@@ -1,7 +1,15 @@
-import { useState, useCallback, useEffect, useMemo, useRef, forwardRef } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  forwardRef,
+  type ReactNode,
+} from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { MapPin, X, Link2, Check, Printer } from "lucide-react";
+import { MapPin, X, Link2, Check, Printer, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -15,13 +23,18 @@ import {
   importNotesJson,
 } from "@/atlas/notes/playerNotes";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
+import { downloadBlob } from "@/atlas/tabs/download";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { printEntityHandout } from "@/atlas/printHandout";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
-import { logger } from "@/lib/logger";
+import { copyToClipboard } from "@/lib/clipboard";
 import type { AssetCredit, CreditsConfig, Entity, MapPlacement } from "@/atlas/content/schema";
+import type { PlayerProfile } from "@/atlas/profiles/profileTypes";
 import { CreditBadge } from "./CreditBadge";
+import { resolveImageCredit } from "@/atlas/content/imageCredit";
 import { mountSecretBlock } from "@/atlas/secrets/secretBlockView";
+import { buildToc } from "@/atlas/entity/paneScrollSync";
+import { AtlasImage } from "@/atlas/content/AtlasImage";
 
 export interface EntityPanelProps {
   entity: Entity | null;
@@ -41,35 +54,23 @@ export interface EntityPanelProps {
   /** World-level per-asset credit registry, keyed by image src. Takes
    *  precedence over `entity.credit` for any src with a registry entry. */
   assetCredits?: Record<string, AssetCredit>;
-}
-
-/**
- * Resolve which credit text (if any) to show for one image src. A registry
- * entry (world.assetCredits[src]) takes precedence when present — shown only
- * when `enabled` and non-empty. With no registry entry, fall back to the
- * entity's coarse `credit` field. Returns null when nothing should show.
- */
-function resolveImageCredit(
-  src: string,
-  assetCredits: Record<string, AssetCredit> | undefined,
-  entityCredit: string | undefined,
-): string | null {
-  const entry = assetCredits?.[src];
-  if (entry) {
-    return entry.enabled && entry.credit ? entry.credit : null;
-  }
-  return entityCredit ? entityCredit : null;
+  /**
+   * What to render when nothing is open. This panel is a third of the player
+   * screen and used to greet a first-time reader with an instruction ("Select a
+   * pin…") — but it has no world data of its own, so the host supplies a real
+   * welcome. Falls back to the plain prompt when omitted.
+   */
+  emptyState?: ReactNode;
 }
 
 function CopyLinkButton() {
   const [copied, setCopied] = useState(false);
   const handle = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
+    const ok = await copyToClipboard(window.location.href);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch (e) {
-      logger.warn("Copy share link failed", e);
+    } else {
       toast.error("Could not copy link");
     }
   }, []);
@@ -133,14 +134,9 @@ function NotesPanel({ entityId, entityTitle }: { entityId: string; entityTitle: 
   const handleExport = useCallback(() => {
     const json = exportNotesJson();
     const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `atlas-player-notes-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    downloadBlob(`atlas-player-notes-${new Date().toISOString().slice(0, 10)}.json`, blob, {
+      toast: false,
+    });
   }, []);
 
   const handleImport = useCallback(
@@ -244,30 +240,56 @@ function NotesPanel({ entityId, entityTitle }: { entityId: string; entityTitle: 
  * image is referenced but missing" instead of "this entity has no images."
  */
 function ImageThumb({ src, alt, onClick }: { src: string; alt: string; onClick: () => void }) {
-  const [broken, setBroken] = useState(false);
-  if (broken) {
-    return (
-      <div
-        className="flex-shrink-0 rounded border border-dashed border-border bg-muted/30 h-24 w-24 flex items-center justify-center text-[10px] text-muted-foreground text-center px-1.5 leading-tight"
-        title={`Image failed to load: ${src}`}
-      >
-        Image missing
-      </div>
-    );
-  }
   return (
     <button
       onClick={onClick}
-      className="rounded border border-border overflow-hidden hover:border-primary transition focus:outline-none focus:ring-2 focus:ring-primary block"
+      className="rounded border border-border overflow-hidden hover:border-primary transition focus:outline-none focus:ring-2 focus:ring-primary block flex-shrink-0"
     >
-      <img
+      <AtlasImage
         src={src}
         alt={alt}
         className="h-24 w-24 object-cover block"
+        fallbackClassName="h-24 w-24 flex items-center justify-center text-[10px] text-muted-foreground text-center px-1.5 leading-tight bg-muted/30"
         loading="lazy"
-        onError={() => setBroken(true)}
       />
     </button>
+  );
+}
+
+function PlayerProfileBlock({ profile }: { profile: PlayerProfile }) {
+  const hasKnownFor = !!profile.known_for;
+  const hasTraits = (profile.visible_traits?.length ?? 0) > 0;
+  const hasRumors = (profile.rumors?.length ?? 0) > 0;
+  if (!hasKnownFor && !hasTraits && !hasRumors) return null;
+  return (
+    <div className="atlas-player-profile space-y-2 pt-1" data-testid="player-profile-block">
+      {hasKnownFor && (
+        <div className="text-sm">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Known for</span>
+          <p className="mt-0.5">{profile.known_for}</p>
+        </div>
+      )}
+      {hasTraits && (
+        <div className="text-sm">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Visible traits</span>
+          <ul className="mt-0.5 list-disc list-inside space-y-0.5">
+            {profile.visible_traits!.map((t, i) => (
+              <li key={i}>{t}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {hasRumors && (
+        <div className="text-sm">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Rumors</span>
+          <ul className="mt-0.5 list-disc list-inside space-y-0.5">
+            {profile.rumors!.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -284,11 +306,63 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
     onPeekLeave,
     credits,
     assetCredits,
+    emptyState,
   },
   ref,
 ) {
-  const [lightbox, setLightbox] = useState<{ src: string; url: string } | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [tocOpen, setTocOpen] = useState(true);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  const tocItems = useMemo(() => buildToc(entity?.body ?? ""), [entity?.body]);
+
+  const connectionTargetIds = useMemo(
+    () => new Set((entity?.relationships ?? []).map((r) => r.entity)),
+    [entity?.relationships],
+  );
+
+  const connectionGroups = useMemo(() => {
+    const rels = entity?.relationships ?? [];
+    const order: string[] = [];
+    const groups = new Map<string, typeof rels>();
+    for (const r of rels) {
+      const label = r.label ?? r.type;
+      if (!groups.has(label)) {
+        order.push(label);
+        groups.set(label, []);
+      }
+      groups.get(label)!.push(r);
+    }
+    return order.map((label) => ({ label, rels: groups.get(label)! }));
+  }, [entity?.relationships]);
+
+  // Reset TOC to open when navigating to a different entity.
+  useEffect(() => {
+    setTocOpen(true);
+  }, [entity?.id]);
+
+  // Inject data-anchor-id onto rendered body headings so TOC clicks can find them.
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el || tocItems.length === 0) return;
+    el.querySelectorAll("h1,h2,h3,h4,h5,h6").forEach((h, i) => {
+      const item = tocItems[i];
+      if (item) h.setAttribute("data-anchor-id", item.id);
+    });
+  }, [tocItems]);
+
+  const scrollToAnchorById = useCallback((anchorId: string) => {
+    const viewport = scrollAreaRef.current?.querySelector<HTMLElement>(
+      "[data-radix-scroll-area-viewport]",
+    );
+    const heading = bodyRef.current?.querySelector<HTMLElement>(
+      `[data-anchor-id="${CSS.escape(anchorId)}"]`,
+    );
+    if (!viewport || !heading) return;
+    const delta = heading.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+    viewport.scrollTop += delta;
+  }, []);
 
   // Merge the forwarded ref (used by callers) and the local bodyRef (used by the secret effect).
   const setBodyRefs = useCallback(
@@ -315,11 +389,42 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
     });
   }, [entity]);
 
+  const imageCount = entity?.images.length ?? 0;
+
+  const goNext = useCallback(() => {
+    setLightboxIndex((i) => (i !== null && imageCount > 0 ? (i + 1) % imageCount : null));
+  }, [imageCount]);
+
+  const goPrev = useCallback(() => {
+    setLightboxIndex((i) =>
+      i !== null && imageCount > 0 ? (i - 1 + imageCount) % imageCount : null,
+    );
+  }, [imageCount]);
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") goNext();
+      else if (e.key === "ArrowLeft") goPrev();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightboxIndex, goNext, goPrev]);
+
+  // Reset the reading panel to the top whenever the displayed entity changes.
+  useEffect(() => {
+    const viewport = scrollAreaRef.current?.querySelector<HTMLElement>(
+      "[data-radix-scroll-area-viewport]",
+    );
+    if (viewport) viewport.scrollTop = 0;
+  }, [entity?.id]);
+
   if (!entity) {
+    if (emptyState) return <>{emptyState}</>;
     return (
       <div className="flex-1 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
         <div className="space-y-2">
-          <MapPin className="h-6 w-6 mx-auto opacity-50" />
+          <MapPin className="h-6 w-6 mx-auto opacity-50" aria-hidden="true" />
           <p>Select a pin or search for a place to read its lore.</p>
         </div>
       </div>
@@ -327,8 +432,10 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
   }
 
   const imageUrl = (src: string) => normalizeAtlasAssetUrl(src);
-  const lightboxCredit = lightbox
-    ? resolveImageCredit(lightbox.src, assetCredits, entity.credit)
+  const lightboxSrc = lightboxIndex !== null ? entity.images[lightboxIndex] : null;
+  const lightboxUrl = lightboxSrc ? imageUrl(lightboxSrc) : null;
+  const lightboxCredit = lightboxSrc
+    ? resolveImageCredit(lightboxSrc, assetCredits, entity.credit)
     : null;
 
   return (
@@ -338,7 +445,11 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
           <div className="flex items-center gap-1.5">
             {(() => {
               const typeLabel = playerTypeLabel(entity.type);
-              const kicker = [typeLabel, entity.race].filter(Boolean).join(" · ");
+              // dateRaw already drives the Timeline's ordering, so an event that
+              // sorts by date used to show no date at all on its own page.
+              const kicker = [typeLabel, entity.race, entity.dateRaw]
+                .filter(Boolean)
+                .join(" · ");
               return kicker ? (
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   {kicker}
@@ -367,7 +478,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => printEntityHandout(entity)}
+              onClick={() => printEntityHandout(entity, entityById, assetCredits, credits)}
               title="Download as printable handout (PDF)"
               aria-label="Download handout as PDF"
             >
@@ -381,12 +492,45 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea ref={scrollAreaRef} className="flex-1">
         <div className="p-4 space-y-4">
+          {tocItems.length >= 2 && (
+            <nav aria-label="On this page" data-testid="on-this-page">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition"
+                onClick={() => setTocOpen((v) => !v)}
+                aria-expanded={tocOpen}
+              >
+                <span>On this page</span>
+                <span aria-hidden="true">{tocOpen ? "−" : "+"}</span>
+              </button>
+              {tocOpen && (
+                <ul className="mt-2 space-y-0.5 list-none pl-0">
+                  {tocItems.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        className="text-xs text-left text-muted-foreground hover:text-foreground hover:underline transition w-full truncate"
+                        onClick={() => scrollToAnchorById(item.id)}
+                      >
+                        {item.text}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </nav>
+          )}
+
           {entity.summary && (
             <p className="text-sm italic text-muted-foreground border-l-2 border-primary pl-3">
               {entity.summary}
             </p>
+          )}
+
+          {entity.profile?.player && (
+            <PlayerProfileBlock profile={entity.profile.player} />
           )}
 
           {entity.images.length > 0 && (
@@ -398,7 +542,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
                     <ImageThumb
                       src={imageUrl(src)}
                       alt={`${entity.title} image ${i + 1}`}
-                      onClick={() => setLightbox({ src, url: imageUrl(src) })}
+                      onClick={() => setLightboxIndex(i)}
                     />
                     {credits?.badges !== false && imgCredit && <CreditBadge credit={imgCredit} />}
                   </div>
@@ -407,6 +551,14 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
             </div>
           )}
 
+          <div
+            ref={setBodyRefs}
+            className="atlas-prose max-w-none"
+            dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(entity.bodyHtml) }}
+          />
+
+          {/* Actions sit after the prose so the summary flows straight into the
+              body — this button used to split the read in two. */}
           {placements.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {placements.map((p) => (
@@ -423,12 +575,6 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
             </div>
           )}
 
-          <div
-            ref={setBodyRefs}
-            className="atlas-prose prose prose-sm max-w-none dark:prose-invert"
-            dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(entity.bodyHtml) }}
-          />
-
           {readerAffordances && <NotesPanel entityId={entity.id} entityTitle={entity.title} />}
 
           {entity.tags.length > 0 && (
@@ -443,63 +589,70 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
             </div>
           )}
 
-          {entity.backlinks.length > 0 && (
+          {entity.backlinks.filter((b) => !connectionTargetIds.has(b.id)).length > 0 && (
             <div className="pt-3 border-t border-border">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
                 Mentioned in
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {entity.backlinks.map((b) => (
-                  <button
-                    key={b.id}
-                    className="text-xs px-2 py-1 rounded bg-muted hover:bg-accent transition"
-                    onClick={() => onOpenEntity(b.id)}
-                    onMouseEnter={(e) => onPeek?.(b.id, e.currentTarget.getBoundingClientRect())}
-                    onMouseLeave={() => onPeekLeave?.()}
-                    onFocus={(e) => onPeek?.(b.id, e.currentTarget.getBoundingClientRect())}
-                    onBlur={() => onPeekLeave?.()}
-                  >
-                    {b.title}
-                  </button>
-                ))}
+                {entity.backlinks
+                  .filter((b) => !connectionTargetIds.has(b.id))
+                  .map((b) => (
+                    <button
+                      key={b.id}
+                      className="text-xs px-2 py-1 rounded bg-muted hover:bg-accent transition"
+                      onClick={() => onOpenEntity(b.id)}
+                      onMouseEnter={(e) => onPeek?.(b.id, e.currentTarget.getBoundingClientRect())}
+                      onMouseLeave={() => onPeekLeave?.()}
+                      onFocus={(e) => onPeek?.(b.id, e.currentTarget.getBoundingClientRect())}
+                      onBlur={() => onPeekLeave?.()}
+                    >
+                      {b.title}
+                    </button>
+                  ))}
               </div>
             </div>
           )}
 
-          {(entity.relationships ?? []).length > 0 && (
+          {connectionGroups.length > 0 && (
             <div className="pt-3 border-t border-border" data-testid="connections-section">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
                 Connections
               </div>
               <div className="flex flex-col gap-1">
-                {(entity.relationships ?? []).map((r, i) => {
-                  const target = entityById.get(r.entity);
-                  const displayLabel = r.label ?? r.type;
-                  return (
-                    <div key={`${r.entity}-${i}`} className="flex items-center gap-1.5 text-xs">
-                      <span className="text-muted-foreground shrink-0">{displayLabel}:</span>
-                      <button
-                        className="hover:underline truncate text-left"
-                        onClick={() => onOpenEntity(r.entity)}
-                        onMouseEnter={(e) =>
-                          onPeek?.(r.entity, e.currentTarget.getBoundingClientRect())
-                        }
-                        onMouseLeave={() => onPeekLeave?.()}
-                        onFocus={(e) => onPeek?.(r.entity, e.currentTarget.getBoundingClientRect())}
-                        onBlur={() => onPeekLeave?.()}
-                      >
-                        {target ? (
-                          target.title
-                        ) : (
-                          <span className="text-muted-foreground">{r.entity}</span>
-                        )}
-                      </button>
-                      {r.visibility === "dm" && (
-                        <span className="text-[10px] text-muted-foreground shrink-0">(DM)</span>
-                      )}
-                    </div>
-                  );
-                })}
+                {connectionGroups.map(({ label, rels }) => (
+                  <div key={label} className="flex flex-wrap items-center gap-1.5 text-xs">
+                    <span className="text-muted-foreground shrink-0">{label}:</span>
+                    {rels.map((r, i) => {
+                      const target = entityById.get(r.entity);
+                      return (
+                        <span key={`${r.entity}-${i}`} className="inline-flex items-center gap-1">
+                          <button
+                            className="hover:underline truncate text-left"
+                            onClick={() => onOpenEntity(r.entity)}
+                            onMouseEnter={(e) =>
+                              onPeek?.(r.entity, e.currentTarget.getBoundingClientRect())
+                            }
+                            onMouseLeave={() => onPeekLeave?.()}
+                            onFocus={(e) =>
+                              onPeek?.(r.entity, e.currentTarget.getBoundingClientRect())
+                            }
+                            onBlur={() => onPeekLeave?.()}
+                          >
+                            {target ? (
+                              target.title
+                            ) : (
+                              <span className="text-muted-foreground">{r.entity}</span>
+                            )}
+                          </button>
+                          {r.visibility === "dm" && (
+                            <span className="text-[10px] text-muted-foreground shrink-0">(DM)</span>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -507,17 +660,43 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
       </ScrollArea>
 
       {/* Lightbox */}
-      <Dialog open={!!lightbox} onOpenChange={(open) => !open && setLightbox(null)}>
+      <Dialog open={lightboxIndex !== null} onOpenChange={(open) => !open && setLightboxIndex(null)}>
         <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 bg-black/90 border-none overflow-hidden">
           <DialogTitle className="sr-only">{entity.title} image</DialogTitle>
-          {lightbox && (
+          {lightboxIndex !== null && lightboxUrl && (
             <div className="relative">
-              <img
-                src={lightbox.url}
+              <AtlasImage
+                src={lightboxUrl}
                 alt={`${entity.title}`}
                 className="max-w-full max-h-[85vh] object-contain mx-auto"
-                onClick={() => setLightbox(null)}
+                fallbackClassName="flex items-center justify-center rounded border border-dashed border-white/30 bg-black/40 text-sm text-white/70 text-center px-6 py-16 min-w-[200px] mx-auto"
+                onClick={() => setLightboxIndex(null)}
               />
+              {imageCount > 1 && (
+                <>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); goPrev(); }}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 hover:bg-black/70 text-white p-2 transition"
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); goNext(); }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 hover:bg-black/70 text-white p-2 transition"
+                    aria-label="Next image"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                  <div
+                    className="absolute top-2 right-2 text-xs text-white/80 bg-black/50 px-2 py-0.5 rounded"
+                    aria-label={`Image ${lightboxIndex + 1} of ${imageCount}`}
+                    data-testid="lightbox-counter"
+                  >
+                    {lightboxIndex + 1} / {imageCount}
+                  </div>
+                </>
+              )}
               {credits?.badges !== false && lightboxCredit && (
                 <CreditBadge credit={lightboxCredit} />
               )}

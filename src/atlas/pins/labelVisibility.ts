@@ -16,11 +16,29 @@ export function labelVisibilityThreshold(zoom: number): number {
 }
 
 /**
+ * A map with fewer pins than this has nothing to de-clutter, so priority
+ * thinning is skipped entirely and every label shows.
+ *
+ * Without this, the threshold quietly emptied sparse maps of all names. The
+ * viewer opens at zoom -2, where the threshold is 5, and the common types a
+ * young world is made of — events, imported notes, ruins, caves, anything
+ * falling through to the `custom` preset — all sit at priority 3 or below. So an
+ * atlas with six pins rendered six unlabelled dots and made the reader click
+ * each one to find out what it was, to solve a crowding problem it didn't have.
+ * Overlap is still prevented by the caller's collision check.
+ */
+export const DECLUTTER_MIN_PINS = 12;
+
+/**
  * Returns true when an "auto" mode pin label with the given priority should
  * render permanently at this zoom level. False means render hover-only.
  *
  * Governs only "auto" labelMode; callers handle "always"/"hover"/"never".
+ *
+ * `pinCount` is the number of pins competing for space on the map. Omit it to
+ * get the pure zoom × priority decision.
  */
-export function shouldShowLabel(zoom: number, priority: number): boolean {
+export function shouldShowLabel(zoom: number, priority: number, pinCount?: number): boolean {
+  if (pinCount !== undefined && pinCount < DECLUTTER_MIN_PINS) return true;
   return priority >= labelVisibilityThreshold(zoom);
 }

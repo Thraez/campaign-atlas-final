@@ -34,6 +34,7 @@ import type {
   MapDocument,
   MapLayer,
   World,
+  WorldCalendar,
 } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useMapLayers } from "@/atlas/useMapLayers";
+import { NudgeButtons } from "@/atlas/NudgeButtons";
 import { MapLayerPanel } from "@/atlas/MapLayerPanel";
 import { MapLayerEditableOverlay } from "@/atlas/MapLayerEditableOverlay";
 import { MapSettingsPanel } from "@/atlas/MapSettingsPanel";
@@ -59,6 +61,7 @@ import { buildSavePlan } from "@/atlas/editor/saveGate";
 import type { FileChange } from "@/atlas/save/localFsSave";
 import { SaveStatus } from "@/atlas/session/SaveStatus";
 import { DiscardConfirmModal } from "@/atlas/session/DiscardConfirmModal";
+import { useExternalRebuildDetector } from "@/atlas/session/useExternalRebuildDetector";
 import { CanonicalSaveError } from "@/atlas/save/canonicalPlacementSave";
 import { buildCanonicalEntityChanges } from "@/atlas/save/canonicalEntitySave";
 import { useWorldYamlBaseline, worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
@@ -83,6 +86,7 @@ import { buildPaletteIndex } from "@/atlas/shell/useCommandPalette";
 import { EditorMenu } from "@/atlas/shell/EditorMenu";
 import { useEditorKeyboardShortcuts } from "@/atlas/shell/useEditorKeyboardShortcuts";
 import { WorldDetailsPanel } from "@/atlas/settings/WorldDetailsPanel";
+import { HelpPanel } from "@/atlas/shell/HelpPanel";
 import { AssetManagerPanel } from "@/atlas/assets/AssetManagerPanel";
 import { CategoryPanel } from "@/atlas/categories/CategoryPanel";
 import { PinStateBadge } from "@/atlas/pins/PinStateBadge";
@@ -102,6 +106,9 @@ import {
   persistOverrides,
   LEGACY_STORAGE_KEY_V1,
 } from "@/atlas/editor/placementOverrides";
+import { foreignMapDraftPlacements } from "@/atlas/editor/foreignMapDrafts";
+import { targetMapHasPlacement } from "@/atlas/editor/duplicateOverwriteCheck";
+import { useBeforeUnloadWarning } from "@/atlas/editor/useBeforeUnloadWarning";
 import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
 import { validateProject } from "@/atlas/yaml/validateProject";
 import { buildValidationScopes } from "@/atlas/yaml/validationScopes";
@@ -136,6 +143,7 @@ import { EditorRail } from "@/atlas/shell/EditorRail";
 import { EditorPanelHost } from "@/atlas/shell/EditorPanelHost";
 import { buildRailItems } from "@/atlas/shell/railRegistry";
 import { CharacterKeysPanel } from "@/atlas/secrets/CharacterKeysPanel";
+import { CalendarPanel } from "@/atlas/calendar/CalendarPanel";
 import { ViewModeProvider, useViewMode } from "@/atlas/view/ViewModeProvider";
 import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
@@ -243,58 +251,7 @@ function AtlasPlacementEditorInner() {
       .catch((e: Error) => setError(e.message));
   }, []);
 
-  // Save-conflict detector: poll atlas.json every 30s while the editor is
-  // mounted. If `publishedAt` has changed since load, a rebuild happened
-  // externally (Obsidian + `npm run atlas:build`, another save plugin
-  // invocation, etc.). Surface a toast so the DM can `Reload canon` before
-  // their next save overwrites someone else's edits.
-  const [externalRebuildAt, setExternalRebuildAt] = useState<string | null>(null);
-  useEffect(() => {
-    if (!project) return;
-    const loadedAt = project.publishedAt;
-    let timer: number | undefined;
-    let cancelled = false;
-    const tick = async () => {
-      if (cancelled) return;
-      try {
-        const fresh = await loadAtlasContent(true);
-        if (cancelled) return;
-        if (
-          fresh.publishedAt &&
-          fresh.publishedAt !== loadedAt &&
-          fresh.publishedAt !== externalRebuildAt
-        ) {
-          setExternalRebuildAt(fresh.publishedAt);
-          toast.warning("Canon rebuilt externally", {
-            description:
-              "Atlas was regenerated since you opened the editor. Reload to see the new canon before saving.",
-            duration: 8000,
-          });
-        }
-      } catch (err) {
-        logger.debug("[editor] background atlas refresh failed; retrying next tick", err);
-      }
-      timer = window.setTimeout(tick, 30_000);
-    };
-    timer = window.setTimeout(tick, 30_000);
-    return () => {
-      cancelled = true;
-      if (timer !== undefined) window.clearTimeout(timer);
-    };
-    // Re-arm only on initial project load.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.publishedAt]);
-
-  const reloadCanon = useCallback(async () => {
-    try {
-      const fresh = await loadAtlasContent(true);
-      setProject(fresh);
-      setExternalRebuildAt(null);
-      toast.success("Canon reloaded from disk");
-    } catch (e) {
-      toast.error(`Reload failed: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  }, []);
+  const { externalRebuildAt, reloadCanon } = useExternalRebuildDetector(project, setProject);
 
   // Phase 1C: md-import orchestration. existingById maps entity id → sourcePath
   // so the staging layer can detect same-id imports and route them to the
@@ -331,7 +288,11 @@ function AtlasPlacementEditorInner() {
   });
 
   useEffect(() => {
-    persistOverrides(overrides);
+    if (!persistOverrides(overrides)) {
+      toast.error("Couldn't save pin changes locally — your browser storage may be full or blocked.", {
+        id: "overrides-persist-failed",
+      });
+    }
   }, [overrides]);
 
   // Stamp a local edit timestamp on every override mutation AFTER mount.
@@ -554,7 +515,7 @@ function AtlasPlacementEditorInner() {
 
   /** Merge a partial into the active world's session override (undo-tracked).
    *  This is the world-level equivalent of patchMap — the save path that lets
-   *  credits / assetCredits changes reach world.yaml. */
+   *  name / credits / assetCredits changes reach world.yaml. */
   const patchWorld = (patch: Partial<World>) => {
     if (!baseWorld) return;
     setWorldOverrideUndoable(
@@ -563,13 +524,35 @@ function AtlasPlacementEditorInner() {
     );
   };
 
+  /**
+   * Session draft for the world calendar. `undefined` means "no draft — use
+   * canon"; a value (including an explicit `undefined` calendar wrapped in the
+   * object) means the DM has edited it this session. Kept separate from
+   * worldOverride because `calendar` is project-level in world.yaml, not a
+   * field on World.
+   */
+  const [calendarDraft, setCalendarDraft] = useState<{ value: WorldCalendar | undefined } | null>(
+    null,
+  );
+
   // Shell state: which rail panel is open (null = closed).
   const [activePanel, setActivePanel] = useState<string | null>(null);
   const selectPanel = (id: string) => setActivePanel((cur) => (cur === id ? null : id));
   const dismissPanel = () => setActivePanel(null);
 
+  // Deep link: /atlas/edit?panel=calendar opens straight into a panel. Read once
+  // on mount so it never fights the DM's own navigation afterwards.
+  const [panelDeepLink] = useState(() =>
+    new URLSearchParams(window.location.search).get("panel"),
+  );
+  useEffect(() => {
+    if (panelDeepLink) setActivePanel(panelDeepLink);
+  }, [panelDeepLink]);
+
   // ☰ menu open/close state
   const [menuOpen, setMenuOpen] = useState(false);
+  /** "Where does this save?" disclosure — replaces the old permanent banner. */
+  const [saveHelpOpen, setSaveHelpOpen] = useState(false);
 
   /** When true, finishing a placement automatically queues the next unplaced entity. */
   const [chainPlaceMode, setChainPlaceMode] = useState(false);
@@ -577,6 +560,17 @@ function AtlasPlacementEditorInner() {
   const [creatingIn, setCreatingIn] = useState<CategoryId | null>(null);
   /** Entity currently open in the EntityEditPanel (null = none). */
   const [editingEntityId, setEditingEntityId] = useState<string | null>(null);
+  /**
+   * In-flight "File as …" for a misfiled note: the type to pre-apply, plus the
+   * category whose panel should host the edit surface. Without the category the
+   * surface would open under the entity's *current* category (Lore), so a DM who
+   * clicked "File as Character" inside Characters would see nothing happen.
+   */
+  const [refiling, setRefiling] = useState<{
+    id: string;
+    type: string;
+    category: CategoryId;
+  } | null>(null);
 
   const {
     canonPlacement,
@@ -597,6 +591,12 @@ function AtlasPlacementEditorInner() {
     const worldId = project.maps.find((m) => m.id === activeMap.id)?.worldId;
     return project.entities.filter((e) => !e.world || e.world === worldId);
   }, [project, activeMap]);
+  // N102: lets EntityEditorPanel catch a colliding slug before Create, instead
+  // of only discovering it when the create-only write 409s server-side.
+  const existingEntityIdsForWorld = useMemo(
+    () => new Set(entitiesForWorld.map((e) => e.id)),
+    [entitiesForWorld],
+  );
 
   const {
     filter,
@@ -716,13 +716,20 @@ function AtlasPlacementEditorInner() {
     worldOverride[baseWorld.id] &&
     Object.keys(worldOverride[baseWorld.id]).length > 0
   );
+  /** Calendar the UI should show and the save should write: draft over canon. */
+  const effectiveCalendar = calendarDraft ? calendarDraft.value : project?.calendar;
+  const calendarDirty =
+    !!calendarDraft &&
+    JSON.stringify(calendarDraft.value ?? null) !== JSON.stringify(project?.calendar ?? null);
+
   const worldYamlDirty =
     mapMetadataDirty ||
     layersDirty ||
     regionDraft.dirty ||
     routeDraft.dirty ||
     fogDraft.dirty ||
-    worldSettingsDirty;
+    worldSettingsDirty ||
+    calendarDirty;
 
   /**
    * Compose the full world.yaml content for the active world by overlaying
@@ -745,7 +752,7 @@ function AtlasPlacementEditorInner() {
     return pureBuildWorldYamlContent({
       activeMap,
       maps: project.maps,
-      calendar: project.calendar,
+      calendar: effectiveCalendar,
       schemaVersion: project.schemaVersion,
       mergedLayers: layerEditor.mergedLayers,
       localLayers: layerEditor.localLayers,
@@ -753,6 +760,7 @@ function AtlasPlacementEditorInner() {
       routesEffective: routeDraft.effective,
       fog: fogDraft.fog,
       existingRaw: worldYamlBaseline.raw,
+      name: effectiveWorld?.name,
       credits: effectiveWorld?.credits,
       assetCredits: effectiveWorld?.assetCredits,
     });
@@ -766,6 +774,7 @@ function AtlasPlacementEditorInner() {
     fogDraft.fog,
     worldYamlBaseline.raw,
     effectiveWorld,
+    effectiveCalendar,
   ]);
 
   /**
@@ -810,11 +819,13 @@ function AtlasPlacementEditorInner() {
       projectEntities: project.entities,
       worldYamlDirty,
     });
-    if (plan.isEmpty) {
+    if (plan.isEmpty && foreignMapDrafts.length === 0) {
       toast.info("No changes to save");
       return;
     }
-    const drafts = plan.dirtyPlacements;
+    // N100: fold in cross-map duplicates (overrides keyed to a map other
+    // than the active one) — buildSavePlan only ever sees the active map.
+    const drafts = [...plan.dirtyPlacements, ...foreignMapDrafts];
     const fmPatches = plan.frontmatterPatches;
     const entitiesById = new Map(project.entities.map((e) => [e.id, e]));
     try {
@@ -919,16 +930,36 @@ function AtlasPlacementEditorInner() {
   const dirtyCount = Object.keys(overrides).filter(
     (k) => activeMap && k.startsWith(`${activeMap.id}:`),
   ).length;
-  // Unsaved-changes signal: there are local pin overrides OR a dirty
-  // world.yaml signal. The pin-side gate also waits for an edit since the
-  // last successful save so a hydrated-but-clean session doesn't nag; the
-  // world.yaml gate fires immediately because the draft hooks already
-  // resolve to a "fresh state" on mount.
+  // N100: "Duplicate to map" (usePinOverrideMutations.ts:151) writes an
+  // override keyed to the TARGET map regardless of which map is active, so
+  // dirtyCount above (active-map-only) never sees it. Gather those foreign
+  // entries separately so a cross-map duplicate still counts as unsaved and
+  // Save (onSaveClick below) actually writes it instead of silently
+  // dropping it until the DM happens to visit the target map first.
+  const foreignMapDrafts = useMemo(
+    () =>
+      project && activeMap
+        ? foreignMapDraftPlacements(
+            overrides,
+            activeMap.id,
+            project.maps.map((m) => m.id),
+            project.entities,
+          )
+        : [],
+    [overrides, activeMap, project],
+  );
+  // Unsaved-changes signal: there are local pin overrides (on the active map
+  // OR duplicated onto another map) OR a dirty world.yaml signal. The
+  // pin-side gate also waits for an edit since the last successful save so a
+  // hydrated-but-clean session doesn't nag; the world.yaml gate fires
+  // immediately because the draft hooks already resolve to a "fresh state"
+  // on mount.
   const pinSideUnsaved =
-    dirtyCount > 0 &&
+    (dirtyCount > 0 || foreignMapDrafts.length > 0) &&
     lastLocalEditAt !== null &&
     (lastSavedAt === null || lastLocalEditAt > lastSavedAt);
   const hasUnsavedChanges = pinSideUnsaved || worldYamlDirty;
+  useBeforeUnloadWarning(hasUnsavedChanges);
 
   const session = useEditorSession({
     activeMapId: activeMap?.id ?? null,
@@ -983,11 +1014,22 @@ function AtlasPlacementEditorInner() {
       layerEditor.localLayers.length +
       (mapMetadataDirty ? 1 : 0) +
       (worldSettingsDirty ? 1 : 0) +
+      // Without this the calendar draft would be invisible to SaveStatus: the
+      // toolbar would report "All changes saved" and offer no Save button while
+      // an edited calendar sat waiting to be written.
+      (calendarDirty ? 1 : 0) +
       dirtyCount +
+      foreignMapDrafts.length +
       (entityEditDraft.isDirty() ? 1 : 0),
   });
 
-  useEditorKeyboardShortcuts({ undoStack, pendingId, setPendingId });
+  useEditorKeyboardShortcuts({
+    undoStack,
+    pendingId,
+    setPendingId,
+    onSave: onSaveClick,
+    canSave: !(saveModalOpen || session.status === "clean"),
+  });
 
   // Project-wide validation, scoped per tab so each tab badge shows its own counts.
   const draftPlacementsForValidation = useMemo(
@@ -1125,20 +1167,35 @@ function AtlasPlacementEditorInner() {
           </Button>
         </div>
       )}
-      <div className="px-3 py-1.5 text-[11px] bg-primary/10 text-foreground border-b border-primary/20 flex items-center justify-between gap-2">
-        <span
-          className="flex items-center gap-2 min-w-0"
-          title="YAML canon (committed) → local draft (this browser) → Save (dev plugin writes canon + rebuilds atlas) → git commit"
+      {/* The permanent banner that used to live here explained the build
+          pipeline ("YAML canon → local draft → Save (dev plugin writes canon
+          + rebuilds atlas)") above the workspace, every session. SaveStatus in
+          the toolbar already answers the only question it was really for — is
+          my work safe right now — in DM-facing words. What remains is the way
+          out, plus the explanation on demand for the times you do want it. */}
+      <div className="px-3 py-1.5 text-[11px] text-muted-foreground border-b border-border flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setSaveHelpOpen((v) => !v)}
+          aria-expanded={saveHelpOpen}
+          className="hover:text-foreground hover:underline shrink-0"
         >
-          <span className="truncate">
-            <strong>YAML is canon.</strong> Save writes directly to your entity .md files and
-            rebuilds the atlas — commit with git when ready.
-          </span>
-        </span>
+          Where does this save?
+        </button>
         <Link to="/" className="text-primary hover:underline shrink-0">
           ← Back
         </Link>
       </div>
+      {saveHelpOpen && (
+        <div className="px-3 py-2 text-[11px] bg-muted/40 text-muted-foreground border-b border-border space-y-1.5">
+          <p>
+            Your changes stay in this browser until you save. Saving writes them straight into your
+            world&rsquo;s markdown files and rebuilds the atlas, so the player view updates without
+            leaving the page.
+          </p>
+          <p>Those markdown files are the real thing — commit them with git when you&rsquo;re happy.</p>
+        </div>
+      )}
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
         <Link
           to="/"
@@ -1210,7 +1267,10 @@ function AtlasPlacementEditorInner() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => undoStack.undo()}
+          onClick={() => {
+            const label = undoStack.undo();
+            if (label) toast.info(`Undid: ${label}`);
+          }}
           disabled={!undoStack.canUndo}
           title="Undo (Ctrl/Cmd+Z)"
           aria-label="Undo"
@@ -1220,7 +1280,10 @@ function AtlasPlacementEditorInner() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => undoStack.redo()}
+          onClick={() => {
+            const label = undoStack.redo();
+            if (label) toast.info(`Redid: ${label}`);
+          }}
           disabled={!undoStack.canRedo}
           title="Redo (Ctrl/Cmd+Shift+Z)"
           aria-label="Redo"
@@ -1244,20 +1307,14 @@ function AtlasPlacementEditorInner() {
           activeMapName={activeMap.name}
           onPick={(id) => setPendingId(id)}
         />
-        <Button
-          variant="default"
-          size="sm"
-          onClick={onSaveClick}
-          // W2: nothing to write when the session is clean — don't offer Save.
-          disabled={saveModalOpen || session.status === "clean"}
-          className="gap-1"
-          title="Write canonical .md frontmatter and rebuild the atlas. Commit with git when ready."
-        >
-          <SaveIcon className="h-4 w-4" />
-          <span className="hidden md:inline">Save</span>
-        </Button>
+        {/* The standalone Save button that used to sit here was the third Save
+            control in the editor — SaveStatus above already shows the state and
+            offers Save exactly when there is something to write, and the rail
+            had a dead "Save" item with no panel behind it. One Save now. */}
         <Button asChild variant="ghost" size="sm">
-          <Link to="/atlas">View as player →</Link>
+          <Link to="/atlas" title="Open the player site in a new tab — the real thing" target="_blank" rel="noreferrer">
+            Open player site ↗
+          </Link>
         </Button>
         <div className="relative">
           <Button
@@ -1288,13 +1345,17 @@ function AtlasPlacementEditorInner() {
                     setMenuOpen(false);
                     setActivePanel("maps");
                   }}
+                  onCalendar={() => {
+                    setMenuOpen(false);
+                    setActivePanel("calendar");
+                  }}
                   onAssetManager={() => {
                     setMenuOpen(false);
                     setActivePanel("assets");
                   }}
                   onHelp={() => {
                     setMenuOpen(false);
-                    window.open("https://github.com", "_blank");
+                    setActivePanel("help");
                   }}
                 />
               </div>
@@ -1309,31 +1370,42 @@ function AtlasPlacementEditorInner() {
             ? project?.entities?.find((e) => e.id === editingEntityId)
             : undefined;
 
+          // A re-filing in progress hosts the edit surface in the TARGET
+          // category, so the DM stays in the section they clicked from.
+          const refilingThis = editingEntity && refiling?.id === editingEntity.id ? refiling : null;
+          const surfaceCategory = refilingThis
+            ? refilingThis.category
+            : editingEntity
+              ? categoryForType(editingEntity.type)
+              : null;
+
           const renderCategory = (cat: string, node: React.ReactNode): React.ReactNode => {
-            if (
-              editingEntity &&
-              categoryForType(editingEntity.type) === cat &&
-              editingEntity.sourcePath
-            ) {
+            if (editingEntity && surfaceCategory === cat && editingEntity.sourcePath) {
+              const closeEditor = () => {
+                setEditingEntityId(null);
+                setRefiling(null);
+              };
               return (
                 <EntitySurface
                   entity={editingEntity}
                   entitiesById={entitiesById}
+                  startInEdit={!!refilingThis}
                   onClose={() => {
                     const intent = resolveEntityCloseIntent({ dirty: entityEditDraft.isDirty() });
                     if (intent.kind === "confirm-discard") {
                       if (!window.confirm("Discard your unsaved changes to this entity?")) return;
                       entityEditDraft.clear();
                     }
-                    setEditingEntityId(null);
+                    closeEditor();
                   }}
                   renderEdit={() => (
                     <EntityEditPanel
                       sourcePath={editingEntity.sourcePath!}
                       draftApi={entityEditDraft}
-                      onClose={() => setEditingEntityId(null)}
+                      initialType={refilingThis?.type}
+                      onClose={closeEditor}
                       onSaved={() => {
-                        setEditingEntityId(null);
+                        closeEditor();
                         void reloadCanon();
                       }}
                     />
@@ -1342,6 +1414,12 @@ function AtlasPlacementEditorInner() {
               );
             }
             return node;
+          };
+
+          /** "File as …" on a misfiled note: open it here with the type applied. */
+          const onFileAs = (category: CategoryId) => (entityId: string, suggestedType: string) => {
+            setRefiling({ id: entityId, type: suggestedType, category });
+            setEditingEntityId(entityId);
           };
 
           const panels: Record<string, React.ReactNode> = {
@@ -1354,6 +1432,7 @@ function AtlasPlacementEditorInner() {
                   category="characters"
                   onCreate={onCreateEntity}
                   onCancel={() => setCreatingIn(null)}
+                  existingIds={existingEntityIdsForWorld}
                 />
               ) : (
                 renderCategory(
@@ -1363,6 +1442,7 @@ function AtlasPlacementEditorInner() {
                     entities={displayEntities}
                     onOpen={(id) => setEditingEntityId(id)}
                     onNew={() => setCreatingIn("characters")}
+                    onFileAs={onFileAs("characters")}
                     onImport={triggerMdImport}
                     hasPlacement={(id) => !!effectiveCoord(id)}
                     onShowOnMap={(id) => goTo(id)}
@@ -1376,6 +1456,7 @@ function AtlasPlacementEditorInner() {
                   category="locations"
                   onCreate={onCreateEntity}
                   onCancel={() => setCreatingIn(null)}
+                  existingIds={existingEntityIdsForWorld}
                 />
               ) : (
                 renderCategory(
@@ -1385,6 +1466,7 @@ function AtlasPlacementEditorInner() {
                     entities={displayEntities}
                     onOpen={(id) => setEditingEntityId(id)}
                     onNew={() => setCreatingIn("locations")}
+                    onFileAs={onFileAs("locations")}
                     onImport={triggerMdImport}
                     hasPlacement={(id) => !!effectiveCoord(id)}
                     onShowOnMap={(id) => goTo(id)}
@@ -1398,6 +1480,7 @@ function AtlasPlacementEditorInner() {
                   category="factions"
                   onCreate={onCreateEntity}
                   onCancel={() => setCreatingIn(null)}
+                  existingIds={existingEntityIdsForWorld}
                 />
               ) : (
                 renderCategory(
@@ -1407,6 +1490,7 @@ function AtlasPlacementEditorInner() {
                     entities={displayEntities}
                     onOpen={(id) => setEditingEntityId(id)}
                     onNew={() => setCreatingIn("factions")}
+                    onFileAs={onFileAs("factions")}
                     onImport={triggerMdImport}
                     hasPlacement={(id) => !!effectiveCoord(id)}
                     onShowOnMap={(id) => goTo(id)}
@@ -1420,6 +1504,7 @@ function AtlasPlacementEditorInner() {
                   category="events"
                   onCreate={onCreateEntity}
                   onCancel={() => setCreatingIn(null)}
+                  existingIds={existingEntityIdsForWorld}
                 />
               ) : (
                 renderCategory(
@@ -1429,6 +1514,7 @@ function AtlasPlacementEditorInner() {
                     entities={displayEntities}
                     onOpen={(id) => setEditingEntityId(id)}
                     onNew={() => setCreatingIn("events")}
+                    onFileAs={onFileAs("events")}
                     onImport={triggerMdImport}
                     hasPlacement={(id) => !!effectiveCoord(id)}
                     onShowOnMap={(id) => goTo(id)}
@@ -1442,6 +1528,7 @@ function AtlasPlacementEditorInner() {
                   category="items"
                   onCreate={onCreateEntity}
                   onCancel={() => setCreatingIn(null)}
+                  existingIds={existingEntityIdsForWorld}
                 />
               ) : (
                 renderCategory(
@@ -1451,6 +1538,7 @@ function AtlasPlacementEditorInner() {
                     entities={displayEntities}
                     onOpen={(id) => setEditingEntityId(id)}
                     onNew={() => setCreatingIn("items")}
+                    onFileAs={onFileAs("items")}
                     onImport={triggerMdImport}
                     hasPlacement={(id) => !!effectiveCoord(id)}
                     onShowOnMap={(id) => goTo(id)}
@@ -1464,6 +1552,7 @@ function AtlasPlacementEditorInner() {
                   category="lore"
                   onCreate={onCreateEntity}
                   onCancel={() => setCreatingIn(null)}
+                  existingIds={existingEntityIdsForWorld}
                 />
               ) : (
                 renderCategory(
@@ -1593,7 +1682,16 @@ function AtlasPlacementEditorInner() {
                       const overridden = overrideKey(activeMap.id, e.id) in overrides;
                       const otherMaps = project.maps
                         .filter((m) => m.id !== activeMap.id)
-                        .map((m) => ({ id: m.id, name: m.name }));
+                        .map((m) => ({
+                          id: m.id,
+                          name: m.name,
+                          hasExisting: targetMapHasPlacement(
+                            m.id,
+                            e.id,
+                            overrides,
+                            project.placements,
+                          ),
+                        }));
                       return (
                         <EntityRow
                           key={e.id}
@@ -1613,7 +1711,18 @@ function AtlasPlacementEditorInner() {
                           onChangeXY={(x, y) => setCoord(e.id, { x, y })}
                           onChangeLabel={(l) => setLabel(e.id, l)}
                           onChangePin={(p) => setPinOverride(e.id, p)}
-                          onDuplicateToMap={(mid) => duplicateToMap(e.id, mid)}
+                          onDuplicateToMap={(mid) => {
+                            const target = otherMaps.find((m) => m.id === mid);
+                            if (
+                              target?.hasExisting &&
+                              !window.confirm(
+                                `"${target.name}" already has a pin for "${e.title}". Overwrite it?`,
+                              )
+                            ) {
+                              return;
+                            }
+                            duplicateToMap(e.id, mid);
+                          }}
                         />
                       );
                     })}
@@ -1757,7 +1866,10 @@ function AtlasPlacementEditorInner() {
               />
             ),
             sync: (
-              <SyncPanel onSync={(root, globs) => void importFlow.openWithVaultScan(root, globs)} />
+              <SyncPanel
+                onSync={(root, globs) => void importFlow.openWithVaultScan(root, globs)}
+                hasDmBuild={importExistingById.size > 0}
+              />
             ),
             // Menu-reachable panels (no rail icon — opened via ☰ menu or CommandPalette).
             world: (
@@ -1779,6 +1891,13 @@ function AtlasPlacementEditorInner() {
             characterKeys: activeWorldId ? (
               <CharacterKeysPanel worldDir={`content/${activeWorldId}`} />
             ) : null,
+            calendar: (
+              <CalendarPanel
+                calendar={effectiveCalendar}
+                onPatch={(next) => setCalendarDraft({ value: next })}
+              />
+            ),
+            help: <HelpPanel />,
           };
           const counts: Record<string, number | undefined> = {
             pins: unplaced.length > 0 ? unplaced.length : undefined,
@@ -1792,6 +1911,8 @@ function AtlasPlacementEditorInner() {
             world: "World details",
             maps: "Map details",
             assets: "Assets",
+            calendar: "Calendar",
+            help: "Keyboard shortcuts",
           };
           const activePanelNode = active?.panel ?? (activePanel ? panels[activePanel] : null);
           const activePanelTitle =
@@ -1836,10 +1957,9 @@ function AtlasPlacementEditorInner() {
                     active={
                       rulerActive && !pendingId && !regionDraft.drawing && !soundscapeDraft.drawing
                     }
+                    mapId={activeMap.id}
                     mapHeight={activeMap.height}
                     scale={activeMap.scale}
-                    wrapX={activeMap.wrapX}
-                    mapWidth={activeMap.width}
                   />
                   <MapClickCapture onClick={onMapClick} />
 
@@ -2236,14 +2356,27 @@ function PlacePinPopover({
           size="sm"
           className="gap-1"
           disabled={unplaced.length === 0}
+          // The visible label is hidden below `md`, which used to leave `title`
+          // as the button's only accessible name — announcing the status
+          // sentence "All entities are placed on this map" as if it were the
+          // label. An explicit aria-label keeps the name a verb at every width.
+          aria-label="Place a pin"
           title={
             unplaced.length === 0
-              ? "All entities are placed on this map"
-              : `Pick one of ${unplaced.length} unplaced entit${unplaced.length === 1 ? "y" : "ies"} to drop on ${activeMapName}`
+              ? `Every entry is already on ${activeMapName}`
+              : `Place one of ${unplaced.length} entr${unplaced.length === 1 ? "y" : "ies"} that ${unplaced.length === 1 ? "isn't" : "aren't"} on ${activeMapName} yet`
           }
         >
-          <Plus className="h-4 w-4" />
-          <span className="hidden md:inline">Place Pin</span>
+          <Plus className="h-4 w-4" aria-hidden />
+          <span className="hidden md:inline">Place a pin</span>
+          {unplaced.length > 0 && (
+            <span
+              className="ml-0.5 rounded-full bg-primary/15 px-1.5 text-[10px] tabular-nums text-primary"
+              aria-hidden
+            >
+              {unplaced.length}
+            </span>
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 p-0">
@@ -2326,7 +2459,7 @@ interface RowProps {
   pinOverride?: PinOverride;
   label?: string;
   /** Other maps the entity could be duplicated to (excludes the active one). */
-  otherMaps?: { id: string; name: string }[];
+  otherMaps?: { id: string; name: string; hasExisting: boolean }[];
   onPlace?: () => void;
   onMove?: () => void;
   onGoTo?: () => void;
@@ -2451,45 +2584,7 @@ function EntityRow({
                   />
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <Label className="text-[11px]">Nudge</Label>
-                <div className="grid grid-cols-3 gap-1 w-28">
-                  <span />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 text-xs p-0"
-                    onClick={() => onNudge?.(0, 100)}
-                  >
-                    ↑
-                  </Button>
-                  <span />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 text-xs p-0"
-                    onClick={() => onNudge?.(-100, 0)}
-                  >
-                    ←
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 text-xs p-0"
-                    onClick={() => onNudge?.(0, -100)}
-                  >
-                    ↓
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 text-xs p-0"
-                    onClick={() => onNudge?.(100, 0)}
-                  >
-                    →
-                  </Button>
-                </div>
-              </div>
+              <NudgeButtons onNudge={(dx, dy) => onNudge?.(dx, dy)} />
               {otherMaps && otherMaps.length > 0 && onDuplicateToMap && (
                 <div className="space-y-1 pt-1 border-t border-border">
                   <Label className="text-[11px]">Duplicate to map</Label>
@@ -2501,6 +2596,7 @@ function EntityRow({
                       {otherMaps.map((m) => (
                         <SelectItem key={m.id} value={m.id} className="text-xs">
                           {m.name}
+                          {m.hasExisting ? " (has a pin)" : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>

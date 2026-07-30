@@ -23,8 +23,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { NudgeButtons } from "@/atlas/NudgeButtons";
 import { TabFrame } from "./TabFrame";
 import { ValidationChips } from "./ValidationChips";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { dumpYaml } from "@/atlas/yaml/dump";
 import type { RegionDraftAPI } from "@/atlas/regions/useRegionDraft";
 import { regionToYamlObject } from "@/atlas/regions/useRegionDraft";
@@ -232,17 +234,21 @@ export function RegionsTab({ project, map, api, blockingCount, warningCount, onF
                 >
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 w-6 p-0 text-destructive"
-                  title="Delete"
-                  onClick={() => {
-                    if (confirm(`Delete region "${selected.name}"?`)) remove(selected.id);
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                <ConfirmDialog
+                  trigger={
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0 text-destructive"
+                      title="Delete"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  }
+                  title={`Delete region "${selected.name}"?`}
+                  description="This can't be undone."
+                  onConfirm={() => remove(selected.id)}
+                />
               </div>
             </div>
 
@@ -361,44 +367,11 @@ export function RegionsTab({ project, map, api, blockingCount, warningCount, onF
               />
             </div>
 
-            <div className="flex items-center justify-between gap-2 pt-1 border-t border-border">
-              <Label className="text-[10px]">Nudge whole region</Label>
-              <div className="grid grid-cols-3 gap-1 w-28">
-                <span />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-6 text-xs p-0"
-                  onClick={() => translate(selected.id, 0, 100)}
-                >
-                  ↑
-                </Button>
-                <span />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-6 text-xs p-0"
-                  onClick={() => translate(selected.id, -100, 0)}
-                >
-                  ←
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-6 text-xs p-0"
-                  onClick={() => translate(selected.id, 0, -100)}
-                >
-                  ↓
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-6 text-xs p-0"
-                  onClick={() => translate(selected.id, 100, 0)}
-                >
-                  →
-                </Button>
-              </div>
+            <div className="pt-1 border-t border-border">
+              <NudgeButtons
+                label="Nudge whole region"
+                onNudge={(dx, dy) => translate(selected.id, dx, dy)}
+              />
             </div>
 
             <p className="text-[10px] text-muted-foreground italic">

@@ -100,9 +100,7 @@ For a folder of existing Obsidian markdown:
    - **Placeable** — has `atlas.placements` or legacy `atlas.x/y`.
    - **Player-published** — visible to players.
 3. The wizard surfaces conflicts (duplicate titles, missing placements, frontmatter shape issues).
-4. On commit, every import writes an **import-batch record** to `atlas/import-batches/<timestamp>.json`. This lists every file created or modified. Use it to:
-   - Audit what an import did.
-   - Roll a batch back: the editor's Import tab has a "remove this batch" affordance that deletes / restores files atomically, warning if any have been modified since the import.
+4. The wizard produces a YAML patch for manual paste — it does not write to disk on its own. Commit the pasted change as a normal git commit; `git log` is the audit trail for what an import did. An **import-batch record** with a "remove this batch" rollback affordance is planned but not yet shipped — see `IMPORT_EXPORT.md`'s Import-batch tracking section.
 
 ## Rollback flow (production)
 

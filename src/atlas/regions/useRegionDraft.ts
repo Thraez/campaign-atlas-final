@@ -6,10 +6,11 @@
  * Persistence: regions remain in `world.yaml`. The hook only tracks LOCAL
  * draft changes; Save serializes them into world.yaml via buildPatches/dumpYaml.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { MapDocument, Point, Region } from "@/atlas/content/schema";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
 import { slugify as toSlug, uniqueId } from "@/atlas/content/slugify";
+import { useDraftCore } from "@/atlas/editor/useDraftCore";
 
 export interface RegionDraft {
   /** Per-id partial overrides applied to existing canon regions. */
@@ -82,43 +83,13 @@ export function useRegionDraft(
   opts: { entityIds?: Set<string>; dmEntityIds?: Set<string> } = {},
   undoStack?: UndoStackAPI,
 ): RegionDraftAPI {
-  const [draft, setDraft] = useState<RegionDraft>(EMPTY);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [draftPoints, setDraftPoints] = useState<Point[]>([]);
 
-  // Synchronous mirror of `draft` so consecutive mutations and undo callbacks
-  // can read the latest state without waiting for React to flush.
-  const draftRef = useRef(draft);
-  useEffect(() => {
-    draftRef.current = draft;
-  }, [draft]);
-
-  const applyDraft = useCallback((next: RegionDraft) => {
-    draftRef.current = next;
-    setDraft(next);
-  }, []);
-
-  /**
-   * Mutate the region draft and (optionally) push an undo entry capturing the
-   * snapshot before/after. Use this in place of setDraft for any mutation
-   * that the DM should be able to Cmd+Z.
-   */
-  const mutateDraft = useCallback(
-    (compute: (prev: RegionDraft) => RegionDraft, label: string) => {
-      const before = draftRef.current;
-      const after = compute(before);
-      if (after === before) return;
-      applyDraft(after);
-      if (undoStack) {
-        undoStack.push({
-          undo: () => applyDraft(before),
-          redo: () => applyDraft(after),
-          label,
-        });
-      }
-    },
-    [applyDraft, undoStack],
+  const { draft, getDraft, applyDraft, mutateDraft, dirty, dirtyCount } = useDraftCore<RegionDraft>(
+    EMPTY,
+    undoStack,
   );
 
   const baseRegions = map?.regions ?? [];
@@ -139,10 +110,6 @@ export function useRegionDraft(
     () => new Set(baseRegions.map((r) => r.id).concat(draft.added.map((r) => r.id))),
     [baseRegions, draft.added],
   );
-
-  const dirty =
-    draft.added.length > 0 || draft.deleted.length > 0 || Object.keys(draft.edits).length > 0;
-  const dirtyCount = draft.added.length + draft.deleted.length + Object.keys(draft.edits).length;
 
   const startDraw = useCallback(() => {
     setDrawing(true);
@@ -371,7 +338,7 @@ export function useRegionDraft(
     return out;
   }, [effective, map, opts.entityIds, opts.dmEntityIds]);
 
-  const snapshot = useCallback((): RegionDraft => draftRef.current, []);
+  const snapshot = useCallback((): RegionDraft => getDraft(), [getDraft]);
   const applySnapshot = useCallback(
     (snap: RegionDraft) => {
       applyDraft(snap);
