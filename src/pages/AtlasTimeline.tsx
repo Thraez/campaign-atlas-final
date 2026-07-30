@@ -86,8 +86,15 @@ export default function AtlasTimeline() {
   const worldName = project.worlds[0]?.name ?? "Atlas";
   // Dated entries exist but no month names to render them with. Only the DM can
   // act on this, and only the editor build can reach the calendar panel.
+  // __INCLUDE_EDITOR__ must come first: it is a build-time define, so a player
+  // build folds this to `false` and drops the `/atlas/edit` link entirely.
+  // isDmToolsEnabled() alone is a runtime check — the URL string would survive
+  // into the player bundle and trip check-secrets' editor-fingerprint scan.
   const needsCalendar =
-    isDmToolsEnabled() && dated.length > 0 && !(project.calendar?.months?.length ?? 0);
+    __INCLUDE_EDITOR__ &&
+    isDmToolsEnabled() &&
+    dated.length > 0 &&
+    !(project.calendar?.months?.length ?? 0);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
