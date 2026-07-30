@@ -33,13 +33,15 @@ export function SoundControl({ hasSoundscape = true }: SoundControlProps) {
             <span aria-hidden>🔊</span>
             Tap to bring the world to life
           </button>
+          {/* Was a bare ✕ glyph measuring 13x24 on a phone. Sized to match the
+              mute button below it, which is already 40x40. */}
           <button
             type="button"
             aria-label="Dismiss"
             onClick={() => setDismissed(true)}
-            className="text-muted-foreground"
+            className="-mr-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
           >
-            ✕
+            <span aria-hidden>✕</span>
           </button>
         </div>
       )}

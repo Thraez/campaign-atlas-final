@@ -55,6 +55,8 @@ import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 import { SearchPalette } from "@/atlas/search/SearchPalette";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
+import { ReadingPanelWelcome } from "@/atlas/entity/ReadingPanelWelcome";
+import { pickStarters } from "@/atlas/entity/pickStarters";
 import { MapCreditOverlay } from "@/atlas/map/MapCreditOverlay";
 import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
@@ -398,6 +400,13 @@ export default function AtlasViewer() {
   const worldCredits = data?.project.worlds[0]?.credits;
   const worldAssetCredits = data?.project.worlds[0]?.assetCredits;
   const worldName = data?.project.worlds[0]?.name ?? "Atlas";
+
+  /** A few entries to offer in the reading panel before anything is opened. */
+  const starterEntries = useMemo(() => {
+    if (!data) return [];
+    const placed = new Set(data.project.placements.map((p) => p.entityId));
+    return pickStarters(data.project.entities, (id) => placed.has(id));
+  }, [data]);
   const showCredits =
     worldCredits?.page !== false && (data?.project.entities.some((e) => e.credit) ?? false);
 
@@ -644,12 +653,15 @@ export default function AtlasViewer() {
         </a>
         <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
           <AtlasNavMenu publishedAt={data.project.publishedAt} showCredits={showCredits} worldName={worldName} />
+          {/* The name used to be `hidden sm:inline`, so a phone showed only the
+              compass — someone opening a shared link couldn't see which world
+              they were looking at. Truncate instead of hiding. */}
           <Link
             to="/"
-            className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2"
+            className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2 min-w-0"
           >
-            <Compass className="h-5 w-5" aria-hidden="true" />{" "}
-            <span className="hidden sm:inline">{worldName}</span>
+            <Compass className="h-5 w-5 shrink-0" aria-hidden="true" />
+            <span className="truncate max-w-[8.5rem] sm:max-w-none">{worldName}</span>
           </Link>
           <div className="flex-1" />
           {data.project.maps.length > 1 && (
@@ -906,6 +918,15 @@ export default function AtlasViewer() {
                 }}
                 onPeek={(id, rect) => peekCtl.onTriggerEnter(id, rect)}
                 onPeekLeave={peekCtl.onTriggerLeave}
+                // Desktop only: the mobile sheet opens because an entity was
+                // picked, so its empty state is never on screen.
+                emptyState={
+                  <ReadingPanelWelcome
+                    worldName={worldName}
+                    starters={starterEntries}
+                    onOpenEntity={openEntity}
+                  />
+                }
                 credits={worldCredits}
                 assetCredits={worldAssetCredits}
               />
@@ -1240,7 +1261,7 @@ export function PlacementMarkers({
     if (style.labelMode === "never") mode = "none";
     else if (style.labelMode === "hover") mode = "hover";
     else if (style.labelMode === "always") mode = "always";
-    else mode = shouldShowLabel(zoom, style.priority) ? "always" : "hover";
+    else mode = shouldShowLabel(zoom, style.priority, enriched.length) ? "always" : "hover";
     if (mode === "always") {
       const pt = map.latLngToContainerPoint([H - p.y, p.x + dx]);
       const collides = taken.some((t) => Math.hypot(t.x - pt.x, t.y - pt.y) < 70);

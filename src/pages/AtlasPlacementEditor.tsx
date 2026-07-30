@@ -1389,6 +1389,7 @@ function AtlasPlacementEditorInner() {
                 <EntitySurface
                   entity={editingEntity}
                   entitiesById={entitiesById}
+                  startInEdit={!!refilingThis}
                   onClose={() => {
                     const intent = resolveEntityCloseIntent({ dirty: entityEditDraft.isDirty() });
                     if (intent.kind === "confirm-discard") {

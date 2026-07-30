@@ -1,4 +1,12 @@
-import { useState, useCallback, useEffect, useMemo, useRef, forwardRef } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  forwardRef,
+  type ReactNode,
+} from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { MapPin, X, Link2, Check, Printer, ChevronLeft, ChevronRight } from "lucide-react";
@@ -46,6 +54,13 @@ export interface EntityPanelProps {
   /** World-level per-asset credit registry, keyed by image src. Takes
    *  precedence over `entity.credit` for any src with a registry entry. */
   assetCredits?: Record<string, AssetCredit>;
+  /**
+   * What to render when nothing is open. This panel is a third of the player
+   * screen and used to greet a first-time reader with an instruction ("Select a
+   * pin…") — but it has no world data of its own, so the host supplies a real
+   * welcome. Falls back to the plain prompt when omitted.
+   */
+  emptyState?: ReactNode;
 }
 
 function CopyLinkButton() {
@@ -291,6 +306,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
     onPeekLeave,
     credits,
     assetCredits,
+    emptyState,
   },
   ref,
 ) {
@@ -404,10 +420,11 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
   }, [entity?.id]);
 
   if (!entity) {
+    if (emptyState) return <>{emptyState}</>;
     return (
       <div className="flex-1 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
         <div className="space-y-2">
-          <MapPin className="h-6 w-6 mx-auto opacity-50" />
+          <MapPin className="h-6 w-6 mx-auto opacity-50" aria-hidden="true" />
           <p>Select a pin or search for a place to read its lore.</p>
         </div>
       </div>

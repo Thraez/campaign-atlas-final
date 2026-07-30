@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { shouldShowLabel, labelVisibilityThreshold } from "@/atlas/pins/labelVisibility";
+import {
+  shouldShowLabel,
+  labelVisibilityThreshold,
+  DECLUTTER_MIN_PINS,
+} from "@/atlas/pins/labelVisibility";
 
 describe("labelVisibilityThreshold", () => {
   it("returns 9 at zoom -6 (very zoomed out — only capitals)", () => {
@@ -73,5 +77,32 @@ describe("shouldShowLabel", () => {
   });
   it("priority 0 is hidden at zoom 0 (threshold 3)", () => {
     expect(shouldShowLabel(0, 0)).toBe(false);
+  });
+});
+
+describe("shouldShowLabel — sparse maps are not de-cluttered", () => {
+  // The viewer opens at zoom -2 (threshold 5). Events, imported notes, ruins and
+  // caves are all priority 3 or below, so a small world used to open with every
+  // pin unlabelled.
+  it("labels a priority-3 event at the default zoom when the map is sparse", () => {
+    expect(shouldShowLabel(-2, 3, 6)).toBe(true);
+  });
+
+  it("labels even priority 0 on a sparse map", () => {
+    expect(shouldShowLabel(-6, 0, 1)).toBe(true);
+  });
+
+  it("resumes priority thinning once the map is crowded", () => {
+    expect(shouldShowLabel(-2, 3, DECLUTTER_MIN_PINS)).toBe(false);
+    expect(shouldShowLabel(-2, 6, DECLUTTER_MIN_PINS)).toBe(true);
+  });
+
+  it("treats the threshold as exclusive — one pin under it still shows all", () => {
+    expect(shouldShowLabel(-2, 0, DECLUTTER_MIN_PINS - 1)).toBe(true);
+  });
+
+  it("omitting pinCount keeps the pure zoom x priority decision", () => {
+    expect(shouldShowLabel(-2, 3)).toBe(false);
+    expect(shouldShowLabel(-2, 6)).toBe(true);
   });
 });

@@ -98,9 +98,10 @@ export default function AtlasTimeline() {
         <AtlasNavMenu publishedAt={project.publishedAt} worldName={worldName} />
         <Link
           to="/atlas"
-          className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2"
+          className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2 min-w-0"
         >
-          <Compass className="h-5 w-5" /> <span className="hidden sm:inline">{worldName}</span>
+          <Compass className="h-5 w-5 shrink-0" aria-hidden="true" />
+          <span className="truncate max-w-[8.5rem] sm:max-w-none">{worldName}</span>
         </Link>
         <span className="text-muted-foreground">/</span>
         <span className="flex items-center gap-1.5 text-sm font-medium">
