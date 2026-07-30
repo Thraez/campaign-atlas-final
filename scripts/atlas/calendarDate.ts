@@ -46,7 +46,14 @@ export function parseAtlasDate(
     }
     // No calendar: use 365-day approximation for sorting.
     const value = year * 365 + monthIndex * 30 + day;
-    return { value, year, monthIndex, day, label: trimmed };
+    // The label is player-facing, so never echo the raw "612-6-3" — that reads
+    // as a real-world ISO date and tells a reader nothing in-world. Without a
+    // calendar we can't name the month, but we can still say what the parts
+    // ARE. Plain wording here also hints that naming the months is worthwhile.
+    let label = `${year}`;
+    if (m[2]) label += ` · month ${monthIndex + 1}`;
+    if (m[3]) label += `, day ${day}`;
+    return { value, year, monthIndex, day, label };
   }
   // Fallback: attempt JS Date parse (for real-world ISO timestamps).
   const ts = Date.parse(trimmed);

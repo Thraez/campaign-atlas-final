@@ -31,11 +31,18 @@ export function EntityEditPanel({
   onClose,
   onSaved,
   draftApi,
+  initialType,
 }: {
   sourcePath: string;
   onClose: () => void;
   onSaved: () => void;
   draftApi?: EntityEditDraftAPI;
+  /**
+   * Pre-apply a type to the draft on open — used by the "File as …" action on a
+   * misfiled note. Applied *after* the draft is seeded from disk so `pristine`
+   * still reflects the file and the change registers as unsaved work.
+   */
+  initialType?: string;
 }) {
   const internal = useEntityEditDraft();
   const api = draftApi ?? internal;
@@ -121,8 +128,14 @@ export function EntityEditPanel({
         // of local state. Only seed the draft from disk on a genuine first
         // open. rawRef is still refreshed above so Save preserves untouched
         // frontmatter.
+        const diskType = String(atlas.type ?? "");
         const existing = api.snapshot();
         if (existing && existing.sourcePath === sourcePath) {
+          // Re-filing an entity the DM already had open: still honour the
+          // requested type, but keep the rest of their in-progress draft.
+          if (initialType && initialType !== existing.fields.type) {
+            api.setField("type", initialType);
+          }
           setPhase("ready");
           return;
         }
@@ -132,13 +145,16 @@ export function EntityEditPanel({
           baseHash,
           fields: {
             id: String(atlas.id ?? ""),
-            type: String(atlas.type ?? ""),
+            type: diskType,
             visibility: isValidVisibility(atlas.visibility) ? atlas.visibility : "dm",
             summary: String(atlas.summary ?? ""),
           },
           body: fm.content,
           secrets: Array.isArray(atlas.secrets) ? (atlas.secrets as DraftSecret[]) : [],
         });
+        // Seeded from disk above so `pristine` is the file's state; applying the
+        // type now makes it a genuine unsaved change the DM can see and Save.
+        if (initialType && initialType !== diskType) api.setField("type", initialType);
         setPhase("ready");
       } catch (e) {
         if (!alive) return;

@@ -6,6 +6,7 @@ import { EditorMenu, EDITOR_MENU_ITEMS } from "@/atlas/shell/EditorMenu";
 describe("EditorMenu guardrail", () => {
   it("contains only the allow-listed items", () => {
     expect(EDITOR_MENU_ITEMS.map((i) => i.id).sort()).toEqual([
+      "calendar",
       "help",
       "manage-assets",
       "map-details",
@@ -26,6 +27,7 @@ describe("EditorMenu guardrail", () => {
       <EditorMenu
         onWorldDetails={vi.fn()}
         onMapDetails={vi.fn()}
+        onCalendar={vi.fn()}
         onAssetManager={vi.fn()}
         onHelp={vi.fn()}
         open
@@ -33,6 +35,7 @@ describe("EditorMenu guardrail", () => {
     );
     expect(screen.getByText("Edit world details")).toBeInTheDocument();
     expect(screen.getByText("Edit map details")).toBeInTheDocument();
+    expect(screen.getByText("Name the months")).toBeInTheDocument();
     expect(screen.getByText("Manage assets")).toBeInTheDocument();
     expect(screen.getByText("Help")).toBeInTheDocument();
   });

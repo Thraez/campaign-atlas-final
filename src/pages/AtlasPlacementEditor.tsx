@@ -34,6 +34,7 @@ import type {
   MapDocument,
   MapLayer,
   World,
+  WorldCalendar,
 } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -142,6 +143,7 @@ import { EditorRail } from "@/atlas/shell/EditorRail";
 import { EditorPanelHost } from "@/atlas/shell/EditorPanelHost";
 import { buildRailItems } from "@/atlas/shell/railRegistry";
 import { CharacterKeysPanel } from "@/atlas/secrets/CharacterKeysPanel";
+import { CalendarPanel } from "@/atlas/calendar/CalendarPanel";
 import { ViewModeProvider, useViewMode } from "@/atlas/view/ViewModeProvider";
 import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
@@ -522,10 +524,30 @@ function AtlasPlacementEditorInner() {
     );
   };
 
+  /**
+   * Session draft for the world calendar. `undefined` means "no draft — use
+   * canon"; a value (including an explicit `undefined` calendar wrapped in the
+   * object) means the DM has edited it this session. Kept separate from
+   * worldOverride because `calendar` is project-level in world.yaml, not a
+   * field on World.
+   */
+  const [calendarDraft, setCalendarDraft] = useState<{ value: WorldCalendar | undefined } | null>(
+    null,
+  );
+
   // Shell state: which rail panel is open (null = closed).
   const [activePanel, setActivePanel] = useState<string | null>(null);
   const selectPanel = (id: string) => setActivePanel((cur) => (cur === id ? null : id));
   const dismissPanel = () => setActivePanel(null);
+
+  // Deep link: /atlas/edit?panel=calendar opens straight into a panel. Read once
+  // on mount so it never fights the DM's own navigation afterwards.
+  const [panelDeepLink] = useState(() =>
+    new URLSearchParams(window.location.search).get("panel"),
+  );
+  useEffect(() => {
+    if (panelDeepLink) setActivePanel(panelDeepLink);
+  }, [panelDeepLink]);
 
   // ☰ menu open/close state
   const [menuOpen, setMenuOpen] = useState(false);
@@ -536,6 +558,17 @@ function AtlasPlacementEditorInner() {
   const [creatingIn, setCreatingIn] = useState<CategoryId | null>(null);
   /** Entity currently open in the EntityEditPanel (null = none). */
   const [editingEntityId, setEditingEntityId] = useState<string | null>(null);
+  /**
+   * In-flight "File as …" for a misfiled note: the type to pre-apply, plus the
+   * category whose panel should host the edit surface. Without the category the
+   * surface would open under the entity's *current* category (Lore), so a DM who
+   * clicked "File as Character" inside Characters would see nothing happen.
+   */
+  const [refiling, setRefiling] = useState<{
+    id: string;
+    type: string;
+    category: CategoryId;
+  } | null>(null);
 
   const {
     canonPlacement,
@@ -681,13 +714,20 @@ function AtlasPlacementEditorInner() {
     worldOverride[baseWorld.id] &&
     Object.keys(worldOverride[baseWorld.id]).length > 0
   );
+  /** Calendar the UI should show and the save should write: draft over canon. */
+  const effectiveCalendar = calendarDraft ? calendarDraft.value : project?.calendar;
+  const calendarDirty =
+    !!calendarDraft &&
+    JSON.stringify(calendarDraft.value ?? null) !== JSON.stringify(project?.calendar ?? null);
+
   const worldYamlDirty =
     mapMetadataDirty ||
     layersDirty ||
     regionDraft.dirty ||
     routeDraft.dirty ||
     fogDraft.dirty ||
-    worldSettingsDirty;
+    worldSettingsDirty ||
+    calendarDirty;
 
   /**
    * Compose the full world.yaml content for the active world by overlaying
@@ -710,7 +750,7 @@ function AtlasPlacementEditorInner() {
     return pureBuildWorldYamlContent({
       activeMap,
       maps: project.maps,
-      calendar: project.calendar,
+      calendar: effectiveCalendar,
       schemaVersion: project.schemaVersion,
       mergedLayers: layerEditor.mergedLayers,
       localLayers: layerEditor.localLayers,
@@ -732,6 +772,7 @@ function AtlasPlacementEditorInner() {
     fogDraft.fog,
     worldYamlBaseline.raw,
     effectiveWorld,
+    effectiveCalendar,
   ]);
 
   /**
@@ -1289,6 +1330,10 @@ function AtlasPlacementEditorInner() {
                     setMenuOpen(false);
                     setActivePanel("maps");
                   }}
+                  onCalendar={() => {
+                    setMenuOpen(false);
+                    setActivePanel("calendar");
+                  }}
                   onAssetManager={() => {
                     setMenuOpen(false);
                     setActivePanel("assets");
@@ -1310,12 +1355,21 @@ function AtlasPlacementEditorInner() {
             ? project?.entities?.find((e) => e.id === editingEntityId)
             : undefined;
 
+          // A re-filing in progress hosts the edit surface in the TARGET
+          // category, so the DM stays in the section they clicked from.
+          const refilingThis = editingEntity && refiling?.id === editingEntity.id ? refiling : null;
+          const surfaceCategory = refilingThis
+            ? refilingThis.category
+            : editingEntity
+              ? categoryForType(editingEntity.type)
+              : null;
+
           const renderCategory = (cat: string, node: React.ReactNode): React.ReactNode => {
-            if (
-              editingEntity &&
-              categoryForType(editingEntity.type) === cat &&
-              editingEntity.sourcePath
-            ) {
+            if (editingEntity && surfaceCategory === cat && editingEntity.sourcePath) {
+              const closeEditor = () => {
+                setEditingEntityId(null);
+                setRefiling(null);
+              };
               return (
                 <EntitySurface
                   entity={editingEntity}
@@ -1326,15 +1380,16 @@ function AtlasPlacementEditorInner() {
                       if (!window.confirm("Discard your unsaved changes to this entity?")) return;
                       entityEditDraft.clear();
                     }
-                    setEditingEntityId(null);
+                    closeEditor();
                   }}
                   renderEdit={() => (
                     <EntityEditPanel
                       sourcePath={editingEntity.sourcePath!}
                       draftApi={entityEditDraft}
-                      onClose={() => setEditingEntityId(null)}
+                      initialType={refilingThis?.type}
+                      onClose={closeEditor}
                       onSaved={() => {
-                        setEditingEntityId(null);
+                        closeEditor();
                         void reloadCanon();
                       }}
                     />
@@ -1343,6 +1398,12 @@ function AtlasPlacementEditorInner() {
               );
             }
             return node;
+          };
+
+          /** "File as …" on a misfiled note: open it here with the type applied. */
+          const onFileAs = (category: CategoryId) => (entityId: string, suggestedType: string) => {
+            setRefiling({ id: entityId, type: suggestedType, category });
+            setEditingEntityId(entityId);
           };
 
           const panels: Record<string, React.ReactNode> = {
@@ -1365,6 +1426,7 @@ function AtlasPlacementEditorInner() {
                     entities={displayEntities}
                     onOpen={(id) => setEditingEntityId(id)}
                     onNew={() => setCreatingIn("characters")}
+                    onFileAs={onFileAs("characters")}
                     onImport={triggerMdImport}
                     hasPlacement={(id) => !!effectiveCoord(id)}
                     onShowOnMap={(id) => goTo(id)}
@@ -1388,6 +1450,7 @@ function AtlasPlacementEditorInner() {
                     entities={displayEntities}
                     onOpen={(id) => setEditingEntityId(id)}
                     onNew={() => setCreatingIn("locations")}
+                    onFileAs={onFileAs("locations")}
                     onImport={triggerMdImport}
                     hasPlacement={(id) => !!effectiveCoord(id)}
                     onShowOnMap={(id) => goTo(id)}
@@ -1411,6 +1474,7 @@ function AtlasPlacementEditorInner() {
                     entities={displayEntities}
                     onOpen={(id) => setEditingEntityId(id)}
                     onNew={() => setCreatingIn("factions")}
+                    onFileAs={onFileAs("factions")}
                     onImport={triggerMdImport}
                     hasPlacement={(id) => !!effectiveCoord(id)}
                     onShowOnMap={(id) => goTo(id)}
@@ -1434,6 +1498,7 @@ function AtlasPlacementEditorInner() {
                     entities={displayEntities}
                     onOpen={(id) => setEditingEntityId(id)}
                     onNew={() => setCreatingIn("events")}
+                    onFileAs={onFileAs("events")}
                     onImport={triggerMdImport}
                     hasPlacement={(id) => !!effectiveCoord(id)}
                     onShowOnMap={(id) => goTo(id)}
@@ -1457,6 +1522,7 @@ function AtlasPlacementEditorInner() {
                     entities={displayEntities}
                     onOpen={(id) => setEditingEntityId(id)}
                     onNew={() => setCreatingIn("items")}
+                    onFileAs={onFileAs("items")}
                     onImport={triggerMdImport}
                     hasPlacement={(id) => !!effectiveCoord(id)}
                     onShowOnMap={(id) => goTo(id)}
@@ -1809,6 +1875,12 @@ function AtlasPlacementEditorInner() {
             characterKeys: activeWorldId ? (
               <CharacterKeysPanel worldDir={`content/${activeWorldId}`} />
             ) : null,
+            calendar: (
+              <CalendarPanel
+                calendar={effectiveCalendar}
+                onPatch={(next) => setCalendarDraft({ value: next })}
+              />
+            ),
             help: <HelpPanel />,
           };
           const counts: Record<string, number | undefined> = {
@@ -1823,6 +1895,7 @@ function AtlasPlacementEditorInner() {
             world: "World details",
             maps: "Map details",
             assets: "Assets",
+            calendar: "Calendar",
             help: "Keyboard shortcuts",
           };
           const activePanelNode = active?.panel ?? (activePanel ? panels[activePanel] : null);
@@ -2267,14 +2340,27 @@ function PlacePinPopover({
           size="sm"
           className="gap-1"
           disabled={unplaced.length === 0}
+          // The visible label is hidden below `md`, which used to leave `title`
+          // as the button's only accessible name — announcing the status
+          // sentence "All entities are placed on this map" as if it were the
+          // label. An explicit aria-label keeps the name a verb at every width.
+          aria-label="Place a pin"
           title={
             unplaced.length === 0
-              ? "All entities are placed on this map"
-              : `Pick one of ${unplaced.length} unplaced entit${unplaced.length === 1 ? "y" : "ies"} to drop on ${activeMapName}`
+              ? `Every entry is already on ${activeMapName}`
+              : `Place one of ${unplaced.length} entr${unplaced.length === 1 ? "y" : "ies"} that ${unplaced.length === 1 ? "isn't" : "aren't"} on ${activeMapName} yet`
           }
         >
-          <Plus className="h-4 w-4" />
-          <span className="hidden md:inline">Place Pin</span>
+          <Plus className="h-4 w-4" aria-hidden />
+          <span className="hidden md:inline">Place a pin</span>
+          {unplaced.length > 0 && (
+            <span
+              className="ml-0.5 rounded-full bg-primary/15 px-1.5 text-[10px] tabular-nums text-primary"
+              aria-hidden
+            >
+              {unplaced.length}
+            </span>
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 p-0">

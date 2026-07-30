@@ -428,7 +428,11 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
           <div className="flex items-center gap-1.5">
             {(() => {
               const typeLabel = playerTypeLabel(entity.type);
-              const kicker = [typeLabel, entity.race].filter(Boolean).join(" · ");
+              // dateRaw already drives the Timeline's ordering, so an event that
+              // sorts by date used to show no date at all on its own page.
+              const kicker = [typeLabel, entity.race, entity.dateRaw]
+                .filter(Boolean)
+                .join(" · ");
               return kicker ? (
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   {kicker}
@@ -530,6 +534,14 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
             </div>
           )}
 
+          <div
+            ref={setBodyRefs}
+            className="atlas-prose max-w-none"
+            dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(entity.bodyHtml) }}
+          />
+
+          {/* Actions sit after the prose so the summary flows straight into the
+              body — this button used to split the read in two. */}
           {placements.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {placements.map((p) => (
@@ -545,12 +557,6 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
               ))}
             </div>
           )}
-
-          <div
-            ref={setBodyRefs}
-            className="atlas-prose max-w-none"
-            dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(entity.bodyHtml) }}
-          />
 
           {readerAffordances && <NotesPanel entityId={entity.id} entityTitle={entity.title} />}
 

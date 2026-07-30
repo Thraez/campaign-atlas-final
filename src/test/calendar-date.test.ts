@@ -28,7 +28,7 @@ describe("parseAtlasDate", () => {
     expect(parseAtlasDate("Year of the Flood", undefined)).toBeNull();
   });
 
-  it("YYYY-MM-DD without calendar: uses 365-day approximation, label = raw string", () => {
+  it("YYYY-MM-DD without calendar: 365-day approximation, label spells out the parts", () => {
     const result = parseAtlasDate("1247-03-15", undefined);
     expect(result).not.toBeNull();
     // value = 1247 * 365 + 2 * 30 + 15 = 455155 + 60 + 15 = 455230
@@ -36,7 +36,14 @@ describe("parseAtlasDate", () => {
     expect(result!.year).toBe(1247);
     expect(result!.monthIndex).toBe(2);
     expect(result!.day).toBe(15);
-    expect(result!.label).toBe("1247-03-15");
+    // Never the raw "1247-03-15" — that reads as a real-world ISO date.
+    expect(result!.label).toBe("1247 · month 3, day 15");
+  });
+
+  it("no-calendar label never contains a bare hyphenated date triple", () => {
+    for (const raw of ["612-6-3", "0-1-1", "47-3-12"]) {
+      expect(parseAtlasDate(raw, undefined)!.label).not.toMatch(/^-?\d+-\d+-\d+$/);
+    }
   });
 
   it("YYYY only without calendar: defaults month=0 day=1", () => {
@@ -54,6 +61,8 @@ describe("parseAtlasDate", () => {
     expect(result!.year).toBe(1300);
     expect(result!.monthIndex).toBe(6);
     expect(result!.day).toBe(1);
+    // Day was absent from the input, so the label must not invent one.
+    expect(result!.label).toBe("1300 · month 7");
   });
 
   it("YYYY-MM-DD with calendar: uses calendar month lengths for value and month name in label", () => {

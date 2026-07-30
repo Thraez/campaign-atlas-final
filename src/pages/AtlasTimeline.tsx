@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
+import { isDmToolsEnabled } from "@/atlas/dmTools";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { entityMatchesQuery } from "@/atlas/search/entityMatchesQuery";
 import {
@@ -83,6 +84,10 @@ export default function AtlasTimeline() {
   }
 
   const worldName = project.worlds[0]?.name ?? "Atlas";
+  // Dated entries exist but no month names to render them with. Only the DM can
+  // act on this, and only the editor build can reach the calendar panel.
+  const needsCalendar =
+    isDmToolsEnabled() && dated.length > 0 && !(project.calendar?.months?.length ?? 0);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
@@ -163,6 +168,21 @@ export default function AtlasTimeline() {
               Calendar: <span className="text-foreground">{project.calendar.name}</span>
               {project.calendar.epochName ? ` · epoch ${project.calendar.epochName}` : ""}
             </p>
+          )}
+
+          {/* No months named yet, so every date here reads as plain numbers.
+              DM-only: a player can't fix this and shouldn't be asked to. */}
+          {needsCalendar && (
+            <div className="mb-4 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs space-y-2">
+              <p className="font-medium text-foreground">Your months don&rsquo;t have names yet.</p>
+              <p className="text-muted-foreground">
+                Name them once and every date in the atlas reads the way your world does, instead of
+                as a number.
+              </p>
+              <Button asChild size="sm" variant="secondary" className="h-7 text-xs">
+                <Link to="/atlas/edit?panel=calendar">Name your months</Link>
+              </Button>
+            </div>
           )}
 
           {groups.length === 0 && dated.length > 0 ? (

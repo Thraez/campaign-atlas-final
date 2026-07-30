@@ -12,6 +12,7 @@ export interface EditorMenuItem {
 export const EDITOR_MENU_ITEMS: EditorMenuItem[] = [
   { id: "world-details", label: "Edit world details" },
   { id: "map-details", label: "Edit map details" },
+  { id: "calendar", label: "Name the months" },
   { id: "manage-assets", label: "Manage assets" },
   { id: "help", label: "Help" },
 ];
@@ -20,12 +21,14 @@ export function EditorMenu({
   open,
   onWorldDetails,
   onMapDetails,
+  onCalendar,
   onAssetManager,
   onHelp,
 }: {
   open?: boolean;
   onWorldDetails: () => void;
   onMapDetails: () => void;
+  onCalendar: () => void;
   onAssetManager: () => void;
   onHelp: () => void;
 }) {
@@ -33,6 +36,7 @@ export function EditorMenu({
   const handlers: Record<string, () => void> = {
     "world-details": onWorldDetails,
     "map-details": onMapDetails,
+    calendar: onCalendar,
     "manage-assets": onAssetManager,
     help: onHelp,
   };

@@ -38,3 +38,15 @@ export function categoryForType(type: string | undefined | null): CategoryId {
   const t = (type ?? "").trim().toLowerCase();
   return TYPE_TO_CATEGORY[t] ?? "lore";
 }
+
+/**
+ * True when `type` has an explicit home in TYPE_TO_CATEGORY.
+ *
+ * `categoryForType` is deliberately total, so a typeless entity and a genuine
+ * lore entry both answer "lore" and are indistinguishable. Callers that need
+ * to know whether the DM actually *chose* that home — e.g. to offer re-filing
+ * for an imported note — ask this instead.
+ */
+export function isKnownEntityType(type: string | undefined | null): boolean {
+  return ((type ?? "").trim().toLowerCase() in TYPE_TO_CATEGORY);
+}
