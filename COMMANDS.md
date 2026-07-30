@@ -99,6 +99,24 @@ Walks every asset reference in the atlas and confirms the file actually exists
 under `public/atlas/assets/`. Catches broken image links before players see a
 404.
 
+### `npm run atlas:check-image-privacy <dir>` &nbsp;·&nbsp; `bin/atlas-check-image-privacy.cmd`
+
+Scans every image under `<dir>` for privacy-sensitive metadata (EXIF GPS,
+author fields, etc.) that shouldn't ship to players. The launcher passes
+`dist`.
+
+### `npm run atlas:check-fog <dir>` &nbsp;·&nbsp; `bin/atlas-check-fog.cmd`
+
+Re-derives fog geometry from the source world config and re-checks the built
+player artifacts against it (leaked layer images, leaked geometry, in-fog
+content, alpha leaks). The launcher passes `dist`.
+
+### `npm run atlas:check-player-secrets <dir>` &nbsp;·&nbsp; `bin/atlas-check-player-secrets.cmd`
+
+Scans player artifacts for unstripped `{{secret:}}` markers or leaked
+character-secret plaintext. Complements `check-secrets`'s sentinel/fingerprint
+scan with a player-secrets-specific one. The launcher passes `dist`.
+
 ### `npm run lint` &nbsp;·&nbsp; `bin/lint.cmd`
 
 ESLint over the whole repo. Run before committing TypeScript/React changes.

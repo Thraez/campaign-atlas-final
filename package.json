@@ -30,6 +30,7 @@
     "atlas:publish:integrity-smoke": "tsx scripts/atlas/publish-integrity-smoke.ts",
     "atlas:check-secrets": "tsx scripts/check-no-secrets.ts",
     "atlas:check-derived": "tsx scripts/check-derived-secrets.ts",
+    "atlas:check-player-secrets": "tsx scripts/check-player-secrets.ts",
     "atlas:check-image-privacy": "tsx scripts/check-image-privacy.ts",
     "atlas:check-fog": "tsx scripts/check-fog-safety.ts",
     "atlas:check-shape": "tsx scripts/check-artifact-shape.ts",
