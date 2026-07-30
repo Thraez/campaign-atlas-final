@@ -17,7 +17,7 @@ describe("railRegistry", () => {
     expect(firstMap).toBeLessThan(firstSystem);
   });
 
-  it("includes the six content categories and the four map tools", () => {
+  it("includes the six content categories and the map tools", () => {
     const items = buildRailItems({ panels: {} as never, counts: {} });
     const ids = items.map((i) => i.id);
     expect(ids).toEqual(
@@ -32,10 +32,26 @@ describe("railRegistry", () => {
         "regions",
         "routes",
         "fog",
-        "save",
         "publish",
       ]),
     );
+  });
+
+  it("registers no Save item — it had no panel, and the toolbar owns Save", () => {
+    const items = buildRailItems({ panels: {} as never, counts: {} });
+    expect(items.find((i) => i.id === "save")).toBeUndefined();
+  });
+
+  it("every item has a panel key it can actually render", () => {
+    // A rail item with no corresponding panel opens an empty flyout. Guard the
+    // whole registry rather than one id, so the next addition can't regress.
+    const panels = Object.fromEntries(
+      buildRailItems({ panels: {} as never, counts: {} }).map((i) => [i.id, <div key={i.id} />]),
+    );
+    const items = buildRailItems({ panels, counts: {} });
+    for (const it of items) {
+      expect(it.panel, `rail item "${it.id}" has no panel`).toBeDefined();
+    }
   });
 
   it("resolves a badge count when a badge fn is provided", () => {

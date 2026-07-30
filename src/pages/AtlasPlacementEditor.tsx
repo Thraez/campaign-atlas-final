@@ -551,6 +551,8 @@ function AtlasPlacementEditorInner() {
 
   // ☰ menu open/close state
   const [menuOpen, setMenuOpen] = useState(false);
+  /** "Where does this save?" disclosure — replaces the old permanent banner. */
+  const [saveHelpOpen, setSaveHelpOpen] = useState(false);
 
   /** When true, finishing a placement automatically queues the next unplaced entity. */
   const [chainPlaceMode, setChainPlaceMode] = useState(false);
@@ -1012,6 +1014,10 @@ function AtlasPlacementEditorInner() {
       layerEditor.localLayers.length +
       (mapMetadataDirty ? 1 : 0) +
       (worldSettingsDirty ? 1 : 0) +
+      // Without this the calendar draft would be invisible to SaveStatus: the
+      // toolbar would report "All changes saved" and offer no Save button while
+      // an edited calendar sat waiting to be written.
+      (calendarDirty ? 1 : 0) +
       dirtyCount +
       foreignMapDrafts.length +
       (entityEditDraft.isDirty() ? 1 : 0),
@@ -1161,20 +1167,35 @@ function AtlasPlacementEditorInner() {
           </Button>
         </div>
       )}
-      <div className="px-3 py-1.5 text-[11px] bg-primary/10 text-foreground border-b border-primary/20 flex items-center justify-between gap-2">
-        <span
-          className="flex items-center gap-2 min-w-0"
-          title="YAML canon (committed) → local draft (this browser) → Save (dev plugin writes canon + rebuilds atlas) → git commit"
+      {/* The permanent banner that used to live here explained the build
+          pipeline ("YAML canon → local draft → Save (dev plugin writes canon
+          + rebuilds atlas)") above the workspace, every session. SaveStatus in
+          the toolbar already answers the only question it was really for — is
+          my work safe right now — in DM-facing words. What remains is the way
+          out, plus the explanation on demand for the times you do want it. */}
+      <div className="px-3 py-1.5 text-[11px] text-muted-foreground border-b border-border flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setSaveHelpOpen((v) => !v)}
+          aria-expanded={saveHelpOpen}
+          className="hover:text-foreground hover:underline shrink-0"
         >
-          <span className="truncate">
-            <strong>YAML is canon.</strong> Save writes directly to your entity .md files and
-            rebuilds the atlas — commit with git when ready.
-          </span>
-        </span>
+          Where does this save?
+        </button>
         <Link to="/" className="text-primary hover:underline shrink-0">
           ← Back
         </Link>
       </div>
+      {saveHelpOpen && (
+        <div className="px-3 py-2 text-[11px] bg-muted/40 text-muted-foreground border-b border-border space-y-1.5">
+          <p>
+            Your changes stay in this browser until you save. Saving writes them straight into your
+            world&rsquo;s markdown files and rebuilds the atlas, so the player view updates without
+            leaving the page.
+          </p>
+          <p>Those markdown files are the real thing — commit them with git when you&rsquo;re happy.</p>
+        </div>
+      )}
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
         <Link
           to="/"
@@ -1286,20 +1307,14 @@ function AtlasPlacementEditorInner() {
           activeMapName={activeMap.name}
           onPick={(id) => setPendingId(id)}
         />
-        <Button
-          variant="default"
-          size="sm"
-          onClick={onSaveClick}
-          // W2: nothing to write when the session is clean — don't offer Save.
-          disabled={saveModalOpen || session.status === "clean"}
-          className="gap-1"
-          title="Write canonical .md frontmatter and rebuild the atlas. Commit with git when ready."
-        >
-          <SaveIcon className="h-4 w-4" />
-          <span className="hidden md:inline">Save</span>
-        </Button>
+        {/* The standalone Save button that used to sit here was the third Save
+            control in the editor — SaveStatus above already shows the state and
+            offers Save exactly when there is something to write, and the rail
+            had a dead "Save" item with no panel behind it. One Save now. */}
         <Button asChild variant="ghost" size="sm">
-          <Link to="/atlas">View as player →</Link>
+          <Link to="/atlas" title="Open the player site in a new tab — the real thing" target="_blank" rel="noreferrer">
+            Open player site ↗
+          </Link>
         </Button>
         <div className="relative">
           <Button

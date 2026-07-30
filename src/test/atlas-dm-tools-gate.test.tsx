@@ -8,7 +8,7 @@
  * stays unlocked for editor convenience.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import React, { Suspense } from "react";
 
@@ -125,19 +125,28 @@ describe("Landing tile gating", () => {
     );
   }
 
-  it("production with flag missing → no editor tile or 'Edit pins' link", async () => {
+  it("production with flag missing → no editor tile or link", async () => {
     setEnv({ dev: false });
     await renderLanding();
-    expect(screen.queryByText(/DM Placement & Map Editor/i)).toBeNull();
+    expect(screen.queryByText(/Open the editor/i)).toBeNull();
     // No anchor pointing at the editor route should be in the DOM.
     const editorLinks = document.querySelectorAll('a[href="/atlas/edit"]');
     expect(editorLinks.length).toBe(0);
   });
 
+  it("production with flag missing → the build-details disclosure leaks no editor link", async () => {
+    setEnv({ dev: false });
+    await renderLanding();
+    // The "how this works" text is editor-gated too; opening it must not
+    // introduce a route a player could follow.
+    fireEvent.click(screen.getByRole("button", { name: /how this works/i }));
+    expect(document.querySelectorAll('a[href="/atlas/edit"]').length).toBe(0);
+  });
+
   it("production with VITE_ENABLE_DM_TOOLS=true → editor tile is present", async () => {
     setEnv({ dev: false, flag: "true" });
     await renderLanding();
-    expect(screen.getByText(/DM Placement & Map Editor/i)).toBeInTheDocument();
+    expect(screen.getByText(/Open the editor/i)).toBeInTheDocument();
     const editorLinks = document.querySelectorAll('a[href="/atlas/edit"]');
     expect(editorLinks.length).toBeGreaterThan(0);
   });
@@ -145,6 +154,6 @@ describe("Landing tile gating", () => {
   it("dev default → editor tile is present", async () => {
     setEnv({ dev: true });
     await renderLanding();
-    expect(screen.getByText(/DM Placement & Map Editor/i)).toBeInTheDocument();
+    expect(screen.getByText(/Open the editor/i)).toBeInTheDocument();
   });
 });

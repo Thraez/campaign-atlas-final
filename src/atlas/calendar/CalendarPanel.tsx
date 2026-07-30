@@ -9,7 +9,6 @@
  * The panel writes into the same world.yaml save batch as the map / region /
  * route / fog tabs, so it is a local draft until the DM hits Save.
  */
-import { useMemo } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { WorldCalendar, CalendarMonth } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
@@ -28,10 +27,9 @@ export function CalendarPanel({
 }) {
   const months = calendar?.months ?? [];
 
-  const yearLength = useMemo(
-    () => months.reduce((sum, m) => sum + (Number.isFinite(m.days) ? m.days : 0), 0),
-    [months],
-  );
+  // A dozen additions — not worth memoising, and memoising a `??` expression
+  // just moves the problem into the dependency array.
+  const yearLength = months.reduce((sum, m) => sum + (Number.isFinite(m.days) ? m.days : 0), 0);
 
   /** Emit a calendar, collapsing to undefined once nothing is left to store. */
   const emit = (next: Partial<WorldCalendar>) => {

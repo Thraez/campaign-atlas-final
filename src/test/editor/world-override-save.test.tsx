@@ -18,9 +18,11 @@ import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import AtlasPlacementEditor from "@/pages/AtlasPlacementEditor";
 import { makeProject, makeSearchIndex } from "../helpers/makeProject";
+import { clearEditorSession } from "../helpers/clearEditorSession";
 
-beforeEach(() => {
+beforeEach(async () => {
   localStorage.clear();
+  await clearEditorSession();
   vi.stubGlobal(
     "fetch",
     vi.fn((url: string) => {
@@ -56,10 +58,9 @@ describe("world-level save path (patchWorld → world.yaml credits)", () => {
         <AtlasPlacementEditor />
       </MemoryRouter>,
     );
-    // Editor mounted once canon loaded.
-    await waitFor(() =>
-      expect(screen.getAllByRole("button", { name: /save/i }).length).toBeGreaterThan(0),
-    );
+    // Editor mounted once canon loaded. Nothing is dirty yet, so the single
+    // Save control correctly offers no button — assert on the status instead.
+    await waitFor(() => expect(screen.getByText("All changes saved")).toBeInTheDocument());
 
     // Open the ☰ menu → Edit world details.
     fireEvent.click(screen.getByRole("button", { name: "Menu" }));
@@ -71,9 +72,9 @@ describe("world-level save path (patchWorld → world.yaml credits)", () => {
     fireEvent.click(badges);
     await waitFor(() => expect(screen.getByLabelText("Show credit badges")).not.toBeChecked());
 
-    // Save via the rail Save (always fires onSaveClick regardless of the
-    // toolbar's enabled gate).
-    fireEvent.click(screen.getByTitle("Save (Ctrl+S)"));
+    // A world-level change must reach the ONE Save control — this is the
+    // regression that made three competing Save buttons look necessary.
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     // The diff modal opens and lists the world.yaml write.
     await waitFor(() => expect(screen.getByText(/_atlas\/world\.yaml/)).toBeInTheDocument());
