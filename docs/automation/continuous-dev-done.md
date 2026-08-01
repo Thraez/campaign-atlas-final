@@ -3394,3 +3394,24 @@ documented `onTaskUpdate` RPC flake, 0 real failures, not re-run per policy). Ne
 **Commits:** `b18508b1` (feat: `approvedHash` on `SyncMapEntry` + `classifyVaultNote` /
 `findPathByApprovedHash` + widened `recordSync`, 8 new tests), on `run/v1-vault-sync-hash`, fast-forward
 merged into `auto/continuous-dev` (no separate merge commit — still at the fork point).
+
+- [x] **V2. Leave unchanged notes unticked on re-sync.** ✅ DONE
+  2026-08-01 — commit `11cd5d5f`.
+
+Plan Task A2 (`docs/superpowers/plans/2026-08-01-vault-publishing.md`), Phase A of the vault-publishing
+refuel. `RawImportFile` and `StagingRow` (`src/atlas/import/stagingState.ts`) both gained an optional
+`vaultState: VaultNoteState` field, carried straight through from the scan input onto the built row. The
+`included` default in `buildStagingRow` now also requires `input.vaultState !== "unchanged"` — a note whose
+bytes match what was last published has nothing to import, so it now defaults unticked; new/changed rows
+(and non-vault rows, where `vaultState` is `undefined`) are unaffected.
+
+**Gate:** `npx tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (18 pre-existing,
+unchanged) · sharded vitest all green (746+654+821+808 = 3029 tests across 4 shards; shards 1 and 4 hit the
+documented `onTaskUpdate` RPC flake, 0 real failures, not re-run per policy). New
+`src/test/import/vault-drift.test.ts` (4 tests) plus the whole `src/test/import/` folder (13 files, 76
+tests) and the wider staging-state/staging-modal/build-import-changes suites (83 tests) all passed — the
+changed default can't quietly break an existing staging test. Pure state-primitive change — no `scripts/`,
+fog, soundscape, or shipped-artifact touch — so `npm run atlas:publish` wasn't required.
+
+**Commits:** `11cd5d5f` (feat: `vaultState` on `RawImportFile`/`StagingRow`, `included` defaults false for
+`"unchanged"`, 4 new tests), on `run/v2-vault-drift-staging`, merged into `auto/continuous-dev`.

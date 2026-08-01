@@ -221,9 +221,7 @@ is for sequencing, not the whole spec.
 
 - [x] **V1. Record what a vault note looked like when it was published.** ✅ DONE 2026-08-01 — commit `b18508b1`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **V2. Leave unchanged notes unticked on re-sync.** Plan Task A2 — carry `vaultState` on `RawFileInput` + `StagingRow`, and make the `included` default in `buildStagingRows` (~:292) false for `"unchanged"`.
-  - **Done when:** `src/test/import/vault-drift.test.ts` passes and the whole `src/test/import/` folder stays green (the `included` default is shared).
-  - **Gate:** standard gate. ~1 run.
+- [x] **V2. Leave unchanged notes unticked on re-sync.** ✅ DONE 2026-08-01 — commit `11cd5d5f`. Full write-up in `continuous-dev-done.md`.
 
 - [ ] **V3. Detect vault notes that changed since they were published.** Plan Task A3 — hash each scanned note in `openWithVaultScan`, classify against the sync map, treat an exact-hash match at another path as a move, and record the hash only after a successful commit.
   - **Done when:** a second sync with no vault edit reports 0 changed; editing a note in the vault reports it as changed.
