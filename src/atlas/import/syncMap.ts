@@ -4,17 +4,62 @@ export interface SyncMapEntry {
   id: string;
   /** Last-synced vault type (used for two-way type conflict detection in §3.6). */
   baseType: string;
+  /**
+   * `sha256:<hex>` of the vault note's raw bytes at the last successful sync.
+   * Optional because maps written before this feature have no hash; those
+   * entries classify as "unknown" once, then settle on the next sync.
+   */
+  approvedHash?: string;
 }
 
 /** Keyed by vault-relative POSIX path (e.g. "notes/corven.md"). */
 export type SyncMap = Record<string, SyncMapEntry>;
+
+/** How a scanned vault note relates to what was last published from it. */
+export type VaultNoteState = "unchanged" | "changed" | "new" | "unknown";
 
 /** Return the sync-map entry for a vault-relative path, or undefined if not present. */
 export function lookupByPath(map: SyncMap, relPath: string): SyncMapEntry | undefined {
   return map[relPath];
 }
 
+/**
+ * Compare a scanned note against what was last published from that path.
+ * `currentHash` must come from hashContent() so the formats match.
+ */
+export function classifyVaultNote(
+  map: SyncMap,
+  relPath: string,
+  currentHash: string,
+): VaultNoteState {
+  const entry = map[relPath];
+  if (!entry) return "new";
+  if (!entry.approvedHash) return "unknown";
+  return entry.approvedHash === currentHash ? "unchanged" : "changed";
+}
+
+/**
+ * Exact-hash lookup used to spot a renamed/moved note: a note with no entry at
+ * its own path whose bytes match a hash recorded elsewhere. Exact match only —
+ * deliberately not fuzzy (design §3, June §5.3).
+ */
+export function findPathByApprovedHash(map: SyncMap, hash: string): string | undefined {
+  for (const [relPath, entry] of Object.entries(map)) {
+    if (entry.approvedHash === hash) return relPath;
+  }
+  return undefined;
+}
+
 /** Return a new SyncMap with the given entry added or updated (pure — does not mutate the original). */
-export function recordSync(map: SyncMap, relPath: string, id: string, baseType: string): SyncMap {
-  return { ...map, [relPath]: { id, baseType } };
+export function recordSync(
+  map: SyncMap,
+  relPath: string,
+  id: string,
+  baseType: string,
+  approvedHash?: string,
+): SyncMap {
+  return {
+    ...map,
+    [relPath]: { id, baseType, ...(approvedHash ? { approvedHash } : {}) },
+  };
 }
