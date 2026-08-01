@@ -197,6 +197,88 @@ is for sequencing, not the whole spec.
 
 - [x] **Q100. Add a build-smoke test that keeps the documented seed-world path green.** ✅ DONE 2026-07-27 — commit f37b3ef1
 
+### V — Refuel 2026-08-01 (vault publishing, part 2 — blessed by the DM)
+
+> DM-directed refuel after an adversarial review of the 2026-07-31 vault design, which was **withdrawn**:
+> it proposed rebuilding the Obsidian sync that already shipped 2026-06-17. What survived review are three
+> genuine gaps — nothing detects a vault note that changed after publishing, image embeds are silently
+> discarded, and every sync pulls all 2,179 notes into one table.
+>
+> **Authoritative spec:** `docs/superpowers/specs/2026-08-01-vault-publishing-design.md`
+> **Authoritative plan (read in full before building):** `docs/superpowers/plans/2026-08-01-vault-publishing.md`
+> Each unit below is one plan task, already TDD-decomposed with test code, exact file paths, and commit
+> messages. **Build V1 → V15 in order, one per run.** Phase A (V1–V6) ships on its own; Phase C (V10–V15)
+> depends on Phase B (V7–V9).
+>
+> **Non-negotiable for every unit in this section:**
+> - **Never weaken visibility defaults.** `build-atlas.ts:425` defaults a missing `atlas.visibility` to
+>   **player**, so an omitted key is a leak, not a neutral state. New entities from vault notes must keep
+>   writing `visibility: dm` (June design §5.7).
+> - **Never write to the vault.** Every vault path is read-only; `isReadableVaultPath` is the boundary.
+> - **Mutation-check every safety test** — break the code deliberately and confirm the test fails before
+>   trusting it. A regression test that has never failed proves nothing (audio-prune lesson, 2026-07-30).
+> - `.local-atlas/` is gitignored and stays that way; the sync map is machine-local by design.
+
+- [ ] **V1. Record what a vault note looked like when it was published.** Plan Task A1 — `approvedHash` on `SyncMapEntry`, plus `classifyVaultNote` / `findPathByApprovedHash` / widened `recordSync` in `src/atlas/import/syncMap.ts`. Pure, no I/O, no behaviour change yet.
+  - **Done when:** `src/test/import/syncMap.test.ts` passes (8 tests) and `tsc --noEmit -p tsconfig.app.json` is clean with existing 4-argument `recordSync` callers untouched.
+  - **Gate:** standard gate (typecheck + ESLint + sharded vitest). ~1 run.
+
+- [ ] **V2. Leave unchanged notes unticked on re-sync.** Plan Task A2 — carry `vaultState` on `RawFileInput` + `StagingRow`, and make the `included` default in `buildStagingRows` (~:292) false for `"unchanged"`.
+  - **Done when:** `src/test/import/vault-drift.test.ts` passes and the whole `src/test/import/` folder stays green (the `included` default is shared).
+  - **Gate:** standard gate. ~1 run.
+
+- [ ] **V3. Detect vault notes that changed since they were published.** Plan Task A3 — hash each scanned note in `openWithVaultScan`, classify against the sync map, treat an exact-hash match at another path as a move, and record the hash only after a successful commit.
+  - **Done when:** a second sync with no vault edit reports 0 changed; editing a note in the vault reports it as changed.
+  - **Gate:** standard gate. ~2 runs.
+
+- [ ] **V4. Say plainly what changed.** Plan Task A4 — `VaultSyncSummary` in `src/atlas/sync/SyncPanel.tsx`, leading with changed notes and reducing unchanged ones to a count.
+  - **Done when:** `src/test/sync-panel.test.tsx` passes; wording is DM-facing (no "drift", no "hash", no paths).
+  - **Gate:** standard gate. ~1 run.
+
+- [ ] **V5. Pin that reworked notes are reported, never auto-applied.** Plan Task A5 — property test plus a **mandatory mutation check**: make `classifyVaultNote` always return `"unchanged"` and confirm the suite fails before reverting.
+  - **Done when:** the mutation check demonstrably fails, then passes after revert.
+  - **Gate:** standard gate. ~1 run.
+
+- [ ] **V6. Warn before a vault change overwrites an edit made in the atlas.** Plan Task A6 — `syncedFileHash` + `hasLocalEdits` in `syncMap.ts`, a fourth `needsReview` reason `"local-edits"` in `stagingState.ts` (~:126), and the flag set on changed update rows.
+  - **Done when:** a note edited in the editor and then changed in the vault comes back unticked and marked for review.
+  - **Gate:** standard gate. ~2 runs.
+
+- [ ] **V7. List vault folders with note counts, without reading notes.** Plan Task B1 — `handleVaultFoldersRequest` + `GET /__atlas/vault-folders` in `scripts/vite-plugin-atlas-save.ts`, honouring `isReadableVaultPath`, returning no file contents.
+  - **Done when:** `src/test/import/vault-folders.test.ts` passes (4 tests), including the assertion that no note text appears in the response.
+  - **Gate:** standard gate **+ `npm run atlas:publish`** (touches the dev-server plugin; the new route must not reach the player bundle — `check-secrets` exit 9 is the signal). ~1 run.
+
+- [ ] **V8. Scan only the folders the DM picked.** Plan Task B2 — third `includeFolders` parameter on `handleVaultScanRequest`, repeated `folder` query params, and `candidateFolders` on `SyncSettings`. Patterns are **built in code, never typed by the DM** — a bare folder name is not a glob and matches nothing.
+  - **Done when:** a scan scoped to one folder returns only that folder's notes; an empty list preserves today's whole-vault behaviour.
+  - **Gate:** standard gate **+ `npm run atlas:publish`**. ~1 run.
+
+- [ ] **V9. Pick vault folders with tick boxes instead of typing globs.** Plan Task B3 — `VaultFolderPicker` in `SyncPanel.tsx`, wired to `candidateFolders`, with the `onSync` prop widened to a third argument (fix the call site in `AtlasPlacementEditor.tsx`).
+  - **Done when:** `src/test/sync-panel.test.tsx` passes and the panel lists real folders with counts against the DM's vault.
+  - **Gate:** standard gate. ~2 runs.
+
+- [ ] **V10. Resolve image embeds, refusing anything outside the chosen folders.** Plan Task C1 — new pure `src/atlas/import/resolveVaultImage.ts` (`resolveVaultImage`, `vaultImageTargetName`). An embed can name an image sitting in a DM-only folder; resolution must refuse it and report why.
+  - **Done when:** `src/test/import/resolveVaultImage.test.ts` passes (8 tests) **and** the mandatory mutation check (make `inCandidates` always return true) fails the out-of-scope test before revert.
+  - **Gate:** standard gate. ~1 run.
+
+- [ ] **V11. Copy vault images out with metadata stripped.** Plan Task C2 — `handleVaultImageCopyRequest` + `POST /__atlas/vault-image-copy`, server-side so image bytes never round-trip through the browser. **The route must strip `publicDir` from the request body** so a request cannot redirect writes.
+  - **Done when:** `src/test/import/vault-image-copy.test.ts` passes (3 tests): in-scope copy named from the entity, EXIF gone, out-of-scope refused with nothing written.
+  - **Gate:** standard gate **+ `npm run atlas:publish`** (writes into `public/atlas/assets/images/`; `check-image-privacy` must stay clean). ~2 runs.
+
+- [ ] **V12. Bring note images across and rewrite the embeds.** Plan Task C3 — `rewriteEmbeds` in `resolveVaultImage.ts`, wired into the sync commit. A refused image leaves **no broken link and no hint the file exists**; the DM is told how many were skipped and why.
+  - **Done when:** an embed with a copied image becomes `![](/atlas/assets/images/…)`, a refused one disappears cleanly, and ordinary `[[wikilinks]]` are untouched.
+  - **Gate:** standard gate **+ `npm run atlas:publish`**. ~2 runs.
+
+- [ ] **V13. Keep vault filenames out of suggested asset paths.** Plan Task C4 — `parseObsidian.ts:128` currently slugifies the *source* filename into the target. A vault filename can itself be a spoiler (`the-cabal-lair.png`) and would trip the image-privacy filename scan; the real name comes from the entity id at copy time.
+  - **Done when:** a parsed attachment's `suggestedTarget` contains no fragment of the source filename.
+  - **Gate:** standard gate **+ `npm run atlas:publish`**. ~1 run.
+
+- [ ] **V14. Correct the stale asset-allowlist comment.** Plan Task C5 — `scripts/vite-plugin-atlas-save.ts:368` claims `asset-binary` lands under `maps/` only, but `isWritableAssetPath` (`sourcePathAllowlist.ts:126-132`) has always permitted `images/` too. Comment-only fix; **no allowlist change is needed or wanted.**
+  - **Done when:** the comment matches the code.
+  - **Gate:** standard gate. Nibble, <1 run — fold into V13's run if convenient.
+
+- [ ] **V15. Pin that the vault is never written and visibility is always explicit.** Plan Task C6 — hash the whole fixture vault before/after a full scan + image copy and assert byte-identity; assert a new entity from a vault note resolves to `dm`, not `player`.
+  - **Done when:** both properties pass **and** the mandatory mutation check (add a stray write into the copy handler) fails the immutability test before revert. **If the visibility test fails, stop and hand back — that is a live secrecy regression, not a test bug.**
+  - **Gate:** standard gate **+ `npm run atlas:publish`**. ~1 run.
+
 ---
 
 ## 🔋 REFUEL POINT — read this when every WANT above is ✅ DONE
