@@ -843,7 +843,16 @@ async function runBuildCore(flags: BuildFlags) {
       return { ...m, soundscape: filterSoundscapeForPlayer(m.soundscape, m.regions) };
     });
     const allAreas = maps.flatMap((m) => m.soundscape?.areas ?? []);
-    const rewrite = hashAudioAssets(allAreas, path.join(ROOT, "public"));
+    // Hashed audio always lands in public/atlas/assets/audio, but only a
+    // build writing its atlas to the default output location owns that
+    // directory. A build redirected with --out (the scanner fixtures in
+    // src/test do exactly this, from the repo root) publishes its atlas
+    // elsewhere; if it also pruned, it would delete the hashed files the
+    // live public/atlas/atlas.json still references — silently 404ing
+    // player ambience. Copy always, prune only when we own the tree.
+    const rewrite = hashAudioAssets(allAreas, path.join(ROOT, "public"), {
+      prune: !flags.outDir,
+    });
     maps = maps.map((m) => {
       if (!m.soundscape?.areas?.length) return m;
       return {

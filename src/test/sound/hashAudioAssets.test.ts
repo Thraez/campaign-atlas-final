@@ -133,6 +133,28 @@ describe("hashAudioAssets", () => {
     expect(remaining[0]).toMatch(/^[a-f0-9]{8}\.ogg$/);
   });
 
+  it("keeps hashed files a caller did not re-emit when prune is false", () => {
+    const audioDir = path.join(tmpDir, "atlas", "assets", "audio");
+    const map1 = hashAudioAssets([area("atlas/assets/maps/tavern.ogg")], tmpDir);
+    const publishedName = path.basename(map1.get("atlas/assets/maps/tavern.ogg")!);
+
+    // A build that does not own this tree (e.g. redirected via --out) must
+    // never delete what the published atlas still references.
+    hashAudioAssets([area("atlas/assets/maps/forest.ogg")], tmpDir, { prune: false });
+
+    expect(fs.existsSync(path.join(audioDir, publishedName))).toBe(true);
+  });
+
+  it("prunes by default when the caller passes no options (owner build)", () => {
+    const audioDir = path.join(tmpDir, "atlas", "assets", "audio");
+    const map1 = hashAudioAssets([area("atlas/assets/maps/tavern.ogg")], tmpDir);
+    const staleName = path.basename(map1.get("atlas/assets/maps/tavern.ogg")!);
+
+    hashAudioAssets([area("atlas/assets/maps/forest.ogg")], tmpDir, {});
+
+    expect(fs.existsSync(path.join(audioDir, staleName))).toBe(false);
+  });
+
   it("does not delete manifest.json or non-hashed-name files in the audio dir", () => {
     const audioDir = path.join(tmpDir, "atlas", "assets", "audio");
     fs.mkdirSync(audioDir, { recursive: true });
