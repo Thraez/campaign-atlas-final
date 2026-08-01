@@ -15,5 +15,12 @@ npx eslint . || exit 1
 # Capture output and only fail the commit if tests actually failed.
 VITEST_OUT=$(npx vitest run --changed 2>&1)
 printf '%s\n' "$VITEST_OUT"
-printf '%s\n' "$VITEST_OUT" | grep -qE "failed \|" && exit 1
+
+# Vitest colorizes "N failed" and inserts ANSI reset codes between it and
+# the following "| M passed", so the literal "failed |" substring never
+# appears contiguously in real (non-piped) terminal output. Strip ANSI
+# escapes before checking, or a real failure silently lets the commit through.
+ESC=$(printf '\033')
+CLEAN_OUT=$(printf '%s\n' "$VITEST_OUT" | sed "s/${ESC}\[[0-9;]*[a-zA-Z]//g")
+printf '%s\n' "$CLEAN_OUT" | grep -qE "failed \|" && exit 1
 exit 0

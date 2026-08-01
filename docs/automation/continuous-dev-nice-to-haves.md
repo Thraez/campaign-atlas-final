@@ -1215,3 +1215,26 @@ The per-pick design-check in `continuous-dev-routine.md` step 2a still binds —
   **Side-effect (recurring, same as N107–N139):** the sharded vitest run's build-pipeline tests deleted the same 6 content-hashed audio files under `public/atlas/assets/audio/` in the run worktree, twice this run (once from my own sharded gate, once from the pre-commit hook's own internal run). Caught via `git status` before each commit/merge; reverted with `git checkout --` both times — no unrelated artifact churn landed on `auto/continuous-dev`.
   ~1 run.
 
+- [x] **N141. Fix the pre-commit hook's flake-detection grep — it doesn't actually catch real test failures.** ✅ DONE 2026-07-31 — commit 8fb9aa9e
+  Confirmed the bug flagged in N140's note: `scripts/pre-commit.sh` greps captured vitest stdout for the
+  literal `"failed \|"` to tell a genuine test failure apart from the harmless `onTaskUpdate` RPC-timeout
+  noise (both exit 1). Vitest's reporter wraps `"N failed"` in one color span and the following `" | "`
+  separator in a second, different color span (`c.bold(c.red(...))` then `.join(c.dim(" | "))`), so ANSI
+  reset codes sit between `"failed"` and `"|"` in real output — the literal substring never appears
+  contiguously and a real failure silently let the commit through.
+  **Fix:** strip ANSI escape codes (`ESC=$(printf '\033')`; `sed "s/${ESC}\[[0-9;]*[a-zA-Z]//g"`) from the
+  captured output before the existing `grep -qE "failed \|"` check — smallest possible diff, same check
+  semantics as before, just no longer blind to color codes.
+  **Verified manually** (no shell-script test harness exists in this repo): built synthetic vitest-shaped
+  ANSI-colored output for three cases — a real failing-test line (old regex missed it, confirmed the bug;
+  new code catches it), an all-passing colored line (correctly ignored), and `onTaskUpdate`-flake-shaped
+  output with 0 failures (correctly ignored). Also self-validated for real: committing this very fix ran
+  it through the pre-commit hook it patches, and the commit succeeded cleanly.
+  **Gate:** typecheck + lint clean (0 errors, pre-existing warnings only) in the run worktree; the
+  pre-commit hook's own typecheck + eslint + `vitest run --changed` passed using the new script. Shell-
+  script-only change, no app source touched — `atlas:publish` wasn't required.
+  **Commits:** `8fb9aa9e` on `fix/precommit-ansi-strip`, fast-forwarded into `auto/continuous-dev` (branched
+  from `origin/auto/continuous-dev` directly since the local main-copy's `auto/continuous-dev` ref carried
+  an unrelated unpushed 3-commit gap not this routine's to touch — see `handovers/ACTIVE.md`).
+  ~1 run.
+
