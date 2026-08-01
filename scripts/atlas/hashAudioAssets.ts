@@ -32,8 +32,17 @@ function pruneStaleHashedAudio(outDir: string, keep: Set<string>): void {
  *
  * External URLs (http/https) are skipped — they keep their original src.
  * Duplicate srcs produce one output file (same hash = same bytes).
+ *
+ * `opts.prune` (default true) must be false whenever the caller is NOT the
+ * build that owns `publicDir` — pruning is scoped by the caller, because
+ * this function cannot tell a real publish from a build writing its atlas
+ * somewhere else. Copying is additive and always safe; deleting is not.
  */
-export function hashAudioAssets(areas: SoundArea[], publicDir: string): Map<string, string> {
+export function hashAudioAssets(
+  areas: SoundArea[],
+  publicDir: string,
+  opts: { prune?: boolean } = {},
+): Map<string, string> {
   const rewrite = new Map<string, string>();
   const srcs = new Set<string>();
 
@@ -62,7 +71,7 @@ export function hashAudioAssets(areas: SoundArea[], publicDir: string): Map<stri
     keepHashedNames.add(hashedName);
   }
 
-  pruneStaleHashedAudio(outDir, keepHashedNames);
+  if (opts.prune ?? true) pruneStaleHashedAudio(outDir, keepHashedNames);
 
   return rewrite;
 }
