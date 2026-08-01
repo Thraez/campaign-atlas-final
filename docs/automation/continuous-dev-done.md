@@ -3374,3 +3374,23 @@ change.)
 **Commits:** `d4b0eb71` (fix: resolve image embeds in `EntityPanes.tsx`'s DM pane + test), on
 `run/n107-dm-pane-image-embeds`, fast-forward merged into `auto/continuous-dev` (no separate merge
 commit — still at the fork point).
+
+- [x] **V1. Record what a vault note looked like when it was published.** ✅ DONE
+  2026-08-01 — commit `b18508b1`.
+
+Plan Task A1 (`docs/superpowers/plans/2026-08-01-vault-publishing.md`), Phase A of the vault-publishing
+refuel. `src/atlas/import/syncMap.ts`'s `SyncMapEntry` gained an optional `approvedHash`, plus three pure
+helpers: `classifyVaultNote` (new/changed/unchanged/unknown against the stored hash), `findPathByApprovedHash`
+(exact-hash lookup for spotting a moved note), and a widened `recordSync` that stores the hash when supplied.
+Pure, no I/O — nothing writes or reads the hash yet; that lands in Task A2/A3. Existing 4-argument
+`recordSync` call sites and the pre-existing `sync-map.test.ts` (7 tests) stayed untouched and green.
+
+**Gate:** `npx tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (18 pre-existing,
+unchanged) · sharded vitest all green (746+654+890+735 = 3025 tests across 4 shards; shard 4 hit the
+documented `onTaskUpdate` RPC flake, 0 real failures, not re-run per policy). New `src/test/import/syncMap.test.ts`
+(8 tests) plus pre-commit's changed-file rerun (12 files, 123 tests) all passed. Pure module addition — no
+`scripts/`, fog, soundscape, or shipped-artifact touch — so `npm run atlas:publish` wasn't required.
+
+**Commits:** `b18508b1` (feat: `approvedHash` on `SyncMapEntry` + `classifyVaultNote` /
+`findPathByApprovedHash` + widened `recordSync`, 8 new tests), on `run/v1-vault-sync-hash`, fast-forward
+merged into `auto/continuous-dev` (no separate merge commit — still at the fork point).

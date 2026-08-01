@@ -219,9 +219,7 @@ is for sequencing, not the whole spec.
 >   trusting it. A regression test that has never failed proves nothing (audio-prune lesson, 2026-07-30).
 > - `.local-atlas/` is gitignored and stays that way; the sync map is machine-local by design.
 
-- [ ] **V1. Record what a vault note looked like when it was published.** Plan Task A1 — `approvedHash` on `SyncMapEntry`, plus `classifyVaultNote` / `findPathByApprovedHash` / widened `recordSync` in `src/atlas/import/syncMap.ts`. Pure, no I/O, no behaviour change yet.
-  - **Done when:** `src/test/import/syncMap.test.ts` passes (8 tests) and `tsc --noEmit -p tsconfig.app.json` is clean with existing 4-argument `recordSync` callers untouched.
-  - **Gate:** standard gate (typecheck + ESLint + sharded vitest). ~1 run.
+- [x] **V1. Record what a vault note looked like when it was published.** ✅ DONE 2026-08-01 — commit `b18508b1`. Full write-up in `continuous-dev-done.md`.
 
 - [ ] **V2. Leave unchanged notes unticked on re-sync.** Plan Task A2 — carry `vaultState` on `RawFileInput` + `StagingRow`, and make the `included` default in `buildStagingRows` (~:292) false for `"unchanged"`.
   - **Done when:** `src/test/import/vault-drift.test.ts` passes and the whole `src/test/import/` folder stays green (the `included` default is shared).
