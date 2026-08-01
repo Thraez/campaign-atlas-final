@@ -15,5 +15,8 @@ npx eslint . || exit 1
 # Capture output and only fail the commit if tests actually failed.
 VITEST_OUT=$(npx vitest run --changed 2>&1)
 printf '%s\n' "$VITEST_OUT"
-printf '%s\n' "$VITEST_OUT" | grep -qE "failed \|" && exit 1
+# Vitest's colorized summary line puts ANSI codes between "failed" and "|"
+# (e.g. "1 failed\x1b[39m\x1b[22m\x1b[2m | ..."), which defeats a literal
+# "failed |" match — strip escape codes before grepping.
+printf '%s\n' "$VITEST_OUT" | sed -E 's/\x1b\[[0-9;]*[a-zA-Z]//g' | grep -qE "failed \|" && exit 1
 exit 0
