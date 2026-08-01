@@ -24,7 +24,7 @@ import { inferTypeFromTags } from "./inferTypeFromTags";
 import { inferTypeFromPath } from "./inferType";
 import { slugify } from "@/atlas/content/slugify";
 import { isValidVisibility } from "@/atlas/content/visibility";
-import { lookupByPath, type SyncMap } from "./syncMap";
+import { lookupByPath, type SyncMap, type VaultNoteState } from "./syncMap";
 import { detectExposureIncrease, resolveType } from "./mergeImportFrontmatter";
 
 /**
@@ -68,6 +68,8 @@ export interface RawImportFile {
   raw: string;
   /** Vault-relative POSIX path (e.g. "notes/corven.md"). Used for sync-map identity lookup. */
   vaultRelPath?: string;
+  /** Drift state from the sync map — present only for rows from a vault scan. */
+  vaultState?: VaultNoteState;
 }
 
 export interface StagingContext {
@@ -126,6 +128,8 @@ export interface StagingRow {
   needsReview?: { reason: "secrecy-increase" | "rename-link" | "type-conflict" };
   /** Vault-relative POSIX path — present when the row came from a vault scan (openWithVaultScan). */
   vaultRelPath?: string;
+  /** Drift state vs the last publish of this note. Undefined for non-vault rows. */
+  vaultState?: VaultNoteState;
   /** Set when tags/aliases arrived as a comma-jammed scalar string instead of a YAML list. */
   frontmatterWarning?: string;
 }
@@ -289,7 +293,14 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
   }
 
   // create and update default ON; path-collision requires explicit opt-in; needsReview rows default OFF
-  const included = !parseError && pathAllowed && rowKind !== "path-collision" && !needsReview;
+  // An unchanged note has nothing to import — leave it unticked so the default
+  // action on a re-sync is "bring in what actually moved".
+  const included =
+    !parseError &&
+    pathAllowed &&
+    rowKind !== "path-collision" &&
+    !needsReview &&
+    input.vaultState !== "unchanged";
 
   return {
     id: nextRowId(input.filename),
@@ -309,6 +320,7 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     baseType,
     needsReview,
     vaultRelPath: input.vaultRelPath,
+    vaultState: input.vaultState,
     frontmatterWarning,
   };
 }
