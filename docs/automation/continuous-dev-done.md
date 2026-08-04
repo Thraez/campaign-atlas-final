@@ -3583,3 +3583,33 @@ reverted as pure churn (single-line diff, confirmed via `git diff` before revert
 **Commits:** `23f489cd` (feat: scan only the vault folders the DM picked — `handleVaultScanRequest` +
 route + `useSyncSettings.ts` + `useMdImportFlow.ts` + `vault-scan.test.ts`), on
 `run/v8-vault-folder-scoping`, merged into `auto/continuous-dev`.
+
+- [x] **V9. Pick vault folders with tick boxes instead of typing globs.** ✅ DONE
+  2026-08-04 — commit `7d5676b7`.
+
+Plan Task B3 (`docs/superpowers/plans/2026-08-01-vault-publishing.md`), Phase B of the vault-publishing
+refuel — the DM now ticks real folders instead of typing glob patterns. New `VaultFolderPicker` component
+in `SyncPanel.tsx` lists each folder with its note count as a checkbox row, reporting the plain folder name
+on toggle so the caller builds the scan pattern. `SyncPanel` gained a "List folders" button (calls the
+existing `/__atlas/vault-folders` endpoint from V7) and `folders`/`candidateFolders` state; the picker
+renders under the vault-path input once folders are loaded. The selection is persisted alongside the other
+settings (`candidateFolders` on `SyncSettings`, already added in V8) and passed through on sync: `onSync`
+widened to a third `candidateFolders` argument, `handleSync` forwards the current selection. The
+`AtlasPlacementEditor.tsx` call site (`onSync={(root, globs) => ...}`) needed a real fix this time (V8 left
+it compiling only because the parameter was optional) — widened to accept and forward the third argument to
+`importFlow.openWithVaultScan`.
+
+**Gate:** `npx tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (18 pre-existing,
+unchanged) · sharded vitest all green (757+669+888+733 = 3047 tests across 4 shards; shard 2 hit an
+unrelated `secrets` test flake, confirmed non-reproducing on a clean re-run of the whole shard — 669/669
+passed; shard 4 hit the documented `onTaskUpdate` RPC flake, 0 real failures, not re-run per policy).
+Extended `src/test/sync-panel.test.tsx` with the plan's three `VaultFolderPicker` tests (shows folder +
+count, ticks report the name, unticks clear it) using `fireEvent.click` rather than the plan's literal
+`userEvent.click` snippet — this repo has no `@testing-library/user-event` dependency (documented
+environment note). Also updated the existing "Sync now button calls onSync…" assertion for the widened
+3-arg call. Pure UI/state change, no `scripts/`/fog/soundscape/artifact touch, so `npm run atlas:publish`
+wasn't required.
+
+**Commits:** `7d5676b7` (feat: pick vault folders with tick boxes instead of typing globs —
+`VaultFolderPicker` + `SyncPanel` wiring + `AtlasPlacementEditor.tsx` call-site fix +
+`sync-panel.test.tsx`), on `run/v9-vault-folder-picker`, merged into `auto/continuous-dev`.

@@ -229,9 +229,7 @@ is for sequencing, not the whole spec.
 
 - [x] **V6. Warn before a vault change overwrites an edit made in the atlas.** ✅ DONE 2026-08-04 — commit `9cecfa0a`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **V9. Pick vault folders with tick boxes instead of typing globs.** Plan Task B3 — `VaultFolderPicker` in `SyncPanel.tsx`, wired to `candidateFolders`, with the `onSync` prop widened to a third argument (fix the call site in `AtlasPlacementEditor.tsx`).
-  - **Done when:** `src/test/sync-panel.test.tsx` passes and the panel lists real folders with counts against the DM's vault.
-  - **Gate:** standard gate. ~2 runs.
+- [x] **V9. Pick vault folders with tick boxes instead of typing globs.** ✅ DONE 2026-08-04 — commit `7d5676b7`. Full write-up in `continuous-dev-done.md`.
 
 - [ ] **V10. Resolve image embeds, refusing anything outside the chosen folders.** Plan Task C1 — new pure `src/atlas/import/resolveVaultImage.ts` (`resolveVaultImage`, `vaultImageTargetName`). An embed can name an image sitting in a DM-only folder; resolution must refuse it and report why.
   - **Done when:** `src/test/import/resolveVaultImage.test.ts` passes (8 tests) **and** the mandatory mutation check (make `inCandidates` always return true) fails the out-of-scope test before revert.
