@@ -70,6 +70,8 @@ export interface RawImportFile {
   vaultRelPath?: string;
   /** Drift state from the sync map — present only for rows from a vault scan. */
   vaultState?: VaultNoteState;
+  /** Hash of the raw vault bytes, recorded into the sync map after a successful sync. */
+  vaultHash?: string;
 }
 
 export interface StagingContext {
@@ -130,6 +132,8 @@ export interface StagingRow {
   vaultRelPath?: string;
   /** Drift state vs the last publish of this note. Undefined for non-vault rows. */
   vaultState?: VaultNoteState;
+  /** Hash of the raw vault bytes for this row (vault scans only). */
+  vaultHash?: string;
   /** Set when tags/aliases arrived as a comma-jammed scalar string instead of a YAML list. */
   frontmatterWarning?: string;
 }
@@ -321,6 +325,7 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     needsReview,
     vaultRelPath: input.vaultRelPath,
     vaultState: input.vaultState,
+    vaultHash: input.vaultHash,
     frontmatterWarning,
   };
 }

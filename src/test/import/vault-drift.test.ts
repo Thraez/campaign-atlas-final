@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { buildStagingRows, type StagingContext } from "@/atlas/import/stagingState";
 import type { ImportFolderConfig } from "@/atlas/content/schema";
-import type { VaultNoteState } from "@/atlas/import/syncMap";
+import { classifyVaultNote, recordSync, type VaultNoteState } from "@/atlas/import/syncMap";
+import { hashContent } from "@/atlas/save/localFsSave";
 
 const NOTE = `---\ntitle: Corven\ntags: [npc]\n---\n\nA quiet smuggler.\n`;
 
@@ -38,5 +39,21 @@ describe("vault drift on staging rows", () => {
 
   it("still ticks a new note", () => {
     expect(rowsFor("new")[0].included).toBe(true);
+  });
+});
+
+describe("hash round-trip", () => {
+  it("a note recorded after sync classifies as unchanged next scan", async () => {
+    const hash = await hashContent(NOTE);
+    const map = recordSync({}, "03_Entities/Corven.md", "corven", "npc", hash);
+    const again = await hashContent(NOTE);
+    expect(classifyVaultNote(map, "03_Entities/Corven.md", again)).toBe("unchanged");
+  });
+
+  it("a note edited after sync classifies as changed", async () => {
+    const hash = await hashContent(NOTE);
+    const map = recordSync({}, "03_Entities/Corven.md", "corven", "npc", hash);
+    const edited = await hashContent(NOTE + "\nHe has been reworked.\n");
+    expect(classifyVaultNote(map, "03_Entities/Corven.md", edited)).toBe("changed");
   });
 });

@@ -15,10 +15,15 @@ import {
   type StagingRowPatch,
 } from "./stagingState";
 import { buildImportChanges, ImportCommitError } from "./buildImportChanges";
-import { saveAtlasPatchToLocalFs, ConflictError, SaveBusyError } from "@/atlas/save/localFsSave";
+import {
+  saveAtlasPatchToLocalFs,
+  ConflictError,
+  SaveBusyError,
+  hashContent,
+} from "@/atlas/save/localFsSave";
 import type { ImportFolderConfig } from "../content/schema";
 import { summarizeImport, formatImportSummaryLine } from "./summarizeImport";
-import { recordSync } from "./syncMap";
+import { recordSync, classifyVaultNote, findPathByApprovedHash } from "./syncMap";
 import { loadSyncMap, saveSyncMap, loadSettings, saveSettings } from "../sync/useSyncSettings";
 
 /** Thrown by assertDmBuildLoaded when the DM atlas has not been built yet. */
@@ -141,7 +146,26 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
         }
         return;
       }
-      openWithInputs(vaultScanResultToInputs(data.files));
+      const syncMap = await loadSyncMap();
+      const inputs = await Promise.all(
+        Object.entries(data.files).map(async ([relPath, raw]) => {
+          const hash = await hashContent(raw);
+          let vaultState = classifyVaultNote(syncMap, relPath, hash);
+          // A note with no entry at its own path whose bytes match a hash
+          // recorded elsewhere is a move/rename, not a new note.
+          if (vaultState === "new" && findPathByApprovedHash(syncMap, hash)) {
+            vaultState = "unchanged";
+          }
+          return {
+            filename: relPath.split("/").pop() ?? relPath,
+            raw,
+            vaultRelPath: relPath,
+            vaultState,
+            vaultHash: hash,
+          };
+        }),
+      );
+      openWithInputs(inputs);
     },
     [existingById, openWithInputs],
   );
@@ -194,7 +218,7 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
         if (vaultRows.length > 0) {
           let syncMap = await loadSyncMap();
           for (const r of vaultRows) {
-            syncMap = recordSync(syncMap, r.vaultRelPath!, r.resolvedId, r.inferredType);
+            syncMap = recordSync(syncMap, r.vaultRelPath!, r.resolvedId, r.inferredType, r.vaultHash);
           }
           await saveSyncMap(syncMap);
           const s = await loadSettings();
