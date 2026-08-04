@@ -3486,3 +3486,39 @@ wasn't required.
 
 **Commits:** `4e0f88b7` (test: property test + mutation-check proof in `vault-drift.test.ts`), on
 `run/v5-vault-drift-pin`, merged into `auto/continuous-dev`.
+
+- [x] **V6. Warn before a vault change overwrites an edit made in the atlas.** ✅ DONE
+  2026-08-04 — commit `9cecfa0a`.
+
+Plan Task A6 (`docs/superpowers/plans/2026-08-01-vault-publishing.md`), Phase A of the vault-publishing
+refuel. A changed vault note overlays the atlas copy's content — if the DM has since edited that copy in
+the editor, that edit is about to be overwritten and they must be told before it happens, not after.
+`SyncMapEntry` (`src/atlas/import/syncMap.ts`) gained a `syncedFileHash` field recording the hash of the
+atlas-side file exactly as the last sync wrote it, plus a `hasLocalEdits` predicate comparing that against
+the file's current on-disk hash (returns false — never cry wolf — when there's no record, e.g. a
+pre-upgrade sync-map entry). `recordSync` widened to a sixth optional argument to carry it. The
+`needsReview` union (`stagingState.ts`) gained a fourth reason, `"local-edits"`.
+
+The check runs at scan time, not commit time, so the DM sees it before they ever tick the row:
+`openWithVaultScan` (`useMdImportFlow.ts`) now builds the staging rows first, then — for any `"update"` row
+whose `vaultState` is `"changed"` — reads the current on-disk atlas file (reusing `readSourceFile`, now
+exported from `buildImportChanges.ts` so both the scan-time and commit-time reads share one code path),
+hashes it, and calls `hasLocalEdits`. A hit flags the row `needsReview: { reason: "local-edits" }` and
+forces `included: false`; a failed disk read is treated as "can't verify" and leaves the row alone rather
+than blocking the DM. A `needsReview` row already defaults to unticked in `buildStagingRow`, so nothing
+reaches the DM's atlas without an explicit opt-in tick. On commit, the sync map now records
+`syncedFileHash` as the hash of the content actually written (matched back from `buildImportChanges`'s
+returned `FileChange[]` by target path), not the raw vault bytes — so the *next* scan compares against
+what really landed on disk after frontmatter merging, not what the vault note said before the merge.
+
+**Gate:** `npx tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (18 pre-existing,
+unchanged) · sharded vitest all green (749+657+824+808 = 3038 tests across 4 shards; shard 4 hit the
+documented `onTaskUpdate` RPC flake, 0 real failures, not re-run per policy). `src/test/import/`'s 13 files
+(82 tests) plus the wider staging-state/staging-modal/build-import/atlas-import suites (147 more tests)
+all passed. The plan's own test list (Step 1-2, `hasLocalEdits` on `syncMap.test.ts`) was run standalone
+first to confirm it failed before implementation, per TDD. No `scripts/`, fog, soundscape, or
+shipped-artifact touch — so `npm run atlas:publish` wasn't required.
+
+**Commits:** `9cecfa0a` (feat: warn before a vault change overwrites an edit made here — `syncMap.ts`,
+`stagingState.ts`, `useMdImportFlow.ts`, `buildImportChanges.ts` export, + `syncMap.test.ts`), on
+`run/v6-vault-local-edits`, merged into `auto/continuous-dev`.

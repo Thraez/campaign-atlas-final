@@ -227,9 +227,7 @@ is for sequencing, not the whole spec.
 
 - [x] **V5. Pin that reworked notes are reported, never auto-applied.** ✅ DONE 2026-08-04 — commit `4e0f88b7`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **V6. Warn before a vault change overwrites an edit made in the atlas.** Plan Task A6 — `syncedFileHash` + `hasLocalEdits` in `syncMap.ts`, a fourth `needsReview` reason `"local-edits"` in `stagingState.ts` (~:126), and the flag set on changed update rows.
-  - **Done when:** a note edited in the editor and then changed in the vault comes back unticked and marked for review.
-  - **Gate:** standard gate. ~2 runs.
+- [x] **V6. Warn before a vault change overwrites an edit made in the atlas.** ✅ DONE 2026-08-04 — commit `9cecfa0a`. Full write-up in `continuous-dev-done.md`.
 
 - [ ] **V7. List vault folders with note counts, without reading notes.** Plan Task B1 — `handleVaultFoldersRequest` + `GET /__atlas/vault-folders` in `scripts/vite-plugin-atlas-save.ts`, honouring `isReadableVaultPath`, returning no file contents.
   - **Done when:** `src/test/import/vault-folders.test.ts` passes (4 tests), including the assertion that no note text appears in the response.
