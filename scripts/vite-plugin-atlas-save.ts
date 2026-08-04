@@ -1051,6 +1051,57 @@ export async function handleVaultScanRequest(
   return { ok: true, files };
 }
 
+export interface VaultFolderSummary {
+  name: string;
+  noteCount: number;
+}
+
+/**
+ * Pure handler for GET /__atlas/vault-folders.
+ * Returns each top-level folder with a recursive .md count. Never returns file
+ * contents — this is the cheap listing that lets the DM pick folders before any
+ * note is read. Read-only.
+ */
+export async function handleVaultFoldersRequest(
+  vaultRoot: string,
+): Promise<
+  { ok: true; folders: VaultFolderSummary[] } | { ok: false; status: number; error: string }
+> {
+  try {
+    const s = await fs.stat(vaultRoot);
+    if (!s.isDirectory()) return { ok: false, status: 400, error: "VaultNotDirectory" };
+  } catch {
+    return { ok: false, status: 400, error: "VaultNotFound" };
+  }
+
+  const rootResolved = path.resolve(vaultRoot);
+
+  async function countMd(dir: string): Promise<number> {
+    let total = 0;
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return 0;
+    }
+    for (const e of entries) {
+      const abs = path.join(dir, e.name);
+      if (e.isDirectory()) total += await countMd(abs);
+      else if (e.name.endsWith(".md") && isReadableVaultPath(rootResolved, abs)) total += 1;
+    }
+    return total;
+  }
+
+  const folders: VaultFolderSummary[] = [];
+  for (const e of await fs.readdir(rootResolved, { withFileTypes: true })) {
+    if (!e.isDirectory()) continue;
+    const abs = path.join(rootResolved, e.name);
+    folders.push({ name: e.name, noteCount: await countMd(abs) });
+  }
+  folders.sort((a, b) => b.noteCount - a.noteCount);
+  return { ok: true, folders };
+}
+
 /**
  * Pure handler for POST /__atlas/local-write.
  * Writes `contents` to `.local-atlas/<name>`, where `name` must be one of the
@@ -1232,6 +1283,31 @@ export function atlasSavePlugin(): Plugin {
           if (result.ok) {
             res.statusCode = 200;
             res.end(JSON.stringify({ files: result.files }));
+          } else {
+            res.statusCode = result.status;
+            res.end(JSON.stringify({ error: result.error }));
+          }
+        });
+      });
+
+      // GET /__atlas/vault-folders?vaultRoot=<abs>
+      // Read-only folder-summary listing so the DM can pick folders before any note is read.
+      server.middlewares.use("/__atlas/vault-folders", (req, res, next) => {
+        if (req.method !== "GET") return next();
+        if (rejectNonLoopback(req, res)) return;
+        const url = new URL(req.url ?? "/", "http://localhost");
+        const vaultRoot = url.searchParams.get("vaultRoot") ?? "";
+        if (!vaultRoot) {
+          res.statusCode = 400;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: "MissingVaultRoot" }));
+          return;
+        }
+        handleVaultFoldersRequest(vaultRoot).then((result) => {
+          res.setHeader("Content-Type", "application/json");
+          if (result.ok) {
+            res.statusCode = 200;
+            res.end(JSON.stringify({ folders: result.folders }));
           } else {
             res.statusCode = result.status;
             res.end(JSON.stringify({ error: result.error }));
