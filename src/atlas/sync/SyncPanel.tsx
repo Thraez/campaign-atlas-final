@@ -8,9 +8,52 @@ import { Label } from "@/components/ui/label";
 import { loadSettings, saveSettings, type SyncSettings } from "./useSyncSettings";
 
 export interface SyncPanelProps {
-  onSync: (vaultRoot: string, ignoreGlobs: string[]) => void | Promise<void>;
+  onSync: (
+    vaultRoot: string,
+    ignoreGlobs: string[],
+    candidateFolders: string[],
+  ) => void | Promise<void>;
   /** False when no DM build/entities are loaded — Sync merges against the full DM atlas. */
   hasDmBuild?: boolean;
+}
+
+export interface VaultFolderPickerProps {
+  folders: { name: string; noteCount: number }[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+}
+
+/**
+ * Folder chooser for the vault. The DM ticks folders; the caller turns those
+ * names into scan parameters. Deliberately not a glob box.
+ */
+export function VaultFolderPicker({ folders, selected, onChange }: VaultFolderPickerProps) {
+  const toggle = (name: string) => {
+    onChange(
+      selected.includes(name) ? selected.filter((n) => n !== name) : [...selected, name],
+    );
+  };
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs">Folders to draw from</Label>
+      <ul className="space-y-1">
+        {folders.map((f) => (
+          <li key={f.name} className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              id={`vault-folder-${f.name}`}
+              checked={selected.includes(f.name)}
+              onChange={() => toggle(f.name)}
+            />
+            <label htmlFor={`vault-folder-${f.name}`} className="flex-1">
+              {f.name}
+            </label>
+            <span className="text-xs text-muted-foreground">{f.noteCount} notes</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 export function SyncPanel({ onSync, hasDmBuild = true }: SyncPanelProps) {
@@ -19,14 +62,32 @@ export function SyncPanel({ onSync, hasDmBuild = true }: SyncPanelProps) {
   const [globsText, setGlobsText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [folders, setFolders] = useState<{ name: string; noteCount: number }[]>([]);
+  const [candidateFolders, setCandidateFolders] = useState<string[]>([]);
 
   useEffect(() => {
     void loadSettings().then((s) => {
       setSettings(s);
       setVaultPath(s.vaultPath ?? "");
       setGlobsText((s.ignoreGlobs ?? []).join("\n"));
+      setCandidateFolders(s.candidateFolders ?? []);
     });
   }, []);
+
+  const loadFolders = useCallback(async () => {
+    const root = vaultPath.trim();
+    if (!root) return;
+    try {
+      const resp = await fetch(`/__atlas/vault-folders?vaultRoot=${encodeURIComponent(root)}`);
+      const data = (await resp.json()) as
+        | { ok: true; folders: { name: string; noteCount: number }[] }
+        | { ok: false; error: string };
+      if (data.ok) setFolders(data.folders);
+      else toast.error("Couldn't read that vault folder — check the path.");
+    } catch {
+      toast.error("Couldn't read that vault folder — check the path.");
+    }
+  }, [vaultPath]);
 
   const handleSave = useCallback(async () => {
     setIsSaving(true);
@@ -39,6 +100,7 @@ export function SyncPanel({ onSync, hasDmBuild = true }: SyncPanelProps) {
         ...settings,
         vaultPath: vaultPath.trim() || undefined,
         ignoreGlobs: globs,
+        candidateFolders,
       };
       await saveSettings(next);
       setSettings(next);
@@ -48,7 +110,7 @@ export function SyncPanel({ onSync, hasDmBuild = true }: SyncPanelProps) {
     } finally {
       setIsSaving(false);
     }
-  }, [settings, vaultPath, globsText]);
+  }, [settings, vaultPath, globsText, candidateFolders]);
 
   const handleSync = useCallback(async () => {
     const root = vaultPath.trim();
@@ -59,11 +121,11 @@ export function SyncPanel({ onSync, hasDmBuild = true }: SyncPanelProps) {
         .split("\n")
         .map((l) => l.trim())
         .filter(Boolean);
-      await onSync(root, globs);
+      await onSync(root, globs, candidateFolders);
     } finally {
       setIsSyncing(false);
     }
-  }, [vaultPath, globsText, onSync]);
+  }, [vaultPath, globsText, candidateFolders, onSync]);
 
   const lastSync = settings.lastSyncAt ? new Date(settings.lastSyncAt).toLocaleString() : null;
 
@@ -80,6 +142,25 @@ export function SyncPanel({ onSync, hasDmBuild = true }: SyncPanelProps) {
         <p className="text-[10px] text-muted-foreground">
           Absolute path to the root of your Obsidian vault on this machine.
         </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full"
+          disabled={!vaultPath.trim()}
+          onClick={() => void loadFolders()}
+        >
+          List folders
+        </Button>
+        {folders.length > 0 && (
+          <VaultFolderPicker
+            folders={folders}
+            selected={candidateFolders}
+            onChange={setCandidateFolders}
+          />
+        )}
       </div>
 
       <div className="space-y-1.5">

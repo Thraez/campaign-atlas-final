@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { toast } from "sonner";
-import { SyncPanel, VaultSyncSummary } from "@/atlas/sync/SyncPanel";
+import { SyncPanel, VaultSyncSummary, VaultFolderPicker } from "@/atlas/sync/SyncPanel";
 import { loadSettings, saveSettings } from "@/atlas/sync/useSyncSettings";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
@@ -85,7 +85,7 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
       expect(screen.getByRole("button", { name: /sync now/i })).not.toBeDisabled(),
     );
     fireEvent.click(screen.getByRole("button", { name: /sync now/i }));
-    await waitFor(() => expect(onSync).toHaveBeenCalledWith("/MyVault", ["_hidden/**"]));
+    await waitFor(() => expect(onSync).toHaveBeenCalledWith("/MyVault", ["_hidden/**"], []));
   });
 
   it("shows last-sync timestamp when lastSyncAt is set", async () => {
@@ -113,6 +113,35 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
       expect(screen.getByRole("button", { name: /sync now/i })).not.toBeDisabled(),
     );
     expect(screen.queryByText(/Rebuild in DM mode first/i)).toBeNull();
+  });
+});
+
+describe("VaultFolderPicker", () => {
+  const folders = [
+    { name: "03_Entities", noteCount: 55 },
+    { name: "10_DmNotesAndSecrets", noteCount: 49 },
+  ];
+
+  it("shows each folder with how many notes it holds", () => {
+    render(<VaultFolderPicker folders={folders} selected={[]} onChange={() => {}} />);
+    expect(screen.getByText("03_Entities")).toBeInTheDocument();
+    expect(screen.getByText(/55 notes/i)).toBeInTheDocument();
+  });
+
+  it("reports the folder name when ticked, so callers build the pattern", () => {
+    const onChange = vi.fn();
+    render(<VaultFolderPicker folders={folders} selected={[]} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /03_Entities/i }));
+    expect(onChange).toHaveBeenCalledWith(["03_Entities"]);
+  });
+
+  it("unticks a selected folder", () => {
+    const onChange = vi.fn();
+    render(
+      <VaultFolderPicker folders={folders} selected={["03_Entities"]} onChange={onChange} />,
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: /03_Entities/i }));
+    expect(onChange).toHaveBeenCalledWith([]);
   });
 });
 

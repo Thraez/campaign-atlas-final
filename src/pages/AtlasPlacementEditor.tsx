@@ -1867,7 +1867,9 @@ function AtlasPlacementEditorInner() {
             ),
             sync: (
               <SyncPanel
-                onSync={(root, globs) => void importFlow.openWithVaultScan(root, globs)}
+                onSync={(root, globs, candidateFolders) =>
+                  void importFlow.openWithVaultScan(root, globs, candidateFolders)
+                }
                 hasDmBuild={importExistingById.size > 0}
               />
             ),
