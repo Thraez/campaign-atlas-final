@@ -3464,3 +3464,25 @@ soundscape, or shipped-artifact touch — so `npm run atlas:publish` wasn't requ
 
 **Commits:** `c7caf2df` (feat: `VaultSyncSummary` component + 3 new tests), on
 `run/v4-vault-sync-summary`, merged into `auto/continuous-dev`.
+
+- [x] **V5. Pin that reworked notes are reported, never auto-applied.** ✅ DONE
+  2026-08-04 — commit `4e0f88b7`.
+
+Plan Task A5 (`docs/superpowers/plans/2026-08-01-vault-publishing.md`), Phase A of the vault-publishing
+refuel. Extended `src/test/import/vault-drift.test.ts` with a property test asserting a `"changed"` row
+still contributes no file change once the DM leaves it unticked — the drift classification only ever
+*reports*, it never auto-applies. Per the plan's mandatory mutation check (the audio-prune lesson: a
+regression test that has never failed proves nothing), `classifyVaultNote` in `src/atlas/import/syncMap.ts`
+was temporarily broken to always return `"unchanged"` and the suite re-run: exactly the two tests named in
+the plan failed (`syncMap.test.ts` "reports a changed note when the hash differs" and `vault-drift.test.ts`
+"a note edited after sync classifies as changed"), confirming the tests are not vacuous. The mutation was
+then reverted (`git checkout --`) and the suite re-confirmed green before committing only the test file.
+
+**Gate:** `npx tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (18 pre-existing,
+unchanged) · sharded vitest all green (749+654+824+808 = 3035 tests across 4 shards; shard 4 hit the
+documented `onTaskUpdate` RPC flake, 0 real failures, not re-run per policy). Test-only change inside
+`src/test/import/` — no `scripts/`, fog, soundscape, or shipped-artifact touch — so `npm run atlas:publish`
+wasn't required.
+
+**Commits:** `4e0f88b7` (test: property test + mutation-check proof in `vault-drift.test.ts`), on
+`run/v5-vault-drift-pin`, merged into `auto/continuous-dev`.
