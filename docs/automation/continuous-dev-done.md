@@ -3415,3 +3415,31 @@ fog, soundscape, or shipped-artifact touch — so `npm run atlas:publish` wasn't
 
 **Commits:** `11cd5d5f` (feat: `vaultState` on `RawImportFile`/`StagingRow`, `included` defaults false for
 `"unchanged"`, 4 new tests), on `run/v2-vault-drift-staging`, merged into `auto/continuous-dev`.
+
+- [x] **V3. Detect vault notes that changed since they were published.** ✅ DONE
+  2026-08-04 — commit `a656afcf`.
+
+Plan Task A3 (`docs/superpowers/plans/2026-08-01-vault-publishing.md`), Phase A of the vault-publishing
+refuel. `openWithVaultScan` (`src/atlas/import/useMdImportFlow.ts`) now hashes every scanned note
+(`hashContent`) and classifies it against the sync map (`classifyVaultNote`) before staging rows are built,
+so `vaultState` (V2) is no longer always `"new"`/`undefined` for vault rows — it now reflects real drift. A
+note with no entry at its own path whose hash matches an entry recorded elsewhere is treated as a
+move/rename (`findPathByApprovedHash`) rather than reported as new. Both `RawImportFile` and `StagingRow`
+gained an optional `vaultHash` field carried alongside `vaultState`; the sync-map commit path now passes
+`row.vaultHash` as `recordSync`'s new fifth argument, so the hash is recorded only after a successful sync
+— a failed or cancelled sync leaves the sync map untouched. The existing synchronous `vaultScanResultToInputs`
+helper (and its test) were left untouched; the hashing/classification is async and lives inline in
+`openWithVaultScan`, which already awaits the vault-scan fetch.
+
+**Gate:** `npx tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (18 pre-existing,
+unchanged) · sharded vitest all green (746+654+823+808 = 3031 tests across 4 shards; shard 4 hit the
+documented `onTaskUpdate` RPC flake, 0 real failures, not re-run per policy). The plan's own hash-round-trip
+pinning pair (`hashContent` → `recordSync` → `classifyVaultNote` agrees on "unchanged"/"changed") was run
+and confirmed green *before* wiring, per the plan's Step 2 — it wasn't testing anything new yet, just
+pinning the contract. The whole `src/test/import/` folder (13 files, 78 tests, including the extended
+`vault-drift.test.ts` at 6 tests) passed. Pure logic change inside the import flow — no `scripts/`, fog,
+soundscape, or shipped-artifact touch — so `npm run atlas:publish` wasn't required.
+
+**Commits:** `a656afcf` (feat: hash + classify scanned notes in `openWithVaultScan`, record the hash on
+`recordSync` only after a successful commit, extends `vault-drift.test.ts` with the hash round-trip pair),
+on `run/v3-vault-drift-hash`, merged into `auto/continuous-dev`.

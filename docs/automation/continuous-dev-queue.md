@@ -223,9 +223,7 @@ is for sequencing, not the whole spec.
 
 - [x] **V2. Leave unchanged notes unticked on re-sync.** ✅ DONE 2026-08-01 — commit `11cd5d5f`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **V3. Detect vault notes that changed since they were published.** Plan Task A3 — hash each scanned note in `openWithVaultScan`, classify against the sync map, treat an exact-hash match at another path as a move, and record the hash only after a successful commit.
-  - **Done when:** a second sync with no vault edit reports 0 changed; editing a note in the vault reports it as changed.
-  - **Gate:** standard gate. ~2 runs.
+- [x] **V3. Detect vault notes that changed since they were published.** ✅ DONE 2026-08-04 — commit `a656afcf`. Full write-up in `continuous-dev-done.md`.
 
 - [ ] **V4. Say plainly what changed.** Plan Task A4 — `VaultSyncSummary` in `src/atlas/sync/SyncPanel.tsx`, leading with changed notes and reducing unchanged ones to a count.
   - **Done when:** `src/test/sync-panel.test.tsx` passes; wording is DM-facing (no "drift", no "hash", no paths).
