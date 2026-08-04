@@ -225,10 +225,6 @@ is for sequencing, not the whole spec.
 
 - [x] **V3. Detect vault notes that changed since they were published.** ✅ DONE 2026-08-04 — commit `a656afcf`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **V4. Say plainly what changed.** Plan Task A4 — `VaultSyncSummary` in `src/atlas/sync/SyncPanel.tsx`, leading with changed notes and reducing unchanged ones to a count.
-  - **Done when:** `src/test/sync-panel.test.tsx` passes; wording is DM-facing (no "drift", no "hash", no paths).
-  - **Gate:** standard gate. ~1 run.
-
 - [ ] **V5. Pin that reworked notes are reported, never auto-applied.** Plan Task A5 — property test plus a **mandatory mutation check**: make `classifyVaultNote` always return `"unchanged"` and confirm the suite fails before reverting.
   - **Done when:** the mutation check demonstrably fails, then passes after revert.
   - **Gate:** standard gate. ~1 run.

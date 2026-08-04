@@ -3443,3 +3443,24 @@ soundscape, or shipped-artifact touch — so `npm run atlas:publish` wasn't requ
 **Commits:** `a656afcf` (feat: hash + classify scanned notes in `openWithVaultScan`, record the hash on
 `recordSync` only after a successful commit, extends `vault-drift.test.ts` with the hash round-trip pair),
 on `run/v3-vault-drift-hash`, merged into `auto/continuous-dev`.
+
+- [x] **V4. Say plainly what changed.** ✅ DONE
+  2026-08-04 — commit `c7caf2df`.
+
+Plan Task A4 (`docs/superpowers/plans/2026-08-01-vault-publishing.md`), Phase A of the vault-publishing
+refuel. `src/atlas/sync/SyncPanel.tsx` gained a new exported `VaultSyncSummary` component that turns the
+`changed`/`added`/`unchanged` counts (V1–V3's groundwork) into a plain-language read-out: it leads with
+changed and new notes, reduces unchanged notes to a quiet trailing count, and says "Nothing to bring over"
+when there's genuinely nothing to report. No "drift"/"hash"/paths anywhere in the wording — DM-facing only,
+matching the plan's copy exactly. The component isn't wired into a caller yet (no scan-result → summary
+plumbing existed to hook it to); it's exported and tested standalone per the plan's own scope for this task.
+
+**Gate:** `npx tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (18 pre-existing,
+unchanged) · sharded vitest all green (749+654+823+808 = 3034 tests across 4 shards; shard 4 hit the
+documented `onTaskUpdate` RPC flake, 0 real failures, not re-run per policy). New tests added to
+`src/test/sync-panel.test.tsx` (3 tests: leads-with-changed, quiet-unchanged-count, nothing-to-report) sit
+alongside the existing 10 `SyncPanel` tests (13 total in the file), all passing. No `scripts/`, fog,
+soundscape, or shipped-artifact touch — so `npm run atlas:publish` wasn't required.
+
+**Commits:** `c7caf2df` (feat: `VaultSyncSummary` component + 3 new tests), on
+`run/v4-vault-sync-summary`, merged into `auto/continuous-dev`.
