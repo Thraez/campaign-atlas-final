@@ -34,7 +34,7 @@ export interface BuildImportChangesDeps {
   fetchFn?: typeof fetch;
 }
 
-async function readSourceFile(path: string, fetchFn: typeof fetch): Promise<string> {
+export async function readSourceFile(path: string, fetchFn: typeof fetch): Promise<string> {
   if (!isWritableSourcePath(path)) {
     throw new ImportCommitError(`Path not in source allowlist: ${path}`, path);
   }

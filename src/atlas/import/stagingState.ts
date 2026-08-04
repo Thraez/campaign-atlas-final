@@ -127,7 +127,7 @@ export interface StagingRow {
   /** Last-synced vault type for this entity (from sync-map, §3.6). Undefined on first sync. */
   baseType?: string;
   /** Opt-in review flag: row defaults to included=false until the DM ticks it (Phase 2 populates). */
-  needsReview?: { reason: "secrecy-increase" | "rename-link" | "type-conflict" };
+  needsReview?: { reason: "secrecy-increase" | "rename-link" | "type-conflict" | "local-edits" };
   /** Vault-relative POSIX path — present when the row came from a vault scan (openWithVaultScan). */
   vaultRelPath?: string;
   /** Drift state vs the last publish of this note. Undefined for non-vault rows. */

@@ -14,7 +14,7 @@ import {
   type StagingRow,
   type StagingRowPatch,
 } from "./stagingState";
-import { buildImportChanges, ImportCommitError } from "./buildImportChanges";
+import { buildImportChanges, readSourceFile, ImportCommitError } from "./buildImportChanges";
 import {
   saveAtlasPatchToLocalFs,
   ConflictError,
@@ -23,7 +23,7 @@ import {
 } from "@/atlas/save/localFsSave";
 import type { ImportFolderConfig } from "../content/schema";
 import { summarizeImport, formatImportSummaryLine } from "./summarizeImport";
-import { recordSync, classifyVaultNote, findPathByApprovedHash } from "./syncMap";
+import { recordSync, classifyVaultNote, findPathByApprovedHash, hasLocalEdits } from "./syncMap";
 import { loadSyncMap, saveSyncMap, loadSettings, saveSettings } from "../sync/useSyncSettings";
 
 /** Thrown by assertDmBuildLoaded when the DM atlas has not been built yet. */
@@ -165,9 +165,34 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
           };
         }),
       );
-      openWithInputs(inputs);
+      if (inputs.length === 0) {
+        toast.error("No .md files to stage");
+        return;
+      }
+      const staged = buildStagingRows(inputs, ctx);
+      // A "changed" update row would overwrite the atlas copy's content — if the
+      // DM has since edited that copy in the editor, that edit is about to be
+      // lost. Hold the row for review instead of ticking it by default.
+      const checked = await Promise.all(
+        staged.map(async (row) => {
+          if (row.rowKind !== "update" || row.vaultState !== "changed" || !row.vaultRelPath) {
+            return row;
+          }
+          let diskRaw: string;
+          try {
+            diskRaw = await readSourceFile(row.targetPath, fetch);
+          } catch {
+            return row; // can't verify — don't block the DM on a read failure
+          }
+          const diskHash = await hashContent(diskRaw);
+          if (!hasLocalEdits(syncMap, row.vaultRelPath, diskHash)) return row;
+          return { ...row, needsReview: { reason: "local-edits" as const }, included: false };
+        }),
+      );
+      setRows(checked);
+      setOpen(true);
     },
-    [existingById, openWithInputs],
+    [existingById, ctx],
   );
 
   const patchRow = useCallback(
@@ -216,9 +241,19 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
           (r) => r.vaultRelPath && r.included && r.pathAllowed && !r.parseError,
         );
         if (vaultRows.length > 0) {
+          const contentByPath = new Map(changes.map((c) => [c.path, c.content]));
           let syncMap = await loadSyncMap();
           for (const r of vaultRows) {
-            syncMap = recordSync(syncMap, r.vaultRelPath!, r.resolvedId, r.inferredType, r.vaultHash);
+            const written = contentByPath.get(r.targetPath);
+            const syncedFileHash = written !== undefined ? await hashContent(written) : undefined;
+            syncMap = recordSync(
+              syncMap,
+              r.vaultRelPath!,
+              r.resolvedId,
+              r.inferredType,
+              r.vaultHash,
+              syncedFileHash,
+            );
           }
           await saveSyncMap(syncMap);
           const s = await loadSettings();

@@ -3,6 +3,7 @@ import {
   classifyVaultNote,
   recordSync,
   findPathByApprovedHash,
+  hasLocalEdits,
   type SyncMap,
 } from "@/atlas/import/syncMap";
 
@@ -52,5 +53,25 @@ describe("findPathByApprovedHash", () => {
 
   it("returns undefined when no entry matches", () => {
     expect(findPathByApprovedHash({}, H1)).toBeUndefined();
+  });
+});
+
+describe("hasLocalEdits", () => {
+  it("is false when the atlas file is exactly what the last sync wrote", () => {
+    const map: SyncMap = {
+      "03_Entities/Corven.md": { id: "corven", baseType: "npc", syncedFileHash: H1 },
+    };
+    expect(hasLocalEdits(map, "03_Entities/Corven.md", H1)).toBe(false);
+  });
+
+  it("is true when the atlas file has drifted from what the last sync wrote", () => {
+    const map: SyncMap = {
+      "03_Entities/Corven.md": { id: "corven", baseType: "npc", syncedFileHash: H1 },
+    };
+    expect(hasLocalEdits(map, "03_Entities/Corven.md", H2)).toBe(true);
+  });
+
+  it("is false when we have no record — never cry wolf on a first sync", () => {
+    expect(hasLocalEdits({}, "03_Entities/Corven.md", H1)).toBe(false);
   });
 });

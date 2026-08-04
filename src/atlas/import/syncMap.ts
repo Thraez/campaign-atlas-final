@@ -10,6 +10,11 @@ export interface SyncMapEntry {
    * entries classify as "unknown" once, then settle on the next sync.
    */
   approvedHash?: string;
+  /**
+   * `sha256:<hex>` of the atlas-side file exactly as the last sync wrote it.
+   * Lets us tell "the DM edited this here" apart from "the sync wrote it".
+   */
+  syncedFileHash?: string;
 }
 
 /** Keyed by vault-relative POSIX path (e.g. "notes/corven.md"). */
@@ -50,6 +55,17 @@ export function findPathByApprovedHash(map: SyncMap, hash: string): string | und
   return undefined;
 }
 
+/**
+ * True when the atlas-side file differs from what the last sync wrote — i.e. the
+ * DM edited it in the editor. Returns false when unknown, so a first sync never
+ * raises a false alarm.
+ */
+export function hasLocalEdits(map: SyncMap, relPath: string, currentFileHash: string): boolean {
+  const entry = map[relPath];
+  if (!entry?.syncedFileHash) return false;
+  return entry.syncedFileHash !== currentFileHash;
+}
+
 /** Return a new SyncMap with the given entry added or updated (pure — does not mutate the original). */
 export function recordSync(
   map: SyncMap,
@@ -57,9 +73,15 @@ export function recordSync(
   id: string,
   baseType: string,
   approvedHash?: string,
+  syncedFileHash?: string,
 ): SyncMap {
   return {
     ...map,
-    [relPath]: { id, baseType, ...(approvedHash ? { approvedHash } : {}) },
+    [relPath]: {
+      id,
+      baseType,
+      ...(approvedHash ? { approvedHash } : {}),
+      ...(syncedFileHash ? { syncedFileHash } : {}),
+    },
   };
 }
