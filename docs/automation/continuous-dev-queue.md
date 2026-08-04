@@ -229,10 +229,6 @@ is for sequencing, not the whole spec.
 
 - [x] **V6. Warn before a vault change overwrites an edit made in the atlas.** ✅ DONE 2026-08-04 — commit `9cecfa0a`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **V7. List vault folders with note counts, without reading notes.** Plan Task B1 — `handleVaultFoldersRequest` + `GET /__atlas/vault-folders` in `scripts/vite-plugin-atlas-save.ts`, honouring `isReadableVaultPath`, returning no file contents.
-  - **Done when:** `src/test/import/vault-folders.test.ts` passes (4 tests), including the assertion that no note text appears in the response.
-  - **Gate:** standard gate **+ `npm run atlas:publish`** (touches the dev-server plugin; the new route must not reach the player bundle — `check-secrets` exit 9 is the signal). ~1 run.
-
 - [ ] **V8. Scan only the folders the DM picked.** Plan Task B2 — third `includeFolders` parameter on `handleVaultScanRequest`, repeated `folder` query params, and `candidateFolders` on `SyncSettings`. Patterns are **built in code, never typed by the DM** — a bare folder name is not a glob and matches nothing.
   - **Done when:** a scan scoped to one folder returns only that folder's notes; an empty list preserves today's whole-vault behaviour.
   - **Gate:** standard gate **+ `npm run atlas:publish`**. ~1 run.

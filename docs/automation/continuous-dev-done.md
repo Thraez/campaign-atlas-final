@@ -3522,3 +3522,31 @@ shipped-artifact touch — so `npm run atlas:publish` wasn't required.
 **Commits:** `9cecfa0a` (feat: warn before a vault change overwrites an edit made here — `syncMap.ts`,
 `stagingState.ts`, `useMdImportFlow.ts`, `buildImportChanges.ts` export, + `syncMap.test.ts`), on
 `run/v6-vault-local-edits`, merged into `auto/continuous-dev`.
+
+- [x] **V7. List vault folders with note counts, without reading notes.** ✅ DONE
+  2026-08-04 — commit `abe92586`.
+
+Plan Task B1 (`docs/superpowers/plans/2026-08-01-vault-publishing.md`), Phase B of the vault-publishing
+refuel — the groundwork for letting the DM pick which vault folders to sync, before B2/B3 wire that up. New
+`handleVaultFoldersRequest` in `scripts/vite-plugin-atlas-save.ts` walks the vault recursively, returning
+each top-level folder with a `.md` count and nothing else — no file contents, no pre-selection. A new
+`GET /__atlas/vault-folders?vaultRoot=<abs>` route registers it beside the existing `vault-scan` route,
+reusing the same `rejectNonLoopback` guard and response shape.
+
+The plan's literal snippet filtered top-level folders through `isReadableVaultPath`, but that helper only
+matches `.md`-suffixed paths — called on a directory it always returns `false`, which silently emptied the
+folder list. Dropped that check for the top-level `readdir(vaultRoot)` entries (already bounded to the
+vault root by construction, since `readdir` can't escape its own directory) and kept it only for the
+per-file `.md` leaf count inside `countMd`, where the suffix match is correct.
+
+**Gate:** `npx tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (18 pre-existing,
+unchanged) · sharded vitest all green (752+669+888+733 = 3042 tests across 4 shards; shard 4 hit the
+documented `onTaskUpdate` RPC flake, 0 real failures, not re-run per policy). New
+`src/test/import/vault-folders.test.ts` (4 tests, including the "no file contents in the response"
+assertion) passed. Touches the dev-server plugin, so `npm run atlas:publish` also ran — all 12 scans clean,
+`check-secrets` had nothing to flag (the new route ships no data into `dist/`). The only build-artifact diff
+was the `atlas.json` publish timestamp, reverted as pure churn.
+
+**Commits:** `abe92586` (feat: list vault folders with note counts, without reading notes —
+`handleVaultFoldersRequest` + route + `vault-folders.test.ts`), on `run/v7-vault-folders-endpoint`, merged
+into `auto/continuous-dev`.
