@@ -3613,3 +3613,30 @@ wasn't required.
 **Commits:** `7d5676b7` (feat: pick vault folders with tick boxes instead of typing globs —
 `VaultFolderPicker` + `SyncPanel` wiring + `AtlasPlacementEditor.tsx` call-site fix +
 `sync-panel.test.tsx`), on `run/v9-vault-folder-picker`, merged into `auto/continuous-dev`.
+
+- [x] **V10. Resolve image embeds, refusing anything outside the chosen folders.** ✅ DONE
+  2026-08-04 — commit `763b3fdf`.
+
+Plan Task C1 (`docs/superpowers/plans/2026-08-01-vault-publishing.md`), Phase C of the vault-publishing
+refuel — new pure `src/atlas/import/resolveVaultImage.ts` (`resolveVaultImage`, `vaultImageTargetName`).
+An Obsidian image embed can name a file by basename or by a relative path, and can name one sitting in a
+DM-only folder the DM didn't pick to sync; resolution requires the image to both exist in the vault file
+index and sit inside a chosen folder, refusing (with a reason, never silently) otherwise. Target filenames
+for copied images are derived from the entity id and an index, never from the source filename — a vault
+filename can itself be a spoiler (`the-cabal-lair.png`) and would trip the image-privacy filename scan
+later in the pipeline (that wiring is C4's job, not this one's).
+
+Implemented exactly to the plan's literal code and test snippets — no deviation needed. Per the plan's
+mandatory mutation check, temporarily made the internal `inCandidates` helper always return `true` and
+re-ran the suite: exactly the "refuses an image that lives outside the chosen folders" test failed (the
+other 7 stayed green), confirming the secrecy assertion isn't vacuous. Reverted (the file was new/untracked
+so a plain rewrite stood in for `git checkout --`), re-confirmed all 8 green before committing.
+
+**Gate:** `tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (18 pre-existing, unchanged) ·
+sharded vitest all green (757+669+894+735 = 3055 tests across 4 shards; shard 4 hit the documented
+`onTaskUpdate` RPC flake, 0 real failures, not re-run per policy). Pure new module, no `scripts/`/fog/
+soundscape/artifact touch, so `npm run atlas:publish` wasn't required.
+
+**Commits:** `763b3fdf` (feat: resolve vault image embeds, refusing anything outside scope —
+`resolveVaultImage.ts` + `resolveVaultImage.test.ts`, 8 tests), on `run/v10-resolve-vault-image`, merged
+into `auto/continuous-dev`.

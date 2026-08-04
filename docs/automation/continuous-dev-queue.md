@@ -231,9 +231,7 @@ is for sequencing, not the whole spec.
 
 - [x] **V9. Pick vault folders with tick boxes instead of typing globs.** ✅ DONE 2026-08-04 — commit `7d5676b7`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **V10. Resolve image embeds, refusing anything outside the chosen folders.** Plan Task C1 — new pure `src/atlas/import/resolveVaultImage.ts` (`resolveVaultImage`, `vaultImageTargetName`). An embed can name an image sitting in a DM-only folder; resolution must refuse it and report why.
-  - **Done when:** `src/test/import/resolveVaultImage.test.ts` passes (8 tests) **and** the mandatory mutation check (make `inCandidates` always return true) fails the out-of-scope test before revert.
-  - **Gate:** standard gate. ~1 run.
+- [x] **V10. Resolve image embeds, refusing anything outside the chosen folders.** ✅ DONE 2026-08-04 — commit `763b3fdf`. Full write-up in `continuous-dev-done.md`.
 
 - [ ] **V11. Copy vault images out with metadata stripped.** Plan Task C2 — `handleVaultImageCopyRequest` + `POST /__atlas/vault-image-copy`, server-side so image bytes never round-trip through the browser. **The route must strip `publicDir` from the request body** so a request cannot redirect writes.
   - **Done when:** `src/test/import/vault-image-copy.test.ts` passes (3 tests): in-scope copy named from the entity, EXIF gone, out-of-scope refused with nothing written.
