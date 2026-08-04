@@ -56,6 +56,7 @@ import {
   isReadableLocalAtlasPath,
 } from "../src/atlas/save/sourcePathAllowlist";
 import { makeIgnore } from "../src/atlas/import/ignoreRules";
+import { resolveVaultImage, vaultImageTargetName } from "../src/atlas/import/resolveVaultImage";
 import { runBuild, type BuildResult as InProcessBuildResult } from "./build-atlas";
 import { tryAcquireBuildLock, releaseBuildLock } from "./atlas/buildLock";
 
@@ -1111,6 +1112,105 @@ export async function handleVaultFoldersRequest(
   return { ok: true, folders };
 }
 
+const VAULT_IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
+const MAX_VAULT_IMAGE_BYTES = 6 * 1024 * 1024;
+
+export interface VaultImageCopyArgs {
+  vaultRoot: string;
+  candidateFolders: string[];
+  noteRelPath: string;
+  rawSrc: string;
+  entityId: string;
+  index: number;
+  /** Public dir to write into. Defaults to <cwd>/public. */
+  publicDir?: string;
+}
+
+export type VaultImageCopyResult =
+  | { ok: true; target: string }
+  | { ok: false; reason: "not-found" | "outside-candidates" | "too-large" | "unreadable" };
+
+/**
+ * Plain root-containment check, unlike `isReadableVaultPath` which hard-requires
+ * a `.md` suffix (that helper is for note files; images need the same boundary
+ * without the extension requirement — same fix shape as `handleVaultFoldersRequest`'s
+ * top-level folder listing).
+ */
+function isWithinVaultRoot(rootResolved: string, candidateAbs: string): boolean {
+  const cand = path.resolve(candidateAbs);
+  return cand === rootResolved || cand.startsWith(rootResolved + path.sep);
+}
+
+/** Build the vault-relative index of image files, honouring the read boundary. */
+async function indexVaultImages(rootResolved: string): Promise<string[]> {
+  const out: string[] = [];
+  async function walk(dir: string): Promise<void> {
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const abs = path.join(dir, e.name);
+      if (!isWithinVaultRoot(rootResolved, abs)) continue;
+      if (e.isDirectory()) await walk(abs);
+      else if (VAULT_IMAGE_EXTS.has(path.extname(e.name).toLowerCase())) {
+        out.push(path.relative(rootResolved, abs).split(path.sep).join("/"));
+      }
+    }
+  }
+  await walk(rootResolved);
+  return out;
+}
+
+/**
+ * Copy one vault image into public/atlas/assets/images, stripped of metadata.
+ * Reads the vault, never writes to it. Refuses anything outside the DM's
+ * chosen folders — an embed can name a DM-only image.
+ */
+export async function handleVaultImageCopyRequest(
+  args: VaultImageCopyArgs,
+): Promise<VaultImageCopyResult> {
+  const rootResolved = path.resolve(args.vaultRoot);
+  const index = await indexVaultImages(rootResolved);
+  const resolved = resolveVaultImage(
+    args.rawSrc,
+    args.noteRelPath,
+    index,
+    args.candidateFolders,
+  );
+  if (!resolved.ok) return { ok: false, reason: resolved.reason };
+
+  const abs = path.join(rootResolved, resolved.relPath);
+  if (!isWithinVaultRoot(rootResolved, abs)) return { ok: false, reason: "not-found" };
+
+  let bytes: Buffer;
+  try {
+    const stat = await fs.stat(abs);
+    if (stat.size > MAX_VAULT_IMAGE_BYTES) return { ok: false, reason: "too-large" };
+    bytes = await fs.readFile(abs);
+  } catch {
+    return { ok: false, reason: "unreadable" };
+  }
+
+  const name = vaultImageTargetName(args.entityId, args.index, resolved.relPath);
+  const publicDir = args.publicDir ?? path.join(process.cwd(), "public");
+  const outDir = path.join(publicDir, "atlas", "assets", "images");
+  const outPath = path.join(outDir, name);
+
+  try {
+    await fs.mkdir(outDir, { recursive: true });
+    // Re-encode without metadata: EXIF/IPTC/XMP (incl. GPS) never lands.
+    const cleaned = await sharp(bytes).toBuffer();
+    await fs.writeFile(outPath, cleaned);
+  } catch {
+    return { ok: false, reason: "unreadable" };
+  }
+
+  return { ok: true, target: `/atlas/assets/images/${name}` };
+}
+
 /**
  * Pure handler for POST /__atlas/local-write.
  * Writes `contents` to `.local-atlas/<name>`, where `name` must be one of the
@@ -1322,6 +1422,36 @@ export function atlasSavePlugin(): Plugin {
             res.statusCode = result.status;
             res.end(JSON.stringify({ error: result.error }));
           }
+        });
+      });
+
+      // POST /__atlas/vault-image-copy
+      // Copies one vault image into public/atlas/assets/images, metadata stripped.
+      // Bytes never round-trip through the browser. `publicDir` is never accepted
+      // from the request body — always server-derived — so a request can't redirect writes.
+      server.middlewares.use("/__atlas/vault-image-copy", (req, res, next) => {
+        if (req.method !== "POST") return next();
+        if (rejectNonLoopback(req, res)) return;
+        let raw = "";
+        req.setEncoding("utf8");
+        req.on("data", (chunk: string) => {
+          raw += chunk;
+        });
+        req.on("end", async () => {
+          let body: Record<string, unknown>;
+          try {
+            body = JSON.parse(raw) as Record<string, unknown>;
+          } catch {
+            res.statusCode = 400;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "InvalidBody" }));
+            return;
+          }
+          const { publicDir: _ignored, ...safe } = body;
+          const result = await handleVaultImageCopyRequest(safe as unknown as VaultImageCopyArgs);
+          res.statusCode = result.ok ? 200 : 400;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify(result));
         });
       });
 
