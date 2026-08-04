@@ -57,3 +57,13 @@ describe("hash round-trip", () => {
     expect(classifyVaultNote(map, "03_Entities/Corven.md", edited)).toBe("changed");
   });
 });
+
+describe("rework never reaches players on its own", () => {
+  it("a changed note is reported but not auto-included when unticked", () => {
+    const rows = rowsFor("changed");
+    // The DM must act: an unticked row contributes no file change.
+    const untouched = rows.map((r) => ({ ...r, included: false }));
+    expect(untouched.every((r) => !r.included)).toBe(true);
+    expect(rows[0].vaultState).toBe("changed");
+  });
+});
