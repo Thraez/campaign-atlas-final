@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { toast } from "sonner";
-import { SyncPanel } from "@/atlas/sync/SyncPanel";
+import { SyncPanel, VaultSyncSummary } from "@/atlas/sync/SyncPanel";
 import { loadSettings, saveSettings } from "@/atlas/sync/useSyncSettings";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
@@ -113,5 +113,23 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
       expect(screen.getByRole("button", { name: /sync now/i })).not.toBeDisabled(),
     );
     expect(screen.queryByText(/Rebuild in DM mode first/i)).toBeNull();
+  });
+});
+
+describe("VaultSyncSummary", () => {
+  it("leads with what changed", () => {
+    render(<VaultSyncSummary changed={3} added={1} unchanged={45} />);
+    expect(screen.getByText(/3 notes changed since you published them/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 new note/i)).toBeInTheDocument();
+  });
+
+  it("keeps unchanged notes quiet but visible as a count", () => {
+    render(<VaultSyncSummary changed={0} added={0} unchanged={45} />);
+    expect(screen.getByText(/45 unchanged/i)).toBeInTheDocument();
+  });
+
+  it("says nothing changed when nothing changed", () => {
+    render(<VaultSyncSummary changed={0} added={0} unchanged={0} />);
+    expect(screen.getByText(/nothing to bring over/i)).toBeInTheDocument();
   });
 });

@@ -129,3 +129,43 @@ export function SyncPanel({ onSync, hasDmBuild = true }: SyncPanelProps) {
     </div>
   );
 }
+
+export interface VaultSyncSummaryProps {
+  changed: number;
+  added: number;
+  unchanged: number;
+}
+
+/**
+ * Plain-language read-out after a scan. Leads with what needs attention;
+ * unchanged notes are reduced to a count so a large vault stays quiet.
+ */
+export function VaultSyncSummary({ changed, added, unchanged }: VaultSyncSummaryProps) {
+  if (changed === 0 && added === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {unchanged > 0
+          ? `Nothing to bring over — ${unchanged} unchanged.`
+          : "Nothing to bring over."}
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-1 text-sm">
+      {changed > 0 && (
+        <p>
+          <strong>
+            {changed} {changed === 1 ? "note has" : "notes"} changed since you published{" "}
+            {changed === 1 ? "it" : "them"}.
+          </strong>
+        </p>
+      )}
+      {added > 0 && (
+        <p>
+          {added} new {added === 1 ? "note" : "notes"} not published yet.
+        </p>
+      )}
+      {unchanged > 0 && <p className="text-muted-foreground">{unchanged} unchanged.</p>}
+    </div>
+  );
+}
