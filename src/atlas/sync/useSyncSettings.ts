@@ -2,6 +2,8 @@ import type { SyncMap } from "@/atlas/import/syncMap";
 
 export interface SyncSettings {
   vaultPath?: string;
+  /** Top-level vault folders the DM draws from. Empty/absent = the whole vault. */
+  candidateFolders?: string[];
   ignoreGlobs?: string[];
   lastSyncAt?: string;
 }

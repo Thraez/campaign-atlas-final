@@ -960,6 +960,7 @@ export async function handleDeleteImageRequest(
 export async function handleVaultScanRequest(
   vaultRoot: string,
   ignoreGlobs: string[],
+  includeFolders: string[] = [],
 ): Promise<
   { ok: true; files: Record<string, string> } | { ok: false; status: number; error: string }
 > {
@@ -975,12 +976,20 @@ export async function handleVaultScanRequest(
   const files: Record<string, string> = {};
   let aggregateBytes = 0;
 
+  // Folder scoping: when the DM has picked folders, a note must sit inside one.
+  // The pattern is built here, never typed by the DM — a bare folder name is not
+  // a glob and would match nothing (see design §2).
+  const inScope = (relPosix: string): boolean =>
+    includeFolders.length === 0 ||
+    includeFolders.some((f) => relPosix === f || relPosix.startsWith(`${f}/`));
+
   async function processFile(
     absPath: string,
   ): Promise<{ ok: false; status: number; error: string } | null> {
     const relPosix = path.relative(rootResolved, absPath).split(path.sep).join("/");
     if (!isReadableVaultPath(rootResolved, absPath)) return null;
     if (isIgnored(relPosix)) return null;
+    if (!inScope(relPosix)) return null;
     let size: number;
     try {
       size = (await fs.stat(absPath)).size;
@@ -1272,13 +1281,14 @@ export function atlasSavePlugin(): Plugin {
         const url = new URL(req.url ?? "/", "http://localhost");
         const vaultRoot = url.searchParams.get("vaultRoot") ?? "";
         const ignoreGlobs = url.searchParams.getAll("ignore");
+        const includeFolders = url.searchParams.getAll("folder");
         if (!vaultRoot) {
           res.statusCode = 400;
           res.setHeader("Content-Type", "application/json");
           res.end(JSON.stringify({ error: "MissingVaultRoot" }));
           return;
         }
-        handleVaultScanRequest(vaultRoot, ignoreGlobs).then((result) => {
+        handleVaultScanRequest(vaultRoot, ignoreGlobs, includeFolders).then((result) => {
           res.setHeader("Content-Type", "application/json");
           if (result.ok) {
             res.statusCode = 200;

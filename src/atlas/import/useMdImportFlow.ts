@@ -116,7 +116,7 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
   );
 
   const openWithVaultScan = useCallback(
-    async (vaultRoot: string, ignoreGlobs: string[]) => {
+    async (vaultRoot: string, ignoreGlobs: string[], candidateFolders: string[] = []) => {
       try {
         assertDmBuildLoaded(existingById);
       } catch (err) {
@@ -128,6 +128,7 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
       }
       const params = new URLSearchParams({ vaultRoot });
       for (const g of ignoreGlobs) params.append("ignore", g);
+      for (const f of candidateFolders) params.append("folder", f);
       let data:
         { ok: true; files: Record<string, string> } | { ok: false; status: number; error: string };
       try {

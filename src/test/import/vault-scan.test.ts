@@ -93,3 +93,31 @@ describe("handleVaultScanRequest", () => {
     expect(result.status).toBe(413);
   });
 });
+
+describe("folder scoping", () => {
+  it("reads only the folders the DM picked", async () => {
+    await fs.mkdir(path.join(tmpDir, "03_Entities"), { recursive: true });
+    await fs.writeFile(path.join(tmpDir, "03_Entities", "Corven.md"), "corven");
+    await fs.mkdir(path.join(tmpDir, "10_DmNotesAndSecrets"), { recursive: true });
+    await fs.writeFile(path.join(tmpDir, "10_DmNotesAndSecrets", "Cabal.md"), "cabal");
+
+    const result = await handleVaultScanRequest(tmpDir, [], ["03_Entities"]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const paths = Object.keys(result.files);
+    expect(paths.every((p) => p.startsWith("03_Entities/"))).toBe(true);
+    expect(paths.some((p) => p.startsWith("10_DmNotesAndSecrets/"))).toBe(false);
+  });
+
+  it("reads everything when no folders are picked, preserving today's behaviour", async () => {
+    await fs.mkdir(path.join(tmpDir, "03_Entities"), { recursive: true });
+    await fs.writeFile(path.join(tmpDir, "03_Entities", "Corven.md"), "corven");
+    await fs.mkdir(path.join(tmpDir, "10_DmNotesAndSecrets"), { recursive: true });
+    await fs.writeFile(path.join(tmpDir, "10_DmNotesAndSecrets", "Cabal.md"), "cabal");
+
+    const result = await handleVaultScanRequest(tmpDir, [], []);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(Object.keys(result.files).length).toBeGreaterThan(0);
+  });
+});
