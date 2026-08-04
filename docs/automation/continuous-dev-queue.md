@@ -233,9 +233,7 @@ is for sequencing, not the whole spec.
 
 - [x] **V10. Resolve image embeds, refusing anything outside the chosen folders.** ✅ DONE 2026-08-04 — commit `763b3fdf`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **V11. Copy vault images out with metadata stripped.** Plan Task C2 — `handleVaultImageCopyRequest` + `POST /__atlas/vault-image-copy`, server-side so image bytes never round-trip through the browser. **The route must strip `publicDir` from the request body** so a request cannot redirect writes.
-  - **Done when:** `src/test/import/vault-image-copy.test.ts` passes (3 tests): in-scope copy named from the entity, EXIF gone, out-of-scope refused with nothing written.
-  - **Gate:** standard gate **+ `npm run atlas:publish`** (writes into `public/atlas/assets/images/`; `check-image-privacy` must stay clean). ~2 runs.
+- [x] **V11. Copy vault images out with metadata stripped.** ✅ DONE 2026-08-05 — commit `c2833117`. Full write-up in `continuous-dev-done.md`.
 
 - [ ] **V12. Bring note images across and rewrite the embeds.** Plan Task C3 — `rewriteEmbeds` in `resolveVaultImage.ts`, wired into the sync commit. A refused image leaves **no broken link and no hint the file exists**; the DM is told how many were skipped and why.
   - **Done when:** an embed with a copied image becomes `![](/atlas/assets/images/…)`, a refused one disappears cleanly, and ordinary `[[wikilinks]]` are untouched.

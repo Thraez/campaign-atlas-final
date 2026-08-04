@@ -3640,3 +3640,45 @@ soundscape/artifact touch, so `npm run atlas:publish` wasn't required.
 **Commits:** `763b3fdf` (feat: resolve vault image embeds, refusing anything outside scope —
 `resolveVaultImage.ts` + `resolveVaultImage.test.ts`, 8 tests), on `run/v10-resolve-vault-image`, merged
 into `auto/continuous-dev`.
+
+- [x] **V11. Copy vault images out with metadata stripped.** ✅ DONE
+  2026-08-05 — commit `c2833117`.
+
+Plan Task C2 (`docs/superpowers/plans/2026-08-01-vault-publishing.md`), Phase C of the vault-publishing
+refuel — a new `handleVaultImageCopyRequest` in `scripts/vite-plugin-atlas-save.ts` plus a
+`POST /__atlas/vault-image-copy` route, registered beside the other vault routes with the same
+`rejectNonLoopback` loopback guard. Image bytes never round-trip through the browser: the route reads the
+request, strips `publicDir` server-side before calling the handler (`const { publicDir: _ignored, ...safe }
+= body`), so a client request can never redirect where the file lands. The handler indexes vault images,
+resolves the requested embed through V10's `resolveVaultImage`, refuses anything outside the DM's chosen
+folders, then re-encodes the bytes through `sharp()` (no `.withMetadata()`) so EXIF/IPTC/XMP — including
+GPS — never lands in the copy, and writes it to `public/atlas/assets/images/<entityId>-<index+1>.ext` (name
+from `vaultImageTargetName`, never the source filename).
+
+**One adaptation vs. the plan's literal snippet:** the plan's own helper calls the existing
+`isReadableVaultPath`, but that helper hard-requires a `.md` suffix (it's built for note files) and would
+silently empty every walk over image files. Used a plain root-containment check
+(`isWithinVaultRoot`) instead — same fix shape V7 already used for `handleVaultFoldersRequest`'s top-level
+folder listing (see that entry above), not a new pattern. The route also uses `rejectNonLoopback`
+(the actual guard every neighbouring route in this file uses) rather than the plan's `isAllowedDevRequest`
+reference, which is the underlying helper `rejectNonLoopback` already wraps.
+
+**Note on provenance:** this unit was mostly built by a prior scheduled run (`v2-2026-08-04-V11`) that
+claimed the lock but crashed before writing back — the lock sat `IN_PROGRESS` for over 24h with no "Last
+run" entry. This run found the crashed run's worktree (`run/v11-vault-image-copy`) still holding the
+complete, uncommitted implementation and test file, verified it against the plan and against the actual
+codebase's route-registration pattern, ran the full gate fresh, and committed it rather than redoing the
+work from scratch.
+
+**Gate:** `tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (18 pre-existing, unchanged) ·
+sharded vitest all green (757+669+824+808 = 3058 tests across 4 shards, including the new 3-test
+`vault-image-copy.test.ts`; shards 1 and 4 hit the documented `onTaskUpdate` RPC flake, 0 real failures, not
+re-run per policy). Touches the dev-server plugin (`scripts/`), so `npm run atlas:publish` also ran per the
+plan's own gate add-on — all 12 scans clean, `check-image-privacy` had nothing to flag. The only
+build-artifact diff was `public/atlas/atlas.json`'s body text switching CRLF→LF (pre-existing line-ending
+drift unrelated to this change, confirmed via a JSON-level diff ignoring `version`/`publishedAt`); reverted
+via `git checkout --` before committing.
+
+**Commits:** `c2833117` (feat: copy vault images out with metadata stripped —
+`handleVaultImageCopyRequest` + `POST /__atlas/vault-image-copy` + `vault-image-copy.test.ts`, 3 tests), on
+`run/v11-vault-image-copy`, merged into `auto/continuous-dev`.
