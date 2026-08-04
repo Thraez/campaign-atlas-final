@@ -229,10 +229,6 @@ is for sequencing, not the whole spec.
 
 - [x] **V6. Warn before a vault change overwrites an edit made in the atlas.** ✅ DONE 2026-08-04 — commit `9cecfa0a`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **V8. Scan only the folders the DM picked.** Plan Task B2 — third `includeFolders` parameter on `handleVaultScanRequest`, repeated `folder` query params, and `candidateFolders` on `SyncSettings`. Patterns are **built in code, never typed by the DM** — a bare folder name is not a glob and matches nothing.
-  - **Done when:** a scan scoped to one folder returns only that folder's notes; an empty list preserves today's whole-vault behaviour.
-  - **Gate:** standard gate **+ `npm run atlas:publish`**. ~1 run.
-
 - [ ] **V9. Pick vault folders with tick boxes instead of typing globs.** Plan Task B3 — `VaultFolderPicker` in `SyncPanel.tsx`, wired to `candidateFolders`, with the `onSync` prop widened to a third argument (fix the call site in `AtlasPlacementEditor.tsx`).
   - **Done when:** `src/test/sync-panel.test.tsx` passes and the panel lists real folders with counts against the DM's vault.
   - **Gate:** standard gate. ~2 runs.

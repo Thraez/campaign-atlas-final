@@ -3550,3 +3550,36 @@ was the `atlas.json` publish timestamp, reverted as pure churn.
 **Commits:** `abe92586` (feat: list vault folders with note counts, without reading notes —
 `handleVaultFoldersRequest` + route + `vault-folders.test.ts`), on `run/v7-vault-folders-endpoint`, merged
 into `auto/continuous-dev`.
+
+- [x] **V8. Scan only the vault folders the DM picked.** ✅ DONE
+  2026-08-04 — commit `23f489cd`.
+
+Plan Task B2 (`docs/superpowers/plans/2026-08-01-vault-publishing.md`), Phase B of the vault-publishing
+refuel — a 2,179-note vault no longer arrives in one table. `handleVaultScanRequest`
+(`scripts/vite-plugin-atlas-save.ts`) gained a third `includeFolders: string[] = []` parameter; an
+`inScope` predicate (same shape as `resolveVaultImage`'s later `inCandidates`) requires each scanned
+note's vault-relative path to sit inside one of the picked folders, checked in `processFile` alongside the
+existing `isIgnored` guard. An empty list preserves today's whole-vault behaviour (`inScope` short-circuits
+true). The `/__atlas/vault-scan` route reads repeated `folder` query params via `getAll("folder")` and
+passes them straight through — patterns are built in code from a folder name, never typed by the DM, so a
+bare name can't silently match nothing. `SyncSettings` (`useSyncSettings.ts`) gained `candidateFolders?:
+string[]` so the choice can persist. `openWithVaultScan` (`useMdImportFlow.ts`) widened to an optional
+third `candidateFolders` parameter, appended to the scan request as repeated `folder` params. No caller
+update was needed this task — `AtlasPlacementEditor.tsx`'s `onSync={(root, globs) => ...}` call site still
+compiles against the widened (now-3-arg-with-default) signature; wiring an actual picker UI to it is B3's
+job, not B2's.
+
+**Gate:** `npx tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (18 pre-existing,
+unchanged) · sharded vitest all green (754+669+888+733 = 3044 tests across 4 shards; shard 4 hit the
+documented `onTaskUpdate` RPC flake, 0 real failures, not re-run per policy). Extended
+`src/test/import/vault-scan.test.ts` with the plan's two folder-scoping tests (scoped scan returns only
+that folder; empty list preserves whole-vault behaviour), built as a self-contained fixture inline (this
+repo's `vault-scan.test.ts` uses a `beforeEach`-scoped `tmpDir`, not the plan's assumed shared `beforeAll`
+`root` — adapted the fixture shape, kept the test intent). Touches the dev-server plugin, so `npm run
+atlas:publish` also ran — all 12 scans clean, `check-secrets` had nothing to flag (the widened scan route
+still ships no data into `dist/`). The only build-artifact diff was the `atlas.json` publish timestamp,
+reverted as pure churn (single-line diff, confirmed via `git diff` before reverting).
+
+**Commits:** `23f489cd` (feat: scan only the vault folders the DM picked — `handleVaultScanRequest` +
+route + `useSyncSettings.ts` + `useMdImportFlow.ts` + `vault-scan.test.ts`), on
+`run/v8-vault-folder-scoping`, merged into `auto/continuous-dev`.
