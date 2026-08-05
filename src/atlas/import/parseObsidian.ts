@@ -125,7 +125,11 @@ function extractAttachments(body: string): AttachmentRef[] {
       return;
     }
     const filename = rawSrc.split("/").pop() ?? rawSrc;
-    const suggestedTarget = `public/atlas/assets/images/${slugify(filename.replace(/\.[^.]+$/, ""))}${(filename.match(/\.[^.]+$/) ?? [""])[0]}`;
+    const ext = (filename.match(/\.[^.]+$/) ?? [".png"])[0].toLowerCase();
+    // Deliberately not derived from the source filename: a vault filename can
+    // itself be a spoiler. The real name is assigned at copy time from the
+    // entity id (resolveVaultImage.vaultImageTargetName).
+    const suggestedTarget = `public/atlas/assets/images/pending${ext}`;
     out.push({ rawSrc, suggestedTarget, resolved: false });
   };
   for (const m of body.matchAll(EMBED_RE)) push(m[1]);

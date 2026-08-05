@@ -148,6 +148,11 @@ describe("parseObsidianFile — uncovered branches", () => {
     expect(f.attachments[0].resolved).toBe(false);
     expect(f.warnings.some((w) => /attachment.*need a target/i.test(w))).toBe(true);
   });
+
+  it("does not put the source filename in the suggested target", () => {
+    const f = parseObsidianFile("![[the-cabal-lair.png]]", "npcs/X.md");
+    expect(f.attachments[0].suggestedTarget).not.toContain("cabal");
+  });
 });
 
 describe("buildEntityFrontmatterPatch", () => {
