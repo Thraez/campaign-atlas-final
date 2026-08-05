@@ -3682,3 +3682,46 @@ via `git checkout --` before committing.
 **Commits:** `c2833117` (feat: copy vault images out with metadata stripped —
 `handleVaultImageCopyRequest` + `POST /__atlas/vault-image-copy` + `vault-image-copy.test.ts`, 3 tests), on
 `run/v11-vault-image-copy`, merged into `auto/continuous-dev`.
+
+- [x] **V12. Bring note images across and rewrite the embeds.** ✅ DONE
+  2026-08-05 — commit `1f6f241e`.
+
+Plan Task C3 (`docs/superpowers/plans/2026-08-01-vault-publishing.md`), the last step of Phase C's image
+pipeline — an included row's Obsidian image embeds (`![[portrait.png]]`) are now copied server-side at
+commit time and swapped for plain markdown image links (`![](/atlas/assets/images/corven-1.png)`). A new
+pure `rewriteEmbeds(body, copied)` in `resolveVaultImage.ts` does the swap: an embed with no entry in the
+`copied` map (refused by V11's `handleVaultImageCopyRequest`, or simply not found) is removed entirely —
+no broken link, no hint that a file exists, matching the secrecy shape V10/V11 already established.
+
+Wired into `useMdImportFlow.ts`'s `commit()`: a new `vaultScanCtxRef` (a `useRef`, set inside
+`openWithVaultScan` right after a successful scan) carries `vaultRoot`/`candidateFolders` forward to commit
+time, since the two calls don't otherwise share a closure. Before `buildImportChanges` runs, each included
+row with a `vaultRelPath` has its `![[...]]` embeds extracted, POSTed one at a time to
+`/__atlas/vault-image-copy`, and its `rawContent` rewritten via `rewriteEmbeds` against the resulting
+`copied` map — so the content that actually reaches `buildImportChanges` (and, on success, the sync-map's
+recorded hash) already has embeds resolved. A running `skippedTotal` count across all rows surfaces as one
+plain-language toast: "`N image(s) skipped — not in the folders you picked.`"
+
+**One addition beyond the plan's literal steps:** the plan's Step 5 wiring came with no test snippet of its
+own (only the pure `rewriteEmbeds` function in Step 1 was TDD'd). Since the wiring is real production
+behaviour with a secrecy property (a refused embed must vanish, not dangle), added one focused test,
+`src/test/import/useMdImportFlow-vault-images.test.ts` — mocks `buildImportChanges`,
+`saveAtlasPatchToLocalFs`, and `@/atlas/sync/useSyncSettings` (same pattern as the existing
+`useMdImportFlow-conflict-toast.test.ts`), drives a real `openWithVaultScan` → `commit()` round trip through
+a stubbed `fetch`, and asserts the row `buildImportChanges` actually receives has the copied embed rewritten
+and the refused one gone, plus the skip toast text.
+
+**Mutation check (mandatory for this section's secrecy-relevant tests):** temporarily made `rewriteEmbeds`
+never hide a refused embed (`` `![](${target ?? src})` ``) and re-ran the suite — exactly the "removes an
+embed that was refused, leaving no broken link" test failed, confirming it isn't vacuous. Reverted, all 6
+tests in `vault-image-copy.test.ts` green again before committing.
+
+**Gate:** `tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (18 pre-existing, unchanged) ·
+sharded vitest all green (757+669+827+809 = 3062 tests across 4 shards; shard 4 hit the documented
+`onTaskUpdate` RPC flake, 0 real failures, not re-run per policy). Full `src/test/import/` folder (16 files,
+103 tests including the new wiring test) passed. Pure `src/atlas/import/` change, no `scripts/` touch, so
+`npm run atlas:publish` wasn't required.
+
+**Commits:** `1f6f241e` (feat: bring note images across and rewrite the embeds — `rewriteEmbeds` +
+`useMdImportFlow.ts` wiring + 4 new tests), on `run/v12-vault-image-embeds`, merged into
+`auto/continuous-dev`.

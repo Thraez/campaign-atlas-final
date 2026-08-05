@@ -235,9 +235,7 @@ is for sequencing, not the whole spec.
 
 - [x] **V11. Copy vault images out with metadata stripped.** ✅ DONE 2026-08-05 — commit `c2833117`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **V12. Bring note images across and rewrite the embeds.** Plan Task C3 — `rewriteEmbeds` in `resolveVaultImage.ts`, wired into the sync commit. A refused image leaves **no broken link and no hint the file exists**; the DM is told how many were skipped and why.
-  - **Done when:** an embed with a copied image becomes `![](/atlas/assets/images/…)`, a refused one disappears cleanly, and ordinary `[[wikilinks]]` are untouched.
-  - **Gate:** standard gate **+ `npm run atlas:publish`**. ~2 runs.
+- [x] **V12. Bring note images across and rewrite the embeds.** ✅ DONE 2026-08-05 — commit `1f6f241e`. Full write-up in `continuous-dev-done.md`.
 
 - [ ] **V13. Keep vault filenames out of suggested asset paths.** Plan Task C4 — `parseObsidian.ts:128` currently slugifies the *source* filename into the target. A vault filename can itself be a spoiler (`the-cabal-lair.png`) and would trip the image-privacy filename scan; the real name comes from the entity id at copy time.
   - **Done when:** a parsed attachment's `suggestedTarget` contains no fragment of the source filename.
