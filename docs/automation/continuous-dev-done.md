@@ -3765,3 +3765,47 @@ behaviour change.
 
 **Commits:** `d05b3d44` (docs: correct the asset allowlist comment — images are allowed too), on
 `run/v13-attachment-naming`, merged into `auto/continuous-dev`.
+
+- [x] **V15. Pin that the vault is never written and visibility is always explicit.** ✅ DONE
+  2026-08-05 — commit `fefb1b65`.
+
+Plan Task C6, the final unit in the V1–V15 vault-publishing refuel. Spec §6's two remaining unpinned
+safety properties — "the vault is never written" and "visibility never silently becomes player" — now
+have tests in `src/test/import/vault-image-copy.test.ts`. The immutability test hashes every file under
+a fixture vault, runs a full `handleVaultScanRequest` scan plus a `handleVaultImageCopyRequest` image
+copy, and asserts the vault tree is byte-identical after. The visibility test builds a staging row from
+a vault note with no `atlas.visibility` key and asserts `resolvedVisibility` is `"dm"` — pinning existing
+June behaviour (`build-atlas.ts:425` defaults a missing visibility to player, so an absent key is a leak,
+not a neutral state) with no production change.
+
+**Test-file drift found and fixed vs. the plan's literal snippet:** the plan's own `buildStagingRows`
+call only supplied `worldId`/`importConfig`/`existingById`, but the real `StagingContext` interface also
+requires `allowedFolders` and `existingPaths`, and `ImportFolderConfig` requires `defaultFolder` — none
+optional. Built the context the same way the neighbouring `build-import-changes.test.ts`'s `makeCtx`
+helper does.
+
+**Mandatory mutation check caught a real vacuous-test bug, not just confirmed the test.** The plan's
+literal immutability-test snippet reuses the file's shared `root`/`outRoot` fixture (also used by three
+earlier tests in the same file that call `handleVaultImageCopyRequest` against the same
+`portrait.png`). Injecting the mutation-check's stray `fs.writeFile(abs + ".touched", "x")` into
+`handleVaultImageCopyRequest` did **not** fail the test on the first attempt — an earlier test in file
+order had already triggered that same code path, so the stray file already existed by the time the new
+test's own "before" hash snapshot was taken, silently absorbing the mutation. Rewrote the test with its
+own isolated `beforeAll`/`afterAll` fixture (`immRoot`/`immOutRoot`, its own temp dir, its own
+`portrait.png`) so no other test's side effects can contaminate the "before" snapshot regardless of run
+order. Re-ran the mutation check against the isolated version: failed exactly the intended assertion
+(`expected { …(2) } to deeply equal { …(1) }` — the `.touched` file showing up as an unexpected extra
+entry). Reverted, re-confirmed all 8 tests green.
+
+Gate: `tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (18 pre-existing, unchanged) ·
+sharded vitest all green (757+669+830+809 = 3065 tests across 4 shards; shards 3 and 4 each hit the
+documented `onTaskUpdate` RPC flake, 0 real failures, not re-run per policy). Queue's own gate note calls
+for `npm run atlas:publish` too — ran it, all 12 scans clean (the same 2 pre-existing `BROKEN REF (info)`
+entries for `Corven.png`/`Edric.png`, unrelated, informational only). Only artifact diff was
+`public/atlas/atlas.json`'s publish timestamp (single-line, `version`/`publishedAt` only), reverted via
+`git checkout --` before committing, per the standing convention.
+
+**This closes out the V1–V15 vault-publishing refuel — every unit in section V is now ✅ DONE.**
+
+**Commits:** `fefb1b65` (test: pin vault immutability + explicit visibility, C6), on
+`run/v15-vault-immutability-visibility`, merged into `auto/continuous-dev`.

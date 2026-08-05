@@ -241,9 +241,7 @@ is for sequencing, not the whole spec.
 
 - [x] **V14. Correct the stale asset-allowlist comment.** ✅ DONE 2026-08-05 — commit `d05b3d44`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **V15. Pin that the vault is never written and visibility is always explicit.** Plan Task C6 — hash the whole fixture vault before/after a full scan + image copy and assert byte-identity; assert a new entity from a vault note resolves to `dm`, not `player`.
-  - **Done when:** both properties pass **and** the mandatory mutation check (add a stray write into the copy handler) fails the immutability test before revert. **If the visibility test fails, stop and hand back — that is a live secrecy regression, not a test bug.**
-  - **Gate:** standard gate **+ `npm run atlas:publish`**. ~1 run.
+- [x] **V15. Pin that the vault is never written and visibility is always explicit.** ✅ DONE 2026-08-05 — commit `fefb1b65`. Full write-up in `continuous-dev-done.md`.
 
 ---
 
