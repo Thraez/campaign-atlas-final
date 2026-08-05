@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
 import { handleVaultImageCopyRequest } from "../../../scripts/vite-plugin-atlas-save";
+import { rewriteEmbeds } from "@/atlas/import/resolveVaultImage";
 
 let root: string;
 let outRoot: string;
@@ -73,5 +74,24 @@ describe("handleVaultImageCopyRequest", () => {
     });
     expect(res).toEqual({ ok: false, reason: "outside-candidates" });
     expect(fs.existsSync(path.join(outRoot, "atlas", "assets", "images", "corven-6.png"))).toBe(false);
+  });
+});
+
+describe("rewriteEmbeds", () => {
+  it("replaces a wiki embed with a normal image link", () => {
+    const body = "He waits here.\n\n![[portrait.png]]\n";
+    expect(rewriteEmbeds(body, { "portrait.png": "/atlas/assets/images/corven-1.png" })).toBe(
+      "He waits here.\n\n![](/atlas/assets/images/corven-1.png)\n",
+    );
+  });
+
+  it("removes an embed that was refused, leaving no broken link", () => {
+    const body = "He waits here.\n\n![[cabal-lair.png]]\n";
+    expect(rewriteEmbeds(body, {})).toBe("He waits here.\n\n\n");
+  });
+
+  it("leaves ordinary wikilinks alone", () => {
+    const body = "See [[Edric]] for more.";
+    expect(rewriteEmbeds(body, {})).toBe("See [[Edric]] for more.");
   });
 });

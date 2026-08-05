@@ -51,3 +51,16 @@ export function vaultImageTargetName(entityId: string, index: number, sourceName
   const ext = (sourceName.match(/\.[^.]+$/)?.[0] ?? ".png").toLowerCase();
   return `${entityId}-${index + 1}${ext}`;
 }
+
+/**
+ * Swap Obsidian image embeds for plain markdown images.
+ * An embed with no entry in `copied` was refused or skipped; it is removed
+ * rather than left as a broken link or a hint that something exists.
+ */
+export function rewriteEmbeds(body: string, copied: Record<string, string>): string {
+  return body.replace(/!\[\[([^\]]+)\]\]/g, (_match, inner: string) => {
+    const src = String(inner).split("|")[0].trim();
+    const target = copied[src];
+    return target ? `![](${target})` : "";
+  });
+}

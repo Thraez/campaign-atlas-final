@@ -5,7 +5,7 @@
  * the committed batch through the unified Save endpoint, and triggers a canon
  * reload so newly-imported entities show up without a page refresh.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   buildStagingRows,
@@ -25,6 +25,7 @@ import type { ImportFolderConfig } from "../content/schema";
 import { summarizeImport, formatImportSummaryLine } from "./summarizeImport";
 import { recordSync, classifyVaultNote, findPathByApprovedHash, hasLocalEdits } from "./syncMap";
 import { loadSyncMap, saveSyncMap, loadSettings, saveSettings } from "../sync/useSyncSettings";
+import { rewriteEmbeds } from "./resolveVaultImage";
 
 /** Thrown by assertDmBuildLoaded when the DM atlas has not been built yet. */
 export class DmBuildRequiredError extends Error {
@@ -74,6 +75,8 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
   const [rows, setRows] = useState<StagingRow[]>([]);
   const [open, setOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  /** Vault scan context, captured at scan time so commit() can copy embedded images. */
+  const vaultScanCtxRef = useRef<{ vaultRoot: string; candidateFolders: string[] } | null>(null);
 
   const ctx = useMemo(() => {
     const allowedFolders = new Set([
@@ -147,6 +150,7 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
         }
         return;
       }
+      vaultScanCtxRef.current = { vaultRoot, candidateFolders };
       const syncMap = await loadSyncMap();
       const inputs = await Promise.all(
         Object.entries(data.files).map(async ([relPath, raw]) => {
@@ -211,7 +215,44 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
   const commit = useCallback(async () => {
     setIsImporting(true);
     try {
-      const changes = await buildImportChanges(rows);
+      const vaultCtx = vaultScanCtxRef.current;
+      let skippedTotal = 0;
+      const rowsForCommit = await Promise.all(
+        rows.map(async (row) => {
+          if (!row.included || !row.vaultRelPath || !vaultCtx) return row;
+          const embeds = [...row.rawContent.matchAll(/!\[\[([^\]]+)\]\]/g)].map((m) =>
+            m[1].split("|")[0].trim(),
+          );
+          if (embeds.length === 0) return row;
+          const copied: Record<string, string> = {};
+          for (const [i, src] of embeds.entries()) {
+            const resp = await fetch("/__atlas/vault-image-copy", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                vaultRoot: vaultCtx.vaultRoot,
+                candidateFolders: vaultCtx.candidateFolders,
+                noteRelPath: row.vaultRelPath,
+                rawSrc: src,
+                entityId: row.resolvedId,
+                index: i,
+              }),
+            });
+            const result = (await resp.json()) as
+              | { ok: true; target: string }
+              | { ok: false; reason: string };
+            if (result.ok) copied[src] = result.target;
+            else skippedTotal += 1;
+          }
+          return { ...row, rawContent: rewriteEmbeds(row.rawContent, copied) };
+        }),
+      );
+      if (skippedTotal > 0) {
+        toast.warning(
+          `${skippedTotal} image${skippedTotal === 1 ? "" : "s"} skipped — not in the folders you picked.`,
+        );
+      }
+      const changes = await buildImportChanges(rowsForCommit);
       const result = await saveAtlasPatchToLocalFs(changes, undefined, { rebuild: true });
       const count = result.saved;
       if (result.rebuilt === false) {
