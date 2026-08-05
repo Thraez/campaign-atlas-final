@@ -19,6 +19,12 @@ the design-check). This file holds the *poppable, ordered units* the routine wor
      unit's distinguishing nouns. If a shipped entry covers it, mark it `~ SKIPPED (already shipped as
      <ID>)` and take the next unit. *This step exists because a 2026-08-05 hand-back proposed six
      candidates and three of them had already shipped.*
+     **A `✅ DONE` marker is evidence, not proof — confirm the code is actually on `main`.** A DONE line
+     records what a run believed it shipped. Q4's pin legend was marked DONE on 2026-07-22 with a real
+     commit hash, but that commit sat on an abandoned branch and never reached `main`; it took until
+     2026-08-06 to notice. So: grep the archive *and* look for the thing in the tree. If the archive says
+     shipped and the code isn't there, that's a lost commit — say so in the hand-back rather than
+     rebuilding it from scratch, since the original work probably still exists on some branch.
    - **Premise check:** open the file/line the unit cites and confirm the thing it describes is still
      there. If the code moved or the behaviour already changed, mark it `~ SKIPPED (premise stale:
      <what you found>)` and take the next unit. Never build from the write-up alone.

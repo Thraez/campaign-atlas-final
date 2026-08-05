@@ -674,7 +674,13 @@ Render/styling parity only — **not** interactivity.
 
 ### Q — Refuel 2026-07-14 (100-task QoL / feature / infra / refactor backlog)
 
-- [x] **Q4. Add a collapsible pin legend for the active map.** ✅ DONE 2026-07-22 — commit cb83354c
+- [x] **Q4. Add a collapsible pin legend for the active map.** ✅ DONE 2026-07-22 — commit cb83354c, **but it never reached `main`** until 2026-08-06. The commit sat on the abandoned branch `claude/objective-brattain-c4555d` for two weeks while this line claimed it had shipped. Recovered and merged during the 2026-08-06 sweep; the one conflict was `SoundControl` gaining a `hasSoundscape` prop on `main` in the meantime (kept `main`'s shape, added the legend above it — refactor-shape wins).
+
+  ⚠️ **This is the only known case, and it was checked.** An audit of every commit hash cited in this file
+  found 199 hashes: 196 resolve to a real commit that is on `main`, 2 are unresolvable abbreviations, and
+  Q4's was the single genuine miss. Worth re-running that audit if a "✅ DONE" entry is ever doubted — a
+  DONE marker records what a run *believed* it shipped, and the new "already-built check" in
+  `continuous-dev-queue.md` step 2 greps this file, so a false DONE here becomes a false SKIP there.
   New `src/atlas/pins/PinLegend.tsx`: derives distinct pin presets from `placementsOnMap` via
   `resolvePinStyle` + dedup by preset id; renders a collapsible top-right corner overlay (default
   collapsed) with `pinSvg` swatches + preset labels; re-derives on map switch via `useMemo`.
