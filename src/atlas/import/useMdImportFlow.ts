@@ -239,8 +239,7 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
               }),
             });
             const result = (await resp.json()) as
-              | { ok: true; target: string }
-              | { ok: false; reason: string };
+              { ok: true; target: string } | { ok: false; reason: string };
             if (result.ok) copied[src] = result.target;
             else skippedTotal += 1;
           }

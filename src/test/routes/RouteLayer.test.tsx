@@ -100,7 +100,9 @@ function makeApi(overrides: Partial<RouteDraftAPI> = {}): RouteDraftAPI {
     applySnapshot: vi.fn(),
     issues: [],
     resolveWaypoint: vi.fn((w: Waypoint): Point | null => (Array.isArray(w) ? w : null)),
-    resolveRoute: vi.fn((r: Route): Point[] => r.waypoints.filter((w): w is Point => Array.isArray(w))),
+    resolveRoute: vi.fn((r: Route): Point[] =>
+      r.waypoints.filter((w): w is Point => Array.isArray(w)),
+    ),
     ...overrides,
   } as RouteDraftAPI;
 }
@@ -147,13 +149,17 @@ describe("N134 — RouteLayer: midpoint markers", () => {
   it("renders no midpoint markers when no route is selected", () => {
     const api = makeApi({ selectedId: null });
     const { container } = renderLayer(api);
-    expect(container.querySelectorAll('[data-class="atlas-route-midpoint-handle"]')).toHaveLength(0);
+    expect(container.querySelectorAll('[data-class="atlas-route-midpoint-handle"]')).toHaveLength(
+      0,
+    );
   });
 
   it("renders no midpoint markers while drawing a new route", () => {
     const api = makeApi({ drawing: true });
     const { container } = renderLayer(api);
-    expect(container.querySelectorAll('[data-class="atlas-route-midpoint-handle"]')).toHaveLength(0);
+    expect(container.querySelectorAll('[data-class="atlas-route-midpoint-handle"]')).toHaveLength(
+      0,
+    );
   });
 
   it("skips a segment whose waypoint is an unresolved entity ref", () => {
@@ -166,6 +172,8 @@ describe("N134 — RouteLayer: midpoint markers", () => {
     });
     const { container } = renderLayer(api);
     // Both segments touch the unresolved entity waypoint, so neither midpoint renders.
-    expect(container.querySelectorAll('[data-class="atlas-route-midpoint-handle"]')).toHaveLength(0);
+    expect(container.querySelectorAll('[data-class="atlas-route-midpoint-handle"]')).toHaveLength(
+      0,
+    );
   });
 });

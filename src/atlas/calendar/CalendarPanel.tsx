@@ -50,8 +50,7 @@ export function CalendarPanel({
 
   const addMonth = () => emit({ months: [...months, { name: "", days: DEFAULT_MONTH_DAYS }] });
 
-  const removeMonth = (index: number) =>
-    emit({ months: months.filter((_, i) => i !== index) });
+  const removeMonth = (index: number) => emit({ months: months.filter((_, i) => i !== index) });
 
   const blankNames = months.filter((m) => !m.name.trim()).length;
 
@@ -152,7 +151,12 @@ export function CalendarPanel({
             </p>
           )}
 
-          <Button variant="outline" size="sm" className="h-8 w-full gap-1 text-xs" onClick={addMonth}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-full gap-1 text-xs"
+            onClick={addMonth}
+          >
             <Plus className="h-3.5 w-3.5" aria-hidden /> Add a month
           </Button>
         </div>

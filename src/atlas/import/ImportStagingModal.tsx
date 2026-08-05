@@ -203,8 +203,7 @@ export function ImportStagingModal({
                           row.rowKind === "create" || row.rowKind === "path-collision";
                         const isSecrecyIncreaseReview =
                           row.needsReview?.reason === "secrecy-increase";
-                        const visibilityLocked =
-                          isNewImportRow && !isSecrecyIncreaseReview;
+                        const visibilityLocked = isNewImportRow && !isSecrecyIncreaseReview;
                         return (
                           <Select
                             value={row.resolvedVisibility || "dm"}

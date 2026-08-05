@@ -41,7 +41,9 @@ describe("ConfirmDialog", () => {
       />,
     );
     fireEvent.click(screen.getByText("Open"));
-    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }),
+    );
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
@@ -57,7 +59,9 @@ describe("ConfirmDialog", () => {
       />,
     );
     fireEvent.click(screen.getByText("Open"));
-    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }),
+    );
     expect(onConfirm).toHaveBeenCalledOnce();
   });
 

@@ -14,7 +14,14 @@ vi.mock("react-leaflet", async () => {
 import { render, waitFor, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import AtlasViewer from "@/pages/AtlasViewer";
-import { makeProject, makeMap, makeWorld, makeEntity, makePlacement, makeSearchIndex } from "../helpers/makeProject";
+import {
+  makeProject,
+  makeMap,
+  makeWorld,
+  makeEntity,
+  makePlacement,
+  makeSearchIndex,
+} from "../helpers/makeProject";
 import { stableMap } from "../helpers/reactLeafletMock";
 import { logger } from "@/lib/logger";
 
@@ -36,9 +43,16 @@ function stubFetchSearchIndexFails(project = makeProject()) {
     "fetch",
     vi.fn((url: string) => {
       if (String(url).includes("search-index")) {
-        return Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve(null) } as unknown as Response);
+        return Promise.resolve({
+          ok: false,
+          status: 500,
+          json: () => Promise.resolve(null),
+        } as unknown as Response);
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(project) } as unknown as Response);
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(project),
+      } as unknown as Response);
     }),
   );
 }
@@ -92,7 +106,10 @@ describe("Load-error Try again retry (Q94)", () => {
             json: () => Promise.resolve(null),
           } as unknown as Response);
         }
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(makeProject()) } as unknown as Response);
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(makeProject()),
+        } as unknown as Response);
       }),
     );
     render(
@@ -129,7 +146,10 @@ describe("Load-error Try again retry (Q94)", () => {
             json: () => Promise.resolve(null),
           } as unknown as Response);
         }
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(makeProject()) } as unknown as Response);
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(makeProject()),
+        } as unknown as Response);
       }),
     );
     render(
@@ -154,7 +174,13 @@ describe("FitBoundsController (Q2)", () => {
       </MemoryRouter>,
     );
     await waitFor(() => expect(stableMap.fitBounds).toHaveBeenCalled());
-    expect(stableMap.fitBounds).toHaveBeenCalledWith([[0, 0], [1000, 1000]], expect.anything());
+    expect(stableMap.fitBounds).toHaveBeenCalledWith(
+      [
+        [0, 0],
+        [1000, 1000],
+      ],
+      expect.anything(),
+    );
   });
 
   it("skips fitBounds on initial load when a deep-link center is present", async () => {
@@ -176,7 +202,9 @@ describe("FitBoundsController (Q2)", () => {
         <AtlasViewer />
       </MemoryRouter>,
     );
-    await waitFor(() => expect(document.querySelector('[aria-label="Reset map view"]')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(document.querySelector('[aria-label="Reset map view"]')).toBeInTheDocument(),
+    );
   });
 
   it("clicking Reset map view calls fitBounds", async () => {
@@ -189,7 +217,13 @@ describe("FitBoundsController (Q2)", () => {
     vi.mocked(stableMap.fitBounds).mockClear(); // ignore the initial-load fit
     const resetBtn = document.querySelector<HTMLButtonElement>('[aria-label="Reset map view"]')!;
     fireEvent.click(resetBtn);
-    expect(stableMap.fitBounds).toHaveBeenCalledWith([[0, 0], [1000, 1000]], expect.anything());
+    expect(stableMap.fitBounds).toHaveBeenCalledWith(
+      [
+        [0, 0],
+        [1000, 1000],
+      ],
+      expect.anything(),
+    );
   });
 
   it("shows the map Select when the atlas has multiple maps", async () => {
@@ -209,7 +243,13 @@ describe("FitBoundsController (Q2)", () => {
     await waitFor(() => expect(document.querySelector("main#atlas-main")).toBeInTheDocument());
     expect(document.querySelector('[aria-label="Choose map"]')).toBeInTheDocument();
     // fitBounds fires for the initial map load (map-a: 600×800)
-    expect(stableMap.fitBounds).toHaveBeenCalledWith([[0, 0], [600, 800]], expect.anything());
+    expect(stableMap.fitBounds).toHaveBeenCalledWith(
+      [
+        [0, 0],
+        [600, 800],
+      ],
+      expect.anything(),
+    );
   });
 });
 
@@ -251,7 +291,9 @@ describe("MapController reduced-motion (Q28)", () => {
       </MemoryRouter>,
     );
     await waitFor(() => expect(stableMap.setView).toHaveBeenCalled());
-    expect(stableMap.setView).toHaveBeenCalledWith([600, 300], expect.any(Number), { animate: false });
+    expect(stableMap.setView).toHaveBeenCalledWith([600, 300], expect.any(Number), {
+      animate: false,
+    });
     expect(stableMap.flyTo).not.toHaveBeenCalled();
   });
 
@@ -299,7 +341,9 @@ describe("Lazy search-index loading (Q66)", () => {
     ).toBe(true);
 
     await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeInTheDocument());
-    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("search-index")).length).toBe(1);
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).includes("search-index")).length,
+    ).toBe(1);
   });
 
   it("does not re-fetch search-index.json when search is closed and reopened", async () => {
@@ -320,7 +364,9 @@ describe("Lazy search-index loading (Q66)", () => {
     await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeInTheDocument());
 
     const fetchMock = vi.mocked(fetch);
-    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("search-index")).length).toBe(1);
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).includes("search-index")).length,
+    ).toBe(1);
   });
 
   it("keeps the map rendered and logs via the logger seam when the search index fails to load (Q89)", async () => {
@@ -355,17 +401,17 @@ describe("Escape closes the desktop entity reading panel (N129)", () => {
       </MemoryRouter>,
     );
     await waitFor(() =>
-      expect(Array.from(document.querySelectorAll("h2")).some((h) => h.textContent === "Iron Tower")).toBe(
-        true,
-      ),
+      expect(
+        Array.from(document.querySelectorAll("h2")).some((h) => h.textContent === "Iron Tower"),
+      ).toBe(true),
     );
 
     fireEvent.keyDown(window, { key: "Escape" });
 
     await waitFor(() =>
-      expect(Array.from(document.querySelectorAll("h2")).some((h) => h.textContent === "Iron Tower")).toBe(
-        false,
-      ),
+      expect(
+        Array.from(document.querySelectorAll("h2")).some((h) => h.textContent === "Iron Tower"),
+      ).toBe(false),
     );
     expect(document.querySelector('[aria-label="Close panel"]')).not.toBeInTheDocument();
   });
@@ -378,9 +424,9 @@ describe("Escape closes the desktop entity reading panel (N129)", () => {
       </MemoryRouter>,
     );
     await waitFor(() =>
-      expect(Array.from(document.querySelectorAll("h2")).some((h) => h.textContent === "Iron Tower")).toBe(
-        true,
-      ),
+      expect(
+        Array.from(document.querySelectorAll("h2")).some((h) => h.textContent === "Iron Tower"),
+      ).toBe(true),
     );
 
     fireEvent.click(document.querySelector('[aria-label="Search atlas (Ctrl+K)"]')!);
@@ -396,9 +442,9 @@ describe("Escape closes the desktop entity reading panel (N129)", () => {
     // Second Escape now closes the entity panel.
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() =>
-      expect(Array.from(document.querySelectorAll("h2")).some((h) => h.textContent === "Iron Tower")).toBe(
-        false,
-      ),
+      expect(
+        Array.from(document.querySelectorAll("h2")).some((h) => h.textContent === "Iron Tower"),
+      ).toBe(false),
     );
   });
 });
@@ -456,10 +502,7 @@ describe("Search 'this map only' filter is scoped to the active map (N115)", () 
   it("excludes an entity placed only on a different map", async () => {
     const project = makeProject({
       worlds: [makeWorld({ defaultMapId: "map-a" })],
-      maps: [
-        makeMap({ id: "map-a", name: "Map A" }),
-        makeMap({ id: "map-b", name: "Map B" }),
-      ],
+      maps: [makeMap({ id: "map-a", name: "Map A" }), makeMap({ id: "map-b", name: "Map B" })],
       entities: [
         makeEntity({ id: "iron-tower", title: "Iron Tower" }),
         makeEntity({ id: "silver-lake", title: "Silver Lake" }),
@@ -493,7 +536,10 @@ describe("Search 'this map only' filter is scoped to the active map (N115)", () 
       "fetch",
       vi.fn((url: string) => {
         const body = String(url).includes("search-index") ? searchIndex : project;
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(body) } as unknown as Response);
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(body),
+        } as unknown as Response);
       }),
     );
 

@@ -395,7 +395,7 @@ describe("ImportStagingModal", () => {
       [
         {
           filename: "garron.md",
-          raw: "---\natlas:\n  type: npc\n  id: garron\n  tags: \"npc, smuggler\"\n---\n",
+          raw: '---\natlas:\n  type: npc\n  id: garron\n  tags: "npc, smuggler"\n---\n',
         },
       ],
       makeCtx(),
@@ -421,9 +421,7 @@ describe("ImportStagingModal", () => {
       ctx,
     );
     render(<Harness initial={rows} ctx={ctx} />);
-    const visSelect = screen.getByLabelText(
-      /visibility for thornhold\.md/i,
-    ) as HTMLButtonElement;
+    const visSelect = screen.getByLabelText(/visibility for thornhold\.md/i) as HTMLButtonElement;
     expect(
       visSelect.hasAttribute("disabled") || visSelect.getAttribute("aria-disabled") === "true",
     ).toBe(true);

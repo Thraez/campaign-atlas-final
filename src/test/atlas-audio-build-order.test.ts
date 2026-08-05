@@ -211,10 +211,7 @@ describe("DM build run after a player build", () => {
     try {
       fs.writeFileSync(
         worldPath,
-        goodYaml.replace(
-          "src: atlas/assets/audio/cavern.ogg",
-          "src: atlas/assets/audio/wind.ogg",
-        ),
+        goodYaml.replace("src: atlas/assets/audio/cavern.ogg", "src: atlas/assets/audio/wind.ogg"),
         "utf8",
       );
 

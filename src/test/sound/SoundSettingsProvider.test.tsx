@@ -66,8 +66,12 @@ function GainProbe() {
   const { engine, setMapMasterGain, setVolume } = useSoundSettings();
   return (
     <>
-      <button id="vol" onClick={() => setVolume(0.5)}>set-vol</button>
-      <button id="gain" onClick={() => setMapMasterGain(0.6)}>set-gain</button>
+      <button id="vol" onClick={() => setVolume(0.5)}>
+        set-vol
+      </button>
+      <button id="gain" onClick={() => setMapMasterGain(0.6)}>
+        set-gain
+      </button>
       <span data-testid="engine-ref">{String(!!engine)}</span>
     </>
   );
@@ -225,7 +229,9 @@ describe("SoundSettingsProvider", () => {
       const engine = engines[0];
       // Mute then advance past the ramp so the context is suspended.
       act(() => screen.getByRole("button").click());
-      await act(async () => { vi.advanceTimersByTime(300); });
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+      });
       const resumeSpy = vi.spyOn(engine, "resume");
       // Unmute — should resume immediately.
       act(() => screen.getByRole("button").click());
@@ -277,16 +283,16 @@ describe("SoundSettingsProvider", () => {
 
     it("enableSound rolls back soundEnabled to false when unlock() rejects", async () => {
       const failingDeps = {
-        createContext: () => { throw new Error("Web Audio not available"); },
+        createContext: () => {
+          throw new Error("Web Audio not available");
+        },
         fetchAudio: async () => new ArrayBuffer(0),
         canPlay: () => true,
       };
       function Probe() {
         const { soundEnabled, enableSound } = useSoundSettings();
         return (
-          <button onClick={() => enableSound()}>
-            {soundEnabled ? "sound-on" : "sound-off"}
-          </button>
+          <button onClick={() => enableSound()}>{soundEnabled ? "sound-on" : "sound-off"}</button>
         );
       }
       render(
@@ -377,8 +383,12 @@ describe("SoundSettingsProvider", () => {
       engines.push(engine);
       return (
         <>
-          <button id="vol" onClick={() => setVolume(0.5)}>vol</button>
-          <button id="gain" onClick={() => setMapMasterGain(0.6)}>gain</button>
+          <button id="vol" onClick={() => setVolume(0.5)}>
+            vol
+          </button>
+          <button id="gain" onClick={() => setMapMasterGain(0.6)}>
+            gain
+          </button>
         </>
       );
     }

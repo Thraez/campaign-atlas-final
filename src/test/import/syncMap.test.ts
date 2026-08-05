@@ -16,12 +16,16 @@ describe("classifyVaultNote", () => {
   });
 
   it("reports an unchanged note when the hash matches", () => {
-    const map: SyncMap = { "03_Entities/Corven.md": { id: "corven", baseType: "npc", approvedHash: H1 } };
+    const map: SyncMap = {
+      "03_Entities/Corven.md": { id: "corven", baseType: "npc", approvedHash: H1 },
+    };
     expect(classifyVaultNote(map, "03_Entities/Corven.md", H1)).toBe("unchanged");
   });
 
   it("reports a changed note when the hash differs", () => {
-    const map: SyncMap = { "03_Entities/Corven.md": { id: "corven", baseType: "npc", approvedHash: H1 } };
+    const map: SyncMap = {
+      "03_Entities/Corven.md": { id: "corven", baseType: "npc", approvedHash: H1 },
+    };
     expect(classifyVaultNote(map, "03_Entities/Corven.md", H2)).toBe("changed");
   });
 
@@ -47,7 +51,9 @@ describe("recordSync", () => {
 
 describe("findPathByApprovedHash", () => {
   it("finds a moved note by exact content hash", () => {
-    const map: SyncMap = { "01_Lore/Corven.md": { id: "corven", baseType: "npc", approvedHash: H1 } };
+    const map: SyncMap = {
+      "01_Lore/Corven.md": { id: "corven", baseType: "npc", approvedHash: H1 },
+    };
     expect(findPathByApprovedHash(map, H1)).toBe("01_Lore/Corven.md");
   });
 

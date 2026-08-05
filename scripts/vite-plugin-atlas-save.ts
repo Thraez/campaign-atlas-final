@@ -1174,12 +1174,7 @@ export async function handleVaultImageCopyRequest(
 ): Promise<VaultImageCopyResult> {
   const rootResolved = path.resolve(args.vaultRoot);
   const index = await indexVaultImages(rootResolved);
-  const resolved = resolveVaultImage(
-    args.rawSrc,
-    args.noteRelPath,
-    index,
-    args.candidateFolders,
-  );
+  const resolved = resolveVaultImage(args.rawSrc, args.noteRelPath, index, args.candidateFolders);
   if (!resolved.ok) return { ok: false, reason: resolved.reason };
 
   const abs = path.join(rootResolved, resolved.relPath);

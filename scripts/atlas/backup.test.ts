@@ -175,9 +175,9 @@ describe("restoreBackup", () => {
   });
 
   it("throws a clear error when the backup zip is missing", async () => {
-    await expect(restoreBackup(path.join(root, "nope.zip"), path.join(root, "out"))).rejects.toThrow(
-      /not found/,
-    );
+    await expect(
+      restoreBackup(path.join(root, "nope.zip"), path.join(root, "out")),
+    ).rejects.toThrow(/not found/);
   });
 
   it("reports expected: undefined when the zip has no manifest", async () => {

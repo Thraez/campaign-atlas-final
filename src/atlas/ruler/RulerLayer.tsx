@@ -15,13 +15,7 @@ interface RulerLayerProps {
 
 type RulerPoints = null | { p1: { x: number; y: number }; p2?: { x: number; y: number } };
 
-export function RulerLayer({
-  active,
-  mapId,
-  mapHeight,
-  scale,
-  onClear,
-}: RulerLayerProps) {
+export function RulerLayer({ active, mapId, mapHeight, scale, onClear }: RulerLayerProps) {
   const [points, setPoints] = useState<RulerPoints>(null);
   const map = useMap();
 
@@ -99,7 +93,7 @@ export function RulerLayer({
         >
           Click two points to measure
         </div>,
-        map.getContainer()
+        map.getContainer(),
       )
     : null;
 

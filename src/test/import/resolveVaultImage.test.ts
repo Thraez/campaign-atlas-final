@@ -9,7 +9,10 @@ const INDEX = [
 
 describe("resolveVaultImage", () => {
   it("finds an image by basename anywhere in scope", () => {
-    const r = resolveVaultImage("tavern.jpg", "03_Entities/Corven.md", INDEX, ["03_Entities", "99_Attachments"]);
+    const r = resolveVaultImage("tavern.jpg", "03_Entities/Corven.md", INDEX, [
+      "03_Entities",
+      "99_Attachments",
+    ]);
     expect(r).toEqual({ ok: true, relPath: "99_Attachments/tavern.jpg" });
   });
 
@@ -24,12 +27,16 @@ describe("resolveVaultImage", () => {
   });
 
   it("resolves a relative path spelled out in the embed", () => {
-    const r = resolveVaultImage("pics/corven-portrait.png", "03_Entities/Corven.md", INDEX, ["03_Entities"]);
+    const r = resolveVaultImage("pics/corven-portrait.png", "03_Entities/Corven.md", INDEX, [
+      "03_Entities",
+    ]);
     expect(r).toEqual({ ok: true, relPath: "03_Entities/pics/corven-portrait.png" });
   });
 
   it("refuses a traversal attempt", () => {
-    const r = resolveVaultImage("../../etc/passwd.png", "03_Entities/Corven.md", INDEX, ["03_Entities"]);
+    const r = resolveVaultImage("../../etc/passwd.png", "03_Entities/Corven.md", INDEX, [
+      "03_Entities",
+    ]);
     expect(r).toEqual({ ok: false, reason: "not-found" });
   });
 });

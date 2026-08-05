@@ -93,8 +93,7 @@ describe("calendar save path (Calendar panel → world.yaml)", () => {
     await waitFor(() =>
       expect(
         screen.getByText(
-          (_content, el) =>
-            el?.tagName === "PRE" && (el.textContent ?? "").includes("Longnight"),
+          (_content, el) => el?.tagName === "PRE" && (el.textContent ?? "").includes("Longnight"),
         ),
       ).toBeInTheDocument(),
     );
@@ -113,9 +112,7 @@ describe("calendar save path (Calendar panel → world.yaml)", () => {
   it("warns about months left unnamed, since those render as a number", async () => {
     await openCalendarPanel();
     fireEvent.click(screen.getByRole("button", { name: /add a month/i }));
-    await waitFor(() =>
-      expect(screen.getByText(/One month has no name yet/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/One month has no name yet/i)).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText("Name of month 1"), { target: { value: "Thaw" } });
     await waitFor(() => expect(screen.queryByText(/no name yet/i)).toBeNull());
   });

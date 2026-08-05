@@ -209,14 +209,28 @@ describe("scanArtifactShape — soundscape assertions", () => {
 describe("scanSearchIndex — leak coverage lives on bodyText, not the removed body field", () => {
   it("flags a DM sentinel leaked in bodyText (the shipped field)", () => {
     const r = scanSearchIndex([
-      { id: "leak", title: "Leak", type: "note", aliases: [], tags: [], bodyText: DM_CONTENT_SENTINELS[0] },
+      {
+        id: "leak",
+        title: "Leak",
+        type: "note",
+        aliases: [],
+        tags: [],
+        bodyText: DM_CONTENT_SENTINELS[0],
+      },
     ]);
     expect(r.violations.some((v) => v.field === "search.bodyText")).toBe(true);
   });
 
   it("does not scan a body field even if one is present (it is no longer shipped)", () => {
     const r = scanSearchIndex([
-      { id: "clean", title: "Clean", type: "note", aliases: [], tags: [], body: DM_CONTENT_SENTINELS[0] },
+      {
+        id: "clean",
+        title: "Clean",
+        type: "note",
+        aliases: [],
+        tags: [],
+        body: DM_CONTENT_SENTINELS[0],
+      },
     ]);
     expect(r.violations).toHaveLength(0);
   });

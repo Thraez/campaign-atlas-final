@@ -170,9 +170,12 @@ export function useMapLayers(map: MapDocument | undefined, undoStack?: UndoStack
       localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
     } catch (e) {
       logger.error("Failed to persist local map layers to localStorage", e);
-      toast.error("Couldn't save map layer changes locally — your browser storage may be full or blocked.", {
-        id: "map-layers-persist-failed",
-      });
+      toast.error(
+        "Couldn't save map layer changes locally — your browser storage may be full or blocked.",
+        {
+          id: "map-layers-persist-failed",
+        },
+      );
     }
   }, [byMap]);
 

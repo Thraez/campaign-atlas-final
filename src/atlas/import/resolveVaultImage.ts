@@ -10,8 +10,7 @@
  * is reported to the DM, never silent.
  */
 export type VaultImageResolution =
-  | { ok: true; relPath: string }
-  | { ok: false; reason: "not-found" | "outside-candidates" };
+  { ok: true; relPath: string } | { ok: false; reason: "not-found" | "outside-candidates" };
 
 function inCandidates(relPath: string, candidateFolders: string[]): boolean {
   if (candidateFolders.length === 0) return true;

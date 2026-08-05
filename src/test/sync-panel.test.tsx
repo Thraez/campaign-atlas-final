@@ -100,9 +100,7 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
   it("shows a DM-build-required note and disables Sync when hasDmBuild is false", async () => {
     mockLoad.mockResolvedValue({ vaultPath: "/Vault" });
     render(<SyncPanel onSync={vi.fn()} hasDmBuild={false} />);
-    await waitFor(() =>
-      expect(screen.getByText(/Rebuild in DM mode first/i)).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText(/Rebuild in DM mode first/i)).toBeTruthy());
     expect(screen.getByRole("button", { name: /sync now/i })).toBeDisabled();
   });
 
@@ -137,9 +135,7 @@ describe("VaultFolderPicker", () => {
 
   it("unticks a selected folder", () => {
     const onChange = vi.fn();
-    render(
-      <VaultFolderPicker folders={folders} selected={["03_Entities"]} onChange={onChange} />,
-    );
+    render(<VaultFolderPicker folders={folders} selected={["03_Entities"]} onChange={onChange} />);
     fireEvent.click(screen.getByRole("checkbox", { name: /03_Entities/i }));
     expect(onChange).toHaveBeenCalledWith([]);
   });

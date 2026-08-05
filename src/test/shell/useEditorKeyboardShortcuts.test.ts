@@ -58,7 +58,13 @@ describe("useEditorKeyboardShortcuts", () => {
     const setPendingId = vi.fn();
     const onSave = vi.fn();
     renderHook(() =>
-      useEditorKeyboardShortcuts({ undoStack, pendingId: null, setPendingId, onSave, canSave: true }),
+      useEditorKeyboardShortcuts({
+        undoStack,
+        pendingId: null,
+        setPendingId,
+        onSave,
+        canSave: true,
+      }),
     );
     dispatchKey({ key: "Escape" });
     expect(setPendingId).not.toHaveBeenCalled();
@@ -69,7 +75,13 @@ describe("useEditorKeyboardShortcuts", () => {
     const setPendingId = vi.fn();
     const onSave = vi.fn();
     renderHook(() =>
-      useEditorKeyboardShortcuts({ undoStack, pendingId: null, setPendingId, onSave, canSave: true }),
+      useEditorKeyboardShortcuts({
+        undoStack,
+        pendingId: null,
+        setPendingId,
+        onSave,
+        canSave: true,
+      }),
     );
     dispatchKey({ key: "z", ctrlKey: true });
     expect(undoStack.undo).toHaveBeenCalledTimes(1);
@@ -81,7 +93,13 @@ describe("useEditorKeyboardShortcuts", () => {
     const setPendingId = vi.fn();
     const onSave = vi.fn();
     renderHook(() =>
-      useEditorKeyboardShortcuts({ undoStack, pendingId: null, setPendingId, onSave, canSave: true }),
+      useEditorKeyboardShortcuts({
+        undoStack,
+        pendingId: null,
+        setPendingId,
+        onSave,
+        canSave: true,
+      }),
     );
     dispatchKey({ key: "z", ctrlKey: true, shiftKey: true });
     expect(undoStack.redo).toHaveBeenCalledTimes(1);
@@ -93,7 +111,13 @@ describe("useEditorKeyboardShortcuts", () => {
     const setPendingId = vi.fn();
     const onSave = vi.fn();
     renderHook(() =>
-      useEditorKeyboardShortcuts({ undoStack, pendingId: null, setPendingId, onSave, canSave: true }),
+      useEditorKeyboardShortcuts({
+        undoStack,
+        pendingId: null,
+        setPendingId,
+        onSave,
+        canSave: true,
+      }),
     );
     dispatchKey({ key: "y", ctrlKey: true });
     expect(undoStack.redo).toHaveBeenCalledTimes(1);
@@ -105,7 +129,13 @@ describe("useEditorKeyboardShortcuts", () => {
     const setPendingId = vi.fn();
     const onSave = vi.fn();
     renderHook(() =>
-      useEditorKeyboardShortcuts({ undoStack, pendingId: null, setPendingId, onSave, canSave: true }),
+      useEditorKeyboardShortcuts({
+        undoStack,
+        pendingId: null,
+        setPendingId,
+        onSave,
+        canSave: true,
+      }),
     );
     dispatchKey({ key: "z", ctrlKey: true });
     expect(toast.info).toHaveBeenCalledWith("Undid: moved pin");
@@ -116,7 +146,13 @@ describe("useEditorKeyboardShortcuts", () => {
     const setPendingId = vi.fn();
     const onSave = vi.fn();
     renderHook(() =>
-      useEditorKeyboardShortcuts({ undoStack, pendingId: null, setPendingId, onSave, canSave: true }),
+      useEditorKeyboardShortcuts({
+        undoStack,
+        pendingId: null,
+        setPendingId,
+        onSave,
+        canSave: true,
+      }),
     );
     dispatchKey({ key: "z", ctrlKey: true, shiftKey: true });
     expect(toast.info).toHaveBeenCalledWith("Redid: moved pin");
@@ -127,7 +163,13 @@ describe("useEditorKeyboardShortcuts", () => {
     const setPendingId = vi.fn();
     const onSave = vi.fn();
     renderHook(() =>
-      useEditorKeyboardShortcuts({ undoStack, pendingId: null, setPendingId, onSave, canSave: true }),
+      useEditorKeyboardShortcuts({
+        undoStack,
+        pendingId: null,
+        setPendingId,
+        onSave,
+        canSave: true,
+      }),
     );
     dispatchKey({ key: "z", ctrlKey: true });
     expect(toast.info).not.toHaveBeenCalled();
@@ -138,7 +180,13 @@ describe("useEditorKeyboardShortcuts", () => {
     const setPendingId = vi.fn();
     const onSave = vi.fn();
     renderHook(() =>
-      useEditorKeyboardShortcuts({ undoStack, pendingId: null, setPendingId, onSave, canSave: true }),
+      useEditorKeyboardShortcuts({
+        undoStack,
+        pendingId: null,
+        setPendingId,
+        onSave,
+        canSave: true,
+      }),
     );
     const input = document.createElement("input");
     document.body.appendChild(input);
@@ -152,7 +200,13 @@ describe("useEditorKeyboardShortcuts", () => {
     const setPendingId = vi.fn();
     const onSave = vi.fn();
     renderHook(() =>
-      useEditorKeyboardShortcuts({ undoStack, pendingId: null, setPendingId, onSave, canSave: true }),
+      useEditorKeyboardShortcuts({
+        undoStack,
+        pendingId: null,
+        setPendingId,
+        onSave,
+        canSave: true,
+      }),
     );
     dispatchKey({ key: "z" });
     expect(undoStack.undo).not.toHaveBeenCalled();
@@ -164,7 +218,13 @@ describe("useEditorKeyboardShortcuts", () => {
     const setPendingId = vi.fn();
     const onSave = vi.fn();
     renderHook(() =>
-      useEditorKeyboardShortcuts({ undoStack, pendingId: null, setPendingId, onSave, canSave: true }),
+      useEditorKeyboardShortcuts({
+        undoStack,
+        pendingId: null,
+        setPendingId,
+        onSave,
+        canSave: true,
+      }),
     );
     const preventDefault = dispatchKey({ key: "s", ctrlKey: true });
     expect(onSave).toHaveBeenCalledTimes(1);
@@ -176,7 +236,13 @@ describe("useEditorKeyboardShortcuts", () => {
     const setPendingId = vi.fn();
     const onSave = vi.fn();
     renderHook(() =>
-      useEditorKeyboardShortcuts({ undoStack, pendingId: null, setPendingId, onSave, canSave: true }),
+      useEditorKeyboardShortcuts({
+        undoStack,
+        pendingId: null,
+        setPendingId,
+        onSave,
+        canSave: true,
+      }),
     );
     dispatchKey({ key: "s", metaKey: true });
     expect(onSave).toHaveBeenCalledTimes(1);
@@ -187,7 +253,13 @@ describe("useEditorKeyboardShortcuts", () => {
     const setPendingId = vi.fn();
     const onSave = vi.fn();
     renderHook(() =>
-      useEditorKeyboardShortcuts({ undoStack, pendingId: null, setPendingId, onSave, canSave: true }),
+      useEditorKeyboardShortcuts({
+        undoStack,
+        pendingId: null,
+        setPendingId,
+        onSave,
+        canSave: true,
+      }),
     );
     const input = document.createElement("input");
     document.body.appendChild(input);
@@ -220,7 +292,13 @@ describe("useEditorKeyboardShortcuts", () => {
     const setPendingId = vi.fn();
     const onSave = vi.fn();
     renderHook(() =>
-      useEditorKeyboardShortcuts({ undoStack, pendingId: null, setPendingId, onSave, canSave: true }),
+      useEditorKeyboardShortcuts({
+        undoStack,
+        pendingId: null,
+        setPendingId,
+        onSave,
+        canSave: true,
+      }),
     );
     dispatchKey({ key: "s" });
     expect(onSave).not.toHaveBeenCalled();

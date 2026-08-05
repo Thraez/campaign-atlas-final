@@ -1,5 +1,9 @@
 import type { Entity, EntityVisibility } from "@/atlas/content/schema";
-import type { EntityProfile, EntityRelationship, PlayerProfile } from "@/atlas/profiles/profileTypes";
+import type {
+  EntityProfile,
+  EntityRelationship,
+  PlayerProfile,
+} from "@/atlas/profiles/profileTypes";
 import type { PlayerTextFieldDef, PlayerListFieldDef } from "@/atlas/profiles/profileFields";
 import type { FrontmatterDraft } from "@/atlas/save/canonicalEntitySave";
 import { Input } from "@/components/ui/input";

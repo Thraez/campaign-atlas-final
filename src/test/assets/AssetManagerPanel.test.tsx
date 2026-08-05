@@ -91,7 +91,9 @@ describe("AssetManagerPanel", () => {
       }),
     );
     render(<AssetManagerPanel project={fixture()} onPatch={vi.fn()} />);
-    await waitFor(() => expect((fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(0));
+    await waitFor(() =>
+      expect((fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(0),
+    );
     expect(screen.queryByText(/MB|KB/)).not.toBeInTheDocument();
     expect(screen.getByLabelText("Credit for assets/pics/a.png")).toBeInTheDocument();
   });
@@ -112,7 +114,9 @@ describe("AssetManagerPanel", () => {
         onPatch={vi.fn()}
       />,
     );
-    expect(screen.getByLabelText("Credit for assets/pics/a.png")).toHaveValue("Applied by bulk action");
+    expect(screen.getByLabelText("Credit for assets/pics/a.png")).toHaveValue(
+      "Applied by bulk action",
+    );
   });
 
   it("'apply to all' copies one row's credit onto every asset, preserving each enabled state", () => {

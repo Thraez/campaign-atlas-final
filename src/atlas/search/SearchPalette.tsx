@@ -132,14 +132,18 @@ export function SearchPalette({
         const visitedInPool = visitedIds.filter((id) => indexIdSet.has(id));
         if (visitedInPool.length > 0) {
           const idMap = new Map(pool.map((e) => [e.id, e]));
-          const items = visitedInPool
-            .slice(0, 40)
-            .map((id) => ({ e: idMap.get(id)!, snip: null as string | null, titleHtml: null as string | null }));
+          const items = visitedInPool.slice(0, 40).map((id) => ({
+            e: idMap.get(id)!,
+            snip: null as string | null,
+            titleHtml: null as string | null,
+          }));
           return { items, total: visitedInPool.length, isRecentlyViewed: true };
         }
       }
       return {
-        items: pool.slice(0, 40).map((e) => ({ e, snip: null as string | null, titleHtml: null as string | null })),
+        items: pool
+          .slice(0, 40)
+          .map((e) => ({ e, snip: null as string | null, titleHtml: null as string | null })),
         total: pool.length,
         isRecentlyViewed: false,
       };
@@ -175,13 +179,11 @@ export function SearchPalette({
       .filter((x) => phrasesOnly || x.s > 0)
       .sort((a, b) => b.s - a.s);
     return {
-      items: scored
-        .slice(0, 40)
-        .map(({ e }) => ({
-          e,
-          snip: snippet(e.bodyText ?? e.body, e.body, snippetQuery),
-          titleHtml: highlightMatch(e.title, snippetQuery),
-        })),
+      items: scored.slice(0, 40).map(({ e }) => ({
+        e,
+        snip: snippet(e.bodyText ?? e.body, e.body, snippetQuery),
+        titleHtml: highlightMatch(e.title, snippetQuery),
+      })),
       total: scored.length,
       isRecentlyViewed: false,
     };
@@ -248,14 +250,11 @@ export function SearchPalette({
       if (r) onPick(r.e.id, placedIds.has(r.e.id));
     }
   };
-  const countLabel =
-    resultTotal === 1 ? "1 match" : `${resultTotal} matches`;
+  const countLabel = resultTotal === 1 ? "1 match" : `${resultTotal} matches`;
 
   // Stable option id for the currently active result — used for aria-activedescendant.
   const activeResultId =
-    activeIndex >= 0 && results[activeIndex]
-      ? `sp-result-${results[activeIndex].e.id}`
-      : undefined;
+    activeIndex >= 0 && results[activeIndex] ? `sp-result-${results[activeIndex].e.id}` : undefined;
 
   return (
     <div
@@ -386,53 +385,55 @@ export function SearchPalette({
                 </div>
               )}
               {results.map(({ e: r, snip, titleHtml }, i) => {
-              const placed = placedIds.has(r.id);
-              const active = i === activeIndex;
-              return (
-                <button
-                  key={r.id}
-                  id={`sp-result-${r.id}`}
-                  role="option"
-                  aria-selected={active}
-                  data-index={i}
-                  onClick={() => onPick(r.id, placed)}
-                  onMouseEnter={() => setActiveIndex(i)}
-                  className={`w-full text-left px-3 py-2 border-b border-border/50 last:border-b-0 ${
-                    active ? "bg-accent/60" : "hover:bg-accent/40"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {titleHtml ? (
-                      <span
-                        className="font-medium text-sm"
-                        dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(titleHtml) }}
+                const placed = placedIds.has(r.id);
+                const active = i === activeIndex;
+                return (
+                  <button
+                    key={r.id}
+                    id={`sp-result-${r.id}`}
+                    role="option"
+                    aria-selected={active}
+                    data-index={i}
+                    onClick={() => onPick(r.id, placed)}
+                    onMouseEnter={() => setActiveIndex(i)}
+                    className={`w-full text-left px-3 py-2 border-b border-border/50 last:border-b-0 ${
+                      active ? "bg-accent/60" : "hover:bg-accent/40"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {titleHtml ? (
+                        <span
+                          className="font-medium text-sm"
+                          dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(titleHtml) }}
+                        />
+                      ) : (
+                        <span className="font-medium text-sm">{r.title}</span>
+                      )}
+                      {playerTypeLabel(r.type) && (
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          {playerTypeLabel(r.type)}
+                        </span>
+                      )}
+                      {r.dateRaw && (
+                        <span className="text-[10px] text-muted-foreground">· {r.dateRaw}</span>
+                      )}
+                      {placed && <MapPin className="h-3 w-3 text-primary ml-auto" />}
+                    </div>
+                    {snip ? (
+                      <div
+                        className="text-xs text-muted-foreground line-clamp-2"
+                        dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(snip) }}
                       />
                     ) : (
-                      <span className="font-medium text-sm">{r.title}</span>
+                      r.summary && (
+                        <div className="text-xs text-muted-foreground line-clamp-1">
+                          {r.summary}
+                        </div>
+                      )
                     )}
-                    {playerTypeLabel(r.type) && (
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                        {playerTypeLabel(r.type)}
-                      </span>
-                    )}
-                    {r.dateRaw && (
-                      <span className="text-[10px] text-muted-foreground">· {r.dateRaw}</span>
-                    )}
-                    {placed && <MapPin className="h-3 w-3 text-primary ml-auto" />}
-                  </div>
-                  {snip ? (
-                    <div
-                      className="text-xs text-muted-foreground line-clamp-2"
-                      dangerouslySetInnerHTML={{ __html: sanitizeAtlasHtml(snip) }}
-                    />
-                  ) : (
-                    r.summary && (
-                      <div className="text-xs text-muted-foreground line-clamp-1">{r.summary}</div>
-                    )
-                  )}
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
             </>
           )}
         </div>

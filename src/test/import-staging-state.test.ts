@@ -173,7 +173,7 @@ describe("buildStagingRow", () => {
     const row = buildStagingRow(
       {
         filename: "garron.md",
-        raw: "---\natlas:\n  type: npc\n  id: garron\n  tags: \"npc, smuggler\"\n---\n",
+        raw: '---\natlas:\n  type: npc\n  id: garron\n  tags: "npc, smuggler"\n---\n',
       },
       makeCtx(),
     );
@@ -184,7 +184,7 @@ describe("buildStagingRow", () => {
     const row = buildStagingRow(
       {
         filename: "garron.md",
-        raw: "---\naliases: \"Garron, The Smuggler\"\natlas:\n  type: npc\n  id: garron\n---\n",
+        raw: '---\naliases: "Garron, The Smuggler"\natlas:\n  type: npc\n  id: garron\n---\n',
       },
       makeCtx(),
     );

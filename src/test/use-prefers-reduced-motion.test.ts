@@ -18,8 +18,7 @@ function installMatchMedia(matches: boolean): { fireChange: (newMatches: boolean
       onchange: null,
       addListener: () => {},
       removeListener: () => {},
-      addEventListener: (_type: string, cb: (e: { matches: boolean }) => void) =>
-        listeners.add(cb),
+      addEventListener: (_type: string, cb: (e: { matches: boolean }) => void) => listeners.add(cb),
       removeEventListener: (_type: string, cb: (e: { matches: boolean }) => void) =>
         listeners.delete(cb),
       dispatchEvent: () => false,

@@ -1150,9 +1150,7 @@ describe("EntityPanel — scroll-to-top on entity change (Q11)", () => {
       </MemoryRouter>,
     );
 
-    const viewport = document.querySelector(
-      "[data-radix-scroll-area-viewport]",
-    ) as HTMLElement;
+    const viewport = document.querySelector("[data-radix-scroll-area-viewport]") as HTMLElement;
     expect(viewport).not.toBeNull();
 
     // Spy on scrollTop assignment to verify our effect sets it to 0.
@@ -1271,8 +1269,12 @@ describe("EntityPanel — 'On this page' jump list (Q13)", () => {
     const viewport = document.querySelector("[data-radix-scroll-area-viewport]") as HTMLElement;
     let assigned: number | undefined;
     Object.defineProperty(viewport, "scrollTop", {
-      set(v: number) { assigned = v; },
-      get() { return assigned ?? 0; },
+      set(v: number) {
+        assigned = v;
+      },
+      get() {
+        return assigned ?? 0;
+      },
       configurable: true,
     });
     // Click the "Overview" jump link — should not throw
@@ -1299,7 +1301,10 @@ describe("EntityPanel — 'On this page' jump list (Q13)", () => {
     );
     // Collapse the TOC on entity A
     fireEvent.click(screen.getByRole("button", { name: /on this page/i }));
-    expect(screen.getByRole("button", { name: /on this page/i })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: /on this page/i })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
 
     // Navigate to entity B — TOC should re-open
     rerender(
@@ -1314,7 +1319,10 @@ describe("EntityPanel — 'On this page' jump list (Q13)", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("button", { name: /on this page/i })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /on this page/i })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
   });
 });
 
@@ -1361,7 +1369,13 @@ describe("EntityPanel — Connections dedup and grouping (Q15)", () => {
         <EntityPanel
           entity={entity}
           placements={[]}
-          entityById={new Map([[e.id, e], [ally.id, ally], [other.id, other]])}
+          entityById={
+            new Map([
+              [e.id, e],
+              [ally.id, ally],
+              [other.id, other],
+            ])
+          }
           onOpenEntity={() => {}}
           onClose={() => {}}
           onShowOnMap={() => {}}
@@ -1388,7 +1402,13 @@ describe("EntityPanel — Connections dedup and grouping (Q15)", () => {
         <EntityPanel
           entity={entity}
           placements={[]}
-          entityById={new Map([[e.id, e], [cityA.id, cityA], [cityB.id, cityB]])}
+          entityById={
+            new Map([
+              [e.id, e],
+              [cityA.id, cityA],
+              [cityB.id, cityB],
+            ])
+          }
           onOpenEntity={() => {}}
           onClose={() => {}}
           onShowOnMap={() => {}}
@@ -1415,7 +1435,13 @@ describe("EntityPanel — Connections dedup and grouping (Q15)", () => {
         <EntityPanel
           entity={entity}
           placements={[]}
-          entityById={new Map([[e.id, e], [ally.id, ally], [cityA.id, cityA]])}
+          entityById={
+            new Map([
+              [e.id, e],
+              [ally.id, ally],
+              [cityA.id, cityA],
+            ])
+          }
           onOpenEntity={() => {}}
           onClose={() => {}}
           onShowOnMap={() => {}}

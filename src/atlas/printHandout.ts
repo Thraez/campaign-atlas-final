@@ -186,7 +186,14 @@ export function buildHandoutHtml(
       ? `<div class="empty">No entities selected for this handout.</div>`
       : entities
           .map((e, i) =>
-            renderEntitySection(e, i < entities.length - 1, entitiesById, i, assetCredits, showCredits),
+            renderEntitySection(
+              e,
+              i < entities.length - 1,
+              entitiesById,
+              i,
+              assetCredits,
+              showCredits,
+            ),
           )
           .join("\n");
 

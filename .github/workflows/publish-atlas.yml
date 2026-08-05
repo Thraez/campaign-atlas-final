@@ -34,8 +34,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  # Static gate on the mainline. `atlas-pr-check.yml` carries the same checks but
+  # only triggers on `pull_request`, and work merges straight to main here — so
+  # until this job existed, nothing on the shipping path ran typecheck, lint, or
+  # format:check. Deliberately excludes the test suite: it needs sharding to stay
+  # inside memory limits, and the pre-commit hook already runs it per commit.
+  verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck:all
+      - name: Lint
+        run: npm run lint
+      - name: Check formatting
+        run: npm run format:check
+
+  build:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -83,6 +108,7 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

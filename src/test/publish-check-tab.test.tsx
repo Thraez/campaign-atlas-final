@@ -126,7 +126,9 @@ describe("PublishCheckTab — publish action surface", () => {
       makeFlow("published", {
         checkResult: {
           ...SAFE_CHECK_RESULT,
-          diff: { counts: { entities: 5, placements: 3, maps: 0, overlays: 0 } } as unknown as PublishCheckResult["diff"],
+          diff: {
+            counts: { entities: 5, placements: 3, maps: 0, overlays: 0 },
+          } as unknown as PublishCheckResult["diff"],
         },
         pushResult: { pushedAt: "2026-01-01T00:00:00Z", commit: "a1b2c3d4e5" },
       }),

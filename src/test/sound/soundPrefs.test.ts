@@ -20,7 +20,12 @@ describe("soundPrefs", () => {
 
   it("round-trips saved prefs including volume", () => {
     saveSoundPrefs({ soundEnabled: true, muted: false, calmMode: true, volume: 0.5 });
-    expect(loadSoundPrefs()).toEqual({ soundEnabled: true, muted: false, calmMode: true, volume: 0.5 });
+    expect(loadSoundPrefs()).toEqual({
+      soundEnabled: true,
+      muted: false,
+      calmMode: true,
+      volume: 0.5,
+    });
   });
 
   it("persists volume and restores it on reload", () => {
@@ -45,7 +50,12 @@ describe("soundPrefs", () => {
 
   it("fills missing fields from defaults when stored object is partial", () => {
     localStorage.setItem("atlas-player-sound-v1", JSON.stringify({ soundEnabled: true }));
-    expect(loadSoundPrefs()).toEqual({ soundEnabled: true, muted: false, calmMode: false, volume: 0.8 });
+    expect(loadSoundPrefs()).toEqual({
+      soundEnabled: true,
+      muted: false,
+      calmMode: false,
+      volume: 0.8,
+    });
   });
 
   it("falls back per-field to defaults when stored fields are non-boolean", () => {
@@ -57,12 +67,18 @@ describe("soundPrefs", () => {
   });
 
   it("degrades volume to default when stored value is out of range", () => {
-    localStorage.setItem("atlas-player-sound-v1", JSON.stringify({ ...DEFAULT_PREFS, volume: 1.5 }));
+    localStorage.setItem(
+      "atlas-player-sound-v1",
+      JSON.stringify({ ...DEFAULT_PREFS, volume: 1.5 }),
+    );
     expect(loadSoundPrefs().volume).toBe(DEFAULT_PREFS.volume);
   });
 
   it("degrades volume to default when stored value is a non-number", () => {
-    localStorage.setItem("atlas-player-sound-v1", JSON.stringify({ ...DEFAULT_PREFS, volume: "loud" }));
+    localStorage.setItem(
+      "atlas-player-sound-v1",
+      JSON.stringify({ ...DEFAULT_PREFS, volume: "loud" }),
+    );
     expect(loadSoundPrefs().volume).toBe(DEFAULT_PREFS.volume);
   });
 

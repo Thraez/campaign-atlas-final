@@ -4,7 +4,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
-import { handleVaultImageCopyRequest, handleVaultScanRequest } from "../../../scripts/vite-plugin-atlas-save";
+import {
+  handleVaultImageCopyRequest,
+  handleVaultScanRequest,
+} from "../../../scripts/vite-plugin-atlas-save";
 import { rewriteEmbeds } from "@/atlas/import/resolveVaultImage";
 import { buildStagingRows, type StagingContext } from "@/atlas/import/stagingState";
 import type { ImportFolderConfig } from "@/atlas/content/schema";
@@ -46,7 +49,9 @@ describe("handleVaultImageCopyRequest", () => {
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.target).toBe("/atlas/assets/images/corven-1.png");
-    expect(fs.existsSync(path.join(outRoot, "atlas", "assets", "images", "corven-1.png"))).toBe(true);
+    expect(fs.existsSync(path.join(outRoot, "atlas", "assets", "images", "corven-1.png"))).toBe(
+      true,
+    );
   });
 
   it("strips metadata from the copy", async () => {
@@ -76,7 +81,9 @@ describe("handleVaultImageCopyRequest", () => {
       publicDir: outRoot,
     });
     expect(res).toEqual({ ok: false, reason: "outside-candidates" });
-    expect(fs.existsSync(path.join(outRoot, "atlas", "assets", "images", "corven-6.png"))).toBe(false);
+    expect(fs.existsSync(path.join(outRoot, "atlas", "assets", "images", "corven-6.png"))).toBe(
+      false,
+    );
   });
 });
 

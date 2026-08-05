@@ -35,8 +35,7 @@ export const MSG: Record<PublishScanReason["scan"], string> = {
     "A map's hidden (fogged) area would have been revealed. Publishing is blocked.",
   "check-artifact-shape":
     "The world file came out malformed — the build needs attention before publishing.",
-  "audit-assets":
-    "An image is larger than the 4 MB limit and must be optimized before publishing.",
+  "audit-assets": "An image is larger than the 4 MB limit and must be optimized before publishing.",
 };
 
 export function reasonsFromNoSecrets(r: ScanResult, target: string): PublishScanReason[] {

@@ -213,7 +213,12 @@ describe("AtlasBrowse — N121: empty state blames the right cause", () => {
     vi.clearAllMocks();
   });
 
-  function renderFacet(mode: "tag" | "type", facetValue: string, url: string, project: AtlasProject) {
+  function renderFacet(
+    mode: "tag" | "type",
+    facetValue: string,
+    url: string,
+    project: AtlasProject,
+  ) {
     vi.mocked(loadAtlasContent).mockResolvedValue(project);
     const path = mode === "tag" ? "/atlas/tag/:tag" : "/atlas/type/:type";
     return render(

@@ -22,10 +22,7 @@ import path from "node:path";
 const SRC = path.resolve(__dirname, "../..");
 
 /** Excluded from player builds entirely, so the literal can never reach one. */
-const EDITOR_ONLY = [
-  path.join("atlas", "editor"),
-  path.join("pages", "AtlasPlacementEditor.tsx"),
-];
+const EDITOR_ONLY = [path.join("atlas", "editor"), path.join("pages", "AtlasPlacementEditor.tsx")];
 
 /** Matches the URL inside a string or template literal. */
 const QUOTED_EDITOR_ROUTE = /["'`]\/atlas\/edit/;

@@ -53,7 +53,10 @@ export function DiscardConfirmModal({ open, count, onConfirm, onClose }: Props) 
       aria-modal="true"
       onKeyDown={handleKeyDown}
     >
-      <div ref={dialogRef} className="w-[min(92vw,420px)] rounded-lg border border-border bg-card p-5 shadow-xl">
+      <div
+        ref={dialogRef}
+        className="w-[min(92vw,420px)] rounded-lg border border-border bg-card p-5 shadow-xl"
+      >
         <h2 className="text-base font-semibold">
           Discard all {count} unsaved {count === 1 ? "change" : "changes"}?
         </h2>

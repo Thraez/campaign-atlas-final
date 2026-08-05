@@ -52,13 +52,12 @@ function AssetSizeInfo({ state }: { state: SizeState | undefined }) {
   const isError = state.size > SIZE_ERROR_BYTES;
   const isWarn = !isError && state.size > SIZE_WARN_BYTES;
   return (
-    <div className={isError ? "text-destructive" : isWarn ? "text-amber-600" : "text-muted-foreground"}>
+    <div
+      className={isError ? "text-destructive" : isWarn ? "text-amber-600" : "text-muted-foreground"}
+    >
       {formatBytes(state.size)}
       {(isError || isWarn) && (
-        <span>
-          {" "}
-          — optimize this image ({isError ? "over the 4 MB limit" : "over 1 MB"})
-        </span>
+        <span> — optimize this image ({isError ? "over the 4 MB limit" : "over 1 MB"})</span>
       )}
     </div>
   );

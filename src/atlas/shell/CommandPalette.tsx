@@ -31,7 +31,9 @@ export function CommandPalette({
   const results = useMemo(() => queryPalette(index, q), [index, q]);
   if (!open) return null;
 
-  const activeOptionId = results[sel] ? `cp-result-${results[sel].kind}-${results[sel].id}` : undefined;
+  const activeOptionId = results[sel]
+    ? `cp-result-${results[sel].kind}-${results[sel].id}`
+    : undefined;
 
   return (
     <div

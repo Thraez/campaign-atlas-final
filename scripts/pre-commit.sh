@@ -10,6 +10,13 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 npm run typecheck:all || exit 1
 npx eslint . || exit 1
 
+# `format:check` used to live only in the PR workflow. Since branches now merge
+# straight to main, that workflow rarely runs and the format gate went unchecked
+# for months (67 committed files had drifted by 2026-08-06). Run it here, where
+# every commit passes through. `.prettierrc.json` sets endOfLine:"auto" so this
+# is not CRLF-noisy on Windows checkouts.
+npm run format:check || exit 1
+
 # Vitest exits 1 for both test failures AND unhandled worker-communication
 # timeouts (infrastructure noise from long-running child-process tests).
 # Capture output and only fail the commit if tests actually failed.

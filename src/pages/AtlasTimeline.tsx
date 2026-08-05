@@ -36,10 +36,9 @@ export default function AtlasTimeline() {
     );
 
   const setActiveType = (t: string | null) =>
-    setSearchParams(
-      (prev) => serializeBrowseFilterParams({ q: prev.get("q") ?? "", type: t }),
-      { replace: true },
-    );
+    setSearchParams((prev) => serializeBrowseFilterParams({ q: prev.get("q") ?? "", type: t }), {
+      replace: true,
+    });
 
   const dated = useMemo(
     () => (project?.entities ?? []).filter((e) => typeof e.dateValue === "number"),
@@ -169,101 +168,102 @@ export default function AtlasTimeline() {
       )}
 
       <main id="timeline-main" className="flex-1 min-h-0" aria-label="Timeline events">
-      <ScrollArea className="h-full">
-        <div className="max-w-3xl mx-auto px-4 md:px-6 py-6">
-          {project.calendar?.name && (
-            <p className="text-xs text-muted-foreground mb-4">
-              Calendar: <span className="text-foreground">{project.calendar.name}</span>
-              {project.calendar.epochName ? ` · epoch ${project.calendar.epochName}` : ""}
-            </p>
-          )}
-
-          {/* No months named yet, so every date here reads as plain numbers.
-              DM-only: a player can't fix this and shouldn't be asked to. */}
-          {needsCalendar && (
-            <div className="mb-4 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs space-y-2">
-              <p className="font-medium text-foreground">Your months don&rsquo;t have names yet.</p>
-              <p className="text-muted-foreground">
-                Name them once and every date in the atlas reads the way your world does, instead of
-                as a number.
+        <ScrollArea className="h-full">
+          <div className="max-w-3xl mx-auto px-4 md:px-6 py-6">
+            {project.calendar?.name && (
+              <p className="text-xs text-muted-foreground mb-4">
+                Calendar: <span className="text-foreground">{project.calendar.name}</span>
+                {project.calendar.epochName ? ` · epoch ${project.calendar.epochName}` : ""}
               </p>
-              <Button asChild size="sm" variant="secondary" className="h-7 text-xs">
-                <Link to="/atlas/edit?panel=calendar">Name your months</Link>
-              </Button>
-            </div>
-          )}
+            )}
 
-          {groups.length === 0 && dated.length > 0 ? (
-            <div className="text-center text-sm text-muted-foreground py-16 space-y-3">
-              <p>No events match your filter.</p>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() =>
-                  setSearchParams(
-                    serializeBrowseFilterParams({ q: "", type: null }),
-                    { replace: true },
-                  )
-                }
-              >
-                Clear filter
-              </Button>
-            </div>
-          ) : groups.length === 0 ? (
-            <div className="text-center text-sm text-muted-foreground py-16">
-              No dated entries yet. Add{" "}
-              <code className="px-1 py-0.5 rounded bg-muted">atlas.date</code> to a markdown file's
-              frontmatter.
-            </div>
-          ) : (
-            <ol className="relative border-l-2 border-border pl-5 space-y-6">
-              {groups.map((g) => (
-                <li key={g.year} className="space-y-3">
-                  <div className="flex items-center gap-2 -ml-7">
-                    <span className="w-3 h-3 rounded-full bg-primary border-2 border-background" />
-                    <h2 className="font-display text-lg text-primary">{g.label}</h2>
-                  </div>
-                  <div className="space-y-2">
-                    {g.entries.map((e) => (
-                      <Link
-                        key={e.id}
-                        to={`/atlas?entity=${encodeURIComponent(e.id)}`}
-                        className="block rounded border border-border bg-card hover:bg-accent/40 transition px-3 py-2"
-                      >
-                        <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="text-xs text-muted-foreground tabular-nums">
-                            {e.dateRaw}
-                          </span>
-                          <span className="font-medium text-sm">{e.title}</span>
-                          {playerTypeLabel(e.type) && (
-                            <Badge variant="outline" className="text-[10px] uppercase">
-                              {playerTypeLabel(e.type)}
-                            </Badge>
-                          )}
-                        </div>
-                        {e.summary && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                            {e.summary}
-                          </p>
-                        )}
-                        {e.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            {e.tags.slice(0, 5).map((t) => (
-                              <span key={t} className="text-[10px] text-muted-foreground">
-                                #{t}
-                              </span>
-                            ))}
+            {/* No months named yet, so every date here reads as plain numbers.
+              DM-only: a player can't fix this and shouldn't be asked to. */}
+            {needsCalendar && (
+              <div className="mb-4 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs space-y-2">
+                <p className="font-medium text-foreground">
+                  Your months don&rsquo;t have names yet.
+                </p>
+                <p className="text-muted-foreground">
+                  Name them once and every date in the atlas reads the way your world does, instead
+                  of as a number.
+                </p>
+                <Button asChild size="sm" variant="secondary" className="h-7 text-xs">
+                  <Link to="/atlas/edit?panel=calendar">Name your months</Link>
+                </Button>
+              </div>
+            )}
+
+            {groups.length === 0 && dated.length > 0 ? (
+              <div className="text-center text-sm text-muted-foreground py-16 space-y-3">
+                <p>No events match your filter.</p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    setSearchParams(serializeBrowseFilterParams({ q: "", type: null }), {
+                      replace: true,
+                    })
+                  }
+                >
+                  Clear filter
+                </Button>
+              </div>
+            ) : groups.length === 0 ? (
+              <div className="text-center text-sm text-muted-foreground py-16">
+                No dated entries yet. Add{" "}
+                <code className="px-1 py-0.5 rounded bg-muted">atlas.date</code> to a markdown
+                file's frontmatter.
+              </div>
+            ) : (
+              <ol className="relative border-l-2 border-border pl-5 space-y-6">
+                {groups.map((g) => (
+                  <li key={g.year} className="space-y-3">
+                    <div className="flex items-center gap-2 -ml-7">
+                      <span className="w-3 h-3 rounded-full bg-primary border-2 border-background" />
+                      <h2 className="font-display text-lg text-primary">{g.label}</h2>
+                    </div>
+                    <div className="space-y-2">
+                      {g.entries.map((e) => (
+                        <Link
+                          key={e.id}
+                          to={`/atlas?entity=${encodeURIComponent(e.id)}`}
+                          className="block rounded border border-border bg-card hover:bg-accent/40 transition px-3 py-2"
+                        >
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              {e.dateRaw}
+                            </span>
+                            <span className="font-medium text-sm">{e.title}</span>
+                            {playerTypeLabel(e.type) && (
+                              <Badge variant="outline" className="text-[10px] uppercase">
+                                {playerTypeLabel(e.type)}
+                              </Badge>
+                            )}
                           </div>
-                        )}
-                      </Link>
-                    ))}
-                  </div>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-      </ScrollArea>
+                          {e.summary && (
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                              {e.summary}
+                            </p>
+                          )}
+                          {e.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {e.tags.slice(0, 5).map((t) => (
+                                <span key={t} className="text-[10px] text-muted-foreground">
+                                  #{t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </Link>
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </ScrollArea>
       </main>
     </div>
   );

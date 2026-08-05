@@ -33,7 +33,12 @@ function EditHost({ sourcePath }: { sourcePath: string }) {
   return (
     <>
       <div data-testid="dirty">{String(api.isDirty())}</div>
-      <EntityEditPanel sourcePath={sourcePath} draftApi={api} onClose={() => {}} onSaved={() => {}} />
+      <EntityEditPanel
+        sourcePath={sourcePath}
+        draftApi={api}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />
     </>
   );
 }

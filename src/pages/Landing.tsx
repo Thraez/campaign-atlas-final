@@ -103,9 +103,7 @@ export default function Landing() {
       <header className="border-b border-border">
         <div className="max-w-5xl mx-auto px-6 py-5 flex items-center gap-3">
           <Compass className="h-6 w-6 text-primary shrink-0" aria-hidden />
-          <h1 className="font-display text-xl text-primary truncate">
-            {world?.name ?? "Atlas"}
-          </h1>
+          <h1 className="font-display text-xl text-primary truncate">{world?.name ?? "Atlas"}</h1>
           {dmOn && (
             <Badge variant="outline" className="ml-auto text-[10px] shrink-0">
               Your copy
@@ -172,9 +170,9 @@ export default function Landing() {
           {howOpen && (
             <div className="mt-3 text-sm text-muted-foreground space-y-2 max-w-2xl">
               <p>
-                Your world is plain markdown in <code>content/</code> — a valid Obsidian vault on its
-                own. A build step turns it into the player-safe atlas this site reads from, stripping
-                every DM-only entry before it ships.
+                Your world is plain markdown in <code>content/</code> — a valid Obsidian vault on
+                its own. A build step turns it into the player-safe atlas this site reads from,
+                stripping every DM-only entry before it ships.
               </p>
               {__INCLUDE_EDITOR__ && (
                 <p>

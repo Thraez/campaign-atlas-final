@@ -74,7 +74,9 @@ function makeLocalLayer(over: Partial<LocalLayer> = {}): LocalLayer {
 const REGIONS: Region[] = [
   { id: "r1", mapId: "m1", name: "Region 1", points: [], visibility: "player" },
 ];
-const ROUTES: Route[] = [{ id: "rt1", mapId: "m1", name: "Route 1", visibility: "player", waypoints: [] }];
+const ROUTES: Route[] = [
+  { id: "rt1", mapId: "m1", name: "Route 1", visibility: "player", waypoints: [] },
+];
 const FOG: FogOverlay = { mapId: "m1", enabled: true, reveals: [] };
 
 beforeEach(() => {

@@ -275,9 +275,9 @@ is for sequencing, not the whole spec.
 
 - [ ] **S4. Show the baseline publish date in the "changes since last publish" panel.** _(qol)_ — `computeAtlasDiff.ts:96/140/293` already carries `baselinePublishedAt`, and a repo-wide grep confirms **nothing in `src/` reads it** — `PublishedDiffPanel` never renders it. Pure display wiring. **Done when:** the panel says what it is comparing against ("since 12 July, 14:03"), and a first-ever publish with no baseline still reads sensibly instead of showing a blank or "Invalid Date".
 
-- [ ] **S5. Add a concurrency group to the PR-check workflow.** _(infra)_ — `publish-atlas.yml:32` has one; `atlas-pr-check.yml` has none, so every push to an open PR starts a fresh full build+scan while the older run keeps burning. Add a `concurrency` group keyed on the ref with `cancel-in-progress: true`. **Done when:** pushing twice in quick succession to a PR leaves exactly one running check, the older one cancelled.
+- [x] ~~**S5. Add a concurrency group to the PR-check workflow.**~~ — built during the 2026-08-06 sweep, alongside the CI-gate-gap fix it sits next to. `atlas-pr-check.yml` now carries `concurrency: pr-check-${{ github.ref }}` with `cancel-in-progress: true`.
 
-- [ ] **S6. Add job timeouts to both CI workflows.** _(infra)_ — no `timeout-minutes` appears anywhere under `.github/workflows/`, so a hung build/scan/deploy runs to the platform's 6-hour default. Set a realistic `timeout-minutes` on each job. **Done when:** both workflow files declare a timeout on every job and a normal run still finishes well inside it.
+- [x] ~~**S6. Add job timeouts to both CI workflows.**~~ — built during the 2026-08-06 sweep. All five jobs across the two workflows now declare `timeout-minutes` (verify 10, scan 20, test 20, build 20, deploy 10).
 
 - [ ] **S7. Add `engines` + `.nvmrc` as the single Node-version source.** _(dx)_ — there is no `.nvmrc` and no `engines` field in `package.json` (both verified absent), yet both workflows hardcode Node 20 and QUICK_START says "Node 20+". Add both and point the workflows at the file. **Done when:** the Node version is written down in exactly one place, and the workflows and docs read from it instead of repeating it.
 

@@ -1,4 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback, type MutableRefObject } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  type MutableRefObject,
+} from "react";
 import {
   MapContainer,
   Marker,
@@ -180,7 +188,13 @@ function FitBoundsController({
   // Keep the reset-view callback current after every render in which deps change
   useLayoutEffect(() => {
     fitRef.current = () => {
-      map.fitBounds([[0, 0], [mapHeight, mapWidth]], { animate: true, duration: 0.5 });
+      map.fitBounds(
+        [
+          [0, 0],
+          [mapHeight, mapWidth],
+        ],
+        { animate: true, duration: 0.5 },
+      );
     };
     return () => {
       fitRef.current = null;
@@ -191,7 +205,13 @@ function FitBoundsController({
     if (seenMapIdRef.current === mapId) return;
     seenMapIdRef.current = mapId;
     if (flyTarget !== null) return; // fly already pending; MapController handles it
-    map.fitBounds([[0, 0], [mapHeight, mapWidth]], { animate: false });
+    map.fitBounds(
+      [
+        [0, 0],
+        [mapHeight, mapWidth],
+      ],
+      { animate: false },
+    );
   }, [mapId, mapWidth, mapHeight, flyTarget, map]);
 
   return null;
@@ -652,7 +672,11 @@ export default function AtlasViewer() {
           Skip to map
         </a>
         <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
-          <AtlasNavMenu publishedAt={data.project.publishedAt} showCredits={showCredits} worldName={worldName} />
+          <AtlasNavMenu
+            publishedAt={data.project.publishedAt}
+            showCredits={showCredits}
+            worldName={worldName}
+          />
           {/* The name used to be `hidden sm:inline`, so a phone showed only the
               compass — someone opening a shared link couldn't see which world
               they were looking at. Truncate instead of hiding. */}
@@ -665,7 +689,13 @@ export default function AtlasViewer() {
           </Link>
           <div className="flex-1" />
           {data.project.maps.length > 1 && (
-            <Select value={activeMap.id} onValueChange={(id) => { setActiveMapId(id); setFlyTarget(null); }}>
+            <Select
+              value={activeMap.id}
+              onValueChange={(id) => {
+                setActiveMapId(id);
+                setFlyTarget(null);
+              }}
+            >
               <SelectTrigger className="h-8 w-[180px] text-xs" aria-label="Choose map">
                 <SelectValue />
               </SelectTrigger>

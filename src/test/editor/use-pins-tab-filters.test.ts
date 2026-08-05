@@ -71,10 +71,7 @@ describe("usePinsTabFilters", () => {
     const effectiveCoord = fakeEffectiveCoord(new Set(["ironkeep", "whispering-woods"]));
     const { result } = renderHook(() => usePinsTabFilters({ entities, effectiveCoord }));
 
-    expect(result.current.placed.map((e) => e.id).sort()).toEqual([
-      "ironkeep",
-      "whispering-woods",
-    ]);
+    expect(result.current.placed.map((e) => e.id).sort()).toEqual(["ironkeep", "whispering-woods"]);
     expect(result.current.unplaced.map((e) => e.id).sort()).toEqual([
       "hidden-vault",
       "shadow-cult",

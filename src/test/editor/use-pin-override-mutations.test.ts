@@ -63,7 +63,13 @@ describe("usePinOverrideMutations", () => {
     it("effectivePlacement prefers a local override over canon, falling back to canon", () => {
       const project = makeProject({
         placements: [
-          makePlacement({ entityId: "iron-tower", mapId: "overview", x: 500, y: 500, label: "Canon" }),
+          makePlacement({
+            entityId: "iron-tower",
+            mapId: "overview",
+            x: 500,
+            y: 500,
+            label: "Canon",
+          }),
         ],
       });
       const activeMap = makeMap();
@@ -220,7 +226,13 @@ describe("usePinOverrideMutations", () => {
     it("setCoord merges onto the canon placement when no prior override exists", () => {
       const project = makeProject({
         placements: [
-          makePlacement({ entityId: "iron-tower", mapId: "overview", x: 500, y: 500, label: "Old" }),
+          makePlacement({
+            entityId: "iron-tower",
+            mapId: "overview",
+            x: 500,
+            y: 500,
+            label: "Old",
+          }),
         ],
       });
       const activeMap = makeMap();
@@ -342,7 +354,10 @@ describe("usePinOverrideMutations", () => {
 
     it("duplicateToMap writes the source's effective placement under the target map key and toasts success", () => {
       const project = makeProject({
-        maps: [makeMap({ id: "overview", name: "Overview" }), makeMap({ id: "detail", name: "Detail Map" })],
+        maps: [
+          makeMap({ id: "overview", name: "Overview" }),
+          makeMap({ id: "detail", name: "Detail Map" }),
+        ],
         placements: [
           makePlacement({
             entityId: "iron-tower",

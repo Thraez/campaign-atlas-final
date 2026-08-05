@@ -58,7 +58,15 @@ export function SoundscapeLayer({ map: mapDoc }: { map: MapDocument }) {
       if (timer.current) clearTimeout(timer.current);
       setAmbiencePlaying(false);
     };
-  }, [leaflet, soundEnabled, prepared, engine, mapDoc.height, mapDoc.soundscape?.enabled, setAmbiencePlaying]);
+  }, [
+    leaflet,
+    soundEnabled,
+    prepared,
+    engine,
+    mapDoc.height,
+    mapDoc.soundscape?.enabled,
+    setAmbiencePlaying,
+  ]);
 
   // Stop sound when switching maps.
   useEffect(() => {

@@ -265,13 +265,17 @@ function PlayerProfileBlock({ profile }: { profile: PlayerProfile }) {
     <div className="atlas-player-profile space-y-2 pt-1" data-testid="player-profile-block">
       {hasKnownFor && (
         <div className="text-sm">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Known for</span>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Known for
+          </span>
           <p className="mt-0.5">{profile.known_for}</p>
         </div>
       )}
       {hasTraits && (
         <div className="text-sm">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Visible traits</span>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Visible traits
+          </span>
           <ul className="mt-0.5 list-disc list-inside space-y-0.5">
             {profile.visible_traits!.map((t, i) => (
               <li key={i}>{t}</li>
@@ -447,9 +451,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
               const typeLabel = playerTypeLabel(entity.type);
               // dateRaw already drives the Timeline's ordering, so an event that
               // sorts by date used to show no date at all on its own page.
-              const kicker = [typeLabel, entity.race, entity.dateRaw]
-                .filter(Boolean)
-                .join(" · ");
+              const kicker = [typeLabel, entity.race, entity.dateRaw].filter(Boolean).join(" · ");
               return kicker ? (
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   {kicker}
@@ -529,9 +531,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
             </p>
           )}
 
-          {entity.profile?.player && (
-            <PlayerProfileBlock profile={entity.profile.player} />
-          )}
+          {entity.profile?.player && <PlayerProfileBlock profile={entity.profile.player} />}
 
           {entity.images.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
@@ -660,7 +660,10 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
       </ScrollArea>
 
       {/* Lightbox */}
-      <Dialog open={lightboxIndex !== null} onOpenChange={(open) => !open && setLightboxIndex(null)}>
+      <Dialog
+        open={lightboxIndex !== null}
+        onOpenChange={(open) => !open && setLightboxIndex(null)}
+      >
         <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 bg-black/90 border-none overflow-hidden">
           <DialogTitle className="sr-only">{entity.title} image</DialogTitle>
           {lightboxIndex !== null && lightboxUrl && (
@@ -675,14 +678,20 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
               {imageCount > 1 && (
                 <>
                   <button
-                    onClick={(e) => { e.stopPropagation(); goPrev(); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      goPrev();
+                    }}
                     className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 hover:bg-black/70 text-white p-2 transition"
                     aria-label="Previous image"
                   >
                     <ChevronLeft className="h-5 w-5" />
                   </button>
                   <button
-                    onClick={(e) => { e.stopPropagation(); goNext(); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      goNext();
+                    }}
                     className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 hover:bg-black/70 text-white p-2 transition"
                     aria-label="Next image"
                   >

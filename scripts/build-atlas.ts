@@ -557,7 +557,10 @@ async function runBuildCore(flags: BuildFlags) {
     const { entity, rawBody } = item;
     // Resolve ![[image.ext]] AFTER DM stripping (rawBody is already noDm) so embeds in %% blocks are absent.
     const resolvedBody = resolveImageEmbeds(rawBody, DEFAULT_RESOLVE_ASSET);
-    const { tokenized, links } = tokenizeWikilinks(resolvedBody, { resolveByName, resolveByBasename });
+    const { tokenized, links } = tokenizeWikilinks(resolvedBody, {
+      resolveByName,
+      resolveByBasename,
+    });
     entity.links = links;
     for (const l of links) {
       // Cross-reference spoiler leak detection (player builds only). The link

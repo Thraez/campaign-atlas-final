@@ -14,7 +14,14 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import JSZip from "jszip";
-import { Upload, ChevronLeft, ChevronRight, AlertTriangle, ShieldAlert, Package } from "lucide-react";
+import {
+  Upload,
+  ChevronLeft,
+  ChevronRight,
+  AlertTriangle,
+  ShieldAlert,
+  Package,
+} from "lucide-react";
 import { fileToDataUrl, readImageSize } from "@/atlas/content/browserFile";
 import { downloadBlob } from "@/atlas/tabs/download";
 import { Button } from "@/components/ui/button";
@@ -292,4 +299,3 @@ export function MapImportWizard({
     </Dialog>
   );
 }
-

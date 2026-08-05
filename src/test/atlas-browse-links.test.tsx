@@ -66,7 +66,13 @@ function renderBrowse(project: AtlasProject) {
 describe("AtlasBrowse — tag facet row (Q24)", () => {
   function makeTaggedProject() {
     return makeProject([
-      makeEntity({ id: "e1", title: "Aldric", type: "npc", tags: ["npc", "smuggler"], summary: "" }),
+      makeEntity({
+        id: "e1",
+        title: "Aldric",
+        type: "npc",
+        tags: ["npc", "smuggler"],
+        summary: "",
+      }),
       makeEntity({ id: "e2", title: "Bridget", type: "npc", tags: ["npc", "city"], summary: "" }),
       makeEntity({ id: "e3", title: "Calder", type: "npc", tags: ["npc", "quest"], summary: "" }),
       makeEntity({

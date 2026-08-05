@@ -289,9 +289,12 @@ function AtlasPlacementEditorInner() {
 
   useEffect(() => {
     if (!persistOverrides(overrides)) {
-      toast.error("Couldn't save pin changes locally — your browser storage may be full or blocked.", {
-        id: "overrides-persist-failed",
-      });
+      toast.error(
+        "Couldn't save pin changes locally — your browser storage may be full or blocked.",
+        {
+          id: "overrides-persist-failed",
+        },
+      );
     }
   }, [overrides]);
 
@@ -542,9 +545,7 @@ function AtlasPlacementEditorInner() {
 
   // Deep link: /atlas/edit?panel=calendar opens straight into a panel. Read once
   // on mount so it never fights the DM's own navigation afterwards.
-  const [panelDeepLink] = useState(() =>
-    new URLSearchParams(window.location.search).get("panel"),
-  );
+  const [panelDeepLink] = useState(() => new URLSearchParams(window.location.search).get("panel"));
   useEffect(() => {
     if (panelDeepLink) setActivePanel(panelDeepLink);
   }, [panelDeepLink]);
@@ -1203,7 +1204,9 @@ function AtlasPlacementEditorInner() {
             world&rsquo;s markdown files and rebuilds the atlas, so the player view updates without
             leaving the page.
           </p>
-          <p>Those markdown files are the real thing — commit them with git when you&rsquo;re happy.</p>
+          <p>
+            Those markdown files are the real thing — commit them with git when you&rsquo;re happy.
+          </p>
         </div>
       )}
       <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
@@ -1322,7 +1325,12 @@ function AtlasPlacementEditorInner() {
             offers Save exactly when there is something to write, and the rail
             had a dead "Save" item with no panel behind it. One Save now. */}
         <Button asChild variant="ghost" size="sm">
-          <Link to="/atlas" title="Open the player site in a new tab — the real thing" target="_blank" rel="noreferrer">
+          <Link
+            to="/atlas"
+            title="Open the player site in a new tab — the real thing"
+            target="_blank"
+            rel="noreferrer"
+          >
             Open player site ↗
           </Link>
         </Button>

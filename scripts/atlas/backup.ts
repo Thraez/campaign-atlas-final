@@ -168,7 +168,9 @@ export async function restoreBackup(
 async function runRestoreCli(zipArg: string, outArg: string): Promise<void> {
   const zipAbs = path.resolve(ROOT, zipArg);
   const outAbs = path.resolve(ROOT, outArg);
-  console.log(`atlas:restore — extracting ${path.relative(ROOT, zipAbs)} → ${path.relative(ROOT, outAbs)}…`);
+  console.log(
+    `atlas:restore — extracting ${path.relative(ROOT, zipAbs)} → ${path.relative(ROOT, outAbs)}…`,
+  );
   const { extracted, expected } = await restoreBackup(zipAbs, outAbs);
   console.log(`\n✓ Restored ${extracted} file(s) into ${path.relative(ROOT, outAbs)}`);
   if (expected === undefined) {

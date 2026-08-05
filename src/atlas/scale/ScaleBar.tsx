@@ -46,8 +46,7 @@ export function ScaleBarController({
       const rawDist = rawMapPx * scale.unitsPerPixel;
       const niceDist = niceScaleNumber(rawDist);
       const barPx = (niceDist / rawDist) * TARGET_PX;
-      const niceFmt =
-        niceDist >= 1 ? String(Math.round(niceDist)) : niceDist.toPrecision(1);
+      const niceFmt = niceDist >= 1 ? String(Math.round(niceDist)) : niceDist.toPrecision(1);
       onChangeRef.current({ barWidth: barPx, label: `${niceFmt} ${scale.unitLabel}` });
     };
 

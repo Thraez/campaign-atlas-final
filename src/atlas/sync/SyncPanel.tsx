@@ -29,9 +29,7 @@ export interface VaultFolderPickerProps {
  */
 export function VaultFolderPicker({ folders, selected, onChange }: VaultFolderPickerProps) {
   const toggle = (name: string) => {
-    onChange(
-      selected.includes(name) ? selected.filter((n) => n !== name) : [...selected, name],
-    );
+    onChange(selected.includes(name) ? selected.filter((n) => n !== name) : [...selected, name]);
   };
   return (
     <div className="space-y-2">
@@ -80,8 +78,7 @@ export function SyncPanel({ onSync, hasDmBuild = true }: SyncPanelProps) {
     try {
       const resp = await fetch(`/__atlas/vault-folders?vaultRoot=${encodeURIComponent(root)}`);
       const data = (await resp.json()) as
-        | { ok: true; folders: { name: string; noteCount: number }[] }
-        | { ok: false; error: string };
+        { ok: true; folders: { name: string; noteCount: number }[] } | { ok: false; error: string };
       if (data.ok) setFolders(data.folders);
       else toast.error("Couldn't read that vault folder — check the path.");
     } catch {

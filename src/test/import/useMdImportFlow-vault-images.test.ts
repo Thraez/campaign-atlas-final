@@ -12,7 +12,12 @@ vi.mock("@/atlas/import/buildImportChanges", async (importOriginal) => {
     ...actual,
     buildImportChanges: vi.fn(() =>
       Promise.resolve([
-        { path: "content/w/notes/corven.md", content: "final content", kind: "entity-md", baseHash: null },
+        {
+          path: "content/w/notes/corven.md",
+          content: "final content",
+          kind: "entity-md",
+          baseHash: null,
+        },
       ]),
     ),
   };
@@ -95,8 +100,6 @@ describe("useMdImportFlow commit — rewrites vault image embeds (V12/C3)", () =
     const passedRows = vi.mocked(buildImportChanges).mock.calls[0][0];
     const row = passedRows.find((r) => r.vaultRelPath === "03_Entities/corven.md");
     expect(row?.rawContent).toBe("![](/atlas/assets/images/corven-1.png)\n\n\n");
-    expect(toast.warning).toHaveBeenCalledWith(
-      "1 image skipped — not in the folders you picked.",
-    );
+    expect(toast.warning).toHaveBeenCalledWith("1 image skipped — not in the folders you picked.");
   });
 });

@@ -265,7 +265,11 @@ describe("wikilink autocomplete ARIA wiring (N132)", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(
-      <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={() => {}} />,
+      <EntityEditPanel
+        sourcePath="content/w/npcs/corven.md"
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
     );
     await waitFor(() => screen.getByDisplayValue(/old body/i));
     const ta = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
@@ -297,7 +301,11 @@ describe("wikilink autocomplete ARIA wiring (N132)", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(
-      <EntityEditPanel sourcePath="content/w/npcs/corven.md" onClose={() => {}} onSaved={() => {}} />,
+      <EntityEditPanel
+        sourcePath="content/w/npcs/corven.md"
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
     );
     await waitFor(() => screen.getByDisplayValue(/old body/i));
     const ta = screen.getByLabelText(/body/i) as HTMLTextAreaElement;

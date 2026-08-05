@@ -31,7 +31,9 @@ function entity(over: Partial<Entity> & { id: string; title: string }): Entity {
   };
 }
 
-function rel(over: Partial<EntityRelationship> & { entity: string; type: string }): EntityRelationship {
+function rel(
+  over: Partial<EntityRelationship> & { entity: string; type: string },
+): EntityRelationship {
   return {
     entity: over.entity,
     type: over.type,
@@ -131,7 +133,13 @@ describe("buildHandoutHtml", () => {
     const bob = entity({ id: "bob", title: "Bob the Merchant" });
     const entitiesById = new Map([["bob", bob]]);
     const html = buildHandoutHtml(
-      [entity({ id: "alice", title: "Alice", relationships: [rel({ entity: "bob", type: "ally" })] })],
+      [
+        entity({
+          id: "alice",
+          title: "Alice",
+          relationships: [rel({ entity: "bob", type: "ally" })],
+        }),
+      ],
       entitiesById,
     );
     expect(html).toContain("Connections");
@@ -200,13 +208,22 @@ describe("N127: image credit/attribution in the printed handout", () => {
   });
 
   it("omits the credit line when the entity has no credit", () => {
-    const html = buildHandoutHtml([entity({ id: "a", title: "A", images: ["atlas/assets/img.jpg"] })]);
+    const html = buildHandoutHtml([
+      entity({ id: "a", title: "A", images: ["atlas/assets/img.jpg"] }),
+    ]);
     expect(html).not.toContain('class="hero-credit"');
   });
 
   it("prefers a registry entry over the entity's coarse credit", () => {
     const html = buildHandoutHtml(
-      [entity({ id: "a", title: "A", images: ["atlas/assets/img.jpg"], credit: "Fallback credit" })],
+      [
+        entity({
+          id: "a",
+          title: "A",
+          images: ["atlas/assets/img.jpg"],
+          credit: "Fallback credit",
+        }),
+      ],
       new Map(),
       { "atlas/assets/img.jpg": { credit: "Registry credit", enabled: true } },
     );
@@ -216,7 +233,14 @@ describe("N127: image credit/attribution in the printed handout", () => {
 
   it("suppresses a disabled registry entry entirely (no fallback to entity.credit)", () => {
     const html = buildHandoutHtml(
-      [entity({ id: "a", title: "A", images: ["atlas/assets/img.jpg"], credit: "Fallback credit" })],
+      [
+        entity({
+          id: "a",
+          title: "A",
+          images: ["atlas/assets/img.jpg"],
+          credit: "Fallback credit",
+        }),
+      ],
       new Map(),
       { "atlas/assets/img.jpg": { credit: "Registry credit", enabled: false } },
     );
@@ -238,7 +262,14 @@ describe("N127: image credit/attribution in the printed handout", () => {
 
   it("hides all image credits when world.credits.badges is false", () => {
     const html = buildHandoutHtml(
-      [entity({ id: "a", title: "A", images: ["atlas/assets/img.jpg"], credit: "Art by Jane Doe" })],
+      [
+        entity({
+          id: "a",
+          title: "A",
+          images: ["atlas/assets/img.jpg"],
+          credit: "Art by Jane Doe",
+        }),
+      ],
       new Map(),
       undefined,
       { badges: false },
@@ -253,7 +284,7 @@ describe("N127: image credit/attribution in the printed handout", () => {
         id: "a",
         title: "A",
         images: ["atlas/assets/img.jpg"],
-        credit: '<script>alert(1)</script>',
+        credit: "<script>alert(1)</script>",
       }),
     ]);
     expect(html).not.toContain("<script>alert(1)</script>");

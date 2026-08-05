@@ -100,8 +100,7 @@ function SaveHarness({
   // useEditorSession.test.tsx's fake-holder harness.
   const perMapDirtyCount = useCallback(
     () =>
-      Object.keys(overrides).filter((k) => k.startsWith(`${mapId}:`)).length +
-      foreignDrafts.length,
+      Object.keys(overrides).filter((k) => k.startsWith(`${mapId}:`)).length + foreignDrafts.length,
     [overrides, mapId, foreignDrafts.length],
   );
 

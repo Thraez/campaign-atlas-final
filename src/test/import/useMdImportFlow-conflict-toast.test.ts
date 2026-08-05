@@ -59,7 +59,9 @@ describe("useMdImportFlow commit — conflict-toast guidance (N126)", () => {
     // mention that the row won't even show up as a conflict until the atlas is
     // rebuilt and canon is reloaded — that's the part this fix corrects.
     const description = vi.mocked(toast.error).mock.calls[0][1]?.description as string;
-    expect(description.indexOf("atlas:build")).toBeLessThan(description.indexOf("Select all overwrites"));
+    expect(description.indexOf("atlas:build")).toBeLessThan(
+      description.indexOf("Select all overwrites"),
+    );
   });
 
   it("still tells the DM to reload canon for a stale-base conflict (unchanged branch)", async () => {
@@ -76,7 +78,8 @@ describe("useMdImportFlow commit — conflict-toast guidance (N126)", () => {
     expect(toast.error).toHaveBeenCalledWith(
       "Import conflict: content/w/npcs/existing-npc.md",
       expect.objectContaining({
-        description: "File changed outside the editor between staging and commit. Reload canon and retry.",
+        description:
+          "File changed outside the editor between staging and commit. Reload canon and retry.",
       }),
     );
   });

@@ -14,9 +14,17 @@ on:
 permissions:
   contents: read
 
+# Superseded pushes to the same PR cancel their in-flight run. Without this, a
+# branch pushed three times in a minute burns three full scan+test matrices and
+# the earliest one can report last.
+concurrency:
+  group: pr-check-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   scan:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -53,6 +61,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       matrix:
         shard: [1, 2, 3, 4]

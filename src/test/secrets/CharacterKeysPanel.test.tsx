@@ -132,7 +132,9 @@ describe("CharacterKeysPanel — load/add/remove/persist contract (N36)", () => 
     await waitFor(() => screen.getByText("key123"));
     fireEvent.click(screen.getByRole("button", { name: /Copy key/i }));
     await waitFor(() => expect(mockToastError).toHaveBeenCalledWith("Could not copy key"));
-    expect(screen.queryByRole("button", { name: /Copy key/i })?.querySelector(".text-green-400")).toBeFalsy();
+    expect(
+      screen.queryByRole("button", { name: /Copy key/i })?.querySelector(".text-green-400"),
+    ).toBeFalsy();
     Object.defineProperty(navigator, "clipboard", {
       value: undefined,
       configurable: true,

@@ -5,18 +5,14 @@ import React from "react";
 // Capture the click handler registered via useMapEvents so tests can fire it.
 const { capturedHandlers, measureCalls } = vi.hoisted(() => {
   const capturedHandlers = {
-    click: null as
-      | ((e: { latlng: { lng: number; lat: number } }) => void)
-      | null,
+    click: null as ((e: { latlng: { lng: number; lat: number } }) => void) | null,
   };
   const measureCalls: Array<{ x: number; y: number }[]> = [];
   return { capturedHandlers, measureCalls };
 });
 
 vi.mock("react-leaflet", async () => {
-  const { makeReactLeafletModule } = await import(
-    "../helpers/reactLeafletMock"
-  );
+  const { makeReactLeafletModule } = await import("../helpers/reactLeafletMock");
   const base = makeReactLeafletModule();
   const fakeMap = {
     ...base.useMap(),
@@ -26,10 +22,7 @@ vi.mock("react-leaflet", async () => {
     ...base,
     useMap: () => fakeMap,
     useMapEvents: (
-      handlers: Record<
-        string,
-        (e: { latlng: { lng: number; lat: number } }) => void
-      >,
+      handlers: Record<string, (e: { latlng: { lng: number; lat: number } }) => void>,
     ) => {
       capturedHandlers.click = handlers.click;
       return fakeMap;
@@ -166,9 +159,7 @@ describe("N114 — RulerLayer: reset on active map change", () => {
     expect(screen.getByText("5.0 mi")).toBeInTheDocument();
     expect(screen.queryByTestId("ruler-hint")).not.toBeInTheDocument();
 
-    rerender(
-      <RulerLayer active mapId="map-2" mapHeight={1000} />,
-    );
+    rerender(<RulerLayer active mapId="map-2" mapHeight={1000} />);
 
     expect(screen.queryByText("5.0 mi")).not.toBeInTheDocument();
     expect(screen.getByTestId("ruler-hint")).toBeInTheDocument();
@@ -180,9 +171,7 @@ describe("N114 — RulerLayer: reset on active map change", () => {
     click(200, 800); // p2
     expect(screen.getByText("5.0 mi")).toBeInTheDocument();
 
-    rerender(
-      <RulerLayer active mapId="map-1" mapHeight={1000} />,
-    );
+    rerender(<RulerLayer active mapId="map-1" mapHeight={1000} />);
 
     expect(screen.getByText("5.0 mi")).toBeInTheDocument();
   });

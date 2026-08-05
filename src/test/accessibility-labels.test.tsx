@@ -19,7 +19,13 @@ import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { MapLayerPanel } from "@/atlas/MapLayerPanel";
 import { EntitiesTab } from "@/atlas/tabs/EntitiesTab";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
-import type { AtlasProject, Entity, MapDocument, MapLayer, MapPlacement } from "@/atlas/content/schema";
+import type {
+  AtlasProject,
+  Entity,
+  MapDocument,
+  MapLayer,
+  MapPlacement,
+} from "@/atlas/content/schema";
 
 // AtlasMinimap uses useMap() which requires a MapContainer context at runtime.
 // Stub the hook so we can render the component in isolation.
@@ -51,15 +57,16 @@ vi.mock("react-leaflet", () => {
         );
       },
     ),
-    Tooltip: React.forwardRef<HTMLDivElement, { children?: React.ReactNode }>(
-      function TooltipMock({ children }, ref) {
-        return (
-          <div data-leaflet="Tooltip" ref={ref}>
-            {children}
-          </div>
-        );
-      },
-    ),
+    Tooltip: React.forwardRef<HTMLDivElement, { children?: React.ReactNode }>(function TooltipMock(
+      { children },
+      ref,
+    ) {
+      return (
+        <div data-leaflet="Tooltip" ref={ref}>
+          {children}
+        </div>
+      );
+    }),
   };
 });
 

@@ -52,9 +52,7 @@ export function ValidationChips<T extends ValidationChipIssue>({
         </div>
       ))}
       {issues.length > limit ? (
-        <div className="text-[11px] text-muted-foreground px-2">
-          +{issues.length - limit} more
-        </div>
+        <div className="text-[11px] text-muted-foreground px-2">+{issues.length - limit} more</div>
       ) : null}
     </div>
   );

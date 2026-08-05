@@ -107,8 +107,8 @@ describe("matchesPhrases", () => {
   });
 
   it("matches against tags (lowercased) — N118", () => {
-    expect(
-      matchesPhrases(entry({ tags: ["Ancient Ruins"], body: "" }), ["ancient ruins"]),
-    ).toBe(true);
+    expect(matchesPhrases(entry({ tags: ["Ancient Ruins"], body: "" }), ["ancient ruins"])).toBe(
+      true,
+    );
   });
 });

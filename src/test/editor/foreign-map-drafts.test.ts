@@ -19,7 +19,9 @@ describe("foreignMapDraftPlacements", () => {
   it("collects an override written to a different (target) map by duplicateToMap", () => {
     const overrides = { "m2:hero": { x: 5, y: 6 } };
     const out = foreignMapDraftPlacements(overrides, "m1", ["m1", "m2"], entities);
-    expect(out).toEqual([{ entityId: "hero", mapId: "m2", x: 5, y: 6, label: undefined, pin: undefined }]);
+    expect(out).toEqual([
+      { entityId: "hero", mapId: "m2", x: 5, y: 6, label: undefined, pin: undefined },
+    ]);
   });
 
   it("skips a null foreign entry (defensive — duplicateToMap never writes null)", () => {
