@@ -367,7 +367,7 @@ export async function handleSaveRequest(
   }
 
   // Path allowlist — dispatch per kind. asset-binary lands under
-  // public/atlas/assets/maps/<file>.<image-ext>; text kinds under content/.
+  // public/atlas/assets/{maps,images}/<file>.<image-ext>; text kinds under content/.
   for (const f of list) {
     const allowed =
       f.kind === "asset-binary" ? isWritableAssetPath(f.path) : isWritableSourcePath(f.path);
