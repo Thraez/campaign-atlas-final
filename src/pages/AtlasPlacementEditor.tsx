@@ -1052,14 +1052,24 @@ function AtlasPlacementEditorInner() {
     validation?.issues ?? [],
   );
 
+  // `onSaveClick` is a large inline closure that is deliberately not memoized (the
+  // `useSaveFlow` extraction was assessed and deferred — 20+ bindings, poor
+  // risk/reward). Depending on it directly made `paletteIndex` rebuild on every
+  // render, so the memo below never actually memoized anything. Route the palette's
+  // Save command through a ref that always holds the latest handler instead.
+  const onSaveClickRef = useRef(onSaveClick);
+  useEffect(() => {
+    onSaveClickRef.current = onSaveClick;
+  });
+
   const paletteIndex = useMemo(
     () =>
-      // eslint-disable-next-line react-hooks/refs -- onSaveClick is an async function, not a ref; rule fires as a false positive here
+      // eslint-disable-next-line react-hooks/refs -- the ref is only dereferenced when the command runs, never during render
       buildPaletteIndex({
         entities: project?.entities ?? [],
         maps: (project?.maps ?? []).map((m) => ({ id: m.id, name: m.name ?? m.id })),
         commands: [
-          { id: "cmd.save", title: "Save", run: onSaveClick },
+          { id: "cmd.save", title: "Save", run: () => onSaveClickRef.current() },
           { id: "cmd.publish", title: "Publish player site", run: () => setActivePanel("publish") },
           { id: "cmd.import", title: "Import .md files", run: triggerMdImport },
           {
@@ -1083,7 +1093,7 @@ function AtlasPlacementEditorInner() {
         ],
         recent: [],
       }),
-    [project, onSaveClick],
+    [project, triggerMdImport],
   );
 
   if (error) {

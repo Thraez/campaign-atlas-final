@@ -84,7 +84,9 @@ export function useRouteDraft(
     undoStack,
   );
 
-  const baseRoutes = map?.routes ?? [];
+  // Memoized so the `?? []` fallback doesn't hand a fresh array to the memos below
+  // on every render (which defeated them whenever the map had no routes yet).
+  const baseRoutes = useMemo(() => map?.routes ?? [], [map]);
 
   const effective: Route[] = useMemo(() => {
     if (!map) return [];

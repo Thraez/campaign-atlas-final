@@ -7,7 +7,7 @@
  *
  * Z-order: rendered AFTER routes, BEFORE pins/labels/handles.
  */
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { CircleMarker, Polygon, Polyline, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import type { MapDocument, Point } from "@/atlas/content/schema";
@@ -56,7 +56,9 @@ function DrawingClicks({
 
 export function FogLayer({ map, api, preview = true, playerMode = false }: Props) {
   const H = map.height;
-  const xy2ll = (x: number, y: number): [number, number] => [H - y, x];
+  // Stable per map height so `fogPositions` can depend on it honestly instead of
+  // relying on H being listed separately.
+  const xy2ll = useCallback((x: number, y: number): [number, number] => [H - y, x], [H]);
   const [_circleAnchor, setCircleAnchor] = useState<Point | null>(null);
   void _circleAnchor;
 
@@ -77,7 +79,7 @@ export function FogLayer({ map, api, preview = true, playerMode = false }: Props
       poly.map(([x, y]) => xy2ll(x, y)),
     );
     return [outer, ...reveals, ...conceals];
-  }, [fog.reveals, fog.conceals, H, map.width]);
+  }, [fog.reveals, fog.conceals, H, map.width, xy2ll]);
 
   return (
     <>

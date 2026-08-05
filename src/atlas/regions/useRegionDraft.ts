@@ -92,7 +92,9 @@ export function useRegionDraft(
     undoStack,
   );
 
-  const baseRegions = map?.regions ?? [];
+  // Memoized so the `?? []` fallback doesn't hand a fresh array to the memos below
+  // on every render (which defeated them whenever the map had no regions yet).
+  const baseRegions = useMemo(() => map?.regions ?? [], [map]);
 
   const effective: Region[] = useMemo(() => {
     if (!map) return [];
