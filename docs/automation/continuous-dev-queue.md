@@ -13,7 +13,15 @@ the design-check). This file holds the *poppable, ordered units* the routine wor
 
 1. Take the **top WANT unit not marked `✅ DONE`** in the WANTS section. (In normal operation every unit
    here is still open — a `✅ DONE` marker is only a transient state between finishing and step 4.)
-2. Confirm it's still valid (the spec it cites hasn't been overtaken).
+2. **Confirm it isn't already built, and that its premise is still true.** Two checks, both required —
+   a unit's write-up is a snapshot of the day it was captured, not a current fact:
+   - **Already-built check:** grep `continuous-dev-done.md` (and this file's `✅ DONE` markers) for the
+     unit's distinguishing nouns. If a shipped entry covers it, mark it `~ SKIPPED (already shipped as
+     <ID>)` and take the next unit. *This step exists because a 2026-08-05 hand-back proposed six
+     candidates and three of them had already shipped.*
+   - **Premise check:** open the file/line the unit cites and confirm the thing it describes is still
+     there. If the code moved or the behaviour already changed, mark it `~ SKIPPED (premise stale:
+     <what you found>)` and take the next unit. Never build from the write-up alone.
 3. Build it, pass the full gate, merge into `auto/continuous-dev`.
 4. **Move the finished unit to `continuous-dev-done.md`** — with its date + commit hash — and remove it
    from the WANTS section here, all in the same merge. Don't leave completed units inline; this keeps the
@@ -29,10 +37,9 @@ is for sequencing, not the whole spec.
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
-> **Refueled 2026-07-14** — section **Q** below (100-task QoL / feature / infra / refactor backlog,
-> Q1–Q100) blessed by the DM: this is the **current priority** — build **Q1 first, then in order**.
-> Each unit is self-contained and independently shippable; all prior sections (P, M, J, K, L, I, H, G,
-> F, E, D, A, B, C) are ✅ DONE. See section **Q**'s own banner for the guardrail recap.
+> **Refueled 2026-08-06** — section **S** at the bottom (15 units, S1–S15) is the **current priority**:
+> build **S1 first, then in order**. Every earlier section (X, Q, V, and the historical P, M, J, K, L,
+> I, H, G, F, E, D, A, B, C) is ✅ DONE. See section **S**'s own banner for its guardrails.
 
 ### ‼️ X — Critical bugfixes (promoted from nice-to-haves 2026-07-19 — BUILD THESE FIRST)
 
@@ -243,6 +250,53 @@ is for sequencing, not the whole spec.
 
 - [x] **V15. Pin that the vault is never written and visibility is always explicit.** ✅ DONE 2026-08-05 — commit `fefb1b65`. Full write-up in `continuous-dev-done.md`.
 
+### S — Refuel 2026-08-06 (deferred-pool sweep — blessed by the DM)
+
+> DM-directed refuel. The 2026-07-14 deferred pool had gone 3 weeks without reconciliation while ~250
+> units shipped past it, so on 2026-08-06 every one of its 83 entries was re-checked against live code.
+> Six were already built or had a false premise (recorded in the pool's RESOLVED table); the 15 below
+> were **verified still-live on 2026-08-06** — the cited file/line was opened and the described state
+> confirmed — and are bounded, single-surface, and clear of the NEVER / HAND-BACK lists.
+>
+> **Build S1 → S15 in order, one per run.** They are independent: if one turns out stale, mark it
+> `~ SKIPPED (reason)` and take the next. All 1 run each unless noted.
+>
+> Guardrails unchanged (`continuous-dev-roadmap.md` + `docs/NON_GOALS.md`): no combat/rules, AI lore,
+> multi-user/auth, theme toggle, mobile editor, per-party fog, fuzzy search, map tiling,
+> relationship-graph, progressive fog. Player-facing units operate on already-projected player data
+> only. **S3 touches the asset audit and S12 deletes content-tree files — both carry an explicit
+> `npm run atlas:publish` gate below.**
+
+- [ ] **S1. Stop the map credit badge from overlapping the minimap.** _(qol)_ — `MapCreditOverlay.tsx:50` is `absolute right-2 bottom-2 z-[500]`; `AtlasMinimap.tsx:84` is `absolute bottom-3 right-3 z-[400]`. Same corner, badge on top. Move the credit overlay clear of the minimap (or offset it when a minimap is mounted). **Done when:** with a multi-map world open at default zoom, the DM can read the whole minimap and the whole credit line at once, neither clipped by the other, at 1280×800 and 1920×1080.
+
+- [ ] **S2. Add a filter and an "uncredited only" toggle to the Asset Manager.** _(qol)_ — `src/atlas/assets/AssetManagerPanel.tsx` renders every asset with no filter control at all (verified 2026-08-06). Add a text filter (matches src / used-by) and a checkbox that narrows the list to assets whose credit is empty or disabled. **Done when:** in a world with 50+ images, the DM can type part of a filename and see only matching rows, and can tick one box to see exactly the images still missing a credit.
+
+- [ ] **S3. Add a total-player-payload budget check to `atlas:audit-assets`.** _(infra)_ — `scripts/atlas/audit-assets.ts:342` already computes `totalBytes` but nothing bounds it; there is no `BUDGET`/`MAX_TOTAL` constant in the file. Add a total-payload threshold that warns (and a higher one that fails) alongside the existing 1 MB / 4 MB per-file checks. **Gate:** `npm run atlas:publish` must stay green. **Done when:** running the audit on the current world prints the total shipped payload and a clear pass/warn/fail line, and deliberately blowing the budget in a scratch copy fails the command.
+
+- [ ] **S4. Show the baseline publish date in the "changes since last publish" panel.** _(qol)_ — `computeAtlasDiff.ts:96/140/293` already carries `baselinePublishedAt`, and a repo-wide grep confirms **nothing in `src/` reads it** — `PublishedDiffPanel` never renders it. Pure display wiring. **Done when:** the panel says what it is comparing against ("since 12 July, 14:03"), and a first-ever publish with no baseline still reads sensibly instead of showing a blank or "Invalid Date".
+
+- [ ] **S5. Add a concurrency group to the PR-check workflow.** _(infra)_ — `publish-atlas.yml:32` has one; `atlas-pr-check.yml` has none, so every push to an open PR starts a fresh full build+scan while the older run keeps burning. Add a `concurrency` group keyed on the ref with `cancel-in-progress: true`. **Done when:** pushing twice in quick succession to a PR leaves exactly one running check, the older one cancelled.
+
+- [ ] **S6. Add job timeouts to both CI workflows.** _(infra)_ — no `timeout-minutes` appears anywhere under `.github/workflows/`, so a hung build/scan/deploy runs to the platform's 6-hour default. Set a realistic `timeout-minutes` on each job. **Done when:** both workflow files declare a timeout on every job and a normal run still finishes well inside it.
+
+- [ ] **S7. Add `engines` + `.nvmrc` as the single Node-version source.** _(dx)_ — there is no `.nvmrc` and no `engines` field in `package.json` (both verified absent), yet both workflows hardcode Node 20 and QUICK_START says "Node 20+". Add both and point the workflows at the file. **Done when:** the Node version is written down in exactly one place, and the workflows and docs read from it instead of repeating it.
+
+- [ ] **S8. Extract the shared `FlatCRS` leaflet constant.** _(refactor)_ — `AtlasViewer.tsx:87` and `AtlasPlacementEditor.tsx:151` declare the byte-identical `const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;`. Home it in one module and import it in both. **Done when:** one declaration remains, both pages import it, and the map still renders identically in the player viewer and the editor.
+
+- [ ] **S9. Replace `OfflineStatus`'s 2-second polling with event-driven cache detection.** _(perf)_ — `src/atlas/OfflineStatus.tsx:47` and `:99` each run `setInterval(() => setCached(isOfflineReady()), 2000)`, so two timers re-read cache state forever on every reader page. Drive it from the actual cache/service-worker events instead. **Done when:** the offline indicator still flips correctly when the app finishes caching and when the connection drops, with no repeating timer left behind.
+
+- [ ] **S10. Configure the Toaster for clearer, persistent error feedback.** _(a11y)_ — `src/components/ui/sonner.tsx:10` renders `<Sonner>` on defaults: no `richColors`, no `closeButton`, default auto-dismiss. An error toast currently looks like a success toast and vanishes before it can be read. **Done when:** an error toast is visually distinct from a success toast, can be dismissed deliberately, and doesn't disappear on its own before the DM has read it.
+
+- [ ] **S11. Fix the editor tab list in README line 46.** _(docs)_ — README:46 still reads "Visual editor tabs for pins, maps, regions, routes, fog, entities, import, and publish check", contradicting README:697-700, which correctly describes the Creator Cockpit rail (Content / Map / System tab groups). The rail section was already fixed by I4; line 46 was missed. **Done when:** line 46 describes the rail the DM actually sees, and no other line in README or WORKFLOWS still lists the old flat tab set.
+
+- [ ] **S12. Remove the leftover generated artifacts from `content/astrath-deeprealm/_atlas/`.** _(infra)_ — the folder holds `placements-patch-astrath-deeprealm-overview.yaml` and `__test.yaml` alongside the real `world.yaml`; a repo-wide grep of `src/` and `scripts/` finds no reference to either (the only `placements-patch-*` hits are `content/world/_atlas/placements-patch-m1.yaml` inside `src/test/diff-preview-modal.test.tsx`, a different fixture). Delete the two stale files, keep `.gitkeep` and `world.yaml`. **Gate:** `npm run atlas:publish` must stay green and the built atlas must be byte-identical apart from its timestamp. **Done when:** the folder holds only files the build actually reads, and a full publish produces the same atlas as before.
+
+- [ ] **S13. Home `centroid()` into `geometry/polygon.ts`.** _(refactor)_ — `centroid(points: Point[])` is still a private helper at `src/atlas/regions/useRegionDraft.ts:70`, used at `:218`, while the shared geometry module is the obvious home. Move it, export it, add a direct unit test. **Done when:** the helper lives in the geometry module with its own test, `useRegionDraft` imports it, and region label placement is unchanged.
+
+- [ ] **S14. Extract `buildDraftPlacements` into a pure editor helper.** _(refactor)_ — it is still a `useCallback` at `AtlasPlacementEditor.tsx:677`, mapping `project.entities` → `PlacementOverride[]` with no component state involved. `src/atlas/editor/dirtyPlacements.ts` already documents it (`:5`) and is the natural home. Move the pure body out, keep a thin wrapper in the component. **Done when:** the logic is a pure exported function with its own unit test, the editor keeps behaving identically, and the component shrinks.
+
+- [ ] **S15. Add a low-noise scheduled `npm audit` safety net.** _(infra)_ — no dependency-vulnerability check exists anywhere in CI (verified: no `npm audit` under `.github/workflows/`). Add a weekly `schedule:` workflow running `npm audit` at a high-severity threshold so it reports real problems and stays quiet otherwise. **Done when:** the workflow runs on a schedule, fails only on genuinely actionable severities, and a normal week produces no noise.
+
 ---
 
 ## 🔋 REFUEL POINT — read this when every WANT above is ✅ DONE
@@ -265,21 +319,13 @@ human's job is direction.
 
 ---
 
-## 📥 INBOX — captured 2026-05-30, awaiting human sequencing
+## 📥 INBOX — closed 2026-08-06
 
-> ⚠️ **Do NOT auto-build from this section.** These are new candidates from a live dogfooding pass, parked
-> here so they aren't lost. They are deliberately *not* `- [ ]` units and *not* in WANTS — the routine keeps
-> popping from WANTS as normal and ignores this list. The human triages these into WANTS / NICE-TO-HAVES
-> (with the right gate) after reviewing the ranked backlog.
+The 2026-05-30 dogfooding inbox held 9 captured candidates. **All 9 have since shipped** (crash guard +
+error boundary, proper-case entity names, search snippet casing, CSS `@import` order, editor-works-on-
+first-run, categorize imported notes, image embeds, honest player preview, planned/broken wikilinks), so
+the list was removed on 2026-08-06 rather than left as a permanently stale "awaiting sequencing" section.
+Their write-ups live in `continuous-dev-done.md`.
 
-Full detail + ranking: **`docs/DEVELOPMENT_WANTS.md`**.
-
-- **Crash guard + error boundary** — selecting a location-less entry (e.g. an Event) white-screens the whole app; no error boundary contains it. → proposed WANT (top), no gate.
-- **Proper-case entity names** — names render as lowercase file-slugs in search/title/pins. → proposed WANT, no gate.
-- **Search snippet casing** — result snippets render lowercased straight from the index. → proposed WANT, no gate.
-- **CSS @import order** — `leaflet.css` imported after the Tailwind directives (build warning every start). → hygiene nibble.
-- **Editor works on first run** — dev serves the player atlas, so the editor opens with "Save won't work" until a manual build. → proposed WANT; write a short spec first (touches build wiring).
-- **Categorize imported notes** — `imports/` NPCs don't appear under Characters or any type tab. → NICE-TO-HAVE, pairs with item B.
-- **Image embeds dropped** — `![[image.png]]` vanishes silently in the reading view. → NICE-TO-HAVE (render) or WANT (just flag in Publish Check).
-- **Honest player preview** — local view shows DM notes; no faithful redacted "as players see it" preview. → NICE-TO-HAVE, design-check first.
-- **Planned/broken wikilinks** — `[[…/Note]]` / `[[Note#Heading]]` render as dead text. → fold into item C + surface in Publish Check.
+**If a future dogfooding pass produces new findings, start a fresh INBOX here** — the section is a useful
+shape, it just has to be emptied as its items ship.
