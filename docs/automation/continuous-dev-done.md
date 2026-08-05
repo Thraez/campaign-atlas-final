@@ -3725,3 +3725,43 @@ sharded vitest all green (757+669+827+809 = 3062 tests across 4 shards; shard 4 
 **Commits:** `1f6f241e` (feat: bring note images across and rewrite the embeds — `rewriteEmbeds` +
 `useMdImportFlow.ts` wiring + 4 new tests), on `run/v12-vault-image-embeds`, merged into
 `auto/continuous-dev`.
+
+- [x] **V13. Keep vault filenames out of suggested asset paths.** ✅ DONE
+  2026-08-05 — commit `d1573e83`.
+
+Plan Task C4 (`docs/superpowers/plans/2026-08-01-vault-publishing.md`) — `extractAttachments` in
+`src/atlas/import/parseObsidian.ts:128` was slugifying the *source* filename straight into a parsed
+attachment's `suggestedTarget` (e.g. `the-cabal-lair.png` → `public/atlas/assets/images/the-cabal-lair.png`).
+A vault filename can itself be a spoiler and would trip the image-privacy filename scan later in the
+pipeline. `suggestedTarget` is now `public/atlas/assets/images/pending<ext>` — a placeholder — matching the
+comment already left in place for V10/V11/V12's real naming logic: the actual name is assigned at copy time
+from the entity id (`resolveVaultImage.vaultImageTargetName`), never invented here.
+
+**Test-file drift note:** the plan cited `src/test/import/` for the existing attachment coverage, but the
+actual test lives in `src/test/atlas-import.test.ts` (the neighbouring "resolves https:// attachment" /
+"emits attachment warning" tests) — used that file and its real `parseObsidianFile(body, path)` signature
+instead of the plan's guessed `parseObsidianNote`, same shape and intent.
+
+**Gate:** `tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (18 pre-existing, unchanged) ·
+sharded vitest all green (757+669+828+809 = 3063 tests across 4 shards; shard 3 hit the documented
+`onTaskUpdate` RPC flake, 0 real failures, not re-run per policy). Touches only `src/atlas/import/`, but the
+queue's own gate note for this unit calls for `npm run atlas:publish` too — ran it, all 12 scans clean, only
+artifact diff was `public/atlas/atlas.json`'s publish timestamp, reverted via `git checkout --` before
+committing.
+
+**Commits:** `d1573e83` (fix: keep vault filenames out of suggested asset paths — `parseObsidian.ts` +
+1 new test), on `run/v13-attachment-naming`, merged into `auto/continuous-dev`.
+
+- [x] **V14. Correct the stale asset-allowlist comment.** ✅ DONE
+  2026-08-05 — commit `d05b3d44`.
+
+Plan Task C5, folded into the same run per the queue's own note. `scripts/vite-plugin-atlas-save.ts`'s
+path-allowlist dispatch comment claimed `asset-binary` lands under `maps/` only, but `isWritableAssetPath`
+(`src/atlas/save/sourcePathAllowlist.ts:126-132`) has always permitted both `maps/` and `images/` — confirmed
+by reading the allowlist's own doc comment before touching anything. Comment-only fix, no allowlist
+behaviour change.
+
+**Gate:** same run as V13 above — full gate green, `npm run atlas:publish` clean.
+
+**Commits:** `d05b3d44` (docs: correct the asset allowlist comment — images are allowed too), on
+`run/v13-attachment-naming`, merged into `auto/continuous-dev`.

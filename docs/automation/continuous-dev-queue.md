@@ -237,13 +237,9 @@ is for sequencing, not the whole spec.
 
 - [x] **V12. Bring note images across and rewrite the embeds.** ✅ DONE 2026-08-05 — commit `1f6f241e`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **V13. Keep vault filenames out of suggested asset paths.** Plan Task C4 — `parseObsidian.ts:128` currently slugifies the *source* filename into the target. A vault filename can itself be a spoiler (`the-cabal-lair.png`) and would trip the image-privacy filename scan; the real name comes from the entity id at copy time.
-  - **Done when:** a parsed attachment's `suggestedTarget` contains no fragment of the source filename.
-  - **Gate:** standard gate **+ `npm run atlas:publish`**. ~1 run.
+- [x] **V13. Keep vault filenames out of suggested asset paths.** ✅ DONE 2026-08-05 — commit `d1573e83`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **V14. Correct the stale asset-allowlist comment.** Plan Task C5 — `scripts/vite-plugin-atlas-save.ts:368` claims `asset-binary` lands under `maps/` only, but `isWritableAssetPath` (`sourcePathAllowlist.ts:126-132`) has always permitted `images/` too. Comment-only fix; **no allowlist change is needed or wanted.**
-  - **Done when:** the comment matches the code.
-  - **Gate:** standard gate. Nibble, <1 run — fold into V13's run if convenient.
+- [x] **V14. Correct the stale asset-allowlist comment.** ✅ DONE 2026-08-05 — commit `d05b3d44`. Full write-up in `continuous-dev-done.md`.
 
 - [ ] **V15. Pin that the vault is never written and visibility is always explicit.** Plan Task C6 — hash the whole fixture vault before/after a full scan + image copy and assert byte-identity; assert a new entity from a vault note resolves to `dm`, not `player`.
   - **Done when:** both properties pass **and** the mandatory mutation check (add a stray write into the copy handler) fails the immutability test before revert. **If the visibility test fails, stop and hand back — that is a live secrecy regression, not a test bug.**
