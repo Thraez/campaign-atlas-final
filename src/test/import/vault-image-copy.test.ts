@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
-import { handleVaultImageCopyRequest } from "../../../scripts/vite-plugin-atlas-save";
+import { handleVaultImageCopyRequest, handleVaultScanRequest } from "../../../scripts/vite-plugin-atlas-save";
 import { rewriteEmbeds } from "@/atlas/import/resolveVaultImage";
+import { buildStagingRows, type StagingContext } from "@/atlas/import/stagingState";
+import type { ImportFolderConfig } from "@/atlas/content/schema";
 
 let root: string;
 let outRoot: string;
@@ -93,5 +96,93 @@ describe("rewriteEmbeds", () => {
   it("leaves ordinary wikilinks alone", () => {
     const body = "See [[Edric]] for more.";
     expect(rewriteEmbeds(body, {})).toBe("See [[Edric]] for more.");
+  });
+});
+
+function hashTree(dir: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const e of fs.readdirSync(dir, { withFileTypes: true, recursive: true })) {
+    const abs = path.join(e.parentPath ?? e.path, e.name);
+    if (!e.isFile()) continue;
+    out[abs] = crypto.createHash("sha256").update(fs.readFileSync(abs)).digest("hex");
+  }
+  return out;
+}
+
+describe("the vault is never written", () => {
+  // Uses its own fixture (never `root`/`outRoot` from the top-level `beforeAll`)
+  // so the "before" snapshot can't be contaminated by an earlier test's own
+  // handleVaultImageCopyRequest call against the shared portrait.png — that
+  // shared state made an earlier version of this test pass even with a stray
+  // write injected into the handler, which is exactly the vacuous-test trap
+  // the mandatory mutation check exists to catch.
+  let immRoot: string;
+  let immOutRoot: string;
+
+  beforeAll(async () => {
+    immRoot = fs.mkdtempSync(path.join(os.tmpdir(), "vault-img-imm-"));
+    immOutRoot = fs.mkdtempSync(path.join(os.tmpdir(), "vault-img-imm-out-"));
+    fs.mkdirSync(path.join(immRoot, "03_Entities", "pics"), { recursive: true });
+    const png = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 1, g: 2, b: 3 } },
+    })
+      .png()
+      .toBuffer();
+    fs.writeFileSync(path.join(immRoot, "03_Entities", "pics", "portrait.png"), png);
+  });
+
+  afterAll(() => {
+    fs.rmSync(immRoot, { recursive: true, force: true });
+    fs.rmSync(immOutRoot, { recursive: true, force: true });
+  });
+
+  it("is byte-identical after a full scan plus an image copy", async () => {
+    const before = hashTree(immRoot);
+    await handleVaultScanRequest(immRoot, [], ["03_Entities"]);
+    await handleVaultImageCopyRequest({
+      vaultRoot: immRoot,
+      candidateFolders: ["03_Entities"],
+      noteRelPath: "03_Entities/Corven.md",
+      rawSrc: "portrait.png",
+      entityId: "corven",
+      index: 0,
+      publicDir: immOutRoot,
+    });
+    expect(hashTree(immRoot)).toEqual(before);
+  });
+});
+
+const VISIBILITY_TEST_IMPORT_CONFIG: ImportFolderConfig = {
+  folders: { npc: "npcs" },
+  defaultFolder: "imports",
+};
+const VISIBILITY_TEST_ALLOWED_FOLDERS: ReadonlySet<string> = new Set([
+  ...Object.values(VISIBILITY_TEST_IMPORT_CONFIG.folders),
+  VISIBILITY_TEST_IMPORT_CONFIG.defaultFolder,
+]);
+
+describe("visibility is never left to the build default", () => {
+  it("a new entity from a vault note is written dm, not player", () => {
+    const ctx: StagingContext = {
+      worldId: "astrath-deeprealm",
+      importConfig: VISIBILITY_TEST_IMPORT_CONFIG,
+      allowedFolders: VISIBILITY_TEST_ALLOWED_FOLDERS,
+      existingById: new Map(),
+      existingPaths: new Set(),
+    };
+    const rows = buildStagingRows(
+      [
+        {
+          filename: "Corven.md",
+          raw: "---\ntitle: Corven\ntags: [npc]\n---\n\nA smuggler.\n",
+          vaultRelPath: "03_Entities/Corven.md",
+          vaultState: "new",
+        },
+      ],
+      ctx,
+    );
+    // build-atlas.ts:425 defaults a missing visibility to PLAYER, so an absent
+    // key is a leak rather than a neutral state. New entities must be explicit.
+    expect(rows[0].resolvedVisibility).toBe("dm");
   });
 });
