@@ -6,6 +6,7 @@ import {
   resolvePinStyle,
   pinSvg,
 } from "@/atlas/pins/presets";
+import { KNOWN_ENTITY_TYPES } from "@/atlas/content/entityCategory";
 
 describe("pin presets", () => {
   it("maps common entity types to presets", () => {
@@ -146,6 +147,37 @@ describe("pinSvg shapes", () => {
   it("no pulse option omits animation", () => {
     const svg = pinSvg({ color: RED, shape: "circle" });
     expect(svg).not.toContain("atlas-pulse");
+  });
+});
+
+/**
+ * These two tables are edited independently and drifted apart in the wild:
+ * `event` and `item` were filed into categories but had no pin preset, so a
+ * vault of events rendered as identical grey `custom` pins. Every fixture in
+ * the suite used `settlement` — which does have a preset — so nothing caught
+ * it. Assert the relationship instead of spot-checking types.
+ */
+describe("pin presets cover every categorised entity type", () => {
+  it("no type with a category home falls through to the grey custom pin", () => {
+    const orphans = KNOWN_ENTITY_TYPES.filter((t) => defaultPresetForType(t) === "custom");
+    expect(orphans).toEqual([]);
+  });
+
+  it("resolves the types a real vault actually uses", () => {
+    expect(defaultPresetForType("event")).toBe("event");
+    expect(defaultPresetForType("item")).toBe("item");
+    expect(defaultPresetForType("character")).toBe("npc");
+    expect(defaultPresetForType("person")).toBe("npc");
+  });
+
+  it("gives events and items distinct shapes so a legend can tell them apart", () => {
+    const shapes = KNOWN_ENTITY_TYPES.map((t) => PIN_PRESETS[defaultPresetForType(t)]);
+    // An event must never read as the hazard it shares a shape with.
+    expect(PIN_PRESETS.event.shape).toBe("diamond");
+    expect(PIN_PRESETS.event.color).not.toBe(PIN_PRESETS.hazard.color);
+    // Items own the only square in the set.
+    expect(PIN_PRESETS.item.shape).toBe("square");
+    expect(shapes.filter((p) => p.shape === "square")).toHaveLength(1);
   });
 });
 

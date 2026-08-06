@@ -33,6 +33,16 @@ const TYPE_TO_CATEGORY: Record<string, CategoryId> = {
   item: "items",
 };
 
+/**
+ * Every entity type with an explicit category home, lowercase.
+ *
+ * Exported so cross-table invariants are testable — notably that each type
+ * filed into a category also has a pin preset in `atlas/pins/presets.ts`.
+ * Those two tables drifted apart once already (events and items rendered as
+ * generic grey pins on a real map while the suite stayed green).
+ */
+export const KNOWN_ENTITY_TYPES: readonly string[] = Object.keys(TYPE_TO_CATEGORY);
+
 /** Total: any unknown/empty/undefined type resolves to "lore". */
 export function categoryForType(type: string | undefined | null): CategoryId {
   const t = (type ?? "").trim().toLowerCase();

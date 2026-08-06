@@ -45,6 +45,8 @@ export type PinPresetId =
   | "mystery"
   | "resonance_site"
   | "player_base"
+  | "event"
+  | "item"
   | "custom";
 
 export const PIN_PRESETS: Record<PinPresetId, PinPreset> = {
@@ -208,6 +210,31 @@ export const PIN_PRESETS: Record<PinPresetId, PinPreset> = {
     priority: 8,
     labelMinZoom: -6,
   },
+  /** Diamond, like the other "something happened here" pins (hazard, mystery),
+   * but amber — the only diamond in the warm range, so an event never reads as
+   * a hazard at a glance. */
+  event: {
+    id: "event",
+    label: "Event",
+    icon: "calendar",
+    color: "#ffb347",
+    shape: "diamond",
+    labelMode: "auto",
+    priority: 4,
+    labelMinZoom: 0,
+  },
+  /** The only square in the set — shape alone separates a cache of loot from
+   * the places and people around it. Hover labels keep loot from shouting. */
+  item: {
+    id: "item",
+    label: "Item",
+    icon: "package",
+    color: "#45b8ac",
+    shape: "square",
+    labelMode: "hover",
+    priority: 2,
+    labelMinZoom: 1,
+  },
   custom: {
     id: "custom",
     label: "Custom",
@@ -233,6 +260,8 @@ const TYPE_TO_PRESET: Record<string, PinPresetId> = {
   dungeon: "dungeon",
   cave: "cave",
   npc: "npc",
+  character: "npc",
+  person: "npc",
   faction: "faction",
   temple: "temple",
   divine_site: "temple",
@@ -241,6 +270,13 @@ const TYPE_TO_PRESET: Record<string, PinPresetId> = {
   hazard: "hazard",
   wilderness_landmark: "hazard",
   mystery: "mystery",
+  // `event` and `item` are first-class in entityCategory.ts's TYPE_TO_CATEGORY
+  // but were missing here, so every event and item on a map fell through to the
+  // grey `custom` pin. The unit fixtures all use `settlement`, which has a
+  // preset, so the suite stayed green while a real vault of events rendered as
+  // six identical grey teardrops. Keep the two tables in step.
+  event: "event",
+  item: "item",
   resonance_site: "resonance_site",
   player_base: "player_base",
 };
