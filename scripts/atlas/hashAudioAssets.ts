@@ -5,11 +5,13 @@ import type { SoundArea } from "../../src/atlas/content/schema";
 
 const AUDIO_OUT_DIR = "atlas/assets/audio";
 
-const AUDIO_EXT = /\.(ogg|mp3|aac|m4a|wav)$/i;
+/** Exported so the player-audio dist prune can define its target set as the
+ * exact inverse of what `writeAudioManifest` exposes to the DM picker. */
+export const AUDIO_EXT = /\.(ogg|mp3|aac|m4a|wav)$/i;
 /** Hashed copies produced below: 8 hex chars + extension. A DM source file
  * named like one (e.g. "deadbeef.ogg") would be hidden from the picker —
  * acceptable, it stays fully usable via the panel's free-text fallback. */
-const HASHED_NAME = /^[0-9a-f]{8}\.[a-z0-9]+$/i;
+export const HASHED_NAME = /^[0-9a-f]{8}\.[a-z0-9]+$/i;
 
 /**
  * Delete hashed audio files in `outDir` that no longer correspond to any
