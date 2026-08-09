@@ -19,12 +19,25 @@ export interface SecretBlob {
 
 const PBKDF2_ITERATIONS = 600_000;
 
+// Base64 via atob/btoa, NOT Node's Buffer. Both encrypt (build-time, Node) and
+// decrypt (runtime, browser) share this file, and `Buffer` is a Node global that
+// Vite does not polyfill — it survived into the player bundle as a bare
+// reference, threw ReferenceError inside decryptSecret's try, and got swallowed
+// by the `catch { return null }` below. Every correct passphrase read as wrong.
+// The unit tests missed it because Vitest runs in Node, where Buffer exists.
+// atob/btoa are global in browsers and in Node 16+, so one implementation
+// covers both. src/test/browser-safe-globals.test.ts keeps it that way.
 function bytesToB64(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString("base64");
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
 }
 
 function b64ToBytes(b64: string): Uint8Array {
-  return new Uint8Array(Buffer.from(b64, "base64"));
+  const binary = atob(b64);
+  const out = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+  return out;
 }
 
 async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {

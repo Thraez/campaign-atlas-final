@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { isAllowedDevRequest, rejectNonLoopback } from "../../scripts/vite-plugin-atlas-save";
+import {
+  isAllowedDevRequest,
+  isLoopbackAddress,
+  rejectNonLoopback,
+} from "../../scripts/vite-plugin-atlas-save";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 describe("isAllowedDevRequest", () => {
@@ -179,9 +183,49 @@ describe("isAllowedDevRequest", () => {
   });
 });
 
+describe("isLoopbackAddress (the unforgeable half of the gate)", () => {
+  it.each(["127.0.0.1", "127.0.0.53", "::1", "[::1]", "::ffff:127.0.0.1", "::FFFF:127.0.0.1"])(
+    "accepts loopback peer %s",
+    (addr) => {
+      expect(isLoopbackAddress(addr)).toBe(true);
+    },
+  );
+
+  it.each([
+    "192.168.1.50",
+    "10.0.0.7",
+    "172.16.0.1",
+    "203.0.113.9",
+    "::ffff:192.168.1.50",
+    "fe80::1",
+    "0.0.0.0",
+    // Not loopback: a hostname is not an address, and this function is only
+    // ever handed a kernel-reported peer address.
+    "localhost",
+  ])("rejects non-loopback peer %s", (addr) => {
+    expect(isLoopbackAddress(addr)).toBe(false);
+  });
+
+  it("fails closed on undefined and empty", () => {
+    expect(isLoopbackAddress(undefined)).toBe(false);
+    expect(isLoopbackAddress("")).toBe(false);
+  });
+
+  it("is not fooled by a non-loopback address that merely starts with 127", () => {
+    expect(isLoopbackAddress("127.0.0.1.evil.com")).toBe(false);
+    expect(isLoopbackAddress("1270.0.0.1")).toBe(false);
+  });
+});
+
 describe("rejectNonLoopback (the shared 403 gate for /__atlas/* middleware)", () => {
-  function mockReq(headers: { host?: string; origin?: string }, method: string): IncomingMessage {
-    return { headers, method } as unknown as IncomingMessage;
+  // remoteAddress defaults to loopback so the existing header-policy cases keep
+  // testing the header policy. Pass it explicitly to exercise the socket check.
+  function mockReq(
+    headers: { host?: string; origin?: string },
+    method: string,
+    remoteAddress: string | undefined = "127.0.0.1",
+  ): IncomingMessage {
+    return { headers, method, socket: { remoteAddress } } as unknown as IncomingMessage;
   }
   function mockRes() {
     const res = {
@@ -199,6 +243,69 @@ describe("rejectNonLoopback (the shared 403 gate for /__atlas/* middleware)", ()
     };
     return res;
   }
+
+  // The finding that motivated the socket check: `Host` and `Origin` are just
+  // strings the client sends. A LAN client can set both to loopback values and
+  // satisfy the entire header policy. Only the peer address tells the truth.
+  describe("spoofed loopback headers from a non-loopback peer", () => {
+    const spoofed = { host: "localhost:8080", origin: "http://localhost:8080" };
+
+    it.each(["192.168.1.50", "10.0.0.7", "::ffff:192.168.1.50", "203.0.113.9"])(
+      "rejects a POST from %s despite perfect loopback headers",
+      (peer) => {
+        const res = mockRes();
+        const blocked = rejectNonLoopback(
+          mockReq(spoofed, "POST", peer),
+          res as unknown as ServerResponse,
+        );
+        expect(blocked).toBe(true);
+        expect(res.statusCode).toBe(403);
+      },
+    );
+
+    it("rejects a GET from a LAN peer with a spoofed Host", () => {
+      const res = mockRes();
+      const blocked = rejectNonLoopback(
+        mockReq({ host: "localhost:8080" }, "GET", "192.168.1.50"),
+        res as unknown as ServerResponse,
+      );
+      expect(blocked).toBe(true);
+      expect(res.statusCode).toBe(403);
+    });
+
+    // Built inline, not via mockReq: passing `undefined` to a parameter with a
+    // default value would just re-apply the default and silently test loopback.
+    it("fails closed when the peer address is unknown", () => {
+      const res = mockRes();
+      const req = {
+        headers: spoofed,
+        method: "POST",
+        socket: { remoteAddress: undefined },
+      } as unknown as IncomingMessage;
+      expect(rejectNonLoopback(req, res as unknown as ServerResponse)).toBe(true);
+      expect(res.statusCode).toBe(403);
+    });
+
+    it("fails closed when the socket is missing entirely", () => {
+      const res = mockRes();
+      const req = { headers: spoofed, method: "POST" } as unknown as IncomingMessage;
+      expect(rejectNonLoopback(req, res as unknown as ServerResponse)).toBe(true);
+      expect(res.statusCode).toBe(403);
+    });
+
+    it.each(["127.0.0.1", "::1", "::ffff:127.0.0.1"])(
+      "still allows a genuine loopback peer on %s",
+      (peer) => {
+        const res = mockRes();
+        const blocked = rejectNonLoopback(
+          mockReq(spoofed, "POST", peer),
+          res as unknown as ServerResponse,
+        );
+        expect(blocked).toBe(false);
+        expect(res.ended).toBe(false);
+      },
+    );
+  });
 
   it("lets an allowed loopback GET through: returns false and writes nothing", () => {
     const res = mockRes();

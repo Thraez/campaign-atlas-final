@@ -41,4 +41,21 @@ describe("secretCrypto", () => {
     const fakeBlob: SecretBlob = { id: "uni", lockType: "character", ...blob };
     expect(await decryptSecret(fakeBlob, "unicode-key")).toBe(plain);
   });
+
+  // Regression: base64 used to go through Node's `Buffer`, which does not exist
+  // in a browser and which Vite does not polyfill. decryptSecret swallows every
+  // throw as "wrong passphrase", so players saw correct keys silently rejected
+  // while these Node-hosted tests stayed green.
+  //
+  // Deleting globalThis.Buffer to reproduce the browser here does work, but it
+  // also breaks Vitest's own internals (~2,300 unhandled "Buffer is not defined"
+  // errors from the reporter). The invariant is enforced statically instead —
+  // see src/test/browser-safe-globals.test.ts.
+  it("encodes base64 without touching Node's Buffer", async () => {
+    const blob = await encryptSecret("round trip", "k");
+    const fakeBlob: SecretBlob = { id: "b64", lockType: "password", ...blob };
+    // atob/btoa produce standard base64: decodable by an independent decoder.
+    expect(Buffer.from(blob.salt, "base64").toString("base64")).toBe(blob.salt);
+    expect(await decryptSecret(fakeBlob, "k")).toBe("round trip");
+  });
 });

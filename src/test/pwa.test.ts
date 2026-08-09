@@ -124,3 +124,93 @@ describe("shouldEnableServiceWorker()", () => {
     expect(shouldEnableServiceWorker()).toBe(true);
   });
 });
+
+/**
+ * "Reload latest atlas" used to call only `wb.update()`, which checks for a new
+ * service-worker script. When the DM publishes new content (or swaps an image
+ * under the same filename) the app shell is unchanged, so there is no new SW —
+ * the player kept reading CacheFirst content while the menu said it had checked
+ * for updates. These cover the caches actually being dropped.
+ */
+describe("reloadLatestAtlas", () => {
+  let deleted: string[];
+  let reloadCalls: number;
+
+  beforeEach(() => {
+    deleted = [];
+    reloadCalls = 0;
+    Object.defineProperty(window, "caches", {
+      value: {
+        keys: async () => [],
+        delete: async (name: string) => {
+          deleted.push(name);
+          return true;
+        },
+      },
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(window, "location", {
+      value: {
+        hostname: "atlas.example.com",
+        reload: () => {
+          reloadCalls++;
+        },
+      },
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(navigator, "onLine", { value: true, configurable: true });
+  });
+
+  afterEach(() => {
+    delete (window as { caches?: unknown }).caches;
+    Object.defineProperty(navigator, "onLine", { value: true, configurable: true });
+  });
+
+  it("clears the atlas content caches, not just the service worker", async () => {
+    const { reloadLatestAtlas } = await loadPwa();
+    const result = await reloadLatestAtlas();
+
+    expect(result.ok).toBe(true);
+    // atlas-assets is the critical one: CacheFirst with a 60-day expiry, so a
+    // replaced same-filename image is invisible until this cache is dropped.
+    expect(deleted).toContain("atlas-assets");
+    expect(deleted).toContain("atlas-data");
+    expect(deleted).toContain("atlas-html");
+  });
+
+  it("reloads the page so the cleared caches refill from the network", async () => {
+    const { reloadLatestAtlas } = await loadPwa();
+    await reloadLatestAtlas();
+    expect(reloadCalls).toBe(1);
+  });
+
+  it("does nothing while offline — never strips a working offline atlas", async () => {
+    Object.defineProperty(navigator, "onLine", { value: false, configurable: true });
+    const { reloadLatestAtlas } = await loadPwa();
+    const result = await reloadLatestAtlas();
+
+    expect(result).toEqual({ ok: false, reason: "offline" });
+    expect(deleted).toEqual([]);
+    expect(reloadCalls).toBe(0);
+  });
+
+  it("still reloads when an individual cache delete fails", async () => {
+    Object.defineProperty(window, "caches", {
+      value: {
+        keys: async () => [],
+        delete: async () => {
+          throw new Error("quota error");
+        },
+      },
+      configurable: true,
+      writable: true,
+    });
+    const { reloadLatestAtlas } = await loadPwa();
+    const result = await reloadLatestAtlas();
+
+    expect(result.ok).toBe(true);
+    expect(reloadCalls).toBe(1);
+  });
+});
