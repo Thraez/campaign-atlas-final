@@ -13,6 +13,16 @@ interface Props {
 }
 
 /**
+ * Pure: the pixel height AtlasMinimap renders at for a given map's aspect
+ * ratio and target width. Exported so callers positioning other overlays in
+ * the same corner (e.g. the credit badge) can reserve its footprint without
+ * duplicating the formula.
+ */
+export function minimapHeightFor(map: Pick<MapDocument, "width" | "height">, width = 180): number {
+  return Math.max(40, Math.round(width * (map.height / map.width)));
+}
+
+/**
  * Lightweight minimap for FlatCRS Leaflet maps. Renders a scaled rectangle of
  * the world with each base layer drawn as an <img>, plus a draggable viewport
  * rectangle synced to the parent map. Click/drag to pan the parent.
@@ -28,8 +38,7 @@ export function AtlasMinimap({ map, layers, width = 180, className }: Props) {
     w: 0,
     h: 0,
   });
-  const aspect = map.height / map.width;
-  const height = Math.max(40, Math.round(width * aspect));
+  const height = minimapHeightFor(map, width);
   const sx = width / map.width;
   const sy = height / map.height;
 
