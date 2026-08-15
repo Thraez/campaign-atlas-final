@@ -166,6 +166,59 @@ describe("AssetManagerPanel", () => {
     expect(screen.getByText("Image missing")).toBeInTheDocument();
   });
 
+  it("typing in the filter narrows rows to assets whose src matches", () => {
+    render(<AssetManagerPanel project={fixture()} onPatch={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Filter assets"), { target: { value: "pics" } });
+    expect(screen.getByLabelText("Credit for assets/pics/a.png")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Credit for assets/maps/o.png")).not.toBeInTheDocument();
+  });
+
+  it("the filter also matches an asset's used-by id", () => {
+    render(<AssetManagerPanel project={fixture()} onPatch={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Filter assets"), { target: { value: "L1" } });
+    expect(screen.getByLabelText("Credit for assets/maps/o.png")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Credit for assets/pics/a.png")).not.toBeInTheDocument();
+  });
+
+  it("shows a no-match message when the filter excludes every asset", () => {
+    render(<AssetManagerPanel project={fixture()} onPatch={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Filter assets"), { target: { value: "nonexistent" } });
+    expect(screen.getByText(/no assets match/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Credit for assets/pics/a.png")).not.toBeInTheDocument();
+  });
+
+  it("'uncredited only' hides assets that already have an enabled credit", () => {
+    render(
+      <AssetManagerPanel
+        project={fixture()}
+        assetCredits={{
+          "assets/pics/a.png": { credit: "Art by A", enabled: true },
+          "assets/maps/o.png": { credit: "", enabled: false },
+        }}
+        onPatch={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("Uncredited only"));
+    expect(screen.queryByLabelText("Credit for assets/pics/a.png")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Credit for assets/maps/o.png")).toBeInTheDocument();
+  });
+
+  it("'uncredited only' still shows an asset with credit text that is disabled", () => {
+    render(
+      <AssetManagerPanel
+        project={fixture()}
+        assetCredits={{
+          "assets/pics/a.png": { credit: "Art by A", enabled: false },
+          "assets/maps/o.png": { credit: "", enabled: false },
+        }}
+        onPatch={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("Uncredited only"));
+    expect(screen.getByLabelText("Credit for assets/pics/a.png")).toBeInTheDocument();
+    expect(screen.getByLabelText("Credit for assets/maps/o.png")).toBeInTheDocument();
+  });
+
   it("'disable all badges' flips every asset's enabled flag off, preserving credit text", () => {
     const onPatch = vi.fn();
     render(

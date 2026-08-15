@@ -74,6 +74,8 @@ export function AssetManagerPanel({
 }) {
   const assets = collectAssets(project);
   const sizes = useAssetSizes(assets.map((a) => a.src));
+  const [filterText, setFilterText] = useState("");
+  const [uncreditedOnly, setUncreditedOnly] = useState(false);
 
   const setEntry = (src: string, patch: Partial<AssetCredit>) => {
     const current = assetCredits?.[src] ?? EMPTY;
@@ -104,6 +106,20 @@ export function AssetManagerPanel({
     );
   }
 
+  const q = filterText.trim().toLowerCase();
+  const visibleAssets = assets.filter((a) => {
+    if (q) {
+      const matchesSrc = a.src.toLowerCase().includes(q);
+      const matchesUsedBy = a.usedBy.some((u) => u.id.toLowerCase().includes(q));
+      if (!matchesSrc && !matchesUsedBy) return false;
+    }
+    if (uncreditedOnly) {
+      const entry = assetCredits?.[a.src] ?? EMPTY;
+      if (entry.credit.trim() !== "" && entry.enabled) return false;
+    }
+    return true;
+  });
+
   return (
     <div className="p-3 space-y-3 text-xs">
       <p className="text-muted-foreground">
@@ -130,8 +146,29 @@ export function AssetManagerPanel({
           Disable all badges
         </Button>
       </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          aria-label="Filter assets"
+          className="h-7 min-w-[10rem] flex-1 px-2 rounded border bg-background"
+          placeholder="Filter by filename or used-by…"
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+        />
+        <label className="flex items-center gap-1.5 shrink-0">
+          <input
+            type="checkbox"
+            aria-label="Uncredited only"
+            checked={uncreditedOnly}
+            onChange={(e) => setUncreditedOnly(e.target.checked)}
+          />
+          <span>Uncredited only</span>
+        </label>
+      </div>
+      {visibleAssets.length === 0 && (
+        <p className="text-muted-foreground">No assets match the current filter.</p>
+      )}
       <ul className="space-y-3">
-        {assets.map((a) => {
+        {visibleAssets.map((a) => {
           const entry = assetCredits?.[a.src] ?? EMPTY;
           return (
             <li key={a.src} className="flex gap-2 items-start border-t pt-3">
