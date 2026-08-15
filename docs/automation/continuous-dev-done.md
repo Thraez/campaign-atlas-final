@@ -3815,3 +3815,44 @@ entries for `Corven.png`/`Edric.png`, unrelated, informational only). Only artif
 
 **Commits:** `fefb1b65` (test: pin vault immutability + explicit visibility, C6), on
 `run/v15-vault-immutability-visibility`, merged into `auto/continuous-dev`.
+
+- [x] **S1. Stop the map credit badge from overlapping the minimap.** ✅ DONE 2026-08-15 — commit `bc33f7bd`
+
+**What shipped:** `MapCreditOverlay` and `AtlasMinimap` both anchored to the bottom-right corner
+(`right-2 bottom-2` vs `bottom-3 right-3`), so the credit badge rendered on top of the minimap
+whenever both were showing. `MapCreditOverlay` now accepts an optional `clearanceBottomPx` prop —
+when given, it replaces the default `bottom-2` resting spot with an inline `bottom` style. A new
+pure `minimapHeightFor(map, width)` is exported from `AtlasMinimap.tsx` (extracted from the
+component's own aspect-ratio math, no behavior change there) so `AtlasViewer` can compute the
+minimap's actual rendered footprint without duplicating the formula, and passes
+`clearanceBottomPx={12 + minimapHeightFor(activeMap) + 8}` to lift the badge clear of it.
+`AtlasPlacementEditor` renders the minimap too but never renders `MapCreditOverlay`, so the fix is
+correctly scoped to the player viewer only.
+
+**Implementation:**
+- `src/atlas/map/MapCreditOverlay.tsx`: added `clearanceBottomPx?: number` to
+  `MapCreditOverlayProps`; the overlay `<div>` now sets `style={{ bottom: ... }}` instead of the
+  Tailwind `bottom-2` class, defaulting to the equivalent `0.5rem` when omitted.
+- `src/atlas/AtlasMinimap.tsx`: extracted and exported `minimapHeightFor(map, width = 180)`; the
+  component now calls it instead of inlining the formula.
+- `src/pages/AtlasViewer.tsx`: imports `minimapHeightFor`; the `<MapCreditOverlay>` call site now
+  passes `clearanceBottomPx`.
+- `src/test/atlas/MapCreditOverlay.test.tsx`: 2 new tests — default resting spot with no clearance,
+  lifted spot when `clearanceBottomPx` is given.
+- `src/test/atlas/minimapHeightFor.test.ts` (new): 3 tests — default-width scaling, custom width,
+  40px floor clamp.
+
+**Gate:** `tsc --noEmit -p tsconfig.app.json` and `tsc --noEmit -p tsconfig.scripts.json` clean ·
+`npm run lint` 0 errors (13 pre-existing `react-refresh/only-export-components` warnings, +1 new
+one from exporting `minimapHeightFor` alongside the `AtlasMinimap` component — same accepted
+cosmetic pattern as `MapCreditOverlay.tsx`'s own pre-existing export) · targeted vitest run (10
+files, 79 tests) green, including the 5 new/updated tests above.
+
+**Scope note:** a second, pre-existing overlap was spotted in passing — the "Reset view" button
+(`AtlasViewer.tsx`, `absolute bottom-3 right-3 z-[500]`) sits in the same corner as the minimap too.
+Left untouched: out of S1's stated scope, and S1 is a one-item run.
+
+**Merge:** `run/s1-credit-badge-minimap` → `auto/continuous-dev`. Fast-forward to `origin/main` was
+**skipped** this run: `main` carries 3 commits (`835aed4f`, `216883fb`, `b9d7516d`) not yet on
+`auto/continuous-dev`, so merging would not be a clean fast-forward. Flagged for a human to
+reconcile rather than force-merged.

@@ -273,7 +273,7 @@ is for sequencing, not the whole spec.
 > only. **S3 touches the asset audit and S12 deletes content-tree files — both carry an explicit
 > `npm run atlas:publish` gate below.**
 
-- [ ] **S1. Stop the map credit badge from overlapping the minimap.** _(qol)_ — `MapCreditOverlay.tsx:50` is `absolute right-2 bottom-2 z-[500]`; `AtlasMinimap.tsx:84` is `absolute bottom-3 right-3 z-[400]`. Same corner, badge on top. Move the credit overlay clear of the minimap (or offset it when a minimap is mounted). **Done when:** with a multi-map world open at default zoom, the DM can read the whole minimap and the whole credit line at once, neither clipped by the other, at 1280×800 and 1920×1080.
+- [x] ~~**S1. Stop the map credit badge from overlapping the minimap.**~~ — built 2026-08-15. `MapCreditOverlay` now takes an optional `clearanceBottomPx`; `AtlasViewer` computes the minimap's real footprint via a new exported pure `minimapHeightFor(map, width)` and lifts the badge above it. See `continuous-dev-done.md`.
 
 - [ ] **S2. Add a filter and an "uncredited only" toggle to the Asset Manager.** _(qol)_ — `src/atlas/assets/AssetManagerPanel.tsx` renders every asset with no filter control at all (verified 2026-08-06). Add a text filter (matches src / used-by) and a checkbox that narrows the list to assets whose credit is empty or disabled. **Done when:** in a world with 50+ images, the DM can type part of a filename and see only matching rows, and can tick one box to see exactly the images still missing a credit.
 
