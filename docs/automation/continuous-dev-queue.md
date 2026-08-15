@@ -275,7 +275,7 @@ is for sequencing, not the whole spec.
 
 - [x] ~~**S1. Stop the map credit badge from overlapping the minimap.**~~ — built 2026-08-15. `MapCreditOverlay` now takes an optional `clearanceBottomPx`; `AtlasViewer` computes the minimap's real footprint via a new exported pure `minimapHeightFor(map, width)` and lifts the badge above it. See `continuous-dev-done.md`.
 
-- [ ] **S2. Add a filter and an "uncredited only" toggle to the Asset Manager.** _(qol)_ — `src/atlas/assets/AssetManagerPanel.tsx` renders every asset with no filter control at all (verified 2026-08-06). Add a text filter (matches src / used-by) and a checkbox that narrows the list to assets whose credit is empty or disabled. **Done when:** in a world with 50+ images, the DM can type part of a filename and see only matching rows, and can tick one box to see exactly the images still missing a credit.
+- [x] ~~**S2. Add a filter and an "uncredited only" toggle to the Asset Manager.**~~ — built 2026-08-16. Text filter (matches src / used-by) plus an "Uncredited only" checkbox that hides assets whose credit is both set and enabled. See `continuous-dev-done.md`.
 
 - [ ] **S3. Add a total-player-payload budget check to `atlas:audit-assets`.** _(infra)_ — `scripts/atlas/audit-assets.ts:342` already computes `totalBytes` but nothing bounds it; there is no `BUDGET`/`MAX_TOTAL` constant in the file. Add a total-payload threshold that warns (and a higher one that fails) alongside the existing 1 MB / 4 MB per-file checks. **Gate:** `npm run atlas:publish` must stay green. **Done when:** running the audit on the current world prints the total shipped payload and a clear pass/warn/fail line, and deliberately blowing the budget in a scratch copy fails the command.
 

@@ -3856,3 +3856,35 @@ Left untouched: out of S1's stated scope, and S1 is a one-item run.
 **skipped** this run: `main` carries 3 commits (`835aed4f`, `216883fb`, `b9d7516d`) not yet on
 `auto/continuous-dev`, so merging would not be a clean fast-forward. Flagged for a human to
 reconcile rather than force-merged.
+
+- [x] **S2. Add a filter and an "uncredited only" toggle to the Asset Manager.** ✅ DONE 2026-08-16 — commit `449e4bf2`
+
+**What shipped:** `AssetManagerPanel` rendered every project asset with no way to narrow the list
+(verified premise still true 2026-08-16). Added a text filter input (matches an asset's `src` or
+any of its used-by ids, case-insensitive) and an "Uncredited only" checkbox that hides assets whose
+credit text is both non-empty and enabled — i.e. it keeps rows that are truly blank or merely
+disabled. Bulk actions (`Apply to all`, `Enable/Disable all badges`) still act on every asset
+regardless of the active filter, matching their existing pre-filter test contracts. A "No assets
+match the current filter." message covers the zero-visible-rows case, distinct from the existing
+zero-assets-total empty state.
+
+**Implementation:**
+- `src/atlas/assets/AssetManagerPanel.tsx`: added `filterText`/`uncreditedOnly` local state, a
+  `visibleAssets` derived filter applied only to the rendered list (asset-size fetching and bulk
+  actions still operate on the full `assets` array), a filter `<input>` (`aria-label="Filter
+  assets"`) and a checkbox (`aria-label="Uncredited only"`) above the asset list.
+- `src/test/assets/AssetManagerPanel.test.tsx`: 6 new tests — filter by src substring, filter by
+  used-by id, no-match empty state, uncredited-only hides an enabled+credited asset, uncredited-only
+  keeps a disabled asset even with credit text, (existing 10 tests untouched and still green).
+
+**Gate:** `tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (13 pre-existing
+`react-refresh/only-export-components` warnings, none new) · targeted vitest (16 tests, the full
+`AssetManagerPanel.test.tsx`) green · full sharded suite green (768+680+841+811 = 3100 tests across
+4 shards; shard 4 hit the documented `onTaskUpdate` RPC flake on both attempts, 0 real test
+failures either time, not a gate failure per policy). No build/scan-pipeline files touched, so
+`atlas:publish` was not required.
+
+**Merge:** `run/s2-asset-filter` → `auto/continuous-dev`. Fast-forward to `origin/main` is still
+**skipped**: the same divergence from the S1 run persists unchanged (`main` at `b9d7516d`,
+3 commits `835aed4f`/`216883fb`/`b9d7516d` not on `auto/continuous-dev`; neither branch is an
+ancestor of the other). Left for a human to reconcile.
