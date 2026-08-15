@@ -101,4 +101,24 @@ describe("MapCreditOverlay (component)", () => {
     );
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("defaults to the standard bottom-right resting spot with no clearance passed", () => {
+    const map = makeMap({ layers: [makeLayer({ src: "a.png" })] });
+    const registry: Record<string, AssetCredit> = {
+      "a.png": { credit: "Art by A", enabled: true },
+    };
+    const { container } = render(<MapCreditOverlay map={map} assetCredits={registry} />);
+    expect((container.firstChild as HTMLElement).style.bottom).toBe("0.5rem");
+  });
+
+  it("lifts clear of an overlapping corner overlay (e.g. the minimap) when clearanceBottomPx is given", () => {
+    const map = makeMap({ layers: [makeLayer({ src: "a.png" })] });
+    const registry: Record<string, AssetCredit> = {
+      "a.png": { credit: "Art by A", enabled: true },
+    };
+    const { container } = render(
+      <MapCreditOverlay map={map} assetCredits={registry} clearanceBottomPx={110} />,
+    );
+    expect((container.firstChild as HTMLElement).style.bottom).toBe("110px");
+  });
 });

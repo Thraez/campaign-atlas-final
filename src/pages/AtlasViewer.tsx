@@ -53,7 +53,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AtlasMinimap } from "@/atlas/AtlasMinimap";
+import { AtlasMinimap, minimapHeightFor } from "@/atlas/AtlasMinimap";
 import { OceanBackground } from "@/atlas/ocean/OceanBackground";
 import { SoundSettingsProvider } from "@/atlas/sound/SoundSettingsProvider";
 import { SoundscapeLayer } from "@/atlas/sound/SoundscapeLayer";
@@ -866,6 +866,9 @@ export default function AtlasViewer() {
               map={activeMap}
               assetCredits={worldAssetCredits}
               credits={worldCredits}
+              clearanceBottomPx={
+                12 /* minimap's own bottom-3 offset */ + minimapHeightFor(activeMap) + 8
+              }
             />
 
             {/* Pin legend — top-right map corner, collapsed by default */}

@@ -39,15 +39,29 @@ export interface MapCreditOverlayProps {
   map: Pick<MapDocument, "layers"> | null | undefined;
   assetCredits?: Record<string, AssetCredit>;
   credits?: CreditsConfig;
+  /**
+   * Pixels to lift the badge above its default bottom-right resting spot —
+   * pass the footprint of whatever else occupies that corner (e.g. the
+   * minimap) so the two never overlap.
+   */
+  clearanceBottomPx?: number;
 }
 
 /** Renders nothing when no active layer credit is enabled, or when the
  *  world-level `credits.badges` master switch is off. */
-export function MapCreditOverlay({ map, assetCredits, credits }: MapCreditOverlayProps) {
+export function MapCreditOverlay({
+  map,
+  assetCredits,
+  credits,
+  clearanceBottomPx,
+}: MapCreditOverlayProps) {
   const active = activeMapCredits(map, assetCredits, credits);
   if (active.length === 0) return null;
   return (
-    <div className="atlas-map-credit-overlay pointer-events-none absolute right-2 bottom-2 z-[500] flex max-w-[240px] flex-col items-end gap-1">
+    <div
+      className="atlas-map-credit-overlay pointer-events-none absolute right-2 z-[500] flex max-w-[240px] flex-col items-end gap-1"
+      style={{ bottom: clearanceBottomPx != null ? `${clearanceBottomPx}px` : "0.5rem" }}
+    >
       {active.map((credit) => (
         <CreditBadge key={credit} credit={credit} variant="static" />
       ))}
