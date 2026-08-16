@@ -4006,3 +4006,41 @@ refactor, doesn't touch `scripts/`, fog redaction, soundscape, or shipped artifa
 
 **Merge:** `run/s8-flatcrs` → `auto/continuous-dev`. Fast-forward to `origin/main` — see the
 "Main merge skipped" note below; still blocked on the same 3 pre-existing divergent commits.
+
+- [x] **S9. Replace `OfflineStatus`'s 2-second polling with event-driven cache detection.** ✅ DONE 2026-08-16 — commit `7bdc1bc5`
+
+**What shipped:** `OfflineStatus` and `OfflineMenu` (`src/atlas/OfflineStatus.tsx`) each ran their own
+`setInterval(() => setCached(isOfflineReady()), 2000)` forever, on every reader page. Replaced both with
+a shared `useOfflineCached()` hook subscribing to a new `onCacheStateChange()` pub/sub in `src/pwa.ts`
+(mirrors the existing `onUpdateAvailable` pattern), fired from two real signals: the Workbox `"activated"`
+event (a freshly-installed SW reaching that state is when `isOfflineReady()`'s answer can flip) and the
+native `navigator.serviceWorker` `"controllerchange"` event. No timer is left running.
+
+**Implementation:**
+- `src/pwa.ts`: added `cacheStateListeners` set + `notifyCacheStateChange()`, wired inside
+  `registerServiceWorker()` (`wb.addEventListener("activated", ...)` and
+  `navigator.serviceWorker.addEventListener("controllerchange", notifyCacheStateChange)`), exported
+  `onCacheStateChange(fn): () => void`.
+- `src/atlas/OfflineStatus.tsx`: new local `useOfflineCached()` hook (reads `isOfflineReady()` for
+  initial state, subscribes via `onCacheStateChange`); both components now call it instead of owning
+  `cached` state + an interval.
+- `src/test/pwa.test.ts`: added a `FakeWorkbox` + `vi.mock("workbox-window", ...)` to capture registered
+  event handlers, plus a `describe("onCacheStateChange", ...)` block (4 tests: activated-event fires
+  subscribers, native controllerchange fires subscribers, unsubscribe stops delivery, no
+  controllerchange listener registered when the SW is disabled in dev).
+
+**Gate:** `tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (13 pre-existing warnings,
+none new) · `format:check` clean · full sharded suite green (775+674+854+814 = 3117 tests across 4
+shards; shard 4 hit the same documented `onTaskUpdate` RPC flake, 0 real test failures — accepted per
+policy; a `buildSecrets.test.ts` failure in an earlier shard-2 attempt was confirmed a flake by isolated
+re-run before the shard was re-run clean). Doesn't touch `scripts/`, fog redaction, or shipped artifacts,
+so `atlas:publish` wasn't required by the gate.
+
+**Merge:** `run/s9-offline-events` → `auto/continuous-dev`. Fast-forward to `origin/main` — **still
+blocked, 7th consecutive run.** This run's investigation found the divergence is worse than previously
+recorded: it isn't just the 3 unrelated commits (`835aed4f` docs, `216883fb` security fix, `b9d7516d`
+deps patch) — `main` also carries a whole `reloadLatestAtlas()` feature in `src/pwa.ts` and
+`OfflineStatus.tsx`'s `OfflineMenu` (with its own `ReloadResult` type, `CONTENT_CACHES` list, and test
+`describe` block in `src/test/pwa.test.ts`) that was never merged into `auto/continuous-dev`. A human
+needs to reconcile these branches — resolving it by hand here would risk silently dropping the shipped
+`reloadLatestAtlas` feature from whichever branch loses the merge.

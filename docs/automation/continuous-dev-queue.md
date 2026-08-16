@@ -287,7 +287,7 @@ is for sequencing, not the whole spec.
 
 - [x] ~~**S8. Extract the shared `FlatCRS` leaflet constant.**~~ ✅ DONE 2026-08-16 — commit `c38a2b91`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **S9. Replace `OfflineStatus`'s 2-second polling with event-driven cache detection.** _(perf)_ — `src/atlas/OfflineStatus.tsx:47` and `:99` each run `setInterval(() => setCached(isOfflineReady()), 2000)`, so two timers re-read cache state forever on every reader page. Drive it from the actual cache/service-worker events instead. **Done when:** the offline indicator still flips correctly when the app finishes caching and when the connection drops, with no repeating timer left behind.
+- [x] ~~**S9. Replace `OfflineStatus`'s 2-second polling with event-driven cache detection.**~~ ✅ DONE 2026-08-16 — commit `7bdc1bc5`. Full write-up in `continuous-dev-done.md`.
 
 - [ ] **S10. Configure the Toaster for clearer, persistent error feedback.** _(a11y)_ — `src/components/ui/sonner.tsx:10` renders `<Sonner>` on defaults: no `richColors`, no `closeButton`, default auto-dismiss. An error toast currently looks like a success toast and vanishes before it can be read. **Done when:** an error toast is visually distinct from a success toast, can be dismissed deliberately, and doesn't disappear on its own before the DM has read it.
 
