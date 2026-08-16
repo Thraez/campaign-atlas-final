@@ -3957,3 +3957,30 @@ pushed to origin). Fast-forward to `origin/main` is still **skipped** — fourth
 flagging this: `main` remains at `b9d7516d`, the same 3 commits (`835aed4f`, `216883fb`, `b9d7516d`)
 are still not reachable from `auto/continuous-dev`, and neither branch is an ancestor of the other.
 Left for a human to reconcile.
+
+- [x] **S7. Add `engines` + `.nvmrc` as the single Node-version source.** ✅ DONE 2026-08-16 — commit `a9c05f95`
+
+**What shipped:** neither `.nvmrc` nor an `engines` field existed (verified premise still true
+2026-08-16), yet both `.github/workflows/publish-atlas.yml` and `.github/workflows/atlas-pr-check.yml`
+hardcoded `node-version: "20"` in two places each, and `docs/QUICK_START.md` repeated "Node 20+" as
+prose with nothing tying it to the workflows.
+
+**Implementation:**
+- `.nvmrc`: new file, contents `20`.
+- `package.json`: new `"engines": { "node": ">=20" }` field.
+- `.github/workflows/publish-atlas.yml` and `.github/workflows/atlas-pr-check.yml`: all four
+  `actions/setup-node@v4` steps now use `node-version-file: ".nvmrc"` instead of a hardcoded
+  `node-version: "20"`.
+- `docs/QUICK_START.md`: Prerequisites line now points at `.nvmrc` for the exact version instead of
+  repeating "Node 20+" as an independent claim.
+
+**Gate:** `tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (13 pre-existing
+warnings, none new) · full sharded suite green (775+684+841+811 = 3111 tests across 4 shards; shard 4
+hit the same documented `onTaskUpdate` RPC flake, 0 real test failures — accepted per policy). CI/docs-
+only change, doesn't touch `scripts/`, fog redaction, soundscape, or shipped artifacts, so
+`atlas:publish` wasn't required by the gate.
+
+**Merge:** `run/s7-node-version` → `auto/continuous-dev`. Fast-forward to `origin/main` is still
+**skipped** — fifth consecutive run flagging this: `main` remains at `b9d7516d`, the same 3 commits
+(`835aed4f`, `216883fb`, `b9d7516d`) are still not reachable from `auto/continuous-dev`, and neither
+branch is an ancestor of the other. Left for a human to reconcile.

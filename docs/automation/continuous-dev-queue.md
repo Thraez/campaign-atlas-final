@@ -285,8 +285,6 @@ is for sequencing, not the whole spec.
 
 - [x] ~~**S6. Add job timeouts to both CI workflows.**~~ — built during the 2026-08-06 sweep. All five jobs across the two workflows now declare `timeout-minutes` (verify 10, scan 20, test 20, build 20, deploy 10).
 
-- [ ] **S7. Add `engines` + `.nvmrc` as the single Node-version source.** _(dx)_ — there is no `.nvmrc` and no `engines` field in `package.json` (both verified absent), yet both workflows hardcode Node 20 and QUICK_START says "Node 20+". Add both and point the workflows at the file. **Done when:** the Node version is written down in exactly one place, and the workflows and docs read from it instead of repeating it.
-
 - [ ] **S8. Extract the shared `FlatCRS` leaflet constant.** _(refactor)_ — `AtlasViewer.tsx:87` and `AtlasPlacementEditor.tsx:151` declare the byte-identical `const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;`. Home it in one module and import it in both. **Done when:** one declaration remains, both pages import it, and the map still renders identically in the player viewer and the editor.
 
 - [ ] **S9. Replace `OfflineStatus`'s 2-second polling with event-driven cache detection.** _(perf)_ — `src/atlas/OfflineStatus.tsx:47` and `:99` each run `setInterval(() => setCached(isOfflineReady()), 2000)`, so two timers re-read cache state forever on every reader page. Drive it from the actual cache/service-worker events instead. **Done when:** the offline indicator still flips correctly when the app finishes caching and when the connection drops, with no repeating timer left behind.
