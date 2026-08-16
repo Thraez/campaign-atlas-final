@@ -3984,3 +3984,25 @@ only change, doesn't touch `scripts/`, fog redaction, soundscape, or shipped art
 **skipped** — fifth consecutive run flagging this: `main` remains at `b9d7516d`, the same 3 commits
 (`835aed4f`, `216883fb`, `b9d7516d`) are still not reachable from `auto/continuous-dev`, and neither
 branch is an ancestor of the other. Left for a human to reconcile.
+
+- [x] **S8. Extract the shared `FlatCRS` leaflet constant.** ✅ DONE 2026-08-16 — commit `c38a2b91`
+
+**What shipped:** `AtlasViewer.tsx` and `AtlasPlacementEditor.tsx` each declared the byte-identical
+`const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;` (verified premise still true 2026-08-16, at
+shifted line numbers 95 and 151 respectively — the queue entry's cited 87/151 had drifted).
+
+**Implementation:**
+- `src/atlas/map/flatCRS.ts`: new module, exports `FlatCRS` (moved verbatim, same comment).
+- `AtlasViewer.tsx` and `AtlasPlacementEditor.tsx`: local declarations removed, both now
+  `import { FlatCRS } from "@/atlas/map/flatCRS"`.
+- `src/test/atlas/map-flat-crs.test.ts`: new unit test asserting `FlatCRS` behaves like
+  `L.CRS.Simple` (same `project()` output, same `infinite` flag) without being the same object.
+
+**Gate:** `tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (13 pre-existing
+warnings, none new) · full sharded suite green (775+674+850+814 = 3113 tests across 4 shards; shard 4
+hit the same documented `onTaskUpdate` RPC flake, 0 real test failures — accepted per policy). Pure
+refactor, doesn't touch `scripts/`, fog redaction, soundscape, or shipped artifacts, so
+`atlas:publish` wasn't required by the gate.
+
+**Merge:** `run/s8-flatcrs` → `auto/continuous-dev`. Fast-forward to `origin/main` — see the
+"Main merge skipped" note below; still blocked on the same 3 pre-existing divergent commits.
