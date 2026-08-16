@@ -4067,6 +4067,32 @@ on the shared `toast` object export from `@/components/ui/sonner`, so import-sid
 tests that mock `"sonner"` directly (asserting single-arg `toHaveBeenCalledWith(message)`) are unaffected
 by the change with zero touch.
 
+## S11. Fix the editor tab list in README line 46 ✅ 2026-08-16
+
+The premise check found the drift went further than the queue entry assumed: README:46 was stale as
+described, but so was the "already correct" reference at README:697-701 — the Creator Cockpit rail
+(`src/atlas/shell/railRegistry.tsx`) and the ☰ menu (`src/atlas/shell/EditorMenu.tsx`) had both moved on
+since that text was written. Save is no longer a rail tab (the toolbar's `SaveStatus` control replaced
+it); Sound, Player keys, and Sync from Obsidian are tabs that didn't exist in the old write-up; Import is
+a per-content-tab button (plus the command palette), not a tab or menu panel; and the real ☰ menu items
+are Edit world details / Edit map details / Name the months / Manage assets / Help, not "Maps (Map
+Details), Import".
+
+**Implementation (docs only, no code changed):**
+- `README.md`: rewrote line 46's feature-list prose, the rail summary at :697-701, the per-tab capability
+  list (added Sound / Player keys / Sync from Obsidian entries, removed the stale Save-tab and
+  Import-menu-panel entries, corrected the ☰ menu panel list).
+- `docs/WORKFLOWS.md`: rewrote the Creator Cockpit tab table to group by Content/Map/System matching the
+  rail, replaced the "Import tab" heading and step 1 with the real "Import .md" button flow, and added a
+  note that Maps/Import live off the rail (Map Details panel + per-tab buttons).
+- Verified no other README or WORKFLOWS line still described the old flat tab set (grepped for the old
+  phrase and for "Import tab" / "Maps tab" / "Save tab" repo-wide; remaining hits are dated historical
+  spec/handover docs under `docs/superpowers/specs/`, out of scope as point-in-time records).
+
+**Gate:** typecheck clean · lint 0 errors (13 pre-existing warnings, none new) · format:check clean · full
+sharded suite green (778+686+918+738 = 3120 tests; shard 4 hit the documented `onTaskUpdate` RPC flake, 0
+real test failures). Docs-only change, so `atlas:publish` wasn't required.
+
 **Gate:** `tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (13 pre-existing warnings,
 none new — `sonner.tsx` was already one of them via `react-refresh/only-export-components`) ·
 `format:check` clean · full sharded suite green (778+686+918+738 = 3120 tests across 4 shards; shard 4
