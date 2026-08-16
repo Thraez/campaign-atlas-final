@@ -14,9 +14,17 @@ import {
   checkForUpdate,
   clearOfflineCache,
   isOfflineReady,
+  onCacheStateChange,
   onUpdateAvailable,
   shouldEnableServiceWorker,
 } from "@/pwa";
+
+/** Track offline-cache readiness via SW events instead of polling. */
+function useOfflineCached(): boolean {
+  const [cached, setCached] = useState<boolean>(isOfflineReady());
+  useEffect(() => onCacheStateChange(() => setCached(isOfflineReady())), []);
+  return cached;
+}
 
 /**
  * Floating offline status + manual cache controls for /atlas.
@@ -28,7 +36,7 @@ export function OfflineStatus() {
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
   const [updateReady, setUpdateReady] = useState(false);
-  const [cached, setCached] = useState<boolean>(isOfflineReady());
+  const cached = useOfflineCached();
 
   useEffect(() => {
     const on = () => setOnline(true);
@@ -43,12 +51,7 @@ export function OfflineStatus() {
 
   useEffect(() => {
     if (!enabled) return;
-    const unsub = onUpdateAvailable(() => setUpdateReady(true));
-    const t = setInterval(() => setCached(isOfflineReady()), 2000);
-    return () => {
-      unsub();
-      clearInterval(t);
-    };
+    return onUpdateAvailable(() => setUpdateReady(true));
   }, [enabled]);
 
   if (!enabled) return null;
@@ -93,12 +96,7 @@ export function OfflineMenu({ className }: OfflineMenuProps) {
   const enabled = shouldEnableServiceWorker();
   const [busy, setBusy] = useState<null | "reload" | "clear">(null);
   const [done, setDone] = useState<null | string>(null);
-  const [cached, setCached] = useState<boolean>(isOfflineReady());
-
-  useEffect(() => {
-    const t = setInterval(() => setCached(isOfflineReady()), 2000);
-    return () => clearInterval(t);
-  }, []);
+  const cached = useOfflineCached();
 
   if (!enabled) return null;
 

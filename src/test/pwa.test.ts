@@ -8,6 +8,26 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
+/**
+ * `registerServiceWorker()` wires event-driven cache-state notifications
+ * through the real `workbox-window` Workbox class — capture the handlers it
+ * registers so tests can simulate SW lifecycle events without a real SW.
+ */
+let wbListeners: Record<string, Array<(event?: unknown) => void>> = {};
+class FakeWorkbox {
+  addEventListener(type: string, fn: (event?: unknown) => void) {
+    (wbListeners[type] ??= []).push(fn);
+  }
+  register() {
+    return Promise.resolve();
+  }
+  update() {
+    return Promise.resolve();
+  }
+  messageSkipWaiting() {}
+}
+vi.mock("workbox-window", () => ({ Workbox: FakeWorkbox }));
+
 function setServiceWorkerSupported(supported: boolean) {
   if (supported) {
     Object.defineProperty(navigator, "serviceWorker", {
@@ -122,5 +142,86 @@ describe("shouldEnableServiceWorker()", () => {
     setHostname("myatlas.lovable.app");
     const { shouldEnableServiceWorker } = await loadPwa();
     expect(shouldEnableServiceWorker()).toBe(true);
+  });
+});
+
+/**
+ * OfflineStatus used to poll `isOfflineReady()` on a 2-second `setInterval`
+ * forever, in two separate components. This is the event-driven replacement:
+ * subscribers are notified when the SW reaches "activated" or the page's
+ * controller changes, not on a timer.
+ */
+describe("onCacheStateChange", () => {
+  let swListeners: Record<string, Array<() => void>>;
+
+  beforeEach(() => {
+    wbListeners = {};
+    swListeners = {};
+    Object.defineProperty(navigator, "serviceWorker", {
+      value: {
+        addEventListener: (type: string, fn: () => void) => {
+          (swListeners[type] ??= []).push(fn);
+        },
+        getRegistrations: async () => [],
+      },
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    setServiceWorkerSupported(hadServiceWorker);
+  });
+
+  it("notifies subscribers when the SW reports activated", async () => {
+    const { registerServiceWorker, onCacheStateChange } = await loadPwa();
+    registerServiceWorker();
+
+    let fired = 0;
+    const unsub = onCacheStateChange(() => {
+      fired++;
+    });
+
+    wbListeners["activated"]?.forEach((fn) => fn());
+
+    expect(fired).toBe(1);
+    unsub();
+  });
+
+  it("notifies subscribers on a native controllerchange event", async () => {
+    const { registerServiceWorker, onCacheStateChange } = await loadPwa();
+    registerServiceWorker();
+
+    let fired = 0;
+    onCacheStateChange(() => {
+      fired++;
+    });
+
+    swListeners["controllerchange"]?.forEach((fn) => fn());
+
+    expect(fired).toBe(1);
+  });
+
+  it("stops notifying after unsubscribe", async () => {
+    const { registerServiceWorker, onCacheStateChange } = await loadPwa();
+    registerServiceWorker();
+
+    let fired = 0;
+    const unsub = onCacheStateChange(() => {
+      fired++;
+    });
+    unsub();
+
+    wbListeners["activated"]?.forEach((fn) => fn());
+    swListeners["controllerchange"]?.forEach((fn) => fn());
+
+    expect(fired).toBe(0);
+  });
+
+  it("never registers a controllerchange listener when the SW is disabled (dev mode)", async () => {
+    vi.stubEnv("PROD", false);
+    const { registerServiceWorker } = await loadPwa();
+    registerServiceWorker();
+
+    expect(swListeners["controllerchange"]).toBeUndefined();
   });
 });

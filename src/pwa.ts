@@ -16,6 +16,11 @@ import { logger } from "@/lib/logger";
 let wb: Workbox | null = null;
 let waitingWorker: ServiceWorker | null = null;
 const updateListeners = new Set<() => void>();
+const cacheStateListeners = new Set<() => void>();
+
+function notifyCacheStateChange(): void {
+  cacheStateListeners.forEach((fn) => fn());
+}
 
 function isInIframe(): boolean {
   try {
@@ -72,6 +77,15 @@ export function registerServiceWorker(): void {
     window.location.reload();
   });
 
+  // A freshly-installed SW reaching "activated" is the event-driven signal
+  // that offline-ready state may have just flipped (isOfflineReady() reads
+  // navigator.serviceWorker.controller, which can change right after this).
+  wb.addEventListener("activated", () => {
+    notifyCacheStateChange();
+  });
+
+  navigator.serviceWorker.addEventListener("controllerchange", notifyCacheStateChange);
+
   wb.register().catch((err) => {
     logger.warn("[pwa] service worker registration failed", err);
   });
@@ -82,6 +96,16 @@ export function onUpdateAvailable(fn: () => void): () => void {
   // If an update is already waiting, fire immediately.
   if (waitingWorker) queueMicrotask(fn);
   return () => updateListeners.delete(fn);
+}
+
+/**
+ * Subscribe to events that can flip `isOfflineReady()`'s result — a
+ * newly-activated service worker, or this page's controller changing.
+ * Replaces polling: callers re-read `isOfflineReady()` when this fires.
+ */
+export function onCacheStateChange(fn: () => void): () => void {
+  cacheStateListeners.add(fn);
+  return () => cacheStateListeners.delete(fn);
 }
 
 export function activateUpdate(): void {
