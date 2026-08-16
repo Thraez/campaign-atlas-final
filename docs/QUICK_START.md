@@ -4,7 +4,7 @@ This is a linear setup path: clone, run dev, see the seed world, swap in your ow
 
 ## Prerequisites
 
-- Node 20+ and npm.
+- Node 20+ and npm (see [`.nvmrc`](../.nvmrc) for the exact version this repo targets).
 - A GitHub account (only required if you want to host the player site).
 - (Optional) Obsidian, for authoring canon. The vault is plain markdown — any editor works.
 
