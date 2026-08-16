@@ -58,6 +58,7 @@ import { OceanBackground } from "@/atlas/ocean/OceanBackground";
 import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
 import { buildSavePlan } from "@/atlas/editor/saveGate";
+import { buildDraftPlacements as pureBuildDraftPlacements } from "@/atlas/editor/dirtyPlacements";
 import type { FileChange } from "@/atlas/save/localFsSave";
 import { SaveStatus } from "@/atlas/session/SaveStatus";
 import { DiscardConfirmModal } from "@/atlas/session/DiscardConfirmModal";
@@ -674,22 +675,9 @@ function AtlasPlacementEditorInner() {
   };
 
   /** Build current draft placements for the active map, including label + pin diffs. */
-  const buildDraftPlacements = useCallback(() => {
+  const buildDraftPlacements = useCallback((): PlacementOverride[] => {
     if (!project || !activeMap) return [];
-    const out: PlacementOverride[] = [];
-    for (const e of project.entities) {
-      const eff = effectivePlacement(e.id);
-      if (!eff) continue;
-      out.push({
-        entityId: e.id,
-        mapId: activeMap.id,
-        x: eff.x,
-        y: eff.y,
-        label: eff.label && eff.label !== e.title ? eff.label : undefined,
-        pin: eff.pin,
-      });
-    }
-    return out;
+    return pureBuildDraftPlacements(project.entities, activeMap.id, effectivePlacement);
   }, [project, activeMap, effectivePlacement]);
 
   const [mapImportOpen, setMapImportOpen] = useState(false);
