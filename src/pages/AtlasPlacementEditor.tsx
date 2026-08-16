@@ -147,8 +147,7 @@ import { CalendarPanel } from "@/atlas/calendar/CalendarPanel";
 import { ViewModeProvider, useViewMode } from "@/atlas/view/ViewModeProvider";
 import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
-
-const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
+import { FlatCRS } from "@/atlas/map/flatCRS";
 
 function pinDivIcon(
   color: string,

@@ -90,9 +90,7 @@ import { HoverPeekCard } from "@/atlas/peek/HoverPeekCard";
 import { usePeekController } from "@/atlas/peek/usePeekController";
 import { resolvePeekEntityId } from "@/atlas/peek/resolvePeekEntityId";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
-
-// Flat CRS for non-globe world (top-left origin via lat = height - y)
-const FlatCRS = L.extend({}, L.CRS.Simple) as L.CRS;
+import { FlatCRS } from "@/atlas/map/flatCRS";
 
 import { resolvePinStyle, pinSvg, type PinPreset } from "@/atlas/pins/presets";
 import { shouldShowLabel } from "@/atlas/pins/labelVisibility";
