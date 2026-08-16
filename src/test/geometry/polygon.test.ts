@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { pointInPolygon, bboxOf, rectArea, rectIntersectArea } from "@/atlas/geometry/polygon";
+import {
+  pointInPolygon,
+  bboxOf,
+  rectArea,
+  rectIntersectArea,
+  centroid,
+} from "@/atlas/geometry/polygon";
 import type { Point } from "@/atlas/content/schema";
 
 const square: Point[] = [
@@ -68,5 +74,20 @@ describe("bboxOf / rectArea / rectIntersectArea", () => {
     const outer = { minX: 0, minY: 0, maxX: 100, maxY: 100 };
     const inner = { minX: 20, minY: 20, maxX: 60, maxY: 50 }; // 40×30 = 1200
     expect(rectIntersectArea(outer, inner)).toBe(1200);
+  });
+});
+
+describe("centroid", () => {
+  it("averages the vertices of a square", () => expect(centroid(square)).toEqual([50, 50]));
+  it("returns [0, 0] for an empty point list", () => expect(centroid([])).toEqual([0, 0]));
+  it("returns the single point for a one-point list", () =>
+    expect(centroid([[7, 3]])).toEqual([7, 3]));
+  it("averages an asymmetric triangle", () => {
+    const tri: Point[] = [
+      [0, 0],
+      [90, 0],
+      [0, 60],
+    ];
+    expect(centroid(tri)).toEqual([30, 20]);
   });
 });

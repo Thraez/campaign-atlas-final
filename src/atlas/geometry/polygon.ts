@@ -44,3 +44,15 @@ export function rectIntersectArea(a: BBox, b: BBox): number {
   const h = Math.max(0, Math.min(a.maxY, b.maxY) - Math.max(a.minY, b.minY));
   return w * h;
 }
+
+/** Arithmetic mean of the vertices. Coordinates are map coords [x, y]. */
+export function centroid(points: Point[]): Point {
+  if (!points.length) return [0, 0];
+  let sx = 0,
+    sy = 0;
+  for (const [x, y] of points) {
+    sx += x;
+    sy += y;
+  }
+  return [sx / points.length, sy / points.length];
+}

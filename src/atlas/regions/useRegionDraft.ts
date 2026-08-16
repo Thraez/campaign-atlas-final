@@ -11,6 +11,7 @@ import type { MapDocument, Point, Region } from "@/atlas/content/schema";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
 import { slugify as toSlug, uniqueId } from "@/atlas/content/slugify";
 import { useDraftCore } from "@/atlas/editor/useDraftCore";
+import { centroid } from "@/atlas/geometry/polygon";
 
 export interface RegionDraft {
   /** Per-id partial overrides applied to existing canon regions. */
@@ -65,17 +66,6 @@ function slugify(s: string): string {
   // Delegate to the canonical build/runtime slug rule; keep the "region"
   // fallback so an all-symbol name still yields a usable id.
   return toSlug(s) || "region";
-}
-
-function centroid(points: Point[]): Point {
-  if (!points.length) return [0, 0];
-  let sx = 0,
-    sy = 0;
-  for (const [x, y] of points) {
-    sx += x;
-    sy += y;
-  }
-  return [sx / points.length, sy / points.length];
 }
 
 export function useRegionDraft(
