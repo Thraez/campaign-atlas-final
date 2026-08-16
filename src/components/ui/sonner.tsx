@@ -3,6 +3,13 @@ import { Toaster as Sonner, toast } from "sonner";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
+// Error toasts stay on screen until the DM dismisses them (via the close button
+// below) instead of auto-clearing on sonner's default timer — a save/import
+// failure shouldn't be able to vanish before it's read. Success/info/warning
+// keep their normal auto-dismiss behavior.
+const notifyError = toast.error;
+toast.error = (message, data) => notifyError(message, { duration: Infinity, ...data });
+
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme();
 
@@ -10,6 +17,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      richColors
+      closeButton
       toastOptions={{
         classNames: {
           toast:
