@@ -238,6 +238,46 @@ describe("PublishedDiffPanel with precomputed diff", () => {
     expect(header).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("New Tavern")).toBeInTheDocument();
   });
+
+  it("shows the baseline publish date in the header when meta.baselinePublishedAt is set", () => {
+    const d: AtlasDiff = {
+      ...diff,
+      meta: { baselinePublishedAt: "2026-07-12T14:03:00Z" },
+    };
+    render(<PublishedDiffPanel diff={d} />);
+    expect(screen.getByText(/since \d/)).toBeInTheDocument();
+  });
+
+  it("shows no baseline-date subtitle when meta.baselinePublishedAt is absent", () => {
+    render(<PublishedDiffPanel diff={diff} />);
+    expect(screen.queryByText(/since \d/)).not.toBeInTheDocument();
+  });
+
+  it("shows no baseline-date subtitle (never 'Invalid Date') when meta.baselinePublishedAt is unparseable", () => {
+    const d: AtlasDiff = {
+      ...diff,
+      meta: { baselinePublishedAt: "not-a-real-date" },
+    };
+    render(<PublishedDiffPanel diff={d} />);
+    expect(screen.queryByText(/since \d/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/invalid date/i)).not.toBeInTheDocument();
+  });
+
+  it("shows no baseline-date subtitle on a first-ever publish with no baseline", () => {
+    const noBaselineDiff: AtlasDiff = {
+      hasChanges: false,
+      hadBaseline: false,
+      counts: { entities: 0, placements: 0, maps: 0, overlays: 0 },
+      entities: [],
+      placements: [],
+      maps: [],
+      overlays: [],
+      meta: {},
+    };
+    render(<PublishedDiffPanel diff={noBaselineDiff} />);
+    expect(screen.queryByText(/since \d/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/invalid date/i)).not.toBeInTheDocument();
+  });
 });
 
 describe("PublishedDiffPanel — fetch-based states", () => {

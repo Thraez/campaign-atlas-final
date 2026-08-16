@@ -34,6 +34,19 @@ interface Props {
 
 const BASE = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "/");
 
+/** Formats an ISO timestamp for the panel subtitle; returns "" for missing/invalid input. */
+function formatBaselineDate(iso: string | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 async function fetchBaseline(): Promise<AtlasProject | null> {
   try {
     const res = await fetch(`${BASE}atlas/.last-published.json`, { cache: "no-cache" });
@@ -78,6 +91,7 @@ export function PublishedDiffPanel({ current, diff: providedDiff }: Props) {
   };
 
   const diff = providedDiff ?? (baseline && current ? computeAtlasDiff(baseline, current) : null);
+  const baselineDate = formatBaselineDate(diff?.meta.baselinePublishedAt);
 
   return (
     <div className="rounded-md border border-border bg-card/30">
@@ -90,6 +104,11 @@ export function PublishedDiffPanel({ current, diff: providedDiff }: Props) {
         {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         <GitCompare className="h-3 w-3" />
         <span>Changes since last publish</span>
+        {baselineDate && (
+          <span className="normal-case tracking-normal text-muted-foreground/70">
+            since {baselineDate}
+          </span>
+        )}
         {diff?.hasChanges && (
           <span className="ml-auto flex items-center gap-1">
             {diff.counts.entities > 0 && (
