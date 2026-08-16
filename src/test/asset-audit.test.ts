@@ -19,6 +19,8 @@ import {
   auditAssets,
   SIZE_WARN_BYTES,
   SIZE_ERROR_BYTES,
+  TOTAL_BUDGET_WARN_BYTES,
+  TOTAL_BUDGET_ERROR_BYTES,
   normalizeRefPath,
   extractMarkdownImageRefs,
   extractFrontmatterImageRefs,
@@ -120,6 +122,74 @@ describe("auditAssets — size budget", () => {
     const report = auditAssets({ assetsDir, publicDir, contentDir });
     expect(report.oversize).toHaveLength(1);
     expect(report.oversize[0].severity).toBe("error");
+  });
+});
+
+describe("auditAssets — total payload budget", () => {
+  it("defaults keep the hard cap above the soft cap", () => {
+    expect(TOTAL_BUDGET_ERROR_BYTES).toBeGreaterThan(TOTAL_BUDGET_WARN_BYTES);
+  });
+
+  it("reports 'ok' when the combined payload is under the soft threshold", () => {
+    writeAsset("atlas/assets/maps/small.jpg", 1024);
+    writeContent(
+      "world/note.md",
+      "---\natlas:\n  images:\n    - atlas/assets/maps/small.jpg\n---\n",
+    );
+    const report = auditAssets({
+      assetsDir,
+      publicDir,
+      contentDir,
+      totalWarnBytes: 2048,
+      totalErrorBytes: 4096,
+    });
+    expect(report.totalBudget.severity).toBe("ok");
+    expect(report.totalBudget.totalBytes).toBe(1024);
+  });
+
+  it("reports 'warning' once combined asset size passes the soft threshold", () => {
+    writeAsset("atlas/assets/maps/a.jpg", 1500);
+    writeAsset("atlas/assets/maps/b.jpg", 1500);
+    writeContent(
+      "world/note.md",
+      "---\natlas:\n  images:\n    - atlas/assets/maps/a.jpg\n    - atlas/assets/maps/b.jpg\n---\n",
+    );
+    const report = auditAssets({
+      assetsDir,
+      publicDir,
+      contentDir,
+      totalWarnBytes: 2048,
+      totalErrorBytes: 8192,
+    });
+    expect(report.totalBudget.severity).toBe("warning");
+  });
+
+  it("reports 'error' once combined asset size passes the hard threshold", () => {
+    writeAsset("atlas/assets/maps/a.jpg", 5000);
+    writeAsset("atlas/assets/maps/b.jpg", 5000);
+    writeContent(
+      "world/note.md",
+      "---\natlas:\n  images:\n    - atlas/assets/maps/a.jpg\n    - atlas/assets/maps/b.jpg\n---\n",
+    );
+    const report = auditAssets({
+      assetsDir,
+      publicDir,
+      contentDir,
+      totalWarnBytes: 2048,
+      totalErrorBytes: 8192,
+    });
+    expect(report.totalBudget.severity).toBe("error");
+  });
+
+  it("uses the shared TOTAL_BUDGET defaults when no override is given", () => {
+    writeAsset("atlas/assets/maps/small.jpg", 1024);
+    writeContent(
+      "world/note.md",
+      "---\natlas:\n  images:\n    - atlas/assets/maps/small.jpg\n---\n",
+    );
+    const report = auditAssets({ assetsDir, publicDir, contentDir });
+    expect(report.totalBudget.warnBytes).toBe(TOTAL_BUDGET_WARN_BYTES);
+    expect(report.totalBudget.errorBytes).toBe(TOTAL_BUDGET_ERROR_BYTES);
   });
 });
 
@@ -296,6 +366,42 @@ describe.sequential("audit-assets CLI", () => {
     const lax = run(["--assets-dir", assetsDir, "--content-dir", contentDir]);
     expect(lax.status, lax.stderr + lax.stdout).toBe(0);
     const strict = run(["--assets-dir", assetsDir, "--content-dir", contentDir, "--strict"]);
+    expect(strict.status).toBe(13);
+  });
+
+  it("exits 13 when the total payload exceeds --total-error-bytes", () => {
+    writeAsset("atlas/assets/maps/a.jpg", 5000);
+    writeContent("world/note.md", "---\natlas:\n  images:\n    - atlas/assets/maps/a.jpg\n---\n");
+    const r = run([
+      "--assets-dir",
+      assetsDir,
+      "--content-dir",
+      contentDir,
+      "--total-warn-bytes",
+      "1000",
+      "--total-error-bytes",
+      "2000",
+    ]);
+    expect(r.status).toBe(13);
+    expect(r.stdout + r.stderr).toContain("BUDGET");
+  });
+
+  it("exits 0 by default but 13 under --strict when only a total-budget warning exists", () => {
+    writeAsset("atlas/assets/maps/a.jpg", 1500);
+    writeContent("world/note.md", "---\natlas:\n  images:\n    - atlas/assets/maps/a.jpg\n---\n");
+    const args = [
+      "--assets-dir",
+      assetsDir,
+      "--content-dir",
+      contentDir,
+      "--total-warn-bytes",
+      "1000",
+      "--total-error-bytes",
+      "8000",
+    ];
+    const lax = run(args);
+    expect(lax.status, lax.stderr + lax.stdout).toBe(0);
+    const strict = run([...args, "--strict"]);
     expect(strict.status).toBe(13);
   });
 
