@@ -3927,3 +3927,33 @@ check confirmed a blown budget (1 MB asset against a 100-byte warn / ~488 KB fai
 **skipped** — third consecutive run flagging this: `main` remains at `b9d7516d`, the same 3 commits
 (`835aed4f`, `216883fb`, `b9d7516d`) are still not reachable from `auto/continuous-dev`, and neither
 branch is an ancestor of the other. Left for a human to reconcile.
+
+- [x] **S4. Show the baseline publish date in the "changes since last publish" panel.** ✅ DONE 2026-08-16 — commit `a323ea40`
+
+**What shipped:** `computeAtlasDiff.ts:96/140/293` already carried `meta.baselinePublishedAt` on
+every `AtlasDiff` (verified premise still true 2026-08-16 — a repo-wide grep found no reader in
+`src/`), but `PublishedDiffPanel` never rendered it, so the panel never said what it was comparing
+against. Pure display wiring, no data-shape change.
+
+**Implementation:**
+- `src/atlas/publish/PublishedDiffPanel.tsx`: new `formatBaselineDate(iso)` helper — returns `""`
+  for a missing or unparseable ISO string (never "Invalid Date"), otherwise a short
+  `toLocaleString`-based day/month/time string, matching the format already used by `SyncPanel` and
+  `PublishCheckTab` elsewhere in the app. Rendered as a small "since &lt;date&gt;" subtitle next to
+  the "Changes since last publish" header, only when a baseline date exists — a first-ever publish
+  (no baseline) or an unparseable date both fall back to no subtitle instead of blank/garbage text.
+- `src/atlas/publish/PublishedDiffPanel.test.tsx`: 4 new tests — subtitle renders when
+  `meta.baselinePublishedAt` is set, stays absent when unset, stays absent (never "Invalid Date")
+  for an unparseable string, and stays absent on a first-ever publish with no baseline.
+
+**Gate:** `tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (13 pre-existing
+warnings, none new) · full sharded suite green (775+684+841+811 = 3111 tests across 4 shards; shard
+4 hit the same documented `onTaskUpdate` RPC flake on two consecutive attempts, 0 real test failures
+either time — accepted per policy). Pure UI display change, doesn't touch `scripts/`, fog redaction,
+soundscape, or shipped artifacts, so `atlas:publish` wasn't required by the gate.
+
+**Merge:** `run/s4-baseline-date` → `auto/continuous-dev` (fast-forward, `8694552d..a323ea40`,
+pushed to origin). Fast-forward to `origin/main` is still **skipped** — fourth consecutive run
+flagging this: `main` remains at `b9d7516d`, the same 3 commits (`835aed4f`, `216883fb`, `b9d7516d`)
+are still not reachable from `auto/continuous-dev`, and neither branch is an ancestor of the other.
+Left for a human to reconcile.

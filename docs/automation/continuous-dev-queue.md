@@ -279,7 +279,7 @@ is for sequencing, not the whole spec.
 
 - [x] ~~**S3. Add a total-player-payload budget check to `atlas:audit-assets`.**~~ — built 2026-08-16. See `continuous-dev-done.md`.
 
-- [ ] **S4. Show the baseline publish date in the "changes since last publish" panel.** _(qol)_ — `computeAtlasDiff.ts:96/140/293` already carries `baselinePublishedAt`, and a repo-wide grep confirms **nothing in `src/` reads it** — `PublishedDiffPanel` never renders it. Pure display wiring. **Done when:** the panel says what it is comparing against ("since 12 July, 14:03"), and a first-ever publish with no baseline still reads sensibly instead of showing a blank or "Invalid Date".
+- [x] ~~**S4. Show the baseline publish date in the "changes since last publish" panel.**~~ — built 2026-08-16. See `continuous-dev-done.md`.
 
 - [x] ~~**S5. Add a concurrency group to the PR-check workflow.**~~ — built during the 2026-08-06 sweep, alongside the CI-gate-gap fix it sits next to. `atlas-pr-check.yml` now carries `concurrency: pr-check-${{ github.ref }}` with `cancel-in-progress: true`.
 
