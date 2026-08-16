@@ -1,0 +1,40 @@
+# Weekly dependency-vulnerability safety net.
+#
+# Neither atlas-pr-check.yml nor publish-atlas.yml runs `npm audit` today, so
+# a new high/critical advisory in a shipped dependency can land silently.
+# This workflow is separate from those so a routine audit finding never
+# blocks a PR or a publish — it only reports.
+
+name: Dependency Audit
+
+on:
+  schedule:
+    # Monday 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit shipped dependencies (high+ severity only)
+        # --omit=dev scopes this to what actually ships (build tooling like
+        # vite/sharp is dev-only and tracked separately); --audit-level=high
+        # ignores moderate/low noise. As of 2026-08, this passes cleanly —
+        # the two known high-severity advisories left in the tree (sharp,
+        # vite) are both dev-only and need a breaking major to clear.
+        run: npm audit --omit=dev --audit-level=high
