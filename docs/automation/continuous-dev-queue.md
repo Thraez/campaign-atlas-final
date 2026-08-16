@@ -295,8 +295,6 @@ is for sequencing, not the whole spec.
 
 - [x] ~~**S13. Home `centroid()` into `geometry/polygon.ts`.**~~ ✅ DONE 2026-08-16 — commit `0f80a8b5`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **S14. Extract `buildDraftPlacements` into a pure editor helper.** _(refactor)_ — it is still a `useCallback` at `AtlasPlacementEditor.tsx:677`, mapping `project.entities` → `PlacementOverride[]` with no component state involved. `src/atlas/editor/dirtyPlacements.ts` already documents it (`:5`) and is the natural home. Move the pure body out, keep a thin wrapper in the component. **Done when:** the logic is a pure exported function with its own unit test, the editor keeps behaving identically, and the component shrinks.
-
 - [ ] **S15. Add a low-noise scheduled `npm audit` safety net.** _(infra)_ — no dependency-vulnerability check exists anywhere in CI (verified: no `npm audit` under `.github/workflows/`). Add a weekly `schedule:` workflow running `npm audit` at a high-severity threshold so it reports real problems and stays quiet otherwise. **Done when:** the workflow runs on a schedule, fails only on genuinely actionable severities, and a normal week produces no noise.
 
 ---

@@ -4152,3 +4152,29 @@ green) · full sharded suite green (778+686+922+738 = 3124 tests across 4 shards
 
 **Merge:** `run/s13-centroid-geometry` (commit `0f80a8b5`) → `auto/continuous-dev` (fast-forward,
 `aac5ac57..0f80a8b5`).
+
+- [x] **S14. Extract `buildDraftPlacements` into a pure editor helper.** ✅ DONE 2026-08-16 — commit `2a0ea558`
+
+**What shipped:** `buildDraftPlacements`, previously a `useCallback` at `AtlasPlacementEditor.tsx:678`
+mapping `project.entities` → `PlacementOverride[]` via `effectivePlacement` (no component state involved),
+now lives as a pure exported function in `src/atlas/editor/dirtyPlacements.ts`, next to
+`filterDirtyPlacements` whose doc comment already referenced it. The component keeps a thin wrapper
+(`project`/`activeMap` null-guard, `useCallback` for referential stability) that delegates to the pure
+function.
+
+- TDD: added a `describe("buildDraftPlacements", ...)` block to the existing
+  `src/test/editor/dirtyPlacements.test.ts` (5 cases: emits a draft per entity with an effective
+  placement, skips entities with none, omits the label when it equals the entity title but keeps it when
+  it differs, passes the pin override through untouched, stamps every draft with the given `mapId`) —
+  9/9 in that file green.
+- Premise re-verified before building: `buildDraftPlacements` was still a private `useCallback` at
+  `AtlasPlacementEditor.tsx:678` (one line off the queue's `:677`, i.e. still current), with
+  `dirtyPlacements.ts` documenting it at `:5` but not yet defining it; no prior DONE entry covered this.
+
+**Gate:** typecheck clean (`tsc --noEmit -p tsconfig.app.json`) · lint 0 errors (13 pre-existing warnings,
+none new) · `format:check` clean (after `prettier --write` on the new test cases) · full sharded suite
+green (778+691+922+738 = 3129 tests across 4 shards; shard 4 hit the documented `onTaskUpdate` RPC flake,
+0 real test failures). Pure refactor, no build/scan/fog/artifact touch, so `atlas:publish` wasn't
+required.
+
+**Merge:** `run/s14-builddraftplacements` (commit `2a0ea558`) → `auto/continuous-dev` (merge commit).
