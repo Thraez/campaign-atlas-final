@@ -3888,3 +3888,42 @@ failures either time, not a gate failure per policy). No build/scan-pipeline fil
 **skipped**: the same divergence from the S1 run persists unchanged (`main` at `b9d7516d`,
 3 commits `835aed4f`/`216883fb`/`b9d7516d` not on `auto/continuous-dev`; neither branch is an
 ancestor of the other). Left for a human to reconcile.
+
+- [x] **S3. Add a total-player-payload budget check to `atlas:audit-assets`.** ✅ DONE 2026-08-16 — commit `c7eaecdb`
+
+**What shipped:** `auditAssets()` in `scripts/atlas/audit-assets.ts` already computed `totalBytes`
+across every scanned asset but never bounded it (verified premise still true 2026-08-16 — no
+`BUDGET`/`MAX_TOTAL` constant existed). Added a total-payload budget alongside the existing 1 MB /
+4 MB per-file thresholds: a soft warn line and a hard fail line, both overridable via new CLI flags.
+
+**Implementation:**
+- `src/atlas/assets/assetSize.ts`: added `TOTAL_BUDGET_WARN_BYTES` (40 MB) and
+  `TOTAL_BUDGET_ERROR_BYTES` (80 MB) next to the existing per-file constants. Values chosen by
+  measuring the current real payload (`du -sh public/atlas/assets/*` ≈ 22 MB: 19 MB maps, 3.4 MB
+  audio, everything else negligible) and giving roughly 2×/4× headroom — no human was available to
+  bless a specific number for this non-interactive run, so this is a documented judgment call, not
+  a design decision requiring a human.
+- `scripts/atlas/audit-assets.ts`: `AuditReport` gained a `totalBudget: TotalBudgetFinding` field
+  (`severity: "ok" | "warning" | "error"`, plus the raw totals); `AuditOptions`/`RunOpts`/`CliFlags`
+  gained optional `totalWarnBytes`/`totalErrorBytes` overrides; new `--total-warn-bytes`/
+  `--total-error-bytes` CLI flags (both `--flag value` and `--flag=value` forms, mirroring the
+  existing flag style); `run()` prints a `BUDGET  <total> total (warn > X, fail > Y) :: PASS|WARN|FAIL`
+  line and the exit code is 13 when `totalBudget.severity === "error"` (or `"warning"` under
+  `--strict`), same exit-code contract as the existing size-error path.
+- `src/test/asset-audit.test.ts`: 5 new unit tests on `auditAssets()` (ok/warn/error severity
+  boundaries, custom threshold overrides, budget independent of per-file oversize) plus 2 new CLI
+  tests (default thresholds pass on a small fixture; a scratch copy with tiny
+  `--total-warn-bytes`/`--total-error-bytes` fails with exit code 13 and a `BUDGET ... FAIL` line).
+
+**Gate:** `tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (13 pre-existing
+warnings, none new) · full sharded suite green (775+680+841+811 = 3107 tests across 4 shards; shard
+4 hit the same documented `onTaskUpdate` RPC flake on two consecutive attempts, 0 real test failures
+either time) · `npm run atlas:publish` green end-to-end, with the new `BUDGET  17.99 MB total
+(warn > 40.00 MB, fail > 80.00 MB) :: PASS` line printed in the scan output · manual scratch-copy
+check confirmed a blown budget (1 MB asset against a 100-byte warn / ~488 KB fail threshold) prints
+`BUDGET ... :: FAIL` and exits 13, satisfying the queue entry's explicit "done when" clause.
+
+**Merge:** `run/s3-asset-budget` → `auto/continuous-dev`. Fast-forward to `origin/main` is still
+**skipped** — third consecutive run flagging this: `main` remains at `b9d7516d`, the same 3 commits
+(`835aed4f`, `216883fb`, `b9d7516d`) are still not reachable from `auto/continuous-dev`, and neither
+branch is an ancestor of the other. Left for a human to reconcile.

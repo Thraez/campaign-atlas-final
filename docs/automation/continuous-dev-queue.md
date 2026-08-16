@@ -277,7 +277,7 @@ is for sequencing, not the whole spec.
 
 - [x] ~~**S2. Add a filter and an "uncredited only" toggle to the Asset Manager.**~~ — built 2026-08-16. Text filter (matches src / used-by) plus an "Uncredited only" checkbox that hides assets whose credit is both set and enabled. See `continuous-dev-done.md`.
 
-- [ ] **S3. Add a total-player-payload budget check to `atlas:audit-assets`.** _(infra)_ — `scripts/atlas/audit-assets.ts:342` already computes `totalBytes` but nothing bounds it; there is no `BUDGET`/`MAX_TOTAL` constant in the file. Add a total-payload threshold that warns (and a higher one that fails) alongside the existing 1 MB / 4 MB per-file checks. **Gate:** `npm run atlas:publish` must stay green. **Done when:** running the audit on the current world prints the total shipped payload and a clear pass/warn/fail line, and deliberately blowing the budget in a scratch copy fails the command.
+- [x] ~~**S3. Add a total-player-payload budget check to `atlas:audit-assets`.**~~ — built 2026-08-16. See `continuous-dev-done.md`.
 
 - [ ] **S4. Show the baseline publish date in the "changes since last publish" panel.** _(qol)_ — `computeAtlasDiff.ts:96/140/293` already carries `baselinePublishedAt`, and a repo-wide grep confirms **nothing in `src/` reads it** — `PublishedDiffPanel` never renders it. Pure display wiring. **Done when:** the panel says what it is comparing against ("since 12 July, 14:03"), and a first-ever publish with no baseline still reads sensibly instead of showing a blank or "Invalid Date".
 
