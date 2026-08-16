@@ -4178,3 +4178,32 @@ green (778+691+922+738 = 3129 tests across 4 shards; shard 4 hit the documented 
 required.
 
 **Merge:** `run/s14-builddraftplacements` (commit `2a0ea558`) → `auto/continuous-dev` (merge commit).
+
+- [x] **S15. Add a low-noise scheduled `npm audit` safety net.** ✅ DONE 2026-08-16 — commit `e5ca2d25`
+
+**What shipped:** `.github/workflows/npm-audit.yml`, a new weekly `schedule:` workflow (Monday 06:00 UTC,
+plus `workflow_dispatch`) separate from `atlas-pr-check.yml`/`publish-atlas.yml` so a routine finding never
+blocks a PR or a publish. Runs `npm audit --omit=dev --audit-level=high`.
+
+- **Design note (premise re-verified, then adjusted for a real conflict):** the queue entry's literal
+  reading — plain `npm audit` at `--audit-level=high` — was checked against the actual dependency tree
+  before building, not just the write-up. `main` currently carries 2 known, deliberately-deferred
+  high-severity advisories (`sharp`, `vite` — both need a semver-major bump per the 2026-08-09 security
+  patch pass) and `auto/continuous-dev` carries 16 (it hasn't picked up that patch commit yet, per the
+  standing main-merge divergence). A bare `--audit-level=high` would have failed on its very first
+  scheduled run, directly contradicting the unit's own "Done when: … a normal week produces no noise."
+  Checked whether the 2 outstanding advisories are shipped: `sharp` and `vite` are both `devDependencies`
+  only (confirmed via `package.json`), so scoping the audit to `--omit=dev` clears both while still
+  catching a new high/critical advisory in anything that actually ships. Verified clean on `main`
+  (`npm audit --omit=dev --audit-level=high` → exit 0, 0 high/critical) before committing to this shape.
+  GitHub's `schedule:` trigger always runs against the default branch (`main`), so this is the tree the
+  workflow will actually audit in production, not `auto/continuous-dev`'s stale one.
+- Premise check: grepped `.github/workflows/*.yml` for any existing audit step — none — confirmed still
+  true; no prior DONE entry covers this.
+
+**Gate:** typecheck clean · lint 0 errors (13 pre-existing warnings, none new) · `format:check` clean ·
+full sharded suite green (778+691+922+738 = 3129 tests across 4 shards; shard 4 hit the documented
+`onTaskUpdate` RPC flake, 0 real test failures). Workflow-only change (no `scripts/`, fog, or shipped
+artifact touch), so `atlas:publish` wasn't required.
+
+**Merge:** `run/s15-npm-audit` (commit `e5ca2d25`) → `auto/continuous-dev` (merge commit).
