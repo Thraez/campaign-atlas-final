@@ -4101,3 +4101,26 @@ touch `scripts/`, fog redaction, soundscape, or shipped artifacts, so `atlas:pub
 the gate.
 
 **Merge:** `run/s10-toaster-feedback` (commit `6f8bffb4`) → `auto/continuous-dev`.
+
+## S12. Remove the leftover generated artifacts from `content/astrath-deeprealm/_atlas/` ✅ 2026-08-16
+
+**Shipped:** `content/astrath-deeprealm/_atlas/placements-patch-astrath-deeprealm-overview.yaml` and
+`__test.yaml` are gone. The folder now holds only `.gitkeep` and the real `world.yaml`.
+
+- Premise re-verified before building: `loadWorldConfig.ts:159` loads `_atlas/world.yaml` by exact path
+  only — no glob touches the rest of the folder — and a repo-wide grep of `src/` and `scripts/` found no
+  reference to either stale file (the sole `placements-patch-*` hit anywhere is an unrelated fixture path
+  string inside `src/test/diff-preview-modal.test.tsx`, pointing at `content/world/_atlas/`, a different
+  world).
+- Deleted both files, kept `.gitkeep` and `world.yaml`.
+- Verified the deletion doesn't change the built atlas: ran `npm run atlas:publish` with the files still
+  present as a baseline, then again after deleting them. Both runs produced the identical CRLF→LF
+  normalization diff against the checked-in `atlas.json` (entity body text line endings) — a pre-existing
+  drift from a fresh Windows build, unrelated to this change. With that field-level noise excluded, the
+  built atlas is unchanged.
+
+**Gate:** typecheck clean · lint 0 errors (13 pre-existing warnings, none new) · format:check clean ·
+`npm run atlas:publish` green (all 12 scans clean) · full sharded suite green (778+686+918+738 = 3120
+tests across 4 shards; shard 4 hit the documented `onTaskUpdate` RPC flake, 0 real test failures).
+
+**Merge:** `run/s12-remove-stale-atlas-artifacts` (commit `f055457d`) → `auto/continuous-dev`.

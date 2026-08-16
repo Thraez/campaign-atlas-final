@@ -291,7 +291,7 @@ is for sequencing, not the whole spec.
 
 - [x] ~~**S10. Configure the Toaster for clearer, persistent error feedback.**~~ ✅ DONE 2026-08-16 — commit `6f8bffb4`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **S12. Remove the leftover generated artifacts from `content/astrath-deeprealm/_atlas/`.** _(infra)_ — the folder holds `placements-patch-astrath-deeprealm-overview.yaml` and `__test.yaml` alongside the real `world.yaml`; a repo-wide grep of `src/` and `scripts/` finds no reference to either (the only `placements-patch-*` hits are `content/world/_atlas/placements-patch-m1.yaml` inside `src/test/diff-preview-modal.test.tsx`, a different fixture). Delete the two stale files, keep `.gitkeep` and `world.yaml`. **Gate:** `npm run atlas:publish` must stay green and the built atlas must be byte-identical apart from its timestamp. **Done when:** the folder holds only files the build actually reads, and a full publish produces the same atlas as before.
+- [x] ~~**S12. Remove the leftover generated artifacts from `content/astrath-deeprealm/_atlas/`.**~~ ✅ DONE 2026-08-16 — commit `f055457d`. Full write-up in `continuous-dev-done.md`.
 
 - [ ] **S13. Home `centroid()` into `geometry/polygon.ts`.** _(refactor)_ — `centroid(points: Point[])` is still a private helper at `src/atlas/regions/useRegionDraft.ts:70`, used at `:218`, while the shared geometry module is the obvious home. Move it, export it, add a direct unit test. **Done when:** the helper lives in the geometry module with its own test, `useRegionDraft` imports it, and region label placement is unchanged.
 
