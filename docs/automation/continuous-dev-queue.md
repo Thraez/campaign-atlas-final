@@ -293,7 +293,7 @@ is for sequencing, not the whole spec.
 
 - [x] ~~**S12. Remove the leftover generated artifacts from `content/astrath-deeprealm/_atlas/`.**~~ ✅ DONE 2026-08-16 — commit `f055457d`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **S13. Home `centroid()` into `geometry/polygon.ts`.** _(refactor)_ — `centroid(points: Point[])` is still a private helper at `src/atlas/regions/useRegionDraft.ts:70`, used at `:218`, while the shared geometry module is the obvious home. Move it, export it, add a direct unit test. **Done when:** the helper lives in the geometry module with its own test, `useRegionDraft` imports it, and region label placement is unchanged.
+- [x] ~~**S13. Home `centroid()` into `geometry/polygon.ts`.**~~ ✅ DONE 2026-08-16 — commit `0f80a8b5`. Full write-up in `continuous-dev-done.md`.
 
 - [ ] **S14. Extract `buildDraftPlacements` into a pure editor helper.** _(refactor)_ — it is still a `useCallback` at `AtlasPlacementEditor.tsx:677`, mapping `project.entities` → `PlacementOverride[]` with no component state involved. `src/atlas/editor/dirtyPlacements.ts` already documents it (`:5`) and is the natural home. Move the pure body out, keep a thin wrapper in the component. **Done when:** the logic is a pure exported function with its own unit test, the editor keeps behaving identically, and the component shrinks.
 

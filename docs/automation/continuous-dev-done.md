@@ -4124,3 +4124,31 @@ the gate.
 tests across 4 shards; shard 4 hit the documented `onTaskUpdate` RPC flake, 0 real test failures).
 
 **Merge:** `run/s12-remove-stale-atlas-artifacts` (commit `f055457d`) → `auto/continuous-dev`.
+
+- [x] **S13. Home `centroid()` into `geometry/polygon.ts`.** ✅ DONE 2026-08-16 — commit `0f80a8b5`
+
+**What shipped:** `centroid(points: Point[])` moved out of `src/atlas/regions/useRegionDraft.ts` (was a
+private helper at `:70`, used at `:220` inside `duplicate`) into `src/atlas/geometry/polygon.ts`, exported
+alongside the other pure polygon helpers (`pointInPolygon`, `bboxOf`, `rectArea`, `rectIntersectArea`).
+`useRegionDraft.ts` now imports it instead of defining its own copy. Body and behavior unchanged — pure
+move + export.
+
+- TDD: added a failing `describe("centroid", ...)` block to the existing `src/test/geometry/polygon.test.ts`
+  (four cases: square average, empty-list `[0,0]` guard, single-point passthrough, asymmetric triangle),
+  watched it fail with `centroid is not a function`, then added the function to `polygon.ts` and watched it
+  pass (20/20 in that file). No test previously covered this function directly — `duplicate()`'s only
+  caller computes `c` and immediately discards it (`void c;`), so region-draft tests never exercised the
+  math.
+- Premise re-verified before building: file/line matched the queue entry exactly (`:70` def, `:218-220`
+  call site); `geometry/polygon.ts` existed with sibling pure helpers but no `centroid`; no prior DONE
+  entry covered it.
+
+**Gate:** typecheck clean · lint 0 errors (13 pre-existing warnings, none new) · targeted suite green
+(`polygon.test.ts` 20/20, plus region-draft-adjacent files `atlas-regions.test.ts`,
+`atlas-region-route-strict.test.ts`, `atlas-viewer-region-ruler.test.tsx`, `RegionsTab.test.tsx`, all
+green) · full sharded suite green (778+686+922+738 = 3124 tests across 4 shards; shard 4 hit the documented
+`onTaskUpdate` RPC flake, 0 real test failures). Pure refactor, no build/scan/fog/artifact touch, so
+`atlas:publish` wasn't required.
+
+**Merge:** `run/s13-centroid-geometry` (commit `0f80a8b5`) → `auto/continuous-dev` (fast-forward,
+`aac5ac57..0f80a8b5`).
