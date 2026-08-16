@@ -38,19 +38,23 @@ Typical session-prep loop, 5–15 minutes:
 
 ## The Creator Cockpit (`/atlas/edit`)
 
-Each tab is a focused tool.
+Each rail tab is a focused tool, grouped Content / Map / System.
 
-| Tab | What it does |
-|---|---|
-| **Pins** | Drop, drag, retype, recolor pin placements. Multi-select for bulk operations. |
-| **Maps** | Add image layers, set opacity/zindex, define scale, grid, ocean color. |
-| **Regions** | Draw polygon regions, color them, set per-region visibility. |
-| **Routes** | Draw waypoint-based routes (foot/horse/ship/fly), with travel-time speed. |
-| **Fog** | Paint reveals + draw fog (conceals) over a map; set a soft-edge width. When fog is enabled on a map, the player build redacts that map's image layers behind a feathered alpha mask, strips the fog geometry from the player atlas, and excludes any pins/routes/regions that fall in fog. The player viewer paints the map's ocean color behind the redacted image. |
-| **Sound** | Draw sound areas over a map and attach a looping ambience to each; set volume and visibility. See [Ambient sound](#ambient-sound) below. |
-| **Entities** | Edit entity frontmatter, profile, relationships. One-click `:::dm` insert for field-level visibility. |
-| **Import** | Drop in a folder of markdown, classify into ignored/wiki-only/placeable/published, get patches. |
-| **Publish Check** | Pre-flight dashboard: counts, warnings, last-publish diff, strict-build summary. |
+| Tab | Group | What it does |
+|---|---|---|
+| **Characters / Locations / Factions / Events / Items / Lore** | Content | One tab per category. Browse, create, edit frontmatter, profile, relationships. One-click `:::dm` insert for field-level visibility. An "Import .md" button on each tab classifies dropped markdown into ignored/wiki-only/placeable/published and produces a patch — see [Import wizard](#import-wizard) below. |
+| **Pins** | Map | Drop, drag, retype, recolor pin placements. Multi-select for bulk operations. |
+| **Regions** | Map | Draw polygon regions, color them, set per-region visibility. |
+| **Routes** | Map | Draw waypoint-based routes (foot/horse/ship/fly), with travel-time speed. |
+| **Fog** | Map | Paint reveals + draw fog (conceals) over a map; set a soft-edge width. When fog is enabled on a map, the player build redacts that map's image layers behind a feathered alpha mask, strips the fog geometry from the player atlas, and excludes any pins/routes/regions that fall in fog. The player viewer paints the map's ocean color behind the redacted image. |
+| **Sound** | Map | Draw sound areas over a map and attach a looping ambience to each; set volume and visibility. See [Ambient sound](#ambient-sound) below. |
+| **Publish** | System | Pre-flight dashboard: counts, warnings, last-publish diff, strict-build summary. |
+| **Player keys** | System | Generate, copy, and revoke per-character secret-unlock keys. |
+| **Sync from Obsidian** | System | Pick vault folders with tick boxes and pull in new/changed notes since the last sync; nothing auto-applies. |
+
+There is no Save tab — saving to disk is the persistent SaveStatus control in the toolbar (Ctrl+S), not a rail
+icon. Map layers (image uploads, opacity/zindex, scale, grid, ocean color) live in the **Map Details** panel,
+and batch map-layer import has its own wizard button there — both open from the ☰ menu, not the rail.
 
 ### Save plugin (writes to disk)
 
@@ -89,11 +93,12 @@ The **Sound** tab (rail shortcut `S`) adds looping atmosphere to a map. Draw a s
 
 In the player viewer, a mute/volume control persists the visitor's preference. Because browsers block audio autoplay, ambience does not start on page load — it begins on the visitor's first interaction with the page (the viewer surfaces an "enable sound" control for that first gesture).
 
-## Import wizard (`/atlas/edit` → Import tab)
+## Import wizard
 
-For a folder of existing Obsidian markdown:
+Import is not a rail tab. Each content tab (`/atlas/edit`) has its own "Import .md" button (also reachable
+from the command palette) for a folder of existing Obsidian markdown:
 
-1. Drop the folder into the import tab.
+1. Drop the folder in via the "Import .md" button.
 2. Each file is classified:
    - **Ignored** — under an excluded folder, or `publish: false`.
    - **Wiki-only** — no `atlas.placements`, ships as a wiki entry but no pin.

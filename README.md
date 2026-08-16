@@ -43,7 +43,7 @@ Minimap
 Offline PWA for production builds
 Print / PDF player handouts
 `/atlas/edit` Creator Cockpit for DM prep
-Visual editor tabs for pins, maps, regions, routes, fog, entities, import, and publish check
+Visual editor rail for content, pins, regions, routes, fog, sound, publish check, player keys, and Obsidian sync
 Unified Save — writes edits straight back to the vault on disk (dev only)
 Ambient soundscapes — looping map audio players hear as they explore, with a mute/volume control
 Build and validation tests for spoiler safety and `world.yaml` behavior
@@ -696,9 +696,10 @@ Open:
 This is a local/private DM tool. It is not the source of truth. It creates local draft changes, then exports YAML/frontmatter patches that you commit.
 The Creator Cockpit rail currently includes:
 Content tabs: Characters, Locations, Factions, Events, Items, Lore
-Map tabs: Pins, Regions, Routes, Fog
-System tabs: Save, Publish
-Panels accessible from the ☰ menu only (not rail icons): Maps (Map Details), Import
+Map tabs: Pins, Regions, Routes, Fog, Sound
+System tabs: Publish, Player keys, Sync from Obsidian
+There is no Save tab — the toolbar's persistent Save control handles that. Import is not a tab either: markdown import runs from an "Import .md" button on each content tab (and the command palette), and map layers get a separate batch Import Maps wizard button in the Edit map details panel.
+Panels accessible from the ☰ menu only (not rail icons): Edit world details, Edit map details (map size, ocean color, layers), Name the months (calendar), Manage assets, Help
 Content tabs (Characters, Locations, Factions, Events, Items, Lore)
 Each content category has its own tab with a browse view and a create-new form.
 Use any content tab to:
@@ -750,11 +751,12 @@ reveal around a pin
 reveal around a route
 reveal a selected region
 export `world.yaml` fog patches
-Save tab (keyboard shortcut: Ctrl+S)
+Sound tab
 Use this to:
-save all draft changes to disk
-review the generated YAML/frontmatter diff before writing
-write accepted changes to your local repository
+draw sound areas over a map, or attach one to an existing region
+attach a looping ambience and set its volume
+set player-visible or DM-only visibility
+export `world.yaml` sound-area patches
 Publish tab
 Use this before publishing to check:
 player-safety issues
@@ -767,20 +769,25 @@ empty maps
 pins outside bounds
 route/region/fog problems
 local draft changes not exported
-Menu-only panels (open via the ☰ hamburger menu, not rail icons)
-Maps (Map Details)
+Player keys tab
 Use this to:
-change map size
-change ocean color
-enable/disable horizontal wrap
-edit grid and scale
-upload map layers
-add external URL layers
-move, resize, scale, center, fit, and reorder layers
-export world map/layer patches
-export uploaded assets as a zip
-Import
-Use this to review imported Obsidian/markdown content and identify missing metadata or safe defaults.
+generate a per-character secret-unlock key
+copy a character's key to share with that player
+revoke or regenerate a key
+Sync from Obsidian tab
+Use this to:
+pick vault folders to draw from with tick boxes (not glob typing)
+pull in new or changed notes since the last sync
+review detected changes before they're applied — nothing auto-applies
+Menu-only panels (open via the ☰ hamburger menu, not rail icons)
+Edit world details
+Edit map details (map size, ocean color, horizontal wrap, grid and scale, upload map layers, add external URL layers, move/resize/scale/center/fit/reorder layers, export world map/layer patches)
+Name the months (define the in-world calendar used by the Timeline)
+Manage assets (browse uploaded assets, credits, export as a zip)
+Help
+Import is not a rail tab or menu panel. Markdown import runs from an "Import .md" button on each content
+tab (and the command palette); map-layer import has its own batch "Import Maps" wizard button inside the
+map-details panel.
 ---
 ## Save workflow (local repo)
 
