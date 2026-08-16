@@ -4044,3 +4044,34 @@ deps patch) — `main` also carries a whole `reloadLatestAtlas()` feature in `sr
 `describe` block in `src/test/pwa.test.ts`) that was never merged into `auto/continuous-dev`. A human
 needs to reconcile these branches — resolving it by hand here would risk silently dropping the shipped
 `reloadLatestAtlas` feature from whichever branch loses the merge.
+
+## S10. Configure the Toaster for clearer, persistent error feedback ✅ 2026-08-16
+
+`src/components/ui/sonner.tsx` rendered `<Sonner>` on defaults — no `richColors`, no `closeButton`,
+default auto-dismiss — so an error toast looked identical to a success toast and could vanish before the
+DM read it.
+
+**Implementation:**
+- `src/components/ui/sonner.tsx`: added `richColors` and `closeButton` props to the shared `<Sonner>`
+  (richColors color-codes by toast type via sonner's own `[data-rich-colors][data-type=...]` CSS, which
+  out-specifies our custom neutral `bg-background`/`border-border` classNames, so it doesn't fight the
+  existing styling). Wrapped the exported `toast.error` so every error toast defaults to
+  `duration: Infinity` (a caller-supplied `duration` or other option still overrides), while
+  `toast.success`/`.warning`/`.info` keep sonner's normal auto-dismiss timing.
+- `src/test/components/sonner.test.ts` (new): asserts the default-Infinity wrap, that a caller override
+  wins, and that `toast.success` is left untouched.
+
+Call sites (`toast.error(...)` in `EntityEditPanel.tsx`, `useMdImportFlow.ts`, `SyncPanel.tsx`, etc.) were
+deliberately left unchanged — they all import `toast` from the raw `"sonner"` package, and the wrap lives
+on the shared `toast` object export from `@/components/ui/sonner`, so import-side call sites and unit
+tests that mock `"sonner"` directly (asserting single-arg `toHaveBeenCalledWith(message)`) are unaffected
+by the change with zero touch.
+
+**Gate:** `tsc --noEmit -p tsconfig.app.json` clean · `npm run lint` 0 errors (13 pre-existing warnings,
+none new — `sonner.tsx` was already one of them via `react-refresh/only-export-components`) ·
+`format:check` clean · full sharded suite green (778+686+918+738 = 3120 tests across 4 shards; shard 4
+hit the same documented `onTaskUpdate` RPC flake, 0 real test failures — accepted per policy). Doesn't
+touch `scripts/`, fog redaction, soundscape, or shipped artifacts, so `atlas:publish` wasn't required by
+the gate.
+
+**Merge:** `run/s10-toaster-feedback` (commit `6f8bffb4`) → `auto/continuous-dev`.

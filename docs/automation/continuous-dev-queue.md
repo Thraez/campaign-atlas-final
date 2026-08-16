@@ -289,7 +289,7 @@ is for sequencing, not the whole spec.
 
 - [x] ~~**S9. Replace `OfflineStatus`'s 2-second polling with event-driven cache detection.**~~ ✅ DONE 2026-08-16 — commit `7bdc1bc5`. Full write-up in `continuous-dev-done.md`.
 
-- [ ] **S10. Configure the Toaster for clearer, persistent error feedback.** _(a11y)_ — `src/components/ui/sonner.tsx:10` renders `<Sonner>` on defaults: no `richColors`, no `closeButton`, default auto-dismiss. An error toast currently looks like a success toast and vanishes before it can be read. **Done when:** an error toast is visually distinct from a success toast, can be dismissed deliberately, and doesn't disappear on its own before the DM has read it.
+- [x] ~~**S10. Configure the Toaster for clearer, persistent error feedback.**~~ ✅ DONE 2026-08-16 — commit `6f8bffb4`. Full write-up in `continuous-dev-done.md`.
 
 - [ ] **S11. Fix the editor tab list in README line 46.** _(docs)_ — README:46 still reads "Visual editor tabs for pins, maps, regions, routes, fog, entities, import, and publish check", contradicting README:697-700, which correctly describes the Creator Cockpit rail (Content / Map / System tab groups). The rail section was already fixed by I4; line 46 was missed. **Done when:** line 46 describes the rail the DM actually sees, and no other line in README or WORKFLOWS still lists the old flat tab set.
 
