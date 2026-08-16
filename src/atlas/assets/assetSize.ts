@@ -8,6 +8,11 @@ export const SIZE_WARN_BYTES = 1 * 1024 * 1024;
 /** Hard error threshold for a single asset (bytes). */
 export const SIZE_ERROR_BYTES = 4 * 1024 * 1024;
 
+/** Soft warning threshold for the total shipped asset payload (bytes). */
+export const TOTAL_BUDGET_WARN_BYTES = 40 * 1024 * 1024;
+/** Hard error threshold for the total shipped asset payload (bytes). */
+export const TOTAL_BUDGET_ERROR_BYTES = 80 * 1024 * 1024;
+
 export function formatBytes(n: number): string {
   if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(2)} MB`;
   if (n >= 1024) return `${(n / 1024).toFixed(2)} KB`;

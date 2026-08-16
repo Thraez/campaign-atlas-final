@@ -5,33 +5,46 @@
  * and every asset reference in the content tree (markdown image syntax,
  * frontmatter `atlas.images`, and `world.yaml` `layers[].src`) and reports:
  *
- *   - oversize images   — > 1 MB warn, > 4 MB error
- *   - orphaned files    — exist on disk but referenced by no content (warn)
- *   - broken references — referenced by content but missing on disk (info;
- *                         build-atlas.ts already errors on this case)
+ *   - oversize images    — > 1 MB warn, > 4 MB error
+ *   - orphaned files     — exist on disk but referenced by no content (warn)
+ *   - broken references  — referenced by content but missing on disk (info;
+ *                          build-atlas.ts already errors on this case)
+ *   - total payload size — > 40 MB warn, > 80 MB error, across every asset
+ *                          combined (catches death-by-a-thousand-cuts bloat
+ *                          that no single oversize check would flag)
  *
  * The point is to catch the slow-bloat failure modes before the player build
  * ships them: hand-painted PNGs that should have been WEBPs, stale draft
- * exports left in the assets folder, and typo'd map src paths.
+ * exports left in the assets folder, typo'd map src paths, and a payload
+ * that crept past a reasonable total one small asset at a time.
  *
  * Usage:
  *   tsx scripts/atlas/audit-assets.ts \
  *     [--assets-dir <path>] \
  *     [--content-dir <path>] \
  *     [--config <atlas.config.json>] \
- *     [--strict]
+ *     [--strict] \
+ *     [--total-warn-bytes <n>] \
+ *     [--total-error-bytes <n>]
  *
  * Exit codes:
  *   0   clean (or only warnings, unless --strict)
  *   1   bad invocation
- *   13  errors found (oversize > 4 MB hard cap, or --strict with any warning)
+ *   13  errors found (oversize > 4 MB hard cap, total payload > hard cap,
+ *       or --strict with any warning)
  */
 import fs from "node:fs";
 import path from "node:path";
 import yaml from "js-yaml";
-import { SIZE_WARN_BYTES, SIZE_ERROR_BYTES, formatBytes } from "../../src/atlas/assets/assetSize";
+import {
+  SIZE_WARN_BYTES,
+  SIZE_ERROR_BYTES,
+  TOTAL_BUDGET_WARN_BYTES,
+  TOTAL_BUDGET_ERROR_BYTES,
+  formatBytes,
+} from "../../src/atlas/assets/assetSize";
 
-export { SIZE_WARN_BYTES, SIZE_ERROR_BYTES };
+export { SIZE_WARN_BYTES, SIZE_ERROR_BYTES, TOTAL_BUDGET_WARN_BYTES, TOTAL_BUDGET_ERROR_BYTES };
 
 /** Extensions that count as image/asset files when walking the assets dir. */
 const ASSET_EXTENSIONS = new Set([
@@ -95,12 +108,23 @@ export interface BrokenRefFinding {
   source: string;
 }
 
+/** Where the total shipped payload sits relative to the two budget thresholds. */
+export type TotalBudgetSeverity = "ok" | "warning" | "error";
+
+export interface TotalBudgetFinding {
+  severity: TotalBudgetSeverity;
+  totalBytes: number;
+  warnBytes: number;
+  errorBytes: number;
+}
+
 export interface AuditReport {
   assets: AssetRecord[];
   references: AssetReference[];
   oversize: SizeFinding[];
   orphans: OrphanFinding[];
   brokenRefs: BrokenRefFinding[];
+  totalBudget: TotalBudgetFinding;
   totals: {
     assetCount: number;
     totalBytes: number;
@@ -330,6 +354,10 @@ export interface AuditOptions {
   warnBytes?: number;
   /** Override hard size threshold (default SIZE_ERROR_BYTES). */
   errorBytes?: number;
+  /** Override soft total-payload threshold (default TOTAL_BUDGET_WARN_BYTES). */
+  totalWarnBytes?: number;
+  /** Override hard total-payload threshold (default TOTAL_BUDGET_ERROR_BYTES). */
+  totalErrorBytes?: number;
 }
 
 /**
@@ -339,6 +367,8 @@ export interface AuditOptions {
 export function auditAssets(opts: AuditOptions): AuditReport {
   const warnBytes = opts.warnBytes ?? SIZE_WARN_BYTES;
   const errorBytes = opts.errorBytes ?? SIZE_ERROR_BYTES;
+  const totalWarnBytes = opts.totalWarnBytes ?? TOTAL_BUDGET_WARN_BYTES;
+  const totalErrorBytes = opts.totalErrorBytes ?? TOTAL_BUDGET_ERROR_BYTES;
 
   const assets = collectAssets(opts.assetsDir, opts.publicDir);
   const references = collectReferences(opts.contentDir);
@@ -373,12 +403,21 @@ export function auditAssets(opts: AuditOptions): AuditReport {
   }
 
   const totalBytes = assets.reduce((acc, a) => acc + a.size, 0);
+  const totalBudgetSeverity: TotalBudgetSeverity =
+    totalBytes > totalErrorBytes ? "error" : totalBytes > totalWarnBytes ? "warning" : "ok";
+
   return {
     assets,
     references,
     oversize,
     orphans,
     brokenRefs,
+    totalBudget: {
+      severity: totalBudgetSeverity,
+      totalBytes,
+      warnBytes: totalWarnBytes,
+      errorBytes: totalErrorBytes,
+    },
     totals: {
       assetCount: assets.length,
       totalBytes,
@@ -394,6 +433,8 @@ interface CliFlags {
   contentDir?: string;
   configPath?: string;
   strict: boolean;
+  totalWarnBytes?: number;
+  totalErrorBytes?: number;
   /** Captures parse errors so main() can short-circuit with exit 1. */
   parseError?: string;
 }
@@ -409,6 +450,12 @@ function parseFlags(argv: string[]): CliFlags {
     else if (a.startsWith("--content-dir=")) flags.contentDir = a.slice("--content-dir=".length);
     else if (a === "--config") flags.configPath = argv[++i];
     else if (a.startsWith("--config=")) flags.configPath = a.slice("--config=".length);
+    else if (a === "--total-warn-bytes") flags.totalWarnBytes = Number(argv[++i]);
+    else if (a.startsWith("--total-warn-bytes="))
+      flags.totalWarnBytes = Number(a.slice("--total-warn-bytes=".length));
+    else if (a === "--total-error-bytes") flags.totalErrorBytes = Number(argv[++i]);
+    else if (a.startsWith("--total-error-bytes="))
+      flags.totalErrorBytes = Number(a.slice("--total-error-bytes=".length));
     else {
       flags.parseError = `unknown argument: ${a}`;
     }
@@ -425,6 +472,8 @@ export interface RunOpts {
   publicDir: string;
   contentDir: string;
   strict?: boolean;
+  totalWarnBytes?: number;
+  totalErrorBytes?: number;
 }
 
 export function run(opts: RunOpts): number {
@@ -441,6 +490,8 @@ export function run(opts: RunOpts): number {
     assetsDir: opts.assetsDir,
     publicDir: opts.publicDir,
     contentDir: opts.contentDir,
+    totalWarnBytes: opts.totalWarnBytes,
+    totalErrorBytes: opts.totalErrorBytes,
   });
 
   const totalsMb = (report.totals.totalBytes / (1024 * 1024)).toFixed(2);
@@ -476,16 +527,32 @@ export function run(opts: RunOpts): number {
     );
   }
 
+  // Total payload budget: warns near the soft cap, fails past the hard cap.
+  const budget = report.totalBudget;
+  const budgetLine =
+    `  BUDGET             ${formatBytes(budget.totalBytes)} total ` +
+    `(warn > ${formatBytes(budget.warnBytes)}, fail > ${formatBytes(budget.errorBytes)})`;
+  if (budget.severity === "error") {
+    console.error(`${budgetLine} :: FAIL`);
+  } else if (budget.severity === "warning") {
+    console.log(`${budgetLine} :: WARN`);
+  } else {
+    console.log(`${budgetLine} :: PASS`);
+  }
+
   console.log(
     `atlas:audit-assets: ${report.totals.assetCount} assets, ${totalsMb} MB total, ` +
       `${report.totals.oversizeCount} oversized, ${report.totals.orphanCount} orphan` +
       (report.totals.brokenRefCount > 0 ? `, ${report.totals.brokenRefCount} broken ref(s)` : ""),
   );
 
-  if (sizeErrors.length > 0) return 13;
+  if (sizeErrors.length > 0 || budget.severity === "error") return 13;
   if (
     opts.strict &&
-    (sizeWarns.length > 0 || report.orphans.length > 0 || report.brokenRefs.length > 0)
+    (sizeWarns.length > 0 ||
+      report.orphans.length > 0 ||
+      report.brokenRefs.length > 0 ||
+      budget.severity === "warning")
   ) {
     console.error("atlas:audit-assets: --strict failed because warnings/info findings are present");
     return 13;
@@ -499,7 +566,8 @@ function main(): number {
   if (flags.parseError) {
     console.error(`atlas:audit-assets: ${flags.parseError}`);
     console.error(
-      "Usage: tsx scripts/atlas/audit-assets.ts [--assets-dir <path>] [--content-dir <path>] [--config <atlas.config.json>] [--strict]",
+      "Usage: tsx scripts/atlas/audit-assets.ts [--assets-dir <path>] [--content-dir <path>] " +
+        "[--config <atlas.config.json>] [--strict] [--total-warn-bytes <n>] [--total-error-bytes <n>]",
     );
     return 1;
   }
@@ -534,7 +602,14 @@ function main(): number {
     : path.resolve(cwd, "public/atlas/assets");
   const publicDir = flags.assetsDir ? path.dirname(assetsDir) : path.resolve(cwd, "public");
 
-  return run({ assetsDir, publicDir, contentDir, strict: flags.strict });
+  return run({
+    assetsDir,
+    publicDir,
+    contentDir,
+    strict: flags.strict,
+    totalWarnBytes: flags.totalWarnBytes,
+    totalErrorBytes: flags.totalErrorBytes,
+  });
 }
 
 // Run only when invoked as a script (not when imported by tests).
