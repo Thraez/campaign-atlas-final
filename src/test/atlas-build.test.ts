@@ -219,6 +219,36 @@ describe.sequential("atlas build pipeline", () => {
     expect(result.stdout + result.stderr).toMatch(/missing local asset/i);
   });
 
+  it("strict player build FAILS on a missing inline image embed", () => {
+    const badDir = path.join(tmpRoot, "missing-embed-vault");
+    fs.mkdirSync(path.join(badDir, "content/test-world/notes"), { recursive: true });
+    fs.writeFileSync(
+      path.join(badDir, "atlas.config.json"),
+      JSON.stringify({
+        contentRoot: "content",
+        outputDir: "out",
+        defaultWorld: "test-world",
+        include: ["**/*.md"],
+        exclude: [],
+      }),
+    );
+    fs.writeFileSync(
+      path.join(badDir, "content/test-world/notes/Embed.md"),
+      `---\ntitle: Embed\natlas:\n  visibility: player\n---\n![[does-not-exist.png]]\n`,
+    );
+    const result = run([
+      "--player",
+      "--strict",
+      "--config",
+      path.join(badDir, "atlas.config.json"),
+      "--out",
+      path.join(tmpRoot, "missing-embed-out"),
+    ]);
+    expect(result.status).not.toBe(0);
+    expect(result.status).toBe(4);
+    expect(result.stdout + result.stderr).toMatch(/missing local asset/i);
+  });
+
   it("duplicate slugs FAIL the build (errors, not warnings)", () => {
     const badDir = path.join(tmpRoot, "dupes-vault");
     fs.mkdirSync(path.join(badDir, "content/test-world/a"), { recursive: true });

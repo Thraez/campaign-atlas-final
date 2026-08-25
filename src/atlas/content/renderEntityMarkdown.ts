@@ -23,6 +23,25 @@ export const DEFAULT_RESOLVE_ASSET = (n: string): string => `/atlas/assets/image
  *  embedding is an explicit non-goal — so they render an inert placeholder instead of a
  *  broken <img> pointing at a note or document that was never an image asset.
  */
+/** Filenames referenced via Obsidian image-embed syntax (`![[image.png]]` or
+ *  `![[image.png|alias]]`), in document order. Non-image embeds (note
+ *  transclusion, PDFs, etc.) are excluded — same filter `resolveImageEmbeds`
+ *  itself applies. Single source of truth for "what image embeds does this
+ *  body reference," shared by the build's asset-existence check and the
+ *  standalone asset auditor so the two can't drift apart. */
+export function extractImageEmbedFilenames(md: string): string[] {
+  const out: string[] = [];
+  const re = new RegExp(EMBED_RE.source, "g");
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(md)) !== null) {
+    const raw = m[1];
+    const pipeIdx = raw.indexOf("|");
+    const filename = (pipeIdx >= 0 ? raw.slice(0, pipeIdx) : raw).trim();
+    if (IMAGE_EXT_RE.test(filename)) out.push(filename);
+  }
+  return out;
+}
+
 export function resolveImageEmbeds(
   md: string,
   resolveAsset: (name: string) => string = DEFAULT_RESOLVE_ASSET
