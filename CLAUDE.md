@@ -26,35 +26,15 @@ D&D world atlas: Obsidian markdown → build pipeline → `atlas.json` → dual-
 <!-- TRIAL: MODEL-SELECTION START (added 2026-05-15 — delete this section alone to revert just model selection) -->
 ## Model selection — trial rules
 
-Default: **Sonnet 4.6**. Switch up or down based on signals.
+General model-tier and subagent policy lives in user-level CLAUDE.md — don't restate it here.
+Version-numbered tiers were removed from this file in Aug 2026 after they went stale.
 
-**Haiku 4.5 — use for:**
-- Slash-command-only sessions
-- Batch template-fill (apply pattern to N files, dossier generation)
-- Pure renames / format conversions
-
-**Sonnet 4.6 — use for (this is the default):**
-- First message references a handover doc, plan file, or "implement phase X"
-- Executing from a written spec under `.claude/plans/` or `docs/superpowers/specs/`
-- Multi-file edits with a clear shape; normal bug fixes; writing tests
-- Small / well-scoped code review
-
-**Opus 4.7 — use for:**
-- Ambiguous spec needing interpretation; "what should we do about X?"
-- Architectural review; UI/UX work without a concrete plan
-- Anything touching `scripts/`, `vite.config.ts`, atlas build pipeline, migrations, security
+Only the project-specific triggers belong here. **Escalate to the strongest model for:**
+- Anything touching `scripts/`, `vite.config.ts`, the atlas build pipeline, migrations, security
+- Ambiguous spec needing interpretation; architectural review; UI/UX with no concrete plan
 - The *first* session of a multi-phase initiative (the one producing the handover)
-
-**Escalate Sonnet → Opus mid-session when:**
-- Verification fails twice in a row in the same area
-- Third "actually, let me try a different approach" reframing
-- The task turned out to need design judgment, not execution
-
-**Agent / subagent rules:**
-- No Agent for work achievable in ≤3 direct tool calls — use Grep/Read.
-- For >3 parallel codebase lookups: Explore subagent.
-- For multi-file implementation with clear shape: Plan agent → write handover → execute on Sonnet in a fresh session.
-- When spawning agents, pass `model: "haiku"` for lookup/search work and `model: "sonnet"` for execution. Reserve Opus subagents for synthesis only.
+- Mid-session: after verification fails twice in the same area, or the third "let me try a
+  different approach" reframing — that means the task needs design judgment, not execution
 <!-- TRIAL: MODEL-SELECTION END -->
 
 <!-- TRIAL: HANDOVER START (added 2026-05-17 — delete this section alone to revert just the handover protocol) -->

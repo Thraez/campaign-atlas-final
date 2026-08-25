@@ -23,7 +23,18 @@ export default defineConfig(({ mode }) => {
   base: process.env.ATLAS_BASE || "/",
   define: { __INCLUDE_EDITOR__: JSON.stringify(includeEditor) },
   server: {
-    host: "::",
+    // Loopback by default. The dev server mounts /__atlas/* — file reads and
+    // writes, vault scans, character keys, and publish-to-main. Binding every
+    // interface put all of that on the LAN, and its guard reads the `Host` and
+    // `Origin` headers, which any non-browser client can simply set. The
+    // socket-level check in scripts/vite-plugin-atlas-save.ts closes that hole;
+    // this closes the port it was reachable on.
+    //
+    // To show the atlas to players on the same network, opt in explicitly:
+    //   npm run dev -- --host
+    // The CLI flag overrides this, and the socket check still keeps DM-only
+    // endpoints loopback-only while players get the player build.
+    host: "127.0.0.1",
     port: 8080,
     hmr: {
       overlay: false,

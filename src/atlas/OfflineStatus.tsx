@@ -11,11 +11,11 @@ import {
 import { CloudOff, Cloud, RefreshCw, Trash2, MoreVertical, CheckCircle2 } from "lucide-react";
 import {
   activateUpdate,
-  checkForUpdate,
   clearOfflineCache,
   isOfflineReady,
   onCacheStateChange,
   onUpdateAvailable,
+  reloadLatestAtlas,
   shouldEnableServiceWorker,
 } from "@/pwa";
 
@@ -102,9 +102,15 @@ export function OfflineMenu({ className }: OfflineMenuProps) {
 
   const handleReload = async () => {
     setBusy("reload");
-    await checkForUpdate();
+    const result = await reloadLatestAtlas();
     setBusy(null);
-    setDone("Checked for updates");
+    if (result.ok) {
+      // The page is reloading; this state rarely paints. Set it anyway so the
+      // menu is never left looking stuck if the reload is slow.
+      setDone("Loading latest atlas…");
+    } else {
+      setDone("You're offline — reconnect to get the latest");
+    }
     setTimeout(() => setDone(null), 1800);
   };
   const handleClear = async () => {

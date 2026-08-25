@@ -8,21 +8,24 @@
  * API, no PAT, no auth.
  *
  * Access control: every `/__atlas/*` middleware (and the `.local-atlas`
- * overlay that serves the DM build) is gated by `isAllowedDevRequest`,
- * which requires:
- *   - the `Host` header to resolve to a loopback name (localhost,
- *     127.0.0.1, or [::1]), AND
- *   - for write methods (POST/DELETE/PUT/PATCH), the `Origin` header to
- *     also resolve to a loopback origin, AND
- *   - for the same write methods, the `Origin` header to be present at
- *     all (a missing Origin on a write = curl / non-browser context, and
- *     the editor never sends one).
+ * overlay that serves the DM build) is gated by `rejectNonLoopback`, which
+ * requires BOTH of:
  *
- * This is defense-in-depth for the case where the dev server is bound to
- * a non-loopback interface (`server.host` widened beyond default). It
- * does NOT replace careful binding: if you can't reach the port from the
- * network, an attacker on that network can't either, and that is the
- * primary control. The Vite default for this project is loopback.
+ *   1. `isLoopbackAddress(req.socket.remoteAddress)` — the connection itself
+ *      came from this machine. Unforgeable, and the actual perimeter.
+ *   2. `isAllowedDevRequest(headers)` — the `Host` header resolves to a
+ *      loopback name, and for write methods (POST/DELETE/PUT/PATCH) the
+ *      `Origin` header is present AND loopback. Forgeable by a scripted
+ *      client, so it is not a perimeter; it is CSRF defense, because a page
+ *      on another origin cannot lie about `Origin` in the DM's own browser.
+ *
+ * Check 1 exists because check 2 alone was not enough. `vite.config.ts` used
+ * to bind `host: "::"` (every interface) while this header stating the
+ * binding was loopback — so a LAN client could send `Host: localhost` plus a
+ * matching `Origin` and reach file reads, saves, vault scans, character keys,
+ * and publish-push. The binding is now `127.0.0.1` and the socket check backs
+ * it up, so `npm run dev -- --host` (the LAN player-preview workflow) stays
+ * safe: players get the player build, DM endpoints still refuse them.
  *
  * Payload contract (Phase 1A unified Save):
  *   POST /__atlas/save  application/json
@@ -130,6 +133,29 @@ async function pruneBackups(repoRoot: string, relPath: string): Promise<void> {
       dir = path.dirname(dir);
     }
   }
+}
+
+/**
+ * Returns true if `addr` is the peer address of a loopback TCP connection.
+ *
+ * This is the ONLY unforgeable half of the dev-server gate. `Host` and
+ * `Origin` are just strings the client sends, so a LAN client can set them to
+ * `localhost` and satisfy every header check; the kernel-reported peer address
+ * cannot be spoofed without controlling the routing path. Header checks stay
+ * on as CSRF defense (a browser sets Origin honestly, and a page on another
+ * origin cannot forge it) — but they are not the perimeter. This is.
+ *
+ * Node reports loopback as "127.0.0.1", "::1", or the IPv4-mapped
+ * "::ffff:127.0.0.1" depending on the socket family. Fails closed on
+ * undefined: a request with no peer address is not one we can vouch for.
+ */
+export function isLoopbackAddress(addr: string | undefined): boolean {
+  if (!addr) return false;
+  const a = addr.toLowerCase().trim();
+  const unmapped = a.startsWith("::ffff:") ? a.slice("::ffff:".length) : a;
+  // The whole 127.0.0.0/8 block is loopback, not just 127.0.0.1.
+  if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(unmapped)) return true;
+  return unmapped === "::1" || unmapped === "[::1]";
 }
 
 /**
@@ -1267,7 +1293,14 @@ export function rejectNonLoopback(
   req: import("http").IncomingMessage,
   res: import("http").ServerResponse,
 ): boolean {
+  // Two independent checks, both required:
+  //   1. the peer actually dialed in over loopback (unforgeable), and
+  //   2. the headers it sent are loopback-consistent (forgeable by a script,
+  //      but a cross-origin *browser* page cannot lie about Origin).
+  // (1) stops a LAN client sending `Host: localhost`; (2) stops a malicious
+  // web page in the DM's own browser driving these endpoints via CSRF.
   if (
+    isLoopbackAddress(req.socket?.remoteAddress) &&
     isAllowedDevRequest({
       host: req.headers.host,
       origin: req.headers.origin,
@@ -1321,6 +1354,7 @@ export function atlasSavePlugin(): Plugin {
           // visible). Gate it the same way as /__atlas/* so a LAN attacker
           // or cross-origin fetch can't pull DM canon by hitting this URL.
           if (
+            !isLoopbackAddress(req.socket?.remoteAddress) ||
             !isAllowedDevRequest({
               host: req.headers.host,
               origin: req.headers.origin,

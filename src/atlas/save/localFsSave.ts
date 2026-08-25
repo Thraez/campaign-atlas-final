@@ -137,11 +137,11 @@ const MAX_ASSET_DATAURL_BYTES = 8 * 1024 * 1024;
 const ENDPOINT = "/__atlas/save";
 
 function utf8ByteLength(s: string): number {
-  if (typeof TextEncoder !== "undefined") {
-    return new TextEncoder().encode(s).length;
-  }
-  // Fallback (node test envs always have TextEncoder, but just in case).
-  return Buffer.byteLength(s, "utf8");
+  // TextEncoder is global in every browser and in Node 11+, so it always wins.
+  // The old `Buffer.byteLength` fallback was unreachable here and, being a Node
+  // global Vite does not polyfill, was the same shape as the bug that broke
+  // player secret unlocking. See browser-safe-globals.test.ts.
+  return new TextEncoder().encode(s).length;
 }
 
 export interface SaveOpts {
