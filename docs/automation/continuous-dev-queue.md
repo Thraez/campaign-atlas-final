@@ -334,6 +334,18 @@ is for sequencing, not the whole spec.
     false parenthetical; regression test plants a missing embed and asserts the non-zero exit. **Mutation-
     check the test** — assert it actually fails before the fix (see `build-order-audio-prune` for why a
     vacuous regression test here is the likely trap). ~1–2 runs.
+  - **2026-08-25: fix built and verified, NOT merged — needs a DM decision.** The code fix is correct and
+    gate-clean in isolation (typecheck/lint/sharded vitest/`atlas:publish:integrity-smoke` all green,
+    regression test mutation-checked). But running it against the **real vault** correctly surfaces 2
+    genuinely missing images that were previously shipping silently: `Corven.png` (embedded from
+    `content/astrath-deeprealm/imports/corven.md:52`) and `Edric.png` (from
+    `content/astrath-deeprealm/imports/edric.md:45`) — `public/atlas/assets/images/` has neither. That
+    makes `atlas:build:player --strict` fail on real content, which both `atlas-pr-check.yml` and
+    `publish-atlas.yml` also run — merging now would break CI/deploy until the content gap is closed.
+    This is a product call, not an execution one: either supply `Corven.png`/`Edric.png`, or remove/fix
+    those two `![[...]]` embeds in the source notes. Fix sits on branch `claude/t1-embed-asset-check`
+    (pushed to origin, commit `af71376e`), untouched — rebase onto `auto/continuous-dev` and merge once
+    the DM picks a direction, no rework needed. Do not re-pick T1 for a routine run until that's resolved.
 
 - [ ] **T2. Vault folder paths leak into player-visible prose.**
   `parseWikilinks.ts:45` defaults a link's display text to `filePart` — the *full* target string — when the
@@ -368,7 +380,8 @@ is for sequencing, not the whole spec.
   `renderEntityMarkdown.ts:34` sets `alt` to the embed's filename when the author wrote no `|alias`, so
   `![[Corven.png]]` renders `alt="Corven.png"`. That string is exactly what a player sees when the image
   fails to load — which, per **T1**, is currently every inline embed in the real vault. Small on its own;
-  build it **after T1** so the failure mode it papers over is already fixed.
+  build it **after T1** so the failure mode it papers over is already fixed. (T1 is built but **blocked on
+  a DM content decision** as of 2026-08-25, not yet merged — T2/T3 are unaffected and can go first.)
   - Done when: an alias-less image embed produces a human-readable alt (entity title, or empty rather than
     a filename — empty is the correct choice for a decorative image), pipe-alias behaviour unchanged, and
     the `width`/`height` dimension path at line 38–42 stays intact. ~1 run.
