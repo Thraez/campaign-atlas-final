@@ -43,9 +43,9 @@ is for sequencing, not the whole spec.
 
 ## ✅ WANTS — sequenced, blessed (build in this order)
 
-> **Refueled 2026-08-06** — section **S** at the bottom (15 units, S1–S15) is the **current priority**:
-> build **S1 first, then in order**. Every earlier section (X, Q, V, and the historical P, M, J, K, L,
-> I, H, G, F, E, D, A, B, C) is ✅ DONE. See section **S**'s own banner for its guardrails.
+> **Refueled 2026-08-25** — section **T** at the bottom (4 units, T1–T4) is the **current priority**:
+> build **T1 first, then in order**. Every earlier section (S, X, Q, V, and the historical P, M, J, K, L,
+> I, H, G, F, E, D, A, B, C) is ✅ DONE. See section **T**'s own banner for its guardrails.
 
 ### ‼️ X — Critical bugfixes (promoted from nice-to-haves 2026-07-19 — BUILD THESE FIRST)
 
@@ -297,7 +297,81 @@ is for sequencing, not the whole spec.
 
 - [x] ~~**S15. Add a low-noise scheduled `npm audit` safety net.**~~ ✅ DONE 2026-08-16 — commit `e5ca2d25`. Full write-up in `continuous-dev-done.md`.
 
-**Section S is now fully ✅ DONE — this hits the REFUEL POINT.** See below.
+**Section S is now fully ✅ DONE.** Continue with section **T** below.
+
+---
+
+### 🔭 T — Dogfooding findings, 2026-08-25 (BUILD THESE NEXT)
+
+> Captured by walking **real vault data** (`content/astrath-deeprealm/` → `public/atlas/atlas.json`), not
+> fixtures. That matters: every one of these is invisible to the 3,000-test suite *because* the fixtures
+> use tidy values the real vault never produces. Each premise was re-verified against the merged tree at
+> `d770e1e2` and each was grepped against `continuous-dev-done.md` before being written here.
+>
+> Build **T1 → T2 → T3 → T4**, one per run, full gate, merge to `auto/continuous-dev`, then move the
+> finished unit to `continuous-dev-done.md`.
+>
+> **Note on T1:** it touches the build pipeline and a ship-blocking gate, so it needs
+> `npm run atlas:publish` *and* `npm run atlas:publish:integrity-smoke` in its gate.
+
+- [ ] **T1. The strict player build ships broken images while reporting `missingAssets: 0`.**
+  `runAssetCheck` (`scripts/build-atlas.ts:941`) is only ever called on `entity.images[]` (line 953) and
+  map layer `src` (line 956). Inline Obsidian embeds — `![[Corven.png]]` in a note body — never reach it,
+  so they never increment `missingAssets` (line 948). The ship-blocking gate at line 1404 therefore passes
+  with `missingAssets: 0` while the published atlas contains `<img>` tags pointing at files that do not
+  exist. Reproduced on the real vault: `public/atlas/assets/images/` contains only `.gitkeep`, the strict
+  player `atlas.json` carries 2 such `<img>` tags, and `buildReport.missingAssets` is `0`. The images are
+  also **not** counted in `brokenLinks` (embeds are consumed before wikilink tokenization — verified: 24
+  broken links, none with an image extension), so they appear **nowhere** in the DM's build report.
+  `atlas:audit-assets` *does* see them, but files them as `BROKEN REF (info)` — the lowest severity — and
+  prints the parenthetical "(build-atlas reports this as an error)", which is simply false. That
+  parenthetical is the missing half of **Q56** (2026-07-25), which taught the auditor about embeds but
+  never checked the claim it printed.
+  - Distinct from **E2** (warns when an embed is *dropped* from the player view) and from **Q51**/**Q56**
+    (non-image embeds; false-orphan warnings). This is a resolved image embed whose target file is absent.
+  - Done when: an inline `![[missing.png]]` in a player-visible note increments `missingAssets` and fails
+    `atlas:build:player --strict` with exit 4; `atlas:audit-assets` either raises the severity or drops the
+    false parenthetical; regression test plants a missing embed and asserts the non-zero exit. **Mutation-
+    check the test** — assert it actually fails before the fix (see `build-order-audio-prune` for why a
+    vacuous regression test here is the likely trap). ~1–2 runs.
+
+- [ ] **T2. Vault folder paths leak into player-visible prose.**
+  `parseWikilinks.ts:45` defaults a link's display text to `filePart` — the *full* target string — when the
+  author gave no `|alias`. So an unresolved `[[02_Regions/Tidemarrow]]` publishes as
+  `<span class="atlas-planned-link-player">02_Regions/Tidemarrow</span>`, and the player reads: *"A
+  smuggler-king of the 02_Regions/Tidemarrow underworld…"* The DM's private folder numbering is now set
+  dressing in the fiction. This contradicts the file's own stated contract 15 lines below, at line 60:
+  *"In player builds, broken links must not leak the original target text."*
+  - The **resolver** half of folder-path links already shipped (basename rescue, 2026-07-25) — that entry
+    explicitly says "alias display preserved" and deliberately left `link.target` untouched so the
+    player leak-scan redaction regexes keep matching. **Do not touch `link.target`** — the fix is display
+    text only, and the redaction regression tests in `projectEntityForPlayer-gaps.test.ts` must stay green.
+  - Done when: display for an alias-less path link falls back to the basename (`Tidemarrow`), not the path;
+    `link.target` unchanged; redaction tests green; a test asserts no `/` reaches player-rendered display.
+    ~1 run.
+
+- [ ] **T3. Real calendar dates render as developer-speak in the player UI.**
+  A vault date of `612-6-3` becomes `dateRaw: "612 · month 6, day 3"` via
+  `scripts/atlas/calendarDate.ts:54`, which literally concatenates the word `month` and a 1-based index.
+  `EntityPanel.tsx:454` then joins that into the kicker with the same separator —
+  `[typeLabel, entity.race, entity.dateRaw].join(" · ")` — so a player sees **"Event · 612 · month 6, day
+  3"**: three `·` separators, one of them internal to a single field. Also surfaces in `AtlasTimeline.tsx`
+  and `SearchPalette.tsx`.
+  - Invisible to tests because every fixture uses `dateRaw: "1000 AE"` (e.g.
+    `src/test/pages/AtlasTimeline.test.tsx:33,103,121`) — a value the real pipeline never emits. **Fix the
+    fixtures too**, or the next regression hides in the same blind spot.
+  - Needs a DM call on the target format (the calendar's month *names* live in `world.yaml`) — if the
+    month list is present, `"3 Harvestmoon, 612"` is the obvious shape; if not, `"612-6-3"` still beats the
+    current string. Prefer using real month names when available, else fall back cleanly. ~1 run.
+
+- [ ] **T4. Inline image alt text is the raw filename.**
+  `renderEntityMarkdown.ts:34` sets `alt` to the embed's filename when the author wrote no `|alias`, so
+  `![[Corven.png]]` renders `alt="Corven.png"`. That string is exactly what a player sees when the image
+  fails to load — which, per **T1**, is currently every inline embed in the real vault. Small on its own;
+  build it **after T1** so the failure mode it papers over is already fixed.
+  - Done when: an alias-less image embed produces a human-readable alt (entity title, or empty rather than
+    a filename — empty is the correct choice for a decorative image), pipe-alias behaviour unchanged, and
+    the `width`/`height` dimension path at line 38–42 stays intact. ~1 run.
 
 ---
 
@@ -331,3 +405,22 @@ Their write-ups live in `continuous-dev-done.md`.
 
 **If a future dogfooding pass produces new findings, start a fresh INBOX here** — the section is a useful
 shape, it just has to be emptied as its items ship.
+
+## 📥 INBOX — opened 2026-08-25
+
+The 2026-08-25 pass produced 4 findings; all 4 were strong enough to go straight into the WANTS section as
+**T1–T4**, so this inbox holds only the leftovers — observations that are real but not yet worth a unit:
+
+- **`buildReport.excluded: 1` names neither the note nor the reason.** The real vault excludes
+  `_drafts/Wip-Note.md` and the DM gets a bare count. Probably a one-line fix (list the paths), but it
+  needs a look at who consumes `excluded` before it's a want.
+- **18 distinct unresolved wikilink targets across 6 notes.** Expected for a living vault — planned links
+  are a feature, not a bug. Captured only as a baseline: if that number climbs sharply after **T2**, the
+  display-text change broke resolution somewhere.
+
+**Method note for the next pass.** These came from reading real built data, because a live UI walk was
+blocked in that session (the harness refused both `npm run dev` and external browsing). Reading
+`atlas.json` still found four real defects, and it has one advantage worth keeping even when the browser
+*is* available: it catches things the eye slides past, like a build report that says `0` when the answer
+is `2`. A future pass should do both — the browser for layout and flow, the built data for honesty.
+**The strongest single tell was a counter disagreeing with the filesystem.** Look for that first.
