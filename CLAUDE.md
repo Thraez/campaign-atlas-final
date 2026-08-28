@@ -17,6 +17,13 @@ D&D world atlas: Obsidian markdown → build pipeline → `atlas.json` → dual-
 - `npm run atlas:publish` — full build + all scans
 - `npm test` — Vitest
 - `npm run lint` — ESLint
+- `npm run images:optimize` — convert leftover PNG/JPEG in the image library to WebP and repoint references
+
+## Image encoding
+
+`src/atlas/assets/imageEncoding.ts` is the single answer to "what format does a published image take, and what is it called". Both ingest paths — the editor's picker and the vault embed copier — import it and convert PNG/JPEG to WebP automatically, so a DM never has to think about file size. Don't re-declare the constants or the convert rule anywhere else; that duplication is what let 2.3 MB portraits ship.
+
+Out of scope on purpose: **maps** (lossless, for fog redaction and map labels — `maps:optimize` owns them) and **GIFs** (converting would flatten the animation).
 
 ## When in doubt
 
