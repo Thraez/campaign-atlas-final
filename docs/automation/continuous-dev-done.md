@@ -4207,3 +4207,40 @@ full sharded suite green (778+691+922+738 = 3129 tests across 4 shards; shard 4 
 artifact touch), so `atlas:publish` wasn't required.
 
 **Merge:** `run/s15-npm-audit` (commit `e5ca2d25`) → `auto/continuous-dev` (merge commit).
+
+### T — Dogfooding findings, 2026-08-25 (blessed by the DM)
+
+- [x] **T2. Vault folder paths leak into player-visible prose.** ✅ DONE 2026-08-28 — commit `4e91e419`
+
+**What was wrong:** an alias-less wikilink like `[[02_Regions/Tidemarrow]]` used the *whole* target
+string as its display text (`parseWikilinks.ts`, the `const d = …` line). An unresolved one published as
+`<span class="atlas-planned-link-player">02_Regions/Tidemarrow</span>`, so a player read the DM's private
+folder numbering as part of the fiction — directly contradicting the file's own contract 15 lines down
+("In player builds, broken links must not leak the original target text").
+
+**Fix (display text only):** when the target contains `/` and the author gave no `|alias`, the default
+display is now the trailing path segment only (`Tidemarrow`), matching the basename the resolver already
+rescues against (Q49). A trailing slash is stripped so `[[Folder/]]` shows `Folder`, not `Folder/`.
+`link.target` is left **untouched** — it still carries the full string, so the player leak-scan redaction
+regexes in `projectEntityForPlayer-gaps.test.ts` keep matching, and an explicit `|alias` is still honored
+verbatim. Confirmed on the real vault: the two `02_Regions/Tidemarrow` planned-link spans in
+`public/atlas/atlas.json` now render as `Tidemarrow`, with `links[].target` unchanged.
+
+- **Tests:** new `describe` block in `parseWikilinks.test.ts` (unresolved path link → basename display +
+  slash-free + `target` preserved; nested path → trailing segment; explicit `|alias` still wins; plain
+  no-slash link unchanged; player-build render carries no folder name), plus a `[[Folder/]]` case, plus
+  the one Q49 assertion that pinned the old leaky display updated to the basename. **Mutation-checked** —
+  the 4 meaningful new cases fail before the fix, pass after; the two "unchanged behaviour" guards stay
+  green both ways.
+- **Premise check:** re-verified the `const d = (display ?? (filePart || t.slice(1))).trim()` line was
+  still live and still leak-prone before building; no prior DONE entry covered the display half (Q49
+  shipped only the *resolver* half and deliberately left display alone).
+
+**Gate:** typecheck clean (`tsc --noEmit -p tsconfig.app.json`) · lint 0 errors (13 pre-existing
+warnings, none new) · full sharded suite green (781+717+863+811 = 3172 tests across 4 shards; shard 4 hit
+the documented `onTaskUpdate` worker flake, 0 real test failures) · `atlas:publish:integrity-smoke` 5/5 ·
+`atlas:publish` 12/12 scans clean. `parseWikilinks.ts` feeds `scripts/build-atlas.ts`, so the publish
+scans were run even though T2's queue entry didn't strictly require them.
+
+**Merge:** `claude/t2-folder-path-display` (commit `4e91e419`) → `auto/continuous-dev` (merge commit
+`84853b67`).

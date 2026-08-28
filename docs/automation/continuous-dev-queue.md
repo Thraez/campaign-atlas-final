@@ -308,8 +308,10 @@ is for sequencing, not the whole spec.
 > use tidy values the real vault never produces. Each premise was re-verified against the merged tree at
 > `d770e1e2` and each was grepped against `continuous-dev-done.md` before being written here.
 >
-> Build **T1 → T2 → T3 → T4**, one per run, full gate, merge to `auto/continuous-dev`, then move the
-> finished unit to `continuous-dev-done.md`.
+> Build in order, one per run, full gate, merge to `auto/continuous-dev`, then move the finished unit to
+> `continuous-dev-done.md`. **T2 is ✅ DONE** (2026-08-28, commit `4e91e419` — see `continuous-dev-done.md`).
+> **T1 is built but blocked on a DM content decision** (see its entry) — do not re-pick it for a routine
+> run until that's resolved. That leaves **T3 next**, then T4.
 >
 > **Note on T1:** it touches the build pipeline and a ship-blocking gate, so it needs
 > `npm run atlas:publish` *and* `npm run atlas:publish:integrity-smoke` in its gate.
@@ -346,21 +348,6 @@ is for sequencing, not the whole spec.
     those two `![[...]]` embeds in the source notes. Fix sits on branch `claude/t1-embed-asset-check`
     (pushed to origin, commit `af71376e`), untouched — rebase onto `auto/continuous-dev` and merge once
     the DM picks a direction, no rework needed. Do not re-pick T1 for a routine run until that's resolved.
-
-- [ ] **T2. Vault folder paths leak into player-visible prose.**
-  `parseWikilinks.ts:45` defaults a link's display text to `filePart` — the *full* target string — when the
-  author gave no `|alias`. So an unresolved `[[02_Regions/Tidemarrow]]` publishes as
-  `<span class="atlas-planned-link-player">02_Regions/Tidemarrow</span>`, and the player reads: *"A
-  smuggler-king of the 02_Regions/Tidemarrow underworld…"* The DM's private folder numbering is now set
-  dressing in the fiction. This contradicts the file's own stated contract 15 lines below, at line 60:
-  *"In player builds, broken links must not leak the original target text."*
-  - The **resolver** half of folder-path links already shipped (basename rescue, 2026-07-25) — that entry
-    explicitly says "alias display preserved" and deliberately left `link.target` untouched so the
-    player leak-scan redaction regexes keep matching. **Do not touch `link.target`** — the fix is display
-    text only, and the redaction regression tests in `projectEntityForPlayer-gaps.test.ts` must stay green.
-  - Done when: display for an alias-less path link falls back to the basename (`Tidemarrow`), not the path;
-    `link.target` unchanged; redaction tests green; a test asserts no `/` reaches player-rendered display.
-    ~1 run.
 
 - [ ] **T3. Real calendar dates render as developer-speak in the player UI.**
   A vault date of `612-6-3` becomes `dateRaw: "612 · month 6, day 3"` via
