@@ -43,6 +43,10 @@ import {
   TOTAL_BUDGET_ERROR_BYTES,
   formatBytes,
 } from "../../src/atlas/assets/assetSize";
+import {
+  extractImageEmbedFilenames,
+  DEFAULT_RESOLVE_ASSET,
+} from "../../src/atlas/content/renderEntityMarkdown";
 
 export { SIZE_WARN_BYTES, SIZE_ERROR_BYTES, TOTAL_BUDGET_WARN_BYTES, TOTAL_BUDGET_ERROR_BYTES };
 
@@ -57,14 +61,6 @@ const ASSET_EXTENSIONS = new Set([
   ".avif",
   ".bmp",
 ]);
-
-/** Mirrors EMBED_RE / IMAGE_EXT_RE / DEFAULT_RESOLVE_ASSET in
- *  src/atlas/content/renderEntityMarkdown.ts, which is the module that
- *  actually turns `![[image.png]]` into a resolved `<img>` at render/build
- *  time — kept as a local copy (not imported) to match this file's existing
- *  pattern of self-contained extractors. */
-const EMBED_RE = /!\[\[([^[\]\n]+?)\]\]/g;
-const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|avif)$/i;
 
 interface Config {
   contentRoot: string;
@@ -202,25 +198,17 @@ export function extractMarkdownImageRefs(markdown: string): string[] {
 
 /**
  * Extract Obsidian image embed references: `![[image.png]]` or
- * `![[image.png|Alt text]]`. Resolves the filename the same way
- * `DEFAULT_RESOLVE_ASSET` does in renderEntityMarkdown.ts (`/atlas/assets/
- * images/<filename>`) so the reference lines up with what the build actually
- * ships. Non-image embeds — note transclusions (`![[Some Note]]`), PDFs,
- * etc. — are not collected; renderEntityMarkdown.ts renders those as an
- * inert placeholder, never a real asset reference.
+ * `![[image.png|Alt text]]`, resolved the same way `DEFAULT_RESOLVE_ASSET`
+ * does in renderEntityMarkdown.ts (`/atlas/assets/images/<filename>`) so the
+ * reference lines up with what the build actually ships. Filename extraction
+ * is imported from renderEntityMarkdown.ts rather than duplicated here — a
+ * second copy of the embed regex is what let this auditor and build-atlas.ts
+ * silently drift apart (T1, 2026-08-25): build-atlas.ts never checked embeds
+ * for existence at all, so this file's "(build-atlas reports this as an
+ * error)" parenthetical was false for every embed finding.
  */
 export function extractEmbedImageRefs(markdown: string): string[] {
-  const out: string[] = [];
-  EMBED_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = EMBED_RE.exec(markdown)) !== null) {
-    const raw = m[1];
-    const pipeIdx = raw.indexOf("|");
-    const filename = (pipeIdx >= 0 ? raw.slice(0, pipeIdx) : raw).trim();
-    if (!IMAGE_EXT_RE.test(filename)) continue;
-    out.push(`/atlas/assets/images/${filename}`);
-  }
-  return out;
+  return extractImageEmbedFilenames(markdown).map((filename) => DEFAULT_RESOLVE_ASSET(filename));
 }
 
 /**

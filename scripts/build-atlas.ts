@@ -16,6 +16,7 @@ import { markdownToHtml } from "../src/atlas/content/markdownCore";
 import {
   resolveImageEmbeds,
   DEFAULT_RESOLVE_ASSET,
+  extractImageEmbedFilenames,
 } from "../src/atlas/content/renderEntityMarkdown";
 import { parseFrontmatter, type ParsedFile } from "./atlas/parseFrontmatter";
 import { stripDmBlocks, stripDmFromShippingString } from "./atlas/stripDmBlocks";
@@ -384,6 +385,10 @@ async function runBuildCore(flags: BuildFlags) {
   let localAssets = 0;
   let externalAssets = 0;
   let missingAssets = 0;
+  // Inline `![[image.png]]` embeds in entity bodies, collected alongside
+  // resolveImageEmbeds() below and validated once runAssetCheck exists
+  // further down — see the "Asset validation" section.
+  const embeddedAssetRefs: { raw: string; owner: string }[] = [];
 
   const pending: Pending[] = [];
   const slugSeen = new Map<string, string>();
@@ -557,6 +562,12 @@ async function runBuildCore(flags: BuildFlags) {
     const { entity, rawBody } = item;
     // Resolve ![[image.ext]] AFTER DM stripping (rawBody is already noDm) so embeds in %% blocks are absent.
     const resolvedBody = resolveImageEmbeds(rawBody, DEFAULT_RESOLVE_ASSET);
+    for (const filename of extractImageEmbedFilenames(rawBody)) {
+      embeddedAssetRefs.push({
+        raw: DEFAULT_RESOLVE_ASSET(filename),
+        owner: `entity ${entity.id} (embedded image)`,
+      });
+    }
     const { tokenized, links } = tokenizeWikilinks(resolvedBody, {
       resolveByName,
       resolveByBasename,
@@ -955,6 +966,13 @@ async function runBuildCore(flags: BuildFlags) {
   for (const m of maps) {
     for (const layer of m.layers ?? []) runAssetCheck(layer.src, `map ${m.id} layer ${layer.id}`);
   }
+  // Inline Obsidian embeds (`![[image.png]]` in a note body) render to real
+  // <img> tags via resolveImageEmbeds() above but, unlike entity.images and
+  // map layers, were never walked through validateAsset() — so a missing
+  // embed target shipped silently (missingAssets: 0) while the player build
+  // carried a broken <img>. Collected during the per-entity loop above;
+  // checked here now that runAssetCheck exists.
+  for (const ref of embeddedAssetRefs) runAssetCheck(ref.raw, ref.owner);
 
   // Strict-player gate for unsupported extensions: ship-blocking because the
   // browser will refuse to render the file. Counted separately from missing
