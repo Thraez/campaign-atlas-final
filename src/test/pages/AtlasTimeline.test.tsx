@@ -30,7 +30,9 @@ function makeEntity(overrides: Partial<Entity> = {}): Entity {
     profile: {},
     dateValue: 1000,
     dateYear: 1000,
-    dateRaw: "1000 AE",
+    // Shaped like what the real no-calendar pipeline emits (calendarDate.ts),
+    // not a tidy "1000 AE" the vault never actually produces.
+    dateRaw: "1000, month 1, day 1",
     ...overrides,
   } as unknown as Entity;
 }
@@ -100,7 +102,7 @@ describe("AtlasTimeline — URL filter state", () => {
       type: "event",
       dateValue: 1100,
       dateYear: 1100,
-      dateRaw: "1100 AE",
+      dateRaw: "1100, month 2, day 14",
       summary: "A diplomatic agreement.",
     });
     renderTimeline(makeProject([battle, treaty]), "/atlas/timeline?q=Battle");
@@ -118,7 +120,7 @@ describe("AtlasTimeline — URL filter state", () => {
       type: "event",
       dateValue: 1100,
       dateYear: 1100,
-      dateRaw: "1100 AE",
+      dateRaw: "1100, month 2, day 14",
       summary: "A diplomatic agreement.",
     });
     renderTimeline(makeProject([battle, treaty]));

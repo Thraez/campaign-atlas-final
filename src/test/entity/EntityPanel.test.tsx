@@ -711,6 +711,25 @@ describe("EntityPanel — header fields (N76)", () => {
     expect(screen.getByText("Person · Human")).toBeInTheDocument();
   });
 
+  it("joins a real no-calendar dateRaw into the kicker without a doubled ' · '", () => {
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={{ ...e, dateRaw: "612, month 6, day 3" } as Entity}
+          placements={[]}
+          entityById={new Map()}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    // The kicker separator is " · "; dateRaw must not carry its own middle-dot
+    // or the player reads "Person · 612 · month 6, day 3" (T3).
+    expect(screen.getByText("Person · 612, month 6, day 3")).toBeInTheDocument();
+    expect(screen.queryByText("Person · 612 · month 6, day 3")).toBeNull();
+  });
+
   it("renders entity.tags as # links", () => {
     render(
       <MemoryRouter>

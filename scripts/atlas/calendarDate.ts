@@ -50,8 +50,11 @@ export function parseAtlasDate(
     // as a real-world ISO date and tells a reader nothing in-world. Without a
     // calendar we can't name the month, but we can still say what the parts
     // ARE. Plain wording here also hints that naming the months is worthwhile.
+    // Separate the parts with commas, NOT " · ": EntityPanel and SearchPalette
+    // join this into a kicker with " · ", so a middle-dot here would be
+    // indistinguishable from the field separator ("Event · 612 · month 6, day 3").
     let label = `${year}`;
-    if (m[2]) label += ` · month ${monthIndex + 1}`;
+    if (m[2]) label += `, month ${monthIndex + 1}`;
     if (m[3]) label += `, day ${day}`;
     return { value, year, monthIndex, day, label };
   }
