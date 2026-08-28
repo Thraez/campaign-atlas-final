@@ -43,14 +43,22 @@ describe("resolveVaultImage", () => {
 
 describe("vaultImageTargetName", () => {
   it("names from the entity, never the source file", () => {
-    expect(vaultImageTargetName("corven", 0, "the-cabal-lair.png")).toBe("corven-1.png");
+    // A PNG is published as WebP, so the extension follows the encoding policy
+    // rather than the source — but the *stem* still comes from the entity id,
+    // which is the secrecy rule this test exists for.
+    expect(vaultImageTargetName("corven", 0, "the-cabal-lair.png")).toBe("corven-1.webp");
   });
 
   it("numbers multiple images per entity", () => {
     expect(vaultImageTargetName("corven", 2, "x.webp")).toBe("corven-3.webp");
   });
 
-  it("lowercases the extension", () => {
-    expect(vaultImageTargetName("corven", 0, "P.PNG")).toBe("corven-1.png");
+  it("keeps the extension of a format that is not converted", () => {
+    expect(vaultImageTargetName("corven", 0, "banner.gif")).toBe("corven-1.gif");
+  });
+
+  it("ignores the case of the source extension", () => {
+    expect(vaultImageTargetName("corven", 0, "P.PNG")).toBe("corven-1.webp");
+    expect(vaultImageTargetName("corven", 0, "B.GIF")).toBe("corven-1.gif");
   });
 });

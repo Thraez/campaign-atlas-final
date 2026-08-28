@@ -9,6 +9,7 @@ import {
   handleVaultScanRequest,
 } from "../../../scripts/vite-plugin-atlas-save";
 import { rewriteEmbeds } from "@/atlas/import/resolveVaultImage";
+import { MAX_IMAGE_WIDTH } from "@/atlas/assets/imageEncoding";
 import { buildStagingRows, type StagingContext } from "@/atlas/import/stagingState";
 import type { ImportFolderConfig } from "@/atlas/content/schema";
 
@@ -28,6 +29,25 @@ beforeAll(async () => {
     .toBuffer();
   fs.writeFileSync(path.join(root, "03_Entities", "pics", "portrait.png"), png);
   fs.writeFileSync(path.join(root, "10_DmNotesAndSecrets", "cabal-lair.png"), png);
+
+  // GIF is excluded from conversion because sharp would flatten a multi-frame
+  // image to a single still. This fixture is a plain one-frame GIF — it pins
+  // the rule that a GIF is republished as a GIF; the animation case is the
+  // reason the rule exists, not something this fixture can demonstrate.
+  const gif = await sharp({
+    create: { width: 8, height: 16, channels: 3, background: { r: 9, g: 9, b: 9 } },
+  })
+    .gif()
+    .toBuffer();
+  fs.writeFileSync(path.join(root, "03_Entities", "pics", "banner.gif"), gif);
+
+  // Wider than MAX_IMAGE_WIDTH, to prove the clamp fires.
+  const wide = await sharp({
+    create: { width: 2400, height: 600, channels: 3, background: { r: 4, g: 5, b: 6 } },
+  })
+    .png()
+    .toBuffer();
+  fs.writeFileSync(path.join(root, "03_Entities", "pics", "wide.png"), wide);
 });
 
 afterAll(() => {
@@ -48,8 +68,8 @@ describe("handleVaultImageCopyRequest", () => {
     });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
-    expect(res.target).toBe("/atlas/assets/images/corven-1.png");
-    expect(fs.existsSync(path.join(outRoot, "atlas", "assets", "images", "corven-1.png"))).toBe(
+    expect(res.target).toBe("/atlas/assets/images/corven-1.webp");
+    expect(fs.existsSync(path.join(outRoot, "atlas", "assets", "images", "corven-1.webp"))).toBe(
       true,
     );
   });
@@ -64,8 +84,11 @@ describe("handleVaultImageCopyRequest", () => {
       index: 0,
       publicDir: outRoot,
     });
+    // Read the bytes rather than the path: `sharp(path)` keeps the file handle
+    // open, which on Windows blocks both a later overwrite and the temp-dir
+    // cleanup in afterAll.
     const meta = await sharp(
-      path.join(outRoot, "atlas", "assets", "images", "corven-1.png"),
+      fs.readFileSync(path.join(outRoot, "atlas", "assets", "images", "corven-1.webp")),
     ).metadata();
     expect(meta.exif).toBeUndefined();
   });
@@ -84,6 +107,59 @@ describe("handleVaultImageCopyRequest", () => {
     expect(fs.existsSync(path.join(outRoot, "atlas", "assets", "images", "corven-6.png"))).toBe(
       false,
     );
+  });
+});
+
+describe("published image format", () => {
+  const copy = (rawSrc: string, entityId: string, index: number) =>
+    handleVaultImageCopyRequest({
+      vaultRoot: root,
+      candidateFolders: ["03_Entities"],
+      noteRelPath: "03_Entities/Corven.md",
+      rawSrc,
+      entityId,
+      index,
+      publicDir: outRoot,
+    });
+
+  /**
+   * Read metadata from bytes, never from a path. `sharp(path)` reads lazily and
+   * keeps the file handle open, which on Windows blocks a later write to that
+   * same path — a copy into it then fails as "unreadable". Every test here also
+   * uses its own entity id so no two tests share an output filename.
+   */
+  const metaOf = async (name: string) =>
+    sharp(fs.readFileSync(path.join(outRoot, "atlas", "assets", "images", name))).metadata();
+
+  it("publishes a PNG embed as WebP, so painted art stops shipping at PNG size", async () => {
+    const res = await copy("portrait.png", "pngconv", 0);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.target).toBe("/atlas/assets/images/pngconv-1.webp");
+
+    // The name is only half of it — the bytes must actually be WebP, or the
+    // file lies about itself to every downstream scan.
+    expect((await metaOf("pngconv-1.webp")).format).toBe("webp");
+  });
+
+  it("republishes a GIF as a GIF rather than flattening it to a still", async () => {
+    const res = await copy("banner.gif", "gifkeep", 0);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.target).toBe("/atlas/assets/images/gifkeep-1.gif");
+    expect((await metaOf("gifkeep-1.gif")).format).toBe("gif");
+  });
+
+  it("clamps an oversized image to the published width ceiling", async () => {
+    const res = await copy("wide.png", "widecopy", 0);
+    expect(res.ok).toBe(true);
+    expect((await metaOf("widecopy-1.webp")).width).toBe(MAX_IMAGE_WIDTH);
+  });
+
+  it("does not upscale art that is already smaller than the ceiling", async () => {
+    const res = await copy("portrait.png", "smallcopy", 0);
+    expect(res.ok).toBe(true);
+    expect((await metaOf("smallcopy-1.webp")).width).toBe(8);
   });
 });
 

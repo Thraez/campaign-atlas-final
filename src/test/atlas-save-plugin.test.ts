@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import * as nodeCrypto from "node:crypto";
 import sharp from "sharp";
+import { MAX_IMAGE_WIDTH } from "@/atlas/assets/imageEncoding";
 import {
   handleSaveRequest,
   handleAssetsImagesRequest,
@@ -1332,3 +1333,74 @@ describe("handleSaveRequest — EXIF / metadata stripping", () => {
 // Mirrors the cap in vite-plugin-atlas-save.ts so the test can build a payload
 // that intentionally exceeds it without importing internal constants.
 const MAX_ASSET_BINARY_BYTES = 6 * 1024 * 1024;
+
+// The editor's image picker is the second way a picture enters the atlas (the
+// first is the vault-import embed copier). Both must publish the same format,
+// or a 2.3 MB painted PNG added through the editor ships at PNG size even
+// though the same file dropped in via Obsidian would not.
+//
+// The client names the target before the batch is built, so the *name* is the
+// instruction: a `.webp` target under assets/images/ means "encode WebP".
+// Maps are named `.png` and are deliberately untouched — fog redaction and
+// map text both want lossless, and optimize-maps.mjs owns that pipeline.
+describe("editor image add publishes WebP", () => {
+  const dataUrl = (buf: Buffer, mime: string) => `data:${mime};base64,${buf.toString("base64")}`;
+
+  const save = async (targetPath: string, buf: Buffer, mime: string) =>
+    handleSaveRequest(
+      {
+        files: [
+          file({
+            path: targetPath,
+            content: dataUrl(buf, mime),
+            kind: "asset-binary",
+            baseHash: null,
+          }),
+        ],
+      },
+      tmp,
+    );
+
+  // Read metadata from bytes, never a path: `sharp(path)` reads lazily and
+  // holds the file open, which on Windows blocks the afterEach temp cleanup.
+  const metaOf = async (p: string) => sharp(fs.readFileSync(path.join(tmp, p))).metadata();
+
+  const makePng = (width: number, height: number) =>
+    sharp({ create: { width, height, channels: 3, background: { r: 7, g: 8, b: 9 } } })
+      .png()
+      .toBuffer();
+
+  it("encodes a PNG dropped on an images/*.webp target as actual WebP", async () => {
+    const target = "public/atlas/assets/images/hero.webp";
+    const r = await save(target, await makePng(64, 64), "image/png");
+    expect(r.status).toBe(200);
+    expect((await metaOf(target)).format).toBe("webp");
+  });
+
+  it("clamps an oversized editor upload to the published width ceiling", async () => {
+    const target = "public/atlas/assets/images/wide.webp";
+    const r = await save(target, await makePng(2400, 600), "image/png");
+    expect(r.status).toBe(200);
+    expect((await metaOf(target)).width).toBe(MAX_IMAGE_WIDTH);
+  });
+
+  it("does not clamp a WebP map — the ceiling is for portraits, not cartography", async () => {
+    // buildSaveBatch can carry a map targetPath that already ends in .webp
+    // (maps:optimize repoints world.yaml to a .webp twin). Only the extension
+    // guards the convert branch, so without the assets/images/ scoping a
+    // re-saved map would silently lose resolution down to MAX_IMAGE_WIDTH.
+    const target = "public/atlas/assets/maps/region.webp";
+    const r = await save(target, await makePng(2400, 600), "image/png");
+    expect(r.status).toBe(200);
+    expect((await metaOf(target)).width).toBe(2400);
+  });
+
+  it("leaves a map PNG lossless — maps are not part of the WebP policy", async () => {
+    const target = "public/atlas/assets/maps/region.png";
+    const r = await save(target, await makePng(2400, 600), "image/png");
+    expect(r.status).toBe(200);
+    const meta = await metaOf(target);
+    expect(meta.format).toBe("png");
+    expect(meta.width).toBe(2400);
+  });
+});

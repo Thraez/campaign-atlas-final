@@ -42,7 +42,7 @@ atlas:
 Edric was the [[Vein-Marked]] companion of [[Harwick]], the previous owner of [[Ashbrook Manor]]. After the Ashbrook sequence, he rode ahead of the party toward [[Stavall]], setting a hard pace that suggests he knows where he is going.
 
 
-![[Edric.png]]
+![[Edric.webp]]
 ## Appearance
 Edric is lean and windburned, with sandy hair tied back, tired sharp eyes, and faint blue vein-marks running up one side of his neck.
 
