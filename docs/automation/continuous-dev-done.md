@@ -4244,3 +4244,44 @@ scans were run even though T2's queue entry didn't strictly require them.
 
 **Merge:** `claude/t2-folder-path-display` (commit `4e91e419`) → `auto/continuous-dev` (merge commit
 `84853b67`).
+
+- [x] **T3. Real calendar dates render as developer-speak in the player UI.** ✅ DONE 2026-08-28 — commit `0b317725`
+
+**What was wrong:** a vault date like `612-6-3` with no `calendar:` block in `world.yaml` becomes
+`dateRaw: "612 · month 6, day 3"` (`scripts/atlas/calendarDate.ts`, no-calendar branch). `EntityPanel.tsx`
+and `SearchPalette.tsx` then join the type/race/date kicker with the **same** `" · "` separator, so a
+player reads **"Event · 612 · month 6, day 3"** — three middle-dots, one of them internal to a single
+field. Confirmed live: the real `public/atlas/atlas.json` shipped `"612 · month 6, day 3"`,
+`"47 · month 3, day 12"`, `"0 · month 1, day 1"` — the vault has no calendar configured.
+
+**Fix (no-calendar label separator only):** the no-calendar branch now joins its parts with commas —
+`"612, month 6, day 3"` — so the kicker has exactly one separator ("Event · 612, month 6, day 3"). It
+still never emits a bare hyphenated `612-6-3` triple (the reason the 2026-07-30 fix `86327c58` moved off
+that — it reads as a real-world ISO date), and it still invents no month name. When a calendar **is**
+configured the `"3 Harvestmoon, 612"` path is completely untouched. Verified on the real vault: the three
+`dateRaw` values above now regenerate as `"612, month 6, day 3"` etc. (the regenerated `atlas.json` was
+not committed — source-only, matching the T2 convention).
+
+- **Tests:** `calendar-date.test.ts` — updated the two no-calendar label assertions; added a dedicated
+  test that the no-calendar label never contains `" · "` (the kicker separator). **Mutation-checked** —
+  restoring the middle-dot fails that test plus two others; reverting passes all. `EntityPanel.test.tsx` —
+  new test that a realistic no-calendar `dateRaw` joins the kicker as `"Person · 612, month 6, day 3"`
+  and never `"Person · 612 · month 6, day 3"`. `AtlasTimeline.test.tsx` — the three `dateRaw: "1000 AE"` /
+  `"1100 AE"` fixtures were a shape the real no-calendar pipeline never emits (T3's blind-spot note); they
+  now carry realistic `"1000, month 1, day 1"`-style values so a future kicker regression can't hide.
+- **Doc copy:** `CalendarPanel.tsx` help text quoted the old `"612 · month 6, day 3"` example — matched
+  to the new string.
+- **Premise / already-built check:** opened `calendarDate.ts:54` and confirmed the `" · month"`
+  concatenation was still live and still reaching the shipped artifact; grepped `continuous-dev-done.md`
+  for `calendarDate` / `dateRaw` / month-name — nothing. The prior calendar work (`86327c58`) added the
+  Calendar panel and the "spell the parts out" wording but chose a separator that collides with its own
+  sibling change (the kicker join, added in the same commit).
+
+**Gate:** typecheck clean (`tsc --noEmit -p tsconfig.app.json`) · lint 0 errors (13 pre-existing
+warnings, none new) · full sharded suite green (781+717+864+812 = 3174 tests across 4 shards; shard 4 hit
+the documented `onTaskUpdate` worker RPC flake on two runs, 0 real test failures) ·
+`atlas:publish:integrity-smoke` 5/5 · `atlas:publish` 12/12 scans clean (`calendarDate.ts` is under
+`scripts/` and feeds the shipped `atlas.json`, so both publish gates were run).
+
+**Merge:** `claude/t3-calendar-date` (commit `0b317725`) → `auto/continuous-dev` (merge commit
+`5be4d300`).

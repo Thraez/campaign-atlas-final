@@ -309,9 +309,10 @@ is for sequencing, not the whole spec.
 > `d770e1e2` and each was grepped against `continuous-dev-done.md` before being written here.
 >
 > Build in order, one per run, full gate, merge to `auto/continuous-dev`, then move the finished unit to
-> `continuous-dev-done.md`. **T2 is ✅ DONE** (2026-08-28, commit `4e91e419` — see `continuous-dev-done.md`).
+> `continuous-dev-done.md`. **T2 is ✅ DONE** (2026-08-28, commit `4e91e419`) and **T3 is ✅ DONE**
+> (2026-08-28, commit `0b317725`) — see `continuous-dev-done.md`.
 > **T1 is built but blocked on a DM content decision** (see its entry) — do not re-pick it for a routine
-> run until that's resolved. That leaves **T3 next**, then T4.
+> run until that's resolved. That leaves **T4 next** (its own note says it can go before T1 lands).
 >
 > **Note on T1:** it touches the build pipeline and a ship-blocking gate, so it needs
 > `npm run atlas:publish` *and* `npm run atlas:publish:integrity-smoke` in its gate.
@@ -348,20 +349,6 @@ is for sequencing, not the whole spec.
     those two `![[...]]` embeds in the source notes. Fix sits on branch `claude/t1-embed-asset-check`
     (pushed to origin, commit `af71376e`), untouched — rebase onto `auto/continuous-dev` and merge once
     the DM picks a direction, no rework needed. Do not re-pick T1 for a routine run until that's resolved.
-
-- [ ] **T3. Real calendar dates render as developer-speak in the player UI.**
-  A vault date of `612-6-3` becomes `dateRaw: "612 · month 6, day 3"` via
-  `scripts/atlas/calendarDate.ts:54`, which literally concatenates the word `month` and a 1-based index.
-  `EntityPanel.tsx:454` then joins that into the kicker with the same separator —
-  `[typeLabel, entity.race, entity.dateRaw].join(" · ")` — so a player sees **"Event · 612 · month 6, day
-  3"**: three `·` separators, one of them internal to a single field. Also surfaces in `AtlasTimeline.tsx`
-  and `SearchPalette.tsx`.
-  - Invisible to tests because every fixture uses `dateRaw: "1000 AE"` (e.g.
-    `src/test/pages/AtlasTimeline.test.tsx:33,103,121`) — a value the real pipeline never emits. **Fix the
-    fixtures too**, or the next regression hides in the same blind spot.
-  - Needs a DM call on the target format (the calendar's month *names* live in `world.yaml`) — if the
-    month list is present, `"3 Harvestmoon, 612"` is the obvious shape; if not, `"612-6-3"` still beats the
-    current string. Prefer using real month names when available, else fall back cleanly. ~1 run.
 
 - [ ] **T4. Inline image alt text is the raw filename.**
   `renderEntityMarkdown.ts:34` sets `alt` to the embed's filename when the author wrote no `|alias`, so
