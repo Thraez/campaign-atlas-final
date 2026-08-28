@@ -65,9 +65,9 @@ describe("renderEntityMarkdown anchor-wikilinks", () => {
 });
 
 describe("resolveImageEmbeds", () => {
-  it("converts ![[image.png]] to standard markdown img with default path", () => {
+  it("converts ![[image.png]] to standard markdown img with default path (empty alt, T4)", () => {
     const out = resolveImageEmbeds("Before\n\n![[Portrait.png]]\n\nAfter");
-    expect(out).toBe("Before\n\n![Portrait.png](/atlas/assets/images/Portrait.png)\n\nAfter");
+    expect(out).toBe("Before\n\n![](/atlas/assets/images/Portrait.png)\n\nAfter");
   });
   it("uses provided resolveAsset when given", () => {
     const out = resolveImageEmbeds("![[face.jpg]]", (n) => `/custom/${n}`);
@@ -79,8 +79,8 @@ describe("resolveImageEmbeds", () => {
   });
   it("converts multiple embeds in one pass", () => {
     const out = resolveImageEmbeds("![[a.png]] and ![[b.jpg]]");
-    expect(out).toContain("![a.png](/atlas/assets/images/a.png)");
-    expect(out).toContain("![b.jpg](/atlas/assets/images/b.jpg)");
+    expect(out).toContain("![](/atlas/assets/images/a.png)");
+    expect(out).toContain("![](/atlas/assets/images/b.jpg)");
   });
   it("secrecy: embed inside %%-stripped body produces no img (mirrors player path)", () => {
     // stripDmBlocks runs BEFORE resolveImageEmbeds in both projectEntityForPlayer and build-atlas.
@@ -107,9 +107,10 @@ describe("resolveImageEmbeds", () => {
     const out = resolveImageEmbeds("![[Portrait.png|Lord Corven]]");
     expect(out).toBe("![Lord Corven](/atlas/assets/images/Portrait.png)");
   });
-  it("![[image.png]] without alias uses filename as alt text (unchanged behavior)", () => {
+  it("![[image.png]] without alias emits an empty alt, never the filename (T4)", () => {
     const out = resolveImageEmbeds("![[Portrait.png]]");
-    expect(out).toBe("![Portrait.png](/atlas/assets/images/Portrait.png)");
+    expect(out).toBe("![](/atlas/assets/images/Portrait.png)");
+    expect(out).not.toContain("Portrait.png]");
   });
   it("![[Some Note]] (no extension) renders an inert placeholder, not a broken img", () => {
     const out = resolveImageEmbeds("![[Some Note]]");
@@ -127,7 +128,7 @@ describe("resolveImageEmbeds", () => {
   });
   it("image extensions stay case-insensitive (uppercase .PNG still resolves as an image)", () => {
     const out = resolveImageEmbeds("![[Portrait.PNG]]");
-    expect(out).toBe("![Portrait.PNG](/atlas/assets/images/Portrait.PNG)");
+    expect(out).toBe("![](/atlas/assets/images/Portrait.PNG)");
   });
 
   it("![[image.png|300]] sets width instead of using '300' as alt text (N112)", () => {
@@ -165,7 +166,30 @@ describe("resolveImageEmbeds", () => {
   it("a real embed outside code still resolves even when code appears nearby (N108)", () => {
     const out = resolveImageEmbeds("`![[Portrait.png]]` is the syntax. ![[Portrait.png]]");
     expect(out).toContain("`![[Portrait.png]]`");
-    expect(out).toContain("![Portrait.png](/atlas/assets/images/Portrait.png)");
+    expect(out).toContain("![](/atlas/assets/images/Portrait.png)");
+  });
+});
+
+describe("renderEntityMarkdown alias-less image alt (T4)", () => {
+  it("an alias-less ![[image]] renders an <img> whose alt is not the filename", () => {
+    const html = renderEntityMarkdown("![[Corven.png]]", {
+      showDmNotes: false,
+      resolveAsset: () => "/static/portrait",
+    });
+    expect(html).toContain("<img");
+    expect(html).toContain('src="/static/portrait"');
+    // The filename must appear nowhere in the rendered output — not as alt text,
+    // which is what a screen reader or a broken-image box would announce.
+    expect(html).not.toContain("Corven");
+    expect(html).not.toMatch(/alt="[^"]+"/);
+  });
+
+  it("an explicit ![[image|caption]] alias is still used as the alt text", () => {
+    const html = renderEntityMarkdown("![[Corven.png|Lord Corven]]", {
+      showDmNotes: false,
+      resolveAsset: () => "/static/portrait",
+    });
+    expect(html).toContain('alt="Lord Corven"');
   });
 });
 
@@ -180,9 +204,9 @@ describe("renderEntityMarkdown edge cases", () => {
     expect(html).toBe("");
   });
 
-  it("resolveImageEmbeds: resolveAsset returning empty string yields empty src (![alt]())", () => {
+  it("resolveImageEmbeds: resolveAsset returning empty string yields empty src and empty alt (![]())", () => {
     const out = resolveImageEmbeds("![[img.png]]", () => "");
-    expect(out).toBe("![img.png]()");
+    expect(out).toBe("![]()");
   });
 });
 

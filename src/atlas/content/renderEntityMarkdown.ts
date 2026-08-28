@@ -17,6 +17,9 @@ export const DEFAULT_RESOLVE_ASSET = (n: string): string => `/atlas/assets/image
 
 /** Convert Obsidian image embed syntax to standard markdown img before the wikilink pass.
  *  Handles the optional pipe-alias: ![[image.png|Alt text]] → ![Alt text](resolved/image.png)
+ *  With no pipe-alias the author gave no description, so the alt is left empty — never the
+ *  raw filename. A filename is not a useful description, and it is exactly the text a
+ *  screen-reader user (or a broken-image box) is read out when the image can't be shown.
  *  A pipe segment that is purely `W` or `WxH` is Obsidian's resize syntax, not a caption —
  *  it renders `<img width height>` instead of using the digits as alt text.
  *  Non-image embeds (e.g. ![[Some Note]], ![[doc.pdf]]) are not transclusion — Obsidian note
@@ -31,7 +34,7 @@ export function resolveImageEmbeds(
     const name = args[1] as string;
     const pipeIdx = name.indexOf("|");
     const filename = (pipeIdx >= 0 ? name.slice(0, pipeIdx) : name).trim();
-    const alt = (pipeIdx >= 0 ? name.slice(pipeIdx + 1) : name).trim();
+    const alt = pipeIdx >= 0 ? name.slice(pipeIdx + 1).trim() : "";
     if (!IMAGE_EXT_RE.test(filename)) {
       return `<span class="atlas-embed-missing">embedded note not shown</span>`;
     }
