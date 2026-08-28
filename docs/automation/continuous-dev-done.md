@@ -4285,3 +4285,44 @@ the documented `onTaskUpdate` worker RPC flake on two runs, 0 real test failures
 
 **Merge:** `claude/t3-calendar-date` (commit `0b317725`) → `auto/continuous-dev` (merge commit
 `5be4d300`).
+
+- [x] **T4. Inline image alt text is the raw filename.** ✅ DONE 2026-08-28 — commit `86c7be06`
+
+**What was wrong:** `resolveImageEmbeds` in `src/atlas/content/renderEntityMarkdown.ts` turned an
+alias-less `![[Corven.png]]` into `![Corven.png](/atlas/assets/images/Corven.png)`, so the rendered
+`<img>` carried `alt="Corven.png"`. A filename is not a description — it is exactly the text a
+screen-reader user hears, and exactly what a sighted player reads in the broken-image box when the file
+fails to load (which, per still-blocked T1, is currently every inline embed in the real vault). Confirmed
+on real data: the strict player `atlas.json` shipped `<img src="/atlas/assets/images/Corven.png"
+alt="Corven.png">` and the same for `Edric.png`.
+
+**Fix (alt text only):** with no `|alias` the author has given no description, so the alt is now left
+empty — `![](...)`, which renders `<img ... alt="">`, the same choice the `|300` / `|300x200`
+image-resize branch already makes. An explicit `![[img.png|Caption]]` still uses the caption; the
+dimension path at lines 38–42 is byte-identical. One line changed:
+`const alt = pipeIdx >= 0 ? name.slice(pipeIdx + 1).trim() : ""` (was: the whole embed name when no
+pipe). Verified on the real vault — the two portrait embeds now regenerate as `alt=""` with the `src`
+unchanged (regenerated `atlas.json` / `search-index.json` not committed — source-only, matching the
+T2/T3 convention).
+
+- **Tests:** `renderEntityMarkdown.test.ts` — the six assertions that pinned `![filename](...)` updated
+  to `![](...)`; two new rendered-HTML tests (an alias-less embed produces an `<img>` whose alt is not
+  the filename and carries no non-empty `alt="…"`; an explicit `![[img|Caption]]` still renders
+  `alt="Caption"`). **Mutation-checked** — restoring the old one-liner fails 7 of these; reverting passes
+  all 34.
+- **Premise / already-built check:** opened `renderEntityMarkdown.ts:34` and confirmed the alias-less
+  branch still fed the filename in as alt text; grepped `continuous-dev-done.md` for `alt` / `alias` /
+  `renderEntityMarkdown` — the near hits (Q51 non-image placeholder, Q56 audit-assets embed refs, V13
+  vault filename slugs, the T2 wikilink display-text change) all address a different surface. No prior
+  entry touched image-embed alt text. `extractMarkdownImageRefs` in `audit-assets.ts` matches `![…]` with
+  `[^\]]*`, so an empty alt does not disturb asset auditing.
+
+**Gate:** typecheck clean (`tsc --noEmit -p tsconfig.app.json`) · lint 0 errors (13 pre-existing
+warnings, none new) · full sharded suite green (781+717+864+814 = 3176 tests across 4 shards; shard 4 hit
+the documented `onTimeoutError` worker RPC flake on two consecutive runs, 0 real test failures) ·
+`atlas:publish:integrity-smoke` 5/5 · `atlas:publish` 12/12 scans clean (`renderEntityMarkdown.ts` feeds
+`scripts/build-atlas.ts` and the shipped `atlas.json`, so both publish gates were run even though T4's
+queue entry didn't strictly require them; the two pre-existing `BROKEN REF (info)` lines for
+Corven.png / Edric.png are the T1 content gap, not introduced here).
+
+**Merge:** `claude/t4-image-alt` (commit `86c7be06`) → `auto/continuous-dev` (merge commit `8db71da8`).

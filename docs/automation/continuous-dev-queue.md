@@ -309,10 +309,11 @@ is for sequencing, not the whole spec.
 > `d770e1e2` and each was grepped against `continuous-dev-done.md` before being written here.
 >
 > Build in order, one per run, full gate, merge to `auto/continuous-dev`, then move the finished unit to
-> `continuous-dev-done.md`. **T2 is ✅ DONE** (2026-08-28, commit `4e91e419`) and **T3 is ✅ DONE**
-> (2026-08-28, commit `0b317725`) — see `continuous-dev-done.md`.
-> **T1 is built but blocked on a DM content decision** (see its entry) — do not re-pick it for a routine
-> run until that's resolved. That leaves **T4 next** (its own note says it can go before T1 lands).
+> `continuous-dev-done.md`. **T2** (2026-08-28, `4e91e419`), **T3** (2026-08-28, `0b317725`) and **T4**
+> (2026-08-28, `86c7be06`) are all ✅ DONE — see `continuous-dev-done.md`.
+> **T1 is the only unit left, and it is blocked on a DM content decision** (see its entry) — do not
+> re-pick it for a routine run until that's resolved. With T1 parked, section T has no actionable WANT:
+> the next run reaches the **REFUEL POINT** and should hand back per routine step 7.
 >
 > **Note on T1:** it touches the build pipeline and a ship-blocking gate, so it needs
 > `npm run atlas:publish` *and* `npm run atlas:publish:integrity-smoke` in its gate.
@@ -349,16 +350,6 @@ is for sequencing, not the whole spec.
     those two `![[...]]` embeds in the source notes. Fix sits on branch `claude/t1-embed-asset-check`
     (pushed to origin, commit `af71376e`), untouched — rebase onto `auto/continuous-dev` and merge once
     the DM picks a direction, no rework needed. Do not re-pick T1 for a routine run until that's resolved.
-
-- [ ] **T4. Inline image alt text is the raw filename.**
-  `renderEntityMarkdown.ts:34` sets `alt` to the embed's filename when the author wrote no `|alias`, so
-  `![[Corven.png]]` renders `alt="Corven.png"`. That string is exactly what a player sees when the image
-  fails to load — which, per **T1**, is currently every inline embed in the real vault. Small on its own;
-  build it **after T1** so the failure mode it papers over is already fixed. (T1 is built but **blocked on
-  a DM content decision** as of 2026-08-25, not yet merged — T2/T3 are unaffected and can go first.)
-  - Done when: an alias-less image embed produces a human-readable alt (entity title, or empty rather than
-    a filename — empty is the correct choice for a decorative image), pipe-alias behaviour unchanged, and
-    the `width`/`height` dimension path at line 38–42 stays intact. ~1 run.
 
 ---
 
