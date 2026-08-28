@@ -8,9 +8,11 @@
 // so a 2.3 MB painted PNG stayed a 2.3 MB PNG on both paths. Fixing one would
 // have left the other shipping the same bloat.
 //
-// Kept dependency-free (no fs/path/node built-ins), like its neighbour
-// assetSize.ts, so the Node scripts and the browser-bundled editor can both
-// import it and agree on the target name before a byte is written.
+// Kept free of node built-ins (no fs/path), like its neighbour assetSize.ts,
+// so the Node scripts and the browser-bundled editor can both import it and
+// agree on the target name before a byte is written. `slugify` is a pure
+// sibling module and safe on both sides.
+import { slugify } from "../content/slugify";
 
 /** WebP quality for converted stills. Visually lossless on painted art. */
 export const WEBP_QUALITY = 82;
@@ -55,4 +57,24 @@ export function webpTargetName(name: string): string {
   const dot = name.lastIndexOf(".");
   const stem = dot === -1 ? name : name.slice(0, dot);
   return `${stem}.webp`;
+}
+
+/**
+ * On-disk name for an image added through the editor's picker.
+ *
+ * The client decides this *before* the save batch is built, which makes the
+ * filename the single instruction the server acts on — the name and the bytes
+ * can never disagree. Sibling of `vaultImageTargetName`; between them they
+ * cover every way an image enters the atlas.
+ *
+ * `mimeType` is the primary signal because it is what the server sees in the
+ * data URL. Browsers sometimes report an empty `File.type` on a drag-and-drop,
+ * so the extension is the fallback rather than silently keeping PNG.
+ */
+export function editorImageTargetName(fileName: string, mimeType: string): string {
+  const dot = fileName.lastIndexOf(".");
+  const ext = dot === -1 ? "" : fileName.slice(dot).toLowerCase();
+  const stem = dot === -1 ? fileName : fileName.slice(0, dot);
+  const base = `${slugify(stem) || "image"}${ext}`;
+  return shouldConvertToWebp(mimeType || ext) ? webpTargetName(base) : base;
 }

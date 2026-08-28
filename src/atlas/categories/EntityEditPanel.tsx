@@ -9,7 +9,7 @@ import {
   type DraftSecret,
 } from "./useEntityEditDraft";
 import { saveAtlasPatchToLocalFs, hashContent, type FileChange } from "@/atlas/save/localFsSave";
-import { slugify } from "@/atlas/content/slugify";
+import { editorImageTargetName } from "@/atlas/assets/imageEncoding";
 import { fileToDataUrl } from "@/atlas/content/browserFile";
 import { readSourceFile } from "@/atlas/save/canonicalPlacementSave";
 import { loadAtlasContent } from "@/atlas/content/loader";
@@ -272,11 +272,10 @@ export function EntityEditPanel({
   const handleImageImport = (file: File) => {
     fileToDataUrl(file)
       .then((dataUrl) => {
-        const ext = file.name.includes(".")
-          ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase()
-          : "";
-        const stem = file.name.slice(0, file.name.length - ext.length);
-        const safeName = (slugify(stem) || "image") + ext;
+        // Naming and encoding are one decision, made here: a `.webp` target
+        // tells the save endpoint to convert. Painted PNG portraits are ~16x
+        // smaller as WebP, and the DM never has to think about it.
+        const safeName = editorImageTargetName(file.name, file.type);
         const imgPath = `public/atlas/assets/images/${safeName}`;
         return saveAtlasPatchToLocalFs([
           { path: imgPath, content: dataUrl, kind: "asset-binary", baseHash: null },

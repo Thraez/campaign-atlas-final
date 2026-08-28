@@ -75,6 +75,18 @@ const MAX_VAULT_AGGREGATE_BYTES = 25 * 1024 * 1024;
 // after the base64 inflation (matches the build's per-asset audit cap).
 const MAX_ASSET_DATAURL_BYTES = 8 * 1024 * 1024;
 const MAX_ASSET_BINARY_BYTES = 6 * 1024 * 1024;
+/**
+ * Whether an uploaded asset is asking to be published as WebP.
+ *
+ * Scoped to `assets/images/` on purpose. Maps live under `assets/maps/` and
+ * stay lossless — fog redaction and map labels both suffer under a lossy
+ * re-encode, and `scripts/dev/optimize-maps.mjs` owns their sizing instead.
+ */
+function isConvertibleImageTarget(relPath: string): boolean {
+  const p = relPath.replace(/\\/g, "/").toLowerCase();
+  return p.includes("/assets/images/") && p.endsWith(".webp");
+}
+
 const BUILD_TIMEOUT_MS = 60_000;
 const BACKUP_DIR = ".atlas-backups";
 const BACKUP_RETENTION = 3;
@@ -491,8 +503,19 @@ export async function handleSaveRequest(
       let stripped: Buffer;
       try {
         const mime = f.content.slice(5, f.content.indexOf(";base64,"));
+        // The client already applied the shared encoding policy when it chose
+        // the filename, so a `.webp` target under assets/images/ IS the
+        // instruction to convert — one decider, and the name can never
+        // disagree with the bytes. Maps are named `.png` and never match:
+        // fog redaction and map labels both want lossless.
         const s = sharp(buf, { animated: true });
-        if (mime === "image/png") stripped = await s.png().toBuffer();
+        if (isConvertibleImageTarget(f.path) && shouldConvertToWebp(mime))
+          stripped = await sharp(buf)
+            .rotate()
+            .resize({ width: MAX_IMAGE_WIDTH, withoutEnlargement: true })
+            .webp({ quality: WEBP_QUALITY })
+            .toBuffer();
+        else if (mime === "image/png") stripped = await s.png().toBuffer();
         else if (mime === "image/jpeg" || mime === "image/jpg")
           stripped = await s.jpeg({ quality: 85, mozjpeg: true }).toBuffer();
         else if (mime === "image/webp") stripped = await s.webp({ quality: 85 }).toBuffer();
