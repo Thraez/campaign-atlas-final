@@ -4326,3 +4326,48 @@ queue entry didn't strictly require them; the two pre-existing `BROKEN REF (info
 Corven.png / Edric.png are the T1 content gap, not introduced here).
 
 **Merge:** `claude/t4-image-alt` (commit `86c7be06`) → `auto/continuous-dev` (merge commit `8db71da8`).
+
+- [x] **T1. The strict player build ships broken images while reporting `missingAssets: 0`.** ✅ DONE 2026-08-28 — commit `ebdbcfda` (merge `23962175`)
+
+**What was wrong:** `runAssetCheck` (`scripts/build-atlas.ts`) was only ever called on `entity.images[]`
+and map-layer `src`. Inline Obsidian embeds — `![[Corven.png]]` in a note body, which
+`resolveImageEmbeds` turns into a real `<img>` — never reached it, so a missing embed target never
+incremented `missingAssets` and the ship-blocking gate passed with `missingAssets: 0` while the published
+atlas carried `<img>` tags pointing at files that did not exist. The images were also absent from
+`brokenLinks` (embeds are consumed before wikilink tokenization), so they appeared nowhere in the DM's
+build report. `atlas:audit-assets` saw them but filed them as `BROKEN REF (info)` — the lowest severity —
+and printed "(build-atlas reports this as an error)", which was simply false (the missing half of Q56).
+
+**Fix (source-only, two parts):**
+1. **Code (`af71376e`).** New exported `extractImageEmbedFilenames(md)` in `renderEntityMarkdown.ts` —
+   one source of truth for "which image embeds does this body reference," reusing the module's existing
+   `EMBED_RE` / `IMAGE_EXT_RE`. `build-atlas.ts` collects those refs per entity from the DM-stripped
+   `rawBody` (so embeds inside `%%` blocks are already gone) and walks each through the same
+   `runAssetCheck` as `entity.images` and map layers — a missing one now increments `missingAssets` and
+   fails `atlas:build:player --strict` with exit 4. `audit-assets.ts` drops its duplicate embed regex
+   (the copy that let the two drift apart), imports the shared extractor, and its stale parenthetical /
+   comment are corrected so the "reported as an error" claim is now true.
+2. **Content (`52fe4bad`, by the DM).** The two embeds that pointed nowhere in the repo now have a file:
+   `public/atlas/assets/images/Corven.png` and `Edric.png`, sourced from the campaign vault
+   (`content/astrath-deeprealm/imports/corven.md:52`, `edric.md:45`). This is the product call the prior
+   six hand-backs were waiting on — supply the files rather than remove the embeds. With them present,
+   the strict build passes with `missingAssets: 0` honestly. Both PNGs trip the 1 MB soft size warning
+   (~2.3 MB each) but not the payload budget; the DM noted downscaling as a follow-up.
+
+- **Tests:** `atlas-build.test.ts` — new "strict player build FAILS on a missing inline image embed" case
+  (+30 lines). **Mutation-checked** — disabling the new `for (const ref of embeddedAssetRefs)` line makes
+  that test fail; restoring it passes.
+- **Premise / already-built check:** re-verified `public/atlas/assets/images/` held only `.gitkeep`, that
+  `Corven.png` / `Edric.png` were tracked nowhere, and that both `![[...]]` embeds were still live before
+  landing. The auto-merge of `renderEntityMarkdown.ts` against T2/T4 was checked by hand — `EMBED_RE` /
+  `IMAGE_EXT_RE` still defined, no conflict.
+
+**Gate:** typecheck clean (`tsc --noEmit -p tsconfig.app.json`) · `typecheck:scripts` clean · lint 0
+errors (13 pre-existing warnings, none new) · full sharded suite green (781+717+864+815 = 3177 tests
+across 4 shards; shard 4 hit the documented `onTaskUpdate` worker RPC flake on two consecutive runs, 0
+real test failures) · `atlas:publish:integrity-smoke` 5/5 · `atlas:publish` 12/12 scans clean, build
+report `missingAssets: 0` with both portraits present in the output. T1 touches `scripts/` and a
+ship-blocking gate, so both publish gates were required and run.
+
+**Merge:** `claude/t1-embed-asset-check` → `auto/t1-land` (merge commit `ebdbcfda`) → `auto/continuous-dev`
+(merge commit `23962175`).

@@ -301,55 +301,24 @@ is for sequencing, not the whole spec.
 
 ---
 
-### 🔭 T — Dogfooding findings, 2026-08-25 (BUILD THESE NEXT)
+### 🔭 T — Dogfooding findings, 2026-08-25 (✅ ALL DONE)
 
 > Captured by walking **real vault data** (`content/astrath-deeprealm/` → `public/atlas/atlas.json`), not
-> fixtures. That matters: every one of these is invisible to the 3,000-test suite *because* the fixtures
-> use tidy values the real vault never produces. Each premise was re-verified against the merged tree at
-> `d770e1e2` and each was grepped against `continuous-dev-done.md` before being written here.
+> fixtures. Every one was invisible to the 3,000-test suite because the fixtures use tidy values the real
+> vault never produces.
 >
-> Build in order, one per run, full gate, merge to `auto/continuous-dev`, then move the finished unit to
-> `continuous-dev-done.md`. **T2** (2026-08-28, `4e91e419`), **T3** (2026-08-28, `0b317725`) and **T4**
-> (2026-08-28, `86c7be06`) are all ✅ DONE — see `continuous-dev-done.md`.
-> **T1 is the only unit left, and it is blocked on a DM content decision** (see its entry) — do not
-> re-pick it for a routine run until that's resolved. With T1 parked, section T has no actionable WANT:
-> the next run reaches the **REFUEL POINT** and should hand back per routine step 7.
+> **All four units are ✅ DONE** — see `continuous-dev-done.md`:
+> **T2** (2026-08-28, `4e91e419`), **T3** (2026-08-28, `0b317725`), **T4** (2026-08-28, `86c7be06`),
+> **T1** (2026-08-28, `ebdbcfda` / merge `23962175`).
 >
-> **Note on T1:** it touches the build pipeline and a ship-blocking gate, so it needs
-> `npm run atlas:publish` *and* `npm run atlas:publish:integrity-smoke` in its gate.
-
-- [ ] **T1. The strict player build ships broken images while reporting `missingAssets: 0`.**
-  `runAssetCheck` (`scripts/build-atlas.ts:941`) is only ever called on `entity.images[]` (line 953) and
-  map layer `src` (line 956). Inline Obsidian embeds — `![[Corven.png]]` in a note body — never reach it,
-  so they never increment `missingAssets` (line 948). The ship-blocking gate at line 1404 therefore passes
-  with `missingAssets: 0` while the published atlas contains `<img>` tags pointing at files that do not
-  exist. Reproduced on the real vault: `public/atlas/assets/images/` contains only `.gitkeep`, the strict
-  player `atlas.json` carries 2 such `<img>` tags, and `buildReport.missingAssets` is `0`. The images are
-  also **not** counted in `brokenLinks` (embeds are consumed before wikilink tokenization — verified: 24
-  broken links, none with an image extension), so they appear **nowhere** in the DM's build report.
-  `atlas:audit-assets` *does* see them, but files them as `BROKEN REF (info)` — the lowest severity — and
-  prints the parenthetical "(build-atlas reports this as an error)", which is simply false. That
-  parenthetical is the missing half of **Q56** (2026-07-25), which taught the auditor about embeds but
-  never checked the claim it printed.
-  - Distinct from **E2** (warns when an embed is *dropped* from the player view) and from **Q51**/**Q56**
-    (non-image embeds; false-orphan warnings). This is a resolved image embed whose target file is absent.
-  - Done when: an inline `![[missing.png]]` in a player-visible note increments `missingAssets` and fails
-    `atlas:build:player --strict` with exit 4; `atlas:audit-assets` either raises the severity or drops the
-    false parenthetical; regression test plants a missing embed and asserts the non-zero exit. **Mutation-
-    check the test** — assert it actually fails before the fix (see `build-order-audio-prune` for why a
-    vacuous regression test here is the likely trap). ~1–2 runs.
-  - **2026-08-25: fix built and verified, NOT merged — needs a DM decision.** The code fix is correct and
-    gate-clean in isolation (typecheck/lint/sharded vitest/`atlas:publish:integrity-smoke` all green,
-    regression test mutation-checked). But running it against the **real vault** correctly surfaces 2
-    genuinely missing images that were previously shipping silently: `Corven.png` (embedded from
-    `content/astrath-deeprealm/imports/corven.md:52`) and `Edric.png` (from
-    `content/astrath-deeprealm/imports/edric.md:45`) — `public/atlas/assets/images/` has neither. That
-    makes `atlas:build:player --strict` fail on real content, which both `atlas-pr-check.yml` and
-    `publish-atlas.yml` also run — merging now would break CI/deploy until the content gap is closed.
-    This is a product call, not an execution one: either supply `Corven.png`/`Edric.png`, or remove/fix
-    those two `![[...]]` embeds in the source notes. Fix sits on branch `claude/t1-embed-asset-check`
-    (pushed to origin, commit `af71376e`), untouched — rebase onto `auto/continuous-dev` and merge once
-    the DM picks a direction, no rework needed. Do not re-pick T1 for a routine run until that's resolved.
+> T1 was blocked for six hand-backs on a DM content decision (two inline `![[...]]` embeds pointed at
+> files present nowhere in the repo). The DM resolved it on 2026-08-28 by committing the two portraits
+> (`Corven.png`, `Edric.png`) onto the T1 branch; this run rebased the fix onto `auto/continuous-dev`,
+> ran the full gate including both publish scans, and merged.
+>
+> **Section T is now fully ✅ DONE. The next run reaches the REFUEL POINT** — read
+> `continuous-dev-nice-to-haves.md`, or hand back per routine step 7 if nothing there passes the design
+> check.
 
 ---
 
