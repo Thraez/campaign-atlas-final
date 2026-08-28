@@ -42,6 +42,7 @@
     "atlas:restore": "tsx scripts/atlas/backup.ts",
     "audio:transcode": "node scripts/dev/transcode-audio.mjs",
     "maps:optimize": "node scripts/dev/optimize-maps.mjs",
+    "images:optimize": "tsx scripts/dev/optimize-images.ts",
     "prepare": "simple-git-hooks"
   },
   "simple-git-hooks": {

@@ -49,7 +49,7 @@ atlas:
 
 A legendary [[Underground]] figure whose name is woven into half the great heists of the past decades. He has not been seen in years, but his name still opens doors. Crews invoke him to recruit, to threaten, to close a deal. So many people have worn his face that the legend is no longer entirely under his control, if it ever was.
 
-![[Corven.png]]
+![[Corven.webp]]
 
 ## Appearance
 
