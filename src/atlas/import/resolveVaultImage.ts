@@ -9,6 +9,8 @@
  * living in a DM-only folder, and copying that out would publish it. Refusal
  * is reported to the DM, never silent.
  */
+import { shouldConvertToWebp, webpTargetName } from "../assets/imageEncoding";
+
 export type VaultImageResolution =
   { ok: true; relPath: string } | { ok: false; reason: "not-found" | "outside-candidates" };
 
@@ -45,10 +47,14 @@ export function resolveVaultImage(
  * Target filename for a copied image. Derived from the entity id and an index —
  * never from the source filename, which can itself be a spoiler
  * ("the-cabal-lair.png") and would trip the image-privacy filename scan.
+ *
+ * The extension follows the shared encoding policy rather than the source, so
+ * the name and the bytes agree: a PNG published as WebP is called `.webp`.
  */
 export function vaultImageTargetName(entityId: string, index: number, sourceName: string): string {
   const ext = (sourceName.match(/\.[^.]+$/)?.[0] ?? ".png").toLowerCase();
-  return `${entityId}-${index + 1}${ext}`;
+  const base = `${entityId}-${index + 1}`;
+  return shouldConvertToWebp(ext) ? webpTargetName(base) : `${base}${ext}`;
 }
 
 /**

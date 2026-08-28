@@ -60,6 +60,12 @@ import {
 } from "../src/atlas/save/sourcePathAllowlist";
 import { makeIgnore } from "../src/atlas/import/ignoreRules";
 import { resolveVaultImage, vaultImageTargetName } from "../src/atlas/import/resolveVaultImage";
+import {
+  shouldConvertToWebp,
+  webpTargetName,
+  WEBP_QUALITY,
+  MAX_IMAGE_WIDTH,
+} from "../src/atlas/assets/imageEncoding";
 import { runBuild, type BuildResult as InProcessBuildResult } from "./build-atlas";
 import { tryAcquireBuildLock, releaseBuildLock } from "./atlas/buildLock";
 
@@ -1223,7 +1229,20 @@ export async function handleVaultImageCopyRequest(
   try {
     await fs.mkdir(outDir, { recursive: true });
     // Re-encode without metadata: EXIF/IPTC/XMP (incl. GPS) never lands.
-    const cleaned = await sharp(bytes).toBuffer();
+    // Format follows the shared policy, which `vaultImageTargetName` used to
+    // pick the extension above — so the bytes always match the filename.
+    const cleaned = shouldConvertToWebp(path.extname(resolved.relPath))
+      ? await sharp(bytes)
+          // Bake in EXIF orientation before that metadata is dropped, or a
+          // phone photo would be published sideways.
+          .rotate()
+          .resize({ width: MAX_IMAGE_WIDTH, withoutEnlargement: true })
+          .webp({ quality: WEBP_QUALITY })
+          .toBuffer()
+      : // Formats we don't convert are passed through as-is. `animated: true`
+        // keeps every frame of a GIF; without it sharp reads only the first
+        // page and silently republishes an animation as a still.
+        await sharp(bytes, { animated: true }).toBuffer();
     await fs.writeFile(outPath, cleaned);
   } catch {
     return { ok: false, reason: "unreadable" };
