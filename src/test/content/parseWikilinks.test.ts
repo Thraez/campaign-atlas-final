@@ -215,7 +215,9 @@ describe("tokenizeWikilinks — folder-path wikilinks resolve by basename (Q49)"
       resolveByBasename: RESOLVE_BY_BASENAME_UNIQUE,
     });
     expect(links[0].target).toBe("02_Regions/Tidemarrow");
-    expect(links[0].display).toBe("02_Regions/Tidemarrow");
+    // Alias-less display is the trailing segment only — the folder name never
+    // reaches the reader (T2). `target` keeps the full string for redaction.
+    expect(links[0].display).toBe("Tidemarrow");
     expect(links[0].resolvedId).toBe("tidemarrow");
     expect(links[0].broken).toBe(false);
   });
@@ -291,6 +293,59 @@ describe("tokenizeWikilinks — folder-path wikilinks resolve by basename (Q49)"
     });
     expect(seenArg).toBeUndefined();
     expect(links[0].broken).toBe(true);
+  });
+
+  it("[[Folder/]] display falls back to the folder name without the trailing slash", () => {
+    const { links } = tokenizeWikilinks("[[Folder/]]", { resolveByName: RESOLVE_KNOWN });
+    expect(links[0].display).toBe("Folder");
+    expect(links[0].display).not.toContain("/");
+  });
+});
+
+describe("tokenizeWikilinks — alias-less folder-path display never leaks folder names (T2)", () => {
+  it("an UNRESOLVED [[02_Regions/Tidemarrow]] displays as the basename, not the path", () => {
+    const { links } = tokenizeWikilinks("A smuggler-king of the [[02_Regions/Tidemarrow]] underworld.", {
+      resolveByName: () => undefined,
+    });
+    expect(links[0].display).toBe("Tidemarrow");
+    expect(links[0].display).not.toContain("/");
+    // target keeps the full string so the player leak-scan redaction still matches
+    expect(links[0].target).toBe("02_Regions/Tidemarrow");
+    expect(links[0].broken).toBe(true);
+  });
+
+  it("a nested path [[World/02_Regions/Tidemarrow]] displays as the trailing segment only", () => {
+    const { links } = tokenizeWikilinks("[[World/02_Regions/Tidemarrow]]", {
+      resolveByName: () => undefined,
+    });
+    expect(links[0].display).toBe("Tidemarrow");
+    expect(links[0].display).not.toContain("/");
+  });
+
+  it("an explicit |alias on a folder-path target is still honored verbatim", () => {
+    const { links } = tokenizeWikilinks("[[02_Regions/Tidemarrow|the port city]]", {
+      resolveByName: () => undefined,
+    });
+    expect(links[0].display).toBe("the port city");
+  });
+
+  it("a plain no-slash unresolved link is unchanged (display equals the target)", () => {
+    const { links } = tokenizeWikilinks("[[Ghost Town]]", { resolveByName: () => undefined });
+    expect(links[0].display).toBe("Ghost Town");
+  });
+
+  it("player build render (hideBroken) never emits the folder path or a slash", () => {
+    const { tokenized, links } = tokenizeWikilinks(
+      "A smuggler-king of the [[02_Regions/Tidemarrow]] underworld.",
+      { resolveByName: () => undefined }
+    );
+    const html = renderLinkTokens(`<p>${tokenized}</p>`, links, { hideBroken: true });
+    expect(html).toContain("Tidemarrow");
+    expect(html).not.toContain("02_Regions");
+    // the rendered span text carries no path separator (tag syntax aside)
+    const spanText = html.match(/atlas-planned-link-player">([^<]*)</)?.[1];
+    expect(spanText).toBe("Tidemarrow");
+    expect(html).toContain("atlas-planned-link-player");
   });
 });
 

@@ -42,7 +42,18 @@ export function tokenizeWikilinks(
       const basename = filePart.slice(filePart.lastIndexOf("/") + 1).trim();
       if (basename) resolved = ctx.resolveByBasename?.(basename);
     }
-    const d = (display ?? (filePart || t.slice(1))).trim();
+    // Display text with no explicit `|alias`: a folder-path target shows only
+    // its trailing segment, never the DM's private folder names — an unresolved
+    // `[[02_Regions/Tidemarrow]]` must read as "Tidemarrow", not the path.
+    // `link.target` still carries the full string so the player leak-scan
+    // redaction regexes keep matching.
+    let defaultDisplay = filePart || t.slice(1);
+    if (filePart.includes("/")) {
+      const trimmed = filePart.replace(/\/+$/, "");
+      const seg = trimmed.slice(trimmed.lastIndexOf("/") + 1).trim();
+      if (seg) defaultDisplay = seg;
+    }
+    const d = (display ?? defaultDisplay).trim();
     const link: ResolvedLink = {
       target: t,
       display: d,
