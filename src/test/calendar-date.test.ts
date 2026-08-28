@@ -37,13 +37,22 @@ describe("parseAtlasDate", () => {
     expect(result!.monthIndex).toBe(2);
     expect(result!.day).toBe(15);
     // Never the raw "1247-03-15" — that reads as a real-world ISO date.
-    expect(result!.label).toBe("1247 · month 3, day 15");
+    expect(result!.label).toBe("1247, month 3, day 15");
   });
 
   it("no-calendar label never contains a bare hyphenated date triple", () => {
     for (const raw of ["612-6-3", "0-1-1", "47-3-12"]) {
       expect(parseAtlasDate(raw, undefined)!.label).not.toMatch(/^-?\d+-\d+-\d+$/);
     }
+  });
+
+  it("no-calendar label never uses ' · ' — the kicker separator EntityPanel joins with", () => {
+    // EntityPanel/SearchPalette render [type, race, dateRaw].join(" · "); a
+    // middle-dot inside dateRaw makes "Event · 612 · month 6, day 3".
+    for (const raw of ["612-6-3", "0-1-1", "47-3-12", "1300-07"]) {
+      expect(parseAtlasDate(raw, undefined)!.label).not.toContain(" · ");
+    }
+    expect(parseAtlasDate("612-6-3", undefined)!.label).toBe("612, month 6, day 3");
   });
 
   it("YYYY only without calendar: defaults month=0 day=1", () => {
@@ -62,7 +71,7 @@ describe("parseAtlasDate", () => {
     expect(result!.monthIndex).toBe(6);
     expect(result!.day).toBe(1);
     // Day was absent from the input, so the label must not invent one.
-    expect(result!.label).toBe("1300 · month 7");
+    expect(result!.label).toBe("1300, month 7");
   });
 
   it("YYYY-MM-DD with calendar: uses calendar month lengths for value and month name in label", () => {

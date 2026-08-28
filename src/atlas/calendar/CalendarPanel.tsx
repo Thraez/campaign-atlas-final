@@ -2,7 +2,7 @@
  * Name the months of the world's year.
  *
  * Until this is filled in, `parseAtlasDate` has no month names to work with and
- * every dated entry renders as "612 · month 6, day 3" — readable, but not the
+ * every dated entry renders as "612, month 6, day 3" — readable, but not the
  * world's own voice. Configuring it used to mean hand-editing `calendar:` in
  * world.yaml, which no screen in the app ever mentioned.
  *
@@ -59,7 +59,7 @@ export function CalendarPanel({
       <div className="flex-1 min-h-0 overflow-auto p-3 space-y-4">
         <p className="text-xs text-muted-foreground">
           Name the months of your year and dates will read the way your world does — “3 Longnight,
-          612 AS” instead of “612 · month 6, day 3”.
+          612 AS” instead of “612, month 6, day 3”.
         </p>
 
         <div className="space-y-1.5">
