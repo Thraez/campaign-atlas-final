@@ -65,6 +65,10 @@ function read(outDir: string) {
       strippedDmBlocks: number;
       missingAssets?: number;
       externalAssets?: number;
+      excluded: number;
+      excludedByFolder?: number;
+      excludedByVisibility?: number;
+      excludedPaths?: string[];
     };
   };
 }
@@ -124,6 +128,45 @@ describe.sequential("atlas build pipeline", () => {
     const town = atlas.entities.find((e) => e.id === "public-town")!;
     expect(town.body).toMatch(/DM-only secret/);
     expect(atlas.buildReport.strippedDmBlocks).toBe(0);
+  });
+
+  it("DM build names the folder-excluded notes behind the excluded count", () => {
+    const out = path.join(tmpRoot, "dm-excluded");
+    const result = run(["--config", path.join(FIXTURE, "atlas.config.json"), "--out", out]);
+    expect(result.status, result.stderr).toBe(0);
+    const atlas = read(out);
+    const br = atlas.buildReport;
+    // The split adds up to the bare total.
+    expect((br.excludedByFolder ?? 0) + (br.excludedByVisibility ?? 0)).toBe(br.excluded);
+    // A DM build never drops entities for visibility.
+    expect(br.excludedByVisibility).toBe(0);
+    // The _drafts/ note is counted and named, relative to the content root.
+    expect(br.excludedByFolder).toBeGreaterThanOrEqual(1);
+    expect(br.excludedPaths).toContain("test-world/_drafts/Wip-Note.md");
+    // Paths are sorted.
+    expect(br.excludedPaths).toEqual([...(br.excludedPaths ?? [])].sort());
+    // The excluded note itself never became an entity.
+    expect(atlas.entities.map((e) => e.id)).not.toContain("wip-note");
+  });
+
+  it("PLAYER build keeps the excluded total but omits the DM-only breakdown", () => {
+    const out = path.join(tmpRoot, "player-excluded");
+    const result = run([
+      "--player",
+      "--config",
+      path.join(FIXTURE, "atlas.config.json"),
+      "--out",
+      out,
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    const atlas = read(out);
+    const br = atlas.buildReport;
+    expect(typeof br.excluded).toBe("number");
+    expect(br.excludedByFolder).toBeUndefined();
+    expect(br.excludedByVisibility).toBeUndefined();
+    expect(br.excludedPaths).toBeUndefined();
+    // Belt-and-braces: no vault path string anywhere in the player artifact.
+    expect(fs.readFileSync(path.join(out, "atlas.json"), "utf8")).not.toMatch(/_drafts\//);
   });
 
   it("multi-map placements emit one MapPlacement per entry", () => {

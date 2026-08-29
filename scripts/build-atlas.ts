@@ -1032,6 +1032,19 @@ async function runBuildCore(flags: BuildFlags) {
       scanned: files.length + scanInfo.excludedFiles,
       included: pending.length,
       excluded: scanInfo.excludedFiles + visibilityExcluded,
+      // Split the bare `excluded` count so the DM can see *what* was left out
+      // and *why*. Folder-excluded note paths never ship to players — a
+      // filename in `_dm/` can itself be a spoiler — so this whole breakdown
+      // is DM-build-only. The player build keeps just the total, as before.
+      ...(flags.player
+        ? {}
+        : {
+            excludedByFolder: scanInfo.excludedFiles,
+            excludedByVisibility: visibilityExcluded,
+            excludedPaths: [...scanInfo.excludedPaths]
+              .map((f) => path.relative(contentDir, f).replace(/\\/g, "/"))
+              .sort(),
+          }),
       // Warning text routinely names DM entities (cross-ref leak messages,
       // relationship leak messages, unresolved-target messages, etc.). Player
       // builds get the same diagnostic warnings, but every secret entity's
@@ -1072,6 +1085,13 @@ async function runBuildCore(flags: BuildFlags) {
   console.log(`Scanned:                 ${r.scanned}`);
   console.log(`Included entities:       ${r.included}`);
   console.log(`Excluded by folder:      ${scanInfo.excludedFiles}`);
+  if (!flags.player && scanInfo.excludedPaths.length > 0) {
+    const rels = [...scanInfo.excludedPaths]
+      .map((f) => path.relative(contentDir, f).replace(/\\/g, "/"))
+      .sort();
+    for (const f of rels.slice(0, 20)) console.log(`  – ${f}`);
+    if (rels.length > 20) console.log(`  – …and ${rels.length - 20} more`);
+  }
   console.log(`Excluded by visibility:  ${visibilityExcluded}`);
   console.log(
     `Stripped DM blocks:      ${r.strippedDmBlocks}${flags.player ? "" : ` (DM build keeps ${detectedDmBlocks} block${detectedDmBlocks === 1 ? "" : "s"} in body)`}`,

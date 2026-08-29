@@ -288,6 +288,22 @@ export interface BuildReport {
   scanned: number;
   included: number;
   excluded: number;
+  /**
+   * Of `excluded`: notes dropped by folder / include-glob rules before parsing
+   * (e.g. anything under `_drafts/` or `_dm/`). Present in DM builds only.
+   */
+  excludedByFolder?: number;
+  /**
+   * Of `excluded`: entities dropped from a player build because they resolved to
+   * DM-only visibility. Always 0 for a DM build. Present in DM builds only.
+   */
+  excludedByVisibility?: number;
+  /**
+   * The folder-excluded note paths, relative to the content root, sorted.
+   * DM builds only — a filename can itself be a spoiler, so this never ships to
+   * players.
+   */
+  excludedPaths?: string[];
   warnings: string[];
   /** Renamed to unresolvedLinks. Kept for back-compat. */
   brokenLinks: number;
