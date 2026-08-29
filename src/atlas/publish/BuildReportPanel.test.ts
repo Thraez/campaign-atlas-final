@@ -96,6 +96,31 @@ describe("deriveBuildIssues", () => {
     expect(issues[0].suggestion).toBeUndefined();
   });
 
+  it("emits singular excluded-note info for one folder-excluded path", () => {
+    const issues = deriveBuildIssues({
+      ...base,
+      excludedPaths: ["test-world/_drafts/Wip-Note.md"],
+    });
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ severity: "info", code: "excluded-note" });
+    expect(issues[0].message).toContain("1 note excluded by folder rules");
+    expect(issues[0].message).toContain("test-world/_drafts/Wip-Note.md");
+    expect(issues[0].message).not.toContain("notes excluded");
+  });
+
+  it("emits plural excluded-note info and truncates past 12 paths", () => {
+    const paths = Array.from({ length: 15 }, (_, i) => `test-world/_dm/note-${i}.md`);
+    const issues = deriveBuildIssues({ ...base, excludedPaths: paths });
+    expect(issues[0].message).toContain("15 notes excluded by folder rules");
+    expect(issues[0].message).toContain("…and 3 more");
+    expect(issues[0].message).not.toContain("note-12.md");
+  });
+
+  it("emits no excluded-note issue when excludedPaths is empty or absent", () => {
+    expect(deriveBuildIssues({ ...base, excludedPaths: [] })).toEqual([]);
+    expect(deriveBuildIssues(base)).toEqual([]);
+  });
+
   it("emits issues in order: error codes before warnings", () => {
     const issues = deriveBuildIssues({
       ...base,
@@ -154,5 +179,21 @@ describe("buildReportToMarkdown", () => {
     expect(md).toContain("Scanned: 20");
     expect(md).toContain("Included: 15");
     expect(md).toContain("Excluded: 5");
+  });
+
+  it("breaks the excluded count into folder vs visibility when the split is present", () => {
+    const md = buildReportToMarkdown({
+      ...base,
+      excluded: 5,
+      excludedByFolder: 3,
+      excludedByVisibility: 2,
+    });
+    expect(md).toContain("Excluded: 5 (3 by folder, 2 by visibility)");
+  });
+
+  it("keeps the bare excluded line when the split fields are absent (player build)", () => {
+    const md = buildReportToMarkdown({ ...base, excluded: 5 });
+    expect(md).toContain("- Excluded: 5\n");
+    expect(md).not.toContain("by folder");
   });
 });

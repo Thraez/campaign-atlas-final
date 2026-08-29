@@ -71,6 +71,18 @@ export function deriveBuildIssues(report: BuildReport): BuildReportIssue[] {
       suggestion: "Rename one of the conflicting entity files so each slug is unique.",
     });
   }
+  if ((report.excludedPaths?.length ?? 0) > 0) {
+    const paths = report.excludedPaths!;
+    const shown = paths.slice(0, 12);
+    const more = paths.length - shown.length;
+    issues.push({
+      severity: "info",
+      code: "excluded-note",
+      message: `${paths.length} note${paths.length === 1 ? "" : "s"} excluded by folder rules: ${shown.join(", ")}${more > 0 ? `, …and ${more} more` : ""}`,
+      suggestion:
+        "These live in _drafts/, _dm/, or another excluded folder and never ship. Move a note out of that folder to include it.",
+    });
+  }
   if ((report.unresolvedLinks ?? 0) > 0) {
     issues.push({
       severity: "info",
@@ -141,7 +153,13 @@ export function buildReportToMarkdown(
   lines.push(`## Summary`);
   lines.push(`- Scanned: ${report.scanned}`);
   lines.push(`- Included: ${report.included}`);
-  lines.push(`- Excluded: ${report.excluded}`);
+  if (report.excludedByFolder !== undefined || report.excludedByVisibility !== undefined) {
+    const byFolder = report.excludedByFolder ?? 0;
+    const byVis = report.excludedByVisibility ?? 0;
+    lines.push(`- Excluded: ${report.excluded} (${byFolder} by folder, ${byVis} by visibility)`);
+  } else {
+    lines.push(`- Excluded: ${report.excluded}`);
+  }
   lines.push(`- Errors: ${errors.length}`);
   lines.push(`- Warnings: ${warnings.length}`);
   lines.push(`- Info: ${infos.length}`);
