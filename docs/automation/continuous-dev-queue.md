@@ -358,9 +358,11 @@ shape, it just has to be emptied as its items ship.
 The 2026-08-25 pass produced 4 findings; all 4 were strong enough to go straight into the WANTS section as
 **T1–T4**, so this inbox holds only the leftovers — observations that are real but not yet worth a unit:
 
-- **`buildReport.excluded: 1` names neither the note nor the reason.** The real vault excludes
-  `_drafts/Wip-Note.md` and the DM gets a bare count. Probably a one-line fix (list the paths), but it
-  needs a look at who consumes `excluded` before it's a want.
+- ~~**`buildReport.excluded: 1` names neither the note nor the reason.**~~ ✅ **DONE 2026-08-29**
+  (`5c0c7ca2`, `415618e9`). DM builds now emit `excludedByFolder` / `excludedByVisibility` /
+  `excludedPaths` (the split, plus the folder-excluded paths), the build console lists them, and the
+  build report panel surfaces them. Player builds keep just the bare total — a `_dm/` filename can be a
+  spoiler. Write-up in `continuous-dev-done.md`.
 - **18 distinct unresolved wikilink targets across 6 notes.** Expected for a living vault — planned links
   are a feature, not a bug. Captured only as a baseline: if that number climbs sharply after **T2**, the
   display-text change broke resolution somewhere.

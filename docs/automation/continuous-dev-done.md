@@ -4371,3 +4371,47 @@ ship-blocking gate, so both publish gates were required and run.
 
 **Merge:** `claude/t1-embed-asset-check` → `auto/t1-land` (merge commit `ebdbcfda`) → `auto/continuous-dev`
 (merge commit `23962175`).
+
+- [x] **T5. `buildReport.excluded` names neither the note nor the reason.** ✅ DONE 2026-08-29 —
+  commits `5c0c7ca2` (pipeline + test) · `415618e9` (build report panel)
+
+This was the first leftover in the 2026-08-25 INBOX (`continuous-dev-queue.md`), blessed by the DM on
+2026-08-29 with "go ahead". Its precondition — "look at who consumes `excluded` first" — was checked:
+nothing reads `.excluded` for logic (`validateProject.checkBuildReport`, `check-artifact-shape`, the
+panel all treat it as display only), and no test pins the exact shape of `buildReport`, so adding
+optional fields is safe.
+
+**What was wrong:** `buildReport.excluded` was one number — folder-excluded notes plus
+visibility-excluded entities, summed, with no way to see which notes or why. The real vault excludes
+`_drafts/Wip-Note.md`; the DM just saw `excluded: 1`.
+
+**Fix (source-only):**
+1. **Schema (`schema.ts`).** Three new optional `BuildReport` fields: `excludedByFolder`,
+   `excludedByVisibility`, `excludedPaths` (content-root-relative, sorted).
+2. **Build (`build-atlas.ts`).** DM builds populate all three; the build console lists the excluded
+   paths (capped at 20 lines). Player builds emit **none** of them — a filename under `_dm/` can itself
+   be a spoiler — so the player `atlas.json` keeps just the bare total, byte-identical to before.
+3. **Panel (`BuildReportPanel.tsx`).** `deriveBuildIssues` adds an `excluded-note` info row naming the
+   folder-excluded paths (first 12, then "…and N more"); `buildReportToMarkdown` expands the
+   "- Excluded: N" line to "N (X by folder, Y by visibility)" when the split is present, bare otherwise.
+
+- **Fixture:** new `src/test/fixtures/atlas-build/content/test-world/_drafts/Wip-Note.md` so the build
+  tests exercise real folder exclusion instead of a synthetic count — closes a fixture-vs-real-vault
+  drift the 2026-08-25 method note flagged.
+- **Tests:** `atlas-build.test.ts` — "DM build names the folder-excluded notes" + "PLAYER build keeps
+  the excluded total but omits the DM-only breakdown" (the latter also asserts `_drafts/` never appears
+  anywhere in the player `atlas.json` text). `BuildReportPanel.test.ts` — singular/plural/truncation for
+  the `excluded-note` issue, and the split vs bare markdown line. **Mutation-checked:** forcing the
+  DM-only block into the player build makes the player-secrecy test fail on
+  `expect(br.excludedByFolder).toBeUndefined()`; restoring the `flags.player` guard passes.
+
+**Gate:** lint 0 errors (13 pre-existing warnings) · typecheck + typecheck:scripts clean ·
+format:check clean · full sharded suite green (786+717+885+833 across 4 shards; shards hit the
+documented `onTaskUpdate` worker RPC flake, 0 real test failures) · `atlas:publish:integrity-smoke` 5/5
+· `atlas:publish` 12/12 scans clean. Touches `scripts/`, so both publish gates were required and run.
+The `atlas:publish` regen of `public/atlas/atlas.json` was **reverted** — the only real deltas were
+pre-existing drift (mojibake em-dash → real em-dash, CRLF → LF in three entity bodies), unrelated to
+this change and not worth bundling into a feature commit. Flagged for a future run.
+
+**Merge:** committed directly on `auto/continuous-dev` (`5c0c7ca2`, `415618e9`) — no feature branch,
+same as T2/T3/T4's source-only convention.
