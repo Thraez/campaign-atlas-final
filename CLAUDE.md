@@ -30,19 +30,23 @@ Out of scope on purpose: **maps** (lossless, for fog redaction and map labels �
 - The source of truth for design is `README.md` (long). Skim its TOC before architectural changes.
 - For changes to the build pipeline, the scan scripts under `scripts/` define the contracts the output must satisfy.
 
-<!-- TRIAL: MODEL-SELECTION START (added 2026-05-15 — delete this section alone to revert just model selection) -->
-## Model selection — trial rules
+<!-- MODEL-SELECTION START (rewritten 2026-09-27 for the Opus 5.5 default) -->
+## Model selection
 
-General model-tier and subagent policy lives in user-level CLAUDE.md — don't restate it here.
-Version-numbered tiers were removed from this file in Aug 2026 after they went stale.
+General model-tier and subagent policy lives in user-level CLAUDE.md (Opus 5.5 at medium
+effort is the default; clear, specced work is routed to Sonnet). Only the project-specific
+triggers belong here.
 
-Only the project-specific triggers belong here. **Escalate to the strongest model for:**
+**Keep on Opus, don't hand to Sonnet:**
 - Anything touching `scripts/`, `vite.config.ts`, the atlas build pipeline, migrations, security
 - Ambiguous spec needing interpretation; architectural review; UI/UX with no concrete plan
 - The *first* session of a multi-phase initiative (the one producing the handover)
-- Mid-session: after verification fails twice in the same area, or the third "let me try a
-  different approach" reframing — that means the task needs design judgment, not execution
-<!-- TRIAL: MODEL-SELECTION END -->
+
+**Good Sonnet hand-offs:** executing an approved plan from `handovers/ACTIVE.md` (see the
+handover protocol below), component work with a written spec, test-fix loops against a known
+spec. Bring the work back to Opus if a Sonnet run fails verification twice in the same area or
+reframes its approach a third time: that means it needs design judgment, not execution.
+<!-- MODEL-SELECTION END -->
 
 <!-- TRIAL: HANDOVER START (added 2026-05-17 — delete this section alone to revert just the handover protocol) -->
 ## Handover protocol — trial rules
