@@ -59,15 +59,15 @@ The general model and subagent policy is in user-level CLAUDE.md. Project specif
 - Keep on Opus: anything touching `scripts/`, `vite.config.ts`, the atlas build pipeline,
   migrations or security; an ambiguous spec; architectural review; UI/UX with no concrete
   plan; the first session of a multi-phase initiative (the one that writes the handover).
-- Good Sonnet hand-offs: executing an approved plan from `handovers/ACTIVE.md`, component work
-  with a written spec, test-fix loops against a known spec.
 
 ## Handovers
 
-Handovers live in project auto-memory at `handovers/ACTIVE.md`. Never commit one to the repo
-as the primary copy, because it gets lost on unmerged branches. When a planning or design phase
-ends with an approved plan (including on leaving Plan Mode), write the plan to `ACTIVE.md`
-before executing; it is the handover. Full protocol: project memory `handover_protocol.md`.
+Session handovers live in project auto-memory at `handovers/SESSION.md`, and `/handover` writes
+there too. `handovers/ACTIVE.md` belongs to the continuous-dev routine, which overwrites the whole
+file every run, so never put a session plan in it. Never commit a handover to the repo as the
+primary copy, because it gets lost on unmerged branches. When a planning or design phase ends
+with an approved plan (including on leaving Plan Mode), write the plan to `SESSION.md` before
+executing; it is the handover. Full protocol: project memory `handover_protocol.md`.
 
 ## Branch cleanup
 
