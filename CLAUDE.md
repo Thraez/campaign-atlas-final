@@ -1,72 +1,81 @@
 # campaign-atlas-final
 
-D&D world atlas: Obsidian markdown → build pipeline → `atlas.json` → dual-mode publish (player-safe static site + DM editor).
+D&D world atlas: Obsidian markdown -> build pipeline -> `atlas.json` -> dual-mode publish
+(player-safe static site + DM editor).
 
 ## Hard rules
 
-- **Never hand-edit generated artifacts.** `public/atlas/atlas.json`, `.local-atlas/`, `dist/`, and `dist-ssr/` are build outputs. Edit source (YAML frontmatter, `world.yaml`, components under `src/`) and rebuild. A pre-tool hook enforces this — if it blocks you, fix the source, not the output.
-- **Player builds must not contain DM content.** Before claiming a build is done, run `npm run atlas:check-secrets <dir>` and `npm run atlas:check-derived <dir>` against the output dir. `npm run atlas:publish` chains both.
-- **Editor code is gated.** The visual editor (`AtlasPlacementEditor`, `/__atlas/save`) is excluded from player builds via the `__INCLUDE_EDITOR__` define in `vite.config.ts`. Don't import editor modules from player-mode entry points.
-- **`main` merges are automatic, not human-gated.** Once a branch (feature work, or the `auto/continuous-dev` integration branch) passes its full gate — typecheck, lint, tests, and `atlas:publish`/scans where the change touches the build pipeline — merge it into `main` and push to `origin/main` without waiting for a go-ahead. Still respect ordinary git safety: never force-push, and if `origin/main` has diverged in a way that isn't a clean fast-forward or conflict-free merge (e.g. concurrent direct-to-main commits not reachable from the branch being merged), stop and flag it rather than resolving conflicts unattended. Confirmed by the user 2026-07-31 (see auto-memory `feedback_automerge_to_main.md`) — this supersedes the earlier "main is sacred, human merges only" convention that gated the hourly continuous-dev routine; that routine's standing instructions (`~/.claude/scheduled-tasks/campaign-atlas-continuous-development-v2/SKILL.md`) were updated to match.
+- **Never hand-edit generated artifacts.** `public/atlas/atlas.json`, `.local-atlas/`, `dist/`
+  and `dist-ssr/` are build outputs. Edit the source (YAML frontmatter, `world.yaml`,
+  components under `src/`) and rebuild. A pre-tool hook enforces this; if it blocks you, fix
+  the source, not the output.
+- **Player builds must not contain DM content.** Before calling a build done, run
+  `npm run atlas:check-secrets <dir>` and `npm run atlas:check-derived <dir>` against the
+  output dir. `npm run atlas:publish` chains both.
+- **Editor code is gated.** The visual editor (`AtlasPlacementEditor`, `/__atlas/save`) is
+  excluded from player builds by the `__INCLUDE_EDITOR__` define in `vite.config.ts`. Don't
+  import editor modules from player-mode entry points.
+- **Merges to `main` are automatic.** Once a branch (feature work or the `auto/continuous-dev`
+  integration branch) passes its full gate (typecheck, lint, tests, plus `atlas:publish` and
+  the scans when the change touches the build pipeline), merge it into `main` and push without
+  waiting for a go-ahead. Never force-push. If `origin/main` has diverged so the merge is not a
+  clean fast-forward or conflict-free merge, stop and flag it instead of resolving conflicts
+  unattended. (User decision 2026-07-31, auto-memory `feedback_automerge_to_main.md`; the
+  continuous-dev routine's SKILL.md matches.)
 
 ## Commands
 
-- `npm run dev` — full editor + local save endpoint
-- `npm run build` — player-safe production build (tree-shakes editor)
-- `npm run atlas:build:player` — strict player atlas → `public/atlas/`
-- `npm run atlas:publish` — full build + all scans
-- `npm test` — Vitest
-- `npm run lint` — ESLint
-- `npm run images:optimize` — convert leftover PNG/JPEG in the image library to WebP and repoint references
+- `npm run dev`: full editor + local save endpoint
+- `npm run build`: player-safe production build (tree-shakes the editor)
+- `npm run atlas:build:player`: strict player atlas -> `public/atlas/`
+- `npm run atlas:publish`: full build + all scans
+- `npm test`: Vitest
+- `npm run lint`: ESLint
+- `npm run images:optimize`: convert leftover PNG/JPEG in the image library to WebP and
+  repoint references
 
 ## Image encoding
 
-`src/atlas/assets/imageEncoding.ts` is the single answer to "what format does a published image take, and what is it called". Both ingest paths — the editor's picker and the vault embed copier — import it and convert PNG/JPEG to WebP automatically, so a DM never has to think about file size. Don't re-declare the constants or the convert rule anywhere else; that duplication is what let 2.3 MB portraits ship.
+`src/atlas/assets/imageEncoding.ts` is the single answer to "what format does a published
+image take, and what is it called". Both ingest paths (the editor's picker and the vault embed
+copier) import it and convert PNG/JPEG to WebP automatically, so a DM never has to think about
+file size. Don't re-declare its constants or convert rule anywhere else; that duplication is
+what let 2.3 MB portraits ship.
 
-Out of scope on purpose: **maps** (lossless, for fog redaction and map labels — `maps:optimize` owns them) and **GIFs** (converting would flatten the animation).
+Out of scope on purpose: maps (kept lossless for fog redaction and map labels;
+`maps:optimize` owns them) and GIFs (converting would flatten the animation).
 
 ## When in doubt
 
-- The source of truth for design is `README.md` (long). Skim its TOC before architectural changes.
-- For changes to the build pipeline, the scan scripts under `scripts/` define the contracts the output must satisfy.
+- `README.md` is the design source of truth and it is long. Skim its TOC before architectural
+  changes.
+- For build-pipeline changes, the scan scripts under `scripts/` define the contracts the
+  output must satisfy.
 
-<!-- MODEL-SELECTION START (rewritten 2026-09-27 for the Opus 5.5 default) -->
 ## Model selection
 
-General model-tier and subagent policy lives in user-level CLAUDE.md (Opus 5.5 at medium
-effort is the default; clear, specced work is routed to Sonnet). Only the project-specific
-triggers belong here.
+The general model and subagent policy is in user-level CLAUDE.md. Project specifics:
 
-**Keep on Opus, don't hand to Sonnet:**
-- Anything touching `scripts/`, `vite.config.ts`, the atlas build pipeline, migrations, security
-- Ambiguous spec needing interpretation; architectural review; UI/UX with no concrete plan
-- The *first* session of a multi-phase initiative (the one producing the handover)
+- Keep on Opus: anything touching `scripts/`, `vite.config.ts`, the atlas build pipeline,
+  migrations or security; an ambiguous spec; architectural review; UI/UX with no concrete
+  plan; the first session of a multi-phase initiative (the one that writes the handover).
+- Good Sonnet hand-offs: executing an approved plan from `handovers/ACTIVE.md`, component work
+  with a written spec, test-fix loops against a known spec.
 
-**Good Sonnet hand-offs:** executing an approved plan from `handovers/ACTIVE.md` (see the
-handover protocol below), component work with a written spec, test-fix loops against a known
-spec. Bring the work back to Opus if a Sonnet run fails verification twice in the same area or
-reframes its approach a third time: that means it needs design judgment, not execution.
-<!-- MODEL-SELECTION END -->
+## Handovers
 
-<!-- TRIAL: HANDOVER START (added 2026-05-17 — delete this section alone to revert just the handover protocol) -->
-## Handover protocol — trial rules
+Handovers live in project auto-memory at `handovers/ACTIVE.md`. Never commit one to the repo
+as the primary copy, because it gets lost on unmerged branches. When a planning or design phase
+ends with an approved plan (including on leaving Plan Mode), write the plan to `ACTIVE.md`
+before executing; it is the handover. Full protocol: project memory `handover_protocol.md`.
 
-**Mid-session handoff signal (when running on Opus):**
-- When finishing a planning, design, or architectural-review phase — *before* starting execution — stop and **write the handover to `<project-memory>/handovers/ACTIVE.md`** (goal, context, files to touch, success criteria, open questions, branch/PR). Then say:
-  > "Planning is done and the handover is saved. Suggest switching to `/model sonnet` and replying `continue` to execute. Staying on Opus is fine if you'd rather not switch."
-- Same signal when exiting Plan Mode with an approved plan: write the approved plan to `ACTIVE.md` — it *is* the handover — then prompt the switch.
-- Do **not** propose a mid-session switch during execution unless verification has failed twice in the same area and a redesign is needed (in which case: switch *back up* to Opus).
-- If the user says "continue" after a handoff signal, treat `ACTIVE.md` as the spec. Don't re-derive the plan; execute it. When the work is done, archive the handover per the protocol.
+## Branch cleanup
 
-**Handover discovery (every session, any model):**
-- At session start, before planning or clarifying questions, read the project auto-memory `handovers/ACTIVE.md`. If it holds a pending handover, that is the spec — confirm scope with the user, then execute; don't re-derive.
-- Never commit handover docs into the repo as the primary copy — they get lost on unmerged branches. Auto-memory is the source of truth. Full protocol: project memory `handover_protocol.md`.
-<!-- TRIAL: HANDOVER END -->
-
-<!-- TRIAL: BRANCH-CLEANUP START (added 2026-05-17 — delete this section alone to revert just the cleanup rule) -->
-## Branch cleanup safety — trial invariant
-
-- **Never delete a branch unless its tip is first tagged `archive/<name>` and that tag is pushed to origin**, and it is not checked out in any worktree. The pushed tag — not any detection heuristic — is the safety net.
-- **Auto-delete only branches provably empty past their fork point. Anything with commits: tag it, list it, wait for explicit user confirmation — never auto-delete.**
-- **GitHub "merged" status is informational only — never a deletion criterion.** Applies to manual sweeps and the `clean_gone` / auto-delete-on-merge routine alike. Exact commands + rationale: project memory `safe_cleanup_protocol.md`.
-<!-- TRIAL: BRANCH-CLEANUP END -->
+- Never delete a branch until its tip is tagged `archive/<name>`, that tag is pushed to origin,
+  and the branch is not checked out in any worktree. The pushed tag is the safety net, not any
+  detection heuristic.
+- Auto-delete only branches with no commits past their fork point. For anything with commits:
+  tag it, list it, and wait for the user to confirm.
+- GitHub's "merged" status is never a deletion criterion, in manual sweeps and in the
+  `clean_gone` / auto-delete-on-merge routine alike. Exact commands and rationale: project
+  memory `safe_cleanup_protocol.md`.
