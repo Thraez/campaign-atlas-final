@@ -152,6 +152,14 @@ describe("isIgnoredPath", () => {
     expect(isIgnoredPath("templates/npc-template.md")).toBe(true);
   });
 
+  it.each(["00_Templates", "98_Templates", "Z_Archive", "90_Inbox", "Z_Codex_Proposals"])(
+    "flags the vault folder '%s' as ignored",
+    (folder) => {
+      expect(isIgnoredPath(`${folder}/note.md`)).toBe(true);
+      expect(isIgnoredPath(`vault/${folder}/sub/note.md`)).toBe(true);
+    },
+  );
+
   it("flags '.obsidian' as ignored", () => {
     expect(isIgnoredPath(".obsidian/config.json")).toBe(true);
   });
