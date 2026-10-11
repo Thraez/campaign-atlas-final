@@ -11,7 +11,28 @@
       "PowerShell(git push --force:*)",
       "PowerShell(git push -f:*)",
       "PowerShell(git push * --force*)",
-      "PowerShell(git push * -f*)"
+      "PowerShell(git push * -f*)",
+      "Edit(./node_modules/**)",
+      "Edit(./dist/**)",
+      "Edit(./dist-ssr/**)",
+      "Edit(./coverage/**)",
+      "Edit(./package-lock.json)",
+      "Read(./.env)",
+      "Read(./dist/**)",
+      "Read(./coverage/**)",
+      "Read(./.atlas-backups/**)",
+      "Read(./.env.local)",
+      "Read(./.env.*.local)",
+      "Read(./.env.production)",
+      "Read(./.env.development)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "PowerShell(git push:*)",
+      "Bash(npm run atlas:publish:*)",
+      "PowerShell(npm run atlas:publish:*)",
+      "Bash(gh workflow run:*)",
+      "PowerShell(gh workflow run:*)"
     ]
   },
   "hooks": {
