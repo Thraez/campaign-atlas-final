@@ -50,15 +50,8 @@ A branch is done only after typecheck, lint, tests, and any pipeline checks it t
   `vite.config.ts`. Never import editor modules from a player entry point.
 - Published image format and naming belong to `src/atlas/assets/imageEncoding.ts`; import it,
   don't copy it. Maps stay lossless (labels, fog redaction); `maps:optimize` owns them.
-
-## Vault folder names (importer depends on them)
-
-`src/atlas/import/inferType.ts` infers note types from vault folder names: `03_Entities/NPCs` ->
-npc, `03_Entities/Gods` -> deity, `02_Regions/Places` -> location. Those names must not change
-without updating the importer. Its ignore list (`IGNORED_FOLDERS`) matches whole folder names,
-lowercase: `templates`, `archive`, `00_templates`, `98_templates`, `z_archive`, `90_inbox`,
-`z_codex_proposals` and others. Saved sync settings and `sync-map.json` also key on vault
-folder names and note paths.
+- Never rename vault folders without updating `src/atlas/import/inferType.ts`, which reads note types and its ignore
+  list from folder names. Details: `docs/IMPORT_EXPORT.md` ("Vault folder names").
 
 ## Models
 

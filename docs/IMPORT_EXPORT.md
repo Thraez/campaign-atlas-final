@@ -57,6 +57,14 @@ The wizard categorizes each `.md` file:
 | **Placeable** | Has placements or legacy coords | Ships with one or more pins. |
 | **Player-published** | `visibility: player` or `rumor`, plus the above | Visible to players in the final build. |
 
+### Vault folder names
+
+`src/atlas/import/inferType.ts` infers note types from vault folder names: `03_Entities/NPCs` -> npc,
+`03_Entities/Gods` -> deity, `02_Regions/Places` -> location. Those names must not change without updating the
+importer. Its ignore list (`IGNORED_FOLDERS`) matches whole folder names, lowercase: `templates`, `archive`,
+`00_templates`, `98_templates`, `z_archive`, `90_inbox`, `z_codex_proposals` and others. Saved sync settings and
+`sync-map.json` also key on vault folder names and note paths.
+
 ### Duplicate-title detection
 
 The build already fails on duplicate slugs (same `atlas.id` or same slugified title). The wizard surfaces these **before** commit:
