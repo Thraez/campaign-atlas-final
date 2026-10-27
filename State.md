@@ -16,11 +16,12 @@ Updated 2026-10-27 on the Mac. Branch `main`, pushed to GitHub at `5dc85f2`.
 
 ## Next, in order
 
-1. `audit-2026-10/07`: react-router v7, done on branch `react-router-v7` (not merged).
+1. `audit-2026-10/07`: react-router v7, done and reviewed on branch `react-router-v7`; waiting on Isak's OK to merge into `main` and push.
 2. `audit-2026-10/03`, `04`: test:ci shard retry; COMMANDS.md drift.
 3. `code-retro/01`-`04`: safety-scan titles and the Sync bugs.
 4. `tidemarrow/01`-`03`: first sync, Tidemarrow map, remove the Astrath sample.
 5. `code-retro/06`-`08`: Note reading module, Sync module with dry run, build core.
+6. `audit-2026-10/08`: stop the map flying while it has no size (Leaflet `NaN`).
 
 ## Waiting on Isak
 
