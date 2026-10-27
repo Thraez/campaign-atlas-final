@@ -73,25 +73,35 @@ export class AudioEngine {
     if (!this.muted) this.setMuted(false);
   }
 
-  /** Crossfade to the given area's bed, or to silence when area is null. */
-  async crossfadeTo(area: PreparedArea | null): Promise<void> {
-    if (!this.ctx || !this.master) return;
+  /** True once unlock() has created the AudioContext. */
+  get unlocked(): boolean {
+    return this.ctx !== null;
+  }
+
+  /**
+   * Crossfade to the given area's bed, or to silence when area is null.
+   * Resolves true only when that bed is actually playing afterwards: false
+   * before unlock(), for silence, when the bed fails to load, or when a newer
+   * crossfade took over while it decoded.
+   */
+  async crossfadeTo(area: PreparedArea | null): Promise<boolean> {
+    if (!this.ctx || !this.master) return false;
     const targetId = area?.id ?? null;
-    if (this.active?.id === targetId) return;
+    if (this.active?.id === targetId) return this.active !== null;
 
     const out = this.active;
     this.active = null;
     if (out) this.fadeOutAndStop(out);
 
-    if (!area) return;
+    if (!area) return false;
 
     const src =
       this.deps.canPlay(area.bed.src) || !area.bed.srcFallback
         ? area.bed.src
         : area.bed.srcFallback;
     const buffer = await this.loadBuffer(src);
-    if (!buffer || !this.ctx || !this.master) return;
-    if (this.active) return; // a newer crossfade superseded us while decoding
+    if (!buffer || !this.ctx || !this.master) return false;
+    if (this.active) return false; // a newer crossfade superseded us while decoding
 
     const gain = this.ctx.createGain();
     gain.gain.value = 0;
@@ -107,6 +117,7 @@ export class AudioEngine {
     gain.gain.setValueAtTime(0, this.ctx.currentTime);
     gain.gain.linearRampToValueAtTime(peak, this.ctx.currentTime + CROSSFADE_S);
     this.active = { id: area.id, source, gain };
+    return true;
   }
 
   private fadeOutAndStop(bed: ActiveBed): void {

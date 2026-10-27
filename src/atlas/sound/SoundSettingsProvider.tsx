@@ -17,6 +17,13 @@ interface SoundSettings extends SoundPrefs {
   setCalmMode: (c: boolean) => void;
   setVolume: (v: number) => void;
   setMapMasterGain: (g: number) => void;
+  /**
+   * True once the AudioContext exists. A saved soundEnabled survives a reload
+   * but the browser only lets audio start from a user gesture, so after a
+   * reload this stays false until the first tap or key press anywhere.
+   */
+  audioUnlocked: boolean;
+  /** True only while a bed is actually playing (reported by SoundscapeLayer). */
   ambiencePlaying: boolean;
   setAmbiencePlaying: (v: boolean) => void;
   /** False when the Web Audio API is unavailable in this environment. */
@@ -55,6 +62,7 @@ export function SoundSettingsProvider({
   const [mapMasterGain, setMapMasterGain] = useState(0.6);
   // ambiencePlaying is reported by SoundscapeLayer when a bed is active.
   const [ambiencePlaying, setAmbiencePlaying] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
 
   const update = useCallback((patch: Partial<SoundPrefs>) => {
     setPrefs((prev) => {
@@ -108,14 +116,39 @@ export function SoundSettingsProvider({
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [engine, prefs.muted, prefs.calmMode]);
 
-  const enableSound = useCallback(() => {
-    engine.unlock().catch(() => {
+  // Must run inside a user-gesture handler so the browser lets audio start.
+  const unlockAudio = useCallback(() => {
+    const unlocking = engine.unlock();
+    // unlock() creates the AudioContext synchronously, before its first await.
+    setAudioUnlocked(engine.unlocked);
+    unlocking.catch(() => {
       // Web Audio failed to initialise (e.g. browser policy or missing API).
-      // Leave soundEnabled false so the invite stays hidden on the next render.
+      // Roll soundEnabled back to false.
       update({ soundEnabled: false });
     });
-    update({ soundEnabled: true });
   }, [engine, update]);
+
+  const enableSound = useCallback(() => {
+    unlockAudio();
+    update({ soundEnabled: true });
+  }, [unlockAudio, update]);
+
+  // Sound was saved on before a reload: unlock on the first tap or key press
+  // anywhere on the page. Capture phase, so map handlers can't swallow it.
+  useEffect(() => {
+    if (!prefs.soundEnabled || audioUnlocked || !audioAvailable) return;
+    const onGesture = () => {
+      window.removeEventListener("pointerdown", onGesture, true);
+      window.removeEventListener("keydown", onGesture, true);
+      unlockAudio();
+    };
+    window.addEventListener("pointerdown", onGesture, true);
+    window.addEventListener("keydown", onGesture, true);
+    return () => {
+      window.removeEventListener("pointerdown", onGesture, true);
+      window.removeEventListener("keydown", onGesture, true);
+    };
+  }, [prefs.soundEnabled, audioUnlocked, audioAvailable, unlockAudio]);
 
   const value = useMemo<SoundSettings>(
     () => ({
@@ -126,12 +159,22 @@ export function SoundSettingsProvider({
       setCalmMode: (c) => update({ calmMode: c }),
       setVolume: (v) => update({ volume: Math.min(1, Math.max(0, v)) }),
       setMapMasterGain,
+      audioUnlocked,
       ambiencePlaying,
       setAmbiencePlaying,
       audioAvailable,
       motionReduced,
     }),
-    [prefs, engine, enableSound, update, ambiencePlaying, audioAvailable, motionReduced],
+    [
+      prefs,
+      engine,
+      enableSound,
+      update,
+      audioUnlocked,
+      ambiencePlaying,
+      audioAvailable,
+      motionReduced,
+    ],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

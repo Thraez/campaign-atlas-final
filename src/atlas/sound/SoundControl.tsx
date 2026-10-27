@@ -8,6 +8,7 @@ interface SoundControlProps {
 export function SoundControl({ hasSoundscape = true }: SoundControlProps) {
   const {
     soundEnabled,
+    audioUnlocked,
     muted,
     calmMode,
     volume,
@@ -20,13 +21,33 @@ export function SoundControl({ hasSoundscape = true }: SoundControlProps) {
   } = useSoundSettings();
   const [dismissed, setDismissed] = useState(false);
 
-  const ambienceActive = soundEnabled && ambiencePlaying && !muted && !calmMode;
+  // Sound saved on from an earlier visit, but the browser hasn't let audio
+  // start yet: the first tap or key press anywhere unlocks it.
+  const awaitingGesture = soundEnabled && !audioUnlocked;
+  const ambienceActive = soundEnabled && audioUnlocked && ambiencePlaying && !muted && !calmMode;
 
   return (
     <div className="absolute bottom-4 right-4 z-[1000] flex items-center gap-2">
       <span role="status" aria-live="polite" className="sr-only">
         {ambienceActive ? "Ambience playing" : ""}
       </span>
+      {hasSoundscape && audioAvailable && awaitingGesture && !dismissed && (
+        <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 shadow-sm">
+          <button type="button" onClick={enableSound} className="flex items-center gap-2 text-sm">
+            <span aria-hidden>🔊</span>
+            Tap to resume sound
+          </button>
+          <button
+            type="button"
+            aria-label="Dismiss"
+            onClick={() => setDismissed(true)}
+            className="-mr-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+          >
+            <span aria-hidden>✕</span>
+          </button>
+        </div>
+      )}
+
       {hasSoundscape && audioAvailable && !soundEnabled && !dismissed && (
         <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 shadow-sm">
           <button type="button" onClick={enableSound} className="flex items-center gap-2 text-sm">
@@ -46,7 +67,7 @@ export function SoundControl({ hasSoundscape = true }: SoundControlProps) {
         </div>
       )}
 
-      {hasSoundscape && audioAvailable && soundEnabled && (
+      {hasSoundscape && audioAvailable && soundEnabled && audioUnlocked && (
         <>
           {ambienceActive && (
             <span className="rounded-full border border-border bg-card px-3 py-2 text-xs shadow-sm text-muted-foreground">
