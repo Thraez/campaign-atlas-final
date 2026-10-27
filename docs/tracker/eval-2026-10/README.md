@@ -15,5 +15,7 @@ Parked as notes, no ticket yet:
 - Save status may stay dirty for drafts on other maps after a save
   (`AtlasPlacementEditor.tsx` ~2155, unverified).
 
+Second sweep, 2026-10-27 (map, player site, editor, import, publish): 08-12, plus 13 from the eval-04 tests. 08, 09 and 13 are bugs.
+
 Work the lowest open number first. Words as in `GLOSSARY.md`; module, interface, seam and depth
 as in the `codebase-design` skill.
