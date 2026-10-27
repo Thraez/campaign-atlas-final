@@ -20,6 +20,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { DEV_API_PATHS } from "./atlas/devRoutes";
 
 export const DM_CONTENT_SENTINELS = [
   "SENTINEL_DM_BODY_001",
@@ -28,14 +29,15 @@ export const DM_CONTENT_SENTINELS = [
   "SENTINEL_DM_BLOCK_001",
 ] as const;
 
-export const EDITOR_CODE_FINGERPRINTS = [
-  "/__atlas/save",
-  "/__atlas/publish-check",
-  "/__atlas/publish-push",
+// Every dev-server endpoint path (from the route table's path list), plus
+// editor-only identifiers. A route added to scripts/atlas/devRoutes.ts is
+// fingerprinted automatically.
+export const EDITOR_CODE_FINGERPRINTS: readonly string[] = [
+  ...Object.values(DEV_API_PATHS),
   "saveAtlasPatchToLocalFs",
   "AtlasPlacementEditor",
   "/atlas/edit",
-] as const;
+];
 
 const TEXT_EXTENSIONS = new Set([
   ".html",

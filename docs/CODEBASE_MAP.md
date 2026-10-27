@@ -157,7 +157,8 @@ atomic writes, backups, and optional in-process rebuild.
 
 | File | Role | Key exports |
 |------|------|-------------|
-| `scripts/vite-plugin-atlas-save.ts` | The plugin: `POST /__atlas/save`, `GET /__atlas/read`, image list/delete, DM-atlas overlay | `atlasSavePlugin`, `handleSaveRequest`, `isAllowedDevRequest`, `rejectNonLoopback`, `serveLocalAtlas` |
+| `scripts/vite-plugin-atlas-save.ts` | The plugin: one route table (`DEV_ROUTES`) for every dev endpoint and the DM-atlas overlay; `createDevRouter` applies the loopback gate, build lock, body cap and JSON parsing once | `atlasSavePlugin`, `DEV_ROUTES`, `createDevRouter`, `handleSaveRequest`, `isAllowedDevRequest`, `rejectNonLoopback` |
+| `scripts/atlas/devRoutes.ts` | The `/__atlas/*` path list, shared by the route table and the player-bundle fingerprints in `check-no-secrets.ts` | `DEV_API_PATHS`, `DEV_API_PREFIX` |
 | `src/atlas/save/sourcePathAllowlist.ts` | Single source of truth for writable paths (shared client+server) | `isWritableSourcePath`, `isWritableAssetPath` |
 | `src/atlas/save/localFsSave.ts` | Browser client: validate → POST → typed errors | `saveAtlasPatchToLocalFs`, `ConflictError`, `SaveBusyError`, `hashContent` |
 | `vite.config.ts` | Defines `__INCLUDE_EDITOR__`; registers the plugin `apply: "serve"` | — |
@@ -165,9 +166,11 @@ atomic writes, backups, and optional in-process rebuild.
 | `src/atlas/dmTools.ts` | Runtime DM-tools gate (`VITE_ENABLE_DM_TOOLS`, defaults ON in dev) | `isDmToolsEnabled` |
 
 **Access control (defense in depth):** `rejectNonLoopback` 403s any request whose
-`Host` isn't loopback; writes additionally require a present loopback `Origin`.
-`serveLocalAtlas` deliberately does *not* 403 — a LAN player can *read* the player
-atlas but never *write*.
+`Host` isn't loopback or whose peer isn't loopback; writes additionally require a
+present loopback `Origin`. The router runs it for every `/__atlas/*` request. The
+DM overlays of `/atlas/atlas.json` and `/atlas/search-index.json` deliberately do
+*not* 403 — a refused request falls through to the player file, so a LAN player
+can *read* the player atlas but never DM canon.
 
 **Conflict model:** `baseHash` = `sha256:` of content-at-load. `null` = create-only,
 `sha256:…` = update-only-if-match. It prevents silent overwrites but is not a lock
