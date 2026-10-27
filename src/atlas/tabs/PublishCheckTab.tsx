@@ -182,8 +182,8 @@ export function PublishCheckTab({
           <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs space-y-1">
             <div className="font-medium">Publishing only works from the main branch.</div>
             <div className="text-[10px] text-muted-foreground">
-              {publish.pushBranch
-                ? `You're on “${publish.pushBranch}”.`
+              {publish.refusedBranch
+                ? `You're on “${publish.refusedBranch}”.`
                 : "No branch is checked out."}{" "}
               Switch to main in GitHub Desktop, then publish again. Nothing was committed or pushed.
             </div>

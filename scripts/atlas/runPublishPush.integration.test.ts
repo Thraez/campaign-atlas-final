@@ -212,6 +212,34 @@ describe("runPublishPush (integration — no network)", () => {
     }
   }, 20_000);
 
+  it("on main with a tag also called main, still publishes to the main branch", async () => {
+    const [repoDir, bareDir] = makeTestRepo();
+    try {
+      git(repoDir, "tag", "main");
+      fs.mkdirSync(path.join(repoDir, "content"), { recursive: true });
+      fs.writeFileSync(path.join(repoDir, "content", "notes.md"), "# note");
+      const result = await runPublishPush(repoDir, {
+        now: "2026-06-16T00:00:00.000Z",
+        verify: async () => SAFE_CHECK,
+      });
+      expect(result.status).toBe("published");
+      expect(git(bareDir, "rev-parse", "refs/heads/main")).toBe(git(repoDir, "rev-parse", "HEAD"));
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+      fs.rmSync(bareDir, { recursive: true, force: true });
+    }
+  }, 20_000);
+
+  it("reports a git failure, not a wrong branch, when HEAD can't be read", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publish-not-a-repo-"));
+    try {
+      const result = await runPublishPush(dir, { verify: async () => SAFE_CHECK });
+      expect(result.status).toBe("git-failed");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }, 20_000);
+
   it("returns nothing-to-publish when the repo has no scoped changes", async () => {
     const [repoDir, bareDir] = makeTestRepo();
     try {

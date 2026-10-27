@@ -275,7 +275,7 @@ describe("usePublishFlow (push half)", () => {
       result.current.confirm();
     });
     await waitFor(() => expect(result.current.state).toBe("wrong-branch"));
-    expect(result.current.pushBranch).toBe("feature/x");
+    expect(result.current.refusedBranch).toBe("feature/x");
     expect(result.current.pushResult).toBeNull();
   });
 

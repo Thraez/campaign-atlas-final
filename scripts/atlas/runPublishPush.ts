@@ -94,9 +94,16 @@ export async function runPublishPush(
   //    commit on any other branch would never reach players, and pushing a local
   //    `main` we didn't just commit to could ship unrelated work. Checked before
   //    the rebuild and before anything is staged.
-  const head = await git(repoRoot, ["symbolic-ref", "--quiet", "--short", "HEAD"]);
-  const branch = head.ok ? head.stdout.trim() : ""; // "" = detached HEAD
-  if (branch !== PUBLISH_BRANCH) return { status: "wrong-branch", branch };
+  //    The full ref name, not `--short`: a tag called `main` would make the
+  //    short name `heads/main`. A detached HEAD prints `HEAD`; a git failure
+  //    is a git failure, not a wrong branch.
+  const head = await git(repoRoot, ["rev-parse", "--symbolic-full-name", "HEAD"]);
+  if (!head.ok) return { status: "git-failed", reason: classifyGitFailure(head.stderr) };
+  const ref = head.stdout.trim();
+  if (ref !== `refs/heads/${PUBLISH_BRANCH}`) {
+    const branch = ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : ""; // "" = detached HEAD
+    return { status: "wrong-branch", branch };
+  }
 
   // 1. Re-verify safety (D10) — never trust a client-claimed verdict.
   const check = await verify(repoRoot);
@@ -133,7 +140,7 @@ export async function runPublishPush(
 
   // 5. Push the commit just made to main (uses the machine's ambient git
   //    credentials — D6). HEAD:main, so what ships is exactly this HEAD.
-  const push = await git(repoRoot, ["push", "origin", `HEAD:${PUBLISH_BRANCH}`]);
+  const push = await git(repoRoot, ["push", "origin", `HEAD:refs/heads/${PUBLISH_BRANCH}`]);
   if (!push.ok) return { status: "git-failed", reason: classifyGitFailure(push.stderr) };
 
   // 6. Snapshot the just-pushed player atlas as the new diff baseline (D11).

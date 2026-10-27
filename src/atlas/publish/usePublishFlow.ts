@@ -27,7 +27,7 @@ export function usePublishFlow() {
   const [pushReason, setPushReason] = useState<string | null>(null);
   const [pushResult, setPushResult] = useState<PublishPushSummary | null>(null);
   /** Checked-out branch when publish refused with wrong-branch ("" = detached HEAD). */
-  const [pushBranch, setPushBranch] = useState<string | null>(null);
+  const [refusedBranch, setRefusedBranch] = useState<string | null>(null);
 
   const check = useCallback(async () => {
     setState("checking");
@@ -83,7 +83,7 @@ export function usePublishFlow() {
         setState("nothing-to-publish");
       } else if (data.status === "wrong-branch") {
         setState("wrong-branch");
-        setPushBranch(data.branch);
+        setRefusedBranch(data.branch);
       } else if (data.status === "blocked") {
         setState("blocked");
       } else if (data.status === "git-failed") {
@@ -96,5 +96,5 @@ export function usePublishFlow() {
     }
   }, []);
 
-  return { state, checkResult, error, check, confirm, pushReason, pushResult, pushBranch };
+  return { state, checkResult, error, check, confirm, pushReason, pushResult, refusedBranch };
 }
