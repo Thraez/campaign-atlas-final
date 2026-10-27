@@ -58,21 +58,15 @@ import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { OceanBackground } from "@/atlas/ocean/OceanBackground";
 import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
-import { buildSavePlan } from "@/atlas/editor/saveGate";
+import { planUnifiedSave } from "@/atlas/editor/saveGate";
 import { buildDraftPlacements as pureBuildDraftPlacements } from "@/atlas/editor/dirtyPlacements";
 import type { FileChange } from "@/atlas/save/localFsSave";
 import { SaveStatus } from "@/atlas/session/SaveStatus";
 import { DiscardConfirmModal } from "@/atlas/session/DiscardConfirmModal";
 import { useExternalRebuildDetector } from "@/atlas/session/useExternalRebuildDetector";
-import {
-  CanonicalSaveError,
-  buildCanonicalPlacementChanges,
-} from "@/atlas/save/canonicalPlacementSave";
+import { CanonicalSaveError } from "@/atlas/save/canonicalPlacementSave";
 import { useWorldYamlBaseline, worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
-import {
-  buildWorldYamlContent as pureBuildWorldYamlContent,
-  buildAssetBinaryChanges as pureBuildAssetBinaryChanges,
-} from "@/atlas/save/buildSaveBatch";
+import { buildWorldYamlContent as pureBuildWorldYamlContent } from "@/atlas/save/buildSaveBatch";
 import { pointInPolygon } from "@/atlas/geometry/polygon";
 import { SyncPanel } from "@/atlas/sync/SyncPanel";
 import { ImportStagingModal } from "@/atlas/import/ImportStagingModal";
@@ -780,20 +774,6 @@ function AtlasPlacementEditorInner() {
   ]);
 
   /**
-   * Build the asset-binary FileChange entries for every upload-origin layer
-   * on the active map. Each carries the upload's dataUrl (which the layer
-   * captured when the file was dragged in) plus its targetPath under
-   * public/atlas/assets/maps/. Uploads with no dataUrl (rare — quota
-   * pressure clears it from localStorage on reload) are skipped silently;
-   * the world.yaml emission still references them so the DM sees the
-   * mismatch in the diff modal.
-   */
-  const buildAssetBinaryChanges = useCallback(
-    (): FileChange[] => pureBuildAssetBinaryChanges(layerEditor.localLayers),
-    [layerEditor.localLayers],
-  );
-
-  /**
    * Save: rewrite the canonical entity .md frontmatter for every drafted
    * placement, route it through /__atlas/save (dev-only Vite plugin → disk),
    * and trigger an atlas rebuild so the player view picks up the changes
@@ -801,86 +781,42 @@ function AtlasPlacementEditorInner() {
    * batch when any of the map / region / route / fog / layer tabs has a
    * dirty draft.
    *
+   * The decision (what to write, or why to refuse) is planUnifiedSave in
+   * src/atlas/editor/saveGate.ts; this handler only wires it to toast/modal.
+   * eval-12: an upload with no bytes refuses the save and the reason shows
+   * as an error toast; nothing is written.
+   *
    * No GitHub API. The dev plugin's allowlist only accepts content/**\/*.md
    * and content/**\/_atlas/*.yaml so even a buggy client cannot widen the
    * surface.
    */
   const onSaveClick = async () => {
     if (!project || !activeMap) return;
-    // B3: buildDraftPlacements() returns a draft for every *effective* placement
-    // (incl. canon-only ones). Queue only the placements the DM actually
-    // overrode this session, or a clean Save would rewrite every placed entity.
-    const plan = buildSavePlan({
-      allDraftPlacements: buildDraftPlacements(),
-      overrides,
-      activeMapId: activeMap.id,
-      worldYamlDirty,
-    });
-    if (plan.isEmpty && foreignMapDrafts.length === 0) {
-      toast.info("No changes to save");
-      return;
-    }
-    // N100: fold in cross-map duplicates (overrides keyed to a map other
-    // than the active one) — buildSavePlan only ever sees the active map.
-    const drafts = [...plan.dirtyPlacements, ...foreignMapDrafts];
-    const entitiesById = new Map(project.entities.map((e) => [e.id, e]));
     try {
-      // One FileChange per entity .md path, however many maps it is placed
-      // on — the save endpoint rejects duplicate paths.
-      const entityChanges = await buildCanonicalPlacementChanges(drafts, entitiesById);
-      const fileChanges: FileChange[] = [...entityChanges];
-
-      if (worldYamlDirty && activeWorldId) {
-        if (worldYamlBaseline.loading) {
-          toast.error("Still loading world.yaml baseline — try again in a moment.");
-          return;
-        }
-        if (worldYamlBaseline.error) {
-          toast.error(`Cannot save world.yaml: ${worldYamlBaseline.error}`);
-          return;
-        }
-        const content = buildWorldYamlContent();
-        if (!content) {
-          toast.error("Cannot build world.yaml content");
-          return;
-        }
-        // Asset-binary entries land in the same batch — bytes hit disk first,
-        // then world.yaml references them. The endpoint's atomic temp+rename
-        // means even a mid-batch failure rolls them back together.
-        const assetChanges = buildAssetBinaryChanges();
-        // Surface uploads that have lost their dataUrl (localStorage quota
-        // pressure clears it on reload). The world.yaml will reference them
-        // but the binary won't land — the next build will flag missing assets.
-        const droppedUploads = layerEditor.localLayers.filter(
-          (l) => l.origin === "upload" && !l.dataUrl,
-        ).length;
-        if (droppedUploads > 0) {
-          toast.warning(
-            `${droppedUploads} uploaded image${droppedUploads === 1 ? "" : "s"} have no in-memory bytes`,
-            {
-              description: "Likely cleared by localStorage quota. Re-upload before saving.",
-              duration: 8000,
-            },
-          );
-        }
-        fileChanges.push(...assetChanges);
-        fileChanges.push({
-          path: worldYamlPath(activeWorldId),
-          content,
-          kind: "world-yaml",
-          // null when world.yaml doesn't yet exist (fresh world → create-only write).
-          baseHash: worldYamlBaseline.hash,
-        });
+      const plan = await planUnifiedSave({
+        allDraftPlacements: buildDraftPlacements(),
+        overrides,
+        activeMapId: activeMap.id,
+        foreignMapDrafts,
+        entitiesById: new Map(project.entities.map((e) => [e.id, e])),
+        worldYamlDirty,
+        worldYamlPath: activeWorldId ? worldYamlPath(activeWorldId) : null,
+        worldYamlBaseline,
+        buildWorldYamlContent,
+        localLayers: layerEditor.localLayers,
+      });
+      if (plan.kind === "nothing-to-save") {
+        toast.info(plan.message);
+        return;
       }
-
-      if (fileChanges.length === 0) {
-        toast.info("No canonical changes to write");
+      if (plan.kind === "refused") {
+        toast.error(plan.reason, { description: plan.detail, duration: 10000 });
         return;
       }
       // B1: do NOT mark "saving" here — opening the review modal is not a write.
       // The session flips to "saving" only when the DM confirms (modal onConfirm),
       // so cancelling the modal can't strand the status bar on "Saving…".
-      setPendingChanges(fileChanges);
+      setPendingChanges(plan.changes);
       setSaveModalOpen(true);
     } catch (err) {
       const msg =

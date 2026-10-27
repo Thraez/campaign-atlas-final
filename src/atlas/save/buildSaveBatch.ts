@@ -123,9 +123,9 @@ export function buildWorldYamlContent(inputs: BuildWorldYamlContentInputs): stri
  * on the active map. Each carries the upload's dataUrl (which the layer
  * captured when the file was dragged in) plus its targetPath under
  * public/atlas/assets/maps/. Uploads with no dataUrl (rare — quota
- * pressure clears it from localStorage on reload) are skipped silently;
- * the world.yaml emission still references them so the DM sees the
- * mismatch in the diff modal.
+ * pressure clears it from localStorage on reload) are skipped here;
+ * planUnifiedSave (src/atlas/editor/saveGate.ts) refuses the whole save
+ * before this runs, so world.yaml never points at bytes that don't land.
  */
 export function buildAssetBinaryChanges(localLayers: LocalLayer[]): FileChange[] {
   const changes: FileChange[] = [];
