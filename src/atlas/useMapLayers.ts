@@ -4,6 +4,7 @@ import { fileToDataUrl, readImageSize } from "@/atlas/content/browserFile";
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
 import { logger } from "@/lib/logger";
+import { mapLayerTargetPath, mapUploadFileName } from "@/atlas/assets/mapLayerTarget";
 
 /** A layer authored locally in the editor. Either a freshly uploaded image
  *  (object URL preview) or a URL/path the user typed. */
@@ -93,14 +94,6 @@ function loadStored(): Stored {
   } catch {
     return {};
   }
-}
-
-function safeFilename(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/\.[^.]+$/, (ext) => ext) // keep extension
-    .replace(/[^a-z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
 }
 
 /**
@@ -203,8 +196,7 @@ export function useMapLayers(map: MapDocument | undefined, undoStack?: UndoStack
       const additions: LocalLayer[] = await Promise.all(
         files.map(async (file, i) => {
           const url = URL.createObjectURL(file);
-          const id = `upload-${Date.now()}-${i}-${safeFilename(file.name).slice(0, 24)}`;
-          const sf = safeFilename(file.name);
+          const id = `upload-${Date.now()}-${i}-${mapUploadFileName(file.name).slice(0, 24)}`;
           // Sniff natural size so the layer doesn't default to "stretch over the whole map".
           const dims = await readImageSize(url).catch(() => null);
           const dataUrl = await fileToDataUrl(file).catch((e: unknown) => {
@@ -228,7 +220,7 @@ export function useMapLayers(map: MapDocument | undefined, undoStack?: UndoStack
             origin: "upload",
             name: file.name,
             filename: file.name,
-            targetPath: `public/atlas/assets/maps/${sf}`,
+            targetPath: mapLayerTargetPath({ id, filename: file.name }),
             isObjectUrl: true,
             dataUrl,
           };

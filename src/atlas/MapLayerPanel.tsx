@@ -39,6 +39,7 @@ import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import { normalizeAtlasAssetUrl } from "./url";
 import { centerAnchoredResize } from "./layerGeometry";
+import { mapLayerTargetPath } from "@/atlas/assets/mapLayerTarget";
 
 interface Props {
   map: MapDocument;
@@ -561,7 +562,15 @@ export function MapLayerPanel(props: Props) {
                     </Label>
                     <Input
                       value={localSelected.targetPath ?? ""}
-                      onChange={(e) => onUpdate(selected.id, { targetPath: e.target.value })}
+                      // Clearing the field restores the default rather than
+                      // storing "": the layer goes back to no chosen path and
+                      // the placeholder shows where Save will write it.
+                      placeholder={mapLayerTargetPath({ ...localSelected, targetPath: undefined })}
+                      onChange={(e) =>
+                        onUpdate(selected.id, {
+                          targetPath: e.target.value.trim() ? e.target.value : undefined,
+                        })
+                      }
                       className="h-7 text-xs font-mono"
                     />
                   </div>
