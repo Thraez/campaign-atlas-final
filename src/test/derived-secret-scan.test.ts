@@ -187,7 +187,9 @@ describe("derived secrets match what the build ships", () => {
   });
 
   it("a hand-typed hyphenated title is also guarded with spaces", () => {
-    const v = tempVault({ "w/Khal-Azum Rift.md": "---\natlas:\n  visibility: dm\n---\n" });
+    const v = tempVault({
+      "w/rift.md": "---\ntitle: Khal-Azum Rift\natlas:\n  visibility: dm\n---\n",
+    });
     try {
       const names = deriveSecretsFromVault(v.config).map((s) => s.name);
       expect(names).toContain("Khal-Azum Rift");

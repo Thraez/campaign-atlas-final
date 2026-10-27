@@ -76,18 +76,19 @@ describe("parseFrontmatter visibility safety", () => {
     const raw = `---\natlas:\n  visibility: private\n---\nbody`;
     const p = parseFrontmatter(raw, "x.md");
     // Critical spoiler-protection invariant: invalid values MUST be dm.
-    expect(p.atlas.visibility).toBe("dm");
+    expect(p.note.visibility).toBe("dm");
     expect(p.warnings.join(" ")).toMatch(/invalid atlas.visibility/);
   });
 
   it("valid visibility passes through", () => {
     const raw = `---\natlas:\n  visibility: rumor\n---\n`;
-    expect(parseFrontmatter(raw, "x.md").atlas.visibility).toBe("rumor");
+    expect(parseFrontmatter(raw, "x.md").note.visibility).toBe("rumor");
   });
 
-  it("missing visibility stays undefined (caller decides default)", () => {
+  it("missing visibility is dm and marked untagged (ADR-0001)", () => {
     const p = parseFrontmatter(`---\natlas: {}\n---\n`, "x.md");
-    expect(p.atlas.visibility).toBeUndefined();
+    expect(p.note.visibility).toBe("dm");
+    expect(p.note.visibilityTagged).toBe(false);
   });
 });
 

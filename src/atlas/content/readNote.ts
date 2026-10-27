@@ -3,24 +3,26 @@
  * markdown. The build, Staging, the merge and the safety scans all call this,
  * so they can never disagree about whether a note ships (code-retro 06).
  *
- * Browser-safe: no node imports. The YAML parser is the editor's
- * (`../import/frontmatter`), which reads the vault the same way gray-matter did.
+ * Browser-safe: no node imports. The YAML parser (`./frontmatter`) is the
+ * editor's too; it ends the frontmatter where gray-matter did and fails on a
+ * fence it can't read cleanly.
  *
  * Rules:
  *   - visibility (ADR-0001): a valid `atlas.visibility`; an invalid one is
  *     `dm` with a warning; with none, the legacy `atlas.publish: true` means
  *     `player`; anything else is `dm`. A top-level `visibility:` isn't read.
  *   - secret: not player-visible, or `atlas.publish: false`.
- *   - title: frontmatter `title` (trimmed); else the filename. A hand-typed
- *     Obsidian name (with a space or a capital) is kept as written; a
- *     lowercase machine name ("great-hall", "lost_city") is title-cased.
+ *   - title: frontmatter `title` (trimmed); else the filename with dashes
+ *     and underscores read as spaces, each word capitalised ("isle-de-marque"
+ *     and "Isle de Marque" both give "Isle De Marque"). The build's rule.
+ *   - aliases: `atlas.aliases`, else a flat `aliases:`; strings only.
  *   - id: a non-empty `atlas.id`, else the slug of the title.
  *   - type: `atlas.type`, else a flat top-level `type:` (trimmed); undefined
  *     if the note names none. Callers apply their own fallback.
  *   - malformed YAML never throws: the note comes back with `parseError`,
  *     empty data, a filename title, and `dm` (fail closed).
  */
-import { parseFrontmatter } from "../import/frontmatter";
+import { parseFrontmatter } from "./frontmatter";
 import type { EntityVisibility } from "./schema";
 import { isPlayerVisible, isValidVisibility } from "./visibility";
 import { slugify } from "./slugify";
@@ -40,6 +42,8 @@ export interface Note {
   /** True when `id` came from `atlas.id` rather than the title. */
   idFromFrontmatter: boolean;
   type: string | undefined;
+  /** Other names the note answers to (wikilink targets, secret names). */
+  aliases: string[];
   visibility: EntityVisibility;
   /**
    * True when the note itself decided its visibility (an `atlas.visibility`,
@@ -92,6 +96,7 @@ export function readNote(raw: string, relPath: string): Note {
   const type = [atlas.type, data.type]
     .find((t): t is string => typeof t === "string" && t.trim().length > 0)
     ?.trim();
+  const aliases = stringList(atlas.aliases ?? data.aliases);
 
   return {
     relPath,
@@ -102,6 +107,7 @@ export function readNote(raw: string, relPath: string): Note {
     id,
     idFromFrontmatter,
     type,
+    aliases,
     visibility,
     visibilityTagged,
     isSecret,
@@ -113,12 +119,16 @@ export function readNote(raw: string, relPath: string): Note {
 function noteTitle(relPath: string, fmTitle: unknown): string {
   if (typeof fmTitle === "string" && fmTitle.trim()) return fmTitle.trim();
   const base = relPath.split(/[\\/]/).pop() ?? "";
-  const stem = base.replace(/\.md$/i, "").trim();
-  if (/[\s\p{Lu}]/u.test(stem)) return stem;
-  return stem
+  return base
+    .replace(/\.md$/i, "")
     .replace(/[-_]+/g, " ")
     .trim()
     .replace(/(^|\s)(\p{L})/gu, (_m, sp: string, ch: string) => sp + ch.toUpperCase());
+}
+
+function stringList(v: unknown): string[] {
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === "string");
+  return typeof v === "string" && v ? [v] : [];
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {

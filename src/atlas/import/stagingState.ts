@@ -152,9 +152,24 @@ function commaJammedWarning(rawTags: unknown, rawAliases: unknown): string | und
 }
 
 /**
- * What Staging needs from a note. Title, id, explicit type and visibility come
- * from `readNote`, as for the build; the type guess (tags, then folder, then
- * "lore") is Staging's own, for notes that name no type.
+ * The title Staging shows and commit writes into the note's frontmatter.
+ * A frontmatter title is `readNote`'s. A note with none keeps a hand-typed
+ * Obsidian filename as written ("Isle de Marque"), where the build would
+ * title-case it ("Isle De Marque"); a slug-shaped name ("isle-de-marque") is
+ * title-cased as the build does (code-retro 02). Once committed, the title
+ * is in the frontmatter and the build reads the same one. The id is the same
+ * either way: the slug ignores case and separators.
+ */
+function stagingTitle(note: Note, filename: string): string {
+  if (typeof note.data.title === "string" && note.data.title.trim()) return note.title;
+  const stem = filename.replace(/\.md$/i, "").trim();
+  return stem !== slugify(stem) ? stem : note.title;
+}
+
+/**
+ * What Staging needs from a note. Id, explicit type and visibility come from
+ * `readNote`, as for the build; the type guess (tags, then folder, then
+ * "lore") and the filename title (`stagingTitle`) are Staging's own.
  */
 function extractStagingFields(
   raw: string,
@@ -222,7 +237,7 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
   // Priority: (1) vault atlas.id; (2) sync-map[vaultRelPath]; (3) slugify(title)
   const syncEntry =
     input.vaultRelPath && ctx.syncMap ? lookupByPath(ctx.syncMap, input.vaultRelPath) : undefined;
-  const title = note.title;
+  const title = stagingTitle(note, input.filename);
   const resolvedId = note.idFromFrontmatter ? note.id : (syncEntry?.id ?? note.id);
   const baseType = syncEntry?.baseType; // for two-way type resolution in §3.6
 

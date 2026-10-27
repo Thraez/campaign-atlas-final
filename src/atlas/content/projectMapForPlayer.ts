@@ -1,9 +1,9 @@
 import type { Entity } from "@/atlas/content/schema";
 
-import { PLAYER_VISIBLE_VISIBILITY } from "./visibility";
+import { isPlayerVisible, isValidVisibility } from "./visibility";
 
 // Region and route visibilities arrive as plain strings (world.yaml).
-const PLAYER_VISIBLE: ReadonlySet<string> = PLAYER_VISIBLE_VISIBILITY;
+const ships = (v: string) => isValidVisibility(v) && isPlayerVisible(v);
 
 interface Placementish { entityId: string; x: number; y: number; mapId?: string; }
 interface Visible { visibility?: string; id?: string; }
@@ -31,17 +31,17 @@ export function projectMapForPlayer<
   const foggedEntityIds: string[] = [];
   const placements = input.placements.filter((p) => {
     const e = input.entitiesById.get(p.entityId);
-    if (!e || !PLAYER_VISIBLE.has(e.visibility)) return false;
+    if (!e || !ships(e.visibility)) return false;
     if (input.isFogged(p.x, p.y)) { foggedEntityIds.push(p.entityId); return false; }
     return true;
   });
   const regions = input.regions.filter((r) => {
-    if (!PLAYER_VISIBLE.has(r.visibility ?? "dm")) return false;
+    if (!ships(r.visibility ?? "dm")) return false;
     if (r.points?.some(([x, y]) => input.isFogged(x, y))) return false;
     return true;
   });
   const routes = input.routes.filter((t) => {
-    if (!PLAYER_VISIBLE.has(t.visibility ?? "dm")) return false;
+    if (!ships(t.visibility ?? "dm")) return false;
     if (t.resolvedPoints?.some(([x, y]) => input.isFogged(x, y))) return false;
     return true;
   });

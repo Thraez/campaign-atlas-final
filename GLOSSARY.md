@@ -8,7 +8,10 @@ The atlas's words. Use these in tickets, tests, UI text and commit messages. Cod
 - **Atlas content**: the atlas's own copy of the lore, `content/<world>/`. Filled from the vault by sync. _Avoid:_ calling it "the vault".
 - **World**: one campaign setting with its own content folder and `world.yaml` (today only `astrath-deeprealm`).
 - **`world.yaml`**: the world's maps, layers, regions, routes and fog, in `content/<world>/_atlas/`.
-- **Entity**: one note in the atlas (an NPC, a settlement, a faction, an event...). Its **type** comes from frontmatter `atlas.type`, else from its vault folder name.
+- **Entity**: one note in the atlas (an NPC, a settlement, a faction, an event...). Its **type** comes from frontmatter `atlas.type`, else a flat top-level `type:`; with neither, the build says `note` and Staging guesses from tags or the vault folder name.
+- **Note** [`Note`, from `readNote`]: one markdown file as read: its title, id, type, aliases, visibility and whether it is secret. Every reader (build, Staging, merge, safety scans) gets these from `readNote` in `src/atlas/content/readNote.ts`. A note becomes an entity when the build ships it.
+- **Content-folder scan** [`scanContentFolder`]: the build's pass over atlas content, applying `include` and `exclude` from `atlas.config.json`. The derived-secrets scan uses the same one.
+- **Excluded note**: a note the content-folder scan leaves out (a `_dm/`, `_drafts/`, `archive/` or `deprecated/` folder, or missed by `include`). Never built, and secret whatever its tag: a player link to one is redacted and its names are guarded.
 - **Placement**: an entity's position on a map. _Avoid:_ "marker" for the data (marker is the drawn pin).
 - **Map / layer**: a map is an image with its own coordinate space; a layer is one image stacked on a map (for example a floor or a revealed overlay).
 - **Fog**: the parts of a map players can't see yet. Baked into player images at build time, never just hidden by CSS.

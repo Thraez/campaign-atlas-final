@@ -38,7 +38,6 @@ export interface AtlasFrontmatter {
   publish?: boolean;
   type?: string;
   world?: string;
-  visibility?: EntityVisibility;
   aliases?: string[];
   images?: string[];
   summary?: string;
@@ -57,7 +56,11 @@ export interface AtlasFrontmatter {
 }
 
 export interface ParsedFile {
-  /** Identity, visibility and secrecy: the shared answer. */
+  /**
+   * Identity, visibility and secrecy: the shared answer, and the only one.
+   * `note.visibility` is what the note ships as; `note.visibilityTagged`
+   * says whether the note set it or ADR-0001's dm default did.
+   */
   note: Note;
   data: Record<string, unknown>;
   atlas: AtlasFrontmatter;
@@ -81,19 +84,12 @@ export function parseNoteFields(note: Note): ParsedFile {
   const data = note.data;
   const atlasRaw = note.atlas;
 
+  warnIfCommaJammed(atlasRaw.aliases ?? data.aliases, "aliases", sourcePath, warnings);
   const atlas: AtlasFrontmatter = {
     publish: typeof atlasRaw.publish === "boolean" ? atlasRaw.publish : undefined,
     type: note.type,
     world: typeof atlasRaw.world === "string" ? atlasRaw.world : undefined,
-    // As written (an invalid value reads as "dm"); undefined when untagged.
-    // Whether the note ships is `note.visibility` / `note.isSecret`.
-    visibility: typeof atlasRaw.visibility === "string" ? note.visibility : undefined,
-    aliases: toStringArrayWarnIfCommaJammed(
-      atlasRaw.aliases ?? data.aliases,
-      "aliases",
-      sourcePath,
-      warnings,
-    ),
+    aliases: note.aliases,
     images: toStringArray(atlasRaw.images),
     summary: pickString(atlasRaw.summary, data.summary),
     id: typeof atlasRaw.id === "string" ? atlasRaw.id : undefined,
@@ -142,10 +138,19 @@ function toStringArrayWarnIfCommaJammed(
   sourcePath: string,
   warnings: string[],
 ): string[] {
+  warnIfCommaJammed(v, fieldName, sourcePath, warnings);
+  return toStringArray(v);
+}
+
+function warnIfCommaJammed(
+  v: unknown,
+  fieldName: string,
+  sourcePath: string,
+  warnings: string[],
+): void {
   if (typeof v === "string" && v.includes(",")) {
     warnings.push(`${sourcePath}: atlas.${fieldName} should be a YAML list — treated as one tag`);
   }
-  return toStringArray(v);
 }
 
 // First non-empty string among candidates. Used to let vault files keep flat

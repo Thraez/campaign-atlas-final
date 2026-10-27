@@ -17,7 +17,7 @@ import { tokenizeWikilinks, renderLinkTokens } from "@/atlas/content/parseWikili
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 import { compactProfile, stripDmProfile, filterRelationshipsForPlayer } from "@/atlas/profiles/profileBuild";
 
-import { PLAYER_VISIBLE_VISIBILITY as PLAYER_VISIBLE } from "./visibility";
+import { PLAYER_VISIBLE_VISIBILITY } from "./visibility";
 
 // Verbatim from scripts/build-atlas.ts META_TAGS. Kept in lockstep
 // by the build-parity test; if the build's list changes, that test fails.
@@ -85,7 +85,7 @@ export function buildProjectionContext(entitiesById: Map<string, Entity>): Proje
   for (const e of entitiesById.values()) {
     registerName(e.title, e.id);
     for (const a of e.aliases ?? []) registerName(a, e.id);
-    if (!PLAYER_VISIBLE.has(e.visibility)) secretIds.add(e.id);
+    if (!PLAYER_VISIBLE_VISIBILITY.has(e.visibility)) secretIds.add(e.id);
     entityVisibility.set(e.id, e.visibility);
   }
   return {

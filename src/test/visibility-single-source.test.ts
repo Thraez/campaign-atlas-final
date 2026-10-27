@@ -6,6 +6,14 @@
  * Flags any array or Set literal in src/ or scripts/ (tests aside) holding two
  * or more visibility values. Import ALL_VISIBILITY, VISIBILITY_MENU_ORDER,
  * PLAYER_VISIBLE_VISIBILITY or the helpers from visibility.ts instead.
+ *
+ * The ESLint rule in eslint.config.js (no-restricted-syntax) is the stricter
+ * guard: it flags two visibility strings anywhere in an array, mixed with
+ * other values or not. This test also reads files ESLint skips.
+ *
+ * Known gap, caught by neither: comparison chains such as
+ * `v === "player" || v === "rumor"`, and switch cases. Use isPlayerVisible /
+ * isSecretVisibility / isValidVisibility rather than writing those.
  */
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
@@ -23,7 +31,7 @@ function sourceFiles(dir: string): string[] {
     if (e.isDirectory()) {
       if (e.name === "test" || e.name === "node_modules") continue;
       out.push(...sourceFiles(rel));
-    } else if (/\.(ts|tsx|mts|mjs)$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)) {
+    } else if (/\.(ts|tsx|mts|js|cjs|mjs)$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)) {
       out.push(rel);
     }
   }
@@ -59,6 +67,10 @@ describe("visibility lists come only from visibility.ts", () => {
     expect(visibilityLists(`type V = "player" | "dm";`)).toHaveLength(0);
     expect(visibilityLists(`// ["player", "dm"]`)).toHaveLength(0);
     expect(visibilityLists(`const GENERIC = ["door", "dm", "hidden"];`)).toHaveLength(0);
+  });
+
+  it("known gap: a comparison chain is not a list, so it is not caught", () => {
+    expect(visibilityLists(`ok = v === "player" || v === "rumor";`)).toHaveLength(0);
   });
 
   it("no source file outside visibility.ts writes its own list", () => {

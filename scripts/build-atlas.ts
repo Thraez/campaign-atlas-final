@@ -40,7 +40,7 @@ import {
 import { parseAtlasDate } from "./atlas/calendarDate";
 import { buildEntitySecrets } from "./atlas/buildSecrets";
 import yaml from "js-yaml";
-import { PLAYER_VISIBLE } from "./atlas/visibility";
+import { PLAYER_VISIBLE_VISIBILITY } from "./atlas/visibility";
 import { isLit } from "../src/atlas/fog/effectiveLit";
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
 import { filterSoundscapeForPlayer } from "./atlas/filterSoundscape";
@@ -190,11 +190,33 @@ function scrubSecretNames(warnings: string[], secretNames: Set<string>): string[
     .filter((n) => typeof n === "string" && n.length >= 3)
     .sort((a, b) => b.length - a.length);
   if (names.length === 0) return warnings.slice();
+  // Any letter case, and dashes, underscores and spaces interchangeable, as
+  // the cross-reference index matches them (code-retro 06): a warning quoting
+  // `[[Khal_Azum]]` must lose it when the secret is titled "Khal Azum".
+  const patterns = names.map((n) => looseNamePattern(n));
   return warnings.map((w) => {
     let out = w;
-    for (const n of names) out = out.split(n).join("…");
+    for (const re of patterns) out = out.replace(re, "…");
     return out;
   });
+}
+
+/** A name with case, dashes, underscores and runs of spaces folded away. */
+function looseNameKey(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[-_\s]+/g, " ")
+    .trim();
+}
+
+/** Matches `name` in any case, with dashes, underscores and spaces interchangeable. */
+function looseNamePattern(name: string): RegExp {
+  const parts = name
+    .trim()
+    .split(/[-_\s]+/)
+    .map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return new RegExp(parts.join("[-_\\s]+"), "gi");
 }
 
 export interface BuildFlags {
@@ -379,15 +401,25 @@ async function runBuildCore(flags: BuildFlags) {
   // guess when a name is ambiguous instead of silently picking the
   // last-registered owner.
   const nameOwners = new Map<string, Set<string>>();
+  // The same names with dashes, underscores and spaces folded together, so
+  // `[[Khal Azum]]`, `[[Khal_Azum]]` and `[[khal-azum]]` all find a note
+  // titled "Khal_Azum" and a link to a secret note is redacted whichever way
+  // the author spelled it (code-retro 06). Used only when the exact name
+  // finds nothing.
+  const looseOwners = new Map<string, Set<string>>();
+  const addOwner = (index: Map<string, Set<string>>, key: string, id: string) => {
+    let owners = index.get(key);
+    if (!owners) {
+      owners = new Set();
+      index.set(key, owners);
+    }
+    owners.add(id);
+  };
   const registerName = (name: string, id: string) => {
     const key = name.toLowerCase();
     crossRefNameIndex.set(key, id);
-    let owners = nameOwners.get(key);
-    if (!owners) {
-      owners = new Set();
-      nameOwners.set(key, owners);
-    }
-    owners.add(id);
+    addOwner(nameOwners, key, id);
+    addOwner(looseOwners, looseNameKey(name), id);
   };
   const allEntityVisibility = new Map<
     string,
@@ -417,24 +449,24 @@ async function runBuildCore(flags: BuildFlags) {
   // unless we treat them as secret targets in the cross-ref index.
   const excludedIdSeen = new Set<string>();
   for (const note of scan.excluded) {
-    const parsed = parseNoteFields(note);
-    const { title, id } = note;
+    const { title, id, aliases } = note;
     if (!title) continue;
     if (slugSeen.has(id) || excludedIdSeen.has(id)) continue;
     excludedIdSeen.add(id);
     registerName(title, id);
-    for (const a of parsed.atlas.aliases ?? []) {
+    for (const a of aliases) {
       registerName(a, id);
     }
     // Folder-excluded files have no published visibility, but for cross-ref
     // purposes they're DM-equivalent: anything wikilinking to them from a
-    // public entry is a spoiler leak.
-    const vis = parsed.atlas.visibility ?? "dm";
+    // public entry is a spoiler leak. The label (warnings only) is the
+    // note's own tag, or dm when it has none.
+    const vis = typeof note.atlas.visibility === "string" ? note.visibility : "dm";
     allEntityVisibility.set(id, vis);
     secretEntityIds.add(id);
     secretNames.add(title);
     secretNames.add(id);
-    for (const a of parsed.atlas.aliases ?? []) secretNames.add(a);
+    for (const a of aliases) secretNames.add(a);
   }
 
   // PASS 2: build entities for pending, filtering out secrets in player mode
@@ -475,14 +507,23 @@ async function runBuildCore(flags: BuildFlags) {
 
   // Wikilink resolution uses the FULL cross-reference index (including
   // DM/hidden entities) so we can detect public-entry → DM-target leaks.
-  const resolveByName = (n: string) => crossRefNameIndex.get(n.trim().toLowerCase());
+  // Loose fallback: one owner wins outright; among several, a secret one
+  // wins so the link is redacted (fail closed); otherwise it stays broken.
+  const resolveLoose = (n: string) => {
+    const owners = looseOwners.get(looseNameKey(n));
+    if (!owners || owners.size === 0) return undefined;
+    if (owners.size === 1) return [...owners][0];
+    return [...owners].find((id) => secretEntityIds.has(id));
+  };
+  const resolveByName = (n: string) =>
+    crossRefNameIndex.get(n.trim().toLowerCase()) ?? resolveLoose(n);
   // Folder-path fallback (Q49): resolves a basename against the same index,
   // but refuses (returns undefined) when that name is owned by more than one
   // distinct entity — an ambiguous basename must stay broken, never guessed.
   const resolveByBasename = (n: string) => {
     const key = n.trim().toLowerCase();
     if ((nameOwners.get(key)?.size ?? 0) > 1) return undefined;
-    return crossRefNameIndex.get(key);
+    return crossRefNameIndex.get(key) ?? resolveLoose(n);
   };
 
   const backlinkMap = new Map<string, Map<string, string>>();
@@ -619,7 +660,7 @@ async function runBuildCore(flags: BuildFlags) {
   if (flags.player) {
     regions = regions
       .filter((r) => {
-        const keep = PLAYER_VISIBLE.has(r.visibility);
+        const keep = PLAYER_VISIBLE_VISIBILITY.has(r.visibility);
         if (!keep) regionsExcluded += 1;
         return keep;
       })
@@ -650,7 +691,7 @@ async function runBuildCore(flags: BuildFlags) {
           ? [{ mapId: undefined, x: item.legacy.x, y: item.legacy.y }]
           : [];
     if (list.length === 0) continue;
-    if (flags.player && !PLAYER_VISIBLE.has(entity.visibility)) {
+    if (flags.player && !PLAYER_VISIBLE_VISIBILITY.has(entity.visibility)) {
       secretPlacementsExcluded += list.length;
       continue;
     }
@@ -699,16 +740,16 @@ async function runBuildCore(flags: BuildFlags) {
   let routeWaypointMisses = 0;
   const routes: Route[] = [];
   for (const r of worldCfg?.routes ?? []) {
-    if (flags.player && !PLAYER_VISIBLE.has(r.visibility)) {
+    if (flags.player && !PLAYER_VISIBLE_VISIBILITY.has(r.visibility)) {
       routesExcluded += 1;
       continue;
     }
     // Spoiler-leak: player-visible route mentions a DM/hidden/unknown entity.
-    if (PLAYER_VISIBLE.has(r.visibility)) {
+    if (PLAYER_VISIBLE_VISIBILITY.has(r.visibility)) {
       for (const w of r.waypoints) {
         if (Array.isArray(w)) continue;
         const targetVis = entityVisibility.get(w.entityId);
-        if (!targetVis || !PLAYER_VISIBLE.has(targetVis)) {
+        if (!targetVis || !PLAYER_VISIBLE_VISIBILITY.has(targetVis)) {
           routeLeaks += 1;
           warnings.push(
             `route "${r.id}": player-visible route routes through ${targetVis ? `${targetVis} entity` : "unknown entity"} "${w.entityId}" — spoiler leak`,
@@ -817,9 +858,9 @@ async function runBuildCore(flags: BuildFlags) {
   //
   // Region leak detection: player-visible region linked to DM/hidden/unknown entity.
   for (const r of regions) {
-    if (!PLAYER_VISIBLE.has(r.visibility) || !r.entityId) continue;
+    if (!PLAYER_VISIBLE_VISIBILITY.has(r.visibility) || !r.entityId) continue;
     const targetVis = entityVisibility.get(r.entityId);
-    if (!targetVis || !PLAYER_VISIBLE.has(targetVis)) {
+    if (!targetVis || !PLAYER_VISIBLE_VISIBILITY.has(targetVis)) {
       regionLeaks += 1;
       warnings.push(
         `region "${r.id}": player-visible region links to ${targetVis ? `${targetVis} entity` : "unknown entity"} "${r.entityId}" — spoiler leak`,

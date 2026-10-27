@@ -1,11 +1,21 @@
 /**
- * code-retro 06 acceptance: the build, Staging, the merge and the
- * derived-secrets scan give every note the same title, id, type and
- * visibility, because all four read it with `readNote`.
+ * code-retro 06 acceptance: the build, Staging, the merge (through
+ * `buildImportChanges`) and the derived-secrets scan agree on every note's
+ * id, type and visibility, because all four read it with `readNote`.
  *
  * Fixtures cover an untitled note, flat top-level `type:`, a note with no
- * visibility (ADR-0001: dm), an invalid tag beside `publish: true`, and a
- * `_dm/` note the build never reads.
+ * visibility (ADR-0001: dm), an invalid tag beside `publish: true`, an untyped
+ * note, and a `_dm/` note the build never reads.
+ *
+ * Three differences are intended and pinned here (ticket Comments):
+ *   - title of a note with no frontmatter title and a hand-typed filename:
+ *     Staging keeps "Isle de Marque", the build title-cases it. Commit writes
+ *     Staging's title into the note, so the build then reads the same one.
+ *   - type of an untyped note: the build says "note", Staging guesses (tags,
+ *     folder, then "lore") and commit writes its guess.
+ *   - an untagged note from a public vault folder (01_Lore): Staging shows
+ *     the folder default `player` and commit writes it; until then the build
+ *     says dm.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import fs from "node:fs";
@@ -13,9 +23,12 @@ import os from "node:os";
 import path from "node:path";
 import { runBuild } from "../../scripts/build-atlas";
 import { deriveSecretsFromVault } from "../../scripts/check-derived-secrets";
-import { buildStagingRows, type StagingContext } from "@/atlas/import/stagingState";
-import { mergeImportFrontmatter } from "@/atlas/import/mergeImportFrontmatter";
-import { parseFrontmatter } from "@/atlas/import/frontmatter";
+import {
+  buildStagingRows,
+  type RawImportFile,
+  type StagingContext,
+} from "@/atlas/import/stagingState";
+import { buildImportChanges } from "@/atlas/import/buildImportChanges";
 import { readNote } from "@/atlas/content/readNote";
 import type { Entity, ImportFolderConfig } from "@/atlas/content/schema";
 
@@ -23,8 +36,12 @@ interface Fixture {
   path: string;
   raw: string;
   title: string;
+  /** Staging's title, where it intentionally differs from the build's. */
+  stagingTitle?: string;
   id: string;
   type: string;
+  /** Staging's type, where it intentionally differs (untyped notes). */
+  stagingType?: string;
   visibility: string;
   secret: boolean;
 }
@@ -44,7 +61,8 @@ const FIXTURES: Fixture[] = [
     // untitled, hand-typed Obsidian filename, flat type:, player tag
     path: "w/places/Isle de Marque.md",
     raw: "---\ntype: location\natlas:\n  visibility: player\n---\nAn island.\n",
-    title: "Isle de Marque",
+    title: "Isle De Marque",
+    stagingTitle: "Isle de Marque",
     id: "isle-de-marque",
     type: "location",
     visibility: "player",
@@ -69,6 +87,17 @@ const FIXTURES: Fixture[] = [
     visibility: "dm",
     secret: true,
   },
+  {
+    // untyped: the build's fallback against Staging's guess
+    path: "w/imports/old-song.md",
+    raw: "---\ntitle: The Old Song\natlas:\n  visibility: player\n---\nA ballad.\n",
+    title: "The Old Song",
+    id: "the-old-song",
+    type: "note",
+    stagingType: "lore",
+    visibility: "player",
+    secret: false,
+  },
 ];
 
 /** In `_dm/`: the build never reads it, so it is secret whatever its tag. */
@@ -84,13 +113,22 @@ const IMPORT_CONFIG: ImportFolderConfig = {
   folders: { npc: "npcs", location: "places", event: "events", dungeon: "ruins" },
   defaultFolder: "imports",
 };
-const ctx: StagingContext = {
+const ctx = (existingById = new Map<string, string>()): StagingContext => ({
   worldId: "w",
   importConfig: IMPORT_CONFIG,
   allowedFolders: new Set(["npcs", "places", "events", "ruins", "imports"]),
-  existingById: new Map(),
-  existingPaths: new Set(),
-};
+  existingById,
+  existingPaths: new Set(existingById.values()),
+});
+
+/** Serves `/__atlas/read` from a map of repo paths, as the dev server would. */
+function readFrom(files: Record<string, string>): typeof fetch {
+  return (async (url: RequestInfo | URL) => {
+    const p = decodeURIComponent(String(url).replace(/^.*\?path=/, ""));
+    if (!(p in files)) return new Response("not found", { status: 404 });
+    return new Response(JSON.stringify({ path: p, contents: files[p] }), { status: 200 });
+  }) as unknown as typeof fetch;
+}
 
 let tmp: string;
 let configPath: string;
@@ -135,8 +173,7 @@ afterAll(() => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-const stage = (p: string, raw: string) =>
-  buildStagingRows([{ filename: path.basename(p), raw }], ctx)[0];
+const stage = (file: RawImportFile, c = ctx()) => buildStagingRows([file], c)[0];
 
 describe.each(FIXTURES)("$path", (f) => {
   it("the build reads it as the fixture says", () => {
@@ -145,24 +182,26 @@ describe.each(FIXTURES)("$path", (f) => {
     expect([e!.title, e!.type, e!.visibility]).toEqual([f.title, f.type, f.visibility]);
   });
 
-  it("Staging agrees on title, id, type and visibility", () => {
-    const row = stage(f.path, f.raw);
+  it("Staging agrees on id and visibility (title and type as pinned)", () => {
+    const row = stage({ filename: path.basename(f.path), raw: f.raw });
     expect([row.title, row.resolvedId, row.inferredType, row.resolvedVisibility]).toEqual([
-      f.title,
+      f.stagingTitle ?? f.title,
       f.id,
-      f.type,
+      f.stagingType ?? f.type,
       f.visibility,
     ]);
   });
 
-  it("the merge keeps the same disk visibility", () => {
-    const r = mergeImportFrontmatter({
-      disk: readNote(f.raw, `content/${f.path}`),
-      vault: parseFrontmatter(f.raw),
-      inferredType: f.type,
-      baseType: f.type,
-    });
-    expect(r.diskVisibility).toBe(f.visibility);
+  it("an update through buildImportChanges keeps the same visibility", async () => {
+    const diskPath = `content/${f.path}`;
+    const row = stage(
+      { filename: path.basename(f.path), raw: f.raw },
+      ctx(new Map([[f.id, diskPath]])),
+    );
+    expect(row.rowKind).toBe("update");
+    const [change] = await buildImportChanges([row], { fetchFn: readFrom({ [diskPath]: f.raw }) });
+    const written = readNote(change.content, diskPath);
+    expect([written.visibility, written.isSecret]).toEqual([f.visibility, f.secret]);
   });
 
   it("the derived-secrets scan guards it exactly when it is secret", () => {
@@ -177,7 +216,7 @@ describe("a _dm/ note", () => {
   });
 
   it("is guarded by the derived-secrets scan under the title and id Staging gives it", () => {
-    const row = stage(DM_FOLDER_NOTE.path, DM_FOLDER_NOTE.raw);
+    const row = stage({ filename: path.basename(DM_FOLDER_NOTE.path), raw: DM_FOLDER_NOTE.raw });
     expect([row.title, row.resolvedId, row.inferredType]).toEqual([
       DM_FOLDER_NOTE.title,
       DM_FOLDER_NOTE.id,
@@ -188,20 +227,27 @@ describe("a _dm/ note", () => {
   });
 });
 
-describe("Staging's vault folder rule only fills in for an untagged, readable note", () => {
-  const fromPublicFolder = (raw: string) =>
-    buildStagingRows([{ filename: "Spy.md", raw, vaultRelPath: "01_Lore/Spy.md" }], ctx)[0]
-      .resolvedVisibility;
+describe("Staging's vault folder rule (intended difference from the build)", () => {
+  const corven = FIXTURES[0];
+  const fromLore = (raw: string) =>
+    stage({ filename: "corven.md", raw, vaultRelPath: "01_Lore/corven.md" });
 
-  it("an untagged note from 01_Lore arrives as player", () => {
-    expect(fromPublicFolder("---\ntype: npc\n---\nA spy.\n")).toBe("player");
+  it("an untagged note from 01_Lore shows player in Staging, and commit writes it", async () => {
+    // The build reads the same uncommitted note as dm (ADR-0001).
+    expect(built.get(corven.id)!.visibility).toBe("dm");
+    const row = fromLore(corven.raw);
+    expect(row.resolvedVisibility).toBe("player");
+    const [change] = await buildImportChanges([row], { fetchFn: readFrom({}) });
+    expect(readNote(change.content, change.path).visibility).toBe("player");
   });
 
   it("an invalid tag is dm, not the folder's player", () => {
-    expect(fromPublicFolder("---\natlas:\n  visibility: plyer\n---\nA spy.\n")).toBe("dm");
+    expect(fromLore("---\natlas:\n  visibility: plyer\n---\nA spy.\n").resolvedVisibility).toBe(
+      "dm",
+    );
   });
 
   it("malformed frontmatter is dm, not the folder's player", () => {
-    expect(fromPublicFolder("---\natlas: [oops\n---\nA spy.\n")).toBe("dm");
+    expect(fromLore("---\natlas: [oops\n---\nA spy.\n").resolvedVisibility).toBe("dm");
   });
 });

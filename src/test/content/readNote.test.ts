@@ -72,6 +72,38 @@ describe("readNote visibility (ADR-0001)", () => {
     expect(n.isSecret).toBe(true);
     expect(n.title).toBe("Lost Note");
   });
+
+  it("a line starting with --- that isn't a clean fence fails closed (review leak case)", () => {
+    // gray-matter ends the frontmatter at `---x: 1`, so main read this note as
+    // untagged (dm). Reading past it would find `visibility: player`.
+    const raw = "---\ntitle: Something\n---x: 1\natlas:\n  visibility: player\n---\nbody";
+    const n = readNote(raw, "w/something.md");
+    expect(n.parseError).toMatch(/clean closing/);
+    expect(n.visibility).toBe("dm");
+    expect(n.isSecret).toBe(true);
+  });
+
+  it("a clean closing fence may carry trailing spaces", () => {
+    const n = readNote("---\natlas:\n  visibility: player\n---  \nbody", "a.md");
+    expect(n.parseError).toBeUndefined();
+    expect(n.visibility).toBe("player");
+    expect(n.body).toBe("body");
+  });
+
+  it("a ---- line is not a fence either", () => {
+    const n = readNote("---\natlas:\n  visibility: player\n----\nbody", "a.md");
+    expect(n.parseError).toBeTruthy();
+    expect(n.visibility).toBe("dm");
+  });
+});
+
+describe("readNote aliases", () => {
+  it("atlas.aliases, else a flat aliases:, strings only", () => {
+    expect(readNote(fm("atlas:\n  aliases: [Kell, 3]"), "a.md").aliases).toEqual(["Kell"]);
+    expect(readNote(fm("aliases: Kell"), "a.md").aliases).toEqual(["Kell"]);
+    expect(readNote(fm("aliases: [a]\natlas:\n  aliases: [b]"), "a.md").aliases).toEqual(["b"]);
+    expect(readNote(fm("title: X"), "a.md").aliases).toEqual([]);
+  });
 });
 
 describe("readNote title", () => {
@@ -88,7 +120,7 @@ describe("readNote title", () => {
     expect(readNote(fm("title:\n  title: Npc"), "notes/npc.md").title).toBe("Npc");
   });
 
-  it("a lowercase machine-style filename is title-cased", () => {
+  it("a filename is title-cased with dashes and underscores as spaces (the build's rule)", () => {
     expect(readNote("x", "notes/great-hall.md").title).toBe("Great Hall");
     expect(readNote("x", "notes/great---hall.md").title).toBe("Great Hall");
     expect(readNote("x", "notes/lost_city.md").title).toBe("Lost City");
@@ -97,16 +129,14 @@ describe("readNote title", () => {
     expect(readNote("x", "notes/ñoño.md").title).toBe("Ñoño");
   });
 
-  it("a hand-typed Obsidian filename is kept as written", () => {
-    expect(readNote("x", "Vault/01_Lore/Isle de Marque.md").title).toBe("Isle de Marque");
-    expect(readNote("x", "Khal-Azum Rift - Fight Kit.md").title).toBe(
-      "Khal-Azum Rift - Fight Kit",
-    );
+  it("a hand-typed Obsidian filename gets the same treatment", () => {
+    expect(readNote("x", "Vault/01_Lore/Isle de Marque.md").title).toBe("Isle De Marque");
+    expect(readNote("x", "Khal_Azum.md").title).toBe("Khal Azum");
     expect(readNote("x", "Corven.md").title).toBe("Corven");
   });
 
   it("works with Windows separators and an upper-case extension", () => {
-    expect(readNote("x", "vault\\npcs\\Isle de Marque.MD").title).toBe("Isle de Marque");
+    expect(readNote("x", "vault\\npcs\\Isle de Marque.MD").title).toBe("Isle De Marque");
   });
 });
 

@@ -34,7 +34,6 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { parseNoteFields } from "./atlas/parseFrontmatter";
 import { readContentFiles } from "./atlas/readContentFiles";
 import { scanContentFolder } from "../src/atlas/content/scanContentFolder";
 
@@ -99,6 +98,7 @@ const GENERIC_NAMES = new Set([
   "caves",
   "draft",
   "dm",
+  // eslint-disable-next-line no-restricted-syntax -- English words too common to flag, not a visibility list
   "hidden",
   "secret",
   "note",
@@ -159,9 +159,8 @@ export function deriveSecretsFromVault(configPath: string): SecretEntry[] {
     if (isReportableName(title)) {
       secrets.push({ name: title, source: rel, field: "title" });
     }
-    // Also the title with dashes and underscores read as spaces, which is how
-    // the build titled filename-only notes before code-retro 06 and how prose
-    // often writes such a name ("Khal-Azum Rift" / "Khal Azum Rift").
+    // Also a frontmatter title with dashes and underscores read as spaces,
+    // as prose often writes such a name ("Khal-Azum Rift" / "Khal Azum Rift").
     const spaced = title.replace(/[-_]+/g, " ").trim();
     if (spaced !== title && isReportableName(spaced)) {
       secrets.push({ name: spaced, source: rel, field: "title" });
@@ -169,7 +168,7 @@ export function deriveSecretsFromVault(configPath: string): SecretEntry[] {
     if (isReportableName(id)) {
       secrets.push({ name: id, source: rel, field: "id" });
     }
-    for (const alias of parseNoteFields(note).atlas.aliases ?? []) {
+    for (const alias of note.aliases) {
       if (isReportableName(alias)) {
         secrets.push({ name: alias, source: rel, field: "alias" });
       }

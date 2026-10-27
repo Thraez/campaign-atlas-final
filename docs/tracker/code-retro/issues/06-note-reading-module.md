@@ -32,13 +32,42 @@ Deepening: one browser-safe `readNote(raw, relPath)` plus one content-folder sca
     only when tagged secret; now always secret, as the build's cross-reference check treats them.
   - Derived scan used `atlas.id ?? slug` (an empty id gave ""); now the build's `||`. Staging's
     `atlas.id: ""` likewise now falls to the sync map or slug.
-  - Title: the build title-cased every filename, Staging kept hand-typed names verbatim. One rule
-    now: frontmatter title, else the filename as written if it has a space or capital, else
-    title-cased. Checked against all 616 vault filenames (same as Staging) and the build's test
-    cases. Ids unchanged. The derived scan also guards the title with dashes read as spaces, so it
-    is not looser for hand-typed hyphenated names.
-  - Type: the build now trims `type`. Untyped notes still differ on purpose (build "note",
-    Staging guesses from tags/folder/"lore"): that fallback is caller policy, not safety, and
-    aligning it would change DM build output. Left for review.
+  - Type: the build now trims `type`.
   - An unreadable file in an excluded folder was skipped by the build; reading now fails loud.
   - Merge's exposure check kept its wider rule (`publish: true` beside dm still asks for review).
+- 2026-10-28, agent (Opus), after three reviews (Standards, Spec, player safety):
+  - Fixed a leak: the editor's parser read past a line like `---x: 1` that gray-matter treats as
+    the end of the frontmatter, so keys below it (`atlas.visibility: player`) shipped a note main
+    kept dm. Now the first line starting with `---` must be a clean fence (`---` plus optional
+    spaces) or the note fails to parse, which is dm. The parser moved to
+    `src/atlas/content/frontmatter.ts`; `import/frontmatter.ts` re-exports it.
+  - Title: back to main's rule per caller (the hybrid rule was scope creep and lost redactions).
+    `readNote` gives the build's title: filename with dashes and underscores as spaces, each word
+    capitalised.
+  - The build's cross-reference index and its warning scrubber now treat dashes, underscores and
+    spaces alike, in any case: `[[Khal Azum]]`, `[[Khal_Azum]]` and `[[khal-azum]]` all resolve
+    to a secret "Khal_Azum" and are redacted in the build itself. Exact names still win; when a
+    loose name has several owners, a secret one wins (redact), else the link stays broken.
+  - `parseObsidian.ts` was used only by tests: deleted with its tests (ticket 07 had flagged it).
+  - `aliases` is on `Note`; `ParsedFile.atlas` no longer carries a second visibility answer.
+  - An ESLint rule (`no-restricted-syntax`) flags any array with two or more visibility strings
+    outside `visibility.ts` and tests. Known gap: comparison chains (`v === "player" || ...`).
+  - `PLAYER_VISIBLE_VISIBILITY` has one name everywhere (the `PLAYER_VISIBLE` shim alias is gone).
+- Intended differences, pinned in `src/test/note-reading-parity.test.ts`:
+  - Title of a note with no frontmatter title and a hand-typed filename: Staging keeps
+    "Isle de Marque" (code-retro 02), the build says "Isle De Marque". Commit writes Staging's
+    title into the note, after which the build reads the same one. Ids are equal either way.
+  - Type of an untyped note: the build says `note`; Staging guesses from tags, then the folder,
+    then `lore`, and commit writes the guess.
+  - An untagged note from a public vault folder (`01_Lore`, `02_Regions`): Staging shows the
+    folder default `player` and commit writes it; until commit the build reads it as dm.
+- Side-by-side against main (45 inputs): one looser result. A closing fence with trailing spaces
+  (`---  `) was dm in Staging and merge on main (their parser wanted a bare `---`) and is now
+  read like the build, which already accepted it on main. Build output is unchanged.
+- Left as they are:
+  - The derived scan treats every `_drafts/` note as secret, so a draft that shares a name with a
+    player note can give a false positive. Safe side; rename or tag around it.
+  - `Note` is wide (data, atlas block, body and the identity fields). Narrowing it waits until a
+    second caller needs less.
+  - One badly formed note anywhere, `_dm/` and `_drafts/` included, now stops the build and so the
+    publish (fail closed). The coordinator logged this as a provisional call.

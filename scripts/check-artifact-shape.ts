@@ -6,7 +6,7 @@
  * place, or forgets to drop frontmatter / DM profile halves. This file
  * encodes those invariants and runs after the build.
  *
- * Imports PLAYER_VISIBLE from scripts/atlas/visibility.ts so the shape gate
+ * Imports PLAYER_VISIBLE_VISIBILITY from scripts/atlas/visibility.ts so the shape gate
  * and the build pipeline share one literal.
  *
  * Exit codes:
@@ -16,7 +16,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { PLAYER_VISIBLE } from "./atlas/visibility";
+import { PLAYER_VISIBLE_VISIBILITY } from "./atlas/visibility";
 import { DM_CONTENT_SENTINELS } from "./check-no-secrets";
 import { findDmMarkup } from "../src/atlas/content/dmMarkup";
 
@@ -60,11 +60,11 @@ export function scanArtifactShape(atlas: unknown): ShapeResult {
   for (const e of entities) {
     const id = typeof e.id === "string" ? e.id : "<unknown>";
     const vis = e.visibility as string | undefined;
-    if (!vis || !PLAYER_VISIBLE.has(vis as never)) {
+    if (!vis || !PLAYER_VISIBLE_VISIBILITY.has(vis as never)) {
       violations.push({
         entityId: id,
         field: "visibility",
-        message: `visibility "${vis}" not in PLAYER_VISIBLE`,
+        message: `visibility "${vis}" not in PLAYER_VISIBLE_VISIBILITY`,
       });
     }
     if (typeof e.sourcePath === "string" && e.sourcePath !== "") {
@@ -134,11 +134,11 @@ export function scanArtifactShape(atlas: unknown): ShapeResult {
   for (const p of placements) {
     const vis = p.visibility as string | undefined;
     const entityId = typeof p.entityId === "string" ? p.entityId : undefined;
-    if (!vis || !PLAYER_VISIBLE.has(vis as never)) {
+    if (!vis || !PLAYER_VISIBLE_VISIBILITY.has(vis as never)) {
       violations.push({
         entityId,
         field: "placement.visibility",
-        message: `placement visibility "${vis}" not in PLAYER_VISIBLE`,
+        message: `placement visibility "${vis}" not in PLAYER_VISIBLE_VISIBILITY`,
       });
     }
     // Placement labels ship and may carry stray %% blocks from raw frontmatter.
@@ -153,10 +153,10 @@ export function scanArtifactShape(atlas: unknown): ShapeResult {
     const regions = Array.isArray(m.regions) ? (m.regions as Record<string, unknown>[]) : [];
     for (const r of regions) {
       const vis = r.visibility as string | undefined;
-      if (!vis || !PLAYER_VISIBLE.has(vis as never)) {
+      if (!vis || !PLAYER_VISIBLE_VISIBILITY.has(vis as never)) {
         violations.push({
           field: `map[${mapId}].region[${r.id ?? "?"}].visibility`,
-          message: `region visibility "${vis}" not in PLAYER_VISIBLE`,
+          message: `region visibility "${vis}" not in PLAYER_VISIBLE_VISIBILITY`,
         });
       }
       checkStringField(violations, mapId, `region[${r.id ?? "?"}].name`, r.name);
@@ -164,10 +164,10 @@ export function scanArtifactShape(atlas: unknown): ShapeResult {
     const routes = Array.isArray(m.routes) ? (m.routes as Record<string, unknown>[]) : [];
     for (const r of routes) {
       const vis = r.visibility as string | undefined;
-      if (!vis || !PLAYER_VISIBLE.has(vis as never)) {
+      if (!vis || !PLAYER_VISIBLE_VISIBILITY.has(vis as never)) {
         violations.push({
           field: `map[${mapId}].route[${r.id ?? "?"}].visibility`,
-          message: `route visibility "${vis}" not in PLAYER_VISIBLE`,
+          message: `route visibility "${vis}" not in PLAYER_VISIBLE_VISIBILITY`,
         });
       }
       checkStringField(violations, mapId, `route[${r.id ?? "?"}].name`, r.name);
@@ -185,10 +185,10 @@ export function scanArtifactShape(atlas: unknown): ShapeResult {
           });
         }
         const vis = a.visibility as string | undefined;
-        if (vis !== undefined && !PLAYER_VISIBLE.has(vis as never)) {
+        if (vis !== undefined && !PLAYER_VISIBLE_VISIBILITY.has(vis as never)) {
           violations.push({
             field: `map[${mapId}].soundscape.area[${aId}].visibility`,
-            message: `soundscape area visibility "${vis}" not in PLAYER_VISIBLE`,
+            message: `soundscape area visibility "${vis}" not in PLAYER_VISIBLE_VISIBILITY`,
           });
         }
         if (a.name !== undefined) {

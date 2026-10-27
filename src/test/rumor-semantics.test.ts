@@ -10,14 +10,14 @@
  *   - A rumor relationship that points at a DM/hidden target is a leak.
  *
  * These tests pin those claims so a future regression that, say, accidentally
- * widens PLAYER_VISIBLE or narrows it will cause an obvious failure here.
+ * widens PLAYER_VISIBLE_VISIBILITY or narrows it will cause an obvious failure here.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { PLAYER_VISIBLE } from "../../scripts/atlas/visibility";
+import { PLAYER_VISIBLE_VISIBILITY } from "../../scripts/atlas/visibility";
 
 const ROOT = path.resolve(__dirname, "../..");
 const SCRIPT = path.resolve(ROOT, "scripts/build-atlas.ts");
@@ -97,11 +97,11 @@ function readSearch(outDir: string) {
 }
 
 describe.sequential("rumor visibility semantics", () => {
-  it("PLAYER_VISIBLE includes rumor", () => {
-    expect(PLAYER_VISIBLE.has("player")).toBe(true);
-    expect(PLAYER_VISIBLE.has("rumor")).toBe(true);
-    expect(PLAYER_VISIBLE.has("dm")).toBe(false);
-    expect(PLAYER_VISIBLE.has("hidden")).toBe(false);
+  it("PLAYER_VISIBLE_VISIBILITY includes rumor", () => {
+    expect(PLAYER_VISIBLE_VISIBILITY.has("player")).toBe(true);
+    expect(PLAYER_VISIBLE_VISIBILITY.has("rumor")).toBe(true);
+    expect(PLAYER_VISIBLE_VISIBILITY.has("dm")).toBe(false);
+    expect(PLAYER_VISIBLE_VISIBILITY.has("hidden")).toBe(false);
   });
 
   it("rumor entities ship to player builds and have placements + search index entries", () => {

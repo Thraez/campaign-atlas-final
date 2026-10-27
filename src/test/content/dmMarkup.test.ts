@@ -12,7 +12,6 @@ import {
   stripDmFromShippingString,
   stripSecretMarkers,
 } from "@/atlas/content/dmMarkup";
-import { generateAutoSummary } from "@/atlas/import/parseObsidian";
 import { scanArtifactShape } from "../../../scripts/check-artifact-shape";
 
 const CASES = [
@@ -51,17 +50,6 @@ describe("DM markup: strip and detect agree", () => {
     const shipped = "Name %% the king is dead";
     expect(stripDmBlocks(shipped).unbalanced).toBe(true);
     expect(findDmMarkup(stripDmFromShippingString(shipped) ?? "")).toBe("%%");
-  });
-});
-
-describe("other readers of DM markup", () => {
-  it("the import auto-summary drops DM blocks and secret markers", () => {
-    const body =
-      "The harbour town of Tidemarrow. %% smugglers %% {{secret:x}}\n\n:::dm\nthe mayor is a lich\n:::\n";
-    const summary = generateAutoSummary(body) ?? "";
-    expect(summary).toContain("The harbour town of Tidemarrow.");
-    expect(findDmMarkup(summary)).toBeNull();
-    expect(summary).not.toMatch(/smugglers|lich/);
   });
 });
 
