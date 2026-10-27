@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseSearchQuery, matchesPhrases } from "../atlas/search/parseSearchQuery";
+import { parseSearchQuery, matchesPhrases } from "../atlas/search/search";
 import type { SearchIndexEntry } from "../atlas/content/loader";
 
 function entry(overrides: Partial<SearchIndexEntry> = {}): SearchIndexEntry {

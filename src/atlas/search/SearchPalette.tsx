@@ -15,7 +15,7 @@ import { Search, MapPin, CalendarClock } from "lucide-react";
 import { Link } from "react-router";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { snippet, highlightMatch } from "@/atlas/search/snippet";
-import { parseSearchQuery, matchesPhrases } from "@/atlas/search/parseSearchQuery";
+import { compileQuery, searchEntries } from "@/atlas/search/search";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 import { loadVisitedOrdered } from "@/atlas/visited/visitedPlaces";
 
@@ -149,40 +149,15 @@ export function SearchPalette({
       };
     }
 
-    const { phrases, rest } = parseSearchQuery(raw);
-    const q = rest.toLowerCase();
-    // When query is phrases-only, score by the first phrase so results are still ranked.
-    const scoreQuery = q || (phrases.length > 0 ? phrases[0] : "");
-    const phrasesOnly = phrases.length > 0 && rest === "";
-
-    // Hard AND-filter: exclude entries missing any required phrase.
-    if (phrases.length > 0) pool = pool.filter((e) => matchesPhrases(e, phrases));
-
-    const score = (e: SearchIndexEntry): number => {
-      if (!scoreQuery) return 0;
-      let s = 0;
-      const t = e.title.toLowerCase();
-      if (t === scoreQuery) s += 30;
-      if (t.startsWith(scoreQuery)) s += 14;
-      if (t.includes(scoreQuery)) s += 10;
-      if (e.aliases.some((a) => a.toLowerCase().includes(scoreQuery))) s += 6;
-      if (e.tags.some((tt) => tt.toLowerCase().includes(scoreQuery))) s += 3;
-      if ((e.summary ?? "").toLowerCase().includes(scoreQuery)) s += 2;
-      if ((e.body ?? "").includes(scoreQuery)) s += 1;
-      return s;
-    };
-    // When phrases-only, all phrase-matched entries are shown (sorted by phrase score).
-    // When unquoted terms are present, the existing score > 0 gate still applies.
-    const snippetQuery = phrases.length > 0 ? phrases[0] : scoreQuery;
-    const scored = pool
-      .map((e) => ({ e, s: score(e) }))
-      .filter((x) => phrasesOnly || x.s > 0)
-      .sort((a, b) => b.s - a.s);
+    // Matching and ranking belong to the shared search module (same rule as
+    // Browse and Timeline); the palette only adds snippets and highlights.
+    const q = compileQuery(raw);
+    const scored = searchEntries(pool, q);
     return {
-      items: scored.slice(0, 40).map(({ e }) => ({
+      items: scored.slice(0, 40).map((e) => ({
         e,
-        snip: snippet(e.bodyText ?? e.body, e.body, snippetQuery),
-        titleHtml: highlightMatch(e.title, snippetQuery),
+        snip: snippet(e.bodyText ?? e.body, e.body, q.highlight),
+        titleHtml: highlightMatch(e.title, q.highlight),
       })),
       total: scored.length,
       isRecentlyViewed: false,

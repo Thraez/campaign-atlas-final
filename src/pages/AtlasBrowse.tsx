@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
-import { entityMatchesQuery } from "@/atlas/search/entityMatchesQuery";
+import { entityMatchesQuery } from "@/atlas/search/search";
 import {
   parseBrowseFilterParams,
   serializeBrowseFilterParams,

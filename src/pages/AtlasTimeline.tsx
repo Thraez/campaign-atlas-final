@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
-import { entityMatchesQuery } from "@/atlas/search/entityMatchesQuery";
+import { entityMatchesQuery } from "@/atlas/search/search";
 import {
   parseBrowseFilterParams,
   serializeBrowseFilterParams,
