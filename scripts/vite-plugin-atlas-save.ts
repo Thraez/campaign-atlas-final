@@ -576,7 +576,10 @@ export async function handleSaveRequest(
       existingBytes = await fs.readFile(abs);
     } catch (e) {
       const err = e as NodeJS.ErrnoException;
-      if (err.code !== "ENOENT") {
+      // ENOTDIR: a parent on the path is a file. Windows reports that as
+      // ENOENT, macOS/Linux don't; either way the target is absent, and the
+      // write pass below reports the blocked path.
+      if (err.code !== "ENOENT" && err.code !== "ENOTDIR") {
         return {
           status: 500,
           payload: { error: "ReadFailed", path: f.path, detail: err.message },

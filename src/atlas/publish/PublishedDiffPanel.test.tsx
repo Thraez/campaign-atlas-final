@@ -245,12 +245,13 @@ describe("PublishedDiffPanel with precomputed diff", () => {
       meta: { baselinePublishedAt: "2026-07-12T14:03:00Z" },
     };
     render(<PublishedDiffPanel diff={d} />);
-    expect(screen.getByText(/since \d/)).toBeInTheDocument();
+    // Locale decides the order ("12 Jul" or "Jul 12"); the day is there either way.
+    expect(screen.getByText(/since .*\b12\b/)).toBeInTheDocument();
   });
 
   it("shows no baseline-date subtitle when meta.baselinePublishedAt is absent", () => {
     render(<PublishedDiffPanel diff={diff} />);
-    expect(screen.queryByText(/since \d/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^since /)).not.toBeInTheDocument();
   });
 
   it("shows no baseline-date subtitle (never 'Invalid Date') when meta.baselinePublishedAt is unparseable", () => {
@@ -259,7 +260,7 @@ describe("PublishedDiffPanel with precomputed diff", () => {
       meta: { baselinePublishedAt: "not-a-real-date" },
     };
     render(<PublishedDiffPanel diff={d} />);
-    expect(screen.queryByText(/since \d/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^since /)).not.toBeInTheDocument();
     expect(screen.queryByText(/invalid date/i)).not.toBeInTheDocument();
   });
 
@@ -275,7 +276,7 @@ describe("PublishedDiffPanel with precomputed diff", () => {
       meta: {},
     };
     render(<PublishedDiffPanel diff={noBaselineDiff} />);
-    expect(screen.queryByText(/since \d/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^since /)).not.toBeInTheDocument();
     expect(screen.queryByText(/invalid date/i)).not.toBeInTheDocument();
   });
 });

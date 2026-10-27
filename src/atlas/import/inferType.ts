@@ -75,6 +75,7 @@ export const IGNORED_FOLDERS = new Set([
   // Numbered/prefixed folders from the restructured D&D vault (matched lowercase).
   "00_templates",
   "98_templates",
+  "99_templates",
   "z_archive",
   "90_inbox",
   "z_codex_proposals",
