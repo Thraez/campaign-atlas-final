@@ -130,6 +130,88 @@ describe("runPublishPush (integration — no network)", () => {
     }
   }, 20_000);
 
+  it("refuses with wrong-branch on a feature branch: no commit, no push, no snapshot", async () => {
+    const [repoDir, bareDir] = makeTestRepo();
+    try {
+      git(repoDir, "checkout", "-b", "feature/x");
+      // An unpushed commit on local main must not leak out either.
+      git(repoDir, "checkout", "main");
+      fs.writeFileSync(path.join(repoDir, "local-only.md"), "unpushed");
+      git(repoDir, "add", "local-only.md");
+      git(repoDir, "commit", "-m", "unpushed main commit");
+      git(repoDir, "checkout", "feature/x");
+
+      fs.mkdirSync(path.join(repoDir, "content"), { recursive: true });
+      fs.writeFileSync(path.join(repoDir, "content", "notes.md"), "# note");
+      fs.mkdirSync(path.join(repoDir, "public", "atlas"), { recursive: true });
+      fs.writeFileSync(path.join(repoDir, "public", "atlas", "atlas.json"), '{"worlds":[]}');
+
+      const headBefore = git(repoDir, "rev-parse", "HEAD");
+      const originBefore = git(bareDir, "rev-parse", "refs/heads/main");
+      let verified = false;
+
+      const result = await runPublishPush(repoDir, {
+        verify: async () => {
+          verified = true;
+          return SAFE_CHECK;
+        },
+      });
+
+      expect(result).toEqual({ status: "wrong-branch", branch: "feature/x" });
+      // Refused before the (expensive) rebuild + scans.
+      expect(verified).toBe(false);
+      // Nothing committed and nothing staged.
+      expect(git(repoDir, "rev-parse", "HEAD")).toBe(headBefore);
+      expect(git(repoDir, "diff", "--cached", "--name-only")).toBe("");
+      // Nothing pushed: origin/main unchanged, no feature branch on origin.
+      expect(git(bareDir, "rev-parse", "refs/heads/main")).toBe(originBefore);
+      expect(git(bareDir, "branch", "--list", "feature/x")).toBe("");
+      // No snapshot.
+      expect(fs.existsSync(path.join(repoDir, "public", "atlas", ".last-published.json"))).toBe(
+        false,
+      );
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+      fs.rmSync(bareDir, { recursive: true, force: true });
+    }
+  }, 20_000);
+
+  it("refuses with wrong-branch on a detached HEAD", async () => {
+    const [repoDir, bareDir] = makeTestRepo();
+    try {
+      git(repoDir, "checkout", "--detach");
+      fs.mkdirSync(path.join(repoDir, "content"), { recursive: true });
+      fs.writeFileSync(path.join(repoDir, "content", "notes.md"), "# note");
+      const headBefore = git(repoDir, "rev-parse", "HEAD");
+
+      const result = await runPublishPush(repoDir, { verify: async () => SAFE_CHECK });
+
+      expect(result).toEqual({ status: "wrong-branch", branch: "" });
+      expect(git(repoDir, "rev-parse", "HEAD")).toBe(headBefore);
+      expect(git(repoDir, "diff", "--cached", "--name-only")).toBe("");
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+      fs.rmSync(bareDir, { recursive: true, force: true });
+    }
+  }, 20_000);
+
+  it("on main, origin/main ends at the commit it just made", async () => {
+    const [repoDir, bareDir] = makeTestRepo();
+    try {
+      fs.mkdirSync(path.join(repoDir, "content"), { recursive: true });
+      fs.writeFileSync(path.join(repoDir, "content", "notes.md"), "# note");
+      const result = await runPublishPush(repoDir, {
+        now: "2026-06-16T00:00:00.000Z",
+        verify: async () => SAFE_CHECK,
+      });
+      expect(result.status).toBe("published");
+      expect(git(bareDir, "rev-parse", "refs/heads/main")).toBe(git(repoDir, "rev-parse", "HEAD"));
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+      fs.rmSync(bareDir, { recursive: true, force: true });
+    }
+  }, 20_000);
+
   it("returns nothing-to-publish when the repo has no scoped changes", async () => {
     const [repoDir, bareDir] = makeTestRepo();
     try {

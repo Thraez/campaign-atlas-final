@@ -44,6 +44,7 @@ function makeFlow(state: PublishState, overrides: Record<string, unknown> = {}) 
     error: null as string | null,
     pushReason: null as string | null,
     pushResult: null as { pushedAt: string; commit: string } | null,
+    pushBranch: null as string | null,
     check: vi.fn(),
     confirm: vi.fn(),
     ...overrides,
@@ -163,6 +164,20 @@ describe("PublishCheckTab — publish action surface", () => {
     mockUsePublishFlow.mockReturnValue(makeFlow("git-failed"));
     render(<PublishCheckTab project={BASE_PROJECT} draftPlacements={[]} draftLocalLayers={[]} />);
     expect(screen.getByText(/couldn.t publish automatically/i)).toBeTruthy();
+  });
+
+  it("wrong-branch: names the branch and says to switch to main", () => {
+    mockUsePublishFlow.mockReturnValue(makeFlow("wrong-branch", { pushBranch: "feature/x" }));
+    render(<PublishCheckTab project={BASE_PROJECT} draftPlacements={[]} draftLocalLayers={[]} />);
+    expect(screen.getByText(/publishing only works from the main branch/i)).toBeTruthy();
+    expect(screen.getByText(/you're on “feature\/x”.*switch to main/i)).toBeTruthy();
+    expect(screen.getByText(/nothing was committed or pushed/i)).toBeTruthy();
+  });
+
+  it("wrong-branch on a detached HEAD: says no branch is checked out", () => {
+    mockUsePublishFlow.mockReturnValue(makeFlow("wrong-branch", { pushBranch: "" }));
+    render(<PublishCheckTab project={BASE_PROJECT} draftPlacements={[]} draftLocalLayers={[]} />);
+    expect(screen.getByText(/no branch is checked out/i)).toBeTruthy();
   });
 
   it("git-failed + pushReason 'offline': offline sub-message shown", () => {

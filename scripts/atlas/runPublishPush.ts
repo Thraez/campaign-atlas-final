@@ -1,6 +1,8 @@
 /**
  * publish-push: re-verify green, scoped commit, push to main, snapshot baseline.
  *
+ * Refuses (`wrong-branch`) unless `main` is checked out; pushes `HEAD:main`.
+ *
  * D10 — re-verifies safety (full rebuild + scans) before pushing; never trusts
  *        a client-supplied verdict.
  * D11 — snapshots the baseline AFTER a successful push, not before.
@@ -18,6 +20,9 @@ import { snapshotBaseline } from "./snapshot-baseline";
 import type { PublishPushResult, PublishCheckResult } from "./publishTypes";
 
 const execFileAsync = promisify(execFile);
+
+/** The only branch publish commits on and pushes to (publish-atlas.yml deploys it). */
+const PUBLISH_BRANCH = "main";
 
 // Scoped pathspec (§5.2): world source + built player atlas files.
 // NOT a bare world.yaml (it lives under content/), NOT .last-published.json
@@ -85,6 +90,14 @@ export async function runPublishPush(
   const now = options.now ?? new Date().toISOString();
   const verify = options.verify ?? runPublishCheck;
 
+  // 0. Publish only from `main`: the deploy workflow runs on pushes to main, so a
+  //    commit on any other branch would never reach players, and pushing a local
+  //    `main` we didn't just commit to could ship unrelated work. Checked before
+  //    the rebuild and before anything is staged.
+  const head = await git(repoRoot, ["symbolic-ref", "--quiet", "--short", "HEAD"]);
+  const branch = head.ok ? head.stdout.trim() : ""; // "" = detached HEAD
+  if (branch !== PUBLISH_BRANCH) return { status: "wrong-branch", branch };
+
   // 1. Re-verify safety (D10) — never trust a client-claimed verdict.
   const check = await verify(repoRoot);
   if (check.verdict !== "safe") return { status: "blocked", reasons: check.reasons };
@@ -118,8 +131,9 @@ export async function runPublishPush(
   ]);
   if (!commit.ok) return { status: "git-failed", reason: classifyGitFailure(commit.stderr) };
 
-  // 5. Push to main (uses the machine's ambient git credentials — D6).
-  const push = await git(repoRoot, ["push", "origin", "main"]);
+  // 5. Push the commit just made to main (uses the machine's ambient git
+  //    credentials — D6). HEAD:main, so what ships is exactly this HEAD.
+  const push = await git(repoRoot, ["push", "origin", `HEAD:${PUBLISH_BRANCH}`]);
   if (!push.ok) return { status: "git-failed", reason: classifyGitFailure(push.stderr) };
 
   // 6. Snapshot the just-pushed player atlas as the new diff baseline (D11).
