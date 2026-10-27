@@ -39,6 +39,18 @@ needs Isak's yes.
 Grill round 2 is ticketed on provisional calls (below): `eval-2026-10/14`-`17`. 17 (entity
 edits stuck after a 409) ranks ahead of code-retro 06-08.
 
+## Morning queue
+
+Isak is away until the morning of 2026-10-28. His rule: commit locally and he pushes `main` in the
+morning. Overnight there are no pushes to `main` and no `atlas:publish` (the gate runs its local
+parts: `atlas:build:player`, `build`, `atlas:scan`). Any new PR whose merge would publish stays open
+and is listed here. Anything refused is logged here with its command and reason.
+
+- `main` was pushed once (f65c854..0c1d92a, docs only, on his yes) before this rule arrived.
+- PRs waiting for his yes to merge (each merge publishes): #62, then #66 (stacked on #62), #63,
+  #64, #65. See "Merge queue" for what each needs him to look at.
+- Local `main` commits since 0c1d92a: push them in the morning.
+
 ## Merge queue
 
 Isak's rule, 2026-10-27: sessions may merge their own PRs once checks pass and the code review is
