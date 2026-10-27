@@ -64,13 +64,15 @@ Isak's rule, 2026-10-27: sessions may merge their own PRs once checks pass and t
 clean, but here every merge into `main` starts the publish workflow, which counts as publishing.
 So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logged here.
 
-| PR  | Ticket | What                                           | Waits on                                |
-| --- | ------ | ---------------------------------------------- | --------------------------------------- |
-| #62 | 18     | Remove the entity-frontmatter save stream      | His yes                                 |
-| #63 | 14     | One search for palette, Browse and Timeline    | Isak tries search (Q2); his yes         |
-| #64 | 15     | One drawing module for regions and routes      | Isak's look at the editor map (Q3); yes |
-| #65 | 10     | A test walks the player entry's imports        | His yes                                 |
-| #66 | 12     | Save refuses when an image's bytes are missing | #62 (stacked); Isak sees the toast; yes |
+| PR  | Ticket | What                                           | Waits on                                       |
+| --- | ------ | ---------------------------------------------- | ---------------------------------------------- |
+| #62 | 18     | Remove the entity-frontmatter save stream      | His yes                                        |
+| #63 | 14     | One search for palette, Browse and Timeline    | Isak tries search (Q2); his yes                |
+| #64 | 15     | One drawing module for regions and routes      | Isak's look at the editor map (Q3); yes        |
+| #65 | 10     | A test walks the player entry's imports        | His yes                                        |
+| #66 | 12     | Save refuses when an image's bytes are missing | #62 (stacked); Isak sees the toast; yes        |
+| #67 | 11     | Pin layer stops rebuilding on every change     | #64 (stacked); Isak checks the map by eye; yes |
+| #68 | 19     | Map layer uploads always get a real path       | #66 (stacked); Isak tries the path field; yes  |
 
 Merged 2026-10-27 on Isak's relayed yes ("Atlas may merge #61 first, then #57, #58, #59 and #60 in
 order, each after its CI re-run is green; the publishes are fine"). Each PR's branch was updated
