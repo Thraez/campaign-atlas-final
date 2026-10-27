@@ -5,10 +5,11 @@
  * builders were deleted when the editor's unified Save flow took over
  * (Save writes canonical .md frontmatter and world.yaml directly to disk).
  *
- * What remains is the entity-frontmatter patch: a read-only YAML preview the
- * EntitiesTab shows and the import wizard offers for files outside the
- * editor's writable allowlist. {@link PlacementOverride} is the shared
- * placement-draft shape consumed by validateProject / the placement editor.
+ * What remains is the entity-frontmatter patch builder (its only UI caller,
+ * the Entities tab, was deleted; it is kept with its tests) and the shared
+ * types: {@link EntityFrontmatterPatch} feeds the canonical save, and
+ * {@link PlacementOverride} is the placement-draft shape consumed by
+ * validateProject / the placement editor.
  */
 
 import type { EntityVisibility } from "@/atlas/content/schema";

@@ -6,9 +6,9 @@
  * meaningfully per type — an NPC has "wants/fears/secret", a faction has
  * "goal/methods/forbidden_line", and so on.
  *
- * This file is the single source of truth for both:
- *   - the UI form in EntitiesTab (which fields to render, with what labels)
- *   - the YAML key names that get written into atlas.profile.dm
+ * This file is the single source of truth for the YAML key names under
+ * atlas.profile (with labels for any form that renders them). The Entities
+ * tab form that used it was deleted; profiles are authored in the vault.
  *
  * Keys here MUST match the YAML keys in entity frontmatter exactly.
  */

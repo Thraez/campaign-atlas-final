@@ -5,8 +5,10 @@
  * the same entity `.md` files:
  *
  *   1. Pin placements (Pins tab) — `atlas.placements[]`.
- *   2. Frontmatter edits (Entities tab) — visibility, summary, aliases,
- *      images, profile, relationships, type.
+ *   2. Frontmatter drafts — visibility, summary, aliases, images, profile,
+ *      relationships, type. (The Entities tab that produced these was
+ *      deleted; the placement editor passes none today and entity edits go
+ *      through EntityEditPanel, but the merge path stays for buildSavePlan.)
  *
  * Previously only stream 1 went through the unified Save; stream 2 could
  * only leave the editor via an "Export Patch" download the DM had to apply
@@ -35,9 +37,8 @@ import {
 } from "./canonicalPlacementSave";
 
 /**
- * Per-entity frontmatter draft, keyed by entity id in the editor. Mirrors
- * the fields the Entities tab can edit. Shared between the tab (which is now
- * a controlled component) and the save builder so the shape can't drift.
+ * Per-entity frontmatter draft, keyed by entity id: the atlas fields a
+ * frontmatter edit can carry into the unified Save.
  */
 export interface FrontmatterDraft {
   visibility?: EntityVisibility;
@@ -52,9 +53,8 @@ export interface FrontmatterDraft {
 /**
  * Derive the canonical `EntityFrontmatterPatch[]` from the editor's draft
  * map. Each patch carries the FULL desired `atlas:` block (drafted value or
- * the entity's current value as fallback) — identical to the logic the
- * Entities tab used for its now-removed export, kept here as the single
- * source of truth.
+ * the entity's current value as fallback). Single source of truth for that
+ * merge.
  */
 export function entityFrontmatterPatches(
   drafts: Record<string, FrontmatterDraft>,
@@ -107,7 +107,7 @@ function mergeFrontmatterFields(
 export interface BuildCanonicalEntityChangesInput {
   /** Pin placement drafts (Pins tab). */
   placements: PlacementDraft[];
-  /** Frontmatter patches (Entities tab), via {@link entityFrontmatterPatches}. */
+  /** Frontmatter patches, via {@link entityFrontmatterPatches}. */
   frontmatter: EntityFrontmatterPatch[];
 }
 

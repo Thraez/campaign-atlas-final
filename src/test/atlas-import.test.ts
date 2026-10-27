@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { parseObsidianFile, generateAutoSummary } from "@/atlas/import/parseObsidian";
 import { inferTypeFromPath, isIgnoredPath } from "@/atlas/import/inferType";
 import { buildEntityFrontmatterPatch } from "@/atlas/yaml/buildPatches";
-import { validatePatchYaml } from "@/atlas/yaml/validatePatch";
+import yaml from "js-yaml";
 
 describe("inferTypeFromPath", () => {
   it("infers from folder", () => {
@@ -164,9 +164,8 @@ describe("buildEntityFrontmatterPatch", () => {
         atlas: { id: "x", type: "settlement", visibility: "dm", summary: "A town." },
       },
     ]);
-    // Each '---' frontmatter block is parseable on its own.
-    const v = validatePatchYaml(a.content.replace(/---/g, ""), "placement");
-    // Doesn't have to pass placement-specific shape, just no fences / parse errors.
+    // The '---' frontmatter blocks parse as YAML once the delimiters are stripped.
+    expect(() => yaml.loadAll(a.content.replace(/---/g, ""))).not.toThrow();
     // The body (non-comment lines) must not contain markdown code fences.
     const body = a.content
       .split("\n")
@@ -174,6 +173,5 @@ describe("buildEntityFrontmatterPatch", () => {
       .join("\n");
     expect(a.content).toMatch(/atlas:/);
     expect(body).not.toMatch(/```/);
-    expect(v.errors.filter((e) => /code fence/i.test(e))).toHaveLength(0);
   });
 });

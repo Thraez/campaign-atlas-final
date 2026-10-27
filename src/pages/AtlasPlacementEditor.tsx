@@ -812,8 +812,8 @@ function AtlasPlacementEditorInner() {
       allDraftPlacements: buildDraftPlacements(),
       overrides,
       activeMapId: activeMap.id,
-      // Entities-tab frontmatter drafts are not wired into this page — entity
-      // edits go through EntityEditPanel/useEntityEditDraft — so supply none.
+      // Frontmatter drafts are not wired into this page — entity edits go
+      // through EntityEditPanel/useEntityEditDraft — so supply none.
       // buildSavePlan keeps the param for its other (tested) callers.
       entityDrafts: {},
       projectEntities: project.entities,
@@ -830,7 +830,7 @@ function AtlasPlacementEditorInner() {
     const entitiesById = new Map(project.entities.map((e) => [e.id, e]));
     try {
       // One FileChange per entity .md path even when an entity is edited in
-      // BOTH the Pins tab (placements) and the Entities tab (frontmatter) —
+      // BOTH placements and frontmatter drafts —
       // the save endpoint rejects duplicate paths.
       const entityChanges = await buildCanonicalEntityChanges(
         { placements: drafts, frontmatter: fmPatches },
@@ -1441,7 +1441,7 @@ function AtlasPlacementEditorInner() {
 
           const panels: Record<string, React.ReactNode> = {
             // Six content categories — wired to CategoryPanel (browse) or
-            // EntityEditorPanel (create). Phase 2 EntitiesTab stopgap removed.
+            // EntityEditorPanel (create).
             characters:
               creatingIn === "characters" ? (
                 <EntityEditorPanel

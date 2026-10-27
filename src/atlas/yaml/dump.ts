@@ -4,7 +4,8 @@
  * Centralizes:
  *  - flow style (block, never inline)
  *  - quoting + indentation
- *  - never-emits-fences invariant (downstream `validatePatchYaml` enforces this)
+ *  - never-emits-fences invariant (`loadWorldConfig` rejects fenced world.yaml
+ *    at build time)
  *
  * Use this instead of hand-stringifying YAML in components. The `header`
  * prepends standard "this is a tool-generated patch" comments.

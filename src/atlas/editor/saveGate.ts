@@ -27,7 +27,7 @@ export interface SavePlanInput<TDraft extends { entityId: string }> {
   /** Session override map; key presence (`${mapId}:${entityId}`) marks a placement dirty. */
   overrides: Record<string, unknown>;
   activeMapId: string;
-  /** Entities-tab frontmatter drafts, keyed by entity id. */
+  /** Frontmatter drafts, keyed by entity id (the placement editor passes none). */
   entityDrafts: Record<string, FrontmatterDraft>;
   projectEntities: Entity[];
   /** True when any map / region / route / fog / layer tab has a dirty draft. */
