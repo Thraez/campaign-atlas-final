@@ -72,6 +72,9 @@ describe("useMdImportFlow commit — rewrites vault image embeds (V12/C3)", () =
           }),
         };
       }
+      if (url.startsWith("/__atlas/read?path=")) {
+        return new Response("not found", { status: 404 }); // commit's conflict check: target is free
+      }
       if (url === "/__atlas/vault-image-copy") {
         const body = JSON.parse(String(init?.body)) as { rawSrc: string };
         if (body.rawSrc === "portrait.png") {
@@ -97,7 +100,8 @@ describe("useMdImportFlow commit — rewrites vault image embeds (V12/C3)", () =
       await result.current.commit();
     });
 
-    const passedRows = vi.mocked(buildImportChanges).mock.calls[0][0];
+    // The last call carries the rows with images rewritten (the first is the conflict check).
+    const passedRows = vi.mocked(buildImportChanges).mock.calls.at(-1)![0];
     const row = passedRows.find((r) => r.vaultRelPath === "03_Entities/corven.md");
     expect(row?.rawContent).toBe("![](/atlas/assets/images/corven-1.png)\n\n\n");
     expect(toast.warning).toHaveBeenCalledWith("1 image skipped — not in the folders you picked.");

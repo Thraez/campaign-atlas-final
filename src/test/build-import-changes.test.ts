@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { buildImportChanges, ImportCommitError } from "@/atlas/import/buildImportChanges";
 import { parseFrontmatter } from "@/atlas/import/frontmatter";
 import {
@@ -7,7 +7,7 @@ import {
   type StagingRow,
   type StagingContext,
 } from "@/atlas/import/stagingState";
-import type { ImportFolderConfig } from "@/atlas/content/schema";
+import type { ImportFolderConfig, EntityVisibility } from "@/atlas/content/schema";
 
 const WORLD = "astrath-deeprealm";
 
@@ -183,7 +183,8 @@ describe("buildImportChanges — update rows use mergeImportFrontmatter", () => 
     expect(changes[0].baseHash).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
-  it("create row with vault publish:true still defaults to dm (no needsReview approval)", async () => {
+  // code-retro 04 replaced "new imports are always dm": commit writes what Staging shows.
+  it("create row writes the visibility Staging shows (vault publish: true → player)", async () => {
     const vaultRaw = [
       "---",
       "atlas:",
@@ -209,7 +210,7 @@ describe("buildImportChanges — update rows use mergeImportFrontmatter", () => 
     };
     const [change] = await buildImportChanges([row as never]);
     const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
-    expect(atlas.visibility).toBe("dm");
+    expect(atlas.visibility).toBe("player");
     expect(change.baseHash).toBeNull();
   });
 });
@@ -316,6 +317,166 @@ describe("buildImportChanges — readSourceFile branch coverage (N92)", () => {
       needsReview: { reason: "secrecy-increase" as const },
     };
     const [change] = await buildImportChanges([row as never]);
+    const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
+    expect(atlas.visibility).toBe("player");
+  });
+});
+
+describe("Sync keeps a note's title and type (code-retro 02)", () => {
+  it("a new note keeps its exact title from the vault filename", async () => {
+    const [row] = buildStagingRows(
+      [
+        {
+          filename: "Isle de Marque.md",
+          raw: "Fog-bound isle.\n",
+          vaultRelPath: "02_Regions/Isle de Marque.md",
+        },
+      ],
+      makeCtx(),
+    );
+    expect(row.title).toBe("Isle de Marque");
+    const [change] = await buildImportChanges([row], { fetchFn: fakeReadFetch({}) });
+    expect(change.path).toMatch(/isle-de-marque\.md$/);
+    expect(parseFrontmatter(change.content).data.title).toBe("Isle de Marque");
+  });
+
+  it("a slug-named note still gets the build's title-cased title", () => {
+    const [row] = buildStagingRows([{ filename: "great-hall.md", raw: "Hall.\n" }], makeCtx());
+    expect(row.title).toBe("Great Hall");
+  });
+
+  it("a frontmatter title wins over the filename", () => {
+    const [row] = buildStagingRows(
+      [{ filename: "Marque.md", raw: "---\ntitle: Isle de Marque\n---\nIsle.\n" }],
+      makeCtx(),
+    );
+    expect(row.title).toBe("Isle de Marque");
+  });
+
+  it("an update keeps the exact title although the vault note has no title field", async () => {
+    const path = `content/${WORLD}/regions/isle-de-marque.md`;
+    const disk =
+      "---\ntitle: Isle de Marque\natlas:\n  id: isle-de-marque\n  type: region\n  visibility: player\n---\nOld.\n";
+    const [row] = buildStagingRows(
+      [
+        {
+          filename: "Isle de Marque.md",
+          raw: "New prose.\n",
+          vaultRelPath: "02_Regions/Isle de Marque.md",
+        },
+      ],
+      makeCtx({
+        existingById: new Map([["isle-de-marque", path]]),
+        existingPaths: new Set([path]),
+      }),
+    );
+    expect(row.rowKind).toBe("update");
+    const [change] = await buildImportChanges([row], { fetchFn: fakeReadFetch({ [path]: disk }) });
+    expect(parseFrontmatter(change.content).data.title).toBe("Isle de Marque");
+  });
+
+  it("a top-level type: npc stages and lands as npc, whatever its folder", async () => {
+    const [row] = buildStagingRows(
+      [
+        {
+          filename: "Varro.md",
+          raw: "---\ntype: npc\n---\nA smuggler.\n",
+          vaultRelPath: "01_Lore/Varro.md",
+        },
+      ],
+      makeCtx(),
+    );
+    expect(row.inferredType).toBe("npc");
+    expect(row.typeWasExplicit).toBe(true);
+    expect(row.targetPath).toBe(`content/${WORLD}/npcs/varro.md`);
+    const [change] = await buildImportChanges([row], { fetchFn: fakeReadFetch({}) });
+    const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
+    expect(atlas.type).toBe("npc");
+  });
+
+  it("atlas.type still wins over a top-level type", () => {
+    const [row] = buildStagingRows(
+      [{ filename: "Varro.md", raw: "---\ntype: npc\natlas:\n  type: faction\n---\n" }],
+      makeCtx(),
+    );
+    expect(row.inferredType).toBe("faction");
+  });
+});
+
+describe("Staging shows the visibility commit writes (code-retro 04)", () => {
+  async function stageAndWrite(vaultRelPath: string, raw: string, ctx = makeCtx()) {
+    const filename = vaultRelPath.split("/").pop()!;
+    const [row] = buildStagingRows([{ filename, raw, vaultRelPath }], ctx);
+    const [change] = await buildImportChanges([row], { fetchFn: fakeReadFetch(diskFiles) });
+    const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
+    return { shown: row.resolvedVisibility, written: atlas.visibility };
+  }
+  let diskFiles: Record<string, string> = {};
+  beforeEach(() => {
+    diskFiles = {};
+  });
+
+  it.each([
+    ["01_Lore/The Sundering.md", "player"],
+    ["02_Regions/Places/Thornhold.md", "player"],
+    ["03_Entities/NPCs/Varro.md", "dm"],
+    ["04_Factions/Red Hand.md", "dm"],
+  ])("an untagged new note from %s arrives as %s", async (vaultRelPath, expected) => {
+    const { shown, written } = await stageAndWrite(vaultRelPath, "Prose.\n");
+    expect(shown).toBe(expected);
+    expect(written).toBe(expected);
+  });
+
+  it("a tag wins over the folder rule", async () => {
+    const { shown, written } = await stageAndWrite(
+      "03_Entities/NPCs/Varro.md",
+      "---\natlas:\n  visibility: player\n---\nPublic smuggler.\n",
+    );
+    expect(shown).toBe("player");
+    expect(written).toBe("player");
+  });
+
+  it("a dropped file outside the vault stays dm when untagged", async () => {
+    const [row] = buildStagingRows([{ filename: "loose.md", raw: "Loose.\n" }], makeCtx());
+    expect(row.resolvedVisibility).toBe("dm");
+  });
+
+  const path = `content/${WORLD}/npcs/varro.md`;
+  const updateCtx = (visibility: EntityVisibility) => ({
+    ...makeCtx({ existingById: new Map([["varro", path]]), existingPaths: new Set([path]) }),
+    entityMeta: new Map([["varro", { visibility, type: "npc", sourcePath: path }]]),
+  });
+
+  it("an update shows and keeps the atlas's own visibility", async () => {
+    diskFiles = {
+      [path]: "---\natlas:\n  id: varro\n  type: npc\n  visibility: hidden\n---\nOld.\n",
+    };
+    const { shown, written } = await stageAndWrite(
+      "01_Lore/Varro.md",
+      "New prose.\n",
+      updateCtx("hidden"),
+    );
+    expect(shown).toBe("hidden");
+    expect(written).toBe("hidden");
+  });
+
+  it("approving a secrecy increase writes the vault's visibility", async () => {
+    diskFiles = { [path]: "---\natlas:\n  id: varro\n  type: npc\n  visibility: dm\n---\nOld.\n" };
+    const [row] = buildStagingRows(
+      [
+        {
+          filename: "Varro.md",
+          raw: "---\natlas:\n  visibility: player\n---\nNow public.\n",
+          vaultRelPath: "03_Entities/NPCs/Varro.md",
+        },
+      ],
+      updateCtx("dm"),
+    );
+    expect(row.needsReview?.reason).toBe("secrecy-increase");
+    expect(row.included).toBe(false);
+    expect(row.resolvedVisibility).toBe("player");
+    const approved = updateStagingRow(row, { included: true }, updateCtx("dm"));
+    const [change] = await buildImportChanges([approved], { fetchFn: fakeReadFetch(diskFiles) });
     const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
     expect(atlas.visibility).toBe("player");
   });

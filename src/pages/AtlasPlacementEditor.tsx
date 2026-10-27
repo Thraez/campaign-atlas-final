@@ -30,6 +30,7 @@ import type {
   AtlasProject,
   CreditsConfig,
   Entity,
+  EntityVisibility,
   ImportFolderConfig,
   MapDocument,
   MapLayer,
@@ -271,10 +272,21 @@ function AtlasPlacementEditorInner() {
     return world?.importFolders ?? { folders: {}, defaultFolder: "imports" };
   }, [project, importWorldId]);
 
+  const importEntityMeta = useMemo(() => {
+    const m = new Map<string, { visibility: EntityVisibility; type: string; sourcePath: string }>();
+    for (const e of project?.entities ?? []) {
+      if (e.id && e.sourcePath) {
+        m.set(e.id, { visibility: e.visibility, type: e.type, sourcePath: e.sourcePath });
+      }
+    }
+    return m;
+  }, [project]);
+
   const importFlow = useMdImportFlow({
     worldId: importWorldId,
     importConfig,
     existingById: importExistingById,
+    entityMeta: importEntityMeta,
     onImported: reloadCanon,
   });
   const [pasteOpen, setPasteOpen] = useState(false);

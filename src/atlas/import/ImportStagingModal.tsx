@@ -199,27 +199,22 @@ export function ImportStagingModal({
                     </td>
                     <td className="py-2 pr-2">
                       {(() => {
-                        const isNewImportRow =
-                          row.rowKind === "create" || row.rowKind === "path-collision";
-                        const isSecrecyIncreaseReview =
-                          row.needsReview?.reason === "secrecy-increase";
-                        const visibilityLocked = isNewImportRow && !isSecrecyIncreaseReview;
+                        // What this shows is what commit writes (stagingState). An update
+                        // from the vault keeps the atlas's own visibility; change it in the editor.
                         return (
                           <Select
                             value={row.resolvedVisibility || "dm"}
                             onValueChange={(v) => onPatchRow(row.id, { resolvedVisibility: v })}
                             disabled={
-                              !!row.parseError ||
-                              (!!row.vaultRelPath && row.rowKind === "update") ||
-                              visibilityLocked
+                              !!row.parseError || (!!row.vaultRelPath && row.rowKind === "update")
                             }
                           >
                             <SelectTrigger
                               className="h-7 text-[11px]"
                               aria-label={`Visibility for ${row.filename}`}
                               title={
-                                visibilityLocked
-                                  ? "New imports are saved DM-only for safety — publish later in the editor."
+                                row.vaultRelPath && row.rowKind === "update"
+                                  ? "Updates keep the atlas's visibility — change it in the editor."
                                   : undefined
                               }
                             >

@@ -6,6 +6,7 @@ function row(overrides: Partial<StagingRow>): StagingRow {
   return {
     id: "r1",
     filename: "a.md",
+    title: "A",
     inferredType: "npc",
     resolvedId: "a",
     targetPath: "content/w/npcs/a.md",

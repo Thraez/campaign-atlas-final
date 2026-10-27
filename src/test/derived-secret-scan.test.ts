@@ -114,6 +114,100 @@ describe("deriveSecretsFromVault", () => {
   });
 });
 
+/** A throwaway vault with the real config's excludes; returns the config path. */
+function tempVault(notes: Record<string, string>): { config: string; root: string } {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "derived-vault-"));
+  for (const [rel, text] of Object.entries(notes)) {
+    const file = path.join(root, "content", rel);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, text);
+  }
+  const config = path.join(root, "atlas.config.json");
+  fs.writeFileSync(
+    config,
+    JSON.stringify({
+      contentRoot: "content",
+      outputDir: "out",
+      defaultWorld: "test",
+      include: ["**/*.md"],
+      exclude: ["**/_drafts/**", "**/_dm/**", "**/archive/**", "**/deprecated/**"],
+    }),
+  );
+  return { config, root };
+}
+
+describe("derived secrets match what the build ships", () => {
+  it("an untitled dm note contributes the build's title-cased title", () => {
+    const v = tempVault({ "w/isle-de-marque.md": "---\natlas:\n  visibility: dm\n---\n" });
+    try {
+      const names = deriveSecretsFromVault(v.config).map((s) => s.name);
+      expect(names).toContain("Isle De Marque");
+    } finally {
+      fs.rmSync(v.root, { recursive: true, force: true });
+    }
+  });
+
+  it("a player note naming a dm note in any case fails the scan", () => {
+    const v = tempVault({ "w/isle-de-marque.md": "---\natlas:\n  visibility: dm\n---\n" });
+    const out = path.join(v.root, "out");
+    fs.mkdirSync(out);
+    fs.writeFileSync(path.join(out, "atlas.json"), '{"body":"Ships sail to isle de marque."}');
+    try {
+      const r = scanArtifactForSecrets(out, deriveSecretsFromVault(v.config));
+      expect(r.hits.map((h) => h.match.name)).toContain("Isle De Marque");
+    } finally {
+      fs.rmSync(v.root, { recursive: true, force: true });
+    }
+  });
+
+  it("titles from _dm/ and _drafts/ are in the list", () => {
+    const v = tempVault({
+      "w/_dm/drowned-temple.md": "---\ntitle: Drowned Temple of Nepheth\n---\n",
+      "w/_drafts/the-ninth-bell.md": "---\natlas:\n  visibility: dm\n---\n",
+    });
+    try {
+      const names = deriveSecretsFromVault(v.config).map((s) => s.name);
+      expect(names).toContain("Drowned Temple of Nepheth");
+      expect(names).toContain("The Ninth Bell");
+    } finally {
+      fs.rmSync(v.root, { recursive: true, force: true });
+    }
+  });
+
+  it("a note with no visibility is dm (ADR-0001), so its title is a secret", () => {
+    const v = tempVault({ "w/corven.md": "---\ntitle: Corven Ashmere\n---\n" });
+    try {
+      const names = deriveSecretsFromVault(v.config).map((s) => s.name);
+      expect(names).toContain("Corven Ashmere");
+    } finally {
+      fs.rmSync(v.root, { recursive: true, force: true });
+    }
+  });
+
+  it("a legacy publish: true note is not a secret", () => {
+    const v = tempVault({
+      "w/harbour.md": "---\ntitle: Grey Harbour\natlas:\n  publish: true\n---\n",
+    });
+    try {
+      expect(deriveSecretsFromVault(v.config)).toHaveLength(0);
+    } finally {
+      fs.rmSync(v.root, { recursive: true, force: true });
+    }
+  });
+
+  it("matches whole words only, so a secret name inside a longer word is not a hit", () => {
+    const v = tempVault({ "w/mira.md": "---\ntitle: Mira\natlas:\n  visibility: dm\n---\n" });
+    const out = path.join(v.root, "out");
+    fs.mkdirSync(out);
+    fs.writeFileSync(path.join(out, "atlas.json"), '{"body":"A miracle at Admiral Point."}');
+    try {
+      expect(scanArtifactForSecrets(out, deriveSecretsFromVault(v.config)).hits).toEqual([]);
+    } finally {
+      fs.rmSync(v.root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("scanArtifactForSecrets", () => {
   let tmpRoot: string;
   beforeAll(() => {

@@ -21,7 +21,7 @@
 import { parseFrontmatter } from "./frontmatter";
 import type { ImportFolderConfig, EntityVisibility } from "../content/schema";
 import { inferTypeFromTags } from "./inferTypeFromTags";
-import { inferTypeFromPath } from "./inferType";
+import { defaultVisibilityForVaultPath, inferTypeFromPath } from "./inferType";
 import { slugify } from "@/atlas/content/slugify";
 import { isValidVisibility } from "@/atlas/content/visibility";
 import { lookupByPath, type SyncMap, type VaultNoteState } from "./syncMap";
@@ -95,6 +95,8 @@ export interface StagingContext {
 export interface StagingRow {
   id: string;
   filename: string;
+  /** The note's exact title (see deriveTitle). Commit writes it as `title`. */
+  title: string;
   /** Inferred entity type — DM-editable via the type dropdown. */
   inferredType: string;
   /** Frontmatter `path` if the file declared one. Tooltip-only — never the target. */
@@ -139,15 +141,18 @@ export interface StagingRow {
 }
 
 /**
- * Derive a display title from filename and frontmatter, matching build-atlas.ts logic:
- *   title = fm.title.trim() if non-empty, else title-cased slug ("great-hall" → "Great Hall")
+ * The note's title, which commit writes into the frontmatter so it survives
+ * the rename to `<slug>.md`:
+ *   - fm.title.trim() if non-empty;
+ *   - else an Obsidian-style filename verbatim ("Isle de Marque.md" → "Isle de Marque");
+ *   - else, for a slug-shaped filename, the build's title-cased slug ("great-hall" → "Great Hall").
  */
 function deriveTitle(filename: string, fmTitle: unknown): string {
   if (typeof fmTitle === "string" && fmTitle.trim()) return fmTitle.trim();
-  return filename
-    .replace(/\.md$/i, "")
+  const stem = filename.replace(/\.md$/i, "").trim();
+  if (stem !== slugify(stem)) return stem;
+  return stem
     .replace(/[-_]+/g, " ")
-    .trim()
     .replace(/(^|\s)(\p{L})/gu, (_m, sp, ch) => sp + ch.toUpperCase());
 }
 
@@ -171,7 +176,8 @@ function extractStagingFields(
   typeWasExplicit: boolean;
   typeWasGuessed: boolean;
   id: string | undefined;
-  visibility: string;
+  /** The note's own tag (atlas.visibility, or legacy publish: true); undefined if untagged. */
+  taggedVisibility: string | undefined;
   fmTitle: string | undefined;
   frontmatterPath: string | undefined;
   parseError: string | undefined;
@@ -182,10 +188,10 @@ function extractStagingFields(
     const data = fm.data;
     const atlas = (data.atlas ?? {}) as Record<string, unknown>;
 
-    const explicit =
-      typeof atlas.type === "string" && atlas.type.trim().length > 0
-        ? atlas.type.trim()
-        : undefined;
+    // atlas.type first, then top-level `type:` (most vault notes use it), as the build does.
+    const explicit = [atlas.type, data.type]
+      .find((t): t is string => typeof t === "string" && t.trim().length > 0)
+      ?.trim();
     const fromTags = explicit ? null : inferTypeFromTags(data.tags);
     const fromFolder = explicit || fromTags ? null : inferTypeFromPath(relPath);
     const type =
@@ -194,8 +200,8 @@ function extractStagingFields(
     const typeWasGuessed = !explicit && !fromTags && fromFolder === "note";
 
     const visRaw = typeof atlas.visibility === "string" ? atlas.visibility : undefined;
-    const visibility =
-      visRaw && isValidVisibility(visRaw) ? visRaw : atlas.publish === true ? "player" : "dm";
+    const taggedVisibility =
+      visRaw && isValidVisibility(visRaw) ? visRaw : atlas.publish === true ? "player" : undefined;
 
     const id = typeof atlas.id === "string" ? atlas.id : undefined;
     const fmTitle = typeof data.title === "string" ? data.title : undefined;
@@ -209,7 +215,7 @@ function extractStagingFields(
       typeWasExplicit: !!explicit,
       typeWasGuessed,
       id,
-      visibility,
+      taggedVisibility,
       fmTitle,
       frontmatterPath,
       parseError: undefined,
@@ -221,7 +227,7 @@ function extractStagingFields(
       typeWasExplicit: false,
       typeWasGuessed: false,
       id: undefined,
-      visibility: "dm",
+      taggedVisibility: undefined,
       fmTitle: undefined,
       frontmatterPath: undefined,
       parseError: e instanceof Error ? e.message : String(e),
@@ -242,12 +248,14 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     typeWasExplicit,
     typeWasGuessed,
     id,
-    visibility,
+    taggedVisibility,
     fmTitle,
     frontmatterPath,
     parseError,
     frontmatterWarning,
   } = extractStagingFields(input.raw, input.filename);
+  // What the vault asks for: its tag, else the folder rule (dm outside the vault).
+  const vaultVisibility = taggedVisibility ?? defaultVisibilityForVaultPath(input.vaultRelPath);
 
   // ── Identity resolution (§5.3 precedence) ──────────────────────────────────
   // Priority: (1) vault atlas.id; (2) sync-map[vaultRelPath]; (3) slugify(title)
@@ -279,22 +287,26 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
   // ── needsReview from DM-canon (§2.3) ────────────────────────────────────────
   // Only computed for update rows; create/collision rows are never auto-exposed.
   let needsReview: StagingRow["needsReview"] = undefined;
-  if (rowKind === "update" && ctx.entityMeta) {
-    const meta = ctx.entityMeta.get(resolvedId);
-    if (meta) {
-      // Check secrecy increase: canon is hidden-tier, vault wants player visibility
-      const vaultAtlas = parseError
-        ? {}
-        : ((parseFrontmatter(input.raw).data.atlas as Record<string, unknown>) ?? {});
-      if (detectExposureIncrease(meta.visibility, vaultAtlas)) {
-        needsReview = { reason: "secrecy-increase" };
-      } else if (baseType) {
-        // Check type conflict: both disk type and vault type diverged from last-synced base
-        const { conflict } = resolveType({ diskType: meta.type, vaultType: type, baseType });
-        if (conflict) needsReview = { reason: "type-conflict" };
-      }
+  const meta = rowKind === "update" ? ctx.entityMeta?.get(resolvedId) : undefined;
+  if (meta) {
+    // Check secrecy increase: canon is hidden-tier, vault wants player visibility
+    const vaultAtlas = parseError
+      ? {}
+      : ((parseFrontmatter(input.raw).data.atlas as Record<string, unknown>) ?? {});
+    if (detectExposureIncrease(meta.visibility, vaultAtlas)) {
+      needsReview = { reason: "secrecy-increase" };
+    } else if (baseType) {
+      // Check type conflict: both disk type and vault type diverged from last-synced base
+      const { conflict } = resolveType({ diskType: meta.type, vaultType: type, baseType });
+      if (conflict) needsReview = { reason: "type-conflict" };
     }
   }
+
+  // The visibility commit will write, which is what Staging shows:
+  // an update keeps the atlas's own unless the DM approves a secrecy increase;
+  // a new note gets what the vault asks for.
+  const resolvedVisibility =
+    meta && needsReview?.reason !== "secrecy-increase" ? meta.visibility : vaultVisibility;
 
   // create and update default ON; path-collision requires explicit opt-in; needsReview rows default OFF
   // An unchanged note has nothing to import — leave it unticked so the default
@@ -309,6 +321,7 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
   return {
     id: nextRowId(input.filename),
     filename: input.filename,
+    title,
     inferredType: type,
     frontmatterPath,
     resolvedId,
@@ -319,7 +332,7 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     parseError,
     typeWasExplicit,
     typeWasGuessed,
-    resolvedVisibility: visibility,
+    resolvedVisibility,
     rawContent: input.raw,
     baseType,
     needsReview,

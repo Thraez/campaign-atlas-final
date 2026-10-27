@@ -13,7 +13,7 @@
  *     The modal already prevents toggling them on, but defending here means
  *     a misuse can't widen the surface.
  */
-import { hashContent, type FileChange } from "@/atlas/save/localFsSave";
+import { ConflictError, hashContent, type FileChange } from "@/atlas/save/localFsSave";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter";
 import { mergeImportFrontmatter } from "./mergeImportFrontmatter";
 import { isWritableSourcePath } from "@/atlas/save/sourcePathAllowlist";
@@ -78,21 +78,25 @@ export async function buildImportChanges(
         inferredType: row.inferredType,
         baseType: row.baseType, // from sync-map (Phase 2); undefined → vault wins on type
       });
-      content = stringifyFrontmatter(merged.content, merged.data);
+      // An approved secrecy increase is the one case where the vault's visibility wins.
+      if (row.needsReview?.reason === "secrecy-increase") {
+        (merged.data.atlas as Record<string, unknown>).visibility = row.resolvedVisibility;
+      }
+      // The vault's title is its filename, which the merge doesn't see.
+      content = stringifyFrontmatter(merged.content, { title: row.title, ...merged.data });
     } else {
       // path-collision: read disk for baseHash but still rewrite from vault.
       if (row.rowKind === "path-collision") {
         const currentRaw = await readSourceFile(row.targetPath, fetchFn);
         baseHash = await hashContent(currentRaw);
       }
-      // create/path-collision: new entities always default to dm-only unless
-      // the DM explicitly approved a secrecy-increase row (Phase 2 populates needsReview).
-      const safeVisibility =
-        row.needsReview?.reason === "secrecy-increase" ? row.resolvedVisibility : "dm";
+      // create/path-collision: the visibility Staging showed (the note's tag,
+      // else the vault folder rule; see stagingState).
       content = rewriteFrontmatter(row.rawContent, {
+        title: row.title,
         id: row.resolvedId,
         type: row.inferredType,
-        visibility: safeVisibility,
+        visibility: row.resolvedVisibility,
         tagsAdd: row.inferredType ? [row.inferredType] : [],
       });
     }
@@ -100,4 +104,24 @@ export async function buildImportChanges(
     changes.push({ path: row.targetPath, content, kind: "entity-md", baseHash });
   }
   return changes;
+}
+
+/**
+ * The Save endpoint refuses a create whose target already exists (409). Check
+ * that up front, so nothing else (image copies) runs for a commit that will be
+ * refused.
+ */
+export async function assertCreateTargetsFree(
+  changes: FileChange[],
+  fetchFn: typeof fetch,
+): Promise<void> {
+  for (const c of changes) {
+    if (c.baseHash !== null) continue;
+    const res = await fetchFn(`/__atlas/read?path=${encodeURIComponent(c.path)}`, {
+      method: "GET",
+    });
+    if (res.status === 404) continue;
+    if (res.ok) throw new ConflictError("already-exists", c.path);
+    throw new ImportCommitError(`Failed to read ${c.path}: status ${res.status}`, c.path);
+  }
 }

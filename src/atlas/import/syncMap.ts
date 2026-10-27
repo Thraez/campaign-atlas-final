@@ -67,6 +67,14 @@ export function hasLocalEdits(map: SyncMap, relPath: string, currentFileHash: st
 }
 
 /** Return a new SyncMap with the given entry added or updated (pure — does not mutate the original). */
+/** Re-key a note's entry after it moved in the vault; the entry itself is unchanged. */
+export function moveSyncEntry(map: SyncMap, fromPath: string, toPath: string): SyncMap {
+  const entry = map[fromPath];
+  if (!entry) return map;
+  const { [fromPath]: _moved, ...rest } = map;
+  return { ...rest, [toPath]: entry };
+}
+
 export function recordSync(
   map: SyncMap,
   relPath: string,

@@ -36,6 +36,9 @@ import { stripSecretMarkers } from "./atlas/stripSecretMarkers";
 import { buildEntitySecrets } from "./atlas/buildSecrets";
 import yaml from "js-yaml";
 import { PLAYER_VISIBLE } from "./atlas/visibility";
+import { deriveTitle, isSecretNote, resolveVisibility } from "./atlas/noteIdentity";
+
+export { deriveTitle };
 import { isLit } from "../src/atlas/fog/effectiveLit";
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
 import { filterSoundscapeForPlayer } from "./atlas/filterSoundscape";
@@ -230,15 +233,6 @@ function globToRegExp(glob: string): RegExp {
   return new RegExp(`^${escaped}$`);
 }
 
-export function deriveTitle(file: string, fmTitle?: unknown): string {
-  if (typeof fmTitle === "string" && fmTitle.trim()) return fmTitle.trim();
-  return path
-    .basename(file, ".md")
-    .replace(/[-_]+/g, " ")
-    .trim()
-    .replace(/(^|\s)(\p{L})/gu, (_m, sp, ch) => sp + ch.toUpperCase());
-}
-
 function relImage(p: string): string {
   // Normalize "assets/..." paths to public output
   return p.replace(/^\/+/, "");
@@ -426,10 +420,8 @@ async function runBuildCore(flags: BuildFlags) {
     }
     slugSeen.set(id, rel);
 
-    // ADR-0001: no visibility means dm. Only an explicit tag, or the legacy
-    // `publish: true`, ships a note.
-    const visibility = parsed.atlas.visibility ?? (parsed.atlas.publish === true ? "player" : "dm");
-    const isSecret = !PLAYER_VISIBLE.has(visibility) || parsed.atlas.publish === false;
+    const visibility = resolveVisibility(parsed.atlas);
+    const isSecret = isSecretNote(parsed.atlas);
     allParsed.push({ file, rel, parsed, title, id, visibility, isSecret });
   }
 
