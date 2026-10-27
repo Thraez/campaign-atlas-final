@@ -1,6 +1,6 @@
 # One Note reading module for id, title, type and visibility
 
-Status: ready-for-agent (built, awaiting review)
+Status: in-review (review pending)
 Blocked by: 01, 02, 04
 Area: build, Sync, safety scans
 
@@ -61,9 +61,19 @@ Deepening: one browser-safe `readNote(raw, relPath)` plus one content-folder sca
     then `lore`, and commit writes the guess.
   - An untagged note from a public vault folder (`01_Lore`, `02_Regions`): Staging shows the
     folder default `player` and commit writes it; until commit the build reads it as dm.
-- Side-by-side against main (45 inputs): one looser result. A closing fence with trailing spaces
-  (`---  `) was dm in Staging and merge on main (their parser wanted a bare `---`) and is now
-  read like the build, which already accepted it on main. Build output is unchanged.
+- 2026-10-28, agent (Opus), after the second safety review: fixed a second leak. gray-matter
+  (main's build) opens frontmatter on any first line starting with `---` (`--- `, `---yaml`) and
+  runs an unclosed block to the end of the file; the branch's parser saw "no frontmatter" there,
+  so the note lost its title, aliases and `atlas.id` and a player `[[Real Name]]` link to it was
+  neither resolved nor redacted. Now a first line starting with `---` must be a clean fence and
+  must be closed, or the note fails to parse, and the build and the derived scan stop naming the
+  file, in every folder. Tests: `src/test/frontmatter-fail-closed.test.ts` (the review repro
+  through the player build and the derived scan, each broken form in `notes/`, `_dm/` and
+  `_drafts/`, and a gray-matter parity sweep: same keys or a parse error).
+- Side-by-side against main (49 inputs): two looser results, both a fence with trailing spaces
+  (`---  ` closing, `--- ` opening). Staging and merge said dm on main (their parser wanted a bare
+  `---`); they now read it like the build, which already accepted it on main. Build output is
+  unchanged.
 - Left as they are:
   - The derived scan treats every `_drafts/` note as secret, so a draft that shares a name with a
     player note can give a false positive. Safe side; rename or tag around it.

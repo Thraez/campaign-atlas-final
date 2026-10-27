@@ -23,8 +23,8 @@ export interface ParsedFrontmatter {
   content: string;
 }
 
-const OPEN_FENCE_RE = /^---\r?\n/;
-const CLEAN_CLOSE_RE = /^---[ \t]*$/;
+/** A clean fence line: `---` plus optional spaces or tabs. */
+const CLEAN_FENCE_RE = /^---[ \t]*$/;
 
 /**
  * Parse a string with optional YAML frontmatter. Returns the parsed data
@@ -32,32 +32,46 @@ const CLEAN_CLOSE_RE = /^---[ \t]*$/;
  * exactly as it appears after the closing fence (no leading-newline trim,
  * matching gray-matter).
  *
- * The frontmatter ends at the first line that starts with `---`, as in
- * gray-matter. That line must be a clean fence (`---` plus optional spaces):
- * anything else (`---x: 1`, `----`) throws instead of being read past, which
- * could pick up keys gray-matter never saw, such as a stray
- * `atlas.visibility: player` (code-retro 06). No closing fence means no
- * frontmatter.
+ * Fail closed against gray-matter (code-retro 06): anything gray-matter would
+ * read as frontmatter is either read the same way here or throws, never
+ * comes back as "no frontmatter". gray-matter opens on any first line that
+ * starts with `---` (`--- `, `---yaml`), ends at the next line that starts
+ * with `---`, and runs to the end of the file when there is none. So:
+ *
+ *   - a first line starting with `---` must be a clean fence (`---` plus
+ *     optional spaces or tabs), else it throws;
+ *   - the first later line starting with `---` must also be clean, else it
+ *     throws (reading past `---x: 1` could pick up keys gray-matter never
+ *     saw, such as a stray `atlas.visibility: player`);
+ *   - an opening fence with no closing fence throws.
  *
  * Throws on malformed YAML or a malformed fence — callers that need
- * tolerance should wrap. `readNote` turns a throw into `dm`.
+ * tolerance should wrap. `readNote` turns a throw into `dm`, and the build
+ * stops on it.
  */
 export function parseFrontmatter(raw: string): ParsedFrontmatter {
   // Strip a leading BOM so `---` matches at column 0.
   const stripped = raw.replace(/^\uFEFF/, "");
-  const open = stripped.match(OPEN_FENCE_RE);
-  if (!open) return { data: {}, content: stripped };
+  if (!stripped.startsWith("---")) return { data: {}, content: stripped };
 
-  let lineStart = open[0].length;
+  const firstNl = stripped.indexOf("\n");
+  const firstLine = (firstNl === -1 ? stripped : stripped.slice(0, firstNl)).replace(/\r$/, "");
+  if (!CLEAN_FENCE_RE.test(firstLine)) {
+    throw new Error(`frontmatter fence "${firstLine}" is not a clean opening "---"`);
+  }
+  if (firstNl === -1) throw new Error("frontmatter opening fence has no closing fence");
+
+  const yamlStart = firstNl + 1;
+  let lineStart = yamlStart;
   while (lineStart < stripped.length) {
     const nl = stripped.indexOf("\n", lineStart);
     const lineEnd = nl === -1 ? stripped.length : nl;
     const line = stripped.slice(lineStart, lineEnd).replace(/\r$/, "");
     if (line.startsWith("---")) {
-      if (!CLEAN_CLOSE_RE.test(line)) {
+      if (!CLEAN_FENCE_RE.test(line)) {
         throw new Error(`frontmatter fence "${line}" is not a clean closing "---"`);
       }
-      const parsed = yaml.load(stripped.slice(open[0].length, lineStart));
+      const parsed = yaml.load(stripped.slice(yamlStart, lineStart));
       const data =
         parsed && typeof parsed === "object" && !Array.isArray(parsed)
           ? (parsed as Record<string, unknown>)
@@ -68,7 +82,7 @@ export function parseFrontmatter(raw: string): ParsedFrontmatter {
     if (nl === -1) break;
     lineStart = nl + 1;
   }
-  return { data: {}, content: stripped };
+  throw new Error("frontmatter opening fence has no closing fence");
 }
 
 /**
