@@ -5,12 +5,12 @@
  * the same entity `.md` files:
  *
  *   1. Pin placements (Pins tab) — `atlas.placements[]`.
- *   2. Frontmatter edits (Entities tab) — visibility, summary, aliases,
- *      images, profile, relationships, type.
+ *   2. Frontmatter drafts — visibility, summary, aliases, images, profile,
+ *      relationships, type. The placement editor always passes none
+ *      (entity edits go through EntityEditPanel); this stream is pending
+ *      removal (eval-2026-10/18).
  *
- * Previously only stream 1 went through the unified Save; stream 2 could
- * only leave the editor via an "Export Patch" download the DM had to apply
- * by hand. This module closes that gap so a single Save writes everything.
+ * A single Save writes both streams.
  *
  * Correctness requirement: an entity can be edited in BOTH streams in one
  * session. The /__atlas/save endpoint rejects a batch with two entries for
@@ -35,9 +35,8 @@ import {
 } from "./canonicalPlacementSave";
 
 /**
- * Per-entity frontmatter draft, keyed by entity id in the editor. Mirrors
- * the fields the Entities tab can edit. Shared between the tab (which is now
- * a controlled component) and the save builder so the shape can't drift.
+ * Per-entity frontmatter draft, keyed by entity id: the atlas fields a
+ * frontmatter edit can carry into the unified Save.
  */
 export interface FrontmatterDraft {
   visibility?: EntityVisibility;
@@ -52,9 +51,8 @@ export interface FrontmatterDraft {
 /**
  * Derive the canonical `EntityFrontmatterPatch[]` from the editor's draft
  * map. Each patch carries the FULL desired `atlas:` block (drafted value or
- * the entity's current value as fallback) — identical to the logic the
- * Entities tab used for its now-removed export, kept here as the single
- * source of truth.
+ * the entity's current value as fallback). Single source of truth for that
+ * merge.
  */
 export function entityFrontmatterPatches(
   drafts: Record<string, FrontmatterDraft>,
@@ -93,9 +91,9 @@ function mergeFrontmatterFields(
   const atlas: Record<string, unknown> = {
     ...((data.atlas as Record<string, unknown>) ?? {}),
   };
-  // Same strip rule as buildEntityFrontmatterPatch: omit undefined and empty
-  // arrays so we don't write noise. `atlas.placements` is never a patch key,
-  // so any placement merge applied earlier is preserved by the spread above.
+  // Omit undefined values and empty arrays so we don't write noise.
+  // `atlas.placements` is never a patch key, so any placement merge applied
+  // earlier is preserved by the spread above.
   for (const [k, v] of Object.entries(patch.atlas)) {
     if (v !== undefined && !(Array.isArray(v) && v.length === 0)) atlas[k] = v;
   }
@@ -107,7 +105,7 @@ function mergeFrontmatterFields(
 export interface BuildCanonicalEntityChangesInput {
   /** Pin placement drafts (Pins tab). */
   placements: PlacementDraft[];
-  /** Frontmatter patches (Entities tab), via {@link entityFrontmatterPatches}. */
+  /** Frontmatter patches, via {@link entityFrontmatterPatches}. */
   frontmatter: EntityFrontmatterPatch[];
 }
 
