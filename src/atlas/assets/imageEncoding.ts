@@ -32,6 +32,26 @@ export const REENCODE_QUALITY = 85;
  */
 export const MAX_IMAGE_WIDTH = 1600;
 
+/**
+ * Sharp WebP options for a map. Maps are never lossy re-encoded: fog redaction
+ * and map labels both smear under a lossy encode. `maps:optimize`
+ * (scripts/dev/optimize-maps.ts) and the save pipeline's map branch
+ * (scripts/vite-plugin-atlas-save.ts) both encode with exactly this. Maps are
+ * never resized either; MAX_IMAGE_WIDTH is for portraits, not cartography.
+ */
+export const MAP_WEBP_OPTIONS = { lossless: true } as const;
+
+/**
+ * Whether `maps:optimize` turns a map of this format into a lossless WebP twin.
+ *
+ * Only PNG. A JPG map is already lossy: re-encoding it lossy adds a second
+ * generation of loss, and re-encoding it lossless only makes it bigger, so it
+ * is published as is.
+ */
+export function shouldConvertMapToWebp(mimeOrExt: string): boolean {
+  return normalizeFormat(mimeOrExt) === "png";
+}
+
 /** Formats worth converting: lossless/legacy stills that WebP shrinks hard. */
 const CONVERTIBLE = new Set(["png", "jpeg", "jpg"]);
 

@@ -1342,7 +1342,7 @@ const MAX_ASSET_BINARY_BYTES = 6 * 1024 * 1024;
 // The client names the target before the batch is built, so the *name* is the
 // instruction: a `.webp` target under assets/images/ means "encode WebP".
 // Maps are named `.png` and are deliberately untouched — fog redaction and
-// map text both want lossless, and optimize-maps.mjs owns that pipeline.
+// map text both want lossless, and optimize-maps.ts owns that pipeline.
 describe("editor image add publishes WebP", () => {
   const dataUrl = (buf: Buffer, mime: string) => `data:${mime};base64,${buf.toString("base64")}`;
 
@@ -1393,6 +1393,27 @@ describe("editor image add publishes WebP", () => {
     const r = await save(target, await makePng(2400, 600), "image/png");
     expect(r.status).toBe(200);
     expect((await metaOf(target)).width).toBe(2400);
+  });
+
+  it("encodes a WebP map target as lossless WebP, never lossy", async () => {
+    // Same settings as maps:optimize (MAP_WEBP_OPTIONS). Noise, because a flat
+    // fill survives even a lossy encode unchanged.
+    const w = 48;
+    const h = 32;
+    const raw = Buffer.alloc(w * h * 3);
+    for (let i = 0; i < raw.length; i++) raw[i] = (i * 7919) % 251;
+    const png = await sharp(raw, { raw: { width: w, height: h, channels: 3 } })
+      .png()
+      .toBuffer();
+    const target = "public/atlas/assets/maps/region.webp";
+    const r = await save(target, png, "image/png");
+    expect(r.status).toBe(200);
+    expect((await metaOf(target)).format).toBe("webp");
+    const out = await sharp(fs.readFileSync(path.join(tmp, target)))
+      .removeAlpha()
+      .raw()
+      .toBuffer();
+    expect(out.equals(raw)).toBe(true);
   });
 
   it("leaves a map PNG lossless — maps are not part of the WebP policy", async () => {

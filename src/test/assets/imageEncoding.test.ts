@@ -7,7 +7,23 @@ import {
   REENCODE_QUALITY,
   WEBP_QUALITY,
   MAX_IMAGE_WIDTH,
+  MAP_WEBP_OPTIONS,
+  shouldConvertMapToWebp,
 } from "@/atlas/assets/imageEncoding";
+
+describe("map encoding", () => {
+  it("is lossless — maps are never lossy re-encoded", () => {
+    expect(MAP_WEBP_OPTIONS).toEqual({ lossless: true });
+  });
+
+  it("converts PNG maps only; a JPG map is published as is", () => {
+    expect(shouldConvertMapToWebp(".png")).toBe(true);
+    expect(shouldConvertMapToWebp("image/png")).toBe(true);
+    expect(shouldConvertMapToWebp(".jpg")).toBe(false);
+    expect(shouldConvertMapToWebp("jpeg")).toBe(false);
+    expect(shouldConvertMapToWebp(".webp")).toBe(false);
+  });
+});
 
 /**
  * The single source of truth for "what format does a published image take".

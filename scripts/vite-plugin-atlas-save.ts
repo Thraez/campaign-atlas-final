@@ -72,6 +72,7 @@ import {
   REENCODE_QUALITY,
   WEBP_QUALITY,
   MAX_IMAGE_WIDTH,
+  MAP_WEBP_OPTIONS,
 } from "../src/atlas/assets/imageEncoding";
 import { runBuild, type BuildResult as InProcessBuildResult } from "./build-atlas";
 import { tryAcquireBuildLock, releaseBuildLock } from "./atlas/buildLock";
@@ -88,11 +89,17 @@ const MAX_ASSET_BINARY_BYTES = 6 * 1024 * 1024;
  *
  * Scoped to `assets/images/` on purpose. Maps live under `assets/maps/` and
  * stay lossless — fog redaction and map labels both suffer under a lossy
- * re-encode, and `scripts/dev/optimize-maps.mjs` owns their sizing instead.
+ * re-encode, and `scripts/dev/optimize-maps.ts` owns their sizing instead.
  */
 function isConvertibleImageTarget(relPath: string): boolean {
   const p = relPath.replace(/\\/g, "/").toLowerCase();
   return p.includes("/assets/images/") && p.endsWith(".webp");
+}
+
+/** A map saved under a `.webp` name: encoded with MAP_WEBP_OPTIONS (lossless). */
+function isMapWebpTarget(relPath: string): boolean {
+  const p = relPath.replace(/\\/g, "/").toLowerCase();
+  return p.includes("/assets/maps/") && p.endsWith(".webp");
 }
 
 const BUILD_TIMEOUT_MS = 60_000;
@@ -391,6 +398,10 @@ async function cleanImageBytes(buf: Buffer, source: string, target: string): Pro
         .webp({ quality: WEBP_QUALITY })
         .toBuffer()
     );
+  // A map named `.webp` (maps:optimize repoints world.yaml to a WebP twin) is
+  // encoded with the same lossless settings maps:optimize uses, never resized:
+  // fog redaction and map labels smear under a lossy encode.
+  if (isMapWebpTarget(target)) return sharp(buf).webp(MAP_WEBP_OPTIONS).toBuffer();
   // `animated: true` keeps every frame of a GIF or WebP; without it sharp
   // reads only the first and republishes an animation as a still.
   const s = sharp(buf, { animated: true });
