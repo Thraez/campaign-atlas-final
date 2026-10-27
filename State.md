@@ -1,6 +1,6 @@
 # State
 
-Updated 2026-10-27 on the Mac. Branch `main`, all commits local (not pushed).
+Updated 2026-10-27 on the Mac. Branch `main`, pushed to GitHub at `5dc85f2`.
 
 ## Where it stands
 
@@ -11,8 +11,8 @@ Updated 2026-10-27 on the Mac. Branch `main`, all commits local (not pushed).
 - The continuous-dev routine is retired; its docs are in `docs/archive/`.
 - Typecheck, lint and `npm run test:ci` pass on the Mac (3,228 tests). The strict player build and
   the secrets scans pass.
-- Live site: https://thraez.github.io/campaign-atlas-final/ (last publish 2026-10-11). The next
-  push to `main` republishes it without Corven, Edric and Soreth (ADR-0001).
+- Live site: https://thraez.github.io/campaign-atlas-final/, republished 2026-10-27 without
+  Corven, Edric and Soreth (ADR-0001). The first deploy try hit a GitHub token timeout; the re-run passed.
 
 ## Next, in order
 
@@ -24,7 +24,5 @@ Updated 2026-10-27 on the Mac. Branch `main`, all commits local (not pushed).
 
 ## Waiting on Isak
 
-- Push `main` (republishes the site) and delete `origin/auto/continuous-dev` after tagging it
-  (`audit-2026-10/06`).
 - The world's new name (`audit-2026-10/05`).
 - On the PC: follow `docs/PC-CLEANUP.md` (turn the old routines off first).
