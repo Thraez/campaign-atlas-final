@@ -4,11 +4,11 @@ import type { ParsedFrontmatter } from "./frontmatter";
 const VALID_VIS = new Set<EntityVisibility>(["player", "dm", "hidden", "rumor"]);
 const PLAYER_VISIBLE = new Set<EntityVisibility>(["player", "rumor"]);
 
-/** Effective visibility build-atlas.ts:346 would derive from a frontmatter atlas block. */
+/** Effective visibility build-atlas.ts would derive from a frontmatter atlas block (ADR-0001). */
 export function resolveEffectiveVisibility(atlas: Record<string, unknown>): EntityVisibility {
   const v = atlas.visibility;
   if (typeof v === "string" && VALID_VIS.has(v as EntityVisibility)) return v as EntityVisibility;
-  return atlas.publish === false ? "dm" : "player";
+  return atlas.publish === true ? "player" : "dm";
 }
 
 /** True iff disk is hidden-tier AND the vault copy would expose it to players. */

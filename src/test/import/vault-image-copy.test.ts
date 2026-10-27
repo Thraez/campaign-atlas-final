@@ -264,8 +264,8 @@ describe("visibility is never left to the build default", () => {
       ],
       ctx,
     );
-    // build-atlas.ts:425 defaults a missing visibility to PLAYER, so an absent
-    // key is a leak rather than a neutral state. New entities must be explicit.
+    // New entities are written with an explicit visibility, never left to the
+    // build's default (ADR-0001).
     expect(rows[0].resolvedVisibility).toBe("dm");
   });
 });

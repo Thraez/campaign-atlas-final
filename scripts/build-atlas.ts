@@ -426,8 +426,9 @@ async function runBuildCore(flags: BuildFlags) {
     }
     slugSeen.set(id, rel);
 
-    const visibility =
-      parsed.atlas.visibility ?? (parsed.atlas.publish === false ? "dm" : "player");
+    // ADR-0001: no visibility means dm. Only an explicit tag, or the legacy
+    // `publish: true`, ships a note.
+    const visibility = parsed.atlas.visibility ?? (parsed.atlas.publish === true ? "player" : "dm");
     const isSecret = !PLAYER_VISIBLE.has(visibility) || parsed.atlas.publish === false;
     allParsed.push({ file, rel, parsed, title, id, visibility, isSecret });
   }

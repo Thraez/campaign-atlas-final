@@ -501,6 +501,36 @@ import:
     expect(playerAtlas.worlds[0].credits).toEqual({ badges: false, page: true });
   });
 
+  it("SECRECY REGRESSION: a note with no visibility is dm and stays out of the player build (ADR-0001)", () => {
+    const dir = path.join(tmpRoot, "missing-visibility");
+    writeWorldVault(dir, `maps:\n  - id: m1\n    name: Main\n    width: 1000\n    height: 1000\n`);
+    fs.writeFileSync(
+      path.join(dir, "content/test-world/notes/Untagged-Npc.md"),
+      `---\ntitle: Untagged Npc\nrole: Story\n---\nNo atlas block at all.\n`,
+    );
+    fs.writeFileSync(
+      path.join(dir, "content/test-world/notes/Legacy-Published.md"),
+      `---\ntitle: Legacy Published\natlas:\n  publish: true\n---\nOld explicit publish flag.\n`,
+    );
+
+    const playerOut = path.join(tmpRoot, "missing-visibility-out");
+    const pr = run([
+      "--player",
+      "--config",
+      path.join(dir, "atlas.config.json"),
+      "--out",
+      playerOut,
+    ]);
+    expect(pr.status, pr.stderr).toBe(0);
+    const ids = (
+      JSON.parse(fs.readFileSync(path.join(playerOut, "atlas.json"), "utf8")) as {
+        entities: Array<{ id: string }>;
+      }
+    ).entities.map((e) => e.id);
+    expect(ids).not.toContain("untagged-npc");
+    expect(ids).toContain("legacy-published");
+  });
+
   it("SECRECY REGRESSION: dm-only entity credit is absent from player atlas.json", () => {
     const dir = path.join(tmpRoot, "dm-credit-secrecy");
     writeWorldVault(dir, `maps:\n  - id: m1\n    name: Main\n    width: 1000\n    height: 1000\n`);

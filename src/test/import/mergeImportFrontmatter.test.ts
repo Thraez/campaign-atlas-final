@@ -13,15 +13,15 @@ describe("resolveEffectiveVisibility (mirrors build-atlas.ts:345)", () => {
     expect(resolveEffectiveVisibility({ visibility: "hidden" })).toBe("hidden");
     expect(resolveEffectiveVisibility({ visibility: "player" })).toBe("player");
   });
-  it("defaults to player when no visibility and publish !== false", () => {
-    expect(resolveEffectiveVisibility({})).toBe("player");
-    expect(resolveEffectiveVisibility({ publish: true })).toBe("player");
-  });
-  it("defaults to dm only when publish === false", () => {
+  it("defaults to dm when no visibility (ADR-0001)", () => {
+    expect(resolveEffectiveVisibility({})).toBe("dm");
     expect(resolveEffectiveVisibility({ publish: false })).toBe("dm");
   });
-  it("ignores an invalid visibility string and falls back", () => {
-    expect(resolveEffectiveVisibility({ visibility: "bogus" })).toBe("player");
+  it("treats the legacy publish: true as player", () => {
+    expect(resolveEffectiveVisibility({ publish: true })).toBe("player");
+  });
+  it("ignores an invalid visibility string and falls back to dm", () => {
+    expect(resolveEffectiveVisibility({ visibility: "bogus" })).toBe("dm");
   });
 });
 
@@ -153,7 +153,7 @@ describe("mergeImportFrontmatter (disk-base merge)", () => {
     const r = mergeImportFrontmatter({ disk, vault, inferredType: "lore", baseType: undefined });
     const a = r.data.atlas as Record<string, unknown>;
     expect(a.summary).toBe("intro");
-    expect(a.visibility).toBe("player"); // no publish:false → defaults player
-    expect(r.exposureIncrease).toBe(false); // disk was already player-effective
+    expect(a.visibility).toBe("dm"); // no visibility anywhere → dm (ADR-0001)
+    expect(r.exposureIncrease).toBe(false); // the vault doesn't ask for exposure either
   });
 });
