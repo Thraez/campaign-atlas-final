@@ -42,8 +42,12 @@
  *
  * The save endpoint optionally rebuilds the atlas (`rebuild: true`) by
  * invoking the in-process `runBuild()` exported from `scripts/build-atlas.ts`
- * (A10). A simple in-flight mutex coalesces concurrent saves so two
+ * (A10). The shared build lock rejects an overlapping save with 423 so two
  * near-simultaneous rebuilds don't race to clobber public/atlas/atlas.json.
+ *
+ * Routes: `DEV_ROUTES` near the end of this file is the one table of
+ * endpoints; `createDevRouter` applies the loopback gate, the build lock, the
+ * body-size cap and JSON parsing once for all of them.
  */
 import type { Plugin } from "vite";
 import fs from "node:fs/promises";
@@ -71,6 +75,7 @@ import {
 } from "../src/atlas/assets/imageEncoding";
 import { runBuild, type BuildResult as InProcessBuildResult } from "./build-atlas";
 import { tryAcquireBuildLock, releaseBuildLock } from "./atlas/buildLock";
+import { DEV_API_PATHS, DEV_API_PREFIX } from "./atlas/devRoutes";
 
 const MAX_FILE_BYTES = 1024 * 1024;
 const MAX_VAULT_AGGREGATE_BYTES = 25 * 1024 * 1024;
@@ -1361,394 +1366,481 @@ async function readAllowlistedFile(
   }
 }
 
+type DevRequest = import("http").IncomingMessage;
+type DevResponse = import("http").ServerResponse;
+
 /**
- * Shared loopback gate for the write/read `/__atlas/*` middleware. If the
- * request is not an allowed dev request, write a 403 and return `true` — the
- * caller must then `return` without handling it. Returns `false` when the
- * request may proceed. This is the single place the `/__atlas/*` endpoints
- * (read, assets/images, save) reject non-loopback callers, so the gate can't
- * drift between them.
- *
- * `serveLocalAtlas` deliberately does NOT use this: on a disallowed request it
- * falls through to Vite's static serving (the *player* atlas) rather than 403,
- * to preserve the LAN player-preview workflow without leaking DM canon.
+ * Whether a request may reach a dev route: the peer dialed in over loopback
+ * AND its headers are loopback-consistent. Two independent checks, both
+ * required:
+ *   1. the peer actually dialed in over loopback (unforgeable), and
+ *   2. the headers it sent are loopback-consistent (forgeable by a script,
+ *      but a cross-origin *browser* page cannot lie about Origin).
+ * (1) stops a LAN client sending `Host: localhost`; (2) stops a malicious
+ * web page in the DM's own browser driving these endpoints via CSRF.
  */
-export function rejectNonLoopback(
-  req: import("http").IncomingMessage,
-  res: import("http").ServerResponse,
-): boolean {
-  // Two independent checks, both required:
-  //   1. the peer actually dialed in over loopback (unforgeable), and
-  //   2. the headers it sent are loopback-consistent (forgeable by a script,
-  //      but a cross-origin *browser* page cannot lie about Origin).
-  // (1) stops a LAN client sending `Host: localhost`; (2) stops a malicious
-  // web page in the DM's own browser driving these endpoints via CSRF.
-  if (
+function isAllowedDevPeer(req: DevRequest): boolean {
+  return (
     isLoopbackAddress(req.socket?.remoteAddress) &&
     isAllowedDevRequest({
       host: req.headers.host,
       origin: req.headers.origin,
       method: req.method,
     })
-  ) {
-    return false;
-  }
+  );
+}
+
+/**
+ * Shared loopback gate. If the request is not an allowed dev request, write a
+ * 403 and return `true` — the caller must then `return` without handling it.
+ * Returns `false` when the request may proceed. The route table
+ * (`createDevRouter`) calls this once for every `/__atlas/*` request, so no
+ * route can forget it.
+ *
+ * The DM overlays of player URLs (`/atlas/atlas.json`, `/atlas/search-index.json`)
+ * don't 403 on a refused request: they fall through to Vite's static serving
+ * (the *player* atlas), to keep the LAN player-preview workflow without
+ * leaking DM canon.
+ */
+export function rejectNonLoopback(req: DevRequest, res: DevResponse): boolean {
+  if (isAllowedDevPeer(req)) return false;
   res.statusCode = 403;
   res.setHeader("Content-Type", "application/json");
   res.end(JSON.stringify({ error: "Forbidden", detail: "loopback-only" }));
   return true;
 }
 
+// ── Route table ─────────────────────────────────────────────────────────────
+
+/**
+ * Request-body caps. A body over its route's cap is drained, discarded and
+ * answered 413.
+ *
+ * The save route is the big one, and nothing caps how many files one batch
+ * holds, so its cap is a ceiling against runaway requests rather than a
+ * computed fit. For scale: a vault sync scans at most MAX_VAULT_AGGREGATE_BYTES
+ * (25 MB) of notes, JSON escaping can roughly double that, and each image is a
+ * base64 data URL of up to MAX_ASSET_DATAURL_BYTES (8 MB). Vault images go
+ * through vault-image-copy, not save, so a save of ~10 or more full-size
+ * editor uploads at once is the case that would hit it.
+ */
+export const SAVE_BODY_LIMIT_BYTES = 128 * 1024 * 1024;
+/** `.local-atlas` config (the sync map grows with the vault). */
+export const LOCAL_WRITE_BODY_LIMIT_BYTES = 8 * 1024 * 1024;
+/** A vault-image-copy body is a couple of paths and a candidate-folder list. */
+export const VAULT_IMAGE_COPY_BODY_LIMIT_BYTES = 1024 * 1024;
+
+export interface DevRouteRequest {
+  url: URL;
+  /** Parsed JSON body; `undefined` for routes that don't read one. */
+  body: unknown;
+  /** Repo root (`server.config.root`). */
+  root: string;
+}
+
+export type DevRouteReply =
+  /** JSON-encode `json` and send it with `status`. */
+  | { status: number; json: unknown }
+  /** Send `text` as-is (already JSON) with `status` and extra headers. */
+  | { status: number; text: string; headers?: Record<string, string> }
+  /** Not handled here: hand the request on to Vite. */
+  | { next: true };
+
+export interface DevRoute {
+  method: "GET" | "POST" | "DELETE";
+  /** Exact URL pathname (query string ignored). */
+  path: string;
+  /** Hold the shared build lock (scripts/atlas/buildLock.ts) for the whole request; 423 if taken. */
+  takesBuildLock: boolean;
+  /**
+   * Read and JSON-parse the body, capped at `maxBytes` (413 above it). A body
+   * that isn't JSON gets 400 `{ error: "InvalidBody" }`, plus `detail` when
+   * `invalidDetail` is set. `null`: the body is never read.
+   */
+  body: { maxBytes: number; invalidDetail?: string } | null;
+  handle: (req: DevRouteRequest) => Promise<DevRouteReply>;
+}
+
+/**
+ * How a route answers a refused (non-loopback or cross-origin) request:
+ * everything under `/__atlas/` gets 403; a DM overlay of a player URL falls
+ * through to the player file.
+ */
+export function refusalPolicy(path: string): "forbid" | "player-fallthrough" {
+  return path.startsWith(DEV_API_PREFIX) ? "forbid" : "player-fallthrough";
+}
+
+/**
+ * Serves `.local-atlas/<basename of urlPath>` (the DM build, or machine-local
+ * editor config) when it exists. A missing file hands the request on to Vite,
+ * which serves the player file for `/atlas/*`.
+ */
+function localAtlasOverlay(urlPath: string): DevRoute["handle"] {
+  return async ({ root }) => {
+    const localPath = path.resolve(root, ".local-atlas", path.posix.basename(urlPath));
+    try {
+      const text = await fs.readFile(localPath, "utf8");
+      return { status: 200, text, headers: { "Cache-Control": "no-store" } };
+    } catch {
+      return { next: true };
+    }
+  };
+}
+
+function overlayRoute(urlPath: string): DevRoute {
+  return {
+    method: "GET",
+    path: urlPath,
+    takesBuildLock: false,
+    body: null,
+    handle: localAtlasOverlay(urlPath),
+  };
+}
+
+/**
+ * Every dev-server route. `createDevRouter` applies the loopback gate, the
+ * build lock, body reading and JSON replies; a handler only maps a request to
+ * a status and body.
+ */
+export const DEV_ROUTES: readonly DevRoute[] = [
+  // In dev, serve the DM build (.local-atlas/atlas.json) at /atlas/atlas.json
+  // when it exists. Without this, the editor fetches public/atlas/atlas.json
+  // — the *player* build that strips DM/hidden entities, so any DM-only
+  // entity the editor just imported is invisible to reloadCanon and to the
+  // client-side conflict-detection pass in the staging modal. When the DM
+  // file isn't there yet (fresh checkout), the request passes through to
+  // Vite's default public/ serving so the player atlas still loads.
+  overlayRoute("/atlas/atlas.json"),
+  overlayRoute("/atlas/search-index.json"),
+
+  // GET /__atlas/read?path=content/...
+  {
+    method: "GET",
+    path: DEV_API_PATHS.read,
+    takesBuildLock: false,
+    body: null,
+    handle: async ({ url, root }) => {
+      const relPath = url.searchParams.get("path") ?? "";
+      const result = await readAllowlistedFile(root, relPath);
+      return result.ok === true
+        ? { status: 200, json: { path: relPath, contents: result.contents } }
+        : { status: result.status, json: { error: result.error, path: relPath } };
+    },
+  },
+
+  // GET /__atlas/vault-scan?vaultRoot=<abs>&ignore=<glob>&ignore=<glob>
+  // Read-only walk of the DM's Obsidian vault; no write ops ever reached.
+  {
+    method: "GET",
+    path: DEV_API_PATHS.vaultScan,
+    takesBuildLock: false,
+    body: null,
+    handle: async ({ url }) => {
+      const vaultRoot = url.searchParams.get("vaultRoot") ?? "";
+      if (!vaultRoot) return { status: 400, json: { error: "MissingVaultRoot" } };
+      const ignoreGlobs = url.searchParams.getAll("ignore");
+      const includeFolders = url.searchParams.getAll("folder");
+      const result = await handleVaultScanRequest(vaultRoot, ignoreGlobs, includeFolders);
+      return result.ok
+        ? { status: 200, json: { files: result.files } }
+        : { status: result.status, json: { error: result.error } };
+    },
+  },
+
+  // GET /__atlas/vault-folders?vaultRoot=<abs>
+  // Read-only folder-summary listing so the DM can pick folders before any note is read.
+  {
+    method: "GET",
+    path: DEV_API_PATHS.vaultFolders,
+    takesBuildLock: false,
+    body: null,
+    handle: async ({ url }) => {
+      const vaultRoot = url.searchParams.get("vaultRoot") ?? "";
+      if (!vaultRoot) return { status: 400, json: { error: "MissingVaultRoot" } };
+      const result = await handleVaultFoldersRequest(vaultRoot);
+      return result.ok
+        ? { status: 200, json: { folders: result.folders } }
+        : { status: result.status, json: { error: result.error } };
+    },
+  },
+
+  // POST /__atlas/vault-image-copy
+  // Copies one vault image into public/atlas/assets/images, metadata stripped.
+  // Bytes never round-trip through the browser. `publicDir` is never accepted
+  // from the request body — always server-derived — so a request can't redirect writes.
+  {
+    method: "POST",
+    path: DEV_API_PATHS.vaultImageCopy,
+    takesBuildLock: false,
+    body: { maxBytes: VAULT_IMAGE_COPY_BODY_LIMIT_BYTES },
+    handle: async ({ body, root }) => {
+      const result = await handleVaultImageCopyRequest({
+        ...(body as VaultImageCopyArgs),
+        publicDir: path.join(root, "public"),
+      });
+      return { status: result.ok ? 200 : 400, json: result };
+    },
+  },
+
+  // GET /__atlas/local/editor-settings.json — reads .local-atlas/editor-settings.json
+  // GET /__atlas/local/sync-map.json — reads .local-atlas/sync-map.json
+  overlayRoute(DEV_API_PATHS.localEditorSettings),
+  overlayRoute(DEV_API_PATHS.localSyncMap),
+
+  // POST /__atlas/local-write { name, contents }
+  // Writes machine-local config (editor-settings.json or sync-map.json) only.
+  {
+    method: "POST",
+    path: DEV_API_PATHS.localWrite,
+    takesBuildLock: false,
+    body: { maxBytes: LOCAL_WRITE_BODY_LIMIT_BYTES },
+    handle: async ({ body, root }) => {
+      const b = body as { name?: unknown; contents?: unknown };
+      const name = typeof b.name === "string" ? b.name : "";
+      const contents = typeof b.contents === "string" ? b.contents : "";
+      const result = await handleLocalWriteRequest(name, contents, root);
+      return { status: result.ok ? 200 : result.status, json: result };
+    },
+  },
+
+  // GET /__atlas/assets/images — list of image filenames in public/atlas/assets/images/
+  {
+    method: "GET",
+    path: DEV_API_PATHS.assetsImages,
+    takesBuildLock: false,
+    body: null,
+    handle: async ({ root }) => {
+      const result = await handleAssetsImagesRequest(root);
+      return result.status === 200
+        ? { status: 200, json: { images: result.images } }
+        : { status: result.status, json: { error: result.error } };
+    },
+  },
+
+  // DELETE /__atlas/assets/images?name=<filename> — remove an image from the library.
+  // Deliberately not under the build lock: it would block the image picker
+  // during long rebuilds, and racing a save of the same image is benign.
+  {
+    method: "DELETE",
+    path: DEV_API_PATHS.assetsImages,
+    takesBuildLock: false,
+    body: null,
+    handle: async ({ url, root }) => {
+      const name = url.searchParams.get("name") ?? "";
+      const result = await handleDeleteImageRequest(root, name);
+      return { status: result.status, json: result };
+    },
+  },
+
+  // POST /__atlas/save  { files, rebuild?: boolean }
+  // A11: overlapping saves/builds are rejected with 423 Locked (D4: shared lock)
+  // so two builds never race to write public/atlas/atlas.json.
+  {
+    method: "POST",
+    path: DEV_API_PATHS.save,
+    takesBuildLock: true,
+    body: { maxBytes: SAVE_BODY_LIMIT_BYTES, invalidDetail: "request body is not JSON" },
+    handle: async ({ body, root }) => {
+      const rebuild = !!(body as { rebuild?: boolean } | null)?.rebuild;
+      const result = await handleSaveRequest(body, root, {
+        afterWrite: rebuild ? async () => runAtlasBuild(root) : undefined,
+        readPublishedAt: rebuild ? () => readAtlasPublishedAt(root) : undefined,
+      });
+      return { status: result.status, json: result.payload };
+    },
+  },
+
+  // POST /__atlas/publish-push — re-verify green → scoped commit → push → snapshot.
+  // Returns PublishPushResult as JSON with statusCode 200; 500 for unexpected throws.
+  // ⚠️ This endpoint pushes to main — never fire it against the real repo during tests.
+  {
+    method: "POST",
+    path: DEV_API_PATHS.publishPush,
+    takesBuildLock: true,
+    body: null,
+    handle: async ({ root }) => {
+      try {
+        const { runPublishPush } = await import("./atlas/runPublishPush");
+        return { status: 200, json: await runPublishPush(root) };
+      } catch (e) {
+        return {
+          status: 500,
+          json: { error: "PublishPushFailed", detail: e instanceof Error ? e.message : String(e) },
+        };
+      }
+    },
+  },
+
+  // POST /__atlas/publish-check — player build + site build + scans → verdict + diff (no git).
+  {
+    method: "POST",
+    path: DEV_API_PATHS.publishCheck,
+    takesBuildLock: true,
+    body: null,
+    handle: async ({ root }) => {
+      try {
+        // Dynamic import: breaks the static analysis chain so esbuild
+        // doesn't try to bundle the scan scripts (which have shebangs)
+        // when loading vite.config.ts for a player build.
+        const { runPublishCheck } = await import("./atlas/runPublishCheck");
+        return { status: 200, json: await runPublishCheck(root) };
+      } catch (e) {
+        return {
+          status: 500,
+          json: { error: "PublishCheckFailed", detail: e instanceof Error ? e.message : String(e) },
+        };
+      }
+    },
+  },
+];
+
+function sendJson(res: DevResponse, status: number, payload: unknown): void {
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json");
+  res.end(JSON.stringify(payload));
+}
+
+type BodyRead = { kind: "ok"; text: string } | { kind: "too-large" } | { kind: "aborted" };
+
+/**
+ * Reads the request body up to `maxBytes`. Stops reading as soon as the
+ * declared Content-Length or the bytes received pass the cap.
+ */
+function readBody(req: DevRequest, maxBytes: number): Promise<BodyRead> {
+  const declared = Number(req.headers["content-length"]);
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    return Promise.resolve({ kind: "too-large" });
+  }
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    let received = 0;
+    let settled = false;
+    const finish = (result: BodyRead) => {
+      if (settled) return;
+      settled = true;
+      req.off("data", onData);
+      req.off("end", onEnd);
+      req.off("error", onError);
+      resolve(result);
+    };
+    const onData = (chunk: Buffer | string) => {
+      const buf = typeof chunk === "string" ? Buffer.from(chunk, "utf8") : chunk;
+      received += buf.length;
+      if (received > maxBytes) {
+        req.pause();
+        finish({ kind: "too-large" });
+        return;
+      }
+      chunks.push(buf);
+    };
+    const onEnd = () => finish({ kind: "ok", text: Buffer.concat(chunks).toString("utf8") });
+    const onError = () => finish({ kind: "aborted" });
+    req.on("data", onData);
+    req.on("end", onEnd);
+    req.on("error", onError);
+  });
+}
+
+async function runRoute(
+  route: DevRoute,
+  url: URL,
+  root: string,
+  req: DevRequest,
+  res: DevResponse,
+  next: () => void,
+): Promise<void> {
+  if (route.takesBuildLock && !tryAcquireBuildLock()) {
+    sendJson(res, 423, { error: "Locked", detail: "another build is in flight" });
+    return;
+  }
+  try {
+    let body: unknown;
+    if (route.body) {
+      const read = await readBody(req, route.body.maxBytes);
+      if (read.kind === "aborted") return; // client went away; nobody to answer
+      if (read.kind === "too-large") {
+        // Drain the rest of the upload before answering: a browser that is
+        // still sending when the socket closes reports "Failed to fetch"
+        // instead of the 413. The bytes are discarded, and it's loopback.
+        if (!req.readableEnded) {
+          await new Promise<void>((resolve) => {
+            req.once("end", resolve);
+            req.once("close", resolve);
+            req.once("error", resolve);
+            req.resume();
+          });
+        }
+        res.setHeader("Connection", "close");
+        sendJson(res, 413, {
+          error: "PayloadTooLarge",
+          detail: `request body exceeds ${route.body.maxBytes} bytes`,
+        });
+        return;
+      }
+      try {
+        body = JSON.parse(read.text);
+      } catch {
+        const detail = route.body.invalidDetail;
+        sendJson(res, 400, detail ? { error: "InvalidBody", detail } : { error: "InvalidBody" });
+        return;
+      }
+    }
+    const reply = await route.handle({ url, body, root });
+    if ("next" in reply) {
+      next();
+      return;
+    }
+    res.statusCode = reply.status;
+    res.setHeader("Content-Type", "application/json");
+    if ("text" in reply) {
+      for (const [k, v] of Object.entries(reply.headers ?? {})) res.setHeader(k, v);
+      res.end(reply.text);
+    } else {
+      res.end(JSON.stringify(reply.json));
+    }
+  } catch (e) {
+    if (!res.headersSent) {
+      sendJson(res, 500, {
+        error: "InternalError",
+        detail: e instanceof Error ? e.message : String(e),
+      });
+    }
+  } finally {
+    if (route.takesBuildLock) releaseBuildLock();
+  }
+}
+
+/**
+ * One connect middleware for a route table. For a request whose pathname is
+ * under `/__atlas/` or matches a route:
+ *   1. the loopback gate runs first, whatever the method (403, or fall-through
+ *      for a DM overlay of a player URL);
+ *   2. no route for this method → hand on to Vite;
+ *   3. the build lock, body cap and JSON parse, then the handler.
+ */
+export function createDevRouter(
+  routes: readonly DevRoute[],
+  root: string,
+): (req: DevRequest, res: DevResponse, next: () => void) => void {
+  return (req, res, next) => {
+    const url = new URL(req.url ?? "/", "http://localhost");
+    const onPath = routes.filter((r) => r.path === url.pathname);
+    const refusal = refusalPolicy(url.pathname);
+    if (refusal === "player-fallthrough" && onPath.length === 0) return next();
+    if (refusal === "player-fallthrough" && !isAllowedDevPeer(req)) return next(); // player file, not DM data
+    if (rejectNonLoopback(req, res)) return;
+    const route = onPath.find((r) => r.method === req.method);
+    if (!route) return next();
+    void runRoute(route, url, root, req, res, next);
+  };
+}
+
 export function atlasSavePlugin(): Plugin {
-  // A11: a save is in flight or it isn't. Rather than coalescing concurrent
-  // saves (the previous behaviour), reject overlapping requests with 423
-  // Locked so the UI can lock its Save button + chip and the next click
-  // either waits or surfaces a clear "already saving" toast. Two builds
-  // racing to write public/atlas/atlas.json was previously prevented by
-  // the coalesce; we still need that guarantee here.
-  //
-  // Scope: this mutex covers POST /__atlas/save only. A DELETE /__atlas/assets/images
-  // racing a save of the same image is theoretically possible but benign in
-  // practice — both ops succeed or the later one wins. The mutex is not
-  // extended to DELETE to avoid blocking the image picker during long rebuilds.
   return {
     name: "atlas-save",
     apply: "serve",
     configureServer(server) {
-      // In dev, serve the DM build (.local-atlas/atlas.json) at /atlas/atlas.json
-      // when it exists. Without this, the editor fetches public/atlas/atlas.json
-      // — the *player* build that strips DM/hidden entities, so any DM-only
-      // entity the editor just imported is invisible to reloadCanon and to the
-      // client-side conflict-detection pass in the staging modal. When the DM
-      // file isn't there yet (fresh checkout), the middleware passes the
-      // request through to Vite's default public/ serving so the player atlas
-      // still loads.
-      const repoRoot = server.config.root;
-      const serveLocalAtlas =
-        (publicRelPath: string) =>
-        (
-          req: import("http").IncomingMessage,
-          res: import("http").ServerResponse,
-          next: () => void,
-        ) => {
-          if (req.method !== "GET") return next();
-          const url = new URL(req.url ?? "/", "http://localhost");
-          if (url.pathname !== publicRelPath) return next();
-          // .local-atlas/atlas.json holds the DM build (hidden entities
-          // visible). Gate it the same way as /__atlas/* so a LAN attacker
-          // or cross-origin fetch can't pull DM canon by hitting this URL.
-          if (
-            !isLoopbackAddress(req.socket?.remoteAddress) ||
-            !isAllowedDevRequest({
-              host: req.headers.host,
-              origin: req.headers.origin,
-              method: req.method,
-            })
-          ) {
-            // Fall through to Vite's static serving (public/atlas/atlas.json,
-            // the *player* build) rather than 403 — preserves the player
-            // preview workflow over LAN without leaking DM canon.
-            return next();
-          }
-          const localPath = path.resolve(
-            repoRoot,
-            ".local-atlas",
-            path.posix.basename(publicRelPath),
-          );
-          fs.readFile(localPath, "utf8").then(
-            (body) => {
-              res.statusCode = 200;
-              res.setHeader("Content-Type", "application/json");
-              res.setHeader("Cache-Control", "no-store");
-              res.end(body);
-            },
-            () => next(),
-          );
-        };
-      server.middlewares.use(serveLocalAtlas("/atlas/atlas.json"));
-      server.middlewares.use(serveLocalAtlas("/atlas/search-index.json"));
-
-      // GET /__atlas/read?path=content/...
-      server.middlewares.use("/__atlas/read", (req, res, next) => {
-        if (req.method !== "GET") return next();
-        if (rejectNonLoopback(req, res)) return;
-        const url = new URL(req.url ?? "/", "http://localhost");
-        const relPath = url.searchParams.get("path") ?? "";
-        readAllowlistedFile(server.config.root, relPath).then((result) => {
-          res.setHeader("Content-Type", "application/json");
-          if (result.ok === true) {
-            res.statusCode = 200;
-            res.end(JSON.stringify({ path: relPath, contents: result.contents }));
-          } else {
-            res.statusCode = result.status;
-            res.end(JSON.stringify({ error: result.error, path: relPath }));
-          }
-        });
-      });
-
-      // GET /__atlas/vault-scan?vaultRoot=<abs>&ignore=<glob>&ignore=<glob>
-      // Read-only walk of the DM's Obsidian vault; no write ops ever reached.
-      server.middlewares.use("/__atlas/vault-scan", (req, res, next) => {
-        if (req.method !== "GET") return next();
-        if (rejectNonLoopback(req, res)) return;
-        const url = new URL(req.url ?? "/", "http://localhost");
-        const vaultRoot = url.searchParams.get("vaultRoot") ?? "";
-        const ignoreGlobs = url.searchParams.getAll("ignore");
-        const includeFolders = url.searchParams.getAll("folder");
-        if (!vaultRoot) {
-          res.statusCode = 400;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "MissingVaultRoot" }));
-          return;
-        }
-        handleVaultScanRequest(vaultRoot, ignoreGlobs, includeFolders).then((result) => {
-          res.setHeader("Content-Type", "application/json");
-          if (result.ok) {
-            res.statusCode = 200;
-            res.end(JSON.stringify({ files: result.files }));
-          } else {
-            res.statusCode = result.status;
-            res.end(JSON.stringify({ error: result.error }));
-          }
-        });
-      });
-
-      // GET /__atlas/vault-folders?vaultRoot=<abs>
-      // Read-only folder-summary listing so the DM can pick folders before any note is read.
-      server.middlewares.use("/__atlas/vault-folders", (req, res, next) => {
-        if (req.method !== "GET") return next();
-        if (rejectNonLoopback(req, res)) return;
-        const url = new URL(req.url ?? "/", "http://localhost");
-        const vaultRoot = url.searchParams.get("vaultRoot") ?? "";
-        if (!vaultRoot) {
-          res.statusCode = 400;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "MissingVaultRoot" }));
-          return;
-        }
-        handleVaultFoldersRequest(vaultRoot).then((result) => {
-          res.setHeader("Content-Type", "application/json");
-          if (result.ok) {
-            res.statusCode = 200;
-            res.end(JSON.stringify({ folders: result.folders }));
-          } else {
-            res.statusCode = result.status;
-            res.end(JSON.stringify({ error: result.error }));
-          }
-        });
-      });
-
-      // POST /__atlas/vault-image-copy
-      // Copies one vault image into public/atlas/assets/images, metadata stripped.
-      // Bytes never round-trip through the browser. `publicDir` is never accepted
-      // from the request body — always server-derived — so a request can't redirect writes.
-      server.middlewares.use("/__atlas/vault-image-copy", (req, res, next) => {
-        if (req.method !== "POST") return next();
-        if (rejectNonLoopback(req, res)) return;
-        let raw = "";
-        req.setEncoding("utf8");
-        req.on("data", (chunk: string) => {
-          raw += chunk;
-        });
-        req.on("end", async () => {
-          let body: Record<string, unknown>;
-          try {
-            body = JSON.parse(raw) as Record<string, unknown>;
-          } catch {
-            res.statusCode = 400;
-            res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify({ error: "InvalidBody" }));
-            return;
-          }
-          const result = await handleVaultImageCopyRequest({
-            ...(body as unknown as VaultImageCopyArgs),
-            publicDir: path.join(server.config.root, "public"),
-          });
-          res.statusCode = result.ok ? 200 : 400;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify(result));
-        });
-      });
-
-      // GET /__atlas/local/editor-settings.json — reads .local-atlas/editor-settings.json
-      // GET /__atlas/local/sync-map.json — reads .local-atlas/sync-map.json
-      server.middlewares.use(serveLocalAtlas("/__atlas/local/editor-settings.json"));
-      server.middlewares.use(serveLocalAtlas("/__atlas/local/sync-map.json"));
-
-      // POST /__atlas/local-write { name, contents }
-      // Writes machine-local config (editor-settings.json or sync-map.json) only.
-      server.middlewares.use("/__atlas/local-write", (req, res, next) => {
-        if (req.method !== "POST") return next();
-        if (rejectNonLoopback(req, res)) return;
-        let raw = "";
-        req.setEncoding("utf8");
-        req.on("data", (chunk: string) => {
-          raw += chunk;
-        });
-        req.on("end", async () => {
-          let body: { name?: unknown; contents?: unknown };
-          try {
-            body = JSON.parse(raw) as { name?: unknown; contents?: unknown };
-          } catch {
-            res.statusCode = 400;
-            res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify({ error: "InvalidBody" }));
-            return;
-          }
-          const name = typeof body.name === "string" ? body.name : "";
-          const contents = typeof body.contents === "string" ? body.contents : "";
-          const result = await handleLocalWriteRequest(name, contents, server.config.root);
-          res.statusCode = result.ok ? 200 : (result as { ok: false; status: number }).status;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify(result));
-        });
-      });
-
-      // GET /__atlas/assets/images — list of image filenames in public/atlas/assets/images/
-      // DELETE /__atlas/assets/images?name=<filename> — remove an image from the library
-      server.middlewares.use("/__atlas/assets/images", (req, res, next) => {
-        if (req.method !== "GET" && req.method !== "DELETE") return next();
-        if (rejectNonLoopback(req, res)) return;
-        if (req.method === "GET") {
-          handleAssetsImagesRequest(server.config.root).then((result) => {
-            res.statusCode = result.status;
-            res.setHeader("Content-Type", "application/json");
-            if (result.status === 200) {
-              res.end(
-                JSON.stringify({ images: (result as { status: 200; images: string[] }).images }),
-              );
-            } else {
-              res.end(JSON.stringify({ error: (result as { status: 500; error: string }).error }));
-            }
-          });
-          return;
-        }
-        if (req.method === "DELETE") {
-          const url = new URL(req.url ?? "", "http://localhost");
-          const name = url.searchParams.get("name") ?? "";
-          handleDeleteImageRequest(server.config.root, name).then((result) => {
-            res.statusCode = result.status;
-            res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify(result));
-          });
-          return;
-        }
-        next();
-      });
-
-      // POST /__atlas/save  { files, rebuild?: boolean }
-      server.middlewares.use("/__atlas/save", (req, res, next) => {
-        if (req.method !== "POST") return next();
-        if (rejectNonLoopback(req, res)) return;
-        // A11: reject concurrent saves/builds with 423 Locked (D4: shared lock).
-        if (!tryAcquireBuildLock()) {
-          res.statusCode = 423;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "Locked", detail: "another build is in flight" }));
-          return;
-        }
-        let raw = "";
-        req.setEncoding("utf8");
-        req.on("data", (chunk: string) => {
-          raw += chunk;
-        });
-        req.on("end", async () => {
-          try {
-            let body: unknown;
-            try {
-              body = JSON.parse(raw);
-            } catch {
-              res.statusCode = 400;
-              res.setHeader("Content-Type", "application/json");
-              res.end(JSON.stringify({ error: "InvalidBody", detail: "request body is not JSON" }));
-              return;
-            }
-            const rebuild = !!(body as { rebuild?: boolean })?.rebuild;
-            const result = await handleSaveRequest(body, server.config.root, {
-              afterWrite: rebuild ? async () => runAtlasBuild(server.config.root) : undefined,
-              readPublishedAt: rebuild ? () => readAtlasPublishedAt(server.config.root) : undefined,
-            });
-            res.statusCode = result.status;
-            res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify(result.payload));
-          } finally {
-            releaseBuildLock();
-          }
-        });
-        req.on("error", () => {
-          releaseBuildLock();
-        });
-      });
-
-      // POST /__atlas/publish-push — re-verify green → scoped commit → push → snapshot.
-      // Uses the same loopback gate and shared build lock as publish-check (D5, D4).
-      // Returns PublishPushResult as JSON with statusCode 200; 500 for unexpected throws.
-      // ⚠️ This endpoint pushes to main — never fire it against the real repo during tests.
-      server.middlewares.use("/__atlas/publish-push", (req, res, next) => {
-        if (req.method !== "POST") return next();
-        if (rejectNonLoopback(req, res)) return;
-        if (!tryAcquireBuildLock()) {
-          res.statusCode = 423;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "Locked", detail: "another build is in flight" }));
-          return;
-        }
-        void (async () => {
-          try {
-            const { runPublishPush } = await import("./atlas/runPublishPush");
-            const result = await runPublishPush(server.config.root);
-            res.statusCode = 200;
-            res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify(result));
-          } catch (e) {
-            res.statusCode = 500;
-            res.setHeader("Content-Type", "application/json");
-            res.end(
-              JSON.stringify({
-                error: "PublishPushFailed",
-                detail: e instanceof Error ? e.message : String(e),
-              }),
-            );
-          } finally {
-            releaseBuildLock();
-          }
-        })();
-      });
-
-      // POST /__atlas/publish-check — player build + site build + scans → verdict + diff (no git).
-      server.middlewares.use("/__atlas/publish-check", (req, res, next) => {
-        if (req.method !== "POST") return next();
-        if (rejectNonLoopback(req, res)) return;
-        if (!tryAcquireBuildLock()) {
-          res.statusCode = 423;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "Locked", detail: "another build is in flight" }));
-          return;
-        }
-        void (async () => {
-          try {
-            // Dynamic import: breaks the static analysis chain so esbuild
-            // doesn't try to bundle the scan scripts (which have shebangs)
-            // when loading vite.config.ts for a player build.
-            const { runPublishCheck } = await import("./atlas/runPublishCheck");
-            const result = await runPublishCheck(server.config.root);
-            res.statusCode = 200;
-            res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify(result));
-          } catch (e) {
-            res.statusCode = 500;
-            res.setHeader("Content-Type", "application/json");
-            res.end(
-              JSON.stringify({
-                error: "PublishCheckFailed",
-                detail: e instanceof Error ? e.message : String(e),
-              }),
-            );
-          } finally {
-            releaseBuildLock();
-          }
-        })();
-      });
+      server.middlewares.use(createDevRouter(DEV_ROUTES, server.config.root));
     },
   };
 }
