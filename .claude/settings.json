@@ -27,7 +27,6 @@
       "Read(./.env.development)"
     ],
     "ask": [
-      "Bash(git push:*)",
       "PowerShell(git push:*)",
       "Bash(npm run atlas:publish:*)",
       "PowerShell(npm run atlas:publish:*)",
