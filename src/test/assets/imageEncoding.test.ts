@@ -9,6 +9,8 @@ import {
   MAX_IMAGE_WIDTH,
   MAP_WEBP_OPTIONS,
   shouldConvertMapToWebp,
+  mapKeepReason,
+  formatOfFileName,
 } from "@/atlas/assets/imageEncoding";
 
 describe("map encoding", () => {
@@ -22,6 +24,19 @@ describe("map encoding", () => {
     expect(shouldConvertMapToWebp(".jpg")).toBe(false);
     expect(shouldConvertMapToWebp("jpeg")).toBe(false);
     expect(shouldConvertMapToWebp(".webp")).toBe(false);
+  });
+
+  it("gives a reason for every map it keeps, and none for a PNG", () => {
+    expect(mapKeepReason(formatOfFileName("Region.PNG"))).toBeNull();
+    for (const name of ["Tidemarrow.JPG", "a.jpeg", "b.webp", "c.gif", "d.svg", "noext"]) {
+      expect(mapKeepReason(formatOfFileName(name))).toMatch(/\S/);
+    }
+  });
+
+  it("reads the format from a file name, case and dots aside", () => {
+    expect(formatOfFileName("Region.PNG")).toBe("png");
+    expect(formatOfFileName("map.v2.webp")).toBe("webp");
+    expect(formatOfFileName("noext")).toBe("");
   });
 });
 
