@@ -208,7 +208,8 @@ Leaflet; `PlacementMarkers` recomputes label collision on every zoom (screen-spa
 not memoizable); `SearchPalette` is controlled (query state lives in the page) and
 `useRecentlyRevealedIds` silently no-ops if `.last-published.json` is absent.
 
-**Tests:** `src/test/search/SearchPalette.test.tsx`, `phrase-search.test.ts`,
+**Tests:** `src/test/search/SearchPalette.test.tsx`, `search/one-search-across-pages.test.tsx`,
+`search/entityMatchesQuery.test.ts`, `content/loader.test.ts`, `phrase-search.test.ts`,
 `atlas-viewer-snippet.test.ts`, `atlas/map-geometry.test.ts`, `entity/EntityPanel.test.tsx`.
 
 ---

@@ -1,8 +1,9 @@
 /**
  * The atlas's one search: query parsing, matching and ranking for the search
- * palette, Browse and Timeline. Every page that filters entities by a typed
- * query goes through `searchMatches` / `searchEntries`, so `"quoted phrases"`
- * and note-text matching behave the same everywhere.
+ * palette, Browse and Timeline, plus the note text all of them search. Every
+ * page that filters entities by a typed query goes through `compileQuery` and
+ * `searchMatches` / `searchEntries`, so `"quoted phrases"` and note-text
+ * matching behave the same everywhere.
  *
  * Player safety: this module only reads the fields it is handed. Browse and
  * Timeline pass atlas.json entities (the player build already stripped DM
@@ -11,13 +12,14 @@
  */
 import type { Entity } from "@/atlas/content/schema";
 
-/** The fields search reads. `body` is the lowercased plain-text note body. */
+/** The fields search reads. */
 export interface SearchDoc {
   title: string;
   aliases: string[];
   tags: string[];
   summary?: string;
-  body?: string;
+  /** Lowercased plain-text note body (`toSearchText(searchBodyText(markdown))`), not markdown. */
+  searchText?: string;
 }
 
 export interface ParsedQuery {
@@ -25,8 +27,8 @@ export interface ParsedQuery {
   rest: string; // text outside quotes, trimmed
 }
 
-/** Longest stretch of a note body that search looks at (shared with the build). */
-export const SEARCH_BODY_MAX_CHARS = 4000;
+/** Longest stretch of a note body that search looks at. */
+const SEARCH_BODY_MAX_CHARS = 4000;
 
 /**
  * Markdown body -> the plain text search matches and snippets show (original
@@ -43,6 +45,11 @@ export function searchBodyText(markdown: string): string {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, SEARCH_BODY_MAX_CHARS);
+}
+
+/** Plain body text (`bodyText`) -> the `searchText` matching runs on. The one place it is made. */
+export function toSearchText(plainBody: string): string {
+  return plainBody.toLowerCase();
 }
 
 /**
@@ -78,7 +85,7 @@ export function parseSearchQuery(raw: string): ParsedQuery {
 
 /**
  * Returns true when every phrase appears as an exact contiguous case-insensitive
- * substring somewhere in the doc's title, aliases, summary, tags, or body.
+ * substring somewhere in the doc's title, aliases, summary, tags, or note text.
  */
 export function matchesPhrases(e: SearchDoc, phrases: string[]): boolean {
   const haystack = [
@@ -86,34 +93,30 @@ export function matchesPhrases(e: SearchDoc, phrases: string[]): boolean {
     ...e.aliases.map((a) => a.toLowerCase()),
     (e.summary ?? "").toLowerCase(),
     ...e.tags.map((t) => t.toLowerCase()),
-    e.body ?? "",
+    e.searchText ?? "",
   ].join(" ");
   return phrases.every((p) => haystack.includes(p));
 }
 
-/** A parsed query ready to match: phrases, the lowercased unquoted term, and what to highlight. */
-export interface CompiledQuery extends ParsedQuery {
+/** A parsed query ready to match. Compile once per filter pass, not per entity. */
+export interface CompiledQuery {
+  /** Lowercased quoted phrases; all must be present. */
+  phrases: string[];
   /** Lowercased unquoted remainder; empty when the query is phrases only. */
   term: string;
-  /** What ranking uses: the term, or the first phrase when there is no term. */
-  scoreTerm: string;
-  /** What snippets and title highlights mark: the first phrase, else the term. */
-  highlight: string;
-  /** No phrase and no term: everything matches. */
+  /** No phrase and no term (blank, or only empty quotes): everything matches. */
   isEmpty: boolean;
 }
 
 export function compileQuery(raw: string): CompiledQuery {
-  const parsed = parseSearchQuery(raw.trim());
-  const term = parsed.rest.toLowerCase();
-  const scoreTerm = term || parsed.phrases[0] || "";
-  return {
-    ...parsed,
-    term,
-    scoreTerm,
-    highlight: parsed.phrases[0] ?? term,
-    isEmpty: parsed.phrases.length === 0 && !term,
-  };
+  const { phrases, rest } = parseSearchQuery(raw.trim());
+  const term = rest.toLowerCase();
+  return { phrases, term, isEmpty: phrases.length === 0 && !term };
+}
+
+/** What snippets and title highlights mark: the first phrase, else the term. */
+export function highlightTerm(q: CompiledQuery): string {
+  return q.phrases[0] ?? q.term;
 }
 
 /** Ranking weight of `term` in a doc; 0 means the term is nowhere in it. */
@@ -127,7 +130,7 @@ export function scoreDoc(e: SearchDoc, term: string): number {
   if (e.aliases.some((a) => a.toLowerCase().includes(term))) s += 6;
   if (e.tags.some((tt) => tt.toLowerCase().includes(term))) s += 3;
   if ((e.summary ?? "").toLowerCase().includes(term)) s += 2;
-  if ((e.body ?? "").includes(term)) s += 1;
+  if ((e.searchText ?? "").includes(term)) s += 1;
   return s;
 }
 
@@ -142,18 +145,28 @@ export function searchMatches(e: SearchDoc, q: CompiledQuery): boolean {
   return !q.term || scoreDoc(e, q.term) > 0;
 }
 
-/** Matching docs, best first (stable for ties). Used by the palette. */
+/**
+ * Matching docs, best first (stable for ties). Used by the palette. Same rule
+ * as `searchMatches`, scoring each doc once: ranked by the term, or by the
+ * first phrase when the query is phrases only.
+ */
 export function searchEntries<T extends SearchDoc>(pool: T[], q: CompiledQuery): T[] {
-  return pool
-    .filter((e) => searchMatches(e, q))
-    .map((e) => ({ e, s: scoreDoc(e, q.scoreTerm) }))
-    .sort((a, b) => b.s - a.s)
-    .map(({ e }) => e);
+  if (q.isEmpty) return pool;
+  const rankBy = q.term || q.phrases[0];
+  const scored: { e: T; s: number }[] = [];
+  for (const e of pool) {
+    if (q.phrases.length > 0 && !matchesPhrases(e, q.phrases)) continue;
+    const s = scoreDoc(e, rankBy);
+    // With a term, rankBy is the term, so s > 0 exactly when the term matches.
+    if (q.term && s === 0) continue;
+    scored.push({ e, s });
+  }
+  return scored.sort((a, b) => b.s - a.s).map(({ e }) => e);
 }
 
 const entityDocs = new WeakMap<Entity, SearchDoc>();
 
-/** An atlas.json entity as search sees it: same fields and body text as its index entry. */
+/** An atlas.json entity as search sees it: same fields and note text as its index entry. */
 export function entitySearchDoc(entity: Entity): SearchDoc {
   let doc = entityDocs.get(entity);
   if (!doc) {
@@ -162,15 +175,14 @@ export function entitySearchDoc(entity: Entity): SearchDoc {
       aliases: entity.aliases,
       tags: entity.tags,
       summary: entity.summary,
-      body: searchBodyText(entity.body ?? "").toLowerCase(),
+      searchText: toSearchText(searchBodyText(entity.body ?? "")),
     };
     entityDocs.set(entity, doc);
   }
   return doc;
 }
 
-/** Browse and Timeline's entry point: does this entity match the typed query? */
+/** Convenience for a single entity; pages compile once and call `searchMatches`. */
 export function entityMatchesQuery(entity: Entity, query: string): boolean {
-  const q = compileQuery(query);
-  return q.isEmpty || searchMatches(entitySearchDoc(entity), q);
+  return searchMatches(entitySearchDoc(entity), compileQuery(query));
 }

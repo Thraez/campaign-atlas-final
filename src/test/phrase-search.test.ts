@@ -9,7 +9,7 @@ function entry(overrides: Partial<SearchIndexEntry> = {}): SearchIndexEntry {
     type: "location",
     aliases: [],
     tags: [],
-    body: "the iron tower stands tall near the ancient guard post",
+    searchText: "the iron tower stands tall near the ancient guard post",
     bodyText: "The Iron Tower stands tall near the ancient guard post",
     ...overrides,
   };
@@ -67,7 +67,7 @@ describe("matchesPhrases", () => {
   it("does NOT match when the words appear non-contiguously", () => {
     expect(
       matchesPhrases(
-        entry({ title: "Dungeon", aliases: [], summary: "", body: "iron and tower" }),
+        entry({ title: "Dungeon", aliases: [], summary: "", searchText: "iron and tower" }),
         ["iron tower"],
       ),
     ).toBe(false);
@@ -79,7 +79,7 @@ describe("matchesPhrases", () => {
 
   it("passes when all phrases are present in body", () => {
     expect(
-      matchesPhrases(entry({ body: "iron tower stands near the ancient guard post" }), [
+      matchesPhrases(entry({ searchText: "iron tower stands near the ancient guard post" }), [
         "iron tower",
         "ancient guard",
       ]),
@@ -87,18 +87,20 @@ describe("matchesPhrases", () => {
   });
 
   it("matches against title (lowercased)", () => {
-    expect(matchesPhrases(entry({ title: "Iron Tower", body: "" }), ["iron tower"])).toBe(true);
-  });
-
-  it("matches against aliases (lowercased)", () => {
-    expect(matchesPhrases(entry({ aliases: ["The Iron Spire"], body: "" }), ["iron spire"])).toBe(
+    expect(matchesPhrases(entry({ title: "Iron Tower", searchText: "" }), ["iron tower"])).toBe(
       true,
     );
   });
 
+  it("matches against aliases (lowercased)", () => {
+    expect(
+      matchesPhrases(entry({ aliases: ["The Iron Spire"], searchText: "" }), ["iron spire"]),
+    ).toBe(true);
+  });
+
   it("matches against summary (lowercased)", () => {
     expect(
-      matchesPhrases(entry({ summary: "A tall iron tower", body: "" }), ["tall iron tower"]),
+      matchesPhrases(entry({ summary: "A tall iron tower", searchText: "" }), ["tall iron tower"]),
     ).toBe(true);
   });
 
@@ -107,8 +109,8 @@ describe("matchesPhrases", () => {
   });
 
   it("matches against tags (lowercased) — N118", () => {
-    expect(matchesPhrases(entry({ tags: ["Ancient Ruins"], body: "" }), ["ancient ruins"])).toBe(
-      true,
-    );
+    expect(
+      matchesPhrases(entry({ tags: ["Ancient Ruins"], searchText: "" }), ["ancient ruins"]),
+    ).toBe(true);
   });
 });

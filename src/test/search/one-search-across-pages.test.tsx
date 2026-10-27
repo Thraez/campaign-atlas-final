@@ -75,7 +75,7 @@ const INDEX: SearchIndexEntry[] = ENTITIES.map((e) => ({
   tags: e.tags,
   summary: e.summary,
   bodyText: BODY_TEXT[e.id],
-  body: BODY_TEXT[e.id].toLowerCase(),
+  searchText: BODY_TEXT[e.id].toLowerCase(),
 }));
 
 const PROJECT = {
@@ -158,6 +158,7 @@ describe("one search across the palette, Browse and Timeline", () => {
     ["posting watch", ["silver-lake"]], // unquoted words only in a note body
     ['"iron tower" near', ["iron-tower"]], // phrase plus unquoted remainder
     ["ruined", ["ashford"]], // summary
+    ['""', ["ashford", "iron-tower", "silver-lake"]], // only empty quotes: like a blank query
   ])("%s returns the same entities on every page", async (query, expected) => {
     expect(paletteIds(query)).toEqual(expected);
     expect(await browseIds(query)).toEqual(expected);

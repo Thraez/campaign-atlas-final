@@ -34,3 +34,12 @@ code (Browse found nothing for note-text and phrase queries). Visible change on 
 Browse and Timeline now find notes by their text and honour `"quoted phrases"`; a query made only
 of empty quotes (`""`) now shows everything in the palette instead of nothing. Needs Isak's look on
 Browse and Timeline before done.
+
+2026-10-27 (agent, Opus): The two-axis review (standards, spec) ran on bc0bb43: spec met, player
+safety confirmed, no blockers. Tidied on the same branch: Browse and Timeline compile the query
+once per filter pass; `searchEntries` scores each entry once; `toSearchText` in `search.ts` is the
+one place the lowercased search body is made (loader and Browse/Timeline both use it); the
+lowercased field is now `searchText` (was `body`, easy to confuse with markdown `Entity.body`);
+`CompiledQuery` shrank to phrases, term and isEmpty; a query of only `""` now behaves like a blank
+query in the palette (recently viewed); `SEARCH_BODY_MAX_CHARS` is private; CODEBASE_MAP lists the
+search tests. Still `ready-for-human`.

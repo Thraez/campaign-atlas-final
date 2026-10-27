@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
-import { entityMatchesQuery } from "@/atlas/search/search";
+import { compileQuery, entitySearchDoc, searchMatches } from "@/atlas/search/search";
 import {
   parseBrowseFilterParams,
   serializeBrowseFilterParams,
@@ -51,10 +51,11 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
 
   const facetFilteredEntries = useMemo(() => {
     const all = project?.entities ?? [];
+    const q = compileQuery(query);
     return all.filter((e) => {
       if (mode === "tag" && !e.tags.includes(facetDecoded)) return false;
       if (mode === "type" && e.type !== facetDecoded) return false;
-      return entityMatchesQuery(e, query);
+      return searchMatches(entitySearchDoc(e), q);
     });
   }, [project, mode, facetDecoded, query]);
 

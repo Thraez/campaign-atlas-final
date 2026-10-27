@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
-import { entityMatchesQuery } from "@/atlas/search/search";
+import { compileQuery, entitySearchDoc, searchMatches } from "@/atlas/search/search";
 import {
   parseBrowseFilterParams,
   serializeBrowseFilterParams,
@@ -52,9 +52,10 @@ export default function AtlasTimeline() {
   }, [dated]);
 
   const groups = useMemo<YearGroup[]>(() => {
+    const q = compileQuery(query);
     const filtered = dated.filter((e) => {
       if (activeType && e.type !== activeType) return false;
-      return entityMatchesQuery(e, query);
+      return searchMatches(entitySearchDoc(e), q);
     });
     const sorted = [...filtered].sort((a, b) => a.dateValue! - b.dateValue!);
     const byYear = new Map<number, Entity[]>();
