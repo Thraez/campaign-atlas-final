@@ -95,6 +95,8 @@ export interface StagingContext {
 export interface StagingRow {
   id: string;
   filename: string;
+  /** The note's exact title (see deriveTitle). Commit writes it as `title`. */
+  title: string;
   /** Inferred entity type — DM-editable via the type dropdown. */
   inferredType: string;
   /** Frontmatter `path` if the file declared one. Tooltip-only — never the target. */
@@ -139,15 +141,18 @@ export interface StagingRow {
 }
 
 /**
- * Derive a display title from filename and frontmatter, matching build-atlas.ts logic:
- *   title = fm.title.trim() if non-empty, else title-cased slug ("great-hall" → "Great Hall")
+ * The note's title, which commit writes into the frontmatter so it survives
+ * the rename to `<slug>.md`:
+ *   - fm.title.trim() if non-empty;
+ *   - else an Obsidian-style filename verbatim ("Isle de Marque.md" → "Isle de Marque");
+ *   - else, for a slug-shaped filename, the build's title-cased slug ("great-hall" → "Great Hall").
  */
 function deriveTitle(filename: string, fmTitle: unknown): string {
   if (typeof fmTitle === "string" && fmTitle.trim()) return fmTitle.trim();
-  return filename
-    .replace(/\.md$/i, "")
+  const stem = filename.replace(/\.md$/i, "").trim();
+  if (stem !== slugify(stem)) return stem;
+  return stem
     .replace(/[-_]+/g, " ")
-    .trim()
     .replace(/(^|\s)(\p{L})/gu, (_m, sp, ch) => sp + ch.toUpperCase());
 }
 
@@ -182,10 +187,10 @@ function extractStagingFields(
     const data = fm.data;
     const atlas = (data.atlas ?? {}) as Record<string, unknown>;
 
-    const explicit =
-      typeof atlas.type === "string" && atlas.type.trim().length > 0
-        ? atlas.type.trim()
-        : undefined;
+    // atlas.type first, then top-level `type:` (most vault notes use it), as the build does.
+    const explicit = [atlas.type, data.type]
+      .find((t): t is string => typeof t === "string" && t.trim().length > 0)
+      ?.trim();
     const fromTags = explicit ? null : inferTypeFromTags(data.tags);
     const fromFolder = explicit || fromTags ? null : inferTypeFromPath(relPath);
     const type =
@@ -309,6 +314,7 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
   return {
     id: nextRowId(input.filename),
     filename: input.filename,
+    title,
     inferredType: type,
     frontmatterPath,
     resolvedId,

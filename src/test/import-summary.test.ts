@@ -6,6 +6,7 @@ function makeRow(overrides: Partial<StagingRow>): StagingRow {
   return {
     id: "staging-1-row",
     filename: "note.md",
+    title: "Note",
     inferredType: "lore",
     resolvedId: "note",
     targetPath: "content/world/lore/note.md",

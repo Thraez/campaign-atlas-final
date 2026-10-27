@@ -78,7 +78,8 @@ export async function buildImportChanges(
         inferredType: row.inferredType,
         baseType: row.baseType, // from sync-map (Phase 2); undefined → vault wins on type
       });
-      content = stringifyFrontmatter(merged.content, merged.data);
+      // The vault's title is its filename, which the merge doesn't see.
+      content = stringifyFrontmatter(merged.content, { title: row.title, ...merged.data });
     } else {
       // path-collision: read disk for baseHash but still rewrite from vault.
       if (row.rowKind === "path-collision") {
@@ -90,6 +91,7 @@ export async function buildImportChanges(
       const safeVisibility =
         row.needsReview?.reason === "secrecy-increase" ? row.resolvedVisibility : "dm";
       content = rewriteFrontmatter(row.rawContent, {
+        title: row.title,
         id: row.resolvedId,
         type: row.inferredType,
         visibility: safeVisibility,

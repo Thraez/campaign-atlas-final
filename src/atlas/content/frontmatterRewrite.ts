@@ -1,6 +1,8 @@
 import { parseFrontmatter, stringifyFrontmatter } from "@/atlas/import/frontmatter";
 
 export interface AtlasFieldPatch {
+  /** Top-level `title`, written first. */
+  title?: string;
   id?: string;
   type?: string;
   visibility?: string;
@@ -25,7 +27,9 @@ export function rewriteFrontmatter(rawFile: string, patch: AtlasFieldPatch): str
   if (patch.visibility !== undefined) atlas.visibility = patch.visibility;
   if (patch.summary !== undefined) atlas.summary = patch.summary;
 
-  const next: Record<string, unknown> = { ...data, atlas };
+  const next: Record<string, unknown> =
+    patch.title !== undefined ? { title: patch.title, ...data, atlas } : { ...data, atlas };
+  if (patch.title !== undefined) next.title = patch.title;
 
   if (patch.tagsAdd && patch.tagsAdd.length > 0) {
     const tags = normaliseTags(data.tags);

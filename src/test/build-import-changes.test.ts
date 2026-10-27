@@ -320,3 +320,84 @@ describe("buildImportChanges — readSourceFile branch coverage (N92)", () => {
     expect(atlas.visibility).toBe("player");
   });
 });
+
+describe("Sync keeps a note's title and type (code-retro 02)", () => {
+  it("a new note keeps its exact title from the vault filename", async () => {
+    const [row] = buildStagingRows(
+      [
+        {
+          filename: "Isle de Marque.md",
+          raw: "Fog-bound isle.\n",
+          vaultRelPath: "02_Regions/Isle de Marque.md",
+        },
+      ],
+      makeCtx(),
+    );
+    expect(row.title).toBe("Isle de Marque");
+    const [change] = await buildImportChanges([row], { fetchFn: fakeReadFetch({}) });
+    expect(change.path).toMatch(/isle-de-marque\.md$/);
+    expect(parseFrontmatter(change.content).data.title).toBe("Isle de Marque");
+  });
+
+  it("a slug-named note still gets the build's title-cased title", () => {
+    const [row] = buildStagingRows([{ filename: "great-hall.md", raw: "Hall.\n" }], makeCtx());
+    expect(row.title).toBe("Great Hall");
+  });
+
+  it("a frontmatter title wins over the filename", () => {
+    const [row] = buildStagingRows(
+      [{ filename: "Marque.md", raw: "---\ntitle: Isle de Marque\n---\nIsle.\n" }],
+      makeCtx(),
+    );
+    expect(row.title).toBe("Isle de Marque");
+  });
+
+  it("an update keeps the exact title although the vault note has no title field", async () => {
+    const path = `content/${WORLD}/regions/isle-de-marque.md`;
+    const disk =
+      "---\ntitle: Isle de Marque\natlas:\n  id: isle-de-marque\n  type: region\n  visibility: player\n---\nOld.\n";
+    const [row] = buildStagingRows(
+      [
+        {
+          filename: "Isle de Marque.md",
+          raw: "New prose.\n",
+          vaultRelPath: "02_Regions/Isle de Marque.md",
+        },
+      ],
+      makeCtx({
+        existingById: new Map([["isle-de-marque", path]]),
+        existingPaths: new Set([path]),
+      }),
+    );
+    expect(row.rowKind).toBe("update");
+    const [change] = await buildImportChanges([row], { fetchFn: fakeReadFetch({ [path]: disk }) });
+    expect(parseFrontmatter(change.content).data.title).toBe("Isle de Marque");
+  });
+
+  it("a top-level type: npc stages and lands as npc, whatever its folder", async () => {
+    const [row] = buildStagingRows(
+      [
+        {
+          filename: "Varro.md",
+          raw: "---\ntype: npc\n---\nA smuggler.\n",
+          vaultRelPath: "01_Lore/Varro.md",
+        },
+      ],
+      makeCtx(),
+    );
+    expect(row.inferredType).toBe("npc");
+    expect(row.typeWasExplicit).toBe(true);
+    expect(row.targetPath).toBe(`content/${WORLD}/npcs/varro.md`);
+    const [change] = await buildImportChanges([row], { fetchFn: fakeReadFetch({}) });
+    const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
+    expect(atlas.type).toBe("npc");
+  });
+
+  it("atlas.type still wins over a top-level type", () => {
+    const [row] = buildStagingRows(
+      [{ filename: "Varro.md", raw: "---\ntype: npc\natlas:\n  type: faction\n---\n" }],
+      makeCtx(),
+    );
+    expect(row.inferredType).toBe("faction");
+  });
+});
