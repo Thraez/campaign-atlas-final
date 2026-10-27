@@ -1,13 +1,9 @@
 #!/usr/bin/env tsx
 /**
- * Parallel scan orchestrator for atlas:publish.
+ * Parallel scan orchestrator for atlas:publish and CI (`npm run atlas:scan`).
  *
- * Replaces the sequential per-scan tsx invocations in package.json with a
- * single-process Promise.all over all scan modules, eliminating the per-scan
- * tsx cold-start cost (~6–7 cold starts → 1).
- *
- * All scans are read-only: they share no mutable state, so parallel execution
- * is safe.
+ * Runs every scan in `scanRegistry.ts` in one process (one tsx cold start
+ * instead of one per scan). The editor's Publish check reads the same list.
  *
  * Exit codes:
  *   0   all scans clean
@@ -15,84 +11,22 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-
-import { run as checkNoSecrets } from "../check-no-secrets.js";
-import { run as checkDerivedSecrets } from "../check-derived-secrets.js";
-import { run as checkImagePrivacy } from "../check-image-privacy.js";
-import { run as checkFogSafety } from "../check-fog-safety.js";
-import { run as checkArtifactShape } from "../check-artifact-shape.js";
-import { run as auditAssets } from "./audit-assets.js";
-import { run as checkPlayerSecrets } from "../check-player-secrets.js";
+import { runAll, scanTasks } from "./scanRegistry.js";
 
 interface Config {
   contentRoot: string;
 }
 
-function resolveContentDir(): string {
-  const configPath = path.resolve(process.cwd(), "atlas.config.json");
-  if (!fs.existsSync(configPath)) {
-    throw new Error(`atlas.config.json not found at ${configPath}`);
-  }
-  const cfg = JSON.parse(fs.readFileSync(configPath, "utf8")) as Config;
-  return path.resolve(path.dirname(configPath), cfg.contentRoot);
-}
-
-interface ScanTask {
-  label: string;
-  fn: () => number | Promise<number>;
-}
-
 async function main(): Promise<number> {
-  let contentDir: string;
-  try {
-    contentDir = resolveContentDir();
-  } catch (e) {
-    console.error(`publish-orchestrator: ${(e as Error).message}`);
+  const root = process.cwd();
+  const configPath = path.resolve(root, "atlas.config.json");
+  if (!fs.existsSync(configPath)) {
+    console.error(`publish-orchestrator: atlas.config.json not found at ${configPath}`);
     return 1;
   }
-
-  const tasks: ScanTask[] = [
-    { label: "check-secrets dist", fn: () => checkNoSecrets({ dir: "dist" }) },
-    { label: "check-secrets public/atlas", fn: () => checkNoSecrets({ dir: "public/atlas" }) },
-    {
-      label: "check-shape",
-      fn: () => checkArtifactShape({ atlasJsonPath: "public/atlas/atlas.json" }),
-    },
-    { label: "check-derived dist", fn: () => checkDerivedSecrets({ dir: "dist" }) },
-    { label: "check-derived public/atlas", fn: () => checkDerivedSecrets({ dir: "public/atlas" }) },
-    { label: "check-image-privacy dist", fn: () => checkImagePrivacy({ dir: "dist" }) },
-    {
-      label: "check-image-privacy public/atlas",
-      fn: () => checkImagePrivacy({ dir: "public/atlas", referencedBy: "public/atlas" }),
-    },
-    {
-      label: "audit-assets",
-      fn: () => auditAssets({ assetsDir: "public/atlas/assets", publicDir: "public", contentDir }),
-    },
-    { label: "check-fog public/atlas", fn: () => checkFogSafety({ dir: "public/atlas" }) },
-    { label: "check-fog dist", fn: () => checkFogSafety({ dir: "dist" }) },
-    { label: "check-player-secrets dist", fn: () => checkPlayerSecrets({ dir: "dist" }) },
-    {
-      label: "check-player-secrets public/atlas",
-      fn: () => checkPlayerSecrets({ dir: "public/atlas" }),
-    },
-  ];
-
-  const results = await Promise.all(
-    tasks.map(async (t) => ({ label: t.label, code: await t.fn() })),
-  );
-
-  const failures = results.filter((r) => r.code !== 0);
-  if (failures.length === 0) {
-    console.log(`\npublish-orchestrator: all ${tasks.length} scans clean`);
-    return 0;
-  }
-
-  console.error(`\npublish-orchestrator: ${failures.length} scan(s) failed:`);
-  for (const f of failures) {
-    console.error(`  [exit ${f.code}] ${f.label}`);
-  }
-  return 1;
+  const cfg = JSON.parse(fs.readFileSync(configPath, "utf8")) as Config;
+  const contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
+  return runAll(scanTasks({ root, configPath, contentDir }));
 }
 
 main().then((code) => process.exit(code));

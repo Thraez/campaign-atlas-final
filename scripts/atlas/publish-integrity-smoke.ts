@@ -19,6 +19,9 @@
  * entities) are SKIPPED — that is a legitimate no-op, not a failure. A harness
  * that cannot find the artifacts it needs is an ERROR and fails the smoke.
  *
+ * `scanRegistry.test.ts` checks that every scan in the registry has a variant
+ * here (or a stated reason it has none).
+ *
  * This script must stay independent of HOW publish invokes the scans (inline
  * chain today, an orchestrator tomorrow). It calls each scan script directly,
  * so it keeps guarding the scans no matter how the publish chain is rearranged.
@@ -270,6 +273,24 @@ function variantShape(): VariantResult {
   );
 }
 
+// ---- Variant 6: unstripped secret marker (check-player-secrets) -------------
+function variantPlayerSecret(): VariantResult {
+  return assertCleanThenDirty(
+    "Unstripped secret marker",
+    "check-player-secrets.ts",
+    () => {
+      const dir = freshDir("player-secret-clean");
+      fs.writeFileSync(path.join(dir, "page.txt"), "nothing locked here");
+      return runScan("check-player-secrets.ts", [dir]);
+    },
+    () => {
+      const dir = freshDir("player-secret-dirty");
+      fs.writeFileSync(path.join(dir, "page.txt"), "{{secret:SMOKE_TEST_SECRET}}");
+      return runScan("check-player-secrets.ts", [dir]);
+    },
+  );
+}
+
 async function main(): Promise<number> {
   if (!fs.existsSync(PLAYER_ATLAS)) {
     console.error(
@@ -293,6 +314,7 @@ async function main(): Promise<number> {
   results.push(await variantExif());
   results.push(variantFog());
   results.push(variantShape());
+  results.push(variantPlayerSecret());
 
   const pad = Math.max(...results.map((r) => r.name.length));
   for (const r of results) {

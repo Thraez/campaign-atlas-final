@@ -1,6 +1,6 @@
 # One list of safety scans
 
-Status: ready-for-agent
+Status: done
 Area: publish safety
 
 The scans are listed by hand in four places, and they drifted:
@@ -25,3 +25,16 @@ Goal (`docs/GOALS.md`): every safety scan passes before a publish.
 - A test of the orchestrator: every registered scan runs on each of its folders, and one
   failing scan gives a non-zero exit.
 - The comment in `publish-atlas.yml` is true.
+
+## Comments
+
+2026-10-27, branch `eval-01-scan-registry`:
+- `scripts/atlas/scanRegistry.ts` lists the seven scans and the folders each runs over. The
+  orchestrator, `runPublishScans` and the integrity smoke's coverage test read it.
+- The editor's Publish check now runs `check-player-secrets` and passes `referencedBy` like CI.
+  Failed scans with a structured export still get locators; the rest get a scan-level row.
+- The smoke has a sixth variant (unstripped `{{secret:}}`). `audit-assets` has none, with the
+  reason in the registry: it's a size budget, not a leak scan.
+- Tests: `scripts/atlas/scanRegistry.test.ts` (7): every scanner script is registered, every
+  scan has a smoke variant or a reason, leak scans cover both folders, `runAll` runs everything
+  and fails on one failure or a crash, and the editor blocks on a `{{secret:}}` marker.
