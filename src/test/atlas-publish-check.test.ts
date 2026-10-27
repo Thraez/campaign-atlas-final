@@ -63,6 +63,16 @@ describe("validateProject — Publish Check", () => {
     expect(r.counts.blocking).toBeGreaterThan(0);
   });
 
+  it.each([
+    ["%%", "Seen. %% the king is dead %%"],
+    [":::dm", "Seen.\n\n:::dm\nthe king is dead\n:::\n"],
+  ])("warns when a player-visible body still holds %s DM blocks", (syntax, body) => {
+    const p = baseProject({ entities: [entity({ body })] });
+    const r = validateProject({ project: p, draftPlacements: [] });
+    const hit = r.issues.find((i) => i.code === "dm-block-in-player-body");
+    expect(hit?.message).toContain(`${syntax} DM blocks`);
+  });
+
   it("flags missing summary as suggestion and missing type as warning", () => {
     const p = baseProject({ entities: [entity({ id: "x", summary: undefined, type: "" })] });
     const r = validateProject({ project: p, draftPlacements: [] });

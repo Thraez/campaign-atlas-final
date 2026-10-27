@@ -7,7 +7,11 @@
 import { markdownToHtml } from "@/atlas/content/markdownCore";
 import type { Entity } from "@/atlas/content/schema";
 import type { EntityVisibility } from "@/atlas/content/schema";
-import { stripDmBlocks, stripDmFromShippingString } from "@/atlas/content/stripDmBlocks";
+import {
+  replaceSecretMarkers,
+  stripDmBlocks,
+  stripDmFromShippingString,
+} from "@/atlas/content/dmMarkup";
 import { resolveImageEmbeds } from "@/atlas/content/renderEntityMarkdown";
 import { tokenizeWikilinks, renderLinkTokens } from "@/atlas/content/parseWikilinks";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
@@ -109,7 +113,7 @@ export function projectEntityForPlayer(entity: Entity, ctx: ProjectionContext): 
   // client (EntityPanel effect) resolves the matching entity.secrets blob and
   // renders the sealed-box UI. Orphan markers (no matching secret blob) are dropped.
   const knownSecretIds = new Set((entity.secrets ?? []).map((s) => s.id));
-  const bodyWithSecrets = bodyForHtml.replace(/\{\{secret:([^}]+)\}\}/g, (_m, rawId) => {
+  const bodyWithSecrets = replaceSecretMarkers(bodyForHtml, (rawId) => {
     const id = String(rawId).trim();
     if (!knownSecretIds.has(id)) return "";
     const esc = id.replace(/"/g, "&quot;");

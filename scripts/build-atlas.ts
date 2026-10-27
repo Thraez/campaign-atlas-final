@@ -19,7 +19,12 @@ import {
   extractImageEmbedFilenames,
 } from "../src/atlas/content/renderEntityMarkdown";
 import { parseFrontmatter, type ParsedFile } from "./atlas/parseFrontmatter";
-import { stripDmBlocks, stripDmFromShippingString } from "./atlas/stripDmBlocks";
+import {
+  secretMarkerIds,
+  stripDmBlocks,
+  stripDmFromShippingString,
+  stripSecretMarkers,
+} from "../src/atlas/content/dmMarkup";
 import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
 import { slugify } from "./atlas/slugify";
 import { loadWorldConfig, projectAssetCredits } from "./atlas/loadWorldConfig";
@@ -32,7 +37,6 @@ import {
   type SvgPolicy,
 } from "./atlas/validateAsset";
 import { parseAtlasDate } from "./atlas/calendarDate";
-import { stripSecretMarkers } from "./atlas/stripSecretMarkers";
 import { buildEntitySecrets } from "./atlas/buildSecrets";
 import yaml from "js-yaml";
 import { PLAYER_VISIBLE } from "./atlas/visibility";
@@ -524,9 +528,7 @@ async function runBuildCore(flags: BuildFlags) {
       secretSpecsByEntity.set(item.id, entitySpecs);
       // Check the RAW body (before marker stripping) so we correctly detect
       // secrets that have no placement marker in the authored text.
-      const markerIds = new Set(
-        [...item.parsed.body.matchAll(/\{\{secret:([^}]+)\}\}/g)].map((m) => m[1]),
-      );
+      const markerIds = new Set(secretMarkerIds(item.parsed.body));
       for (const s of entitySpecs) {
         if (!markerIds.has(s.id)) {
           warnings.push(

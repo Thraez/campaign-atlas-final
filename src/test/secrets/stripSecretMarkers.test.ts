@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { stripSecretMarkers } from "../../../scripts/atlas/stripSecretMarkers";
+import { stripSecretMarkers } from "@/atlas/content/dmMarkup";
 
 describe("stripSecretMarkers", () => {
   it("removes a single marker and leaves surrounding text", () => {

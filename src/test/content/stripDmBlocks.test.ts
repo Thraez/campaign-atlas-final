@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   stripDmBlocks,
   stripDmFromShippingString,
-} from "@/atlas/content/stripDmBlocks";
+} from "@/atlas/content/dmMarkup";
 
 // ------------------------------------------------------------
 // stripDmBlocks
