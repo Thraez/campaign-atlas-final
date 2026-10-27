@@ -44,9 +44,9 @@ export function SoundscapeLayer({ map: mapDoc }: { map: MapDocument }) {
 
     let cancelled = false;
     // The first settle of each run always reaches the engine, so the playing
-    // state is reported again (crossfadeTo the bed already playing resolves
-    // true at once, and to null stops a stale bed).
-    let reported = false;
+    // state is reported again after the cleanup cleared it (crossfadeTo the
+    // bed already playing reports it at once, and to null stops a stale bed).
+    let settledOnce = false;
     const settle = () => {
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => {
@@ -56,13 +56,16 @@ export function SoundscapeLayer({ map: mapDoc }: { map: MapDocument }) {
           mapDoc.height,
           activeId.current,
         );
-        if (reported && next === activeId.current) return;
-        reported = true;
+        if (settledOnce && next === activeId.current) return;
+        settledOnce = true;
         activeId.current = next;
         if (next === null) setAmbiencePlaying(false);
         // Announce playback only once the bed has really started.
-        void engine.crossfadeTo(prepared.find((a) => a.id === next) ?? null).then((playing) => {
-          if (!cancelled && activeId.current === next) setAmbiencePlaying(playing);
+        void engine.crossfadeTo(prepared.find((a) => a.id === next) ?? null).then((result) => {
+          // "paused" (context suspended while muted or hidden) still counts as
+          // the bed being active; SoundControl hides the label while muted.
+          if (!cancelled && activeId.current === next)
+            setAmbiencePlaying(result === "playing" || result === "paused");
         });
       }, DEBOUNCE_MS);
     };

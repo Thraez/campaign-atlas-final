@@ -23,13 +23,15 @@ press anywhere. The invite shows until then.
 
 ## Comments
 
-- 2026-10-28, branch `eval-21-sound-after-reload`: `SoundSettingsProvider` now tracks
-  `audioUnlocked`. With sound saved on and audio still locked, it listens (capture phase) for the
-  first `pointerdown` or `keydown` on `window` and unlocks the engine from that gesture.
-  `SoundControl` shows a "Tap to resume sound" invite until then and hides mute/volume.
-  `SoundscapeLayer` picks no bed before unlock, and sets `ambiencePlaying` from
-  `AudioEngine.crossfadeTo`, which now resolves true only when the bed really started (false
-  before unlock, for silence, on a failed load, or when superseded). Tests:
-  `src/test/sound/soundAfterReload.test.tsx`.
-- Not checked on a real phone: iOS Safari may want `touchend` rather than `pointerdown` as the
-  unlocking gesture; the invite button still unlocks there either way.
+- 2026-10-28, branch `eval-21-sound-after-reload`: `SoundSettingsProvider` tracks
+  `audioUnlocked`, true only once the AudioContext is running. With sound saved on and audio
+  not running, it listens (capture phase) on `window` for `pointerup`, `touchend`, `click`
+  and `keydown` (not Escape or lone modifiers), and unlocks from that gesture. Gestures inside
+  the sound invite are left to its buttons, so Dismiss stays silent for the visit. If a gesture
+  leaves the context suspended or resume fails, the saved "on" and the "Tap to resume sound"
+  invite both stay. Only an explicit enable where Web Audio can't start turns it off.
+  `AudioEngine.unlock()` resolves whether the context is running. `crossfadeTo` returns
+  "playing" | "paused" | "locked" | "silence" | "failed" | "superseded". A crossfade beaten
+  to the same bed still reports it as playing. `SoundscapeLayer` picks no bed before unlock and
+  sets `ambiencePlaying` from that result. Tests: `src/test/sound/soundAfterReload.test.tsx`.
+- This hasn't been tried on a real phone. Touch unlock is covered only by jsdom events.

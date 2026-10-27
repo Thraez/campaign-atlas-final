@@ -4,7 +4,14 @@ import type { MapDocument } from "@/atlas/content/schema";
 import { SoundSettingsProvider } from "@/atlas/sound/SoundSettingsProvider";
 import { SoundControl } from "@/atlas/sound/SoundControl";
 import { SoundscapeLayer } from "@/atlas/sound/SoundscapeLayer";
-import { _resetSoundPrefsForTests, saveSoundPrefs, DEFAULT_PREFS } from "@/atlas/sound/soundPrefs";
+import { AudioEngine } from "@/atlas/sound/AudioEngine";
+import { prepareAreas } from "@/atlas/sound/resolveSoundscape";
+import {
+  _resetSoundPrefsForTests,
+  saveSoundPrefs,
+  loadSoundPrefs,
+  DEFAULT_PREFS,
+} from "@/atlas/sound/soundPrefs";
 
 // The view sits well inside the single area, so the bed is chosen at once.
 const fakeLeaflet = {
@@ -40,7 +47,11 @@ const mapDoc = {
   },
 } as unknown as MapDocument;
 
-function makeDeps() {
+/**
+ * resume: "works" puts the context in running; "ignored" leaves it suspended
+ * (the browser didn't count the gesture); "rejects" throws.
+ */
+function makeDeps({ resume = "works" }: { resume?: "works" | "ignored" | "rejects" } = {}) {
   const started: unknown[] = [];
   const gainNode = () => ({
     gain: {
@@ -69,7 +80,8 @@ function makeDeps() {
       },
       decodeAudioData: async () => ({ duration: 10 }),
       resume: async () => {
-        ctx.state = "running";
+        if (resume === "rejects") throw new Error("not allowed");
+        if (resume === "works") ctx.state = "running";
       },
       suspend: async () => {
         ctx.state = "suspended";
@@ -89,26 +101,30 @@ function makeDeps() {
   };
 }
 
-function renderPage(deps: ReturnType<typeof makeDeps>["deps"]) {
+function renderPage(deps: ReturnType<typeof makeDeps>["deps"], map: MapDocument = mapDoc) {
   return render(
     <SoundSettingsProvider deps={deps} audioAvailable={true}>
-      <SoundscapeLayer map={mapDoc} />
+      <SoundscapeLayer map={map} />
       <SoundControl />
       <p>Map body</p>
     </SoundSettingsProvider>,
   );
 }
 
-/** Let the 150 ms viewport debounce and the async buffer load settle. */
+/** Let unlock(), the 150 ms viewport debounce and the async buffer load settle. */
 async function settle() {
+  const flush = async () => {
+    for (let i = 0; i < 5; i++) {
+      await act(async () => {
+        await Promise.resolve();
+      });
+    }
+  };
+  await flush(); // unlock() resolving
   await act(async () => {
     vi.advanceTimersByTime(200);
   });
-  for (let i = 0; i < 5; i++) {
-    await act(async () => {
-      await Promise.resolve();
-    });
-  }
+  await flush(); // buffer fetch + decode
 }
 
 describe("sound after a reload with sound saved on", () => {
@@ -135,12 +151,12 @@ describe("sound after a reload with sound saved on", () => {
     expect(started).toHaveLength(0);
   });
 
-  it("the first pointerdown anywhere unlocks audio and starts the current ambience", async () => {
+  it("the first pointerup anywhere unlocks audio and starts the current ambience", async () => {
     const { deps, started, createContext } = makeDeps();
     renderPage(deps);
     await settle();
 
-    fireEvent.pointerDown(screen.getByText("Map body"));
+    fireEvent.pointerUp(screen.getByText("Map body"));
     await settle();
 
     expect(createContext).toHaveBeenCalledTimes(1);
@@ -173,9 +189,126 @@ describe("sound after a reload with sound saved on", () => {
     renderPage(failing);
     await settle();
 
-    fireEvent.pointerDown(screen.getByText("Map body"));
+    fireEvent.pointerUp(screen.getByText("Map body"));
     await settle();
 
     expect(screen.getByRole("status").textContent).toBe("");
+  });
+
+  it("a touch (touchend) unlocks audio", async () => {
+    const { deps, started } = makeDeps();
+    renderPage(deps);
+    await settle();
+
+    fireEvent.touchEnd(screen.getByText("Map body"));
+    await settle();
+
+    expect(started).toHaveLength(1);
+    expect(screen.getByRole("status").textContent).toBe("Ambience playing");
+  });
+
+  it("Escape and lone modifier keys don't unlock audio", async () => {
+    const { deps, createContext } = makeDeps();
+    renderPage(deps);
+    await settle();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(window, { key: "Shift" });
+    await settle();
+
+    expect(createContext).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /resume sound/i })).toBeTruthy();
+  });
+
+  it("Dismiss on the resume invite leaves sound silent, even after later taps", async () => {
+    const { deps, started, createContext } = makeDeps();
+    renderPage(deps);
+    await settle();
+
+    const dismiss = screen.getByRole("button", { name: /dismiss/i });
+    fireEvent.pointerUp(dismiss);
+    fireEvent.click(dismiss);
+    await settle();
+
+    expect(screen.queryByRole("button", { name: /resume sound/i })).toBeNull();
+    fireEvent.pointerUp(screen.getByText("Map body"));
+    await settle();
+
+    expect(createContext).not.toHaveBeenCalled();
+    expect(started).toHaveLength(0);
+    expect(screen.getByRole("status").textContent).toBe("");
+    expect(loadSoundPrefs().soundEnabled).toBe(true);
+  });
+
+  it("a gesture that leaves the context suspended announces nothing and keeps the invite", async () => {
+    const { deps, started } = makeDeps({ resume: "ignored" });
+    renderPage(deps);
+    await settle();
+
+    fireEvent.pointerUp(screen.getByText("Map body"));
+    await settle();
+
+    expect(started).toHaveLength(0);
+    expect(screen.getByRole("status").textContent).toBe("");
+    expect(screen.getByRole("button", { name: /resume sound/i })).toBeTruthy();
+  });
+
+  it("a failed resume on an automatic gesture keeps the saved sound-on and the invite", async () => {
+    const { deps } = makeDeps({ resume: "rejects" });
+    renderPage(deps);
+    await settle();
+
+    fireEvent.pointerUp(screen.getByText("Map body"));
+    await settle();
+
+    expect(loadSoundPrefs().soundEnabled).toBe(true);
+    expect(screen.getByRole("button", { name: /resume sound/i })).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("");
+  });
+
+  it("keeps announcing when the soundscape effect re-runs over the same bed", async () => {
+    const { deps, started } = makeDeps();
+    const view = renderPage(deps);
+    await settle();
+    fireEvent.pointerUp(screen.getByText("Map body"));
+    await settle();
+    expect(screen.getByRole("status").textContent).toBe("Ambience playing");
+
+    // A new map object with the same id re-runs the effect; the bed keeps playing.
+    view.rerender(
+      <SoundSettingsProvider deps={deps} audioAvailable={true}>
+        <SoundscapeLayer map={{ ...mapDoc }} />
+        <SoundControl />
+        <p>Map body</p>
+      </SoundSettingsProvider>,
+    );
+    await settle();
+
+    expect(started).toHaveLength(1);
+    expect(screen.getByRole("status").textContent).toBe("Ambience playing");
+  });
+});
+
+describe("AudioEngine.crossfadeTo results", () => {
+  it("two crossfades to the same bed during decode both report playing", async () => {
+    const { deps, started } = makeDeps();
+    const engine = new AudioEngine(deps);
+    expect(await engine.unlock()).toBe(true);
+    const [area] = prepareAreas(mapDoc);
+
+    const results = await Promise.all([engine.crossfadeTo(area), engine.crossfadeTo(area)]);
+
+    expect(results).toEqual(["playing", "playing"]);
+    expect(started).toHaveLength(1);
+  });
+
+  it("reports locked before unlock and paused while the context is suspended", async () => {
+    const { deps } = makeDeps({ resume: "ignored" });
+    const engine = new AudioEngine(deps);
+    const [area] = prepareAreas(mapDoc);
+
+    expect(await engine.crossfadeTo(area)).toBe("locked");
+    expect(await engine.unlock()).toBe(false);
+    expect(await engine.crossfadeTo(area)).toBe("paused");
   });
 });

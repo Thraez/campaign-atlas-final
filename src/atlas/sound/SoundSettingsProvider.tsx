@@ -18,11 +18,15 @@ interface SoundSettings extends SoundPrefs {
   setVolume: (v: number) => void;
   setMapMasterGain: (g: number) => void;
   /**
-   * True once the AudioContext exists. A saved soundEnabled survives a reload
-   * but the browser only lets audio start from a user gesture, so after a
-   * reload this stays false until the first tap or key press anywhere.
+   * True once the AudioContext has reached "running". A saved soundEnabled
+   * survives a reload, but the browser only lets audio start from a user
+   * gesture, so after a reload this stays false until the first tap or key
+   * press anywhere (or until a gesture the browser actually honours).
    */
   audioUnlocked: boolean;
+  /** True after the player dismissed the resume invite: stay silent this visit. */
+  resumeDismissed: boolean;
+  dismissResume: () => void;
   /** True only while a bed is actually playing (reported by SoundscapeLayer). */
   ambiencePlaying: boolean;
   setAmbiencePlaying: (v: boolean) => void;
@@ -30,6 +34,29 @@ interface SoundSettings extends SoundPrefs {
   audioAvailable: boolean;
   /** True when the OS reports prefers-reduced-motion: reduce. Audio is unaffected. */
   motionReduced: boolean;
+}
+
+/**
+ * Events that count as user activation for every pointer type. pointerdown
+ * only counts for a mouse; a touch activates at pointerup/touchend/click.
+ */
+const GESTURE_EVENTS = ["pointerup", "touchend", "click", "keydown"] as const;
+
+/** Escape and lone modifier keys don't grant user activation. */
+const NON_ACTIVATING_KEYS = new Set([
+  "Escape",
+  "Shift",
+  "Control",
+  "Alt",
+  "Meta",
+  "AltGraph",
+  "CapsLock",
+  "Fn",
+  "OS",
+]);
+
+function grantsActivation(e: KeyboardEvent): boolean {
+  return !NON_ACTIVATING_KEYS.has(e.key);
 }
 
 const Ctx = createContext<SoundSettings | null>(null);
@@ -63,6 +90,7 @@ export function SoundSettingsProvider({
   // ambiencePlaying is reported by SoundscapeLayer when a bed is active.
   const [ambiencePlaying, setAmbiencePlaying] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [resumeDismissed, setResumeDismissed] = useState(false);
 
   const update = useCallback((patch: Partial<SoundPrefs>) => {
     setPrefs((prev) => {
@@ -116,39 +144,48 @@ export function SoundSettingsProvider({
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [engine, prefs.muted, prefs.calmMode]);
 
-  // Must run inside a user-gesture handler so the browser lets audio start.
-  const unlockAudio = useCallback(() => {
-    const unlocking = engine.unlock();
-    // unlock() creates the AudioContext synchronously, before its first await.
-    setAudioUnlocked(engine.unlocked);
-    unlocking.catch(() => {
-      // Web Audio failed to initialise (e.g. browser policy or missing API).
-      // Roll soundEnabled back to false.
-      update({ soundEnabled: false });
-    });
+  // Explicit enable from the invite button. If Web Audio can't start at all,
+  // roll soundEnabled back to false. If the context stays suspended, keep
+  // soundEnabled on: audioUnlocked stays false, so the resume invite shows.
+  const enableSound = useCallback(() => {
+    update({ soundEnabled: true });
+    engine
+      .unlock()
+      .then(setAudioUnlocked)
+      .catch(() => {
+        // Web Audio failed to initialise (e.g. browser policy or missing API).
+        update({ soundEnabled: false });
+      });
   }, [engine, update]);
 
-  const enableSound = useCallback(() => {
-    unlockAudio();
-    update({ soundEnabled: true });
-  }, [unlockAudio, update]);
+  const dismissResume = useCallback(() => setResumeDismissed(true), []);
 
-  // Sound was saved on before a reload: unlock on the first tap or key press
-  // anywhere on the page. Capture phase, so map handlers can't swallow it.
+  // Sound was saved on before a reload: unlock on the first gesture anywhere
+  // that the browser counts as user activation. Gestures on the sound invite
+  // itself are left to its own buttons (Dismiss must stay silent). A gesture
+  // that doesn't get the context running leaves the listener in place for the
+  // next one, and never touches the saved preference.
   useEffect(() => {
-    if (!prefs.soundEnabled || audioUnlocked || !audioAvailable) return;
-    const onGesture = () => {
-      window.removeEventListener("pointerdown", onGesture, true);
-      window.removeEventListener("keydown", onGesture, true);
-      unlockAudio();
+    if (!prefs.soundEnabled || audioUnlocked || resumeDismissed || !audioAvailable) return;
+    let alive = true;
+    const onGesture = (e: Event) => {
+      if (e.target instanceof Element && e.target.closest("[data-sound-invite]")) return;
+      if (e instanceof KeyboardEvent && !grantsActivation(e)) return;
+      engine
+        .unlock()
+        .then((running) => {
+          if (alive && running) setAudioUnlocked(true);
+        })
+        .catch(() => {
+          /* keep the saved "on"; the invite stays */
+        });
     };
-    window.addEventListener("pointerdown", onGesture, true);
-    window.addEventListener("keydown", onGesture, true);
+    for (const type of GESTURE_EVENTS) window.addEventListener(type, onGesture, true);
     return () => {
-      window.removeEventListener("pointerdown", onGesture, true);
-      window.removeEventListener("keydown", onGesture, true);
+      alive = false;
+      for (const type of GESTURE_EVENTS) window.removeEventListener(type, onGesture, true);
     };
-  }, [prefs.soundEnabled, audioUnlocked, audioAvailable, unlockAudio]);
+  }, [prefs.soundEnabled, audioUnlocked, resumeDismissed, audioAvailable, engine]);
 
   const value = useMemo<SoundSettings>(
     () => ({
@@ -160,6 +197,8 @@ export function SoundSettingsProvider({
       setVolume: (v) => update({ volume: Math.min(1, Math.max(0, v)) }),
       setMapMasterGain,
       audioUnlocked,
+      resumeDismissed,
+      dismissResume,
       ambiencePlaying,
       setAmbiencePlaying,
       audioAvailable,
@@ -171,6 +210,8 @@ export function SoundSettingsProvider({
       enableSound,
       update,
       audioUnlocked,
+      resumeDismissed,
+      dismissResume,
       ambiencePlaying,
       audioAvailable,
       motionReduced,

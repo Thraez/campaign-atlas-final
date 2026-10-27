@@ -7,6 +7,18 @@ export interface AudioDeps {
   canPlay: (src: string) => boolean;
 }
 
+/**
+ * What crossfadeTo did:
+ * - "playing": the bed is set up and the AudioContext is running.
+ * - "paused": the bed is set up but the context is suspended (muted, or the
+ *   tab is hidden); it plays as soon as the context resumes.
+ * - "locked": no AudioContext yet (unlock() hasn't run); nothing happened.
+ * - "silence": crossfaded to no bed.
+ * - "failed": the bed could not be fetched or decoded.
+ * - "superseded": a crossfade to a different bed took over while decoding.
+ */
+export type CrossfadeResult = "playing" | "paused" | "locked" | "silence" | "failed" | "superseded";
+
 const CROSSFADE_S = 1.0;
 const BUFFER_CAP = 4;
 
@@ -38,8 +50,12 @@ export class AudioEngine {
 
   constructor(private deps: AudioDeps) {}
 
-  /** Must be called from a user-gesture handler. Idempotent. */
-  async unlock(): Promise<void> {
+  /**
+   * Must be called from a user-gesture handler. Idempotent. Resolves true
+   * when the AudioContext is running afterwards; false when the browser kept
+   * it suspended (the gesture didn't count). Rejects when Web Audio can't start.
+   */
+  async unlock(): Promise<boolean> {
     if (!this.ctx) {
       this.ctx = this.deps.createContext();
       this.master = this.ctx.createGain();
@@ -47,6 +63,11 @@ export class AudioEngine {
       this.master.connect(this.ctx.destination);
     }
     await this.resume();
+    return this.running;
+  }
+
+  private get running(): boolean {
+    return this.ctx?.state === "running";
   }
 
   async resume(): Promise<void> {
@@ -73,35 +94,33 @@ export class AudioEngine {
     if (!this.muted) this.setMuted(false);
   }
 
-  /** True once unlock() has created the AudioContext. */
-  get unlocked(): boolean {
-    return this.ctx !== null;
+  private bedResult(): CrossfadeResult {
+    return this.running ? "playing" : "paused";
   }
 
-  /**
-   * Crossfade to the given area's bed, or to silence when area is null.
-   * Resolves true only when that bed is actually playing afterwards: false
-   * before unlock(), for silence, when the bed fails to load, or when a newer
-   * crossfade took over while it decoded.
-   */
-  async crossfadeTo(area: PreparedArea | null): Promise<boolean> {
-    if (!this.ctx || !this.master) return false;
+  /** Crossfade to the given area's bed, or to silence when area is null. */
+  async crossfadeTo(area: PreparedArea | null): Promise<CrossfadeResult> {
+    if (!this.ctx || !this.master) return "locked";
     const targetId = area?.id ?? null;
-    if (this.active?.id === targetId) return this.active !== null;
+    if (this.active?.id === targetId) return this.active ? this.bedResult() : "silence";
 
     const out = this.active;
     this.active = null;
     if (out) this.fadeOutAndStop(out);
 
-    if (!area) return false;
+    if (!area) return "silence";
 
     const src =
       this.deps.canPlay(area.bed.src) || !area.bed.srcFallback
         ? area.bed.src
         : area.bed.srcFallback;
     const buffer = await this.loadBuffer(src);
-    if (!buffer || !this.ctx || !this.master) return false;
-    if (this.active) return false; // a newer crossfade superseded us while decoding
+    if (!buffer || !this.ctx || !this.master) return "failed";
+    // Another crossfade finished while we decoded. If it was to this same bed,
+    // the bed is playing all the same.
+    // (TS narrowed this.active to null above; the await may have changed it.)
+    const winner = this.active as ActiveBed | null;
+    if (winner) return winner.id === area.id ? this.bedResult() : "superseded";
 
     const gain = this.ctx.createGain();
     gain.gain.value = 0;
@@ -117,7 +136,7 @@ export class AudioEngine {
     gain.gain.setValueAtTime(0, this.ctx.currentTime);
     gain.gain.linearRampToValueAtTime(peak, this.ctx.currentTime + CROSSFADE_S);
     this.active = { id: area.id, source, gain };
-    return true;
+    return this.bedResult();
   }
 
   private fadeOutAndStop(bed: ActiveBed): void {
