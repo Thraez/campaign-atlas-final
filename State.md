@@ -62,9 +62,7 @@ Either Isak merges in that order on GitHub, or he adds a Bash permission rule fo
 
 In flight (2026-10-27, stopped at the agent session limit, resets 23:10 Berlin):
 
-- `eval-14-one-search` (bc0bb43 pushed): two-axis review clean (player safety confirmed); the
-  review tidy-ups are uncommitted in worktree `.claude/worktrees/agent-a5539c8240a905637`, gate
-  not yet run. Finish, gate, commit, push, open PR.
+- `eval-14-one-search`: review fixes in, gate green, PR #63 open.
 - `eval-15-shared-drawing` (31cdaf6 pushed): built and gated; two-axis review not run yet.
 - `eval-18-drop-frontmatter-stream`: review clean, PR #62 open (base `eval-16-delete-entity-tabs`;
   retarget to `main` after #59).
