@@ -53,7 +53,7 @@ commands with shell variables (one plain command per call, absolute paths).
 
 - `main` was pushed once (f65c854..0c1d92a, docs only, on his yes) before this rule arrived.
 - PRs waiting for his yes to merge (each merge publishes), in stack order: #62 → #66 → #68;
-  #64 → #67 → #69; #63; #65. See "Merge queue" for what each needs him to look at.
+  #64 → #67 → #69 → #70; #63; #65. See "Merge queue" for what each needs him to look at.
 - Local `main` commits since 0c1d92a: push them in the morning.
 - Code-retro 06 needs a real `npm run atlas:publish` run before it is done (the ticket asks for
   it; overnight only its parts ran).
@@ -76,6 +76,7 @@ So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logg
 | #67 | 11     | Pin layer stops rebuilding on every change     | #64 (stacked); Isak checks the map by eye; yes |
 | #68 | 19     | Map layer uploads always get a real path       | #66 (stacked); Isak tries the path field; yes  |
 | #69 | a-08   | The map waits for a size before flying         | #67 (stacked); his yes                         |
+| #70 | 20     | Pin labels switch mode when the zoom changes   | #69 (stacked); Isak zooms and looks; yes       |
 
 In flight (2026-10-28, overnight):
 
@@ -83,7 +84,7 @@ In flight (2026-10-28, overnight):
   review found one leak (a `---x` line inside frontmatter now parsed as a key, so a note could
   ship as player) and one place where the build no longer redacts on its own. Fixes are with the
   builder; no PR until they land and the side-by-side check against main shows nothing looser.
-- `eval-20-label-mode-zoom`: building, stacked on `audit-08-flyto-zero-size`.
+- `eval-21-sound-after-reload` and `eval-22-maps-optimize-lossless`: building, each from `main`.
 - Code-retro 07 and 08 wait on 06.
   Merged 2026-10-27 on Isak's relayed yes ("Atlas may merge #61 first, then #57, #58, #59 and #60 in
   order, each after its CI re-run is green; the publishes are fine"). Each PR's branch was updated
