@@ -377,7 +377,8 @@ describe("ImportStagingModal", () => {
     expect(visSelect.getAttribute("aria-disabled")).not.toBe("true");
   });
 
-  it("create row — visibility select is disabled with a DM-only-safety tooltip", () => {
+  // code-retro 04: commit writes what the row shows, so a new row's visibility is the DM's to set.
+  it("create row — visibility select is enabled and shows dm for an untagged dropped file", () => {
     const rows = buildStagingRows(
       [{ filename: "new-npc.md", raw: "---\natlas: { type: npc, id: new-npc }\n---\n" }],
       makeCtx(),
@@ -386,8 +387,8 @@ describe("ImportStagingModal", () => {
     const visSelect = screen.getByLabelText(/visibility for new-npc\.md/i) as HTMLButtonElement;
     expect(
       visSelect.hasAttribute("disabled") || visSelect.getAttribute("aria-disabled") === "true",
-    ).toBe(true);
-    expect(visSelect.getAttribute("title")).toMatch(/saved DM-only for safety/i);
+    ).toBe(false);
+    expect(visSelect.textContent).toBe("dm");
   });
 
   it("shows a comma-separated tags/aliases warning badge when frontmatterWarning is set", () => {
@@ -413,7 +414,8 @@ describe("ImportStagingModal", () => {
     expect(screen.queryByText(/Comma-separated tags\/aliases/i)).toBeNull();
   });
 
-  it("path-collision row — visibility select is disabled with a DM-only-safety tooltip", () => {
+  // code-retro 04: commit writes what the row shows, so a new row's visibility is the DM's to set.
+  it("path-collision row — visibility select is enabled and shows dm for an untagged dropped file", () => {
     const existingPaths = new Set(["content/astrath-deeprealm/settlements/thornhold.md"]);
     const ctx = makeCtx({ existingPaths });
     const rows = buildStagingRows(
@@ -424,8 +426,8 @@ describe("ImportStagingModal", () => {
     const visSelect = screen.getByLabelText(/visibility for thornhold\.md/i) as HTMLButtonElement;
     expect(
       visSelect.hasAttribute("disabled") || visSelect.getAttribute("aria-disabled") === "true",
-    ).toBe(true);
-    expect(visSelect.getAttribute("title")).toMatch(/saved DM-only for safety/i);
+    ).toBe(false);
+    expect(visSelect.textContent).toBe("dm");
   });
 
   it("needsReview row shows plain-language reason badge", () => {

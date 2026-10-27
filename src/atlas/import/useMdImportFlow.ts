@@ -12,6 +12,7 @@ import {
   updateStagingRow,
   type RawImportFile,
   type StagingRow,
+  type StagingContext,
   type StagingRowPatch,
 } from "./stagingState";
 import {
@@ -64,6 +65,9 @@ export interface UseMdImportFlowArgs {
   importConfig: ImportFolderConfig;
   /** Map of entity id → sourcePath for conflict detection (update vs create). */
   existingById: ReadonlyMap<string, string>;
+  /** Entity id → its visibility and type in the DM atlas, so an update row shows
+   *  the visibility it keeps and a secrecy increase is held for review. */
+  entityMeta?: StagingContext["entityMeta"];
   /** Called after a successful import so the editor can reload canon. */
   onImported: () => void | Promise<void>;
 }
@@ -82,7 +86,7 @@ export function vaultScanResultToInputs(files: Record<string, string>): RawImpor
 }
 
 export function useMdImportFlow(args: UseMdImportFlowArgs) {
-  const { worldId, importConfig, existingById, onImported } = args;
+  const { worldId, importConfig, existingById, entityMeta, onImported } = args;
   const [rows, setRows] = useState<StagingRow[]>([]);
   const [open, setOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -95,8 +99,8 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
       importConfig.defaultFolder,
     ]) as ReadonlySet<string>;
     const existingPaths = new Set(existingById.values()) as ReadonlySet<string>;
-    return { worldId, importConfig, allowedFolders, existingById, existingPaths };
-  }, [worldId, importConfig, existingById]);
+    return { worldId, importConfig, allowedFolders, existingById, existingPaths, entityMeta };
+  }, [worldId, importConfig, existingById, entityMeta]);
 
   const openWithInputs = useCallback(
     (inputs: RawImportFile[]) => {

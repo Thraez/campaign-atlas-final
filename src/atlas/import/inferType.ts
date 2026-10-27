@@ -83,6 +83,18 @@ export const IGNORED_FOLDERS = new Set([
   ".trash",
 ]);
 
+/**
+ * Vault folders whose notes are already public (on the Obsidian site), so an
+ * untagged note from them arrives as `player`. Everything else arrives as `dm`
+ * until the DM tags it (docs/GOALS.md, "Sync from Obsidian").
+ */
+export const PLAYER_VAULT_FOLDERS = new Set(["01_lore", "02_regions"]);
+
+export function defaultVisibilityForVaultPath(relPath: string | undefined): "player" | "dm" {
+  const top = relPath?.split(/[\\/]/).find(Boolean)?.toLowerCase();
+  return top && PLAYER_VAULT_FOLDERS.has(top) ? "player" : "dm";
+}
+
 export function inferTypeFromPath(relPath: string): string {
   const parts = relPath.split(/[\\/]/).filter(Boolean);
   // Walk parents from closest-to-file outward — closer folders win.

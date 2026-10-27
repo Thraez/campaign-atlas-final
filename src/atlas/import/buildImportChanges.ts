@@ -78,6 +78,10 @@ export async function buildImportChanges(
         inferredType: row.inferredType,
         baseType: row.baseType, // from sync-map (Phase 2); undefined → vault wins on type
       });
+      // An approved secrecy increase is the one case where the vault's visibility wins.
+      if (row.needsReview?.reason === "secrecy-increase") {
+        (merged.data.atlas as Record<string, unknown>).visibility = row.resolvedVisibility;
+      }
       // The vault's title is its filename, which the merge doesn't see.
       content = stringifyFrontmatter(merged.content, { title: row.title, ...merged.data });
     } else {
@@ -86,15 +90,13 @@ export async function buildImportChanges(
         const currentRaw = await readSourceFile(row.targetPath, fetchFn);
         baseHash = await hashContent(currentRaw);
       }
-      // create/path-collision: new entities always default to dm-only unless
-      // the DM explicitly approved a secrecy-increase row (Phase 2 populates needsReview).
-      const safeVisibility =
-        row.needsReview?.reason === "secrecy-increase" ? row.resolvedVisibility : "dm";
+      // create/path-collision: the visibility Staging showed (the note's tag,
+      // else the vault folder rule; see stagingState).
       content = rewriteFrontmatter(row.rawContent, {
         title: row.title,
         id: row.resolvedId,
         type: row.inferredType,
-        visibility: safeVisibility,
+        visibility: row.resolvedVisibility,
         tagsAdd: row.inferredType ? [row.inferredType] : [],
       });
     }

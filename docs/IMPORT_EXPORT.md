@@ -65,6 +65,11 @@ importer. Its ignore list (`IGNORED_FOLDERS`) matches whole folder names, lowerc
 `00_templates`, `98_templates`, `99_templates`, `z_archive`, `90_inbox`, `z_codex_proposals` and others. Saved sync
 settings and `sync-map.json` also key on vault folder names and note paths.
 
+The same file holds the visibility rule for new notes (`PLAYER_VAULT_FOLDERS`): an untagged note from
+`01_Lore` or `02_Regions` arrives as `player`, from anywhere else as `dm`. A note's own tag wins. An
+update keeps the atlas's visibility unless the DM approves a secrecy increase in Staging. Staging
+shows exactly the visibility the commit writes.
+
 ### Duplicate-title detection
 
 The build already fails on duplicate slugs (same `atlas.id` or same slugified title). The wizard surfaces these **before** commit:
