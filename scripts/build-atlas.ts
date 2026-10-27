@@ -20,6 +20,7 @@ import {
 } from "../src/atlas/content/renderEntityMarkdown";
 import { parseFrontmatter, type ParsedFile } from "./atlas/parseFrontmatter";
 import {
+  secretMarkerIds,
   stripDmBlocks,
   stripDmFromShippingString,
   stripSecretMarkers,
@@ -527,9 +528,7 @@ async function runBuildCore(flags: BuildFlags) {
       secretSpecsByEntity.set(item.id, entitySpecs);
       // Check the RAW body (before marker stripping) so we correctly detect
       // secrets that have no placement marker in the authored text.
-      const markerIds = new Set(
-        [...item.parsed.body.matchAll(/\{\{secret:([^}]+)\}\}/g)].map((m) => m[1]),
-      );
+      const markerIds = new Set(secretMarkerIds(item.parsed.body));
       for (const s of entitySpecs) {
         if (!markerIds.has(s.id)) {
           warnings.push(

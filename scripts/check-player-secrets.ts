@@ -9,7 +9,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { secretMarkerIds } from "../src/atlas/content/dmMarkup";
+import { hasSecretMarker } from "../src/atlas/content/dmMarkup";
 
 export interface RunOpts {
   dir: string;
@@ -31,8 +31,6 @@ const TEXT_EXTENSIONS = new Set([
 
 /** Fields that must not appear on a PlayerSecret object in any player artifact. */
 const FORBIDDEN_KEYS = ["reveal", "password", "for"];
-
-const hasSecretMarker = (text: string) => secretMarkerIds(text).length > 0;
 
 interface PlayerSecret {
   id?: string;

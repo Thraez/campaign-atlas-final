@@ -13,6 +13,7 @@
  * their output in order and tallies the counts.
  */
 import type { AtlasProject, MapDocument, Entity } from "@/atlas/content/schema";
+import { findDmMarkup } from "@/atlas/content/dmMarkup";
 import {
   PLAYER_VISIBLE_VISIBILITY,
   VALID_VISIBILITY,
@@ -354,15 +355,15 @@ const checkEntities: Rule = (ctx) => {
         scope: { entityId: e.id },
       });
     }
-    // DM block leakage in body — %% ... %% should already be stripped by the
-    // build, but if any literal "%%" pair remains in a player-visible entity
-    // it will be visible. Flag it as a suggestion to encourage cleanup.
-    if (ctx.playerVisibleVis.has(e.visibility) && /%%[\s\S]+?%%/.test(e.body || "")) {
+    // DM markup in a player-visible source body. The build strips it, but the
+    // source markdown still holds DM notes. Flag it to encourage cleanup.
+    const markup = ctx.playerVisibleVis.has(e.visibility) ? findDmMarkup(e.body || "") : null;
+    if (markup === "%%" || markup === ":::dm") {
       issues.push({
         severity: "warning",
         code: "dm-block-in-player-body",
         category: "safety",
-        message: `Player-visible entity "${e.title}" still contains %% DM blocks %%`,
+        message: `Player-visible entity "${e.title}" still contains ${markup} DM blocks`,
         hint: "The build strips these, but leaving DM notes in player-visible files is risky if someone reads the source markdown. Move sensitive notes to a DM-only entity.",
         scope: { entityId: e.id },
       });

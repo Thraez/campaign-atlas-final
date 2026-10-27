@@ -12,12 +12,14 @@ import {
   stripDmFromShippingString,
   stripSecretMarkers,
 } from "@/atlas/content/dmMarkup";
+import { generateAutoSummary } from "@/atlas/import/parseObsidian";
 import { scanArtifactShape } from "../../../scripts/check-artifact-shape";
 
 const CASES = [
   { syntax: "%%", text: "Seen. %% the king is dead %% Also seen." },
   { syntax: "%%", text: "Seen.\n\n%%\nmulti\nline\n%%\n\nAlso seen." },
   { syntax: ":::dm", text: "Seen.\n\n:::dm\nthe king is dead\n:::\n\nAlso seen." },
+  { syntax: ":::dm", text: "Seen.\n\n:::DM\nthe king is dead\n:::\n\nAlso seen." },
   { syntax: "{{secret:", text: "Seen. {{secret:signet}} Also seen." },
 ] as const;
 
@@ -43,6 +45,23 @@ describe("DM markup: strip and detect agree", () => {
 
   it("plain prose and other {{...}} patterns are not DM markup", () => {
     expect(findDmMarkup("100% sure, {{other:thing}}, ::: alone")).toBeNull();
+  });
+
+  it("a lone %% is flagged: stripping can't close it, so the scans must catch it", () => {
+    const shipped = "Name %% the king is dead";
+    expect(stripDmBlocks(shipped).unbalanced).toBe(true);
+    expect(findDmMarkup(stripDmFromShippingString(shipped) ?? "")).toBe("%%");
+  });
+});
+
+describe("other readers of DM markup", () => {
+  it("the import auto-summary drops DM blocks and secret markers", () => {
+    const body =
+      "The harbour town of Tidemarrow. %% smugglers %% {{secret:x}}\n\n:::dm\nthe mayor is a lich\n:::\n";
+    const summary = generateAutoSummary(body) ?? "";
+    expect(summary).toContain("The harbour town of Tidemarrow.");
+    expect(findDmMarkup(summary)).toBeNull();
+    expect(summary).not.toMatch(/smugglers|lich/);
   });
 });
 

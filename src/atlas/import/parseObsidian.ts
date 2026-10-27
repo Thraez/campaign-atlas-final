@@ -12,6 +12,7 @@ import type { EntityVisibility } from "@/atlas/content/schema";
 import { isValidVisibility } from "@/atlas/content/visibility";
 import { parseFrontmatter } from "./frontmatter";
 import { slugify } from "@/atlas/content/slugify";
+import { stripDmBlocks, stripSecretMarkers } from "@/atlas/content/dmMarkup";
 import { inferTypeFromPath, isIgnoredPath } from "./inferType";
 
 export type ImportLevel =
@@ -73,11 +74,11 @@ function safeFilenameToTitle(name: string): string {
 
 /** Generate a one-paragraph summary from the first meaningful prose. */
 export function generateAutoSummary(body: string, maxLen = 220): string | undefined {
-  const cleaned = body
+  // The summary may ship to players, so DM blocks and secret markers go first.
+  const cleaned = stripSecretMarkers(stripDmBlocks(body).text)
     .replace(/```[\s\S]*?```/g, "") // fenced code
     .replace(/`[^`\n]+`/g, "") // inline code
     .replace(/<!--[\s\S]*?-->/g, "") // HTML comments
-    .replace(/%%[\s\S]*?%%/g, "") // Obsidian comments
     .replace(/<[^>]+>/g, "") // raw HTML
     .replace(/!\[\[[^\]]+\]\]/g, "") // embeds
     .replace(/!\[[^\]]*\]\([^)]+\)/g, "") // md images
