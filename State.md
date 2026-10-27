@@ -53,6 +53,7 @@ So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logg
 | #60 | 17     | Entity edit recovers from a save conflict   | Isak's look at the banners; his yes       |
 | #61 | -      | CI: build tests run async (shard 4 timeout) | His yes; #57-#60 need it for green CI     |
 | #62 | 18     | Remove the entity-frontmatter save stream   | #59 (stacked); his yes                    |
+| #63 | 14     | One search for palette, Browse and Timeline | Isak tries search (Q2); his yes           |
 
 Local `main` is ahead of `origin/main` by the tracker commits for 14-18 (not pushed).
 
