@@ -15,7 +15,12 @@
  * Comment preservation is delegated to serializeWorldYaml — the leading
  * block of the existing file is re-prepended byte-for-byte (or a default
  * boilerplate header when there's no existing file).
+ *
+ * Top-level keys the editor doesn't own (see EDITOR_OWNED_KEYS) are read
+ * from the existing file and written back unchanged, so a Save never drops
+ * Sync's `import:` block or any other hand-written key.
  */
+import yaml from "js-yaml";
 import type {
   AssetCredit,
   CreditsConfig,
@@ -55,18 +60,73 @@ export interface BuildFullWorldYamlOpts {
   assetCredits?: Record<string, AssetCredit>;
 }
 
+/**
+ * Top-level keys the editor owns: Save rewrites them from editor state (or
+ * removes them when the editor has no value). `regions`, `fog` and `routes`
+ * are the legacy top-level forms the loader folds into `maps[]`; the editor
+ * writes them nested, so keeping the top-level copies would duplicate them.
+ * Every other top-level key in the existing file (`import:`, anything the
+ * editor doesn't model) is carried over unchanged.
+ */
+const EDITOR_OWNED_KEYS = new Set([
+  "schemaVersion",
+  "name",
+  "maps",
+  "calendar",
+  "credits",
+  "assetCredits",
+  "regions",
+  "fog",
+  "routes",
+]);
+
 export function buildFullWorldYaml(opts: BuildFullWorldYamlOpts): string {
-  const root: Record<string, unknown> = {};
-  if (opts.schemaVersion !== undefined) root.schemaVersion = opts.schemaVersion;
-  if (opts.name) root.name = opts.name;
-  root.maps = opts.maps.map(mapToYamlObject);
-  if (opts.calendar) root.calendar = calendarToYamlObject(opts.calendar);
-  if (opts.credits) root.credits = creditsToYamlObject(opts.credits);
+  const existingRoot = parseExistingRoot(opts.existing);
+  const owned: Record<string, unknown> = {};
+  if (opts.schemaVersion !== undefined) owned.schemaVersion = opts.schemaVersion;
+  if (opts.name) owned.name = opts.name;
+  owned.maps = opts.maps.map(mapToYamlObject);
+  if (opts.calendar) owned.calendar = calendarToYamlObject(opts.calendar);
+  // The loader always fills credits in (both flags true), so the projection
+  // carries it even when the file doesn't. Don't write the default into a
+  // file that didn't have the key.
+  if (opts.credits && (!isDefaultCredits(opts.credits) || "credits" in existingRoot)) {
+    owned.credits = creditsToYamlObject(opts.credits);
+  }
   if (opts.assetCredits && Object.keys(opts.assetCredits).length > 0) {
-    root.assetCredits = assetCreditsToYamlObject(opts.assetCredits);
+    owned.assetCredits = assetCreditsToYamlObject(opts.assetCredits);
+  }
+
+  // Keep the existing file's key order: owned keys are replaced in place,
+  // unknown keys pass through, new owned keys are appended.
+  const root: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(existingRoot)) {
+    if (!EDITOR_OWNED_KEYS.has(key)) root[key] = value;
+    else if (key in owned) root[key] = owned[key];
+  }
+  for (const [key, value] of Object.entries(owned)) {
+    if (!(key in root)) root[key] = value;
   }
   const body = dumpYaml(root);
   return serializeWorldYaml(body, opts.existing);
+}
+
+/** Parse the existing file's top-level mapping. An absent, empty or
+ *  unparseable file yields `{}` (nothing to carry over). */
+function parseExistingRoot(existing: string | null): Record<string, unknown> {
+  if (existing === null) return {};
+  let data: unknown;
+  try {
+    data = yaml.load(existing);
+  } catch {
+    return {};
+  }
+  if (data === null || typeof data !== "object" || Array.isArray(data)) return {};
+  return data as Record<string, unknown>;
+}
+
+function isDefaultCredits(c: CreditsConfig): boolean {
+  return c.badges !== false && c.page !== false;
 }
 
 function mapToYamlObject(m: MapDocument): Record<string, unknown> {
