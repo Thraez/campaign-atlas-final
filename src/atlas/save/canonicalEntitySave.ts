@@ -6,13 +6,11 @@
  *
  *   1. Pin placements (Pins tab) — `atlas.placements[]`.
  *   2. Frontmatter drafts — visibility, summary, aliases, images, profile,
- *      relationships, type. (The Entities tab that produced these was
- *      deleted; the placement editor passes none today and entity edits go
- *      through EntityEditPanel, but the merge path stays for buildSavePlan.)
+ *      relationships, type. The placement editor always passes none
+ *      (entity edits go through EntityEditPanel); this stream is pending
+ *      removal (eval-2026-10/18).
  *
- * Previously only stream 1 went through the unified Save; stream 2 could
- * only leave the editor via an "Export Patch" download the DM had to apply
- * by hand. This module closes that gap so a single Save writes everything.
+ * A single Save writes both streams.
  *
  * Correctness requirement: an entity can be edited in BOTH streams in one
  * session. The /__atlas/save endpoint rejects a batch with two entries for
@@ -93,9 +91,9 @@ function mergeFrontmatterFields(
   const atlas: Record<string, unknown> = {
     ...((data.atlas as Record<string, unknown>) ?? {}),
   };
-  // Same strip rule as buildEntityFrontmatterPatch: omit undefined and empty
-  // arrays so we don't write noise. `atlas.placements` is never a patch key,
-  // so any placement merge applied earlier is preserved by the spread above.
+  // Omit undefined values and empty arrays so we don't write noise.
+  // `atlas.placements` is never a patch key, so any placement merge applied
+  // earlier is preserved by the spread above.
   for (const [k, v] of Object.entries(patch.atlas)) {
     if (v !== undefined && !(Array.isArray(v) && v.length === 0)) atlas[k] = v;
   }

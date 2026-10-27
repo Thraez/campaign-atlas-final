@@ -4,8 +4,8 @@
  * Centralizes:
  *  - flow style (block, never inline)
  *  - quoting + indentation
- *  - never-emits-fences invariant (`loadWorldConfig` rejects fenced world.yaml
- *    at build time)
+ *  - never-emits-fences invariant. The only build-time fence check is
+ *    `loadWorldConfig`, and it covers world.yaml only, not entity .md files.
  *
  * Use this instead of hand-stringifying YAML in components. The `header`
  * prepends standard "this is a tool-generated patch" comments.

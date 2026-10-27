@@ -52,3 +52,21 @@ Kept, and why:
 Follow-up candidates: `buildEntityFrontmatterPatch`, `profileFields.ts` and the empty
 frontmatter-draft stream in `buildSavePlan`.
 
+### 2026-10-27 (agent, Opus): review fixes
+
+Two-axis review confirmed reachability; status stays `done` now that review has run (non-UI
+change). Fixes on the same branch:
+
+- Deleted `src/atlas/profiles/profileFields.ts` and `buildEntityFrontmatterPatch` (with
+  `PatchArtifact`/`PatchKindId`), plus the tests that covered only them (`dmFieldsForType` cases in
+  `atlas-profiles.test.ts`, the builder cases in `atlas-import.test.ts` and
+  `yaml/buildPatches.test.ts`; the remaining `patchHeader`/`dumpYaml` cases moved to
+  `yaml/dump.test.ts`). `buildPatches.ts` keeps `PlacementOverride` and `EntityFrontmatterPatch`.
+- Frontmatter-draft save stream left in place; comments now say `entityDrafts` is always `{}` in
+  production and pending removal (eval-2026-10/18).
+- `docs/IMPORT_EXPORT.md`: profile/relationships point at the vault; the "Export patch" section
+  (no such button exists) replaced with the real Save flow and the Regions/Routes/Fog YAML
+  previews; the multi-entity handout note no longer points at the Entities tab.
+- Comments that narrated history now say what the code is for; `dump.ts` says the build-time fence
+  check covers `world.yaml` only.
+

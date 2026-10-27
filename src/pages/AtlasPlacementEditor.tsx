@@ -812,9 +812,8 @@ function AtlasPlacementEditorInner() {
       allDraftPlacements: buildDraftPlacements(),
       overrides,
       activeMapId: activeMap.id,
-      // Frontmatter drafts are not wired into this page — entity edits go
-      // through EntityEditPanel/useEntityEditDraft — so supply none.
-      // buildSavePlan keeps the param for its other (tested) callers.
+      // Entity edits go through EntityEditPanel/useEntityEditDraft, so this is
+      // always {} in production. The param is pending removal (eval-2026-10/18).
       entityDrafts: {},
       projectEntities: project.entities,
       worldYamlDirty,
