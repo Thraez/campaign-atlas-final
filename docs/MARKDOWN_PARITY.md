@@ -48,4 +48,4 @@ treat it as a new scoped decision, not a parity bug.
 
 See also: [docs/NON_GOALS.md](NON_GOALS.md) for product-level non-goals and
 the design record at
-`docs/superpowers/specs/2026-05-18-obsidian-markdown-parity-design.md`.
+`docs/archive/superpowers/specs/2026-05-18-obsidian-markdown-parity-design.md`.

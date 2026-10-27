@@ -487,7 +487,7 @@ the source `world.yaml` and fails the build if any layer image, geometry
 field, in-fog content, or alpha pixel leaked. It runs as part of
 `npm run atlas:publish`.
 
-Full spec: `docs/superpowers/specs/2026-05-19-fog-player-mechanic-design.md`.
+Full spec: `docs/archive/superpowers/specs/2026-05-19-fog-player-mechanic-design.md`.
 ---
 Calendar and timeline
 Define a calendar in `world.yaml`:

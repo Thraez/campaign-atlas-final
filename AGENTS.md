@@ -12,24 +12,26 @@ local DM editor. Vite, React, TypeScript. Remote: github.com/Thraez/campaign-atl
 - `npm run atlas:publish`: full build plus the safety scans
 - `npm run images:optimize`: convert PNG/JPEG to WebP and update references
 
-A branch is done only after typecheck, lint, tests, and any pipeline checks it touches.
+A ticket is done per `docs/agents/workflow.md` ("Done").
 
 ## Where things are
 
-- State: `State.md` (this repo). The continuous routine's own log is project memory
-  `handovers/ACTIVE.md`; session plans go in `handovers/SESSION.md`. Never put a session plan in ACTIVE.md.
-- Decisions: `docs/decisions.md`. Longer recorded choices live in project memory `feedback_*.md`.
+- Goals and what "working" means: `docs/GOALS.md`. State: `State.md`. Work: `docs/tracker/`.
+  Decisions: `docs/adr/` (`docs/decisions.md` is closed). Hand-overs between sessions go in the
+  ticket or `State.md`.
 - Map: `docs/CODEBASE_MAP.md`, plus the `README.md` table of contents.
 - Output contract for builds: the scan scripts under `scripts/`.
 - `content/astrath-deeprealm/` is the atlas's own copy of the lore. The real vault sits outside the
-  repo; the DM types its path into the "Sync from Obsidian" panel.
+  repo (Mac: `~/Documents/DnD-Campaign-Repository/Vault-DnD`); the DM types its path into the
+  "Sync from Obsidian" panel.
+- `docs/archive/`: the retired continuous-dev routine and old plans. History only.
 
 ## Search, don't read whole
 
-- `docs/automation/continuous-dev-done.md` (347 KB, 4,417 lines)
-- `docs/automation/continuous-dev-nice-to-haves.md` (150 KB)
+- `docs/archive/automation/continuous-dev-done.md` (347 KB)
 - `README.md` (35 KB, 1,055 lines)
 - `src/pages/AtlasPlacementEditor.tsx` (110 KB)
+- `scripts/build-atlas.ts`, `scripts/vite-plugin-atlas-save.ts` (1,500+ lines each)
 - `package-lock.json` (496 KB)
 
 ## Git and deploy
@@ -38,7 +40,7 @@ A branch is done only after typecheck, lint, tests, and any pipeline checks it t
   Ask before any `git push` and before merging into `main`. Nothing goes out unasked.
 - If `origin/main` has diverged or a merge conflicts, stop; do not resolve it unattended.
 - Never force-push. Before deleting a branch with commits, tag its tip `archive/<name>`, push the
-  tag, confirm it is in no worktree, list it, and wait for the user (`safe_cleanup_protocol.md`).
+  tag, confirm it is in no worktree, list it, and wait for the user.
 
 ## Never
 
@@ -51,15 +53,8 @@ A branch is done only after typecheck, lint, tests, and any pipeline checks it t
   `vite.config.ts`. Never import editor modules from a player entry point.
 - Published image format and naming belong to `src/atlas/assets/imageEncoding.ts`; import it,
   don't copy it. Maps stay lossless (labels, fog redaction); `maps:optimize` owns them.
-
-## Vault folder names (importer depends on them)
-
-`src/atlas/import/inferType.ts` infers note types from vault folder names: `03_Entities/NPCs` ->
-npc, `03_Entities/Gods` -> deity, `02_Regions/Places` -> location. Those names must not change
-without updating the importer. Its ignore list (`IGNORED_FOLDERS`) matches whole folder names,
-lowercase: `templates`, `archive`, `00_templates`, `98_templates`, `99_templates`, `z_archive`, `90_inbox`,
-`z_codex_proposals` and others. Saved sync settings and `sync-map.json` also key on vault
-folder names and note paths.
+- Never rename vault folders without updating `src/atlas/import/inferType.ts`, which reads note types and its ignore
+  list from folder names. Details: `docs/IMPORT_EXPORT.md` ("Vault folder names").
 
 ## Agent skills
 

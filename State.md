@@ -1,28 +1,30 @@
 # State
 
-Updated 2026-10-11. Branch `auto/continuous-dev`; last content commit is `b32a8a9b` (2026-08-29),
-followed only by CLAUDE.md/settings work through `89724d4c`.
+Updated 2026-10-27 on the Mac. Branch `main`, all commits local (not pushed).
 
 ## Where it stands
 
-- Every queued want and nice-to-have is done (checked by the routine on 2026-09-06; the last
-  feature work was the excluded-count split in the DM build report, `5c0c7ca2` / `415618e9`).
-- The continuous routine is idle and has handed back 18 times with nothing to build. It needs a
-  refuel (a fresh dogfooding pass is the suggested next step). Project memory `handovers/ACTIVE.md`
-  is the routine's log and reads as current; it is not.
-- Session handover is empty (`handovers/SESSION.md`: Status NONE).
+- Reworked on 2026-10-27: Matt Pocock's skills installed (`docs/agents/`), goals agreed with Isak
+  (`docs/GOALS.md`), ADR-0001 (a note with no visibility is DM-only), tickets in `docs/tracker/`.
+- The atlas becomes the players' atlas for the world, Tidemarrow first, filled from the vault by
+  Sync from Obsidian. Today it still shows the old Astrath sample (three events).
+- The continuous-dev routine is retired; its docs are in `docs/archive/`.
+- Typecheck, lint and `npm run test:ci` pass on the Mac (3,228 tests). The strict player build and
+  the secrets scans pass.
+- Live site: https://thraez.github.io/campaign-atlas-final/ (last publish 2026-10-11). The next
+  push to `main` republishes it without Corven, Edric and Soreth (ADR-0001).
 
-## Next
+## Next, in order
 
-1. Restructured D&D vault: importer ignore list now covers `00_Templates`, `98_Templates`,
-   `Z_Archive`, `90_Inbox`, `Z_Codex_Proposals`. Keep `03_Entities/NPCs`, `03_Entities/Gods` and
-   `02_Regions/Places` names, or update `inferType.ts`.
-2. Decide whether to refuel or retire the continuous routine.
-3. Clean up: 38 identical `claude/*` branches, stale worktrees, 3 stashes (follow the archive-tag
-   rule in AGENTS.md).
+1. `audit-2026-10/02`: clear the production dependency audit (weekly CI audit has been failing).
+2. `audit-2026-10/03`, `04`: test:ci shard retry; COMMANDS.md drift.
+3. `code-retro/01`-`04`: safety-scan titles and the Sync bugs.
+4. `tidemarrow/01`-`03`: first sync, Tidemarrow map, remove the Astrath sample.
+5. `code-retro/06`-`08`: Note reading module, Sync module with dry run, build core.
 
-## Blocked / waiting on the user
+## Waiting on Isak
 
-- `stash@{2}` holds `content/astrath-deeprealm/imports/kellan-brecht.md`, in no commit. Keep or drop?
-- Which vault folders are ticked in "Sync from Obsidian" (none saved yet).
-- Whether `campaign-atlas-t1` worktree and the empty `*-worktrees` folders can go.
+- Push `main` (republishes the site) and delete `origin/auto/continuous-dev` after tagging it
+  (`audit-2026-10/06`).
+- The world's new name (`audit-2026-10/05`).
+- On the PC: follow `docs/PC-CLEANUP.md` (turn the old routines off first).

@@ -1,5 +1,7 @@
 # Decisions
 
+Closed 2026-10-27: new decisions go in `docs/adr/` (see `docs/agents/domain.md`). Kept as history.
+
 Each entry: date, decision, why. Newest last. More are recorded as memory files (`feedback_*.md`).
 
 - **2026-07-31** Auto-merge gated work to `main` and push without asking
@@ -13,3 +15,5 @@ Each entry: date, decision, why. Newest last. More are recorded as memory files 
 - **2026-10-11** Importer ignore list gains `00_templates`, `98_templates`, `z_archive`,
   `90_inbox`, `z_codex_proposals` for the restructured D&D vault. The importer infers types from
   `03_Entities/NPCs`, `03_Entities/Gods`, `02_Regions/Places`; renaming them needs an importer change.
+- **2026-10-27** The continuous-dev routine is retired; its docs are in `docs/archive/`. Matt
+  Pocock's skills replace the old process (`docs/agents/workflow.md`). Last entry here.
