@@ -54,6 +54,7 @@ So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logg
 | #61 | -      | CI: build tests run async (shard 4 timeout) | His yes; #57-#60 need it for green CI     |
 | #62 | 18     | Remove the entity-frontmatter save stream   | #59 (stacked); his yes                    |
 | #63 | 14     | One search for palette, Browse and Timeline | Isak tries search (Q2); his yes           |
+| #64 | 15     | One drawing module for regions and routes   | Isak's look at the editor map (Q3); yes   |
 
 Local `main` is ahead of `origin/main` by the tracker commits for 14-18 (not pushed).
 
@@ -64,7 +65,7 @@ Either Isak merges in that order on GitHub, or he adds a Bash permission rule fo
 In flight (2026-10-27, stopped at the agent session limit, resets 23:10 Berlin):
 
 - `eval-14-one-search`: review fixes in, gate green, PR #63 open.
-- `eval-15-shared-drawing` (31cdaf6 pushed): built and gated; two-axis review not run yet.
+- `eval-15-shared-drawing`: review fixes in, gate green, PR #64 open.
 - `eval-18-drop-frontmatter-stream`: review clean, PR #62 open (base `eval-16-delete-entity-tabs`;
   retarget to `main` after #59).
 
