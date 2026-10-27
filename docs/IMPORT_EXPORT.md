@@ -26,7 +26,7 @@ The parser supports two forms for the same data: a **flat top-level form** (what
 
 Fields **only** read under `atlas.*` (no flat-form fallback): `visibility`, `publish`, `id`, `canon`, `date`, `dateValue`, `world`, `images`, `placements`, `profile`, `relationships`. These are atlas-mode concepts; the visual editor manages them and they're rare to hand-author.
 
-**Everything else in your frontmatter is ignored by the build** — including common Obsidian fields like `role`, `status`, `campaign`, `occupation`, `faction`, `voice`, `appearance`, `mannerism`, `catchphrase`, `connections`. They stay in your file as DM-only documentation; the build never reads, ships, or strips them. If you want richer structured DM data the app understands, use `atlas.profile.dm` and `atlas.relationships[]` (see the visual editor's Entities tab).
+**Everything else in your frontmatter is ignored by the build** — including common Obsidian fields like `role`, `status`, `campaign`, `occupation`, `faction`, `voice`, `appearance`, `mannerism`, `catchphrase`, `connections`. They stay in your file as DM-only documentation; the build never reads, ships, or strips them. If you want richer structured DM data the app understands, write `atlas.profile.dm` and `atlas.relationships[]` in the note's frontmatter in the vault.
 
 ### What players actually see
 
@@ -103,17 +103,13 @@ A conflict warning means a file has been edited since the import. The wizard wil
 
 For the current patch-paste workflow, the audit trail lives in git: every paste produces a commit, and `git log` is the batch history. Status: **planned**, not yet shipped — track it in `superpowers:writing-plans` style follow-up work.
 
-## Patches: the YAML-paste workflow
+## YAML previews
 
-For users not running the save plugin (or wanting to commit a discrete change):
-
-1. Make edits in the Creator Cockpit.
-2. **Export patch** at the bottom of every tab.
-3. A `.txt` file downloads, containing one YAML block per entity, with comment headers describing where it goes.
-4. Paste each block into the matching entity's frontmatter (or `world.yaml`).
-5. Save the markdown file. Re-run `npm run atlas:build`.
-
-The patch file **is not** valid YAML on its own — the comment headers and multi-entity structure make it a documentation file. **Never paste the whole patch into one place.**
+The editor has no patch export: **Save** writes entity frontmatter and `world.yaml` directly
+through the local save endpoint (`npm run dev`). The Regions, Routes and Fog tabs each have a
+read-only **advanced YAML preview** of the `world.yaml` block they would write. If you copy a block
+by hand, paste only the YAML into `world.yaml`, never markdown code fences; the build rejects a
+fenced `world.yaml`.
 
 ## Export: handouts
 
@@ -122,9 +118,9 @@ The viewer's per-entity print button (`src/atlas/printHandout.ts`) produces a pr
 1. Player viewer → click the entity → **Print handout**.
 2. Browser's print dialog → save as PDF.
 
-### Multi-entity bundles (planned)
+### Multi-entity bundles
 
-For session prep ("hand out these 5 NPCs"), a multi-entity handout flow is planned in the Entities tab of the Creator Cockpit. Today, repeat the single-entity print flow per entity. Status: **planned**, not yet shipped.
+For session prep ("hand out these 5 NPCs"), repeat the single-entity print flow per entity. A multi-entity bundle is not built.
 
 ## Export: full backup
 

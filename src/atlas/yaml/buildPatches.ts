@@ -1,38 +1,17 @@
 /**
- * Entity-frontmatter patch builder.
+ * Shared draft shapes for the editor's Save flow.
  *
- * The offline export modal and its world-map / placement / publish-report
- * builders were deleted when the editor's unified Save flow took over
- * (Save writes canonical .md frontmatter and world.yaml directly to disk).
- *
- * What remains is the entity-frontmatter patch: a read-only YAML preview the
- * EntitiesTab shows and the import wizard offers for files outside the
- * editor's writable allowlist. {@link PlacementOverride} is the shared
- * placement-draft shape consumed by validateProject / the placement editor.
+ * {@link PlacementOverride} is the placement-draft shape consumed by
+ * validateProject and the placement editor. {@link EntityFrontmatterPatch} is
+ * the desired `atlas:` block for one entity .md file, consumed by the
+ * canonical entity save.
  */
 
 import type { EntityVisibility } from "@/atlas/content/schema";
-import { dumpYaml, patchHeader } from "./dump";
-
-export type PatchKindId = "entity-frontmatter";
-
-export interface PatchArtifact {
-  kind: PatchKindId;
-  filename: string;
-  mime: string;
-  /** Final downloadable text. */
-  content: string;
-  /** Human-readable summary lines shown in the modal. */
-  summary: string[];
-  /** Optional per-section breakdown for the "advanced raw YAML preview". */
-  sections?: Array<{ label: string; yaml: string }>;
-}
 
 // --------------------------------------------------------------------------
-// PLACEMENT OVERRIDE — shared draft shape. Placement patches were deleted with
-// the offline export modal; the editor's Save flow now writes canonical .md
-// frontmatter directly via canonicalPlacementSave.ts. This type is still the
-// contract between the placement editor and validateProject.
+// PLACEMENT OVERRIDE — contract between the placement editor and
+// validateProject. Save writes placements via canonicalPlacementSave.ts.
 // --------------------------------------------------------------------------
 
 export interface PlacementOverride {
@@ -47,7 +26,7 @@ export interface PlacementOverride {
 }
 
 // --------------------------------------------------------------------------
-// ENTITY FRONTMATTER PATCH (full atlas: block, used by import wizard)
+// ENTITY FRONTMATTER PATCH (full atlas: block, merged by canonicalEntitySave)
 // --------------------------------------------------------------------------
 
 export interface EntityFrontmatterPatch {
@@ -67,48 +46,5 @@ export interface EntityFrontmatterPatch {
     tags?: string[];
     profile?: import("@/atlas/profiles/profileTypes").EntityProfile;
     relationships?: import("@/atlas/profiles/profileTypes").EntityRelationship[];
-  };
-}
-
-export function buildEntityFrontmatterPatch(patches: EntityFrontmatterPatch[]): PatchArtifact {
-  const sections: Array<{ label: string; yaml: string }> = [];
-  const bodyParts: string[] = [];
-
-  for (const p of patches) {
-    const top: Record<string, unknown> = {};
-    if (p.title) top.title = p.title;
-    // Strip undefined keys so dumpYaml emits a clean block.
-    const atlas: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(p.atlas)) {
-      if (v !== undefined && !(Array.isArray(v) && v.length === 0)) atlas[k] = v;
-    }
-    top.atlas = atlas;
-    const ymlBlock = dumpYaml(top);
-    sections.push({ label: p.sourcePath, yaml: ymlBlock });
-    bodyParts.push(`# file: ${p.sourcePath}`);
-    bodyParts.push("---");
-    bodyParts.push(ymlBlock.trimEnd());
-    bodyParts.push("---");
-    bodyParts.push("");
-  }
-
-  const header = patchHeader({
-    title: `Entity frontmatter patch — ${patches.length} file${patches.length === 1 ? "" : "s"}`,
-    subject: `frontmatter on ${patches.length} entity .md file${patches.length === 1 ? "" : "s"}`,
-    applyTo: "the matching entity .md file (replace its existing frontmatter block)",
-    notes: [
-      "Each '# file:' section below is a complete YAML frontmatter block.",
-      "Replace the file's existing '---' frontmatter (top of file) with the block here.",
-      "If the file has no frontmatter yet, paste the entire '---' block at the very top.",
-    ],
-  });
-
-  return {
-    kind: "entity-frontmatter",
-    filename: `entity-frontmatter-patch-${patches.length}.yaml`,
-    mime: "text/yaml",
-    content: header + bodyParts.join("\n"),
-    summary: [`Frontmatter for ${patches.length} entity file${patches.length === 1 ? "" : "s"}`],
-    sections,
   };
 }
