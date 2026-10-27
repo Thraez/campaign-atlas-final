@@ -2,62 +2,49 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
+import { EDITOR_ONLY_PATHS, isEditorOnlyPath } from "@/test/helpers/editorOnlyPaths";
 
 /**
- * Guardrail: no file in an editor-only folder is reachable from the player entry.
+ * Guardrail: no file in an editor-only path is reachable from the player entry.
  *
  * AGENTS.md: "Never import editor modules from a player entry point." A text match on a few
- * file names misses transitive imports, so this walks the real static import graph from
- * `src/main.tsx` and fails on any reached file under an editor-only folder.
+ * file names misses transitive imports, so this walks the real import graph from `src/main.tsx`
+ * and fails on any reached file under `EDITOR_ONLY_PATHS` (see src/test/helpers/editorOnlyPaths.ts
+ * for what each path holds, and the known gap of editor hooks in mixed folders).
  *
- * The one edge it skips is the editor route in `src/App.tsx`:
- * `__INCLUDE_EDITOR__ ? lazy(() => import("./pages/AtlasPlacementEditor.tsx")) : null`.
- * vite.config.ts defines `__INCLUDE_EDITOR__` as `false` in player builds, so that branch is
- * dead code and the editor chunk never ships. Every other import, static or dynamic, counts.
- * `import type` / `export type` statements are skipped too: the compiler erases them.
+ * What the walk skips:
+ * - any `import()` in the true branch of an `__INCLUDE_EDITOR__ ? … : …` conditional, in any
+ *   file. vite.config.ts defines `__INCLUDE_EDITOR__` as `false` in player builds, so that
+ *   branch is dead code. Today the only one is the editor route in `src/App.tsx`.
+ * - `import type` / `export type` statements: the compiler erases them.
+ * Every other import, static or dynamic, counts.
+ *
+ * The walk fails closed: an `@/` or relative specifier that resolves to no file fails the test
+ * (it could be hiding an edge), unless it names a known asset (`.css`, images, `?url`, `?raw`).
  */
 
 const SRC = path.resolve(__dirname, "../..");
 const ENTRY = path.join(SRC, "main.tsx");
 
-/**
- * Folders whose files are only used by the DM editor (`/atlas/edit`) and its dev-server endpoints.
- * Each was checked against its contents:
- * - atlas/editor: placement-editor state, draft hooks, toolbars and pickers.
- * - atlas/tabs: the editor's side tabs (entities, fog, regions, routes, soundscape, publish check).
- * - atlas/categories: entity and category edit panels.
- * - atlas/sound-editor: sound-area drawing and soundscape drafts.
- * - atlas/save: save batches and the local file-system writer behind `/__atlas/save`.
- * - atlas/sync: the "Sync from Obsidian" panel.
- * - atlas/import: Obsidian/markdown import, staging and the map import wizard.
- * - atlas/publish: build report, published diff and the publish flow.
- * - pages/AtlasPlacementEditor.tsx: the editor page itself.
- */
-const EDITOR_ONLY = [
-  "atlas/editor/",
-  "atlas/tabs/",
-  "atlas/categories/",
-  "atlas/sound-editor/",
-  "atlas/save/",
-  "atlas/sync/",
-  "atlas/import/",
-  "atlas/publish/",
-  "pages/AtlasPlacementEditor.tsx",
-];
+const SOURCE_EXTENSIONS = ["", ".ts", ".tsx", "/index.ts", "/index.tsx"];
+const ASSET_SPECIFIER = /(\.(css|svg|png|jpe?g|webp|gif|avif|ico)|\?(url|raw))$/;
 
-const EXTENSIONS = ["", ".ts", ".tsx", "/index.ts", "/index.tsx"];
+type Resolution = { kind: "source"; file: string } | { kind: "asset" } | { kind: "external" };
 
-/** Resolves `@/` and relative specifiers to a file under src; bare packages return null. */
-function resolve(spec: string, from: string): string | null {
+/** Resolves `@/` and relative specifiers to a source file under src; throws if none matches. */
+function resolveSrcImport(spec: string, from: string): Resolution {
   let base: string;
   if (spec.startsWith("@/")) base = path.join(SRC, spec.slice(2));
   else if (spec.startsWith(".")) base = path.resolve(path.dirname(from), spec);
-  else return null;
-  for (const ext of EXTENSIONS) {
+  else return { kind: "external" };
+  if (ASSET_SPECIFIER.test(spec)) return { kind: "asset" };
+  for (const ext of SOURCE_EXTENSIONS) {
     const candidate = base + ext;
-    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
+    if (/\.tsx?$/.test(candidate) && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+      return { kind: "source", file: candidate };
+    }
   }
-  return null;
+  throw new Error(`unresolved import "${spec}" in ${srcRelative(from)}`);
 }
 
 /** True when `node` sits in the true branch of a `__INCLUDE_EDITOR__ ? … : …` conditional. */
@@ -75,11 +62,10 @@ function isEditorGated(node: ts.Node): boolean {
   return false;
 }
 
-/** Module specifiers a file pulls in at runtime. */
-function runtimeImports(file: string): string[] {
-  const text = fs.readFileSync(file, "utf8");
-  const kind = file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, kind);
+/** Module specifiers a source text pulls in at runtime. */
+function runtimeImports(fileName: string, text: string): string[] {
+  const kind = fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  const source = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true, kind);
   const specs: string[] = [];
 
   const visit = (node: ts.Node) => {
@@ -112,21 +98,23 @@ function playerGraph(entry: string): Map<string, string | null> {
   const queue = [entry];
   while (queue.length > 0) {
     const file = queue.shift()!;
-    for (const spec of runtimeImports(file)) {
-      const target = resolve(spec, file);
-      if (!target || parents.has(target) || !/\.tsx?$/.test(target)) continue;
-      parents.set(target, file);
-      queue.push(target);
+    for (const spec of runtimeImports(file, fs.readFileSync(file, "utf8"))) {
+      const target = resolveSrcImport(spec, file);
+      if (target.kind !== "source" || parents.has(target.file)) continue;
+      parents.set(target.file, file);
+      queue.push(target.file);
     }
   }
   return parents;
 }
 
-const rel = (file: string) => path.relative(SRC, file).split(path.sep).join("/");
+const srcRelative = (file: string) => path.relative(SRC, file).split(path.sep).join("/");
 
-function chain(file: string, parents: Map<string, string | null>): string {
+function importChain(file: string, parents: Map<string, string | null>): string {
   const steps: string[] = [];
-  for (let f: string | null | undefined = file; f; f = parents.get(f)) steps.unshift(rel(f));
+  for (let f: string | null | undefined = file; f; f = parents.get(f)) {
+    steps.unshift(srcRelative(f));
+  }
   return steps.join(" -> ");
 }
 
@@ -142,12 +130,24 @@ describe("player import graph", () => {
 
   it("skips the __INCLUDE_EDITOR__-gated editor route", () => {
     expect(graph.has(path.join(SRC, "pages", "AtlasPlacementEditor.tsx"))).toBe(false);
+    const gated = `const E = __INCLUDE_EDITOR__ ? lazy(() => import("./editor")) : null;`;
+    const ungated = `const E = flag ? lazy(() => import("./editor")) : null;`;
+    expect(runtimeImports("x.tsx", gated)).toEqual([]);
+    expect(runtimeImports("x.tsx", ungated)).toEqual(["./editor"]);
   });
 
-  it("reaches no file in an editor-only folder", () => {
+  it("fails closed on an import it cannot resolve, but allows assets", () => {
+    expect(() => resolveSrcImport("@/no/such/module", ENTRY)).toThrow(/unresolved import/);
+    expect(resolveSrcImport("./index.css", ENTRY)).toEqual({ kind: "asset" });
+    expect(resolveSrcImport("@/assets/logo.png?url", ENTRY)).toEqual({ kind: "asset" });
+    expect(resolveSrcImport("react", ENTRY)).toEqual({ kind: "external" });
+  });
+
+  it("reaches no file in an editor-only path", () => {
+    expect(EDITOR_ONLY_PATHS.length).toBeGreaterThan(0);
     const leaks = [...graph.keys()]
-      .filter((file) => EDITOR_ONLY.some((prefix) => rel(file).startsWith(prefix)))
-      .map((file) => chain(file, graph));
+      .filter((file) => isEditorOnlyPath(srcRelative(file)))
+      .map((file) => importChain(file, graph));
     expect(leaks).toEqual([]);
   });
 });

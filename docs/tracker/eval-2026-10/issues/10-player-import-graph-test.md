@@ -21,10 +21,21 @@ would pass. Today two helpers in editor folders are reachable from `src/main.tsx
 ## Comments
 
 2026-10-27, branch `eval-10-player-import-graph`: moved `mapClickCoord.ts` to `src/atlas/map/` and
-`download.ts` to `src/lib/` (their tests moved with them). `src/test/build/player-import-graph.test.ts`
-walks runtime imports from `src/main.tsx` with the TypeScript parser, skips only the
-`__INCLUDE_EDITOR__ ?` branch in `App.tsx` and `import type`, and fails on the eight folders listed
-plus `pages/AtlasPlacementEditor.tsx`; all eight hold editor-only code. It went red on the two
-helpers before the move, and red again on a planted `import "@/atlas/sync/useSyncSettings"` in
-`OfflineStatus.tsx` (removed). The guard cited above (`src/test/player-build-exclusion.test.ts`)
-does not exist on `main`; nothing was replaced.
+`download.ts` to `src/lib/` (their tests moved with them).
+`src/test/build/player-import-graph.test.ts` walks runtime imports from `src/main.tsx` with the
+TypeScript parser, skipping only `import()` in the true branch of an `__INCLUDE_EDITOR__ ?`
+conditional and `import type`. It went red on the two helpers before the move, and red again on a
+planted `import "@/atlas/sync/useSyncSettings"` in `OfflineStatus.tsx` (removed). It replaces
+`src/test/sound-editor/player-build-exclusion.test.ts`, the five-file text match, which is deleted.
+
+The two-axis review ran on the first commit; fixes applied:
+
+- deleted the old guard (covered transitively);
+- the walk fails closed on an `@/` or relative import that resolves to nothing, except assets
+  (`.css`, images, `?url`, `?raw`);
+- added `atlas/session/` (all editor-only) to the list; named the editor hooks in mixed folders
+  (`fog/useFogDraft`, `MapLayerEditableOverlay`, `useUndoStack`) as a known gap;
+- the list is one constant in `src/test/helpers/editorOnlyPaths.ts`, also used by
+  `src/test/build/editor-link-gating.test.ts`;
+- corrected the docblock, renamed helpers (`resolveSrcImport`, `importChain`, `srcRelative`), kept
+  the moved test's name `mapClickCoord.test.ts`, and undid the `CODEBASE_MAP.md` table reflow.
