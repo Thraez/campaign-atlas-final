@@ -90,9 +90,9 @@ jobs:
         run: npm run build
 
       - name: Scan built artifacts (full safety set)
-        # D13: run the same orchestrator the local one-click check runs, so a
-        # green local check implies a green CI run. This adds image-privacy,
-        # fog-safety, and audit-assets, which CI previously did not run.
+        # Runs every scan in scripts/atlas/scanRegistry.ts. The editor's Publish
+        # check runs the same list with the same options, so a green local check
+        # implies a green CI run.
         run: npm run atlas:scan
 
       - name: Add SPA 404 fallback

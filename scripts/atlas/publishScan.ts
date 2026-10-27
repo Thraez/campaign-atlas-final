@@ -17,9 +17,7 @@ import {
   type DerivedScanResult,
 } from "../check-derived-secrets";
 import { scanArtifactShape, type ShapeResult } from "../check-artifact-shape";
-import { run as runImagePrivacy } from "../check-image-privacy";
-import { run as runFogSafety } from "../check-fog-safety";
-import { run as runAuditAssets } from "./audit-assets";
+import { scanTasks, type ScanContext, type ScanTask } from "./scanRegistry";
 import type { PublishScanReason } from "./publishTypes";
 
 export const MSG: Record<PublishScanReason["scan"], string> = {
@@ -35,6 +33,8 @@ export const MSG: Record<PublishScanReason["scan"], string> = {
     "A map's hidden (fogged) area would have been revealed. Publishing is blocked.",
   "check-artifact-shape":
     "The world file came out malformed — the build needs attention before publishing.",
+  "check-player-secrets":
+    "A locked secret or its password would have been visible to players. Publishing is blocked.",
   "audit-assets": "An image is larger than the 4 MB limit and must be optimized before publishing.",
 };
 
@@ -103,81 +103,53 @@ function scanLevelReason(scan: PublishScanReason["scan"], target: string): Publi
   return { scan, target, severity: "blocking", message: MSG[scan] };
 }
 
+/** Plain-language reasons for one failed task, with locators where the scan
+ *  has a structured export; otherwise one scan-level row. */
+function reasonsForFailure(task: ScanTask, ctx: ScanContext): PublishScanReason[] {
+  const target = task.label.slice(task.scan.length + 1);
+  const dir = path.join(ctx.root, target);
+  let structured: PublishScanReason[] = [];
+  if (task.scan === "check-no-secrets") {
+    structured = reasonsFromNoSecrets(scanDir(dir), target);
+  } else if (task.scan === "check-derived-secrets") {
+    structured = reasonsFromDerived(
+      scanArtifactForSecrets(dir, deriveSecretsFromVault(ctx.configPath)),
+      target,
+    );
+  } else if (task.scan === "check-artifact-shape") {
+    const atlasJsonPath = path.join(ctx.root, "public", "atlas", "atlas.json");
+    if (fs.existsSync(atlasJsonPath)) {
+      structured = reasonsFromShape(
+        scanArtifactShape(JSON.parse(fs.readFileSync(atlasJsonPath, "utf8"))),
+      );
+    }
+  }
+  if (structured.length > 0) return structured;
+  const scan = task.scan === "check-no-secrets" ? "check-no-secrets-dm" : task.scan;
+  return [scanLevelReason(scan, target)];
+}
+
 /**
- * Run every scan over dist/ and public/atlas/ and collect reasons.
+ * Run every scan in the registry (the same list CI runs) and collect reasons.
  * `repoRoot` is the dev-server cwd (the repo root).
  */
 export async function runPublishScans(repoRoot: string): Promise<PublishScanReason[]> {
-  const reasons: PublishScanReason[] = [];
-  const dist = path.resolve(repoRoot, "dist");
-  const pub = path.resolve(repoRoot, "public/atlas");
   const configPath = path.resolve(repoRoot, "atlas.config.json");
-
-  // check-no-secrets — structured
-  for (const [dir, label] of [
-    [dist, "dist"],
-    [pub, "public/atlas"],
-  ] as const) {
-    if (fs.existsSync(dir)) {
-      reasons.push(...reasonsFromNoSecrets(scanDir(dir), label));
-    }
-  }
-
-  // check-derived-secrets — structured
-  const secrets = deriveSecretsFromVault(configPath);
-  for (const [dir, label] of [
-    [dist, "dist"],
-    [pub, "public/atlas"],
-  ] as const) {
-    if (fs.existsSync(dir)) {
-      reasons.push(...reasonsFromDerived(scanArtifactForSecrets(dir, secrets), label));
-    }
-  }
-
-  // check-artifact-shape — structured (reads + parses atlas.json)
-  const atlasJsonPath = path.join(pub, "atlas.json");
-  if (fs.existsSync(atlasJsonPath)) {
-    const atlas = JSON.parse(fs.readFileSync(atlasJsonPath, "utf8"));
-    reasons.push(...reasonsFromShape(scanArtifactShape(atlas)));
-  }
-
-  // Exit-code-only scans — scan-level rows (no structured export available)
-  const distExists = fs.existsSync(dist);
-  const pubExists = fs.existsSync(pub);
-
-  if (distExists || pubExists) {
-    // check-image-privacy (RunOpts: { dir, config? })
-    const imgResults = await Promise.all([
-      distExists ? runImagePrivacy({ dir: dist, config: configPath }) : Promise.resolve(0),
-      pubExists
-        ? runImagePrivacy({ dir: pub, config: configPath, referencedBy: pub })
-        : Promise.resolve(0),
-    ]);
-    if (imgResults.some((c) => c !== 0)) {
-      reasons.push(scanLevelReason("check-image-privacy", "player build"));
-    }
-
-    // check-fog-safety (RunOpts: { dir, config? })
-    const fogResults = await Promise.all([
-      pubExists ? runFogSafety({ dir: pub, config: configPath }) : Promise.resolve(0),
-      distExists ? runFogSafety({ dir: dist, config: configPath }) : Promise.resolve(0),
-    ]);
-    if (fogResults.some((c) => c !== 0)) {
-      reasons.push(scanLevelReason("check-fog-safety", "player build"));
-    }
-  }
-
-  // audit-assets (RunOpts: { assetsDir, publicDir, contentDir, strict? }) — synchronous
   const cfg = JSON.parse(fs.readFileSync(configPath, "utf8")) as { contentRoot: string };
-  const contentDir = path.resolve(repoRoot, cfg.contentRoot);
-  const auditCode = runAuditAssets({
-    assetsDir: path.join(pub, "assets"),
-    publicDir: path.resolve(repoRoot, "public"),
-    contentDir,
-  });
-  if (auditCode !== 0) {
-    reasons.push(scanLevelReason("audit-assets", "public/atlas/assets"));
-  }
-
-  return reasons;
+  const ctx: ScanContext = {
+    root: repoRoot,
+    configPath,
+    contentDir: path.resolve(path.dirname(configPath), cfg.contentRoot),
+  };
+  const tasks = scanTasks(ctx);
+  const codes = await Promise.all(
+    tasks.map(async (t) => {
+      try {
+        return await t.run();
+      } catch {
+        return -1;
+      }
+    }),
+  );
+  return tasks.flatMap((t, i) => (codes[i] === 0 ? [] : reasonsForFailure(t, ctx)));
 }
