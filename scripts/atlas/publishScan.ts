@@ -149,7 +149,9 @@ export async function runPublishScans(repoRoot: string): Promise<PublishScanReas
     // check-image-privacy (RunOpts: { dir, config? })
     const imgResults = await Promise.all([
       distExists ? runImagePrivacy({ dir: dist, config: configPath }) : Promise.resolve(0),
-      pubExists ? runImagePrivacy({ dir: pub, config: configPath }) : Promise.resolve(0),
+      pubExists
+        ? runImagePrivacy({ dir: pub, config: configPath, referencedBy: pub })
+        : Promise.resolve(0),
     ]);
     if (imgResults.some((c) => c !== 0)) {
       reasons.push(scanLevelReason("check-image-privacy", "player build"));

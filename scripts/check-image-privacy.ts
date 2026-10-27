@@ -15,8 +15,12 @@
  *      named "the-cabal-lair.jpg" would ship uncaught even if no text
  *      reference exists.
  *
+ *      With `--referenced-by <dir>` (the source store, public/atlas), only
+ *      images the player JSON in <dir> names get this check: the rest stay
+ *      in the DM's store and the player build prunes them from dist.
+ *
  * Usage:
- *   tsx scripts/check-image-privacy.ts <artifact-dir> [--config <path>]
+ *   tsx scripts/check-image-privacy.ts <artifact-dir> [--config <path>] [--referenced-by <dir>]
  *
  * Exit codes:
  *   0   clean
@@ -27,6 +31,7 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { deriveSecretsFromVault } from "./check-derived-secrets";
+import { isReferenced, readPlayerJson } from "./atlas/playerImageRefs";
 
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
 const CONFIG_CANDIDATES = ["atlas.config.json"];
@@ -40,14 +45,16 @@ function findConfig(): string | null {
   return null;
 }
 
-function parseArgs(): { dir: string; config: string } | null {
+function parseArgs(): { dir: string; config: string; referencedBy?: string } | null {
   const args = process.argv.slice(2);
   let dir: string | undefined;
   let config: string | undefined;
+  let referencedBy: string | undefined;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--config") config = args[++i];
     else if (a.startsWith("--config=")) config = a.slice(9);
+    else if (a === "--referenced-by") referencedBy = args[++i];
     else if (!dir) dir = a;
   }
   if (!dir) return null;
@@ -56,7 +63,7 @@ function parseArgs(): { dir: string; config: string } | null {
     if (!found) return null;
     config = found;
   }
-  return { dir, config };
+  return { dir, config, referencedBy };
 }
 
 function walkImages(dir: string): string[] {
@@ -78,6 +85,9 @@ function walkImages(dir: string): string[] {
 export interface RunOpts {
   dir: string;
   config?: string;
+  /** A dir of player JSON. When set, the filename check covers only images it
+   *  names: the rest are the DM's asset store, which the player build prunes. */
+  referencedBy?: string;
 }
 
 export async function run(opts: RunOpts): Promise<number> {
@@ -96,6 +106,7 @@ export async function run(opts: RunOpts): Promise<number> {
   }
 
   const secrets = deriveSecretsFromVault(configAbs);
+  const playerJson = opts.referencedBy !== undefined ? readPlayerJson(opts.referencedBy) : null;
 
   const violations: string[] = [];
 
@@ -103,7 +114,8 @@ export async function run(opts: RunOpts): Promise<number> {
     const stem = path.basename(imgPath, path.extname(imgPath)).toLowerCase();
 
     // Check 1: filename contains a derived-secret name
-    for (const s of secrets) {
+    const shipped = playerJson === null || isReferenced(path.basename(imgPath), playerJson);
+    for (const s of shipped ? secrets : []) {
       if (stem.includes(s.name.toLowerCase())) {
         violations.push(
           `FILENAME LEAK: ${imgPath}\n    filename contains secret "${s.name}" (from ${s.source})`,
@@ -147,10 +159,12 @@ export async function run(opts: RunOpts): Promise<number> {
 async function main(): Promise<number> {
   const args = parseArgs();
   if (!args) {
-    console.error("Usage: tsx scripts/check-image-privacy.ts <artifact-dir> [--config <path>]");
+    console.error(
+      "Usage: tsx scripts/check-image-privacy.ts <artifact-dir> [--config <path>] [--referenced-by <dir>]",
+    );
     return 1;
   }
-  return run({ dir: args.dir, config: args.config });
+  return run({ dir: args.dir, config: args.config, referencedBy: args.referencedBy });
 }
 
 // Run only when invoked as a script (not when imported by tests).

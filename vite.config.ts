@@ -5,6 +5,7 @@ import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 import { atlasSavePlugin } from "./scripts/vite-plugin-atlas-save";
 import { prunePlayerAudioPlugin } from "./scripts/vite-plugin-prune-player-audio";
+import { prunePlayerImagesPlugin } from "./scripts/vite-plugin-prune-player-images";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -157,6 +158,9 @@ export default defineConfig(({ mode }) => {
       // for the DM picker in public/). Runs last so it fires after the public
       // copy + PWA precache generation. See the plugin for the full rationale.
       !includeEditor && prunePlayerAudioPlugin(),
+      // Player builds only: strip images no player note shows (the DM's asset
+      // store lives in public/ too). See the plugin.
+      !includeEditor && prunePlayerImagesPlugin(),
     ].filter(Boolean),
     resolve: {
       alias: {
