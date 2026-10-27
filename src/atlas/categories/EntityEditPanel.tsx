@@ -8,7 +8,12 @@ import {
   type EntityEditDraftAPI,
   type DraftSecret,
 } from "./useEntityEditDraft";
-import { saveAtlasPatchToLocalFs, hashContent, type FileChange } from "@/atlas/save/localFsSave";
+import {
+  saveAtlasPatchToLocalFs,
+  hashContent,
+  ConflictError,
+  type FileChange,
+} from "@/atlas/save/localFsSave";
 import { editorImageTargetName } from "@/atlas/assets/imageEncoding";
 import { fileToDataUrl } from "@/atlas/content/browserFile";
 import { readSourceFile } from "@/atlas/save/canonicalPlacementSave";
@@ -26,6 +31,22 @@ import { FormatToolbar } from "@/atlas/editor/FormatToolbar";
 import { ImagePickerPanel } from "@/atlas/editor/ImagePickerPanel";
 import { applyToolbarAction, type ToolbarActionId } from "@/atlas/editor/toolbarActions";
 import { secretMarkerIds } from "@/atlas/content/dmMarkup";
+
+/** The draft's view of an entity file as it sits on disk. */
+function draftContentFromDisk(raw: string) {
+  const fm = parseFrontmatter(raw);
+  const atlas = (fm.data.atlas as Record<string, unknown>) ?? {};
+  return {
+    fields: {
+      id: String(atlas.id ?? ""),
+      type: String(atlas.type ?? ""),
+      visibility: isValidVisibility(atlas.visibility) ? atlas.visibility : ("dm" as const),
+      summary: String(atlas.summary ?? ""),
+    },
+    body: fm.content,
+    secrets: Array.isArray(atlas.secrets) ? (atlas.secrets as DraftSecret[]) : [],
+  };
+}
 
 export function EntityEditPanel({
   sourcePath,
@@ -49,6 +70,11 @@ export function EntityEditPanel({
   const api = draftApi ?? internal;
   const [phase, setPhase] = useState<"loading" | "ready" | "saving" | "saved" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
+  // Set when Save hit a 409: the file changed on disk after the draft's
+  // baseHash. The form stays up (nothing typed is lost) under a banner that
+  // offers the rebase.
+  const [conflict, setConflict] = useState(false);
+  const [rebasing, setRebasing] = useState(false);
   // Keep the original raw file so we can preserve all existing frontmatter fields on save.
   const rawRef = useRef<string>("");
 
@@ -121,15 +147,14 @@ export function EntityEditPanel({
         const raw = await readSourceFile(sourcePath, fetch);
         if (!alive) return;
         rawRef.current = raw;
-        const fm = parseFrontmatter(raw);
-        const atlas = (fm.data.atlas as Record<string, unknown>) ?? {};
+        const disk = draftContentFromDisk(raw);
         // No-loss: if a live draft for THIS sourcePath already exists (the user
         // was editing, left Edit, and came back), keep it — including any
         // in-progress secret edits, which now live on the shared draft instead
         // of local state. Only seed the draft from disk on a genuine first
         // open. rawRef is still refreshed above so Save preserves untouched
         // frontmatter.
-        const diskType = String(atlas.type ?? "");
+        const diskType = disk.fields.type;
         const existing = api.snapshot();
         if (existing && existing.sourcePath === sourcePath) {
           // Re-filing an entity the DM already had open: still honour the
@@ -141,18 +166,7 @@ export function EntityEditPanel({
           return;
         }
         const baseHash = await hashContent(raw);
-        api.load({
-          sourcePath,
-          baseHash,
-          fields: {
-            id: String(atlas.id ?? ""),
-            type: diskType,
-            visibility: isValidVisibility(atlas.visibility) ? atlas.visibility : "dm",
-            summary: String(atlas.summary ?? ""),
-          },
-          body: fm.content,
-          secrets: Array.isArray(atlas.secrets) ? (atlas.secrets as DraftSecret[]) : [],
-        });
+        api.load({ sourcePath, baseHash, ...disk });
         // Seeded from disk above so `pristine` is the file's state; applying the
         // type now makes it a genuine unsaved change the DM can see and Save.
         if (initialType && initialType !== diskType) api.setField("type", initialType);
@@ -202,12 +216,42 @@ export function EntityEditPanel({
       };
       await saveAtlasPatchToLocalFs([change], undefined, { rebuild: true });
       setPhase("saved");
+      setConflict(false);
       api.clear();
       onSaved();
     } catch (e) {
+      // stale-base / missing-base: the file moved under the draft. Keep the
+      // form and the draft, and offer the rebase instead of the error page.
+      if (e instanceof ConflictError && e.reason !== "already-exists") {
+        logger.warn("Entity save conflict", e);
+        setConflict(true);
+        setPhase("ready");
+        return;
+      }
       logger.error("Entity save failed", e);
       setError(e instanceof Error ? e.message : String(e));
       setPhase("error");
+    }
+  };
+
+  // Rebase after a conflict: re-read the file and put the DM's draft (fields,
+  // body, secrets, all kept as typed) on top of it with the new baseHash.
+  // rawRef is refreshed so frontmatter the panel doesn't edit comes from the
+  // new file on the next Save.
+  const onRebase = async () => {
+    if (!api.draft) return;
+    setRebasing(true);
+    try {
+      const raw = await readSourceFile(api.draft.sourcePath, fetch);
+      const baseHash = await hashContent(raw);
+      rawRef.current = raw;
+      api.rebase(baseHash, draftContentFromDisk(raw));
+      setConflict(false);
+    } catch (e) {
+      logger.error("Entity rebase failed", e);
+      toast.error(`Couldn't reload the file: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setRebasing(false);
     }
   };
 
@@ -408,6 +452,22 @@ export function EntityEditPanel({
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-auto p-3 space-y-3 text-xs">
+        {conflict && (
+          <div role="alert" className="rounded border border-amber-500/60 p-2 space-y-2">
+            <p>
+              This file changed on disk after you opened it, so Save was refused. Your edits are
+              still here.
+            </p>
+            <button
+              type="button"
+              className="h-7 px-2 text-xs rounded border"
+              disabled={rebasing}
+              onClick={onRebase}
+            >
+              {rebasing ? "Reloading…" : "Reload from disk and keep my edits"}
+            </button>
+          </div>
+        )}
         <label className="block">
           <span className="block mb-1">Type</span>
           <input

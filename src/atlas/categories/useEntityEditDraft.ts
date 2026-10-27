@@ -41,6 +41,15 @@ export interface EntityEditDraftAPI {
   isDirty: () => boolean;
   snapshot: () => EntityEditSnapshot;
   applySnapshot: (s: EntityEditSnapshot) => void;
+  /**
+   * After a save conflict: move the draft onto the file now on disk. The DM's
+   * fields, body and secrets are kept as they are; `baseHash` becomes the new
+   * file's hash and `pristine` its state, so the draft still reads as unsaved.
+   */
+  rebase: (
+    baseHash: string,
+    disk: { fields: EntityEditFields; body: string; secrets: DraftSecret[] },
+  ) => void;
 }
 
 export function useEntityEditDraft(): EntityEditDraftAPI {
@@ -84,6 +93,22 @@ export function useEntityEditDraft(): EntityEditDraftAPI {
   );
   const snapshot = useCallback<() => EntityEditSnapshot>(() => ref.current, []);
   const applySnapshot = useCallback((s: EntityEditSnapshot) => setDraft(s), []);
+  const rebase = useCallback<EntityEditDraftAPI["rebase"]>((baseHash, disk) => {
+    setDraft((d) =>
+      d ? { ...d, baseHash, pristine: fingerprint(disk.fields, disk.body, disk.secrets) } : d,
+    );
+  }, []);
 
-  return { draft, load, setField, setBody, setSecrets, clear, isDirty, snapshot, applySnapshot };
+  return {
+    draft,
+    load,
+    setField,
+    setBody,
+    setSecrets,
+    clear,
+    isDirty,
+    snapshot,
+    applySnapshot,
+    rebase,
+  };
 }
