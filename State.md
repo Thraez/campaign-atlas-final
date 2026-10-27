@@ -54,6 +54,14 @@ So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logg
 
 Local `main` is ahead of `origin/main` by the tracker commits for 14-18 (not pushed).
 
+In flight (2026-10-27, stopped at the agent session limit, resets 23:10 Berlin):
+
+- `eval-14-one-search` (bc0bb43 pushed): two-axis review clean (player safety confirmed); the
+  review tidy-ups are uncommitted in worktree `.claude/worktrees/agent-a5539c8240a905637`, gate
+  not yet run. Finish, gate, commit, push, open PR.
+- `eval-15-shared-drawing` (31cdaf6 pushed): built and gated; two-axis review not run yet.
+- `eval-18-drop-frontmatter-stream`: stacked on `eval-16-delete-entity-tabs`; check its state.
+
 ## Provisional calls
 
 Isak's rule, 2026-10-27: work never stops on a question. Each open question gets the recommended
