@@ -18,12 +18,11 @@
  *     included=false and require explicit opt-in to overwrite.
  */
 
-import { parseFrontmatter } from "./frontmatter";
 import type { ImportFolderConfig, EntityVisibility } from "../content/schema";
 import { inferTypeFromTags } from "./inferTypeFromTags";
 import { defaultVisibilityForVaultPath, inferTypeFromPath } from "./inferType";
 import { slugify } from "@/atlas/content/slugify";
-import { isValidVisibility } from "@/atlas/content/visibility";
+import { readNote, type Note } from "@/atlas/content/readNote";
 import { lookupByPath, type SyncMap, type VaultNoteState } from "./syncMap";
 import { detectExposureIncrease, resolveType } from "./mergeImportFrontmatter";
 
@@ -140,22 +139,6 @@ export interface StagingRow {
   frontmatterWarning?: string;
 }
 
-/**
- * The note's title, which commit writes into the frontmatter so it survives
- * the rename to `<slug>.md`:
- *   - fm.title.trim() if non-empty;
- *   - else an Obsidian-style filename verbatim ("Isle de Marque.md" → "Isle de Marque");
- *   - else, for a slug-shaped filename, the build's title-cased slug ("great-hall" → "Great Hall").
- */
-function deriveTitle(filename: string, fmTitle: unknown): string {
-  if (typeof fmTitle === "string" && fmTitle.trim()) return fmTitle.trim();
-  const stem = filename.replace(/\.md$/i, "").trim();
-  if (stem !== slugify(stem)) return stem;
-  return stem
-    .replace(/[-_]+/g, " ")
-    .replace(/(^|\s)(\p{L})/gu, (_m, sp, ch) => sp + ch.toUpperCase());
-}
-
 // The common Obsidian authoring mistake of writing a comma-separated scalar
 // (`tags: npc, smuggler`) instead of a YAML list — YAML parses that as ONE
 // string, silently corrupting tag/alias-based filtering with no signal to
@@ -168,72 +151,54 @@ function commaJammedWarning(rawTags: unknown, rawAliases: unknown): string | und
   return `${jammed.join(" and ")} should be a YAML list, not a comma-separated string — treated as one value`;
 }
 
+/**
+ * What Staging needs from a note. Title, id, explicit type and visibility come
+ * from `readNote`, as for the build; the type guess (tags, then folder, then
+ * "lore") is Staging's own, for notes that name no type.
+ */
 function extractStagingFields(
   raw: string,
   relPath: string,
 ): {
+  note: Note;
   type: string;
   typeWasExplicit: boolean;
   typeWasGuessed: boolean;
-  id: string | undefined;
-  /** The note's own tag (atlas.visibility, or legacy publish: true); undefined if untagged. */
-  taggedVisibility: string | undefined;
-  fmTitle: string | undefined;
   frontmatterPath: string | undefined;
-  parseError: string | undefined;
   frontmatterWarning: string | undefined;
 } {
-  try {
-    const fm = parseFrontmatter(raw);
-    const data = fm.data;
-    const atlas = (data.atlas ?? {}) as Record<string, unknown>;
-
-    // atlas.type first, then top-level `type:` (most vault notes use it), as the build does.
-    const explicit = [atlas.type, data.type]
-      .find((t): t is string => typeof t === "string" && t.trim().length > 0)
-      ?.trim();
-    const fromTags = explicit ? null : inferTypeFromTags(data.tags);
-    const fromFolder = explicit || fromTags ? null : inferTypeFromPath(relPath);
-    const type =
-      explicit ?? fromTags ?? (fromFolder && fromFolder !== "note" ? fromFolder : "lore");
-    // Guessed = no explicit type, no recognized tag, and the folder gave no useful signal.
-    const typeWasGuessed = !explicit && !fromTags && fromFolder === "note";
-
-    const visRaw = typeof atlas.visibility === "string" ? atlas.visibility : undefined;
-    const taggedVisibility =
-      visRaw && isValidVisibility(visRaw) ? visRaw : atlas.publish === true ? "player" : undefined;
-
-    const id = typeof atlas.id === "string" ? atlas.id : undefined;
-    const fmTitle = typeof data.title === "string" ? data.title : undefined;
-    const frontmatterPath = typeof data.path === "string" ? data.path : undefined;
-    const frontmatterWarning = commaJammedWarning(
-      atlas.tags ?? data.tags,
-      atlas.aliases ?? data.aliases,
-    );
+  const note = readNote(raw, relPath);
+  if (note.parseError !== undefined) {
     return {
-      type,
-      typeWasExplicit: !!explicit,
-      typeWasGuessed,
-      id,
-      taggedVisibility,
-      fmTitle,
-      frontmatterPath,
-      parseError: undefined,
-      frontmatterWarning,
-    };
-  } catch (e) {
-    return {
+      note,
       type: "lore",
       typeWasExplicit: false,
       typeWasGuessed: false,
-      id: undefined,
-      taggedVisibility: undefined,
-      fmTitle: undefined,
       frontmatterPath: undefined,
-      parseError: e instanceof Error ? e.message : String(e),
       frontmatterWarning: undefined,
     };
   }
+  const { data, atlas } = note;
+  const explicit = note.type;
+  const fromTags = explicit ? null : inferTypeFromTags(data.tags);
+  const fromFolder = explicit || fromTags ? null : inferTypeFromPath(relPath);
+  const type = explicit ?? fromTags ?? (fromFolder && fromFolder !== "note" ? fromFolder : "lore");
+  // Guessed = no explicit type, no recognized tag, and the folder gave no useful signal.
+  const typeWasGuessed = !explicit && !fromTags && fromFolder === "note";
+
+  const frontmatterPath = typeof data.path === "string" ? data.path : undefined;
+  const frontmatterWarning = commaJammedWarning(
+    atlas.tags ?? data.tags,
+    atlas.aliases ?? data.aliases,
+  );
+  return {
+    note,
+    type,
+    typeWasExplicit: !!explicit,
+    typeWasGuessed,
+    frontmatterPath,
+    frontmatterWarning,
+  };
 }
 
 let rowIdCounter = 0;
@@ -243,26 +208,22 @@ function nextRowId(filename: string): string {
 }
 
 export function buildStagingRow(input: RawImportFile, ctx: StagingContext): StagingRow {
-  const {
-    type,
-    typeWasExplicit,
-    typeWasGuessed,
-    id,
-    taggedVisibility,
-    fmTitle,
-    frontmatterPath,
-    parseError,
-    frontmatterWarning,
-  } = extractStagingFields(input.raw, input.filename);
-  // What the vault asks for: its tag, else the folder rule (dm outside the vault).
-  const vaultVisibility = taggedVisibility ?? defaultVisibilityForVaultPath(input.vaultRelPath);
+  const { note, type, typeWasExplicit, typeWasGuessed, frontmatterPath, frontmatterWarning } =
+    extractStagingFields(input.raw, input.filename);
+  const parseError = note.parseError;
+  // What the vault asks for: the note's own tag (readNote, as the build reads
+  // it), else the vault folder rule. An unreadable note is dm (fail closed).
+  const vaultVisibility: EntityVisibility =
+    note.visibilityTagged || parseError !== undefined
+      ? note.visibility
+      : defaultVisibilityForVaultPath(input.vaultRelPath);
 
   // ── Identity resolution (§5.3 precedence) ──────────────────────────────────
   // Priority: (1) vault atlas.id; (2) sync-map[vaultRelPath]; (3) slugify(title)
   const syncEntry =
     input.vaultRelPath && ctx.syncMap ? lookupByPath(ctx.syncMap, input.vaultRelPath) : undefined;
-  const title = deriveTitle(input.filename, fmTitle);
-  const resolvedId = id ?? syncEntry?.id ?? slugify(title);
+  const title = note.title;
+  const resolvedId = note.idFromFrontmatter ? note.id : (syncEntry?.id ?? note.id);
   const baseType = syncEntry?.baseType; // for two-way type resolution in §3.6
 
   // Stem for path computation: use resolvedId (same as build-atlas derivation)
@@ -290,10 +251,7 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
   const meta = rowKind === "update" ? ctx.entityMeta?.get(resolvedId) : undefined;
   if (meta) {
     // Check secrecy increase: canon is hidden-tier, vault wants player visibility
-    const vaultAtlas = parseError
-      ? {}
-      : ((parseFrontmatter(input.raw).data.atlas as Record<string, unknown>) ?? {});
-    if (detectExposureIncrease(meta.visibility, vaultAtlas)) {
+    if (detectExposureIncrease(meta.visibility, note.atlas)) {
       needsReview = { reason: "secrecy-increase" };
     } else if (baseType) {
       // Check type conflict: both disk type and vault type diverged from last-synced base

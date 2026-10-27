@@ -9,7 +9,7 @@
  * plugin uses.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { runBuild, BuildError, deriveTitle } from "../../scripts/build-atlas";
+import { runBuild, BuildError } from "../../scripts/build-atlas";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -152,59 +152,5 @@ describe("world name", () => {
     } finally {
       fs.writeFileSync(worldPath, goodYaml, "utf8");
     }
-  });
-});
-
-describe("deriveTitle", () => {
-  it("title-cases a single-word slug when no fmTitle provided", () => {
-    expect(deriveTitle("/notes/corven.md")).toBe("Corven");
-  });
-
-  it("title-cases each word of a hyphenated slug", () => {
-    expect(deriveTitle("/notes/great-hall.md")).toBe("Great Hall");
-  });
-
-  it("title-cases each word of an underscore slug", () => {
-    expect(deriveTitle("/notes/lost_city.md")).toBe("Lost City");
-  });
-
-  it("returns explicit fmTitle trimmed and unchanged (no forced case change)", () => {
-    expect(deriveTitle("/notes/corven.md", "  corven the Bold  ")).toBe("corven the Bold");
-  });
-
-  it("falls back to slug-derived title when fmTitle is empty string", () => {
-    expect(deriveTitle("/notes/edric.md", "")).toBe("Edric");
-  });
-
-  it("falls back to slug-derived title when fmTitle is whitespace-only", () => {
-    expect(deriveTitle("/notes/edric.md", "   ")).toBe("Edric");
-  });
-
-  it("non-string fmTitle (number) falls through to slug-derived title", () => {
-    expect(deriveTitle("/notes/npc.md", 42)).toBe("Npc");
-  });
-
-  it("non-string fmTitle (boolean) falls through to slug-derived title", () => {
-    expect(deriveTitle("/notes/npc.md", true)).toBe("Npc");
-  });
-
-  it("non-string fmTitle (object) falls through to slug-derived title", () => {
-    expect(deriveTitle("/notes/npc.md", { title: "Npc" })).toBe("Npc");
-  });
-
-  it("collapses multiple consecutive hyphens into a single space", () => {
-    expect(deriveTitle("/notes/great---hall.md")).toBe("Great Hall");
-  });
-
-  it("collapses mixed hyphens and underscores into spaces", () => {
-    expect(deriveTitle("/notes/the-lost_city.md")).toBe("The Lost City");
-  });
-
-  it("capitalizes unicode first letter via \\p{L} regex", () => {
-    expect(deriveTitle("/notes/ñoño.md")).toBe("Ñoño");
-  });
-
-  it("trims space produced by a leading separator", () => {
-    expect(deriveTitle("/notes/-the-way.md")).toBe("The Way");
   });
 });

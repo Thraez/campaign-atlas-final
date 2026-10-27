@@ -25,6 +25,7 @@ import type {
   RouteMode,
   Point,
 } from "@/atlas/content/schema";
+import { VISIBILITY_MENU_ORDER } from "@/atlas/content/visibility";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -342,7 +343,7 @@ export function RoutesTab({ project, map, api, blockingCount, warningCount, onFi
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {["player", "rumor", "dm", "hidden"].map((v) => (
+                    {VISIBILITY_MENU_ORDER.map((v) => (
                       <SelectItem key={v} value={v} className="text-xs">
                         {v}
                       </SelectItem>

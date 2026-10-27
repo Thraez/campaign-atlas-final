@@ -1,6 +1,9 @@
 import type { Entity } from "@/atlas/content/schema";
 
-const PLAYER_VISIBLE = new Set(["player", "rumor"]);
+import { PLAYER_VISIBLE_VISIBILITY } from "./visibility";
+
+// Region and route visibilities arrive as plain strings (world.yaml).
+const PLAYER_VISIBLE: ReadonlySet<string> = PLAYER_VISIBLE_VISIBILITY;
 
 interface Placementish { entityId: string; x: number; y: number; mapId?: string; }
 interface Visible { visibility?: string; id?: string; }

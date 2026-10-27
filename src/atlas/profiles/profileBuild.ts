@@ -7,7 +7,7 @@
 import type { EntityVisibility } from "@/atlas/content/schema";
 import type { EntityProfile, EntityRelationship, PlayerProfile, DmProfile } from "./profileTypes";
 
-const PLAYER_VIS = new Set<EntityVisibility>(["player", "rumor"]);
+import { PLAYER_VISIBLE_VISIBILITY as PLAYER_VIS } from "../content/visibility";
 
 /** Strip the DM half of a profile. Used to produce player-build entities. */
 export function stripDmProfile(profile: EntityProfile | undefined): EntityProfile | undefined {

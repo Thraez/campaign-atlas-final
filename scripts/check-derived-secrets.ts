@@ -9,14 +9,16 @@
  * This script derives a list of "must-not-appear" strings from the source
  * vault itself:
  *
- *   - any note the build treats as secret (`isSecretNote`: dm or hidden,
- *     no visibility at all (ADR-0001), or atlas.publish: false)
- *   - every note in an excluded folder (`_dm/`, `_drafts/`, ...) by the same
- *     rule: the build never ships them, but player notes can still name them
+ *   - any note the build reads and treats as secret (`readNote`'s `isSecret`:
+ *     dm or hidden, no visibility at all (ADR-0001), or atlas.publish: false)
+ *   - every note the build never reads (an excluded folder such as `_dm/` or
+ *     `_drafts/`, or missed by `include`), whatever its tag, as the build's
+ *     cross-reference check treats them: player notes can still name them
  *
- * For each such note, the title (worked out exactly as the build does,
- * `deriveTitle`), the slug-form id, and every alias is added to the secret
- * list. The target directory is then scanned for whole-word occurrences in
+ * Both lists come from the build's own scan (`scanContentFolder`). For each
+ * such note, the title and id (exactly as the build works them out, via
+ * `readNote`), the title with dashes read as spaces, and every alias are
+ * added to the secret list. The target directory is then scanned for whole-word occurrences in
  * any letter case. Names that are too short or too generic to
  * meaningfully flag (single common words) are excluded to keep false
  * positives manageable — a DM who names a secret "Door" or "The North"
@@ -32,9 +34,9 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { parseFrontmatter } from "./atlas/parseFrontmatter";
-import { deriveTitle, isSecretNote } from "./atlas/noteIdentity";
-import { slugify } from "./atlas/slugify";
+import { parseNoteFields } from "./atlas/parseFrontmatter";
+import { readContentFiles } from "./atlas/readContentFiles";
+import { scanContentFolder } from "../src/atlas/content/scanContentFolder";
 
 interface Config {
   contentRoot: string;
@@ -132,38 +134,6 @@ function loadConfig(configPath: string): Config {
   return JSON.parse(fs.readFileSync(configPath, "utf8")) as Config;
 }
 
-function matchAny(target: string, globs: string[]): boolean {
-  return globs.some((g) => globToRegExp(g).test(target));
-}
-
-function globToRegExp(glob: string): RegExp {
-  const escaped = glob
-    .replace(/[.+^${}()|\\]/g, "\\$&")
-    .replace(/\*\*/g, "::DSTAR::")
-    .replace(/\*/g, "[^/]*")
-    .replace(/::DSTAR::/g, ".*")
-    .replace(/\?/g, ".");
-  return new RegExp(`^${escaped}$`);
-}
-
-// No `exclude` here: excluded notes never ship, but their names still must
-// not appear in what does.
-function walkMd(dir: string, contentRoot: string, include: string[]): string[] {
-  const out: string[] = [];
-  if (!fs.existsSync(dir)) return out;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    const contentRel = path.relative(contentRoot, full).replace(/\\/g, "/");
-    if (entry.isDirectory()) {
-      out.push(...walkMd(full, contentRoot, include));
-    } else if (entry.name.endsWith(".md")) {
-      if (include.length > 0 && !matchAny(contentRel, include)) continue;
-      out.push(full);
-    }
-  }
-  return out;
-}
-
 /** Should the candidate name be included in the must-not-appear list? */
 function isReportableName(name: string): boolean {
   const trimmed = name.trim();
@@ -175,23 +145,31 @@ function isReportableName(name: string): boolean {
 export function deriveSecretsFromVault(configPath: string): SecretEntry[] {
   const cfg = loadConfig(configPath);
   const contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
-  const files = walkMd(contentDir, contentDir, cfg.include ?? []);
+  // The build's own content-folder scan: every note it reads that is secret,
+  // plus every note it never reads (folder-excluded), whatever its tag.
+  const scan = scanContentFolder(readContentFiles(contentDir, path.dirname(configPath)), {
+    include: cfg.include ?? [],
+    exclude: cfg.exclude ?? [],
+  });
+  const secretNotes = [...scan.notes.filter((n) => n.isSecret), ...scan.excluded];
   const secrets: SecretEntry[] = [];
-  for (const file of files) {
-    const raw = fs.readFileSync(file, "utf8");
-    const rel = path.relative(path.dirname(configPath), file).replace(/\\/g, "/");
-    const parsed = parseFrontmatter(raw, rel);
-    if (!isSecretNote(parsed.atlas)) continue;
-
-    const title = deriveTitle(file, parsed.data.title);
+  for (const note of secretNotes) {
+    const rel = note.relPath;
+    const { title, id } = note;
     if (isReportableName(title)) {
       secrets.push({ name: title, source: rel, field: "title" });
     }
-    const id = parsed.atlas.id ?? slugify(title);
+    // Also the title with dashes and underscores read as spaces, which is how
+    // the build titled filename-only notes before code-retro 06 and how prose
+    // often writes such a name ("Khal-Azum Rift" / "Khal Azum Rift").
+    const spaced = title.replace(/[-_]+/g, " ").trim();
+    if (spaced !== title && isReportableName(spaced)) {
+      secrets.push({ name: spaced, source: rel, field: "title" });
+    }
     if (isReportableName(id)) {
       secrets.push({ name: id, source: rel, field: "id" });
     }
-    for (const alias of parsed.atlas.aliases ?? []) {
+    for (const alias of parseNoteFields(note).atlas.aliases ?? []) {
       if (isReportableName(alias)) {
         secrets.push({ name: alias, source: rel, field: "alias" });
       }

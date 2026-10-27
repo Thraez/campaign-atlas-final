@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Pen, Plus, Trash2, Copy, Crosshair, Target, RotateCcw, ChevronRight } from "lucide-react";
 import type { AtlasProject, MapDocument, Region, EntityVisibility } from "@/atlas/content/schema";
+import { VISIBILITY_MENU_ORDER } from "@/atlas/content/visibility";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -290,7 +291,7 @@ export function RegionsTab({ project, map, api, blockingCount, warningCount, onF
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {["player", "rumor", "dm", "hidden"].map((v) => (
+                    {VISIBILITY_MENU_ORDER.map((v) => (
                       <SelectItem key={v} value={v} className="text-xs">
                         {v}
                       </SelectItem>

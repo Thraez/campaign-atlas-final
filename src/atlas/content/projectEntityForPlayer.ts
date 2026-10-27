@@ -17,7 +17,7 @@ import { tokenizeWikilinks, renderLinkTokens } from "@/atlas/content/parseWikili
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 import { compactProfile, stripDmProfile, filterRelationshipsForPlayer } from "@/atlas/profiles/profileBuild";
 
-const PLAYER_VISIBLE = new Set<EntityVisibility>(["player", "rumor"]);
+import { PLAYER_VISIBLE_VISIBILITY as PLAYER_VISIBLE } from "./visibility";
 
 // Verbatim from scripts/build-atlas.ts META_TAGS. Kept in lockstep
 // by the build-parity test; if the build's list changes, that test fails.

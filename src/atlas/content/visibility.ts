@@ -17,6 +17,12 @@ import type { EntityVisibility } from "./schema";
 /** Every accepted `atlas.visibility` value, in canonical order. */
 export const ALL_VISIBILITY: readonly EntityVisibility[] = ["player", "dm", "hidden", "rumor"];
 
+/**
+ * The same values from most to least visible, the order the editor's
+ * region, route and sound-area visibility menus list them in.
+ */
+export const VISIBILITY_MENU_ORDER: readonly EntityVisibility[] = ["player", "rumor", "dm", "hidden"];
+
 /** The same values as a Set, for O(1) membership checks. */
 export const VALID_VISIBILITY: ReadonlySet<EntityVisibility> = new Set(ALL_VISIBILITY);
 

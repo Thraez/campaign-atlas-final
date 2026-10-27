@@ -10,7 +10,7 @@ import { useViewMode } from "@/atlas/view/ViewModeProvider";
 import { tokenizeWikilinks, renderLinkTokens } from "@/atlas/content/parseWikilinks";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
 
-const PLAYER_VISIBLE = new Set(["player", "rumor"]);
+import { PLAYER_VISIBLE_VISIBILITY as PLAYER_VISIBLE } from "@/atlas/content/visibility";
 
 export function EntityReadingView({
   entity,

@@ -18,7 +18,9 @@ import {
   DEFAULT_RESOLVE_ASSET,
   extractImageEmbedFilenames,
 } from "../src/atlas/content/renderEntityMarkdown";
-import { parseFrontmatter, type ParsedFile } from "./atlas/parseFrontmatter";
+import { parseNoteFields, type ParsedFile } from "./atlas/parseFrontmatter";
+import { readContentFiles } from "./atlas/readContentFiles";
+import { scanContentFolder } from "../src/atlas/content/scanContentFolder";
 import {
   secretMarkerIds,
   stripDmBlocks,
@@ -26,7 +28,6 @@ import {
   stripSecretMarkers,
 } from "../src/atlas/content/dmMarkup";
 import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
-import { slugify } from "./atlas/slugify";
 import { loadWorldConfig, projectAssetCredits } from "./atlas/loadWorldConfig";
 import { CURRENT_ATLAS_SCHEMA_VERSION } from "./atlas/schemaVersion";
 import { sanitizeAtlasHtml } from "../src/atlas/sanitizeHtml";
@@ -40,9 +41,6 @@ import { parseAtlasDate } from "./atlas/calendarDate";
 import { buildEntitySecrets } from "./atlas/buildSecrets";
 import yaml from "js-yaml";
 import { PLAYER_VISIBLE } from "./atlas/visibility";
-import { deriveTitle, isSecretNote, resolveVisibility } from "./atlas/noteIdentity";
-
-export { deriveTitle };
 import { isLit } from "../src/atlas/fog/effectiveLit";
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
 import { filterSoundscapeForPlayer } from "./atlas/filterSoundscape";
@@ -135,7 +133,6 @@ type Pending = {
  * public-entry → DM-target spoiler leaks.
  */
 type AllParsed = {
-  file: string;
   rel: string;
   parsed: ParsedFile;
   title: string;
@@ -173,68 +170,6 @@ function loadConfig(configPath: string): Config {
     }
   }
   return parsed as Config;
-}
-
-function walk(
-  dir: string,
-  contentRoot: string,
-  include: string[],
-  exclude: string[],
-  scanned: { excludedFiles: number; excludedPaths: string[] },
-): string[] {
-  const out: string[] = [];
-  if (!fs.existsSync(dir)) return out;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    const contentRel = path.relative(contentRoot, full).replace(/\\/g, "/");
-    if (matchAny(contentRel, exclude)) {
-      if (entry.isDirectory()) {
-        const all = listMd(full);
-        scanned.excludedFiles += all.length;
-        scanned.excludedPaths.push(...all);
-      } else if (entry.name.endsWith(".md")) {
-        scanned.excludedFiles += 1;
-        scanned.excludedPaths.push(full);
-      }
-      continue;
-    }
-    if (entry.isDirectory()) {
-      out.push(...walk(full, contentRoot, include, exclude, scanned));
-    } else if (entry.name.endsWith(".md")) {
-      // include globs only filter files (not dirs); empty list = include all.
-      if (include.length > 0 && !matchAny(contentRel, include)) {
-        scanned.excludedFiles += 1;
-        scanned.excludedPaths.push(full);
-        continue;
-      }
-      out.push(full);
-    }
-  }
-  return out;
-}
-
-function listMd(dir: string): string[] {
-  const out: string[] = [];
-  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    const f = path.join(dir, e.name);
-    if (e.isDirectory()) out.push(...listMd(f));
-    else if (e.name.endsWith(".md")) out.push(f);
-  }
-  return out;
-}
-
-function matchAny(target: string, globs: string[]): boolean {
-  return globs.some((g) => globToRegExp(g).test(target));
-}
-
-function globToRegExp(glob: string): RegExp {
-  const escaped = glob
-    .replace(/[.+^${}()|\\]/g, "\\$&")
-    .replace(/\*\*/g, "::DSTAR::")
-    .replace(/\*/g, "[^/]*")
-    .replace(/::DSTAR::/g, ".*")
-    .replace(/\?/g, ".");
-  return new RegExp(`^${escaped}$`);
 }
 
 function relImage(p: string): string {
@@ -339,8 +274,18 @@ async function runBuildCore(flags: BuildFlags) {
   const cfg = loadConfig(configPath);
   const contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
 
-  const scanInfo = { excludedFiles: 0, excludedPaths: [] as string[] };
-  const files = walk(contentDir, contentDir, cfg.include ?? [], cfg.exclude ?? [], scanInfo);
+  // One content-folder scan, shared with the derived-secrets scan: `files`
+  // are the notes the build reads, `scan.excluded` the ones it only knows by
+  // name (`_dm/`, `_drafts/`, ...).
+  const scan = scanContentFolder(readContentFiles(contentDir, ROOT), {
+    include: cfg.include ?? [],
+    exclude: cfg.exclude ?? [],
+  });
+  const files = scan.notes;
+  const scanInfo = {
+    excludedFiles: scan.excluded.length,
+    excludedPaths: scan.excluded.map((n) => path.resolve(ROOT, n.relPath)),
+  };
 
   // Load world config up-front so entity parsing can resolve dates against
   // the in-world calendar.
@@ -402,21 +347,19 @@ async function runBuildCore(flags: BuildFlags) {
   // leak even if the target entity is later excluded from the player build —
   // the display TEXT inside the link still ships and reveals the name.
   const allParsed: AllParsed[] = [];
-  for (const file of files) {
-    const rel = path.relative(ROOT, file).replace(/\\/g, "/");
-    const raw = fs.readFileSync(file, "utf8");
-    const parsed = parseFrontmatter(raw, rel);
+  for (const note of files) {
+    const rel = note.relPath;
+    const parsed = parseNoteFields(note);
     for (const w of parsed.warnings) {
       if (w.includes("invalid atlas.visibility")) invalidVisibilityCount += 1;
     }
     warnings.push(...parsed.warnings);
 
-    const title = deriveTitle(file, (parsed.data.title as string) ?? undefined);
+    const { title, id, visibility, isSecret } = note;
     if (!title) {
       errors.push(`${rel}: missing title`);
       continue;
     }
-    const id = parsed.atlas.id || slugify(title);
     if (slugSeen.has(id)) {
       duplicateSlugs += 1;
       errors.push(`${rel}: duplicate slug "${id}" also produced by ${slugSeen.get(id)} — skipping`);
@@ -424,9 +367,7 @@ async function runBuildCore(flags: BuildFlags) {
     }
     slugSeen.set(id, rel);
 
-    const visibility = resolveVisibility(parsed.atlas);
-    const isSecret = isSecretNote(parsed.atlas);
-    allParsed.push({ file, rel, parsed, title, id, visibility, isSecret });
+    allParsed.push({ rel, parsed, title, id, visibility, isSecret });
   }
 
   // Cross-reference index: title + aliases → id, covering EVERY parsed entity
@@ -475,18 +416,10 @@ async function runBuildCore(flags: BuildFlags) {
   // a public-entry wikilink to their title would still leak the display text
   // unless we treat them as secret targets in the cross-ref index.
   const excludedIdSeen = new Set<string>();
-  for (const file of scanInfo.excludedPaths) {
-    const rel = path.relative(ROOT, file).replace(/\\/g, "/");
-    let raw: string;
-    try {
-      raw = fs.readFileSync(file, "utf8");
-    } catch {
-      continue;
-    }
-    const parsed = parseFrontmatter(raw, rel);
-    const title = deriveTitle(file, (parsed.data.title as string) ?? undefined);
+  for (const note of scan.excluded) {
+    const parsed = parseNoteFields(note);
+    const { title, id } = note;
     if (!title) continue;
-    const id = parsed.atlas.id || slugify(title);
     if (slugSeen.has(id) || excludedIdSeen.has(id)) continue;
     excludedIdSeen.add(id);
     registerName(title, id);

@@ -1,7 +1,7 @@
 import type { Entity } from "@/atlas/content/schema";
 import type { ViewMode } from "@/atlas/view/ViewModeProvider";
 
-const PLAYER_VISIBLE = new Set(["player", "rumor"]);
+import { PLAYER_VISIBLE_VISIBILITY as PLAYER_VISIBLE } from "@/atlas/content/visibility";
 
 export function filterEntitiesForLens(entities: Entity[], mode: ViewMode): Entity[] {
   if (mode === "dm") return entities;

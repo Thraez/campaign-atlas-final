@@ -22,6 +22,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ChevronRight, MapPin, Pen, Plus, RotateCcw, Trash2 } from "lucide-react";
 import type { EntityVisibility, MapDocument, SoundArea } from "@/atlas/content/schema";
+import { VISIBILITY_MENU_ORDER } from "@/atlas/content/visibility";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -400,7 +401,7 @@ export function SoundscapeTab({ map, onPatch, availableAudioFiles, undoStack, ap
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {["player", "rumor", "dm", "hidden"].map((v) => (
+                    {VISIBILITY_MENU_ORDER.map((v) => (
                       <SelectItem key={v} value={v} className="text-xs">
                         {v}
                       </SelectItem>

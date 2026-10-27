@@ -16,6 +16,7 @@
 import { ConflictError, hashContent, type FileChange } from "@/atlas/save/localFsSave";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter";
 import { mergeImportFrontmatter } from "./mergeImportFrontmatter";
+import { readNote } from "@/atlas/content/readNote";
 import { isWritableSourcePath } from "@/atlas/save/sourcePathAllowlist";
 import { rewriteFrontmatter } from "@/atlas/content/frontmatterRewrite";
 import type { StagingRow } from "./stagingState";
@@ -72,8 +73,15 @@ export async function buildImportChanges(
       // Read fresh disk content at commit time (not stale staging-time snapshot).
       const currentRaw = await readSourceFile(row.targetPath, fetchFn);
       baseHash = await hashContent(currentRaw);
+      const disk = readNote(currentRaw, row.targetPath);
+      if (disk.parseError !== undefined) {
+        throw new ImportCommitError(
+          `${row.targetPath} has malformed frontmatter: ${disk.parseError}`,
+          row.targetPath,
+        );
+      }
       const merged = mergeImportFrontmatter({
-        disk: parseFrontmatter(currentRaw),
+        disk,
         vault: parseFrontmatter(row.rawContent),
         inferredType: row.inferredType,
         baseType: row.baseType, // from sync-map (Phase 2); undefined → vault wins on type
