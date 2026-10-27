@@ -21,3 +21,9 @@ page and can only be tested by mounting it.
   `src/test/editor/plan-unified-save.test.ts`. An upload with no bytes now refuses Save: an error
   toast "Save refused: N uploaded image(s) have no bytes" names the layers, and no modal opens.
   Needs Isak's look at the toast in the editor.
+- 2026-10-27 (agent): The two-axis review ran and its fixes are in. `planUnifiedSave(state, deps)`
+  moved to `src/atlas/save/planUnifiedSave.ts` (tests: `src/test/save/plan-unified-save.test.ts`).
+  Entity reads now go through the injected `deps.fetchFn`. The world.yaml inputs are one
+  `worldYaml` field. `uploadsMissingBytes` in `buildSaveBatch.ts` serves both the refusal and the
+  asset skip. A dirty world.yaml with no active world is still left out of the batch, and it now says
+  so. Status stays ready-for-human.

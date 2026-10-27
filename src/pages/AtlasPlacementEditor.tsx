@@ -58,7 +58,6 @@ import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { OceanBackground } from "@/atlas/ocean/OceanBackground";
 import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
-import { planUnifiedSave } from "@/atlas/editor/saveGate";
 import { buildDraftPlacements as pureBuildDraftPlacements } from "@/atlas/editor/dirtyPlacements";
 import type { FileChange } from "@/atlas/save/localFsSave";
 import { SaveStatus } from "@/atlas/session/SaveStatus";
@@ -67,6 +66,7 @@ import { useExternalRebuildDetector } from "@/atlas/session/useExternalRebuildDe
 import { CanonicalSaveError } from "@/atlas/save/canonicalPlacementSave";
 import { useWorldYamlBaseline, worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
 import { buildWorldYamlContent as pureBuildWorldYamlContent } from "@/atlas/save/buildSaveBatch";
+import { planUnifiedSave } from "@/atlas/save/planUnifiedSave";
 import { pointInPolygon } from "@/atlas/geometry/polygon";
 import { SyncPanel } from "@/atlas/sync/SyncPanel";
 import { ImportStagingModal } from "@/atlas/import/ImportStagingModal";
@@ -782,7 +782,7 @@ function AtlasPlacementEditorInner() {
    * dirty draft.
    *
    * The decision (what to write, or why to refuse) is planUnifiedSave in
-   * src/atlas/editor/saveGate.ts; this handler only wires it to toast/modal.
+   * src/atlas/save/planUnifiedSave.ts; this handler only wires it to toast/modal.
    * eval-12: an upload with no bytes refuses the save and the reason shows
    * as an error toast; nothing is written.
    *
@@ -793,18 +793,24 @@ function AtlasPlacementEditorInner() {
   const onSaveClick = async () => {
     if (!project || !activeMap) return;
     try {
-      const plan = await planUnifiedSave({
-        allDraftPlacements: buildDraftPlacements(),
-        overrides,
-        activeMapId: activeMap.id,
-        foreignMapDrafts,
-        entitiesById: new Map(project.entities.map((e) => [e.id, e])),
-        worldYamlDirty,
-        worldYamlPath: activeWorldId ? worldYamlPath(activeWorldId) : null,
-        worldYamlBaseline,
-        buildWorldYamlContent,
-        localLayers: layerEditor.localLayers,
-      });
+      const plan = await planUnifiedSave(
+        {
+          allDraftPlacements: buildDraftPlacements(),
+          overrides,
+          activeMapId: activeMap.id,
+          foreignMapDrafts,
+          entitiesById: new Map(project.entities.map((e) => [e.id, e])),
+          worldYaml: worldYamlDirty
+            ? {
+                path: activeWorldId ? worldYamlPath(activeWorldId) : null,
+                baseline: worldYamlBaseline,
+                buildContent: buildWorldYamlContent,
+              }
+            : null,
+          localLayers: layerEditor.localLayers,
+        },
+        { fetchFn: fetch },
+      );
       if (plan.kind === "nothing-to-save") {
         toast.info(plan.message);
         return;
