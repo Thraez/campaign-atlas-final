@@ -230,7 +230,7 @@ large (~2.7k lines) but delegates to focused, testable modules.
 | `src/atlas/routes/useRouteDraft.ts`                                     | Route draft state + waypoint resolution (coords or entity refs)                | `useRouteDraft`, `RouteDraftAPI`                                            |
 | `src/atlas/{fog,regions,routes}/*Layer.tsx`                             | react-leaflet visual layers (z-ordered base→regions→routes→fog→pins)           | `FogLayer`, `RegionLayer`, `RouteLayer`                                     |
 | `src/atlas/tabs/{FogTab,RegionsTab,RoutesTab}.tsx`, `MapLayerPanel.tsx` | Tab UIs                                                                        | —                                                                           |
-| `src/atlas/editor/saveGate.ts` + `dirtyPlacements.ts`                   | Pure save pre-flight (dirty filter, patch derivation, empty gate)              | `buildSavePlan`, `filterDirtyPlacements`                                    |
+| `src/atlas/editor/saveGate.ts` + `dirtyPlacements.ts`                   | Pure save pre-flight (dirty filter, empty gate)                                | `buildSavePlan`, `filterDirtyPlacements`                                    |
 | `src/atlas/editor/{mapClickCoord,pinClickIntent,entityCloseIntent}.ts`  | Pure click/intent resolvers                                                    | `mapClickToAtlasCoord`, `resolvePinClickIntent`, `resolveEntityCloseIntent` |
 | `src/atlas/useUndoStack.ts` + `session/useEditorSession.ts`             | Central snapshot undo/redo + session status                                    | `useUndoStack`, `useEditorSession`                                          |
 
