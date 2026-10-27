@@ -6,7 +6,8 @@ local DM editor. Vite, React, TypeScript. Remote: github.com/Thraez/campaign-atl
 ## Run, test, build
 
 - `npm run dev`: editor and local save endpoint
-- `npm run typecheck`, `npm run lint`, `npm test` (Vitest, ~3-5 min), `npm run build`
+- `npm run typecheck:all`, `npm run lint`, `npm run test:ci` (Vitest in 4 shards, ~3 min; a
+  single `npm test` run of the whole suite runs out of memory), `npm run build`
 - `npm run atlas:build:player`: strict player atlas in `public/atlas/`
 - `npm run atlas:publish`: full build plus the safety scans
 - `npm run images:optimize`: convert PNG/JPEG to WebP and update references
@@ -43,7 +44,7 @@ A branch is done only after typecheck, lint, tests, and any pipeline checks it t
 
 - Never hand-edit `public/atlas/atlas.json`, `.local-atlas/`, `dist/`, `dist-ssr/`. Edit
   frontmatter, `world.yaml`, `scripts/` or `src/`, then rebuild. The hook
-  `.claude/hooks/block-generated-paths.ps1` blocks Edit/Write on them; shell writes are on you.
+  `.claude/hooks/block-generated-paths.mjs` blocks Edit/Write on them; shell writes are on you.
 - Player builds must contain no DM content. Run `npm run atlas:check-secrets <dir>` and
   `npm run atlas:check-derived <dir>` before calling output safe.
 - Keep `AtlasPlacementEditor` and `/__atlas/save` behind the `__INCLUDE_EDITOR__` gate in
@@ -56,9 +57,26 @@ A branch is done only after typecheck, lint, tests, and any pipeline checks it t
 `src/atlas/import/inferType.ts` infers note types from vault folder names: `03_Entities/NPCs` ->
 npc, `03_Entities/Gods` -> deity, `02_Regions/Places` -> location. Those names must not change
 without updating the importer. Its ignore list (`IGNORED_FOLDERS`) matches whole folder names,
-lowercase: `templates`, `archive`, `00_templates`, `98_templates`, `z_archive`, `90_inbox`,
+lowercase: `templates`, `archive`, `00_templates`, `98_templates`, `99_templates`, `z_archive`, `90_inbox`,
 `z_codex_proposals` and others. Saved sync settings and `sync-map.json` also key on vault
 folder names and note paths.
+
+## Agent skills
+
+Matt Pocock's skills are copied into `.claude/skills/` (Codex reads them through `.agents/skills/`).
+Don't edit them; see `.claude/skills/README.md`. How they fit this project: `docs/agents/workflow.md`.
+
+### Issue tracker
+
+Local Markdown in `docs/tracker/`, committed to git. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Not used: the `triage` skill isn't installed. Ticket states are in `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single context: `GLOSSARY.md` and `docs/adr/` at the root. See `docs/agents/domain.md`.
 
 ## Models
 
