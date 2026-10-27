@@ -7,7 +7,7 @@ local DM editor. Vite, React, TypeScript. Remote: github.com/Thraez/campaign-atl
 
 - `npm run dev`: editor and local save endpoint
 - `npm run typecheck:all`, `npm run lint`, `npm run test:ci` (Vitest in 4 shards, ~3 min; a
-  single `npm test` run of the whole suite runs out of memory), `npm run build`
+  single unsharded `vitest run` of the whole suite runs out of memory), `npm run build`
 - `npm run atlas:build:player`: strict player atlas in `public/atlas/`
 - `npm run atlas:publish`: full build plus the safety scans
 - `npm run images:optimize`: convert PNG/JPEG to WebP and update references

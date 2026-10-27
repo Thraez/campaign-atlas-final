@@ -151,7 +151,7 @@ Diagnose in this order:
 
 1. Look at the latest GitHub Actions run. Did the publish workflow fail? Read the log — the safety scanners print actionable messages.
 2. Locally: `npm run atlas:publish`. Does it succeed? If not, the canon is broken — fix the source.
-3. Locally: `npm test`. Does the suite pass? A regression in build/scan logic shows up here.
+3. Locally: `npm run test:ci`. Does the suite pass? A regression in build/scan logic shows up here.
 4. Compare `public/atlas/atlas.json` on the deployed site (open `https://yourusername.github.io/<repo>/atlas/atlas.json`) against your local build. If they differ, a deploy step is stale.
 
 If you can't fix it in <10 minutes, rollback (above) and investigate offline.

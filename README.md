@@ -556,7 +556,7 @@ npm install
 npm run atlas:build
 npm run atlas:build:player
 npm run atlas:publish
-npm test
+npm run test:ci
 ```
 Scripts:
 Script	Purpose
@@ -570,7 +570,7 @@ Script	Purpose
 `npm run atlas:check-fog`	Re-derive the fog boundary and check for un-redacted map images, geometry, or in-fog content.
 `npm run atlas:audit-assets`	Content-quality check: oversize images, orphaned files, broken asset references (not a safety scanner).
 `npm run atlas:scan`	Runs all six safety scanners (including check-player-secrets, which has no standalone alias) plus audit-assets in parallel — what `atlas:publish` gates on.
-`npm test`	Runs Vitest test suite.
+`npm run test:ci`	Runs the Vitest suite in 4 shards (`npm test` does the same).
 Generated files:
 ```text
 public/atlas/atlas.json
@@ -986,7 +986,7 @@ layers:
 Tests
 Run:
 ```bash
-npm test
+npm run test:ci
 ```
 The test suite covers:
 player build spoiler protection

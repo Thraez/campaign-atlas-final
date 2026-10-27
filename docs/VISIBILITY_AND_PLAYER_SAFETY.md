@@ -189,4 +189,4 @@ The Vitest suite under `src/test/` exercises every guarantee above. The headline
 - `cross-reference-leak.test.ts` — wikilink display-text redaction (exit 8).
 - `unbalanced-dm-block.test.ts` — unclosed `%%` fails the build.
 
-Run them with `npm test`. A green suite is the precondition for `git push`.
+Run them with `npm run test:ci`. A green suite is the precondition for `git push`.
