@@ -60,7 +60,8 @@ In flight (2026-10-27, stopped at the agent session limit, resets 23:10 Berlin):
   review tidy-ups are uncommitted in worktree `.claude/worktrees/agent-a5539c8240a905637`, gate
   not yet run. Finish, gate, commit, push, open PR.
 - `eval-15-shared-drawing` (31cdaf6 pushed): built and gated; two-axis review not run yet.
-- `eval-18-drop-frontmatter-stream`: stacked on `eval-16-delete-entity-tabs`; check its state.
+- `eval-18-drop-frontmatter-stream` (878fa20 pushed, stacked on `eval-16-delete-entity-tabs`):
+  built and gated (-541 lines, `canonicalEntitySave.ts` gone); two-axis review not run yet.
 
 ## Provisional calls
 
