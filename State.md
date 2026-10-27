@@ -53,7 +53,7 @@ commands with shell variables (one plain command per call, absolute paths).
 
 - `main` was pushed once (f65c854..0c1d92a, docs only, on his yes) before this rule arrived.
 - PRs waiting for his yes to merge (each merge publishes), in stack order: #62 → #66 → #68;
-  #64 → #67 → #69 → #70; #63; #65; #71 → #73; #72. See "Merge queue" for what each needs him to look at.
+  #64 → #67 → #69 → #70; #63; #65; #71 → #73; #72; #74. See "Merge queue" for what each needs him to look at.
 - Local `main` commits since 0c1d92a: push them in the morning.
 - Code-retro 06 needs a real `npm run atlas:publish` run before it is done (the ticket asks for
   it; overnight only its parts ran).
@@ -66,33 +66,31 @@ Isak's rule, 2026-10-27: sessions may merge their own PRs once checks pass and t
 clean, but here every merge into `main` starts the publish workflow, which counts as publishing.
 So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logged here.
 
-| PR  | Ticket | What                                           | Waits on                                         |
-| --- | ------ | ---------------------------------------------- | ------------------------------------------------ |
-| #62 | 18     | Remove the entity-frontmatter save stream      | His yes                                          |
-| #63 | 14     | One search for palette, Browse and Timeline    | Isak tries search (Q2); his yes                  |
-| #64 | 15     | One drawing module for regions and routes      | Isak's look at the editor map (Q3); yes          |
-| #65 | 10     | A test walks the player entry's imports        | His yes                                          |
-| #66 | 12     | Save refuses when an image's bytes are missing | #62 (stacked); Isak sees the toast; yes          |
-| #67 | 11     | Pin layer stops rebuilding on every change     | #64 (stacked); Isak checks the map by eye; yes   |
-| #68 | 19     | Map layer uploads always get a real path       | #66 (stacked); Isak tries the path field; yes    |
-| #69 | a-08   | The map waits for a size before flying         | #67 (stacked); his yes                           |
-| #70 | 20     | Pin labels switch mode when the zoom changes   | #69 (stacked); Isak zooms and looks; yes         |
-| #71 | 21     | Sound comes back after a reload                | Isak reloads with sound on (desktop, phone); yes |
-| #72 | 22     | `maps:optimize` keeps maps lossless            | His yes                                          |
-| #73 | 23     | The newest soundscape request always wins      | #71 (stacked); his yes                           |
+| PR  | Ticket | What                                                     | Waits on                                         |
+| --- | ------ | -------------------------------------------------------- | ------------------------------------------------ |
+| #62 | 18     | Remove the entity-frontmatter save stream                | His yes                                          |
+| #63 | 14     | One search for palette, Browse and Timeline              | Isak tries search (Q2); his yes                  |
+| #64 | 15     | One drawing module for regions and routes                | Isak's look at the editor map (Q3); yes          |
+| #65 | 10     | A test walks the player entry's imports                  | His yes                                          |
+| #66 | 12     | Save refuses when an image's bytes are missing           | #62 (stacked); Isak sees the toast; yes          |
+| #67 | 11     | Pin layer stops rebuilding on every change               | #64 (stacked); Isak checks the map by eye; yes   |
+| #68 | 19     | Map layer uploads always get a real path                 | #66 (stacked); Isak tries the path field; yes    |
+| #69 | a-08   | The map waits for a size before flying                   | #67 (stacked); his yes                           |
+| #70 | 20     | Pin labels switch mode when the zoom changes             | #69 (stacked); Isak zooms and looks; yes         |
+| #71 | 21     | Sound comes back after a reload                          | Isak reloads with sound on (desktop, phone); yes |
+| #72 | 22     | `maps:optimize` keeps maps lossless                      | His yes                                          |
+| #73 | 23     | The newest soundscape request always wins                | #71 (stacked); his yes                           |
+| #74 | c-06   | One module reads a note; bad frontmatter stops the build | A real `atlas:publish` run first; his yes        |
 
 In flight (2026-10-28, overnight):
 
-- `code-retro-06-read-note`: three reviews done (Standards, Spec, player safety). The safety
-  review found one leak (a `---x` line inside frontmatter now parsed as a key, so a note could
-  ship as player) and one place where the build no longer redacts on its own. Fixed in f575e7a.
-  A second safety review found another: front matter gray-matter reads but the new parser drops
-  (`--- ` opening, or no closing fence) loses a secret note's name, so links to it aren't
-  redacted. Fix (fail closed, stop the build) is with the builder. No PR until it is clean.
+- Code-retro 06 is PR #74. Two safety reviews each found a leak (a `---x` key; front matter the
+  new parser dropped, so a secret's name went unredacted). Both are fixed and the second repro
+  now stops the build on the file.
 - `eval-24-one-test-runner` and `eval-25-offline-menu-truth`: building, each from `main`.
-- Ticket 26 waits on code-retro 06 (both change `build-atlas.ts`).
+- `eval-26-timeline-undated` and `code-retro-07-sync-module`: building, each stacked on #74.
+- Code-retro 08 (build core) waits on 26 (both change `build-atlas.ts`).
 - Ticket 29 waits on #68 and #72 (both touch the save pipeline's map path).
-- Code-retro 07 and 08 wait on 06.
   Merged 2026-10-27 on Isak's relayed yes ("Atlas may merge #61 first, then #57, #58, #59 and #60 in
   order, each after its CI re-run is green; the publishes are fine"). Each PR's branch was updated
   from `main`, its CI re-run went green, then it merged and its publish run succeeded:
