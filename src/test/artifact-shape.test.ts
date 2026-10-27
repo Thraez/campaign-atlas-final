@@ -140,7 +140,7 @@ describe.sequential("artifact shape gate", () => {
     expect(out).toMatch(/leak-block/);
     expect(out).toMatch(/visibility/);
     expect(out).toMatch(/sourcePath/);
-    expect(out).toMatch(/DM block/);
+    expect(out).toMatch(/unstripped %% DM markup/);
   });
 });
 

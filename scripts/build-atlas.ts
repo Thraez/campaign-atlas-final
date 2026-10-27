@@ -19,7 +19,11 @@ import {
   extractImageEmbedFilenames,
 } from "../src/atlas/content/renderEntityMarkdown";
 import { parseFrontmatter, type ParsedFile } from "./atlas/parseFrontmatter";
-import { stripDmBlocks, stripDmFromShippingString } from "./atlas/stripDmBlocks";
+import {
+  stripDmBlocks,
+  stripDmFromShippingString,
+  stripSecretMarkers,
+} from "../src/atlas/content/dmMarkup";
 import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
 import { slugify } from "./atlas/slugify";
 import { loadWorldConfig, projectAssetCredits } from "./atlas/loadWorldConfig";
@@ -32,7 +36,6 @@ import {
   type SvgPolicy,
 } from "./atlas/validateAsset";
 import { parseAtlasDate } from "./atlas/calendarDate";
-import { stripSecretMarkers } from "./atlas/stripSecretMarkers";
 import { buildEntitySecrets } from "./atlas/buildSecrets";
 import yaml from "js-yaml";
 import { PLAYER_VISIBLE } from "./atlas/visibility";

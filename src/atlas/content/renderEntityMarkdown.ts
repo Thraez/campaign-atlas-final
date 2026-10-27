@@ -1,5 +1,5 @@
 import { dropOrphanFootnoteRefs, renderMarkdownBodyToSafeHtml } from "./markdownCore";
-import { stripDmBlocks } from "./stripDmBlocks";
+import { stripDmBlocks } from "./dmMarkup";
 import { replaceOutsideCode } from "./codeRegions";
 
 export interface RenderOpts {

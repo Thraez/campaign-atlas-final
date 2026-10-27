@@ -9,6 +9,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { secretMarkerIds } from "../src/atlas/content/dmMarkup";
 
 export interface RunOpts {
   dir: string;
@@ -31,8 +32,7 @@ const TEXT_EXTENSIONS = new Set([
 /** Fields that must not appear on a PlayerSecret object in any player artifact. */
 const FORBIDDEN_KEYS = ["reveal", "password", "for"];
 
-/** Pattern that must be stripped before shipping. */
-const SECRET_MARKER_RE = /\{\{secret:[^}]+\}\}/;
+const hasSecretMarker = (text: string) => secretMarkerIds(text).length > 0;
 
 interface PlayerSecret {
   id?: string;
@@ -44,7 +44,7 @@ interface PlayerSecret {
 }
 
 function scanForbiddenInString(text: string): string | null {
-  if (SECRET_MARKER_RE.test(text)) return "unstripped {{secret:}} marker";
+  if (hasSecretMarker(text)) return "unstripped {{secret:}} marker";
   return null;
 }
 
@@ -99,7 +99,7 @@ function scanSearchIndex(content: string): string[] {
 }
 
 function scanTextFile(filePath: string, content: string): string[] {
-  if (SECRET_MARKER_RE.test(content)) {
+  if (hasSecretMarker(content)) {
     return [`${filePath}: contains unstripped {{secret:}} marker`];
   }
   return [];

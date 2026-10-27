@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderEntityMarkdown, resolveImageEmbeds } from "@/atlas/content/renderEntityMarkdown";
-import { stripDmBlocks } from "@/atlas/content/stripDmBlocks";
+import { stripDmBlocks } from "@/atlas/content/dmMarkup";
 
 describe("renderEntityMarkdown", () => {
   const body = `# Corven

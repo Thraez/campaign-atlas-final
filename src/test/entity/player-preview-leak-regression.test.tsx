@@ -343,7 +343,7 @@ describe("I1 — Connections section: DM mode shows all relationship channels", 
 //   B. Real %%...%% and :::dm::: blocks in merged prose are stripped by the player pipeline
 
 import { mergeImportFrontmatter } from "@/atlas/import/mergeImportFrontmatter";
-import { stripDmBlocks } from "@/atlas/content/stripDmBlocks";
+import { stripDmBlocks } from "@/atlas/content/dmMarkup";
 
 describe("K1 — re-import merge: never auto-exposes, strips real DM blocks", () => {
   it("DM-only entity re-synced from a visibility-less vault copy stays dm (channel A)", () => {

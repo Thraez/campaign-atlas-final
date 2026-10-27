@@ -18,8 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { PLAYER_VISIBLE } from "./atlas/visibility";
 import { DM_CONTENT_SENTINELS } from "./check-no-secrets";
-
-const DM_BLOCK_RE = /%%[\s\S]*?%%/;
+import { findDmMarkup } from "../src/atlas/content/dmMarkup";
 
 export interface ShapeViolation {
   entityId?: string;
@@ -38,8 +37,9 @@ function checkStringField(
   value: unknown,
 ): void {
   if (typeof value !== "string" || value === "") return;
-  if (DM_BLOCK_RE.test(value)) {
-    out.push({ entityId, field, message: `${field} contains an unstripped %% DM block %%` });
+  const markup = findDmMarkup(value);
+  if (markup) {
+    out.push({ entityId, field, message: `${field} contains unstripped ${markup} DM markup` });
   }
   for (const s of DM_CONTENT_SENTINELS) {
     if (value.includes(s)) {

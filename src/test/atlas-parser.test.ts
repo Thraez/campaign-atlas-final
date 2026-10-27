@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseFrontmatter } from "../../scripts/atlas/parseFrontmatter";
-import { stripDmBlocks, stripDmFromShippingString } from "../../scripts/atlas/stripDmBlocks";
+import { stripDmBlocks, stripDmFromShippingString } from "@/atlas/content/dmMarkup";
 import { tokenizeWikilinks, renderLinkTokens } from "../../scripts/atlas/parseWikilinks";
 
 describe("parseFrontmatter flat-field fallbacks (Obsidian vault compat)", () => {

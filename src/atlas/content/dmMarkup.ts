@@ -1,3 +1,44 @@
+/**
+ * DM markup: the one owner of every syntax that hides text from players
+ * (eval-2026-10/02). The build strips with these functions and the safety
+ * scans detect with `findDmMarkup`, so a syntax the build strips is always
+ * one the scans look for.
+ *
+ *   %% ... %%            Obsidian comment, inline or multi-line
+ *   :::dm ... :::        the project's own DM callout, paragraph-level
+ *   {{secret:id}}        a locked-secret marker; players get a sealed box or nothing
+ */
+
+const PCT_BLOCK = /%%[\s\S]*?%%/;
+const DM_CALLOUT_OPEN = /:::dm/;
+const SECRET_MARKER = /\{\{secret:([^}]+)\}\}/;
+const SECRET_MARKER_G = new RegExp(SECRET_MARKER.source, "g");
+
+export type DmSyntax = "%%" | ":::dm" | "{{secret:";
+
+/** The first DM syntax left in `s`, or null when none is. */
+export function findDmMarkup(s: string): DmSyntax | null {
+  if (PCT_BLOCK.test(s)) return "%%";
+  if (DM_CALLOUT_OPEN.test(s)) return ":::dm";
+  if (SECRET_MARKER.test(s)) return "{{secret:";
+  return null;
+}
+
+/** Removes {{secret:id}} markers from body text before it ships to players. */
+export function stripSecretMarkers(s: string): string {
+  return s.replace(SECRET_MARKER_G, "");
+}
+
+/** Replaces each {{secret:id}} marker with `fn(id)` (the raw id, untrimmed). */
+export function replaceSecretMarkers(s: string, fn: (id: string) => string): string {
+  return s.replace(SECRET_MARKER_G, (_m, id: string) => fn(id));
+}
+
+/** The raw ids of every {{secret:id}} marker in `s`, in order. */
+export function secretMarkerIds(s: string): string[] {
+  return [...s.matchAll(SECRET_MARKER_G)].map((m) => m[1]);
+}
+
 // Strip Obsidian comment blocks: %% ... %% (single or multi-line) AND
 // field-level DM callouts: :::dm ... ::: (multi-line, paragraph-level).
 //

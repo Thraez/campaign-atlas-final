@@ -25,6 +25,7 @@ import { WikilinkPopover } from "@/atlas/editor/WikilinkPopover";
 import { FormatToolbar } from "@/atlas/editor/FormatToolbar";
 import { ImagePickerPanel } from "@/atlas/editor/ImagePickerPanel";
 import { applyToolbarAction, type ToolbarActionId } from "@/atlas/editor/toolbarActions";
+import { secretMarkerIds } from "@/atlas/content/dmMarkup";
 
 export function EntityEditPanel({
   sourcePath,
@@ -252,10 +253,8 @@ export function EntityEditPanel({
     api.setBody(result.value);
     setAcCtx(null);
     // Extract the newly generated secret ID by diffing old vs new markers
-    const oldIds = new Set([...oldBody.matchAll(/\{\{secret:([^}]+)\}\}/g)].map((m) => m[1]));
-    const newId = [...result.value.matchAll(/\{\{secret:([^}]+)\}\}/g)]
-      .map((m) => m[1])
-      .find((id) => !oldIds.has(id));
+    const oldIds = new Set(secretMarkerIds(oldBody));
+    const newId = secretMarkerIds(result.value).find((id) => !oldIds.has(id));
     if (newId) {
       const scaffold: DraftSecret =
         type === "character"
