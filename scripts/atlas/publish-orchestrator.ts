@@ -63,7 +63,7 @@ async function main(): Promise<number> {
     { label: "check-image-privacy dist", fn: () => checkImagePrivacy({ dir: "dist" }) },
     {
       label: "check-image-privacy public/atlas",
-      fn: () => checkImagePrivacy({ dir: "public/atlas" }),
+      fn: () => checkImagePrivacy({ dir: "public/atlas", referencedBy: "public/atlas" }),
     },
     {
       label: "audit-assets",
