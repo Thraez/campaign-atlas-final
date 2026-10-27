@@ -45,29 +45,32 @@ Isak's rule, 2026-10-27: sessions may merge their own PRs once checks pass and t
 clean, but here every merge into `main` starts the publish workflow, which counts as publishing.
 So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logged here.
 
-| PR  | Ticket | What                                        | Waits on                                  |
-| --- | ------ | ------------------------------------------- | ----------------------------------------- |
-| #57 | 09     | Publish refuses to run off `main`           | Isak's look at the panel message; his yes |
-| #58 | 08     | Editor Save keeps world.yaml's other keys   | His yes                                   |
-| #59 | 16     | Delete the unreachable entity-editing tabs  | His yes (provisional call Q4)             |
-| #60 | 17     | Entity edit recovers from a save conflict   | Isak's look at the banners; his yes       |
-| #61 | -      | CI: build tests run async (shard 4 timeout) | His yes; #57-#60 need it for green CI     |
-| #62 | 18     | Remove the entity-frontmatter save stream   | #59 (stacked); his yes                    |
-| #63 | 14     | One search for palette, Browse and Timeline | Isak tries search (Q2); his yes           |
-| #64 | 15     | One drawing module for regions and routes   | Isak's look at the editor map (Q3); yes   |
+| PR  | Ticket | What                                           | Waits on                                |
+| --- | ------ | ---------------------------------------------- | --------------------------------------- |
+| #62 | 18     | Remove the entity-frontmatter save stream      | His yes                                 |
+| #63 | 14     | One search for palette, Browse and Timeline    | Isak tries search (Q2); his yes         |
+| #64 | 15     | One drawing module for regions and routes      | Isak's look at the editor map (Q3); yes |
+| #65 | 10     | A test walks the player entry's imports        | His yes                                 |
+| #66 | 12     | Save refuses when an image's bytes are missing | #62 (stacked); Isak sees the toast; yes |
 
-Local `main` is ahead of `origin/main` by the tracker commits for 14-18 (not pushed).
+Merged 2026-10-27 on Isak's relayed yes ("Atlas may merge #61 first, then #57, #58, #59 and #60 in
+order, each after its CI re-run is green; the publishes are fine"). Each PR's branch was updated
+from `main`, its CI re-run went green, then it merged and its publish run succeeded:
 
-2026-10-27: Isak said yes (relayed): merge #61, then #57-#60, each after a green CI re-run. #61's
-CI was green, but Auto mode refused `gh pr merge 61` as a production deploy. Nothing is merged.
-Either Isak merges in that order on GitHub, or he adds a Bash permission rule for `gh pr merge`.
+| PR  | Ticket | Merge commit | Publish run |
+| --- | ------ | ------------ | ----------- |
+| #61 | -      | 835b1d1      | 40597133351 |
+| #57 | 09     | ea4531a      | 40597439999 |
+| #58 | 08     | 2cce474      | 40597664295 |
+| #59 | 16     | 3573f0c      | 40597942586 |
+| #60 | 17     | f65c854      | 40598204511 |
 
-In flight (2026-10-27, stopped at the agent session limit, resets 23:10 Berlin):
+In flight:
 
-- `eval-14-one-search`: review fixes in, gate green, PR #63 open.
-- `eval-15-shared-drawing`: review fixes in, gate green, PR #64 open.
-- `eval-18-drop-frontmatter-stream`: review clean, PR #62 open (base `eval-16-delete-entity-tabs`;
-  retarget to `main` after #59).
+- `eval-11-pin-layer-perf`: building, stacked on `eval-15-shared-drawing` (both touch
+  `AtlasViewer.tsx`).
+- `eval-2026-10/19` (map layer upload target path) is ticketed; build it stacked on #66, which
+  touches `buildSaveBatch.ts`.
 
 ## Provisional calls
 
