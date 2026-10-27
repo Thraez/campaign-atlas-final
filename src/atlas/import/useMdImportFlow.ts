@@ -72,6 +72,24 @@ export interface UseMdImportFlowArgs {
   onImported: () => void | Promise<void>;
 }
 
+export type VaultScanReply =
+  { ok: true; files: Record<string, string> } | { ok: false; status: number; error: string };
+
+/**
+ * Reads a `/__atlas/vault-scan` reply. The route answers `{ files }` on 200
+ * and `{ error }` otherwise; success is the HTTP status, not a body field
+ * (eval-2026-10/13: the client used to look for `ok` in the body, which the
+ * route never sends, so every real scan failed).
+ */
+export async function readVaultScanReply(resp: Response): Promise<VaultScanReply> {
+  const body = (await resp.json().catch(() => ({}))) as { files?: unknown; error?: unknown };
+  if (resp.ok && body.files && typeof body.files === "object") {
+    return { ok: true, files: body.files as Record<string, string> };
+  }
+  const error = typeof body.error === "string" ? body.error : `HTTP ${resp.status}`;
+  return { ok: false, status: resp.ok ? 500 : resp.status, error };
+}
+
 /**
  * Maps a `/__atlas/vault-scan` response to staging inputs.
  * Extracts the POSIX basename for the staging filename and preserves the
@@ -147,11 +165,9 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
       const params = new URLSearchParams({ vaultRoot });
       for (const g of ignoreGlobs) params.append("ignore", g);
       for (const f of candidateFolders) params.append("folder", f);
-      let data:
-        { ok: true; files: Record<string, string> } | { ok: false; status: number; error: string };
+      let data: VaultScanReply;
       try {
-        const resp = await fetch(`/__atlas/vault-scan?${params.toString()}`);
-        data = (await resp.json()) as typeof data;
+        data = await readVaultScanReply(await fetch(`/__atlas/vault-scan?${params.toString()}`));
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         toast.error(`Vault scan failed: ${msg}`);

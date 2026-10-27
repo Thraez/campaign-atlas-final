@@ -17,7 +17,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { handleVaultScanRequest } from "../../scripts/vite-plugin-atlas-save";
-import { vaultScanResultToInputs } from "@/atlas/import/useMdImportFlow";
+import { readVaultScanReply, vaultScanResultToInputs } from "@/atlas/import/useMdImportFlow";
 import { buildStagingRows, type StagingContext } from "@/atlas/import/stagingState";
 import { buildImportChanges } from "@/atlas/import/buildImportChanges";
 import type { FileChange } from "@/atlas/save/localFsSave";
@@ -39,11 +39,11 @@ const VAULT_NOTES: Record<string, string> = {
   "03_Entities/NPCs/Corven.md": "---\ntags: [npc]\n---\nA smuggler.\n",
   "04_Factions/Red Hand.md": "A guild.\n",
   "10_DmNotesAndSecrets/The Cabal.md": `---\ntags: [faction]\n---\n${SECRET} runs the city.\n`,
-  "00_SessionNotes/Session 1.md": "What happened.\n",
-  "11_DmToolBox/Random Encounters.md": "Roll a d20.\n",
-  "99_Templates/NPC Template.md": "Template.\n",
-  "90_Inbox/Loose Idea.md": "An idea.\n",
-  "Z_Archive/Old Draft.md": "Old.\n",
+  "00_SessionNotes/Session 1.md": "SESSION_NOTES_MARKER what happened.\n",
+  "11_DmToolBox/Random Encounters.md": "DM_TOOLBOX_MARKER roll a d20.\n",
+  "99_Templates/NPC Template.md": "TEMPLATE_MARKER fill me in.\n",
+  "90_Inbox/Loose Idea.md": "INBOX_MARKER an idea.\n",
+  "Z_Archive/Old Draft.md": "ARCHIVE_MARKER old.\n",
 };
 
 const IMPORT_CONFIG: ImportFolderConfig = {
@@ -72,20 +72,29 @@ interface SyncRun {
   changes: FileChange[];
 }
 
-/** Scan → Staging → the changes Save would write. Nothing exists in the atlas yet. */
+const stagingCtx = (): StagingContext => ({
+  worldId: WORLD,
+  importConfig: IMPORT_CONFIG,
+  allowedFolders: new Set([...Object.values(IMPORT_CONFIG.folders), IMPORT_CONFIG.defaultFolder]),
+  existingById: new Map(),
+  existingPaths: new Set(),
+});
+
+/**
+ * Scan → the route's reply as the client reads it → Staging → the changes
+ * Save would write. Nothing exists in the atlas yet. The reply is built the
+ * way the `/__atlas/vault-scan` route sends it (200, `{ files }`).
+ */
 async function runSync(candidateFolders: string[]): Promise<SyncRun> {
   const scan = await handleVaultScanRequest(vaultRoot, [], candidateFolders);
   if (!scan.ok) throw new Error(`scan failed: ${scan.error}`);
-  const ctx: StagingContext = {
-    worldId: WORLD,
-    importConfig: IMPORT_CONFIG,
-    allowedFolders: new Set([...Object.values(IMPORT_CONFIG.folders), IMPORT_CONFIG.defaultFolder]),
-    existingById: new Map(),
-    existingPaths: new Set(),
-  };
-  const rows = buildStagingRows(vaultScanResultToInputs(scan.files), ctx);
+  const reply = await readVaultScanReply(
+    new Response(JSON.stringify({ files: scan.files }), { status: 200 }),
+  );
+  if (!reply.ok) throw new Error(`client refused the scan: ${reply.error}`);
+  const rows = buildStagingRows(vaultScanResultToInputs(reply.files), stagingCtx());
   const changes = await buildImportChanges(rows);
-  return { scanned: Object.keys(scan.files), changes };
+  return { scanned: Object.keys(reply.files), changes };
 }
 
 function leakedFrom(run: SyncRun, folder: string): string[] {
@@ -171,11 +180,9 @@ describe("Sync from Obsidian with no folders picked (the default)", () => {
     },
   );
 
-  // BUG (eval-2026-10/04): only the DM's folder pick keeps these out. With
-  // nothing ticked, SyncPanel sends no `folder` params and the scan reads the
-  // whole vault; IGNORED_FOLDERS in src/atlas/import/inferType.ts does not name
-  // them. `it.fails` until the product code is fixed; then flip to `it`.
-  it.fails.each(["10_DmNotesAndSecrets", "00_SessionNotes", "11_DmToolBox"])(
+  // eval-2026-10/13: these were only kept out by the DM's folder pick; with
+  // nothing ticked the scan read the whole vault. IGNORED_FOLDERS names them now.
+  it.each(["10_DmNotesAndSecrets", "00_SessionNotes", "11_DmToolBox"])(
     "leaves out %s",
     async (folder) => {
       const run = await runSync([]);
@@ -183,13 +190,22 @@ describe("Sync from Obsidian with no folders picked (the default)", () => {
     },
   );
 
-  it("a 10_DmNotesAndSecrets note that does get written arrives as dm and never reaches the player build", async () => {
-    const run = await runSync([]);
-    const cabal = run.changes.find((c) => c.content.includes(SECRET));
-    // Precondition for this backstop test: the bug above lets the note through.
-    expect(cabal, "the note was not written; drop this backstop's precondition").toBeDefined();
+  it("a 10_DmNotesAndSecrets note forced through Staging arrives as dm and never reaches the player build", async () => {
+    // Backstop behind the ignore list: hand the note to Staging as if a scan
+    // had returned it, and check the visibility rule and the build still hold.
+    const cabalPath = "10_DmNotesAndSecrets/The Cabal.md";
+    const forced = await buildImportChanges(
+      buildStagingRows(
+        vaultScanResultToInputs({ [cabalPath]: VAULT_NOTES[cabalPath] }),
+        stagingCtx(),
+      ),
+    );
+    const cabal = forced.find((c) => c.content.includes(SECRET));
+    expect(cabal).toBeDefined();
     expect(cabal!.content).toMatch(/visibility:\s*dm\b/);
 
+    const run = await runSync([]);
+    run.changes.push(...forced);
     const out = buildPlayer(path.join(tmpRoot, "repo-default"), run.changes);
     const atlas = fs.readFileSync(path.join(out, "atlas.json"), "utf8");
     const searchIndex = fs.readFileSync(path.join(out, "search-index.json"), "utf8");

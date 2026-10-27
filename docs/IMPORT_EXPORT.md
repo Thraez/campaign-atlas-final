@@ -62,7 +62,9 @@ The wizard categorizes each `.md` file:
 `src/atlas/import/inferType.ts` infers note types from vault folder names: `03_Entities/NPCs` -> npc,
 `03_Entities/Gods` -> deity, `02_Regions/Places` -> location. Those names must not change without updating the
 importer. Its ignore list (`IGNORED_FOLDERS`) matches whole folder names, lowercase: `templates`, `archive`,
-`00_templates`, `98_templates`, `99_templates`, `z_archive`, `90_inbox`, `z_codex_proposals` and others. Saved sync
+`00_templates`, `98_templates`, `99_templates`, `z_archive`, `90_inbox`, `z_codex_proposals`, the DM-only
+`00_sessionnotes`, `10_dmnotesandsecrets` and `11_dmtoolbox`, and others. Sync never reads those, even with no
+folders ticked. Saved sync
 settings and `sync-map.json` also key on vault folder names and note paths.
 
 The same file holds the visibility rule for new notes (`PLAYER_VAULT_FOLDERS`): an untagged note from

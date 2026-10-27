@@ -47,7 +47,8 @@ function setup() {
 function fakeServer(opts: { files: Record<string, string>; onDisk?: Record<string, string> }) {
   const fetchMock = vi.fn(async (url: string) => {
     if (url.startsWith("/__atlas/vault-scan")) {
-      return { ok: true, json: async () => ({ ok: true, files: opts.files }) };
+      // The route's real reply: 200 with `{ files }`, no `ok` in the body.
+      return { ok: true, status: 200, json: async () => ({ files: opts.files }) };
     }
     if (url.startsWith("/__atlas/read?path=")) {
       const path = decodeURIComponent(url.slice("/__atlas/read?path=".length));
