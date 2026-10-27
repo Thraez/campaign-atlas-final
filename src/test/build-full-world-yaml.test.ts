@@ -16,8 +16,12 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import yaml from "js-yaml";
-import { buildFullWorldYaml } from "@/atlas/yaml/buildFullWorldYaml";
-import { loadWorldConfig } from "../../scripts/atlas/loadWorldConfig";
+import {
+  buildFullWorldYaml,
+  EDITOR_OWNED_KEYS,
+  WorldYamlUnreadableError,
+} from "@/atlas/yaml/buildFullWorldYaml";
+import { loadWorldConfig, resolveCredits } from "../../scripts/atlas/loadWorldConfig";
 import type { FogOverlay, MapDocument, Region, Route, WorldCalendar } from "@/atlas/content/schema";
 
 const WORLD = "test-world";
@@ -551,6 +555,50 @@ describe("buildFullWorldYaml — keeps keys the editor doesn't model", () => {
     expect(out.startsWith("# header\n\n")).toBe(true);
     const cfg = loadEmitted(out)!;
     expect(cfg.importConfig.folders.npc).toBe("npcs");
+  });
+
+  it("refuses to save over an existing world.yaml that doesn't parse", () => {
+    const existing = "schemaVersion: 1\nimport:\n  folders: [unclosed\n";
+    expect(() => buildFullWorldYaml({ maps: [makeMap()], schemaVersion: 1, existing })).toThrow(
+      WorldYamlUnreadableError,
+    );
+    expect(() =>
+      buildFullWorldYaml({ maps: [makeMap()], schemaVersion: 1, existing: "- a\n- b\n" }),
+    ).toThrow(/import:/);
+  });
+
+  it("still saves when the existing file is empty or absent", () => {
+    for (const existing of [null, "", "# only a comment\n"]) {
+      const out = buildFullWorldYaml({ maps: [makeMap()], schemaVersion: 1, existing });
+      expect(loadEmitted(out)!.maps[0].id).toBe("m1");
+    }
+  });
+
+  it("lists every top-level key it emits in EDITOR_OWNED_KEYS", () => {
+    // Every owned field set (credits non-default so it's emitted), no existing
+    // file, so the output holds exactly the owned keys.
+    const out = buildFullWorldYaml({
+      maps: [makeMap()],
+      schemaVersion: 1,
+      name: "W",
+      calendar: { months: [{ name: "M", days: 30 }] },
+      credits: { badges: false, page: false },
+      assetCredits: { "atlas/a.png": { credit: "x", enabled: true } },
+      existing: null,
+    });
+    const keys = Object.keys(yaml.load(out) as Record<string, unknown>);
+    expect(keys.length).toBe(6);
+    for (const k of keys) expect(EDITOR_OWNED_KEYS.has(k)).toBe(true);
+  });
+
+  it("treats the loader's default credits as absent (matches resolveCredits)", () => {
+    const out = buildFullWorldYaml({
+      maps: [makeMap()],
+      schemaVersion: 1,
+      credits: resolveCredits(undefined),
+      existing: "maps: []\n",
+    });
+    expect(out).not.toMatch(/^credits:/m);
   });
 
   it("drops legacy top-level regions/fog/routes (the editor folds them into maps)", () => {

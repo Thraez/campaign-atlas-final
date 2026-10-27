@@ -68,7 +68,7 @@ export interface BuildFullWorldYamlOpts {
  * Every other top-level key in the existing file (`import:`, anything the
  * editor doesn't model) is carried over unchanged.
  */
-const EDITOR_OWNED_KEYS = new Set([
+export const EDITOR_OWNED_KEYS: ReadonlySet<string> = new Set([
   "schemaVersion",
   "name",
   "maps",
@@ -111,20 +111,41 @@ export function buildFullWorldYaml(opts: BuildFullWorldYamlOpts): string {
   return serializeWorldYaml(body, opts.existing);
 }
 
-/** Parse the existing file's top-level mapping. An absent, empty or
- *  unparseable file yields `{}` (nothing to carry over). */
+/** Thrown when the on-disk world.yaml exists but can't be read as a YAML
+ *  mapping. Save refuses rather than overwrite it: rebuilding from the editor
+ *  alone would drop `import:` and every key the editor doesn't model. */
+export class WorldYamlUnreadableError extends Error {
+  constructor(detail: string) {
+    super(
+      `world.yaml on disk can't be read (${detail}). Fix it by hand before saving; ` +
+        `saving now would drop the keys the editor doesn't manage, such as import:.`,
+    );
+    this.name = "WorldYamlUnreadableError";
+  }
+}
+
+/** Parse the existing file's top-level mapping. An absent or empty file
+ *  yields `{}` (nothing to carry over); a file that won't parse, or whose top
+ *  level isn't a mapping, throws WorldYamlUnreadableError. */
 function parseExistingRoot(existing: string | null): Record<string, unknown> {
   if (existing === null) return {};
   let data: unknown;
   try {
     data = yaml.load(existing);
-  } catch {
-    return {};
+  } catch (e) {
+    throw new WorldYamlUnreadableError(e instanceof Error ? e.message : String(e));
   }
-  if (data === null || typeof data !== "object" || Array.isArray(data)) return {};
+  if (data === null || data === undefined) return {};
+  if (typeof data !== "object" || Array.isArray(data)) {
+    throw new WorldYamlUnreadableError("top level is not a mapping");
+  }
   return data as Record<string, unknown>;
 }
 
+/** True when `c` is what the loader produces for an absent `credits:` key.
+ *  The default is owned by `resolveCredits` in scripts/atlas/loadWorldConfig.ts
+ *  (both flags true); src/ can't import that Node-side module, so keep this
+ *  in step with it. Pinned by build-full-world-yaml.test.ts. */
 function isDefaultCredits(c: CreditsConfig): boolean {
   return c.badges !== false && c.page !== false;
 }

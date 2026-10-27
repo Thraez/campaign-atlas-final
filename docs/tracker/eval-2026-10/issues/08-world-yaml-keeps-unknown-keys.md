@@ -42,5 +42,18 @@ defaults get written into the file too.
 - Not covered, left open: comments inside or between YAML keys (other than the leading block) are
   still lost on save, a documented existing limitation. Other loader defaults inside `maps[]`
   (e.g. `wrapX: false` always written) can still appear in the file; they don't change meaning.
+- Review (two-axis, standards + spec) ran on `35b6f76`; fixes in the follow-up commit:
+  a world.yaml that exists but won't parse (or isn't a mapping) now makes Save refuse with
+  `WorldYamlUnreadableError`, shown as "Could not prepare save: …", instead of overwriting it
+  and dropping `import:` (an empty or absent file still saves); `isDefaultCredits` points at its
+  owner `resolveCredits` (src/ can't import the Node-side loader) and a test pins it to
+  `resolveCredits(undefined)`; `EDITOR_OWNED_KEYS` is exported and a test checks every key the
+  builder emits is in it. Tests: "refuses to save over an existing world.yaml that doesn't
+  parse", "still saves when the existing file is empty or absent", "lists every top-level key it
+  emits in EDITOR_OWNED_KEYS", "treats the loader's default credits as absent". Full gate rerun
+  green.
+- Follow-up notes, no work: loader defaults that still leak into the file on save (`oceanColor`,
+  `wrapX`, layer `opacity`/`zIndex` defaults); unknown keys are re-dumped by js-yaml, so dates
+  become ISO timestamps and YAML anchors/aliases are expanded.
 - Worktree note: the worktree had no `node_modules`, and `test:ci` spawns
   `./node_modules/.bin/vitest`; I linked `node_modules/.bin` to the main repo's (gitignored).
