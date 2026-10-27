@@ -24,6 +24,10 @@ Its re-encode policy is a second copy of the save path's (~500-541).
 - `publicDir` is required and the dev route sets it from `server.config.root`; `process.cwd()` is
   gone.
 - `cleanImageBytes` in `scripts/vite-plugin-atlas-save.ts` is the one re-encode for both save and
-  copy. Copies of `.webp` and `.gif` are now re-encoded like saves (WebP at quality 85) instead of
-  passed through.
+  copy. Its settings come from `imageEncoding.ts` (`REENCODE_QUALITY` for a JPEG or WebP kept as
+  is), and so does the `-2` naming (`suffixedName`). Copies of `.webp` were already re-encoded
+  (sharp's default, quality 80); now they match saves at 85.
+- A failed write reports `write-failed`, not `unreadable`.
+- From the review: an image changed in the vault and re-synced gets a new `-2` name; the old file
+  stays until the asset audit or a delete removes it.
 - Tests: `src/test/import/vault-image-copy.test.ts` ("vault image copy safety").

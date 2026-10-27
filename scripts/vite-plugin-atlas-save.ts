@@ -61,8 +61,11 @@ import {
 import { makeIgnore } from "../src/atlas/import/ignoreRules";
 import { resolveVaultImage, vaultImageTargetName } from "../src/atlas/import/resolveVaultImage";
 import {
+  normalizeFormat,
   shouldConvertToWebp,
+  suffixedName,
   webpTargetName,
+  REENCODE_QUALITY,
   WEBP_QUALITY,
   MAX_IMAGE_WIDTH,
 } from "../src/atlas/assets/imageEncoding";
@@ -368,10 +371,12 @@ function hashBytes(buf: Buffer): string {
  * Re-encode an image so no EXIF/IPTC/XMP/ICC metadata (GPS included) survives:
  * sharp drops it all unless `withMetadata()` is called. Shared by the save
  * route and the vault image copy so both publish the same bytes.
- * `toWebp` is the caller's decision under the shared encoding policy.
+ * `source` is the input's mime type or extension; `target` is the published
+ * path, whose name (chosen by the shared policy) says WebP or not.
  */
-async function cleanImageBytes(buf: Buffer, mime: string, toWebp: boolean): Promise<Buffer> {
-  if (toWebp)
+async function cleanImageBytes(buf: Buffer, source: string, target: string): Promise<Buffer> {
+  const format = normalizeFormat(source);
+  if (isConvertibleImageTarget(target) && shouldConvertToWebp(format))
     return (
       sharp(buf)
         // Bake in EXIF orientation before that metadata is dropped, or a phone
@@ -384,11 +389,11 @@ async function cleanImageBytes(buf: Buffer, mime: string, toWebp: boolean): Prom
   // `animated: true` keeps every frame of a GIF or WebP; without it sharp
   // reads only the first and republishes an animation as a still.
   const s = sharp(buf, { animated: true });
-  if (mime === "image/png") return s.png().toBuffer();
-  if (mime === "image/jpeg" || mime === "image/jpg")
-    return s.jpeg({ quality: 85, mozjpeg: true }).toBuffer();
-  if (mime === "image/webp") return s.webp({ quality: 85 }).toBuffer();
-  if (mime === "image/gif") return s.gif().toBuffer();
+  if (format === "png") return s.png().toBuffer();
+  if (format === "jpeg" || format === "jpg")
+    return s.jpeg({ quality: REENCODE_QUALITY, mozjpeg: true }).toBuffer();
+  if (format === "webp") return s.webp({ quality: REENCODE_QUALITY }).toBuffer();
+  if (format === "gif") return s.gif().toBuffer();
   return s.toBuffer();
 }
 
@@ -536,8 +541,7 @@ export async function handleSaveRequest(
         // instruction to convert — one decider, and the name can never
         // disagree with the bytes. Maps are named `.png` and never match:
         // fog redaction and map labels both want lossless.
-        const toWebp = isConvertibleImageTarget(f.path) && shouldConvertToWebp(mime);
-        stripped = await cleanImageBytes(buf, mime, toWebp);
+        stripped = await cleanImageBytes(buf, mime, f.path);
       } catch (e) {
         return {
           status: 400,
@@ -1189,13 +1193,6 @@ export async function handleVaultFoldersRequest(
 
 const VAULT_IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
 const MAX_VAULT_IMAGE_BYTES = 6 * 1024 * 1024;
-const VAULT_IMAGE_MIME: Record<string, string> = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".webp": "image/webp",
-  ".gif": "image/gif",
-};
 
 export interface VaultImageCopyArgs {
   vaultRoot: string;
@@ -1210,7 +1207,13 @@ export interface VaultImageCopyArgs {
 
 export type VaultImageCopyResult =
   | { ok: true; target: string }
-  | { ok: false; reason: "not-found" | "outside-candidates" | "too-large" | "unreadable" };
+  | {
+      ok: false;
+      reason: "not-found" | "outside-candidates" | "too-large" | "unreadable" | "write-failed";
+    };
+
+/** How many `-2`, `-3`… names a copy tries before giving up. */
+const MAX_NAME_SUFFIX = 99;
 
 /**
  * Plain root-containment check, unlike `isReadableVaultPath` which hard-requires
@@ -1278,38 +1281,39 @@ export async function handleVaultImageCopyRequest(
 
   // The format follows the shared policy, which `vaultImageTargetName` used to
   // pick the extension, so the bytes always match the filename.
-  const ext = path.extname(resolved.relPath).toLowerCase();
   const name = vaultImageTargetName(args.entityId, args.index, resolved.relPath);
   const outDir = path.join(args.publicDir, "atlas", "assets", "images");
   let cleaned: Buffer;
   try {
-    cleaned = await cleanImageBytes(bytes, VAULT_IMAGE_MIME[ext] ?? "", shouldConvertToWebp(ext));
-    await fs.mkdir(outDir, { recursive: true });
+    cleaned = await cleanImageBytes(
+      bytes,
+      path.extname(resolved.relPath),
+      `atlas/assets/images/${name}`,
+    );
   } catch {
     return { ok: false, reason: "unreadable" };
   }
 
   // Never overwrite: the same bytes reuse the file (a re-sync), different
   // bytes take the next free `-2`, `-3`… name.
-  const dot = name.lastIndexOf(".");
-  for (let n = 1; n < 100; n++) {
-    const candidate = n === 1 ? name : `${name.slice(0, dot)}-${n}${name.slice(dot)}`;
-    const outPath = path.join(outDir, candidate);
-    try {
-      await fs.writeFile(outPath, cleaned, { flag: "wx" });
-      return { ok: true, target: `/atlas/assets/images/${candidate}` };
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "EEXIST")
-        return { ok: false, reason: "unreadable" };
-    }
-    try {
+  try {
+    await fs.mkdir(outDir, { recursive: true });
+    for (let n = 1; n <= MAX_NAME_SUFFIX; n++) {
+      const candidate = suffixedName(name, n);
+      const outPath = path.join(outDir, candidate);
+      try {
+        await fs.writeFile(outPath, cleaned, { flag: "wx" });
+        return { ok: true, target: `/atlas/assets/images/${candidate}` };
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+      }
       if (cleaned.equals(await fs.readFile(outPath)))
         return { ok: true, target: `/atlas/assets/images/${candidate}` };
-    } catch {
-      return { ok: false, reason: "unreadable" };
     }
+  } catch {
+    // an fs error, or every name up to MAX_NAME_SUFFIX holds other bytes
   }
-  return { ok: false, reason: "unreadable" };
+  return { ok: false, reason: "write-failed" };
 }
 
 /**
@@ -1556,9 +1560,8 @@ export function atlasSavePlugin(): Plugin {
             res.end(JSON.stringify({ error: "InvalidBody" }));
             return;
           }
-          const { publicDir: _ignored, ...safe } = body;
           const result = await handleVaultImageCopyRequest({
-            ...(safe as unknown as VaultImageCopyArgs),
+            ...(body as unknown as VaultImageCopyArgs),
             publicDir: path.join(server.config.root, "public"),
           });
           res.statusCode = result.ok ? 200 : 400;

@@ -55,6 +55,18 @@ afterAll(() => {
   fs.rmSync(outRoot, { recursive: true, force: true });
 });
 
+/** Copy an image embedded in 03_Entities/Corven.md, as the Sync panel would. */
+const copy = (rawSrc: string, entityId: string, index = 0, vaultRoot = root) =>
+  handleVaultImageCopyRequest({
+    vaultRoot,
+    candidateFolders: ["03_Entities"],
+    noteRelPath: "03_Entities/Corven.md",
+    rawSrc,
+    entityId,
+    index,
+    publicDir: outRoot,
+  });
+
 describe("handleVaultImageCopyRequest", () => {
   it("copies an in-scope image and names it from the entity", async () => {
     const res = await handleVaultImageCopyRequest({
@@ -112,16 +124,6 @@ describe("handleVaultImageCopyRequest", () => {
 
 describe("vault image copy safety (eval-2026-10/05)", () => {
   const imagesDir = () => path.join(outRoot, "atlas", "assets", "images");
-  const copy = (rawSrc: string, entityId: string, index = 0) =>
-    handleVaultImageCopyRequest({
-      vaultRoot: root,
-      candidateFolders: ["03_Entities"],
-      noteRelPath: "03_Entities/Corven.md",
-      rawSrc,
-      entityId,
-      index,
-      publicDir: outRoot,
-    });
 
   it("refuses a symlinked image that points outside the vault", async () => {
     const outside = fs.mkdtempSync(path.join(os.tmpdir(), "vault-outside-"));
@@ -155,6 +157,18 @@ describe("vault image copy safety (eval-2026-10/05)", () => {
     }
   });
 
+  it("still copies when the vault root itself is a symlink", async () => {
+    const linkDir = fs.mkdtempSync(path.join(os.tmpdir(), "vault-link-"));
+    const linkedRoot = path.join(linkDir, "vault");
+    fs.symlinkSync(root, linkedRoot);
+    try {
+      const res = await copy("portrait.png", "linked-root", 0, linkedRoot);
+      expect(res).toEqual({ ok: true, target: "/atlas/assets/images/linked-root-1.webp" });
+    } finally {
+      fs.rmSync(linkDir, { recursive: true, force: true });
+    }
+  });
+
   it("never overwrites a different image already at the target name", async () => {
     fs.mkdirSync(imagesDir(), { recursive: true });
     const existing = path.join(imagesDir(), "taken-1.webp");
@@ -174,17 +188,6 @@ describe("vault image copy safety (eval-2026-10/05)", () => {
 });
 
 describe("published image format", () => {
-  const copy = (rawSrc: string, entityId: string, index: number) =>
-    handleVaultImageCopyRequest({
-      vaultRoot: root,
-      candidateFolders: ["03_Entities"],
-      noteRelPath: "03_Entities/Corven.md",
-      rawSrc,
-      entityId,
-      index,
-      publicDir: outRoot,
-    });
-
   /**
    * Read metadata from bytes, never from a path. `sharp(path)` reads lazily and
    * keeps the file handle open, which on Windows blocks a later write to that
