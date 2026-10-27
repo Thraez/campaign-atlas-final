@@ -53,7 +53,7 @@ commands with shell variables (one plain command per call, absolute paths).
 
 - `main` was pushed once (f65c854..0c1d92a, docs only, on his yes) before this rule arrived.
 - PRs waiting for his yes to merge (each merge publishes), in stack order: #62 → #66 → #68;
-  #64 → #67 → #69 → #70; #63; #65; #71; #72. See "Merge queue" for what each needs him to look at.
+  #64 → #67 → #69 → #70; #63; #65; #71 → #73; #72. See "Merge queue" for what each needs him to look at.
 - Local `main` commits since 0c1d92a: push them in the morning.
 - Code-retro 06 needs a real `npm run atlas:publish` run before it is done (the ticket asks for
   it; overnight only its parts ran).
@@ -79,6 +79,7 @@ So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logg
 | #70 | 20     | Pin labels switch mode when the zoom changes   | #69 (stacked); Isak zooms and looks; yes         |
 | #71 | 21     | Sound comes back after a reload                | Isak reloads with sound on (desktop, phone); yes |
 | #72 | 22     | `maps:optimize` keeps maps lossless            | His yes                                          |
+| #73 | 23     | The newest soundscape request always wins      | #71 (stacked); his yes                           |
 
 In flight (2026-10-28, overnight):
 
@@ -88,8 +89,8 @@ In flight (2026-10-28, overnight):
   A second safety review found another: front matter gray-matter reads but the new parser drops
   (`--- ` opening, or no closing fence) loses a secret note's name, so links to it aren't
   redacted. Fix (fail closed, stop the build) is with the builder. No PR until it is clean.
-- `eval-23-crossfade-latest-wins`: building, stacked on #71.
-- `eval-24-one-test-runner`: building, from `main`.
+- `eval-24-one-test-runner` and `eval-25-offline-menu-truth`: building, each from `main`.
+- Ticket 26 waits on code-retro 06 (both change `build-atlas.ts`).
 - Ticket 29 waits on #68 and #72 (both touch the save pipeline's map path).
 - Code-retro 07 and 08 wait on 06.
   Merged 2026-10-27 on Isak's relayed yes ("Atlas may merge #61 first, then #57, #58, #59 and #60 in
