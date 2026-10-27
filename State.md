@@ -59,6 +59,9 @@ commands with shell variables (one plain command per call, absolute paths).
   it; overnight only its parts ran).
 - Filed overnight: ticket 20 (pin labels keep their first mode across zoom, from the eval-11
   build) and 21-28 from the third sweep. 21-25 and 27 rest on provisional calls below.
+- Branch `eval-24-one-test-runner` (645baf5) was cut from local `main` and carries its unpushed
+  docs commits. Its work moves to `eval-24-test-runner` (from `origin/main`). The old branch can
+  be deleted once Isak says so (tag `archive/` first, per AGENTS.md).
 
 ## Merge queue
 
@@ -128,6 +131,7 @@ answer, logged here and built on; he reviews this list in batches, and a reversa
 | 2026-10-28 | eval-21 review: should Dismiss on the "resume sound" invite leave sound off? | Yes; taps on the invite's own buttons don't count as the gesture | Dismiss has to mean no sound | 21 |
 | 2026-10-28 | eval-21: does a bed set up while muted or in a hidden tab ("paused") count as playing? | Yes; the label can't show while muted anyway | Otherwise unmuting doesn't bring the label back until a pan | 21 |
 | 2026-10-28 | eval-22: sharp 0.34.5 has no WebP `exact`; what happens to a PNG with colour under transparent pixels? | Skipped by the script, refused by Save; nothing converts unless all 4 channels match | Lossless must mean exact; a sharp bump can lift it later | 22 |
+| 2026-10-28 | eval-24 review: should the PR check keep its 4 parallel shard jobs? | Yes; each job calls a per-shard entry of the same runner; publish runs `test:ci` | One runner and retry rule, without making every PR wait for the shards one after another | 24 |
 
 ## Retro, 2026-10-28 (overnight)
 
