@@ -29,7 +29,7 @@ vi.mock("react-leaflet", async () => {
   return { ...base, Polygon: path("Polygon"), Polyline: path("Polyline") };
 });
 
-const { WrappedWorld } = await import("@/pages/AtlasViewer");
+const { WrappedWorld } = await import("@/atlas/map/WrappedWorld");
 const { RegionLayer } = await import("@/atlas/regions/RegionLayer");
 const { RouteLayer } = await import("@/atlas/routes/RouteLayer");
 

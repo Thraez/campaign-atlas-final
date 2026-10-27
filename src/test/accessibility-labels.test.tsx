@@ -43,6 +43,7 @@ vi.mock("react-leaflet", () => {
     }),
     getZoom: () => 0,
     latLngToContainerPoint: () => ({ x: 0, y: 0 }),
+    project: () => ({ x: 0, y: 0 }),
     on: () => {},
     off: () => {},
   };
@@ -70,7 +71,7 @@ vi.mock("react-leaflet", () => {
   };
 });
 
-const { PlacementMarkers } = await import("@/pages/AtlasViewer");
+const { PlacementMarkers } = await import("@/atlas/map/PinLayer");
 
 // ---------------------------------------------------------------------------
 // Minimal stubs
