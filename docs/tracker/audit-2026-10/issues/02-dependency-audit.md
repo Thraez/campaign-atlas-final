@@ -1,6 +1,6 @@
 # Clear the production dependency audit
 
-Status: ready-for-agent
+Status: done
 
 The weekly `npm-audit.yml` run has failed since at least 2026-10-12: 21 vulnerabilities (3 critical) in production dependencies, among them dompurify, react-router, undici, js-yaml and zod. `isomorphic-dompurify` pulls jsdom and undici into production dependencies.
 
@@ -14,3 +14,5 @@ The weekly `npm-audit.yml` run has failed since at least 2026-10-12: 21 vulnerab
 ## Comments
 
 2026-10-27: `npm audit` says every finding but zod clears with a plain `npm audit fix` (no major bumps). Running it was refused by auto mode on the Mac, because it changes installed dependencies; it needs Isak's OK or a permission rule.
+
+2026-10-27 (Isak's yes): `npm audit fix` cleared all but two; zod moved 3 -> 4 (one file, `src/atlas/schemas/imports.ts`, needed no change). `npm audit --omit=dev --audit-level=high` exits 0. Gate: typecheck, lint, test:ci and all 12 `atlas:publish` scans pass. Left: react-router (moderate, needs v7), ticket 07. `isomorphic-dompurify` swap not tried.

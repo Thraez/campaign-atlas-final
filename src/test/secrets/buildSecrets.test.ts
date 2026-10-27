@@ -35,10 +35,13 @@ describe("buildEntitySecrets", () => {
   });
 
   it("does not include reveal, password, or for in output blobs", async () => {
-    const specs: AtlasSecretSpec[] = [{ id: "w", password: "pw", reveal: "secret text" }];
+    // A long password: a two-letter one turns up in random ciphertext now and then.
+    const specs: AtlasSecretSpec[] = [
+      { id: "w", password: "password-sentinel-7c1e", reveal: "secret text" },
+    ];
     const { secrets } = await buildEntitySecrets("e", specs, keys);
     const raw = JSON.stringify(secrets[0]);
     expect(raw.includes("secret text")).toBe(false);
-    expect(raw.includes("pw")).toBe(false);
+    expect(raw.includes("password-sentinel-7c1e")).toBe(false);
   });
 });
