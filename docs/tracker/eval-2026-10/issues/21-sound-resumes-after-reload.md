@@ -1,6 +1,6 @@
 # Sound comes back after a reload
 
-Status: in-review (review pending)
+Status: ready-for-human (Isak tries a reload with sound on, on desktop and on a phone)
 Area: sound, player site
 
 Found by the third sweep (2026-10-28) and spot-checked. `soundEnabled` is kept in localStorage
@@ -35,3 +35,5 @@ press anywhere. The invite shows until then.
   to the same bed still reports it as playing. `SoundscapeLayer` picks no bed before unlock and
   sets `ambiencePlaying` from that result. Tests: `src/test/sound/soundAfterReload.test.tsx`.
 - This hasn't been tried on a real phone. Touch unlock is covered only by jsdom events.
+- Provisional call: the "paused" result (bed set up while the context is suspended) counts as
+  playing, because the "Ambience playing" label can't show while muted anyway.
