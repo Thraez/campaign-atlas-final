@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { classifyShard } from "./shardOutcome";
+import { classifyShard, SHARD_COUNT, vitestArgs } from "./shardOutcome";
+
+describe("vitestArgs", () => {
+  it("runs shard N of the suite's four shards", () => {
+    expect(SHARD_COUNT).toBe(4);
+    expect(vitestArgs({ shard: 2 })).toEqual(["run", "--shard=2/4"]);
+  });
+
+  it("runs only the tests related to uncommitted changes for the pre-commit hook", () => {
+    expect(vitestArgs("changed")).toEqual(["run", "--changed"]);
+  });
+});
 
 const timeoutNoise =
   'Error: [vitest-worker]: Timeout calling "onTaskUpdate" with "[...]"\n' +
@@ -27,6 +38,12 @@ describe("classifyShard", () => {
     expect(classifyShard(1, out)).toBe("fail");
   });
 
+  it("fails a run whose summary shows failures even if it exited 0", () => {
+    const out =
+      " Test Files  1 failed | 61 passed (62)\n      Tests  \u001b[31m1 failed\u001b[39m | 785 passed (786)\n";
+    expect(classifyShard(0, out)).toBe("fail");
+  });
+
   it("fails a non-zero shard with no passing summary", () => {
     expect(classifyShard(1, 'Error: [vitest-worker]: Timeout calling "onTaskUpdate"')).toBe("fail");
   });
@@ -37,5 +54,21 @@ describe("classifyShard", () => {
 
   it("fails a shard that could not start", () => {
     expect(classifyShard(null, "")).toBe("fail");
+  });
+
+  const noTests =
+    "No test files found, exiting with code 1\n\n" +
+    "filter: changed\ninclude: src/**/*.{test,spec}.{ts,tsx}, scripts/**/*.test.ts\n";
+
+  it("passes a --changed run that found no related tests (docs-only commit)", () => {
+    expect(classifyShard(1, noTests, "changed")).toBe("pass");
+  });
+
+  it("fails a shard that found no tests: the suite is never empty", () => {
+    expect(classifyShard(1, noTests, { shard: 3 })).toBe("fail");
+  });
+
+  it("retries the worker timeout in a --changed run too", () => {
+    expect(classifyShard(1, timeoutNoise, "changed")).toBe("retry");
   });
 });

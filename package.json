@@ -25,6 +25,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ci": "tsx scripts/dev/run-sharded-tests.ts",
+    "test:changed": "tsx scripts/dev/run-sharded-tests.ts --changed",
     "atlas:build": "tsx scripts/build-atlas.ts",
     "atlas:build:player": "tsx scripts/build-atlas.ts --player --strict",
     "atlas:snapshot": "tsx scripts/atlas/snapshot-baseline.ts",
