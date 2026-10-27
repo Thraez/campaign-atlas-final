@@ -11,7 +11,15 @@ import { resolvePinStyle } from "@/atlas/pins/presets";
 import { ROUTE_MODE_LABEL, formatTravelTime, routeDistancePx } from "@/atlas/map/geometry";
 
 export const DEFAULT_REGION_COLOR = "#7fb069";
+export const DEFAULT_REGION_FILL_OPACITY = 0.18;
+export const DEFAULT_REGION_STROKE_OPACITY = 0.85;
 export const DEFAULT_ROUTE_COLOR = "#cfd6dc";
+export const DEFAULT_ROUTE_WEIGHT = 3;
+
+/** Editor-only emphasis for the selected region/route; players never select. */
+export interface ShapeStyleState {
+  selected?: boolean;
+}
 
 /** Region colour: its own, else its linked entity's pin colour, else the default. */
 export function regionColor(region: Region, entityType?: string): string {
@@ -21,20 +29,27 @@ export function regionColor(region: Region, entityType?: string): string {
   );
 }
 
-export function regionPathOptions(region: Region, color: string): PathOptions {
+export function regionPathOptions(
+  region: Region,
+  color: string,
+  { selected = false }: ShapeStyleState = {},
+): PathOptions {
   return {
     color,
-    weight: 1.5,
+    weight: selected ? 2.5 : 1.5,
     fillColor: color,
-    fillOpacity: region.fillOpacity ?? 0.18,
-    opacity: region.strokeOpacity ?? 0.85,
+    fillOpacity: region.fillOpacity ?? DEFAULT_REGION_FILL_OPACITY,
+    opacity: region.strokeOpacity ?? DEFAULT_REGION_STROKE_OPACITY,
   };
 }
 
-export function routePathOptions(route: Route): PathOptions {
+export function routePathOptions(
+  route: Route,
+  { selected = false }: ShapeStyleState = {},
+): PathOptions {
   return {
     color: route.color ?? DEFAULT_ROUTE_COLOR,
-    weight: route.weight ?? 3,
+    weight: (route.weight ?? DEFAULT_ROUTE_WEIGHT) + (selected ? 1 : 0),
     opacity: 0.9,
     dashArray: route.dashed ? "8 6" : undefined,
     lineCap: "round",

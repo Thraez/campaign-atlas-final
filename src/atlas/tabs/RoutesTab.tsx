@@ -4,6 +4,7 @@
  * State lives in `useRouteDraft`; the map (RouteLayer) and this form share it.
  * YAML stays canon — every change is a local draft until the DM hits Save.
  */
+import { DEFAULT_ROUTE_COLOR } from "@/atlas/map/featureStyle";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -244,7 +245,7 @@ export function RoutesTab({ project, map, api, blockingCount, warningCount, onFi
               >
                 <span
                   className="inline-block w-3 h-1 rounded-sm"
-                  style={{ background: r.color ?? "#cfd6dc" }}
+                  style={{ background: r.color ?? DEFAULT_ROUTE_COLOR }}
                 />
                 <span className="text-xs flex-1 truncate">{r.name}</span>
                 <span className="text-[10px] text-muted-foreground">{r.waypoints.length} wp</span>
@@ -386,7 +387,7 @@ export function RoutesTab({ project, map, api, blockingCount, warningCount, onFi
                 <Input
                   type="color"
                   className="h-7 p-1"
-                  value={selected.color ?? "#cfd6dc"}
+                  value={selected.color ?? DEFAULT_ROUTE_COLOR}
                   onChange={(e) => patch(selected.id, { color: e.target.value })}
                 />
               </div>

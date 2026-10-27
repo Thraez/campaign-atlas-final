@@ -157,6 +157,27 @@ describe("ticket 15 — shared region and route drawing", () => {
     expect(editor.tooltip).toBe(viewer.tooltip);
   });
 
+  it("the editor hides the tooltip only on the selected (being-edited) region and route", () => {
+    const region = shape(
+      render(
+        <RegionLayer
+          map={MAP}
+          api={{ ...regionApi(), selectedId: REGION.id }}
+          entityById={entityById}
+        />,
+      ).container,
+      "Polygon",
+    );
+    const route = shape(
+      render(<RouteLayer map={MAP} api={{ ...routeApi(), selectedId: ROUTE.id }} />).container,
+      "Polyline",
+    );
+    expect(region.tooltip).toBeNull();
+    expect(region.path.weight).toBe(2.5);
+    expect(route.tooltip).toBeNull();
+    expect(route.path.weight).toBe(4);
+  });
+
   it("a route renders with the same path options and tooltip in the viewer and the editor", () => {
     const viewer = shape(renderViewer().container, "Polyline");
     const editor = shape(render(<RouteLayer map={MAP} api={routeApi()} />).container, "Polyline");

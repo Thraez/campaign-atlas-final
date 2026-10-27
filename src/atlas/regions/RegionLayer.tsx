@@ -22,7 +22,7 @@ interface Props {
   /** Hide all region geometry (DM toggle). */
   visible?: boolean;
   /** Entities by id, so a linked region takes its entity's colour as players see it. */
-  entityById?: ReadonlyMap<string, { type: string }>;
+  entityById: ReadonlyMap<string, { type: string }>;
 }
 
 const handleIcon = (selected: boolean) =>
@@ -78,14 +78,17 @@ export function RegionLayer({ map, api, visible = true, entityById }: Props) {
       {visible &&
         regions.map((r) => {
           const isSelected = r.id === api.selectedId;
-          const entityType = r.entityId ? entityById?.get(r.entityId)?.type : undefined;
+          const entityType = r.entityId ? entityById.get(r.entityId)?.type : undefined;
           return (
             <RegionShape
               key={r.id}
               region={r}
               entityType={entityType}
               positions={r.points.map(([x, y]) => xy2ll(x, y))}
-              pathOverrides={isSelected ? { weight: 2.5 } : undefined}
+              selected={isSelected}
+              // The selected region shows vertex handles; a sticky tooltip
+              // would follow the cursor while the DM drags them.
+              hideTooltip={isSelected}
               eventHandlers={{
                 click: (e) => {
                   if (api.drawing) return;

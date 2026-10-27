@@ -77,7 +77,10 @@ export function RouteLayer({ map, api, visible = true }: Props) {
               points={pts}
               positions={pts.map(([x, y]) => xy2ll(x, y))}
               scale={map.scale}
-              pathOverrides={isSelected ? { weight: (r.weight ?? 3) + 1 } : undefined}
+              selected={isSelected}
+              // The selected route shows waypoint handles; a sticky tooltip
+              // would follow the cursor while the DM drags them.
+              hideTooltip={isSelected}
               eventHandlers={{
                 click: (e) => {
                   if (api.drawing) return;

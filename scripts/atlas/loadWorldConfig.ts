@@ -274,6 +274,8 @@ export function loadWorldConfig(contentRoot: string, worldId: string): WorldConf
         name: r.name,
         entityId: r.entityId,
         color: r.color,
+        // Same defaults as DEFAULT_REGION_FILL_OPACITY / DEFAULT_REGION_STROKE_OPACITY
+        // in src/atlas/map/featureStyle.ts (this Node-side loader imports only types from src/).
         fillOpacity: r.fillOpacity ?? 0.18,
         strokeOpacity: r.strokeOpacity ?? 0.85,
         points: (r.points ?? []) as Point[],

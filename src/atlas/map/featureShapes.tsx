@@ -11,7 +11,7 @@
  */
 import type { ReactNode } from "react";
 import { Polygon, Polyline, Tooltip } from "react-leaflet";
-import type { LeafletEventHandlerFnMap, PathOptions } from "leaflet";
+import type { LeafletEventHandlerFnMap } from "leaflet";
 import type { MapScale, Point, Region, Route } from "@/atlas/content/schema";
 import {
   regionColor,
@@ -27,8 +27,10 @@ interface RegionShapeProps {
   /** Linked entity's type, for the default colour. */
   entityType?: string;
   positions: LatLng[];
-  /** Applied over the shared style (e.g. the editor's selection weight). */
-  pathOverrides?: PathOptions;
+  /** Editor: draw the selection emphasis. */
+  selected?: boolean;
+  /** Editor: hide the hover tooltip (the shape is being edited). */
+  hideTooltip?: boolean;
   eventHandlers?: LeafletEventHandlerFnMap;
   /** Extra layer children, e.g. the viewer's click popup. */
   children?: ReactNode;
@@ -38,7 +40,8 @@ export function RegionShape({
   region,
   entityType,
   positions,
-  pathOverrides,
+  selected,
+  hideTooltip,
   eventHandlers,
   children,
 }: RegionShapeProps) {
@@ -46,14 +49,16 @@ export function RegionShape({
   return (
     <Polygon
       positions={positions}
-      pathOptions={{ ...regionPathOptions(region, color), ...pathOverrides }}
+      pathOptions={regionPathOptions(region, color, { selected })}
       eventHandlers={eventHandlers}
     >
       {/* Hover label so users don't rely on fill color alone to identify
           a region (WCAG 1.4.1). */}
-      <Tooltip sticky direction="top" opacity={0.95}>
-        <div className="text-xs font-medium">{region.name}</div>
-      </Tooltip>
+      {!hideTooltip && (
+        <Tooltip sticky direction="top" opacity={0.95}>
+          <div className="text-xs font-medium">{region.name}</div>
+        </Tooltip>
+      )}
       {children}
     </Polygon>
   );
@@ -65,7 +70,8 @@ interface RouteShapeProps {
   points: Point[];
   positions: LatLng[];
   scale: MapScale | undefined;
-  pathOverrides?: PathOptions;
+  selected?: boolean;
+  hideTooltip?: boolean;
   eventHandlers?: LeafletEventHandlerFnMap;
 }
 
@@ -74,22 +80,25 @@ export function RouteShape({
   points,
   positions,
   scale,
-  pathOverrides,
+  selected,
+  hideTooltip,
   eventHandlers,
 }: RouteShapeProps) {
   const { name, detail } = routeTooltipLines(route, points, scale);
   return (
     <Polyline
       positions={positions}
-      pathOptions={{ ...routePathOptions(route), ...pathOverrides }}
+      pathOptions={routePathOptions(route, { selected })}
       eventHandlers={eventHandlers}
     >
-      <Tooltip sticky direction="top" opacity={0.95}>
-        <div className="text-xs">
-          <div className="font-medium">{name}</div>
-          <div className="opacity-80">{detail}</div>
-        </div>
-      </Tooltip>
+      {!hideTooltip && (
+        <Tooltip sticky direction="top" opacity={0.95}>
+          <div className="text-xs">
+            <div className="font-medium">{name}</div>
+            <div className="opacity-80">{detail}</div>
+          </div>
+        </Tooltip>
+      )}
     </Polyline>
   );
 }
