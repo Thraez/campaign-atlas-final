@@ -4,8 +4,26 @@
     {
       "name": "atlas-editor",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 8080
+    },
+    {
+      "name": "atlas-pages-preview",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "ATLAS_BASE=/campaign-atlas-final/",
+        "npm",
+        "run",
+        "preview",
+        "--",
+        "--port",
+        "4173",
+        "--strictPort"
+      ],
+      "port": 4173
     }
   ]
 }

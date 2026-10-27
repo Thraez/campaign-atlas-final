@@ -13,174 +13,184 @@ export default defineConfig(({ mode }) => {
   // INCLUDE_EDITOR env var is "true". Production player builds tree-shake
   // the editor entirely (see src/App.tsx).
   const includeEditor =
-    mode === "development" ||
-    mode === "editor" ||
-    process.env.INCLUDE_EDITOR === "true";
+    mode === "development" || mode === "editor" || process.env.INCLUDE_EDITOR === "true";
 
   return {
-  // For GitHub Pages project sites, set ATLAS_BASE=/<repo>/ at build time.
-  // Defaults to "/" for local dev and Lovable preview.
-  base: process.env.ATLAS_BASE || "/",
-  define: { __INCLUDE_EDITOR__: JSON.stringify(includeEditor) },
-  server: {
-    // Loopback by default. The dev server mounts /__atlas/* — file reads and
-    // writes, vault scans, character keys, and publish-to-main. Binding every
-    // interface put all of that on the LAN, and its guard reads the `Host` and
-    // `Origin` headers, which any non-browser client can simply set. The
-    // socket-level check in scripts/vite-plugin-atlas-save.ts closes that hole;
-    // this closes the port it was reachable on.
-    //
-    // To show the atlas to players on the same network, opt in explicitly:
-    //   npm run dev -- --host
-    // The CLI flag overrides this, and the socket check still keeps DM-only
-    // endpoints loopback-only while players get the player build.
-    host: "127.0.0.1",
-    port: 8080,
-    hmr: {
-      overlay: false,
+    // For GitHub Pages project sites, set ATLAS_BASE=/<repo>/ at build time.
+    // Defaults to "/" for local dev and Lovable preview.
+    base: process.env.ATLAS_BASE || "/",
+    define: { __INCLUDE_EDITOR__: JSON.stringify(includeEditor) },
+    server: {
+      // Loopback by default. The dev server mounts /__atlas/* — file reads and
+      // writes, vault scans, character keys, and publish-to-main. Binding every
+      // interface put all of that on the LAN, and its guard reads the `Host` and
+      // `Origin` headers, which any non-browser client can simply set. The
+      // socket-level check in scripts/vite-plugin-atlas-save.ts closes that hole;
+      // this closes the port it was reachable on.
+      //
+      // To show the atlas to players on the same network, opt in explicitly:
+      //   npm run dev -- --host
+      // The CLI flag overrides this, and the socket check still keeps DM-only
+      // endpoints loopback-only while players get the player build.
+      host: "127.0.0.1",
+      port: 8080,
+      hmr: {
+        overlay: false,
+      },
     },
-  },
-  plugins: [
-    react(),
-    mode === "development" && componentTagger(),
-    // Dev-only middleware that writes allowlisted source files to disk.
-    // Auto-disabled in build modes via apply: "serve".
-    atlasSavePlugin(),
-    // Production-only PWA. devOptions.enabled = false so the service
-    // worker is NEVER active during `vite dev` or in the Lovable editor
-    // preview — registration is also iframe/host-guarded in src/main.tsx.
-    VitePWA({
-      registerType: "prompt",
-      injectRegister: null, // we register manually in src/main.tsx
-      devOptions: { enabled: false },
-      includeAssets: [
-        "icons/icon-192.png",
-        "icons/icon-512.png",
-        "icons/apple-touch-icon.png",
-        "robots.txt",
+    plugins: [
+      react(),
+      mode === "development" && componentTagger(),
+      // Dev-only middleware that writes allowlisted source files to disk.
+      // Auto-disabled in build modes via apply: "serve".
+      atlasSavePlugin(),
+      // Production-only PWA. devOptions.enabled = false so the service
+      // worker is NEVER active during `vite dev` or in the Lovable editor
+      // preview — registration is also iframe/host-guarded in src/main.tsx.
+      VitePWA({
+        registerType: "prompt",
+        injectRegister: null, // we register manually in src/main.tsx
+        devOptions: { enabled: false },
+        includeAssets: [
+          "icons/icon-192.png",
+          "icons/icon-512.png",
+          "icons/apple-touch-icon.png",
+          "robots.txt",
+        ],
+        manifest: {
+          name: "AstrathDeeprealm Atlas",
+          short_name: "Astrath Atlas",
+          description: "Interactive fantasy world atlas for AstrathDeeprealm.",
+          start_url: "./atlas",
+          scope: "./",
+          display: "standalone",
+          theme_color: "#18313f",
+          background_color: "#0f1a22",
+          icons: [
+            { src: "icons/icon-192.png", sizes: "192x192", type: "image/png" },
+            { src: "icons/icon-512.png", sizes: "512x512", type: "image/png" },
+            {
+              src: "icons/icon-512.png",
+              sizes: "512x512",
+              type: "image/png",
+              purpose: "any maskable",
+            },
+          ],
+        },
+        workbox: {
+          // Precache the built shell (HTML/JS/CSS) + small bundled assets.
+          globPatterns: ["**/*.{js,css,html,ico,svg,woff2}"],
+          // OAuth-style callbacks must always hit the network.
+          navigateFallbackDenylist: [/^\/~oauth/, /^\/auth/],
+          cleanupOutdatedCaches: true,
+          // Allow caching the larger published atlas.json safely.
+          maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+          runtimeCaching: [
+            // HTML navigations: network-first so users see new builds.
+            {
+              urlPattern: ({ request }) => request.mode === "navigate",
+              handler: "NetworkFirst",
+              options: {
+                cacheName: "atlas-html",
+                networkTimeoutSeconds: 3,
+                expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              },
+            },
+            // Player atlas data: prefer fresh, fall back to cache when offline.
+            {
+              urlPattern: ({ url }) =>
+                url.pathname.endsWith("/atlas/atlas.json") ||
+                url.pathname.endsWith("/atlas/search-index.json"),
+              handler: "NetworkFirst",
+              options: {
+                cacheName: "atlas-data",
+                networkTimeoutSeconds: 4,
+                expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 30 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+            // Local atlas assets (maps/images/icons/audio committed to /public/atlas/assets).
+            // rangeRequests + status 206 are required for audio streaming (browsers use
+            // HTTP range requests for <audio> elements).
+            {
+              urlPattern: ({ url }) => url.pathname.includes("/atlas/assets/"),
+              handler: "CacheFirst",
+              options: {
+                cacheName: "atlas-assets",
+                expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 60 },
+                cacheableResponse: { statuses: [0, 200, 206] },
+                rangeRequests: true,
+              },
+            },
+            // Google Fonts stylesheet + files.
+            {
+              urlPattern: ({ url }) => url.origin === "https://fonts.googleapis.com",
+              handler: "StaleWhileRevalidate",
+              options: { cacheName: "google-fonts-css" },
+            },
+            {
+              urlPattern: ({ url }) => url.origin === "https://fonts.gstatic.com",
+              handler: "CacheFirst",
+              options: {
+                cacheName: "google-fonts-files",
+                expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+            // External http(s) images (e.g. pinimg) are NOT promised offline,
+            // but we cache opportunistically so repeat online visits are fast.
+            {
+              urlPattern: ({ url, request, sameOrigin }) =>
+                request.destination === "image" && !sameOrigin,
+              handler: "StaleWhileRevalidate",
+              options: {
+                cacheName: "external-images",
+                expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 14 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+          ],
+        },
+      }),
+      // Player builds only: strip the source-named audio beds from dist/ (the
+      // player references content-hashed copies; the source names exist solely
+      // for the DM picker in public/). Runs last so it fires after the public
+      // copy + PWA precache generation. See the plugin for the full rationale.
+      !includeEditor && prunePlayerAudioPlugin(),
+    ].filter(Boolean),
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+      },
+      dedupe: [
+        "react",
+        "react-dom",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
+        "@tanstack/react-query",
+        "@tanstack/query-core",
       ],
-      manifest: {
-        name: "AstrathDeeprealm Atlas",
-        short_name: "Astrath Atlas",
-        description: "Interactive fantasy world atlas for AstrathDeeprealm.",
-        start_url: "./atlas",
-        scope: "./",
-        display: "standalone",
-        theme_color: "#18313f",
-        background_color: "#0f1a22",
-        icons: [
-          { src: "icons/icon-192.png", sizes: "192x192", type: "image/png" },
-          { src: "icons/icon-512.png", sizes: "512x512", type: "image/png" },
-          { src: "icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
-        ],
-      },
-      workbox: {
-        // Precache the built shell (HTML/JS/CSS) + small bundled assets.
-        globPatterns: ["**/*.{js,css,html,ico,svg,woff2}"],
-        // OAuth-style callbacks must always hit the network.
-        navigateFallbackDenylist: [/^\/~oauth/, /^\/auth/],
-        cleanupOutdatedCaches: true,
-        // Allow caching the larger published atlas.json safely.
-        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
-        runtimeCaching: [
-          // HTML navigations: network-first so users see new builds.
-          {
-            urlPattern: ({ request }) => request.mode === "navigate",
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "atlas-html",
-              networkTimeoutSeconds: 3,
-              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 7 },
-            },
-          },
-          // Player atlas data: prefer fresh, fall back to cache when offline.
-          {
-            urlPattern: ({ url }) =>
-              url.pathname.endsWith("/atlas/atlas.json") ||
-              url.pathname.endsWith("/atlas/search-index.json"),
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "atlas-data",
-              networkTimeoutSeconds: 4,
-              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 30 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          // Local atlas assets (maps/images/icons/audio committed to /public/atlas/assets).
-          // rangeRequests + status 206 are required for audio streaming (browsers use
-          // HTTP range requests for <audio> elements).
-          {
-            urlPattern: ({ url }) => url.pathname.includes("/atlas/assets/"),
-            handler: "CacheFirst",
-            options: {
-              cacheName: "atlas-assets",
-              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 60 },
-              cacheableResponse: { statuses: [0, 200, 206] },
-              rangeRequests: true,
-            },
-          },
-          // Google Fonts stylesheet + files.
-          {
-            urlPattern: ({ url }) => url.origin === "https://fonts.googleapis.com",
-            handler: "StaleWhileRevalidate",
-            options: { cacheName: "google-fonts-css" },
-          },
-          {
-            urlPattern: ({ url }) => url.origin === "https://fonts.gstatic.com",
-            handler: "CacheFirst",
-            options: {
-              cacheName: "google-fonts-files",
-              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          // External http(s) images (e.g. pinimg) are NOT promised offline,
-          // but we cache opportunistically so repeat online visits are fast.
-          {
-            urlPattern: ({ url, request, sameOrigin }) =>
-              request.destination === "image" && !sameOrigin,
-            handler: "StaleWhileRevalidate",
-            options: {
-              cacheName: "external-images",
-              expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 14 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-        ],
-      },
-    }),
-    // Player builds only: strip the source-named audio beds from dist/ (the
-    // player references content-hashed copies; the source names exist solely
-    // for the DM picker in public/). Runs last so it fires after the public
-    // copy + PWA precache generation. See the plugin for the full rationale.
-    !includeEditor && prunePlayerAudioPlugin(),
-  ].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
     },
-    dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query", "@tanstack/query-core"],
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        // Group stable third-party deps into their own chunks so repeat
-        // visitors only re-download changed app/content chunks, not the
-        // whole vendor graph, when unrelated app code changes.
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return;
-          if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) {
-            return "vendor-react";
-          }
-          if (/[\\/]node_modules[\\/](leaflet|react-leaflet)[\\/]/.test(id)) {
-            return "vendor-leaflet";
-          }
-          if (/[\\/]node_modules[\\/]@radix-ui[\\/]/.test(id)) {
-            return "vendor-radix";
-          }
+    build: {
+      rollupOptions: {
+        output: {
+          // Group stable third-party deps into their own chunks so repeat
+          // visitors only re-download changed app/content chunks, not the
+          // whole vendor graph, when unrelated app code changes.
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return;
+            if (/[\\/]node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/.test(id)) {
+              return "vendor-react";
+            }
+            if (/[\\/]node_modules[\\/](leaflet|react-leaflet)[\\/]/.test(id)) {
+              return "vendor-leaflet";
+            }
+            if (/[\\/]node_modules[\\/]@radix-ui[\\/]/.test(id)) {
+              return "vendor-radix";
+            }
+          },
         },
       },
     },
-  },
   };
 });

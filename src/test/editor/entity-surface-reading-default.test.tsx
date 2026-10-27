@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { EntitySurface } from "@/atlas/entity/EntitySurface";
 import { ViewModeProvider } from "@/atlas/view/ViewModeProvider";
 import type { Entity } from "@/atlas/content/schema";

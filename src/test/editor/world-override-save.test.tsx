@@ -15,7 +15,7 @@ vi.mock("react-leaflet", async () => {
 });
 
 import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import AtlasPlacementEditor from "@/pages/AtlasPlacementEditor";
 import { makeProject, makeSearchIndex } from "../helpers/makeProject";
 import { clearEditorSession } from "../helpers/clearEditorSession";

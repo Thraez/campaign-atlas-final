@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act } from "@testing-library/react";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { SearchPalette } from "@/atlas/search/SearchPalette";
 import { _resetVisitedForTests } from "@/atlas/visited/visitedPlaces";
 import type { SearchIndexEntry } from "@/atlas/content/loader";

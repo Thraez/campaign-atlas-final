@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { ViewModeProvider } from "@/atlas/view/ViewModeProvider";
 import { EntityPanes } from "@/atlas/entity/EntityPanes";
 import { EntityReadingView } from "@/atlas/entity/EntityReadingView";

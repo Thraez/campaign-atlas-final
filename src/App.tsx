@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Landing from "./pages/Landing.tsx";
@@ -46,10 +46,7 @@ const RouteFallback = () => (
 const App = () => (
   <TooltipProvider>
     <Sonner />
-    <BrowserRouter
-      basename={import.meta.env.BASE_URL.replace(/\/+$/, "") || "/"}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-    >
+    <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/+$/, "") || "/"}>
       <RouteErrorBoundary>
         <Suspense fallback={<RouteFallback />}>
           <Routes>

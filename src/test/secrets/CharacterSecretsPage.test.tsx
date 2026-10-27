@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import CharacterSecretsPage from "@/atlas/secrets/CharacterSecretsPage";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import * as playerSecretsStore from "@/atlas/secrets/playerSecretsStore";
