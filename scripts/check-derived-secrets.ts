@@ -9,12 +9,15 @@
  * This script derives a list of "must-not-appear" strings from the source
  * vault itself:
  *
- *   - any entity with atlas.visibility: dm | hidden
- *   - any entity with atlas.publish: false
+ *   - any note the build treats as secret (`isSecretNote`: dm or hidden,
+ *     no visibility at all (ADR-0001), or atlas.publish: false)
+ *   - every note in an excluded folder (`_dm/`, `_drafts/`, ...) by the same
+ *     rule: the build never ships them, but player notes can still name them
  *
- * For each such entity, the title, the slug-form id (filename), and every
- * alias is added to the secret list. The target directory is then scanned
- * for verbatim occurrences. Names that are too short or too generic to
+ * For each such note, the title (worked out exactly as the build does,
+ * `deriveTitle`), the slug-form id, and every alias is added to the secret
+ * list. The target directory is then scanned for whole-word occurrences in
+ * any letter case. Names that are too short or too generic to
  * meaningfully flag (single common words) are excluded to keep false
  * positives manageable — a DM who names a secret "Door" or "The North"
  * is on their own.
@@ -30,7 +33,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseFrontmatter } from "./atlas/parseFrontmatter";
-import { isSecretVisibility } from "./atlas/visibility";
+import { deriveTitle, isSecretNote } from "./atlas/noteIdentity";
 import { slugify } from "./atlas/slugify";
 
 interface Config {
@@ -143,15 +146,16 @@ function globToRegExp(glob: string): RegExp {
   return new RegExp(`^${escaped}$`);
 }
 
-function walkMd(dir: string, contentRoot: string, include: string[], exclude: string[]): string[] {
+// No `exclude` here: excluded notes never ship, but their names still must
+// not appear in what does.
+function walkMd(dir: string, contentRoot: string, include: string[]): string[] {
   const out: string[] = [];
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     const contentRel = path.relative(contentRoot, full).replace(/\\/g, "/");
-    if (matchAny(contentRel, exclude)) continue;
     if (entry.isDirectory()) {
-      out.push(...walkMd(full, contentRoot, include, exclude));
+      out.push(...walkMd(full, contentRoot, include));
     } else if (entry.name.endsWith(".md")) {
       if (include.length > 0 && !matchAny(contentRel, include)) continue;
       out.push(full);
@@ -171,21 +175,15 @@ function isReportableName(name: string): boolean {
 export function deriveSecretsFromVault(configPath: string): SecretEntry[] {
   const cfg = loadConfig(configPath);
   const contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
-  const files = walkMd(contentDir, contentDir, cfg.include ?? [], cfg.exclude ?? []);
+  const files = walkMd(contentDir, contentDir, cfg.include ?? []);
   const secrets: SecretEntry[] = [];
   for (const file of files) {
     const raw = fs.readFileSync(file, "utf8");
     const rel = path.relative(path.dirname(configPath), file).replace(/\\/g, "/");
     const parsed = parseFrontmatter(raw, rel);
-    const isHiddenVisibility =
-      parsed.atlas.visibility !== undefined && isSecretVisibility(parsed.atlas.visibility);
-    const isUnpublished = parsed.atlas.publish === false;
-    if (!isHiddenVisibility && !isUnpublished) continue;
+    if (!isSecretNote(parsed.atlas)) continue;
 
-    const title =
-      typeof parsed.data.title === "string"
-        ? parsed.data.title.trim()
-        : path.basename(file, ".md").replace(/[-_]+/g, " ").trim();
+    const title = deriveTitle(file, parsed.data.title);
     if (isReportableName(title)) {
       secrets.push({ name: title, source: rel, field: "title" });
     }
@@ -199,11 +197,12 @@ export function deriveSecretsFromVault(configPath: string): SecretEntry[] {
       }
     }
   }
-  // De-duplicate by exact name; keep the first source for the report.
+  // De-duplicate ignoring case (the scan does); keep the first source for the report.
   const seen = new Set<string>();
   return secrets.filter((s) => {
-    if (seen.has(s.name)) return false;
-    seen.add(s.name);
+    const key = s.name.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
     return true;
   });
 }
@@ -211,9 +210,10 @@ export function deriveSecretsFromVault(configPath: string): SecretEntry[] {
 export function scanArtifactForSecrets(dir: string, secrets: SecretEntry[]): DerivedScanResult {
   const hits: DerivedScanHit[] = [];
   let filesScanned = 0;
-  // Build a single case-sensitive Map for cheap includes() — secrets are
-  // user-defined, so substring-containment matches the worst-case leak shape
-  // (e.g. the title appearing inside a longer rendered string).
+  // Any letter case, but whole words only: "isle de marque" is a hit for
+  // "Isle De Marque", while a name inside a longer word ("Mira" in
+  // "miracle") is not.
+  const patterns = secrets.map((s) => ({ s, re: wholeWordPattern(s.name) }));
   function walk(d: string) {
     let entries: fs.Dirent[];
     try {
@@ -242,14 +242,19 @@ export function scanArtifactForSecrets(dir: string, secrets: SecretEntry[]): Der
           );
           continue;
         }
-        for (const s of secrets) {
-          if (text.includes(s.name)) hits.push({ file: full, match: s });
+        for (const { s, re } of patterns) {
+          if (re.test(text)) hits.push({ file: full, match: s });
         }
       }
     }
   }
   walk(dir);
   return { derivedCount: secrets.length, filesScanned, hits };
+}
+
+function wholeWordPattern(name: string): RegExp {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "iu");
 }
 
 function resolveConfig(configHint?: string): string | null {
@@ -301,7 +306,7 @@ export function run(opts: RunOpts): number {
   }
   const secrets = deriveSecretsFromVault(configAbs);
   if (secrets.length === 0) {
-    console.log("atlas:check-derived-secrets: vault has no hidden/dm entities — nothing to check");
+    console.log("atlas:check-derived-secrets: vault has no dm/hidden notes — nothing to check");
     return 0;
   }
   const result = scanArtifactForSecrets(targetAbs, secrets);
