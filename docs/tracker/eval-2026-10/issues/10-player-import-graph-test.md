@@ -1,6 +1,6 @@
 # A test walks the player entry's imports
 
-Status: ready-for-agent
+Status: done
 Area: player site, publish safety
 
 AGENTS.md: never import editor modules from a player entry point. The guard
@@ -17,3 +17,14 @@ would pass. Today two helpers in editor folders are reachable from `src/main.tsx
   `sound-editor/`, `save/`, `sync/`, `import/` or `publish/` (adjust the list to what the folders
   hold; say why in the test).
 - The test fails if one editor import is planted (prove it once, then remove the plant).
+
+## Comments
+
+2026-10-27, branch `eval-10-player-import-graph`: moved `mapClickCoord.ts` to `src/atlas/map/` and
+`download.ts` to `src/lib/` (their tests moved with them). `src/test/build/player-import-graph.test.ts`
+walks runtime imports from `src/main.tsx` with the TypeScript parser, skips only the
+`__INCLUDE_EDITOR__ ?` branch in `App.tsx` and `import type`, and fails on the eight folders listed
+plus `pages/AtlasPlacementEditor.tsx`; all eight hold editor-only code. It went red on the two
+helpers before the move, and red again on a planted `import "@/atlas/sync/useSyncSettings"` in
+`OfflineStatus.tsx` (removed). The guard cited above (`src/test/player-build-exclusion.test.ts`)
+does not exist on `main`; nothing was replaced.

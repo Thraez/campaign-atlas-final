@@ -21,7 +21,7 @@ import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TabFrame } from "./TabFrame";
-import { downloadText } from "./download";
+import { downloadText } from "@/lib/download";
 import { BuildReportPanel } from "@/atlas/publish/BuildReportPanel";
 import { ReadinessCard } from "@/atlas/publish/ReadinessCard";
 import { usePublishFlow } from "@/atlas/publish/usePublishFlow";
