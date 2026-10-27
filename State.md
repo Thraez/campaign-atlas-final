@@ -39,6 +39,20 @@ needs Isak's yes.
 Grill round 2 is ticketed on provisional calls (below): `eval-2026-10/14`-`17`. 17 (entity
 edits stuck after a 409) ranks ahead of code-retro 06-08.
 
+## Merge queue
+
+Isak's rule, 2026-10-27: sessions may merge their own PRs once checks pass and the code review is
+clean, but here every merge into `main` starts the publish workflow, which counts as publishing.
+So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logged here.
+
+| PR  | Ticket | What                                       | Waits on                                  |
+| --- | ------ | ------------------------------------------ | ----------------------------------------- |
+| #57 | 09     | Publish refuses to run off `main`          | Isak's look at the panel message; his yes |
+| #58 | 08     | Editor Save keeps world.yaml's other keys  | His yes                                   |
+| #59 | 16     | Delete the unreachable entity-editing tabs | His yes (provisional call Q4)             |
+
+Local `main` is ahead of `origin/main` by the tracker commits for 14-18 (not pushed).
+
 ## Provisional calls
 
 Isak's rule, 2026-10-27: work never stops on a question. Each open question gets the recommended
