@@ -227,37 +227,98 @@ describe("AudioEngine", () => {
     expect(eng.buffers.has("active.ogg")).toBe(true);
     expect(eng.lru).toContain("active.ogg");
   });
+});
 
-  it("a crossfade superseded while decoding — the newer target wins", async () => {
+describe("AudioEngine: the newest crossfade request wins", () => {
+  /** An engine whose fetches stay pending until the test resolves them by src. */
+  async function setup() {
     const ctx = makeMockCtx();
-    let resolveA!: (v: ArrayBuffer) => void;
-    let resolveB!: (v: ArrayBuffer) => void;
-    const pendingA = new Promise<ArrayBuffer>((res) => {
-      resolveA = res;
+    const started: string[] = [];
+    ctx.decodeAudioData = vi.fn(async (bytes: ArrayBuffer) => ({
+      duration: 30,
+      src: (bytes as any).src,
+    }));
+    ctx.createBufferSource = vi.fn(() => {
+      const source: any = {
+        buffer: null,
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        start: vi.fn(() => started.push(source.buffer.src)),
+        stop: vi.fn(),
+      };
+      return source;
     });
-    const pendingB = new Promise<ArrayBuffer>((res) => {
-      resolveB = res;
-    });
-    const fetchAudio = vi.fn((url: string) => {
-      if (url.includes("a.ogg")) return pendingA;
-      if (url.includes("b.ogg")) return pendingB;
-      return Promise.resolve(new ArrayBuffer(8));
-    });
-    const d = { createContext: () => ctx, fetchAudio, canPlay: () => true };
-    const eng = new AudioEngine(d as any);
+    const pending = new Map<string, () => void>();
+    const fetchAudio = vi.fn(
+      (url: string) =>
+        new Promise<ArrayBuffer>((res) => {
+          const src = url.replace("atlas/assets/audio/", "");
+          pending.set(src, () => {
+            const bytes: any = new ArrayBuffer(8);
+            // slice(0) in loadBuffer copies the bytes; keep the tag on the copy.
+            bytes.slice = () => Object.assign(new ArrayBuffer(8), { src });
+            res(bytes);
+          });
+        }),
+    );
+    const eng = new AudioEngine({ createContext: () => ctx, fetchAudio, canPlay: () => true });
     await eng.unlock();
+    const area = (id: string) => ({ id, bed: { src: `${id}.ogg` } }) as any;
+    const resolve = (id: string) => pending.get(`${id}.ogg`)!();
+    return { eng, area, resolve, started };
+  }
 
-    const pA = eng.crossfadeTo({ id: "a", bed: { src: "a.ogg" } } as any);
-    const pB = eng.crossfadeTo({ id: "b", bed: { src: "b.ogg" } } as any);
+  it("the older request resolving first never starts; the newer one plays", async () => {
+    const { eng, area, resolve, started } = await setup();
+    const pA = eng.crossfadeTo(area("a"));
+    const pB = eng.crossfadeTo(area("b"));
 
-    // "b" resolves its decode first and becomes active...
-    resolveB(new ArrayBuffer(8));
-    await pB;
+    resolve("a");
+    expect(await pA).toBe("superseded");
+    expect(started).toEqual([]);
+
+    resolve("b");
+    expect(await pB).toBe("playing");
+    expect(started).toEqual(["b.ogg"]);
     expect((eng as any).active?.id).toBe("b");
+  });
 
-    // ...then "a" resolves late and must be a no-op (superseded).
-    resolveA(new ArrayBuffer(8));
-    await pA;
+  it("the newer request resolving first plays; the older one stays out", async () => {
+    const { eng, area, resolve, started } = await setup();
+    const pA = eng.crossfadeTo(area("a"));
+    const pB = eng.crossfadeTo(area("b"));
+
+    resolve("b");
+    expect(await pB).toBe("playing");
+    resolve("a");
+    expect(await pA).toBe("superseded");
+    expect(started).toEqual(["b.ogg"]);
     expect((eng as any).active?.id).toBe("b");
+  });
+
+  it("null arriving during a decode means nothing starts", async () => {
+    const { eng, area, resolve, started } = await setup();
+    const pA = eng.crossfadeTo(area("a"));
+    expect(await eng.crossfadeTo(null)).toBe("silence");
+
+    resolve("a");
+    expect(await pA).toBe("superseded");
+    expect(started).toEqual([]);
+    expect((eng as any).active).toBeNull();
+  });
+
+  it("A, then B, then A again during decodes ends on A", async () => {
+    const { eng, area, resolve, started } = await setup();
+    const pA1 = eng.crossfadeTo(area("a"));
+    const pB = eng.crossfadeTo(area("b"));
+    const pA2 = eng.crossfadeTo(area("a"));
+
+    resolve("b");
+    expect(await pB).toBe("superseded");
+    resolve("a");
+    const results = await Promise.all([pA1, pA2]);
+    expect(results[1]).toBe("playing");
+    expect(started).toEqual(["a.ogg"]);
+    expect((eng as any).active?.id).toBe("a");
   });
 });

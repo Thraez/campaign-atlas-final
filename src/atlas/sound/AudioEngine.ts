@@ -15,7 +15,8 @@ export interface AudioDeps {
  * - "locked": no AudioContext yet (unlock() hasn't run); nothing happened.
  * - "silence": crossfaded to no bed.
  * - "failed": the bed could not be fetched or decoded.
- * - "superseded": a crossfade to a different bed took over while decoding.
+ * - "superseded": a newer crossfade (to another bed, or to silence) was asked
+ *   for while this one decoded; this one started nothing.
  */
 export type CrossfadeResult = "playing" | "paused" | "locked" | "silence" | "failed" | "superseded";
 
@@ -47,6 +48,10 @@ export class AudioEngine {
   private muted = false;
   private masterGain = 0.6;
   private decoding = new Map<string, Promise<AudioBuffer | null>>();
+  /** Request counter: bumped by every crossfadeTo, so a call can tell it is stale. */
+  private requests = 0;
+  /** What the newest crossfadeTo asked for (a bed id, or null for silence). */
+  private newestTarget: string | null = null;
 
   constructor(private deps: AudioDeps) {}
 
@@ -102,6 +107,8 @@ export class AudioEngine {
   async crossfadeTo(area: PreparedArea | null): Promise<CrossfadeResult> {
     if (!this.ctx || !this.master) return "locked";
     const targetId = area?.id ?? null;
+    const request = ++this.requests;
+    this.newestTarget = targetId;
     if (this.active?.id === targetId) return this.active ? this.bedResult() : "silence";
 
     const out = this.active;
@@ -115,12 +122,15 @@ export class AudioEngine {
         ? area.bed.src
         : area.bed.srcFallback;
     const buffer = await this.loadBuffer(src);
+    // Only the newest request may start a bed. A stale call to the same bed as
+    // the newest one goes on: both share one decode, and whichever resumes
+    // first starts the bed for both.
+    if (request !== this.requests && this.newestTarget !== area.id) return "superseded";
     if (!buffer || !this.ctx || !this.master) return "failed";
-    // Another crossfade finished while we decoded. If it was to this same bed,
-    // the bed is playing all the same.
+    // A call to this same bed already started it while we decoded.
     // (TS narrowed this.active to null above; the await may have changed it.)
-    const winner = this.active as ActiveBed | null;
-    if (winner) return winner.id === area.id ? this.bedResult() : "superseded";
+    const started = this.active as ActiveBed | null;
+    if (started) return started.id === area.id ? this.bedResult() : "superseded";
 
     const gain = this.ctx.createGain();
     gain.gain.value = 0;
