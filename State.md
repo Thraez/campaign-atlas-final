@@ -118,6 +118,10 @@ answer, logged here and built on; he reviews this list in batches, and a reversa
 | 2026-10-28 | Sweep 3 Q4: calm mode becomes the one "reduce motion" switch (map, ocean, transitions)?                 | Yes; moved out of sound settings, OR'd with the OS setting | Calm mode stops the waves but not the map's flights            | 27     |
 | 2026-10-28 | Sweep 3 Q5: the offline menu claims only what is stored; install caches atlas.json and the current map? | Yes; portraits and audio stay cached on visit              | Precaching every picture makes the install too heavy           | 25     |
 
+| 2026-10-28 | eval-22 review: may the editor re-encode a JPG map lossy to strip its metadata? | No; drop the metadata segments, keep the image data | Maps stay lossless; one more q85 pass smears labels | 29 |
+| 2026-10-28 | eval-22 review: may `maps:optimize` delete the PNG once its WebP twin is in place and repointed? | Yes, as `images:optimize` does; git keeps it | Otherwise every map ships twice and every run re-encodes | 22 |
+| 2026-10-28 | eval-21 review: should Dismiss on the "resume sound" invite leave sound off? | Yes; taps on the invite's own buttons don't count as the gesture | Dismiss has to mean no sound | 21 |
+
 ## Retro, 2026-10-28 (overnight)
 
 - Merged and published: #61, #57, #58, #59, #60, each after a fresh CI run on top of the one
