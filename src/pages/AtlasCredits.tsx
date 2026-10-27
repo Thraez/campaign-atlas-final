@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { ArrowLeft, Star } from "lucide-react";
 import type { AtlasProject, Entity } from "@/atlas/content/schema";
 import { useAtlasContent } from "@/atlas/content/useAtlasContent";

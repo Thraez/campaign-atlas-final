@@ -11,7 +11,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router";
 import AtlasBrowse from "@/pages/AtlasBrowse";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity } from "@/atlas/content/schema";

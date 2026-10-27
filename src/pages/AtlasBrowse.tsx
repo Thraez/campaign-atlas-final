@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router";
 import { ArrowLeft, Compass, Hash, LayoutGrid, MapPin, Tag } from "lucide-react";
 import type { Entity } from "@/atlas/content/schema";
 import { useAtlasContent } from "@/atlas/content/useAtlasContent";

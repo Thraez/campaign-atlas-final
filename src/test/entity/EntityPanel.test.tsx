@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
 import type { AssetCredit, CreditsConfig, Entity, MapPlacement } from "@/atlas/content/schema";
 import type { EntityRelationship } from "@/atlas/profiles/profileTypes";

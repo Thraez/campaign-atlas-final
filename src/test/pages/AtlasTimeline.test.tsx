@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import AtlasTimeline from "@/pages/AtlasTimeline";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type { AtlasProject, Entity } from "@/atlas/content/schema";

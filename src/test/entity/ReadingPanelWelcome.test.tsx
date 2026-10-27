@@ -4,7 +4,7 @@ import type { Entity } from "@/atlas/content/schema";
 import { ReadingPanelWelcome } from "@/atlas/entity/ReadingPanelWelcome";
 import { pickStarters } from "@/atlas/entity/pickStarters";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 
 afterEach(cleanup);
 

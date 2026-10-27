@@ -12,7 +12,7 @@ vi.mock("react-leaflet", async () => {
 });
 
 import { render, waitFor, cleanup, fireEvent, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import AtlasViewer from "@/pages/AtlasViewer";
 import {
   makeProject,

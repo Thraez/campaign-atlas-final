@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { Compass, Map, MapPin, BookOpen, CalendarClock, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { isDmToolsEnabled } from "@/atlas/dmTools";

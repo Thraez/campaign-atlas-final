@@ -12,7 +12,7 @@ import type { MapPlacement } from "@/atlas/content/schema";
 import type { SearchIndexEntry } from "@/atlas/content/loader";
 import { Input } from "@/components/ui/input";
 import { Search, MapPin, CalendarClock } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { snippet, highlightMatch } from "@/atlas/search/snippet";
 import { parseSearchQuery, matchesPhrases } from "@/atlas/search/parseSearchQuery";

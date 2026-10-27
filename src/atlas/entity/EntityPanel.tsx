@@ -7,7 +7,7 @@ import {
   forwardRef,
   type ReactNode,
 } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { toast } from "sonner";
 import { MapPin, X, Link2, Check, Printer, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";

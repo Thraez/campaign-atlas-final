@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { AtlasLoadState } from "@/atlas/content/AtlasLoadState";
 
 function renderState(props: Partial<ComponentProps<typeof AtlasLoadState>>) {
