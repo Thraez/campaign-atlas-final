@@ -186,7 +186,8 @@ The Vitest suite under `src/test/` exercises every guarantee above. The headline
 - `safety-fortress.test.ts` — end-to-end spoiler-leak gates. Hidden villains, hidden routes, hidden relationships, hidden DM notes; player build must not contain any of them.
 - `atlas-region-route-strict.test.ts` — strict player builds fail on region/route leaks (exits 6 and 7).
 - `atlas-build.test.ts` — visibility-based entity filtering, `%%` stripping, multi-map placements.
-- `cross-reference-leak.test.ts` — wikilink display-text redaction (exit 8).
-- `unbalanced-dm-block.test.ts` — unclosed `%%` fails the build.
+- `safety-fortress.test.ts` ("strict player build fails with exit 8 on cross-reference leak") — wikilink display-text redaction (exit 8).
+- `safety-fortress.test.ts` ("unbalanced %% delimiter fails the build with exit 1") — unclosed `%%` fails the build.
+- `sync-safety.test.ts` — what Sync from Obsidian leaves out, and that a `10_DmNotesAndSecrets` note never reaches the player build.
 
 Run them with `npm run test:ci`. A green suite is the precondition for `git push`.

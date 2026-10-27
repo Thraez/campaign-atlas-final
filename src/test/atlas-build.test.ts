@@ -229,9 +229,72 @@ describe.sequential("atlas build pipeline", () => {
       "--out",
       path.join(tmpRoot, "bad-vis-out"),
     ]);
-    expect(result.status).not.toBe(0);
+    expect(result.status).toBe(3);
     expect(result.stdout + result.stderr).toMatch(/invalid visibility/i);
   });
+
+  it("non-strict build coerces an invalid visibility to dm", () => {
+    const dir = path.join(tmpRoot, "coerce-vis-vault");
+    writeWorldVault(dir, `maps:\n  - id: m1\n    name: Main\n    width: 1000\n    height: 1000\n`);
+    fs.writeFileSync(
+      path.join(dir, "content/test-world/notes/Bad.md"),
+      `---\ntitle: Bad\natlas:\n  visibility: secret\n---\nbody\n`,
+    );
+    const config = path.join(dir, "atlas.config.json");
+
+    const dmOut = path.join(tmpRoot, "coerce-vis-dm");
+    const dm = run(["--config", config, "--out", dmOut]);
+    expect(dm.status, dm.stderr).toBe(0);
+    expect(read(dmOut).entities.find((e) => e.id === "bad")?.visibility).toBe("dm");
+
+    const playerOut = path.join(tmpRoot, "coerce-vis-player");
+    const player = run(["--player", "--config", config, "--out", playerOut]);
+    expect(player.status, player.stderr).toBe(0);
+    const ids = read(playerOut).entities.map((e) => e.id);
+    expect(ids).not.toContain("bad");
+    expect(ids).toContain("stub");
+  });
+
+  // The real atlas.config.json is what CI builds with, so read its exclude list.
+  const REAL_EXCLUDE = (
+    JSON.parse(fs.readFileSync(path.join(ROOT, "atlas.config.json"), "utf8")) as {
+      exclude: string[];
+    }
+  ).exclude;
+
+  it.each(["archive", "deprecated"])(
+    "the real atlas.config.json keeps a %s/ folder out of the build",
+    (folder) => {
+      const dir = path.join(tmpRoot, `excluded-${folder}`);
+      writeWorldVault(
+        dir,
+        `maps:\n  - id: m1\n    name: Main\n    width: 1000\n    height: 1000\n`,
+      );
+      const cfgPath = path.join(dir, "atlas.config.json");
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8")) as { exclude: string[] };
+      fs.writeFileSync(cfgPath, JSON.stringify({ ...cfg, exclude: REAL_EXCLUDE }));
+      fs.mkdirSync(path.join(dir, `content/test-world/${folder}`), { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, `content/test-world/${folder}/Old-Note.md`),
+        `---\ntitle: Old Note\natlas:\n  visibility: player\n---\nOLD_NOTE_BODY\n`,
+      );
+
+      const dmOut = path.join(tmpRoot, `excluded-${folder}-dm`);
+      const dm = run(["--config", cfgPath, "--out", dmOut]);
+      expect(dm.status, dm.stderr).toBe(0);
+      const atlas = read(dmOut);
+      expect(atlas.entities.map((e) => e.id)).not.toContain("old-note");
+      expect(atlas.entities.map((e) => e.id)).toContain("stub");
+      expect(atlas.buildReport.excludedPaths).toContain(`test-world/${folder}/Old-Note.md`);
+
+      const playerOut = path.join(tmpRoot, `excluded-${folder}-player`);
+      const player = run(["--player", "--config", cfgPath, "--out", playerOut]);
+      expect(player.status, player.stderr).toBe(0);
+      expect(fs.readFileSync(path.join(playerOut, "atlas.json"), "utf8")).not.toContain(
+        "OLD_NOTE_BODY",
+      );
+    },
+  );
 
   it("strict player build FAILS on missing local assets", () => {
     const badDir = path.join(tmpRoot, "missing-assets-vault");
