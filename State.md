@@ -103,6 +103,7 @@ answer, logged here and built on; he reviews this list in batches, and a reversa
 | 2026-10-27 | Q4: delete the unreachable entity-editing tabs?                                                | Yes; the vault owns profiles and relationships             | ~800 lines reached only from tests; git keeps them             | 16     |
 | 2026-10-27 | Q5: ticket "one client for canon" now?                                                         | Yes, starting with rebase-on-conflict, ahead of code-retro | A real bug: after a 409 every later save of that entity fails  | 17     |
 | 2026-10-27 | eval-16 review: delete the test-only `profileFields.ts` and `buildEntityFrontmatterPatch` too? | Yes, with the tabs                                         | Follows Q4: the vault owns profiles; the build never read them | 16     |
+| 2026-10-28 | eval-19 review: may a DM type a map layer path outside `assets/maps/`?                         | No; it falls back to the default under maps/               | Maps stay lossless; a `.webp` name under images/ would convert | 19     |
 
 ## Retro, 2026-10-27
 
