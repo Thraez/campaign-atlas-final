@@ -55,6 +55,18 @@ afterAll(() => {
   fs.rmSync(outRoot, { recursive: true, force: true });
 });
 
+/** Copy an image embedded in 03_Entities/Corven.md, as the Sync panel would. */
+const copy = (rawSrc: string, entityId: string, index = 0, vaultRoot = root) =>
+  handleVaultImageCopyRequest({
+    vaultRoot,
+    candidateFolders: ["03_Entities"],
+    noteRelPath: "03_Entities/Corven.md",
+    rawSrc,
+    entityId,
+    index,
+    publicDir: outRoot,
+  });
+
 describe("handleVaultImageCopyRequest", () => {
   it("copies an in-scope image and names it from the entity", async () => {
     const res = await handleVaultImageCopyRequest({
@@ -110,18 +122,72 @@ describe("handleVaultImageCopyRequest", () => {
   });
 });
 
-describe("published image format", () => {
-  const copy = (rawSrc: string, entityId: string, index: number) =>
-    handleVaultImageCopyRequest({
-      vaultRoot: root,
-      candidateFolders: ["03_Entities"],
-      noteRelPath: "03_Entities/Corven.md",
-      rawSrc,
-      entityId,
-      index,
-      publicDir: outRoot,
-    });
+describe("vault image copy safety (eval-2026-10/05)", () => {
+  const imagesDir = () => path.join(outRoot, "atlas", "assets", "images");
 
+  it("refuses a symlinked image that points outside the vault", async () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "vault-outside-"));
+    try {
+      fs.copyFileSync(
+        path.join(root, "03_Entities", "pics", "portrait.png"),
+        path.join(outside, "stolen.png"),
+      );
+      fs.symlinkSync(
+        path.join(outside, "stolen.png"),
+        path.join(root, "03_Entities", "pics", "stolen.png"),
+      );
+      const res = await copy("stolen.png", "symlink-file");
+      expect(res.ok).toBe(false);
+      expect(fs.existsSync(path.join(imagesDir(), "symlink-file-1.webp"))).toBe(false);
+    } finally {
+      fs.rmSync(path.join(root, "03_Entities", "pics", "stolen.png"), { force: true });
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses an image reached through a symlinked folder into a DM folder", async () => {
+    const link = path.join(root, "03_Entities", "dmlink");
+    fs.symlinkSync(path.join(root, "10_DmNotesAndSecrets"), link);
+    try {
+      const res = await copy("dmlink/cabal-lair.png", "symlink-dir");
+      expect(res.ok).toBe(false);
+      expect(fs.existsSync(path.join(imagesDir(), "symlink-dir-1.webp"))).toBe(false);
+    } finally {
+      fs.rmSync(link, { force: true });
+    }
+  });
+
+  it("still copies when the vault root itself is a symlink", async () => {
+    const linkDir = fs.mkdtempSync(path.join(os.tmpdir(), "vault-link-"));
+    const linkedRoot = path.join(linkDir, "vault");
+    fs.symlinkSync(root, linkedRoot);
+    try {
+      const res = await copy("portrait.png", "linked-root", 0, linkedRoot);
+      expect(res).toEqual({ ok: true, target: "/atlas/assets/images/linked-root-1.webp" });
+    } finally {
+      fs.rmSync(linkDir, { recursive: true, force: true });
+    }
+  });
+
+  it("never overwrites a different image already at the target name", async () => {
+    fs.mkdirSync(imagesDir(), { recursive: true });
+    const existing = path.join(imagesDir(), "taken-1.webp");
+    fs.writeFileSync(existing, "someone else's image");
+    const res = await copy("portrait.png", "taken");
+    expect(res).toEqual({ ok: true, target: "/atlas/assets/images/taken-1-2.webp" });
+    expect(fs.readFileSync(existing, "utf8")).toBe("someone else's image");
+  });
+
+  it("reuses the file when the same image is copied again", async () => {
+    const first = await copy("portrait.png", "resync");
+    const second = await copy("portrait.png", "resync");
+    expect(first).toEqual({ ok: true, target: "/atlas/assets/images/resync-1.webp" });
+    expect(second).toEqual(first);
+    expect(fs.existsSync(path.join(imagesDir(), "resync-1-2.webp"))).toBe(false);
+  });
+});
+
+describe("published image format", () => {
   /**
    * Read metadata from bytes, never from a path. `sharp(path)` reads lazily and
    * keeps the file handle open, which on Windows blocks a later write to that

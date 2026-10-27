@@ -18,6 +18,13 @@ import { slugify } from "../content/slugify";
 export const WEBP_QUALITY = 82;
 
 /**
+ * Quality for re-encoding a JPEG or WebP kept in its own format (the metadata
+ * strip). Higher than WEBP_QUALITY because the source is already lossy and
+ * this pass adds a second generation of loss.
+ */
+export const REENCODE_QUALITY = 85;
+
+/**
  * Ceiling on the width of a published image, applied `withoutEnlargement` so
  * smaller art is never upscaled. Portraits display at roughly 500px, so this
  * comfortably covers 2x displays; it is a guard against a future 4000px drop
@@ -33,7 +40,7 @@ const CONVERTIBLE = new Set(["png", "jpeg", "jpg"]);
  * Anything with parameters or structure we don't recognise falls through as-is
  * and simply won't match CONVERTIBLE.
  */
-function normalizeFormat(mimeOrExt: string): string {
+export function normalizeFormat(mimeOrExt: string): string {
   const s = mimeOrExt.trim().toLowerCase();
   if (!s) return "";
   const withoutPrefix = s.startsWith("image/") ? s.slice("image/".length) : s;
@@ -57,6 +64,16 @@ export function webpTargetName(name: string): string {
   const dot = name.lastIndexOf(".");
   const stem = dot === -1 ? name : name.slice(0, dot);
   return `${stem}.webp`;
+}
+
+/**
+ * `name` with `-n` before the extension, for the n-th image wanting the same
+ * name (`corven-1.webp` → `corven-1-2.webp`). n = 1 is the name itself.
+ */
+export function suffixedName(name: string, n: number): string {
+  if (n === 1) return name;
+  const dot = name.lastIndexOf(".");
+  return dot === -1 ? `${name}-${n}` : `${name.slice(0, dot)}-${n}${name.slice(dot)}`;
 }
 
 /**

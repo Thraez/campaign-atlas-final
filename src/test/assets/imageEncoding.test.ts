@@ -3,6 +3,8 @@ import {
   shouldConvertToWebp,
   webpTargetName,
   editorImageTargetName,
+  suffixedName,
+  REENCODE_QUALITY,
   WEBP_QUALITY,
   MAX_IMAGE_WIDTH,
 } from "@/atlas/assets/imageEncoding";
@@ -70,10 +72,26 @@ describe("webpTargetName", () => {
   });
 });
 
+describe("suffixedName", () => {
+  it("leaves the first name alone and numbers the rest before the extension", () => {
+    expect(suffixedName("corven-1.webp", 1)).toBe("corven-1.webp");
+    expect(suffixedName("corven-1.webp", 2)).toBe("corven-1-2.webp");
+    expect(suffixedName("map.v2.png", 3)).toBe("map.v2-3.png");
+    expect(suffixedName("noext", 2)).toBe("noext-2");
+  });
+});
+
 describe("encode settings", () => {
   it("keeps quality in the range that stays visually lossless on painted art", () => {
     expect(WEBP_QUALITY).toBeGreaterThanOrEqual(75);
     expect(WEBP_QUALITY).toBeLessThanOrEqual(90);
+  });
+
+  it("re-encodes kept lossy formats no lower than it converts", () => {
+    // A JPEG or WebP kept as-is is already lossy; the strip pass adds a second
+    // generation, so it must not be harsher than a first-time conversion.
+    expect(REENCODE_QUALITY).toBeGreaterThanOrEqual(WEBP_QUALITY);
+    expect(REENCODE_QUALITY).toBeLessThanOrEqual(95);
   });
 
   it("clamps width generously enough for retina but not for a 4000px drop", () => {
