@@ -14,7 +14,12 @@ import {
   type StagingRow,
   type StagingRowPatch,
 } from "./stagingState";
-import { buildImportChanges, readSourceFile, ImportCommitError } from "./buildImportChanges";
+import {
+  assertCreateTargetsFree,
+  buildImportChanges,
+  readSourceFile,
+  ImportCommitError,
+} from "./buildImportChanges";
 import {
   saveAtlasPatchToLocalFs,
   ConflictError,
@@ -23,7 +28,13 @@ import {
 } from "@/atlas/save/localFsSave";
 import type { ImportFolderConfig } from "../content/schema";
 import { summarizeImport, formatImportSummaryLine } from "./summarizeImport";
-import { recordSync, classifyVaultNote, findPathByApprovedHash, hasLocalEdits } from "./syncMap";
+import {
+  recordSync,
+  classifyVaultNote,
+  findPathByApprovedHash,
+  hasLocalEdits,
+  moveSyncEntry,
+} from "./syncMap";
 import { loadSyncMap, saveSyncMap, loadSettings, saveSettings } from "../sync/useSyncSettings";
 import { rewriteEmbeds } from "./resolveVaultImage";
 
@@ -151,15 +162,21 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
         return;
       }
       vaultScanCtxRef.current = { vaultRoot, candidateFolders };
-      const syncMap = await loadSyncMap();
+      let syncMap = await loadSyncMap();
+      const moves: [from: string, to: string][] = [];
       const inputs = await Promise.all(
         Object.entries(data.files).map(async ([relPath, raw]) => {
           const hash = await hashContent(raw);
           let vaultState = classifyVaultNote(syncMap, relPath, hash);
           // A note with no entry at its own path whose bytes match a hash
-          // recorded elsewhere is a move/rename, not a new note.
-          if (vaultState === "new" && findPathByApprovedHash(syncMap, hash)) {
+          // recorded elsewhere is a move/rename, not a new note. Its entry
+          // follows it, so the next sync sees it as unchanged too. (If the old
+          // path is still in the vault, it's a copy: leave the entry alone.)
+          const movedFrom =
+            vaultState === "new" ? findPathByApprovedHash(syncMap, hash) : undefined;
+          if (movedFrom) {
             vaultState = "unchanged";
+            if (!(movedFrom in data.files)) moves.push([movedFrom, relPath]);
           }
           return {
             filename: relPath.split("/").pop() ?? relPath,
@@ -170,6 +187,10 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
           };
         }),
       );
+      if (moves.length > 0) {
+        for (const [from, to] of moves) syncMap = moveSyncEntry(syncMap, from, to);
+        await saveSyncMap(syncMap);
+      }
       if (inputs.length === 0) {
         toast.error("No .md files to stage");
         return;
@@ -216,6 +237,9 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
     setIsImporting(true);
     try {
       const vaultCtx = vaultScanCtxRef.current;
+      // Conflicts first: a commit the Save endpoint will refuse must not copy images.
+      const firstChanges = await buildImportChanges(rows);
+      await assertCreateTargetsFree(firstChanges, fetch);
       let skippedTotal = 0;
       const rowsForCommit = await Promise.all(
         rows.map(async (row) => {
@@ -251,9 +275,34 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
           `${skippedTotal} image${skippedTotal === 1 ? "" : "s"} skipped — not in the folders you picked.`,
         );
       }
-      const changes = await buildImportChanges(rowsForCommit);
+      const changes = rowsForCommit.some((r, i) => r !== rows[i])
+        ? await buildImportChanges(rowsForCommit)
+        : firstChanges;
       const result = await saveAtlasPatchToLocalFs(changes, undefined, { rebuild: true });
       const count = result.saved;
+      // The files are written whether or not the rebuild worked: record them.
+      const vaultRows = rows.filter(
+        (r) => r.vaultRelPath && r.included && r.pathAllowed && !r.parseError,
+      );
+      if (vaultRows.length > 0) {
+        const contentByPath = new Map(changes.map((c) => [c.path, c.content]));
+        let syncMap = await loadSyncMap();
+        for (const r of vaultRows) {
+          const written = contentByPath.get(r.targetPath);
+          const syncedFileHash = written !== undefined ? await hashContent(written) : undefined;
+          syncMap = recordSync(
+            syncMap,
+            r.vaultRelPath!,
+            r.resolvedId,
+            r.inferredType,
+            r.vaultHash,
+            syncedFileHash,
+          );
+        }
+        await saveSyncMap(syncMap);
+        const s = await loadSettings();
+        await saveSettings({ ...s, lastSyncAt: new Date().toISOString() });
+      }
       if (result.rebuilt === false) {
         toast.warning(`Imported ${count} file${count === 1 ? "" : "s"} but atlas rebuild failed`, {
           description: result.rebuildError ?? "Run `npm run atlas:build` manually.",
@@ -276,29 +325,6 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
           toast.success(`Imported ${count} note${count === 1 ? "" : "s"} and rebuilt the atlas`, {
             description,
           });
-        }
-        // Persist sync-map for vault-scan rows
-        const vaultRows = rows.filter(
-          (r) => r.vaultRelPath && r.included && r.pathAllowed && !r.parseError,
-        );
-        if (vaultRows.length > 0) {
-          const contentByPath = new Map(changes.map((c) => [c.path, c.content]));
-          let syncMap = await loadSyncMap();
-          for (const r of vaultRows) {
-            const written = contentByPath.get(r.targetPath);
-            const syncedFileHash = written !== undefined ? await hashContent(written) : undefined;
-            syncMap = recordSync(
-              syncMap,
-              r.vaultRelPath!,
-              r.resolvedId,
-              r.inferredType,
-              r.vaultHash,
-              syncedFileHash,
-            );
-          }
-          await saveSyncMap(syncMap);
-          const s = await loadSettings();
-          await saveSettings({ ...s, lastSyncAt: new Date().toISOString() });
         }
       }
       setOpen(false);

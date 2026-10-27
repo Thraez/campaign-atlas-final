@@ -13,7 +13,7 @@
  *     The modal already prevents toggling them on, but defending here means
  *     a misuse can't widen the surface.
  */
-import { hashContent, type FileChange } from "@/atlas/save/localFsSave";
+import { ConflictError, hashContent, type FileChange } from "@/atlas/save/localFsSave";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter";
 import { mergeImportFrontmatter } from "./mergeImportFrontmatter";
 import { isWritableSourcePath } from "@/atlas/save/sourcePathAllowlist";
@@ -102,4 +102,24 @@ export async function buildImportChanges(
     changes.push({ path: row.targetPath, content, kind: "entity-md", baseHash });
   }
   return changes;
+}
+
+/**
+ * The Save endpoint refuses a create whose target already exists (409). Check
+ * that up front, so nothing else (image copies) runs for a commit that will be
+ * refused.
+ */
+export async function assertCreateTargetsFree(
+  changes: FileChange[],
+  fetchFn: typeof fetch,
+): Promise<void> {
+  for (const c of changes) {
+    if (c.baseHash !== null) continue;
+    const res = await fetchFn(`/__atlas/read?path=${encodeURIComponent(c.path)}`, {
+      method: "GET",
+    });
+    if (res.status === 404) continue;
+    if (res.ok) throw new ConflictError("already-exists", c.path);
+    throw new ImportCommitError(`Failed to read ${c.path}: status ${res.status}`, c.path);
+  }
 }
