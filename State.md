@@ -13,6 +13,8 @@ Updated 2026-10-27 on the Mac. Branch `main`.
 - Live site: https://thraez.github.io/campaign-atlas-final/. The player build now ships only
   images a player note shows (the Corven and Edric portraits leaked until 2026-10-27).
 - code-retro 01-04 are on `main`: scan titles, Sync title and type, Sync order, Staging.
+- `eval-2026-10/01` and `06` are on `main`: one list of safety scans (`scanRegistry.ts`) for CI,
+  the editor's Publish check and the smoke; in-range dependency updates, `date-fns` gone.
 - The GitHub repo is public, so the DM notes in `content/` are readable there. Decided
   2026-10-27: Isak makes it private and takes GitHub Pro so Pages keeps working.
 
@@ -21,17 +23,15 @@ Updated 2026-10-27 on the Mac. Branch `main`.
 Size S/M/L; risk is what breaks if it goes wrong.
 
 1. Repo private plus GitHub Pro: Isak, in GitHub's settings. S.
-2. `eval-2026-10/01`: one list of safety scans (the editor's Publish check skips
-   `check-player-secrets`). M. Risk: the editor blocks more, the same as CI.
-3. `eval-2026-10/02`: one module for DM markup (the shape scan misses `:::dm`). S.
-4. `tidemarrow/01`-`03`: first sync, Tidemarrow map, remove the Astrath sample. M.
-5. `eval-2026-10/03`: dev save endpoint as one route table. M. Risk: a gating slip exposes the
+2. `eval-2026-10/02`: one module for DM markup (the shape scan misses `:::dm`). S.
+3. `tidemarrow/01`-`03`: first sync, Tidemarrow map, remove the Astrath sample. M.
+4. `eval-2026-10/03`: dev save endpoint as one route table. M. Risk: a gating slip exposes the
    vault on the LAN.
-6. `eval-2026-10/04` safety tests, `05` vault image copy, `06` in-range dependency updates. S each.
-7. `code-retro/06`-`08`: note reading module, Sync module with dry run, build core. L.
-8. `eval-2026-10/07`: Vite 8 with Vitest 5, after Tidemarrow. L. React 19, Tailwind 4 and
+5. `eval-2026-10/04` safety tests, `05` vault image copy. S each.
+6. `code-retro/06`-`08`: note reading module, Sync module with dry run, build core. L.
+7. `eval-2026-10/07`: Vite 8 with Vitest 5, after Tidemarrow. L. React 19, Tailwind 4 and
    ESLint 10 are parked.
-9. `audit-2026-10/08` (Leaflet `NaN`). S. Parked notes: `docs/tracker/eval-2026-10/README.md`.
+8. `audit-2026-10/08` (Leaflet `NaN`). S. Parked notes: `docs/tracker/eval-2026-10/README.md`.
 
 ## Waiting on Isak
 
