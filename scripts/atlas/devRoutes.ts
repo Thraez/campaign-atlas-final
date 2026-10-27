@@ -23,5 +23,3 @@ export const DEV_API_PATHS = {
   publishPush: "/__atlas/publish-push",
   publishCheck: "/__atlas/publish-check",
 } as const;
-
-export type DevApiPath = (typeof DEV_API_PATHS)[keyof typeof DEV_API_PATHS];

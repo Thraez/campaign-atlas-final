@@ -5,7 +5,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   DEV_ROUTES,
   createDevRouter,
-  devRouteRefusal,
+  refusalPolicy,
   type DevRoute,
 } from "../../scripts/vite-plugin-atlas-save";
 import { DEV_API_PATHS, DEV_API_PREFIX } from "../../scripts/atlas/devRoutes";
@@ -86,7 +86,7 @@ describe("dev route table: every route refuses a non-loopback request", () => {
         );
         await new Promise((r) => setTimeout(r, 0));
         expect(handle).not.toHaveBeenCalled();
-        if (devRouteRefusal(route.path) === "forbid") {
+        if (refusalPolicy(route.path) === "forbid") {
           expect(res.statusCode).toBe(403);
           expect(JSON.parse(res.body ?? "")).toEqual({
             error: "Forbidden",

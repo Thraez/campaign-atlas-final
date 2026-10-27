@@ -35,10 +35,13 @@ Leave the vault handlers' insides alone (`code-retro/07`).
 - Paths live in `scripts/atlas/devRoutes.ts` (plain strings). `EDITOR_CODE_FINGERPRINTS` is built
   from it, so it now also covers `/__atlas/read`, `vault-scan`, `vault-folders`,
   `vault-image-copy`, `local/...` and `local-write`, `assets/images`. Player build scans clean.
-- Body caps: save 128 MB (25 MB vault-aggregate of notes, doubled for JSON escaping, plus eight
-  8 MB image data URLs sized from `MAX_ASSET_BINARY_BYTES`), local-write 8 MB, vault-image-copy
-  1 MB. Over the cap: 413 `{ error: "PayloadTooLarge" }`, Content-Length checked first, reading
-  stops, connection closed.
+- Body caps: save 128 MB, local-write 8 MB, vault-image-copy 1 MB. Nothing caps how many files
+  one save batch holds, so the save cap is a ceiling against runaway requests, not a computed fit:
+  about ten or more full-size editor image uploads in one save would hit it (vault images go
+  through vault-image-copy). Over the cap: Content-Length checked first, then the rest of the body
+  is drained and discarded and the reply is 413 `{ error: "PayloadTooLarge" }` with
+  `Connection: close`. Draining matters: closing the socket mid-upload makes a browser report
+  "Failed to fetch" instead of the 413.
 - Test: `src/test/atlas-dev-routes.test.ts` (every route refuses LAN peers, cross-origin pages,
   LAN Host and Origin-less writes; fingerprints cover every route; body cap, lock and
   InvalidBody shapes over a real loopback socket).
@@ -46,3 +49,6 @@ Leave the vault handlers' insides alone (`code-retro/07`).
   403s a refused request instead of falling through to Vite, and a wrong-method or unknown
   `/__atlas/*` request is gated before it is handed on. A handler that throws now gets a 500
   instead of a hung request.
+- Review fixes: the drain above, `devRouteRefusal` renamed `refusalPolicy`, unused `DevApiPath`
+  type dropped. Gate: typecheck, lint (0 errors), format, `test:ci`, full `atlas:publish`
+  (12 scans clean) and `atlas:publish:integrity-smoke`.

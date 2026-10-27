@@ -1413,14 +1413,16 @@ export function rejectNonLoopback(req: DevRequest, res: DevResponse): boolean {
 // ── Route table ─────────────────────────────────────────────────────────────
 
 /**
- * Request-body caps. A body over its route's cap gets 413 and is not read any
- * further.
+ * Request-body caps. A body over its route's cap is drained, discarded and
+ * answered 413.
  *
- * The save route is the big one: a vault sync can save up to
- * MAX_VAULT_AGGREGATE_BYTES (25 MB) of notes in one batch, JSON escaping can
- * roughly double that, and each image rides along as a base64 data URL of up
- * to MAX_ASSET_DATAURL_BYTES (8 MB, sized from MAX_ASSET_BINARY_BYTES). 128 MB
- * covers 50 MB of escaped notes plus eight full-size images.
+ * The save route is the big one, and nothing caps how many files one batch
+ * holds, so its cap is a ceiling against runaway requests rather than a
+ * computed fit. For scale: a vault sync scans at most MAX_VAULT_AGGREGATE_BYTES
+ * (25 MB) of notes, JSON escaping can roughly double that, and each image is a
+ * base64 data URL of up to MAX_ASSET_DATAURL_BYTES (8 MB). Vault images go
+ * through vault-image-copy, not save, so a save of ~10 or more full-size
+ * editor uploads at once is the case that would hit it.
  */
 export const SAVE_BODY_LIMIT_BYTES = 128 * 1024 * 1024;
 /** `.local-atlas` config (the sync map grows with the vault). */
@@ -1464,7 +1466,7 @@ export interface DevRoute {
  * everything under `/__atlas/` gets 403; a DM overlay of a player URL falls
  * through to the player file.
  */
-export function devRouteRefusal(path: string): "forbid" | "player-fallthrough" {
+export function refusalPolicy(path: string): "forbid" | "player-fallthrough" {
   return path.startsWith(DEV_API_PREFIX) ? "forbid" : "player-fallthrough";
 }
 
@@ -1757,9 +1759,18 @@ async function runRoute(
       const read = await readBody(req, route.body.maxBytes);
       if (read.kind === "aborted") return; // client went away; nobody to answer
       if (read.kind === "too-large") {
-        // Close the connection rather than drain the rest of an oversized upload.
+        // Drain the rest of the upload before answering: a browser that is
+        // still sending when the socket closes reports "Failed to fetch"
+        // instead of the 413. The bytes are discarded, and it's loopback.
+        if (!req.readableEnded) {
+          await new Promise<void>((resolve) => {
+            req.once("end", resolve);
+            req.once("close", resolve);
+            req.once("error", resolve);
+            req.resume();
+          });
+        }
         res.setHeader("Connection", "close");
-        res.once("finish", () => req.destroy());
         sendJson(res, 413, {
           error: "PayloadTooLarge",
           detail: `request body exceeds ${route.body.maxBytes} bytes`,
@@ -1814,7 +1825,7 @@ export function createDevRouter(
   return (req, res, next) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     const onPath = routes.filter((r) => r.path === url.pathname);
-    const refusal = devRouteRefusal(url.pathname);
+    const refusal = refusalPolicy(url.pathname);
     if (refusal === "player-fallthrough" && onPath.length === 0) return next();
     if (refusal === "player-fallthrough" && !isAllowedDevPeer(req)) return next(); // player file, not DM data
     if (rejectNonLoopback(req, res)) return;
