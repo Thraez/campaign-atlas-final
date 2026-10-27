@@ -1,11 +1,11 @@
 # Remove the unused entity-frontmatter save stream
 
-Status: ready-for-agent
+Status: done
 Area: editor, local save
 Blocked by: 16
 
 Found in the eval-16 review, 2026-10-27. With the Entities tab gone, the editor always passes
-`entityDrafts: {}` to `buildSavePlan` (`src/atlas/save/saveGate.ts`), so the frontmatter-draft
+`entityDrafts: {}` to `buildSavePlan` (`src/atlas/editor/saveGate.ts`), so the frontmatter-draft
 stream (`entityFrontmatterPatches`, `mergeFrontmatterFields` in `canonicalEntitySave.ts`) runs
 only in tests (`placement-save-integration.test.tsx`). Entity edits go through
 `EntityEditPanel`.
@@ -34,3 +34,8 @@ only in tests (`placement-save-integration.test.tsx`). Entity edits go through
   removed params and the `frontmatterPatches` assertion. Gate: typecheck:all, lint (0 errors,
   13 warnings), format:check, test:ci (4 shards green), atlas:publish (all 12 scans clean),
   integrity smoke safe.
+- Two-axis review (2026-10-27): no findings to fix. It confirmed `buildCanonicalEntityChanges` with
+  no frontmatter behaved exactly like `buildCanonicalPlacementChanges` (grouping, order, errors,
+  `baseHash`, world.yaml last), and that the deleted tests covered nothing still live. Follow-up
+  note, no work: `src/atlas/yaml/buildPatches.ts` now holds only `PlacementOverride`; rename it or
+  move the type next to `canonicalPlacementSave.ts`.
