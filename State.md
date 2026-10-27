@@ -56,6 +56,10 @@ So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logg
 
 Local `main` is ahead of `origin/main` by the tracker commits for 14-18 (not pushed).
 
+2026-10-27: Isak said yes (relayed): merge #61, then #57-#60, each after a green CI re-run. #61's
+CI was green, but Auto mode refused `gh pr merge 61` as a production deploy. Nothing is merged.
+Either Isak merges in that order on GitHub, or he adds a Bash permission rule for `gh pr merge`.
+
 In flight (2026-10-27, stopped at the agent session limit, resets 23:10 Berlin):
 
 - `eval-14-one-search` (bc0bb43 pushed): two-axis review clean (player safety confirmed); the
