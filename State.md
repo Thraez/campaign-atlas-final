@@ -50,6 +50,7 @@ So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logg
 | #57 | 09     | Publish refuses to run off `main`          | Isak's look at the panel message; his yes |
 | #58 | 08     | Editor Save keeps world.yaml's other keys  | His yes                                   |
 | #59 | 16     | Delete the unreachable entity-editing tabs | His yes (provisional call Q4)             |
+| #60 | 17     | Entity edit recovers from a save conflict  | Isak's look at the banners; his yes       |
 
 Local `main` is ahead of `origin/main` by the tracker commits for 14-18 (not pushed).
 
