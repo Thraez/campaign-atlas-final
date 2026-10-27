@@ -9,6 +9,8 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, basename } from "node:path";
 import sharp from "sharp";
 
+// Same folder as MAP_ASSET_DIR in src/atlas/assets/mapLayerTarget.ts, which
+// names map files; this .mjs script can't import TypeScript, so keep both in step.
 const MAPS_DIR = "public/atlas/assets/maps";
 const SEARCH_ROOTS = ["content", "examples"];
 // Matches SIZE_WARN_BYTES in src/atlas/assets/assetSize.ts — the existing

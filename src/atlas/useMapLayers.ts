@@ -4,7 +4,7 @@ import { fileToDataUrl, readImageSize } from "@/atlas/content/browserFile";
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
 import { logger } from "@/lib/logger";
-import { mapLayerTargetPath, mapUploadFileName } from "@/atlas/assets/mapLayerTarget";
+import { mapLayerTargetPath, safeFilename } from "@/atlas/assets/mapLayerTarget";
 
 /** A layer authored locally in the editor. Either a freshly uploaded image
  *  (object URL preview) or a URL/path the user typed. */
@@ -75,6 +75,18 @@ function isStoredLayer(v: unknown): v is LocalLayer {
   );
 }
 
+/**
+ * Older sessions could store a blank `targetPath` (a cleared field). Load it
+ * as no path, so the layer shows and saves to its default.
+ */
+function withCleanTargetPath(l: LocalLayer): LocalLayer {
+  if (l.targetPath === undefined) return l;
+  const trimmed = typeof l.targetPath === "string" ? l.targetPath.trim() : "";
+  if (trimmed && trimmed === l.targetPath) return l;
+  const { targetPath: _blank, ...rest } = l;
+  return trimmed ? { ...rest, targetPath: trimmed } : rest;
+}
+
 function loadStored(): Stored {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -88,7 +100,8 @@ function loadStored(): Stored {
       // Restore src from dataUrl so previews survive a page reload.
       out[mapId] = layers
         .filter(isStoredLayer)
-        .map((l) => (l.dataUrl ? { ...l, src: l.dataUrl, isObjectUrl: false } : l));
+        .map((l) => (l.dataUrl ? { ...l, src: l.dataUrl, isObjectUrl: false } : l))
+        .map(withCleanTargetPath);
     }
     return out;
   } catch {
@@ -196,7 +209,7 @@ export function useMapLayers(map: MapDocument | undefined, undoStack?: UndoStack
       const additions: LocalLayer[] = await Promise.all(
         files.map(async (file, i) => {
           const url = URL.createObjectURL(file);
-          const id = `upload-${Date.now()}-${i}-${mapUploadFileName(file.name).slice(0, 24)}`;
+          const id = `upload-${Date.now()}-${i}-${safeFilename(file.name).slice(0, 24)}`;
           // Sniff natural size so the layer doesn't default to "stretch over the whole map".
           const dims = await readImageSize(url).catch(() => null);
           const dataUrl = await fileToDataUrl(file).catch((e: unknown) => {

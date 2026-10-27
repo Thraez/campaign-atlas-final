@@ -39,9 +39,9 @@ describe("map layer upload target path", () => {
     await act(() => result.current.addUploaded([file]));
 
     const [layer] = result.current.localLayers;
-    expect(layer.targetPath).toBe("public/atlas/assets/maps/fog-overlay-v2-.png");
+    expect(layer.targetPath).toBe("public/atlas/assets/maps/fog-overlay-v2.png");
     expect(buildAssetBinaryChanges([layer])[0].path).toBe(
-      "public/atlas/assets/maps/fog-overlay-v2-.png",
+      "public/atlas/assets/maps/fog-overlay-v2.png",
     );
   });
 
@@ -57,5 +57,32 @@ describe("map layer upload target path", () => {
     expect(buildAssetBinaryChanges([old])[0].path).toBe(
       "public/atlas/assets/maps/sunken-keep.jpeg",
     );
+  });
+
+  it("a legacy empty target path loaded from localStorage comes back as no path", () => {
+    localStorage.setItem(
+      "atlas-local-map-layers-v1",
+      JSON.stringify({
+        "test-map": [
+          {
+            id: "upload-1-0-keep",
+            src: "blob:dead",
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 10,
+            opacity: 1,
+            zIndex: 10,
+            origin: "upload",
+            filename: "Keep.png",
+            targetPath: "",
+          },
+        ],
+      }),
+    );
+
+    const { result } = renderHook(() => useMapLayers(testMap));
+
+    expect(result.current.localLayers[0].targetPath).toBeUndefined();
   });
 });

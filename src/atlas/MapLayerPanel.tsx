@@ -39,7 +39,7 @@ import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import { normalizeAtlasAssetUrl } from "./url";
 import { centerAnchoredResize } from "./layerGeometry";
-import { mapLayerTargetPath } from "@/atlas/assets/mapLayerTarget";
+import { defaultMapLayerTargetPath, isMapAssetPath } from "@/atlas/assets/mapLayerTarget";
 
 interface Props {
   map: MapDocument;
@@ -565,14 +565,20 @@ export function MapLayerPanel(props: Props) {
                       // Clearing the field restores the default rather than
                       // storing "": the layer goes back to no chosen path and
                       // the placeholder shows where Save will write it.
-                      placeholder={mapLayerTargetPath({ ...localSelected, targetPath: undefined })}
+                      placeholder={defaultMapLayerTargetPath(localSelected)}
                       onChange={(e) =>
                         onUpdate(selected.id, {
-                          targetPath: e.target.value.trim() ? e.target.value : undefined,
+                          targetPath: e.target.value.trim() || undefined,
                         })
                       }
                       className="h-7 text-xs font-mono"
                     />
+                    {localSelected.targetPath && !isMapAssetPath(localSelected.targetPath) && (
+                      <p className="mt-1 text-[10px] text-amber-300/90">
+                        Maps save directly in public/atlas/assets/maps/. Save will use{" "}
+                        <code>{defaultMapLayerTargetPath(localSelected)}</code>.
+                      </p>
+                    )}
                   </div>
                 )}
                 {localSelected.origin === "url" && /^https?:/i.test(localSelected.src) && (
