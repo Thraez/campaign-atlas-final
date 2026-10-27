@@ -1,7 +1,7 @@
 /**
  * Route visual editor layer for the placement editor.
  *
- * Renders effective routes as polylines, supports selection, drag-handles for
+ * Renders effective routes with the shared player look (`RouteShape`), supports selection, drag-handles for
  * coordinate waypoints (entity-ref waypoints are read-only — they follow
  * their entity placement), and an in-progress draft preview while drawing.
  *
@@ -11,6 +11,7 @@ import { useMemo } from "react";
 import { CircleMarker, Marker, Polyline, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import type { MapDocument, Point } from "@/atlas/content/schema";
+import { RouteShape } from "@/atlas/map/featureShapes";
 import type { RouteDraftAPI, Waypoint } from "./useRouteDraft";
 
 interface Props {
@@ -70,17 +71,13 @@ export function RouteLayer({ map, api, visible = true }: Props) {
           if (pts.length < 2) return null;
           const isSelected = r.id === api.selectedId;
           return (
-            <Polyline
+            <RouteShape
               key={r.id}
+              route={r}
+              points={pts}
               positions={pts.map(([x, y]) => xy2ll(x, y))}
-              pathOptions={{
-                color: r.color ?? "#cfd6dc",
-                weight: (r.weight ?? 3) + (isSelected ? 1 : 0),
-                opacity: 0.95,
-                dashArray: r.dashed ? "8 6" : undefined,
-                lineCap: "round",
-                lineJoin: "round",
-              }}
+              scale={map.scale}
+              pathOverrides={isSelected ? { weight: (r.weight ?? 3) + 1 } : undefined}
               eventHandlers={{
                 click: (e) => {
                   if (api.drawing) return;

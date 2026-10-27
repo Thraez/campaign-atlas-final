@@ -1,7 +1,7 @@
 /**
  * Visual region layer for the editor map.
  *
- * Renders effective regions as polygons, with selection, vertex handles,
+ * Renders effective regions with the shared player look (`RegionShape`), plus selection, vertex handles,
  * mid-point "add vertex" handles, and an in-progress draft polyline while
  * drawing. All geometry is in map coordinates (y-up); we flip to Leaflet's
  * (lat = height - y, lng = x) on render.
@@ -13,6 +13,7 @@ import { useMemo } from "react";
 import { CircleMarker, Marker, Polygon, Polyline, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import type { MapDocument, Point, Region } from "@/atlas/content/schema";
+import { RegionShape } from "@/atlas/map/featureShapes";
 import type { RegionDraftAPI } from "./useRegionDraft";
 
 interface Props {
@@ -20,6 +21,8 @@ interface Props {
   api: RegionDraftAPI;
   /** Hide all region geometry (DM toggle). */
   visible?: boolean;
+  /** Entities by id, so a linked region takes its entity's colour as players see it. */
+  entityById?: ReadonlyMap<string, { type: string }>;
 }
 
 const handleIcon = (selected: boolean) =>
@@ -55,7 +58,7 @@ function DrawingClicks({ api, map }: { api: RegionDraftAPI; map: MapDocument }) 
   return null;
 }
 
-export function RegionLayer({ map, api, visible = true }: Props) {
+export function RegionLayer({ map, api, visible = true, entityById }: Props) {
   const H = map.height;
   const xy2ll = (x: number, y: number): [number, number] => [H - y, x];
 
@@ -74,21 +77,15 @@ export function RegionLayer({ map, api, visible = true }: Props) {
 
       {visible &&
         regions.map((r) => {
-          const positions = r.points.map(([x, y]) => xy2ll(x, y));
-          const color = r.color ?? "#7fb069";
           const isSelected = r.id === api.selectedId;
+          const entityType = r.entityId ? entityById?.get(r.entityId)?.type : undefined;
           return (
-            <Polygon
+            <RegionShape
               key={r.id}
-              positions={positions}
-              pathOptions={{
-                color,
-                weight: isSelected ? 2.5 : 1.5,
-                fillColor: color,
-                fillOpacity: r.fillOpacity ?? 0.15,
-                opacity: r.strokeOpacity ?? 0.7,
-                dashArray: isSelected ? undefined : undefined,
-              }}
+              region={r}
+              entityType={entityType}
+              positions={r.points.map(([x, y]) => xy2ll(x, y))}
+              pathOverrides={isSelected ? { weight: 2.5 } : undefined}
               eventHandlers={{
                 click: (e) => {
                   if (api.drawing) return;
