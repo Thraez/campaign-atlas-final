@@ -110,6 +110,69 @@ describe("handleVaultImageCopyRequest", () => {
   });
 });
 
+describe("vault image copy safety (eval-2026-10/05)", () => {
+  const imagesDir = () => path.join(outRoot, "atlas", "assets", "images");
+  const copy = (rawSrc: string, entityId: string, index = 0) =>
+    handleVaultImageCopyRequest({
+      vaultRoot: root,
+      candidateFolders: ["03_Entities"],
+      noteRelPath: "03_Entities/Corven.md",
+      rawSrc,
+      entityId,
+      index,
+      publicDir: outRoot,
+    });
+
+  it("refuses a symlinked image that points outside the vault", async () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "vault-outside-"));
+    try {
+      fs.copyFileSync(
+        path.join(root, "03_Entities", "pics", "portrait.png"),
+        path.join(outside, "stolen.png"),
+      );
+      fs.symlinkSync(
+        path.join(outside, "stolen.png"),
+        path.join(root, "03_Entities", "pics", "stolen.png"),
+      );
+      const res = await copy("stolen.png", "symlink-file");
+      expect(res.ok).toBe(false);
+      expect(fs.existsSync(path.join(imagesDir(), "symlink-file-1.webp"))).toBe(false);
+    } finally {
+      fs.rmSync(path.join(root, "03_Entities", "pics", "stolen.png"), { force: true });
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses an image reached through a symlinked folder into a DM folder", async () => {
+    const link = path.join(root, "03_Entities", "dmlink");
+    fs.symlinkSync(path.join(root, "10_DmNotesAndSecrets"), link);
+    try {
+      const res = await copy("dmlink/cabal-lair.png", "symlink-dir");
+      expect(res.ok).toBe(false);
+      expect(fs.existsSync(path.join(imagesDir(), "symlink-dir-1.webp"))).toBe(false);
+    } finally {
+      fs.rmSync(link, { force: true });
+    }
+  });
+
+  it("never overwrites a different image already at the target name", async () => {
+    fs.mkdirSync(imagesDir(), { recursive: true });
+    const existing = path.join(imagesDir(), "taken-1.webp");
+    fs.writeFileSync(existing, "someone else's image");
+    const res = await copy("portrait.png", "taken");
+    expect(res).toEqual({ ok: true, target: "/atlas/assets/images/taken-1-2.webp" });
+    expect(fs.readFileSync(existing, "utf8")).toBe("someone else's image");
+  });
+
+  it("reuses the file when the same image is copied again", async () => {
+    const first = await copy("portrait.png", "resync");
+    const second = await copy("portrait.png", "resync");
+    expect(first).toEqual({ ok: true, target: "/atlas/assets/images/resync-1.webp" });
+    expect(second).toEqual(first);
+    expect(fs.existsSync(path.join(imagesDir(), "resync-1-2.webp"))).toBe(false);
+  });
+});
+
 describe("published image format", () => {
   const copy = (rawSrc: string, entityId: string, index: number) =>
     handleVaultImageCopyRequest({
