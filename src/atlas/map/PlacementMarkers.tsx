@@ -110,9 +110,6 @@ interface PlacementMarkersProps {
   onPinPeekLeave?: () => void;
 }
 
-/** Renders pin markers with preset-derived shape/color, and computes which
- *  labels are permanently visible based on per-pin priority + labelMinZoom +
- *  a screen-space collision pass (higher priority wins). */
 export function PlacementMarkers({
   dx,
   H,

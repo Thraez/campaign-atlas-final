@@ -23,7 +23,7 @@ times on wrapping maps (~841).
 2026-10-27, branch `eval-11-pin-layer-perf` (stacked on `eval-15-shared-drawing`):
 
 - Moved: `WrappedWorld` → `src/atlas/map/WrappedWorld.tsx`; `PlacementMarkers` and the label
-  pass → `src/atlas/map/PinLayer.tsx`; the pin icon → `src/atlas/map/pinIcon.ts`. All player-safe
+  pass → `src/atlas/map/PlacementMarkers.tsx`; the pin icon → `src/atlas/map/pinIcon.ts`. All player-safe
   (no editor imports). Tests that imported them from the page now import the modules.
 - Icons: `pinIcon(style, state)` returns the same `L.DivIcon` for the same colour, shape, dim,
   classes (discovery, active) and aria label, so react-leaflet's `updateMarker` skips `setIcon`.
@@ -54,10 +54,28 @@ types (960 markers), median of 15 runs per action, before = the page code on
 Mount is about the same (240-600 ms before, 260-430 after, noisy). "Open a pin" re-icons the
 new and the previous active pin in each of the three copies.
 
+What the numbers don't show:
+
+- The ms come from jsdom, which has no layout or paint: treat them as a rough guide. The
+  `setIcon` and `divIcon` counts are the reliable figures.
+- The keystroke/pan rows re-render a stand-in parent with stable props. That the real page
+  keeps them stable is proved by `src/test/map/pinLayer.test.tsx`, not by the bench.
+- The zoom median alternates between two zooms whose label decisions are already cached, so it
+  leaves out the first collision pass at each new zoom.
+- The "before" run needed an uncommitted change: the bench pointed at a temporary copy of the
+  eval-15 page, since the bench imports the new module.
+
+The bench asserts when run: 0 `setIcon` per keystroke, pan (a 200 px `panBy` plus a page
+re-render; after: ~11 ms, 0 `setIcon`) and zoom, and at most 6 per pin opened.
+
 Not covered, pre-existing (same on the old code): react-leaflet sets a Tooltip's `permanent`
 option only when it creates the tooltip, so a label mounted as hover-only stays hover-only
 after a zoom that would make it permanent (and the reverse). Noted in `docs/CODEBASE_MAP.md`;
 not fixed here because it would change what the map shows.
 
+One visible change: a hovered pin now stays raised (`riseOnHover`) while its peek card is
+open. Before, opening the peek re-rendered every pin, `setIcon` rebuilt the hovered pin's DOM,
+and it sank back among its neighbours. An improvement, but it is a change.
+
 For Isak: check pan, zoom, search and hover on the player map by eye; pins and labels should
-look exactly as before.
+look as before, apart from the hovered pin staying on top while its peek is open.

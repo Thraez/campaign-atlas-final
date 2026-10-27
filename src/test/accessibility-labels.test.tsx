@@ -71,7 +71,7 @@ vi.mock("react-leaflet", () => {
   };
 });
 
-const { PlacementMarkers } = await import("@/atlas/map/PinLayer");
+const { PlacementMarkers } = await import("@/atlas/map/PlacementMarkers");
 
 // ---------------------------------------------------------------------------
 // Minimal stubs

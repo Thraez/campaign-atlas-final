@@ -7,6 +7,7 @@
  * and `L.divIcon` builds:
  *   - keystroke: the page re-renders with nothing about the map changed (a
  *     search keystroke, a pan's `setViewCenter`, a hover peek);
+ *   - pan: a map pan plus the page re-render it causes;
  *   - zoom: a `zoomend`, which re-decides permanent labels;
  *   - open: one pin becomes the active pin.
  * Skipped in the normal suite: timings are machine-dependent.
@@ -116,21 +117,31 @@ describe.skipIf(!process.env.PIN_BENCH)("pin layer bench (320 pins, wrapX)", () 
 
     const sample = (fn: () => void, n = 15) => {
       const times: number[] = [];
+      let maxSetIcon = 0;
       setIcon.mockClear();
       divIcon.mockClear();
       for (let i = 0; i < n; i++) {
+        const before = setIcon.mock.calls.length;
         const s = performance.now();
         act(fn);
         times.push(performance.now() - s);
+        maxSetIcon = Math.max(maxSetIcon, setIcon.mock.calls.length - before);
       }
       return {
         ms: median(times).toFixed(1),
         setIcon: setIcon.mock.calls.length / n,
+        maxSetIcon,
         divIcon: divIcon.mock.calls.length / n,
       };
     };
 
     const keystroke = sample(() => bump());
+    let dir = 1;
+    const pan = sample(() => {
+      dir = -dir;
+      leaflet!.panBy([200 * dir, 0], { animate: false });
+      bump(); // the page re-renders on every pan (setViewCenter)
+    });
     let z = -2;
     const zoom = sample(() => {
       z = z === -2 ? 0 : -2;
@@ -145,10 +156,17 @@ describe.skipIf(!process.env.PIN_BENCH)("pin layer bench (320 pins, wrapX)", () 
         markers: PINS * 3,
         mountMs: mount.toFixed(0),
         keystroke,
+        pan,
         zoom,
         open,
       }),
     );
     expect(document.querySelectorAll(".atlas-viewer-pin").length).toBe(PINS * 3);
+    // Unchanged pins keep their icon; opening one re-icons only the new and the
+    // previous active pin, in each of the three copies.
+    expect(keystroke.maxSetIcon).toBe(0);
+    expect(pan.maxSetIcon).toBe(0);
+    expect(zoom.maxSetIcon).toBe(0);
+    expect(open.maxSetIcon).toBeLessThanOrEqual(6);
   });
 });

@@ -32,7 +32,7 @@ vi.mock("react-leaflet", async () => {
   };
 });
 
-const { PlacementMarkers } = await import("@/atlas/map/PinLayer");
+const { PlacementMarkers } = await import("@/atlas/map/PlacementMarkers");
 
 const ENTITY: Entity = {
   id: "loc-1",

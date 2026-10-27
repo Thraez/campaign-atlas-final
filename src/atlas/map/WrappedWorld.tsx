@@ -5,7 +5,7 @@
  * Memoised: the viewer page re-renders on every pan, search keystroke and hover
  * peek, and none of those change what's drawn here. With the page's props
  * stable, the copy skips the render; when only pin state changes (the open pin,
- * visited places) the shapes are reused and `PinLayer` touches only the pins
+ * visited places) the shapes are reused and `PlacementMarkers` touches only the pins
  * that changed.
  *
  * PLAYER-SAFE: the player bundle imports this file. Import nothing editor-only.
@@ -17,7 +17,7 @@ import type { Entity, MapDocument, MapPlacement } from "@/atlas/content/schema";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { gridLines } from "./geometry";
 import { RegionShape, RouteShape } from "./featureShapes";
-import { PlacementMarkers } from "./PinLayer";
+import { PlacementMarkers } from "./PlacementMarkers";
 
 export interface WrappedWorldProps {
   dx: number;
