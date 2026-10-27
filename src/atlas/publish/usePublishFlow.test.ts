@@ -268,6 +268,17 @@ describe("usePublishFlow (push half)", () => {
     });
   });
 
+  it("confirm() → wrong-branch with the checked-out branch exposed", async () => {
+    const { result } = await reachReady();
+    mockPush({ status: "wrong-branch", branch: "feature/x" });
+    act(() => {
+      result.current.confirm();
+    });
+    await waitFor(() => expect(result.current.state).toBe("wrong-branch"));
+    expect(result.current.refusedBranch).toBe("feature/x");
+    expect(result.current.pushResult).toBeNull();
+  });
+
   it("pushResult stays null when confirm() doesn't reach published", async () => {
     const { result } = await reachReady();
     mockPush({ status: "nothing-to-publish" });
