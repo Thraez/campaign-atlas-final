@@ -79,6 +79,11 @@ export const IGNORED_FOLDERS = new Set([
   "z_archive",
   "90_inbox",
   "z_codex_proposals",
+  // DM-only vault folders: never synced, even when the DM ticks no folders
+  // and the scan reads the whole vault (eval-2026-10/13).
+  "00_sessionnotes",
+  "10_dmnotesandsecrets",
+  "11_dmtoolbox",
   ".obsidian",
   ".trash",
 ]);

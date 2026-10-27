@@ -1,6 +1,6 @@
 # Sync's vault scan works in the browser and skips DM folders by default
 
-Status: ready-for-agent
+Status: done
 Blocked by: 04
 Area: Sync from Obsidian
 
@@ -24,3 +24,16 @@ Two bugs, found 2026-10-27 by the eval-04 tests and checked by hand.
   `04`'s criteria); the `it.fails` tests in `src/test/sync-safety.test.ts` become plain passing
   tests.
 - `docs/IMPORT_EXPORT.md` ("Vault folder names") lists the new ignored folders.
+
+## Comments
+
+2026-10-27, branch `eval-13-sync-scan` (on top of `eval-04-safety-tests`):
+- `readVaultScanReply` in `useMdImportFlow.ts` reads success from the HTTP status and files from
+  the route's `{ files }` body. `src/test/import/vault-scan-reply.test.ts` feeds it the route's
+  real reply shapes; `sync-safety.test.ts` now passes every scan through it.
+  `useMdImportFlow-order.test.ts` mocks the real shape (no `ok` in the body).
+- `IGNORED_FOLDERS` names `00_sessionnotes`, `10_dmnotesandsecrets`, `11_dmtoolbox`; the
+  `it.fails` cases from 04 are plain tests now, with a unique marker per note. The dm-visibility
+  backstop forces the note through Staging instead of relying on the bug.
+- The route itself is still not driven in a test: `eval-03` turns the routes into a table whose
+  handlers return status and body, and that test belongs there.

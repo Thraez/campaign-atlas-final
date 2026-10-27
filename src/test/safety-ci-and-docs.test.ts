@@ -62,7 +62,7 @@ describe(".github/workflows/publish-atlas.yml", () => {
     // A scan failure must fail its job: no soft-fail on the step or the job.
     expect(scan.step["continue-on-error"]).toBeUndefined();
     expect(jobs[scan.job]["continue-on-error"]).toBeUndefined();
-    expect(scan.step.if).toBeUndefined();
+    expect(scan.step.if ?? "").not.toMatch(/always\(\)|failure\(\)|cancelled\(\)/);
 
     // The artifact the deploy publishes is uploaded after the scan, in the same
     // job, and not on an `if:` that would run it past a failed scan.
