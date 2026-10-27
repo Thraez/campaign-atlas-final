@@ -26,15 +26,17 @@ needs Isak's yes.
 1. Repo private plus GitHub Pro: Isak, in GitHub's settings. S.
 2. Merge the finished branches, in order: `eval-02-dm-markup`, `eval-05-vault-image-copy`, then
    `eval-03-route-table` (built on 05) and `eval-04-safety-tests` once reviewed.
-3. `eval-2026-10/08`: editor Save drops world.yaml's `import:` block (Sync's folder map). S.
+3. `eval-2026-10/13`: Sync's vault scan fails in every real browser (`ok` missing from the
+   reply, since June), and default Sync imports DM folders into `content/`. S. Blocks Tidemarrow.
+4. `eval-2026-10/08`: editor Save drops world.yaml's `import:` block (Sync's folder map). S.
    Data loss; must land before Tidemarrow's first sync.
-4. `eval-2026-10/09`: Publish pushes `main` from any branch. S.
-5. `tidemarrow/01`-`03`: first sync, Tidemarrow map, remove the Astrath sample. M.
-6. `eval-2026-10/10` player import-graph test, `12` Save refuses missing image bytes. S each.
-7. `code-retro/06`-`08`: note reading module, Sync module with dry run, build core. L.
-8. `eval-2026-10/11`: pin layer rebuilds on every pan, keystroke and hover. M.
-9. `eval-2026-10/07`: Vite 8 with Vitest 5, after Tidemarrow. L.
-10. `audit-2026-10/08` (Leaflet `NaN`). S. Parked notes: `docs/tracker/eval-2026-10/README.md`.
+5. `eval-2026-10/09`: Publish pushes `main` from any branch. S.
+6. `tidemarrow/01`-`03`: first sync, Tidemarrow map, remove the Astrath sample. M.
+7. `eval-2026-10/10` player import-graph test, `12` Save refuses missing image bytes. S each.
+8. `code-retro/06`-`08`: note reading module, Sync module with dry run, build core. L.
+9. `eval-2026-10/11`: pin layer rebuilds on every pan, keystroke and hover. M.
+10. `eval-2026-10/07`: Vite 8 with Vitest 5, after Tidemarrow. L.
+11. `audit-2026-10/08` (Leaflet `NaN`). S. Parked notes: `docs/tracker/eval-2026-10/README.md`.
 
 Waiting on a decision (grill round 2): one search module for palette, Browse and Timeline;
 the editor drawing regions in the player style; deleting the unreachable entity-editing tabs
