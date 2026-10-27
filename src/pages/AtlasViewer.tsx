@@ -64,6 +64,7 @@ import { ScaleBarController, type ScaleBarState } from "@/atlas/scale/ScaleBar";
 import { serializeDeepLink, parseDeepLink } from "@/atlas/deepLink";
 import { WrappedWorld } from "@/atlas/map/WrappedWorld";
 import { atlasToLatLng } from "@/atlas/map/coords";
+import { whenMapHasSize } from "@/atlas/map/whenMapHasSize";
 import { useVisitedPlaces } from "@/atlas/visited/useVisitedPlaces";
 import { selectWanderTarget } from "@/atlas/wander/selectWanderTarget";
 import { discoveryMeter } from "@/atlas/wander/discoveryMeter";
@@ -87,7 +88,8 @@ function MapController({
     if (!flyTo) return;
     const [lat, lng] = atlasToLatLng(flyTo.x, flyTo.y, flyTo.height);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    const fly = () => {
+    // A zero-size (hidden) map would make Leaflet project to NaN and throw.
+    return whenMapHasSize(map, () => {
       const targetZoom =
         flyTo.zoom != null && Number.isFinite(flyTo.zoom)
           ? flyTo.zoom
@@ -97,35 +99,7 @@ function MapController({
       } else {
         map.flyTo([lat, lng], targetZoom, { duration: 0.6 });
       }
-    };
-    const hasSize = () => {
-      const size = map.getSize();
-      return size.x > 0 && size.y > 0;
-    };
-    if (hasSize()) {
-      fly();
-      return;
-    }
-    // A hidden container (e.g. a collapsed preview pane) has zero size, and
-    // Leaflet's flyTo then projects to NaN and throws. Wait for the map to get
-    // a size: Leaflet fires `resize` from invalidateSize, and a ResizeObserver
-    // calls invalidateSize when the container is shown again.
-    const onResize = () => {
-      if (!hasSize()) return;
-      cleanup();
-      fly();
-    };
-    const observer =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(() => map.invalidateSize({ pan: false }))
-        : null;
-    const cleanup = () => {
-      map.off("resize", onResize);
-      observer?.disconnect();
-    };
-    map.on("resize", onResize);
-    observer?.observe(map.getContainer());
-    return cleanup;
+    });
   }, [flyTo, map, prefersReducedMotion]);
   return null;
 }
@@ -189,15 +163,22 @@ function FitBoundsController({
 
   useEffect(() => {
     if (seenMapIdRef.current === mapId) return;
-    seenMapIdRef.current = mapId;
-    if (flyTarget !== null) return; // fly already pending; MapController handles it
-    map.fitBounds(
-      [
-        [0, 0],
-        [mapHeight, mapWidth],
-      ],
-      { animate: false },
-    );
+    if (flyTarget !== null) {
+      seenMapIdRef.current = mapId;
+      return; // fly already pending; MapController handles it
+    }
+    // Mark the map as seen only once the fit runs, so a fit cancelled while
+    // the map had no size is rescheduled by the next run of this effect.
+    return whenMapHasSize(map, () => {
+      seenMapIdRef.current = mapId;
+      map.fitBounds(
+        [
+          [0, 0],
+          [mapHeight, mapWidth],
+        ],
+        { animate: false },
+      );
+    });
   }, [mapId, mapWidth, mapHeight, flyTarget, map]);
 
   return null;
