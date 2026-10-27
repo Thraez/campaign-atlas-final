@@ -45,12 +45,14 @@ Isak's rule, 2026-10-27: sessions may merge their own PRs once checks pass and t
 clean, but here every merge into `main` starts the publish workflow, which counts as publishing.
 So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logged here.
 
-| PR  | Ticket | What                                       | Waits on                                  |
-| --- | ------ | ------------------------------------------ | ----------------------------------------- |
-| #57 | 09     | Publish refuses to run off `main`          | Isak's look at the panel message; his yes |
-| #58 | 08     | Editor Save keeps world.yaml's other keys  | His yes                                   |
-| #59 | 16     | Delete the unreachable entity-editing tabs | His yes (provisional call Q4)             |
-| #60 | 17     | Entity edit recovers from a save conflict  | Isak's look at the banners; his yes       |
+| PR  | Ticket | What                                        | Waits on                                  |
+| --- | ------ | ------------------------------------------- | ----------------------------------------- |
+| #57 | 09     | Publish refuses to run off `main`           | Isak's look at the panel message; his yes |
+| #58 | 08     | Editor Save keeps world.yaml's other keys   | His yes                                   |
+| #59 | 16     | Delete the unreachable entity-editing tabs  | His yes (provisional call Q4)             |
+| #60 | 17     | Entity edit recovers from a save conflict   | Isak's look at the banners; his yes       |
+| #61 | -      | CI: build tests run async (shard 4 timeout) | His yes; #57-#60 need it for green CI     |
+| #62 | 18     | Remove the entity-frontmatter save stream   | #59 (stacked); his yes                    |
 
 Local `main` is ahead of `origin/main` by the tracker commits for 14-18 (not pushed).
 
@@ -60,8 +62,8 @@ In flight (2026-10-27, stopped at the agent session limit, resets 23:10 Berlin):
   review tidy-ups are uncommitted in worktree `.claude/worktrees/agent-a5539c8240a905637`, gate
   not yet run. Finish, gate, commit, push, open PR.
 - `eval-15-shared-drawing` (31cdaf6 pushed): built and gated; two-axis review not run yet.
-- `eval-18-drop-frontmatter-stream` (878fa20 pushed, stacked on `eval-16-delete-entity-tabs`):
-  built and gated (-541 lines, `canonicalEntitySave.ts` gone); two-axis review not run yet.
+- `eval-18-drop-frontmatter-stream`: review clean, PR #62 open (base `eval-16-delete-entity-tabs`;
+  retarget to `main` after #59).
 
 ## Provisional calls
 
