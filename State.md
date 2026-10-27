@@ -44,12 +44,13 @@ edits stuck after a 409) ranks ahead of code-retro 06-08.
 Isak's rule, 2026-10-27: work never stops on a question. Each open question gets the recommended
 answer, logged here and built on; he reviews this list in batches, and a reversal becomes a ticket.
 
-| Date       | Question                                                 | Call                                                       | Why                                                           | Ticket |
-| ---------- | -------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------- | ------ |
-| 2026-10-27 | Q2: one search for palette, Browse and Timeline?         | Yes, the palette's syntax on all three                     | The same query finds different notes on different pages       | 14     |
-| 2026-10-27 | Q3: editor draws regions and routes in the player style? | Yes, one drawing module; the editor adds handles on top    | What the DM checks should be what players see                 | 15     |
-| 2026-10-27 | Q4: delete the unreachable entity-editing tabs?          | Yes; the vault owns profiles and relationships             | ~800 lines reached only from tests; git keeps them            | 16     |
-| 2026-10-27 | Q5: ticket "one client for canon" now?                   | Yes, starting with rebase-on-conflict, ahead of code-retro | A real bug: after a 409 every later save of that entity fails | 17     |
+| Date       | Question                                                                                       | Call                                                       | Why                                                            | Ticket |
+| ---------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- | ------ |
+| 2026-10-27 | Q2: one search for palette, Browse and Timeline?                                               | Yes, the palette's syntax on all three                     | The same query finds different notes on different pages        | 14     |
+| 2026-10-27 | Q3: editor draws regions and routes in the player style?                                       | Yes, one drawing module; the editor adds handles on top    | What the DM checks should be what players see                  | 15     |
+| 2026-10-27 | Q4: delete the unreachable entity-editing tabs?                                                | Yes; the vault owns profiles and relationships             | ~800 lines reached only from tests; git keeps them             | 16     |
+| 2026-10-27 | Q5: ticket "one client for canon" now?                                                         | Yes, starting with rebase-on-conflict, ahead of code-retro | A real bug: after a 409 every later save of that entity fails  | 17     |
+| 2026-10-27 | eval-16 review: delete the test-only `profileFields.ts` and `buildEntityFrontmatterPatch` too? | Yes, with the tabs                                         | Follows Q4: the vault owns profiles; the build never read them | 16     |
 
 ## Retro, 2026-10-27
 
