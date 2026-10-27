@@ -11,7 +11,8 @@ vi.mock("react-leaflet", async () => {
   return makeReactLeafletModule();
 });
 
-import { render, waitFor, cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { act, render, waitFor, cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MemoryRouter } from "react-router";
 import AtlasViewer from "@/pages/AtlasViewer";
 import {
@@ -308,6 +309,59 @@ describe("MapController reduced-motion (Q28)", () => {
     await waitFor(() => expect(stableMap.flyTo).toHaveBeenCalled());
     expect(stableMap.flyTo).toHaveBeenCalledWith([600, 300], expect.any(Number), { duration: 0.6 });
     expect(stableMap.setView).not.toHaveBeenCalled();
+  });
+});
+
+describe("MapController waits for a sized map (audit-08)", () => {
+  let size = { x: 0, y: 0 };
+
+  beforeEach(() => {
+    size = { x: 0, y: 0 };
+    vi.spyOn(stableMap, "getSize").mockImplementation(() => size);
+    // Real Leaflet's flyTo on a zero-size map throws `Invalid LatLng (NaN, NaN)`.
+    vi.mocked(stableMap.flyTo).mockImplementation(() => {
+      if (size.x === 0 || size.y === 0) throw new Error("Invalid LatLng object: (NaN, NaN)");
+    });
+    vi.mocked(stableMap.on).mockClear();
+  });
+
+  afterEach(() => {
+    vi.mocked(stableMap.getSize).mockRestore();
+    vi.mocked(stableMap.flyTo).mockReset();
+  });
+
+  it("does not fly while the map has no size, and flies once it gets one", async () => {
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    window.history.pushState({}, "", "/?entity=iron-tower");
+    render(
+      <ErrorBoundary>
+        <MemoryRouter>
+          <AtlasViewer />
+        </MemoryRouter>
+      </ErrorBoundary>,
+    );
+    await waitFor(() =>
+      expect(
+        Array.from(document.querySelectorAll("h2")).some((h) => h.textContent === "Iron Tower"),
+      ).toBe(true),
+    );
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+    expect(stableMap.flyTo).not.toHaveBeenCalled();
+
+    // The pane becomes visible: Leaflet fires `resize` once the map has a size.
+    size = { x: 800, y: 600 };
+    const resizeHandlers = vi
+      .mocked(stableMap.on)
+      .mock.calls.filter(([event]) => event === "resize")
+      .map(([, handler]) => handler as () => void);
+    expect(resizeHandlers.length).toBeGreaterThan(0);
+    act(() => resizeHandlers.forEach((h) => h()));
+
+    expect(stableMap.flyTo).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+    errorSpy.mockRestore();
+    consoleSpy.mockRestore();
   });
 });
 

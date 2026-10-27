@@ -87,13 +87,45 @@ function MapController({
     if (!flyTo) return;
     const [lat, lng] = atlasToLatLng(flyTo.x, flyTo.y, flyTo.height);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    const targetZoom =
-      flyTo.zoom != null && Number.isFinite(flyTo.zoom) ? flyTo.zoom : Math.max(map.getZoom(), -1);
-    if (prefersReducedMotion) {
-      map.setView([lat, lng], targetZoom, { animate: false });
-    } else {
-      map.flyTo([lat, lng], targetZoom, { duration: 0.6 });
+    const fly = () => {
+      const targetZoom =
+        flyTo.zoom != null && Number.isFinite(flyTo.zoom)
+          ? flyTo.zoom
+          : Math.max(map.getZoom(), -1);
+      if (prefersReducedMotion) {
+        map.setView([lat, lng], targetZoom, { animate: false });
+      } else {
+        map.flyTo([lat, lng], targetZoom, { duration: 0.6 });
+      }
+    };
+    const hasSize = () => {
+      const size = map.getSize();
+      return size.x > 0 && size.y > 0;
+    };
+    if (hasSize()) {
+      fly();
+      return;
     }
+    // A hidden container (e.g. a collapsed preview pane) has zero size, and
+    // Leaflet's flyTo then projects to NaN and throws. Wait for the map to get
+    // a size: Leaflet fires `resize` from invalidateSize, and a ResizeObserver
+    // calls invalidateSize when the container is shown again.
+    const onResize = () => {
+      if (!hasSize()) return;
+      cleanup();
+      fly();
+    };
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => map.invalidateSize({ pan: false }))
+        : null;
+    const cleanup = () => {
+      map.off("resize", onResize);
+      observer?.disconnect();
+    };
+    map.on("resize", onResize);
+    observer?.observe(map.getContainer());
+    return cleanup;
   }, [flyTo, map, prefersReducedMotion]);
   return null;
 }
