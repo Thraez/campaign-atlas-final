@@ -211,7 +211,11 @@ const PinMarker = memo(function PinMarker({
       eventHandlers={eventHandlers}
     >
       {labelMode !== "none" && (
+        // react-leaflet reads `permanent` only when it creates the tooltip, so
+        // the key remounts it when the zoom flips this pin's mode. Pins whose
+        // decision didn't change keep their tooltip.
         <Tooltip
+          key={labelMode}
           permanent={labelMode === "always"}
           direction="top"
           offset={[0, -12]}
