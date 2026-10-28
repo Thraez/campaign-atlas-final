@@ -75,6 +75,10 @@ leave the rest for Isak (AGENTS.md: never resolve a merge conflict unattended).
    - **#86** (eval 36): the character keys panel recovers from a failed load and from conflicts,
      and keeps every key.
    - **#83** (eval 35): dead credits links.
+   - **Not pushed yet: `eval-42-entity-save-failure-form`** (eval 42, at 594d21e, stacked on
+     #84): a failed entity save keeps the form; a failed rebuild is said. It's built, reviewed
+     and gated (test:ci 4 shards). Auto mode refused the push and the PR, so they're Isak's:
+     push the branch, open the PR on base `eval-33-write-failed-not-saved`, merge after #84.
 
    Their tickets, and 37-41, are on the local branch `eval-sweep5-docs` (docs only, committed
    there): merge it into `main` with the docs push. Ticket 40 is a live player-safety bug: a
