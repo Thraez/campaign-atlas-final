@@ -683,6 +683,22 @@ describe("automatic save on install", () => {
     );
   });
 
+  it("tries once per shell: a layer that 404s doesn't make every load re-fetch", async () => {
+    const fake = installFakeCaches([WORLD_URLS[1]]);
+    fake.precacheShell();
+    const pwa = await loadPwa();
+    pwa.setOfflineMap({ key: "world", layerSrcs: WORLD_LAYERS });
+    await vi.waitFor(() => expect(pwa.getOfflineCoverageSnapshot()).toBe("notes"));
+    const fetchesBefore = fake.fetches.length;
+    expect(fetchesBefore).toBeGreaterThan(0);
+
+    // A reload: same shell, fresh module.
+    const again = await loadPwa();
+    again.setOfflineMap({ key: "world", layerSrcs: WORLD_LAYERS });
+    await vi.waitFor(() => expect(again.getOfflineCoverageSnapshot()).toBe("notes"));
+    expect(fake.fetches.length).toBe(fetchesBefore);
+  });
+
   it("does nothing while offline", async () => {
     Object.defineProperty(navigator, "onLine", { value: false, configurable: true });
     const fake = installFakeCaches();

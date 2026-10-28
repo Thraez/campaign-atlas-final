@@ -380,8 +380,8 @@ let autoSaving = false;
 /**
  * Installing the app saves the notes and the map on screen. Runs once per
  * app shell: on the first install and after each deploy that brings a new
- * service worker, which also refreshes that map's layers. A cleared cache is
- * not refilled until the next deploy.
+ * service worker, which also refreshes that map's layers. A cleared cache, or
+ * a file that failed to download, is not retried until the next deploy.
  */
 export async function autoSaveForNewShell(): Promise<void> {
   if (autoSaving || !currentMap || !("caches" in window)) return;
@@ -391,7 +391,10 @@ export async function autoSaveForNewShell(): Promise<void> {
     const signature = await shellSignature();
     if (signature === null || signature === readAutoSavedShell()) return;
     const result = await saveForOffline(currentMap.layerSrcs);
-    if (result.ok) writeAutoSavedShell(signature);
+    // Once tried, this shell is done, even if a file failed: otherwise every
+    // load would re-fetch the notes. The menu shows what is missing, and its
+    // Save item retries. Only a save that never ran (offline) tries again.
+    if (result.ok || result.reason !== "offline") writeAutoSavedShell(signature);
   } catch (err) {
     logger.warn("[pwa] automatic offline save failed", err);
   } finally {

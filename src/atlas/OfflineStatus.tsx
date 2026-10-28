@@ -155,12 +155,17 @@ export function OfflineMenu({ className }: OfflineMenuProps) {
   const [done, setDone] = useState<null | string>(null);
   const text = useCoverageText();
 
+  // Hide the message after a moment; the cleanup drops the timer on unmount
+  // and when a newer message replaces it.
+  useEffect(() => {
+    if (done === null) return;
+    const timer = setTimeout(() => setDone(null), 1800);
+    return () => clearTimeout(timer);
+  }, [done]);
+
   if (!enabled) return null;
 
-  const flash = (message: string) => {
-    setDone(message);
-    setTimeout(() => setDone(null), 1800);
-  };
+  const flash = (message: string) => setDone(message);
 
   const handleSave = async () => {
     setBusy("save");
