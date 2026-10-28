@@ -158,8 +158,9 @@ export default defineConfig(({ mode }) => {
       // for the DM picker in public/). Runs last so it fires after the public
       // copy + PWA precache generation. See the plugin for the full rationale.
       !includeEditor && prunePlayerAudioPlugin(),
-      // Player builds only: strip images no player note shows (the DM's asset
-      // store lives in public/ too). See the plugin.
+      // Player builds only: strip images no player note shows and any file
+      // off the player allowlist (the DM's asset store lives in public/ too).
+      // See the plugin.
       !includeEditor && prunePlayerImagesPlugin(),
     ].filter(Boolean),
     resolve: {
