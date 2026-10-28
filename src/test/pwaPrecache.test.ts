@@ -12,7 +12,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { getManifest } from "workbox-build";
-import { IMAGE_EXTENSIONS } from "../../scripts/atlas/playerImageRefs";
+import { IMAGE_EXTENSIONS } from "../../scripts/atlas/assetRefs";
 import {
   PRECACHE_GLOB_IGNORES,
   PRECACHE_GLOB_PATTERNS,
