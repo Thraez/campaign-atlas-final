@@ -21,5 +21,9 @@ Second sweep, 2026-10-27 (map, player site, editor, import, publish): 08-12, plu
 Grill round 2, 2026-10-27: 14-17 are built on provisional calls (`State.md`, "Provisional
 calls"); Isak hadn't answered yet. 17 is a bug.
 
+Overnight 2026-10-28: 19 and 20 came out of reviews. 21-28 come from a third sweep (sound,
+timeline, CI, dev scripts, accessibility and offline, test health); 21-25 and 27 rest on
+provisional calls in `State.md`. 21, 22, 23, 25 and 26 are bugs; 28 is unverified.
+
 Work the lowest open number first. Words as in `GLOSSARY.md`; module, interface, seam and depth
 as in the `codebase-design` skill.
