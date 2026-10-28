@@ -152,6 +152,7 @@ import { ViewModeProvider, useViewMode } from "@/atlas/view/ViewModeProvider";
 import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
 import { FlatCRS } from "@/atlas/map/flatCRS";
+import { whenMapHasSize } from "@/atlas/map/whenMapHasSize";
 
 function pinDivIcon(
   color: string,
@@ -178,7 +179,10 @@ function MapClickCapture({ onClick }: { onClick: (x: number, y: number) => void 
 function FlyTo({ target }: { target: { lat: number; lng: number } | null }) {
   const map = useMap();
   useEffect(() => {
-    if (target) map.flyTo([target.lat, target.lng], Math.max(map.getZoom(), -1), { duration: 0.5 });
+    if (!target) return;
+    return whenMapHasSize(map, () =>
+      map.flyTo([target.lat, target.lng], Math.max(map.getZoom(), -1), { duration: 0.5 }),
+    );
   }, [target, map]);
   return null;
 }
