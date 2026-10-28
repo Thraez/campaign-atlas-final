@@ -53,7 +53,7 @@ commands with shell variables (one plain command per call, absolute paths).
 
 - `main` was pushed once (f65c854..0c1d92a, docs only, on his yes) before this rule arrived.
 - PRs waiting for his yes to merge (each merge publishes), in stack order: #62 → #66 → #68;
-  #64 → #67 → #69 → #70; #63; #65; #71 → #73; #72; #74. See "Merge queue" for what each needs him to look at.
+  #64 → #67 → #69 → #70; #63; #65; #71 → #73; #72; #74; #75. See "Merge queue" for what each needs him to look at.
 - Local `main` commits since 0c1d92a: push them in the morning.
 - Code-retro 06 needs a real `npm run atlas:publish` run before it is done (the ticket asks for
   it; overnight only its parts ran).
@@ -84,14 +84,21 @@ So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logg
 | #72 | 22     | `maps:optimize` keeps maps lossless                      | His yes                                          |
 | #73 | 23     | The newest soundscape request always wins                | #71 (stacked); his yes                           |
 | #74 | c-06   | One module reads a note; bad frontmatter stops the build | A real `atlas:publish` run first; his yes        |
+| #75 | 24     | One test runner for the PR check, publish and the hook   | His yes (publish gains a `test` job, ~3 min)     |
 
 In flight (2026-10-28, overnight):
 
 - Code-retro 06 is PR #74. Two safety reviews each found a leak (a `---x` key; front matter the
   new parser dropped, so a secret's name went unredacted). Both are fixed and the second repro
   now stops the build on the file.
-- `eval-24-one-test-runner` and `eval-25-offline-menu-truth`: building, each from `main`.
-- `eval-26-timeline-undated` and `code-retro-07-sync-module`: building, each stacked on #74.
+- `eval-25-offline-menu-truth`: review fixes with the builder.
+- `eval-26-timeline-undated` (small review fixes) and `code-retro-07-sync-module` (building),
+  each stacked on #74.
+- `eval-28-audio-asset-urls`: building (reproduce first), stacked on #73.
+- Ticket 27 (one reduce-motion switch, shared filter chips) waits until the open stacks merge: it
+  touches sound (#71, #73), the viewer (#67-#70, 25) and Timeline/Browse/search (#63, 26).
+- A local-only branch `eval-24-test-runner` (932edc8) sits in an agent worktree, never pushed;
+  it can be deleted.
 - Code-retro 08 (build core) waits on 26 (both change `build-atlas.ts`).
 - Ticket 29 waits on #68 and #72 (both touch the save pipeline's map path).
   Merged 2026-10-27 on Isak's relayed yes ("Atlas may merge #61 first, then #57, #58, #59 and #60 in
