@@ -99,7 +99,7 @@ import { EntityEditPanel } from "@/atlas/categories/EntityEditPanel";
 import { EntitySurface } from "@/atlas/entity/EntitySurface";
 import { resolvePinClickIntent } from "@/atlas/editor/pinClickIntent";
 import { resolveEntityCloseIntent } from "@/atlas/editor/entityCloseIntent";
-import { mapClickToAtlasCoord } from "@/atlas/editor/mapClickCoord";
+import { mapClickToAtlasCoord } from "@/atlas/map/mapClickCoord";
 import { usePinsTabFilters } from "@/atlas/editor/usePinsTabFilters";
 import { usePinOverrideMutations } from "@/atlas/editor/usePinOverrideMutations";
 import {
@@ -2045,7 +2045,12 @@ function AtlasPlacementEditorInner() {
 
                   {/* Z-order: layers → regions → routes → fog → sound → pins → handles. */}
                   {showRegions && (
-                    <RegionLayer map={activeMap} api={regionDraft} visible={showRegions} />
+                    <RegionLayer
+                      map={activeMap}
+                      api={regionDraft}
+                      visible={showRegions}
+                      entityById={entitiesById}
+                    />
                   )}
                   <RouteLayer map={activeMap} api={routeDraft} />
                   <FogLayer

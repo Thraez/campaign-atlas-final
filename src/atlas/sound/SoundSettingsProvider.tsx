@@ -17,12 +17,46 @@ interface SoundSettings extends SoundPrefs {
   setCalmMode: (c: boolean) => void;
   setVolume: (v: number) => void;
   setMapMasterGain: (g: number) => void;
+  /**
+   * True once the AudioContext has reached "running". A saved soundEnabled
+   * survives a reload, but the browser only lets audio start from a user
+   * gesture, so after a reload this stays false until the first tap or key
+   * press anywhere (or until a gesture the browser actually honours).
+   */
+  audioUnlocked: boolean;
+  /** True after the player dismissed the resume invite: stay silent this visit. */
+  resumeDismissed: boolean;
+  dismissResume: () => void;
+  /** True only while a bed is actually playing (reported by SoundscapeLayer). */
   ambiencePlaying: boolean;
   setAmbiencePlaying: (v: boolean) => void;
   /** False when the Web Audio API is unavailable in this environment. */
   audioAvailable: boolean;
   /** True when the OS reports prefers-reduced-motion: reduce. Audio is unaffected. */
   motionReduced: boolean;
+}
+
+/**
+ * Events that count as user activation for every pointer type. pointerdown
+ * only counts for a mouse; a touch activates at pointerup/touchend/click.
+ */
+const GESTURE_EVENTS = ["pointerup", "touchend", "click", "keydown"] as const;
+
+/** Escape and lone modifier keys don't grant user activation. */
+const NON_ACTIVATING_KEYS = new Set([
+  "Escape",
+  "Shift",
+  "Control",
+  "Alt",
+  "Meta",
+  "AltGraph",
+  "CapsLock",
+  "Fn",
+  "OS",
+]);
+
+function grantsActivation(e: KeyboardEvent): boolean {
+  return !NON_ACTIVATING_KEYS.has(e.key);
 }
 
 const Ctx = createContext<SoundSettings | null>(null);
@@ -55,6 +89,8 @@ export function SoundSettingsProvider({
   const [mapMasterGain, setMapMasterGain] = useState(0.6);
   // ambiencePlaying is reported by SoundscapeLayer when a bed is active.
   const [ambiencePlaying, setAmbiencePlaying] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [resumeDismissed, setResumeDismissed] = useState(false);
 
   const update = useCallback((patch: Partial<SoundPrefs>) => {
     setPrefs((prev) => {
@@ -108,14 +144,48 @@ export function SoundSettingsProvider({
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [engine, prefs.muted, prefs.calmMode]);
 
+  // Explicit enable from the invite button. If Web Audio can't start at all,
+  // roll soundEnabled back to false. If the context stays suspended, keep
+  // soundEnabled on: audioUnlocked stays false, so the resume invite shows.
   const enableSound = useCallback(() => {
-    engine.unlock().catch(() => {
-      // Web Audio failed to initialise (e.g. browser policy or missing API).
-      // Leave soundEnabled false so the invite stays hidden on the next render.
-      update({ soundEnabled: false });
-    });
     update({ soundEnabled: true });
+    engine
+      .unlock()
+      .then(setAudioUnlocked)
+      .catch(() => {
+        // Web Audio failed to initialise (e.g. browser policy or missing API).
+        update({ soundEnabled: false });
+      });
   }, [engine, update]);
+
+  const dismissResume = useCallback(() => setResumeDismissed(true), []);
+
+  // Sound was saved on before a reload: unlock on the first gesture anywhere
+  // that the browser counts as user activation. Gestures on the sound invite
+  // itself are left to its own buttons (Dismiss must stay silent). A gesture
+  // that doesn't get the context running leaves the listener in place for the
+  // next one, and never touches the saved preference.
+  useEffect(() => {
+    if (!prefs.soundEnabled || audioUnlocked || resumeDismissed || !audioAvailable) return;
+    let alive = true;
+    const onGesture = (e: Event) => {
+      if (e.target instanceof Element && e.target.closest("[data-sound-invite]")) return;
+      if (e instanceof KeyboardEvent && !grantsActivation(e)) return;
+      engine
+        .unlock()
+        .then((running) => {
+          if (alive && running) setAudioUnlocked(true);
+        })
+        .catch(() => {
+          /* keep the saved "on"; the invite stays */
+        });
+    };
+    for (const type of GESTURE_EVENTS) window.addEventListener(type, onGesture, true);
+    return () => {
+      alive = false;
+      for (const type of GESTURE_EVENTS) window.removeEventListener(type, onGesture, true);
+    };
+  }, [prefs.soundEnabled, audioUnlocked, resumeDismissed, audioAvailable, engine]);
 
   const value = useMemo<SoundSettings>(
     () => ({
@@ -126,12 +196,26 @@ export function SoundSettingsProvider({
       setCalmMode: (c) => update({ calmMode: c }),
       setVolume: (v) => update({ volume: Math.min(1, Math.max(0, v)) }),
       setMapMasterGain,
+      audioUnlocked,
+      resumeDismissed,
+      dismissResume,
       ambiencePlaying,
       setAmbiencePlaying,
       audioAvailable,
       motionReduced,
     }),
-    [prefs, engine, enableSound, update, ambiencePlaying, audioAvailable, motionReduced],
+    [
+      prefs,
+      engine,
+      enableSound,
+      update,
+      audioUnlocked,
+      resumeDismissed,
+      dismissResume,
+      ambiencePlaying,
+      audioAvailable,
+      motionReduced,
+    ],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

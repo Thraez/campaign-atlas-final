@@ -87,4 +87,89 @@ describe("check-image-privacy — the DM's asset store", () => {
     expect(await run({ dir, config: FIXTURE_CONFIG, referencedBy: dir })).toBe(13);
     expect(errSpy.mock.calls.flat().join("\n")).toContain("FILENAME LEAK");
   });
+
+  it("with referencedBy, a secret-named image named by its full path fails", async () => {
+    fs.writeFileSync(
+      path.join(dir, "atlas.json"),
+      '{"layers":[{"src":"atlas/assets/images/hidden-thing.png"}]}',
+    );
+    expect(await run({ dir, config: FIXTURE_CONFIG, referencedBy: dir })).toBe(13);
+  });
+
+  it("with referencedBy, an image the JSON names only in another folder passes, as the build prunes it", async () => {
+    fs.writeFileSync(
+      path.join(dir, "atlas.json"),
+      '{"layers":[{"src":"atlas/assets/maps/hidden-thing.png"}]}',
+    );
+    expect(await run({ dir, config: FIXTURE_CONFIG, referencedBy: dir })).toBe(0);
+  });
+
+  it("with referencedBy, an image whose name is a suffix of a named image passes, as the build prunes it", async () => {
+    // "hidden-thing.png" is a suffix of "not-hidden-thing.png", which is named but not on disk.
+    fs.writeFileSync(
+      path.join(dir, "atlas.json"),
+      '{"layers":[{"src":"atlas/assets/images/not-hidden-thing.png"}]}',
+    );
+    expect(await run({ dir, config: FIXTURE_CONFIG, referencedBy: dir })).toBe(0);
+  });
+
+  it("checks every image type the player could show, e.g. a secret-named .avif", async () => {
+    const png = fs.readFileSync(path.join(dir, "assets", "images", "hidden-thing.png"));
+    fs.rmSync(path.join(dir, "assets", "images", "hidden-thing.png"));
+    fs.writeFileSync(path.join(dir, "assets", "images", "hidden-thing.avif"), png);
+    expect(await run({ dir, config: FIXTURE_CONFIG })).toBe(13);
+    expect(errSpy.mock.calls.flat().join("\n")).toContain("FILENAME LEAK");
+  });
+
+  it("with referencedBy, a secret-named image outside assets/ fails: the build never prunes it", async () => {
+    fs.renameSync(
+      path.join(dir, "assets", "images", "hidden-thing.png"),
+      path.join(dir, "hidden-thing.png"),
+    );
+    fs.writeFileSync(path.join(dir, "atlas.json"), '{"entities":[]}');
+    expect(await run({ dir, config: FIXTURE_CONFIG, referencedBy: dir })).toBe(13);
+  });
+});
+
+describe("check-image-privacy — formats sharp can't read", () => {
+  let dir: string;
+  let errSpy: ReturnType<typeof vi.spyOn>;
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "img-privacy-formats-"));
+    errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  // Minimal ICO header: reserved 0, type 1 (icon), 0 images. sharp cannot decode ICO.
+  const ico = Buffer.from([0, 0, 1, 0, 0, 0]);
+
+  it("passes an .ico, saying its metadata was not checked", async () => {
+    fs.writeFileSync(path.join(dir, "favicon.ico"), ico);
+
+    expect(await run({ dir, config: FIXTURE_CONFIG })).toBe(0);
+    const out = logSpy.mock.calls.flat().join("\n");
+    expect(out).toContain(`metadata not checked: ${path.join(dir, "favicon.ico")}`);
+  });
+
+  it("still fails a secret-named .ico on its filename", async () => {
+    // "Hidden Thing" is a hidden note in the fixture vault.
+    fs.writeFileSync(path.join(dir, "hidden-thing.ico"), ico);
+
+    expect(await run({ dir, config: FIXTURE_CONFIG })).toBe(13);
+    expect(errSpy.mock.calls.flat().join("\n")).toContain("FILENAME LEAK");
+  });
+
+  it("still fails a corrupt .png as UNREADABLE", async () => {
+    fs.writeFileSync(path.join(dir, "broken.png"), Buffer.from("not a real image at all"));
+
+    expect(await run({ dir, config: FIXTURE_CONFIG })).toBe(13);
+    expect(errSpy.mock.calls.flat().join("\n")).toContain("UNREADABLE: ");
+  });
 });

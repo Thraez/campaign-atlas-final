@@ -1,4 +1,4 @@
-/** Shared download helper for tab exports. */
+/** Shared browser download helper (viewer and editor exports). */
 import { toast } from "sonner";
 
 /** Trigger a browser download of a Blob. Appends the anchor to the DOM before

@@ -6,6 +6,11 @@
  * Persistence: regions remain in `world.yaml`. The hook only tracks LOCAL
  * draft changes; Save serializes them into world.yaml via buildPatches/dumpYaml.
  */
+import {
+  DEFAULT_REGION_COLOR,
+  DEFAULT_REGION_FILL_OPACITY,
+  DEFAULT_REGION_STROKE_OPACITY,
+} from "@/atlas/map/featureStyle";
 import { useCallback, useMemo, useState } from "react";
 import type { MapDocument, Point, Region } from "@/atlas/content/schema";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
@@ -128,9 +133,9 @@ export function useRegionDraft(
       name: `New Region ${effective.length + 1}`,
       points: draftPoints,
       visibility: "dm",
-      color: "#7fb069",
-      fillOpacity: 0.18,
-      strokeOpacity: 0.85,
+      color: DEFAULT_REGION_COLOR,
+      fillOpacity: DEFAULT_REGION_FILL_OPACITY,
+      strokeOpacity: DEFAULT_REGION_STROKE_OPACITY,
     };
     mutateDraft((d) => ({ ...d, added: [...d.added, region] }), `add region ${id}`);
     setDrawing(false);
