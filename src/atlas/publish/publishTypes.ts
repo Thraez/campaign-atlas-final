@@ -18,6 +18,7 @@ export interface PublishScanReason {
     | "check-fog-safety"
     | "check-artifact-shape"
     | "check-player-secrets"
+    | "check-player-files"
     | "audit-assets";
   target: string;
   severity: "blocking";

@@ -6,6 +6,7 @@
  * for the active map so the live polyline preview matches what the player
  * runtime would render.
  */
+import { DEFAULT_ROUTE_COLOR, DEFAULT_ROUTE_WEIGHT } from "@/atlas/map/featureStyle";
 import { useCallback, useMemo, useState } from "react";
 import type { AtlasProject, MapDocument, Point, Route, RouteMode } from "@/atlas/content/schema";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
@@ -165,8 +166,8 @@ export function useRouteDraft(
       visibility: "dm",
       waypoints: draftWaypoints,
       mode: "foot",
-      color: "#cfd6dc",
-      weight: 3,
+      color: DEFAULT_ROUTE_COLOR,
+      weight: DEFAULT_ROUTE_WEIGHT,
       dashed: false,
     };
     mutateDraft((d) => ({ ...d, added: [...d.added, route] }), `add route ${id}`);

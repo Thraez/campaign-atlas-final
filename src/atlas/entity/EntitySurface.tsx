@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Entity } from "@/atlas/content/schema";
 import { EntityPanes } from "@/atlas/entity/EntityPanes";
 
@@ -8,6 +8,7 @@ export function EntitySurface({
   renderEdit,
   onClose,
   startInEdit = false,
+  editRequest = 0,
 }: {
   entity: Entity;
   entitiesById: Map<string, Entity>;
@@ -20,10 +21,26 @@ export function EntitySurface({
    * nothing. Reading stays the default for every other way in.
    */
   startInEdit?: boolean;
+  /**
+   * Bump to ask for Edit (Save pointing to an unsaved entity edit). Switches a
+   * Reading surface to Edit and focuses the form; an open Edit pane stays
+   * mounted, so its banners and any in-flight work survive.
+   */
+  editRequest?: number;
 }) {
   const [editing, setEditing] = useState(startInEdit);
+  const [seenEditRequest, setSeenEditRequest] = useState(editRequest);
+  if (editRequest !== seenEditRequest) {
+    setSeenEditRequest(editRequest);
+    setEditing(true);
+  }
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (editRequest === 0) return;
+    rootRef.current?.querySelector<HTMLElement>("input, textarea, select")?.focus();
+  }, [editRequest]);
   return (
-    <div className="flex flex-col h-full">
+    <div ref={rootRef} className="flex flex-col h-full">
       <div className="flex items-center gap-2 px-3 py-1.5 border-b text-xs">
         <span className="font-medium truncate flex-1">{entity.title}</span>
         <button

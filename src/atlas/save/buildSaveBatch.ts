@@ -22,6 +22,7 @@ import type {
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import type { FileChange } from "@/atlas/save/localFsSave";
 import { buildFullWorldYaml } from "@/atlas/yaml/buildFullWorldYaml";
+import { mapLayerTargetPath } from "@/atlas/assets/mapLayerTarget";
 
 export interface BuildWorldYamlContentInputs {
   /** The map whose layers/regions/routes/fog get the draft overlay applied. */
@@ -93,7 +94,7 @@ export function buildWorldYamlContent(inputs: BuildWorldYamlContentInputs): stri
     // upload: rewrite src to the canonical "atlas/assets/maps/<file>" form
     // (strip the public/ prefix). The actual binary is written by the
     // asset-binary FileChange we add in onSaveClick.
-    const target = local.targetPath ?? `public/atlas/assets/maps/${l.id}.png`;
+    const target = mapLayerTargetPath(local);
     const src = target.replace(/^public\//, "");
     return { ...l, src };
   });
@@ -118,21 +119,34 @@ export function buildWorldYamlContent(inputs: BuildWorldYamlContentInputs): stri
   });
 }
 
+type UploadWithBytes = LocalLayer & { origin: "upload"; dataUrl: string };
+
+function isUploadWithBytes(layer: LocalLayer): layer is UploadWithBytes {
+  return layer.origin === "upload" && !!layer.dataUrl;
+}
+
+/**
+ * Upload-origin layers whose bytes (`dataUrl`) are gone, e.g. cleared by
+ * localStorage quota on reload. buildAssetBinaryChanges skips these and
+ * planUnifiedSave refuses the save over them.
+ */
+export function uploadsMissingBytes(localLayers: readonly LocalLayer[]): LocalLayer[] {
+  return localLayers.filter((l) => l.origin === "upload" && !isUploadWithBytes(l));
+}
+
 /**
  * Build the asset-binary FileChange entries for every upload-origin layer
  * on the active map. Each carries the upload's dataUrl (which the layer
  * captured when the file was dragged in) plus its targetPath under
  * public/atlas/assets/maps/. Uploads with no dataUrl (rare — quota
- * pressure clears it from localStorage on reload) are skipped silently;
- * the world.yaml emission still references them so the DM sees the
- * mismatch in the diff modal.
+ * pressure clears it from localStorage on reload) are skipped here;
+ * planUnifiedSave (src/atlas/save/planUnifiedSave.ts) refuses the whole save
+ * before this runs, so world.yaml never points at bytes that don't land.
  */
-export function buildAssetBinaryChanges(localLayers: LocalLayer[]): FileChange[] {
+export function buildAssetBinaryChanges(localLayers: readonly LocalLayer[]): FileChange[] {
   const changes: FileChange[] = [];
-  for (const local of localLayers) {
-    if (local.origin !== "upload") continue;
-    if (!local.dataUrl) continue;
-    const target = local.targetPath ?? `public/atlas/assets/maps/${local.id}.png`;
+  for (const local of localLayers.filter(isUploadWithBytes)) {
+    const target = mapLayerTargetPath(local);
     changes.push({
       path: target,
       content: local.dataUrl,

@@ -15,6 +15,8 @@
  * or any player-mode entry point.
  */
 
+import { normalizeAtlasAssetUrl } from "@/atlas/url";
+
 const AUDIO_EXTENSION = /\.(ogg|mp3|aac|m4a|wav)$/i;
 
 /** Filter a raw file listing to audio basenames, de-duped and sorted. */
@@ -31,7 +33,7 @@ export function audioBasenames(paths: string[]): string[] {
  * Where the dev editor looks for the audio manifest: a JSON array of file
  * names/paths describing what lives under `public/atlas/assets/audio/`.
  */
-export const AUDIO_MANIFEST_URL = "/atlas/assets/audio/manifest.json";
+export const AUDIO_MANIFEST_URL = "atlas/assets/audio/manifest.json";
 
 /**
  * Load the list of available audio files for the picker. Any failure —
@@ -42,7 +44,7 @@ export async function loadAvailableAudio(
   fetchImpl: typeof fetch = (...args) => fetch(...args),
 ): Promise<string[]> {
   try {
-    const res = await fetchImpl(AUDIO_MANIFEST_URL, { cache: "no-store" });
+    const res = await fetchImpl(normalizeAtlasAssetUrl(AUDIO_MANIFEST_URL), { cache: "no-store" });
     if (!res.ok) return [];
     const data: unknown = await res.json();
     if (!Array.isArray(data)) return [];

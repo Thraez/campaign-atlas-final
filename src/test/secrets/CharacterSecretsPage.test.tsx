@@ -93,6 +93,21 @@ describe("CharacterSecretsPage — SecretsBody state machine", () => {
     await screen.findByText(/On: The Keep/i);
   });
 
+  it("links a secret to the viewer with the entity id URI-encoded", async () => {
+    mockGetKey.mockReturnValue("vesper-key");
+    mockCollect.mockResolvedValue([
+      {
+        entityId: "old keep/#1",
+        entityTitle: "Old Keep",
+        secretId: "s1",
+        html: "<p>Treasure here</p>",
+      },
+    ]);
+    renderPage();
+    const link = await screen.findByRole("link", { name: /On: Old Keep/ });
+    expect(link).toHaveAttribute("href", "/atlas?entity=old%20keep%2F%231");
+  });
+
   it("Forget button calls forgetAll", async () => {
     mockGetKey.mockReturnValue("some-key");
     mockCollect.mockResolvedValue([]);
