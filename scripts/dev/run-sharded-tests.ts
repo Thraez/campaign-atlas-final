@@ -1,12 +1,21 @@
-// The one test runner. `npm run test:ci` runs every shard in turn (the PR check,
-// the publish workflow and `npm run verify` all call it); `npm run test:changed`
-// (`--changed`) runs only the tests related to uncommitted changes, for
-// scripts/pre-commit.sh. Flags and the worker-timeout retry rule live in
-// ./shardOutcome.ts. See docs/CODEBASE_MAP.md's "Always shard" trap: a
-// whole-suite `vitest run` OOMs the coordinator on this repo's ~250 test files.
+// The one test runner. Entry points, shard flags and the worker-timeout retry
+// rule are in ./shardOutcome.ts:
+//   npm run test:ci          every shard in turn (publish workflow, `npm run verify`)
+//   npm run test:shard -- N  shard N only (the PR check's matrix jobs)
+//   npm run test:changed     tests related to uncommitted changes (scripts/pre-commit.sh)
+// See docs/CODEBASE_MAP.md's "Always shard" trap: a whole-suite `vitest run`
+// OOMs the coordinator on this repo's ~250 test files.
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { classifyShard, SHARD_COUNT, vitestArgs, type VitestTarget } from "./shardOutcome";
+import {
+  parseRunnerArgs,
+  runWithRetry,
+  SHARD_COUNT,
+  vitestArgs,
+  type RunnerPlan,
+  type VitestResult,
+  type VitestTarget,
+} from "./shardOutcome";
 
 const VITEST = path.resolve(
   "node_modules",
@@ -14,8 +23,8 @@ const VITEST = path.resolve(
   process.platform === "win32" ? "vitest.cmd" : "vitest",
 );
 
-// Streams the run's output as usual and keeps a copy for classifyShard.
-function runVitest(target: VitestTarget): Promise<{ status: number | null; output: string }> {
+// Streams the run's output as usual and keeps a copy for classifyRun.
+function runVitest(target: VitestTarget): Promise<VitestResult> {
   return new Promise((resolve) => {
     const child = spawn(VITEST, vitestArgs(target), {
       stdio: ["inherit", "pipe", "pipe"],
@@ -35,41 +44,44 @@ function runVitest(target: VitestTarget): Promise<{ status: number | null; outpu
   });
 }
 
-// Runs one target, re-running it once on the worker-timeout noise. True if it passed.
-async function runWithRetry(target: VitestTarget, label: string): Promise<boolean> {
-  let { status, output } = await runVitest(target);
-  if (classifyShard(status, output, target) === "retry") {
-    console.warn(`\n${label}: worker timeout with all tests passed; re-running once`);
-    ({ status, output } = await runVitest(target));
+function label(target: VitestTarget): string {
+  return target === "changed" ? "test:changed" : `shard ${target.shard}/${SHARD_COUNT}`;
+}
+
+// True if the target passed (or, for the hook, had no related tests).
+async function runTarget(target: VitestTarget): Promise<boolean> {
+  const outcome = await runWithRetry(target, runVitest, () =>
+    console.warn(`\n${label(target)}: worker timeout with all tests passed; re-running once`),
+  );
+  if (outcome === "no-tests") {
+    console.log(`\n${label(target)}: no tests relate to these changes; nothing to run.`);
+    return true;
   }
-  if (classifyShard(status, output, target) !== "pass") {
-    console.error(`\n${label} failed (exit code ${status})`);
+  if (outcome === "fail") {
+    console.error(`\n${label(target)} FAILED`);
     return false;
   }
+  console.log(`\n${label(target)} passed`);
   return true;
 }
 
-const args = process.argv.slice(2);
-const unknown = args.filter((a) => a !== "--changed");
-if (unknown.length > 0) {
-  console.error(`run-sharded-tests: unknown argument(s): ${unknown.join(" ")}`);
+let plan: RunnerPlan;
+try {
+  plan = parseRunnerArgs(process.argv.slice(2));
+} catch (err) {
+  console.error(`run-sharded-tests: ${(err as Error).message}`);
   process.exit(2);
 }
 
-if (args.includes("--changed")) {
-  if (!(await runWithRetry("changed", "vitest --changed"))) {
-    console.error("\ntest:changed FAILED");
-    process.exit(1);
-  }
-  console.log("\ntest:changed passed");
-  process.exit(0);
+if (plan.kind === "one") {
+  process.exit((await runTarget(plan.target)) ? 0 : 1);
 }
 
 let anyShardFailed = false;
 
 for (let shard = 1; shard <= SHARD_COUNT; shard++) {
   console.log(`\n--- shard ${shard}/${SHARD_COUNT} ---`);
-  if (!(await runWithRetry({ shard }, `shard ${shard}/${SHARD_COUNT}`))) anyShardFailed = true;
+  if (!(await runTarget({ shard }))) anyShardFailed = true;
 }
 
 if (anyShardFailed) {

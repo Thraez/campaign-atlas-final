@@ -8,7 +8,7 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 # (files:[], project references) and type-checks NOTHING, so it must not be
 # used as the gate.
 npm run typecheck:all || exit 1
-npx eslint . || exit 1
+npm run lint || exit 1
 
 # `format:check` used to live only in the PR workflow. Since branches now merge
 # straight to main, that workflow rarely runs and the format gate went unchecked

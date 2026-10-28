@@ -37,3 +37,13 @@ so PR runs are slower but can't drift from the runner. `publish-atlas.yml`'s `bu
 `shardOutcome.test.ts`. Workflows parse with js-yaml; Actions not run. Vitest 4 drops
 `poolOptions`: noted on eval-07. Gate: typecheck, lint, format, `test:ci` (3,339 passed),
 snapshot, player build, build, `atlas:scan` (12 clean), integrity smoke pass.
+
+2026-10-28, review fixes: the PR check keeps its 4 parallel shard jobs (20 min), each running
+`npm run test:shard -- N`, a per-shard entry of the same runner; publish keeps one
+`npm run test:ci` job, now with job-level `permissions: contents: read`. `classifyShard` is
+now `classifyRun(status, output, target)` with `target` required, returning `RunOutcome`
+(adds `"no-tests"`, so the hook prints "no tests relate to these changes" again).
+`runWithRetry` and `parseRunnerArgs` moved into `shardOutcome.ts` and are tested with a fake
+vitest (at most one re-run, the second result decides, a second timeout fails); a shard number
+outside 1..`SHARD_COUNT` is refused, so a stale matrix fails loudly. `pre-commit.sh` runs
+`npm run lint` instead of `npx eslint .`. 23 tests in `shardOutcome.test.ts`.

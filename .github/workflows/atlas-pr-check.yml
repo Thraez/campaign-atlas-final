@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 # Superseded pushes to the same PR cancel their in-flight run. Without this, a
-# branch pushed three times in a minute burns three full scan+test runs and
+# branch pushed three times in a minute burns three full scan+test matrices and
 # the earliest one can report last.
 concurrency:
   group: pr-check-${{ github.ref }}
@@ -61,7 +61,12 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        # Must list 1..SHARD_COUNT from scripts/dev/shardOutcome.ts. The runner
+        # refuses a shard number outside that range.
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
 
@@ -73,8 +78,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests (all shards, worker-timeout retry)
-        # The same runner publish-atlas.yml, `npm run verify` and the pre-commit
-        # hook use. Shard flags and the retry rule live in scripts/dev/shardOutcome.ts.
-        run: npm run test:ci
+      - name: Run test shard ${{ matrix.shard }} (worker-timeout retry)
+        # The same runner as publish-atlas.yml's `npm run test:ci` and the
+        # pre-commit hook; shard flags and the retry rule live in
+        # scripts/dev/shardOutcome.ts.
+        run: npm run test:shard -- ${{ matrix.shard }}
 
