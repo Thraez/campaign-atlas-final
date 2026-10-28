@@ -64,6 +64,11 @@ commands with shell variables (one plain command per call, absolute paths).
   as a ticked update with no warning, and the written file stays `player` with the secret body.
   Untick such rows in the Sync panel by hand. Also on `main`: a crafted `atlas.id` can make the
   image copy write outside `public/` (only someone who can write the vault can do this).
+- **Safety, already on `main`** (found in the code-retro 08 review, being fixed on that branch): a
+  build that fails a check (e.g. an unclosed `%%` in a player note) still writes `atlas.json` and
+  `search-index.json` first, with the leaked text. The editor's player rebuild writes into
+  `public/atlas/`, which is committed. Before committing `public/atlas/` after a failed build, run
+  `git checkout -- public/atlas`. The committed copy scanned clean at 04:50.
 - Code-retro 06 needs a real `npm run atlas:publish` run before it is done (the ticket asks for
   it; overnight only its parts ran).
 - Filed overnight: ticket 20 (pin labels keep their first mode across zoom, from the eval-11
