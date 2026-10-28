@@ -19,12 +19,16 @@ export function CharacterKeysPanel({ worldDir }: Props) {
   const [rows, setRows] = useState<CharacterRow[]>([]);
   const [baseHash, setBaseHash] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // Why the last load failed. While set, the list is hidden and Save is off,
+  // so an empty list can never be written over a file we couldn't read.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch(`/__atlas/read?path=${encodeURIComponent(keysPath)}`);
       if (res.status === 404) {
@@ -32,9 +36,15 @@ export function CharacterKeysPanel({ worldDir }: Props) {
         setBaseHash(null);
         return;
       }
-      if (!res.ok) return;
+      if (!res.ok) {
+        setLoadError(`the server answered ${res.status}`);
+        return;
+      }
       const body = (await res.json()) as { contents?: unknown };
-      if (typeof body.contents !== "string") return;
+      if (typeof body.contents !== "string") {
+        setLoadError("the server's answer had no file contents");
+        return;
+      }
       const parsed = yaml.load(body.contents);
       if (parsed && typeof parsed === "object") {
         const loaded = Object.entries(parsed as Record<string, unknown>)
@@ -45,7 +55,7 @@ export function CharacterKeysPanel({ worldDir }: Props) {
       const h = await hashContent(body.contents);
       setBaseHash(h);
     } catch {
-      // dev server not running or file unreadable — start empty
+      setLoadError("the dev server couldn't be reached");
     } finally {
       setLoading(false);
     }
@@ -129,79 +139,97 @@ export function CharacterKeysPanel({ worldDir }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-3 space-y-3">
-        {rows.length === 0 && (
-          <div className="text-[10px] text-muted-foreground py-2">
-            No characters yet — add one below.
-          </div>
-        )}
-        {rows.map((row, i) => (
-          <div key={i} className="space-y-1">
-            <div className="flex items-center gap-1">
-              <input
-                type="text"
-                value={row.name}
-                onChange={(e) => updateName(i, e.target.value)}
-                placeholder="Character name"
-                className="flex-1 h-7 text-xs border border-border rounded bg-background px-2 focus:outline-none focus:ring-1 focus:ring-primary"
-                aria-label="Character name"
-              />
-              <button
-                type="button"
-                onClick={() => removeRow(i)}
-                className="h-7 px-1.5 rounded border border-border hover:bg-destructive/20 text-muted-foreground hover:text-destructive flex items-center"
-                title="Remove this character"
-                aria-label="Remove character"
-              >
-                <Trash2 className="h-3 w-3" />
-              </button>
-            </div>
-            <div className="flex items-center gap-1">
-              <code
-                className="flex-1 text-[10px] font-mono bg-muted px-2 py-1 rounded truncate select-all cursor-text"
-                title={row.key}
-              >
-                {row.key}
-              </code>
-              <button
-                type="button"
-                onClick={() => copyKey(i)}
-                className="h-6 px-1.5 rounded border border-border hover:bg-accent flex items-center gap-1 text-[10px]"
-                title="Copy key to clipboard"
-                aria-label="Copy key"
-              >
-                {copiedIdx === i ? (
-                  <Check className="h-3 w-3 text-green-400" />
-                ) : (
-                  <Copy className="h-3 w-3" />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => regenerateKey(i)}
-                className="h-6 px-1.5 rounded border border-border hover:bg-accent flex items-center gap-1 text-[10px] text-muted-foreground"
-                title="Generate a new key — player must be re-told the new key"
-                aria-label="Regenerate key"
-              >
-                <RefreshCw className="h-3 w-3" />
-              </button>
-            </div>
-          </div>
-        ))}
+      {loadError && (
+        <div role="alert" className="m-3 rounded border border-amber-500/60 p-2 space-y-2 text-xs">
+          <p>
+            Couldn't load the character keys ({loadError}). Saving is off, so an empty list can't
+            overwrite the file.
+          </p>
+          <button
+            type="button"
+            className="h-7 px-2 text-xs rounded border"
+            onClick={() => void load()}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
-        <button
-          type="button"
-          onClick={addRow}
-          className="w-full h-7 text-xs border border-dashed border-border rounded hover:bg-accent flex items-center justify-center gap-1 text-muted-foreground"
-        >
-          <Plus className="h-3.5 w-3.5" /> Add character
-        </button>
-      </div>
+      {loadError === null && (
+        <div className="flex-1 overflow-auto p-3 space-y-3">
+          {rows.length === 0 && (
+            <div className="text-[10px] text-muted-foreground py-2">
+              No characters yet — add one below.
+            </div>
+          )}
+          {rows.map((row, i) => (
+            <div key={i} className="space-y-1">
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  value={row.name}
+                  onChange={(e) => updateName(i, e.target.value)}
+                  placeholder="Character name"
+                  className="flex-1 h-7 text-xs border border-border rounded bg-background px-2 focus:outline-none focus:ring-1 focus:ring-primary"
+                  aria-label="Character name"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeRow(i)}
+                  className="h-7 px-1.5 rounded border border-border hover:bg-destructive/20 text-muted-foreground hover:text-destructive flex items-center"
+                  title="Remove this character"
+                  aria-label="Remove character"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+              <div className="flex items-center gap-1">
+                <code
+                  className="flex-1 text-[10px] font-mono bg-muted px-2 py-1 rounded truncate select-all cursor-text"
+                  title={row.key}
+                >
+                  {row.key}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => copyKey(i)}
+                  className="h-6 px-1.5 rounded border border-border hover:bg-accent flex items-center gap-1 text-[10px]"
+                  title="Copy key to clipboard"
+                  aria-label="Copy key"
+                >
+                  {copiedIdx === i ? (
+                    <Check className="h-3 w-3 text-green-400" />
+                  ) : (
+                    <Copy className="h-3 w-3" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => regenerateKey(i)}
+                  className="h-6 px-1.5 rounded border border-border hover:bg-accent flex items-center gap-1 text-[10px] text-muted-foreground"
+                  title="Generate a new key — player must be re-told the new key"
+                  aria-label="Regenerate key"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={addRow}
+            className="w-full h-7 text-xs border border-dashed border-border rounded hover:bg-accent flex items-center justify-center gap-1 text-muted-foreground"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add character
+          </button>
+        </div>
+      )}
 
       <div className="p-3 border-t border-border">
         <button
           type="button"
-          disabled={saving}
+          disabled={saving || loadError !== null}
           onClick={() => void persist(rows)}
           className="w-full h-7 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
         >

@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { CharacterKeysPanel } from "@/atlas/secrets/CharacterKeysPanel";
 
-vi.mock("@/atlas/save/localFsSave", () => ({
+vi.mock("@/atlas/save/localFsSave", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/atlas/save/localFsSave")>()),
   saveAtlasPatchToLocalFs: vi.fn().mockResolvedValue({ saved: 1, paths: [] }),
   hashContent: vi.fn().mockResolvedValue("sha256:abc123"),
 }));
@@ -140,5 +141,43 @@ describe("CharacterKeysPanel — load/add/remove/persist contract (N36)", () => 
       configurable: true,
       writable: true,
     });
+  });
+});
+
+describe("CharacterKeysPanel — a failed load never offers an empty list to save (eval-2026-10/36)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockHash.mockResolvedValue("sha256:abc123");
+    mockSave.mockResolvedValue({ saved: 1, paths: ["/world/_dm/character-keys.yaml"] });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("a server error says the keys couldn't load and keeps Save off", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+    render(<CharacterKeysPanel worldDir="/world" />);
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(/Couldn't load the character keys/i),
+    );
+    expect(screen.queryByText(/No characters yet/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /Save keys/i })).toBeDisabled();
+  });
+
+  it("a network error says so too, and Retry loads the file", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValue({ ok: true, status: 200, json: async () => ({ contents: "Aria: k1\n" }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<CharacterKeysPanel worldDir="/world" />);
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(/Couldn't load the character keys/i),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Retry/i }));
+    await waitFor(() => expect(screen.getByDisplayValue("Aria")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /Save keys/i })).toBeEnabled();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
