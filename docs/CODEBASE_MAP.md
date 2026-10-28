@@ -231,7 +231,8 @@ large (~2.7k lines) but delegates to focused, testable modules.
 | `src/atlas/{fog,regions,routes}/*Layer.tsx`                             | react-leaflet visual layers (z-ordered base→regions→routes→fog→pins)           | `FogLayer`, `RegionLayer`, `RouteLayer`                                     |
 | `src/atlas/tabs/{FogTab,RegionsTab,RoutesTab}.tsx`, `MapLayerPanel.tsx` | Tab UIs                                                                        | —                                                                           |
 | `src/atlas/editor/saveGate.ts` + `dirtyPlacements.ts`                   | Pure save pre-flight (dirty filter, empty gate)                                | `buildSavePlan`, `filterDirtyPlacements`                                    |
-| `src/atlas/editor/{mapClickCoord,pinClickIntent,entityCloseIntent}.ts`  | Pure click/intent resolvers                                                    | `mapClickToAtlasCoord`, `resolvePinClickIntent`, `resolveEntityCloseIntent` |
+| `src/atlas/editor/{pinClickIntent,entityCloseIntent}.ts`                | Pure click/intent resolvers                                                    | `resolvePinClickIntent`, `resolveEntityCloseIntent`                         |
+| `src/atlas/map/mapClickCoord.ts`                                        | Pure map-click resolver (shared with the viewer's ruler)                       | `mapClickToAtlasCoord`                                                      |
 | `src/atlas/useUndoStack.ts` + `session/useEditorSession.ts`             | Central snapshot undo/redo + session status                                    | `useUndoStack`, `useEditorSession`                                          |
 
 **Entry:** router mounts the page (behind the editor gate); map/layer/draw clicks
@@ -284,6 +285,7 @@ error, not a deep crash); asset URLs resolve against `import.meta.env.BASE_URL`
 | File                                  | Role                                                                          | Key exports                                      |
 | ------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------ |
 | `src/lib/logger.ts`                   | Leveled logger seam — the single point all diagnostics route through          | `logger`, `shouldEmit`                           |
+| `src/lib/download.ts`                 | Browser file download (viewer handouts and editor reports share it)           | `downloadText`, `downloadBlob`                   |
 | `src/components/ui/sonner.tsx`        | Toast mount; call `toast()` from `sonner` directly for user feedback          | `Toaster`, `toast`                               |
 | `src/hooks/use-has-desktop-aside.tsx` | Responsive gate (≥1024px → aside, else sheet; never both/neither)             | `useHasDesktopAside`, `DESKTOP_ASIDE_BREAKPOINT` |
 | `src/atlas/tabs/ValidationChips.tsx`  | Shared validation-issue chips (RegionsTab/RoutesTab/FogTab)                   | `ValidationChips`                                |
