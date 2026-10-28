@@ -291,6 +291,23 @@ function variantPlayerSecret(): VariantResult {
   );
 }
 
+// ---- Variant 7: a DM file in the built atlas dir (check-player-files) ------
+function variantPlayerFiles(): VariantResult {
+  const plant = (label: string, extra?: string) => {
+    const dir = freshDir(label);
+    fs.mkdirSync(path.join(dir, "atlas", "assets", "maps"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "atlas", "atlas.json"), "{}");
+    if (extra) fs.writeFileSync(path.join(dir, "atlas", "assets", "maps", extra), "fog: {}");
+    return runScan("check-player-files.ts", [dir]);
+  };
+  return assertCleanThenDirty(
+    "DM file in player build",
+    "check-player-files.ts",
+    () => plant("player-files-clean"),
+    () => plant("player-files-dirty", "world.yaml"),
+  );
+}
+
 async function main(): Promise<number> {
   if (!fs.existsSync(PLAYER_ATLAS)) {
     console.error(
@@ -315,6 +332,7 @@ async function main(): Promise<number> {
   results.push(variantFog());
   results.push(variantShape());
   results.push(variantPlayerSecret());
+  results.push(variantPlayerFiles());
 
   const pad = Math.max(...results.map((r) => r.name.length));
   for (const r of results) {

@@ -33,7 +33,8 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { deriveSecretsFromVault } from "./check-derived-secrets";
-import { IMAGE_EXTENSIONS, isReferenced, readPlayerImageRefs } from "./atlas/playerImageRefs";
+import { IMAGE_EXTENSIONS } from "./atlas/assetRefs";
+import { isReferenced, readPlayerImageRefs } from "./atlas/playerImageRefs";
 const CONFIG_CANDIDATES = ["atlas.config.json"];
 /** Image types sharp cannot decode: their metadata goes unchecked (the filename
  *  check still runs), and the scan says so per file. Provisional call, 2026-10-28. */
@@ -113,8 +114,9 @@ export async function run(opts: RunOpts): Promise<number> {
     opts.referencedBy !== undefined
       ? { dir: opts.referencedBy, refs: readPlayerImageRefs(opts.referencedBy) }
       : null;
-  /** Whether the player build keeps this image. Mirrors prunePlayerImagesPlugin,
-   *  which only prunes under the atlas dir's `assets/`. */
+  /** Whether the player build may keep this image. prunePlayerFilesPlugin
+   *  prunes unnamed images anywhere under the atlas dir; this skips only those
+   *  under `assets/`, the stricter choice (an image elsewhere is always checked). */
   const ships = (imgPath: string): boolean => {
     if (player === null) return true;
     const rel = path.relative(player.dir, imgPath);
