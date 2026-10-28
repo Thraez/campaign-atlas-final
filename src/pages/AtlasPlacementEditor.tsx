@@ -64,8 +64,10 @@ import type { FileChange } from "@/atlas/save/localFsSave";
 import { SaveStatus } from "@/atlas/session/SaveStatus";
 import { DiscardConfirmModal } from "@/atlas/session/DiscardConfirmModal";
 import { useExternalRebuildDetector } from "@/atlas/session/useExternalRebuildDetector";
-import { CanonicalSaveError } from "@/atlas/save/canonicalPlacementSave";
-import { buildCanonicalEntityChanges } from "@/atlas/save/canonicalEntitySave";
+import {
+  CanonicalSaveError,
+  buildCanonicalPlacementChanges,
+} from "@/atlas/save/canonicalPlacementSave";
 import { useWorldYamlBaseline, worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
 import {
   buildWorldYamlContent as pureBuildWorldYamlContent,
@@ -97,7 +99,7 @@ import { EntityEditPanel } from "@/atlas/categories/EntityEditPanel";
 import { EntitySurface } from "@/atlas/entity/EntitySurface";
 import { resolvePinClickIntent } from "@/atlas/editor/pinClickIntent";
 import { resolveEntityCloseIntent } from "@/atlas/editor/entityCloseIntent";
-import { mapClickToAtlasCoord } from "@/atlas/editor/mapClickCoord";
+import { mapClickToAtlasCoord } from "@/atlas/map/mapClickCoord";
 import { usePinsTabFilters } from "@/atlas/editor/usePinsTabFilters";
 import { usePinOverrideMutations } from "@/atlas/editor/usePinOverrideMutations";
 import {
@@ -812,11 +814,6 @@ function AtlasPlacementEditorInner() {
       allDraftPlacements: buildDraftPlacements(),
       overrides,
       activeMapId: activeMap.id,
-      // Entities-tab frontmatter drafts are not wired into this page — entity
-      // edits go through EntityEditPanel/useEntityEditDraft — so supply none.
-      // buildSavePlan keeps the param for its other (tested) callers.
-      entityDrafts: {},
-      projectEntities: project.entities,
       worldYamlDirty,
     });
     if (plan.isEmpty && foreignMapDrafts.length === 0) {
@@ -826,16 +823,11 @@ function AtlasPlacementEditorInner() {
     // N100: fold in cross-map duplicates (overrides keyed to a map other
     // than the active one) — buildSavePlan only ever sees the active map.
     const drafts = [...plan.dirtyPlacements, ...foreignMapDrafts];
-    const fmPatches = plan.frontmatterPatches;
     const entitiesById = new Map(project.entities.map((e) => [e.id, e]));
     try {
-      // One FileChange per entity .md path even when an entity is edited in
-      // BOTH the Pins tab (placements) and the Entities tab (frontmatter) —
-      // the save endpoint rejects duplicate paths.
-      const entityChanges = await buildCanonicalEntityChanges(
-        { placements: drafts, frontmatter: fmPatches },
-        entitiesById,
-      );
+      // One FileChange per entity .md path, however many maps it is placed
+      // on — the save endpoint rejects duplicate paths.
+      const entityChanges = await buildCanonicalPlacementChanges(drafts, entitiesById);
       const fileChanges: FileChange[] = [...entityChanges];
 
       if (worldYamlDirty && activeWorldId) {
@@ -1441,7 +1433,7 @@ function AtlasPlacementEditorInner() {
 
           const panels: Record<string, React.ReactNode> = {
             // Six content categories — wired to CategoryPanel (browse) or
-            // EntityEditorPanel (create). Phase 2 EntitiesTab stopgap removed.
+            // EntityEditorPanel (create).
             characters:
               creatingIn === "characters" ? (
                 <EntityEditorPanel

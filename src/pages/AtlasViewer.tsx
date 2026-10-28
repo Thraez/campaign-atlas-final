@@ -49,6 +49,7 @@ import { SoundSettingsProvider } from "@/atlas/sound/SoundSettingsProvider";
 import { SoundscapeLayer } from "@/atlas/sound/SoundscapeLayer";
 import { SoundControl } from "@/atlas/sound/SoundControl";
 import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
+import { setOfflineMap, type OfflineMap } from "@/pwa";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 import { SearchPalette } from "@/atlas/search/SearchPalette";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
@@ -360,6 +361,13 @@ export default function AtlasViewer() {
     () => data?.project.maps.find((m) => m.id === activeMapId),
     [data, activeMapId],
   );
+  // The offline menu and banner describe what is stored for this map.
+  const offlineMap: OfflineMap | null = useMemo(() => {
+    if (!activeMap) return null;
+    const layerSrcs = activeMap.layers.map((l) => l.src);
+    return { key: [activeMap.id, ...layerSrcs].join("\n"), layerSrcs };
+  }, [activeMap]);
+  useEffect(() => setOfflineMap(offlineMap), [offlineMap]);
   const placementsOnMap: MapPlacement[] = useMemo(
     () =>
       data && activeMap ? data.project.placements.filter((p) => p.mapId === activeMap.id) : [],

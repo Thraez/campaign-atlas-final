@@ -18,6 +18,7 @@ export interface PublishScanReason {
     | "check-fog-safety"
     | "check-artifact-shape"
     | "check-player-secrets"
+    | "check-player-files"
     | "audit-assets";
   target: string;
   severity: "blocking";
@@ -40,4 +41,7 @@ export type PublishPushResult =
   | { status: "published"; pushedAt: string; commit: string }
   | { status: "blocked"; reasons: PublishScanReason[] }
   | { status: "nothing-to-publish" }
+  /** Publish only runs with `main` checked out. `branch` is the current
+   *  branch name, or "" for a detached HEAD. Nothing was staged, committed or pushed. */
+  | { status: "wrong-branch"; branch: string }
   | { status: "git-failed"; reason: "offline" | "auth" | "behind" | "conflict" | "unknown" };

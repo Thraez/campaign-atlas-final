@@ -3,9 +3,20 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
+import {
+  PRECACHE_GLOB_IGNORES,
+  PRECACHE_GLOB_PATTERNS,
+  precacheShippedOnlyPlugin,
+} from "./scripts/pwaPrecache";
 import { atlasSavePlugin } from "./scripts/vite-plugin-atlas-save";
 import { prunePlayerAudioPlugin } from "./scripts/vite-plugin-prune-player-audio";
-import { prunePlayerImagesPlugin } from "./scripts/vite-plugin-prune-player-images";
+import { prunePlayerFilesPlugin } from "./scripts/vite-plugin-prune-player-files";
+import {
+  ATLAS_ASSETS_CACHE,
+  ATLAS_DATA_CACHE,
+  ATLAS_HTML_CACHE,
+  EXTERNAL_IMAGES_CACHE,
+} from "./src/pwaCacheNames";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -80,7 +91,10 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           // Precache the built shell (HTML/JS/CSS) + small bundled assets.
-          globPatterns: ["**/*.{js,css,html,ico,svg,woff2}"],
+          // atlas/ is left to the runtime caches below: the prunes delete
+          // from it after this service worker is written. See the module.
+          globPatterns: PRECACHE_GLOB_PATTERNS,
+          globIgnores: PRECACHE_GLOB_IGNORES,
           // OAuth-style callbacks must always hit the network.
           navigateFallbackDenylist: [/^\/~oauth/, /^\/auth/],
           cleanupOutdatedCaches: true,
@@ -92,7 +106,7 @@ export default defineConfig(({ mode }) => {
               urlPattern: ({ request }) => request.mode === "navigate",
               handler: "NetworkFirst",
               options: {
-                cacheName: "atlas-html",
+                cacheName: ATLAS_HTML_CACHE,
                 networkTimeoutSeconds: 3,
                 expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 7 },
               },
@@ -104,7 +118,7 @@ export default defineConfig(({ mode }) => {
                 url.pathname.endsWith("/atlas/search-index.json"),
               handler: "NetworkFirst",
               options: {
-                cacheName: "atlas-data",
+                cacheName: ATLAS_DATA_CACHE,
                 networkTimeoutSeconds: 4,
                 expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 30 },
                 cacheableResponse: { statuses: [0, 200] },
@@ -117,7 +131,7 @@ export default defineConfig(({ mode }) => {
               urlPattern: ({ url }) => url.pathname.includes("/atlas/assets/"),
               handler: "CacheFirst",
               options: {
-                cacheName: "atlas-assets",
+                cacheName: ATLAS_ASSETS_CACHE,
                 expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 60 },
                 cacheableResponse: { statuses: [0, 200, 206] },
                 rangeRequests: true,
@@ -145,7 +159,7 @@ export default defineConfig(({ mode }) => {
                 request.destination === "image" && !sameOrigin,
               handler: "StaleWhileRevalidate",
               options: {
-                cacheName: "external-images",
+                cacheName: EXTERNAL_IMAGES_CACHE,
                 expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 14 },
                 cacheableResponse: { statuses: [0, 200] },
               },
@@ -153,14 +167,20 @@ export default defineConfig(({ mode }) => {
           ],
         },
       }),
+      // Fail the build if sw.js precaches a file the build doesn't ship. Its
+      // closeBundle is ordered "post", so it runs after the SW is written and
+      // after the prunes below, wherever it sits in this list.
+      precacheShippedOnlyPlugin(),
+
       // Player builds only: strip the source-named audio beds from dist/ (the
       // player references content-hashed copies; the source names exist solely
       // for the DM picker in public/). Runs last so it fires after the public
       // copy + PWA precache generation. See the plugin for the full rationale.
       !includeEditor && prunePlayerAudioPlugin(),
-      // Player builds only: strip images no player note shows (the DM's asset
-      // store lives in public/ too). See the plugin.
-      !includeEditor && prunePlayerImagesPlugin(),
+      // Player builds only: strip images no player note shows and any file
+      // off the player allowlist (the DM's asset store lives in public/ too).
+      // See the plugin.
+      !includeEditor && prunePlayerFilesPlugin(),
     ].filter(Boolean),
     resolve: {
       alias: {

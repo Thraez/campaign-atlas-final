@@ -23,7 +23,7 @@ import {
   Package,
 } from "lucide-react";
 import { fileToDataUrl, readImageSize } from "@/atlas/content/browserFile";
-import { downloadBlob } from "@/atlas/tabs/download";
+import { downloadBlob } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

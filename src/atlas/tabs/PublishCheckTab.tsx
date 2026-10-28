@@ -21,7 +21,7 @@ import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TabFrame } from "./TabFrame";
-import { downloadText } from "./download";
+import { downloadText } from "@/lib/download";
 import { BuildReportPanel } from "@/atlas/publish/BuildReportPanel";
 import { ReadinessCard } from "@/atlas/publish/ReadinessCard";
 import { usePublishFlow } from "@/atlas/publish/usePublishFlow";
@@ -176,6 +176,18 @@ export function PublishCheckTab({
           <p className="text-[11px] text-muted-foreground text-center">
             Already up to date — nothing new to publish.
           </p>
+        )}
+
+        {publish.state === "wrong-branch" && (
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs space-y-1">
+            <div className="font-medium">Publishing only works from the main branch.</div>
+            <div className="text-[10px] text-muted-foreground">
+              {publish.refusedBranch
+                ? `You're on “${publish.refusedBranch}”.`
+                : "No branch is checked out."}{" "}
+              Switch to main in GitHub Desktop, then publish again. Nothing was committed or pushed.
+            </div>
+          </div>
         )}
 
         {publish.state === "git-failed" && (

@@ -1,6 +1,6 @@
 # Editor Save keeps world.yaml's other keys
 
-Status: ready-for-agent
+Status: done
 Area: editor, local save
 
 Bug, found 2026-10-27. `buildFullWorldYaml` (`src/atlas/yaml/buildFullWorldYaml.ts:58-70`) writes
@@ -19,3 +19,41 @@ defaults get written into the file too.
 - A round-trip test: load the real world.yaml, save an unchanged map, load again; the same keys
   and the same `import:` value come back.
 - The existing world.yaml save tests pass.
+
+## Comments
+
+2026-10-27, branch `eval-08-world-yaml-keys`:
+
+- `buildFullWorldYaml` now parses the existing file's top-level mapping and writes it back with
+  only the editor-owned keys replaced (`EDITOR_OWNED_KEYS`: schemaVersion, name, maps, calendar,
+  credits, assetCredits, plus the legacy top-level regions/fog/routes, which the loader folds into
+  `maps[]` and so are dropped as before to avoid duplicates). Every other key (`import:`, anything
+  unknown) passes through, and the file's key order is kept; new owned keys are appended. The
+  leading comment block is still handled by `serializeWorldYaml`, unchanged.
+- Loader default no longer leaks in: `credits` equal to the default (both true) is not written
+  into a file that didn't have the key. That was the one loader default that showed up on the
+  real world.yaml.
+- Tests in `src/test/build-full-world-yaml.test.ts`, "keeps keys the editor doesn't model":
+  `import:` + an unknown `dmNotes:` key kept (with key order), legacy top-level `regions:` dropped,
+  and a round-trip of the real `content/astrath-deeprealm/_atlas/world.yaml` (same top-level keys,
+  same `import:` value, same `importConfig`). The first and third failed on the old code.
+- Gate: typecheck:all clean, lint 0 errors / 13 warnings, format:check clean, test:ci all 4 shards
+  green (3,390 tests), atlas:publish "all 12 scans clean", integrity-smoke "all 6 caught".
+- Not covered, left open: comments inside or between YAML keys (other than the leading block) are
+  still lost on save, a documented existing limitation. Other loader defaults inside `maps[]`
+  (e.g. `wrapX: false` always written) can still appear in the file; they don't change meaning.
+- Review (two-axis, standards + spec) ran on `35b6f76`; fixes in the follow-up commit:
+  a world.yaml that exists but won't parse (or isn't a mapping) now makes Save refuse with
+  `WorldYamlUnreadableError`, shown as "Could not prepare save: …", instead of overwriting it
+  and dropping `import:` (an empty or absent file still saves); `isDefaultCredits` points at its
+  owner `resolveCredits` (src/ can't import the Node-side loader) and a test pins it to
+  `resolveCredits(undefined)`; `EDITOR_OWNED_KEYS` is exported and a test checks every key the
+  builder emits is in it. Tests: "refuses to save over an existing world.yaml that doesn't
+  parse", "still saves when the existing file is empty or absent", "lists every top-level key it
+  emits in EDITOR_OWNED_KEYS", "treats the loader's default credits as absent". Full gate rerun
+  green.
+- Follow-up notes, no work: loader defaults that still leak into the file on save (`oceanColor`,
+  `wrapX`, layer `opacity`/`zIndex` defaults); unknown keys are re-dumped by js-yaml, so dates
+  become ISO timestamps and YAML anchors/aliases are expanded.
+- Worktree note: the worktree had no `node_modules`, and `test:ci` spawns
+  `./node_modules/.bin/vitest`; I linked `node_modules/.bin` to the main repo's (gitignored).

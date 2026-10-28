@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { toast } from "sonner";
-import { downloadText } from "@/atlas/tabs/download";
+import { downloadText } from "@/lib/download";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
 

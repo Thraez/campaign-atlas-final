@@ -35,6 +35,8 @@ export const MSG: Record<PublishScanReason["scan"], string> = {
     "The world file came out malformed — the build needs attention before publishing.",
   "check-player-secrets":
     "A locked secret or its password would have been visible to players. Publishing is blocked.",
+  "check-player-files":
+    "A file that isn't part of the player site (such as a world.yaml or a note) would have been published. Publishing is blocked.",
   "audit-assets": "An image is larger than the 4 MB limit and must be optimized before publishing.",
 };
 
