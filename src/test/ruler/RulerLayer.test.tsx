@@ -39,7 +39,7 @@ vi.mock("react-dom", async () => {
   };
 });
 
-vi.mock("@/atlas/editor/mapClickCoord", () => ({
+vi.mock("@/atlas/map/mapClickCoord", () => ({
   mapClickToAtlasCoord: (lng: number, lat: number, mapHeight: number) => ({
     x: lng,
     y: mapHeight - lat,

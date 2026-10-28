@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapClickToAtlasCoord } from "@/atlas/editor/mapClickCoord";
+import { mapClickToAtlasCoord } from "@/atlas/map/mapClickCoord";
 
 describe("mapClickToAtlasCoord", () => {
   it("rounds lng→x and flips lat against map height for y", () => {
