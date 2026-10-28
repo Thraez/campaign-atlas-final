@@ -1,6 +1,6 @@
 # Map layer uploads always get a real target path
 
-Status: ready-for-agent
+Status: ready-for-human
 Area: editor, local save
 
 Found by the eval-12 review (2026-10-27). These problems were already there before that work.
@@ -17,3 +17,9 @@ AGENTS.md says published image naming belongs to `src/atlas/assets/imageEncoding
 - One function names an upload's target, and `buildSaveBatch.ts` uses it instead of the `${id}.png` literals. That function either lives in `imageEncoding.ts` or is called by the code that owns map naming. Say which, and why, in a comment.
 - Old layers with no `targetPath` get the same name on save as a fresh upload would.
 - Tests cover the empty string, the missing path and a fresh upload.
+
+## Comments
+
+- 2026-10-28 (agent, branch eval-19-upload-target-path): "Maps stay lossless; maps:optimize owns them" governs, so naming lives in `src/atlas/assets/mapLayerTarget.ts` (`mapLayerTargetPath`) and keeps the extension, not in `imageEncoding.ts` (which renames to `.webp`). Used by `useMapLayers.ts` and both spots in `buildSaveBatch.ts`. Clearing the path field restores the default (stores no path; the placeholder shows the default) rather than showing an error. Needs Isak's look at the path field in the editor. Superseded in part by the review fixes below.
+- 2026-10-28 (agent, review fixes): `mapLayerTarget.ts` now owns map file naming for editor uploads and the Map Import Wizard (`safeFilename`, `defaultTargetPath` moved from `mapImport.ts`), so both name a file the same; dashes at either end of the name are stripped (`Fog Overlay (v2).PNG` → `fog-overlay-v2.png`). Provisional call: typed paths are forced under maps/, because maps stay lossless and the spec says so. A typed path outside `public/atlas/assets/maps/`, or a bare name, saves to the default; the field shows an amber hint (not a blocking error) naming the path Save will use. With no filename, the extension comes from the `dataUrl` MIME type. Typed values are trimmed when stored, and a legacy `""` is cleaned on load from localStorage.
+- Known edge, left as is: undoing past a Save can leave the written file on disk with no layer pointing at it (an orphan).

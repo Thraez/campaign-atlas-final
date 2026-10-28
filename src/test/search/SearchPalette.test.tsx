@@ -21,7 +21,7 @@ function entry(overrides: Partial<SearchIndexEntry> = {}): SearchIndexEntry {
     type: "location",
     aliases: [],
     tags: [],
-    body: "",
+    searchText: "",
     bodyText: "",
     ...overrides,
   };
@@ -32,7 +32,7 @@ const IRON = entry({
   title: "Iron Tower",
   type: "location",
   tags: ["ruins"],
-  body: "the iron tower stands tall",
+  searchText: "the iron tower stands tall",
   bodyText: "The Iron Tower stands tall",
 });
 const GUARD = entry({
@@ -40,7 +40,7 @@ const GUARD = entry({
   title: "Ancient Guard",
   type: "npc",
   tags: ["ruins"],
-  body: "a weathered sentinel",
+  searchText: "a weathered sentinel",
   bodyText: "A weathered sentinel",
 });
 const LAKE = entry({
@@ -48,7 +48,7 @@ const LAKE = entry({
   title: "Silver Lake",
   type: "location",
   tags: ["water"],
-  body: "a still silver lake",
+  searchText: "a still silver lake",
   bodyText: "A still silver lake",
 });
 

@@ -109,7 +109,7 @@ export function makeSearchIndex(): SearchIndexEntry[] {
       aliases: [],
       tags: [],
       summary: "A tower of black iron.",
-      body: "a tower of black iron.",
+      searchText: "a tower of black iron.",
     },
   ];
 }

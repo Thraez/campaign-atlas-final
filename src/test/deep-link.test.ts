@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { serializeDeepLink, parseDeepLink } from "@/atlas/deepLink";
+import { serializeDeepLink, parseDeepLink, entityHref } from "@/atlas/deepLink";
 
 describe("serializeDeepLink", () => {
   it("serializes all four fields", () => {
@@ -125,5 +125,21 @@ describe("parseDeepLink", () => {
   it("treats empty-string cz as no zoom", () => {
     const dl = parseDeepLink("?cz=");
     expect(dl.zoom).toBeNull();
+  });
+});
+
+describe("entityHref", () => {
+  it("points at the viewer with the entity id", () => {
+    expect(entityHref("corven")).toBe("/atlas?entity=corven");
+  });
+
+  it("URI-encodes spaces and reserved characters", () => {
+    expect(entityHref("old keep/#1&x")).toBe("/atlas?entity=old%20keep%2F%231%26x");
+  });
+
+  it("parses back to the same entity id", () => {
+    const id = "old keep/#1&x+y";
+    const search = entityHref(id).slice("/atlas".length);
+    expect(parseDeepLink(search).entityId).toBe(id);
   });
 });

@@ -23,7 +23,7 @@ import {
   Package,
 } from "lucide-react";
 import { fileToDataUrl, readImageSize } from "@/atlas/content/browserFile";
-import { downloadBlob } from "@/atlas/tabs/download";
+import { downloadBlob } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -41,11 +41,11 @@ import {
   buildPlanYaml,
   buildReadme,
   defaultAssignment,
-  safeFilename,
   validateImportPlan,
   type ImportImage,
   type ImportMode,
 } from "./mapImport";
+import { safeFilename } from "@/atlas/assets/mapLayerTarget";
 import { SelectStep } from "./wizard-steps/SelectStep";
 import { ModeStep } from "./wizard-steps/ModeStep";
 import { ConfigureStep } from "./wizard-steps/ConfigureStep";

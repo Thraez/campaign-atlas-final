@@ -11,11 +11,12 @@ import { Input } from "@/components/ui/input";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
-import { entityMatchesQuery } from "@/atlas/search/entityMatchesQuery";
+import { compileQuery, entitySearchDoc, searchMatches } from "@/atlas/search/search";
 import {
   parseBrowseFilterParams,
   serializeBrowseFilterParams,
 } from "@/atlas/browse/browseFilterParams";
+import { entityHref } from "@/atlas/deepLink";
 
 interface YearGroup {
   key: string;
@@ -52,9 +53,10 @@ export default function AtlasTimeline() {
   }, [dated]);
 
   const groups = useMemo<YearGroup[]>(() => {
+    const q = compileQuery(query);
     const filtered = dated.filter((e) => {
       if (activeType && e.type !== activeType) return false;
-      return entityMatchesQuery(e, query);
+      return searchMatches(entitySearchDoc(e), q);
     });
     const sorted = [...filtered].sort((a, b) => a.dateValue! - b.dateValue!);
     // Group by year, then order the groups by year: a dateValue override can
@@ -234,7 +236,7 @@ export default function AtlasTimeline() {
                       {g.entries.map((e) => (
                         <Link
                           key={e.id}
-                          to={`/atlas?entity=${encodeURIComponent(e.id)}`}
+                          to={entityHref(e.id)}
                           className="block rounded border border-border bg-card hover:bg-accent/40 transition px-3 py-2"
                         >
                           <div className="flex items-baseline gap-2 flex-wrap">

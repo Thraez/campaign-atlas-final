@@ -36,6 +36,7 @@ import {
 import { loadWorldConfig, projectAssetCredits } from "./atlas/loadWorldConfig";
 import { CURRENT_ATLAS_SCHEMA_VERSION } from "./atlas/schemaVersion";
 import { sanitizeAtlasHtml } from "../src/atlas/sanitizeHtml";
+import { searchBodyText } from "../src/atlas/search/search";
 import {
   validateAsset,
   formatFinding,
@@ -1370,19 +1371,10 @@ async function redactMapsForPlayer(
  * (loader.ts) rather than duplicated here.
  */
 function buildSearchIndex(pending: Pending[]): SearchIndexEntry[] {
-  // Strip markdown but preserve original case — used as bodyText for display.
-  const stripMdCore = (s: string) =>
-    s
-      .replace(/```[\s\S]*?```/g, " ")
-      .replace(/!\[[^\]]*]\([^)]*\)/g, " ")
-      .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?]]/g, (_m, t, d) => d || t)
-      .replace(/\[([^\]]*)]\([^)]*\)/g, "$1")
-      .replace(/[*_`>#~]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-
   return pending.map(({ entity }) => {
-    const stripped = stripMdCore(entity.body).slice(0, 4000);
+    // Shared with Browse/Timeline (src/atlas/search/search.ts) so every page
+    // searches the same text. Original case, used for snippets too.
+    const stripped = searchBodyText(entity.body);
     return {
       id: entity.id,
       title: entity.title,

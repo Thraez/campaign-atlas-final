@@ -1,7 +1,7 @@
 /**
  * Tests for src/atlas/content/loader.ts's loadSearchIndex.
  *
- * The shipped search-index.json carries only bodyText (original case); body
+ * The shipped search-index.json carries only bodyText (original case); searchText
  * (lowercased, used for matching) is derived client-side on load rather than
  * duplicated in the artifact (Q65).
  */
@@ -23,18 +23,18 @@ afterEach(() => {
 });
 
 describe("loadSearchIndex", () => {
-  it("derives lowercased body from bodyText for each entry", async () => {
+  it("derives lowercased searchText from bodyText for each entry", async () => {
     stubFetch([
       { id: "a", title: "A", type: "npc", aliases: [], tags: [], bodyText: "Mixed CASE Body" },
     ]);
     const index = await loadSearchIndex();
     expect(index[0].bodyText).toBe("Mixed CASE Body");
-    expect(index[0].body).toBe("mixed case body");
+    expect(index[0].searchText).toBe("mixed case body");
   });
 
-  it("leaves body undefined when the entry has no bodyText", async () => {
+  it("leaves searchText undefined when the entry has no bodyText", async () => {
     stubFetch([{ id: "a", title: "A", type: "npc", aliases: [], tags: [] }]);
     const index = await loadSearchIndex();
-    expect(index[0].body).toBeUndefined();
+    expect(index[0].searchText).toBeUndefined();
   });
 });

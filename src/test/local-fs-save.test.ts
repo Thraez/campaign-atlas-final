@@ -5,6 +5,7 @@ import {
   LocalSaveError,
   ConflictError,
   SaveBusyError,
+  WriteFailedError,
   hashContent,
   type FileChange,
 } from "@/atlas/save/localFsSave";
@@ -160,13 +161,54 @@ describe("saveAtlasPatchToLocalFs", () => {
 
   it("500 from server throws LocalSaveError", async () => {
     const fetchFn = vi.fn(async () =>
-      jsonResponse(500, { error: "WriteFailed", detail: "disk full" }),
+      jsonResponse(500, { error: "BackupFailed", path: "content/world/notes/ok.md" }),
     );
     await expect(
       saveAtlasPatchToLocalFs([file({ content: "hi" })], {
         fetchFn: fetchFn as unknown as typeof fetch,
       }),
     ).rejects.toBeInstanceOf(LocalSaveError);
+  });
+
+  // The endpoint's real shape for a rolled-back write (vite-plugin-atlas-save
+  // handleSaveRequest): 207, which passes res.ok, yet nothing was saved.
+  it("207 WriteFailed (rolled back) throws WriteFailedError naming the file", async () => {
+    const fetchFn = vi.fn(async () =>
+      jsonResponse(207, {
+        error: "WriteFailed",
+        partialWrite: true,
+        saved: 0,
+        rolledBack: 2,
+        failedPath: "content/world/notes/ok.md",
+        writeError: "ENOSPC: no space left on device",
+      }),
+    );
+    const err = await saveAtlasPatchToLocalFs([file({ content: "hi" })], {
+      fetchFn: fetchFn as unknown as typeof fetch,
+    }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(WriteFailedError);
+    expect(err).toBeInstanceOf(LocalSaveError);
+    const wf = err as WriteFailedError;
+    expect(wf.failedPath).toBe("content/world/notes/ok.md");
+    expect(wf.rolledBack).toBe(2);
+    expect(wf.message).toContain("content/world/notes/ok.md");
+    expect(wf.message).toContain("ENOSPC");
+  });
+
+  it("207 after a failed rebuild is still a save (files are on disk)", async () => {
+    const fetchFn = vi.fn(async () =>
+      jsonResponse(207, {
+        saved: 1,
+        paths: ["content/world/notes/ok.md"],
+        rebuilt: false,
+        rebuildError: "boom",
+      }),
+    );
+    const result = await saveAtlasPatchToLocalFs([file({ content: "hi" })], {
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+    expect(result.saved).toBe(1);
+    expect(result.rebuilt).toBe(false);
   });
 
   it("sends rebuild:true when opts.rebuild is set", async () => {
