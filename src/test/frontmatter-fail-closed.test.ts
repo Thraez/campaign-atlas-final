@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * code-retro 06, second safety review: frontmatter that gray-matter (main's
  * build parser) reads must never come back from `parseFrontmatter` as "no

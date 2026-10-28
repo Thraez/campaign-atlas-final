@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * code-retro 06 review: a player note's wikilink to a secret note must be
  * redacted however the author spelled the name: spaces, underscores or

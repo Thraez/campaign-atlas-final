@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * The build ships an entity's formatted display date as `dateLabel`. A note
  * with a `dateValue` but no date that parses gets a label and a value but no

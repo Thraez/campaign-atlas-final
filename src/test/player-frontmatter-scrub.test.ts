@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Behavior tests for two player-build sanitizations:
  *   1. meta tags ("#npc", "#stub") stripped from entity.tags in player builds
@@ -6,7 +7,7 @@
  *      "aka {title}" line otherwise looks like a bug.
  *
  * Exercises the programmatic runBuild() entry — cheap compared to the
- * full atlas-build.test.ts spawn harness.
+ * spawned CLI (build-atlas-cli.test.ts).
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { runBuild } from "../../scripts/build-atlas";

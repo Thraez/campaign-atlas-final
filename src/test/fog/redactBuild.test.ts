@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Build-level test for D3: confirms a player build of a fog-enabled map
  * writes a redacted .fog.png layer, the player atlas.json references it,

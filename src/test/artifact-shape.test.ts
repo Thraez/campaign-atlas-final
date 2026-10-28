@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Artifact shape assertions.
  *
@@ -10,12 +11,14 @@ import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { runBuildCli } from "./helpers/buildInProcess";
 import { scanArtifactShape, scanSearchIndex } from "../../scripts/check-artifact-shape";
 import { DM_CONTENT_SENTINELS } from "../../scripts/check-no-secrets";
 
 const ROOT = path.resolve(__dirname, "../..");
 const SHAPE_SCRIPT = path.resolve(ROOT, "scripts/check-artifact-shape.ts");
-const BUILD_SCRIPT = path.resolve(ROOT, "scripts/build-atlas.ts");
+// The build runs in-process; the check scripts still run as CLIs.
+const buildCli = (args: string[]) => runBuildCli(args, ROOT);
 const FIXTURE = path.resolve(__dirname, "fixtures/sentinel-vault");
 
 interface RunResult {
@@ -53,9 +56,9 @@ afterAll(() => {
 });
 
 describe.sequential("artifact shape gate", () => {
-  it("clean player build of sentinel-vault has zero shape violations", () => {
+  it("clean player build of sentinel-vault has zero shape violations", async () => {
     const out = path.join(tmpRoot, "build");
-    const build = run(BUILD_SCRIPT, [
+    const build = await buildCli([
       "--player",
       "--strict",
       "--config",
@@ -72,7 +75,7 @@ describe.sequential("artifact shape gate", () => {
     expect(cli.status, cli.stderr).toBe(0);
   });
 
-  it("CLI exits 11 and lists each violation for a malformed atlas.json", () => {
+  it("CLI exits 11 and lists each violation for a malformed atlas.json", async () => {
     const dir = path.join(tmpRoot, "bad");
     fs.mkdirSync(dir, { recursive: true });
     const bad = {
@@ -163,7 +166,7 @@ describe("scanArtifactShape — soundscape assertions", () => {
     };
   }
 
-  it("clean soundscape with neutralised IDs and no names → zero violations", () => {
+  it("clean soundscape with neutralised IDs and no names → zero violations", async () => {
     const atlas = makeAtlas({
       enabled: true,
       areas: [
@@ -175,7 +178,7 @@ describe("scanArtifactShape — soundscape assertions", () => {
     expect(r.violations.filter((v) => v.field.includes("soundscape"))).toHaveLength(0);
   });
 
-  it("flags a DM-visibility area", () => {
+  it("flags a DM-visibility area", async () => {
     const atlas = makeAtlas({
       areas: [{ id: "area-0", bed: { src: "audio/x.ogg" }, visibility: "dm" }],
     });
@@ -185,7 +188,7 @@ describe("scanArtifactShape — soundscape assertions", () => {
     ).toBe(true);
   });
 
-  it("flags an area with a non-neutralised id", () => {
+  it("flags an area with a non-neutralised id", async () => {
     const atlas = makeAtlas({
       areas: [{ id: "dungeon-lair", bed: { src: "audio/x.ogg" } }],
     });
@@ -195,7 +198,7 @@ describe("scanArtifactShape — soundscape assertions", () => {
     ).toBe(true);
   });
 
-  it("flags an area that still has a name", () => {
+  it("flags an area that still has a name", async () => {
     const atlas = makeAtlas({
       areas: [{ id: "area-0", bed: { src: "audio/x.ogg" }, name: "Ye Olde Tavern" }],
     });
@@ -207,7 +210,7 @@ describe("scanArtifactShape — soundscape assertions", () => {
 });
 
 describe("scanSearchIndex — leak coverage lives on bodyText, not the removed body field", () => {
-  it("flags a DM sentinel leaked in bodyText (the shipped field)", () => {
+  it("flags a DM sentinel leaked in bodyText (the shipped field)", async () => {
     const r = scanSearchIndex([
       {
         id: "leak",
@@ -221,7 +224,7 @@ describe("scanSearchIndex — leak coverage lives on bodyText, not the removed b
     expect(r.violations.some((v) => v.field === "search.bodyText")).toBe(true);
   });
 
-  it("does not scan a body field even if one is present (it is no longer shipped)", () => {
+  it("does not scan a body field even if one is present (it is no longer shipped)", async () => {
     const r = scanSearchIndex([
       {
         id: "clean",
@@ -237,7 +240,7 @@ describe("scanSearchIndex — leak coverage lives on bodyText, not the removed b
 });
 
 describe("dateLabel (renamed from dateRaw) is still scanned", () => {
-  it("scanArtifactShape flags DM markup in an entity's dateLabel", () => {
+  it("scanArtifactShape flags DM markup in an entity's dateLabel", async () => {
     const r = scanArtifactShape({
       version: "1",
       publishedAt: "",
@@ -259,7 +262,7 @@ describe("dateLabel (renamed from dateRaw) is still scanned", () => {
     expect(r.violations.some((v) => v.entityId === "dated" && v.field === "dateLabel")).toBe(true);
   });
 
-  it("scanSearchIndex flags a DM sentinel in a search entry's dateLabel", () => {
+  it("scanSearchIndex flags a DM sentinel in a search entry's dateLabel", async () => {
     const r = scanSearchIndex([
       {
         id: "dated",
