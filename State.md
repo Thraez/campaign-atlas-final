@@ -52,7 +52,7 @@ Prompts Isak got overnight, and what replaced them: `npm run atlas:publish` (its
 commands with shell variables (one plain command per call, absolute paths).
 
 - `main` was pushed once (f65c854..0c1d92a, docs only, on his yes) before this rule arrived.
-- PRs waiting for his yes to merge (each merge publishes), in stack order: #62 → #66 → #68;
+- PRs waiting for his yes to merge (each merge publishes), in stack order: #62 → #66 → #68 → #80 → #81;
   #64 → #67 → #69 → #70; #63; #65; #71 → #73 → #77; #72; #74 → #76, #74 → #79; #75; #78. See "Merge queue" for what each needs him to look at.
 - Local `main` commits since 0c1d92a: push them in the morning.
 - **In the vault, for Isak in Obsidian:** four notes have an unclosed DM block (`%%` or `:::dm`),
@@ -103,6 +103,8 @@ So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logg
 | #77 | 28     | Sound URLs follow the image asset rule (`/atlas/` fix)   | #73 (stacked); his yes                           |
 | #78 | 25     | The offline menu says what is actually saved             | Isak tries it offline in a browser; his yes      |
 | #79 | c-07   | Sync behind a vault port + dry run; sync can't leak a DM note | #74 (stacked); Isak tries the Sync panel; yes |
+| #80 | 31     | The Save chip names an unsaved entity edit               | #68 (stacked); Isak checks the chip; yes         |
+| #81 | 32     | A world.yaml conflict recovers and names what changed    | #80 (stacked); Isak reads the notice; yes        |
 
 In flight (2026-10-28, overnight):
 
@@ -122,7 +124,9 @@ In flight (2026-10-28, overnight):
 - Fourth sweep (editor page, second pass) filed 30-32. 30 is the worst find tonight: saving on one
   map silently drops region, route and fog drafts on other maps, and undo after a map switch edits
   the wrong map. Until it ships, save before switching maps. 30 waits for the editor stacks
-  (#62→#66→#68 and #64→…→#70). 31 and 32 build now, stacked on #68.
+  (#62→#66→#68 and #64→…→#70). 31 and 32 are PRs #80 and #81, stacked on #68.
+- Stacked PRs get no CI until they're retargeted to `main` (the PR check runs only on PRs into
+  `main`); each passed the local gate.
 - Ticket 27 (one reduce-motion switch, shared filter chips) waits until the open stacks merge: it
   touches sound (#71, #73), the viewer (#67-#70, 25) and Timeline/Browse/search (#63, 26).
 - A local-only branch `eval-24-test-runner` (932edc8) sits in an agent worktree, never pushed;
