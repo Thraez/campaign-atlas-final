@@ -1,21 +1,21 @@
 /**
  * Which images the player site actually shows. The player build prunes every
- * image under `atlas/assets/` that this module does not count as shown, and
- * the image-privacy scan uses the same answer on the source asset store.
+ * image under `atlas/` that this module does not count as shown, and the
+ * image-privacy scan uses the same answer on the source asset store.
  *
  * An image counts as shown when the parsed player JSON names its whole asset
  * path, never by a substring or a bare file name: a DM-only `elf.png` must not
  * ride along with a shown `shelf.png`, nor `images/x.png` with `maps/x.png`.
  *
  * Asset paths here are relative to the atlas dir (the one holding atlas.json),
- * e.g. `assets/maps/world.png`. References are collected from every string
- * value in the JSON, each read as a URL through `atlas/assets/` (with or
- * without a leading `/` or `./`, behind a site base prefix, with a query or
- * hash, URL-encoded):
+ * e.g. `assets/maps/world.png` or `maps/overlay.png`. References are collected
+ * from every string value in the JSON, each read as a URL through `atlas/`
+ * (with or without a leading `/` or `./`, behind a site base prefix, with a
+ * query or hash, URL-encoded):
  *   - the whole value (a map layer `src`, an entity image);
  *   - markdown link and image destinations, `(<...>)` and balanced-paren forms;
  *   - HTML attribute values, quoted or not, and CSS `url(...)` values;
- *   - any other `atlas/assets/` token in the text, as a safety net;
+ *   - any other `atlas/` token in the text, as a safety net;
  *   - bare `![[name.png]]` embeds, which the player resolves the way the build
  *     does (`DEFAULT_RESOLVE_ASSET`, always `assets/images/<name>`).
  * An absolute URL to the site's own host (`https://<host>/atlas/assets/...`)
@@ -25,9 +25,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { extractEmbedImageRefs, normalizeRefPath } from "./assetRefs";
 
-export { IMAGE_EXTENSIONS } from "./assetRefs";
-
-/** The asset path a URL-like value points at, or null when it is not one of ours. */
+/**
+ * The asset path (relative to the atlas dir) a URL-like value points at, or
+ * null when it is not one of ours or escapes the atlas dir.
+ */
 export function toAssetPath(value: string): string | null {
   const ref = normalizeRefPath(value);
   if (ref === null || /^[a-z][a-z0-9+.-]*:/i.test(ref)) return null; // mailto:, file:, ...
@@ -37,10 +38,10 @@ export function toAssetPath(value: string): string | null {
   } catch {
     // Not valid percent-encoding: match the value as written.
   }
-  const m = /(?:^|\/)atlas\/(assets\/.+)$/.exec(v.trim());
+  const m = /(?:^|\/)atlas\/(.+)$/.exec(v.trim());
   if (!m) return null;
   const p = path.posix.normalize(m[1]);
-  return p.startsWith("assets/") ? p : null;
+  return p === "." || p === ".." || p.startsWith("../") ? null : p;
 }
 
 /** Destinations of markdown links and images: `](dest)`, `](<dest>)`, `](dest "title")`. */
@@ -73,8 +74,8 @@ function markdownDestinations(s: string): string[] {
 /** HTML attribute values (quoted or not) and CSS `url(...)` values. */
 const HTML_ATTR = /[\w:-]+\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
 const CSS_URL = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)"']*?))\s*\)/gi;
-/** Any `atlas/assets/` token in free text. */
-const ASSET_TOKEN = /[^\s"'()<>[\]]*atlas\/assets\/[^\s"'()<>]+/g;
+/** Any `atlas/` token in free text. */
+const ASSET_TOKEN = /[^\s"'()<>[\]]*atlas\/[^\s"'()<>]+/g;
 
 function collectFromString(s: string, refs: Set<string>): void {
   const add = (v: string | undefined) => {
@@ -82,7 +83,7 @@ function collectFromString(s: string, refs: Set<string>): void {
     if (p) refs.add(p);
   };
   add(s);
-  if (s.includes("atlas/assets/")) {
+  if (s.includes("atlas/")) {
     markdownDestinations(s).forEach(add);
     for (const m of s.matchAll(HTML_ATTR)) add(m[1] ?? m[2] ?? m[3]);
     for (const m of s.matchAll(CSS_URL)) add(m[1] ?? m[2] ?? m[3]);
@@ -106,16 +107,21 @@ export function collectImageRefs(jsonTexts: string[]): Set<string> {
   return refs;
 }
 
+/** The player JSON whose references keep an image. Not `.last-published.json`:
+ *  it is the previous publish, so it would keep an image the DM has hidden since. */
+const PLAYER_JSON = ["atlas.json", "search-index.json"];
+
 /**
- * The references in every `.json` file directly in `dir` (atlas.json,
- * search-index.json). A file that is not valid JSON throws, naming the file:
- * guessing at its references could prune a shown image or keep a DM one.
+ * The references in the player JSON in `dir` (`PLAYER_JSON`). A file that is
+ * not valid JSON throws, naming the file: guessing at its references could
+ * prune a shown image or keep a DM one.
  */
 export function readPlayerImageRefs(dir: string): Set<string> {
   const refs = new Set<string>();
   if (!fs.existsSync(dir)) return refs;
-  for (const name of fs.readdirSync(dir).filter((n) => n.endsWith(".json"))) {
+  for (const name of PLAYER_JSON) {
     const file = path.join(dir, name);
+    if (!fs.existsSync(file)) continue;
     let parsed: unknown;
     try {
       parsed = JSON.parse(fs.readFileSync(file, "utf8"));
