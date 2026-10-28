@@ -3,14 +3,14 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
-import { atlasSavePlugin } from "./scripts/vite-plugin-atlas-save";
-import { prunePlayerAudioPlugin } from "./scripts/vite-plugin-prune-player-audio";
-import { prunePlayerImagesPlugin } from "./scripts/vite-plugin-prune-player-images";
 import {
   PRECACHE_GLOB_IGNORES,
   PRECACHE_GLOB_PATTERNS,
   precacheShippedOnlyPlugin,
 } from "./scripts/pwaPrecache";
+import { atlasSavePlugin } from "./scripts/vite-plugin-atlas-save";
+import { prunePlayerAudioPlugin } from "./scripts/vite-plugin-prune-player-audio";
+import { prunePlayerImagesPlugin } from "./scripts/vite-plugin-prune-player-images";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
