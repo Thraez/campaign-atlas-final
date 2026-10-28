@@ -73,11 +73,14 @@ async function seedSession(over: Partial<SessionState>) {
 }
 
 const saveBodies: unknown[] = [];
+/** Reads of the entity file: each EntityEditPanel mount reads it once. */
+let entityReads = 0;
 
 beforeEach(async () => {
   localStorage.clear();
   await clearEditorSession();
   saveBodies.length = 0;
+  entityReads = 0;
   toastMock.info.mockClear();
   toastMock.success.mockClear();
   toastMock.error.mockClear();
@@ -93,6 +96,7 @@ beforeEach(async () => {
         } as unknown as Response);
       if (u.includes("/__atlas/read")) {
         if (u.includes(encodeURIComponent(ENTITY_PATH))) {
+          entityReads++;
           return json(200, { contents: ENTITY_FILE });
         }
         return json(404, {});
@@ -131,7 +135,7 @@ function renderEditor() {
   );
 }
 
-describe("Save with an unsaved entity edit (eval-31)", () => {
+describe("Save with an unsaved entity edit", () => {
   it("with only an entity edit pending, the chip names it and Save opens the entity panel", async () => {
     await seedSession({ entityEdit: dirtyEntityDraft() });
     renderEditor();
@@ -181,5 +185,22 @@ describe("Save with an unsaved entity edit (eval-31)", () => {
         expect.anything(),
       ),
     );
+  });
+
+  it("Save while the entity is already open in Edit keeps the panel mounted", async () => {
+    await seedSession({ entityEdit: dirtyEntityDraft() });
+    renderEditor();
+    await screen.findByText("1 entity edit – open it to save");
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByDisplayValue("Edited summary");
+    await waitFor(() => expect(entityReads).toBe(1));
+
+    // A remount would re-run the panel's load (and drop its conflict banners).
+    // Cmd+S: the open panel has its own Save button, so the toolbar's is ambiguous.
+    fireEvent.keyDown(window, { key: "s", metaKey: true });
+    await waitFor(() => expect(toastMock.info).toHaveBeenCalledTimes(2));
+    expect(screen.getByDisplayValue("Edited summary")).toBeInTheDocument();
+    expect(entityReads).toBe(1);
   });
 });

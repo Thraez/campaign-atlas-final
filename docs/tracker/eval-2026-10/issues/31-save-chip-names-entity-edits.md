@@ -35,7 +35,24 @@ it.
   "Open it" action.
 - `EntitySurface` opens in Edit when a dirty parked draft belongs to that entity, and remounts
   (a nonce key) when Save points to it, so a surface already open in Reading switches to Edit.
+  (Superseded by the review fixes below: no remount.)
 - Tests: `src/test/editor/save-entity-edit-pending.test.tsx` mounts the page with a restored
   session (entity draft, plus a map rename for the mixed case). All three failed on the old code.
 - For Isak's look in the preview: the chip wording, and that Save with a restored entity edit lands
   in the edit form.
+
+2026-10-28, review fixes on the same branch:
+
+- No remount: `EntitySurface` takes an `editRequest` counter. A bump switches Reading to Edit and
+  focuses the form; a surface already in Edit stays mounted, so the panel's banners (ticket 17's
+  conflict and deleted banners, once that lands here) and any rebase in flight survive. Test: Save
+  twice with the panel open in Edit reads the entity file once.
+- Save with no active map now still points to a pending entity edit (the check runs before the
+  `!project || !activeMap` guard). Not tested: the page can't easily be mounted with no map.
+- The chip takes `entityEditCount` (from the draft, 0 or 1 today) and pluralizes; with 0 it
+  claims nothing. `SaveStatus.test.tsx` covers it.
+- One helper, `useEntityEditDraft().pendingFor(sourcePath?)`, replaces the four dirty and
+  sourcePath checks; hook test added.
+- Deliberate behaviour change: an entity with an unsaved edit now opens straight in Edit (from
+  any way in, not only from Save), so the DM lands on their unsaved work.
+- Ticket tags dropped from code comments.
