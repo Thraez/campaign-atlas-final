@@ -1,13 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import yaml from "js-yaml";
 import { Key, Copy, Check, Trash2, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { saveAtlasPatchToLocalFs, hashContent } from "@/atlas/save/localFsSave";
 import { copyToClipboard } from "@/lib/clipboard";
+import { parseCharacterKeys, serializeCharacterKeys } from "./characterKeysFile";
 
 interface CharacterRow {
   name: string;
   key: string;
+}
+
+/** The file's text, or null when it doesn't exist yet. Throws, with a reason fit for the DM, when it can't be read. */
+async function readKeysFile(keysPath: string): Promise<string | null> {
+  let res: Response;
+  try {
+    res = await fetch(`/__atlas/read?path=${encodeURIComponent(keysPath)}`);
+  } catch {
+    throw new Error("the dev server couldn't be reached");
+  }
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`the server answered ${res.status}`);
+  const body = (await res.json()) as { contents?: unknown };
+  if (typeof body.contents !== "string")
+    throw new Error("the server's answer had no file contents");
+  return body.contents;
 }
 
 interface Props {
@@ -22,6 +38,9 @@ export function CharacterKeysPanel({ worldDir }: Props) {
   // Why the last load failed. While set, the list is hidden and Save is off,
   // so an empty list can never be written over a file we couldn't read.
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Entries the panel can't show as a name and a key (nested maps, lists, no
+  // key). Saving would drop them, so Save is off while there are any.
+  const [unsupported, setUnsupported] = useState<string[]>([]);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -29,33 +48,24 @@ export function CharacterKeysPanel({ worldDir }: Props) {
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
+    setUnsupported([]);
     try {
-      const res = await fetch(`/__atlas/read?path=${encodeURIComponent(keysPath)}`);
-      if (res.status === 404) {
+      const text = await readKeysFile(keysPath);
+      if (text === null) {
         setRows([]);
         setBaseHash(null);
         return;
       }
-      if (!res.ok) {
-        setLoadError(`the server answered ${res.status}`);
+      const parsed = parseCharacterKeys(text);
+      if (!parsed.ok) {
+        setLoadError(parsed.error);
         return;
       }
-      const body = (await res.json()) as { contents?: unknown };
-      if (typeof body.contents !== "string") {
-        setLoadError("the server's answer had no file contents");
-        return;
-      }
-      const parsed = yaml.load(body.contents);
-      if (parsed && typeof parsed === "object") {
-        const loaded = Object.entries(parsed as Record<string, unknown>)
-          .filter(([, v]) => typeof v === "string")
-          .map(([name, key]) => ({ name, key: key as string }));
-        setRows(loaded);
-      }
-      const h = await hashContent(body.contents);
-      setBaseHash(h);
-    } catch {
-      setLoadError("the dev server couldn't be reached");
+      setRows(parsed.entries);
+      setUnsupported(parsed.unsupported);
+      setBaseHash(await hashContent(text));
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
@@ -70,17 +80,8 @@ export function CharacterKeysPanel({ worldDir }: Props) {
       .map((b) => b.toString(36))
       .join("");
 
-  const toYamlObj = (r: CharacterRow[]): Record<string, string> => {
-    const obj: Record<string, string> = {};
-    for (const row of r) {
-      if (row.name.trim()) obj[row.name.trim()] = row.key;
-    }
-    return obj;
-  };
-
   const persist = async (next: CharacterRow[]) => {
-    const obj = toYamlObj(next);
-    const content = yaml.dump(obj);
+    const content = serializeCharacterKeys(next);
     setSaving(true);
     try {
       await saveAtlasPatchToLocalFs([
@@ -144,6 +145,22 @@ export function CharacterKeysPanel({ worldDir }: Props) {
           <p>
             Couldn't load the character keys ({loadError}). Saving is off, so an empty list can't
             overwrite the file.
+          </p>
+          <button
+            type="button"
+            className="h-7 px-2 text-xs rounded border"
+            onClick={() => void load()}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {unsupported.length > 0 && (
+        <div role="alert" className="m-3 rounded border border-amber-500/60 p-2 space-y-2 text-xs">
+          <p>
+            Not every entry in character-keys.yaml is a name and a key: {unsupported.join(", ")}.
+            Saving is off so they aren't lost. Fix them in the file by hand, then Retry.
           </p>
           <button
             type="button"
@@ -229,7 +246,7 @@ export function CharacterKeysPanel({ worldDir }: Props) {
       <div className="p-3 border-t border-border">
         <button
           type="button"
-          disabled={saving || loadError !== null}
+          disabled={saving || loadError !== null || unsupported.length > 0}
           onClick={() => void persist(rows)}
           className="w-full h-7 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
         >

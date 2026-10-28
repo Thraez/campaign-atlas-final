@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import yaml from "js-yaml";
 import { CharacterKeysPanel } from "@/atlas/secrets/CharacterKeysPanel";
 
 vi.mock("@/atlas/save/localFsSave", async (importOriginal) => ({
@@ -179,5 +180,42 @@ describe("CharacterKeysPanel — a failed load never offers an empty list to sav
     await waitFor(() => expect(screen.getByDisplayValue("Aria")).toBeInTheDocument());
     expect(screen.getByRole("button", { name: /Save keys/i })).toBeEnabled();
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("CharacterKeysPanel — every key survives a load and a save (eval-2026-10/36)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockHash.mockResolvedValue("sha256:abc123");
+    mockSave.mockResolvedValue({ saved: 1, paths: ["/world/_dm/character-keys.yaml"] });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("a hand-edited numeric key loads as its text and is saved as a string", async () => {
+    stubFetchOk({ contents: "Aria: k1\nBob: 12345\nCara: 0123\n" });
+    render(<CharacterKeysPanel worldDir="/world" />);
+    await waitFor(() => expect(screen.getByDisplayValue("Bob")).toBeInTheDocument());
+    expect(screen.getByText("12345")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Save keys/i }));
+    await waitFor(() => expect(mockSave).toHaveBeenCalled());
+    // Read back the way the build does (default schema, strings only).
+    expect(yaml.load(mockSave.mock.calls[0][0][0].content)).toEqual({
+      Aria: "k1",
+      Bob: "12345",
+      Cara: "0123",
+    });
+  });
+
+  it("an entry that isn't a name and a key blocks saving and is named", async () => {
+    stubFetchOk({ contents: "Aria: k1\nBob:\n  nested: x\nCara: [a, b]\n" });
+    render(<CharacterKeysPanel worldDir="/world" />);
+    await waitFor(() => expect(screen.getByDisplayValue("Aria")).toBeInTheDocument());
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(/Bob/);
+    expect(alert).toHaveTextContent(/Cara/);
+    expect(screen.getByRole("button", { name: /Save keys/i })).toBeDisabled();
   });
 });
