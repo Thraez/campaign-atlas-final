@@ -235,3 +235,41 @@ describe("scanSearchIndex — leak coverage lives on bodyText, not the removed b
     expect(r.violations).toHaveLength(0);
   });
 });
+
+describe("dateLabel (renamed from dateRaw) is still scanned", () => {
+  it("scanArtifactShape flags DM markup in an entity's dateLabel", () => {
+    const r = scanArtifactShape({
+      version: "1",
+      publishedAt: "",
+      worlds: [],
+      maps: [],
+      placements: [],
+      assets: [],
+      entities: [
+        {
+          id: "dated",
+          title: "Dated",
+          type: "event",
+          visibility: "player",
+          sourcePath: "",
+          dateLabel: "612 %% leak %%",
+        },
+      ],
+    });
+    expect(r.violations.some((v) => v.entityId === "dated" && v.field === "dateLabel")).toBe(true);
+  });
+
+  it("scanSearchIndex flags a DM sentinel in a search entry's dateLabel", () => {
+    const r = scanSearchIndex([
+      {
+        id: "dated",
+        title: "Dated",
+        type: "event",
+        aliases: [],
+        tags: [],
+        dateLabel: DM_CONTENT_SENTINELS[0],
+      },
+    ]);
+    expect(r.violations.some((v) => v.field === "search.dateLabel")).toBe(true);
+  });
+});

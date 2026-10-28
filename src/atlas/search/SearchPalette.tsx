@@ -390,8 +390,8 @@ export function SearchPalette({
                           {playerTypeLabel(r.type)}
                         </span>
                       )}
-                      {r.dateRaw && (
-                        <span className="text-[10px] text-muted-foreground">· {r.dateRaw}</span>
+                      {r.dateLabel && (
+                        <span className="text-[10px] text-muted-foreground">· {r.dateLabel}</span>
                       )}
                       {placed && <MapPin className="h-3 w-3 text-primary ml-auto" />}
                     </div>

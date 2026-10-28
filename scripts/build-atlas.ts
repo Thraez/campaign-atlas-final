@@ -1223,12 +1223,12 @@ function buildEntity(
   // Date / timeline support.
   const parsedDate = parseAtlasDate(parsed.atlas.date, opts.calendar);
   if (parsedDate) {
-    entity.dateRaw = sanitizeShippingField(parsedDate.label);
+    entity.dateLabel = sanitizeShippingField(parsedDate.label);
     entity.dateValue = parsed.atlas.dateValue ?? parsedDate.value;
     entity.dateYear = parsedDate.year;
   } else if (typeof parsed.atlas.dateValue === "number") {
     entity.dateValue = parsed.atlas.dateValue;
-    entity.dateRaw = sanitizeShippingField(parsed.atlas.date);
+    entity.dateLabel = sanitizeShippingField(parsed.atlas.date);
   }
 
   const fmAtlas = (parsed.data.atlas as Record<string, unknown>) ?? {};
@@ -1357,7 +1357,7 @@ function buildSearchIndex(pending: Pending[]) {
       summary: entity.summary,
       excerpt: stripSecretMarkers(entity.body).replace(/\s+/g, " ").trim().slice(0, 240),
       bodyText: stripped,
-      dateRaw: entity.dateRaw,
+      dateLabel: entity.dateLabel,
       dateValue: entity.dateValue,
       dateYear: entity.dateYear,
     };
