@@ -36,3 +36,8 @@ export function parseDeepLink(search: string): DeepLinkState {
     zoom: Number.isFinite(cz) ? cz : null,
   };
 }
+
+/** Link to the viewer with one entity open. The only place this URL is built. */
+export function entityHref(id: string): string {
+  return `/atlas?entity=${encodeURIComponent(id)}`;
+}
