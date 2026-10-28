@@ -1,6 +1,6 @@
 # The character keys panel recovers and keeps every key
 
-Status: ready-for-agent
+Status: done (PR #86, merged 2026-10-28)
 Area: editor (character keys)
 
 Found by the fifth sweep (2026-10-28), from reading; not run.

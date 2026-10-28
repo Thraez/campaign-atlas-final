@@ -8,3 +8,4 @@ Local Markdown issue tracker. Rules in [`../agents/issue-tracker.md`](../agents/
 | [`code-retro/`](code-retro/) | Tickets from `/improve-codebase-architecture`, in work order | open |
 | [`tidemarrow/`](tidemarrow/) | Tidemarrow onto the atlas (the main goal) | open, after eval-2026-10 01-02, 08 and 13 |
 | [`eval-2026-10/`](eval-2026-10/) | Evaluation: safety scans, save endpoint, dependencies, editor and map | open; 02, 08 and 13 before tidemarrow |
+| [`agent-retro/`](agent-retro/) | How the agent sessions of 2026-10-27/28 went | open: 01, 03 |

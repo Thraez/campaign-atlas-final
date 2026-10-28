@@ -1,6 +1,6 @@
 # How the skills fit the atlas's process
 
-Matt's skills assume a team product with PRs. The atlas is Isak's solo tool whose one hard promise is player safety. Where they disagree, this file wins. Decided 2026-10-27: Matt's way on every clash.
+Matt's skills assume a team product. The atlas is Isak's solo tool whose one hard promise is player safety. Where they disagree, this file wins. Decided 2026-10-27: Matt's way on every clash.
 
 ## Where work and decisions live
 
@@ -11,19 +11,26 @@ Matt's skills assume a team product with PRs. The atlas is Isak's solo tool whos
 
 ## Done
 
-A ticket is done when:
+A ticket is done when its PR is merged after:
 
-1. `npm run typecheck:all`, `npm run lint` and `npm run test:ci` pass;
-2. any pipeline it touches passes its checks (`npm run atlas:build:player`, then `npm run atlas:check-secrets` and `npm run atlas:check-derived` on the output, or the full `npm run atlas:publish` chain when scans or the build change);
-3. `/code-review` has run on its diff;
-4. a change Isak must see (map look, editor UI) has his look. Until then it stays `ready-for-human`.
+1. the full local gate passes on the branch with `main` merged in: `npm run typecheck:all`,
+   `npm run lint`, `npm run format:check`, `npm run test:ci`, `npm run atlas:publish` (build plus
+   the 13 scans), then `npm run atlas:check-secrets dist` and `npm run atlas:check-derived dist`,
+   then `git checkout -- public/atlas`. A shard that times out under load is rerun once;
+2. `/code-review` has run on its diff and its findings are fixed. Anything touching visibility,
+   parsing or the scans also gets an adversarial player-safety review, and a re-check of its fixes;
+3. a change Isak must see (map look, editor UI) is listed in `State.md` for his look.
 
-Then commit it on `main`.
+Set `Status: done` after the review, never before.
 
 ## Git
 
-- Work on `main`, no PRs. Commit locally per ticket.
-- A push to `main` publishes the site. Push once at the end of a work session, and only with Isak's yes.
+- A branch and a PR per ticket, cut from `origin/main`. Tracker and `State.md` edits ride in that PR
+  or in a docs PR; local `main` holds nothing that isn't on `origin`.
+- Merging publishes, so it needs Isak's yes (`AGENTS.md`, "Git and deploy"). GitHub CI is not a
+  gate: nobody starts or waits on it.
+- Stack a branch on another only when both edit the same file; retarget it to `main` once its parent
+  merges.
 
 ## Tests and seams
 
@@ -33,4 +40,4 @@ Then commit it on `main`.
 
 ## Not used here
 
-`triage`, `implement-spec`, `pr`, `handoff` and pushed `research/` branches.
+`triage`, `implement-spec`, `handoff` and pushed `research/` branches.

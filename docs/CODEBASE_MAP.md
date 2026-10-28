@@ -339,7 +339,7 @@ must wrap the tree (it's mounted at `App.tsx` root).
 | `eslint.config.js`                               | flat config; bans `require()` in ESM                                                                                        |
 | `.prettierrc.json`                               | 100 cols, double quotes, trailing commas                                                                                    |
 | `scripts/pre-commit.sh`                          | `typecheck:all` + lint + format + `npm run test:changed` (same runner and retry rule as `test:ci`)                          |
-| `.github/workflows/atlas-pr-check.yml`           | PR CI: `typecheck:all`, lint, format:check, player build, `atlas:scan`, `test:shard`                                        |
+| `.github/workflows/atlas-pr-check.yml`           | By hand only: `typecheck:all`, lint, format:check, player build, `atlas:scan`, `test:shard`                                        |
 | `src/test/fixtures/{atlas-build,sentinel-vault}` | integration test vaults                                                                                                     |
 
 **Traps (the ones that cost time):**

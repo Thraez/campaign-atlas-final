@@ -1,6 +1,6 @@
 # The service worker precaches only files the build ships
 
-Status: ready-for-agent
+Status: done (PR #87, merged 2026-10-28)
 Area: publish (offline, PWA)
 
 Found by the safety review of ticket 40 (2026-10-28), checked on `main`'s own `dist/`. Workbox's

@@ -1,6 +1,6 @@
 # A world.yaml conflict recovers without a page reload
 
-Status: ready-for-human (review pending)
+Status: done (PR #81, merged 2026-10-28)
 Area: editor (save, conflicts)
 
 Found by the fourth sweep (2026-10-28), verified by reading. `worldYamlBaseline.refresh()` runs

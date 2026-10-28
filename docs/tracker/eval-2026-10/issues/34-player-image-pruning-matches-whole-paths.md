@@ -1,6 +1,6 @@
 # Player-image pruning matches whole asset paths
 
-Status: ready-for-agent
+Status: done (PR #85, merged 2026-10-28)
 Area: publish (player safety)
 
 Found by the fifth sweep (2026-10-28), verified by reading. `isReferenced`

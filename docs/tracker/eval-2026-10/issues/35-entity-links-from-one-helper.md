@@ -1,6 +1,6 @@
 # Entity links come from one helper; credits links work
 
-Status: ready-for-agent
+Status: done (PR #83, merged 2026-10-28)
 Area: player site
 
 Found by the fifth sweep (2026-10-28), verified by reading. `AtlasCredits.tsx` (~38, 65) links

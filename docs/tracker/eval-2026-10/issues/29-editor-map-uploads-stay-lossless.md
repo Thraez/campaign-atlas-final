@@ -2,7 +2,6 @@
 
 Status: ready-for-agent
 Area: editor, save pipeline, maps
-Blocked by: #68 (ticket 19 owns map target naming), #72 (ticket 22 owns the map encode)
 
 Found by the eval-22 reviews on 2026-10-28. `maps:optimize` keeps maps lossless, but the editor's
 save path does not:

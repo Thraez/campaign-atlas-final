@@ -1,6 +1,6 @@
 # The player build ships only allowed files
 
-Status: ready-for-agent
+Status: done (PR #88, merged 2026-10-28)
 Area: publish (player safety)
 
 Found by the safety review of ticket 34 (2026-10-28), verified by reading. The player build copies

@@ -1,6 +1,6 @@
 # Pin labels switch between always-on and hover when the zoom changes
 
-Status: ready-for-human
+Status: done (PR #70, merged 2026-10-28)
 Area: map, player site
 
 The eval-11 build found this on 2026-10-28; the old code had it too. react-leaflet sets a label's

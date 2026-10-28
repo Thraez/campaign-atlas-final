@@ -36,5 +36,8 @@ leak), then 35 and 36; 37 stacks on #82, 38 waits for the viewer PRs, 39 stacks 
 editor writes them to, so character secrets never reach a player build (fails safe).
 33-36 are built: PRs #84, #85, #83 and #86.
 
+Every PR through #90 merged on 2026-10-28, so nothing waits on a stack any more. Open: 27, 29, 30,
+37-39 and 41; build 30 first (data loss).
+
 Work the lowest open number first. Words as in `GLOSSARY.md`; module, interface, seam and depth
 as in the `codebase-design` skill.

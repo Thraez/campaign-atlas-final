@@ -1,6 +1,6 @@
 # A failed entity save keeps the form and says what failed
 
-Status: ready-for-agent
+Status: done (PR #89, merged 2026-10-28)
 Area: editor (entity panel, save)
 
 Found by the reviews of ticket 33 (2026-10-28), verified by reading

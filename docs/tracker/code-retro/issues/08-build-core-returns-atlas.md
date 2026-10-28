@@ -1,6 +1,6 @@
 # The build core returns the atlas; one player projection
 
-Status: ready-for-agent
+Status: done (PR #82, merged 2026-10-28)
 Blocked by: 06
 Area: build pipeline, tests
 

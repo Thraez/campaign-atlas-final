@@ -1,6 +1,6 @@
 # Entity edit recovers from a save conflict
 
-Status: ready-for-human
+Status: done (PR #60, merged 2026-10-27)
 Area: editor, local save
 
 Provisional call (grill round 2, Q5), 2026-10-27: Isak hasn't answered yet; ticketed on the

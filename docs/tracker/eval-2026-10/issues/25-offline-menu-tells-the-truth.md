@@ -1,6 +1,6 @@
 # The offline menu says what is actually stored
 
-Status: in-review (review pending)
+Status: done (PR #78, merged 2026-10-28)
 Area: player site, offline
 
 Found by the third sweep (2026-10-28). `clearOfflineCache` deletes every cache, the shell's

@@ -1,6 +1,6 @@
 # Map layer uploads always get a real target path
 
-Status: ready-for-human
+Status: done (PR #68, merged 2026-10-28)
 Area: editor, local save
 
 Found by the eval-12 review (2026-10-27). These problems were already there before that work.

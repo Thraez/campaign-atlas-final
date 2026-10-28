@@ -1,6 +1,6 @@
 # A failed, rolled-back write never reads as a save
 
-Status: ready-for-agent
+Status: done (PR #84, merged 2026-10-28)
 Area: editor (save), sync
 
 Found by the fifth sweep (2026-10-28), verified by reading. When a write fails partway, the save

@@ -1,6 +1,6 @@
 # Sync from Obsidian as one module behind a vault seam, with a dry run
 
-Status: ready-for-human (review pending)
+Status: done (PR #79, merged 2026-10-28)
 Blocked by: 06
 Area: Sync from Obsidian
 

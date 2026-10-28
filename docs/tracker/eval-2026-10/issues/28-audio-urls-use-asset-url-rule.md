@@ -1,6 +1,6 @@
 # Audio URLs use the same asset URL rule as images
 
-Status: in-review (review pending)
+Status: done (PR #77, merged 2026-10-28)
 Area: sound, player site
 
 Found by the third sweep (2026-10-28), unverified: check it first. `AudioEngine.ts` ~19-27 fetches

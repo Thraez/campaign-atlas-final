@@ -1,6 +1,6 @@
 # One test runner for the PR check, publish and the hook
 
-Status: in-review (review pending)
+Status: done (PR #75, merged 2026-10-28)
 Area: CI, tests
 
 Found by the third sweep (2026-10-28). The PR check runs plain `npx vitest --shard`
