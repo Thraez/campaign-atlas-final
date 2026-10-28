@@ -2,10 +2,8 @@
  * Service worker registration + offline cache controls.
  *
  * IMPORTANT: registration is gated to PRODUCTION builds AND skipped
- * inside iframes / Lovable preview hosts. The Lovable editor renders
- * the app in an iframe on `id-preview--*.lovable.app` /
- * `*.lovableproject.com`; registering a SW there causes stale-content
- * and navigation issues that persist across reloads.
+ * inside iframes, where a SW causes stale content and navigation issues
+ * that persist across reloads.
  *
  * Vite dev server (`npm run dev`) is also skipped — `import.meta.env.PROD`
  * is false during dev.
@@ -33,22 +31,10 @@ function isInIframe(): boolean {
   }
 }
 
-function isPreviewHost(): boolean {
-  const h = window.location.hostname;
-  return (
-    h.includes("id-preview--") ||
-    h.includes("preview--") ||
-    h.endsWith("lovableproject.com") ||
-    h.endsWith("lovableproject-dev.com") ||
-    (h.endsWith("lovable.app") && h.includes("preview"))
-  );
-}
-
 export function shouldEnableServiceWorker(): boolean {
   if (!("serviceWorker" in navigator)) return false;
   if (!import.meta.env.PROD) return false; // dev mode
-  if (isInIframe()) return false; // Lovable editor preview
-  if (isPreviewHost()) return false; // Lovable preview hosts
+  if (isInIframe()) return false;
   return true;
 }
 

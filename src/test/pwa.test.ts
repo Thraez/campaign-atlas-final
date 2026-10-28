@@ -3,8 +3,8 @@
  *
  * `shouldEnableServiceWorker()` decides whether the player atlas ever
  * registers a service worker — getting this wrong ships stale content, so
- * every branch (iframe detection, preview-host detection, prod/dev, SW
- * support) is covered here rather than left implicit.
+ * every branch (iframe detection, prod/dev, SW support) is covered here
+ * rather than left implicit.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
@@ -97,7 +97,7 @@ afterEach(() => {
 });
 
 describe("shouldEnableServiceWorker()", () => {
-  it("enabled when prod, not iframed, not a preview host, and SW is supported", async () => {
+  it("enabled when prod, not iframed, and SW is supported", async () => {
     const { shouldEnableServiceWorker } = await loadPwa();
     expect(shouldEnableServiceWorker()).toBe(true);
   });
@@ -124,24 +124,6 @@ describe("shouldEnableServiceWorker()", () => {
     setIframeCheckThrows();
     const { shouldEnableServiceWorker } = await loadPwa();
     expect(shouldEnableServiceWorker()).toBe(false);
-  });
-
-  it.each([
-    ["id-preview--foo.lovable.app", "id-preview-- prefix"],
-    ["preview--bar.lovable.app", "preview-- prefix"],
-    ["myatlas.lovableproject.com", "lovableproject.com suffix"],
-    ["myatlas.lovableproject-dev.com", "lovableproject-dev.com suffix"],
-    ["preview.myatlas.lovable.app", "lovable.app suffix containing 'preview'"],
-  ])("disabled on preview host: %s (%s)", async (hostname) => {
-    setHostname(hostname);
-    const { shouldEnableServiceWorker } = await loadPwa();
-    expect(shouldEnableServiceWorker()).toBe(false);
-  });
-
-  it("enabled on a plain lovable.app host without 'preview' in it", async () => {
-    setHostname("myatlas.lovable.app");
-    const { shouldEnableServiceWorker } = await loadPwa();
-    expect(shouldEnableServiceWorker()).toBe(true);
   });
 });
 
