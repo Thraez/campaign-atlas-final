@@ -41,11 +41,11 @@ import {
   buildPlanYaml,
   buildReadme,
   defaultAssignment,
-  safeFilename,
   validateImportPlan,
   type ImportImage,
   type ImportMode,
 } from "./mapImport";
+import { safeFilename } from "@/atlas/assets/mapLayerTarget";
 import { SelectStep } from "./wizard-steps/SelectStep";
 import { ModeStep } from "./wizard-steps/ModeStep";
 import { ConfigureStep } from "./wizard-steps/ConfigureStep";

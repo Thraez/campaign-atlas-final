@@ -22,6 +22,7 @@ import type {
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import type { FileChange } from "@/atlas/save/localFsSave";
 import { buildFullWorldYaml } from "@/atlas/yaml/buildFullWorldYaml";
+import { mapLayerTargetPath } from "@/atlas/assets/mapLayerTarget";
 
 export interface BuildWorldYamlContentInputs {
   /** The map whose layers/regions/routes/fog get the draft overlay applied. */
@@ -93,7 +94,7 @@ export function buildWorldYamlContent(inputs: BuildWorldYamlContentInputs): stri
     // upload: rewrite src to the canonical "atlas/assets/maps/<file>" form
     // (strip the public/ prefix). The actual binary is written by the
     // asset-binary FileChange we add in onSaveClick.
-    const target = local.targetPath ?? `public/atlas/assets/maps/${l.id}.png`;
+    const target = mapLayerTargetPath(local);
     const src = target.replace(/^public\//, "");
     return { ...l, src };
   });
@@ -145,7 +146,7 @@ export function uploadsMissingBytes(localLayers: readonly LocalLayer[]): LocalLa
 export function buildAssetBinaryChanges(localLayers: readonly LocalLayer[]): FileChange[] {
   const changes: FileChange[] = [];
   for (const local of localLayers.filter(isUploadWithBytes)) {
-    const target = local.targetPath ?? `public/atlas/assets/maps/${local.id}.png`;
+    const target = mapLayerTargetPath(local);
     changes.push({
       path: target,
       content: local.dataUrl,

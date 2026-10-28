@@ -577,7 +577,8 @@ export async function handleSaveRequest(
         // The client already applied the shared encoding policy when it chose
         // the filename, so a `.webp` target under assets/images/ IS the
         // instruction to convert — one decider, and the name can never
-        // disagree with the bytes. Maps are named `.png` and never match:
+        // disagree with the bytes. Maps keep their own extension
+        // (src/atlas/assets/mapLayerTarget.ts) and never match:
         // fog redaction and map labels both want lossless.
         stripped = await cleanImageBytes(buf, mime, f.path);
       } catch (e) {
