@@ -5,10 +5,17 @@ import { isValidVisibility, ALL_VISIBILITY } from "@/atlas/content/visibility";
 import { parseFrontmatter, stringifyFrontmatter } from "@/atlas/import/frontmatter";
 import {
   useEntityEditDraft,
+  draftContentFromDisk,
   type EntityEditDraftAPI,
   type DraftSecret,
+  type RebaseOutcome,
 } from "./useEntityEditDraft";
-import { saveAtlasPatchToLocalFs, hashContent, type FileChange } from "@/atlas/save/localFsSave";
+import {
+  saveAtlasPatchToLocalFs,
+  hashContent,
+  ConflictError,
+  type FileChange,
+} from "@/atlas/save/localFsSave";
 import { editorImageTargetName } from "@/atlas/assets/imageEncoding";
 import { fileToDataUrl } from "@/atlas/content/browserFile";
 import { readSourceFile } from "@/atlas/save/canonicalPlacementSave";
@@ -26,6 +33,23 @@ import { FormatToolbar } from "@/atlas/editor/FormatToolbar";
 import { ImagePickerPanel } from "@/atlas/editor/ImagePickerPanel";
 import { applyToolbarAction, type ToolbarActionId } from "@/atlas/editor/toolbarActions";
 import { secretMarkerIds } from "@/atlas/content/dmMarkup";
+import { parseCharacterKeys } from "@/atlas/secrets/characterKeysFile";
+
+/**
+ * - `conflict`: Save hit a stale-base 409; the banner offers the rebase.
+ * - `rebasing`: the rebase is reading the file; Save is disabled.
+ * - `deleted`: Save hit missing-base; the banner offers Save as a new file.
+ * In all three (and `saving`) the form stays up, so nothing typed is lost.
+ */
+type Phase =
+  "loading" | "ready" | "saving" | "saved" | "error" | "conflict" | "rebasing" | "deleted";
+
+const BODY_OVERWRITE_NOTICE =
+  "The body was also edited outside the editor. Saving will overwrite those edits with yours.";
+
+/** readSourceFile's 404: the file is gone from disk. */
+const isNotFound = (e: unknown) =>
+  e instanceof Error && e.message.startsWith("Source file not found");
 
 export function EntityEditPanel({
   sourcePath,
@@ -47,8 +71,16 @@ export function EntityEditPanel({
 }) {
   const internal = useEntityEditDraft();
   const api = draftApi ?? internal;
-  const [phase, setPhase] = useState<"loading" | "ready" | "saving" | "saved" | "error">("loading");
+  const [phase, setPhase] = useState<Phase>("loading");
   const [error, setError] = useState<string | null>(null);
+  // Shown after a rebase (manual or on reopen) when the DM's body replaces a
+  // body that was also edited on disk.
+  const [notice, setNotice] = useState<string | null>(null);
+  // The entity this panel shows now; async work started for another is dropped.
+  const sourcePathRef = useRef(sourcePath);
+  useEffect(() => {
+    sourcePathRef.current = sourcePath;
+  }, [sourcePath]);
   // Keep the original raw file so we can preserve all existing frontmatter fields on save.
   const rawRef = useRef<string>("");
 
@@ -93,20 +125,8 @@ export function EntityEditPanel({
     const keysPath = `${parts[0]}/${parts[1]}/_dm/character-keys.yaml`;
     readSourceFile(keysPath, fetch)
       .then((content) => {
-        const names: string[] = [];
-        for (const line of content.split("\n")) {
-          const trimmed = line.trim();
-          if (
-            trimmed &&
-            !trimmed.startsWith("#") &&
-            !trimmed.startsWith(" ") &&
-            trimmed.includes(":")
-          ) {
-            const name = trimmed.split(":")[0].trim();
-            if (name) names.push(name);
-          }
-        }
-        setCharNames(names);
+        const parsed = parseCharacterKeys(content);
+        setCharNames(parsed.ok ? parsed.entries.map((e) => e.name) : []);
       })
       .catch(() => {
         /* non-fatal — keys file may not exist yet */
@@ -116,22 +136,30 @@ export function EntityEditPanel({
   useEffect(() => {
     let alive = true;
     setPhase("loading");
+    setNotice(null);
     (async () => {
       try {
         const raw = await readSourceFile(sourcePath, fetch);
         if (!alive) return;
         rawRef.current = raw;
-        const fm = parseFrontmatter(raw);
-        const atlas = (fm.data.atlas as Record<string, unknown>) ?? {};
+        const disk = draftContentFromDisk(raw);
         // No-loss: if a live draft for THIS sourcePath already exists (the user
         // was editing, left Edit, and came back), keep it — including any
         // in-progress secret edits, which now live on the shared draft instead
         // of local state. Only seed the draft from disk on a genuine first
         // open. rawRef is still refreshed above so Save preserves untouched
         // frontmatter.
-        const diskType = String(atlas.type ?? "");
+        const diskType = disk.fields.type;
+        const baseHash = await hashContent(raw);
+        if (!alive) return;
         const existing = api.snapshot();
         if (existing && existing.sourcePath === sourcePath) {
+          // The file changed while the draft was parked (Obsidian, a sync):
+          // rebase now, so the first Save doesn't hit a stale-base 409.
+          if (existing.baseHash !== baseHash) {
+            const outcome = api.rebase(sourcePath, baseHash, disk);
+            if (outcome?.bodyOverwritten) setNotice(BODY_OVERWRITE_NOTICE);
+          }
           // Re-filing an entity the DM already had open: still honour the
           // requested type, but keep the rest of their in-progress draft.
           if (initialType && initialType !== existing.fields.type) {
@@ -140,19 +168,7 @@ export function EntityEditPanel({
           setPhase("ready");
           return;
         }
-        const baseHash = await hashContent(raw);
-        api.load({
-          sourcePath,
-          baseHash,
-          fields: {
-            id: String(atlas.id ?? ""),
-            type: diskType,
-            visibility: isValidVisibility(atlas.visibility) ? atlas.visibility : "dm",
-            summary: String(atlas.summary ?? ""),
-          },
-          body: fm.content,
-          secrets: Array.isArray(atlas.secrets) ? (atlas.secrets as DraftSecret[]) : [],
-        });
+        api.load({ sourcePath, baseHash, ...disk });
         // Seeded from disk above so `pristine` is the file's state; applying the
         // type now makes it a genuine unsaved change the DM can see and Save.
         if (initialType && initialType !== diskType) api.setField("type", initialType);
@@ -170,8 +186,12 @@ export function EntityEditPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourcePath]);
 
-  const onSave = async () => {
-    if (!api.draft) return;
+  // `asNewFile`: the file was deleted or moved on disk; write it again with a
+  // create-only save (baseHash null), which the endpoint refuses if a file
+  // has reappeared at that path.
+  const onSave = async (asNewFile = false) => {
+    if (!api.draft || phase === "saving" || phase === "rebasing") return;
+    const startedFor = sourcePath;
     setPhase("saving");
     try {
       const { data } = parseFrontmatter(rawRef.current);
@@ -198,16 +218,56 @@ export function EntityEditPanel({
         path: api.draft.sourcePath,
         content,
         kind: "entity-md",
-        baseHash: api.draft.baseHash,
+        baseHash: asNewFile ? null : api.draft.baseHash,
       };
       await saveAtlasPatchToLocalFs([change], undefined, { rebuild: true });
+      if (sourcePathRef.current !== startedFor) return;
       setPhase("saved");
+      setNotice(null);
       api.clear();
       onSaved();
     } catch (e) {
+      if (sourcePathRef.current !== startedFor) return;
+      // The file moved under the draft. Keep the form and the draft and offer
+      // a way on, instead of the error page. already-exists only comes from
+      // Save as a new file: a file is back at that path, so rebase onto it.
+      if (e instanceof ConflictError) {
+        logger.warn("Entity save conflict", e);
+        setPhase(e.reason === "missing-base" ? "deleted" : "conflict");
+        return;
+      }
       logger.error("Entity save failed", e);
       setError(e instanceof Error ? e.message : String(e));
       setPhase("error");
+    }
+  };
+
+  // Rebase after a conflict: re-read the file and move the draft onto it with
+  // the new baseHash (what the DM changed is kept, the rest comes from disk;
+  // see `rebaseDraft`). rawRef is refreshed so frontmatter the panel doesn't
+  // edit comes from the new file on the next Save. A result for an entity the
+  // panel no longer shows is dropped.
+  const onRebase = async () => {
+    if (!api.draft || phase === "rebasing") return;
+    const startedFor = sourcePath;
+    setPhase("rebasing");
+    try {
+      const raw = await readSourceFile(startedFor, fetch);
+      const baseHash = await hashContent(raw);
+      if (sourcePathRef.current !== startedFor) return;
+      rawRef.current = raw;
+      const outcome = api.rebase(startedFor, baseHash, draftContentFromDisk(raw));
+      setNotice(outcome?.bodyOverwritten ? BODY_OVERWRITE_NOTICE : null);
+      setPhase("ready");
+    } catch (e) {
+      if (sourcePathRef.current !== startedFor) return;
+      if (isNotFound(e)) {
+        setPhase("deleted");
+        return;
+      }
+      logger.error("Entity rebase failed", e);
+      toast.error(`Couldn't reload the file: ${e instanceof Error ? e.message : String(e)}`);
+      setPhase("conflict");
     }
   };
 
@@ -408,6 +468,42 @@ export function EntityEditPanel({
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-auto p-3 space-y-3 text-xs">
+        {(phase === "conflict" || phase === "rebasing") && (
+          <div role="alert" className="rounded border border-amber-500/60 p-2 space-y-2">
+            <p>
+              This file changed on disk after you opened it, so Save was refused. Your edits are
+              still here.
+            </p>
+            <button
+              type="button"
+              className="h-7 px-2 text-xs rounded border"
+              disabled={phase === "rebasing"}
+              onClick={onRebase}
+            >
+              {phase === "rebasing" ? "Reloading…" : "Reload from disk and keep my edits"}
+            </button>
+          </div>
+        )}
+        {phase === "deleted" && (
+          <div role="alert" className="rounded border border-amber-500/60 p-2 space-y-2">
+            <p>
+              This file was deleted or moved on disk, so Save was refused. Your edits are still
+              here.
+            </p>
+            <button
+              type="button"
+              className="h-7 px-2 text-xs rounded border"
+              onClick={() => void onSave(true)}
+            >
+              Save as a new file
+            </button>
+          </div>
+        )}
+        {notice && phase !== "conflict" && phase !== "deleted" && (
+          <p role="status" className="rounded border border-amber-500/60 p-2">
+            {notice}
+          </p>
+        )}
         <label className="block">
           <span className="block mb-1">Type</span>
           <input
@@ -616,8 +712,8 @@ export function EntityEditPanel({
         <button
           type="button"
           className="h-8 px-3 text-xs rounded bg-primary text-primary-foreground"
-          disabled={phase === "saving"}
-          onClick={onSave}
+          disabled={phase === "saving" || phase === "rebasing"}
+          onClick={() => void onSave()}
         >
           {phase === "saving" ? "Saving…" : "Save"}
         </button>
