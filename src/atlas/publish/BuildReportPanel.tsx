@@ -28,7 +28,7 @@ import {
   ShieldAlert,
   Inbox,
 } from "lucide-react";
-import { downloadText } from "@/atlas/tabs/download";
+import { downloadText } from "@/lib/download";
 import { toast } from "sonner";
 import { copyToClipboard } from "@/lib/clipboard";
 
