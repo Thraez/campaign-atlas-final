@@ -59,7 +59,7 @@ import { OceanBackground } from "@/atlas/ocean/OceanBackground";
 import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
 import { buildDraftPlacements as pureBuildDraftPlacements } from "@/atlas/editor/dirtyPlacements";
-import type { FileChange } from "@/atlas/save/localFsSave";
+import type { ConflictError, FileChange } from "@/atlas/save/localFsSave";
 import { SaveStatus } from "@/atlas/session/SaveStatus";
 import { DiscardConfirmModal } from "@/atlas/session/DiscardConfirmModal";
 import { useExternalRebuildDetector } from "@/atlas/session/useExternalRebuildDetector";
@@ -809,30 +809,36 @@ function AtlasPlacementEditorInner() {
    * and content/**\/_atlas/*.yaml so even a buggy client cannot widen the
    * surface.
    */
+  const planSave = async () => {
+    if (!project || !activeMap) return null;
+    return planUnifiedSave(
+      {
+        allDraftPlacements: buildDraftPlacements(),
+        overrides,
+        activeMapId: activeMap.id,
+        foreignMapDrafts,
+        entitiesById: new Map(project.entities.map((e) => [e.id, e])),
+        worldYaml: worldYamlDirty
+          ? {
+              path: activeWorldId ? worldYamlPath(activeWorldId) : null,
+              baseline: worldYamlBaseline,
+              buildContent: buildWorldYamlContent,
+            }
+          : null,
+        localLayers: layerEditor.localLayers,
+      },
+      { fetchFn: fetch },
+    );
+  };
+
   const onSaveClick = async () => {
     if (!project || !activeMap) return;
     // eval-31: an entity edit is counted in the chip but saved only by its own
     // panel, so Save points to that panel instead of claiming nothing is unsaved.
     const entityEditPending = entityEditDraft.isDirty();
     try {
-      const plan = await planUnifiedSave(
-        {
-          allDraftPlacements: buildDraftPlacements(),
-          overrides,
-          activeMapId: activeMap.id,
-          foreignMapDrafts,
-          entitiesById: new Map(project.entities.map((e) => [e.id, e])),
-          worldYaml: worldYamlDirty
-            ? {
-                path: activeWorldId ? worldYamlPath(activeWorldId) : null,
-                baseline: worldYamlBaseline,
-                buildContent: buildWorldYamlContent,
-              }
-            : null,
-          localLayers: layerEditor.localLayers,
-        },
-        { fetchFn: fetch },
-      );
+      const plan = await planSave();
+      if (!plan) return;
       if (plan.kind === "nothing-to-save") {
         if (entityEditPending) {
           openPendingEntityEdit();
@@ -862,6 +868,49 @@ function AtlasPlacementEditorInner() {
       toast.error(`Could not prepare save: ${msg}`);
     }
   };
+
+  /**
+   * eval-32: a world.yaml save conflict (the file changed on disk after the
+   * editor read it). Re-read the baseline and canon, then (once they have
+   * rendered) rebuild the batch on top of them; the drafts are untouched. The
+   * modal shows the returned notice and its Try again writes the rebuilt batch.
+   */
+  const replanAfterConflictRef = useRef<((notice: string | null) => void) | null>(null);
+  const [conflictReplan, setConflictReplan] = useState(0);
+  const onSaveConflict = async (err: ConflictError): Promise<string | null> => {
+    if (!activeWorldId || err.failedPath !== worldYamlPath(activeWorldId)) return null;
+    await Promise.all([
+      worldYamlBaseline.refresh(),
+      loadAtlasContent(true)
+        .then(setProject)
+        .catch(() => {
+          /* keep current canon; the baseline re-read is what unblocks the save */
+        }),
+    ]);
+    return new Promise((resolve) => {
+      replanAfterConflictRef.current = resolve;
+      setConflictReplan((n) => n + 1);
+    });
+  };
+  useEffect(() => {
+    const resolve = replanAfterConflictRef.current;
+    if (!resolve || worldYamlBaseline.loading) return;
+    replanAfterConflictRef.current = null;
+    planSave()
+      .then((plan) => {
+        if (plan?.kind !== "save") return resolve(null);
+        setPendingChanges(plan.changes);
+        resolve(
+          "world.yaml changed on disk after the editor read it (edited outside the editor), so " +
+            "Save was refused and nothing was written. The editor re-read it and the atlas and " +
+            "rebuilt your changes on top: the diff below is against the file as it is now. " +
+            "Your changes are kept. Check the diff, then Try again.",
+        );
+      })
+      .catch(() => resolve(null));
+    // planSave is a fresh closure each render; this runs once per replan request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conflictReplan, worldYamlBaseline.loading]);
 
   /**
    * Create handler for the EntityEditorPanel. Builds a FileChange for the new
@@ -2096,6 +2145,7 @@ function AtlasPlacementEditorInner() {
         rebuildAfterSave={true}
         onConfirm={() => session.markSaving()}
         onWriteFailed={(msg) => session.markFailed(msg)}
+        onConflict={onSaveConflict}
         onSaved={(result) => {
           void session.markSaved();
           setLastSavedAt(Date.now());

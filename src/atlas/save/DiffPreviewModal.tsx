@@ -44,12 +44,18 @@ export interface DiffPreviewModalProps {
    *  the editor can reflect a persistent "Save failed" status (the modal also
    *  shows its own error UI with Try again / Cancel). */
   onWriteFailed?: (message: string) => void;
+  /** eval-32: a save conflict the editor can recover from. It re-reads what
+   *  changed, replaces `changes` with a batch rebuilt on top, and resolves to a
+   *  notice for the DM; null means it could not, and the conflict error shows. */
+  onConflict?: (err: ConflictError) => Promise<string | null>;
   onClose: () => void;
 }
 
 type Phase =
   | { kind: "review" }
   | { kind: "saving" }
+  /** eval-32: a conflict was recovered; review the rebuilt batch, then Try again. */
+  | { kind: "rebased"; notice: string }
   | { kind: "success"; result: LocalSaveResult }
   | { kind: "disallowed"; path: string }
   | { kind: "error"; message: string };
@@ -100,6 +106,7 @@ export function DiffPreviewModal({
   onConfirm,
   onSaved,
   onWriteFailed,
+  onConflict,
   onClose,
 }: DiffPreviewModalProps) {
   const [phase, setPhase] = useState<Phase>({ kind: "review" });
@@ -155,7 +162,11 @@ export function DiffPreviewModal({
               ? err.message
               : "Unknown error",
       );
-      if (err instanceof DisallowedPathError) {
+      const notice =
+        err instanceof ConflictError && onConflict ? await onConflict(err).catch(() => null) : null;
+      if (notice) {
+        setPhase({ kind: "rebased", notice });
+      } else if (err instanceof DisallowedPathError) {
         setPhase({ kind: "disallowed", path: err.path });
       } else if (err instanceof ConflictError) {
         // Conflict failures used to surface as the bare error message
@@ -265,6 +276,14 @@ export function DiffPreviewModal({
                 <code className="font-mono">git status</code> to review and commit.
               </DialogDescription>
             </DialogHeader>
+            {phase.kind === "rebased" && (
+              <p
+                role="alert"
+                className="text-xs rounded-md border border-amber-500/40 bg-amber-500/10 p-2"
+              >
+                {phase.notice}
+              </p>
+            )}
             <ScrollArea className="flex-1 pr-3 -mr-3">
               <ul className="space-y-3 text-xs">
                 {changes.map((c, i) => {
@@ -301,7 +320,11 @@ export function DiffPreviewModal({
                 Cancel
               </Button>
               <Button onClick={runSave} disabled={phase.kind === "saving"}>
-                {phase.kind === "saving" ? "Saving…" : "Save to disk"}
+                {phase.kind === "saving"
+                  ? "Saving…"
+                  : phase.kind === "rebased"
+                    ? "Try again"
+                    : "Save to disk"}
               </Button>
             </div>
           </>
