@@ -1405,6 +1405,7 @@ function AtlasPlacementEditorInner() {
                 <EntitySurface
                   entity={editingEntity}
                   entitiesById={entitiesById}
+                  excludedNotes={project?.buildReport?.excludedNotes}
                   startInEdit={!!refilingThis}
                   onClose={() => {
                     const intent = resolveEntityCloseIntent({ dirty: entityEditDraft.isDirty() });

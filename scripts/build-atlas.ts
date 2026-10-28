@@ -29,9 +29,8 @@ import {
 } from "../src/atlas/content/dmMarkup";
 import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
 import {
-  NameIndex,
+  createProjectionContext,
   projectEntityWithReport,
-  type ProjectionContext,
   type ProjectionReport,
 } from "../src/atlas/content/projectEntityForPlayer";
 import { loadWorldConfig, projectAssetCredits } from "./atlas/loadWorldConfig";
@@ -50,7 +49,13 @@ import { PLAYER_VISIBLE_VISIBILITY } from "./atlas/visibility";
 import { isLit } from "../src/atlas/fog/effectiveLit";
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
 import { filterSoundscapeForPlayer } from "./atlas/filterSoundscape";
-import { hashAudioAssets, rewriteAudioSrcs, writeAudioManifest } from "./atlas/hashAudioAssets";
+import {
+  applyAudioPlan,
+  planAudioAssets,
+  rewriteAudioSrcs,
+  writeAudioManifest,
+  type AudioPlan,
+} from "./atlas/hashAudioAssets";
 import { compactProfile } from "../src/atlas/profiles/profileBuild";
 import type {
   AssetCredit,
@@ -58,6 +63,8 @@ import type {
   AtlasProject,
   CreditsConfig,
   Entity,
+  EntityVisibility,
+  ExcludedNoteName,
   MapDocument,
   MapPlacement,
   Region,
@@ -101,7 +108,7 @@ type AllParsed = {
   parsed: ParsedFile;
   title: string;
   id: string;
-  visibility: import("../src/atlas/content/schema").EntityVisibility;
+  visibility: EntityVisibility;
   isSecret: boolean;
 };
 
@@ -287,18 +294,40 @@ export interface BuildAtlasReport {
   failure?: BuildFailure;
 }
 
+/** A file the core prepared for `writeBuildOutput` to write. */
+export interface PlannedFile {
+  path: string;
+  bytes: Buffer;
+}
+
+/**
+ * The asset files a build writes besides the atlas, prepared by `buildAtlas`
+ * and written by `writeBuildOutput`, so the core touches no file.
+ */
+export interface BuildAssetWrites {
+  /** Player fog masks (`<src>.fog.png`); every other `*.fog.png` in `pruneDir` is stale. */
+  fog?: { files: PlannedFile[]; pruneDir: string };
+  /** Player hashed audio copies. */
+  audio?: AudioPlan;
+  /** The `public/` folder whose audio picker manifest is refreshed (every build). */
+  publicDir: string;
+}
+
 export interface BuildAtlasResult {
   project: AtlasProject;
   searchIndex: SearchIndexEntry[];
   report: BuildAtlasReport;
+  assets: BuildAssetWrites;
 }
 
 /**
  * Programmatic entry. Same behavior as invoking `tsx scripts/build-atlas.ts`
  * with the equivalent flags from `root`, but never calls `process.exit`:
- * `buildAtlas`, then `writeBuildOutput`, then the console report, then the
- * gates. Validation failures come back as `{ ok: false, exitCode }`. The dev
- * save plugin uses this so an in-flight save can rebuild atlas.json without
+ * `buildAtlas`, the console report, then `writeBuildOutput` only when every
+ * gate passed. A failed build, player or DM, writes nothing: no atlas, no
+ * search index, no fog masks, no audio, so the last good output stays.
+ * Validation failures come back as `{ ok: false, exitCode }`. The dev save
+ * plugin uses this so an in-flight save can rebuild atlas.json without
  * spawning a child process.
  */
 export async function runBuild(
@@ -306,40 +335,61 @@ export async function runBuild(
   root: string = process.cwd(),
 ): Promise<BuildResult> {
   const started = Date.now();
+  let result: BuildAtlasResult;
   try {
-    const result = await buildAtlas(root, flags);
-    const outDir = writeBuildOutput(root, flags, result);
-    console.log(formatBuildReport(result.report));
-    console.log(`\nWrote ${path.relative(root, path.join(outDir, "atlas.json"))}`);
-    console.log(`Wrote ${path.relative(root, path.join(outDir, "search-index.json"))}\n`);
-    const failure = result.report.failure;
-    if (failure) {
-      console.error(
-        failure.exitCode === 1 ? "Build failed: validation errors above." : failure.message,
-      );
-      throw new BuildError(failure.exitCode, failure.message);
-    }
-    return { ok: true, exitCode: 0, durationMs: Date.now() - started };
+    result = await buildAtlas(root, flags);
   } catch (e) {
-    if (e instanceof BuildError) {
-      return { ok: false, exitCode: e.code, durationMs: Date.now() - started, error: e.message };
-    }
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, exitCode: 1, durationMs: Date.now() - started, error: msg };
+    // buildAtlas throws BuildError for the failures it can't build past
+    // (missing config, bad world.yaml); anything else is exit 1.
+    const exitCode = e instanceof BuildError ? e.code : 1;
+    const error = e instanceof Error ? e.message : String(e);
+    return { ok: false, exitCode, durationMs: Date.now() - started, error };
   }
+  console.log(formatBuildReport(result.report));
+  const failure = result.report.failure;
+  if (failure) {
+    console.error(
+      failure.exitCode === 1 ? "Build failed: validation errors above." : failure.message,
+    );
+    console.error("Nothing written.");
+    return {
+      ok: false,
+      exitCode: failure.exitCode,
+      durationMs: Date.now() - started,
+      error: failure.message,
+    };
+  }
+  const outDir = writeBuildOutput(root, flags, result);
+  console.log(`\nWrote ${path.relative(root, path.join(outDir, "atlas.json"))}`);
+  console.log(`Wrote ${path.relative(root, path.join(outDir, "search-index.json"))}\n`);
+  return { ok: true, exitCode: 0, durationMs: Date.now() - started };
 }
 
 /**
- * The thin file adapter: writes `atlas.json` and `search-index.json` and
- * returns the directory. Player builds go to `cfg.outputDir` (public/atlas,
- * committed and served); DM builds to the gitignored `.local-atlas`, so
- * spoilers never land in the committed atlas.json by accident. `--out` wins.
+ * The thin file adapter: writes the asset files the core prepared (fog
+ * masks, hashed audio, the audio manifest), then `atlas.json` and
+ * `search-index.json`, and returns the directory. Player builds go to
+ * `cfg.outputDir` (public/atlas, committed and served); DM builds to the
+ * gitignored `.local-atlas`, so spoilers never land in the committed
+ * atlas.json by accident. `--out` wins. Refuses a result whose gates failed.
  */
 export function writeBuildOutput(
   root: string,
   flags: BuildFlags,
-  { project, searchIndex, report }: BuildAtlasResult,
+  { project, searchIndex, report, assets }: BuildAtlasResult,
 ): string {
+  if (report.failure) {
+    throw new Error(`writeBuildOutput: refusing a failed build (${report.failure.message})`);
+  }
+  if (assets.fog) {
+    for (const f of assets.fog.files) fs.writeFileSync(f.path, f.bytes);
+    const keep = new Set(assets.fog.files.map((f) => f.path));
+    pruneStaleFogOutputs(assets.fog.pruneDir, keep);
+  }
+  // Hashed audio first, then the manifest that lists the folder's sources.
+  if (assets.audio) applyAudioPlan(assets.audio);
+  writeAudioManifest(assets.publicDir);
+
   const outDir = flags.outDir ? path.resolve(root, flags.outDir) : report.defaultOutDir;
   fs.mkdirSync(outDir, { recursive: true });
   // Player builds ship minified (smaller payload for players); DM/.local-atlas
@@ -506,55 +556,47 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     allParsed.push({ rel, parsed, title, id, visibility, isSecret });
   }
 
-  // Cross-reference index: title + aliases → id, covering EVERY parsed entity
-  // (player-visible and DM/hidden) and folder-excluded notes. Used for
-  // wikilink resolution so we can detect cross-ref leaks (a public-entry link
-  // to a DM-only target). Loose and basename matching: see NameIndex.
-  const secretEntityIds = new Set<string>();
-  const names = new NameIndex(secretEntityIds);
-  const registerName = (name: string, id: string) => names.register(name, id);
-  const allEntityVisibility = new Map<
-    string,
-    import("../src/atlas/content/schema").EntityVisibility
-  >();
-  // Every literal string (title / id / alias) belonging to a non-player
-  // entity. Used to scrub warning text before it ships in a player build.
+  // Folder-excluded notes (`_dm/`, `_drafts/`, ...) are never read into
+  // entities and never ship, but a public-entry wikilink to their title would
+  // still leak the display text, so the cross-ref index treats them as secret
+  // targets. A note that also parsed (same id) is already covered.
+  const excludedNotes: ExcludedNoteName[] = scan.excluded
+    .filter((n) => n.title && !slugSeen.has(n.id))
+    .filter((n, i, all) => all.findIndex((o) => o.id === n.id) === i)
+    .map((n) => ({ id: n.id, title: n.title, aliases: [...n.aliases] }));
+
+  // Cross-reference index: title + aliases → id over EVERY parsed note
+  // (shipped or secret) plus the folder-excluded ones. The same function
+  // builds the editor preview's context, so build and preview resolve and
+  // redact links alike. Loose and basename matching: see createProjectionContext.
+  const projectionCtx = createProjectionContext(
+    allParsed.map((p) => ({
+      id: p.id,
+      title: p.title,
+      aliases: p.parsed.atlas.aliases,
+      visibility: p.visibility,
+      isSecret: p.isSecret,
+    })),
+    excludedNotes,
+  );
+
+  // Warnings only: each note's visibility label (folder-excluded notes show
+  // their own tag, or dm), and every literal name of a secret note so player
+  // warnings can be scrubbed of it.
+  const allEntityVisibility = new Map<string, EntityVisibility>();
   const secretNames = new Set<string>();
   for (const p of allParsed) {
-    registerName(p.title, p.id);
-    for (const a of p.parsed.atlas.aliases ?? []) {
-      registerName(a, p.id);
-    }
     allEntityVisibility.set(p.id, p.visibility);
     if (p.isSecret) {
-      secretEntityIds.add(p.id);
       secretNames.add(p.title);
       secretNames.add(p.id);
       for (const a of p.parsed.atlas.aliases ?? []) secretNames.add(a);
     }
   }
-
-  // Also parse identity-only from folder-excluded files (e.g. `_dm/`,
-  // `_drafts/`). These files are NEVER read into entities and never ship, but
-  // a public-entry wikilink to their title would still leak the display text
-  // unless we treat them as secret targets in the cross-ref index.
-  const excludedIdSeen = new Set<string>();
-  for (const note of scan.excluded) {
-    const { title, id, aliases } = note;
-    if (!title) continue;
-    if (slugSeen.has(id) || excludedIdSeen.has(id)) continue;
-    excludedIdSeen.add(id);
-    registerName(title, id);
-    for (const a of aliases) {
-      registerName(a, id);
-    }
-    // Folder-excluded files have no published visibility, but for cross-ref
-    // purposes they're DM-equivalent: anything wikilinking to them from a
-    // public entry is a spoiler leak. The label (warnings only) is the
-    // note's own tag, or dm when it has none.
-    const vis = typeof note.atlas.visibility === "string" ? note.visibility : "dm";
-    allEntityVisibility.set(id, vis);
-    secretEntityIds.add(id);
+  const excludedById = new Map(scan.excluded.map((n) => [n.id, n]));
+  for (const { id, title, aliases = [] } of excludedNotes) {
+    const note = excludedById.get(id)!;
+    allEntityVisibility.set(id, typeof note.atlas.visibility === "string" ? note.visibility : "dm");
     secretNames.add(title);
     secretNames.add(id);
     for (const a of aliases) secretNames.add(a);
@@ -569,21 +611,13 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
       continue;
     }
     const built = buildEntity(item, {
+      player: flags.player,
       defaultWorld: cfg.defaultWorld,
       calendar: worldCfg?.calendar,
     });
     detectedDmBlocks += built.detectedDmBlocks;
     if (flags.player) strippedDmBlocks += built.detectedDmBlocks;
     if (built.unbalancedError) errors.push(built.unbalancedError);
-    // Secret placement markers ({{secret:id}}) never ship in either mode —
-    // the secrets tab and encrypted blobs carry that content instead. The
-    // player projection strips them itself; the DM body loses them here.
-    if (flags.player) {
-      built.pending.rawBody = stripSecretMarkers(stripDmBlocks(item.parsed.body).text);
-    } else {
-      built.pending.entity.body = stripSecretMarkers(item.parsed.body);
-      built.pending.rawBody = built.pending.entity.body;
-    }
     pending.push(built.pending);
 
     // Capture secret specs for the async encrypt pass below.
@@ -606,22 +640,13 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
 
   // Entity → visibility for the entities this build ships. Relationship,
   // region and route leak detection all read it.
-  const entityVisibility = new Map<
-    string,
-    import("../src/atlas/content/schema").EntityVisibility
-  >();
+  const entityVisibility = new Map<string, EntityVisibility>();
   for (const { entity } of pending) entityVisibility.set(entity.id, entity.visibility);
 
   // Player builds: every entity goes through the one player projection
   // (src/atlas/content/projectEntityForPlayer.ts). It runs before the encrypt
   // pass, so no entity has `secrets` yet and every {{secret:id}} marker is
   // dropped from the player HTML. Its report feeds the counters below.
-  const projectionCtx: ProjectionContext = {
-    secretIds: secretEntityIds,
-    resolveByName: names.resolveByName,
-    resolveByBasename: names.resolveByBasename,
-    entityVisibility,
-  };
   const projectionReports = new Map<string, ProjectionReport>();
 
   const backlinkMap = new Map<string, Map<string, string>>();
@@ -650,8 +675,8 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
       const { entity } = item;
       const resolvedBody = resolveImageEmbeds(rawBody, DEFAULT_RESOLVE_ASSET);
       const { tokenized, links } = tokenizeWikilinks(resolvedBody, {
-        resolveByName: names.resolveByName,
-        resolveByBasename: names.resolveByBasename,
+        resolveByName: projectionCtx.resolveByName,
+        resolveByBasename: projectionCtx.resolveByBasename,
       });
       entity.links = links;
       // Sanitize rendered markdown HTML BEFORE shipping it in atlas.json:
@@ -884,8 +909,14 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // mask PNG, write <name>.fog.png next to the source, rewrite the layer src
   // in the player atlas, and strip fog geometry so reveal polygons never ship.
   // (See docs/superpowers/specs/2026-05-19-fog-player-mechanic-design.md.)
+  let fogWrites: BuildAssetWrites["fog"];
   if (flags.player) {
-    maps = await redactMapsForPlayer(maps, ROOT, warnings);
+    const redacted = await redactMapsForPlayer(maps, ROOT, warnings);
+    maps = redacted.maps;
+    fogWrites = {
+      files: redacted.files,
+      pruneDir: path.join(ROOT, "public", "atlas", "assets", "maps"),
+    };
   }
 
   // -------- Soundscape player-strip --------
@@ -894,6 +925,8 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // so the original DM file paths never appear in the player build. Runs
   // unconditionally (even with zero areas) so a build that removes all sound
   // still prunes previously-hashed files instead of leaving them orphaned.
+  // The copies and the prune are planned here and written by writeBuildOutput.
+  let audioPlan: AudioPlan | undefined;
   if (flags.player) {
     maps = maps.map((m) => {
       if (!m.soundscape) return m;
@@ -907,9 +940,10 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     // elsewhere; if it also pruned, it would delete the hashed files the
     // live public/atlas/atlas.json still references — silently 404ing
     // player ambience. Copy always, prune only when we own the tree.
-    const rewrite = hashAudioAssets(allAreas, path.join(ROOT, "public"), {
+    audioPlan = planAudioAssets(allAreas, path.join(ROOT, "public"), {
       prune: !flags.outDir,
     });
+    const rewrite = audioPlan.rewrite;
     maps = maps.map((m) => {
       if (!m.soundscape?.areas?.length) return m;
       return {
@@ -920,10 +954,9 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   }
 
   // -------- Audio picker manifest --------
-  // Refresh the static listing the editor's sound panel reads. Runs in every
-  // build mode so the picker sees files the DM drops in before any area
-  // exists; hashed copies are excluded so only source files are listed.
-  writeAudioManifest(path.join(ROOT, "public"));
+  // writeBuildOutput refreshes the static listing the editor's sound panel
+  // reads, in every build mode, so the picker sees files the DM drops in
+  // before any area exists; hashed copies are excluded.
 
   // -------- Profile + relationship player-strip --------
   // The DM half of `profile` and DM-only relationships must NEVER reach a
@@ -990,12 +1023,14 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // SVG policy is centralized in validateAsset.ts; expose hook here for future
   // per-project overrides via atlas.config.json.
   const svgPolicy: SvgPolicy | undefined = undefined;
+  // Fog masks are written by writeBuildOutput, after this check.
+  const planned = new Map((fogWrites?.files ?? []).map((f) => [f.path, f.bytes.length]));
 
   const runAssetCheck = (raw: string, owner: string) => {
     if (!raw) return;
     if (/^(https?:|data:|blob:)/i.test(raw)) externalAssets += 1;
     else localAssets += 1;
-    const found = validateAsset(raw, owner, { publicDir: PUBLIC_DIR, svgPolicy });
+    const found = validateAsset(raw, owner, { publicDir: PUBLIC_DIR, svgPolicy, planned });
     for (const f of found) {
       assetFindings.push(f);
       if (f.category === "missing") missingAssets += 1;
@@ -1086,6 +1121,7 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
             excludedPaths: [...scanInfo.excludedPaths]
               .map((f) => path.relative(contentDir, f).replace(/\\/g, "/"))
               .sort(),
+            excludedNotes,
           }),
       // Warning text routinely names DM entities (cross-ref leak messages,
       // relationship leak messages, unresolved-target messages, etc.). Player
@@ -1143,19 +1179,30 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     assetErrors: assetFindings.filter((f) => f.severity === "error").map(formatFinding),
   };
   report.failure = checkBuildGates(flags, report);
-  return { project, searchIndex, report };
+  const assets: BuildAssetWrites = {
+    fog: fogWrites,
+    audio: audioPlan,
+    publicDir: path.join(ROOT, "public"),
+  };
+  return { project, searchIndex, report, assets };
 }
 
 /**
- * Assemble the DM-side entity for one parsed file: every field as authored
- * (body still carrying DM blocks and secret markers). DM builds strip the
- * secret markers from the body and ship the rest; player builds hand it to
- * `projectEntityWithReport`, the one player projection. Title-duplicate
- * aliases are dropped in both. Counters are returned, not mutated.
+ * Assemble the DM-side entity for one parsed file, every field as authored,
+ * and the `rawBody` the later passes scan (embedded images, search index).
+ * Body preparation lives only here:
+ * - DM builds: `entity.body` and `rawBody` lose the secret markers
+ *   ({{secret:id}}); the secrets tab carries that content. DM blocks stay.
+ * - Player builds: `entity.body` stays as authored, because
+ *   `projectEntityWithReport` (the one player projection) strips DM blocks
+ *   and markers itself; `rawBody` is the body with both already stripped.
+ * Title-duplicate aliases are dropped in both. Counters are returned, not
+ * mutated.
  */
 function buildEntity(
   item: AllParsed,
   opts: {
+    player: boolean;
     defaultWorld: string;
     calendar: Parameters<typeof parseAtlasDate>[1];
   },
@@ -1190,7 +1237,7 @@ function buildEntity(
     race: parsed.atlas.race,
     credit: parsed.atlas.credit,
     images: (parsed.atlas.images ?? []).map(relImage),
-    body: parsed.body,
+    body: opts.player ? parsed.body : stripSecretMarkers(parsed.body),
     bodyHtml: "",
     frontmatter: parsed.data,
     sourcePath: rel,
@@ -1218,7 +1265,12 @@ function buildEntity(
   const explicitPlacements = parsed.atlas.placements ?? [];
 
   return {
-    pending: { entity, rawBody: parsed.body, placements: explicitPlacements, legacy },
+    pending: {
+      entity,
+      rawBody: opts.player ? stripSecretMarkers(stripDmBlocks(parsed.body).text) : entity.body,
+      placements: explicitPlacements,
+      legacy,
+    },
     detectedDmBlocks,
     unbalancedError,
   };
@@ -1242,25 +1294,22 @@ function pruneStaleFogOutputs(dir: string, keep: ReadonlySet<string>): void {
 
 /**
  * Player-mode fog redaction. For each fog-enabled map, redact every raster
- * layer to a feathered alpha-mask PNG (written as <name>.fog.png next to the
- * source), rewrite the layer src to the redacted file, and strip fog geometry
- * so reveal polygons never ship. Returns a new maps array; pushes a warning
- * for any layer whose source image is missing.
- *
- * Before returning, prunes stale `.fog.png` outputs from prior builds: a
- * renamed/removed layer or map (or fog disabled) otherwise orphans its old
- * redacted file in `public/atlas/assets/maps` forever, since nothing else
- * ever revisits or removes it. Only files freshly (re-)emitted this build
- * are kept; scoped strictly to the `.fog.png` naming, never a source image.
+ * layer to a feathered alpha-mask PNG (to be written as <name>.fog.png next
+ * to the source), rewrite the layer src to the redacted file, and strip fog
+ * geometry so reveal polygons never ship. Returns the new maps and the files
+ * to write; pushes a warning for any layer whose source image is missing.
+ * Writes nothing: writeBuildOutput writes the files and then prunes stale
+ * `.fog.png` outputs from prior builds (a renamed/removed layer or map, or
+ * fog disabled, would otherwise orphan its old redacted file forever).
  * (See docs/superpowers/specs/2026-05-19-fog-player-mechanic-design.md.)
  */
 async function redactMapsForPlayer(
   maps: MapDocument[],
   ROOT: string,
   warnings: string[],
-): Promise<MapDocument[]> {
+): Promise<{ maps: MapDocument[]; files: PlannedFile[] }> {
   const redactedMaps: MapDocument[] = [];
-  const emittedFogPaths = new Set<string>();
+  const files: PlannedFile[] = [];
   for (const m of maps) {
     if (!m.fog?.enabled) {
       redactedMaps.push(m);
@@ -1296,8 +1345,7 @@ async function redactMapsForPlayer(
       const srcAbs = path.resolve(ROOT, "public", cleanSrc);
       const base = srcAbs.slice(0, -ext.length);
       const outPath = `${base}.fog.png`;
-      fs.writeFileSync(outPath, redacted);
-      emittedFogPaths.add(outPath);
+      files.push({ path: outPath, bytes: redacted });
       // Rewrite the layer src to the redacted file (relative to public/, forward slashes).
       const newSrcRel = path
         .relative(path.resolve(ROOT, "public"), outPath)
@@ -1311,8 +1359,7 @@ async function redactMapsForPlayer(
     const playerFog = { mapId: fog.mapId, enabled: true } as FogOverlay;
     redactedMaps.push({ ...m, layers: newLayers, fog: playerFog });
   }
-  pruneStaleFogOutputs(path.join(ROOT, "public", "atlas", "assets", "maps"), emittedFogPaths);
-  return redactedMaps;
+  return { maps: redactedMaps, files };
 }
 
 /**

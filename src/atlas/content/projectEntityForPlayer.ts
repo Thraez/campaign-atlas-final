@@ -8,7 +8,7 @@
  * working directory, where the `@/` alias may not resolve.
  */
 import { markdownToHtml } from "./markdownCore";
-import type { Entity, EntityVisibility } from "./schema";
+import type { Entity, EntityVisibility, ExcludedNoteName } from "./schema";
 import {
   replaceSecretMarkers,
   stripDmBlocks,
@@ -89,7 +89,7 @@ export function looseNameKey(name: string): string {
  * secret one wins so the link is redacted (fail closed). Basename lookups
  * (Q49) refuse a name owned by more than one entity.
  */
-export class NameIndex {
+class NameIndex {
   private readonly exact = new Map<string, string>();
   private readonly owners = new Map<string, Set<string>>();
   private readonly looseOwners = new Map<string, Set<string>>();
@@ -129,18 +129,45 @@ function addOwner(index: Map<string, Set<string>>, key: string, id: string): voi
   owners.add(id);
 }
 
-/** Projection context for the editor preview, from the DM-side entity map. */
-export function buildProjectionContext(entitiesById: Map<string, Entity>): ProjectionContext {
+/** A note the projection may link to, shipped or not. */
+export interface ProjectionNote {
+  id: string;
+  title: string;
+  aliases?: readonly string[];
+  visibility: EntityVisibility;
+  /** True when the note never reaches players (non-player visibility or `atlas.publish: false`). */
+  isSecret: boolean;
+}
+
+/**
+ * The one way to build a projection context, used by the build and the
+ * editor preview alike. `notes` are every parsed note; `excluded` are the
+ * folder-excluded notes (`_dm/`, `_drafts/`, ...) known only by name, which
+ * are always secret. Names register in that order, so an excluded note that
+ * shares a name with a shipped one wins the exact match and its links redact.
+ */
+export function createProjectionContext(
+  notes: Iterable<ProjectionNote>,
+  excluded: Iterable<ExcludedNoteName> = [],
+): ProjectionContext {
   const secretIds = new Set<string>();
   const entityVisibility = new Map<string, EntityVisibility>();
-  for (const e of entitiesById.values()) {
-    if (!PLAYER_VISIBLE_VISIBILITY.has(e.visibility)) secretIds.add(e.id);
-    entityVisibility.set(e.id, e.visibility);
-  }
   const names = new NameIndex(secretIds);
-  for (const e of entitiesById.values()) {
-    names.register(e.title, e.id);
-    for (const a of e.aliases ?? []) names.register(a, e.id);
+  const seen = new Set<string>();
+  for (const n of notes) {
+    seen.add(n.id);
+    if (n.isSecret) secretIds.add(n.id);
+    // Only notes that ship are valid relationship targets.
+    else entityVisibility.set(n.id, n.visibility);
+    names.register(n.title, n.id);
+    for (const a of n.aliases ?? []) names.register(a, n.id);
+  }
+  for (const n of excluded) {
+    if (!n.title || seen.has(n.id)) continue;
+    seen.add(n.id);
+    secretIds.add(n.id);
+    names.register(n.title, n.id);
+    for (const a of n.aliases ?? []) names.register(a, n.id);
   }
   return {
     secretIds,
@@ -148,6 +175,31 @@ export function buildProjectionContext(entitiesById: Map<string, Entity>): Proje
     resolveByBasename: names.resolveByBasename,
     entityVisibility,
   };
+}
+
+/** Is this DM-side entity kept out of player builds? Mirrors readNote's `isSecret`. */
+function entityIsSecret(e: Entity): boolean {
+  const atlas = (e.frontmatter as { atlas?: { publish?: unknown } } | undefined)?.atlas;
+  return !PLAYER_VISIBLE_VISIBILITY.has(e.visibility) || atlas?.publish === false;
+}
+
+/**
+ * Projection context for the editor preview, from the DM atlas: its entities
+ * plus the folder-excluded notes the DM build lists in
+ * `buildReport.excludedNotes`, so a link the build redacts redacts here too.
+ */
+export function buildProjectionContext(
+  entitiesById: Map<string, Entity>,
+  excludedNotes: readonly ExcludedNoteName[] = [],
+): ProjectionContext {
+  const notes = [...entitiesById.values()].map((e) => ({
+    id: e.id,
+    title: e.title,
+    aliases: e.aliases,
+    visibility: e.visibility,
+    isSecret: entityIsSecret(e),
+  }));
+  return createProjectionContext(notes, excludedNotes);
 }
 
 /** What the projection removed, for the build's counters and warnings. */

@@ -216,6 +216,13 @@ export interface ResolvedLink {
   broken: boolean;
 }
 
+/** A folder-excluded note (`_dm/`, `_drafts/`, ...) known only by its names. */
+export interface ExcludedNoteName {
+  id: string;
+  title: string;
+  aliases?: string[];
+}
+
 export interface Entity {
   id: string;            // stable slug
   title: string;
@@ -307,6 +314,11 @@ export interface BuildReport {
    * players.
    */
   excludedPaths?: string[];
+  /**
+   * The folder-excluded notes by name, so the editor's player preview redacts
+   * links to them the way the player build does. DM builds only.
+   */
+  excludedNotes?: ExcludedNoteName[];
   warnings: string[];
   /** Renamed to unresolvedLinks. Kept for back-compat. */
   brokenLinks: number;
