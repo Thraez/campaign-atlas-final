@@ -26,7 +26,7 @@ export interface SearchIndexEntry {
   excerpt?: string;
   body?: string;        // lowercased plain-text body for full-text search (derived from bodyText on load, not shipped)
   bodyText?: string;   // original-case plain-text body for display (snippets) — the shipped field
-  dateRaw?: string;
+  dateLabel?: string;
   dateValue?: number;
   dateYear?: number;
 }

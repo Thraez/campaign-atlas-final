@@ -18,7 +18,7 @@ import {
 } from "@/atlas/browse/browseFilterParams";
 
 interface YearGroup {
-  year: number;
+  key: string;
   label: string;
   entries: Entity[];
 }
@@ -57,18 +57,24 @@ export default function AtlasTimeline() {
       return entityMatchesQuery(e, query);
     });
     const sorted = [...filtered].sort((a, b) => a.dateValue! - b.dateValue!);
-    const byYear = new Map<number, Entity[]>();
+    // Group by year, then order the groups by year: a dateValue override can
+    // sort an event ahead of an earlier year's events, which must not drag its
+    // year's group out of order. Events with no year (the date didn't parse)
+    // go last under "Undated", never under year 0.
+    const byYear = new Map<number | null, Entity[]>();
     sorted.forEach((e) => {
-      const y = e.dateYear ?? 0;
+      const y = typeof e.dateYear === "number" ? e.dateYear : null;
       if (!byYear.has(y)) byYear.set(y, []);
       byYear.get(y)!.push(e);
     });
     const epoch = project?.calendar?.epochName ? ` ${project.calendar.epochName}` : "";
-    return Array.from(byYear.entries()).map(([year, entries]) => ({
-      year,
-      label: `${year}${epoch}`,
-      entries,
-    }));
+    return Array.from(byYear.entries())
+      .sort(([a], [b]) => (a === null ? 1 : b === null ? -1 : a - b))
+      .map(([year, entries]) => ({
+        key: year === null ? "undated" : String(year),
+        label: year === null ? "Undated" : `${year}${epoch}`,
+        entries,
+      }));
   }, [dated, query, activeType, project]);
 
   if (error || !project) {
@@ -218,7 +224,7 @@ export default function AtlasTimeline() {
             ) : (
               <ol className="relative border-l-2 border-border pl-5 space-y-6">
                 {groups.map((g) => (
-                  <li key={g.year} className="space-y-3">
+                  <li key={g.key} className="space-y-3">
                     <div className="flex items-center gap-2 -ml-7">
                       <span className="w-3 h-3 rounded-full bg-primary border-2 border-background" />
                       <h2 className="font-display text-lg text-primary">{g.label}</h2>
@@ -232,7 +238,7 @@ export default function AtlasTimeline() {
                         >
                           <div className="flex items-baseline gap-2 flex-wrap">
                             <span className="text-xs text-muted-foreground tabular-nums">
-                              {e.dateRaw}
+                              {e.dateLabel}
                             </span>
                             <span className="font-medium text-sm">{e.title}</span>
                             {playerTypeLabel(e.type) && (

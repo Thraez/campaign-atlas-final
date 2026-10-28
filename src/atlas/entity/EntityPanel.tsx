@@ -449,9 +449,9 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
           <div className="flex items-center gap-1.5">
             {(() => {
               const typeLabel = playerTypeLabel(entity.type);
-              // dateRaw already drives the Timeline's ordering, so an event that
-              // sorts by date used to show no date at all on its own page.
-              const kicker = [typeLabel, entity.race, entity.dateRaw].filter(Boolean).join(" · ");
+              // The Timeline already shows dateLabel, so an event that sorts by
+              // date used to show no date at all on its own page.
+              const kicker = [typeLabel, entity.race, entity.dateLabel].filter(Boolean).join(" · ");
               return kicker ? (
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   {kicker}
