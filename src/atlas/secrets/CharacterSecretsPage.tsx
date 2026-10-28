@@ -8,6 +8,7 @@ import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { collectCharacterSecrets, type CollectedSecret } from "./collectCharacterSecrets";
 import { getCharacterKey, setCharacterKey, forgetAll } from "./playerSecretsStore";
 import { isSecureCryptoAvailable } from "./isSecureCryptoAvailable";
+import { entityHref } from "@/atlas/deepLink";
 
 function SafeHtml({ html }: { html: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -113,7 +114,7 @@ function SecretsBody({ entities }: { entities: Entity[] }) {
           <li key={`${s.entityId}:${s.secretId}`} className="border border-border rounded p-4">
             <SafeHtml html={s.html} />
             <Link
-              to={`/atlas?entity=${encodeURIComponent(s.entityId)}`}
+              to={entityHref(s.entityId)}
               className="text-xs text-muted-foreground hover:text-foreground mt-2 inline-block"
             >
               On: {s.entityTitle}

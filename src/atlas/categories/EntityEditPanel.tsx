@@ -33,6 +33,7 @@ import { FormatToolbar } from "@/atlas/editor/FormatToolbar";
 import { ImagePickerPanel } from "@/atlas/editor/ImagePickerPanel";
 import { applyToolbarAction, type ToolbarActionId } from "@/atlas/editor/toolbarActions";
 import { secretMarkerIds } from "@/atlas/content/dmMarkup";
+import { parseCharacterKeys } from "@/atlas/secrets/characterKeysFile";
 
 /**
  * - `conflict`: Save hit a stale-base 409; the banner offers the rebase.
@@ -124,20 +125,8 @@ export function EntityEditPanel({
     const keysPath = `${parts[0]}/${parts[1]}/_dm/character-keys.yaml`;
     readSourceFile(keysPath, fetch)
       .then((content) => {
-        const names: string[] = [];
-        for (const line of content.split("\n")) {
-          const trimmed = line.trim();
-          if (
-            trimmed &&
-            !trimmed.startsWith("#") &&
-            !trimmed.startsWith(" ") &&
-            trimmed.includes(":")
-          ) {
-            const name = trimmed.split(":")[0].trim();
-            if (name) names.push(name);
-          }
-        }
-        setCharNames(names);
+        const parsed = parseCharacterKeys(content);
+        setCharNames(parsed.ok ? parsed.entries.map((e) => e.name) : []);
       })
       .catch(() => {
         /* non-fatal — keys file may not exist yet */
