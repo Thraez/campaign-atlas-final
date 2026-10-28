@@ -33,10 +33,11 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { deriveSecretsFromVault } from "./check-derived-secrets";
-import { isReferenced, readPlayerImageRefs } from "./atlas/playerImageRefs";
-
-const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
+import { IMAGE_EXTENSIONS, isReferenced, readPlayerImageRefs } from "./atlas/playerImageRefs";
 const CONFIG_CANDIDATES = ["atlas.config.json"];
+/** Image types sharp cannot decode: their metadata goes unchecked (the filename
+ *  check still runs), and the scan says so per file. Provisional call, 2026-10-28. */
+const SHARP_UNREADABLE_EXTENSIONS = new Set([".ico", ".bmp"]);
 const EXIT_VIOLATION = 13;
 
 function findConfig(): string | null {
@@ -108,15 +109,17 @@ export async function run(opts: RunOpts): Promise<number> {
   }
 
   const secrets = deriveSecretsFromVault(configAbs);
-  const referencedBy = opts.referencedBy;
-  const refs = referencedBy !== undefined ? readPlayerImageRefs(referencedBy) : null;
+  const player =
+    opts.referencedBy !== undefined
+      ? { dir: opts.referencedBy, refs: readPlayerImageRefs(opts.referencedBy) }
+      : null;
   /** Whether the player build keeps this image. Mirrors prunePlayerImagesPlugin,
    *  which only prunes under the atlas dir's `assets/`. */
   const ships = (imgPath: string): boolean => {
-    if (refs === null || referencedBy === undefined) return true;
-    const rel = path.relative(referencedBy, imgPath).split(path.sep).join("/");
-    if (!rel.startsWith("assets/")) return true;
-    return isReferenced(rel, refs);
+    if (player === null) return true;
+    const rel = path.relative(player.dir, imgPath);
+    if (rel.split(path.sep)[0] !== "assets") return true;
+    return isReferenced(rel, player.refs);
   };
 
   const violations: string[] = [];
@@ -136,6 +139,12 @@ export async function run(opts: RunOpts): Promise<number> {
     }
 
     // Check 2: image contains metadata that should have been stripped on upload
+    if (SHARP_UNREADABLE_EXTENSIONS.has(path.extname(imgPath).toLowerCase())) {
+      console.log(
+        `check-image-privacy: metadata not checked: ${imgPath} (format sharp can't read)`,
+      );
+      continue;
+    }
     try {
       const buf = fs.readFileSync(imgPath);
       const meta = await sharp(buf).metadata();

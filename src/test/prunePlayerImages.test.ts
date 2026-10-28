@@ -7,11 +7,12 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { collectImageRefs } from "../../scripts/atlas/playerImageRefs";
-import { pruneUnreferencedImages as pruneWithRefs } from "../../scripts/vite-plugin-prune-player-images";
+import { collectImageRefs, readPlayerImageRefs } from "../../scripts/atlas/playerImageRefs";
+import { pruneUnreferencedImages } from "../../scripts/vite-plugin-prune-player-images";
 
-const pruneUnreferencedImages = (dir: string, json: string) =>
-  pruneWithRefs(dir, collectImageRefs([json]));
+/** Prune `dir` against the refs of one player JSON text. */
+const pruneFromJson = (dir: string, json: string) =>
+  pruneUnreferencedImages(dir, collectImageRefs([json]));
 
 describe("collectImageRefs", () => {
   it("collects whole asset paths, from paths and bare embeds", () => {
@@ -21,11 +22,46 @@ describe("collectImageRefs", () => {
     expect([...refs].sort()).toEqual(["assets/images/Corven.webp", "assets/maps/Map.png"]);
   });
 
+  it("reads paths with spaces, quotes and parens in markdown, HTML and CSS", () => {
+    const refs = collectImageRefs([
+      JSON.stringify({
+        a: "Look: ![](/atlas/assets/images/foo(1).png) and more",
+        b: 'Look: ![alt](</atlas/assets/images/my pic.png> "title") here',
+        c: '<p><img alt="x" src="/atlas/assets/images/your pic.png"></p>',
+        d: "<div style=\"background: url('/atlas/assets/images/bg pic.png')\"></div>",
+        e: "Look: ![](/atlas/assets/images/o'neil.png)",
+        f: "<img src='/atlas/assets/images/a \"b\".png'>",
+      }),
+    ]);
+    expect([...refs]).toEqual(
+      expect.arrayContaining([
+        'assets/images/a "b".png',
+        "assets/images/bg pic.png",
+        "assets/images/foo(1).png",
+        "assets/images/my pic.png",
+        "assets/images/o'neil.png",
+        "assets/images/your pic.png",
+      ]),
+    );
+  });
+
   it("ignores external URLs and paths outside the atlas assets", () => {
     const refs = collectImageRefs([
       '{"a":"https://example.com/atlas/assets/maps/x.png","b":"assets/maps/y.png","c":"/atlas/assets/../secret.png"}',
     ]);
     expect([...refs]).toEqual([]);
+  });
+});
+
+describe("readPlayerImageRefs", () => {
+  it("fails closed on invalid JSON, naming the file", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "player-refs-"));
+    try {
+      fs.writeFileSync(path.join(dir, "atlas.json"), "{not json");
+      expect(() => readPlayerImageRefs(dir)).toThrow(/atlas\.json/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -50,7 +86,7 @@ describe("pruneUnreferencedImages", () => {
 
   it("removes images the player JSON does not name and keeps the rest", () => {
     const json = '{"body":"![[shown.webp]]","layers":[{"src":"/atlas/assets/maps/world.png"}]}';
-    const { removed, bytes } = pruneUnreferencedImages(dir, json);
+    const { removed, bytes } = pruneFromJson(dir, json);
 
     expect(removed.sort()).toEqual(["images/Corven.webp", "maps/dm-only.png"]);
     expect(bytes).toBe(15);
@@ -63,7 +99,7 @@ describe("pruneUnreferencedImages", () => {
     fs.writeFileSync(path.join(dir, "images", "shelf.png"), "x");
     fs.writeFileSync(path.join(dir, "images", "elf.png"), "x");
     const json = '{"body":"![[shelf.png]]"}';
-    const { removed } = pruneUnreferencedImages(dir, json);
+    const { removed } = pruneFromJson(dir, json);
 
     expect(removed).toContain("images/elf.png");
     expect(removed).not.toContain("images/shelf.png");
@@ -72,7 +108,7 @@ describe("pruneUnreferencedImages", () => {
   it("prunes a DM-only image that shares its file name with a shown image in another folder", () => {
     fs.writeFileSync(path.join(dir, "images", "world.png"), "x");
     const json = '{"layers":[{"src":"atlas/assets/maps/world.png"}]}';
-    const { removed } = pruneUnreferencedImages(dir, json);
+    const { removed } = pruneFromJson(dir, json);
 
     expect(removed).toContain("images/world.png");
     expect(removed).not.toContain("maps/world.png");
@@ -105,13 +141,21 @@ describe("pruneUnreferencedImages", () => {
         },
       ],
     });
-    const { removed } = pruneUnreferencedImages(dir, json);
+    const { removed } = pruneFromJson(dir, json);
 
     expect(removed.sort()).toEqual(["images/shown.webp", "maps/dm-only.png", "maps/world.png"]);
   });
 
+  it("prunes DM-only images of every image type the player could show", () => {
+    const exts = [".avif", ".bmp", ".tif", ".tiff", ".ico", ".svg"];
+    for (const ext of exts) fs.writeFileSync(path.join(dir, "images", `dm-secret${ext}`), "x");
+    const { removed } = pruneFromJson(dir, "{}");
+
+    for (const ext of exts) expect(removed).toContain(`images/dm-secret${ext}`);
+  });
+
   it("is a no-op when the assets dir is absent", () => {
-    expect(pruneUnreferencedImages(path.join(dir, "nope"), "{}")).toEqual({
+    expect(pruneFromJson(path.join(dir, "nope"), "{}")).toEqual({
       removed: [],
       bytes: 0,
     });
