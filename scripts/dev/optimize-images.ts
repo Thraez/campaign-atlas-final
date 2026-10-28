@@ -7,10 +7,10 @@
  * that were dropped into the folder with a plain `git add`. Running it is
  * idempotent, so it is safe to run whenever a library looks heavy.
  *
- * Unlike maps:optimize, which keeps its source PNG as a twin, this REPLACES
- * the original. An image that nothing references is an orphan, and
- * scripts/atlas/audit-assets.ts warns on orphans — a twin would trade a size
- * problem for a permanent audit warning, and would keep shipping the bytes.
+ * Like maps:optimize, this REPLACES the original (git keeps it). An image that
+ * nothing references is an orphan, and scripts/atlas/audit-assets.ts warns on
+ * orphans — a twin would trade a size problem for a permanent audit warning,
+ * and would keep shipping the bytes.
  *
  * Maps are not touched. They live under assets/maps/, want lossless for fog
  * redaction and map labels, and have their own optimizer.
@@ -26,6 +26,7 @@ import {
   WEBP_QUALITY,
   MAX_IMAGE_WIDTH,
 } from "../../src/atlas/assets/imageEncoding";
+import { escapeRegExp, findFiles } from "./devFiles";
 
 const DEFAULT_IMAGES_DIR = "public/atlas/assets/images";
 const DEFAULT_CONTENT_ROOTS = ["content", "examples"];
@@ -48,28 +49,9 @@ export interface OptimizeImagesOptions {
   contentRoots?: string[];
 }
 
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 /** Every markdown file under the given roots. */
 function findMarkdownFiles(rootDirs: string[]): string[] {
-  const found: string[] = [];
-  function walk(dir: string): void {
-    let entries;
-    try {
-      entries = readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const e of entries) {
-      const full = join(dir, e.name);
-      if (e.isDirectory()) walk(full);
-      else if (e.isFile() && e.name.toLowerCase().endsWith(".md")) found.push(full);
-    }
-  }
-  for (const root of rootDirs) walk(root);
-  return found;
+  return findFiles(rootDirs, (_dir, name) => name.toLowerCase().endsWith(".md"));
 }
 
 /**
