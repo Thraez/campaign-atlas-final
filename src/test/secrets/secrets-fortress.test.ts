@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Secrets fortress — end-to-end build + leak-scan self-test.
  *
@@ -8,34 +9,16 @@
  * Mirrors src/test/safety-fortress.test.ts pattern.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { runBuildCli, type InProcessRun } from "../helpers/buildInProcess";
 import { run as checkPlayerSecrets } from "../../../scripts/check-player-secrets";
 
 const ROOT = path.resolve(__dirname, "../../..");
-const SCRIPT = path.resolve(ROOT, "scripts/build-atlas.ts");
-const IS_WIN = process.platform === "win32";
-
-function runBuild(args: string[], cwd: string): { status: number; stdout: string; stderr: string } {
-  try {
-    const stdout = execFileSync(IS_WIN ? "npx.cmd" : "npx", ["tsx", SCRIPT, ...args], {
-      cwd: ROOT,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: IS_WIN,
-      env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
-    } as ExecFileSyncOptions);
-    return { status: 0, stdout: String(stdout), stderr: "" };
-  } catch (e) {
-    const err = e as { status?: number; stdout?: Buffer | string; stderr?: Buffer | string };
-    return {
-      status: err.status ?? 1,
-      stdout: String(err.stdout ?? ""),
-      stderr: String(err.stderr ?? ""),
-    };
-  }
+// Builds from the repo root, as the CLI did; the vault comes in via --config.
+function runBuild(args: string[], _cwd: string): Promise<InProcessRun> {
+  return runBuildCli(args, ROOT);
 }
 
 let root: string;
@@ -107,9 +90,9 @@ afterAll(() => {
 });
 
 describe("secrets fortress", () => {
-  it("clean player build of a secret vault passes the leak scan", () => {
+  it("clean player build of a secret vault passes the leak scan", async () => {
     const out = path.join(root, "out");
-    const result = runBuild(
+    const result = await runBuild(
       ["--player", "--config", path.join(root, "atlas.config.json"), "--out", out],
       root,
     );
@@ -139,7 +122,7 @@ describe("secrets fortress", () => {
     expect(searchText.includes("{{secret:")).toBe(false);
   });
 
-  it("scan catches a planted plaintext reveal field", () => {
+  it("scan catches a planted plaintext reveal field", async () => {
     const bad = path.join(root, "bad");
     fs.mkdirSync(bad, { recursive: true });
     fs.writeFileSync(
@@ -168,7 +151,7 @@ describe("secrets fortress", () => {
     expect(checkPlayerSecrets({ dir: bad })).toBe(13);
   });
 
-  it("scan catches an unstripped {{secret:}} marker in the body", () => {
+  it("scan catches an unstripped {{secret:}} marker in the body", async () => {
     const bad2 = path.join(root, "bad2");
     fs.mkdirSync(bad2, { recursive: true });
     fs.writeFileSync(

@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Safety fortress — consolidated end-to-end spoiler-leak fixture test.
  *
@@ -20,40 +21,14 @@
  * script against a vault written into a tmp dir.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { runBuildCli, type InProcessRun } from "./helpers/buildInProcess";
 
 const ROOT = path.resolve(__dirname, "../..");
-const SCRIPT = path.resolve(ROOT, "scripts/build-atlas.ts");
-const IS_WIN = process.platform === "win32";
-
-interface RunResult {
-  status: number;
-  stdout: string;
-  stderr: string;
-}
-
-function run(args: string[], opts: ExecFileSyncOptions = {}): RunResult {
-  try {
-    const stdout = execFileSync(IS_WIN ? "npx.cmd" : "npx", ["tsx", SCRIPT, ...args], {
-      cwd: ROOT,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: IS_WIN,
-      env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
-      ...opts,
-    });
-    return { status: 0, stdout: String(stdout), stderr: "" };
-  } catch (e) {
-    const err = e as { status?: number; stdout?: Buffer | string; stderr?: Buffer | string };
-    return {
-      status: err.status ?? 1,
-      stdout: String(err.stdout ?? ""),
-      stderr: String(err.stderr ?? ""),
-    };
-  }
+function run(args: string[]): Promise<InProcessRun> {
+  return runBuildCli(args, ROOT);
 }
 
 let tmpRoot: string;
@@ -221,14 +196,20 @@ function walkFiles(dir: string): string[] {
 }
 
 describe("safety fortress: end-to-end spoiler leak gates", () => {
-  it("non-strict player build: no secret string appears anywhere in output", () => {
+  it("non-strict player build: no secret string appears anywhere in output", async () => {
     const dir = path.join(tmpRoot, "fortress-loose");
     fs.mkdirSync(dir, { recursive: true });
     writeFortress(dir);
     const outDir = path.join(dir, "out");
     // Non-strict so the build completes even with the cross-ref leak; we then
     // assert that the leak was redacted from output rather than passing through.
-    const res = run(["--player", "--config", path.join(dir, "atlas.config.json"), "--out", outDir]);
+    const res = await run([
+      "--player",
+      "--config",
+      path.join(dir, "atlas.config.json"),
+      "--out",
+      outDir,
+    ]);
     expect(res.status).toBe(0);
     const files = walkFiles(outDir);
     expect(files.length).toBeGreaterThan(0);
@@ -250,12 +231,12 @@ describe("safety fortress: end-to-end spoiler leak gates", () => {
     }
   });
 
-  it("strict player build fails with exit 8 on cross-reference leak", () => {
+  it("strict player build fails with exit 8 on cross-reference leak", async () => {
     const dir = path.join(tmpRoot, "fortress-strict");
     fs.mkdirSync(dir, { recursive: true });
     writeFortress(dir);
     const outDir = path.join(dir, "out");
-    const res = run([
+    const res = await run([
       "--player",
       "--strict",
       "--config",
@@ -270,17 +251,23 @@ describe("safety fortress: end-to-end spoiler leak gates", () => {
     expect(`${res.stdout}${res.stderr}`).toMatch(/cross-reference leak|spoiler leak/i);
   });
 
-  it("unbalanced %% delimiter fails the build with exit 1", () => {
+  it("unbalanced %% delimiter fails the build with exit 1", async () => {
     const dir = path.join(tmpRoot, "unbalanced");
     fs.mkdirSync(dir, { recursive: true });
     writeUnbalanced(dir);
     const outDir = path.join(dir, "out");
-    const res = run(["--player", "--config", path.join(dir, "atlas.config.json"), "--out", outDir]);
+    const res = await run([
+      "--player",
+      "--config",
+      path.join(dir, "atlas.config.json"),
+      "--out",
+      outDir,
+    ]);
     expect(res.status).toBe(1);
     expect(`${res.stdout}${res.stderr}`).toMatch(/unbalanced (DM delimiter|%%)/i);
   });
 
-  it("DM build leaves DM secrets in body but does NOT ship %% in summary/labels", () => {
+  it("DM build leaves DM secrets in body but does NOT ship %% in summary/labels", async () => {
     // DM build is intentionally not player-safe — secrets like
     // SUNHAVEN_TOWER_OF_SECRETS may appear in DM build output. But we still
     // expect the build to succeed (no unbalanced %%) and to write artifacts.
@@ -288,7 +275,7 @@ describe("safety fortress: end-to-end spoiler leak gates", () => {
     fs.mkdirSync(dir, { recursive: true });
     writeFortress(dir);
     const outDir = path.join(dir, "out");
-    const res = run(["--config", path.join(dir, "atlas.config.json"), "--out", outDir]);
+    const res = await run(["--config", path.join(dir, "atlas.config.json"), "--out", outDir]);
     expect(res.status).toBe(0);
     const atlas = fs.readFileSync(path.join(outDir, "atlas.json"), "utf8");
     // The DM build keeps DM entities (so secrets DO appear here).

@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Sentinel-string scanner tests.
  *
@@ -11,6 +12,7 @@ import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { runBuildCli } from "./helpers/buildInProcess";
 import {
   scanDir,
   scanFile,
@@ -20,7 +22,8 @@ import {
 
 const ROOT = path.resolve(__dirname, "../..");
 const SCRIPT = path.resolve(ROOT, "scripts/check-no-secrets.ts");
-const BUILD_SCRIPT = path.resolve(ROOT, "scripts/build-atlas.ts");
+// The build runs in-process; the check scripts still run as CLIs.
+const buildCli = (args: string[]) => runBuildCli(args, ROOT);
 const FIXTURE = path.resolve(__dirname, "fixtures/sentinel-vault");
 
 interface RunResult {
@@ -65,7 +68,7 @@ function plant(dir: string, name: string, contents: string) {
 }
 
 describe.sequential("sentinel scanner", () => {
-  it("flags planted DM sentinel and CLI exits 8", () => {
+  it("flags planted DM sentinel and CLI exits 8", async () => {
     const dir = path.join(tmpRoot, "dm-only");
     plant(dir, "leak.html", `<html>${DM_CONTENT_SENTINELS[0]}</html>`);
     const r = scanDir(dir);
@@ -75,7 +78,7 @@ describe.sequential("sentinel scanner", () => {
     expect(cli.status).toBe(8);
   });
 
-  it("flags planted editor fingerprint and CLI exits 9", () => {
+  it("flags planted editor fingerprint and CLI exits 9", async () => {
     const dir = path.join(tmpRoot, "editor-only");
     plant(dir, "bundle.js", `console.log("${EDITOR_CODE_FINGERPRINTS[0]}");`);
     const r = scanDir(dir);
@@ -85,7 +88,7 @@ describe.sequential("sentinel scanner", () => {
     expect(cli.status).toBe(9);
   });
 
-  it("flags a bundle containing the publish endpoint string as an editor leak", () => {
+  it("flags a bundle containing the publish endpoint string as an editor leak", async () => {
     const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "fp-")), "bundle.js");
     fs.writeFileSync(f, 'fetch("/__atlas/publish-check")');
     const hits = scanFile(f);
@@ -94,7 +97,7 @@ describe.sequential("sentinel scanner", () => {
     );
   });
 
-  it("CLI exits 10 when both kinds leak", () => {
+  it("CLI exits 10 when both kinds leak", async () => {
     const dir = path.join(tmpRoot, "both");
     plant(dir, "a.html", DM_CONTENT_SENTINELS[1]);
     plant(dir, "b.js", EDITOR_CODE_FINGERPRINTS[2]);
@@ -102,22 +105,22 @@ describe.sequential("sentinel scanner", () => {
     expect(cli.status).toBe(10);
   });
 
-  it("clean dir exits 0", () => {
+  it("clean dir exits 0", async () => {
     const dir = path.join(tmpRoot, "clean");
     plant(dir, "ok.html", "<html>hello world</html>");
     const cli = run(SCRIPT, [dir]);
     expect(cli.status, cli.stderr).toBe(0);
   });
 
-  it("missing target exits 0 with skipping message", () => {
+  it("missing target exits 0 with skipping message", async () => {
     const cli = run(SCRIPT, [path.join(tmpRoot, "does-not-exist")]);
     expect(cli.status).toBe(0);
     expect(cli.stdout).toMatch(/skipping/i);
   });
 
-  it("integration: building sentinel-vault under --player --strict produces a clean artifact", () => {
+  it("integration: building sentinel-vault under --player --strict produces a clean artifact", async () => {
     const out = path.join(tmpRoot, "sentinel-build");
-    const build = run(BUILD_SCRIPT, [
+    const build = await buildCli([
       "--player",
       "--strict",
       "--config",

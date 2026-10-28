@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Roundtrip test: build → snapshot atlas.json → build again → compare.
  *
@@ -9,37 +10,14 @@
  * fields without backward compatibility, this test will surface it.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { runBuildCli, type InProcessRun } from "./helpers/buildInProcess";
 
 const ROOT = path.resolve(__dirname, "../..");
-const SCRIPT = path.resolve(ROOT, "scripts/build-atlas.ts");
-const IS_WIN = process.platform === "win32";
-
-function run(
-  args: string[],
-  opts: ExecFileSyncOptions = {},
-): { status: number; stdout: string; stderr: string } {
-  try {
-    const stdout = execFileSync(IS_WIN ? "npx.cmd" : "npx", ["tsx", SCRIPT, ...args], {
-      cwd: ROOT,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: IS_WIN,
-      env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
-      ...opts,
-    });
-    return { status: 0, stdout: String(stdout), stderr: "" };
-  } catch (e) {
-    const err = e as { status?: number; stdout?: Buffer | string; stderr?: Buffer | string };
-    return {
-      status: err.status ?? 1,
-      stdout: String(err.stdout ?? ""),
-      stderr: String(err.stderr ?? ""),
-    };
-  }
+function run(args: string[]): Promise<InProcessRun> {
+  return runBuildCli(args, ROOT);
 }
 
 let tmpRoot: string;
@@ -117,15 +95,15 @@ function stripVolatile(obj: MutableAtlasShape): MutableAtlasShape {
 }
 
 describe.sequential("atlas build roundtrip", () => {
-  it("two consecutive player builds produce identical artifacts (modulo timestamps)", () => {
+  it("two consecutive player builds produce identical artifacts (modulo timestamps)", async () => {
     const dir = path.join(tmpRoot, "roundtrip-player");
     const configPath = makeVault(dir);
 
     const out1 = path.join(dir, "out1");
     const out2 = path.join(dir, "out2");
-    const r1 = run(["--player", "--strict", "--config", configPath, "--out", out1]);
+    const r1 = await run(["--player", "--strict", "--config", configPath, "--out", out1]);
     expect(r1.status, r1.stderr).toBe(0);
-    const r2 = run(["--player", "--strict", "--config", configPath, "--out", out2]);
+    const r2 = await run(["--player", "--strict", "--config", configPath, "--out", out2]);
     expect(r2.status, r2.stderr).toBe(0);
 
     const a1 = JSON.parse(
@@ -138,15 +116,15 @@ describe.sequential("atlas build roundtrip", () => {
     expect(normalize(stripVolatile(a1))).toEqual(normalize(stripVolatile(a2)));
   });
 
-  it("two consecutive DM builds produce identical artifacts (modulo timestamps)", () => {
+  it("two consecutive DM builds produce identical artifacts (modulo timestamps)", async () => {
     const dir = path.join(tmpRoot, "roundtrip-dm");
     const configPath = makeVault(dir);
 
     const out1 = path.join(dir, "out1");
     const out2 = path.join(dir, "out2");
-    const r1 = run(["--config", configPath, "--out", out1]);
+    const r1 = await run(["--config", configPath, "--out", out1]);
     expect(r1.status, r1.stderr).toBe(0);
-    const r2 = run(["--config", configPath, "--out", out2]);
+    const r2 = await run(["--config", configPath, "--out", out2]);
     expect(r2.status, r2.stderr).toBe(0);
 
     const a1 = JSON.parse(
@@ -159,14 +137,14 @@ describe.sequential("atlas build roundtrip", () => {
     expect(normalize(stripVolatile(a1))).toEqual(normalize(stripVolatile(a2)));
   });
 
-  it("search-index.json is also stable across two builds", () => {
+  it("search-index.json is also stable across two builds", async () => {
     const dir = path.join(tmpRoot, "roundtrip-search");
     const configPath = makeVault(dir);
 
     const out1 = path.join(dir, "out1");
     const out2 = path.join(dir, "out2");
-    run(["--player", "--config", configPath, "--out", out1]);
-    run(["--player", "--config", configPath, "--out", out2]);
+    await run(["--player", "--config", configPath, "--out", out1]);
+    await run(["--player", "--config", configPath, "--out", out2]);
 
     const s1 = fs.readFileSync(path.join(out1, "search-index.json"), "utf8");
     const s2 = fs.readFileSync(path.join(out2, "search-index.json"), "utf8");

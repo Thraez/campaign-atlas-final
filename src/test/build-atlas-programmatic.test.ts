@@ -1,10 +1,11 @@
+// @vitest-environment node
 /**
  * A10 programmatic-entry contract. Confirms that `runBuild()` exported
  * from `scripts/build-atlas.ts` returns a structured `BuildResult` (never
  * calling process.exit) and that validation failures surface their CLI
  * exit code via the result rather than killing the host process.
  *
- * The existing `atlas-build.test.ts` covers the CLI surface via spawn;
+ * `build-atlas-cli.test.ts` covers the CLI surface via spawn;
  * this complements it by exercising the in-process path the dev save
  * plugin uses.
  */

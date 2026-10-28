@@ -1,52 +1,23 @@
+// @vitest-environment node
 /**
  * Build pipeline integration tests.
  *
- * These spawn the real `scripts/build-atlas.ts` against a small fixture vault
- * under `src/test/fixtures/atlas-build/`. They cover the spoiler-protection
+ * These run the real `scripts/build-atlas.ts` in-process (as the CLI would
+ * from the repo root) against a small fixture vault under
+ * `src/test/fixtures/atlas-build/`. They cover the spoiler-protection
  * invariants that matter for player builds.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { execFile, type ExecFileOptions } from "node:child_process";
-import { promisify } from "node:util";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { runBuildCli, type InProcessRun } from "./helpers/buildInProcess";
 
 const ROOT = path.resolve(__dirname, "../..");
 const FIXTURE = path.resolve(__dirname, "fixtures/atlas-build");
-const SCRIPT = path.resolve(ROOT, "scripts/build-atlas.ts");
 
-interface RunResult {
-  status: number;
-  stdout: string;
-  stderr: string;
-}
-
-const IS_WIN = process.platform === "win32";
-const execFileAsync = promisify(execFile);
-
-// Async on purpose: a synchronous spawn blocks the test worker for each ~2.5 s
-// build, and back-to-back builds starve Vitest's worker RPC on slow CI runners
-// ("Timeout calling onTaskUpdate") even though every test passes.
-async function run(args: string[], opts: ExecFileOptions = {}): Promise<RunResult> {
-  try {
-    const { stdout } = await execFileAsync(IS_WIN ? "npx.cmd" : "npx", ["tsx", SCRIPT, ...args], {
-      cwd: ROOT,
-      encoding: "utf8",
-      shell: IS_WIN,
-      maxBuffer: 64 * 1024 * 1024,
-      env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
-      ...opts,
-    });
-    return { status: 0, stdout: String(stdout), stderr: "" };
-  } catch (e) {
-    const err = e as { code?: number | string; stdout?: Buffer | string; stderr?: Buffer | string };
-    return {
-      status: typeof err.code === "number" ? err.code : 1,
-      stdout: String(err.stdout ?? ""),
-      stderr: String(err.stderr ?? ""),
-    };
-  }
+function run(args: string[]): Promise<InProcessRun> {
+  return runBuildCli(args, ROOT);
 }
 
 let tmpRoot: string;

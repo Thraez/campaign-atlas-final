@@ -58,6 +58,11 @@ export interface ValidateAssetOptions {
   publicDir: string;
   sizeBudgetBytes?: number;
   svgPolicy?: SvgPolicy;
+  /**
+   * Files the build will write but has not yet (absolute path → byte size),
+   * such as fog masks: checked as if already on disk.
+   */
+  planned?: ReadonlyMap<string, number>;
 }
 
 /** Returns true for http(s)/data/blob URLs. */
@@ -165,11 +170,16 @@ export function validateAsset(
   // 3) Existence + size check (only for paths we can resolve to disk).
   const rel = raw.replace(/^\/+/, "");
   const abs = path.join(opts.publicDir, rel);
-  let stat: fs.Stats | null = null;
-  try {
-    stat = fs.statSync(abs);
-  } catch {
-    stat = null;
+  let stat: { size: number; isFile(): boolean } | null = null;
+  const plannedSize = opts.planned?.get(abs);
+  if (plannedSize !== undefined) {
+    stat = { size: plannedSize, isFile: () => true };
+  } else {
+    try {
+      stat = fs.statSync(abs);
+    } catch {
+      stat = null;
+    }
   }
   if (!stat || !stat.isFile()) {
     findings.push({

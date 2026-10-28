@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Sync from Obsidian, end to end without a browser (eval-2026-10/04).
  *
@@ -12,10 +13,10 @@
  * 11_DmToolBox, templates, inbox and archive stay out.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { runBuildCli } from "./helpers/buildInProcess";
 import { handleVaultScanRequest } from "../../scripts/vite-plugin-atlas-save";
 import { readVaultScanReply, vaultScanResultToInputs } from "@/atlas/import/useMdImportFlow";
 import { buildStagingRows, type StagingContext } from "@/atlas/import/stagingState";
@@ -24,8 +25,6 @@ import type { FileChange } from "@/atlas/save/localFsSave";
 import type { ImportFolderConfig } from "@/atlas/content/schema";
 
 const ROOT = path.resolve(__dirname, "../..");
-const BUILD_SCRIPT = path.resolve(ROOT, "scripts/build-atlas.ts");
-const IS_WIN = process.platform === "win32";
 const WORLD = "test-world";
 
 /** The folders docs/GOALS.md says Sync draws from. */
@@ -106,7 +105,7 @@ function leakedFrom(run: SyncRun, folder: string): string[] {
 }
 
 /** Write the changes into a fresh repo-shaped dir and run the strict player build. */
-function buildPlayer(dir: string, changes: FileChange[]): string {
+async function buildPlayer(dir: string, changes: FileChange[]): Promise<string> {
   fs.mkdirSync(path.join(dir, `content/${WORLD}`), { recursive: true });
   fs.writeFileSync(
     path.join(dir, "atlas.config.json"),
@@ -124,25 +123,11 @@ function buildPlayer(dir: string, changes: FileChange[]): string {
     fs.writeFileSync(abs, c.content);
   }
   const out = path.join(dir, "out");
-  execFileSync(
-    IS_WIN ? "npx.cmd" : "npx",
-    [
-      "tsx",
-      BUILD_SCRIPT,
-      "--player",
-      "--strict",
-      "--config",
-      path.join(dir, "atlas.config.json"),
-      "--out",
-      out,
-    ],
-    {
-      cwd: ROOT,
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: IS_WIN,
-      env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
-    },
+  const r = await runBuildCli(
+    ["--player", "--strict", "--config", path.join(dir, "atlas.config.json"), "--out", out],
+    ROOT,
   );
+  if (r.status !== 0) throw new Error(`build exited ${r.status}\n${r.stderr}\n${r.stdout}`);
   return out;
 }
 
@@ -206,7 +191,7 @@ describe("Sync from Obsidian with no folders picked (the default)", () => {
 
     const run = await runSync([]);
     run.changes.push(...forced);
-    const out = buildPlayer(path.join(tmpRoot, "repo-default"), run.changes);
+    const out = await buildPlayer(path.join(tmpRoot, "repo-default"), run.changes);
     const atlas = fs.readFileSync(path.join(out, "atlas.json"), "utf8");
     const searchIndex = fs.readFileSync(path.join(out, "search-index.json"), "utf8");
     expect(atlas).not.toContain(SECRET);

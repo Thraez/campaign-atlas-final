@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { markdownToHtml } from "@/atlas/content/markdownCore";
-import type { Entity, MapPlacement } from "@/atlas/content/schema";
+import type { Entity, ExcludedNoteName, MapPlacement } from "@/atlas/content/schema";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
 import {
   projectEntityForPlayer,
@@ -15,6 +15,7 @@ import { PLAYER_VISIBLE_VISIBILITY } from "@/atlas/content/visibility";
 export function EntityReadingView({
   entity,
   entitiesById,
+  excludedNotes,
   placements = [],
   onOpenEntity,
   onClose,
@@ -22,6 +23,8 @@ export function EntityReadingView({
 }: {
   entity: Entity;
   entitiesById: Map<string, Entity>;
+  /** Folder-excluded notes from the DM build report: their links redact in the player preview. */
+  excludedNotes?: readonly ExcludedNoteName[];
   placements?: MapPlacement[];
   onOpenEntity?: (id: string) => void;
   onClose?: () => void;
@@ -31,7 +34,7 @@ export function EntityReadingView({
 
   const view = useMemo(() => {
     if (mode === "player") {
-      return projectEntityForPlayer(entity, buildProjectionContext(entitiesById));
+      return projectEntityForPlayer(entity, buildProjectionContext(entitiesById, excludedNotes));
     }
     // DM lens: render raw body (keeps %%dm%%), no redaction, no stripping.
     const byName = new Map<string, string>();
@@ -45,7 +48,7 @@ export function EntityReadingView({
     const html = markdownToHtml(tokenized);
     const bodyHtml = sanitizeAtlasHtml(renderLinkTokens(html, links, {}));
     return { ...entity, bodyHtml };
-  }, [entity, entitiesById, mode]);
+  }, [entity, entitiesById, excludedNotes, mode]);
 
   const notYetVisible = mode === "player" && !PLAYER_VISIBLE_VISIBILITY.has(entity.visibility);
 

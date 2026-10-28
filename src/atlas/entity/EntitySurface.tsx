@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import type { Entity } from "@/atlas/content/schema";
+import type { Entity, ExcludedNoteName } from "@/atlas/content/schema";
 import { EntityPanes } from "@/atlas/entity/EntityPanes";
 
 export function EntitySurface({
   entity,
   entitiesById,
+  excludedNotes,
   renderEdit,
   onClose,
   startInEdit = false,
@@ -12,6 +13,8 @@ export function EntitySurface({
 }: {
   entity: Entity;
   entitiesById: Map<string, Entity>;
+  /** Folder-excluded notes from the DM build report: their links redact in the player preview. */
+  excludedNotes?: readonly ExcludedNoteName[];
   renderEdit: () => React.ReactNode;
   onClose: () => void;
   /**
@@ -63,6 +66,7 @@ export function EntitySurface({
         <EntityPanes
           entity={entity}
           entitiesById={entitiesById}
+          excludedNotes={excludedNotes}
           mode={editing ? "editing" : "reading"}
           renderEdit={renderEdit}
         />

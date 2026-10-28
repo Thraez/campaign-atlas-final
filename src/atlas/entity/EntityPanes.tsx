@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { markdownToHtml } from "@/atlas/content/markdownCore";
-import type { Entity } from "@/atlas/content/schema";
+import type { Entity, ExcludedNoteName } from "@/atlas/content/schema";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
 import {
   projectEntityForPlayer,
@@ -17,11 +17,14 @@ type Mode = "reading" | "editing";
 export function EntityPanes({
   entity,
   entitiesById,
+  excludedNotes,
   mode,
   renderEdit,
 }: {
   entity: Entity;
   entitiesById: Map<string, Entity>;
+  /** Folder-excluded notes from the DM build report: their links redact in the player preview. */
+  excludedNotes?: readonly ExcludedNoteName[];
   mode: Mode;
   renderEdit: () => React.ReactNode;
 }) {
@@ -51,8 +54,8 @@ export function EntityPanes({
   }, [entity, entitiesById]);
 
   const playerEntity = useMemo(
-    () => projectEntityForPlayer(entity, buildProjectionContext(entitiesById)),
-    [entity, entitiesById],
+    () => projectEntityForPlayer(entity, buildProjectionContext(entitiesById, excludedNotes)),
+    [entity, entitiesById, excludedNotes],
   );
 
   // --- Anchor-sync refs and helpers ---
