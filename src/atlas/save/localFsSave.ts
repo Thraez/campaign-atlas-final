@@ -114,6 +114,28 @@ export class LocalSaveError extends Error {
 }
 
 /**
+ * Thrown when a write failed partway through the batch and the endpoint
+ * rolled it back (HTTP 207 `{ error: "WriteFailed", partialWrite: true }`).
+ * Nothing was saved, so callers must keep their drafts. 207 passes `res.ok`,
+ * which is why this needs its own check. The message names the file for
+ * callers that only show `err.message`.
+ */
+export class WriteFailedError extends LocalSaveError {
+  constructor(
+    public readonly failedPath: string,
+    public readonly rolledBack: number,
+    public readonly writeError?: string,
+  ) {
+    super(
+      `Could not write ${failedPath}${writeError ? ` (${writeError})` : ""}. Nothing was saved: ` +
+        `rolled back ${rolledBack} earlier file${rolledBack === 1 ? "" : "s"} in the batch.`,
+      { failedPath, rolledBack, writeError },
+    );
+    this.name = "WriteFailedError";
+  }
+}
+
+/**
  * Thrown when the Save endpoint reports another save is already in flight
  * (HTTP 423 Locked). The editor should disable the Save button visibly
  * during a save to make this rare, but two tabs / a force-click race can
@@ -238,6 +260,22 @@ export async function saveAtlasPatchToLocalFs(
     throw new LocalSaveError(
       body && typeof body.error === "string" ? body.error : `Save failed with status ${res.status}`,
       body ?? undefined,
+    );
+  }
+
+  // A rolled-back write answers 207, which passes `res.ok`: not a save.
+  const ok = parsed as {
+    error?: unknown;
+    partialWrite?: unknown;
+    failedPath?: unknown;
+    rolledBack?: unknown;
+    writeError?: unknown;
+  } | null;
+  if (ok && (ok.error === "WriteFailed" || ok.partialWrite === true)) {
+    throw new WriteFailedError(
+      typeof ok.failedPath === "string" ? ok.failedPath : "(unknown file)",
+      typeof ok.rolledBack === "number" ? ok.rolledBack : 0,
+      typeof ok.writeError === "string" ? ok.writeError : undefined,
     );
   }
 
