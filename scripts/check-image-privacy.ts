@@ -15,9 +15,11 @@
  *      named "the-cabal-lair.jpg" would ship uncaught even if no text
  *      reference exists.
  *
- *      With `--referenced-by <dir>` (the source store, public/atlas), only
- *      images the player JSON in <dir> names get this check: the rest stay
- *      in the DM's store and the player build prunes them from dist.
+ *      With `--referenced-by <dir>` (the source store, public/atlas), images
+ *      under <dir>/assets/ get this check only when the player JSON in <dir>
+ *      names their whole path (see `playerImageRefs`): the rest stay in the
+ *      DM's store and the player build prunes them from dist. Images anywhere
+ *      else are never pruned, so they are always checked.
  *
  * Usage:
  *   tsx scripts/check-image-privacy.ts <artifact-dir> [--config <path>] [--referenced-by <dir>]
@@ -31,10 +33,11 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { deriveSecretsFromVault } from "./check-derived-secrets";
-import { isReferenced, readPlayerJson } from "./atlas/playerImageRefs";
-
-const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
+import { IMAGE_EXTENSIONS, isReferenced, readPlayerImageRefs } from "./atlas/playerImageRefs";
 const CONFIG_CANDIDATES = ["atlas.config.json"];
+/** Image types sharp cannot decode: their metadata goes unchecked (the filename
+ *  check still runs), and the scan says so per file. Provisional call, 2026-10-28. */
+const SHARP_UNREADABLE_EXTENSIONS = new Set([".ico", ".bmp"]);
 const EXIT_VIOLATION = 13;
 
 function findConfig(): string | null {
@@ -85,8 +88,8 @@ function walkImages(dir: string): string[] {
 export interface RunOpts {
   dir: string;
   config?: string;
-  /** A dir of player JSON. When set, the filename check covers only images it
-   *  names: the rest are the DM's asset store, which the player build prunes. */
+  /** A dir of player JSON. When set, the filename check skips images under its
+   *  `assets/` that the JSON does not name: the player build prunes those. */
   referencedBy?: string;
 }
 
@@ -106,7 +109,18 @@ export async function run(opts: RunOpts): Promise<number> {
   }
 
   const secrets = deriveSecretsFromVault(configAbs);
-  const playerJson = opts.referencedBy !== undefined ? readPlayerJson(opts.referencedBy) : null;
+  const player =
+    opts.referencedBy !== undefined
+      ? { dir: opts.referencedBy, refs: readPlayerImageRefs(opts.referencedBy) }
+      : null;
+  /** Whether the player build keeps this image. Mirrors prunePlayerImagesPlugin,
+   *  which only prunes under the atlas dir's `assets/`. */
+  const ships = (imgPath: string): boolean => {
+    if (player === null) return true;
+    const rel = path.relative(player.dir, imgPath);
+    if (rel.split(path.sep)[0] !== "assets") return true;
+    return isReferenced(rel, player.refs);
+  };
 
   const violations: string[] = [];
 
@@ -114,7 +128,7 @@ export async function run(opts: RunOpts): Promise<number> {
     const stem = path.basename(imgPath, path.extname(imgPath)).toLowerCase();
 
     // Check 1: filename contains a derived-secret name
-    const shipped = playerJson === null || isReferenced(path.basename(imgPath), playerJson);
+    const shipped = ships(imgPath);
     for (const s of shipped ? secrets : []) {
       if (stem.includes(s.name.toLowerCase())) {
         violations.push(
@@ -125,6 +139,12 @@ export async function run(opts: RunOpts): Promise<number> {
     }
 
     // Check 2: image contains metadata that should have been stripped on upload
+    if (SHARP_UNREADABLE_EXTENSIONS.has(path.extname(imgPath).toLowerCase())) {
+      console.log(
+        `check-image-privacy: metadata not checked: ${imgPath} (format sharp can't read)`,
+      );
+      continue;
+    }
     try {
       const buf = fs.readFileSync(imgPath);
       const meta = await sharp(buf).metadata();
