@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from "react";
+import { flushSync } from "react-dom";
 import { MapContainer, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -64,7 +65,12 @@ import { SaveStatus } from "@/atlas/session/SaveStatus";
 import { DiscardConfirmModal } from "@/atlas/session/DiscardConfirmModal";
 import { useExternalRebuildDetector } from "@/atlas/session/useExternalRebuildDetector";
 import { CanonicalSaveError } from "@/atlas/save/canonicalPlacementSave";
-import { useWorldYamlBaseline, worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
+import {
+  useWorldYamlBaseline,
+  worldYamlPath,
+  type WorldYamlBaselineValues,
+} from "@/atlas/save/useWorldYamlBaseline";
+import { describeWorldYamlConflict, worldYamlConflictNotice } from "@/atlas/save/worldYamlConflict";
 import { buildWorldYamlContent as pureBuildWorldYamlContent } from "@/atlas/save/buildSaveBatch";
 import { planUnifiedSave } from "@/atlas/save/planUnifiedSave";
 import { pointInPolygon } from "@/atlas/geometry/polygon";
@@ -745,35 +751,39 @@ function AtlasPlacementEditorInner() {
    * Returns null when there's no active world (editor still loading) or
    * when a baseline fetch error prevents a safe write.
    */
-  const buildWorldYamlContent = useCallback((): string | null => {
-    if (!project || !activeMap) return null;
-    return pureBuildWorldYamlContent({
+  const buildWorldYamlContent = useCallback(
+    // existingRaw: the on-disk file to build on (the save-conflict recovery passes a fresh read).
+    (existingRaw: string | null = worldYamlBaseline.raw): string | null => {
+      if (!project || !activeMap) return null;
+      return pureBuildWorldYamlContent({
+        activeMap,
+        maps: project.maps,
+        calendar: effectiveCalendar,
+        schemaVersion: project.schemaVersion,
+        mergedLayers: layerEditor.mergedLayers,
+        localLayers: layerEditor.localLayers,
+        regionsEffective: regionDraft.effective,
+        routesEffective: routeDraft.effective,
+        fog: fogDraft.fog,
+        existingRaw,
+        name: effectiveWorld?.name,
+        credits: effectiveWorld?.credits,
+        assetCredits: effectiveWorld?.assetCredits,
+      });
+    },
+    [
+      project,
       activeMap,
-      maps: project.maps,
-      calendar: effectiveCalendar,
-      schemaVersion: project.schemaVersion,
-      mergedLayers: layerEditor.mergedLayers,
-      localLayers: layerEditor.localLayers,
-      regionsEffective: regionDraft.effective,
-      routesEffective: routeDraft.effective,
-      fog: fogDraft.fog,
-      existingRaw: worldYamlBaseline.raw,
-      name: effectiveWorld?.name,
-      credits: effectiveWorld?.credits,
-      assetCredits: effectiveWorld?.assetCredits,
-    });
-  }, [
-    project,
-    activeMap,
-    layerEditor.mergedLayers,
-    layerEditor.localLayers,
-    regionDraft.effective,
-    routeDraft.effective,
-    fogDraft.fog,
-    worldYamlBaseline.raw,
-    effectiveWorld,
-    effectiveCalendar,
-  ]);
+      layerEditor.mergedLayers,
+      layerEditor.localLayers,
+      regionDraft.effective,
+      routeDraft.effective,
+      fogDraft.fog,
+      worldYamlBaseline.raw,
+      effectiveWorld,
+      effectiveCalendar,
+    ],
+  );
 
   /**
    * Open the entity whose unsaved edit is parked in `entityEditDraft`,
@@ -793,6 +803,34 @@ function AtlasPlacementEditorInner() {
   };
 
   /**
+   * The unified Save plan for the current drafts: what Save would write, or
+   * why it writes nothing. Shared by Save and the save-conflict recovery,
+   * which passes a freshly read world.yaml baseline (the page's own may not
+   * have rendered yet).
+   */
+  const planSave = async (baseline: WorldYamlBaselineValues = worldYamlBaseline) => {
+    if (!project || !activeMap) return null;
+    return planUnifiedSave(
+      {
+        allDraftPlacements: buildDraftPlacements(),
+        overrides,
+        activeMapId: activeMap.id,
+        foreignMapDrafts,
+        entitiesById: new Map(project.entities.map((e) => [e.id, e])),
+        worldYaml: worldYamlDirty
+          ? {
+              path: activeWorldId ? worldYamlPath(activeWorldId) : null,
+              baseline,
+              buildContent: () => buildWorldYamlContent(baseline.raw),
+            }
+          : null,
+        localLayers: layerEditor.localLayers,
+      },
+      { fetchFn: fetch },
+    );
+  };
+
+  /**
    * Save: rewrite the canonical entity .md frontmatter for every drafted
    * placement, route it through /__atlas/save (dev-only Vite plugin → disk),
    * and trigger an atlas rebuild so the player view picks up the changes
@@ -809,28 +847,6 @@ function AtlasPlacementEditorInner() {
    * and content/**\/_atlas/*.yaml so even a buggy client cannot widen the
    * surface.
    */
-  const planSave = async () => {
-    if (!project || !activeMap) return null;
-    return planUnifiedSave(
-      {
-        allDraftPlacements: buildDraftPlacements(),
-        overrides,
-        activeMapId: activeMap.id,
-        foreignMapDrafts,
-        entitiesById: new Map(project.entities.map((e) => [e.id, e])),
-        worldYaml: worldYamlDirty
-          ? {
-              path: activeWorldId ? worldYamlPath(activeWorldId) : null,
-              baseline: worldYamlBaseline,
-              buildContent: buildWorldYamlContent,
-            }
-          : null,
-        localLayers: layerEditor.localLayers,
-      },
-      { fetchFn: fetch },
-    );
-  };
-
   const onSaveClick = async () => {
     // An entity edit is counted in the chip but saved only by its own panel,
     // so Save points to that panel instead of claiming nothing is unsaved.
@@ -873,47 +889,42 @@ function AtlasPlacementEditorInner() {
   };
 
   /**
-   * eval-32: a world.yaml save conflict (the file changed on disk after the
-   * editor read it). Re-read the baseline and canon, then (once they have
-   * rendered) rebuild the batch on top of them; the drafts are untouched. The
-   * modal shows the returned notice and its Try again writes the rebuilt batch.
+   * A world.yaml save conflict: the file changed on disk after the editor read
+   * it. Re-read it and canon, rebuild the batch on top (the drafts are not
+   * touched), and return a notice naming what changed outside and any outside
+   * edit Try again would overwrite. Null when this isn't world.yaml or the
+   * rebuild fails; the modal then shows the conflict as a failed save.
+   *
+   * `saveAttemptRef` is bumped when the modal closes, so a recovery still in
+   * flight then drops its result instead of reviving a closed review.
    */
-  const replanAfterConflictRef = useRef<((notice: string | null) => void) | null>(null);
-  const [conflictReplan, setConflictReplan] = useState(0);
+  const saveAttemptRef = useRef(0);
+  const planSaveRef = useRef(planSave);
+  useLayoutEffect(() => {
+    planSaveRef.current = planSave;
+  });
   const onSaveConflict = async (err: ConflictError): Promise<string | null> => {
     if (!activeWorldId || err.failedPath !== worldYamlPath(activeWorldId)) return null;
-    await Promise.all([
+    const attempt = saveAttemptRef.current;
+    const before = worldYamlBaseline.raw;
+    const [baseline, freshCanon] = await Promise.all([
       worldYamlBaseline.refresh(),
-      loadAtlasContent(true)
-        .then(setProject)
-        .catch(() => {
-          /* keep current canon; the baseline re-read is what unblocks the save */
-        }),
+      loadAtlasContent(true).catch(() => null),
     ]);
-    return new Promise((resolve) => {
-      replanAfterConflictRef.current = resolve;
-      setConflictReplan((n) => n + 1);
-    });
+    if (attempt !== saveAttemptRef.current || baseline.error) return null;
+    // Render the fresh canon now so the rebuild below derives from it.
+    if (freshCanon) flushSync(() => setProject(freshCanon));
+    const plan = await planSaveRef.current(baseline).catch(() => null);
+    if (attempt !== saveAttemptRef.current || plan?.kind !== "save") return null;
+    const rebuilt = plan.changes.find((c) => c.path === err.failedPath)?.content;
+    if (rebuilt === undefined) return null;
+    setPendingChanges(plan.changes);
+    // Nothing failed for good: the chip goes back to the unsaved count.
+    session.markIdle();
+    return worldYamlConflictNotice(
+      describeWorldYamlConflict({ before, after: baseline.raw, rebuilt }),
+    );
   };
-  useEffect(() => {
-    const resolve = replanAfterConflictRef.current;
-    if (!resolve || worldYamlBaseline.loading) return;
-    replanAfterConflictRef.current = null;
-    planSave()
-      .then((plan) => {
-        if (plan?.kind !== "save") return resolve(null);
-        setPendingChanges(plan.changes);
-        resolve(
-          "world.yaml changed on disk after the editor read it (edited outside the editor), so " +
-            "Save was refused and nothing was written. The editor re-read it and the atlas and " +
-            "rebuilt your changes on top: the diff below is against the file as it is now. " +
-            "Your changes are kept. Check the diff, then Try again.",
-        );
-      })
-      .catch(() => resolve(null));
-    // planSave is a fresh closure each render; this runs once per replan request.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conflictReplan, worldYamlBaseline.loading]);
 
   /**
    * Create handler for the EntityEditorPanel. Builds a FileChange for the new
@@ -2276,6 +2287,7 @@ function AtlasPlacementEditorInner() {
           }
         }}
         onClose={() => {
+          saveAttemptRef.current++;
           setSaveModalOpen(false);
           setPendingChanges([]);
           // B1: if the DM confirmed then cancelled (or a write failed and they

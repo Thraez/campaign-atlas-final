@@ -38,3 +38,26 @@ its approach.
   change to a key the DM also edited loses to the draft (like ticket 17's body rule). The notice
   doesn't list which keys changed underneath; the rebuilt diff shows it.
 - For Isak's look in the preview: the notice wording and its place in the review dialog.
+- Superseded in part by the review fixes below (the notice, the chip, the replan effect).
+
+2026-10-28, review fixes on the same branch (31's review fixes merged in first):
+
+- What changed underneath: `src/atlas/save/worldYamlConflict.ts` compares the old baseline, the
+  file now on disk and the rebuilt file, leaf by leaf (maps, layers, regions keyed by id, so
+  `maps.caves.name`). The notice names what changed outside; when the rebuilt file would replace
+  an outside edit (the DM's draft touches it, or canon didn't pick it up) it says "Try again will
+  overwrite these outside edits: …". A deleted file reads "(the whole file was deleted)".
+  Comment-only changes read "only comments or formatting changed".
+- The chip: the modal now asks `onConflict` before `onWriteFailed`. A recovered conflict calls
+  `session.markIdle()` (back to the unsaved count); a failed recovery still marks Save failed.
+- No parked resolver or effect: `refresh()` now resolves to the fresh baseline, canon is set with
+  `flushSync`, and `planSave(baseline)` (through a ref to the latest render) builds on that
+  baseline. The `eslint-disable` is gone. A close bumps `saveAttemptRef` and retires the modal's
+  per-open token, so a late recovery result is dropped. The close test checks the next Save is an
+  ordinary review that writes; it can't tell the guards apart from the reopen reset (Save refuses
+  while the re-read is in flight), so the guards are defensive.
+- `onSaveClick`'s JSDoc is back above it; `planSave` has its own.
+- Tests: `src/test/save/world-yaml-conflict.test.ts` (6, the pure diff and notice) and
+  `src/test/editor/world-yaml-conflict-recovers.test.tsx` (5: disjoint keys listed and both kept,
+  same key warns overwrite, missing-base recreates, failed recovery keeps Save failed, close
+  mid-recovery). The first three and the chip check failed on the previous code.
