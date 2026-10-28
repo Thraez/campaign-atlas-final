@@ -39,6 +39,12 @@ needs Isak's yes.
 Grill round 2 is ticketed on provisional calls (below): `eval-2026-10/14`-`17`. 17 (entity
 edits stuck after a 409) ranks ahead of code-retro 06-08.
 
+Fifth sweep (2026-10-28, canon read/save, deep links, retro): `eval-2026-10/33`-`39`, on
+provisional calls. Build after the PRs in the merge order are in. First: 33 (a failed write reads
+as a save and clears the drafts) and 34 (player-image pruning matches names, not paths: a DM-only
+image can ship). Then 35 (dead credits links) and 36 (character keys panel). 37 stacks on #82,
+38 after the viewer PRs, 39 on #79 and #81.
+
 ## Morning queue
 
 Isak is away until the morning of 2026-10-28. His rule: commit locally and he pushes `main` in the
@@ -217,6 +223,11 @@ answer, logged here and built on; he reviews this list in batches, and a reversa
 | 2026-10-28 | Sweep 4: one save writes every map's drafts (rather than blocking map switches while dirty)? | Yes | All maps share one world.yaml; blocking switches would get in the DM's way | 30 |
 | 2026-10-28 | Sweep 4: undoing an edit made on another map switches to that map first? | Yes | Refusing would strand the undo stack; applying it in place corrupts the other map | 30 |
 | 2026-10-28 | Sweep 4: Save with only an entity edit pending points to the entity panel rather than saving it? | Yes | The entity panel owns that save and its conflict handling (ticket 17) | 31 |
+| 2026-10-28 | Sweep 5 Q1: the canon client returns a typed outcome union rather than throwing error classes? | Yes | Every caller already branches on the reason; the compiler then catches an unhandled case like the 207 | 39 |
+| 2026-10-28 | Sweep 5 Q2: fix the rolled-back write that reads as a save now, ahead of the canon client? | Yes | It loses drafts and sync-map entries today; 39 waits on two stacks | 33 |
+| 2026-10-28 | Sweep 5 Q3: an entity link with no center opens the URL's map if valid, else the entity's placement on the default map, else its first placement? | Yes | Respects the link, then the default view | 38 |
+| 2026-10-28 | Sweep 5 Q4: save protocol types and size caps live in `src/atlas/save/saveProtocol.ts`, imported by the plugin? | Yes | The plugin already imports from `src/atlas/save/`; no new dependency direction | 39 |
+| 2026-10-28 | Sweep 5 Q5: player-image pruning matches full asset paths, not file names? | Yes | Name matching keeps `elf.png` when `shelf.png` ships, and one folder's image keeps another's | 34 |
 
 ## Retro, 2026-10-28 (overnight)
 

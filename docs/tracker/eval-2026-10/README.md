@@ -10,9 +10,6 @@ From an architecture sweep (`improve-codebase-architecture`), a test-gap check a
 
 Parked as notes, no ticket yet:
 
-- One client for reading and saving canon (`/__atlas/read` fetched and hashed by hand in five
-  places; `FileKind` and `ConflictReason` defined twice).
-- Viewer deep links: load and Back resolve a link differently (`AtlasViewer.tsx:316-381`).
 - Save lifecycle out of the page: `onSaveClick` (~808-904) and the ~120-line `onSaved` cleanup
   (~2129-2247) live inline; a module from (session state, save result) to (next state, undo entry)
   would test them without rendering. Revisit after 30.
@@ -29,6 +26,11 @@ provisional calls in `State.md`. 21, 22, 23, 25 and 26 are bugs; 28 is unverifie
 Fourth sweep, 2026-10-28 (the editor page, second pass): 30-32, all bugs. The parked "save status
 may stay dirty" note was worse than it read: a save drops other maps' region, route and fog drafts
 (30). 30 waits for the editor stacks (#64 and #68 chains) to merge.
+
+Fifth sweep, 2026-10-28 (the canon read/save seam, viewer deep links, and a retro of 19-32):
+33-39. The two parked notes became 38 and 39. 33-37 are bugs; 34 is a player-safety bug. The
+fifth sweep's grill answers are provisional (`State.md`). Order: 33 and 34 first (data loss, a
+leak), then 35 and 36; 37 stacks on #82, 38 waits for the viewer PRs, 39 stacks on #79 and #81.
 
 Work the lowest open number first. Words as in `GLOSSARY.md`; module, interface, seam and depth
 as in the `codebase-design` skill.
