@@ -38,7 +38,7 @@ import {
 } from "./atlas/validateAsset";
 import { parseAtlasDate } from "./atlas/calendarDate";
 import { buildEntitySecrets } from "./atlas/buildSecrets";
-import yaml from "js-yaml";
+import { parseCharacterKeys } from "../src/atlas/secrets/characterKeysFile";
 import { PLAYER_VISIBLE } from "./atlas/visibility";
 import { deriveTitle, isSecretNote, resolveVisibility } from "./atlas/noteIdentity";
 
@@ -359,12 +359,13 @@ async function runBuildCore(flags: BuildFlags) {
   try {
     const keysPath = path.join(contentDir, "_dm", "character-keys.yaml");
     if (fs.existsSync(keysPath)) {
-      const raw = fs.readFileSync(keysPath, "utf8");
-      const parsed = yaml.load(raw) as Record<string, string> | null;
-      if (parsed && typeof parsed === "object") {
-        for (const [k, v] of Object.entries(parsed)) {
-          if (typeof v === "string") charKeys.set(k, v);
-        }
+      // Same reader as the editor: scalars keep the text typed (`Bob: 12345`
+      // is key "12345"). Entries that aren't a name and a key are left out,
+      // so their secrets take the missing-key warning below; an unreadable
+      // file leaves the map empty, as before.
+      const parsed = parseCharacterKeys(fs.readFileSync(keysPath, "utf8"));
+      if (parsed.ok) {
+        for (const { name, key } of parsed.entries) charKeys.set(name, key);
       }
     }
   } catch {
