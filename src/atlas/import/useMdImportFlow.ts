@@ -1,9 +1,9 @@
 /**
- * Phase 1C — orchestrator hook for the .md staging-and-import flow.
- *
- * Owns the modal state, parses dropped/picked files into StagingRow[], routes
- * the committed batch through the unified Save endpoint, and triggers a canon
- * reload so newly-imported entities show up without a page refresh.
+ * The editor's hook over Sync from Obsidian (`src/atlas/sync/sync.ts`): owns
+ * the Staging modal's state and turns sync results and errors into toasts.
+ * The steps themselves (scan, classify, conflict check, image copy, write,
+ * sync map) live in `planSync` / `commitSync`; this only wires them to the
+ * dev endpoint port and to React.
  */
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -15,48 +15,19 @@ import {
   type StagingContext,
   type StagingRowPatch,
 } from "./stagingState";
-import {
-  assertCreateTargetsFree,
-  buildImportChanges,
-  readSourceFile,
-  ImportCommitError,
-} from "./buildImportChanges";
-import {
-  saveAtlasPatchToLocalFs,
-  ConflictError,
-  SaveBusyError,
-  hashContent,
-} from "@/atlas/save/localFsSave";
+import { ImportCommitError } from "./buildImportChanges";
+import { ConflictError, SaveBusyError } from "@/atlas/save/localFsSave";
 import type { ImportFolderConfig } from "../content/schema";
 import { summarizeImport, formatImportSummaryLine } from "./summarizeImport";
 import {
-  recordSync,
-  classifyVaultNote,
-  findPathByApprovedHash,
-  hasLocalEdits,
-  moveSyncEntry,
-} from "./syncMap";
-import { loadSyncMap, saveSyncMap, loadSettings, saveSettings } from "../sync/useSyncSettings";
-import { rewriteEmbeds } from "./resolveVaultImage";
-
-/** Thrown by assertDmBuildLoaded when the DM atlas has not been built yet. */
-export class DmBuildRequiredError extends Error {
-  constructor() {
-    super("Rebuild in DM mode first — Sync needs the full DM atlas loaded.");
-    this.name = "DmBuildRequiredError";
-  }
-}
-
-/**
- * Guard: requires the DM build to be loaded before a vault sync can run.
- * Throws DmBuildRequiredError if existingById is empty (player atlas or no build).
- * Phase 3's openWithVaultScan calls this before fetching vault files.
- */
-export function assertDmBuildLoaded(existingById: ReadonlyMap<string, string>): void {
-  if (existingById.size === 0) {
-    throw new DmBuildRequiredError();
-  }
-}
+  commitSync,
+  DmBuildRequiredError,
+  planSync,
+  stagingContext,
+  type SyncWorld,
+} from "../sync/sync";
+import { createDevEndpointPort } from "../sync/devEndpointPort";
+import { VaultScanError, type SyncSource, type VaultPort } from "../sync/vaultPort";
 
 export interface UseMdImportFlowArgs {
   /** Active world id; drives target-path allowlist. */
@@ -70,37 +41,8 @@ export interface UseMdImportFlowArgs {
   entityMeta?: StagingContext["entityMeta"];
   /** Called after a successful import so the editor can reload canon. */
   onImported: () => void | Promise<void>;
-}
-
-export type VaultScanReply =
-  { ok: true; files: Record<string, string> } | { ok: false; status: number; error: string };
-
-/**
- * Reads a `/__atlas/vault-scan` reply. The route answers `{ files }` on 200
- * and `{ error }` otherwise; success is the HTTP status, not a body field
- * (eval-2026-10/13: the client used to look for `ok` in the body, which the
- * route never sends, so every real scan failed).
- */
-export async function readVaultScanReply(resp: Response): Promise<VaultScanReply> {
-  const body = (await resp.json().catch(() => ({}))) as { files?: unknown; error?: unknown };
-  if (resp.ok && body.files && typeof body.files === "object") {
-    return { ok: true, files: body.files as Record<string, string> };
-  }
-  const error = typeof body.error === "string" ? body.error : `HTTP ${resp.status}`;
-  return { ok: false, status: resp.ok ? 500 : resp.status, error };
-}
-
-/**
- * Maps a `/__atlas/vault-scan` response to staging inputs.
- * Extracts the POSIX basename for the staging filename and preserves the
- * vault-relative path for sync-map identity resolution.
- */
-export function vaultScanResultToInputs(files: Record<string, string>): RawImportFile[] {
-  return Object.entries(files).map(([relPath, raw]) => ({
-    filename: relPath.split("/").pop() ?? relPath,
-    raw,
-    vaultRelPath: relPath,
-  }));
+  /** Where sync reads and writes; the dev endpoint unless a test passes another. */
+  port?: VaultPort;
 }
 
 export function useMdImportFlow(args: UseMdImportFlowArgs) {
@@ -108,17 +50,16 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
   const [rows, setRows] = useState<StagingRow[]>([]);
   const [open, setOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  /** Vault scan context, captured at scan time so commit() can copy embedded images. */
-  const vaultScanCtxRef = useRef<{ vaultRoot: string; candidateFolders: string[] } | null>(null);
+  const defaultPort = useMemo(() => createDevEndpointPort(), []);
+  const port = args.port ?? defaultPort;
+  /** The vault the open rows came from (null for dropped or pasted files). */
+  const sourceRef = useRef<SyncSource | null>(null);
 
-  const ctx = useMemo(() => {
-    const allowedFolders = new Set([
-      ...Object.values(importConfig.folders),
-      importConfig.defaultFolder,
-    ]) as ReadonlySet<string>;
-    const existingPaths = new Set(existingById.values()) as ReadonlySet<string>;
-    return { worldId, importConfig, allowedFolders, existingById, existingPaths, entityMeta };
-  }, [worldId, importConfig, existingById, entityMeta]);
+  const world = useMemo(
+    (): SyncWorld => ({ worldId, importConfig, existingById, entityMeta }),
+    [worldId, importConfig, existingById, entityMeta],
+  );
+  const ctx = useMemo(() => stagingContext(world), [world]);
 
   const openWithInputs = useCallback(
     (inputs: RawImportFile[]) => {
@@ -126,6 +67,7 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
         toast.error("No .md files to stage");
         return;
       }
+      sourceRef.current = null;
       setRows(buildStagingRows(inputs, ctx));
       setOpen(true);
     },
@@ -153,92 +95,34 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
 
   const openWithVaultScan = useCallback(
     async (vaultRoot: string, ignoreGlobs: string[], candidateFolders: string[] = []) => {
+      const source: SyncSource = { vaultRoot, ignoreGlobs, candidateFolders };
+      let planned: StagingRow[];
       try {
-        assertDmBuildLoaded(existingById);
+        planned = (await planSync(port, world, source)).rows;
       } catch (err) {
         if (err instanceof DmBuildRequiredError) {
           toast.error(err.message);
           return;
         }
+        if (err instanceof VaultScanError) {
+          toast.error(
+            err.status === 413
+              ? "Vault is too large to scan — more than 25 MB of Obsidian notes"
+              : `Vault scan failed: ${err.message}`,
+          );
+          return;
+        }
         throw err;
       }
-      const params = new URLSearchParams({ vaultRoot });
-      for (const g of ignoreGlobs) params.append("ignore", g);
-      for (const f of candidateFolders) params.append("folder", f);
-      let data: VaultScanReply;
-      try {
-        data = await readVaultScanReply(await fetch(`/__atlas/vault-scan?${params.toString()}`));
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        toast.error(`Vault scan failed: ${msg}`);
-        return;
-      }
-      if (!data.ok) {
-        if (data.status === 413) {
-          toast.error("Vault is too large to scan — more than 25 MB of Obsidian notes");
-        } else {
-          toast.error(`Vault scan failed: ${data.error}`);
-        }
-        return;
-      }
-      vaultScanCtxRef.current = { vaultRoot, candidateFolders };
-      let syncMap = await loadSyncMap();
-      const moves: [from: string, to: string][] = [];
-      const inputs = await Promise.all(
-        Object.entries(data.files).map(async ([relPath, raw]) => {
-          const hash = await hashContent(raw);
-          let vaultState = classifyVaultNote(syncMap, relPath, hash);
-          // A note with no entry at its own path whose bytes match a hash
-          // recorded elsewhere is a move/rename, not a new note. Its entry
-          // follows it, so the next sync sees it as unchanged too. (If the old
-          // path is still in the vault, it's a copy: leave the entry alone.)
-          const movedFrom =
-            vaultState === "new" ? findPathByApprovedHash(syncMap, hash) : undefined;
-          if (movedFrom) {
-            vaultState = "unchanged";
-            if (!(movedFrom in data.files)) moves.push([movedFrom, relPath]);
-          }
-          return {
-            filename: relPath.split("/").pop() ?? relPath,
-            raw,
-            vaultRelPath: relPath,
-            vaultState,
-            vaultHash: hash,
-          };
-        }),
-      );
-      if (moves.length > 0) {
-        for (const [from, to] of moves) syncMap = moveSyncEntry(syncMap, from, to);
-        await saveSyncMap(syncMap);
-      }
-      if (inputs.length === 0) {
+      if (planned.length === 0) {
         toast.error("No .md files to stage");
         return;
       }
-      const staged = buildStagingRows(inputs, ctx);
-      // A "changed" update row would overwrite the atlas copy's content — if the
-      // DM has since edited that copy in the editor, that edit is about to be
-      // lost. Hold the row for review instead of ticking it by default.
-      const checked = await Promise.all(
-        staged.map(async (row) => {
-          if (row.rowKind !== "update" || row.vaultState !== "changed" || !row.vaultRelPath) {
-            return row;
-          }
-          let diskRaw: string;
-          try {
-            diskRaw = await readSourceFile(row.targetPath, fetch);
-          } catch {
-            return row; // can't verify — don't block the DM on a read failure
-          }
-          const diskHash = await hashContent(diskRaw);
-          if (!hasLocalEdits(syncMap, row.vaultRelPath, diskHash)) return row;
-          return { ...row, needsReview: { reason: "local-edits" as const }, included: false };
-        }),
-      );
-      setRows(checked);
+      sourceRef.current = source;
+      setRows(planned);
       setOpen(true);
     },
-    [existingById, ctx],
+    [port, world],
   );
 
   const patchRow = useCallback(
@@ -256,72 +140,11 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
   const commit = useCallback(async () => {
     setIsImporting(true);
     try {
-      const vaultCtx = vaultScanCtxRef.current;
-      // Conflicts first: a commit the Save endpoint will refuse must not copy images.
-      const firstChanges = await buildImportChanges(rows);
-      await assertCreateTargetsFree(firstChanges, fetch);
-      let skippedTotal = 0;
-      const rowsForCommit = await Promise.all(
-        rows.map(async (row) => {
-          if (!row.included || !row.vaultRelPath || !vaultCtx) return row;
-          const embeds = [...row.rawContent.matchAll(/!\[\[([^\]]+)\]\]/g)].map((m) =>
-            m[1].split("|")[0].trim(),
-          );
-          if (embeds.length === 0) return row;
-          const copied: Record<string, string> = {};
-          for (const [i, src] of embeds.entries()) {
-            const resp = await fetch("/__atlas/vault-image-copy", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                vaultRoot: vaultCtx.vaultRoot,
-                candidateFolders: vaultCtx.candidateFolders,
-                noteRelPath: row.vaultRelPath,
-                rawSrc: src,
-                entityId: row.resolvedId,
-                index: i,
-              }),
-            });
-            const result = (await resp.json()) as
-              { ok: true; target: string } | { ok: false; reason: string };
-            if (result.ok) copied[src] = result.target;
-            else skippedTotal += 1;
-          }
-          return { ...row, rawContent: rewriteEmbeds(row.rawContent, copied) };
-        }),
-      );
-      if (skippedTotal > 0) {
-        toast.warning(
-          `${skippedTotal} image${skippedTotal === 1 ? "" : "s"} skipped — not in the folders you picked.`,
-        );
-      }
-      const changes = rowsForCommit.some((r, i) => r !== rows[i])
-        ? await buildImportChanges(rowsForCommit)
-        : firstChanges;
-      const result = await saveAtlasPatchToLocalFs(changes, undefined, { rebuild: true });
+      const result = await commitSync(port, rows, sourceRef.current);
       const count = result.saved;
-      // The files are written whether or not the rebuild worked: record them.
-      const vaultRows = rows.filter(
-        (r) => r.vaultRelPath && r.included && r.pathAllowed && !r.parseError,
-      );
-      if (vaultRows.length > 0) {
-        const contentByPath = new Map(changes.map((c) => [c.path, c.content]));
-        let syncMap = await loadSyncMap();
-        for (const r of vaultRows) {
-          const written = contentByPath.get(r.targetPath);
-          const syncedFileHash = written !== undefined ? await hashContent(written) : undefined;
-          syncMap = recordSync(
-            syncMap,
-            r.vaultRelPath!,
-            r.resolvedId,
-            r.inferredType,
-            r.vaultHash,
-            syncedFileHash,
-          );
-        }
-        await saveSyncMap(syncMap);
-        const s = await loadSettings();
-        await saveSettings({ ...s, lastSyncAt: new Date().toISOString() });
+      if (result.skippedImages > 0) {
+        const n = result.skippedImages;
+        toast.warning(`${n} image${n === 1 ? "" : "s"} skipped — not in the folders you picked.`);
       }
       if (result.rebuilt === false) {
         toast.warning(`Imported ${count} file${count === 1 ? "" : "s"} but atlas rebuild failed`, {
@@ -388,7 +211,7 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
     } finally {
       setIsImporting(false);
     }
-  }, [rows, onImported]);
+  }, [port, rows, onImported]);
 
   return {
     open,

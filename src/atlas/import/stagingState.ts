@@ -24,6 +24,7 @@ import { defaultVisibilityForVaultPath, inferTypeFromPath } from "./inferType";
 import { slugify } from "@/atlas/content/slugify";
 import { readNote, type Note } from "@/atlas/content/readNote";
 import { lookupByPath, type SyncMap, type VaultNoteState } from "./syncMap";
+import { isPlayerVisible } from "@/atlas/content/visibility";
 import { detectExposureIncrease, resolveType } from "./mergeImportFrontmatter";
 
 /**
@@ -128,7 +129,10 @@ export interface StagingRow {
   /** Last-synced vault type for this entity (from sync-map, §3.6). Undefined on first sync. */
   baseType?: string;
   /** Opt-in review flag: row defaults to included=false until the DM ticks it (Phase 2 populates). */
-  needsReview?: { reason: "secrecy-increase" | "rename-link" | "type-conflict" | "local-edits" };
+  needsReview?: {
+    reason:
+      "secrecy-increase" | "vault-more-secret" | "rename-link" | "type-conflict" | "local-edits";
+  };
   /** Vault-relative POSIX path — present when the row came from a vault scan (openWithVaultScan). */
   vaultRelPath?: string;
   /** Drift state vs the last publish of this note. Undefined for non-vault rows. */
@@ -228,10 +232,14 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
   const parseError = note.parseError;
   // What the vault asks for: the note's own tag (readNote, as the build reads
   // it), else the vault folder rule. An unreadable note is dm (fail closed).
-  const vaultVisibility: EntityVisibility =
+  // `atlas.publish: false` keeps any note from players (readNote's isSecret),
+  // so a player or rumor tag beside it reads as dm here, as it does there.
+  const taggedOrFolder: EntityVisibility =
     note.visibilityTagged || parseError !== undefined
       ? note.visibility
       : defaultVisibilityForVaultPath(input.vaultRelPath);
+  const vaultVisibility: EntityVisibility =
+    note.atlas.publish === false && isPlayerVisible(taggedOrFolder) ? "dm" : taggedOrFolder;
 
   // ── Identity resolution (§5.3 precedence) ──────────────────────────────────
   // Priority: (1) vault atlas.id; (2) sync-map[vaultRelPath]; (3) slugify(title)
@@ -268,6 +276,11 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     // Check secrecy increase: canon is hidden-tier, vault wants player visibility
     if (detectExposureIncrease(meta.visibility, note.atlas)) {
       needsReview = { reason: "secrecy-increase" };
+    } else if (isPlayerVisible(meta.visibility) && !isPlayerVisible(vaultVisibility)) {
+      // The vault keeps this note from players but the atlas shows it: the
+      // vault body may hold the secret. Hold it; if ticked, the vault's
+      // secrecy is written (see resolvedVisibility below).
+      needsReview = { reason: "vault-more-secret" };
     } else if (baseType) {
       // Check type conflict: both disk type and vault type diverged from last-synced base
       const { conflict } = resolveType({ diskType: meta.type, vaultType: type, baseType });
@@ -278,8 +291,9 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
   // The visibility commit will write, which is what Staging shows:
   // an update keeps the atlas's own unless the DM approves a secrecy increase;
   // a new note gets what the vault asks for.
-  const resolvedVisibility =
-    meta && needsReview?.reason !== "secrecy-increase" ? meta.visibility : vaultVisibility;
+  const vaultVisibilityWins =
+    needsReview?.reason === "secrecy-increase" || needsReview?.reason === "vault-more-secret";
+  const resolvedVisibility = meta && !vaultVisibilityWins ? meta.visibility : vaultVisibility;
 
   // create and update default ON; path-collision requires explicit opt-in; needsReview rows default OFF
   // An unchanged note has nothing to import — leave it unticked so the default

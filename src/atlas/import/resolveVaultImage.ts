@@ -10,6 +10,7 @@
  * is reported to the DM, never silent.
  */
 import { shouldConvertToWebp, webpTargetName } from "../assets/imageEncoding";
+import { slugify } from "../content/slugify";
 
 export type VaultImageResolution =
   { ok: true; relPath: string } | { ok: false; reason: "not-found" | "outside-candidates" };
@@ -53,7 +54,9 @@ export function resolveVaultImage(
  */
 export function vaultImageTargetName(entityId: string, index: number, sourceName: string): string {
   const ext = (sourceName.match(/\.[^.]+$/)?.[0] ?? ".png").toLowerCase();
-  const base = `${entityId}-${index + 1}`;
+  // The id comes from the note's own frontmatter and can be anything
+  // ("../../x"): only its slug may name a file.
+  const base = `${slugify(entityId) || "image"}-${index + 1}`;
   return shouldConvertToWebp(ext) ? webpTargetName(base) : `${base}${ext}`;
 }
 

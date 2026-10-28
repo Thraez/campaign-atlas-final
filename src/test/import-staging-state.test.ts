@@ -748,7 +748,8 @@ describe("Task 2.3 — needsReview from entityMeta", () => {
     const row = buildStagingRow(
       {
         filename: "hero.md",
-        raw: "---\natlas:\n  id: hero\n  type: faction\n---\n",
+        // Tagged player: an untagged note reads as dm and would hold as vault-more-secret first.
+        raw: "---\natlas:\n  id: hero\n  type: faction\n  visibility: player\n---\n",
         vaultRelPath: "notes/hero.md",
       },
       ctx,

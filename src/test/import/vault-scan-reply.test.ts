@@ -5,7 +5,7 @@
  * sends `ok` in the body.
  */
 import { describe, it, expect } from "vitest";
-import { readVaultScanReply } from "@/atlas/import/useMdImportFlow";
+import { readVaultScanReply } from "@/atlas/sync/devEndpointPort";
 
 const reply = (status: number, body: unknown) =>
   readVaultScanReply(new Response(JSON.stringify(body), { status }));

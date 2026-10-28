@@ -13,11 +13,10 @@
  *     The modal already prevents toggling them on, but defending here means
  *     a misuse can't widen the surface.
  */
-import { ConflictError, hashContent, type FileChange } from "@/atlas/save/localFsSave";
+import { hashContent, type FileChange } from "@/atlas/save/localFsSave";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter";
 import { mergeImportFrontmatter } from "./mergeImportFrontmatter";
 import { readNote } from "@/atlas/content/readNote";
-import { isWritableSourcePath } from "@/atlas/save/sourcePathAllowlist";
 import { rewriteFrontmatter } from "@/atlas/content/frontmatterRewrite";
 import type { StagingRow } from "./stagingState";
 
@@ -32,33 +31,18 @@ export class ImportCommitError extends Error {
 }
 
 export interface BuildImportChangesDeps {
-  fetchFn?: typeof fetch;
-}
-
-export async function readSourceFile(path: string, fetchFn: typeof fetch): Promise<string> {
-  if (!isWritableSourcePath(path)) {
-    throw new ImportCommitError(`Path not in source allowlist: ${path}`, path);
-  }
-  const url = `/__atlas/read?path=${encodeURIComponent(path)}`;
-  const res = await fetchFn(url, { method: "GET" });
-  if (res.status === 404) {
-    throw new ImportCommitError(`Source file not found: ${path}`, path);
-  }
-  if (!res.ok) {
-    throw new ImportCommitError(`Failed to read ${path}: status ${res.status}`, path);
-  }
-  const body = (await res.json()) as { contents?: unknown };
-  if (typeof body.contents !== "string") {
-    throw new ImportCommitError(`Malformed read response for ${path}`, path);
-  }
-  return body.contents;
+  /**
+   * An existing atlas file's current text; throws `ImportCommitError` when it
+   * is missing. Sync builds it from its vault port (`existingFileReader` in
+   * `src/atlas/sync/sync.ts`).
+   */
+  readFile: (path: string) => Promise<string>;
 }
 
 export async function buildImportChanges(
   rows: StagingRow[],
-  deps?: BuildImportChangesDeps,
+  { readFile }: BuildImportChangesDeps,
 ): Promise<FileChange[]> {
-  const fetchFn = deps?.fetchFn ?? fetch;
   const eligible = rows.filter((r) => r.included && r.pathAllowed && !r.parseError);
   if (eligible.length === 0) {
     throw new ImportCommitError("No rows selected for import");
@@ -71,7 +55,7 @@ export async function buildImportChanges(
 
     if (row.rowKind === "update") {
       // Read fresh disk content at commit time (not stale staging-time snapshot).
-      const currentRaw = await readSourceFile(row.targetPath, fetchFn);
+      const currentRaw = await readFile(row.targetPath);
       baseHash = await hashContent(currentRaw);
       const disk = readNote(currentRaw, row.targetPath);
       if (disk.parseError !== undefined) {
@@ -86,8 +70,12 @@ export async function buildImportChanges(
         inferredType: row.inferredType,
         baseType: row.baseType, // from sync-map (Phase 2); undefined → vault wins on type
       });
-      // An approved secrecy increase is the one case where the vault's visibility wins.
-      if (row.needsReview?.reason === "secrecy-increase") {
+      // The vault's visibility wins only on an approved review of it: a
+      // secrecy increase, or a vault that keeps a player note from players.
+      if (
+        row.needsReview?.reason === "secrecy-increase" ||
+        row.needsReview?.reason === "vault-more-secret"
+      ) {
         (merged.data.atlas as Record<string, unknown>).visibility = row.resolvedVisibility;
       }
       // The vault's title is its filename, which the merge doesn't see.
@@ -95,7 +83,7 @@ export async function buildImportChanges(
     } else {
       // path-collision: read disk for baseHash but still rewrite from vault.
       if (row.rowKind === "path-collision") {
-        const currentRaw = await readSourceFile(row.targetPath, fetchFn);
+        const currentRaw = await readFile(row.targetPath);
         baseHash = await hashContent(currentRaw);
       }
       // create/path-collision: the visibility Staging showed (the note's tag,
@@ -112,24 +100,4 @@ export async function buildImportChanges(
     changes.push({ path: row.targetPath, content, kind: "entity-md", baseHash });
   }
   return changes;
-}
-
-/**
- * The Save endpoint refuses a create whose target already exists (409). Check
- * that up front, so nothing else (image copies) runs for a commit that will be
- * refused.
- */
-export async function assertCreateTargetsFree(
-  changes: FileChange[],
-  fetchFn: typeof fetch,
-): Promise<void> {
-  for (const c of changes) {
-    if (c.baseHash !== null) continue;
-    const res = await fetchFn(`/__atlas/read?path=${encodeURIComponent(c.path)}`, {
-      method: "GET",
-    });
-    if (res.status === 404) continue;
-    if (res.ok) throw new ConflictError("already-exists", c.path);
-    throw new ImportCommitError(`Failed to read ${c.path}: status ${res.status}`, c.path);
-  }
 }

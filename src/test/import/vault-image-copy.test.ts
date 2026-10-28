@@ -68,6 +68,16 @@ const copy = (rawSrc: string, entityId: string, index = 0, vaultRoot = root) =>
   });
 
 describe("handleVaultImageCopyRequest", () => {
+  it("a traversal entity id cannot write outside the images folder (code-retro 07 review)", async () => {
+    const res = await copy("portrait.png", "../../../../../escaped/pwned.x");
+    const imagesDir = path.join(outRoot, "atlas", "assets", "images");
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.target).toMatch(/^\/atlas\/assets\/images\/[a-z0-9-]+\.webp$/);
+    expect(fs.existsSync(path.join(imagesDir, path.basename(res.target)))).toBe(true);
+    expect(fs.existsSync(path.join(outRoot, "..", "escaped"))).toBe(false);
+  });
+
   it("copies an in-scope image and names it from the entity", async () => {
     const res = await handleVaultImageCopyRequest({
       vaultRoot: root,

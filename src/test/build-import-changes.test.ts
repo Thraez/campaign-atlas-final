@@ -8,6 +8,13 @@ import {
   type StagingContext,
 } from "@/atlas/import/stagingState";
 import type { ImportFolderConfig, EntityVisibility } from "@/atlas/content/schema";
+import { createDevEndpointPort } from "@/atlas/sync/devEndpointPort";
+import { existingFileReader } from "@/atlas/sync/sync";
+
+/** buildImportChanges reading the atlas through the dev endpoint, as the editor does. */
+const viaFetch = (fetchFn: typeof fetch) => ({
+  readFile: existingFileReader(createDevEndpointPort(fetchFn)),
+});
 
 const WORLD = "astrath-deeprealm";
 
@@ -78,7 +85,7 @@ describe("buildImportChanges", () => {
       rows[1],
       updateStagingRow(rows[2], { included: false }, makeCtx()),
     ];
-    const changes = await buildImportChanges(adjusted, { fetchFn: fakeReadFetch({}) });
+    const changes = await buildImportChanges(adjusted, viaFetch(fakeReadFetch({})));
     expect(changes).toHaveLength(1);
     expect(changes[0].path).toBe("content/astrath-deeprealm/npcs/ok.md");
     expect(changes[0].kind).toBe("entity-md");
@@ -101,11 +108,14 @@ describe("buildImportChanges", () => {
     );
     // rows[0].rowKind === "path-collision", included === false — DM explicitly opts in.
     const opted = updateStagingRow(rows[0], { included: true }, ctx);
-    const changes = await buildImportChanges([opted], {
-      fetchFn: fakeReadFetch({
-        "content/astrath-deeprealm/settlements/thornhold.md": onDisk,
-      }),
-    });
+    const changes = await buildImportChanges(
+      [opted],
+      viaFetch(
+        fakeReadFetch({
+          "content/astrath-deeprealm/settlements/thornhold.md": onDisk,
+        }),
+      ),
+    );
     expect(changes).toHaveLength(1);
     expect(changes[0].baseHash).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(changes[0].content).toContain("new body");
@@ -117,7 +127,7 @@ describe("buildImportChanges", () => {
       makeCtx(),
     );
     const off = updateStagingRow(rows[0], { included: false }, makeCtx());
-    await expect(buildImportChanges([off], { fetchFn: fakeReadFetch({}) })).rejects.toBeInstanceOf(
+    await expect(buildImportChanges([off], viaFetch(fakeReadFetch({})))).rejects.toBeInstanceOf(
       ImportCommitError,
     );
   });
@@ -132,7 +142,7 @@ describe("buildImportChanges", () => {
     const opted = updateStagingRow(rows[0], { included: true }, ctx);
     // fetch map empty → read returns 404.
     const fetchFn = vi.fn(fakeReadFetch({}));
-    await expect(buildImportChanges([opted], { fetchFn })).rejects.toBeInstanceOf(
+    await expect(buildImportChanges([opted], viaFetch(fetchFn))).rejects.toBeInstanceOf(
       ImportCommitError,
     );
   });
@@ -172,9 +182,10 @@ describe("buildImportChanges — update rows use mergeImportFrontmatter", () => 
       typeWasGuessed: false,
       resolvedVisibility: "dm",
     };
-    const changes = await buildImportChanges([row as never], {
-      fetchFn: fakeReadFetch({ "content/w/npcs/corven.md": diskRaw }),
-    });
+    const changes = await buildImportChanges(
+      [row as never],
+      viaFetch(fakeReadFetch({ "content/w/npcs/corven.md": diskRaw })),
+    );
     expect(changes).toHaveLength(1);
     expect(changes[0].content).toContain("NEW PROSE");
     expect(changes[0].content).not.toContain("OLD PROSE");
@@ -208,7 +219,7 @@ describe("buildImportChanges — update rows use mergeImportFrontmatter", () => 
       typeWasGuessed: false,
       resolvedVisibility: "player",
     };
-    const [change] = await buildImportChanges([row as never]);
+    const [change] = await buildImportChanges([row as never], viaFetch(fakeReadFetch({})));
     const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
     expect(atlas.visibility).toBe("player");
     expect(change.baseHash).toBeNull();
@@ -233,7 +244,7 @@ describe("buildImportChanges persists inferred atlas fields", () => {
       included: true,
       frontmatterPath: undefined,
     };
-    const [change] = await buildImportChanges([row as never]);
+    const [change] = await buildImportChanges([row as never], viaFetch(fakeReadFetch({})));
     expect(change.content).not.toBe(raw); // not verbatim
     const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
     expect(atlas.type).toBe("npc");
@@ -267,7 +278,7 @@ describe("buildImportChanges — readSourceFile branch coverage (N92)", () => {
     const serverErrorFetch: typeof fetch = async () =>
       new Response("internal server error", { status: 500 }) as Response;
     await expect(
-      buildImportChanges([row as never], { fetchFn: serverErrorFetch }),
+      buildImportChanges([row as never], viaFetch(serverErrorFetch)),
     ).rejects.toBeInstanceOf(ImportCommitError);
   });
 
@@ -294,7 +305,7 @@ describe("buildImportChanges — readSourceFile branch coverage (N92)", () => {
         headers: { "Content-Type": "application/json" },
       }) as Response;
     await expect(
-      buildImportChanges([row as never], { fetchFn: malformedFetch }),
+      buildImportChanges([row as never], viaFetch(malformedFetch)),
     ).rejects.toBeInstanceOf(ImportCommitError);
   });
 
@@ -316,7 +327,7 @@ describe("buildImportChanges — readSourceFile branch coverage (N92)", () => {
       resolvedVisibility: "player",
       needsReview: { reason: "secrecy-increase" as const },
     };
-    const [change] = await buildImportChanges([row as never]);
+    const [change] = await buildImportChanges([row as never], viaFetch(fakeReadFetch({})));
     const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
     expect(atlas.visibility).toBe("player");
   });
@@ -335,7 +346,7 @@ describe("Sync keeps a note's title and type (code-retro 02)", () => {
       makeCtx(),
     );
     expect(row.title).toBe("Isle de Marque");
-    const [change] = await buildImportChanges([row], { fetchFn: fakeReadFetch({}) });
+    const [change] = await buildImportChanges([row], viaFetch(fakeReadFetch({})));
     expect(change.path).toMatch(/isle-de-marque\.md$/);
     expect(parseFrontmatter(change.content).data.title).toBe("Isle de Marque");
   });
@@ -371,7 +382,7 @@ describe("Sync keeps a note's title and type (code-retro 02)", () => {
       }),
     );
     expect(row.rowKind).toBe("update");
-    const [change] = await buildImportChanges([row], { fetchFn: fakeReadFetch({ [path]: disk }) });
+    const [change] = await buildImportChanges([row], viaFetch(fakeReadFetch({ [path]: disk })));
     expect(parseFrontmatter(change.content).data.title).toBe("Isle de Marque");
   });
 
@@ -389,7 +400,7 @@ describe("Sync keeps a note's title and type (code-retro 02)", () => {
     expect(row.inferredType).toBe("npc");
     expect(row.typeWasExplicit).toBe(true);
     expect(row.targetPath).toBe(`content/${WORLD}/npcs/varro.md`);
-    const [change] = await buildImportChanges([row], { fetchFn: fakeReadFetch({}) });
+    const [change] = await buildImportChanges([row], viaFetch(fakeReadFetch({})));
     const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
     expect(atlas.type).toBe("npc");
   });
@@ -407,7 +418,7 @@ describe("Staging shows the visibility commit writes (code-retro 04)", () => {
   async function stageAndWrite(vaultRelPath: string, raw: string, ctx = makeCtx()) {
     const filename = vaultRelPath.split("/").pop()!;
     const [row] = buildStagingRows([{ filename, raw, vaultRelPath }], ctx);
-    const [change] = await buildImportChanges([row], { fetchFn: fakeReadFetch(diskFiles) });
+    const [change] = await buildImportChanges([row], viaFetch(fakeReadFetch(diskFiles)));
     const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
     return { shown: row.resolvedVisibility, written: atlas.visibility };
   }
@@ -476,7 +487,7 @@ describe("Staging shows the visibility commit writes (code-retro 04)", () => {
     expect(row.included).toBe(false);
     expect(row.resolvedVisibility).toBe("player");
     const approved = updateStagingRow(row, { included: true }, updateCtx("dm"));
-    const [change] = await buildImportChanges([approved], { fetchFn: fakeReadFetch(diskFiles) });
+    const [change] = await buildImportChanges([approved], viaFetch(fakeReadFetch(diskFiles)));
     const atlas = parseFrontmatter(change.content).data.atlas as Record<string, unknown>;
     expect(atlas.visibility).toBe("player");
   });

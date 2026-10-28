@@ -122,13 +122,14 @@ const ctx = (existingById = new Map<string, string>()): StagingContext => ({
   existingPaths: new Set(existingById.values()),
 });
 
-/** Serves `/__atlas/read` from a map of repo paths, as the dev server would. */
-function readFrom(files: Record<string, string>): typeof fetch {
-  return (async (url: RequestInfo | URL) => {
-    const p = decodeURIComponent(String(url).replace(/^.*\?path=/, ""));
-    if (!(p in files)) return new Response("not found", { status: 404 });
-    return new Response(JSON.stringify({ path: p, contents: files[p] }), { status: 200 });
-  }) as unknown as typeof fetch;
+/** Reads atlas files from a map of repo paths. */
+function readFrom(files: Record<string, string>) {
+  return {
+    readFile: async (p: string) => {
+      if (!(p in files)) throw new Error(`Source file not found: ${p}`);
+      return files[p];
+    },
+  };
 }
 
 let tmp: string;
@@ -200,7 +201,7 @@ describe.each(FIXTURES)("$path", (f) => {
       ctx(new Map([[f.id, diskPath]])),
     );
     expect(row.rowKind).toBe("update");
-    const [change] = await buildImportChanges([row], { fetchFn: readFrom({ [diskPath]: f.raw }) });
+    const [change] = await buildImportChanges([row], readFrom({ [diskPath]: f.raw }));
     const written = readNote(change.content, diskPath);
     expect([written.visibility, written.isSecret]).toEqual([f.visibility, f.secret]);
   });
@@ -238,7 +239,7 @@ describe("Staging's vault folder rule (intended difference from the build)", () 
     expect(built.get(corven.id)!.visibility).toBe("dm");
     const row = fromLore(corven.raw);
     expect(row.resolvedVisibility).toBe("player");
-    const [change] = await buildImportChanges([row], { fetchFn: readFrom({}) });
+    const [change] = await buildImportChanges([row], readFrom({}));
     expect(readNote(change.content, change.path).visibility).toBe("player");
   });
 

@@ -365,6 +365,8 @@ must wrap the tree (it's mounted at `App.tsx` root).
 | `npm run atlas:build`                                                                 | Build DM atlas                                                                        | `.local-atlas/` (gitignored) |
 | `npm run atlas:build:player`                                                          | Strict player atlas                                                                   | **`public/atlas/`** ⚠️       |
 | `npm run atlas:publish`                                                               | Snapshot + player build + prod build + all scans                                      | `public/atlas/`, `dist/`     |
+| `npm run atlas:sync -- --dry-run <vault>`                                             | What Sync from Obsidian would do, per vault folder (`src/atlas/sync/sync.ts`)          | —                            |
+| `npm run atlas:sync -- --write <vault>`                                               | Sync the notes Staging ticks by default; no rebuild                                   | `content/`, `.local-atlas/`  |
 | `npm run atlas:check-secrets <dir>` / `:check-derived <dir>`                          | Leak scans against an output dir                                                      | —                            |
 | `npm run typecheck` / `typecheck:scripts` / `typecheck:all` / `lint` / `format:check` | Static gates                                                                          | —                            |
 | `npm test`                                                                            | Vitest (**shard it — see above**)                                                     | —                            |
