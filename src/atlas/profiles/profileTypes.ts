@@ -25,7 +25,7 @@ export interface EntityProfile {
 export interface EntityRelationship {
   /** Target entity id (slug). May be unresolved at author time. */
   entity: string;
-  /** Verb — see RELATIONSHIP_TYPES for common values, but free-form is allowed. */
+  /** Free-form verb in snake_case, e.g. `allied_with`, `member_of`, `rivals_with`. */
   type: string;
   /** Optional human label shown in UI. */
   label?: string;

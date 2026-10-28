@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { EntityVisibility } from "@/atlas/content/schema";
+import { isValidVisibility } from "@/atlas/content/visibility";
+import { parseFrontmatter } from "@/atlas/import/frontmatter";
 
 export interface EntityEditFields {
   id: string;
@@ -27,8 +29,75 @@ export type EntityEditDraftInit = Omit<EntityEditDraft, "pristine" | "secrets"> 
   secrets?: DraftSecret[];
 };
 
+/** What the entity panel edits: the four atlas fields, the body and the secrets. */
+export interface EntityEditContent {
+  fields: EntityEditFields;
+  body: string;
+  secrets: DraftSecret[];
+}
+
 function fingerprint(fields: EntityEditFields, body: string, secrets: DraftSecret[]): string {
   return JSON.stringify({ fields, body, secrets });
+}
+
+/** The draft's view of an entity file as it sits on disk. */
+export function draftContentFromDisk(raw: string): EntityEditContent {
+  const fm = parseFrontmatter(raw);
+  const atlas = (fm.data.atlas as Record<string, unknown>) ?? {};
+  return {
+    fields: {
+      id: String(atlas.id ?? ""),
+      type: String(atlas.type ?? ""),
+      visibility: isValidVisibility(atlas.visibility) ? atlas.visibility : "dm",
+      summary: String(atlas.summary ?? ""),
+    },
+    body: fm.content,
+    secrets: Array.isArray(atlas.secrets) ? (atlas.secrets as DraftSecret[]) : [],
+  };
+}
+
+export interface RebaseOutcome {
+  /** The DM changed the body and so did the disk: the DM's body wins on Save. */
+  bodyOverwritten: boolean;
+}
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * Move a draft onto a newer file. Per field (id, type, visibility, summary),
+ * body and secrets list: what the DM changed since the draft's base
+ * (`pristine`) is kept; anything they didn't touch takes the disk's value.
+ * `baseHash` and `pristine` become the new file's. Null when the draft is for
+ * another sourcePath.
+ */
+export function rebaseDraft(
+  d: EntityEditDraft,
+  sourcePath: string,
+  baseHash: string,
+  disk: EntityEditContent,
+): { draft: EntityEditDraft; outcome: RebaseOutcome } | null {
+  if (d.sourcePath !== sourcePath) return null;
+  const base = JSON.parse(d.pristine) as EntityEditContent;
+  const pick = <T>(mine: T, was: T, theirs: T): T => (same(mine, was) ? theirs : mine);
+  const fields = { ...d.fields };
+  for (const k of Object.keys(fields) as Array<keyof EntityEditFields>) {
+    (fields as Record<string, unknown>)[k] = pick(d.fields[k], base.fields[k], disk.fields[k]);
+  }
+  const bodyMine = d.body !== base.body;
+  const bodyOverwritten = bodyMine && disk.body !== base.body && disk.body !== d.body;
+  const body = pick(d.body, base.body, disk.body);
+  const secrets = pick(d.secrets, base.secrets, disk.secrets);
+  return {
+    draft: {
+      ...d,
+      baseHash,
+      fields,
+      body,
+      secrets,
+      pristine: fingerprint(disk.fields, disk.body, disk.secrets),
+    },
+    outcome: { bodyOverwritten },
+  };
 }
 
 export interface EntityEditDraftAPI {
@@ -41,6 +110,11 @@ export interface EntityEditDraftAPI {
   isDirty: () => boolean;
   snapshot: () => EntityEditSnapshot;
   applySnapshot: (s: EntityEditSnapshot) => void;
+  /**
+   * Move the draft onto the file now on disk (see `rebaseDraft`). Returns null
+   * and changes nothing when the live draft is for another sourcePath.
+   */
+  rebase: (sourcePath: string, baseHash: string, disk: EntityEditContent) => RebaseOutcome | null;
 }
 
 export function useEntityEditDraft(): EntityEditDraftAPI {
@@ -84,6 +158,25 @@ export function useEntityEditDraft(): EntityEditDraftAPI {
   );
   const snapshot = useCallback<() => EntityEditSnapshot>(() => ref.current, []);
   const applySnapshot = useCallback((s: EntityEditSnapshot) => setDraft(s), []);
+  const rebase = useCallback<EntityEditDraftAPI["rebase"]>((sourcePath, baseHash, disk) => {
+    // The outcome is read from the latest rendered draft; the updater applies
+    // the same rule to whatever state is current when React runs it.
+    const now = ref.current ? rebaseDraft(ref.current, sourcePath, baseHash, disk) : null;
+    if (!now) return null;
+    setDraft((d) => (d ? (rebaseDraft(d, sourcePath, baseHash, disk)?.draft ?? d) : d));
+    return now.outcome;
+  }, []);
 
-  return { draft, load, setField, setBody, setSecrets, clear, isDirty, snapshot, applySnapshot };
+  return {
+    draft,
+    load,
+    setField,
+    setBody,
+    setSecrets,
+    clear,
+    isDirty,
+    snapshot,
+    applySnapshot,
+    rebase,
+  };
 }

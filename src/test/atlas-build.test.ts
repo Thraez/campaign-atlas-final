@@ -6,7 +6,8 @@
  * invariants that matter for player builds.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
+import { execFile, type ExecFileOptions } from "node:child_process";
+import { promisify } from "node:util";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -22,22 +23,26 @@ interface RunResult {
 }
 
 const IS_WIN = process.platform === "win32";
+const execFileAsync = promisify(execFile);
 
-function run(args: string[], opts: ExecFileSyncOptions = {}): RunResult {
+// Async on purpose: a synchronous spawn blocks the test worker for each ~2.5 s
+// build, and back-to-back builds starve Vitest's worker RPC on slow CI runners
+// ("Timeout calling onTaskUpdate") even though every test passes.
+async function run(args: string[], opts: ExecFileOptions = {}): Promise<RunResult> {
   try {
-    const stdout = execFileSync(IS_WIN ? "npx.cmd" : "npx", ["tsx", SCRIPT, ...args], {
+    const { stdout } = await execFileAsync(IS_WIN ? "npx.cmd" : "npx", ["tsx", SCRIPT, ...args], {
       cwd: ROOT,
       encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
       shell: IS_WIN,
+      maxBuffer: 64 * 1024 * 1024,
       env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
       ...opts,
     });
     return { status: 0, stdout: String(stdout), stderr: "" };
   } catch (e) {
-    const err = e as { status?: number; stdout?: Buffer | string; stderr?: Buffer | string };
+    const err = e as { code?: number | string; stdout?: Buffer | string; stderr?: Buffer | string };
     return {
-      status: err.status ?? 1,
+      status: typeof err.code === "number" ? err.code : 1,
       stdout: String(err.stdout ?? ""),
       stderr: String(err.stderr ?? ""),
     };
@@ -94,9 +99,9 @@ function writeWorldVault(dir: string, worldYaml: string) {
 }
 
 describe.sequential("atlas build pipeline", () => {
-  it("PLAYER build excludes dm + hidden entities and strips DM blocks", () => {
+  it("PLAYER build excludes dm + hidden entities and strips DM blocks", async () => {
     const out = path.join(tmpRoot, "player");
-    const result = run([
+    const result = await run([
       "--player",
       "--config",
       path.join(FIXTURE, "atlas.config.json"),
@@ -117,9 +122,9 @@ describe.sequential("atlas build pipeline", () => {
     expect(warnText).toMatch(/external asset/i);
   });
 
-  it("DM build keeps dm/hidden entities and preserves %% blocks", () => {
+  it("DM build keeps dm/hidden entities and preserves %% blocks", async () => {
     const out = path.join(tmpRoot, "dm");
-    const result = run(["--config", path.join(FIXTURE, "atlas.config.json"), "--out", out]);
+    const result = await run(["--config", path.join(FIXTURE, "atlas.config.json"), "--out", out]);
     expect(result.status, result.stderr).toBe(0);
     const atlas = read(out);
     const ids = atlas.entities.map((e) => e.id);
@@ -130,9 +135,9 @@ describe.sequential("atlas build pipeline", () => {
     expect(atlas.buildReport.strippedDmBlocks).toBe(0);
   });
 
-  it("DM build names the folder-excluded notes behind the excluded count", () => {
+  it("DM build names the folder-excluded notes behind the excluded count", async () => {
     const out = path.join(tmpRoot, "dm-excluded");
-    const result = run(["--config", path.join(FIXTURE, "atlas.config.json"), "--out", out]);
+    const result = await run(["--config", path.join(FIXTURE, "atlas.config.json"), "--out", out]);
     expect(result.status, result.stderr).toBe(0);
     const atlas = read(out);
     const br = atlas.buildReport;
@@ -149,9 +154,9 @@ describe.sequential("atlas build pipeline", () => {
     expect(atlas.entities.map((e) => e.id)).not.toContain("wip-note");
   });
 
-  it("PLAYER build keeps the excluded total but omits the DM-only breakdown", () => {
+  it("PLAYER build keeps the excluded total but omits the DM-only breakdown", async () => {
     const out = path.join(tmpRoot, "player-excluded");
-    const result = run([
+    const result = await run([
       "--player",
       "--config",
       path.join(FIXTURE, "atlas.config.json"),
@@ -169,9 +174,9 @@ describe.sequential("atlas build pipeline", () => {
     expect(fs.readFileSync(path.join(out, "atlas.json"), "utf8")).not.toMatch(/_drafts\//);
   });
 
-  it("multi-map placements emit one MapPlacement per entry", () => {
+  it("multi-map placements emit one MapPlacement per entry", async () => {
     const out = path.join(tmpRoot, "multi");
-    const result = run(["--config", path.join(FIXTURE, "atlas.config.json"), "--out", out]);
+    const result = await run(["--config", path.join(FIXTURE, "atlas.config.json"), "--out", out]);
     expect(result.status).toBe(0);
     const atlas = read(out);
     const mm = atlas.placements.filter((p) => p.entityId === "multi-map-place");
@@ -179,9 +184,9 @@ describe.sequential("atlas build pipeline", () => {
     expect(mm.map((p) => p.x).sort()).toEqual([10, 30]);
   });
 
-  it("legacy atlas.x/atlas.y still produces a placement", () => {
+  it("legacy atlas.x/atlas.y still produces a placement", async () => {
     const out = path.join(tmpRoot, "legacy");
-    const result = run(["--config", path.join(FIXTURE, "atlas.config.json"), "--out", out]);
+    const result = await run(["--config", path.join(FIXTURE, "atlas.config.json"), "--out", out]);
     expect(result.status).toBe(0);
     const atlas = read(out);
     const ph = atlas.placements.find((p) => p.entityId === "public-town");
@@ -190,9 +195,9 @@ describe.sequential("atlas build pipeline", () => {
     expect(ph!.y).toBe(200);
   });
 
-  it("unresolved wikilinks do NOT fail strict", () => {
+  it("unresolved wikilinks do NOT fail strict", async () => {
     const out = path.join(tmpRoot, "strict-ok");
-    const result = run([
+    const result = await run([
       "--player",
       "--strict",
       "--config",
@@ -203,7 +208,7 @@ describe.sequential("atlas build pipeline", () => {
     expect(result.status, result.stderr + result.stdout).toBe(0);
   });
 
-  it("strict player build FAILS on invalid visibility", () => {
+  it("strict player build FAILS on invalid visibility", async () => {
     // Add a fixture with bad visibility, build, expect non-zero exit.
     const badDir = path.join(tmpRoot, "bad-vis-vault");
     fs.mkdirSync(path.join(badDir, "content/test-world/notes"), { recursive: true });
@@ -221,7 +226,7 @@ describe.sequential("atlas build pipeline", () => {
       path.join(badDir, "content/test-world/notes/Bad.md"),
       `---\ntitle: Bad\natlas:\n  visibility: secret\n---\nbody\n`,
     );
-    const result = run([
+    const result = await run([
       "--player",
       "--strict",
       "--config",
@@ -233,7 +238,7 @@ describe.sequential("atlas build pipeline", () => {
     expect(result.stdout + result.stderr).toMatch(/invalid visibility/i);
   });
 
-  it("non-strict build coerces an invalid visibility to dm", () => {
+  it("non-strict build coerces an invalid visibility to dm", async () => {
     const dir = path.join(tmpRoot, "coerce-vis-vault");
     writeWorldVault(dir, `maps:\n  - id: m1\n    name: Main\n    width: 1000\n    height: 1000\n`);
     fs.writeFileSync(
@@ -243,12 +248,12 @@ describe.sequential("atlas build pipeline", () => {
     const config = path.join(dir, "atlas.config.json");
 
     const dmOut = path.join(tmpRoot, "coerce-vis-dm");
-    const dm = run(["--config", config, "--out", dmOut]);
+    const dm = await run(["--config", config, "--out", dmOut]);
     expect(dm.status, dm.stderr).toBe(0);
     expect(read(dmOut).entities.find((e) => e.id === "bad")?.visibility).toBe("dm");
 
     const playerOut = path.join(tmpRoot, "coerce-vis-player");
-    const player = run(["--player", "--config", config, "--out", playerOut]);
+    const player = await run(["--player", "--config", config, "--out", playerOut]);
     expect(player.status, player.stderr).toBe(0);
     const ids = read(playerOut).entities.map((e) => e.id);
     expect(ids).not.toContain("bad");
@@ -264,7 +269,7 @@ describe.sequential("atlas build pipeline", () => {
 
   it.each(["archive", "deprecated"])(
     "the real atlas.config.json keeps a %s/ folder out of the build",
-    (folder) => {
+    async (folder) => {
       const dir = path.join(tmpRoot, `excluded-${folder}`);
       writeWorldVault(
         dir,
@@ -280,7 +285,7 @@ describe.sequential("atlas build pipeline", () => {
       );
 
       const dmOut = path.join(tmpRoot, `excluded-${folder}-dm`);
-      const dm = run(["--config", cfgPath, "--out", dmOut]);
+      const dm = await run(["--config", cfgPath, "--out", dmOut]);
       expect(dm.status, dm.stderr).toBe(0);
       const atlas = read(dmOut);
       expect(atlas.entities.map((e) => e.id)).not.toContain("old-note");
@@ -288,7 +293,7 @@ describe.sequential("atlas build pipeline", () => {
       expect(atlas.buildReport.excludedPaths).toContain(`test-world/${folder}/Old-Note.md`);
 
       const playerOut = path.join(tmpRoot, `excluded-${folder}-player`);
-      const player = run(["--player", "--config", cfgPath, "--out", playerOut]);
+      const player = await run(["--player", "--config", cfgPath, "--out", playerOut]);
       expect(player.status, player.stderr).toBe(0);
       expect(fs.readFileSync(path.join(playerOut, "atlas.json"), "utf8")).not.toContain(
         "OLD_NOTE_BODY",
@@ -296,7 +301,7 @@ describe.sequential("atlas build pipeline", () => {
     },
   );
 
-  it("strict player build FAILS on missing local assets", () => {
+  it("strict player build FAILS on missing local assets", async () => {
     const badDir = path.join(tmpRoot, "missing-assets-vault");
     fs.mkdirSync(path.join(badDir, "content/test-world/notes"), { recursive: true });
     fs.writeFileSync(
@@ -313,7 +318,7 @@ describe.sequential("atlas build pipeline", () => {
       path.join(badDir, "content/test-world/notes/Img.md"),
       `---\ntitle: Img\natlas:\n  visibility: player\n  images:\n    - /atlas/assets/maps/does-not-exist.png\n---\nbody\n`,
     );
-    const result = run([
+    const result = await run([
       "--player",
       "--strict",
       "--config",
@@ -325,7 +330,7 @@ describe.sequential("atlas build pipeline", () => {
     expect(result.stdout + result.stderr).toMatch(/missing local asset/i);
   });
 
-  it("strict player build FAILS on a missing inline image embed", () => {
+  it("strict player build FAILS on a missing inline image embed", async () => {
     const badDir = path.join(tmpRoot, "missing-embed-vault");
     fs.mkdirSync(path.join(badDir, "content/test-world/notes"), { recursive: true });
     fs.writeFileSync(
@@ -342,7 +347,7 @@ describe.sequential("atlas build pipeline", () => {
       path.join(badDir, "content/test-world/notes/Embed.md"),
       `---\ntitle: Embed\natlas:\n  visibility: player\n---\n![[does-not-exist.png]]\n`,
     );
-    const result = run([
+    const result = await run([
       "--player",
       "--strict",
       "--config",
@@ -355,7 +360,7 @@ describe.sequential("atlas build pipeline", () => {
     expect(result.stdout + result.stderr).toMatch(/missing local asset/i);
   });
 
-  it("duplicate slugs FAIL the build (errors, not warnings)", () => {
+  it("duplicate slugs FAIL the build (errors, not warnings)", async () => {
     const badDir = path.join(tmpRoot, "dupes-vault");
     fs.mkdirSync(path.join(badDir, "content/test-world/a"), { recursive: true });
     fs.mkdirSync(path.join(badDir, "content/test-world/b"), { recursive: true });
@@ -377,7 +382,7 @@ describe.sequential("atlas build pipeline", () => {
       path.join(badDir, "content/test-world/b/Same-Name.md"),
       `---\ntitle: Same Name\natlas:\n  visibility: player\n---\nB\n`,
     );
-    const result = run([
+    const result = await run([
       "--config",
       path.join(badDir, "atlas.config.json"),
       "--out",
@@ -387,13 +392,13 @@ describe.sequential("atlas build pipeline", () => {
     expect(result.stdout + result.stderr).toMatch(/duplicate slug/i);
   });
 
-  it("valid world.yaml with one layer outputs that layer into atlas.json", () => {
+  it("valid world.yaml with one layer outputs that layer into atlas.json", async () => {
     const dir = path.join(tmpRoot, "valid-world");
     writeWorldVault(
       dir,
       `maps:\n  - id: test-world-overview\n    name: Overview\n    width: 1000\n    height: 500\n    layers:\n      - id: base\n        src: /atlas/assets/maps/map.jpg\n        x: 0\n        y: 0\n        width: 1000\n        height: 500\n        opacity: 1\n        zIndex: 1\n`,
     );
-    const result = run([
+    const result = await run([
       "--config",
       path.join(dir, "atlas.config.json"),
       "--out",
@@ -407,13 +412,13 @@ describe.sequential("atlas build pipeline", () => {
     expect(map!.layers[0].src).toMatch(/map\.jpg$/);
   });
 
-  it("world.yaml containing markdown fences FAILS the build", () => {
+  it("world.yaml containing markdown fences FAILS the build", async () => {
     const dir = path.join(tmpRoot, "fence-world");
     writeWorldVault(
       dir,
       "```yaml\nmaps:\n  - id: test-world-overview\n    name: Overview\n    width: 1000\n    height: 500\n    layers: []\n```\n",
     );
-    const result = run([
+    const result = await run([
       "--config",
       path.join(dir, "atlas.config.json"),
       "--out",
@@ -423,10 +428,10 @@ describe.sequential("atlas build pipeline", () => {
     expect(result.stdout + result.stderr).toMatch(/markdown code fence/i);
   });
 
-  it("world.yaml with no maps FAILS the build", () => {
+  it("world.yaml with no maps FAILS the build", async () => {
     const dir = path.join(tmpRoot, "nomaps-world");
     writeWorldVault(dir, "maps: []\n");
-    const result = run([
+    const result = await run([
       "--config",
       path.join(dir, "atlas.config.json"),
       "--out",
@@ -436,13 +441,13 @@ describe.sequential("atlas build pipeline", () => {
     expect(result.stdout + result.stderr).toMatch(/no maps defined/i);
   });
 
-  it("missing local layer asset FAILS strict player build", () => {
+  it("missing local layer asset FAILS strict player build", async () => {
     const dir = path.join(tmpRoot, "missing-layer");
     writeWorldVault(
       dir,
       `maps:\n  - id: test-world-overview\n    name: Overview\n    width: 1000\n    height: 500\n    layers:\n      - id: base\n        src: /atlas/assets/maps/does-not-exist-anywhere.png\n        x: 0\n        y: 0\n        width: 1000\n        height: 500\n        opacity: 1\n        zIndex: 1\n`,
     );
-    const result = run([
+    const result = await run([
       "--player",
       "--strict",
       "--config",
@@ -454,13 +459,13 @@ describe.sequential("atlas build pipeline", () => {
     expect(result.stdout + result.stderr).toMatch(/missing local asset/i);
   });
 
-  it("external layer URL warns but does not fail", () => {
+  it("external layer URL warns but does not fail", async () => {
     const dir = path.join(tmpRoot, "ext-layer");
     writeWorldVault(
       dir,
       `maps:\n  - id: test-world-overview\n    name: Overview\n    width: 1000\n    height: 500\n    layers:\n      - id: base\n        src: https://example.com/map.png\n        x: 0\n        y: 0\n        width: 1000\n        height: 500\n        opacity: 1\n        zIndex: 1\n`,
     );
-    const result = run([
+    const result = await run([
       "--player",
       "--strict",
       "--config",
@@ -473,7 +478,7 @@ describe.sequential("atlas build pipeline", () => {
     expect(atlas.buildReport.warnings.join("\n")).toMatch(/external asset/i);
   });
 
-  it("emits importFolders in DM build and omits it from --player build", () => {
+  it("emits importFolders in DM build and omits it from --player build", async () => {
     const vaultDir = path.join(tmpRoot, "import-folders-vault");
     writeWorldVault(
       vaultDir,
@@ -492,7 +497,7 @@ import:
 
     // DM build
     const dmOut = path.join(tmpRoot, "import-folders-dm");
-    const dm = run(["--config", path.join(vaultDir, "atlas.config.json"), "--out", dmOut]);
+    const dm = await run(["--config", path.join(vaultDir, "atlas.config.json"), "--out", dmOut]);
     expect(dm.status, dm.stderr).toBe(0);
     const dmAtlas = JSON.parse(fs.readFileSync(path.join(dmOut, "atlas.json"), "utf8")) as {
       worlds: Array<{ importFolders?: unknown }>;
@@ -504,7 +509,7 @@ import:
 
     // Player build
     const playerOut = path.join(tmpRoot, "import-folders-player");
-    const player = run([
+    const player = await run([
       "--player",
       "--config",
       path.join(vaultDir, "atlas.config.json"),
@@ -518,7 +523,7 @@ import:
     expect(playerAtlas.worlds[0].importFolders).toBeUndefined();
   });
 
-  it("entity.credit round-trips into player and DM atlas.json", () => {
+  it("entity.credit round-trips into player and DM atlas.json", async () => {
     const dir = path.join(tmpRoot, "credit-roundtrip");
     writeWorldVault(dir, `maps:\n  - id: m1\n    name: Main\n    width: 1000\n    height: 1000\n`);
     fs.writeFileSync(
@@ -527,7 +532,7 @@ import:
     );
 
     const playerOut = path.join(tmpRoot, "credit-player-out");
-    const pr = run([
+    const pr = await run([
       "--player",
       "--config",
       path.join(dir, "atlas.config.json"),
@@ -542,7 +547,7 @@ import:
     expect(credited?.credit).toBe("Portrait by Evelyn K, CC BY 4.0");
   });
 
-  it("world.credits block round-trips into player atlas.json", () => {
+  it("world.credits block round-trips into player atlas.json", async () => {
     const dir = path.join(tmpRoot, "world-credits-roundtrip");
     writeWorldVault(
       dir,
@@ -550,7 +555,7 @@ import:
     );
 
     const playerOut = path.join(tmpRoot, "world-credits-out");
-    const pr = run([
+    const pr = await run([
       "--player",
       "--config",
       path.join(dir, "atlas.config.json"),
@@ -564,7 +569,7 @@ import:
     expect(playerAtlas.worlds[0].credits).toEqual({ badges: false, page: true });
   });
 
-  it("SECRECY REGRESSION: a note with no visibility is dm and stays out of the player build (ADR-0001)", () => {
+  it("SECRECY REGRESSION: a note with no visibility is dm and stays out of the player build (ADR-0001)", async () => {
     const dir = path.join(tmpRoot, "missing-visibility");
     writeWorldVault(dir, `maps:\n  - id: m1\n    name: Main\n    width: 1000\n    height: 1000\n`);
     fs.writeFileSync(
@@ -577,7 +582,7 @@ import:
     );
 
     const playerOut = path.join(tmpRoot, "missing-visibility-out");
-    const pr = run([
+    const pr = await run([
       "--player",
       "--config",
       path.join(dir, "atlas.config.json"),
@@ -594,7 +599,7 @@ import:
     expect(ids).toContain("legacy-published");
   });
 
-  it("SECRECY REGRESSION: dm-only entity credit is absent from player atlas.json", () => {
+  it("SECRECY REGRESSION: dm-only entity credit is absent from player atlas.json", async () => {
     const dir = path.join(tmpRoot, "dm-credit-secrecy");
     writeWorldVault(dir, `maps:\n  - id: m1\n    name: Main\n    width: 1000\n    height: 1000\n`);
     // DM-only entity with a credit — must not appear in player build
@@ -609,7 +614,7 @@ import:
     );
 
     const playerOut = path.join(tmpRoot, "dm-credit-secrecy-out");
-    const pr = run([
+    const pr = await run([
       "--player",
       "--config",
       path.join(dir, "atlas.config.json"),
