@@ -1,5 +1,5 @@
 import type { Region, SoundscapeConfig, SoundArea } from "../../src/atlas/content/schema";
-import { PLAYER_VISIBLE } from "./visibility";
+import { PLAYER_VISIBLE_VISIBILITY } from "./visibility";
 
 /**
  * Strip DM-visible areas and neutralise identifying metadata for player builds.
@@ -29,9 +29,9 @@ export function filterSoundscapeForPlayer(
   const isPlayerVisible = (a: SoundArea): boolean => {
     if (a.regionId) {
       const v = regionVisibility.get(a.regionId);
-      return v !== undefined && PLAYER_VISIBLE.has(v);
+      return v !== undefined && PLAYER_VISIBLE_VISIBILITY.has(v);
     }
-    return !a.visibility || PLAYER_VISIBLE.has(a.visibility);
+    return !a.visibility || PLAYER_VISIBLE_VISIBILITY.has(a.visibility);
   };
 
   const kept: SoundArea[] = (sc.areas ?? [])

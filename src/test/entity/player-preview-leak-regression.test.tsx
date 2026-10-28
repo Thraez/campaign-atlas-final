@@ -343,11 +343,15 @@ describe("I1 — Connections section: DM mode shows all relationship channels", 
 //   B. Real %%...%% and :::dm::: blocks in merged prose are stripped by the player pipeline
 
 import { mergeImportFrontmatter } from "@/atlas/import/mergeImportFrontmatter";
+import { readNote } from "@/atlas/content/readNote";
 import { stripDmBlocks } from "@/atlas/content/dmMarkup";
 
 describe("K1 — re-import merge: never auto-exposes, strips real DM blocks", () => {
   it("DM-only entity re-synced from a visibility-less vault copy stays dm (channel A)", () => {
-    const disk = { data: { atlas: { id: "villain", visibility: "dm" } }, content: "secret plans" };
+    const disk = readNote(
+      "---\natlas:\n  id: villain\n  visibility: dm\n---\nsecret plans\n",
+      "content/w/npcs/villain.md",
+    );
     const vault = { data: { atlas: {} }, content: "updated public lore %%dm only note%%" };
     const r = mergeImportFrontmatter({ disk, vault, inferredType: "npc", baseType: "npc" });
     expect((r.data.atlas as Record<string, unknown>).visibility).toBe("dm");

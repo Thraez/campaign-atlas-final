@@ -1,6 +1,6 @@
 # One Note reading module for id, title, type and visibility
 
-Status: ready-for-agent
+Status: done
 Blocked by: 01, 02, 04
 Area: build, Sync, safety scans
 
@@ -14,3 +14,72 @@ Deepening: one browser-safe `readNote(raw, relPath)` plus one content-folder sca
 - Title, id and type come out identical from all callers for a fixture set covering untitled, flat-`type:` and `_dm/` notes.
 - A lint rule or test finds no visibility literal list outside `visibility.ts`.
 - Safety scans and `atlas:publish` pass.
+
+## Comments
+
+- 2026-10-28, agent (Opus): Status: done — build complete, review pending. `readNote` and
+  `scanContentFolder` live in `src/atlas/content/`; `scripts/atlas/readContentFiles.ts` does the
+  file reading; `scripts/atlas/noteIdentity.ts` and gray-matter in the build are gone. Build,
+  Staging, merge and the derived scan all read notes through `readNote`. Guard test:
+  `src/test/visibility-single-source.test.ts`; parity: `src/test/note-reading-parity.test.ts`.
+  `atlas:publish` itself was not run (overnight rule); its parts were.
+- Where callers disagreed, the stricter answer won:
+  - Staging and merge: an invalid `atlas.visibility` beside `publish: true` was player; now dm
+    (the build's answer).
+  - Staging: an invalid tag or malformed YAML in a note from `01_Lore`/`02_Regions` took the
+    folder's player default; now dm. The folder default still fills in for untagged, readable notes.
+  - Derived scan: notes in excluded folders (`_dm/`, `_drafts/` ...) or missed by `include` counted
+    only when tagged secret; now always secret, as the build's cross-reference check treats them.
+  - Derived scan used `atlas.id ?? slug` (an empty id gave ""); now the build's `||`. Staging's
+    `atlas.id: ""` likewise now falls to the sync map or slug.
+  - Type: the build now trims `type`.
+  - An unreadable file in an excluded folder was skipped by the build; reading now fails loud.
+  - Merge's exposure check kept its wider rule (`publish: true` beside dm still asks for review).
+- 2026-10-28, agent (Opus), after three reviews (Standards, Spec, player safety):
+  - Fixed a leak: the editor's parser read past a line like `---x: 1` that gray-matter treats as
+    the end of the frontmatter, so keys below it (`atlas.visibility: player`) shipped a note main
+    kept dm. Now the first line starting with `---` must be a clean fence (`---` plus optional
+    spaces) or the note fails to parse, which is dm. The parser moved to
+    `src/atlas/content/frontmatter.ts`; `import/frontmatter.ts` re-exports it.
+  - Title: back to main's rule per caller (the hybrid rule was scope creep and lost redactions).
+    `readNote` gives the build's title: filename with dashes and underscores as spaces, each word
+    capitalised.
+  - The build's cross-reference index and its warning scrubber now treat dashes, underscores and
+    spaces alike, in any case: `[[Khal Azum]]`, `[[Khal_Azum]]` and `[[khal-azum]]` all resolve
+    to a secret "Khal_Azum" and are redacted in the build itself. Exact names still win; when a
+    loose name has several owners, a secret one wins (redact), else the link stays broken.
+  - `parseObsidian.ts` was used only by tests: deleted with its tests (ticket 07 had flagged it).
+  - `aliases` is on `Note`; `ParsedFile.atlas` no longer carries a second visibility answer.
+  - An ESLint rule (`no-restricted-syntax`) flags any array with two or more visibility strings
+    outside `visibility.ts` and tests. Known gap: comparison chains (`v === "player" || ...`).
+  - `PLAYER_VISIBLE_VISIBILITY` has one name everywhere (the `PLAYER_VISIBLE` shim alias is gone).
+- Intended differences, pinned in `src/test/note-reading-parity.test.ts`:
+  - Title of a note with no frontmatter title and a hand-typed filename: Staging keeps
+    "Isle de Marque" (code-retro 02), the build says "Isle De Marque". Commit writes Staging's
+    title into the note, after which the build reads the same one. Ids are equal either way.
+  - Type of an untyped note: the build says `note`; Staging guesses from tags, then the folder,
+    then `lore`, and commit writes the guess.
+  - An untagged note from a public vault folder (`01_Lore`, `02_Regions`): Staging shows the
+    folder default `player` and commit writes it; until commit the build reads it as dm.
+- 2026-10-28, agent (Opus), after the second safety review: fixed a second leak. gray-matter
+  (main's build) opens frontmatter on any first line starting with `---` (`--- `, `---yaml`) and
+  runs an unclosed block to the end of the file; the branch's parser saw "no frontmatter" there,
+  so the note lost its title, aliases and `atlas.id` and a player `[[Real Name]]` link to it was
+  neither resolved nor redacted. Now a first line starting with `---` must be a clean fence and
+  must be closed, or the note fails to parse, and the build and the derived scan stop naming the
+  file, in every folder. Tests: `src/test/frontmatter-fail-closed.test.ts` (the review repro
+  through the player build and the derived scan, each broken form in `notes/`, `_dm/` and
+  `_drafts/`, and a gray-matter parity sweep: same keys or a parse error).
+- Side-by-side against main (49 inputs): two looser results, both a fence with trailing spaces
+  (`---  ` closing, `--- ` opening). Staging and merge said dm on main (their parser wanted a bare
+  `---`); they now read it like the build, which already accepted it on main. Build output is
+  unchanged.
+- Left as they are:
+  - The derived scan treats every `_drafts/` note as secret, so a draft that shares a name with a
+    player note can give a false positive. Safe side; rename or tag around it.
+  - `Note` is wide (data, atlas block, body and the identity fields). Narrowing it waits until a
+    second caller needs less.
+  - One badly formed note anywhere, `_dm/` and `_drafts/` included, now stops the build and so the
+    publish (fail closed). The coordinator logged this as a provisional call.
+- 2026-10-28, agent (Opus): with main merged in (95ce5ad), the full local gate and a real
+  `npm run atlas:publish` pass: all 13 scans clean, check-secrets and check-derived clean on dist.

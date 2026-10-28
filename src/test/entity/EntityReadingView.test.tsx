@@ -153,7 +153,7 @@ describe("EntityReadingView", () => {
         </ViewModeProvider>
       </MemoryRouter>,
     );
-    // "rumor" is in PLAYER_VISIBLE so the pre-publish warning banner must be absent.
+    // "rumor" is in PLAYER_VISIBLE_VISIBILITY so the pre-publish warning banner must be absent.
     expect(screen.queryByText(/not yet visible to players/i)).not.toBeInTheDocument();
   });
 

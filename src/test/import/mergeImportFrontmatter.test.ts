@@ -1,27 +1,39 @@
 import { describe, it, expect } from "vitest";
 import {
-  resolveEffectiveVisibility,
   detectExposureIncrease,
   resolveType,
   mergeImportFrontmatter,
 } from "@/atlas/import/mergeImportFrontmatter";
+import { readNote } from "@/atlas/content/readNote";
+import { stringifyFrontmatter } from "@/atlas/import/frontmatter";
 
-describe("resolveEffectiveVisibility (mirrors build-atlas.ts:345)", () => {
+/** The disk copy as the merge gets it: read with readNote, as the build reads it. */
+const diskNote = (data: Record<string, unknown>, content = "body") =>
+  readNote(stringifyFrontmatter(content, data), "content/w/npcs/x.md");
+
+describe("merge keeps the disk visibility the build would give it (readNote)", () => {
+  const vault = { data: { atlas: {} }, content: "v" };
+  const merged = (atlas: Record<string, unknown>) =>
+    mergeImportFrontmatter({
+      disk: diskNote({ atlas }),
+      vault,
+      inferredType: "npc",
+      baseType: "npc",
+    }).diskVisibility;
+
   it("uses explicit visibility when valid", () => {
-    expect(resolveEffectiveVisibility({ visibility: "dm" })).toBe("dm");
-    expect(resolveEffectiveVisibility({ visibility: "rumor" })).toBe("rumor");
-    expect(resolveEffectiveVisibility({ visibility: "hidden" })).toBe("hidden");
-    expect(resolveEffectiveVisibility({ visibility: "player" })).toBe("player");
+    for (const v of ["dm", "rumor", "hidden", "player"]) expect(merged({ visibility: v })).toBe(v);
   });
   it("defaults to dm when no visibility (ADR-0001)", () => {
-    expect(resolveEffectiveVisibility({})).toBe("dm");
-    expect(resolveEffectiveVisibility({ publish: false })).toBe("dm");
+    expect(merged({})).toBe("dm");
+    expect(merged({ publish: false })).toBe("dm");
   });
   it("treats the legacy publish: true as player", () => {
-    expect(resolveEffectiveVisibility({ publish: true })).toBe("player");
+    expect(merged({ publish: true })).toBe("player");
   });
-  it("ignores an invalid visibility string and falls back to dm", () => {
-    expect(resolveEffectiveVisibility({ visibility: "bogus" })).toBe("dm");
+  it("an invalid visibility is dm, even with publish: true (the build's answer)", () => {
+    expect(merged({ visibility: "bogus" })).toBe("dm");
+    expect(merged({ visibility: "bogus", publish: true })).toBe("dm");
   });
 });
 
@@ -83,7 +95,7 @@ const fm = (data: Record<string, unknown>, content = "body") => ({ data, content
 
 describe("mergeImportFrontmatter (disk-base merge)", () => {
   it("preserves atlas-owned keys verbatim incl. unknown + legacy x/y", () => {
-    const disk = fm(
+    const disk = diskNote(
       {
         atlas: {
           id: "corven",
@@ -114,7 +126,7 @@ describe("mergeImportFrontmatter (disk-base merge)", () => {
   });
 
   it("always writes an explicit visibility = disk effective (never omitted)", () => {
-    const disk = fm({ atlas: { id: "x", publish: false } });
+    const disk = diskNote({ atlas: { id: "x", publish: false } });
     const vault = fm({ atlas: {} });
     const r = mergeImportFrontmatter({ disk, vault, inferredType: "note", baseType: "note" });
     expect((r.data.atlas as Record<string, unknown>).visibility).toBe("dm");
@@ -123,7 +135,7 @@ describe("mergeImportFrontmatter (disk-base merge)", () => {
   });
 
   it("flags exposure increase but keeps disk visibility in the data", () => {
-    const disk = fm({ atlas: { id: "x", visibility: "dm" } });
+    const disk = diskNote({ atlas: { id: "x", visibility: "dm" } });
     const vault = fm({ atlas: { publish: true } });
     const r = mergeImportFrontmatter({ disk, vault, inferredType: "note", baseType: "note" });
     expect(r.exposureIncrease).toBe(true);
@@ -131,7 +143,7 @@ describe("mergeImportFrontmatter (disk-base merge)", () => {
   });
 
   it("top-level Obsidian props: vault wins (and deletions propagate)", () => {
-    const disk = fm({ role: "stale", title: "Old", atlas: { id: "x", visibility: "dm" } });
+    const disk = diskNote({ role: "stale", title: "Old", atlas: { id: "x", visibility: "dm" } });
     const vault = fm({ role: "active", title: "New", atlas: {} });
     const r = mergeImportFrontmatter({ disk, vault, inferredType: "note", baseType: "note" });
     expect(r.data.role).toBe("active");
@@ -139,7 +151,7 @@ describe("mergeImportFrontmatter (disk-base merge)", () => {
   });
 
   it("unions tags/aliases and appends the resolved type as a tag", () => {
-    const disk = fm({ atlas: { id: "x", visibility: "dm", tags: ["a"], aliases: ["A1"] } });
+    const disk = diskNote({ atlas: { id: "x", visibility: "dm", tags: ["a"], aliases: ["A1"] } });
     const vault = fm({ atlas: { tags: ["b"], aliases: ["A2"] } });
     const r = mergeImportFrontmatter({ disk, vault, inferredType: "npc", baseType: "npc" });
     const a = r.data.atlas as Record<string, unknown>;
@@ -148,7 +160,7 @@ describe("mergeImportFrontmatter (disk-base merge)", () => {
   });
 
   it("disk has no atlas block — merge still safe (new entity with vault data)", () => {
-    const disk = fm({ title: "New Entity" });
+    const disk = diskNote({ title: "New Entity" });
     const vault = fm({ atlas: { summary: "intro" } }, "Content here");
     const r = mergeImportFrontmatter({ disk, vault, inferredType: "lore", baseType: undefined });
     const a = r.data.atlas as Record<string, unknown>;

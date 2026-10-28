@@ -103,7 +103,7 @@ describe("projectEntityForPlayer — branch gaps (N34)", () => {
   });
 
   it("rumor-visibility entity is NOT in secretIds — wikilink to it is preserved (security invariant)", () => {
-    // PLAYER_VISIBLE = { "player", "rumor" }; rumor entities must not be redacted.
+    // PLAYER_VISIBLE_VISIBILITY = { "player", "rumor" }; rumor entities must not be redacted.
     const rumor = ent({ id: "ghost", title: "The Ghost", visibility: "rumor" });
     const pub = ent({ id: "npc", title: "NPC", visibility: "player",
       body: "Seen near [[The Ghost]]." });

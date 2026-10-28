@@ -18,7 +18,9 @@ import {
   DEFAULT_RESOLVE_ASSET,
   extractImageEmbedFilenames,
 } from "../src/atlas/content/renderEntityMarkdown";
-import { parseFrontmatter, type ParsedFile } from "./atlas/parseFrontmatter";
+import { parseNoteFields, type ParsedFile } from "./atlas/parseFrontmatter";
+import { readContentFiles } from "./atlas/readContentFiles";
+import { scanContentFolder } from "../src/atlas/content/scanContentFolder";
 import {
   secretMarkerIds,
   stripDmBlocks,
@@ -26,7 +28,6 @@ import {
   stripSecretMarkers,
 } from "../src/atlas/content/dmMarkup";
 import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
-import { slugify } from "./atlas/slugify";
 import { loadWorldConfig, projectAssetCredits } from "./atlas/loadWorldConfig";
 import { CURRENT_ATLAS_SCHEMA_VERSION } from "./atlas/schemaVersion";
 import { sanitizeAtlasHtml } from "../src/atlas/sanitizeHtml";
@@ -40,10 +41,7 @@ import {
 import { parseAtlasDate } from "./atlas/calendarDate";
 import { buildEntitySecrets } from "./atlas/buildSecrets";
 import yaml from "js-yaml";
-import { PLAYER_VISIBLE } from "./atlas/visibility";
-import { deriveTitle, isSecretNote, resolveVisibility } from "./atlas/noteIdentity";
-
-export { deriveTitle };
+import { PLAYER_VISIBLE_VISIBILITY } from "./atlas/visibility";
 import { isLit } from "../src/atlas/fog/effectiveLit";
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
 import { filterSoundscapeForPlayer } from "./atlas/filterSoundscape";
@@ -136,7 +134,6 @@ type Pending = {
  * public-entry → DM-target spoiler leaks.
  */
 type AllParsed = {
-  file: string;
   rel: string;
   parsed: ParsedFile;
   title: string;
@@ -176,68 +173,6 @@ function loadConfig(configPath: string): Config {
   return parsed as Config;
 }
 
-function walk(
-  dir: string,
-  contentRoot: string,
-  include: string[],
-  exclude: string[],
-  scanned: { excludedFiles: number; excludedPaths: string[] },
-): string[] {
-  const out: string[] = [];
-  if (!fs.existsSync(dir)) return out;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    const contentRel = path.relative(contentRoot, full).replace(/\\/g, "/");
-    if (matchAny(contentRel, exclude)) {
-      if (entry.isDirectory()) {
-        const all = listMd(full);
-        scanned.excludedFiles += all.length;
-        scanned.excludedPaths.push(...all);
-      } else if (entry.name.endsWith(".md")) {
-        scanned.excludedFiles += 1;
-        scanned.excludedPaths.push(full);
-      }
-      continue;
-    }
-    if (entry.isDirectory()) {
-      out.push(...walk(full, contentRoot, include, exclude, scanned));
-    } else if (entry.name.endsWith(".md")) {
-      // include globs only filter files (not dirs); empty list = include all.
-      if (include.length > 0 && !matchAny(contentRel, include)) {
-        scanned.excludedFiles += 1;
-        scanned.excludedPaths.push(full);
-        continue;
-      }
-      out.push(full);
-    }
-  }
-  return out;
-}
-
-function listMd(dir: string): string[] {
-  const out: string[] = [];
-  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    const f = path.join(dir, e.name);
-    if (e.isDirectory()) out.push(...listMd(f));
-    else if (e.name.endsWith(".md")) out.push(f);
-  }
-  return out;
-}
-
-function matchAny(target: string, globs: string[]): boolean {
-  return globs.some((g) => globToRegExp(g).test(target));
-}
-
-function globToRegExp(glob: string): RegExp {
-  const escaped = glob
-    .replace(/[.+^${}()|\\]/g, "\\$&")
-    .replace(/\*\*/g, "::DSTAR::")
-    .replace(/\*/g, "[^/]*")
-    .replace(/::DSTAR::/g, ".*")
-    .replace(/\?/g, ".");
-  return new RegExp(`^${escaped}$`);
-}
-
 function relImage(p: string): string {
   // Normalize "assets/..." paths to public output
   return p.replace(/^\/+/, "");
@@ -256,11 +191,33 @@ function scrubSecretNames(warnings: string[], secretNames: Set<string>): string[
     .filter((n) => typeof n === "string" && n.length >= 3)
     .sort((a, b) => b.length - a.length);
   if (names.length === 0) return warnings.slice();
+  // Any letter case, and dashes, underscores and spaces interchangeable, as
+  // the cross-reference index matches them (code-retro 06): a warning quoting
+  // `[[Khal_Azum]]` must lose it when the secret is titled "Khal Azum".
+  const patterns = names.map((n) => looseNamePattern(n));
   return warnings.map((w) => {
     let out = w;
-    for (const n of names) out = out.split(n).join("…");
+    for (const re of patterns) out = out.replace(re, "…");
     return out;
   });
+}
+
+/** A name with case, dashes, underscores and runs of spaces folded away. */
+function looseNameKey(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[-_\s]+/g, " ")
+    .trim();
+}
+
+/** Matches `name` in any case, with dashes, underscores and spaces interchangeable. */
+function looseNamePattern(name: string): RegExp {
+  const parts = name
+    .trim()
+    .split(/[-_\s]+/)
+    .map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return new RegExp(parts.join("[-_\\s]+"), "gi");
 }
 
 export interface BuildFlags {
@@ -340,8 +297,18 @@ async function runBuildCore(flags: BuildFlags) {
   const cfg = loadConfig(configPath);
   const contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
 
-  const scanInfo = { excludedFiles: 0, excludedPaths: [] as string[] };
-  const files = walk(contentDir, contentDir, cfg.include ?? [], cfg.exclude ?? [], scanInfo);
+  // One content-folder scan, shared with the derived-secrets scan: `files`
+  // are the notes the build reads, `scan.excluded` the ones it only knows by
+  // name (`_dm/`, `_drafts/`, ...).
+  const scan = scanContentFolder(readContentFiles(contentDir, ROOT), {
+    include: cfg.include ?? [],
+    exclude: cfg.exclude ?? [],
+  });
+  const files = scan.notes;
+  const scanInfo = {
+    excludedFiles: scan.excluded.length,
+    excludedPaths: scan.excluded.map((n) => path.resolve(ROOT, n.relPath)),
+  };
 
   // Load world config up-front so entity parsing can resolve dates against
   // the in-world calendar.
@@ -403,21 +370,19 @@ async function runBuildCore(flags: BuildFlags) {
   // leak even if the target entity is later excluded from the player build —
   // the display TEXT inside the link still ships and reveals the name.
   const allParsed: AllParsed[] = [];
-  for (const file of files) {
-    const rel = path.relative(ROOT, file).replace(/\\/g, "/");
-    const raw = fs.readFileSync(file, "utf8");
-    const parsed = parseFrontmatter(raw, rel);
+  for (const note of files) {
+    const rel = note.relPath;
+    const parsed = parseNoteFields(note);
     for (const w of parsed.warnings) {
       if (w.includes("invalid atlas.visibility")) invalidVisibilityCount += 1;
     }
     warnings.push(...parsed.warnings);
 
-    const title = deriveTitle(file, (parsed.data.title as string) ?? undefined);
+    const { title, id, visibility, isSecret } = note;
     if (!title) {
       errors.push(`${rel}: missing title`);
       continue;
     }
-    const id = parsed.atlas.id || slugify(title);
     if (slugSeen.has(id)) {
       duplicateSlugs += 1;
       errors.push(`${rel}: duplicate slug "${id}" also produced by ${slugSeen.get(id)} — skipping`);
@@ -425,9 +390,7 @@ async function runBuildCore(flags: BuildFlags) {
     }
     slugSeen.set(id, rel);
 
-    const visibility = resolveVisibility(parsed.atlas);
-    const isSecret = isSecretNote(parsed.atlas);
-    allParsed.push({ file, rel, parsed, title, id, visibility, isSecret });
+    allParsed.push({ rel, parsed, title, id, visibility, isSecret });
   }
 
   // Cross-reference index: title + aliases → id, covering EVERY parsed entity
@@ -439,15 +402,25 @@ async function runBuildCore(flags: BuildFlags) {
   // guess when a name is ambiguous instead of silently picking the
   // last-registered owner.
   const nameOwners = new Map<string, Set<string>>();
+  // The same names with dashes, underscores and spaces folded together, so
+  // `[[Khal Azum]]`, `[[Khal_Azum]]` and `[[khal-azum]]` all find a note
+  // titled "Khal_Azum" and a link to a secret note is redacted whichever way
+  // the author spelled it (code-retro 06). Used only when the exact name
+  // finds nothing.
+  const looseOwners = new Map<string, Set<string>>();
+  const addOwner = (index: Map<string, Set<string>>, key: string, id: string) => {
+    let owners = index.get(key);
+    if (!owners) {
+      owners = new Set();
+      index.set(key, owners);
+    }
+    owners.add(id);
+  };
   const registerName = (name: string, id: string) => {
     const key = name.toLowerCase();
     crossRefNameIndex.set(key, id);
-    let owners = nameOwners.get(key);
-    if (!owners) {
-      owners = new Set();
-      nameOwners.set(key, owners);
-    }
-    owners.add(id);
+    addOwner(nameOwners, key, id);
+    addOwner(looseOwners, looseNameKey(name), id);
   };
   const allEntityVisibility = new Map<
     string,
@@ -476,33 +449,25 @@ async function runBuildCore(flags: BuildFlags) {
   // a public-entry wikilink to their title would still leak the display text
   // unless we treat them as secret targets in the cross-ref index.
   const excludedIdSeen = new Set<string>();
-  for (const file of scanInfo.excludedPaths) {
-    const rel = path.relative(ROOT, file).replace(/\\/g, "/");
-    let raw: string;
-    try {
-      raw = fs.readFileSync(file, "utf8");
-    } catch {
-      continue;
-    }
-    const parsed = parseFrontmatter(raw, rel);
-    const title = deriveTitle(file, (parsed.data.title as string) ?? undefined);
+  for (const note of scan.excluded) {
+    const { title, id, aliases } = note;
     if (!title) continue;
-    const id = parsed.atlas.id || slugify(title);
     if (slugSeen.has(id) || excludedIdSeen.has(id)) continue;
     excludedIdSeen.add(id);
     registerName(title, id);
-    for (const a of parsed.atlas.aliases ?? []) {
+    for (const a of aliases) {
       registerName(a, id);
     }
     // Folder-excluded files have no published visibility, but for cross-ref
     // purposes they're DM-equivalent: anything wikilinking to them from a
-    // public entry is a spoiler leak.
-    const vis = parsed.atlas.visibility ?? "dm";
+    // public entry is a spoiler leak. The label (warnings only) is the
+    // note's own tag, or dm when it has none.
+    const vis = typeof note.atlas.visibility === "string" ? note.visibility : "dm";
     allEntityVisibility.set(id, vis);
     secretEntityIds.add(id);
     secretNames.add(title);
     secretNames.add(id);
-    for (const a of parsed.atlas.aliases ?? []) secretNames.add(a);
+    for (const a of aliases) secretNames.add(a);
   }
 
   // PASS 2: build entities for pending, filtering out secrets in player mode
@@ -543,14 +508,23 @@ async function runBuildCore(flags: BuildFlags) {
 
   // Wikilink resolution uses the FULL cross-reference index (including
   // DM/hidden entities) so we can detect public-entry → DM-target leaks.
-  const resolveByName = (n: string) => crossRefNameIndex.get(n.trim().toLowerCase());
+  // Loose fallback: one owner wins outright; among several, a secret one
+  // wins so the link is redacted (fail closed); otherwise it stays broken.
+  const resolveLoose = (n: string) => {
+    const owners = looseOwners.get(looseNameKey(n));
+    if (!owners || owners.size === 0) return undefined;
+    if (owners.size === 1) return [...owners][0];
+    return [...owners].find((id) => secretEntityIds.has(id));
+  };
+  const resolveByName = (n: string) =>
+    crossRefNameIndex.get(n.trim().toLowerCase()) ?? resolveLoose(n);
   // Folder-path fallback (Q49): resolves a basename against the same index,
   // but refuses (returns undefined) when that name is owned by more than one
   // distinct entity — an ambiguous basename must stay broken, never guessed.
   const resolveByBasename = (n: string) => {
     const key = n.trim().toLowerCase();
     if ((nameOwners.get(key)?.size ?? 0) > 1) return undefined;
-    return crossRefNameIndex.get(key);
+    return crossRefNameIndex.get(key) ?? resolveLoose(n);
   };
 
   const backlinkMap = new Map<string, Map<string, string>>();
@@ -687,7 +661,7 @@ async function runBuildCore(flags: BuildFlags) {
   if (flags.player) {
     regions = regions
       .filter((r) => {
-        const keep = PLAYER_VISIBLE.has(r.visibility);
+        const keep = PLAYER_VISIBLE_VISIBILITY.has(r.visibility);
         if (!keep) regionsExcluded += 1;
         return keep;
       })
@@ -718,7 +692,7 @@ async function runBuildCore(flags: BuildFlags) {
           ? [{ mapId: undefined, x: item.legacy.x, y: item.legacy.y }]
           : [];
     if (list.length === 0) continue;
-    if (flags.player && !PLAYER_VISIBLE.has(entity.visibility)) {
+    if (flags.player && !PLAYER_VISIBLE_VISIBILITY.has(entity.visibility)) {
       secretPlacementsExcluded += list.length;
       continue;
     }
@@ -767,16 +741,16 @@ async function runBuildCore(flags: BuildFlags) {
   let routeWaypointMisses = 0;
   const routes: Route[] = [];
   for (const r of worldCfg?.routes ?? []) {
-    if (flags.player && !PLAYER_VISIBLE.has(r.visibility)) {
+    if (flags.player && !PLAYER_VISIBLE_VISIBILITY.has(r.visibility)) {
       routesExcluded += 1;
       continue;
     }
     // Spoiler-leak: player-visible route mentions a DM/hidden/unknown entity.
-    if (PLAYER_VISIBLE.has(r.visibility)) {
+    if (PLAYER_VISIBLE_VISIBILITY.has(r.visibility)) {
       for (const w of r.waypoints) {
         if (Array.isArray(w)) continue;
         const targetVis = entityVisibility.get(w.entityId);
-        if (!targetVis || !PLAYER_VISIBLE.has(targetVis)) {
+        if (!targetVis || !PLAYER_VISIBLE_VISIBILITY.has(targetVis)) {
           routeLeaks += 1;
           warnings.push(
             `route "${r.id}": player-visible route routes through ${targetVis ? `${targetVis} entity` : "unknown entity"} "${w.entityId}" — spoiler leak`,
@@ -885,9 +859,9 @@ async function runBuildCore(flags: BuildFlags) {
   //
   // Region leak detection: player-visible region linked to DM/hidden/unknown entity.
   for (const r of regions) {
-    if (!PLAYER_VISIBLE.has(r.visibility) || !r.entityId) continue;
+    if (!PLAYER_VISIBLE_VISIBILITY.has(r.visibility) || !r.entityId) continue;
     const targetVis = entityVisibility.get(r.entityId);
-    if (!targetVis || !PLAYER_VISIBLE.has(targetVis)) {
+    if (!targetVis || !PLAYER_VISIBLE_VISIBILITY.has(targetVis)) {
       regionLeaks += 1;
       warnings.push(
         `region "${r.id}": player-visible region links to ${targetVis ? `${targetVis} entity` : "unknown entity"} "${r.entityId}" — spoiler leak`,

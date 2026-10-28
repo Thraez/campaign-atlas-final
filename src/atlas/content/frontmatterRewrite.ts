@@ -1,4 +1,4 @@
-import { parseFrontmatter, stringifyFrontmatter } from "@/atlas/import/frontmatter";
+import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter";
 
 export interface AtlasFieldPatch {
   /** Top-level `title`, written first. */

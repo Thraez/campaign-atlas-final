@@ -31,6 +31,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { StagingRow } from "./stagingState";
 import type { ImportFolderConfig } from "../content/schema";
+import { ALL_VISIBILITY } from "../content/visibility";
 
 export interface ImportStagingModalProps {
   open: boolean;
@@ -221,7 +222,7 @@ export function ImportStagingModal({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {["player", "dm", "hidden", "rumor"].map((v) => (
+                              {ALL_VISIBILITY.map((v) => (
                                 <SelectItem key={v} value={v} className="text-[11px]">
                                   {v}
                                 </SelectItem>

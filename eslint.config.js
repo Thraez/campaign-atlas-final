@@ -4,6 +4,23 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
+// Guardrail (code-retro 06): every list of visibility values comes from
+// src/atlas/content/visibility.ts. Flags an array literal holding two or more
+// visibility strings, in any position. src/test/visibility-single-source.test.ts
+// backs it up and names what neither catches.
+const VISIBILITY_LITERAL = "Literal[value=/^(player|rumor|dm|hidden)$/]";
+const NO_VISIBILITY_LIST = {
+  selector: `ArrayExpression > ${VISIBILITY_LITERAL} ~ ${VISIBILITY_LITERAL}`,
+  message:
+    "Visibility lists live in src/atlas/content/visibility.ts. Import ALL_VISIBILITY, VISIBILITY_MENU_ORDER, PLAYER_VISIBLE_VISIBILITY or a helper instead.",
+};
+const NO_REQUIRE = {
+  selector: "CallExpression[callee.name='require']",
+  message:
+    "require() is banned in this ESM project — it crashes the bundled vite.config/save server. Use `import` or `await import()`.",
+};
+const VISIBILITY_EXEMPT = ["src/atlas/content/visibility.ts", "src/test/**", "**/*.test.{ts,tsx}"];
+
 export default tseslint.config(
   { ignores: ["dist", ".claude/**", "dist-ssr", "coverage"] },
   {
@@ -32,15 +49,19 @@ export default tseslint.config(
       // `await import()` (lazy/browser-safe paths) instead. Distinct from
       // @typescript-eslint/no-require-imports so a copied disable comment
       // can't silently reintroduce the crash.
-      "no-restricted-syntax": [
-        "error",
-        {
-          selector: "CallExpression[callee.name='require']",
-          message:
-            "require() is banned in this ESM project — it crashes the bundled vite.config/save server. Use `import` or `await import()`.",
-        },
-      ],
+      "no-restricted-syntax": ["error", NO_REQUIRE, NO_VISIBILITY_LIST],
     },
+  },
+  {
+    // The same visibility-list guardrail for plain JavaScript (Node scripts).
+    files: ["**/*.{js,cjs,mjs}"],
+    languageOptions: { ecmaVersion: 2022, sourceType: "module" },
+    rules: { "no-restricted-syntax": ["error", NO_VISIBILITY_LIST] },
+  },
+  {
+    // visibility.ts is where the lists live; tests spell values out on purpose.
+    files: VISIBILITY_EXEMPT,
+    rules: { "no-restricted-syntax": ["error", NO_REQUIRE] },
   },
   {
     // Guardrail: these are the player-graph entry modules — main.tsx, App.tsx,

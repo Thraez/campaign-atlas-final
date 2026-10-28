@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
-import { isSecretVisibility } from "@/atlas/content/visibility";
+import { isSecretVisibility, VISIBILITY_MENU_ORDER } from "@/atlas/content/visibility";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type {
   AtlasProject,
@@ -1658,7 +1658,7 @@ function AtlasPlacementEditorInner() {
                           <SelectValue placeholder="visibility" />
                         </SelectTrigger>
                         <SelectContent>
-                          {["all", "player", "rumor", "dm", "hidden"].map((v) => (
+                          {["all", ...VISIBILITY_MENU_ORDER].map((v) => (
                             <SelectItem key={v} value={v} className="text-xs">
                               {v}
                             </SelectItem>

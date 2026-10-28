@@ -1,26 +1,22 @@
 import type { EntityVisibility } from "@/atlas/content/schema";
+import type { Note } from "@/atlas/content/readNote";
+import { isPlayerVisible, isValidVisibility } from "@/atlas/content/visibility";
 import type { ParsedFrontmatter } from "./frontmatter";
 
-const VALID_VIS = new Set<EntityVisibility>(["player", "dm", "hidden", "rumor"]);
-const PLAYER_VISIBLE = new Set<EntityVisibility>(["player", "rumor"]);
-
-/** Effective visibility build-atlas.ts would derive from a frontmatter atlas block (ADR-0001). */
-export function resolveEffectiveVisibility(atlas: Record<string, unknown>): EntityVisibility {
-  const v = atlas.visibility;
-  if (typeof v === "string" && VALID_VIS.has(v as EntityVisibility)) return v as EntityVisibility;
-  return atlas.publish === true ? "player" : "dm";
-}
-
-/** True iff disk is hidden-tier AND the vault copy would expose it to players. */
+/**
+ * True iff disk is hidden-tier AND the vault copy asks for any player
+ * exposure: a player-visible tag, or `publish: true` even beside another tag.
+ * Deliberately wider than the vault note's resolved visibility, so anything
+ * that might expose a hidden note goes to review.
+ */
 export function detectExposureIncrease(
   diskEffective: EntityVisibility,
   vaultAtlas: Record<string, unknown>,
 ): boolean {
-  if (PLAYER_VISIBLE.has(diskEffective)) return false;
+  if (isPlayerVisible(diskEffective)) return false;
   const vaultVis = vaultAtlas.visibility;
   const vaultWantsExposure =
-    (typeof vaultVis === "string" && PLAYER_VISIBLE.has(vaultVis as EntityVisibility)) ||
-    vaultAtlas.publish === true;
+    (isValidVisibility(vaultVis) && isPlayerVisible(vaultVis)) || vaultAtlas.publish === true;
   return vaultWantsExposure;
 }
 
@@ -62,7 +58,8 @@ function unionStrings(...sources: unknown[]): string[] {
 }
 
 export interface MergeImportInput {
-  disk: ParsedFrontmatter;
+  /** The disk copy, read with readNote (as the build reads it). */
+  disk: Note;
   vault: ParsedFrontmatter;
   inferredType: string;
   baseType: string | undefined;
@@ -88,9 +85,8 @@ export interface MergeImportResult {
  * 6. Prose always comes from the vault.
  */
 export function mergeImportFrontmatter(input: MergeImportInput): MergeImportResult {
-  const diskData = input.disk.data;
   const vaultData = input.vault.data;
-  const diskAtlas = (diskData.atlas as Record<string, unknown>) ?? {};
+  const diskAtlas = input.disk.atlas;
   const vaultAtlas = (vaultData.atlas as Record<string, unknown>) ?? {};
 
   // (1) Base = disk atlas verbatim
@@ -114,7 +110,7 @@ export function mergeImportFrontmatter(input: MergeImportInput): MergeImportResu
   if (aliases.length > 0) atlas.aliases = aliases;
 
   // (4) Visibility: disk effective, ALWAYS written explicitly
-  const diskVisibility = resolveEffectiveVisibility(diskAtlas);
+  const diskVisibility = input.disk.visibility;
   const exposureIncrease = detectExposureIncrease(diskVisibility, vaultAtlas);
   atlas.visibility = diskVisibility;
 

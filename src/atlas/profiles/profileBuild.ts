@@ -7,7 +7,7 @@
 import type { EntityVisibility } from "@/atlas/content/schema";
 import type { EntityProfile, EntityRelationship, PlayerProfile, DmProfile } from "./profileTypes";
 
-const PLAYER_VIS = new Set<EntityVisibility>(["player", "rumor"]);
+import { PLAYER_VISIBLE_VISIBILITY } from "../content/visibility";
 
 /** Strip the DM half of a profile. Used to produce player-build entities. */
 export function stripDmProfile(profile: EntityProfile | undefined): EntityProfile | undefined {
@@ -95,7 +95,7 @@ export function filterRelationshipsForPlayer(
   const droppedByLeak: EntityRelationship[] = [];
   const unresolved: EntityRelationship[] = [];
   for (const r of rels) {
-    if (!PLAYER_VIS.has(r.visibility)) {
+    if (!PLAYER_VISIBLE_VISIBILITY.has(r.visibility)) {
       droppedByVisibility.push(r);
       continue;
     }
@@ -105,7 +105,7 @@ export function filterRelationshipsForPlayer(
       droppedByLeak.push(r);
       continue;
     }
-    if (!PLAYER_VIS.has(targetVis)) {
+    if (!PLAYER_VISIBLE_VISIBILITY.has(targetVis)) {
       droppedByLeak.push(r);
       continue;
     }

@@ -1,6 +1,12 @@
-import matter from "gray-matter";
+/**
+ * The build's full read of a note: identity (id, title, type, visibility)
+ * comes from `readNote` (src/atlas/content/readNote.ts), shared with Staging,
+ * the merge and the safety scans; this adds the build-only fields
+ * (placements, profile, secrets, ...).
+ */
 import type { EntityVisibility, PinPlacementStyle } from "../../src/atlas/content/schema";
 import type { EntityProfile, EntityRelationship } from "../../src/atlas/profiles/profileTypes";
+import { readNote, type Note } from "../../src/atlas/content/readNote";
 import { isValidVisibility } from "./visibility";
 
 export interface AtlasPlacementSpec {
@@ -32,7 +38,6 @@ export interface AtlasFrontmatter {
   publish?: boolean;
   type?: string;
   world?: string;
-  visibility?: EntityVisibility;
   aliases?: string[];
   images?: string[];
   summary?: string;
@@ -51,29 +56,40 @@ export interface AtlasFrontmatter {
 }
 
 export interface ParsedFile {
+  /**
+   * Identity, visibility and secrecy: the shared answer, and the only one.
+   * `note.visibility` is what the note ships as; `note.visibilityTagged`
+   * says whether the note set it or ADR-0001's dm default did.
+   */
+  note: Note;
   data: Record<string, unknown>;
   atlas: AtlasFrontmatter;
   body: string;
   warnings: string[];
 }
 
+/** Reads and parses one note. Throws on malformed frontmatter YAML. */
 export function parseFrontmatter(raw: string, sourcePath: string): ParsedFile {
-  const warnings: string[] = [];
-  const fm = matter(raw);
-  const data = (fm.data ?? {}) as Record<string, unknown>;
-  const atlasRaw = (data.atlas ?? {}) as Record<string, unknown>;
+  const note = readNote(raw, sourcePath);
+  if (note.parseError !== undefined) {
+    throw new Error(`${sourcePath}: malformed frontmatter: ${note.parseError}`);
+  }
+  return parseNoteFields(note);
+}
 
+/** The build-only fields of a note `readNote` already read. */
+export function parseNoteFields(note: Note): ParsedFile {
+  const sourcePath = note.relPath;
+  const warnings: string[] = [];
+  const data = note.data;
+  const atlasRaw = note.atlas;
+
+  warnIfCommaJammed(atlasRaw.aliases ?? data.aliases, "aliases", sourcePath, warnings);
   const atlas: AtlasFrontmatter = {
     publish: typeof atlasRaw.publish === "boolean" ? atlasRaw.publish : undefined,
-    type: pickString(atlasRaw.type, data.type),
+    type: note.type,
     world: typeof atlasRaw.world === "string" ? atlasRaw.world : undefined,
-    visibility: undefined,
-    aliases: toStringArrayWarnIfCommaJammed(
-      atlasRaw.aliases ?? data.aliases,
-      "aliases",
-      sourcePath,
-      warnings,
-    ),
+    aliases: note.aliases,
     images: toStringArray(atlasRaw.images),
     summary: pickString(atlasRaw.summary, data.summary),
     id: typeof atlasRaw.id === "string" ? atlasRaw.id : undefined,
@@ -97,20 +113,10 @@ export function parseFrontmatter(raw: string, sourcePath: string): ParsedFile {
     secrets: parseSecrets(atlasRaw.secrets, sourcePath, warnings),
   };
 
-  if (typeof atlasRaw.visibility === "string") {
-    if (isValidVisibility(atlasRaw.visibility)) {
-      atlas.visibility = atlasRaw.visibility;
-    } else {
-      // Fail-safe: spoiler protection beats convenience. Invalid visibility
-      // values must NOT silently fall through to the player default.
-      atlas.visibility = "dm";
-      warnings.push(
-        `${sourcePath}: invalid atlas.visibility "${atlasRaw.visibility}" — defaulted to "dm"`,
-      );
-    }
-  }
+  // readNote's own warnings (an invalid visibility) come last, as they always have.
+  warnings.push(...note.warnings);
 
-  return { data, atlas, body: fm.content, warnings };
+  return { note, data, atlas, body: note.body, warnings };
 }
 
 function toStringArray(v: unknown): string[] {
@@ -132,10 +138,19 @@ function toStringArrayWarnIfCommaJammed(
   sourcePath: string,
   warnings: string[],
 ): string[] {
+  warnIfCommaJammed(v, fieldName, sourcePath, warnings);
+  return toStringArray(v);
+}
+
+function warnIfCommaJammed(
+  v: unknown,
+  fieldName: string,
+  sourcePath: string,
+  warnings: string[],
+): void {
   if (typeof v === "string" && v.includes(",")) {
     warnings.push(`${sourcePath}: atlas.${fieldName} should be a YAML list — treated as one tag`);
   }
-  return toStringArray(v);
 }
 
 // First non-empty string among candidates. Used to let vault files keep flat

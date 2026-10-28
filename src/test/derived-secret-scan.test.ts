@@ -174,6 +174,31 @@ describe("derived secrets match what the build ships", () => {
     }
   });
 
+  it("a _dm/ note is guarded even when tagged player: the build never ships it", () => {
+    const v = tempVault({
+      "w/_dm/villain-lair.md": "---\ntitle: Villain Lair\natlas:\n  visibility: player\n---\n",
+    });
+    try {
+      const names = deriveSecretsFromVault(v.config).map((s) => s.name);
+      expect(names).toContain("Villain Lair");
+    } finally {
+      fs.rmSync(v.root, { recursive: true, force: true });
+    }
+  });
+
+  it("a hand-typed hyphenated title is also guarded with spaces", () => {
+    const v = tempVault({
+      "w/rift.md": "---\ntitle: Khal-Azum Rift\natlas:\n  visibility: dm\n---\n",
+    });
+    try {
+      const names = deriveSecretsFromVault(v.config).map((s) => s.name);
+      expect(names).toContain("Khal-Azum Rift");
+      expect(names).toContain("Khal Azum Rift");
+    } finally {
+      fs.rmSync(v.root, { recursive: true, force: true });
+    }
+  });
+
   it("a note with no visibility is dm (ADR-0001), so its title is a secret", () => {
     const v = tempVault({ "w/corven.md": "---\ntitle: Corven Ashmere\n---\n" });
     try {
