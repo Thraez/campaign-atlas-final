@@ -56,7 +56,11 @@ beforeEach(() => {
   vault = path.join(tmp, "vault");
   repo = path.join(tmp, "repo");
   write(vault, "03_Entities/NPCs/Corven.md", CORVEN);
-  write(vault, "03_Entities/NPCs/Placeholder.md", "---\ntitle: Placeholder\n---\nNew.\n");
+  write(
+    vault,
+    "03_Entities/NPCs/Placeholder.md",
+    "---\ntitle: Placeholder\natlas:\n  visibility: player\n---\nNew.\n",
+  );
   write(vault, "01_Lore/History.md", "The old war.\n");
   write(vault, "10_DmNotesAndSecrets/Cabal.md", "secret\n");
   write(repo, `content/${WORLD}/npcs/placeholder.md`, PLACEHOLDER);
@@ -72,9 +76,11 @@ describe("npm run atlas:sync", () => {
     const before = { vault: snapshot(vault), repo: snapshot(repo) };
     const text = await runSyncCli(parseSyncArgs(["--dry-run", vault, "--repo", repo]));
     expect(text).toMatch(/Nothing written/);
-    expect(text).toMatch(/01_Lore\s+1\s+0\s+0\s+0/);
-    expect(text).toMatch(/03_Entities\s+1\s+1\s+0\s+0/);
-    expect(text).toMatch(/total\s+2\s+1\s+0\s+0/);
+    // Columns: create, update, unchanged, held, skipped.
+    expect(text).toMatch(/held\s+skipped/);
+    expect(text).toMatch(/01_Lore\s+1\s+0\s+0\s+0\s+0/);
+    expect(text).toMatch(/03_Entities\s+1\s+1\s+0\s+0\s+0/);
+    expect(text).toMatch(/total\s+2\s+1\s+0\s+0\s+0/);
     expect(text).not.toMatch(/10_Dm/);
     expect({ vault: snapshot(vault), repo: snapshot(repo) }).toEqual(before);
   });
@@ -94,9 +100,58 @@ describe("npm run atlas:sync", () => {
       history: `content/${WORLD}/imports/history.md`,
     });
     const second = await runSyncCli(parseSyncArgs(["--write", vault, "--repo", repo]));
-    expect(second).toMatch(/total\s+0\s+0\s+3\s+0/);
+    expect(second).toMatch(/total\s+0\s+0\s+3\s+0\s+0/);
     expect(second).toMatch(/Nothing to write/);
     expect(snapshot(vault)).toEqual(vaultBefore);
+  });
+
+  describe("a vault note marked dm that updates a player entity", () => {
+    beforeEach(() => {
+      write(
+        vault,
+        "03_Entities/NPCs/Placeholder.md",
+        "---\ntitle: Placeholder\natlas:\n  visibility: dm\n---\nThe secret.\n",
+      );
+    });
+
+    it("--dry-run shows it in the held column and names it", async () => {
+      const text = await runSyncCli(parseSyncArgs(["--dry-run", vault, "--repo", repo]));
+      expect(text).toMatch(/03_Entities\s+1\s+0\s+0\s+1\s+0/);
+      expect(text).toMatch(/03_Entities\/NPCs\/Placeholder\.md.*vault-more-secret/);
+    });
+
+    it("--write refuses with the list and writes nothing", async () => {
+      const before = snapshot(repo);
+      await expect(runSyncCli(parseSyncArgs(["--write", vault, "--repo", repo]))).rejects.toThrow(
+        /Refused[\s\S]*03_Entities\/NPCs\/Placeholder\.md/,
+      );
+      expect(snapshot(repo)).toEqual(before);
+    });
+
+    it("--write --skip-held writes the rest and leaves the held note alone", async () => {
+      const text = await runSyncCli(
+        parseSyncArgs(["--write", vault, "--repo", repo, "--skip-held"]),
+      );
+      expect(text).toMatch(/Wrote 2 file/);
+      expect(text).toMatch(/Left out[\s\S]*Placeholder\.md/);
+      expect(fs.readFileSync(path.join(repo, `content/${WORLD}/npcs/placeholder.md`), "utf8")).toBe(
+        PLACEHOLDER,
+      );
+    });
+  });
+
+  it("a corrupt sync map stops the run with a clear error", async () => {
+    write(repo, ".local-atlas/sync-map.json", "{ not json");
+    await expect(runSyncCli(parseSyncArgs(["--dry-run", vault, "--repo", repo]))).rejects.toThrow(
+      /sync-map\.json is not valid JSON/,
+    );
+  });
+
+  it("a corrupt settings file stops the run with a clear error", async () => {
+    write(repo, ".local-atlas/editor-settings.json", "{ not json");
+    await expect(runSyncCli(parseSyncArgs(["--dry-run", vault, "--repo", repo]))).rejects.toThrow(
+      /editor-settings\.json is not valid JSON/,
+    );
   });
 
   it("a dry-run port refuses every write", async () => {

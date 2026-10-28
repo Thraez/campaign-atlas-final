@@ -1214,7 +1214,13 @@ export type VaultImageCopyResult =
   | { ok: true; target: string }
   | {
       ok: false;
-      reason: "not-found" | "outside-candidates" | "too-large" | "unreadable" | "write-failed";
+      reason:
+        | "not-found"
+        | "outside-candidates"
+        | "too-large"
+        | "unreadable"
+        | "write-failed"
+        | "bad-target";
     };
 
 /** How many `-2`, `-3`… names a copy tries before giving up. */
@@ -1288,6 +1294,10 @@ export async function handleVaultImageCopyRequest(
   // pick the extension, so the bytes always match the filename.
   const name = vaultImageTargetName(args.entityId, args.index, resolved.relPath);
   const outDir = path.join(args.publicDir, "atlas", "assets", "images");
+  // The name derives from a note's id: it must stay a plain file in outDir.
+  if (path.dirname(path.resolve(outDir, name)) !== path.resolve(outDir)) {
+    return { ok: false, reason: "bad-target" };
+  }
   let cleaned: Buffer;
   try {
     cleaned = await cleanImageBytes(

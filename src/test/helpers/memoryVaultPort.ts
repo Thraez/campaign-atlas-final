@@ -14,7 +14,7 @@ import type {
   VaultImageCopyRequest,
   VaultImageCopyResult,
   VaultPort,
-} from "./vaultPort";
+} from "@/atlas/sync/vaultPort";
 
 export interface MemoryVaultInit {
   /** Vault-relative path → note text. */

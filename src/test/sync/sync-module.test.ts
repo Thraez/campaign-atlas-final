@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { planSync, commitSync, countByFolder, type SyncWorld } from "@/atlas/sync/sync";
-import { createMemoryVaultPort } from "@/atlas/sync/memoryVaultPort";
+import { createMemoryVaultPort } from "../helpers/memoryVaultPort";
 import type { SyncSource } from "@/atlas/sync/vaultPort";
 import { ConflictError, hashContent } from "@/atlas/save/localFsSave";
 import type { ImportFolderConfig } from "@/atlas/content/schema";
@@ -50,8 +50,8 @@ describe("planSync", () => {
     });
     const plan = await planSync(port, world(), source());
     expect(plan.counts).toEqual([
-      { folder: "01_Lore", create: 1, update: 0, unchanged: 1, skipped: 0 },
-      { folder: "03_Entities", create: 1, update: 1, unchanged: 0, skipped: 0 },
+      { folder: "01_Lore", create: 1, update: 0, unchanged: 1, held: 0, skipped: 0 },
+      { folder: "03_Entities", create: 1, update: 1, unchanged: 0, held: 0, skipped: 0 },
     ]);
   });
 
@@ -213,6 +213,78 @@ describe("commitSync", () => {
       syncMap: { "03_Entities/corven.md": { id: "corven", baseType: "npc", approvedHash: hash } },
     });
     await planSync(port, world(), source());
+    expect(port.writes).toEqual([]);
+  });
+});
+
+// ── code-retro 07 review: safety ─────────────────────────────────────────────
+
+describe("planSync / commitSync safety", () => {
+  const P = "content/w/npcs/corven.md";
+  const PLAYER_CORVEN =
+    "---\ntitle: Corven\natlas:\n  id: corven\n  type: npc\n  visibility: player\n---\nA smuggler.\n";
+  const playerWorld = (): SyncWorld => ({
+    worldId: "w",
+    importConfig,
+    existingById: new Map([["corven", P]]),
+    entityMeta: new Map([
+      ["corven", { visibility: "player" as const, type: "npc", sourcePath: P }],
+    ]),
+  });
+  const secretNote = (title: string) =>
+    `---\ntitle: ${title}\natlas:\n  type: npc\n  visibility: dm\n---\nSECRET: Corven works for the Cabal.\n`;
+
+  it.each([
+    ["same title", { "03_Entities/Corven.md": secretNote("Corven") }, {}],
+    [
+      "a sync-map entry (renamed note)",
+      { "03_Entities/The Traitor.md": secretNote("The Traitor") },
+      {
+        "03_Entities/The Traitor.md": { id: "corven", baseType: "npc", approvedHash: "sha256:old" },
+      },
+    ],
+  ])(
+    "a dm vault note that updates a player entity (%s) is held, and writes dm if approved",
+    async (_label, notes, syncMap) => {
+      const port = createMemoryVaultPort({ notes, atlas: { [P]: PLAYER_CORVEN }, syncMap });
+      const plan = await planSync(port, playerWorld(), source());
+      expect(plan.rows).toHaveLength(1);
+      const [row] = plan.rows;
+      expect(row.rowKind).toBe("update");
+      expect(row.included).toBe(false);
+      expect(row.needsReview).toBeDefined();
+      expect(row.resolvedVisibility).toBe("dm");
+      expect(plan.counts[0]).toMatchObject({ held: 1, update: 0 });
+
+      // A DM who ticks it gets the vault's secrecy, never player.
+      await commitSync(port, [{ ...row, included: true }], plan.source);
+      expect(port.atlas.get(P)).toMatch(/visibility:\s*dm\b/);
+    },
+  );
+
+  it("an embedded image of a note with a traversal id is named inside the images folder", async () => {
+    const port = createMemoryVaultPort({
+      notes: {
+        "03_Entities/evil.md":
+          "---\ntitle: Evil\natlas:\n  id: ../../../../../vault/03_Entities/pwned.x\n  type: npc\n---\n![[p.png]]\n",
+      },
+      images: ["03_Entities/p.png"],
+    });
+    const plan = await planSync(port, world(), source());
+    await commitSync(port, plan.rows, plan.source);
+    expect(port.copiedImages).toHaveLength(1);
+    expect(port.copiedImages[0]).toMatch(/^\/atlas\/assets\/images\/[a-z0-9-]+\.webp$/);
+  });
+
+  it("a picked note does not take the sync-map entry of a note outside the picked folders", async () => {
+    const STUB = "";
+    const hash = await hashContent(STUB);
+    const port = createMemoryVaultPort({
+      notes: { "03_Entities/stub.md": STUB, "01_Lore/real.md": STUB },
+      syncMap: { "01_Lore/real.md": { id: "real", baseType: "lore", approvedHash: hash } },
+    });
+    await planSync(port, world(), source(["03_Entities"]));
+    expect(Object.keys(port.syncMap)).toEqual(["01_Lore/real.md"]);
     expect(port.writes).toEqual([]);
   });
 });

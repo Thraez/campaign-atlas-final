@@ -42,3 +42,15 @@ Deepening: `planSync` / `commitSync` behind a vault port, with three adapters: t
   ```
 
 - Needs Isak: open Sync from Obsidian in the preview pane (`atlas-editor`), scan, check Staging and commit as before.
+
+2026-10-28, review fixes:
+
+- Safety: a vault note that keeps a note from players (dm/hidden, or a secret) while it updates a player entity, matched by title or by sync map, is now held (`needsReview: vault-more-secret`, unticked). Ticking it writes the vault's secrecy. **Consequence:** an untagged note in a dm-default vault folder (03_Entities) that updates a player entity is held too.
+- `atlas:sync --write` refuses with a list when any changed note is held, a path collision, or would show players an entity the atlas keeps from them (`unattendedRefusal` in `sync.ts`). `--skip-held` writes the rest; a row that lowers secrecy still refuses. The table has a `held` column; a dry run lists held notes.
+- Image copy: `vaultImageTargetName` slugifies the entity id, and the plugin's copy handler rejects a target outside the images folder (`bad-target`, 400).
+- A partial-folder scan only moves a sync-map entry whose old path was inside the scanned folders.
+- `fsVaultPort` writes `.local-atlas/` through `handleLocalWriteRequest`; one reader (`readLocalAtlasJson`): missing returns the default, corrupt JSON throws. Uses `SyncSettings`.
+- `buildImportChanges` takes a required `readFile` (no fetch fallback); callers use `existingFileReader(port)`.
+- `memoryVaultPort` moved to `src/test/helpers/`; `sync-safety.test.ts` runs the real scan handler through `planSync`.
+- Sync twice on real data (scratch copy, vault read-only, the four GOALS folders): first `--write` created 184, updated 3, held 0, wrote 187 files, skipped 94 images. After `atlas:build` (190 entities; 4 errors for unbalanced DM fences in vault notes, see below), the dry run: 187 unchanged, 0 create/update/held/skipped. The vault's file times and sizes were identical before and after.
+- Found, not fixed: the rebuild after sync fails validation on 4 synced notes with unbalanced `%%`/`:::dm` fences (blood-moon-circle, the-sovereign-eternal, sister-peline-thrace, the-penitent-of-harkafell). That is vault content.

@@ -29,6 +29,7 @@
  */
 import type { AtlasProject, EntityVisibility, ImportFolderConfig } from "@/atlas/content/schema";
 import { buildImportChanges, ImportCommitError } from "@/atlas/import/buildImportChanges";
+import { makeIgnore } from "@/atlas/import/ignoreRules";
 import { rewriteEmbeds } from "@/atlas/import/resolveVaultImage";
 import {
   buildStagingRows,
@@ -46,6 +47,7 @@ import {
 } from "@/atlas/import/syncMap";
 import { ConflictError, hashContent } from "@/atlas/save/localFsSave";
 import { isWritableSourcePath } from "@/atlas/save/sourcePathAllowlist";
+import { isPlayerVisible, isValidVisibility } from "@/atlas/content/visibility";
 import type { SyncSource, VaultPort } from "./vaultPort";
 
 /** The atlas side a sync works against, taken from the DM build. */
@@ -61,12 +63,14 @@ export interface SyncWorld {
 export interface FolderCounts {
   /** Top-level vault folder, or "(vault root)" for notes at the top. */
   folder: string;
-  /** New entities (a path collision counts here too). */
+  /** New entities. */
   create: number;
   /** Notes that would rewrite an existing entity. */
   update: number;
   /** Notes the sync map says are as last synced. */
   unchanged: number;
+  /** Notes Staging won't tick by default: held for review, or a path collision. */
+  held: number;
   /** Notes that can't be synced: unreadable frontmatter or a target outside the import folders. */
   skipped: number;
 }
@@ -152,6 +156,13 @@ export async function planSync(
   const files = await port.scanVault(source);
   let syncMap = await port.loadSyncMap();
 
+  // A sync-map path this scan could have seen. An entry outside it isn't
+  // "gone from the vault", only unscanned, so nothing may move away from it.
+  const ignored = makeIgnore(source.ignoreGlobs);
+  const scanned = (p: string) =>
+    !ignored(p) &&
+    (source.candidateFolders.length === 0 ||
+      source.candidateFolders.some((f) => p === f || p.startsWith(`${f}/`)));
   const moves: [from: string, to: string][] = [];
   const inputs: RawImportFile[] = [];
   for (const [relPath, raw] of Object.entries(files)) {
@@ -160,7 +171,7 @@ export async function planSync(
     const movedFrom = vaultState === "new" ? findPathByApprovedHash(syncMap, hash) : undefined;
     if (movedFrom) {
       vaultState = "unchanged";
-      if (!(movedFrom in files)) moves.push([movedFrom, relPath]);
+      if (!(movedFrom in files) && scanned(movedFrom)) moves.push([movedFrom, relPath]);
     }
     inputs.push({
       filename: relPath.split("/").pop() ?? relPath,
@@ -204,23 +215,49 @@ export function countByFolder(rows: readonly StagingRow[]): FolderCounts[] {
     const folder = rel.includes("/") ? rel.split("/")[0] : "(vault root)";
     let c = byFolder.get(folder);
     if (!c) {
-      c = { folder, create: 0, update: 0, unchanged: 0, skipped: 0 };
+      c = { folder, create: 0, update: 0, unchanged: 0, held: 0, skipped: 0 };
       byFolder.set(folder, c);
     }
     if (row.parseError !== undefined || !row.pathAllowed) c.skipped += 1;
     else if (row.vaultState === "unchanged") c.unchanged += 1;
+    else if (row.needsReview || row.rowKind === "path-collision") c.held += 1;
     else if (row.rowKind === "update") c.update += 1;
     else c.create += 1;
   }
   return [...byFolder.values()].sort((a, b) => a.folder.localeCompare(b.folder));
 }
 
-export async function commitSync(
-  port: VaultPort,
-  rows: StagingRow[],
-  source: SyncSource | null,
-): Promise<SyncCommitResult> {
-  const readFile = async (path: string): Promise<string> => {
+export interface UnattendedRefusal {
+  /** "lowers-secrecy": writing it would show players an entity the atlas keeps from them. */
+  kind: "lowers-secrecy" | "held";
+  reason: string;
+}
+
+/**
+ * Why a row must not be written without a person looking at it, or null:
+ * held rows (review flags, path collisions), and any update whose written
+ * visibility would show players an entity the atlas keeps from them.
+ */
+export function unattendedRefusal(row: StagingRow, world: SyncWorld): UnattendedRefusal | null {
+  const atlasVis = world.entityMeta?.get(row.resolvedId)?.visibility;
+  if (
+    row.rowKind === "update" &&
+    atlasVis !== undefined &&
+    !isPlayerVisible(atlasVis) &&
+    isValidVisibility(row.resolvedVisibility) &&
+    isPlayerVisible(row.resolvedVisibility)
+  ) {
+    return { kind: "lowers-secrecy", reason: `would show players a ${atlasVis} entity` };
+  }
+  if (row.needsReview)
+    return { kind: "held", reason: `held for review (${row.needsReview.reason})` };
+  if (row.rowKind === "path-collision") return { kind: "held", reason: "path collision" };
+  return null;
+}
+
+/** An existing atlas file's text through the port; a missing or non-content path throws. */
+export function existingFileReader(port: VaultPort): (path: string) => Promise<string> {
+  return async (path) => {
     if (!isWritableSourcePath(path)) {
       throw new ImportCommitError(`Path not in source allowlist: ${path}`, path);
     }
@@ -228,6 +265,14 @@ export async function commitSync(
     if (raw === null) throw new ImportCommitError(`Source file not found: ${path}`, path);
     return raw;
   };
+}
+
+export async function commitSync(
+  port: VaultPort,
+  rows: StagingRow[],
+  source: SyncSource | null,
+): Promise<SyncCommitResult> {
+  const readFile = existingFileReader(port);
 
   // Conflicts first: a commit the save will refuse must not copy images.
   const firstChanges = await buildImportChanges(rows, { readFile });

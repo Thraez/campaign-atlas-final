@@ -26,7 +26,10 @@ export async function readVaultScanReply(resp: Response): Promise<VaultScanReply
   return { ok: false, status: resp.ok ? 500 : resp.status, error };
 }
 
-export function createDevEndpointPort(): VaultPort {
+/** `fetchFn` defaults to the global `fetch`, looked up at call time. */
+export function createDevEndpointPort(
+  fetchFn: typeof fetch = (input, init) => fetch(input, init),
+): VaultPort {
   return {
     async scanVault(source) {
       const params = new URLSearchParams({ vaultRoot: source.vaultRoot });
@@ -34,7 +37,7 @@ export function createDevEndpointPort(): VaultPort {
       for (const f of source.candidateFolders) params.append("folder", f);
       let reply: VaultScanReply;
       try {
-        reply = await readVaultScanReply(await fetch(`/__atlas/vault-scan?${params.toString()}`));
+        reply = await readVaultScanReply(await fetchFn(`/__atlas/vault-scan?${params.toString()}`));
       } catch (err) {
         throw new VaultScanError(0, err instanceof Error ? err.message : String(err));
       }
@@ -43,7 +46,7 @@ export function createDevEndpointPort(): VaultPort {
     },
 
     async copyVaultImage(req) {
-      const resp = await fetch("/__atlas/vault-image-copy", {
+      const resp = await fetchFn("/__atlas/vault-image-copy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(req),
@@ -55,7 +58,9 @@ export function createDevEndpointPort(): VaultPort {
       if (!isWritableSourcePath(path)) {
         throw new ImportCommitError(`Path not in source allowlist: ${path}`, path);
       }
-      const res = await fetch(`/__atlas/read?path=${encodeURIComponent(path)}`, { method: "GET" });
+      const res = await fetchFn(`/__atlas/read?path=${encodeURIComponent(path)}`, {
+        method: "GET",
+      });
       if (res.status === 404) return null;
       if (!res.ok)
         throw new ImportCommitError(`Failed to read ${path}: status ${res.status}`, path);
@@ -66,7 +71,7 @@ export function createDevEndpointPort(): VaultPort {
       return body.contents;
     },
 
-    writeAtlasFiles: (changes) => saveAtlasPatchToLocalFs(changes, undefined, { rebuild: true }),
+    writeAtlasFiles: (changes) => saveAtlasPatchToLocalFs(changes, { fetchFn }, { rebuild: true }),
     loadSyncMap: () => loadSyncMap(),
     saveSyncMap: (map) => saveSyncMap(map),
     async markSynced(at) {

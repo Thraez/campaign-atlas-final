@@ -3,8 +3,8 @@
  *
  * Drives the real seams in the order the editor runs them:
  *   handleVaultScanRequest (GET /__atlas/vault-scan)
- *   → readVaultScanReply → buildStagingRows (Staging)
- *   → buildImportChanges (what the Save endpoint would write under content/)
+ *   → readVaultScanReply → planSync (Staging, sync map, holds)
+ *   → buildImportChanges (what commitSync would write under content/)
  *   → scripts/build-atlas.ts --player (atlas.json, search-index.json).
  *
  * docs/GOALS.md: the vault folders that sync are 01_Lore, 02_Regions,
@@ -18,12 +18,10 @@ import os from "node:os";
 import path from "node:path";
 import { handleVaultScanRequest } from "../../scripts/vite-plugin-atlas-save";
 import { readVaultScanReply } from "@/atlas/sync/devEndpointPort";
-import {
-  buildStagingRows,
-  type RawImportFile,
-  type StagingContext,
-} from "@/atlas/import/stagingState";
+import { existingFileReader, planSync, type SyncWorld } from "@/atlas/sync/sync";
+import type { SyncSource, VaultPort } from "@/atlas/sync/vaultPort";
 import { buildImportChanges } from "@/atlas/import/buildImportChanges";
+import { createMemoryVaultPort } from "./helpers/memoryVaultPort";
 import type { FileChange } from "@/atlas/save/localFsSave";
 import type { ImportFolderConfig } from "@/atlas/content/schema";
 
@@ -76,38 +74,52 @@ interface SyncRun {
   changes: FileChange[];
 }
 
-const stagingCtx = (): StagingContext => ({
+/**
+ * The atlas holds one unrelated entity: planSync refuses an empty DM build,
+ * and nothing in the vault resolves to it, so every note is a create.
+ */
+const WORLD_STATE: SyncWorld = {
   worldId: WORLD,
   importConfig: IMPORT_CONFIG,
-  allowedFolders: new Set([...Object.values(IMPORT_CONFIG.folders), IMPORT_CONFIG.defaultFolder]),
-  existingById: new Map(),
-  existingPaths: new Set(),
-});
+  existingById: new Map([["placeholder", `content/${WORLD}/imports/placeholder.md`]]),
+};
 
-/** A scan reply as Staging inputs, the way planSync makes them. */
-const toInputs = (files: Record<string, string>): RawImportFile[] =>
-  Object.entries(files).map(([vaultRelPath, raw]) => ({
-    filename: vaultRelPath.split("/").pop()!,
-    raw,
-    vaultRelPath,
-  }));
-
-/**
- * Scan → the route's reply as the client reads it → Staging → the changes
- * Save would write. Nothing exists in the atlas yet. The reply is built the
- * way the `/__atlas/vault-scan` route sends it (200, `{ files }`).
- */
-async function runSync(candidateFolders: string[]): Promise<SyncRun> {
-  const scan = await handleVaultScanRequest(vaultRoot, [], candidateFolders);
+/** The route's reply exactly as the editor's dev-endpoint port reads it (200, `{ files }`). */
+async function routeScan(source: SyncSource): Promise<Record<string, string>> {
+  const scan = await handleVaultScanRequest(
+    source.vaultRoot,
+    source.ignoreGlobs,
+    source.candidateFolders,
+  );
   if (!scan.ok) throw new Error(`scan failed: ${scan.error}`);
   const reply = await readVaultScanReply(
     new Response(JSON.stringify({ files: scan.files }), { status: 200 }),
   );
   if (!reply.ok) throw new Error(`client refused the scan: ${reply.error}`);
-  const rows = buildStagingRows(toInputs(reply.files), stagingCtx());
-  const changes = await buildImportChanges(rows);
-  return { scanned: Object.keys(reply.files), changes };
+  return reply.files;
 }
+
+/** planSync → the changes commitSync would write, through a port whose scan is `scan`. */
+async function planChanges(
+  scan: (source: SyncSource) => Promise<Record<string, string>>,
+  candidateFolders: string[],
+): Promise<SyncRun> {
+  const port: VaultPort = { ...createMemoryVaultPort(), scanVault: scan };
+  const plan = await planSync(
+    port,
+    WORLD_STATE,
+    { vaultRoot, ignoreGlobs: [], candidateFolders },
+    { dryRun: true },
+  );
+  const changes = await buildImportChanges(plan.rows, { readFile: existingFileReader(port) });
+  return { scanned: plan.rows.map((r) => r.vaultRelPath!), changes };
+}
+
+/**
+ * The real scan handler on a real vault folder → planSync (Staging, sync
+ * map, holds) → the changes Save would write.
+ */
+const runSync = (candidateFolders: string[]) => planChanges(routeScan, candidateFolders);
 
 function leakedFrom(run: SyncRun, folder: string): string[] {
   const marker = VAULT_NOTES[Object.keys(VAULT_NOTES).find((p) => p.startsWith(`${folder}/`))!];
@@ -206,8 +218,9 @@ describe("Sync from Obsidian with no folders picked (the default)", () => {
     // Backstop behind the ignore list: hand the note to Staging as if a scan
     // had returned it, and check the visibility rule and the build still hold.
     const cabalPath = "10_DmNotesAndSecrets/The Cabal.md";
-    const forced = await buildImportChanges(
-      buildStagingRows(toInputs({ [cabalPath]: VAULT_NOTES[cabalPath] }), stagingCtx()),
+    const { changes: forced } = await planChanges(
+      async () => ({ [cabalPath]: VAULT_NOTES[cabalPath] }),
+      [],
     );
     const cabal = forced.find((c) => c.content.includes(SECRET));
     expect(cabal).toBeDefined();

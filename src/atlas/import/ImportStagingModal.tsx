@@ -297,9 +297,11 @@ export function ImportStagingModal({
                             Review needed —{" "}
                             {row.needsReview.reason === "secrecy-increase"
                               ? "vault wants to expose a DM-only note"
-                              : row.needsReview.reason === "type-conflict"
-                                ? "type changed on both sides"
-                                : "needs your attention"}
+                              : row.needsReview.reason === "vault-more-secret"
+                                ? "vault marks this player note DM-only; ticking it hides it from players"
+                                : row.needsReview.reason === "type-conflict"
+                                  ? "type changed on both sides"
+                                  : "needs your attention"}
                           </Badge>
                         )}
 

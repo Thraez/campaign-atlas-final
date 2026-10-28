@@ -4,6 +4,11 @@
  *   npm run atlas:sync -- --dry-run <vault>   what a sync would do, per vault folder; writes nothing
  *   npm run atlas:sync -- --write <vault>     sync the notes Staging would tick by default
  *
+ * `--write` refuses, listing them, when any note needs review (held in
+ * Staging, a path collision, or a write that would show players something the
+ * atlas keeps from them). `--skip-held` leaves held notes out and writes the
+ * rest; a note that would lower secrecy still refuses the run.
+ *
  * Options: --folder <name> (repeatable; the vault folders to read),
  * --ignore <glob> (repeatable), --world <id>, --repo <path> (default: cwd).
  * Folders and globs default to the editor's saved Sync settings.
@@ -12,35 +17,39 @@
  * tell an update from a create, as the editor does. `--write` does not
  * rebuild: run `npm run atlas:build` afterwards.
  */
-import fs from "node:fs";
 import path from "node:path";
 import type { AtlasProject } from "../src/atlas/content/schema";
 import {
   commitSync,
   planSync,
   syncWorldFromProject,
+  unattendedRefusal,
   type FolderCounts,
 } from "../src/atlas/sync/sync";
+import type { SyncSettings } from "../src/atlas/sync/useSyncSettings";
 import type { SyncSource } from "../src/atlas/sync/vaultPort";
-import { createFsVaultPort } from "./atlas/fsVaultPort";
+import { createFsVaultPort, readLocalAtlasJson } from "./atlas/fsVaultPort";
 
 export interface SyncCliArgs {
   mode: "dry-run" | "write";
   vaultRoot: string;
   repoRoot: string;
   worldId?: string;
+  /** `--write` only: leave held notes out instead of refusing the whole run. */
+  skipHeld?: boolean;
   folders?: string[];
   ignoreGlobs?: string[];
 }
 
 const USAGE =
-  "Usage: npm run atlas:sync -- (--dry-run | --write) <vault> [--folder <name>]... [--ignore <glob>]... [--world <id>] [--repo <path>]";
+  "Usage: npm run atlas:sync -- (--dry-run | --write [--skip-held]) <vault> [--folder <name>]... [--ignore <glob>]... [--world <id>] [--repo <path>]";
 
 export function parseSyncArgs(argv: string[]): SyncCliArgs {
   let mode: SyncCliArgs["mode"] | undefined;
   let vaultRoot: string | undefined;
   let repoRoot = process.cwd();
   let worldId: string | undefined;
+  let skipHeld = false;
   const folders: string[] = [];
   const ignoreGlobs: string[] = [];
   for (let i = 0; i < argv.length; i++) {
@@ -52,6 +61,7 @@ export function parseSyncArgs(argv: string[]): SyncCliArgs {
     };
     if (a === "--dry-run") mode = "dry-run";
     else if (a === "--write") mode = "write";
+    else if (a === "--skip-held") skipHeld = true;
     else if (a === "--folder") folders.push(value());
     else if (a === "--ignore") ignoreGlobs.push(value());
     else if (a === "--world") worldId = value();
@@ -67,17 +77,26 @@ export function parseSyncArgs(argv: string[]): SyncCliArgs {
     vaultRoot: path.resolve(vaultRoot),
     repoRoot: path.resolve(repoRoot),
     worldId,
+    skipHeld,
     folders: folders.length > 0 ? folders : undefined,
     ignoreGlobs: ignoreGlobs.length > 0 ? ignoreGlobs : undefined,
   };
 }
 
 export function formatCounts(counts: FolderCounts[]): string {
-  const total: FolderCounts = { folder: "total", create: 0, update: 0, unchanged: 0, skipped: 0 };
+  const total: FolderCounts = {
+    folder: "total",
+    create: 0,
+    update: 0,
+    unchanged: 0,
+    held: 0,
+    skipped: 0,
+  };
   for (const c of counts) {
     total.create += c.create;
     total.update += c.update;
     total.unchanged += c.unchanged;
+    total.held += c.held;
     total.skipped += c.skipped;
   }
   const rows = [...counts, total];
@@ -85,28 +104,20 @@ export function formatCounts(counts: FolderCounts[]): string {
   const line = (f: string, ...cols: (string | number)[]) =>
     [f.padEnd(width), ...cols.map((c) => String(c).padStart(9))].join("  ");
   return [
-    line("folder", "create", "update", "unchanged", "skipped"),
-    ...rows.map((r) => line(r.folder, r.create, r.update, r.unchanged, r.skipped)),
+    line("folder", "create", "update", "unchanged", "held", "skipped"),
+    ...rows.map((r) => line(r.folder, r.create, r.update, r.unchanged, r.held, r.skipped)),
   ].join("\n");
 }
 
-function readJsonFile<T>(file: string): T | null {
-  try {
-    return JSON.parse(fs.readFileSync(file, "utf8")) as T;
-  } catch {
-    return null;
-  }
-}
-
-/** Runs one sync and returns what to print. Throws on refusal (no DM build, scan failure, conflict). */
+/**
+ * Runs one sync and returns what to print. Throws on refusal: no DM build,
+ * a corrupt `.local-atlas/` file, a scan failure, a conflict, or (with
+ * `--write`) any note that needs a person to look at it.
+ */
 export async function runSyncCli(args: SyncCliArgs): Promise<string> {
-  const localAtlas = path.join(args.repoRoot, ".local-atlas");
-  const project = readJsonFile<AtlasProject>(path.join(localAtlas, "atlas.json"));
+  const project = await readLocalAtlasJson<AtlasProject | null>(args.repoRoot, "atlas.json", null);
   if (!project) throw new Error("No DM build in .local-atlas/ — run `npm run atlas:build` first.");
-  const saved =
-    readJsonFile<{ candidateFolders?: string[]; ignoreGlobs?: string[] }>(
-      path.join(localAtlas, "editor-settings.json"),
-    ) ?? {};
+  const saved = await readLocalAtlasJson<SyncSettings>(args.repoRoot, "editor-settings.json", {});
   const source: SyncSource = {
     vaultRoot: args.vaultRoot,
     candidateFolders: args.folders ?? saved.candidateFolders ?? [],
@@ -123,9 +134,44 @@ export async function runSyncCli(args: SyncCliArgs): Promise<string> {
     ? `Dry run: ${args.vaultRoot} (${scope}) into ${world.worldId}. Nothing written.`
     : `Sync: ${args.vaultRoot} (${scope}) into ${world.worldId}.`;
   const out = [head, "", formatCounts(plan.counts)];
-  const held = plan.rows.filter((r) => r.needsReview).length;
-  if (held > 0) out.push("", `${held} note(s) held for review: open Sync in the editor.`);
-  if (dryRun) return out.join("\n");
+
+  // A note whose vault copy is as last synced writes nothing, so only the
+  // rest can need a person.
+  const refusals = plan.rows.flatMap((row) => {
+    if (row.vaultState === "unchanged") return [];
+    const r = unattendedRefusal(row, world);
+    return r ? [{ row, ...r }] : [];
+  });
+  const list = (rs: typeof refusals) =>
+    rs.map((r) => `  ${r.row.vaultRelPath ?? r.row.filename}: ${r.reason}`);
+  if (dryRun) {
+    if (refusals.length > 0) {
+      out.push(
+        "",
+        `${refusals.length} note(s) need review in the editor's Sync:`,
+        ...list(refusals),
+      );
+    }
+    return out.join("\n");
+  }
+
+  // Unattended, nothing may lower secrecy; held notes stop the run unless
+  // the DM said to leave them out (they stay unticked, so nothing writes them).
+  const blocking = refusals.filter(
+    (r) => !args.skipHeld || r.kind === "lowers-secrecy" || r.row.included,
+  );
+  if (blocking.length > 0) {
+    throw new Error(
+      [
+        `Refused: ${blocking.length} note(s) need review. Open Sync in the editor` +
+          (blocking.every((r) => r.kind === "held") ? ", or rerun with --skip-held." : "."),
+        ...list(blocking),
+      ].join("\n"),
+    );
+  }
+  if (refusals.length > 0) {
+    out.push("", `Left out ${refusals.length} held note(s):`, ...list(refusals));
+  }
 
   if (!plan.rows.some((r) => r.included)) return [...out, "", "Nothing to write."].join("\n");
   const result = await commitSync(port, plan.rows, source);

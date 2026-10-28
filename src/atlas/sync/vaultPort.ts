@@ -5,7 +5,7 @@
  * Three adapters:
  *   - `createDevEndpointPort` (`./devEndpointPort.ts`): the editor, through the
  *     dev server's `/__atlas/*` routes.
- *   - `createMemoryVaultPort` (`./memoryVaultPort.ts`): tests.
+ *   - `createMemoryVaultPort` (`src/test/helpers/memoryVaultPort.ts`): tests.
  *   - `createFsVaultPort` (`scripts/atlas/fsVaultPort.ts`): Node, for
  *     `npm run atlas:sync`.
  *
