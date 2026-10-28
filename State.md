@@ -53,7 +53,7 @@ commands with shell variables (one plain command per call, absolute paths).
 
 - `main` was pushed once (f65c854..0c1d92a, docs only, on his yes) before this rule arrived.
 - PRs waiting for his yes to merge (each merge publishes), in stack order: #62 → #66 → #68;
-  #64 → #67 → #69 → #70; #63; #65; #71 → #73; #72; #74 → #76; #75. See "Merge queue" for what each needs him to look at.
+  #64 → #67 → #69 → #70; #63; #65; #71 → #73 → #77; #72; #74 → #76; #75. See "Merge queue" for what each needs him to look at.
 - Local `main` commits since 0c1d92a: push them in the morning.
 - Code-retro 06 needs a real `npm run atlas:publish` run before it is done (the ticket asks for
   it; overnight only its parts ran).
@@ -86,6 +86,7 @@ So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logg
 | #74 | c-06   | One module reads a note; bad frontmatter stops the build | A real `atlas:publish` run first; his yes        |
 | #75 | 24     | One test runner for the PR check, publish and the hook   | His yes (publish gains a `test` job, ~3 min)     |
 | #76 | 26     | Timeline: undated events get their own last group        | #74 (stacked); his yes                           |
+| #77 | 28     | Sound URLs follow the image asset rule (`/atlas/` fix)   | #73 (stacked); his yes                           |
 
 In flight (2026-10-28, overnight):
 
@@ -97,7 +98,10 @@ In flight (2026-10-28, overnight):
   GitHub.
 - Ticket 26 is PR #76, stacked on #74. `code-retro-07-sync-module` is building, also on #74.
   Code-retro 08 builds next, stacked on #76.
-- `eval-28-audio-asset-urls`: building (reproduce first), stacked on #73.
+- Ticket 28 reproduced (sound broke at `/atlas/`, the editor manifest lost the base path) and is
+  PR #77, stacked on #73.
+- Code-retro 07 (`code-retro-07-sync-module`, ba7e620) is built and in review. Standards and Spec
+  are back with no hard defects; fixes go out once the safety review reports.
 - Ticket 27 (one reduce-motion switch, shared filter chips) waits until the open stacks merge: it
   touches sound (#71, #73), the viewer (#67-#70, 25) and Timeline/Browse/search (#63, 26).
 - A local-only branch `eval-24-test-runner` (932edc8) sits in an agent worktree, never pushed;
@@ -144,6 +148,7 @@ answer, logged here and built on; he reviews this list in batches, and a reversa
 | 2026-10-28 | eval-24 review: should the PR check keep its 4 parallel shard jobs? | Yes; each job calls a per-shard entry of the same runner; publish runs `test:ci` | One runner and retry rule, without making every PR wait for the shards one after another | 24 |
 | 2026-10-28 | eval-25 review: does "installing" mean the service-worker install, or a menu click? | The SW install: each new worker saves `atlas.json`, the search index and the current map; the menu item stays for other maps | Q5's reason ("too heavy") is about an automatic install; a new deploy also refreshes the saved map | 25 |
 | 2026-10-28 | eval-25 review: may "Clear offline cache" keep the app shell? | Yes; the label stays and says the app itself stays | Deleting the shell left the menu stuck until a new worker installed | 25 |
+| 2026-10-28 | code-retro 07 review: Staging now gets the sync map (match by sync map, type-conflict hold): keep it? | Yes; check it in the Sync panel | The editor never ran either check before; a renamed note now keeps its id | c-07 |
 
 ## Retro, 2026-10-28 (overnight)
 
