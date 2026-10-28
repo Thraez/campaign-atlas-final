@@ -197,6 +197,22 @@ answer, logged here and built on; he reviews this list in batches, and a reversa
 - Third sweep: 5 verified bugs (sound after reload, lossy `maps:optimize`, crossfade race, offline
   menu, timeline year 0) were found in areas no earlier sweep looked at. Areas not yet swept:
   none left from the list; next is a second pass on the editor page itself (110 KB).
+- Later in the night: PRs #70-#82 opened, none merged. The safety lens found four player-safety
+  bugs that were already live on `main`. Three were in sync: a dm note overwriting a player
+  entity, an image path escaping its folder, and a `publish: false` bypass. The fourth: a failed
+  build still wrote the player atlas. All four are fixed on branches (#79, #82) with workarounds
+  in the Morning queue. The Standards and Spec reviews caught none of them.
+- The `publish: false` bypass got past a case-by-case fix and fell to a 144-case invariant test
+  (write, read back, never more visible than the source). For anything that touches visibility,
+  brief the builder for the invariant test from the start.
+- Re-run the safety lens on its own fixes: two of three re-checks found something.
+- Stacked PRs get no CI (the PR check runs only on PRs into `main`); the local gate is all they
+  have until they're retargeted.
+- A usage limit stopped four agents at once around 03:00. Each resumed from where it stopped once
+  the limit reset.
+- Sweep 4 (editor page) found a data-loss bug, ticket 30, that waits on the editor stacks. Every
+  area has now been swept once, the editor twice. With 27, 29 and 30 blocked, the next work is
+  merging the stacks.
 
 ## Retro, 2026-10-27
 
