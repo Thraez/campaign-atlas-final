@@ -1,4 +1,5 @@
 import type { PreparedArea } from "@/atlas/sound/resolveSoundscape";
+import { normalizeAtlasAssetUrl } from "@/atlas/url";
 
 export interface AudioDeps {
   createContext: () => AudioContext;
@@ -31,12 +32,15 @@ interface ActiveBed {
 
 const AUDIO_DIR_PREFIX = "atlas/assets/audio/";
 
-/** Resolve the asset URL for the player build. Idempotent: a src that is
- * already absolute, remote, or already under the audio dir is left alone. */
+/** Resolve a bed's URL with the same rule as images (`normalizeAtlasAssetUrl`):
+ * a bare filename goes under the audio dir, then the site base path is
+ * prefixed, so it resolves the same at `/atlas` and `/atlas/`. Remote URLs
+ * pass through. */
 function audioUrl(src: string): string {
-  return src.startsWith("/") || src.startsWith("http") || src.startsWith(AUDIO_DIR_PREFIX)
-    ? src
-    : `${AUDIO_DIR_PREFIX}${src}`;
+  const path = src.replace(/^\/+/, "");
+  const withDir =
+    /^(https?:|data:|blob:)/i.test(src) || path.includes("/") ? src : `${AUDIO_DIR_PREFIX}${path}`;
+  return normalizeAtlasAssetUrl(withDir);
 }
 
 export class AudioEngine {
