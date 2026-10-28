@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Rumor visibility semantics — behavioral pins.
  *
@@ -13,41 +14,15 @@
  * widens PLAYER_VISIBLE_VISIBILITY or narrows it will cause an obvious failure here.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { runBuildCli, type InProcessRun } from "./helpers/buildInProcess";
 import { PLAYER_VISIBLE_VISIBILITY } from "../../scripts/atlas/visibility";
 
 const ROOT = path.resolve(__dirname, "../..");
-const SCRIPT = path.resolve(ROOT, "scripts/build-atlas.ts");
-const IS_WIN = process.platform === "win32";
-
-interface RunResult {
-  status: number;
-  stdout: string;
-  stderr: string;
-}
-
-function run(args: string[], opts: ExecFileSyncOptions = {}): RunResult {
-  try {
-    const stdout = execFileSync(IS_WIN ? "npx.cmd" : "npx", ["tsx", SCRIPT, ...args], {
-      cwd: ROOT,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: IS_WIN,
-      env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
-      ...opts,
-    });
-    return { status: 0, stdout: String(stdout), stderr: "" };
-  } catch (e) {
-    const err = e as { status?: number; stdout?: Buffer | string; stderr?: Buffer | string };
-    return {
-      status: err.status ?? 1,
-      stdout: String(err.stdout ?? ""),
-      stderr: String(err.stderr ?? ""),
-    };
-  }
+function run(args: string[]): Promise<InProcessRun> {
+  return runBuildCli(args, ROOT);
 }
 
 let tmpRoot: string;
@@ -97,14 +72,14 @@ function readSearch(outDir: string) {
 }
 
 describe.sequential("rumor visibility semantics", () => {
-  it("PLAYER_VISIBLE_VISIBILITY includes rumor", () => {
+  it("PLAYER_VISIBLE_VISIBILITY includes rumor", async () => {
     expect(PLAYER_VISIBLE_VISIBILITY.has("player")).toBe(true);
     expect(PLAYER_VISIBLE_VISIBILITY.has("rumor")).toBe(true);
     expect(PLAYER_VISIBLE_VISIBILITY.has("dm")).toBe(false);
     expect(PLAYER_VISIBLE_VISIBILITY.has("hidden")).toBe(false);
   });
 
-  it("rumor entities ship to player builds and have placements + search index entries", () => {
+  it("rumor entities ship to player builds and have placements + search index entries", async () => {
     const dir = path.join(tmpRoot, "rumor-ships");
     const { configPath } = makeVault(dir);
     fs.writeFileSync(
@@ -112,7 +87,7 @@ describe.sequential("rumor visibility semantics", () => {
       `---\ntitle: The Whisper\natlas:\n  visibility: rumor\n  type: legend\n  placements:\n    - mapId: m1\n      x: 100\n      y: 100\n---\nLocals say something walks the marsh at night.\n`,
     );
     const out = path.join(dir, "out");
-    const result = run(["--player", "--strict", "--config", configPath, "--out", out]);
+    const result = await run(["--player", "--strict", "--config", configPath, "--out", out]);
     expect(result.status, result.stderr).toBe(0);
 
     const atlas = readAtlas(out);
@@ -126,7 +101,7 @@ describe.sequential("rumor visibility semantics", () => {
     expect(search.find((s) => s.id === "the-whisper")).toBeDefined();
   });
 
-  it("rumor entity wikilinking to a DM target is treated as a cross-ref leak (strict fails)", () => {
+  it("rumor entity wikilinking to a DM target is treated as a cross-ref leak (strict fails)", async () => {
     const dir = path.join(tmpRoot, "rumor-xref-leak");
     const { configPath } = makeVault(dir);
     fs.writeFileSync(
@@ -138,11 +113,11 @@ describe.sequential("rumor visibility semantics", () => {
       `---\ntitle: Secret Cult Leader\natlas:\n  visibility: dm\n---\nThe villain.\n`,
     );
     const out = path.join(dir, "out");
-    const result = run(["--player", "--strict", "--config", configPath, "--out", out]);
+    const result = await run(["--player", "--strict", "--config", configPath, "--out", out]);
     expect(result.status).toBe(8); // cross-ref leak exit
   });
 
-  it("rumor relationship pointing at a hidden target fails strict player build", () => {
+  it("rumor relationship pointing at a hidden target fails strict player build", async () => {
     const dir = path.join(tmpRoot, "rumor-rel-leak");
     const { configPath } = makeVault(dir);
     fs.writeFileSync(
@@ -154,11 +129,11 @@ describe.sequential("rumor visibility semantics", () => {
       `---\ntitle: Hidden Target\natlas:\n  id: hidden-target\n  visibility: hidden\n---\nthe secret\n`,
     );
     const out = path.join(dir, "out");
-    const result = run(["--player", "--strict", "--config", configPath, "--out", out]);
+    const result = await run(["--player", "--strict", "--config", configPath, "--out", out]);
     expect(result.status).toBe(5); // relationship leak exit
   });
 
-  it("rumor relationship between two player-visible entities ships in player build", () => {
+  it("rumor relationship between two player-visible entities ships in player build", async () => {
     const dir = path.join(tmpRoot, "rumor-rel-ok");
     const { configPath } = makeVault(dir);
     fs.writeFileSync(
@@ -170,7 +145,7 @@ describe.sequential("rumor visibility semantics", () => {
       `---\ntitle: B\natlas:\n  id: b\n  visibility: rumor\n---\nbody\n`,
     );
     const out = path.join(dir, "out");
-    const result = run(["--player", "--strict", "--config", configPath, "--out", out]);
+    const result = await run(["--player", "--strict", "--config", configPath, "--out", out]);
     expect(result.status, result.stderr).toBe(0);
     const atlas = readAtlas(out);
     const a = atlas.entities.find((e) => e.id === "a");
@@ -179,7 +154,7 @@ describe.sequential("rumor visibility semantics", () => {
     ).toBeDefined();
   });
 
-  it(":::dm callout in a player body is stripped from player build, kept in DM build", () => {
+  it(":::dm callout in a player body is stripped from player build, kept in DM build", async () => {
     const dir = path.join(tmpRoot, "callout");
     const { configPath } = makeVault(dir);
     const body =
@@ -200,7 +175,7 @@ describe.sequential("rumor visibility semantics", () => {
     fs.writeFileSync(path.join(dir, "content/w/notes/Town.md"), body);
 
     const playerOut = path.join(dir, "out-player");
-    const playerR = run(["--player", "--strict", "--config", configPath, "--out", playerOut]);
+    const playerR = await run(["--player", "--strict", "--config", configPath, "--out", playerOut]);
     expect(playerR.status, playerR.stderr).toBe(0);
     const playerAtlas = readAtlas(playerOut);
     const town = playerAtlas.entities.find((e) => e.id === "town");
@@ -208,7 +183,7 @@ describe.sequential("rumor visibility semantics", () => {
     expect(JSON.stringify(town)).not.toMatch(/DM CALLOUT SECRET STRING/);
 
     const dmOut = path.join(dir, "out-dm");
-    const dmR = run(["--config", configPath, "--out", dmOut]);
+    const dmR = await run(["--config", configPath, "--out", dmOut]);
     expect(dmR.status).toBe(0);
     const dmAtlas = JSON.parse(fs.readFileSync(path.join(dmOut, "atlas.json"), "utf8")) as {
       entities: Array<{ id: string; body: string }>;
@@ -217,7 +192,7 @@ describe.sequential("rumor visibility semantics", () => {
     expect(dmTown?.body).toMatch(/DM CALLOUT SECRET STRING/);
   });
 
-  it("unclosed :::dm callout fails the build", () => {
+  it("unclosed :::dm callout fails the build", async () => {
     const dir = path.join(tmpRoot, "unclosed");
     const { configPath } = makeVault(dir);
     const body =
@@ -236,12 +211,12 @@ describe.sequential("rumor visibility semantics", () => {
     fs.writeFileSync(path.join(dir, "content/w/notes/Bad.md"), body);
 
     const out = path.join(dir, "out");
-    const r = run(["--player", "--config", configPath, "--out", out]);
+    const r = await run(["--player", "--config", configPath, "--out", out]);
     expect(r.status).not.toBe(0);
     expect(r.stdout + r.stderr).toMatch(/unbalanced DM delimiter|unclosed/i);
   });
 
-  it("dm-visibility entity is EXCLUDED from player builds even with placement", () => {
+  it("dm-visibility entity is EXCLUDED from player builds even with placement", async () => {
     const dir = path.join(tmpRoot, "dm-not-shipped");
     const { configPath } = makeVault(dir);
     fs.writeFileSync(
@@ -253,7 +228,7 @@ describe.sequential("rumor visibility semantics", () => {
       `---\ntitle: Lair\natlas:\n  visibility: dm\n  placements:\n    - mapId: m1\n      x: 5\n      y: 5\n---\nbody\n`,
     );
     const out = path.join(dir, "out");
-    const result = run(["--player", "--strict", "--config", configPath, "--out", out]);
+    const result = await run(["--player", "--strict", "--config", configPath, "--out", out]);
     expect(result.status).toBe(0);
     const atlas = readAtlas(out);
     expect(atlas.entities.find((e) => e.id === "lair")).toBeUndefined();

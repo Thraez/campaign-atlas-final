@@ -216,6 +216,13 @@ export interface ResolvedLink {
   broken: boolean;
 }
 
+/** A folder-excluded note (`_dm/`, `_drafts/`, ...) known only by its names. */
+export interface ExcludedNoteName {
+  id: string;
+  title: string;
+  aliases?: string[];
+}
+
 export interface Entity {
   id: string;            // stable slug
   title: string;
@@ -234,9 +241,12 @@ export interface Entity {
   sourcePath: string;
   links: ResolvedLink[];
   backlinks: { id: string; title: string }[];
-  // Timeline support (Batch 7). dateRaw is human-readable; dateValue is a
-  // sortable integer derived from the world calendar (or ISO date fallback).
-  dateRaw?: string;
+  // Timeline support (Batch 7). dateLabel is the formatted date shown to
+  // readers; dateValue is a sortable integer derived from the
+  // world calendar (or ISO date fallback), or the note's `dateValue` override.
+  // dateYear is absent when the date doesn't parse: the Timeline files those
+  // events under "Undated".
+  dateLabel?: string;
   dateValue?: number;
   dateYear?: number;
   /** DM/player profile fields. In player builds, only `profile.player` survives. */
@@ -304,6 +314,11 @@ export interface BuildReport {
    * players.
    */
   excludedPaths?: string[];
+  /**
+   * The folder-excluded notes by name, so the editor's player preview redacts
+   * links to them the way the player build does. DM builds only.
+   */
+  excludedNotes?: ExcludedNoteName[];
   warnings: string[];
   /** Renamed to unresolvedLinks. Kept for back-compat. */
   brokenLinks: number;

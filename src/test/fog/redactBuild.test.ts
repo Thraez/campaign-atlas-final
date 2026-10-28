@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Build-level test for D3: confirms a player build of a fog-enabled map
  * writes a redacted .fog.png layer, the player atlas.json references it,
@@ -133,6 +134,19 @@ describe("D3: fog redaction wired into player build", () => {
     );
     expect(await alphaAt(fogPng, 40, 40)).toBeGreaterThanOrEqual(250); // inside reveal
     expect(await alphaAt(fogPng, 5, 5)).toBe(0); // outside reveal
+  });
+
+  it("a strict player build counts the fog mask it is about to write as present", async () => {
+    process.chdir(tmpDir);
+    fs.rmSync(path.join(tmpDir, "public", "atlas", "assets", "maps", "world.fog.png"), {
+      force: true,
+    });
+    const { runBuild } = await import("../../../scripts/build-atlas");
+    const r = await runBuild({ player: true, strict: true });
+    expect(r.ok, `build failed: ${r.error ?? ""}`).toBe(true);
+    expect(
+      fs.existsSync(path.join(tmpDir, "public", "atlas", "assets", "maps", "world.fog.png")),
+    ).toBe(true);
   });
 
   it("prunes a stale .fog.png when a fog-enabled map's layer is renamed", async () => {

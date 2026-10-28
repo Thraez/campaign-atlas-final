@@ -27,6 +27,65 @@ function pruneStaleHashedAudio(outDir: string, keep: Set<string>): void {
 }
 
 /**
+ * What a player build does to `public/atlas/assets/audio`: the hashed copies
+ * to write (skipped when already there), the hashed names to keep, and
+ * originalSrc → hashedSrc for the atlas. Planned by the build core, applied
+ * by its file adapter, so a failed build touches nothing.
+ */
+export interface AudioPlan {
+  outDir: string;
+  copies: { path: string; bytes: Buffer }[];
+  keep: Set<string>;
+  rewrite: Map<string, string>;
+  /** Delete hashed files not in `keep` (see `hashAudioAssets`). */
+  prune: boolean;
+}
+
+/** Read and hash each local audio src; writes nothing. See `hashAudioAssets`. */
+export function planAudioAssets(
+  areas: SoundArea[],
+  publicDir: string,
+  opts: { prune?: boolean } = {},
+): AudioPlan {
+  const outDir = path.join(publicDir, AUDIO_OUT_DIR);
+  const plan: AudioPlan = {
+    outDir,
+    copies: [],
+    keep: new Set(),
+    rewrite: new Map(),
+    prune: opts.prune ?? true,
+  };
+  const srcs = new Set<string>();
+  for (const a of areas) {
+    if (a.bed.src.trim()) srcs.add(a.bed.src);
+    if (a.bed.srcFallback?.trim()) srcs.add(a.bed.srcFallback);
+  }
+  for (const src of srcs) {
+    if (/^https?:\/\//i.test(src)) continue;
+    const srcAbs = path.join(publicDir, src);
+    if (!fs.existsSync(srcAbs)) continue;
+    const content = fs.readFileSync(srcAbs);
+    const hash = crypto.createHash("sha256").update(content).digest("hex").slice(0, 8);
+    const hashedName = `${hash}${path.extname(src)}`;
+    if (!plan.keep.has(hashedName)) {
+      plan.copies.push({ path: path.join(outDir, hashedName), bytes: content });
+    }
+    plan.rewrite.set(src, `${AUDIO_OUT_DIR}/${hashedName}`);
+    plan.keep.add(hashedName);
+  }
+  return plan;
+}
+
+/** Write a plan's missing hashed copies, then prune when the plan says so. */
+export function applyAudioPlan(plan: AudioPlan): void {
+  fs.mkdirSync(plan.outDir, { recursive: true });
+  for (const c of plan.copies) {
+    if (!fs.existsSync(c.path)) fs.writeFileSync(c.path, c.bytes);
+  }
+  if (plan.prune) pruneStaleHashedAudio(plan.outDir, plan.keep);
+}
+
+/**
  * Copy each local audio src to `public/atlas/assets/audio/<sha256[0..8]><ext>`
  * and return a rewrite map: originalSrc → hashedSrc. Any previously-hashed
  * file not re-emitted by this call is pruned, so a bed dropped or renamed
@@ -39,43 +98,17 @@ function pruneStaleHashedAudio(outDir: string, keep: Set<string>): void {
  * build that owns `publicDir` — pruning is scoped by the caller, because
  * this function cannot tell a real publish from a build writing its atlas
  * somewhere else. Copying is additive and always safe; deleting is not.
+ *
+ * `planAudioAssets` then `applyAudioPlan`; the build calls those separately.
  */
 export function hashAudioAssets(
   areas: SoundArea[],
   publicDir: string,
   opts: { prune?: boolean } = {},
 ): Map<string, string> {
-  const rewrite = new Map<string, string>();
-  const srcs = new Set<string>();
-
-  for (const a of areas) {
-    if (a.bed.src.trim()) srcs.add(a.bed.src);
-    if (a.bed.srcFallback?.trim()) srcs.add(a.bed.srcFallback);
-  }
-
-  const outDir = path.join(publicDir, AUDIO_OUT_DIR);
-  fs.mkdirSync(outDir, { recursive: true });
-
-  const keepHashedNames = new Set<string>();
-  for (const src of srcs) {
-    if (/^https?:\/\//i.test(src)) continue;
-    const srcAbs = path.join(publicDir, src);
-    if (!fs.existsSync(srcAbs)) continue;
-    const content = fs.readFileSync(srcAbs);
-    const hash = crypto.createHash("sha256").update(content).digest("hex").slice(0, 8);
-    const ext = path.extname(src);
-    const hashedName = `${hash}${ext}`;
-    const outAbs = path.join(outDir, hashedName);
-    if (!fs.existsSync(outAbs)) {
-      fs.writeFileSync(outAbs, content);
-    }
-    rewrite.set(src, `${AUDIO_OUT_DIR}/${hashedName}`);
-    keepHashedNames.add(hashedName);
-  }
-
-  if (opts.prune ?? true) pruneStaleHashedAudio(outDir, keepHashedNames);
-
-  return rewrite;
+  const plan = planAudioAssets(areas, publicDir, opts);
+  applyAudioPlan(plan);
+  return plan.rewrite;
 }
 
 /**

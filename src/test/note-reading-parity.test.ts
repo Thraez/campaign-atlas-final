@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * code-retro 06 acceptance: the build, Staging, the merge (through
  * `buildImportChanges`) and the derived-secrets scan agree on every note's

@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Build-order regression guard for published soundscape audio.
  *

@@ -155,11 +155,15 @@ export interface WorldConfig {
 
 export class WorldConfigError extends Error {}
 
-export function loadWorldConfig(contentRoot: string, worldId: string): WorldConfig | null {
+export function loadWorldConfig(
+  contentRoot: string,
+  worldId: string,
+  root: string = process.cwd(),
+): WorldConfig | null {
   const file = path.join(contentRoot, worldId, "_atlas", "world.yaml");
   if (!fs.existsSync(file)) return null;
   const raw = fs.readFileSync(file, "utf8");
-  const rel = path.relative(process.cwd(), file).replace(/\\/g, "/");
+  const rel = path.relative(root, file).replace(/\\/g, "/");
 
   // Hard-fail guard: the most common authoring mistake is pasting an exported
   // patch's full markdown (with ```yaml fences) into world.yaml instead of just

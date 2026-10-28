@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Integration tests for region/route strict-mode failures in player builds.
  *
@@ -37,16 +38,12 @@
  *       player-visible record reveals a DM target.)
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { runBuildCli } from "./helpers/buildInProcess";
 
 const ROOT = path.resolve(__dirname, "../..");
-const SCRIPT = "scripts/build-atlas.ts"; // relative to ROOT (cwd)
-
-const IS_WIN = process.platform === "win32";
-const NPX = IS_WIN ? "npx.cmd" : "npx";
 
 let tmp: string;
 
@@ -95,30 +92,12 @@ function makeVault(opts: {
   };
 }
 
-function runBuild(args: string[]): { status: number; out: string } {
-  try {
-    const opts: ExecFileSyncOptions = {
-      cwd: ROOT,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: IS_WIN,
-      // Auto-ack the source-DM privacy gate; this suite is testing
-      // region/route gating, not the privacy gate.
-      env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
-    };
-    const stdout = execFileSync(NPX, ["tsx", SCRIPT, ...args], opts);
-    return { status: 0, out: String(stdout) };
-  } catch (e) {
-    const err = e as { status?: number; stdout?: Buffer; stderr?: Buffer };
-    return {
-      status: err.status ?? 1,
-      out: String(err.stdout ?? "") + String(err.stderr ?? ""),
-    };
-  }
-}
-
-function build(configPath: string, outDir: string) {
-  return runBuild(["--player", "--strict", "--config", configPath, "--out", outDir]);
+async function build(configPath: string, outDir: string): Promise<{ status: number; out: string }> {
+  const r = await runBuildCli(
+    ["--player", "--strict", "--config", configPath, "--out", outDir],
+    ROOT,
+  );
+  return { status: r.status, out: r.stdout + r.stderr };
 }
 
 /** Single-map skeleton, used by every fixture. */
@@ -134,45 +113,45 @@ const MAP_SKELETON = `maps:
 // Top-level (legacy) regions
 // ---------------------------------------------------------------------------
 describe("strict player build — top-level regions (exit code 6)", () => {
-  it("(1) player-safe region linked to a player entity → exit 0", () => {
+  it("(1) player-safe region linked to a player entity → exit 0", async () => {
     const v = makeVault({
       worldYaml:
         MAP_SKELETON +
         `regions:\n  - id: safe-region\n    mapId: m1\n    name: Safe\n    entityId: alice\n    visibility: player\n    points: [[0,0],[10,0],[10,10]]\n`,
       entities: [{ rel: "alice.md", visibility: "player" }],
     });
-    const r = build(v.configPath, v.outDir);
+    const r = await build(v.configPath, v.outDir);
     expect(r.status, r.out).toBe(0);
   });
 
-  it("(3) region linked to a DM entity → exit 6, names the region + entity", () => {
+  it("(3) region linked to a DM entity → exit 6, names the region + entity", async () => {
     const v = makeVault({
       worldYaml:
         MAP_SKELETON +
         `regions:\n  - id: leaky-region\n    mapId: m1\n    name: Leaky\n    entityId: secret-base\n    visibility: player\n    points: [[0,0],[10,0],[10,10]]\n`,
       entities: [{ rel: "secret-base.md", visibility: "dm" }],
     });
-    const r = build(v.configPath, v.outDir);
+    const r = await build(v.configPath, v.outDir);
     expect(r.status, r.out).toBe(6);
     expect(r.out).toMatch(/region "leaky-region"/);
     expect(r.out).toMatch(/secret-base/);
     expect(r.out).toMatch(/spoiler leak/);
   });
 
-  it("(4) region linked to a hidden entity → exit 6", () => {
+  it("(4) region linked to a hidden entity → exit 6", async () => {
     const v = makeVault({
       worldYaml:
         MAP_SKELETON +
         `regions:\n  - id: leaky-region\n    mapId: m1\n    name: Leaky\n    entityId: hidden-thing\n    visibility: rumor\n    points: [[0,0],[10,0],[10,10]]\n`,
       entities: [{ rel: "hidden-thing.md", visibility: "hidden" }],
     });
-    const r = build(v.configPath, v.outDir);
+    const r = await build(v.configPath, v.outDir);
     expect(r.status, r.out).toBe(6);
     expect(r.out).toMatch(/region "leaky-region"/);
     expect(r.out).toMatch(/hidden-thing/);
   });
 
-  it("(7) mixed safe + unsafe regions → exit 6 names ONLY the unsafe id", () => {
+  it("(7) mixed safe + unsafe regions → exit 6 names ONLY the unsafe id", async () => {
     const v = makeVault({
       worldYaml:
         MAP_SKELETON +
@@ -184,14 +163,14 @@ describe("strict player build — top-level regions (exit code 6)", () => {
         { rel: "secret-base.md", visibility: "dm" },
       ],
     });
-    const r = build(v.configPath, v.outDir);
+    const r = await build(v.configPath, v.outDir);
     expect(r.status, r.out).toBe(6);
     expect(r.out).toMatch(/region "bad-region"/);
     // Should not slander the safe one.
     expect(r.out).not.toMatch(/region "ok-region": .* spoiler leak/);
   });
 
-  it("(13) DM-only region (no entity link) is silently dropped → exit 0", () => {
+  it("(13) DM-only region (no entity link) is silently dropped → exit 0", async () => {
     // The player build filter strips any region whose own visibility isn't
     // player-safe, so a `visibility: dm` region with no leaky link should
     // simply not appear in player output and not trigger the strict gate.
@@ -201,7 +180,7 @@ describe("strict player build — top-level regions (exit code 6)", () => {
         `regions:\n  - id: dm-only-region\n    mapId: m1\n    name: DM Only\n    visibility: dm\n    points: [[0,0],[10,0],[10,10]]\n`,
       entities: [],
     });
-    const r = build(v.configPath, v.outDir);
+    const r = await build(v.configPath, v.outDir);
     expect(r.status, r.out).toBe(0);
   });
 });
@@ -210,45 +189,45 @@ describe("strict player build — top-level regions (exit code 6)", () => {
 // Top-level (legacy) routes
 // ---------------------------------------------------------------------------
 describe("strict player build — top-level routes (exit code 7)", () => {
-  it("(2) player-safe route through player entity → exit 0", () => {
+  it("(2) player-safe route through player entity → exit 0", async () => {
     const v = makeVault({
       worldYaml:
         MAP_SKELETON +
         `routes:\n  - id: safe-route\n    mapId: m1\n    name: Safe Road\n    visibility: player\n    waypoints:\n      - { entityId: alice }\n      - [500, 500]\n`,
       entities: [{ rel: "alice.md", visibility: "player" }],
     });
-    const r = build(v.configPath, v.outDir);
+    const r = await build(v.configPath, v.outDir);
     expect(r.status, r.out).toBe(0);
   });
 
-  it("(5) route waypoint to a DM entity → exit 7", () => {
+  it("(5) route waypoint to a DM entity → exit 7", async () => {
     const v = makeVault({
       worldYaml:
         MAP_SKELETON +
         `routes:\n  - id: leaky-route\n    mapId: m1\n    name: Bad Road\n    visibility: player\n    waypoints:\n      - [0, 0]\n      - { entityId: secret-base }\n`,
       entities: [{ rel: "secret-base.md", visibility: "dm" }],
     });
-    const r = build(v.configPath, v.outDir);
+    const r = await build(v.configPath, v.outDir);
     expect(r.status, r.out).toBe(7);
     expect(r.out).toMatch(/route "leaky-route"/);
     expect(r.out).toMatch(/secret-base/);
     expect(r.out).toMatch(/spoiler leak/);
   });
 
-  it("(6) route waypoint to an unknown entity → exit 7", () => {
+  it("(6) route waypoint to an unknown entity → exit 7", async () => {
     const v = makeVault({
       worldYaml:
         MAP_SKELETON +
         `routes:\n  - id: unknown-route\n    mapId: m1\n    name: "Unknown Road"\n    visibility: player\n    waypoints:\n      - [0,0]\n      - { entityId: never-defined }\n`,
       entities: [{ rel: "alice.md", visibility: "player" }],
     });
-    const r = build(v.configPath, v.outDir);
+    const r = await build(v.configPath, v.outDir);
     expect(r.status, r.out).toBe(7);
     expect(r.out).toMatch(/never-defined/);
     expect(r.out).toMatch(/unknown entity/);
   });
 
-  it("(8) mixed safe + unsafe routes → exit 7 names ONLY the unsafe id", () => {
+  it("(8) mixed safe + unsafe routes → exit 7 names ONLY the unsafe id", async () => {
     const v = makeVault({
       worldYaml:
         MAP_SKELETON +
@@ -260,7 +239,7 @@ describe("strict player build — top-level routes (exit code 7)", () => {
         { rel: "secret-base.md", visibility: "dm" },
       ],
     });
-    const r = build(v.configPath, v.outDir);
+    const r = await build(v.configPath, v.outDir);
     expect(r.status, r.out).toBe(7);
     expect(r.out).toMatch(/route "bad-route"/);
     expect(r.out).not.toMatch(/route "ok-route": .* spoiler leak/);
@@ -275,49 +254,49 @@ describe("strict player build — nested maps[] geometry", () => {
     return `maps:\n  - id: m1\n    name: Map One\n    width: 1000\n    height: 1000\n    layers: []\n${extraIndented}`;
   }
 
-  it("(9) nested regions player-safe → exit 0", () => {
+  it("(9) nested regions player-safe → exit 0", async () => {
     const v = makeVault({
       worldYaml: nestedMap(
         `    regions:\n      - id: nested-safe\n        name: Safe\n        entityId: alice\n        visibility: player\n        points: [[0,0],[10,0],[10,10]]\n`,
       ),
       entities: [{ rel: "alice.md", visibility: "player" }],
     });
-    const r = build(v.configPath, v.outDir);
+    const r = await build(v.configPath, v.outDir);
     expect(r.status, r.out).toBe(0);
   });
 
-  it("(10) nested regions linked to DM entity → exit 6, names the region", () => {
+  it("(10) nested regions linked to DM entity → exit 6, names the region", async () => {
     const v = makeVault({
       worldYaml: nestedMap(
         `    regions:\n      - id: nested-bad\n        name: Bad\n        entityId: secret-base\n        visibility: player\n        points: [[0,0],[10,0],[10,10]]\n`,
       ),
       entities: [{ rel: "secret-base.md", visibility: "dm" }],
     });
-    const r = build(v.configPath, v.outDir);
+    const r = await build(v.configPath, v.outDir);
     expect(r.status, r.out).toBe(6);
     expect(r.out).toMatch(/region "nested-bad"/);
     expect(r.out).toMatch(/secret-base/);
   });
 
-  it("(11) nested routes player-safe → exit 0", () => {
+  it("(11) nested routes player-safe → exit 0", async () => {
     const v = makeVault({
       worldYaml: nestedMap(
         `    routes:\n      - id: nested-safe-route\n        name: Safe\n        visibility: player\n        waypoints:\n          - { entityId: alice }\n          - [500,500]\n`,
       ),
       entities: [{ rel: "alice.md", visibility: "player" }],
     });
-    const r = build(v.configPath, v.outDir);
+    const r = await build(v.configPath, v.outDir);
     expect(r.status, r.out).toBe(0);
   });
 
-  it("(12) nested routes waypoint → DM entity → exit 7, names the route", () => {
+  it("(12) nested routes waypoint → DM entity → exit 7, names the route", async () => {
     const v = makeVault({
       worldYaml: nestedMap(
         `    routes:\n      - id: nested-bad-route\n        name: Bad\n        visibility: player\n        waypoints:\n          - [0,0]\n          - { entityId: secret-base }\n`,
       ),
       entities: [{ rel: "secret-base.md", visibility: "dm" }],
     });
-    const r = build(v.configPath, v.outDir);
+    const r = await build(v.configPath, v.outDir);
     expect(r.status, r.out).toBe(7);
     expect(r.out).toMatch(/route "nested-bad-route"/);
     expect(r.out).toMatch(/secret-base/);

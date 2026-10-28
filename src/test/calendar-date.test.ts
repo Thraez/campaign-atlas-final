@@ -47,8 +47,8 @@ describe("parseAtlasDate", () => {
   });
 
   it("no-calendar label never uses ' · ' — the kicker separator EntityPanel joins with", () => {
-    // EntityPanel/SearchPalette render [type, race, dateRaw].join(" · "); a
-    // middle-dot inside dateRaw makes "Event · 612 · month 6, day 3".
+    // EntityPanel/SearchPalette render [type, race, dateLabel].join(" · "); a
+    // middle-dot inside dateLabel makes "Event · 612 · month 6, day 3".
     for (const raw of ["612-6-3", "0-1-1", "47-3-12", "1300-07"]) {
       expect(parseAtlasDate(raw, undefined)!.label).not.toContain(" · ");
     }

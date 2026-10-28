@@ -97,7 +97,7 @@ export function scanArtifactShape(atlas: unknown): ShapeResult {
     checkStringField(violations, id, "bodyHtml", e.bodyHtml);
     checkStringField(violations, id, "summary", e.summary);
     checkStringField(violations, id, "title", e.title);
-    checkStringField(violations, id, "dateRaw", e.dateRaw);
+    checkStringField(violations, id, "dateLabel", e.dateLabel);
     // Aliases + tags: each element ships individually, so each is scanned.
     if (Array.isArray(e.aliases)) {
       for (const a of e.aliases as unknown[]) checkStringField(violations, id, "alias", a);
@@ -219,6 +219,7 @@ export function scanSearchIndex(records: unknown): SearchIndexResult {
       ["summary", r.summary],
       ["excerpt", r.excerpt],
       ["bodyText", r.bodyText],
+      ["dateLabel", r.dateLabel],
       ["aliases", Array.isArray(r.aliases) ? (r.aliases as unknown[]).join(" ") : undefined],
       ["tags", Array.isArray(r.tags) ? (r.tags as unknown[]).join(" ") : undefined],
     ];

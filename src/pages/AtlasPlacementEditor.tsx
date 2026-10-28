@@ -1435,6 +1435,7 @@ function AtlasPlacementEditorInner() {
                   editRequest={entityEditRequest}
                   entity={editingEntity}
                   entitiesById={entitiesById}
+                  excludedNotes={project?.buildReport?.excludedNotes}
                   startInEdit={
                     !!refilingThis ||
                     // An entity with an unsaved edit reopens in Edit.

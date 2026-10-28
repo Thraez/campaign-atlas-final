@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Player atlas trust gate.
  *
@@ -29,17 +30,19 @@
  *     scan dist/ opportunistically when present, but absence is expected.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { runBuildCli } from "./helpers/buildInProcess";
 
 const ROOT = path.resolve(__dirname, "../..");
 const FIXTURE = path.resolve(__dirname, "fixtures/atlas-build");
-const SCRIPT = path.resolve(ROOT, "scripts/build-atlas.ts");
 
-const IS_WIN = process.platform === "win32";
-const NPX = IS_WIN ? "npx.cmd" : "npx";
+/** Runs the build in-process from the repo root; throws on a non-zero exit, as execFileSync did. */
+async function build(args: string[]): Promise<void> {
+  const r = await runBuildCli(args, ROOT);
+  if (r.status !== 0) throw new Error(`build exited ${r.status}\n${r.stderr}\n${r.stdout}`);
+}
 
 /** Sentinel strings only present in DM-only fixture entities. */
 const SENTINELS = ["SECRET_NEVER_PUBLISH_001", "DM_ONLY_SENTINEL_DO_NOT_SHIP"];
@@ -61,31 +64,19 @@ const TEXT_EXT = new Set([".json", ".html", ".js", ".css", ".txt", ".md", ".svg"
 let tmpRoot: string;
 let outDir: string;
 
-beforeAll(() => {
+beforeAll(async () => {
   tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-trust-gate-"));
   outDir = path.join(tmpRoot, "out");
   // Build the player atlas from the shared fixture vault. Use --strict so
   // ANY weakening of the upstream gates also surfaces here.
-  execFileSync(
-    NPX,
-    [
-      "tsx",
-      SCRIPT,
-      "--player",
-      "--strict",
-      "--config",
-      path.join(FIXTURE, "atlas.config.json"),
-      "--out",
-      outDir,
-    ],
-    {
-      cwd: ROOT,
-      stdio: ["ignore", "pipe", "pipe"],
-      encoding: "utf8",
-      shell: IS_WIN,
-      env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
-    },
-  );
+  await build([
+    "--player",
+    "--strict",
+    "--config",
+    path.join(FIXTURE, "atlas.config.json"),
+    "--out",
+    outDir,
+  ]);
 });
 
 afterAll(() => {
@@ -146,23 +137,13 @@ describe("player atlas trust gate", () => {
     expect(offenders, offenders.join("\n")).toEqual([]);
   });
 
-  it("sentinel scan: DM build (control) DOES leak sentinels — proves the scan is wired up", () => {
+  it("sentinel scan: DM build (control) DOES leak sentinels — proves the scan is wired up", async () => {
     // Sanity: build the same fixture WITHOUT --player and confirm the
     // sentinels are present. If this ever stops finding them, the
     // sentinels themselves were silently removed and the player-side
     // assertion above is a false negative.
     const dmOut = path.join(tmpRoot, "dm-control");
-    execFileSync(
-      NPX,
-      ["tsx", SCRIPT, "--config", path.join(FIXTURE, "atlas.config.json"), "--out", dmOut],
-      {
-        cwd: ROOT,
-        stdio: ["ignore", "pipe", "pipe"],
-        encoding: "utf8",
-        shell: IS_WIN,
-        env: { ...process.env, ATLAS_ACK_DM_IN_SOURCE: "true" },
-      },
-    );
+    await build(["--config", path.join(FIXTURE, "atlas.config.json"), "--out", dmOut]);
     const text = fs.readFileSync(path.join(dmOut, "atlas.json"), "utf8");
     for (const s of SENTINELS) expect(text).toContain(s);
   });
