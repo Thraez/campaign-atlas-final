@@ -117,6 +117,19 @@ describe("findMissingPrecacheEntries", () => {
   it("returns nothing when the build wrote no service worker", () => {
     expect(findMissingPrecacheEntries(dist)).toEqual([]);
   });
+
+  it("fails rather than passing when it can't read the precache list", () => {
+    write(dist, "sw.js", `e.precacheAndRoute([{revision:"r1",url:"index.html"}],{})`);
+    expect(() => findMissingPrecacheEntries(dist)).toThrow(/no precache URLs/);
+  });
+
+  it("reads the sw.js a real player build wrote (workbox 7.4.1)", () => {
+    const real = fs.readFileSync(path.join(__dirname, "fixtures/pwa/sw.workbox-7.4.1.js"), "utf8");
+    const urls = listPrecacheUrls(real);
+    expect(urls).toHaveLength(26);
+    expect(urls).toContain("index.html");
+    expect(urls.filter((u) => u.startsWith("atlas/"))).toEqual([]);
+  });
 });
 
 describe("vite.config wiring", () => {

@@ -34,12 +34,21 @@ export function listPrecacheUrls(swSource: string): string[] {
 
 /**
  * Precache URLs in `outDir/sw.js` with no file behind them. Empty when the
- * build wrote no service worker.
+ * build wrote no service worker. Throws when `sw.js` exists but no URL can be
+ * read from it (the shell always precaches `index.html`), so a change in
+ * workbox's output fails the build instead of passing the check unread.
  */
 export function findMissingPrecacheEntries(outDir: string, swFile = "sw.js"): string[] {
   const swPath = path.join(outDir, swFile);
   if (!fs.existsSync(swPath)) return [];
-  return listPrecacheUrls(fs.readFileSync(swPath, "utf8")).filter((url) => {
+  const urls = listPrecacheUrls(fs.readFileSync(swPath, "utf8"));
+  if (urls.length === 0) {
+    throw new Error(
+      `atlas-precache-shipped-only: found no precache URLs in ${swPath}; ` +
+        `has workbox's output format changed? Update listPrecacheUrls.`,
+    );
+  }
+  return urls.filter((url) => {
     const rel = decodeURIComponent(url.split(/[?#]/)[0]);
     return !fs.existsSync(path.join(outDir, rel));
   });
