@@ -53,7 +53,7 @@ commands with shell variables (one plain command per call, absolute paths).
 
 - `main` was pushed once (f65c854..0c1d92a, docs only, on his yes) before this rule arrived.
 - PRs waiting for his yes to merge (each merge publishes), in stack order: #62 → #66 → #68;
-  #64 → #67 → #69 → #70; #63; #65; #71 → #73; #72; #74; #75. See "Merge queue" for what each needs him to look at.
+  #64 → #67 → #69 → #70; #63; #65; #71 → #73; #72; #74 → #76; #75. See "Merge queue" for what each needs him to look at.
 - Local `main` commits since 0c1d92a: push them in the morning.
 - Code-retro 06 needs a real `npm run atlas:publish` run before it is done (the ticket asks for
   it; overnight only its parts ran).
@@ -85,6 +85,7 @@ So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logg
 | #73 | 23     | The newest soundscape request always wins                | #71 (stacked); his yes                           |
 | #74 | c-06   | One module reads a note; bad frontmatter stops the build | A real `atlas:publish` run first; his yes        |
 | #75 | 24     | One test runner for the PR check, publish and the hook   | His yes (publish gains a `test` job, ~3 min)     |
+| #76 | 26     | Timeline: undated events get their own last group        | #74 (stacked); his yes                           |
 
 In flight (2026-10-28, overnight):
 
@@ -92,8 +93,10 @@ In flight (2026-10-28, overnight):
   new parser dropped, so a secret's name went unredacted). Both are fixed and the second repro
   now stops the build on the file.
 - `eval-25-offline-menu-truth`: review fixes with the builder.
-- `eval-26-timeline-undated` (small review fixes) and `code-retro-07-sync-module` (building),
-  each stacked on #74.
+- #75's own CI run passed (scan and all 4 `test:shard` jobs), so the new shard entry works on
+  GitHub.
+- Ticket 26 is PR #76, stacked on #74. `code-retro-07-sync-module` is building, also on #74.
+  Code-retro 08 builds next, stacked on #76.
 - `eval-28-audio-asset-urls`: building (reproduce first), stacked on #73.
 - Ticket 27 (one reduce-motion switch, shared filter chips) waits until the open stacks merge: it
   touches sound (#71, #73), the viewer (#67-#70, 25) and Timeline/Browse/search (#63, 26).
