@@ -107,6 +107,10 @@ In flight (2026-10-28, overnight):
   PR #77, stacked on #73.
 - Code-retro 07 (`code-retro-07-sync-module`, ba7e620) is built and in review. Standards and Spec
   are back with no hard defects; fixes go out once the safety review reports.
+- Fourth sweep (editor page, second pass) filed 30-32. 30 is the worst find tonight: saving on one
+  map silently drops region, route and fog drafts on other maps, and undo after a map switch edits
+  the wrong map. Until it ships, save before switching maps. 30 waits for the editor stacks
+  (#62→#66→#68 and #64→…→#70). 31 and 32 build now, stacked on #68.
 - Ticket 27 (one reduce-motion switch, shared filter chips) waits until the open stacks merge: it
   touches sound (#71, #73), the viewer (#67-#70, 25) and Timeline/Browse/search (#63, 26).
 - A local-only branch `eval-24-test-runner` (932edc8) sits in an agent worktree, never pushed;
@@ -154,6 +158,9 @@ answer, logged here and built on; he reviews this list in batches, and a reversa
 | 2026-10-28 | eval-25 review: does "installing" mean the service-worker install, or a menu click? | The SW install: each new worker saves `atlas.json`, the search index and the current map; the menu item stays for other maps | Q5's reason ("too heavy") is about an automatic install; a new deploy also refreshes the saved map | 25 |
 | 2026-10-28 | eval-25 review: may "Clear offline cache" keep the app shell? | Yes; the label stays and says the app itself stays | Deleting the shell left the menu stuck until a new worker installed | 25 |
 | 2026-10-28 | code-retro 07 review: Staging now gets the sync map (match by sync map, type-conflict hold): keep it? | Yes; check it in the Sync panel | The editor never ran either check before; a renamed note now keeps its id | c-07 |
+| 2026-10-28 | Sweep 4: one save writes every map's drafts (rather than blocking map switches while dirty)? | Yes | All maps share one world.yaml; blocking switches would get in the DM's way | 30 |
+| 2026-10-28 | Sweep 4: undoing an edit made on another map switches to that map first? | Yes | Refusing would strand the undo stack; applying it in place corrupts the other map | 30 |
+| 2026-10-28 | Sweep 4: Save with only an entity edit pending points to the entity panel rather than saving it? | Yes | The entity panel owns that save and its conflict handling (ticket 17) | 31 |
 
 ## Retro, 2026-10-28 (overnight)
 
