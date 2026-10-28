@@ -28,6 +28,12 @@ import {
   stripSecretMarkers,
 } from "../src/atlas/content/dmMarkup";
 import { tokenizeWikilinks, renderLinkTokens } from "./atlas/parseWikilinks";
+import {
+  NameIndex,
+  projectEntityWithReport,
+  type ProjectionContext,
+  type ProjectionReport,
+} from "../src/atlas/content/projectEntityForPlayer";
 import { loadWorldConfig, projectAssetCredits } from "./atlas/loadWorldConfig";
 import { CURRENT_ATLAS_SCHEMA_VERSION } from "./atlas/schemaVersion";
 import { sanitizeAtlasHtml } from "../src/atlas/sanitizeHtml";
@@ -45,11 +51,7 @@ import { isLit } from "../src/atlas/fog/effectiveLit";
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
 import { filterSoundscapeForPlayer } from "./atlas/filterSoundscape";
 import { hashAudioAssets, rewriteAudioSrcs, writeAudioManifest } from "./atlas/hashAudioAssets";
-import {
-  stripDmProfile,
-  filterRelationshipsForPlayer,
-  compactProfile,
-} from "../src/atlas/profiles/profileBuild";
+import { compactProfile } from "../src/atlas/profiles/profileBuild";
 import type {
   AssetCredit,
   AssetRef,
@@ -72,44 +74,6 @@ interface Config {
   include: string[];
   exclude: string[];
 }
-
-// Tags that are organizational/meta for the DM but read as jargon to players
-// ("#npc", "#stub"). Stripped from `entity.tags` in player builds only — DM
-// builds keep them so the DM can still filter the editor by these.
-const META_TAGS = new Set([
-  "npc",
-  "person",
-  "region",
-  "settlement",
-  "city",
-  "town",
-  "village",
-  "faction",
-  "organization",
-  "guild",
-  "deity",
-  "god",
-  "event",
-  "item",
-  "artifact",
-  "note",
-  "location",
-  "ruin",
-  "dungeon",
-  "cave",
-  "temple",
-  "shop",
-  "port",
-  "stub",
-  "draft",
-  "wip",
-  "todo",
-]);
-
-// Resolved per-invocation inside runBuildCore so programmatic callers
-// (the dev save plugin, tests) get the cwd that was active when they
-// called, not the cwd that happened to be set when this module was first
-// imported.
 
 /** One entity assembled and awaiting link resolution + placement. */
 type Pending = {
@@ -141,13 +105,11 @@ type AllParsed = {
   isSecret: boolean;
 };
 
-/** Result of `buildEntity`: one pending entity plus its per-file counters. */
+/** Result of `buildEntity`: one source entity plus its per-file counters. */
 interface BuiltEntity {
   pending: Pending;
   /** DM blocks found in the body (counted in every build mode). */
   detectedDmBlocks: number;
-  /** DM blocks actually removed (player builds only; 0 for DM builds). */
-  strippedDmBlocks: number;
   /** Set when the body has an unbalanced %% / :::dm delimiter. */
   unbalancedError?: string;
 }
@@ -201,15 +163,6 @@ function scrubSecretNames(warnings: string[], secretNames: Set<string>): string[
   });
 }
 
-/** A name with case, dashes, underscores and runs of spaces folded away. */
-function looseNameKey(name: string): string {
-  return name
-    .trim()
-    .toLowerCase()
-    .replace(/[-_\s]+/g, " ")
-    .trim();
-}
-
 /** Matches `name` in any case, with dashes, underscores and spaces interchangeable. */
 function looseNamePattern(name: string): RegExp {
   const parts = name
@@ -251,8 +204,8 @@ export interface BuildResult {
   error?: string;
 }
 
-function parseFlags(): BuildFlags {
-  const args = process.argv.slice(2);
+/** CLI arguments → flags (`--player`, `--strict`, `--out <dir>`, `--config <file>`). */
+export function parseFlags(args: string[] = process.argv.slice(2)): BuildFlags {
   const flags: BuildFlags = { player: false, strict: false };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -266,20 +219,106 @@ function parseFlags(): BuildFlags {
   return flags;
 }
 
+/** One search-index row per shipped entity. */
+export interface SearchIndexEntry {
+  id: string;
+  title: string;
+  type: Entity["type"];
+  aliases: string[];
+  tags: string[];
+  summary?: string;
+  excerpt: string;
+  bodyText: string;
+  dateLabel?: string;
+  dateValue?: number;
+  dateYear?: number;
+}
+
+/** A gate the build failed: the CLI exit code and its one-line reason. */
+export interface BuildFailure {
+  exitCode: number;
+  message: string;
+}
+
 /**
- * Programmatic entry. Same behavior as invoking `npx tsx scripts/build-atlas.ts`
- * with the equivalent flags, but never calls `process.exit` directly.
- * Validation failures throw `BuildError(code, message)`; the top-level
- * CLI shim translates those into process.exit. The dev save plugin uses
- * this directly so an in-flight save can rebuild atlas.json without
+ * Everything the build counted, for the console report and the gates. The
+ * `warnings` here are the unscrubbed ones (they name DM entities); the
+ * player-safe copy is `project.buildReport.warnings`. Never ship this object.
+ */
+export interface BuildAtlasReport {
+  player: boolean;
+  strict: boolean;
+  scanned: number;
+  included: number;
+  /** Where `writeBuildOutput` puts the files by default (absolute). */
+  defaultOutDir: string;
+  excludedByFolder: number;
+  /** Folder-excluded notes, content-relative, sorted. */
+  excludedPaths: string[];
+  excludedByVisibility: number;
+  detectedDmBlocks: number;
+  strippedDmBlocks: number;
+  secretPlacementsExcluded: number;
+  regionsExcluded: number;
+  routesExcluded: number;
+  invalidVisibilityCount: number;
+  maps: number;
+  regions: number;
+  routes: number;
+  unresolvedLinks: number;
+  duplicateSlugs: number;
+  localAssets: number;
+  externalAssets: number;
+  missingAssets: number;
+  badExtensionCount: number;
+  strippedDmProfiles: number;
+  strippedDmRelationships: number;
+  relationshipLeaks: number;
+  regionLeaks: number;
+  routeLeaks: number;
+  routeWaypointMisses: number;
+  crossRefLeaks: number;
+  unresolvedRelationships: number;
+  warnings: string[];
+  errors: string[];
+  /** Asset findings of severity "error", formatted. */
+  assetErrors: string[];
+  /** Set when a gate fails; the atlas is still returned so callers can inspect it. */
+  failure?: BuildFailure;
+}
+
+export interface BuildAtlasResult {
+  project: AtlasProject;
+  searchIndex: SearchIndexEntry[];
+  report: BuildAtlasReport;
+}
+
+/**
+ * Programmatic entry. Same behavior as invoking `tsx scripts/build-atlas.ts`
+ * with the equivalent flags from `root`, but never calls `process.exit`:
+ * `buildAtlas`, then `writeBuildOutput`, then the console report, then the
+ * gates. Validation failures come back as `{ ok: false, exitCode }`. The dev
+ * save plugin uses this so an in-flight save can rebuild atlas.json without
  * spawning a child process.
  */
 export async function runBuild(
   flags: BuildFlags = { player: false, strict: false },
+  root: string = process.cwd(),
 ): Promise<BuildResult> {
   const started = Date.now();
   try {
-    await runBuildCore(flags);
+    const result = await buildAtlas(root, flags);
+    const outDir = writeBuildOutput(root, flags, result);
+    console.log(formatBuildReport(result.report));
+    console.log(`\nWrote ${path.relative(root, path.join(outDir, "atlas.json"))}`);
+    console.log(`Wrote ${path.relative(root, path.join(outDir, "search-index.json"))}\n`);
+    const failure = result.report.failure;
+    if (failure) {
+      console.error(
+        failure.exitCode === 1 ? "Build failed: validation errors above." : failure.message,
+      );
+      throw new BuildError(failure.exitCode, failure.message);
+    }
     return { ok: true, exitCode: 0, durationMs: Date.now() - started };
   } catch (e) {
     if (e instanceof BuildError) {
@@ -290,8 +329,83 @@ export async function runBuild(
   }
 }
 
-async function runBuildCore(flags: BuildFlags) {
-  const ROOT = process.cwd();
+/**
+ * The thin file adapter: writes `atlas.json` and `search-index.json` and
+ * returns the directory. Player builds go to `cfg.outputDir` (public/atlas,
+ * committed and served); DM builds to the gitignored `.local-atlas`, so
+ * spoilers never land in the committed atlas.json by accident. `--out` wins.
+ */
+export function writeBuildOutput(
+  root: string,
+  flags: BuildFlags,
+  { project, searchIndex, report }: BuildAtlasResult,
+): string {
+  const outDir = flags.outDir ? path.resolve(root, flags.outDir) : report.defaultOutDir;
+  fs.mkdirSync(outDir, { recursive: true });
+  // Player builds ship minified (smaller payload for players); DM/.local-atlas
+  // builds stay 2-space-indented so human diffs against them are readable.
+  const jsonIndent = flags.player ? undefined : 2;
+  fs.writeFileSync(path.join(outDir, "atlas.json"), JSON.stringify(project, null, jsonIndent));
+  fs.writeFileSync(
+    path.join(outDir, "search-index.json"),
+    JSON.stringify(searchIndex, null, jsonIndent),
+  );
+  return outDir;
+}
+
+/** The console build report, as the CLI prints it. */
+export function formatBuildReport(r: BuildAtlasReport): string {
+  const lines: string[] = [];
+  const log = (l: string) => lines.push(l);
+  log(`\n=== Atlas build report (${r.player ? "PLAYER" : "DM"}${r.strict ? ", strict" : ""}) ===`);
+  log(`Scanned:                 ${r.scanned}`);
+  log(`Included entities:       ${r.included}`);
+  log(`Excluded by folder:      ${r.excludedByFolder}`);
+  if (!r.player && r.excludedPaths.length > 0) {
+    for (const f of r.excludedPaths.slice(0, 20)) log(`  – ${f}`);
+    if (r.excludedPaths.length > 20) log(`  – …and ${r.excludedPaths.length - 20} more`);
+  }
+  log(`Excluded by visibility:  ${r.excludedByVisibility}`);
+  log(
+    `Stripped DM blocks:      ${r.strippedDmBlocks}${r.player ? "" : ` (DM build keeps ${r.detectedDmBlocks} block${r.detectedDmBlocks === 1 ? "" : "s"} in body)`}`,
+  );
+  log(`Excluded secret pins:    ${r.secretPlacementsExcluded}`);
+  log(`Excluded secret regions: ${r.regionsExcluded}`);
+  log(`Excluded secret routes:  ${r.routesExcluded}`);
+  log(`Invalid visibility (→dm):${r.invalidVisibilityCount}`);
+  log(`Maps:                    ${r.maps}`);
+  log(`Regions:                 ${r.regions}`);
+  log(`Routes:                  ${r.routes}`);
+  log(`Unresolved wikilinks:    ${r.unresolvedLinks} (allowed — not-yet-created notes)`);
+  log(`Duplicate slugs:         ${r.duplicateSlugs}`);
+  log(`Local assets:            ${r.localAssets}`);
+  log(`External assets:         ${r.externalAssets}`);
+  log(`Missing local assets:    ${r.missingAssets}`);
+  log(`Stripped DM profiles:    ${r.strippedDmProfiles}`);
+  log(`Stripped DM rels:        ${r.strippedDmRelationships}`);
+  log(`Relationship leaks:      ${r.relationshipLeaks}`);
+  log(`Region leaks:            ${r.regionLeaks}`);
+  log(`Route leaks:             ${r.routeLeaks}`);
+  log(`Route waypoint misses:   ${r.routeWaypointMisses}`);
+  log(`Cross-ref leaks:         ${r.crossRefLeaks}`);
+  log(`Unresolved relationships:${r.unresolvedRelationships}`);
+  log(`Warnings:                ${r.warnings.length}`);
+  log(`Errors:                  ${r.errors.length}`);
+  for (const e of r.errors) log(`  ✗ ${e}`);
+  for (const w of r.warnings) log(`  ! ${w}`);
+  for (const a of r.assetErrors) log(`  ${a}`);
+  return lines.join("\n");
+}
+
+/**
+ * Build the atlas in memory from the project at `root`: `{ project,
+ * searchIndex, report }`. Writes nothing but the build's asset side effects
+ * under `root/public` (player fog-redacted map layers, hashed audio, the
+ * audio picker manifest). Gate failures land in `report.failure`; an
+ * unreadable world config or a fog-on-tiled-layer map throws.
+ */
+export async function buildAtlas(root: string, flags: BuildFlags): Promise<BuildAtlasResult> {
+  const ROOT = path.resolve(root);
   const configPath = path.resolve(ROOT, flags.configPath ?? "atlas.config.json");
   const cfg = loadConfig(configPath);
   const contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
@@ -313,7 +427,7 @@ async function runBuildCore(flags: BuildFlags) {
   // the in-world calendar.
   let worldCfg: ReturnType<typeof loadWorldConfig> | null = null;
   try {
-    worldCfg = loadWorldConfig(contentDir, cfg.defaultWorld);
+    worldCfg = loadWorldConfig(contentDir, cfg.defaultWorld, ROOT);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`\n✗ ${msg}\n`);
@@ -393,39 +507,16 @@ async function runBuildCore(flags: BuildFlags) {
   }
 
   // Cross-reference index: title + aliases → id, covering EVERY parsed entity
-  // (player-visible and DM/hidden). Used for wikilink resolution so we can
-  // detect cross-ref leaks (a public-entry link to a DM-only target).
-  const crossRefNameIndex = new Map<string, string>();
-  // Tracks every distinct entity id a name (lowercased title/alias) has been
-  // registered under, so folder-path basename resolution (Q49) can refuse to
-  // guess when a name is ambiguous instead of silently picking the
-  // last-registered owner.
-  const nameOwners = new Map<string, Set<string>>();
-  // The same names with dashes, underscores and spaces folded together, so
-  // `[[Khal Azum]]`, `[[Khal_Azum]]` and `[[khal-azum]]` all find a note
-  // titled "Khal_Azum" and a link to a secret note is redacted whichever way
-  // the author spelled it (code-retro 06). Used only when the exact name
-  // finds nothing.
-  const looseOwners = new Map<string, Set<string>>();
-  const addOwner = (index: Map<string, Set<string>>, key: string, id: string) => {
-    let owners = index.get(key);
-    if (!owners) {
-      owners = new Set();
-      index.set(key, owners);
-    }
-    owners.add(id);
-  };
-  const registerName = (name: string, id: string) => {
-    const key = name.toLowerCase();
-    crossRefNameIndex.set(key, id);
-    addOwner(nameOwners, key, id);
-    addOwner(looseOwners, looseNameKey(name), id);
-  };
+  // (player-visible and DM/hidden) and folder-excluded notes. Used for
+  // wikilink resolution so we can detect cross-ref leaks (a public-entry link
+  // to a DM-only target). Loose and basename matching: see NameIndex.
+  const secretEntityIds = new Set<string>();
+  const names = new NameIndex(secretEntityIds);
+  const registerName = (name: string, id: string) => names.register(name, id);
   const allEntityVisibility = new Map<
     string,
     import("../src/atlas/content/schema").EntityVisibility
   >();
-  const secretEntityIds = new Set<string>();
   // Every literal string (title / id / alias) belonging to a non-player
   // entity. Used to scrub warning text before it ships in a player build.
   const secretNames = new Set<string>();
@@ -469,8 +560,8 @@ async function runBuildCore(flags: BuildFlags) {
     for (const a of aliases) secretNames.add(a);
   }
 
-  // PASS 2: build entities for pending, filtering out secrets in player mode
-  // and applying shipping-field DM-block stripping defensively.
+  // PASS 2: build the DM-side entity for every note that ships (secrets
+  // drop out of player builds here).
   let crossRefLeaks = 0;
   for (const item of allParsed) {
     if (flags.player && item.isSecret) {
@@ -478,13 +569,21 @@ async function runBuildCore(flags: BuildFlags) {
       continue;
     }
     const built = buildEntity(item, {
-      player: flags.player,
       defaultWorld: cfg.defaultWorld,
       calendar: worldCfg?.calendar,
     });
     detectedDmBlocks += built.detectedDmBlocks;
-    strippedDmBlocks += built.strippedDmBlocks;
+    if (flags.player) strippedDmBlocks += built.detectedDmBlocks;
     if (built.unbalancedError) errors.push(built.unbalancedError);
+    // Secret placement markers ({{secret:id}}) never ship in either mode —
+    // the secrets tab and encrypted blobs carry that content instead. The
+    // player projection strips them itself; the DM body loses them here.
+    if (flags.player) {
+      built.pending.rawBody = stripSecretMarkers(stripDmBlocks(item.parsed.body).text);
+    } else {
+      built.pending.entity.body = stripSecretMarkers(item.parsed.body);
+      built.pending.rawBody = built.pending.entity.body;
+    }
     pending.push(built.pending);
 
     // Capture secret specs for the async encrypt pass below.
@@ -505,71 +604,63 @@ async function runBuildCore(flags: BuildFlags) {
     }
   }
 
-  // Wikilink resolution uses the FULL cross-reference index (including
-  // DM/hidden entities) so we can detect public-entry → DM-target leaks.
-  // Loose fallback: one owner wins outright; among several, a secret one
-  // wins so the link is redacted (fail closed); otherwise it stays broken.
-  const resolveLoose = (n: string) => {
-    const owners = looseOwners.get(looseNameKey(n));
-    if (!owners || owners.size === 0) return undefined;
-    if (owners.size === 1) return [...owners][0];
-    return [...owners].find((id) => secretEntityIds.has(id));
+  // Entity → visibility for the entities this build ships. Relationship,
+  // region and route leak detection all read it.
+  const entityVisibility = new Map<
+    string,
+    import("../src/atlas/content/schema").EntityVisibility
+  >();
+  for (const { entity } of pending) entityVisibility.set(entity.id, entity.visibility);
+
+  // Player builds: every entity goes through the one player projection
+  // (src/atlas/content/projectEntityForPlayer.ts). It runs before the encrypt
+  // pass, so no entity has `secrets` yet and every {{secret:id}} marker is
+  // dropped from the player HTML. Its report feeds the counters below.
+  const projectionCtx: ProjectionContext = {
+    secretIds: secretEntityIds,
+    resolveByName: names.resolveByName,
+    resolveByBasename: names.resolveByBasename,
+    entityVisibility,
   };
-  const resolveByName = (n: string) =>
-    crossRefNameIndex.get(n.trim().toLowerCase()) ?? resolveLoose(n);
-  // Folder-path fallback (Q49): resolves a basename against the same index,
-  // but refuses (returns undefined) when that name is owned by more than one
-  // distinct entity — an ambiguous basename must stay broken, never guessed.
-  const resolveByBasename = (n: string) => {
-    const key = n.trim().toLowerCase();
-    if ((nameOwners.get(key)?.size ?? 0) > 1) return undefined;
-    return crossRefNameIndex.get(key) ?? resolveLoose(n);
-  };
+  const projectionReports = new Map<string, ProjectionReport>();
 
   const backlinkMap = new Map<string, Map<string, string>>();
   for (const item of pending) {
-    const { entity, rawBody } = item;
-    // Resolve ![[image.ext]] AFTER DM stripping (rawBody is already noDm) so embeds in %% blocks are absent.
-    const resolvedBody = resolveImageEmbeds(rawBody, DEFAULT_RESOLVE_ASSET);
+    const { rawBody } = item;
     for (const filename of extractImageEmbedFilenames(rawBody)) {
       embeddedAssetRefs.push({
         raw: DEFAULT_RESOLVE_ASSET(filename),
-        owner: `entity ${entity.id} (embedded image)`,
+        owner: `entity ${item.entity.id} (embedded image)`,
       });
     }
-    const { tokenized, links } = tokenizeWikilinks(resolvedBody, {
-      resolveByName,
-      resolveByBasename,
-    });
-    entity.links = links;
-    for (const l of links) {
-      // Cross-reference spoiler leak detection (player builds only). The link
-      // resolved to a real entity, but that entity is excluded from the player
-      // build — keeping the link would ship the display text (often the
-      // secret's name). Redact display, drop href, mark broken, count it.
-      if (flags.player && l.resolvedId && secretEntityIds.has(l.resolvedId)) {
+    if (flags.player) {
+      const projected = projectEntityWithReport(item.entity, projectionCtx);
+      item.entity = projected.entity;
+      projectionReports.set(item.entity.id, projected.report);
+      // Cross-reference spoiler leaks: a link from a shipped entry to a
+      // secret note. The projection already redacted it; count and warn.
+      for (const l of projected.report.redactedLinks) {
         crossRefLeaks += 1;
         const targetVis = allEntityVisibility.get(l.resolvedId) ?? "dm";
         warnings.push(
-          `entity "${entity.id}": wikilink "${l.target}" resolves to ${targetVis} entity "${l.resolvedId}" — spoiler leak, redacted from player output`,
+          `entity "${item.entity.id}": wikilink "${l.target}" resolves to ${targetVis} entity "${l.resolvedId}" — spoiler leak, redacted from player output`,
         );
-        // Redact body markdown: replace the raw `[[target(|display)?]]`
-        // syntax with "…" so the secret name doesn't leak through atlas.json
-        // entity.body or the search index (which both ship the raw body).
-        if (l.target) {
-          const escTarget = l.target.replace(/[.+*?^${}()|[\]\\]/g, "\\$&");
-          entity.body = entity.body.replace(
-            new RegExp(`\\[\\[${escTarget}(?:\\|[^\\]]+)?\\]\\]`, "g"),
-            "…",
-          );
-        }
-        l.resolvedId = undefined;
-        l.display = "…";
-        // Redact target too — entity.links ships verbatim, and the raw target
-        // text is usually the secret's name.
-        l.target = "";
-        l.broken = true;
       }
+    } else {
+      const { entity } = item;
+      const resolvedBody = resolveImageEmbeds(rawBody, DEFAULT_RESOLVE_ASSET);
+      const { tokenized, links } = tokenizeWikilinks(resolvedBody, {
+        resolveByName: names.resolveByName,
+        resolveByBasename: names.resolveByBasename,
+      });
+      entity.links = links;
+      // Sanitize rendered markdown HTML BEFORE shipping it in atlas.json:
+      // defense-in-depth against HTML/script injection in lore content.
+      const html = markdownToHtml(tokenized);
+      entity.bodyHtml = sanitizeAtlasHtml(renderLinkTokens(html, links, { hideBroken: false }));
+    }
+    const { entity } = item;
+    for (const l of entity.links) {
       if (l.broken) {
         // Unresolved wikilinks are normal "not created yet" — count, don't warn.
         unresolvedLinks += 1;
@@ -578,15 +669,6 @@ async function runBuildCore(flags: BuildFlags) {
         backlinkMap.get(l.resolvedId)!.set(entity.id, entity.title);
       }
     }
-    const html = markdownToHtml(tokenized);
-    // In player builds, broken link tokens (which now include links to excluded
-    // dm entities) must NOT leak the target name. Render as plain display text.
-    // Sanitize rendered markdown HTML BEFORE shipping it in atlas.json.
-    // This is defense-in-depth against HTML/script injection in lore content;
-    // it does NOT replace player-safe DM stripping (which has already run
-    // upstream on the raw markdown).
-    const linked = renderLinkTokens(html, links, { hideBroken: flags.player });
-    entity.bodyHtml = sanitizeAtlasHtml(linked);
   }
   for (const { entity } of pending) {
     const m = backlinkMap.get(entity.id);
@@ -598,14 +680,6 @@ async function runBuildCore(flags: BuildFlags) {
 
   const worldId = cfg.defaultWorld;
   const fallbackMapId = `${worldId}-overview`;
-
-  // Build entity → visibility map up-front so route/region leak detection
-  // (which runs before the relationship pass) can use it too.
-  const entityVisibility = new Map<
-    string,
-    import("../src/atlas/content/schema").EntityVisibility
-  >();
-  for (const { entity } of pending) entityVisibility.set(entity.id, entity.visibility);
 
   // worldCfg was loaded earlier (so entity dates can resolve against the calendar).
   if (worldCfg) warnings.push(...worldCfg.warnings);
@@ -874,12 +948,12 @@ async function runBuildCore(flags: BuildFlags) {
   let unresolvedRelationships = 0;
   for (const { entity } of pending) {
     if (flags.player) {
-      if (entity.profile?.dm) strippedDmProfiles += 1;
-      entity.profile = stripDmProfile(entity.profile);
-    }
-    if (!entity.relationships?.length) continue;
-    if (flags.player) {
-      const res = filterRelationshipsForPlayer(entity.relationships, { entityVisibility });
+      // The projection already dropped profile.dm and filtered relationships;
+      // its report says what went, for the counters and the strict gate.
+      const report = projectionReports.get(entity.id);
+      if (report?.strippedDmProfile) strippedDmProfiles += 1;
+      const res = report?.relationships;
+      if (!res) continue;
       strippedDmRelationships += res.droppedByVisibility.length;
       relationshipLeaks += res.droppedByLeak.length;
       unresolvedRelationships += res.unresolved.length;
@@ -894,10 +968,9 @@ async function runBuildCore(flags: BuildFlags) {
           `entity "${entity.id}": relationship → "${r.entity}" points at unknown entity — dropped`,
         );
       }
-      entity.relationships = res.kept.length > 0 ? res.kept : undefined;
     } else {
       // DM build: only check for unresolved targets so the editor can flag them.
-      for (const r of entity.relationships) {
+      for (const r of entity.relationships ?? []) {
         if (!entityVisibility.has(r.entity)) {
           unresolvedRelationships += 1;
           warnings.push(
@@ -1030,204 +1103,112 @@ async function runBuildCore(flags: BuildFlags) {
     },
   };
 
-  // Output safety: player builds go to public/atlas (committed/served).
-  // DM builds go to a gitignored .local-atlas folder by default to avoid
-  // accidentally shipping spoilers via the committed atlas.json.
-  const defaultOut = flags.player ? cfg.outputDir : ".local-atlas";
-  const outDir = path.resolve(ROOT, flags.outDir ?? defaultOut);
-  fs.mkdirSync(outDir, { recursive: true });
-  // Player builds ship minified (smaller payload for players); DM/.local-atlas
-  // builds stay 2-space-indented so human diffs against them are readable.
-  const jsonIndent = flags.player ? undefined : 2;
-  fs.writeFileSync(path.join(outDir, "atlas.json"), JSON.stringify(project, null, jsonIndent));
-
   const searchIndex = buildSearchIndex(pending);
-  fs.writeFileSync(
-    path.join(outDir, "search-index.json"),
-    JSON.stringify(searchIndex, null, jsonIndent),
-  );
-
-  const r = project.buildReport!;
-  console.log(
-    `\n=== Atlas build report (${flags.player ? "PLAYER" : "DM"}${flags.strict ? ", strict" : ""}) ===`,
-  );
-  console.log(`Scanned:                 ${r.scanned}`);
-  console.log(`Included entities:       ${r.included}`);
-  console.log(`Excluded by folder:      ${scanInfo.excludedFiles}`);
-  if (!flags.player && scanInfo.excludedPaths.length > 0) {
-    const rels = [...scanInfo.excludedPaths]
+  const report: BuildAtlasReport = {
+    player: flags.player,
+    strict: flags.strict,
+    defaultOutDir: path.resolve(ROOT, flags.player ? cfg.outputDir : ".local-atlas"),
+    scanned: project.buildReport!.scanned,
+    included: project.buildReport!.included,
+    excludedByFolder: scanInfo.excludedFiles,
+    excludedPaths: [...scanInfo.excludedPaths]
       .map((f) => path.relative(contentDir, f).replace(/\\/g, "/"))
-      .sort();
-    for (const f of rels.slice(0, 20)) console.log(`  – ${f}`);
-    if (rels.length > 20) console.log(`  – …and ${rels.length - 20} more`);
-  }
-  console.log(`Excluded by visibility:  ${visibilityExcluded}`);
-  console.log(
-    `Stripped DM blocks:      ${r.strippedDmBlocks}${flags.player ? "" : ` (DM build keeps ${detectedDmBlocks} block${detectedDmBlocks === 1 ? "" : "s"} in body)`}`,
-  );
-  console.log(`Excluded secret pins:    ${secretPlacementsExcluded}`);
-  console.log(`Excluded secret regions: ${regionsExcluded}`);
-  console.log(`Excluded secret routes:  ${routesExcluded}`);
-  console.log(`Invalid visibility (→dm):${invalidVisibilityCount}`);
-  console.log(`Maps:                    ${maps.length}`);
-  console.log(`Regions:                 ${regions.length}`);
-  console.log(`Routes:                  ${routes.length}`);
-  console.log(`Unresolved wikilinks:    ${r.unresolvedLinks} (allowed — not-yet-created notes)`);
-  console.log(`Duplicate slugs:         ${r.duplicateSlugs}`);
-  console.log(`Local assets:            ${localAssets}`);
-  console.log(`External assets:         ${externalAssets}`);
-  console.log(`Missing local assets:    ${missingAssets}`);
-  console.log(`Stripped DM profiles:    ${strippedDmProfiles}`);
-  console.log(`Stripped DM rels:        ${strippedDmRelationships}`);
-  console.log(`Relationship leaks:      ${relationshipLeaks}`);
-  console.log(`Region leaks:            ${regionLeaks}`);
-  console.log(`Route leaks:             ${routeLeaks}`);
-  console.log(`Route waypoint misses:   ${routeWaypointMisses}`);
-  console.log(`Cross-ref leaks:         ${crossRefLeaks}`);
-  console.log(`Unresolved relationships:${unresolvedRelationships}`);
-  console.log(`Warnings:                ${warnings.length}`);
-  console.log(`Errors:                  ${errors.length}`);
-  for (const e of errors) console.log(`  ✗ ${e}`);
-  for (const w of warnings) console.log(`  ! ${w}`);
-  for (const f of assetFindings) {
-    if (f.severity === "error") console.log(`  ${formatFinding(f)}`);
-  }
-  console.log(`\nWrote ${path.relative(ROOT, path.join(outDir, "atlas.json"))}`);
-  console.log(`Wrote ${path.relative(ROOT, path.join(outDir, "search-index.json"))}\n`);
-
-  enforceBuildGates(flags, {
-    errors,
+      .sort(),
+    excludedByVisibility: visibilityExcluded,
+    detectedDmBlocks,
+    strippedDmBlocks,
+    secretPlacementsExcluded,
+    regionsExcluded,
+    routesExcluded,
     invalidVisibilityCount,
+    maps: maps.length,
+    regions: regions.length,
+    routes: routes.length,
+    unresolvedLinks,
+    duplicateSlugs,
+    localAssets,
+    externalAssets,
     missingAssets,
     badExtensionCount,
-    duplicateSlugs,
+    strippedDmProfiles,
+    strippedDmRelationships,
     relationshipLeaks,
     regionLeaks,
     routeLeaks,
+    routeWaypointMisses,
     crossRefLeaks,
-  });
+    unresolvedRelationships,
+    warnings,
+    errors,
+    assetErrors: assetFindings.filter((f) => f.severity === "error").map(formatFinding),
+  };
+  report.failure = checkBuildGates(flags, report);
+  return { project, searchIndex, report };
 }
 
 /**
- * Assemble one player-or-DM entity from a parsed file. This is the DM-content
- * stripping frontier: in player mode every shipping string (body, summary,
- * aliases, tags, profile.player, relationship labels, dates) is run through
- * the %%-block sanitizer, meta tags are dropped, and title-duplicate aliases
- * are removed. DM builds keep everything. Counters the caller aggregates
- * (detected / stripped DM blocks, unbalanced-delimiter errors) are returned
- * rather than mutated so the function stays pure.
+ * Assemble the DM-side entity for one parsed file: every field as authored
+ * (body still carrying DM blocks and secret markers). DM builds strip the
+ * secret markers from the body and ship the rest; player builds hand it to
+ * `projectEntityWithReport`, the one player projection. Title-duplicate
+ * aliases are dropped in both. Counters are returned, not mutated.
  */
 function buildEntity(
   item: AllParsed,
   opts: {
-    player: boolean;
     defaultWorld: string;
     calendar: Parameters<typeof parseAtlasDate>[1];
   },
 ): BuiltEntity {
   const { parsed, title, id, visibility, rel } = item;
-  const { player } = opts;
 
-  // Body DM-block stripping (player builds only). Unbalanced %% is a build
-  // error in either mode — it indicates an unclosed comment block, which
-  // can silently leak everything after it.
-  const { text: noDmStripped, count: cStripped, unbalanced } = stripDmBlocks(parsed.body);
-  const detectedDmBlocks = cStripped;
+  // Unbalanced %% is a build error in either mode: it indicates an unclosed
+  // comment block, which can silently leak everything after it.
+  const { count: detectedDmBlocks, unbalanced } = stripDmBlocks(parsed.body);
   let unbalancedError: string | undefined;
   if (unbalanced) {
     unbalancedError = `${rel}: body has an unbalanced DM delimiter — likely an unclosed %%...%% block or an unclosed :::dm...::: callout. Add the closing fence (or remove the stray opener).`;
   }
-  // Secret placement markers ({{secret:id}}) never ship in either mode — the
-  // secrets tab and encrypted blobs carry that content instead.
-  const noDm = stripSecretMarkers(player ? noDmStripped : parsed.body);
-  const strippedDmBlocks = player ? cStripped : 0;
-
-  // Shipping-field sanitization: every string that lands in atlas.json must
-  // be free of %% blocks in player builds. The body is already handled
-  // above; this covers summary, aliases, tags, profile player fields, etc.
-  // Sanitize a single shipping string. In player builds this strips %% DM
-  // blocks and returns `undefined` when the field was ENTIRELY DM content — so
-  // callers fall back explicitly (e.g. `?? title`). In DM builds it passes
-  // the value through unchanged.
-  const sanitizeShippingField = player
-    ? (s: string | undefined) => stripDmFromShippingString(s)
-    : (s: string | undefined) => s;
-  const stripArr = player
-    ? (arr: string[]) =>
-        arr.map((x) => stripDmFromShippingString(x) ?? "").filter((x) => x.length > 0)
-    : (arr: string[]) => arr;
-
-  // Player builds only: strip meta tags ("#npc", "#stub") that read as
-  // jargon to players. DM builds keep them — they're useful for editor
-  // filtering. Comparison is case-insensitive.
-  const scrubTags = player
-    ? (arr: string[]) => arr.filter((t) => !META_TAGS.has(t.toLowerCase()))
-    : (arr: string[]) => arr;
 
   // Drop aliases that duplicate the title (case-insensitive). The vault
   // convention of `aliases: [TitleString, ...]` is common and harmless on
   // disk, but rendering "aka {title}" alongside the title itself looks like
-  // a bug. Always apply — duplicate aliases are never useful anywhere.
-  const dedupAliases = (arr: string[], t: string) => {
-    const tl = t.toLowerCase();
-    return arr.filter((a) => a.trim().toLowerCase() !== tl);
-  };
+  // a bug.
+  const tl = title.toLowerCase();
+  const aliases = (parsed.atlas.aliases ?? []).filter((a) => a.trim().toLowerCase() !== tl);
 
   const entity: Entity = {
     id,
-    title: sanitizeShippingField(title) ?? title,
+    title,
     type: parsed.atlas.type ?? "note",
     world: parsed.atlas.world ?? opts.defaultWorld,
     visibility,
     canon: (parsed.atlas.canon as Entity["canon"]) ?? "canon",
-    aliases: dedupAliases(stripArr(parsed.atlas.aliases ?? []), title),
-    tags: scrubTags(stripArr(parsed.atlas.tags ?? [])),
-    summary: sanitizeShippingField(parsed.atlas.summary),
-    race: sanitizeShippingField(parsed.atlas.race),
+    aliases,
+    tags: parsed.atlas.tags ?? [],
+    summary: parsed.atlas.summary,
+    race: parsed.atlas.race,
     credit: parsed.atlas.credit,
     images: (parsed.atlas.images ?? []).map(relImage),
-    body: noDm,
+    body: parsed.body,
     bodyHtml: "",
-    frontmatter: player ? {} : parsed.data,
-    sourcePath: player ? "" : rel,
+    frontmatter: parsed.data,
+    sourcePath: rel,
     links: [],
     backlinks: [],
     profile: compactProfile(parsed.atlas.profile),
     relationships: parsed.atlas.relationships,
   };
 
-  // Sanitize profile.player shipping strings (profile.dm is dropped later).
-  if (player && entity.profile?.player) {
-    const pp = entity.profile.player;
-    if (pp.known_for) pp.known_for = stripDmFromShippingString(pp.known_for);
-    if (pp.visible_traits) {
-      pp.visible_traits = pp.visible_traits
-        .map((s: string) => stripDmFromShippingString(s) ?? "")
-        .filter((s: string) => s.length > 0);
-    }
-    if (pp.rumors) {
-      pp.rumors = pp.rumors
-        .map((s: string) => stripDmFromShippingString(s) ?? "")
-        .filter((s: string) => s.length > 0);
-    }
-  }
-  // Sanitize relationship.label / description for player builds.
-  if (player && entity.relationships) {
-    for (const r of entity.relationships) {
-      if (r.label) r.label = stripDmFromShippingString(r.label);
-      if (r.description) r.description = stripDmFromShippingString(r.description);
-    }
-  }
-
   // Date / timeline support.
   const parsedDate = parseAtlasDate(parsed.atlas.date, opts.calendar);
   if (parsedDate) {
-    entity.dateLabel = sanitizeShippingField(parsedDate.label);
+    entity.dateLabel = parsedDate.label;
     entity.dateValue = parsed.atlas.dateValue ?? parsedDate.value;
     entity.dateYear = parsedDate.year;
   } else if (typeof parsed.atlas.dateValue === "number") {
     entity.dateValue = parsed.atlas.dateValue;
-    entity.dateLabel = sanitizeShippingField(parsed.atlas.date);
+    entity.dateLabel = parsed.atlas.date;
   }
 
   const fmAtlas = (parsed.data.atlas as Record<string, unknown>) ?? {};
@@ -1237,9 +1218,8 @@ function buildEntity(
   const explicitPlacements = parsed.atlas.placements ?? [];
 
   return {
-    pending: { entity, rawBody: noDm, placements: explicitPlacements, legacy },
+    pending: { entity, rawBody: parsed.body, placements: explicitPlacements, legacy },
     detectedDmBlocks,
-    strippedDmBlocks,
     unbalancedError,
   };
 }
@@ -1342,7 +1322,7 @@ async function redactMapsForPlayer(
  * the lowercased `body` used for matching is derived client-side on load
  * (loader.ts) rather than duplicated here.
  */
-function buildSearchIndex(pending: Pending[]) {
+function buildSearchIndex(pending: Pending[]): SearchIndexEntry[] {
   // Strip markdown but preserve original case — used as bodyText for display.
   const stripMdCore = (s: string) =>
     s
@@ -1373,88 +1353,79 @@ function buildSearchIndex(pending: Pending[]) {
 }
 
 /**
- * Enforce the build's fail-fast gates in the exact order and with the exact
- * exit codes the CLI contract depends on. Any validation error fails the
- * build (exit 1); strict / strict-player builds additionally fail on invalid
+ * The build's fail-fast gates, in the exact order and with the exact exit
+ * codes the CLI contract depends on. Any validation error fails the build
+ * (exit 1); strict / strict-player builds additionally fail on invalid
  * visibility (3), missing assets (4), bad extensions (9), duplicate slugs (2),
  * relationship leaks (5), region leaks (6), route leaks (7), and cross-ref
- * leaks (8). Throws BuildError; never returns on failure.
+ * leaks (8). Returns the first failure, or undefined when every gate passes.
  */
-function enforceBuildGates(
-  flags: BuildFlags,
-  d: {
-    errors: string[];
-    invalidVisibilityCount: number;
-    missingAssets: number;
-    badExtensionCount: number;
-    duplicateSlugs: number;
-    relationshipLeaks: number;
-    regionLeaks: number;
-    routeLeaks: number;
-    crossRefLeaks: number;
-  },
-): void {
-  if (d.errors.length > 0) {
-    console.error("Build failed: validation errors above.");
-    throw new BuildError(1, "validation errors");
-  }
+function checkBuildGates(flags: BuildFlags, d: BuildAtlasReport): BuildFailure | undefined {
+  if (d.errors.length > 0) return { exitCode: 1, message: "validation errors" };
+  const strictPlayer = flags.player && flags.strict;
   // Strict + player must NEVER ship a build with invalid visibility values,
   // because the parser silently coerces them to "dm" and the spoiler risk
   // demands authoring discipline.
-  if (flags.player && flags.strict && d.invalidVisibilityCount > 0) {
-    const msg = `Strict player mode: ${d.invalidVisibilityCount} invalid visibility value(s). Failing build.`;
-    console.error(msg);
-    throw new BuildError(3, msg);
+  if (strictPlayer && d.invalidVisibilityCount > 0) {
+    return {
+      exitCode: 3,
+      message: `Strict player mode: ${d.invalidVisibilityCount} invalid visibility value(s). Failing build.`,
+    };
   }
   // Missing local assets in a strict player build must fail — players would
   // see broken images. External URLs only warn.
-  if (flags.player && flags.strict && d.missingAssets > 0) {
-    const msg = `Strict player mode: ${d.missingAssets} missing local asset(s). Failing build.`;
-    console.error(msg);
-    throw new BuildError(4, msg);
+  if (strictPlayer && d.missingAssets > 0) {
+    return {
+      exitCode: 4,
+      message: `Strict player mode: ${d.missingAssets} missing local asset(s). Failing build.`,
+    };
   }
   // Unsupported asset extensions are unrenderable in browsers — block strict
   // player builds before they ship 404s or broken images.
-  if (flags.player && flags.strict && d.badExtensionCount > 0) {
-    const msg = `Strict player mode: ${d.badExtensionCount} asset(s) with unsupported extension. Failing build.`;
-    console.error(msg);
-    throw new BuildError(9, msg);
+  if (strictPlayer && d.badExtensionCount > 0) {
+    return {
+      exitCode: 9,
+      message: `Strict player mode: ${d.badExtensionCount} asset(s) with unsupported extension. Failing build.`,
+    };
   }
   // Strict mode (non-asset, non-link) still fails on duplicate slugs etc.
   // Unresolved wikilinks are explicitly allowed and do NOT fail strict.
   if (flags.strict && d.duplicateSlugs > 0) {
-    const msg = "Strict mode: duplicate slugs present. Failing build.";
-    console.error(msg);
-    throw new BuildError(2, msg);
+    return { exitCode: 2, message: "Strict mode: duplicate slugs present. Failing build." };
   }
   // Strict + player must never ship a relationship that points at a DM-only
   // entity — that's a direct spoiler leak via the public relationship graph.
-  if (flags.player && flags.strict && d.relationshipLeaks > 0) {
-    const msg = `Strict player mode: ${d.relationshipLeaks} relationship leak(s) to DM-only entities. Failing build.`;
-    console.error(msg);
-    throw new BuildError(5, msg);
+  if (strictPlayer && d.relationshipLeaks > 0) {
+    return {
+      exitCode: 5,
+      message: `Strict player mode: ${d.relationshipLeaks} relationship leak(s) to DM-only entities. Failing build.`,
+    };
   }
   // Strict + player must never ship player-visible region/route geometry that
   // names DM-only or unknown entities — these leak DM map prep to players.
-  if (flags.player && flags.strict && d.regionLeaks > 0) {
-    const msg = `Strict player mode: ${d.regionLeaks} region leak(s) to DM-only/unknown entities. Failing build.`;
-    console.error(msg);
-    throw new BuildError(6, msg);
+  if (strictPlayer && d.regionLeaks > 0) {
+    return {
+      exitCode: 6,
+      message: `Strict player mode: ${d.regionLeaks} region leak(s) to DM-only/unknown entities. Failing build.`,
+    };
   }
-  if (flags.player && flags.strict && d.routeLeaks > 0) {
-    const msg = `Strict player mode: ${d.routeLeaks} route leak(s) to DM-only/unknown entities. Failing build.`;
-    console.error(msg);
-    throw new BuildError(7, msg);
+  if (strictPlayer && d.routeLeaks > 0) {
+    return {
+      exitCode: 7,
+      message: `Strict player mode: ${d.routeLeaks} route leak(s) to DM-only/unknown entities. Failing build.`,
+    };
   }
   // Strict + player must never ship a wikilink from a public entry to a
   // DM/hidden entity — the display TEXT inside the link reveals the secret
   // name even after we redact the href. Build fails so the DM rewrites the
   // sentence.
-  if (flags.player && flags.strict && d.crossRefLeaks > 0) {
-    const msg = `Strict player mode: ${d.crossRefLeaks} cross-reference leak(s): wikilinks from player-visible entries to DM/hidden entities. Failing build.`;
-    console.error(msg);
-    throw new BuildError(8, msg);
+  if (strictPlayer && d.crossRefLeaks > 0) {
+    return {
+      exitCode: 8,
+      message: `Strict player mode: ${d.crossRefLeaks} cross-reference leak(s): wikilinks from player-visible entries to DM/hidden entities. Failing build.`,
+    };
   }
+  return undefined;
 }
 
 /**
