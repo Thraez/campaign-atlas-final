@@ -64,8 +64,10 @@ import type { FileChange } from "@/atlas/save/localFsSave";
 import { SaveStatus } from "@/atlas/session/SaveStatus";
 import { DiscardConfirmModal } from "@/atlas/session/DiscardConfirmModal";
 import { useExternalRebuildDetector } from "@/atlas/session/useExternalRebuildDetector";
-import { CanonicalSaveError } from "@/atlas/save/canonicalPlacementSave";
-import { buildCanonicalEntityChanges } from "@/atlas/save/canonicalEntitySave";
+import {
+  CanonicalSaveError,
+  buildCanonicalPlacementChanges,
+} from "@/atlas/save/canonicalPlacementSave";
 import { useWorldYamlBaseline, worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
 import {
   buildWorldYamlContent as pureBuildWorldYamlContent,
@@ -812,10 +814,6 @@ function AtlasPlacementEditorInner() {
       allDraftPlacements: buildDraftPlacements(),
       overrides,
       activeMapId: activeMap.id,
-      // Entity edits go through EntityEditPanel/useEntityEditDraft, so this is
-      // always {} in production. The param is pending removal (eval-2026-10/18).
-      entityDrafts: {},
-      projectEntities: project.entities,
       worldYamlDirty,
     });
     if (plan.isEmpty && foreignMapDrafts.length === 0) {
@@ -825,16 +823,11 @@ function AtlasPlacementEditorInner() {
     // N100: fold in cross-map duplicates (overrides keyed to a map other
     // than the active one) — buildSavePlan only ever sees the active map.
     const drafts = [...plan.dirtyPlacements, ...foreignMapDrafts];
-    const fmPatches = plan.frontmatterPatches;
     const entitiesById = new Map(project.entities.map((e) => [e.id, e]));
     try {
-      // One FileChange per entity .md path even when an entity is edited in
-      // BOTH placements and frontmatter drafts —
-      // the save endpoint rejects duplicate paths.
-      const entityChanges = await buildCanonicalEntityChanges(
-        { placements: drafts, frontmatter: fmPatches },
-        entitiesById,
-      );
+      // One FileChange per entity .md path, however many maps it is placed
+      // on — the save endpoint rejects duplicate paths.
+      const entityChanges = await buildCanonicalPlacementChanges(drafts, entitiesById);
       const fileChanges: FileChange[] = [...entityChanges];
 
       if (worldYamlDirty && activeWorldId) {
