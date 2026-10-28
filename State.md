@@ -52,9 +52,47 @@ Prompts Isak got overnight, and what replaced them: `npm run atlas:publish` (its
 commands with shell variables (one plain command per call, absolute paths).
 
 - `main` was pushed once (f65c854..0c1d92a, docs only, on his yes) before this rule arrived.
-- PRs waiting for his yes to merge (each merge publishes), in stack order: #62 → #66 → #68 → #80 → #81;
-  #64 → #67 → #69 → #70; #63; #65; #71 → #73 → #77; #72; #74 → #76 → #82, #74 → #79; #75; #78. See "Merge queue" for what each needs him to look at.
+- PRs #62-#82 wait for his yes to merge (each merge publishes). The order is under "Merge order"
+  below.
 - Local `main` commits since 0c1d92a: push them in the morning.
+
+### Merge order for #62-#82 (one yes covers the list)
+
+Push local `main` first: every overnight branch carries its docs commits, so each diff shrinks to
+its own work. The repo merges with merge commits, and the publish workflow cancels a run still in
+progress when a newer one starts (`cancel-in-progress`). So a run of merges ends in one
+publish of the last state. For each PR: retarget it to `main` once its parent has merged, bring
+`main` in, wait for the PR check, then merge. **Stop at the first conflict or red check** and
+leave the rest for Isak (AGENTS.md: never resolve a merge conflict unattended).
+
+1. **#75**: one test runner, and publish runs the tests. First, so every later merge's publish
+   runs the suite.
+2. **#82's safety fix, early:** #74 → #76 → #82. Before #74 merges, Isak runs `npm run
+   atlas:publish` once on the #74 branch, as its ticket asks.
+3. **#79** (sync safety), stacked on #74. It conflicts with #82 in `src/test/sync-safety.test.ts`;
+   #82 changed a few lines there and #79 rewrote the file. Resolve on #79's branch by keeping
+   #79's version with #82's in-process `buildPlayer` helper and node pragma. That conflict is the
+   one place this list needs Isak.
+4. Save stack: **#62 → #66 → #68 → #80 → #81**.
+5. Drawing stack: **#64 → #67 → #69 → #70**. It touches `AtlasPlacementEditor.tsx`, as the save
+   stack does, in different hunks; a conflict here means stop.
+6. Independent: **#65** (player import graph), **#72** (maps lossless), **#63** (one search),
+   **#78** (offline menu).
+7. Sound stack: **#71 → #73 → #77**.
+
+Needs Isak's eyes before or after the merge (each is in "Merge queue"):
+- #63: search;
+- #64 and #67: the editor map;
+- #66: the toast;
+- #68: the path field;
+- #70: zooming pin labels;
+- #71: a reload with sound on, on desktop and phone;
+- #78: offline in a browser;
+- #79: the Sync panel;
+- #80 and #81: the chip and the conflict notice.
+
+None of these blocks a merge: each is a look-and-feel check, and a bad result becomes a ticket.
+Once the stacks are in, tickets 27, 29 and 30 are unblocked; build 30 first (it fixes data loss).
 - **In the vault, for Isak in Obsidian:** four notes have an unclosed DM block (`%%` or `:::dm`),
   so the DM build refuses them after a sync: blood-moon-circle, the-sovereign-eternal,
   sister-peline-thrace, the-penitent-of-harkafell. Found by the code-retro 07 sync-twice run (read
