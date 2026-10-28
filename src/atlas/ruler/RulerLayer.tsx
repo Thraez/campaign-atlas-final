@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useMapEvents, useMap, CircleMarker, Polyline, Tooltip } from "react-leaflet";
 import type { MapScale } from "@/atlas/content/schema";
-import { mapClickToAtlasCoord } from "@/atlas/editor/mapClickCoord";
+import { mapClickToAtlasCoord } from "@/atlas/map/mapClickCoord";
 import { measureDistance } from "./measureDistance";
 
 interface RulerLayerProps {

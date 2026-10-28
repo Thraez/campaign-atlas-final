@@ -15,6 +15,7 @@ import {
   parseBrowseFilterParams,
   serializeBrowseFilterParams,
 } from "@/atlas/browse/browseFilterParams";
+import { entityHref } from "@/atlas/deepLink";
 
 type Mode = "browse" | "tag" | "type";
 
@@ -279,7 +280,7 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
                                 (z-10 lifts them above the overlay). Nesting <a> in <a>
                                 is invalid HTML and breaks the chip clicks. */}
                               <Link
-                                to={`/atlas?entity=${encodeURIComponent(e.id)}`}
+                                to={entityHref(e.id)}
                                 className="font-medium text-sm truncate after:absolute after:inset-0 after:content-['']"
                               >
                                 {e.title}

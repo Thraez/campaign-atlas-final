@@ -11,7 +11,6 @@ import {
   MapContainer,
   Marker,
   Popup,
-  Polygon,
   Polyline,
   ImageOverlay,
   Tooltip,
@@ -29,7 +28,6 @@ import type {
   MapPlacement,
   Point,
   GridOverlay,
-  MapScale,
 } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -59,6 +57,7 @@ import { SoundSettingsProvider } from "@/atlas/sound/SoundSettingsProvider";
 import { SoundscapeLayer } from "@/atlas/sound/SoundscapeLayer";
 import { SoundControl } from "@/atlas/sound/SoundControl";
 import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
+import { setOfflineMap, type OfflineMap } from "@/pwa";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 import { SearchPalette } from "@/atlas/search/SearchPalette";
@@ -73,12 +72,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
 import { ScaleBarController, type ScaleBarState } from "@/atlas/scale/ScaleBar";
 import { serializeDeepLink, parseDeepLink } from "@/atlas/deepLink";
-import {
-  ROUTE_MODE_LABEL,
-  routeDistancePx,
-  formatTravelTime,
-  gridLines,
-} from "@/atlas/map/geometry";
+import { gridLines } from "@/atlas/map/geometry";
+import { RegionShape, RouteShape } from "@/atlas/map/featureShapes";
 import { atlasToLatLng } from "@/atlas/map/coords";
 import { useVisitedPlaces } from "@/atlas/visited/useVisitedPlaces";
 import { pinDiscoveryClass } from "@/atlas/wander/pinDiscoveryClass";
@@ -405,6 +400,13 @@ export default function AtlasViewer() {
     () => data?.project.maps.find((m) => m.id === activeMapId),
     [data, activeMapId],
   );
+  // The offline menu and banner describe what is stored for this map.
+  const offlineMap: OfflineMap | null = useMemo(() => {
+    if (!activeMap) return null;
+    const layerSrcs = activeMap.layers.map((l) => l.src);
+    return { key: [activeMap.id, ...layerSrcs].join("\n"), layerSrcs };
+  }, [activeMap]);
+  useEffect(() => setOfflineMap(offlineMap), [offlineMap]);
   const placementsOnMap: MapPlacement[] = useMemo(
     () =>
       data && activeMap ? data.project.placements.filter((p) => p.mapId === activeMap.id) : [],
@@ -1132,77 +1134,37 @@ export function WrappedWorld({
 
       {(map.regions ?? []).map((region) => {
         const ent = region.entityId ? entityById.get(region.entityId) : undefined;
-        const color = region.color ?? (ent ? resolvePinStyle(ent.type).color : "#7fb069");
-        const positions = region.points.map(([x, y]) => [H - y, x + dx] as [number, number]);
         return (
-          <Polygon
+          <RegionShape
             key={`${region.id}-${dx}`}
-            positions={positions}
-            pathOptions={{
-              color,
-              weight: 1.5,
-              fillColor: color,
-              fillOpacity: region.fillOpacity ?? 0.18,
-              opacity: region.strokeOpacity ?? 0.85,
-            }}
+            region={region}
+            entityType={ent?.type}
+            positions={region.points.map(([x, y]) => [H - y, x + dx] as [number, number])}
             eventHandlers={
               region.entityId && !rulerActive
                 ? { click: () => onOpenEntity(region.entityId!, false) }
                 : undefined
             }
           >
-            {/* Hover label so users don't rely on fill color alone to identify
-                a region (WCAG 1.4.1). Click still opens the full popup. */}
-            <Tooltip sticky direction="top" opacity={0.95}>
-              <div className="text-xs font-medium">{region.name}</div>
-            </Tooltip>
             <Popup>
               <div className="text-sm font-medium">{region.name}</div>
               {ent?.summary && <div className="text-xs opacity-70">{ent.summary}</div>}
             </Popup>
-          </Polygon>
+          </RegionShape>
         );
       })}
 
       {(map.routes ?? []).map((route) => {
-        const pts = (route.resolvedPoints ?? []).map(
-          ([x, y]) => [H - y, x + dx] as [number, number],
-        );
-        if (pts.length < 2) return null;
-        const color = route.color ?? "#cfd6dc";
-        const distPx = routeDistancePx(route.resolvedPoints ?? []);
-        const scale: MapScale | undefined = map.scale;
-        const distLabel = scale
-          ? `${(distPx * scale.unitsPerPixel).toFixed(1)} ${scale.unitLabel}`
-          : `${Math.round(distPx)} px`;
-        const travel =
-          scale && route.speed
-            ? formatTravelTime((distPx * scale.unitsPerPixel) / route.speed)
-            : null;
-        const modeLabel = route.mode ? ROUTE_MODE_LABEL[route.mode] : "";
+        const points = route.resolvedPoints ?? [];
+        if (points.length < 2) return null;
         return (
-          <Polyline
+          <RouteShape
             key={`${route.id}-${dx}`}
-            positions={pts}
-            pathOptions={{
-              color,
-              weight: route.weight ?? 3,
-              opacity: 0.9,
-              dashArray: route.dashed ? "8 6" : undefined,
-              lineCap: "round",
-              lineJoin: "round",
-            }}
-          >
-            <Tooltip sticky direction="top" opacity={0.95}>
-              <div className="text-xs">
-                <div className="font-medium">{route.name}</div>
-                <div className="opacity-80">
-                  {distLabel}
-                  {travel ? ` · ${travel} ${modeLabel}` : ""}
-                </div>
-              </div>
-            </Tooltip>
-          </Polyline>
+            route={route}
+            points={points}
+            positions={points.map(([x, y]) => [H - y, x + dx] as [number, number])}
+            scale={map.scale}
+          />
         );
       })}
 

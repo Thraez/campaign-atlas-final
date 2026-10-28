@@ -72,7 +72,9 @@ import {
   REENCODE_QUALITY,
   WEBP_QUALITY,
   MAX_IMAGE_WIDTH,
+  shouldConvertMapToWebp,
 } from "../src/atlas/assets/imageEncoding";
+import { encodeMapWebp } from "./atlas/mapWebp";
 import { runBuild, type BuildResult as InProcessBuildResult } from "./build-atlas";
 import { tryAcquireBuildLock, releaseBuildLock } from "./atlas/buildLock";
 import { DEV_API_PATHS, DEV_API_PREFIX } from "./atlas/devRoutes";
@@ -84,16 +86,25 @@ const MAX_VAULT_AGGREGATE_BYTES = 25 * 1024 * 1024;
 const MAX_ASSET_DATAURL_BYTES = 8 * 1024 * 1024;
 const MAX_ASSET_BINARY_BYTES = 6 * 1024 * 1024;
 /**
- * Whether an uploaded asset is asking to be published as WebP.
+ * Whether an uploaded asset targets a `.webp` name under `assets/<folder>/`.
  *
- * Scoped to `assets/images/` on purpose. Maps live under `assets/maps/` and
- * stay lossless — fog redaction and map labels both suffer under a lossy
- * re-encode, and `scripts/dev/optimize-maps.mjs` owns their sizing instead.
+ * Under `images/` that name is the instruction to convert (lossy, clamped).
+ * Under `maps/` it means a map that maps:optimize repointed to a WebP twin;
+ * maps stay lossless — fog redaction and map labels both suffer under a lossy
+ * re-encode, and `scripts/dev/optimize-maps.ts` owns their sizing instead.
  */
-function isConvertibleImageTarget(relPath: string): boolean {
+function isWebpTargetIn(relPath: string, folder: "images" | "maps"): boolean {
   const p = relPath.replace(/\\/g, "/").toLowerCase();
-  return p.includes("/assets/images/") && p.endsWith(".webp");
+  return p.includes(`/assets/${folder}/`) && p.endsWith(".webp");
 }
+
+/**
+ * A map upload that can't reach a `.webp` map target without loss (JPG, or a
+ * PNG that wouldn't come out pixel-identical) or without flattening an
+ * animation (GIF). Turned into a 400 with reason `map-format-refused`. Ticket
+ * eval-2026-10/29 owns the editor's JPG-map path.
+ */
+class MapFormatRefusedError extends Error {}
 
 const BUILD_TIMEOUT_MS = 60_000;
 const BACKUP_DIR = ".atlas-backups";
@@ -381,7 +392,7 @@ function hashBytes(buf: Buffer): string {
  */
 async function cleanImageBytes(buf: Buffer, source: string, target: string): Promise<Buffer> {
   const format = normalizeFormat(source);
-  if (isConvertibleImageTarget(target) && shouldConvertToWebp(format))
+  if (isWebpTargetIn(target, "images") && shouldConvertToWebp(format))
     return (
       sharp(buf)
         // Bake in EXIF orientation before that metadata is dropped, or a phone
@@ -391,6 +402,28 @@ async function cleanImageBytes(buf: Buffer, source: string, target: string): Pro
         .webp({ quality: WEBP_QUALITY })
         .toBuffer()
     );
+  // A map named `.webp` (maps:optimize repoints world.yaml to a WebP twin)
+  // is never lossy re-encoded and never resized: fog redaction and map labels
+  // smear under a lossy encode.
+  if (isWebpTargetIn(target, "maps")) {
+    // PNG is lossless: encode it the way maps:optimize does, checked pixel for
+    // pixel, and refuse rather than keep a WebP that isn't exact.
+    if (shouldConvertMapToWebp(format)) {
+      const encoded = await encodeMapWebp(buf);
+      if (encoded.ok) return encoded.webp;
+      throw new MapFormatRefusedError(
+        `This PNG can't be saved as a WebP map without loss: ${encoded.reason}. ` +
+          `Save it under a .png name instead.`,
+      );
+    }
+    // Already WebP: keep the bytes. Any re-encode would either add loss (if it
+    // was lossy) or flatten an animation.
+    if (format === "webp") return buf;
+    throw new MapFormatRefusedError(
+      `A ${format || "unknown"} file can't be saved as a WebP map without loss or ` +
+        `flattening; upload a PNG or WebP (JPG maps: ticket eval-2026-10/29).`,
+    );
+  }
   // `animated: true` keeps every frame of a GIF or WebP; without it sharp
   // reads only the first and republishes an animation as a still.
   const s = sharp(buf, { animated: true });
@@ -549,6 +582,17 @@ export async function handleSaveRequest(
         // fog redaction and map labels both want lossless.
         stripped = await cleanImageBytes(buf, mime, f.path);
       } catch (e) {
+        if (e instanceof MapFormatRefusedError) {
+          return {
+            status: 400,
+            payload: {
+              error: "InvalidContent",
+              reason: "map-format-refused",
+              failedPath: f.path,
+              detail: e.message,
+            },
+          };
+        }
         return {
           status: 400,
           payload: {
