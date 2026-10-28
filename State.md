@@ -53,7 +53,7 @@ commands with shell variables (one plain command per call, absolute paths).
 
 - `main` was pushed once (f65c854..0c1d92a, docs only, on his yes) before this rule arrived.
 - PRs waiting for his yes to merge (each merge publishes), in stack order: #62 → #66 → #68;
-  #64 → #67 → #69; #63; #65. See "Merge queue" for what each needs him to look at.
+  #64 → #67 → #69 → #70; #63; #65; #71. See "Merge queue" for what each needs him to look at.
 - Local `main` commits since 0c1d92a: push them in the morning.
 - Code-retro 06 needs a real `npm run atlas:publish` run before it is done (the ticket asks for
   it; overnight only its parts ran).
@@ -66,24 +66,27 @@ Isak's rule, 2026-10-27: sessions may merge their own PRs once checks pass and t
 clean, but here every merge into `main` starts the publish workflow, which counts as publishing.
 So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logged here.
 
-| PR  | Ticket | What                                           | Waits on                                       |
-| --- | ------ | ---------------------------------------------- | ---------------------------------------------- |
-| #62 | 18     | Remove the entity-frontmatter save stream      | His yes                                        |
-| #63 | 14     | One search for palette, Browse and Timeline    | Isak tries search (Q2); his yes                |
-| #64 | 15     | One drawing module for regions and routes      | Isak's look at the editor map (Q3); yes        |
-| #65 | 10     | A test walks the player entry's imports        | His yes                                        |
-| #66 | 12     | Save refuses when an image's bytes are missing | #62 (stacked); Isak sees the toast; yes        |
-| #67 | 11     | Pin layer stops rebuilding on every change     | #64 (stacked); Isak checks the map by eye; yes |
-| #68 | 19     | Map layer uploads always get a real path       | #66 (stacked); Isak tries the path field; yes  |
-| #69 | a-08   | The map waits for a size before flying         | #67 (stacked); his yes                         |
+| PR  | Ticket | What                                           | Waits on                                         |
+| --- | ------ | ---------------------------------------------- | ------------------------------------------------ |
+| #62 | 18     | Remove the entity-frontmatter save stream      | His yes                                          |
+| #63 | 14     | One search for palette, Browse and Timeline    | Isak tries search (Q2); his yes                  |
+| #64 | 15     | One drawing module for regions and routes      | Isak's look at the editor map (Q3); yes          |
+| #65 | 10     | A test walks the player entry's imports        | His yes                                          |
+| #66 | 12     | Save refuses when an image's bytes are missing | #62 (stacked); Isak sees the toast; yes          |
+| #67 | 11     | Pin layer stops rebuilding on every change     | #64 (stacked); Isak checks the map by eye; yes   |
+| #68 | 19     | Map layer uploads always get a real path       | #66 (stacked); Isak tries the path field; yes    |
+| #69 | a-08   | The map waits for a size before flying         | #67 (stacked); his yes                           |
+| #70 | 20     | Pin labels switch mode when the zoom changes   | #69 (stacked); Isak zooms and looks; yes         |
+| #71 | 21     | Sound comes back after a reload                | Isak reloads with sound on (desktop, phone); yes |
 
 In flight (2026-10-28, overnight):
 
 - `code-retro-06-read-note`: three reviews done (Standards, Spec, player safety). The safety
   review found one leak (a `---x` line inside frontmatter now parsed as a key, so a note could
-  ship as player) and one place where the build no longer redacts on its own. Fixes are with the
-  builder; no PR until they land and the side-by-side check against main shows nothing looser.
-- `eval-20-label-mode-zoom`: building, stacked on `audit-08-flyto-zero-size`.
+  ship as player) and one place where the build no longer redacts on its own. Fixed in f575e7a;
+  a second safety review is running. No PR until it is clean.
+- `eval-22-maps-optimize-lossless`: review fixes with the builder.
+- `eval-23-crossfade-latest-wins`: building, stacked on #71.
 - Code-retro 07 and 08 wait on 06.
   Merged 2026-10-27 on Isak's relayed yes ("Atlas may merge #61 first, then #57, #58, #59 and #60 in
   order, each after its CI re-run is green; the publishes are fine"). Each PR's branch was updated
@@ -116,6 +119,11 @@ answer, logged here and built on; he reviews this list in batches, and a reversa
 | 2026-10-28 | Sweep 3 Q3: the PR check and publish both run `test:ci`; publish is gated on tests?                     | Yes (about 3 min more per publish)                         | A merge in GitHub skips the hook, so publish trusts nothing    | 24     |
 | 2026-10-28 | Sweep 3 Q4: calm mode becomes the one "reduce motion" switch (map, ocean, transitions)?                 | Yes; moved out of sound settings, OR'd with the OS setting | Calm mode stops the waves but not the map's flights            | 27     |
 | 2026-10-28 | Sweep 3 Q5: the offline menu claims only what is stored; install caches atlas.json and the current map? | Yes; portraits and audio stay cached on visit              | Precaching every picture makes the install too heavy           | 25     |
+
+| 2026-10-28 | eval-22 review: may the editor re-encode a JPG map lossy to strip its metadata? | No; drop the metadata segments, keep the image data | Maps stay lossless; one more q85 pass smears labels | 29 |
+| 2026-10-28 | eval-22 review: may `maps:optimize` delete the PNG once its WebP twin is in place and repointed? | Yes, as `images:optimize` does; git keeps it | Otherwise every map ships twice and every run re-encodes | 22 |
+| 2026-10-28 | eval-21 review: should Dismiss on the "resume sound" invite leave sound off? | Yes; taps on the invite's own buttons don't count as the gesture | Dismiss has to mean no sound | 21 |
+| 2026-10-28 | eval-21: does a bed set up while muted or in a hidden tab ("paused") count as playing? | Yes; the label can't show while muted anyway | Otherwise unmuting doesn't bring the label back until a pan | 21 |
 
 ## Retro, 2026-10-28 (overnight)
 

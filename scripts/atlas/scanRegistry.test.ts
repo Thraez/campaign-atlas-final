@@ -50,6 +50,14 @@ describe("SCANS", () => {
       expect(labels).toContain(`${id} public/atlas`);
     }
   });
+
+  it("checks the built site's file types (the DM's store may hold other files)", () => {
+    const ctx = { root: "/repo", configPath: "/repo/atlas.config.json", contentDir: "/c" };
+    const labels = scanTasks(ctx).map((t) => t.label);
+    expect(labels.filter((l) => l.startsWith("check-player-files"))).toEqual([
+      "check-player-files dist",
+    ]);
+  });
 });
 
 describe("runAll", () => {
