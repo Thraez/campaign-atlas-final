@@ -76,6 +76,16 @@ export interface LocalSaveResult {
   build?: LocalSaveBuildInfo;
 }
 
+/**
+ * null when the rebuild was fine (or not requested); otherwise the message to
+ * show: the build's stderr, else the rebuild error tail, else a stub. The files
+ * are on disk either way.
+ */
+export function rebuildFailure(result: LocalSaveResult): string | null {
+  if (result.build?.ok !== false && result.rebuilt !== false) return null;
+  return result.build?.stderr || result.rebuildError || "No details were reported.";
+}
+
 export class DisallowedPathError extends Error {
   constructor(public readonly path: string) {
     super(`Path not in source allowlist: ${path}`);
@@ -110,6 +120,28 @@ export class LocalSaveError extends Error {
   ) {
     super(message);
     this.name = "LocalSaveError";
+  }
+}
+
+/**
+ * Thrown when a write failed partway through the batch and the endpoint
+ * rolled it back (HTTP 207 `{ error: "WriteFailed", partialWrite: true }`).
+ * Nothing was saved, so callers must keep their drafts. 207 passes `res.ok`,
+ * which is why this needs its own check. The message names the file for
+ * callers that only show `err.message`.
+ */
+export class WriteFailedError extends LocalSaveError {
+  constructor(
+    public readonly failedPath: string,
+    public readonly rolledBack: number,
+    public readonly writeError?: string,
+  ) {
+    super(
+      `Could not write ${failedPath}${writeError ? ` (${writeError})` : ""}. Nothing was saved: ` +
+        `rolled back ${rolledBack} earlier file${rolledBack === 1 ? "" : "s"} in the batch.`,
+      { failedPath, rolledBack, writeError },
+    );
+    this.name = "WriteFailedError";
   }
 }
 
@@ -238,6 +270,24 @@ export async function saveAtlasPatchToLocalFs(
     throw new LocalSaveError(
       body && typeof body.error === "string" ? body.error : `Save failed with status ${res.status}`,
       body ?? undefined,
+    );
+  }
+
+  // A rolled-back write answers 207, which passes `res.ok`: not a save.
+  const writeFailedBody = parsed as {
+    error?: unknown;
+    partialWrite?: unknown;
+    failedPath?: unknown;
+    rolledBack?: unknown;
+    writeError?: unknown;
+  } | null;
+  if (writeFailedBody?.error === "WriteFailed" && writeFailedBody.partialWrite === true) {
+    throw new WriteFailedError(
+      typeof writeFailedBody.failedPath === "string"
+        ? writeFailedBody.failedPath
+        : "(unknown file)",
+      typeof writeFailedBody.rolledBack === "number" ? writeFailedBody.rolledBack : 0,
+      typeof writeFailedBody.writeError === "string" ? writeFailedBody.writeError : undefined,
     );
   }
 

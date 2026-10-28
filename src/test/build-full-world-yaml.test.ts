@@ -15,8 +15,13 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { buildFullWorldYaml } from "@/atlas/yaml/buildFullWorldYaml";
-import { loadWorldConfig } from "../../scripts/atlas/loadWorldConfig";
+import yaml from "js-yaml";
+import {
+  buildFullWorldYaml,
+  EDITOR_OWNED_KEYS,
+  WorldYamlUnreadableError,
+} from "@/atlas/yaml/buildFullWorldYaml";
+import { loadWorldConfig, resolveCredits } from "../../scripts/atlas/loadWorldConfig";
 import type { FogOverlay, MapDocument, Region, Route, WorldCalendar } from "@/atlas/content/schema";
 
 const WORLD = "test-world";
@@ -522,5 +527,112 @@ describe("buildFullWorldYaml — layer optional fields", () => {
     const cfg = loadEmitted(out)!;
     expect(cfg.maps[0].layers[0].rotation).toBe(45);
     expect(cfg.maps[0].layers[0].tileSrc).toBe("atlas/assets/maps/tile.png");
+  });
+});
+
+describe("buildFullWorldYaml — keeps keys the editor doesn't model", () => {
+  it("keeps the import: block and an unknown top-level key from the existing file", () => {
+    const existing =
+      "# header\n\n" +
+      "schemaVersion: 1\n" +
+      "maps:\n  - id: m1\n    name: Old\n    width: 10\n    height: 10\n    layers: []\n" +
+      "import:\n  folders:\n    npc: npcs\n    region: regions\n  defaultFolder: imports\n" +
+      "dmNotes:\n  owner: thraez\n  tags: [a, b]\n";
+    const out = buildFullWorldYaml({
+      maps: [makeMap({ name: "New" })],
+      schemaVersion: 1,
+      existing,
+    });
+    const parsed = yaml.load(out) as Record<string, unknown>;
+    expect(parsed.import).toEqual({
+      folders: { npc: "npcs", region: "regions" },
+      defaultFolder: "imports",
+    });
+    expect(parsed.dmNotes).toEqual({ owner: "thraez", tags: ["a", "b"] });
+    // The editor-owned key is still replaced, and the file's key order is kept.
+    expect((parsed.maps as Array<{ name: string }>)[0].name).toBe("New");
+    expect(Object.keys(parsed)).toEqual(["schemaVersion", "maps", "import", "dmNotes"]);
+    expect(out.startsWith("# header\n\n")).toBe(true);
+    const cfg = loadEmitted(out)!;
+    expect(cfg.importConfig.folders.npc).toBe("npcs");
+  });
+
+  it("refuses to save over an existing world.yaml that doesn't parse", () => {
+    const existing = "schemaVersion: 1\nimport:\n  folders: [unclosed\n";
+    expect(() => buildFullWorldYaml({ maps: [makeMap()], schemaVersion: 1, existing })).toThrow(
+      WorldYamlUnreadableError,
+    );
+    expect(() =>
+      buildFullWorldYaml({ maps: [makeMap()], schemaVersion: 1, existing: "- a\n- b\n" }),
+    ).toThrow(/import:/);
+  });
+
+  it("still saves when the existing file is empty or absent", () => {
+    for (const existing of [null, "", "# only a comment\n"]) {
+      const out = buildFullWorldYaml({ maps: [makeMap()], schemaVersion: 1, existing });
+      expect(loadEmitted(out)!.maps[0].id).toBe("m1");
+    }
+  });
+
+  it("lists every top-level key it emits in EDITOR_OWNED_KEYS", () => {
+    // Every owned field set (credits non-default so it's emitted), no existing
+    // file, so the output holds exactly the owned keys.
+    const out = buildFullWorldYaml({
+      maps: [makeMap()],
+      schemaVersion: 1,
+      name: "W",
+      calendar: { months: [{ name: "M", days: 30 }] },
+      credits: { badges: false, page: false },
+      assetCredits: { "atlas/a.png": { credit: "x", enabled: true } },
+      existing: null,
+    });
+    const keys = Object.keys(yaml.load(out) as Record<string, unknown>);
+    expect(keys.length).toBe(6);
+    for (const k of keys) expect(EDITOR_OWNED_KEYS.has(k)).toBe(true);
+  });
+
+  it("treats the loader's default credits as absent (matches resolveCredits)", () => {
+    const out = buildFullWorldYaml({
+      maps: [makeMap()],
+      schemaVersion: 1,
+      credits: resolveCredits(undefined),
+      existing: "maps: []\n",
+    });
+    expect(out).not.toMatch(/^credits:/m);
+  });
+
+  it("drops legacy top-level regions/fog/routes (the editor folds them into maps)", () => {
+    const existing =
+      "maps:\n  - id: m1\n    name: Old\n    width: 10\n    height: 10\n    layers: []\n" +
+      "regions:\n  - id: r1\n    mapId: m1\n    name: R\n    points: [[0, 0], [1, 0], [1, 1]]\n";
+    const out = buildFullWorldYaml({ maps: [makeMap()], schemaVersion: 1, existing });
+    const parsed = yaml.load(out) as Record<string, unknown>;
+    expect(parsed.regions).toBeUndefined();
+  });
+
+  it("round-trips the real world.yaml: same top-level keys and the same import: value", () => {
+    const contentRoot = path.resolve(__dirname, "../../content");
+    const worldId = "astrath-deeprealm";
+    const raw = fs.readFileSync(path.join(contentRoot, worldId, "_atlas", "world.yaml"), "utf8");
+    const before = loadWorldConfig(contentRoot, worldId)!;
+    // Save an unchanged map: feed the loader's own projection back in, the
+    // way the editor feeds atlas.json's.
+    const out = buildFullWorldYaml({
+      maps: before.maps,
+      schemaVersion: before.schemaVersion,
+      name: before.name,
+      calendar: before.calendar,
+      credits: before.credits,
+      assetCredits: before.assetCredits,
+      existing: raw,
+    });
+    const rawParsed = yaml.load(raw) as Record<string, unknown>;
+    const outParsed = yaml.load(out) as Record<string, unknown>;
+    expect(Object.keys(outParsed)).toEqual(Object.keys(rawParsed));
+    expect(rawParsed.import).toBeDefined();
+    expect(outParsed.import).toEqual(rawParsed.import);
+    const after = loadEmitted(out)!;
+    expect(after.importConfig).toEqual(before.importConfig);
+    expect(after.maps.map((m) => m.id)).toEqual(before.maps.map((m) => m.id));
   });
 });
