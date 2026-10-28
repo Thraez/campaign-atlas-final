@@ -59,9 +59,9 @@ commands with shell variables (one plain command per call, absolute paths).
   it; overnight only its parts ran).
 - Filed overnight: ticket 20 (pin labels keep their first mode across zoom, from the eval-11
   build) and 21-28 from the third sweep. 21-25 and 27 rest on provisional calls below.
-- Branch `eval-24-one-test-runner` (645baf5) was cut from local `main` and carries its unpushed
-  docs commits. Its work moves to `eval-24-test-runner` (from `origin/main`). The old branch can
-  be deleted once Isak says so (tag `archive/` first, per AGENTS.md).
+- Overnight branches (#71 onward) are cut from local `main`, because tickets 20-29 exist only
+  there. Their PRs show the unpushed docs commits too; once `main` is pushed, each PR's diff
+  shrinks to its own commits.
 
 ## Merge queue
 
