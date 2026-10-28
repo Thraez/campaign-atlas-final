@@ -2,16 +2,15 @@
  * Service worker registration + offline cache controls.
  *
  * IMPORTANT: registration is gated to PRODUCTION builds AND skipped
- * inside iframes / Lovable preview hosts. The Lovable editor renders
- * the app in an iframe on `id-preview--*.lovable.app` /
- * `*.lovableproject.com`; registering a SW there causes stale-content
- * and navigation issues that persist across reloads.
+ * inside iframes, where a SW causes stale content and navigation issues
+ * that persist across reloads.
  *
  * Vite dev server (`npm run dev`) is also skipped — `import.meta.env.PROD`
  * is false during dev.
  */
 import { Workbox } from "workbox-window";
 import { logger } from "@/lib/logger";
+import { normalizeAtlasAssetUrl } from "@/atlas/url";
 
 let wb: Workbox | null = null;
 let waitingWorker: ServiceWorker | null = null;
@@ -30,22 +29,10 @@ function isInIframe(): boolean {
   }
 }
 
-function isPreviewHost(): boolean {
-  const h = window.location.hostname;
-  return (
-    h.includes("id-preview--") ||
-    h.includes("preview--") ||
-    h.endsWith("lovableproject.com") ||
-    h.endsWith("lovableproject-dev.com") ||
-    (h.endsWith("lovable.app") && h.includes("preview"))
-  );
-}
-
 export function shouldEnableServiceWorker(): boolean {
   if (!("serviceWorker" in navigator)) return false;
   if (!import.meta.env.PROD) return false; // dev mode
-  if (isInIframe()) return false; // Lovable editor preview
-  if (isPreviewHost()) return false; // Lovable preview hosts
+  if (isInIframe()) return false;
   return true;
 }
 
@@ -99,9 +86,9 @@ export function onUpdateAvailable(fn: () => void): () => void {
 }
 
 /**
- * Subscribe to events that can flip `isOfflineReady()`'s result — a
- * newly-activated service worker, or this page's controller changing.
- * Replaces polling: callers re-read `isOfflineReady()` when this fires.
+ * Subscribe to events that can change `getOfflineCoverage()`'s result — a
+ * newly-activated service worker, this page's controller changing, or a
+ * save or clear from the offline menu. Callers re-read the caches when it fires.
  */
 export function onCacheStateChange(fn: () => void): () => void {
   cacheStateListeners.add(fn);
@@ -161,16 +148,7 @@ export async function reloadLatestAtlas(): Promise<ReloadResult> {
     return { ok: false, reason: "offline" };
   }
 
-  if ("caches" in window) {
-    await Promise.all(
-      CONTENT_CACHES.map((name) =>
-        caches.delete(name).catch((err) => {
-          logger.warn(`[pwa] could not clear cache ${name}`, err);
-          return false;
-        }),
-      ),
-    );
-  }
+  await deleteContentCaches();
 
   await checkForUpdate();
 
@@ -178,14 +156,121 @@ export async function reloadLatestAtlas(): Promise<ReloadResult> {
   return { ok: true };
 }
 
-/** Wipe all caches managed by the SW. */
-export async function clearOfflineCache(): Promise<void> {
+async function deleteContentCaches(): Promise<void> {
   if (!("caches" in window)) return;
-  const names = await caches.keys();
-  await Promise.all(names.map((n) => caches.delete(n)));
+  await Promise.all(
+    CONTENT_CACHES.map((name) =>
+      caches.delete(name).catch((err) => {
+        logger.warn(`[pwa] could not clear cache ${name}`, err);
+        return false;
+      }),
+    ),
+  );
 }
 
-/** True if a SW is currently controlling this page (i.e. offline-ready). */
-export function isOfflineReady(): boolean {
-  return !!navigator.serviceWorker?.controller;
+// ---------------------------------------------------------------------------
+// What is stored for offline use
+// ---------------------------------------------------------------------------
+
+/** Runtime cache names from vite.config.ts `workbox.runtimeCaching`. */
+const DATA_CACHE = "atlas-data";
+const ASSET_CACHE = "atlas-assets";
+/** Workbox names its precache `workbox-precache-v2-<scope>`. */
+const PRECACHE_PREFIX = "workbox-precache";
+
+/**
+ * What would work with no network, read from the caches themselves:
+ * - "none": the app shell or the notes (`atlas.json`) are missing;
+ * - "notes": shell and notes are stored, but not every layer of this map;
+ * - "notes-and-map": shell, notes and every local layer of this map.
+ * Portraits and audio are cached as they are opened, so any state but
+ * "none" also means "pictures you have opened".
+ */
+export type OfflineCoverage = "none" | "notes" | "notes-and-map";
+
+export type SaveForOfflineResult =
+  { ok: true } | { ok: false; reason: "offline" | "failed" | "unsupported" };
+
+function atlasDataUrls(): string[] {
+  return [
+    normalizeAtlasAssetUrl("atlas/atlas.json"),
+    normalizeAtlasAssetUrl("atlas/search-index.json"),
+  ];
+}
+
+/** Local layer URLs of a map, built like the viewer builds them. External
+ *  layers (http, data, blob) are never promised offline and are left out. */
+function localLayerUrls(layerSrcs: readonly string[]): string[] {
+  const urls = layerSrcs
+    .filter((src) => src && !/^(https?:|data:|blob:)/i.test(src))
+    .map((src) => normalizeAtlasAssetUrl(src));
+  return [...new Set(urls)];
+}
+
+async function hasShell(): Promise<boolean> {
+  const names = await caches.keys();
+  for (const name of names.filter((n) => n.startsWith(PRECACHE_PREFIX))) {
+    const cache = await caches.open(name);
+    if ((await cache.keys()).length > 0) return true;
+  }
+  return false;
+}
+
+async function allStored(cacheName: string, urls: string[]): Promise<boolean> {
+  if (!(await caches.has(cacheName))) return urls.length === 0;
+  const cache = await caches.open(cacheName);
+  const hits = await Promise.all(urls.map((u) => cache.match(u)));
+  return hits.every(Boolean);
+}
+
+/** Read the caches and say what of the atlas works offline for this map. */
+export async function getOfflineCoverage(layerSrcs: readonly string[]): Promise<OfflineCoverage> {
+  if (typeof window === "undefined" || !("caches" in window)) return "none";
+  try {
+    if (!(await hasShell())) return "none";
+    const [atlasJson] = atlasDataUrls();
+    if (!(await allStored(DATA_CACHE, [atlasJson]))) return "none";
+    return (await allStored(ASSET_CACHE, localLayerUrls(layerSrcs))) ? "notes-and-map" : "notes";
+  } catch (err) {
+    logger.warn("[pwa] could not read the offline caches", err);
+    return "none";
+  }
+}
+
+/**
+ * "Save this map for offline": store the notes and this map's layers in the
+ * same caches the service worker reads from, so they work with no network.
+ * Only URLs the player build itself serves are fetched (atlas data and the
+ * map's own layers), so nothing outside the player site is stored.
+ */
+export async function saveForOffline(layerSrcs: readonly string[]): Promise<SaveForOfflineResult> {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    return { ok: false, reason: "offline" };
+  }
+  if (!("caches" in window)) return { ok: false, reason: "unsupported" };
+  try {
+    const data = await caches.open(DATA_CACHE);
+    await data.addAll(atlasDataUrls());
+    const layers = localLayerUrls(layerSrcs);
+    if (layers.length > 0) {
+      const assets = await caches.open(ASSET_CACHE);
+      await assets.addAll(layers);
+    }
+    return { ok: true };
+  } catch (err) {
+    logger.warn("[pwa] could not save the atlas for offline use", err);
+    return { ok: false, reason: "failed" };
+  } finally {
+    notifyCacheStateChange();
+  }
+}
+
+/**
+ * Delete the stored atlas content (notes, maps, pictures). The app shell stays,
+ * so "Save this map for offline" can make it work offline again without
+ * waiting for a new service worker.
+ */
+export async function clearOfflineCache(): Promise<void> {
+  await deleteContentCaches();
+  notifyCacheStateChange();
 }

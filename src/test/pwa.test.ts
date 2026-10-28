@@ -3,7 +3,7 @@
  *
  * `shouldEnableServiceWorker()` decides whether the player atlas ever
  * registers a service worker — getting this wrong ships stale content, so
- * every branch (iframe detection, preview-host detection, prod/dev, SW
+ * every branch (iframe detection, prod/dev, SW
  * support) is covered here rather than left implicit.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -97,7 +97,7 @@ afterEach(() => {
 });
 
 describe("shouldEnableServiceWorker()", () => {
-  it("enabled when prod, not iframed, not a preview host, and SW is supported", async () => {
+  it("enabled when prod, not iframed, and SW is supported", async () => {
     const { shouldEnableServiceWorker } = await loadPwa();
     expect(shouldEnableServiceWorker()).toBe(true);
   });
@@ -124,24 +124,6 @@ describe("shouldEnableServiceWorker()", () => {
     setIframeCheckThrows();
     const { shouldEnableServiceWorker } = await loadPwa();
     expect(shouldEnableServiceWorker()).toBe(false);
-  });
-
-  it.each([
-    ["id-preview--foo.lovable.app", "id-preview-- prefix"],
-    ["preview--bar.lovable.app", "preview-- prefix"],
-    ["myatlas.lovableproject.com", "lovableproject.com suffix"],
-    ["myatlas.lovableproject-dev.com", "lovableproject-dev.com suffix"],
-    ["preview.myatlas.lovable.app", "lovable.app suffix containing 'preview'"],
-  ])("disabled on preview host: %s (%s)", async (hostname) => {
-    setHostname(hostname);
-    const { shouldEnableServiceWorker } = await loadPwa();
-    expect(shouldEnableServiceWorker()).toBe(false);
-  });
-
-  it("enabled on a plain lovable.app host without 'preview' in it", async () => {
-    setHostname("myatlas.lovable.app");
-    const { shouldEnableServiceWorker } = await loadPwa();
-    expect(shouldEnableServiceWorker()).toBe(true);
   });
 });
 
@@ -313,5 +295,179 @@ describe("reloadLatestAtlas", () => {
 
     expect(result.ok).toBe(true);
     expect(reloadCalls).toBe(1);
+  });
+});
+
+/**
+ * In-memory CacheStorage: cache name -> stored request URLs. `addAll` stands in
+ * for the fetch-and-store the browser does; a URL in `failing` makes it reject
+ * like a 404 would.
+ */
+function installFakeCaches(failing: string[] = []) {
+  const store = new Map<string, Set<string>>();
+  const open = async (name: string) => {
+    let entries = store.get(name);
+    if (!entries) {
+      entries = new Set();
+      store.set(name, entries);
+    }
+    const set = entries;
+    return {
+      match: async (url: string) => (set.has(url) ? { ok: true } : undefined),
+      keys: async () => [...set].map((url) => ({ url })),
+      addAll: async (urls: string[]) => {
+        const bad = urls.find((u) => failing.includes(u));
+        if (bad) throw new Error(`404 ${bad}`);
+        urls.forEach((u) => set.add(u));
+      },
+    };
+  };
+  Object.defineProperty(window, "caches", {
+    value: {
+      open,
+      keys: async () => [...store.keys()],
+      has: async (name: string) => store.has(name),
+      delete: async (name: string) => store.delete(name),
+    },
+    configurable: true,
+    writable: true,
+  });
+  return {
+    store,
+    /** What the service worker's install step leaves behind: the app shell. */
+    precacheShell() {
+      store.set("workbox-precache-v2-https://atlas.example.com/", new Set(["/index.html"]));
+    },
+    /** What visiting the atlas leaves behind: atlas.json via NetworkFirst. */
+    visitNotes() {
+      store.set("atlas-data", new Set(["/atlas/atlas.json"]));
+    },
+  };
+}
+
+const WORLD_LAYERS = ["atlas/assets/maps/world-1.webp", "/atlas/assets/maps/world-2.webp"];
+
+/**
+ * The offline menu used to say "Available offline" whenever a service worker
+ * controlled the page, even right after "Clear offline cache" had deleted
+ * every cache. Coverage now comes from what the caches actually hold.
+ */
+describe("offline coverage", () => {
+  beforeEach(() => {
+    Object.defineProperty(navigator, "onLine", { value: true, configurable: true });
+  });
+
+  afterEach(() => {
+    delete (window as { caches?: unknown }).caches;
+  });
+
+  it("is 'none' before anything is stored, even with a controlling SW", async () => {
+    Object.defineProperty(navigator, "serviceWorker", {
+      value: { controller: {} },
+      configurable: true,
+    });
+    installFakeCaches();
+    const { getOfflineCoverage } = await loadPwa();
+    expect(await getOfflineCoverage(WORLD_LAYERS)).toBe("none");
+  });
+
+  it("is 'none' when the notes are stored but the app shell is not", async () => {
+    const fake = installFakeCaches();
+    fake.visitNotes();
+    const { getOfflineCoverage } = await loadPwa();
+    expect(await getOfflineCoverage(WORLD_LAYERS)).toBe("none");
+  });
+
+  it("is 'notes' after a visit: shell and atlas.json stored, map layers not", async () => {
+    const fake = installFakeCaches();
+    fake.precacheShell();
+    fake.visitNotes();
+    const { getOfflineCoverage } = await loadPwa();
+    expect(await getOfflineCoverage(WORLD_LAYERS)).toBe("notes");
+  });
+
+  it("is 'notes-and-map' after saving this map for offline", async () => {
+    const fake = installFakeCaches();
+    fake.precacheShell();
+    const { getOfflineCoverage, saveForOffline } = await loadPwa();
+
+    const result = await saveForOffline(WORLD_LAYERS);
+
+    expect(result).toEqual({ ok: true });
+    expect(fake.store.get("atlas-data")).toContain("/atlas/atlas.json");
+    // Layer URLs go through the shared asset-URL helper: one leading slash.
+    expect([...(fake.store.get("atlas-assets") ?? [])].sort()).toEqual([
+      "/atlas/assets/maps/world-1.webp",
+      "/atlas/assets/maps/world-2.webp",
+    ]);
+    expect(await getOfflineCoverage(WORLD_LAYERS)).toBe("notes-and-map");
+  });
+
+  it("ignores external layer URLs: they are never promised offline", async () => {
+    const fake = installFakeCaches();
+    fake.precacheShell();
+    const { getOfflineCoverage, saveForOffline } = await loadPwa();
+    const layers = [...WORLD_LAYERS, "https://i.pinimg.com/x.jpg"];
+
+    await saveForOffline(layers);
+
+    expect(fake.store.get("atlas-assets")).not.toContain("https://i.pinimg.com/x.jpg");
+    expect(await getOfflineCoverage(layers)).toBe("notes-and-map");
+  });
+
+  it("only claims the map for the map it was saved for", async () => {
+    const fake = installFakeCaches();
+    fake.precacheShell();
+    const { getOfflineCoverage, saveForOffline } = await loadPwa();
+    await saveForOffline(WORLD_LAYERS);
+    expect(await getOfflineCoverage(["atlas/assets/maps/underdark.webp"])).toBe("notes");
+  });
+
+  it("saving refuses while offline and stores nothing", async () => {
+    Object.defineProperty(navigator, "onLine", { value: false, configurable: true });
+    const fake = installFakeCaches();
+    const { saveForOffline } = await loadPwa();
+    expect(await saveForOffline(WORLD_LAYERS)).toEqual({ ok: false, reason: "offline" });
+    expect(fake.store.size).toBe(0);
+  });
+
+  it("saving reports failure when a file can't be fetched", async () => {
+    const fake = installFakeCaches(["/atlas/assets/maps/world-2.webp"]);
+    fake.precacheShell();
+    const { saveForOffline, getOfflineCoverage } = await loadPwa();
+    expect(await saveForOffline(WORLD_LAYERS)).toEqual({ ok: false, reason: "failed" });
+    expect(await getOfflineCoverage(WORLD_LAYERS)).toBe("notes");
+  });
+
+  it("after clearing, coverage drops to 'none' and subscribers hear about it", async () => {
+    const fake = installFakeCaches();
+    fake.precacheShell();
+    const { getOfflineCoverage, saveForOffline, clearOfflineCache, onCacheStateChange } =
+      await loadPwa();
+    await saveForOffline(WORLD_LAYERS);
+    let fired = 0;
+    onCacheStateChange(() => fired++);
+
+    await clearOfflineCache();
+
+    expect(await getOfflineCoverage(WORLD_LAYERS)).toBe("none");
+    expect(fired).toBe(1);
+  });
+
+  it("clearing keeps the app shell so a later save can make it work offline again", async () => {
+    const fake = installFakeCaches();
+    fake.precacheShell();
+    const { getOfflineCoverage, saveForOffline, clearOfflineCache } = await loadPwa();
+    await saveForOffline(WORLD_LAYERS);
+    await clearOfflineCache();
+
+    await saveForOffline(WORLD_LAYERS);
+
+    expect(await getOfflineCoverage(WORLD_LAYERS)).toBe("notes-and-map");
+  });
+
+  it("is 'none' when the browser has no Cache API", async () => {
+    const { getOfflineCoverage } = await loadPwa();
+    expect(await getOfflineCoverage(WORLD_LAYERS)).toBe("none");
   });
 });
