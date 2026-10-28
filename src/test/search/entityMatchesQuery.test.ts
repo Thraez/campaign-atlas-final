@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { entityMatchesQuery } from "@/atlas/search/entityMatchesQuery";
+import { entityMatchesQuery } from "@/atlas/search/search";
 import type { Entity } from "@/atlas/content/schema";
 
 function makeEntity(overrides: Partial<Entity> = {}): Entity {
