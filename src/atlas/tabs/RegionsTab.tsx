@@ -8,6 +8,7 @@
  * YAML remains canon — every change here is a local draft until the DM hits
  * Save, which writes world.yaml and rebuilds the atlas.
  */
+import { DEFAULT_REGION_COLOR, DEFAULT_REGION_FILL_OPACITY } from "@/atlas/map/featureStyle";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Pen, Plus, Trash2, Copy, Crosshair, Target, RotateCcw, ChevronRight } from "lucide-react";
@@ -191,7 +192,7 @@ export function RegionsTab({ project, map, api, blockingCount, warningCount, onF
               >
                 <span
                   className="inline-block w-3 h-3 rounded-sm"
-                  style={{ background: r.color ?? "#7fb069" }}
+                  style={{ background: r.color ?? DEFAULT_REGION_COLOR }}
                 />
                 <span className="text-xs flex-1 truncate">{r.name}</span>
                 <span className="text-[10px] text-muted-foreground">{r.points.length} pts</span>
@@ -325,7 +326,7 @@ export function RegionsTab({ project, map, api, blockingCount, warningCount, onF
                 <Input
                   type="color"
                   className="h-7 p-1"
-                  value={selected.color ?? "#7fb069"}
+                  value={selected.color ?? DEFAULT_REGION_COLOR}
                   onChange={(e) => patch(selected.id, { color: e.target.value })}
                 />
               </div>
@@ -341,14 +342,14 @@ export function RegionsTab({ project, map, api, blockingCount, warningCount, onF
               <div className="flex justify-between">
                 <Label className="text-[10px]">Fill opacity</Label>
                 <span className="text-[10px] text-muted-foreground">
-                  {(selected.fillOpacity ?? 0.18).toFixed(2)}
+                  {(selected.fillOpacity ?? DEFAULT_REGION_FILL_OPACITY).toFixed(2)}
                 </span>
               </div>
               <Slider
                 min={0}
                 max={1}
                 step={0.05}
-                value={[selected.fillOpacity ?? 0.18]}
+                value={[selected.fillOpacity ?? DEFAULT_REGION_FILL_OPACITY]}
                 onValueChange={([v]) => patch(selected.id, { fillOpacity: v })}
               />
             </div>

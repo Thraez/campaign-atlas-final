@@ -1,15 +1,15 @@
 # PR safety scans for the campaign atlas.
 #
-# Runs on every pull request against main to catch DM/secret leaks before
-# they merge. The full publish + deploy flow lives in publish-atlas.yml and
-# still runs on push-to-main; this workflow only builds and scans, never
-# deploys.
+# Runs only when started by hand (Actions tab, or `gh workflow run`): CI
+# minutes are scarce, so PRs merge on the full local gate instead. Pick the
+# branch to check when starting it. The full publish + deploy flow lives in
+# publish-atlas.yml and still runs on push-to-main; this workflow only builds
+# and scans, never deploys.
 
 name: Atlas PR Check
 
 on:
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -83,4 +83,3 @@ jobs:
         # pre-commit hook; shard flags and the retry rule live in
         # scripts/dev/shardOutcome.ts.
         run: npm run test:shard -- ${{ matrix.shard }}
-

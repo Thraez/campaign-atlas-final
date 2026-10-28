@@ -283,3 +283,50 @@ describe("buildAssetBinaryChanges", () => {
     expect(buildAssetBinaryChanges([])).toEqual([]);
   });
 });
+
+// eval-19: an upload's target path is never "" and never a guess that differs
+// from what a fresh upload of the same file would get.
+describe("upload target path (eval-19)", () => {
+  it("treats an empty targetPath as missing and saves to the default path", () => {
+    const local = makeLocalLayer({
+      id: "layer-7",
+      filename: "Fog Overlay.PNG",
+      dataUrl: "data:image/png;base64,BBBB",
+      targetPath: "",
+    });
+
+    expect(buildAssetBinaryChanges([local])[0].path).toBe(
+      "public/atlas/assets/maps/fog-overlay.png",
+    );
+  });
+
+  it("treats a whitespace-only targetPath as missing in the world.yaml src too", () => {
+    const activeMap = makeMap();
+    const local = makeLocalLayer({ id: "layer-9", filename: "Ruins.jpg", targetPath: "   " });
+
+    buildWorldYamlContent({
+      activeMap,
+      maps: [activeMap],
+      mergedLayers: [makeLayer({ id: "layer-9", src: "blob:local" })],
+      localLayers: [local],
+      regionsEffective: [],
+      routesEffective: [],
+      fog: FOG,
+      existingRaw: null,
+    });
+
+    const maps = buildFullWorldYamlMock.mock.calls[0][0].maps as MapDocument[];
+    expect(maps[0].layers[0].src).toBe("atlas/assets/maps/ruins.jpg");
+  });
+
+  it("names an old layer with no targetPath from its original filename, keeping the extension", () => {
+    const local = makeLocalLayer({
+      id: "upload-1700000000000-0-old-map.webp",
+      filename: "Old Map.webp",
+      dataUrl: "data:image/webp;base64,CCCC",
+      targetPath: undefined,
+    });
+
+    expect(buildAssetBinaryChanges([local])[0].path).toBe("public/atlas/assets/maps/old-map.webp");
+  });
+});

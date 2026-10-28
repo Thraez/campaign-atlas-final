@@ -7,7 +7,7 @@
  *
  * No GitHub API, no auth — guarded disk writes only.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -44,12 +44,18 @@ export interface DiffPreviewModalProps {
    *  the editor can reflect a persistent "Save failed" status (the modal also
    *  shows its own error UI with Try again / Cancel). */
   onWriteFailed?: (message: string) => void;
+  /** A save conflict the editor can recover from. It re-reads what
+   *  changed, replaces `changes` with a batch rebuilt on top, and resolves to a
+   *  notice for the DM; null means it could not, and the conflict error shows. */
+  onConflict?: (err: ConflictError) => Promise<string | null>;
   onClose: () => void;
 }
 
 type Phase =
   | { kind: "review" }
   | { kind: "saving" }
+  /** A conflict was recovered; review the rebuilt batch, then Try again. */
+  | { kind: "rebased"; notice: string }
   | { kind: "success"; result: LocalSaveResult }
   | { kind: "disallowed"; path: string }
   | { kind: "error"; message: string };
@@ -100,6 +106,7 @@ export function DiffPreviewModal({
   onConfirm,
   onSaved,
   onWriteFailed,
+  onConflict,
   onClose,
 }: DiffPreviewModalProps) {
   const [phase, setPhase] = useState<Phase>({ kind: "review" });
@@ -111,6 +118,18 @@ export function DiffPreviewModal({
       setPhase({ kind: "review" });
       setExpanded({});
     }
+  }, [open]);
+
+  // One token per open/close spell, retired when the modal opens, closes or
+  // unmounts, so a conflict recovery that finishes afterwards can't set a
+  // phase on a review it no longer belongs to.
+  const spellRef = useRef({ live: true });
+  useEffect(() => {
+    const spell = { live: true };
+    spellRef.current = spell;
+    return () => {
+      spell.live = false;
+    };
   }, [open]);
 
   const stats = useMemo(
@@ -143,6 +162,17 @@ export function DiffPreviewModal({
       setPhase({ kind: "success", result });
       onSaved?.(result);
     } catch (err: unknown) {
+      // A conflict the editor recovers from is not a failed save: it rebuilt
+      // the batch, so show its notice over the rebuilt review instead.
+      if (err instanceof ConflictError && onConflict) {
+        const spell = spellRef.current;
+        const notice = await onConflict(err).catch(() => null);
+        if (!spell.live) return;
+        if (notice) {
+          setPhase({ kind: "rebased", notice });
+          return;
+        }
+      }
       // Surface the failure to the editor so the session status reflects a
       // real "Save failed" (not a stranded "saving"/"unsaved"). The branches
       // below still render the modal's own detailed error UI.
@@ -265,6 +295,14 @@ export function DiffPreviewModal({
                 <code className="font-mono">git status</code> to review and commit.
               </DialogDescription>
             </DialogHeader>
+            {phase.kind === "rebased" && (
+              <p
+                role="alert"
+                className="text-xs rounded-md border border-amber-500/40 bg-amber-500/10 p-2"
+              >
+                {phase.notice}
+              </p>
+            )}
             <ScrollArea className="flex-1 pr-3 -mr-3">
               <ul className="space-y-3 text-xs">
                 {changes.map((c, i) => {
@@ -301,7 +339,11 @@ export function DiffPreviewModal({
                 Cancel
               </Button>
               <Button onClick={runSave} disabled={phase.kind === "saving"}>
-                {phase.kind === "saving" ? "Saving…" : "Save to disk"}
+                {phase.kind === "saving"
+                  ? "Saving…"
+                  : phase.kind === "rebased"
+                    ? "Try again"
+                    : "Save to disk"}
               </Button>
             </div>
           </>

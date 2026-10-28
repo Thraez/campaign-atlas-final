@@ -32,7 +32,7 @@ vi.mock("react-leaflet", async () => {
   };
 });
 
-const { WrappedWorld } = await import("@/pages/AtlasViewer");
+const { WrappedWorld } = await import("@/atlas/map/WrappedWorld");
 
 const ENTITY: Entity = {
   id: "region-ent-1",

@@ -7,16 +7,7 @@ import {
   useCallback,
   type MutableRefObject,
 } from "react";
-import {
-  MapContainer,
-  Marker,
-  Popup,
-  Polygon,
-  Polyline,
-  ImageOverlay,
-  Tooltip,
-  useMap,
-} from "react-leaflet";
+import { MapContainer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { loadAtlasContent, loadSearchIndex, type SearchIndexEntry } from "@/atlas/content/loader";
@@ -29,7 +20,6 @@ import type {
   MapPlacement,
   Point,
   GridOverlay,
-  MapScale,
 } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -59,7 +49,7 @@ import { SoundSettingsProvider } from "@/atlas/sound/SoundSettingsProvider";
 import { SoundscapeLayer } from "@/atlas/sound/SoundscapeLayer";
 import { SoundControl } from "@/atlas/sound/SoundControl";
 import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
-import { normalizeAtlasAssetUrl } from "@/atlas/url";
+import { setOfflineMap, type OfflineMap } from "@/pwa";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 import { SearchPalette } from "@/atlas/search/SearchPalette";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
@@ -73,15 +63,9 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
 import { ScaleBarController, type ScaleBarState } from "@/atlas/scale/ScaleBar";
 import { serializeDeepLink, parseDeepLink } from "@/atlas/deepLink";
-import {
-  ROUTE_MODE_LABEL,
-  routeDistancePx,
-  formatTravelTime,
-  gridLines,
-} from "@/atlas/map/geometry";
+import { WrappedWorld } from "@/atlas/map/WrappedWorld";
 import { atlasToLatLng } from "@/atlas/map/coords";
 import { useVisitedPlaces } from "@/atlas/visited/useVisitedPlaces";
-import { pinDiscoveryClass } from "@/atlas/wander/pinDiscoveryClass";
 import { selectWanderTarget } from "@/atlas/wander/selectWanderTarget";
 import { discoveryMeter } from "@/atlas/wander/discoveryMeter";
 import { WanderControl } from "@/atlas/wander/WanderControl";
@@ -89,37 +73,9 @@ import { createPortal } from "react-dom";
 import { HoverPeekCard } from "@/atlas/peek/HoverPeekCard";
 import { usePeekController } from "@/atlas/peek/usePeekController";
 import { resolvePeekEntityId } from "@/atlas/peek/resolvePeekEntityId";
-import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { FlatCRS } from "@/atlas/map/flatCRS";
 
-import { resolvePinStyle, pinSvg, type PinPreset } from "@/atlas/pins/presets";
-import { shouldShowLabel } from "@/atlas/pins/labelVisibility";
 import { PinLegend } from "@/atlas/pins/PinLegend";
-
-function pinIconForStyle(
-  style: PinPreset,
-  opts?: { dim?: boolean; extraClass?: string; ariaLabel?: string },
-): L.DivIcon {
-  // iconSize defines the hit area Leaflet uses for click/touch dispatch. The
-  // visual SVG is smaller (~22px) but we expose a 44x44 hit area so mobile
-  // touch targets meet WCAG 2.5.5 (Target Size, Level AAA). The SVG centers
-  // visually inside the box via the `atlas-viewer-pin` CSS rule.
-  const cls = opts?.extraClass ? `atlas-viewer-pin ${opts.extraClass}` : "atlas-viewer-pin";
-  const svgHtml = pinSvg({ color: style.color, shape: style.shape }, { dim: opts?.dim });
-  // Inject role + aria-label into the SVG so screen readers announce the pin name.
-  const html = opts?.ariaLabel
-    ? svgHtml.replace(
-        "<svg ",
-        `<svg role="img" aria-label="${opts.ariaLabel.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}" `,
-      )
-    : svgHtml;
-  return L.divIcon({
-    className: cls,
-    html,
-    iconSize: [44, 44],
-    iconAnchor: [22, 36],
-  });
-}
 
 function MapController({
   flyTo,
@@ -405,6 +361,13 @@ export default function AtlasViewer() {
     () => data?.project.maps.find((m) => m.id === activeMapId),
     [data, activeMapId],
   );
+  // The offline menu and banner describe what is stored for this map.
+  const offlineMap: OfflineMap | null = useMemo(() => {
+    if (!activeMap) return null;
+    const layerSrcs = activeMap.layers.map((l) => l.src);
+    return { key: [activeMap.id, ...layerSrcs].join("\n"), layerSrcs };
+  }, [activeMap]);
+  useEffect(() => setOfflineMap(offlineMap), [offlineMap]);
   const placementsOnMap: MapPlacement[] = useMemo(
     () =>
       data && activeMap ? data.project.placements.filter((p) => p.mapId === activeMap.id) : [],
@@ -435,20 +398,23 @@ export default function AtlasViewer() {
     typeof window !== "undefined" && !!window.matchMedia?.("(pointer: fine)").matches;
   const peekCtl = usePeekController({ pointerFine });
 
-  const onPinPeek = useCallback(
-    (id: string, ev: MouseEvent) => {
-      const r = {
-        top: ev.clientY,
-        bottom: ev.clientY + 1,
-        left: ev.clientX,
-        right: ev.clientX + 1,
-        width: 1,
-        height: 1,
-      } as DOMRect;
-      peekCtl.onTriggerEnter(id, r);
-    },
-    [peekCtl],
-  );
+  // Read through a ref so the callback stays the same object while the peek
+  // opens and closes; a new one would re-render every pin on the map.
+  const peekEnterRef = useRef(peekCtl.onTriggerEnter);
+  useLayoutEffect(() => {
+    peekEnterRef.current = peekCtl.onTriggerEnter;
+  }, [peekCtl.onTriggerEnter]);
+  const onPinPeek = useCallback((id: string, ev: MouseEvent) => {
+    const r = {
+      top: ev.clientY,
+      bottom: ev.clientY + 1,
+      left: ev.clientX,
+      right: ev.clientX + 1,
+      width: 1,
+      height: 1,
+    } as DOMRect;
+    peekEnterRef.current(id, r);
+  }, []);
 
   const openEntity = useCallback(
     (id: string, fly = true) => {
@@ -1081,276 +1047,5 @@ export default function AtlasViewer() {
           )}
       </div>
     </SoundSettingsProvider>
-  );
-}
-
-interface WrappedWorldProps {
-  dx: number;
-  map: MapDocument;
-  placements: MapPlacement[];
-  entityById: Map<string, Entity>;
-  showGrid: boolean | null;
-  onOpenEntity: (id: string, fly?: boolean) => void;
-  visited: Set<string>;
-  openId: string | null;
-  onPinPeek?: (id: string, ev: MouseEvent) => void;
-  onPinPeekLeave?: () => void;
-  rulerActive?: boolean;
-}
-
-export function WrappedWorld({
-  dx,
-  map,
-  placements,
-  entityById,
-  showGrid,
-  onOpenEntity,
-  visited,
-  openId,
-  onPinPeek,
-  onPinPeekLeave,
-  rulerActive,
-}: WrappedWorldProps) {
-  const H = map.height;
-  return (
-    <>
-      {[...map.layers]
-        .sort((a, b) => a.zIndex - b.zIndex)
-        .map((layer) => (
-          <ImageOverlay
-            key={`${layer.id}-${dx}`}
-            url={normalizeAtlasAssetUrl(layer.src)}
-            bounds={
-              [
-                [H - (layer.y + layer.height), layer.x + dx],
-                [H - layer.y, layer.x + layer.width + dx],
-              ] as L.LatLngBoundsLiteral
-            }
-            opacity={layer.opacity}
-          />
-        ))}
-
-      {(map.regions ?? []).map((region) => {
-        const ent = region.entityId ? entityById.get(region.entityId) : undefined;
-        const color = region.color ?? (ent ? resolvePinStyle(ent.type).color : "#7fb069");
-        const positions = region.points.map(([x, y]) => [H - y, x + dx] as [number, number]);
-        return (
-          <Polygon
-            key={`${region.id}-${dx}`}
-            positions={positions}
-            pathOptions={{
-              color,
-              weight: 1.5,
-              fillColor: color,
-              fillOpacity: region.fillOpacity ?? 0.18,
-              opacity: region.strokeOpacity ?? 0.85,
-            }}
-            eventHandlers={
-              region.entityId && !rulerActive
-                ? { click: () => onOpenEntity(region.entityId!, false) }
-                : undefined
-            }
-          >
-            {/* Hover label so users don't rely on fill color alone to identify
-                a region (WCAG 1.4.1). Click still opens the full popup. */}
-            <Tooltip sticky direction="top" opacity={0.95}>
-              <div className="text-xs font-medium">{region.name}</div>
-            </Tooltip>
-            <Popup>
-              <div className="text-sm font-medium">{region.name}</div>
-              {ent?.summary && <div className="text-xs opacity-70">{ent.summary}</div>}
-            </Popup>
-          </Polygon>
-        );
-      })}
-
-      {(map.routes ?? []).map((route) => {
-        const pts = (route.resolvedPoints ?? []).map(
-          ([x, y]) => [H - y, x + dx] as [number, number],
-        );
-        if (pts.length < 2) return null;
-        const color = route.color ?? "#cfd6dc";
-        const distPx = routeDistancePx(route.resolvedPoints ?? []);
-        const scale: MapScale | undefined = map.scale;
-        const distLabel = scale
-          ? `${(distPx * scale.unitsPerPixel).toFixed(1)} ${scale.unitLabel}`
-          : `${Math.round(distPx)} px`;
-        const travel =
-          scale && route.speed
-            ? formatTravelTime((distPx * scale.unitsPerPixel) / route.speed)
-            : null;
-        const modeLabel = route.mode ? ROUTE_MODE_LABEL[route.mode] : "";
-        return (
-          <Polyline
-            key={`${route.id}-${dx}`}
-            positions={pts}
-            pathOptions={{
-              color,
-              weight: route.weight ?? 3,
-              opacity: 0.9,
-              dashArray: route.dashed ? "8 6" : undefined,
-              lineCap: "round",
-              lineJoin: "round",
-            }}
-          >
-            <Tooltip sticky direction="top" opacity={0.95}>
-              <div className="text-xs">
-                <div className="font-medium">{route.name}</div>
-                <div className="opacity-80">
-                  {distLabel}
-                  {travel ? ` · ${travel} ${modeLabel}` : ""}
-                </div>
-              </div>
-            </Tooltip>
-          </Polyline>
-        );
-      })}
-
-      {map.grid &&
-        (showGrid ?? map.grid.enabled !== false) &&
-        gridLines(map, map.grid).map((line, i) => (
-          <Polyline
-            key={`grid-${dx}-${i}`}
-            positions={line.map((p) => {
-              const [lat, lng] = p as [number, number];
-              return [lat, lng + dx] as [number, number];
-            })}
-            pathOptions={{
-              color: map.grid!.color ?? "rgba(255,255,255,0.08)",
-              weight: 1,
-              opacity: 1,
-              interactive: false,
-            }}
-          />
-        ))}
-
-      <PlacementMarkers
-        dx={dx}
-        H={H}
-        placements={placements}
-        entityById={entityById}
-        onOpenEntity={onOpenEntity}
-        visited={visited}
-        openId={openId}
-        onPinPeek={onPinPeek}
-        onPinPeekLeave={onPinPeekLeave}
-      />
-    </>
-  );
-}
-
-/** Renders pin markers with preset-derived shape/color, and computes which
- *  labels are permanently visible based on per-pin priority + labelMinZoom +
- *  a screen-space collision pass (higher priority wins). */
-export function PlacementMarkers({
-  dx,
-  H,
-  placements,
-  entityById,
-  onOpenEntity,
-  visited,
-  openId,
-  onPinPeek,
-  onPinPeekLeave,
-}: {
-  dx: number;
-  H: number;
-  placements: MapPlacement[];
-  entityById: Map<string, Entity>;
-  onOpenEntity: (id: string, fly?: boolean) => void;
-  visited: Set<string>;
-  openId: string | null;
-  onPinPeek?: (id: string, ev: MouseEvent) => void;
-  onPinPeekLeave?: () => void;
-}) {
-  const map = useMap();
-  const [zoom, setZoom] = useState(map.getZoom());
-  useEffect(() => {
-    const h = () => setZoom(map.getZoom());
-    map.on("zoomend", h);
-    return () => {
-      map.off("zoomend", h);
-    };
-  }, [map]);
-
-  // Resolve preset + decide label visibility (permanent / hover / none).
-  // Order by priority desc; suppress lower-priority permanent labels that fall
-  // within ~70 px of a higher-priority one already shown at this zoom.
-  const enriched = placements
-    .map((p) => {
-      const ent = entityById.get(p.entityId);
-      if (!ent) return null;
-      const style = resolvePinStyle(
-        ent.type,
-        p.pin as import("@/atlas/pins/presets").PinOverride | undefined,
-      );
-      return { p, ent, style };
-    })
-    .filter((x): x is { p: MapPlacement; ent: Entity; style: PinPreset } => !!x)
-    .sort((a, b) => b.style.priority - a.style.priority);
-
-  const labelDecisions = new Map<string, "always" | "hover" | "none">();
-  const taken: { x: number; y: number }[] = [];
-  for (const { p, style } of enriched) {
-    let mode: "always" | "hover" | "none";
-    if (style.labelMode === "never") mode = "none";
-    else if (style.labelMode === "hover") mode = "hover";
-    else if (style.labelMode === "always") mode = "always";
-    else mode = shouldShowLabel(zoom, style.priority, enriched.length) ? "always" : "hover";
-    if (mode === "always") {
-      const pt = map.latLngToContainerPoint([H - p.y, p.x + dx]);
-      const collides = taken.some((t) => Math.hypot(t.x - pt.x, t.y - pt.y) < 70);
-      if (collides) mode = "hover";
-      else taken.push(pt);
-    }
-    labelDecisions.set(`${p.id}-${dx}`, mode);
-  }
-
-  return (
-    <>
-      {enriched.map(({ p, ent, style }) => {
-        const dim = ent.visibility === "rumor";
-        const labelMode = labelDecisions.get(`${p.id}-${dx}`) ?? "none";
-        const labelText = p.label ?? ent.title;
-        const typeLabel = playerTypeLabel(ent.type);
-        const a11yLabel = typeLabel ? `${ent.title}, ${typeLabel}` : ent.title;
-        return (
-          <Marker
-            key={`${p.id}-${dx}`}
-            position={[H - p.y, p.x + dx]}
-            icon={pinIconForStyle(style, {
-              dim,
-              extraClass: [
-                pinDiscoveryClass(p.entityId, visited),
-                p.entityId === openId ? "atlas-viewer-pin--active" : null,
-              ]
-                .filter(Boolean)
-                .join(" "),
-              ariaLabel: a11yLabel,
-            })}
-            riseOnHover
-            riseOffset={250}
-            title={a11yLabel}
-            eventHandlers={{
-              click: () => onOpenEntity(p.entityId, false),
-              mouseover: (e) => onPinPeek?.(p.entityId, e.originalEvent as MouseEvent),
-              mouseout: () => onPinPeekLeave?.(),
-            }}
-          >
-            {labelMode !== "none" && (
-              <Tooltip
-                permanent={labelMode === "always"}
-                direction="top"
-                offset={[0, -12]}
-                opacity={dim ? 0.7 : 0.95}
-                className={`atlas-pin-label atlas-pin-label--${ent.visibility}`}
-              >
-                {labelText}
-              </Tooltip>
-            )}
-          </Marker>
-        );
-      })}
-    </>
   );
 }

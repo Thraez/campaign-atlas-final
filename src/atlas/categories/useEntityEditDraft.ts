@@ -108,6 +108,8 @@ export interface EntityEditDraftAPI {
   setSecrets: (updater: DraftSecret[] | ((prev: DraftSecret[]) => DraftSecret[])) => void;
   clear: () => void;
   isDirty: () => boolean;
+  /** True when there is an unsaved edit, and (given a sourcePath) it is for that file. */
+  pendingFor: (sourcePath?: string) => boolean;
   snapshot: () => EntityEditSnapshot;
   applySnapshot: (s: EntityEditSnapshot) => void;
   /**
@@ -156,6 +158,11 @@ export function useEntityEditDraft(): EntityEditDraftAPI {
         ref.current.pristine,
     [],
   );
+  const pendingFor = useCallback(
+    (sourcePath?: string) =>
+      isDirty() && (sourcePath === undefined || ref.current?.sourcePath === sourcePath),
+    [isDirty],
+  );
   const snapshot = useCallback<() => EntityEditSnapshot>(() => ref.current, []);
   const applySnapshot = useCallback((s: EntityEditSnapshot) => setDraft(s), []);
   const rebase = useCallback<EntityEditDraftAPI["rebase"]>((sourcePath, baseHash, disk) => {
@@ -175,6 +182,7 @@ export function useEntityEditDraft(): EntityEditDraftAPI {
     setSecrets,
     clear,
     isDirty,
+    pendingFor,
     snapshot,
     applySnapshot,
     rebase,
