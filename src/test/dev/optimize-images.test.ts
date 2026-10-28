@@ -48,7 +48,7 @@ describe("optimizeImages", () => {
   });
 
   it("removes the PNG rather than leaving a twin beside it", async () => {
-    // maps:optimize keeps its source PNG, but images are different: an image
+    // Same as maps:optimize (git keeps the original). An image
     // that nothing references is an orphan, and audit-assets warns on those.
     // Replacing keeps the library honest and the player payload smaller.
     fs.writeFileSync(path.join(imagesDir, "Corven.png"), await makePng());

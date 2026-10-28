@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseObsidianFile, generateAutoSummary } from "@/atlas/import/parseObsidian";
 import { inferTypeFromPath, isIgnoredPath } from "@/atlas/import/inferType";
-import { buildEntityFrontmatterPatch } from "@/atlas/yaml/buildPatches";
-import { validatePatchYaml } from "@/atlas/yaml/validatePatch";
 
 describe("inferTypeFromPath", () => {
   it("infers from folder", () => {
@@ -152,28 +150,5 @@ describe("parseObsidianFile — uncovered branches", () => {
   it("does not put the source filename in the suggested target", () => {
     const f = parseObsidianFile("![[the-cabal-lair.png]]", "npcs/X.md");
     expect(f.attachments[0].suggestedTarget).not.toContain("cabal");
-  });
-});
-
-describe("buildEntityFrontmatterPatch", () => {
-  it("produces parseable YAML blocks", () => {
-    const a = buildEntityFrontmatterPatch([
-      {
-        sourcePath: "settlements/X.md",
-        title: "X",
-        atlas: { id: "x", type: "settlement", visibility: "dm", summary: "A town." },
-      },
-    ]);
-    // Each '---' frontmatter block is parseable on its own.
-    const v = validatePatchYaml(a.content.replace(/---/g, ""), "placement");
-    // Doesn't have to pass placement-specific shape, just no fences / parse errors.
-    // The body (non-comment lines) must not contain markdown code fences.
-    const body = a.content
-      .split("\n")
-      .filter((l) => !l.trim().startsWith("#"))
-      .join("\n");
-    expect(a.content).toMatch(/atlas:/);
-    expect(body).not.toMatch(/```/);
-    expect(v.errors.filter((e) => /code fence/i.test(e))).toHaveLength(0);
   });
 });

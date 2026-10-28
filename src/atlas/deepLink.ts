@@ -36,3 +36,9 @@ export function parseDeepLink(search: string): DeepLinkState {
     zoom: Number.isFinite(cz) ? cz : null,
   };
 }
+
+/** Link to the viewer with one entity open, for pages outside the viewer. The viewer
+ *  writes its own URL with `serializeDeepLink`; both parse back the same. */
+export function entityHref(id: string): string {
+  return `/atlas?entity=${encodeURIComponent(id)}`;
+}

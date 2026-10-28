@@ -1,6 +1,42 @@
 import { useState } from "react";
 import { useSoundSettings } from "@/atlas/sound/SoundSettingsProvider";
 
+/**
+ * The sound invite pill. data-sound-invite tells the provider's gesture
+ * listener to leave taps here to these buttons, so Dismiss stays silent.
+ */
+function SoundInvite({
+  label,
+  onEnable,
+  onDismiss,
+}: {
+  label: string;
+  onEnable: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div
+      data-sound-invite
+      className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 shadow-sm"
+    >
+      <button type="button" onClick={onEnable} className="flex items-center gap-2 text-sm">
+        <span aria-hidden>🔊</span>
+        {label}
+      </button>
+      {/* Was a bare ✕ glyph measuring 13x24 on a phone. Sized to match the
+          mute button, which is already 40x40. */}
+      <button
+        type="button"
+        aria-label="Dismiss"
+        onClick={onDismiss}
+        className="-mr-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+      >
+        <span aria-hidden>✕</span>
+      </button>
+    </div>
+  );
+}
+
 interface SoundControlProps {
   hasSoundscape?: boolean;
 }
@@ -8,6 +44,9 @@ interface SoundControlProps {
 export function SoundControl({ hasSoundscape = true }: SoundControlProps) {
   const {
     soundEnabled,
+    audioUnlocked,
+    resumeDismissed,
+    dismissResume,
     muted,
     calmMode,
     volume,
@@ -20,33 +59,30 @@ export function SoundControl({ hasSoundscape = true }: SoundControlProps) {
   } = useSoundSettings();
   const [dismissed, setDismissed] = useState(false);
 
-  const ambienceActive = soundEnabled && ambiencePlaying && !muted && !calmMode;
+  // Sound is on (saved from an earlier visit, or the browser kept the context
+  // suspended) but audio isn't running yet: the first tap or key press
+  // anywhere unlocks it, and the invite stays until then.
+  const awaitingGesture = soundEnabled && !audioUnlocked;
+  const ambienceActive = soundEnabled && audioUnlocked && ambiencePlaying && !muted && !calmMode;
 
   return (
     <div className="absolute bottom-4 right-4 z-[1000] flex items-center gap-2">
       <span role="status" aria-live="polite" className="sr-only">
         {ambienceActive ? "Ambience playing" : ""}
       </span>
-      {hasSoundscape && audioAvailable && !soundEnabled && !dismissed && (
-        <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 shadow-sm">
-          <button type="button" onClick={enableSound} className="flex items-center gap-2 text-sm">
-            <span aria-hidden>🔊</span>
-            Tap to bring the world to life
-          </button>
-          {/* Was a bare ✕ glyph measuring 13x24 on a phone. Sized to match the
-              mute button below it, which is already 40x40. */}
-          <button
-            type="button"
-            aria-label="Dismiss"
-            onClick={() => setDismissed(true)}
-            className="-mr-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
-          >
-            <span aria-hidden>✕</span>
-          </button>
-        </div>
+      {hasSoundscape && audioAvailable && awaitingGesture && !resumeDismissed && (
+        <SoundInvite label="Tap to resume sound" onEnable={enableSound} onDismiss={dismissResume} />
       )}
 
-      {hasSoundscape && audioAvailable && soundEnabled && (
+      {hasSoundscape && audioAvailable && !soundEnabled && !dismissed && (
+        <SoundInvite
+          label="Tap to bring the world to life"
+          onEnable={enableSound}
+          onDismiss={() => setDismissed(true)}
+        />
+      )}
+
+      {hasSoundscape && audioAvailable && soundEnabled && audioUnlocked && (
         <>
           {ambienceActive && (
             <span className="rounded-full border border-border bg-card px-3 py-2 text-xs shadow-sm text-muted-foreground">

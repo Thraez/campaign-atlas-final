@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { isEditorOnlyPath } from "@/test/helpers/editorOnlyPaths";
 
 /**
  * Guardrail: every player-reachable source file that hard-codes the `/atlas/edit`
@@ -16,13 +17,11 @@ import path from "node:path";
  * Regression: the Timeline's "Name your months" nudge shipped gated on
  * isDmToolsEnabled() alone and leaked `/atlas/edit` into AtlasTimeline's chunk.
  *
- * Editor-only modules are exempt — they are excluded from player builds wholesale.
+ * Editor-only paths are exempt: src/test/build/player-import-graph.test.ts proves none of them
+ * is reachable from the player entry, so the literal can never reach a player bundle.
  */
 
 const SRC = path.resolve(__dirname, "../..");
-
-/** Excluded from player builds entirely, so the literal can never reach one. */
-const EDITOR_ONLY = [path.join("atlas", "editor"), path.join("pages", "AtlasPlacementEditor.tsx")];
 
 /** Matches the URL inside a string or template literal. */
 const QUOTED_EDITOR_ROUTE = /["'`]\/atlas\/edit/;
@@ -57,7 +56,7 @@ describe("player-reachable editor links are build-gated", () => {
 
     for (const file of sourceFiles(SRC)) {
       const rel = path.relative(SRC, file);
-      if (EDITOR_ONLY.some((p) => rel.startsWith(p))) continue;
+      if (isEditorOnlyPath(rel)) continue;
 
       const text = fs.readFileSync(file, "utf8");
       if (!QUOTED_EDITOR_ROUTE.test(stripComments(text))) continue;

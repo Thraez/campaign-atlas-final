@@ -1342,7 +1342,7 @@ const MAX_ASSET_BINARY_BYTES = 6 * 1024 * 1024;
 // The client names the target before the batch is built, so the *name* is the
 // instruction: a `.webp` target under assets/images/ means "encode WebP".
 // Maps are named `.png` and are deliberately untouched — fog redaction and
-// map text both want lossless, and optimize-maps.mjs owns that pipeline.
+// map text both want lossless, and optimize-maps.ts owns that pipeline.
 describe("editor image add publishes WebP", () => {
   const dataUrl = (buf: Buffer, mime: string) => `data:${mime};base64,${buf.toString("base64")}`;
 
@@ -1393,6 +1393,69 @@ describe("editor image add publishes WebP", () => {
     const r = await save(target, await makePng(2400, 600), "image/png");
     expect(r.status).toBe(200);
     expect((await metaOf(target)).width).toBe(2400);
+  });
+
+  describe("a .webp map target is never lossy", () => {
+    const mapTarget = "public/atlas/assets/maps/region.webp";
+
+    // Noisy RGBA with every fourth pixel fully transparent. Noise, because a
+    // flat fill survives even a lossy encode. With `hiddenRgb` those
+    // transparent pixels still carry colour, which libwebp rewrites.
+    const rgba = (hiddenRgb: boolean) => {
+      const w = 48;
+      const h = 32;
+      const raw = Buffer.alloc(w * h * 4);
+      for (let i = 0; i < raw.length; i++) raw[i] = (i * 7919) % 251;
+      for (let p = 0; p < w * h; p++) {
+        const clear = p % 4 === 0;
+        raw[p * 4 + 3] = clear ? 0 : 255;
+        if (clear && !hiddenRgb) raw.fill(0, p * 4, p * 4 + 3);
+        if (clear && hiddenRgb) raw[p * 4] = raw[p * 4] | 1;
+      }
+      return { raw, img: sharp(raw, { raw: { width: w, height: h, channels: 4 } }) };
+    };
+
+    it("encodes a PNG losslessly — all four channels exact", async () => {
+      const { raw, img } = rgba(false);
+      const r = await save(mapTarget, await img.png().toBuffer(), "image/png");
+      expect(r.status).toBe(200);
+      expect((await metaOf(mapTarget)).format).toBe("webp");
+      const out = await sharp(fs.readFileSync(path.join(tmp, mapTarget)))
+        .ensureAlpha()
+        .raw()
+        .toBuffer();
+      expect(out.equals(raw)).toBe(true);
+    });
+
+    it("refuses a PNG whose transparent pixels hide colour the WebP would lose", async () => {
+      const r = await save(mapTarget, await rgba(true).img.png().toBuffer(), "image/png");
+      expect(r.status).toBe(400);
+      expect(r.payload).toMatchObject({ reason: "map-format-refused" });
+      expect(fs.existsSync(path.join(tmp, mapTarget))).toBe(false);
+    });
+
+    it("keeps a WebP's bytes rather than re-encoding them", async () => {
+      const webp = await rgba(false).img.webp({ quality: 60 }).toBuffer();
+      const r = await save(mapTarget, webp, "image/webp");
+      expect(r.status).toBe(200);
+      expect(fs.readFileSync(path.join(tmp, mapTarget)).equals(webp)).toBe(true);
+    });
+
+    it("refuses a JPG, naming ticket 29", async () => {
+      const jpg = await rgba(false).img.flatten().jpeg().toBuffer();
+      const r = await save(mapTarget, jpg, "image/jpeg");
+      expect(r.status).toBe(400);
+      expect(r.payload).toMatchObject({ reason: "map-format-refused" });
+      expect(JSON.stringify(r.payload)).toMatch(/eval-2026-10\/29/);
+      expect(fs.existsSync(path.join(tmp, mapTarget))).toBe(false);
+    });
+
+    it("refuses a GIF rather than flattening an animation", async () => {
+      const gif = await rgba(false).img.gif().toBuffer();
+      const r = await save(mapTarget, gif, "image/gif");
+      expect(r.status).toBe(400);
+      expect(r.payload).toMatchObject({ reason: "map-format-refused" });
+    });
   });
 
   it("leaves a map PNG lossless — maps are not part of the WebP policy", async () => {
