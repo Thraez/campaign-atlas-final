@@ -16,5 +16,5 @@ The prune's header says the precache globs "never match images"; they do.
 - The precache leaves `atlas/` to the runtime caches (`globIgnores`), or the prune runs before the
   service worker is generated; say which and why.
 - Fix the prune's header comment.
-- Own branch from `origin/main`. `eval-25-offline-menu-truth` (#?) edits `vite.config.ts` in the
+- Own branch from `origin/main`. `eval-25-offline-menu-truth` (PR #78) edits `vite.config.ts` in the
   runtime caching block: trial-merge with it.
