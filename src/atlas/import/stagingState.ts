@@ -232,10 +232,14 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
   const parseError = note.parseError;
   // What the vault asks for: the note's own tag (readNote, as the build reads
   // it), else the vault folder rule. An unreadable note is dm (fail closed).
-  const vaultVisibility: EntityVisibility =
+  // `atlas.publish: false` keeps any note from players (readNote's isSecret),
+  // so a player or rumor tag beside it reads as dm here, as it does there.
+  const taggedOrFolder: EntityVisibility =
     note.visibilityTagged || parseError !== undefined
       ? note.visibility
       : defaultVisibilityForVaultPath(input.vaultRelPath);
+  const vaultVisibility: EntityVisibility =
+    note.atlas.publish === false && isPlayerVisible(taggedOrFolder) ? "dm" : taggedOrFolder;
 
   // ── Identity resolution (§5.3 precedence) ──────────────────────────────────
   // Priority: (1) vault atlas.id; (2) sync-map[vaultRelPath]; (3) slugify(title)
@@ -272,10 +276,7 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
     // Check secrecy increase: canon is hidden-tier, vault wants player visibility
     if (detectExposureIncrease(meta.visibility, note.atlas)) {
       needsReview = { reason: "secrecy-increase" };
-    } else if (
-      isPlayerVisible(meta.visibility) &&
-      (!isPlayerVisible(vaultVisibility) || note.isSecret)
-    ) {
+    } else if (isPlayerVisible(meta.visibility) && !isPlayerVisible(vaultVisibility)) {
       // The vault keeps this note from players but the atlas shows it: the
       // vault body may hold the secret. Hold it; if ticked, the vault's
       // secrecy is written (see resolvedVisibility below).

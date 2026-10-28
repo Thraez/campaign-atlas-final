@@ -113,6 +113,10 @@ export function mergeImportFrontmatter(input: MergeImportInput): MergeImportResu
   const diskVisibility = input.disk.visibility;
   const exposureIncrease = detectExposureIncrease(diskVisibility, vaultAtlas);
   atlas.visibility = diskVisibility;
+  // The vault's `publish: false` keeps the note from players whatever the
+  // tag says (readNote's isSecret): carry it, never drop it. `publish: true`
+  // is not carried, since it could only expose.
+  if (vaultAtlas.publish === false) atlas.publish = false;
 
   // (5) Top-level: vault wins; then set merged atlas; prose from vault
   const data: Record<string, unknown> = { ...vaultData, atlas };
