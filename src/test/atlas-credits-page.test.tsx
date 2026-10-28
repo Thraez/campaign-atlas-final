@@ -187,6 +187,28 @@ describe("AtlasCredits page — assetCredits registry aggregation", () => {
   });
 });
 
+describe("AtlasCredits page — entity links", () => {
+  it("links an entity credit to the viewer with the id URI-encoded", async () => {
+    renderCredits(
+      makeProject([makeEntity({ id: "old keep/#1", title: "Old Keep", credit: "Art by K" })]),
+    );
+    const link = await screen.findByRole("link", { name: "Old Keep" });
+    expect(link).toHaveAttribute("href", "/atlas?entity=old%20keep%2F%231");
+  });
+
+  it("links a registry-only credit to its owning entity in the viewer, id encoded", async () => {
+    renderCredits(
+      makeProject([makeEntity({ id: "old keep/#1", title: "Old Keep", images: ["keep.png"] })], {
+        id: "w1",
+        name: "World",
+        assetCredits: { "keep.png": { credit: "Keep by Registry", enabled: true } },
+      }),
+    );
+    const link = await screen.findByRole("link", { name: "Old Keep" });
+    expect(link).toHaveAttribute("href", "/atlas?entity=old%20keep%2F%231");
+  });
+});
+
 describe("AtlasCredits page — skip link and main landmark", () => {
   beforeEach(() => {
     vi.clearAllMocks();

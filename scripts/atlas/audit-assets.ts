@@ -43,12 +43,11 @@ import {
   TOTAL_BUDGET_ERROR_BYTES,
   formatBytes,
 } from "../../src/atlas/assets/assetSize";
-import {
-  extractImageEmbedFilenames,
-  DEFAULT_RESOLVE_ASSET,
-} from "../../src/atlas/content/renderEntityMarkdown";
+import { extractEmbedImageRefs, isExternalUrl, normalizeRefPath } from "./assetRefs";
 
 export { SIZE_WARN_BYTES, SIZE_ERROR_BYTES, TOTAL_BUDGET_WARN_BYTES, TOTAL_BUDGET_ERROR_BYTES };
+// Shared with the player-image rule (playerImageRefs.ts); re-exported for callers of this module.
+export { extractEmbedImageRefs, isExternalUrl, normalizeRefPath };
 
 /** Extensions that count as image/asset files when walking the assets dir. */
 const ASSET_EXTENSIONS = new Set([
@@ -130,24 +129,6 @@ export interface AuditReport {
   };
 }
 
-/** True for URLs we do not own (http/https/data/blob). */
-export function isExternalUrl(raw: string): boolean {
-  return /^(https?:|data:|blob:)/i.test(raw);
-}
-
-/**
- * Normalize an asset reference for comparison with disk records.
- * Strips leading slashes and converts backslashes to forward slashes.
- * Returns null for external URLs and empty strings.
- */
-export function normalizeRefPath(raw: string): string | null {
-  if (!raw) return null;
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  if (isExternalUrl(trimmed)) return null;
-  return trimmed.replace(/\\/g, "/").replace(/^\/+/, "");
-}
-
 /** Recursively walk a directory and collect every asset file with its size. */
 export function collectAssets(assetsDir: string, publicDir: string): AssetRecord[] {
   const out: AssetRecord[] = [];
@@ -194,21 +175,6 @@ export function extractMarkdownImageRefs(markdown: string): string[] {
     if (m[1]) out.push(m[1]);
   }
   return out;
-}
-
-/**
- * Extract Obsidian image embed references: `![[image.png]]` or
- * `![[image.png|Alt text]]`, resolved the same way `DEFAULT_RESOLVE_ASSET`
- * does in renderEntityMarkdown.ts (`/atlas/assets/images/<filename>`) so the
- * reference lines up with what the build actually ships. Filename extraction
- * is imported from renderEntityMarkdown.ts rather than duplicated here — a
- * second copy of the embed regex is what let this auditor and build-atlas.ts
- * silently drift apart (T1, 2026-08-25): build-atlas.ts never checked embeds
- * for existence at all, so this file's "(build-atlas reports this as an
- * error)" parenthetical was false for every embed finding.
- */
-export function extractEmbedImageRefs(markdown: string): string[] {
-  return extractImageEmbedFilenames(markdown).map((filename) => DEFAULT_RESOLVE_ASSET(filename));
 }
 
 /**
