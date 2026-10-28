@@ -16,6 +16,7 @@ import {
   parseBrowseFilterParams,
   serializeBrowseFilterParams,
 } from "@/atlas/browse/browseFilterParams";
+import { entityHref } from "@/atlas/deepLink";
 
 interface YearGroup {
   year: number;
@@ -227,7 +228,7 @@ export default function AtlasTimeline() {
                       {g.entries.map((e) => (
                         <Link
                           key={e.id}
-                          to={`/atlas?entity=${encodeURIComponent(e.id)}`}
+                          to={entityHref(e.id)}
                           className="block rounded border border-border bg-card hover:bg-accent/40 transition px-3 py-2"
                         >
                           <div className="flex items-baseline gap-2 flex-wrap">
