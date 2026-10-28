@@ -55,6 +55,10 @@ commands with shell variables (one plain command per call, absolute paths).
 - PRs waiting for his yes to merge (each merge publishes), in stack order: #62 → #66 → #68;
   #64 → #67 → #69 → #70; #63; #65; #71 → #73 → #77; #72; #74 → #76; #75; #78. See "Merge queue" for what each needs him to look at.
 - Local `main` commits since 0c1d92a: push them in the morning.
+- **In the vault, for Isak in Obsidian:** four notes have an unclosed DM block (`%%` or `:::dm`),
+  so the DM build refuses them after a sync: blood-moon-circle, the-sovereign-eternal,
+  sister-peline-thrace, the-penitent-of-harkafell. Found by the code-retro 07 sync-twice run (read
+  only; nothing in the vault was changed).
 - **Safety, already on `main`** (found in the code-retro 07 review, being fixed on that branch):
   until it merges, a vault note marked `visibility: dm` whose title matches a player entity syncs
   as a ticked update with no warning, and the written file stays `player` with the secret body.
