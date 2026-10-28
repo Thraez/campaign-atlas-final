@@ -569,8 +569,8 @@ function AtlasPlacementEditorInner() {
   const [creatingIn, setCreatingIn] = useState<CategoryId | null>(null);
   /** Entity currently open in the EntityEditPanel (null = none). */
   const [editingEntityId, setEditingEntityId] = useState<string | null>(null);
-  /** eval-31: bumped when Save points to a parked entity edit, so the surface remounts in Edit. */
-  const [entitySurfaceNonce, setEntitySurfaceNonce] = useState(0);
+  /** Bumped when Save points to an unsaved entity edit: the surface switches to Edit. */
+  const [entityEditRequest, setEntityEditRequest] = useState(0);
   /**
    * In-flight "File as …" for a misfiled note: the type to pre-apply, plus the
    * category whose panel should host the edit surface. Without the category the
@@ -776,7 +776,7 @@ function AtlasPlacementEditorInner() {
   ]);
 
   /**
-   * eval-31: open the entity whose unsaved edit is parked in `entityEditDraft`,
+   * Open the entity whose unsaved edit is parked in `entityEditDraft`,
    * in Edit, so the DM can save it from its own panel (which owns that save).
    */
   const openPendingEntityEdit = () => {
@@ -788,7 +788,7 @@ function AtlasPlacementEditorInner() {
     }
     setActivePanel(categoryForType(ent.type));
     setEditingEntityId(ent.id);
-    setEntitySurfaceNonce((n) => n + 1);
+    setEntityEditRequest((n) => n + 1);
     toast.info(`Your edit to ${ent.title} saves from its own panel: it is open now.`);
   };
 
@@ -832,10 +832,13 @@ function AtlasPlacementEditorInner() {
   };
 
   const onSaveClick = async () => {
-    if (!project || !activeMap) return;
-    // eval-31: an entity edit is counted in the chip but saved only by its own
-    // panel, so Save points to that panel instead of claiming nothing is unsaved.
-    const entityEditPending = entityEditDraft.isDirty();
+    // An entity edit is counted in the chip but saved only by its own panel,
+    // so Save points to that panel instead of claiming nothing is unsaved.
+    const entityEditPending = entityEditDraft.pendingFor();
+    if (!project || !activeMap) {
+      if (entityEditPending) openPendingEntityEdit();
+      return;
+    }
     try {
       const plan = await planSave();
       if (!plan) return;
@@ -1280,7 +1283,7 @@ function AtlasPlacementEditorInner() {
         <SaveStatus
           status={session.status}
           unsavedCount={session.unsavedCount}
-          entityEditPending={entityEditDraft.isDirty()}
+          entityEditCount={entityEditDraft.pendingFor() ? 1 : 0}
           savedAt={lastSavedAt}
           failedReason={session.failedReason}
           onSave={onSaveClick}
@@ -1414,14 +1417,13 @@ function AtlasPlacementEditorInner() {
               };
               return (
                 <EntitySurface
-                  key={entitySurfaceNonce}
+                  editRequest={entityEditRequest}
                   entity={editingEntity}
                   entitiesById={entitiesById}
                   startInEdit={
                     !!refilingThis ||
-                    // eval-31: a parked unsaved edit for this entity reopens in Edit.
-                    (entityEditDraft.draft?.sourcePath === editingEntity.sourcePath &&
-                      entityEditDraft.isDirty())
+                    // An entity with an unsaved edit reopens in Edit.
+                    entityEditDraft.pendingFor(editingEntity.sourcePath)
                   }
                   onClose={() => {
                     const intent = resolveEntityCloseIntent({ dirty: entityEditDraft.isDirty() });
@@ -2149,8 +2151,8 @@ function AtlasPlacementEditorInner() {
         onSaved={(result) => {
           void session.markSaved();
           setLastSavedAt(Date.now());
-          // eval-31: this batch never carries the entity edit; its panel saves it.
-          if (entityEditDraft.isDirty()) {
+          // This batch never carries the entity edit; its panel saves it.
+          if (entityEditDraft.pendingFor()) {
             toast.info(
               "Map changes saved. Your entity edit is still open: save it from its panel.",
               {
