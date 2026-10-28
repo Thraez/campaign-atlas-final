@@ -8,6 +8,6 @@ installGlobalErrorHandlers();
 
 createRoot(document.getElementById("root")!).render(<App />);
 
-// Production-only PWA registration — see src/pwa.ts for the iframe and dev
-// guards.
+// Production-only PWA registration — see src/pwa.ts for the iframe /
+// Lovable preview / dev guards.
 registerServiceWorker();

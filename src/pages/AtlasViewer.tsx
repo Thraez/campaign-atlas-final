@@ -59,6 +59,7 @@ import { SoundSettingsProvider } from "@/atlas/sound/SoundSettingsProvider";
 import { SoundscapeLayer } from "@/atlas/sound/SoundscapeLayer";
 import { SoundControl } from "@/atlas/sound/SoundControl";
 import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
+import { setOfflineMap, type OfflineMap } from "@/pwa";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 import { SearchPalette } from "@/atlas/search/SearchPalette";
@@ -405,6 +406,13 @@ export default function AtlasViewer() {
     () => data?.project.maps.find((m) => m.id === activeMapId),
     [data, activeMapId],
   );
+  // The offline menu and banner describe what is stored for this map.
+  const offlineMap: OfflineMap | null = useMemo(() => {
+    if (!activeMap) return null;
+    const layerSrcs = activeMap.layers.map((l) => l.src);
+    return { key: [activeMap.id, ...layerSrcs].join("\n"), layerSrcs };
+  }, [activeMap]);
+  useEffect(() => setOfflineMap(offlineMap), [offlineMap]);
   const placementsOnMap: MapPlacement[] = useMemo(
     () =>
       data && activeMap ? data.project.placements.filter((p) => p.mapId === activeMap.id) : [],
@@ -775,12 +783,12 @@ export default function AtlasViewer() {
               </Link>
             </Button>
           )}
-          <OfflineMenu layerSrcs={activeMap.layers.map((l) => l.src)} />
+          <OfflineMenu />
           <span className="hidden lg:block text-[11px] text-muted-foreground ml-2">
             Updated {new Date(data.project.publishedAt).toLocaleDateString()}
           </span>
         </header>
-        <OfflineStatus layerSrcs={activeMap.layers.map((l) => l.src)} />
+        <OfflineStatus />
 
         <div className="flex-1 flex relative min-h-0">
           <main

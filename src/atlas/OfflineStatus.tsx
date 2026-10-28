@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,72 +12,82 @@ import { CloudOff, Cloud, RefreshCw, Trash2, CheckCircle2, Download } from "luci
 import {
   activateUpdate,
   clearOfflineCache,
-  getOfflineCoverage,
-  onCacheStateChange,
+  getOfflineCoverageSnapshot,
   onUpdateAvailable,
+  refreshOfflineCoverage,
   reloadLatestAtlas,
-  saveForOffline,
+  saveCurrentMapForOffline,
   shouldEnableServiceWorker,
+  subscribeOfflineCoverage,
   type OfflineCoverage,
 } from "@/pwa";
 
-/**
- * What of the atlas works offline for this map, read from the caches. `null`
- * while the first read is in flight. Re-reads on mount, when the map changes,
- * when `pwa.ts` reports a change (SW activated, save, clear) and on `recheck()`.
- */
-function useOfflineCoverage(layerSrcs: readonly string[]) {
-  const [coverage, setCoverage] = useState<OfflineCoverage | null>(null);
-  // A string key, so a fresh array with the same layers doesn't re-read.
-  const layersKey = layerSrcs.join("\n");
-  const readId = useRef(0);
-
-  const recheck = useCallback(() => {
-    const id = ++readId.current;
-    void getOfflineCoverage(layersKey.split("\n").filter(Boolean)).then((c) => {
-      // Only the newest read wins; an older one may describe another map.
-      if (id === readId.current) setCoverage(c);
-    });
-  }, [layersKey]);
-
-  useEffect(() => {
-    recheck();
-  }, [recheck]);
-  useEffect(() => onCacheStateChange(recheck), [recheck]);
-
-  return { coverage, recheck };
+interface CoverageText {
+  /** Menu heading. */
+  label: string;
+  /** Second line under the heading, when the map isn't covered. */
+  note?: string;
+  /** Banner shown while the device is offline. */
+  banner: string;
+  /** Something works offline (cloud icon, check mark). */
+  saved: boolean;
+  /** "Save this map for offline" would add something. */
+  canSave: boolean;
 }
 
-/** Menu heading for each state, in plain words. */
-function coverageLabel(coverage: OfflineCoverage | null): string {
-  switch (coverage) {
-    case null:
-      return "Checking what is saved…";
-    case "none":
-      return "Not saved for offline yet";
-    case "notes":
-      return "Works offline: the notes; pictures you have opened";
-    case "notes-and-map":
-      return "Works offline: this map and the notes; pictures you have opened";
-  }
-}
+/** Everything the offline views say, per state, in plain words. */
+const COVERAGE_TEXT: Record<OfflineCoverage | "checking", CoverageText> = {
+  checking: {
+    label: "Checking what is saved…",
+    banner: "Offline — checking what is saved",
+    saved: false,
+    canSave: false,
+  },
+  none: {
+    label: "Not saved for offline yet",
+    banner: "Offline — the atlas isn't saved on this device",
+    saved: false,
+    canSave: true,
+  },
+  notes: {
+    label: "Works offline: the notes; pictures you have opened",
+    note: "This map is not saved yet",
+    banner: "Offline — showing the saved notes; this map isn't saved",
+    saved: true,
+    canSave: true,
+  },
+  "notes-map-online": {
+    label: "Works offline: the notes; pictures you have opened",
+    note: "This map's pictures come from another site and aren't saved",
+    banner: "Offline — showing the saved notes; this map needs the internet",
+    saved: true,
+    canSave: false,
+  },
+  "notes-and-map": {
+    label: "Works offline: this map and the notes; pictures you have opened",
+    banner: "Offline — showing the saved map and notes",
+    saved: true,
+    canSave: false,
+  },
+};
 
-interface OfflineProps {
-  /** `src` of every layer of the map on screen, as in `atlas.json`. */
-  layerSrcs: readonly string[];
+/** What is stored for the map on screen; one shared read for every view. */
+function useCoverageText(): CoverageText {
+  const coverage = useSyncExternalStore(subscribeOfflineCoverage, getOfflineCoverageSnapshot);
+  return COVERAGE_TEXT[coverage ?? "checking"];
 }
 
 /**
  * Floating offline status + update banner for /atlas.
  * Hidden in dev, where the SW is intentionally not registered.
  */
-export function OfflineStatus({ layerSrcs }: OfflineProps) {
+export function OfflineStatus() {
   const enabled = shouldEnableServiceWorker();
   const [online, setOnline] = useState<boolean>(
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
   const [updateReady, setUpdateReady] = useState(false);
-  const { coverage } = useOfflineCoverage(layerSrcs);
+  const text = useCoverageText();
 
   useEffect(() => {
     const on = () => setOnline(true);
@@ -96,13 +106,6 @@ export function OfflineStatus({ layerSrcs }: OfflineProps) {
   }, [enabled]);
 
   if (!enabled) return null;
-
-  const offlineText =
-    coverage === "notes-and-map"
-      ? "Offline — showing the saved map and notes"
-      : coverage === "notes"
-        ? "Offline — notes saved; this map may be missing"
-        : "Offline — atlas not saved for offline";
 
   return (
     <>
@@ -128,23 +131,29 @@ export function OfflineStatus({ layerSrcs }: OfflineProps) {
           className="fixed top-14 left-1/2 -translate-x-1/2 z-[1100] flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-card text-xs text-muted-foreground shadow"
         >
           <CloudOff className="h-3.5 w-3.5" aria-hidden="true" />
-          {offlineText}
+          {text.banner}
         </div>
       )}
     </>
   );
 }
 
-interface OfflineMenuProps extends OfflineProps {
+interface OfflineMenuProps {
   className?: string;
 }
 
+const SAVE_MESSAGES = {
+  offline: "You're offline — connect to save",
+  failed: "Couldn't save everything — try again",
+  unsupported: "This browser can't save pages for offline use",
+} as const;
+
 /** Compact dropdown trigger to be placed in the toolbar. */
-export function OfflineMenu({ className, layerSrcs }: OfflineMenuProps) {
+export function OfflineMenu({ className }: OfflineMenuProps) {
   const enabled = shouldEnableServiceWorker();
   const [busy, setBusy] = useState<null | "save" | "reload" | "clear">(null);
   const [done, setDone] = useState<null | string>(null);
-  const { coverage, recheck } = useOfflineCoverage(layerSrcs);
+  const text = useCoverageText();
 
   if (!enabled) return null;
 
@@ -155,11 +164,9 @@ export function OfflineMenu({ className, layerSrcs }: OfflineMenuProps) {
 
   const handleSave = async () => {
     setBusy("save");
-    const result = await saveForOffline(layerSrcs);
+    const result = await saveCurrentMapForOffline();
     setBusy(null);
-    if (result.ok) flash("This map is saved for offline");
-    else if (result.reason === "offline") flash("You're offline — connect to save");
-    else flash("Couldn't save everything — try again");
+    flash(result.ok ? "This map is saved for offline" : SAVE_MESSAGES[result.reason]);
   };
   const handleReload = async () => {
     setBusy("reload");
@@ -173,22 +180,20 @@ export function OfflineMenu({ className, layerSrcs }: OfflineMenuProps) {
     setBusy("clear");
     await clearOfflineCache();
     setBusy(null);
-    flash("Offline copy cleared");
+    flash("Offline cache cleared");
   };
 
-  const saved = coverage === "notes" || coverage === "notes-and-map";
-
   return (
-    <DropdownMenu onOpenChange={(open) => open && recheck()}>
+    <DropdownMenu onOpenChange={(open) => open && void refreshOfflineCoverage()}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
           aria-label="Offline options"
           className={className}
-          title={coverageLabel(coverage)}
+          title={text.label}
         >
-          {saved ? (
+          {text.saved ? (
             <Cloud className="h-4 w-4" aria-hidden="true" />
           ) : (
             <CloudOff className="h-4 w-4" aria-hidden="true" />
@@ -197,7 +202,7 @@ export function OfflineMenu({ className, layerSrcs }: OfflineMenuProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel className="flex items-start gap-2 text-xs font-normal">
-          {saved ? (
+          {text.saved ? (
             <CheckCircle2
               className="h-3.5 w-3.5 mt-0.5 shrink-0 text-green-500"
               aria-hidden="true"
@@ -205,24 +210,33 @@ export function OfflineMenu({ className, layerSrcs }: OfflineMenuProps) {
           ) : (
             <CloudOff className="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true" />
           )}
-          <span>{coverageLabel(coverage)}</span>
+          <span>{text.label}</span>
         </DropdownMenuLabel>
-        {coverage === "notes" && (
+        {text.note && (
           <div className="px-2 pb-1.5 pl-[1.875rem] text-[11px] text-muted-foreground">
-            This map is not saved yet
+            {text.note}
           </div>
         )}
         <DropdownMenuSeparator />
-        {coverage !== "notes-and-map" && (
-          <DropdownMenuItem onClick={handleSave} disabled={busy !== null || coverage === null}>
+        {text.canSave && (
+          <DropdownMenuItem onClick={handleSave} disabled={busy !== null}>
             <Download className="h-3.5 w-3.5 mr-2" aria-hidden="true" /> Save this map for offline
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onClick={handleReload} disabled={busy !== null}>
           <RefreshCw className="h-3.5 w-3.5 mr-2" aria-hidden="true" /> Reload latest atlas
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleClear} disabled={busy !== null}>
-          <Trash2 className="h-3.5 w-3.5 mr-2" aria-hidden="true" /> Clear offline copy
+        <DropdownMenuItem
+          onClick={handleClear}
+          disabled={busy !== null}
+          className="flex-col items-start gap-0.5"
+        >
+          <span className="flex items-center">
+            <Trash2 className="h-3.5 w-3.5 mr-2" aria-hidden="true" /> Clear offline cache
+          </span>
+          <span className="pl-[1.375rem] text-[11px] text-muted-foreground">
+            Removes saved notes, maps and pictures; the app itself stays
+          </span>
         </DropdownMenuItem>
         {done && (
           <>

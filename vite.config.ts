@@ -6,6 +6,12 @@ import { VitePWA } from "vite-plugin-pwa";
 import { atlasSavePlugin } from "./scripts/vite-plugin-atlas-save";
 import { prunePlayerAudioPlugin } from "./scripts/vite-plugin-prune-player-audio";
 import { prunePlayerImagesPlugin } from "./scripts/vite-plugin-prune-player-images";
+import {
+  ATLAS_ASSETS_CACHE,
+  ATLAS_DATA_CACHE,
+  ATLAS_HTML_CACHE,
+  EXTERNAL_IMAGES_CACHE,
+} from "./src/pwaCacheNames";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -92,7 +98,7 @@ export default defineConfig(({ mode }) => {
               urlPattern: ({ request }) => request.mode === "navigate",
               handler: "NetworkFirst",
               options: {
-                cacheName: "atlas-html",
+                cacheName: ATLAS_HTML_CACHE,
                 networkTimeoutSeconds: 3,
                 expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 7 },
               },
@@ -104,7 +110,7 @@ export default defineConfig(({ mode }) => {
                 url.pathname.endsWith("/atlas/search-index.json"),
               handler: "NetworkFirst",
               options: {
-                cacheName: "atlas-data",
+                cacheName: ATLAS_DATA_CACHE,
                 networkTimeoutSeconds: 4,
                 expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 30 },
                 cacheableResponse: { statuses: [0, 200] },
@@ -117,7 +123,7 @@ export default defineConfig(({ mode }) => {
               urlPattern: ({ url }) => url.pathname.includes("/atlas/assets/"),
               handler: "CacheFirst",
               options: {
-                cacheName: "atlas-assets",
+                cacheName: ATLAS_ASSETS_CACHE,
                 expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 60 },
                 cacheableResponse: { statuses: [0, 200, 206] },
                 rangeRequests: true,
@@ -145,7 +151,7 @@ export default defineConfig(({ mode }) => {
                 request.destination === "image" && !sameOrigin,
               handler: "StaleWhileRevalidate",
               options: {
-                cacheName: "external-images",
+                cacheName: EXTERNAL_IMAGES_CACHE,
                 expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 14 },
                 cacheableResponse: { statuses: [0, 200] },
               },

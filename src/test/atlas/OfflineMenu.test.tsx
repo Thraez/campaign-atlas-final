@@ -1,41 +1,36 @@
 /**
- * The offline menu says what is actually stored (eval-2026-10/25). It used to
- * say "Available offline" whenever a service worker controlled the page, even
- * right after "Clear offline cache" had emptied every cache.
+ * The offline menu and banner say what is actually stored (eval-2026-10/25).
+ * The menu used to say "Available offline" whenever a service worker
+ * controlled the page, even right after "Clear offline cache" had emptied
+ * every cache.
  *
- * `@/pwa` is replaced by a stand-in that keeps the stored state in memory and,
- * like the real module, tells subscribers when a save or clear changes it.
- * `src/test/pwa.test.ts` covers the cache reading itself.
+ * `@/pwa` is replaced by a stand-in for its shared offline store: one
+ * coverage value that save and clear change and announce, as the real store
+ * does. `src/test/pwa.test.ts` covers reading the caches into that value.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 
-type Coverage = "none" | "notes" | "notes-and-map";
+type Coverage = "none" | "notes" | "notes-map-online" | "notes-and-map";
 const pwa = vi.hoisted(() => {
   const listeners = new Set<() => void>();
-  const state = { coverage: "none" as Coverage, savedFor: [] as string[] };
-  const notify = () => listeners.forEach((fn) => fn());
+  const state = { coverage: null as Coverage | null };
+  const set = (c: Coverage) => {
+    state.coverage = c;
+    listeners.forEach((fn) => fn());
+  };
   return {
     state,
     listeners,
-    notify,
-    getOfflineCoverage: vi.fn(async (layers: readonly string[]) => {
-      if (state.coverage === "notes-and-map" && layers.some((l) => !state.savedFor.includes(l))) {
-        return "notes" as Coverage;
-      }
-      return state.coverage;
-    }),
-    saveForOffline: vi.fn(async (layers: readonly string[]) => {
-      state.coverage = "notes-and-map";
-      state.savedFor = [...layers];
-      notify();
-      return { ok: true as const };
-    }),
-    clearOfflineCache: vi.fn(async () => {
-      state.coverage = "none";
-      state.savedFor = [];
-      notify();
-    }),
+    set,
+    saveCurrentMapForOffline: vi.fn(
+      async (): Promise<{ ok: true } | { ok: false; reason: string }> => {
+        set("notes-and-map");
+        return { ok: true };
+      },
+    ),
+    clearOfflineCache: vi.fn(async () => set("none")),
+    refreshOfflineCoverage: vi.fn(async () => {}),
   };
 });
 
@@ -44,78 +39,88 @@ vi.mock("@/pwa", () => ({
   reloadLatestAtlas: vi.fn(async () => ({ ok: true })),
   onUpdateAvailable: () => () => {},
   shouldEnableServiceWorker: () => true,
-  onCacheStateChange: (fn: () => void) => {
+  subscribeOfflineCoverage: (fn: () => void) => {
     pwa.listeners.add(fn);
     return () => pwa.listeners.delete(fn);
   },
-  getOfflineCoverage: pwa.getOfflineCoverage,
-  saveForOffline: pwa.saveForOffline,
+  getOfflineCoverageSnapshot: () => pwa.state.coverage,
+  refreshOfflineCoverage: pwa.refreshOfflineCoverage,
+  saveCurrentMapForOffline: pwa.saveCurrentMapForOffline,
   clearOfflineCache: pwa.clearOfflineCache,
 }));
 
-import { OfflineMenu } from "@/atlas/OfflineStatus";
+import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
 
-const LAYERS = ["atlas/assets/maps/world-1.webp", "atlas/assets/maps/world-2.webp"];
+const SAVE = /save this map for offline/i;
+const NOTES = "Works offline: the notes; pictures you have opened";
+const MAP_AND_NOTES = "Works offline: this map and the notes; pictures you have opened";
 
 function openMenu() {
-  const trigger = screen.getByRole("button", { name: /offline/i });
-  fireEvent.keyDown(trigger, { key: "Enter" });
+  fireEvent.keyDown(screen.getByRole("button", { name: /offline/i }), { key: "Enter" });
 }
 
 beforeEach(() => {
   pwa.state.coverage = "none";
-  pwa.state.savedFor = [];
   pwa.listeners.clear();
   vi.clearAllMocks();
 });
 
 describe("OfflineMenu", () => {
   it("before saving, says nothing is saved and offers to save this map", async () => {
-    render(<OfflineMenu layerSrcs={LAYERS} />);
+    render(<OfflineMenu />);
     openMenu();
     expect(await screen.findByText("Not saved for offline yet")).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitem", { name: /save this map for offline/i }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/available offline/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: SAVE })).toBeInTheDocument();
+    expect(screen.queryByText(/works offline/i)).not.toBeInTheDocument();
+  });
+
+  it("re-reads the caches each time it opens", async () => {
+    render(<OfflineMenu />);
+    openMenu();
+    await screen.findByText("Not saved for offline yet");
+    expect(pwa.refreshOfflineCoverage).toHaveBeenCalled();
   });
 
   it("after a visit stored only the notes, says so and still offers the map", async () => {
     pwa.state.coverage = "notes";
-    render(<OfflineMenu layerSrcs={LAYERS} />);
+    render(<OfflineMenu />);
     openMenu();
-    expect(
-      await screen.findByText("Works offline: the notes; pictures you have opened"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(NOTES)).toBeInTheDocument();
     expect(screen.getByText("This map is not saved yet")).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: SAVE })).toBeInTheDocument();
+  });
+
+  it("for a map whose pictures live on another site, claims only the notes", async () => {
+    pwa.state.coverage = "notes-map-online";
+    render(<OfflineMenu />);
+    openMenu();
+    expect(await screen.findByText(NOTES)).toBeInTheDocument();
     expect(
-      screen.getByRole("menuitem", { name: /save this map for offline/i }),
+      screen.getByText("This map's pictures come from another site and aren't saved"),
     ).toBeInTheDocument();
+    expect(screen.queryByText(MAP_AND_NOTES)).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: SAVE })).not.toBeInTheDocument();
   });
 
   it("after saving, names this map and the notes, and pictures already opened", async () => {
-    render(<OfflineMenu layerSrcs={LAYERS} />);
+    render(<OfflineMenu />);
     openMenu();
-    fireEvent.click(await screen.findByRole("menuitem", { name: /save this map for offline/i }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: SAVE }));
 
-    expect(pwa.saveForOffline).toHaveBeenCalledWith(LAYERS);
+    await waitFor(() => expect(pwa.saveCurrentMapForOffline).toHaveBeenCalled());
     openMenu();
-    expect(
-      await screen.findByText("Works offline: this map and the notes; pictures you have opened"),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("menuitem", { name: /save this map for offline/i }),
-    ).not.toBeInTheDocument();
+    expect(await screen.findByText(MAP_AND_NOTES)).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: SAVE })).not.toBeInTheDocument();
   });
 
   it("after clearing, stops claiming offline until something is saved again", async () => {
     pwa.state.coverage = "notes-and-map";
-    pwa.state.savedFor = [...LAYERS];
-    render(<OfflineMenu layerSrcs={LAYERS} />);
+    render(<OfflineMenu />);
     openMenu();
-    await screen.findByText("Works offline: this map and the notes; pictures you have opened");
+    await screen.findByText(MAP_AND_NOTES);
+    expect(screen.getByText(/the app itself stays/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("menuitem", { name: /clear offline copy/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /clear offline cache/i }));
 
     await waitFor(() => expect(pwa.clearOfflineCache).toHaveBeenCalled());
     openMenu();
@@ -123,30 +128,52 @@ describe("OfflineMenu", () => {
     expect(screen.queryByText(/works offline/i)).not.toBeInTheDocument();
   });
 
-  it("switching to a map that isn't saved drops the map claim", async () => {
-    pwa.state.coverage = "notes-and-map";
-    pwa.state.savedFor = [...LAYERS];
-    const { rerender } = render(<OfflineMenu layerSrcs={LAYERS} />);
-    await waitFor(() => expect(pwa.getOfflineCoverage).toHaveBeenCalled());
-
-    rerender(<OfflineMenu layerSrcs={["atlas/assets/maps/underdark.webp"]} />);
+  it("follows the shared store when the caches change behind its back", async () => {
+    render(<OfflineMenu />);
+    act(() => pwa.set("notes"));
     openMenu();
-
-    expect(
-      await screen.findByText("Works offline: the notes; pictures you have opened"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(NOTES)).toBeInTheDocument();
   });
 
-  it("re-reads the caches when they change behind its back", async () => {
-    render(<OfflineMenu layerSrcs={LAYERS} />);
-    await waitFor(() => expect(pwa.getOfflineCoverage).toHaveBeenCalled());
-
-    pwa.state.coverage = "notes";
-    act(() => pwa.notify());
+  it("says so when the browser can't save for offline", async () => {
+    pwa.saveCurrentMapForOffline.mockImplementationOnce(async () => ({
+      ok: false,
+      reason: "unsupported",
+    }));
+    render(<OfflineMenu />);
     openMenu();
-
+    fireEvent.click(await screen.findByRole("menuitem", { name: SAVE }));
+    openMenu();
     expect(
-      await screen.findByText("Works offline: the notes; pictures you have opened"),
+      await screen.findByText("This browser can't save pages for offline use"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("OfflineStatus banner while offline", () => {
+  beforeEach(() => {
+    Object.defineProperty(navigator, "onLine", { value: false, configurable: true });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(navigator, "onLine", { value: true, configurable: true });
+  });
+
+  it.each([
+    [null, "Offline — checking what is saved"],
+    ["none", "Offline — the atlas isn't saved on this device"],
+    ["notes", "Offline — showing the saved notes; this map isn't saved"],
+    ["notes-map-online", "Offline — showing the saved notes; this map needs the internet"],
+    ["notes-and-map", "Offline — showing the saved map and notes"],
+  ] as const)("coverage %s: %s", (coverage, banner) => {
+    pwa.state.coverage = coverage;
+    render(<OfflineStatus />);
+    expect(screen.getByRole("status")).toHaveTextContent(banner);
+  });
+
+  it("shows no banner while online", () => {
+    Object.defineProperty(navigator, "onLine", { value: true, configurable: true });
+    render(<OfflineStatus />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });
