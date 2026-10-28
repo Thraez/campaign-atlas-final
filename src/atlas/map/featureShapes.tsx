@@ -1,7 +1,7 @@
 /**
  * How a region and a route look on the map: stroke, fill and hover tooltip.
  *
- * One module for both the player viewer (`WrappedWorld` in AtlasViewer) and the
+ * One module for both the player viewer (`WrappedWorld.tsx`) and the
  * editor layers (RegionLayer, RouteLayer), so what the DM checks in the editor
  * is what players see. The editor only adds its own click handling, a
  * selection highlight, edit handles and draft shapes on top.

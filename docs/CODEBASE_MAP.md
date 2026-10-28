@@ -192,30 +192,38 @@ create-only skips 409 when bytes are identical (survives the localStorage replay
 
 Leaflet map + searchable entities + detail panels + deep-linkable viewport.
 
-| File                                   | Role                                                                                                    | Key exports                                                                              |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `src/pages/AtlasViewer.tsx`            | Orchestrates map, markers, search, panels, URL sync                                                     | `AtlasViewer`, `MapController`, `ViewSyncController`, `WrappedWorld`, `PlacementMarkers` |
-| `src/atlas/search/SearchPalette.tsx`   | Cmd/Ctrl-K modal search (filters, ranking, keyboard nav) — **no Leaflet dep, unit-tested in isolation** | `SearchPalette`, `useRecentlyRevealedIds`                                                |
+| File                                   | Role                                                                                                                 | Key exports                                                     |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `src/pages/AtlasViewer.tsx`            | Orchestrates map, search, panels, URL sync                                                                           | `AtlasViewer`, `MapController`, `ViewSyncController`            |
+| `src/atlas/map/WrappedWorld.tsx`       | One memoised copy of the world (layers, regions, routes, grid, pins), shifted for wrapping maps; player-safe         | `WrappedWorld`                                                  |
+| `src/atlas/map/PlacementMarkers.tsx`   | Pin markers (one memoised `PinMarker` each) and the label decisions, cached per placement list and zoom; player-safe | `PlacementMarkers`                                              |
+| `src/atlas/map/pinIcon.ts`             | Pin `L.DivIcon`, cached by style and state so unchanged pins never get `setIcon`; player-safe                        | `pinIcon`                                                       |
+| `src/atlas/search/SearchPalette.tsx`   | Cmd/Ctrl-K modal search (filters, ranking, keyboard nav) — **no Leaflet dep, unit-tested in isolation**              | `SearchPalette`, `useRecentlyRevealedIds`                       |
 | `src/atlas/search/search.ts`         | The one search: query parsing (quoted phrases), matching and ranking for the palette, Browse and Timeline; body text shared with the build | `compileQuery`, `searchMatches`, `searchEntries`, `entityMatchesQuery`, `searchBodyText` |
-| `src/atlas/search/snippet.ts`          | Pure 140-char match snippet with `<mark>`                                                               | `snippet`                                                                                |
-| `src/atlas/map/geometry.ts`            | Pure map-space geometry (route distance, travel time, grid lines) — type-only Leaflet import            | `routeDistancePx`, `formatTravelTime`, `gridLines`                                       |
-| `src/atlas/map/featureShapes.tsx`      | Region and route drawing (style, fill, tooltip) shared by the viewer and the editor layers; player-safe | `RegionShape`, `RouteShape`                                                              |
-| `src/atlas/map/featureStyle.ts`        | Region/route Leaflet path options, default colours and opacity, route tooltip text; player-safe         | `regionPathOptions`, `routePathOptions`, `DEFAULT_REGION_COLOR`                          |
-| `src/atlas/entity/EntityPanel.tsx`     | Entity detail (desktop aside / mobile sheet), notes, handout export                                     | `EntityPanel`, `NotesPanel`                                                              |
-| `src/atlas/pins/presets.ts`            | Entity-type → pin visual preset registry                                                                | `PIN_PRESETS`, `PinPreset`                                                               |
-| `src/atlas/pins/labelVisibility.ts`    | Zoom-dependent label thresholding                                                                       | `shouldShowLabel`                                                                        |
+| `src/atlas/search/snippet.ts`          | Pure 140-char match snippet with `<mark>`                                                                            | `snippet`                                                       |
+| `src/atlas/map/geometry.ts`            | Pure map-space geometry (route distance, travel time, grid lines) — type-only Leaflet import                         | `routeDistancePx`, `formatTravelTime`, `gridLines`              |
+| `src/atlas/map/featureShapes.tsx`      | Region and route drawing (style, fill, tooltip) shared by the viewer and the editor layers; player-safe              | `RegionShape`, `RouteShape`                                     |
+| `src/atlas/map/featureStyle.ts`        | Region/route Leaflet path options, default colours and opacity, route tooltip text; player-safe                      | `regionPathOptions`, `routePathOptions`, `DEFAULT_REGION_COLOR` |
+| `src/atlas/entity/EntityPanel.tsx`     | Entity detail (desktop aside / mobile sheet), notes, handout export                                                  | `EntityPanel`, `NotesPanel`                                     |
+| `src/atlas/pins/presets.ts`            | Entity-type → pin visual preset registry                                                                             | `PIN_PRESETS`, `PinPreset`                                      |
+| `src/atlas/pins/labelVisibility.ts`    | Zoom-dependent label thresholding                                                                                    | `shouldShowLabel`                                               |
 
 **Entry:** page load fetches `atlas.json` + `search-index.json`, parses the deep-link
 URL; `MapContainer` (react-leaflet) with flat CRS; Cmd/Ctrl-K opens search.
 
 **Traps:** the `lat = mapHeight − y` flip is everywhere a coordinate crosses into
-Leaflet; `PlacementMarkers` recomputes label collision on every zoom (screen-space, so
-not memoizable); `SearchPalette` is controlled (query state lives in the page) and
+Leaflet; the pin layer only stays cheap while the page's props to
+`WrappedWorld` stay the same objects (memoised data, `useCallback` handlers);
+a new handler or `placements` array per render re-renders every pin. Label
+collision is decided once per zoom from projected pixels (pan-invariant).
+react-leaflet fixes a Tooltip's `permanent` option at creation, so a label
+mounted as hover-only stays that way when a zoom would make it permanent; `SearchPalette` is controlled (query state lives in the page) and
 `useRecentlyRevealedIds` silently no-ops if `.last-published.json` is absent.
 
 **Tests:** `src/test/search/SearchPalette.test.tsx`, `search/one-search-across-pages.test.tsx`,
 `search/entityMatchesQuery.test.ts`, `content/loader.test.ts`, `phrase-search.test.ts`,
-`atlas-viewer-snippet.test.ts`, `atlas/map-geometry.test.ts`, `entity/EntityPanel.test.tsx`.
+`atlas-viewer-snippet.test.ts`, `atlas/map-geometry.test.ts`, `entity/EntityPanel.test.tsx`,
+`map/pinLayer.test.tsx`, `map/pinLabels.test.tsx`; bench: `PIN_BENCH=1 vitest run src/test/map/pinLayer.bench`.
 
 ---
 
