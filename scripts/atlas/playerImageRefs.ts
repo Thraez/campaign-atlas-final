@@ -107,16 +107,21 @@ export function collectImageRefs(jsonTexts: string[]): Set<string> {
   return refs;
 }
 
+/** The player JSON whose references keep an image. Not `.last-published.json`:
+ *  it is the previous publish, so it would keep an image the DM has hidden since. */
+const PLAYER_JSON = ["atlas.json", "search-index.json"];
+
 /**
- * The references in every `.json` file directly in `dir` (atlas.json,
- * search-index.json). A file that is not valid JSON throws, naming the file:
- * guessing at its references could prune a shown image or keep a DM one.
+ * The references in the player JSON in `dir` (`PLAYER_JSON`). A file that is
+ * not valid JSON throws, naming the file: guessing at its references could
+ * prune a shown image or keep a DM one.
  */
 export function readPlayerImageRefs(dir: string): Set<string> {
   const refs = new Set<string>();
   if (!fs.existsSync(dir)) return refs;
-  for (const name of fs.readdirSync(dir).filter((n) => n.endsWith(".json"))) {
+  for (const name of PLAYER_JSON) {
     const file = path.join(dir, name);
+    if (!fs.existsSync(file)) continue;
     let parsed: unknown;
     try {
       parsed = JSON.parse(fs.readFileSync(file, "utf8"));

@@ -75,6 +75,21 @@ describe("readPlayerImageRefs", () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("ignores the last-publish snapshot, so an image the DM hid since then is pruned", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "player-refs-"));
+    try {
+      fs.writeFileSync(path.join(dir, "atlas.json"), '{"src":"/atlas/assets/maps/Map.png"}');
+      fs.writeFileSync(path.join(dir, "search-index.json"), '{"img":"![[Shown.webp]]"}');
+      fs.writeFileSync(path.join(dir, ".last-published.json"), '{"img":"![[Hidden.webp]]"}');
+      expect([...readPlayerImageRefs(dir)].sort()).toEqual([
+        "assets/images/Shown.webp",
+        "assets/maps/Map.png",
+      ]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("pruneUnreferencedImages", () => {
