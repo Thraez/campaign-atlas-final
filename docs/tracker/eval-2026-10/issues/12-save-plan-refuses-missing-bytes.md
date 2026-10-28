@@ -1,6 +1,6 @@
 # Save refuses when an image's bytes are missing
 
-Status: ready-for-agent
+Status: ready-for-human
 Area: editor, local save
 
 `AtlasPlacementEditor.tsx` ~862-878 warns about uploads with no bytes and then writes world.yaml
@@ -13,3 +13,17 @@ page and can only be tested by mounting it.
   it and shows the reason.
 - A missing upload is a refusal: nothing is written.
 - Unit tests for the plan without mounting the page; the existing save tests pass.
+
+## Comments
+
+- 2026-10-27 (agent): `planUnifiedSave(state)` in `src/atlas/editor/saveGate.ts` returns
+  `nothing-to-save`, `refused` (reason + detail) or `save` (changes); tests in
+  `src/test/editor/plan-unified-save.test.ts`. An upload with no bytes now refuses Save: an error
+  toast "Save refused: N uploaded image(s) have no bytes" names the layers, and no modal opens.
+  Needs Isak's look at the toast in the editor.
+- 2026-10-27 (agent): The two-axis review ran and its fixes are in. `planUnifiedSave(state, deps)`
+  moved to `src/atlas/save/planUnifiedSave.ts` (tests: `src/test/save/plan-unified-save.test.ts`).
+  Entity reads now go through the injected `deps.fetchFn`. The world.yaml inputs are one
+  `worldYaml` field. `uploadsMissingBytes` in `buildSaveBatch.ts` serves both the refusal and the
+  asset skip. A dirty world.yaml with no active world is still left out of the batch, and it now says
+  so. Status stays ready-for-human.
