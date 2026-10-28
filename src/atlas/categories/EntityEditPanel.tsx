@@ -13,6 +13,7 @@ import {
 import {
   saveAtlasPatchToLocalFs,
   hashContent,
+  rebuildFailure,
   ConflictError,
   type FileChange,
 } from "@/atlas/save/localFsSave";
@@ -76,6 +77,10 @@ export function EntityEditPanel({
   // Shown after a rebase (manual or on reopen) when the DM's body replaces a
   // body that was also edited on disk.
   const [notice, setNotice] = useState<string | null>(null);
+  // A failed (non-conflict) save: the form stays up with this above it.
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // The files were written but the atlas rebuild failed: the build's message.
+  const [rebuildError, setRebuildError] = useState<string | null>(null);
   // The entity this panel shows now; async work started for another is dropped.
   const sourcePathRef = useRef(sourcePath);
   useEffect(() => {
@@ -137,6 +142,8 @@ export function EntityEditPanel({
     let alive = true;
     setPhase("loading");
     setNotice(null);
+    setSaveError(null);
+    setRebuildError(null);
     (async () => {
       try {
         const raw = await readSourceFile(sourcePath, fetch);
@@ -193,6 +200,7 @@ export function EntityEditPanel({
     if (!api.draft || phase === "saving" || phase === "rebasing") return;
     const startedFor = sourcePath;
     setPhase("saving");
+    setSaveError(null);
     try {
       const { data } = parseFrontmatter(rawRef.current);
       const atlas: Record<string, unknown> = {
@@ -220,8 +228,10 @@ export function EntityEditPanel({
         kind: "entity-md",
         baseHash: asNewFile ? null : api.draft.baseHash,
       };
-      await saveAtlasPatchToLocalFs([change], undefined, { rebuild: true });
+      const result = await saveAtlasPatchToLocalFs([change], undefined, { rebuild: true });
       if (sourcePathRef.current !== startedFor) return;
+      // The files are on disk either way; a failed rebuild is said, not hidden.
+      setRebuildError(rebuildFailure(result));
       setPhase("saved");
       setNotice(null);
       api.clear();
@@ -237,8 +247,9 @@ export function EntityEditPanel({
         return;
       }
       logger.error("Entity save failed", e);
-      setError(e instanceof Error ? e.message : String(e));
-      setPhase("error");
+      // Not a load failure: the file is fine and the draft is kept. Stay on the form.
+      setSaveError(e instanceof Error ? e.message : String(e));
+      setPhase("ready");
     }
   };
 
@@ -455,7 +466,20 @@ export function EntityEditPanel({
         </button>
       </div>
     );
-  if (phase === "saved") return <div className="p-4 text-xs">Saved.</div>;
+  if (phase === "saved")
+    return rebuildError ? (
+      <div
+        role="alert"
+        className="m-3 rounded border p-2 space-y-2 text-xs bg-destructive/10 border-destructive/30"
+      >
+        <p>Files saved, but the atlas rebuild failed:</p>
+        <pre className="font-mono text-[10px] whitespace-pre-wrap max-h-48 overflow-auto">
+          {rebuildError}
+        </pre>
+      </div>
+    ) : (
+      <div className="p-4 text-xs">Saved.</div>
+    );
   // "saving" intentionally falls through to the form (Save button shows "Saving…").
   if (phase === "loading" || !api.draft) return <div className="p-4 text-xs">Loading…</div>;
 
@@ -497,6 +521,15 @@ export function EntityEditPanel({
             >
               Save as a new file
             </button>
+          </div>
+        )}
+        {saveError && (
+          <div
+            role="alert"
+            className="rounded border p-2 space-y-2 bg-destructive/10 border-destructive/30"
+          >
+            <p>{saveError}</p>
+            <p>Nothing was saved; your edits are still here.</p>
           </div>
         )}
         {notice && phase !== "conflict" && phase !== "deleted" && (
