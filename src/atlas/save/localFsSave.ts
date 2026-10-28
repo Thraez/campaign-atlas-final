@@ -76,6 +76,16 @@ export interface LocalSaveResult {
   build?: LocalSaveBuildInfo;
 }
 
+/**
+ * null when the rebuild was fine (or not requested); otherwise the message to
+ * show: the build's stderr, else the rebuild error tail, else a stub. The files
+ * are on disk either way.
+ */
+export function rebuildFailure(result: LocalSaveResult): string | null {
+  if (result.build?.ok !== false && result.rebuilt !== false) return null;
+  return result.build?.stderr || result.rebuildError || "No details were reported.";
+}
+
 export class DisallowedPathError extends Error {
   constructor(public readonly path: string) {
     super(`Path not in source allowlist: ${path}`);
