@@ -1,9 +1,7 @@
 /**
- * The build ships an entity's display date as `dateLabel` (it was `dateRaw`,
- * a name that hid the fact that it holds the formatted label, not the
- * frontmatter text). A note with a `dateValue` but no date that parses gets
- * a label and a value but no `dateYear`, so the Timeline can file it under
- * "Undated".
+ * The build ships an entity's formatted display date as `dateLabel`. A note
+ * with a `dateValue` but no date that parses gets a label and a value but no
+ * `dateYear`, so the Timeline can file it under "Undated".
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { runBuild } from "../../scripts/build-atlas";
@@ -13,6 +11,7 @@ import path from "node:path";
 
 let originalCwd: string;
 let tmpRoot: string;
+let buildOk: boolean;
 
 function note(file: string, lines: string[]) {
   fs.writeFileSync(
@@ -22,7 +21,7 @@ function note(file: string, lines: string[]) {
   );
 }
 
-beforeAll(() => {
+beforeAll(async () => {
   originalCwd = process.cwd();
   tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-date-label-"));
   fs.mkdirSync(path.join(tmpRoot, "content/test-world/_atlas"), { recursive: true });
@@ -60,6 +59,7 @@ beforeAll(() => {
     "  dateValue: 500",
   ]);
   process.chdir(tmpRoot);
+  buildOk = (await runBuild({ player: true, strict: false })).ok;
 });
 
 afterAll(() => {
@@ -72,9 +72,8 @@ function readOut(file: string) {
 }
 
 describe("player build: dateLabel", () => {
-  it("ships the formatted date as dateLabel, never dateRaw", async () => {
-    const r = await runBuild({ player: true, strict: false });
-    expect(r.ok).toBe(true);
+  it("ships the formatted date as dateLabel, never dateRaw", () => {
+    expect(buildOk).toBe(true);
     const atlas = readOut("atlas.json");
     const battle = atlas.entities.find((e: { id: string }) => e.id === "battle");
     expect(battle.dateLabel).toBe("1247, month 3, day 15");
@@ -87,9 +86,8 @@ describe("player build: dateLabel", () => {
     expect(entry).not.toHaveProperty("dateRaw");
   });
 
-  it("an unparsable date with a dateValue gets a label and value but no year", async () => {
-    const r = await runBuild({ player: true, strict: false });
-    expect(r.ok).toBe(true);
+  it("an unparsable date with a dateValue gets a label and value but no year", () => {
+    expect(buildOk).toBe(true);
     const flood = readOut("atlas.json").entities.find((e: { id: string }) => e.id === "flood");
     expect(flood.dateLabel).toBe("Year of the Flood");
     expect(flood.dateValue).toBe(500);

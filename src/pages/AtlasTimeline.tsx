@@ -61,20 +61,21 @@ export default function AtlasTimeline() {
     // sort an event ahead of an earlier year's events, which must not drag its
     // year's group out of order. Events with no year (the date didn't parse)
     // go last under "Undated", never under year 0.
-    const byYear = new Map<number | null, Entity[]>();
+    const byYear = new Map<number, Entity[]>();
+    const undated: YearGroup = { key: "undated", label: "Undated", entries: [] };
     sorted.forEach((e) => {
-      const y = typeof e.dateYear === "number" ? e.dateYear : null;
-      if (!byYear.has(y)) byYear.set(y, []);
-      byYear.get(y)!.push(e);
+      if (typeof e.dateYear !== "number") {
+        undated.entries.push(e);
+        return;
+      }
+      if (!byYear.has(e.dateYear)) byYear.set(e.dateYear, []);
+      byYear.get(e.dateYear)!.push(e);
     });
     const epoch = project?.calendar?.epochName ? ` ${project.calendar.epochName}` : "";
-    return Array.from(byYear.entries())
-      .sort(([a], [b]) => (a === null ? 1 : b === null ? -1 : a - b))
-      .map(([year, entries]) => ({
-        key: year === null ? "undated" : String(year),
-        label: year === null ? "Undated" : `${year}${epoch}`,
-        entries,
-      }));
+    const years: YearGroup[] = Array.from(byYear.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([year, entries]) => ({ key: String(year), label: `${year}${epoch}`, entries }));
+    return undated.entries.length > 0 ? [...years, undated] : years;
   }, [dated, query, activeType, project]);
 
   if (error || !project) {

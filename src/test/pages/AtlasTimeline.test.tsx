@@ -192,6 +192,28 @@ describe("AtlasTimeline — year groups", () => {
     expect(titlesIn("Undated")).toEqual(["The Flood"]);
   });
 
+  it("keeps a year-0 event under 0, not Undated", async () => {
+    const founding = makeEntity({
+      id: "founding",
+      title: "Founding",
+      dateValue: 1,
+      dateYear: 0,
+      dateLabel: "0",
+    });
+    const flood = makeEntity({
+      id: "flood",
+      title: "The Flood",
+      dateValue: 500,
+      dateYear: undefined,
+      dateLabel: "Year of the Flood",
+    });
+    renderTimeline(makeProject([flood, founding]));
+    await screen.findByText("Founding");
+    expect(headings()).toEqual(["0", "Undated"]);
+    expect(titlesIn("0")).toEqual(["Founding"]);
+    expect(titlesIn("Undated")).toEqual(["The Flood"]);
+  });
+
   it("keeps year groups in year order when a dateValue override crosses years", async () => {
     // The 1100 event's override sorts it before every 1000 event by value.
     const early = makeEntity({ id: "a", title: "Early", dateValue: 1000, dateYear: 1000 });

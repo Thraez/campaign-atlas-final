@@ -235,7 +235,7 @@ export interface Entity {
   links: ResolvedLink[];
   backlinks: { id: string; title: string }[];
   // Timeline support (Batch 7). dateLabel is the formatted date shown to
-  // readers (was `dateRaw`); dateValue is a sortable integer derived from the
+  // readers; dateValue is a sortable integer derived from the
   // world calendar (or ISO date fallback), or the note's `dateValue` override.
   // dateYear is absent when the date doesn't parse: the Timeline files those
   // events under "Undated".

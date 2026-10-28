@@ -28,3 +28,9 @@ no `dateYear` (`build-atlas.ts` ~1254-1256), and the Timeline falls back to `?? 
   `timeline-date-label.test.ts` (build), `artifact-shape.test.ts`, `AtlasTimeline.test.tsx`.
   This ticket file isn't on the base branch yet, so the branch adds it; expect a trivial conflict
   with main's copy on merge.
+- 2026-10-28, agent, after both reviews passed: added a year-0 test (stays under "0", not
+  "Undated"), built the Undated group once, ran the build test's build once, and dropped the
+  history comments. The committed `public/atlas/atlas.json` and `search-index.json` still carry
+  `dateRaw` until the next build (generated output isn't committed on stacked branches; the publish
+  workflow rebuilds them), so a local dev run shows no dates until `npm run atlas:build:player`.
+  The search-index shape check on `dateLabel` is new: the old `dateRaw` was never checked there.
