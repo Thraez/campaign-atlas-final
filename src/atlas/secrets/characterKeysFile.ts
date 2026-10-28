@@ -76,3 +76,58 @@ export function serializeCharacterKeys(entries: readonly CharacterKeyEntry[]): s
   }
   return yaml.dump(obj);
 }
+
+export interface CharacterKeysRebase {
+  /** The DM's rows moved onto the file as it is now. */
+  rows: CharacterKeyEntry[];
+  /** Names added, removed or given another key on disk since `base` was read. */
+  added: string[];
+  removed: string[];
+  changed: string[];
+  /** Of those, the names where the DM's rows win, so a save overwrites the disk. */
+  overwritten: string[];
+}
+
+/**
+ * Move unsaved rows onto a file that changed on disk (a save conflict). `base`
+ * is the file as last read, `mine` the rows on screen, `theirs` the file now.
+ * A row the DM didn't touch follows the disk (new key, or gone); a row the DM
+ * edited, added or removed keeps the DM's version; names added on disk that
+ * the DM doesn't have are appended. Blank-name rows are kept as they are.
+ */
+export function rebaseCharacterKeys(
+  base: readonly CharacterKeyEntry[],
+  mine: readonly CharacterKeyEntry[],
+  theirs: readonly CharacterKeyEntry[],
+): CharacterKeysRebase {
+  const baseMap = new Map(base.map((e) => [e.name, e.key]));
+  const theirsMap = new Map(theirs.map((e) => [e.name, e.key]));
+  const mineNames = new Set(mine.map((r) => r.name.trim()).filter(Boolean));
+
+  const rows: CharacterKeyEntry[] = [];
+  for (const row of mine) {
+    const name = row.name.trim();
+    const untouched = name !== "" && baseMap.get(name) === row.key;
+    if (!untouched) {
+      rows.push(row);
+    } else if (theirsMap.has(name)) {
+      rows.push({ ...row, key: theirsMap.get(name)! });
+    }
+  }
+  for (const e of theirs) {
+    if (!baseMap.has(e.name) && !mineNames.has(e.name)) rows.push(e);
+  }
+
+  const added = theirs.filter((e) => !baseMap.has(e.name)).map((e) => e.name);
+  const removed = base.filter((e) => !theirsMap.has(e.name)).map((e) => e.name);
+  const changed = base
+    .filter((e) => theirsMap.has(e.name) && theirsMap.get(e.name) !== e.key)
+    .map((e) => e.name);
+
+  const finalMap = new Map<string, string>();
+  for (const r of rows) if (r.name.trim()) finalMap.set(r.name.trim(), r.key);
+  const overwritten = [...added, ...removed, ...changed].filter(
+    (n) => finalMap.get(n) !== theirsMap.get(n),
+  );
+  return { rows, added, removed, changed, overwritten };
+}

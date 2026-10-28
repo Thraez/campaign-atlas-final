@@ -11,7 +11,7 @@ vi.mock("@/atlas/save/localFsSave", async (importOriginal) => ({
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-import { saveAtlasPatchToLocalFs, hashContent } from "@/atlas/save/localFsSave";
+import { saveAtlasPatchToLocalFs, hashContent, ConflictError } from "@/atlas/save/localFsSave";
 import { toast } from "sonner";
 
 const mockSave = vi.mocked(saveAtlasPatchToLocalFs);
@@ -217,5 +217,98 @@ describe("CharacterKeysPanel — every key survives a load and a save (eval-2026
     expect(alert).toHaveTextContent(/Bob/);
     expect(alert).toHaveTextContent(/Cara/);
     expect(screen.getByRole("button", { name: /Save keys/i })).toBeDisabled();
+  });
+});
+
+describe("CharacterKeysPanel — a save conflict re-reads the file and keeps the DM's rows (eval-2026-10/36)", () => {
+  const fileResponse = (contents: string) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ contents }),
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockHash.mockImplementation(async (c: string) => `h:${c}`);
+    mockSave.mockResolvedValue({ saved: 1, paths: ["/world/_dm/character-keys.yaml"] });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("merges the file's new state, says what changed outside, and the next save uses the new baseHash", async () => {
+    const before = "Aria: k1\nBob: k2\nEve: k5\n";
+    const after = "Aria: k1-new\nBob: k2-outside\nDag: k4\n";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(fileResponse(before)).mockResolvedValue(fileResponse(after)),
+    );
+    mockSave.mockRejectedValueOnce(
+      new ConflictError("stale-base", "/world/_dm/character-keys.yaml", "h:other"),
+    );
+    render(<CharacterKeysPanel worldDir="/world" />);
+    await waitFor(() => screen.getByDisplayValue("Bob"));
+
+    // The DM regenerates Bob's key and adds Cara, unsaved.
+    fireEvent.click(screen.getAllByRole("button", { name: /Regenerate key/i })[1]);
+    fireEvent.click(screen.getByRole("button", { name: /Add character/i }));
+    const names = screen.getAllByLabelText("Character name");
+    fireEvent.change(names[names.length - 1], { target: { value: "Cara" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /Save keys/i }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/changed on disk/i);
+    expect(alert).toHaveTextContent(/Added outside the editor: Dag/);
+    expect(alert).toHaveTextContent(/Removed outside the editor: Eve/);
+    expect(alert).toHaveTextContent(/Changed outside the editor: Aria, Bob/);
+    expect(alert).toHaveTextContent(/Saving again overwrites.*Bob/);
+
+    // Drafts survive; untouched rows follow the file.
+    expect(screen.getByDisplayValue("Cara")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Dag")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Eve")).toBeNull();
+    expect(screen.getByText("k1-new")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Save keys/i }));
+    await waitFor(() => expect(mockSave).toHaveBeenCalledTimes(2));
+    const second = mockSave.mock.calls[1][0][0];
+    expect(second.baseHash).toBe(`h:${after}`);
+    const saved = yaml.load(second.content) as Record<string, string>;
+    expect(Object.keys(saved).sort()).toEqual(["Aria", "Bob", "Cara", "Dag"]);
+    expect(saved.Aria).toBe("k1-new");
+    expect(saved.Dag).toBe("k4");
+    expect(saved.Bob).not.toBe("k2");
+    expect(saved.Bob).not.toBe("k2-outside");
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  });
+
+  it("a file created after an absent load is merged in, not refused forever", async () => {
+    const created = "Aria: k1\n";
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({ ok: false, status: 404 })
+        .mockResolvedValue(fileResponse(created)),
+    );
+    mockSave.mockRejectedValueOnce(
+      new ConflictError("already-exists", "/world/_dm/character-keys.yaml"),
+    );
+    render(<CharacterKeysPanel worldDir="/world" />);
+    await waitFor(() => screen.getByText(/No characters yet/i));
+    fireEvent.click(screen.getByRole("button", { name: /Add character/i }));
+    fireEvent.change(screen.getByLabelText("Character name"), { target: { value: "Cara" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save keys/i }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/Added outside the editor: Aria/);
+    expect(screen.getByDisplayValue("Cara")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Save keys/i }));
+    await waitFor(() => expect(mockSave).toHaveBeenCalledTimes(2));
+    const second = mockSave.mock.calls[1][0][0];
+    expect(second.baseHash).toBe(`h:${created}`);
+    expect(Object.keys(yaml.load(second.content) as object).sort()).toEqual(["Aria", "Cara"]);
   });
 });

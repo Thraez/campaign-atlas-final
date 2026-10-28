@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Key, Copy, Check, Trash2, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { saveAtlasPatchToLocalFs, hashContent } from "@/atlas/save/localFsSave";
+import { saveAtlasPatchToLocalFs, hashContent, ConflictError } from "@/atlas/save/localFsSave";
 import { copyToClipboard } from "@/lib/clipboard";
-import { parseCharacterKeys, serializeCharacterKeys } from "./characterKeysFile";
+import {
+  parseCharacterKeys,
+  rebaseCharacterKeys,
+  serializeCharacterKeys,
+  type CharacterKeyEntry,
+  type CharacterKeysRebase,
+} from "./characterKeysFile";
 
 interface CharacterRow {
   name: string;
@@ -26,6 +32,11 @@ async function readKeysFile(keysPath: string): Promise<string | null> {
   return body.contents;
 }
 
+/** What the panel tells the DM after a save conflict. */
+type ConflictNotice =
+  | { kind: "merged"; deleted: boolean; rebase: CharacterKeysRebase }
+  | { kind: "unreadable"; reason: string };
+
 interface Props {
   worldDir: string;
 }
@@ -44,16 +55,21 @@ export function CharacterKeysPanel({ worldDir }: Props) {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The file as last read or saved: the base a conflict merges against.
+  const diskRef = useRef<CharacterKeyEntry[]>([]);
+  const [conflict, setConflict] = useState<ConflictNotice | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     setUnsupported([]);
+    setConflict(null);
     try {
       const text = await readKeysFile(keysPath);
       if (text === null) {
         setRows([]);
         setBaseHash(null);
+        diskRef.current = [];
         return;
       }
       const parsed = parseCharacterKeys(text);
@@ -64,6 +80,7 @@ export function CharacterKeysPanel({ worldDir }: Props) {
       setRows(parsed.entries);
       setUnsupported(parsed.unsupported);
       setBaseHash(await hashContent(text));
+      diskRef.current = parsed.entries;
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -94,12 +111,44 @@ export function CharacterKeysPanel({ worldDir }: Props) {
       ]);
       const h = await hashContent(content);
       setBaseHash(h);
+      const saved = parseCharacterKeys(content);
+      diskRef.current = saved.ok ? saved.entries : [];
+      setConflict(null);
       toast.success("Character keys saved");
     } catch (e) {
+      if (e instanceof ConflictError) {
+        await recoverFromConflict(next, e.reason === "missing-base");
+        return;
+      }
       toast.error(`Save failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setSaving(false);
     }
+  };
+
+  // The file changed on disk under the DM's rows. Re-read it, keep what the
+  // DM changed, take the rest from disk, adopt the new baseHash and say what
+  // moved, so the next Save goes through.
+  const recoverFromConflict = async (mine: CharacterRow[], deleted: boolean) => {
+    let text: string | null;
+    try {
+      text = await readKeysFile(keysPath);
+    } catch (e) {
+      setConflict({ kind: "unreadable", reason: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    const parsed = text === null ? null : parseCharacterKeys(text);
+    if (parsed && !parsed.ok) {
+      setConflict({ kind: "unreadable", reason: parsed.error });
+      return;
+    }
+    const theirs = parsed ? parsed.entries : [];
+    const rebase = rebaseCharacterKeys(diskRef.current, mine, theirs);
+    setRows(rebase.rows);
+    setUnsupported(parsed ? parsed.unsupported : []);
+    setBaseHash(text === null ? null : await hashContent(text));
+    diskRef.current = theirs;
+    setConflict({ kind: "merged", deleted: deleted || text === null, rebase });
   };
 
   const addRow = () => setRows((r) => [...r, { name: "", key: generate() }]);
@@ -155,6 +204,8 @@ export function CharacterKeysPanel({ worldDir }: Props) {
           </button>
         </div>
       )}
+
+      {conflict && <ConflictBanner notice={conflict} />}
 
       {unsupported.length > 0 && (
         <div role="alert" className="m-3 rounded border border-amber-500/60 p-2 space-y-2 text-xs">
@@ -253,6 +304,47 @@ export function CharacterKeysPanel({ worldDir }: Props) {
           {saving ? "Saving…" : "Save keys"}
         </button>
       </div>
+    </div>
+  );
+}
+
+const listed = (label: string, names: string[]) =>
+  names.length > 0 ? (
+    <p>
+      {label}: {names.join(", ")}.
+    </p>
+  ) : null;
+
+function ConflictBanner({ notice }: { notice: ConflictNotice }) {
+  if (notice.kind === "unreadable") {
+    return (
+      <div role="alert" className="m-3 rounded border border-amber-500/60 p-2 space-y-1 text-xs">
+        <p>
+          character-keys.yaml changed on disk after you opened it, so Save was refused, and it can't
+          be read now ({notice.reason}). Your edits are still here; Save again to retry.
+        </p>
+      </div>
+    );
+  }
+  const { rebase, deleted } = notice;
+  const nothingMoved = rebase.added.length + rebase.removed.length + rebase.changed.length === 0;
+  return (
+    <div role="alert" className="m-3 rounded border border-amber-500/60 p-2 space-y-1 text-xs">
+      <p>
+        {deleted
+          ? "character-keys.yaml was deleted or moved on disk after you opened it, so Save was refused."
+          : "character-keys.yaml changed on disk after you opened it, so Save was refused."}{" "}
+        Your edits are still here, merged with the file as it is now.
+      </p>
+      {listed("Added outside the editor", rebase.added)}
+      {listed("Removed outside the editor", rebase.removed)}
+      {listed("Changed outside the editor", rebase.changed)}
+      {nothingMoved && <p>No character changed outside the editor, only the file's layout.</p>}
+      {rebase.overwritten.length > 0 && (
+        <p>
+          Saving again overwrites the outside changes to {rebase.overwritten.join(", ")} with yours.
+        </p>
+      )}
     </div>
   );
 }
