@@ -1,4 +1,5 @@
 import type { PreparedArea } from "@/atlas/sound/resolveSoundscape";
+import { normalizeAtlasAssetUrl } from "@/atlas/url";
 
 export interface AudioDeps {
   createContext: () => AudioContext;
@@ -6,6 +7,19 @@ export interface AudioDeps {
   /** true if the browser can decode the given src extension (Ogg probe etc.). */
   canPlay: (src: string) => boolean;
 }
+
+/**
+ * What crossfadeTo did:
+ * - "playing": the bed is set up and the AudioContext is running.
+ * - "paused": the bed is set up but the context is suspended (muted, or the
+ *   tab is hidden); it plays as soon as the context resumes.
+ * - "locked": no AudioContext yet (unlock() hasn't run); nothing happened.
+ * - "silence": crossfaded to no bed.
+ * - "failed": the bed could not be fetched or decoded.
+ * - "superseded": a newer crossfade (to another bed, or to silence) was asked
+ *   for while this one decoded; this one started nothing.
+ */
+export type CrossfadeResult = "playing" | "paused" | "locked" | "silence" | "failed" | "superseded";
 
 const CROSSFADE_S = 1.0;
 const BUFFER_CAP = 4;
@@ -18,12 +32,15 @@ interface ActiveBed {
 
 const AUDIO_DIR_PREFIX = "atlas/assets/audio/";
 
-/** Resolve the asset URL for the player build. Idempotent: a src that is
- * already absolute, remote, or already under the audio dir is left alone. */
+/** Resolve a bed's URL with the same rule as images (`normalizeAtlasAssetUrl`):
+ * a bare filename goes under the audio dir, then the site base path is
+ * prefixed, so it resolves the same at `/atlas` and `/atlas/`. Remote URLs
+ * pass through. */
 function audioUrl(src: string): string {
-  return src.startsWith("/") || src.startsWith("http") || src.startsWith(AUDIO_DIR_PREFIX)
-    ? src
-    : `${AUDIO_DIR_PREFIX}${src}`;
+  const path = src.replace(/^\/+/, "");
+  const withDir =
+    /^(https?:|data:|blob:)/i.test(src) || path.includes("/") ? src : `${AUDIO_DIR_PREFIX}${path}`;
+  return normalizeAtlasAssetUrl(withDir);
 }
 
 export class AudioEngine {
@@ -35,11 +52,19 @@ export class AudioEngine {
   private muted = false;
   private masterGain = 0.6;
   private decoding = new Map<string, Promise<AudioBuffer | null>>();
+  /** Request counter: bumped by every crossfadeTo, so a call can tell it is stale. */
+  private requests = 0;
+  /** What the newest crossfadeTo asked for (a bed id, or null for silence). */
+  private newestTarget: string | null = null;
 
   constructor(private deps: AudioDeps) {}
 
-  /** Must be called from a user-gesture handler. Idempotent. */
-  async unlock(): Promise<void> {
+  /**
+   * Must be called from a user-gesture handler. Idempotent. Resolves true
+   * when the AudioContext is running afterwards; false when the browser kept
+   * it suspended (the gesture didn't count). Rejects when Web Audio can't start.
+   */
+  async unlock(): Promise<boolean> {
     if (!this.ctx) {
       this.ctx = this.deps.createContext();
       this.master = this.ctx.createGain();
@@ -47,6 +72,11 @@ export class AudioEngine {
       this.master.connect(this.ctx.destination);
     }
     await this.resume();
+    return this.running;
+  }
+
+  private get running(): boolean {
+    return this.ctx?.state === "running";
   }
 
   async resume(): Promise<void> {
@@ -73,25 +103,38 @@ export class AudioEngine {
     if (!this.muted) this.setMuted(false);
   }
 
+  private bedResult(): CrossfadeResult {
+    return this.running ? "playing" : "paused";
+  }
+
   /** Crossfade to the given area's bed, or to silence when area is null. */
-  async crossfadeTo(area: PreparedArea | null): Promise<void> {
-    if (!this.ctx || !this.master) return;
+  async crossfadeTo(area: PreparedArea | null): Promise<CrossfadeResult> {
+    if (!this.ctx || !this.master) return "locked";
     const targetId = area?.id ?? null;
-    if (this.active?.id === targetId) return;
+    const request = ++this.requests;
+    this.newestTarget = targetId;
+    if (this.active?.id === targetId) return this.active ? this.bedResult() : "silence";
 
     const out = this.active;
     this.active = null;
     if (out) this.fadeOutAndStop(out);
 
-    if (!area) return;
+    if (!area) return "silence";
 
     const src =
       this.deps.canPlay(area.bed.src) || !area.bed.srcFallback
         ? area.bed.src
         : area.bed.srcFallback;
     const buffer = await this.loadBuffer(src);
-    if (!buffer || !this.ctx || !this.master) return;
-    if (this.active) return; // a newer crossfade superseded us while decoding
+    // Only the newest request may start a bed. A stale call to the same bed as
+    // the newest one goes on: both share one decode, and whichever resumes
+    // first starts the bed for both.
+    if (request !== this.requests && this.newestTarget !== area.id) return "superseded";
+    if (!buffer || !this.ctx || !this.master) return "failed";
+    // A call to this same bed already started it while we decoded.
+    // (TS narrowed this.active to null above; the await may have changed it.)
+    const started = this.active as ActiveBed | null;
+    if (started) return started.id === area.id ? this.bedResult() : "superseded";
 
     const gain = this.ctx.createGain();
     gain.gain.value = 0;
@@ -107,6 +150,7 @@ export class AudioEngine {
     gain.gain.setValueAtTime(0, this.ctx.currentTime);
     gain.gain.linearRampToValueAtTime(peak, this.ctx.currentTime + CROSSFADE_S);
     this.active = { id: area.id, source, gain };
+    return this.bedResult();
   }
 
   private fadeOutAndStop(bed: ActiveBed): void {

@@ -15,6 +15,7 @@ import { run as checkImagePrivacy } from "../check-image-privacy.js";
 import { run as checkFogSafety } from "../check-fog-safety.js";
 import { run as checkArtifactShape } from "../check-artifact-shape.js";
 import { run as checkPlayerSecrets } from "../check-player-secrets.js";
+import { run as checkPlayerFiles } from "../check-player-files.js";
 import { run as auditAssets } from "./audit-assets.js";
 
 export type ScanId =
@@ -24,6 +25,7 @@ export type ScanId =
   | "check-image-privacy"
   | "check-fog-safety"
   | "check-player-secrets"
+  | "check-player-files"
   | "audit-assets";
 
 /** Absolute paths the scans run against. `root` is the repo root. */
@@ -118,6 +120,18 @@ export const SCANS: ScanEntry[] = [
     id: "check-player-secrets",
     script: "check-player-secrets.ts",
     tasks: (ctx) => perDir("check-player-secrets", ctx, (dir) => checkPlayerSecrets({ dir })),
+  },
+  {
+    id: "check-player-files",
+    script: "check-player-files.ts",
+    // The built site only: public/atlas is the DM's store and legitimately
+    // holds files the player build drops (source-named audio beds).
+    tasks: (ctx) => [
+      {
+        label: "check-player-files dist",
+        run: () => checkPlayerFiles({ dir: path.join(ctx.root, "dist") }),
+      },
+    ],
   },
   {
     id: "audit-assets",

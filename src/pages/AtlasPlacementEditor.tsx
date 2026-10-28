@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from "react";
+import { flushSync } from "react-dom";
 import { MapContainer, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -58,19 +59,20 @@ import { AtlasMinimap } from "@/atlas/AtlasMinimap";
 import { OceanBackground } from "@/atlas/ocean/OceanBackground";
 import type { PlacementOverride } from "@/atlas/yaml/buildPatches";
 import { DiffPreviewModal } from "@/atlas/save/DiffPreviewModal";
-import { buildSavePlan } from "@/atlas/editor/saveGate";
 import { buildDraftPlacements as pureBuildDraftPlacements } from "@/atlas/editor/dirtyPlacements";
-import type { FileChange } from "@/atlas/save/localFsSave";
+import type { ConflictError, FileChange } from "@/atlas/save/localFsSave";
 import { SaveStatus } from "@/atlas/session/SaveStatus";
 import { DiscardConfirmModal } from "@/atlas/session/DiscardConfirmModal";
 import { useExternalRebuildDetector } from "@/atlas/session/useExternalRebuildDetector";
 import { CanonicalSaveError } from "@/atlas/save/canonicalPlacementSave";
-import { buildCanonicalEntityChanges } from "@/atlas/save/canonicalEntitySave";
-import { useWorldYamlBaseline, worldYamlPath } from "@/atlas/save/useWorldYamlBaseline";
 import {
-  buildWorldYamlContent as pureBuildWorldYamlContent,
-  buildAssetBinaryChanges as pureBuildAssetBinaryChanges,
-} from "@/atlas/save/buildSaveBatch";
+  useWorldYamlBaseline,
+  worldYamlPath,
+  type WorldYamlBaselineValues,
+} from "@/atlas/save/useWorldYamlBaseline";
+import { describeWorldYamlConflict, worldYamlConflictNotice } from "@/atlas/save/worldYamlConflict";
+import { buildWorldYamlContent as pureBuildWorldYamlContent } from "@/atlas/save/buildSaveBatch";
+import { planUnifiedSave } from "@/atlas/save/planUnifiedSave";
 import { pointInPolygon } from "@/atlas/geometry/polygon";
 import { SyncPanel } from "@/atlas/sync/SyncPanel";
 import { ImportStagingModal } from "@/atlas/import/ImportStagingModal";
@@ -97,7 +99,7 @@ import { EntityEditPanel } from "@/atlas/categories/EntityEditPanel";
 import { EntitySurface } from "@/atlas/entity/EntitySurface";
 import { resolvePinClickIntent } from "@/atlas/editor/pinClickIntent";
 import { resolveEntityCloseIntent } from "@/atlas/editor/entityCloseIntent";
-import { mapClickToAtlasCoord } from "@/atlas/editor/mapClickCoord";
+import { mapClickToAtlasCoord } from "@/atlas/map/mapClickCoord";
 import { usePinsTabFilters } from "@/atlas/editor/usePinsTabFilters";
 import { usePinOverrideMutations } from "@/atlas/editor/usePinOverrideMutations";
 import {
@@ -577,6 +579,8 @@ function AtlasPlacementEditorInner() {
   const [creatingIn, setCreatingIn] = useState<CategoryId | null>(null);
   /** Entity currently open in the EntityEditPanel (null = none). */
   const [editingEntityId, setEditingEntityId] = useState<string | null>(null);
+  /** Bumped when Save points to an unsaved entity edit: the surface switches to Edit. */
+  const [entityEditRequest, setEntityEditRequest] = useState(0);
   /**
    * In-flight "File as …" for a misfiled note: the type to pre-apply, plus the
    * category whose panel should host the edit surface. Without the category the
@@ -751,49 +755,84 @@ function AtlasPlacementEditorInner() {
    * Returns null when there's no active world (editor still loading) or
    * when a baseline fetch error prevents a safe write.
    */
-  const buildWorldYamlContent = useCallback((): string | null => {
-    if (!project || !activeMap) return null;
-    return pureBuildWorldYamlContent({
+  const buildWorldYamlContent = useCallback(
+    // existingRaw: the on-disk file to build on (the save-conflict recovery passes a fresh read).
+    (existingRaw: string | null = worldYamlBaseline.raw): string | null => {
+      if (!project || !activeMap) return null;
+      return pureBuildWorldYamlContent({
+        activeMap,
+        maps: project.maps,
+        calendar: effectiveCalendar,
+        schemaVersion: project.schemaVersion,
+        mergedLayers: layerEditor.mergedLayers,
+        localLayers: layerEditor.localLayers,
+        regionsEffective: regionDraft.effective,
+        routesEffective: routeDraft.effective,
+        fog: fogDraft.fog,
+        existingRaw,
+        name: effectiveWorld?.name,
+        credits: effectiveWorld?.credits,
+        assetCredits: effectiveWorld?.assetCredits,
+      });
+    },
+    [
+      project,
       activeMap,
-      maps: project.maps,
-      calendar: effectiveCalendar,
-      schemaVersion: project.schemaVersion,
-      mergedLayers: layerEditor.mergedLayers,
-      localLayers: layerEditor.localLayers,
-      regionsEffective: regionDraft.effective,
-      routesEffective: routeDraft.effective,
-      fog: fogDraft.fog,
-      existingRaw: worldYamlBaseline.raw,
-      name: effectiveWorld?.name,
-      credits: effectiveWorld?.credits,
-      assetCredits: effectiveWorld?.assetCredits,
-    });
-  }, [
-    project,
-    activeMap,
-    layerEditor.mergedLayers,
-    layerEditor.localLayers,
-    regionDraft.effective,
-    routeDraft.effective,
-    fogDraft.fog,
-    worldYamlBaseline.raw,
-    effectiveWorld,
-    effectiveCalendar,
-  ]);
+      layerEditor.mergedLayers,
+      layerEditor.localLayers,
+      regionDraft.effective,
+      routeDraft.effective,
+      fogDraft.fog,
+      worldYamlBaseline.raw,
+      effectiveWorld,
+      effectiveCalendar,
+    ],
+  );
 
   /**
-   * Build the asset-binary FileChange entries for every upload-origin layer
-   * on the active map. Each carries the upload's dataUrl (which the layer
-   * captured when the file was dragged in) plus its targetPath under
-   * public/atlas/assets/maps/. Uploads with no dataUrl (rare — quota
-   * pressure clears it from localStorage on reload) are skipped silently;
-   * the world.yaml emission still references them so the DM sees the
-   * mismatch in the diff modal.
+   * Open the entity whose unsaved edit is parked in `entityEditDraft`,
+   * in Edit, so the DM can save it from its own panel (which owns that save).
    */
-  const buildAssetBinaryChanges = useCallback(
-    (): FileChange[] => pureBuildAssetBinaryChanges(layerEditor.localLayers),
-    [layerEditor.localLayers],
-  );
+  const openPendingEntityEdit = () => {
+    const sourcePath = entityEditDraft.draft?.sourcePath;
+    const ent = project?.entities.find((e) => e.sourcePath === sourcePath);
+    if (!ent) {
+      toast.info("Your entity edit saves from its own panel: open the entity to save it.");
+      return;
+    }
+    setActivePanel(categoryForType(ent.type));
+    setEditingEntityId(ent.id);
+    setEntityEditRequest((n) => n + 1);
+    toast.info(`Your edit to ${ent.title} saves from its own panel: it is open now.`);
+  };
+
+  /**
+   * The unified Save plan for the current drafts: what Save would write, or
+   * why it writes nothing. Shared by Save and the save-conflict recovery,
+   * which passes a freshly read world.yaml baseline (the page's own may not
+   * have rendered yet).
+   */
+  const planSave = async (baseline: WorldYamlBaselineValues = worldYamlBaseline) => {
+    if (!project || !activeMap) return null;
+    return planUnifiedSave(
+      {
+        allDraftPlacements: buildDraftPlacements(),
+        overrides,
+        activeMapId: activeMap.id,
+        foreignMapDrafts,
+        entitiesById: new Map(project.entities.map((e) => [e.id, e])),
+        worldYaml: worldYamlDirty
+          ? {
+              path: activeWorldId ? worldYamlPath(activeWorldId) : null,
+              baseline,
+              buildContent: () => buildWorldYamlContent(baseline.raw),
+            }
+          : null,
+        localLayers: layerEditor.localLayers,
+      },
+      { fetchFn: fetch },
+    );
+  };
 
   /**
    * Save: rewrite the canonical entity .md frontmatter for every drafted
@@ -803,96 +842,42 @@ function AtlasPlacementEditorInner() {
    * batch when any of the map / region / route / fog / layer tabs has a
    * dirty draft.
    *
+   * The decision (what to write, or why to refuse) is planUnifiedSave in
+   * src/atlas/save/planUnifiedSave.ts; this handler only wires it to toast/modal.
+   * eval-12: an upload with no bytes refuses the save and the reason shows
+   * as an error toast; nothing is written.
+   *
    * No GitHub API. The dev plugin's allowlist only accepts content/**\/*.md
    * and content/**\/_atlas/*.yaml so even a buggy client cannot widen the
    * surface.
    */
   const onSaveClick = async () => {
-    if (!project || !activeMap) return;
-    // B3: buildDraftPlacements() returns a draft for every *effective* placement
-    // (incl. canon-only ones). Queue only the placements the DM actually
-    // overrode this session, or a clean Save would rewrite every placed entity.
-    const plan = buildSavePlan({
-      allDraftPlacements: buildDraftPlacements(),
-      overrides,
-      activeMapId: activeMap.id,
-      // Entities-tab frontmatter drafts are not wired into this page — entity
-      // edits go through EntityEditPanel/useEntityEditDraft — so supply none.
-      // buildSavePlan keeps the param for its other (tested) callers.
-      entityDrafts: {},
-      projectEntities: project.entities,
-      worldYamlDirty,
-    });
-    if (plan.isEmpty && foreignMapDrafts.length === 0) {
-      toast.info("No changes to save");
+    // An entity edit is counted in the chip but saved only by its own panel,
+    // so Save points to that panel instead of claiming nothing is unsaved.
+    const entityEditPending = entityEditDraft.pendingFor();
+    if (!project || !activeMap) {
+      if (entityEditPending) openPendingEntityEdit();
       return;
     }
-    // N100: fold in cross-map duplicates (overrides keyed to a map other
-    // than the active one) — buildSavePlan only ever sees the active map.
-    const drafts = [...plan.dirtyPlacements, ...foreignMapDrafts];
-    const fmPatches = plan.frontmatterPatches;
-    const entitiesById = new Map(project.entities.map((e) => [e.id, e]));
     try {
-      // One FileChange per entity .md path even when an entity is edited in
-      // BOTH the Pins tab (placements) and the Entities tab (frontmatter) —
-      // the save endpoint rejects duplicate paths.
-      const entityChanges = await buildCanonicalEntityChanges(
-        { placements: drafts, frontmatter: fmPatches },
-        entitiesById,
-      );
-      const fileChanges: FileChange[] = [...entityChanges];
-
-      if (worldYamlDirty && activeWorldId) {
-        if (worldYamlBaseline.loading) {
-          toast.error("Still loading world.yaml baseline — try again in a moment.");
+      const plan = await planSave();
+      if (!plan) return;
+      if (plan.kind === "nothing-to-save") {
+        if (entityEditPending) {
+          openPendingEntityEdit();
           return;
         }
-        if (worldYamlBaseline.error) {
-          toast.error(`Cannot save world.yaml: ${worldYamlBaseline.error}`);
-          return;
-        }
-        const content = buildWorldYamlContent();
-        if (!content) {
-          toast.error("Cannot build world.yaml content");
-          return;
-        }
-        // Asset-binary entries land in the same batch — bytes hit disk first,
-        // then world.yaml references them. The endpoint's atomic temp+rename
-        // means even a mid-batch failure rolls them back together.
-        const assetChanges = buildAssetBinaryChanges();
-        // Surface uploads that have lost their dataUrl (localStorage quota
-        // pressure clears it on reload). The world.yaml will reference them
-        // but the binary won't land — the next build will flag missing assets.
-        const droppedUploads = layerEditor.localLayers.filter(
-          (l) => l.origin === "upload" && !l.dataUrl,
-        ).length;
-        if (droppedUploads > 0) {
-          toast.warning(
-            `${droppedUploads} uploaded image${droppedUploads === 1 ? "" : "s"} have no in-memory bytes`,
-            {
-              description: "Likely cleared by localStorage quota. Re-upload before saving.",
-              duration: 8000,
-            },
-          );
-        }
-        fileChanges.push(...assetChanges);
-        fileChanges.push({
-          path: worldYamlPath(activeWorldId),
-          content,
-          kind: "world-yaml",
-          // null when world.yaml doesn't yet exist (fresh world → create-only write).
-          baseHash: worldYamlBaseline.hash,
-        });
+        toast.info(plan.message);
+        return;
       }
-
-      if (fileChanges.length === 0) {
-        toast.info("No canonical changes to write");
+      if (plan.kind === "refused") {
+        toast.error(plan.reason, { description: plan.detail, duration: 10000 });
         return;
       }
       // B1: do NOT mark "saving" here — opening the review modal is not a write.
       // The session flips to "saving" only when the DM confirms (modal onConfirm),
       // so cancelling the modal can't strand the status bar on "Saving…".
-      setPendingChanges(fileChanges);
+      setPendingChanges(plan.changes);
       setSaveModalOpen(true);
     } catch (err) {
       const msg =
@@ -905,6 +890,44 @@ function AtlasPlacementEditorInner() {
       session.markFailed(msg);
       toast.error(`Could not prepare save: ${msg}`);
     }
+  };
+
+  /**
+   * A world.yaml save conflict: the file changed on disk after the editor read
+   * it. Re-read it and canon, rebuild the batch on top (the drafts are not
+   * touched), and return a notice naming what changed outside and any outside
+   * edit Try again would overwrite. Null when this isn't world.yaml or the
+   * rebuild fails; the modal then shows the conflict as a failed save.
+   *
+   * `saveAttemptRef` is bumped when the modal closes, so a recovery still in
+   * flight then drops its result instead of reviving a closed review.
+   */
+  const saveAttemptRef = useRef(0);
+  const planSaveRef = useRef(planSave);
+  useLayoutEffect(() => {
+    planSaveRef.current = planSave;
+  });
+  const onSaveConflict = async (err: ConflictError): Promise<string | null> => {
+    if (!activeWorldId || err.failedPath !== worldYamlPath(activeWorldId)) return null;
+    const attempt = saveAttemptRef.current;
+    const before = worldYamlBaseline.raw;
+    const [baseline, freshCanon] = await Promise.all([
+      worldYamlBaseline.refresh(),
+      loadAtlasContent(true).catch(() => null),
+    ]);
+    if (attempt !== saveAttemptRef.current || baseline.error) return null;
+    // Render the fresh canon now so the rebuild below derives from it.
+    if (freshCanon) flushSync(() => setProject(freshCanon));
+    const plan = await planSaveRef.current(baseline).catch(() => null);
+    if (attempt !== saveAttemptRef.current || plan?.kind !== "save") return null;
+    const rebuilt = plan.changes.find((c) => c.path === err.failedPath)?.content;
+    if (rebuilt === undefined) return null;
+    setPendingChanges(plan.changes);
+    // Nothing failed for good: the chip goes back to the unsaved count.
+    session.markIdle();
+    return worldYamlConflictNotice(
+      describeWorldYamlConflict({ before, after: baseline.raw, rebuilt }),
+    );
   };
 
   /**
@@ -1275,6 +1298,7 @@ function AtlasPlacementEditorInner() {
         <SaveStatus
           status={session.status}
           unsavedCount={session.unsavedCount}
+          entityEditCount={entityEditDraft.pendingFor() ? 1 : 0}
           savedAt={lastSavedAt}
           failedReason={session.failedReason}
           onSave={onSaveClick}
@@ -1408,9 +1432,14 @@ function AtlasPlacementEditorInner() {
               };
               return (
                 <EntitySurface
+                  editRequest={entityEditRequest}
                   entity={editingEntity}
                   entitiesById={entitiesById}
-                  startInEdit={!!refilingThis}
+                  startInEdit={
+                    !!refilingThis ||
+                    // An entity with an unsaved edit reopens in Edit.
+                    entityEditDraft.pendingFor(editingEntity.sourcePath)
+                  }
                   onClose={() => {
                     const intent = resolveEntityCloseIntent({ dirty: entityEditDraft.isDirty() });
                     if (intent.kind === "confirm-discard") {
@@ -1445,7 +1474,7 @@ function AtlasPlacementEditorInner() {
 
           const panels: Record<string, React.ReactNode> = {
             // Six content categories — wired to CategoryPanel (browse) or
-            // EntityEditorPanel (create). Phase 2 EntitiesTab stopgap removed.
+            // EntityEditorPanel (create).
             characters:
               creatingIn === "characters" ? (
                 <EntityEditorPanel
@@ -2138,9 +2167,19 @@ function AtlasPlacementEditorInner() {
         rebuildAfterSave={true}
         onConfirm={() => session.markSaving()}
         onWriteFailed={(msg) => session.markFailed(msg)}
+        onConflict={onSaveConflict}
         onSaved={(result) => {
           void session.markSaved();
           setLastSavedAt(Date.now());
+          // This batch never carries the entity edit; its panel saves it.
+          if (entityEditDraft.pendingFor()) {
+            toast.info(
+              "Map changes saved. Your entity edit is still open: save it from its panel.",
+              {
+                action: { label: "Open it", onClick: openPendingEntityEdit },
+              },
+            );
+          }
           // Phase 1B B0 — capture pre-save snapshots so the save-boundary
           // undo entry below can restore the dirty local state when the DM
           // hits Cmd+Z across a save. Snapshots reflect the state RIGHT
@@ -2257,6 +2296,7 @@ function AtlasPlacementEditorInner() {
           }
         }}
         onClose={() => {
+          saveAttemptRef.current++;
           setSaveModalOpen(false);
           setPendingChanges([]);
           // B1: if the DM confirmed then cancelled (or a write failed and they

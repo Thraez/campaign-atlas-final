@@ -168,6 +168,12 @@ describe("AtlasBrowse — entity card links", () => {
     expect(card).toHaveAttribute("href", "/atlas?entity=corven");
   });
 
+  it("encodes an id with a space or special characters in the card link", async () => {
+    renderBrowse(makeProject([makeEntity({ id: "old keep/#1", title: "Old Keep" })]));
+    const card = await screen.findByRole("link", { name: /Old Keep/i });
+    expect(card).toHaveAttribute("href", "/atlas?entity=old%20keep%2F%231");
+  });
+
   it("renders each tag chip as a real link to its tag page", async () => {
     renderBrowse(makeProject([makeEntity({ tags: ["smuggler"] })]));
     await screen.findByText("Corven");
