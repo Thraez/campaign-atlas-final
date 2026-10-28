@@ -53,7 +53,7 @@ commands with shell variables (one plain command per call, absolute paths).
 
 - `main` was pushed once (f65c854..0c1d92a, docs only, on his yes) before this rule arrived.
 - PRs waiting for his yes to merge (each merge publishes), in stack order: #62 → #66 → #68 → #80 → #81;
-  #64 → #67 → #69 → #70; #63; #65; #71 → #73 → #77; #72; #74 → #76, #74 → #79; #75; #78. See "Merge queue" for what each needs him to look at.
+  #64 → #67 → #69 → #70; #63; #65; #71 → #73 → #77; #72; #74 → #76 → #82, #74 → #79; #75; #78. See "Merge queue" for what each needs him to look at.
 - Local `main` commits since 0c1d92a: push them in the morning.
 - **In the vault, for Isak in Obsidian:** four notes have an unclosed DM block (`%%` or `:::dm`),
   so the DM build refuses them after a sync: blood-moon-circle, the-sovereign-eternal,
@@ -64,7 +64,7 @@ commands with shell variables (one plain command per call, absolute paths).
   as a ticked update with no warning, and the written file stays `player` with the secret body.
   Untick such rows in the Sync panel by hand. Also on `main`: a crafted `atlas.id` can make the
   image copy write outside `public/` (only someone who can write the vault can do this).
-- **Safety, already on `main`** (found in the code-retro 08 review, being fixed on that branch): a
+- **Safety, already on `main`** (found in the code-retro 08 review, fixed in PR #82): a
   build that fails a check (e.g. an unclosed `%%` in a player note) still writes `atlas.json` and
   `search-index.json` first, with the leaked text. The editor's player rebuild writes into
   `public/atlas/`, which is committed. Before committing `public/atlas/` after a failed build, run
@@ -103,6 +103,7 @@ So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logg
 | #77 | 28     | Sound URLs follow the image asset rule (`/atlas/` fix)   | #73 (stacked); his yes                           |
 | #78 | 25     | The offline menu says what is actually saved             | Isak tries it offline in a browser; his yes      |
 | #79 | c-07   | Sync behind a vault port + dry run; sync can't leak a DM note | #74 (stacked); Isak tries the Sync panel; yes |
+| #82 | c-08   | Build returns the atlas; one projection; failed build writes nothing | #76 (stacked); conflicts with #79 in sync-safety.test.ts; yes |
 | #80 | 31     | The Save chip names an unsaved entity edit               | #68 (stacked); Isak checks the chip; yes         |
 | #81 | 32     | A world.yaml conflict recovers and names what changed    | #80 (stacked); Isak reads the notice; yes        |
 
