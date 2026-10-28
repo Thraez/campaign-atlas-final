@@ -10,8 +10,10 @@
  *
  * Scope and ordering match `prunePlayerAudioPlugin`: player builds only,
  * `apply: "build"`, and `closeBundle` with `enforce: "post"`, after the public
- * copy and the PWA precache (whose globs never match images anyway). Audio is
- * not an image and is left to the audio plugin.
+ * copy and the PWA precache. The precache globs do match `.svg`, so they ignore
+ * `atlas/` outright (`scripts/pwaPrecache.ts`); otherwise `sw.js` would list
+ * images this plugin deletes and the service worker would fail to install.
+ * Audio is not an image and is left to the audio plugin.
  */
 import fs from "node:fs";
 import path from "node:path";

@@ -6,6 +6,11 @@ import { VitePWA } from "vite-plugin-pwa";
 import { atlasSavePlugin } from "./scripts/vite-plugin-atlas-save";
 import { prunePlayerAudioPlugin } from "./scripts/vite-plugin-prune-player-audio";
 import { prunePlayerImagesPlugin } from "./scripts/vite-plugin-prune-player-images";
+import {
+  PRECACHE_GLOB_IGNORES,
+  PRECACHE_GLOB_PATTERNS,
+  precacheShippedOnlyPlugin,
+} from "./scripts/pwaPrecache";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -80,7 +85,10 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           // Precache the built shell (HTML/JS/CSS) + small bundled assets.
-          globPatterns: ["**/*.{js,css,html,ico,svg,woff2}"],
+          // atlas/ is left to the runtime caches below: the prunes delete
+          // from it after this service worker is written. See the module.
+          globPatterns: PRECACHE_GLOB_PATTERNS,
+          globIgnores: PRECACHE_GLOB_IGNORES,
           // OAuth-style callbacks must always hit the network.
           navigateFallbackDenylist: [/^\/~oauth/, /^\/auth/],
           cleanupOutdatedCaches: true,
@@ -161,6 +169,8 @@ export default defineConfig(({ mode }) => {
       // Player builds only: strip images no player note shows (the DM's asset
       // store lives in public/ too). See the plugin.
       !includeEditor && prunePlayerImagesPlugin(),
+      // Last: fail the build if sw.js precaches a file the prunes removed.
+      precacheShippedOnlyPlugin(),
     ].filter(Boolean),
     resolve: {
       alias: {
