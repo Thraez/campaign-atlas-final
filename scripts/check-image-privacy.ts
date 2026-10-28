@@ -15,9 +15,11 @@
  *      named "the-cabal-lair.jpg" would ship uncaught even if no text
  *      reference exists.
  *
- *      With `--referenced-by <dir>` (the source store, public/atlas), only
- *      images the player JSON in <dir> names get this check: the rest stay
- *      in the DM's store and the player build prunes them from dist.
+ *      With `--referenced-by <dir>` (the source store, public/atlas), images
+ *      under <dir>/assets/ get this check only when the player JSON in <dir>
+ *      names their whole path (see `playerImageRefs`): the rest stay in the
+ *      DM's store and the player build prunes them from dist. Images anywhere
+ *      else are never pruned, so they are always checked.
  *
  * Usage:
  *   tsx scripts/check-image-privacy.ts <artifact-dir> [--config <path>] [--referenced-by <dir>]
@@ -31,7 +33,7 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { deriveSecretsFromVault } from "./check-derived-secrets";
-import { isReferenced, readPlayerJson } from "./atlas/playerImageRefs";
+import { isReferenced, readPlayerImageRefs } from "./atlas/playerImageRefs";
 
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
 const CONFIG_CANDIDATES = ["atlas.config.json"];
@@ -85,8 +87,8 @@ function walkImages(dir: string): string[] {
 export interface RunOpts {
   dir: string;
   config?: string;
-  /** A dir of player JSON. When set, the filename check covers only images it
-   *  names: the rest are the DM's asset store, which the player build prunes. */
+  /** A dir of player JSON. When set, the filename check skips images under its
+   *  `assets/` that the JSON does not name: the player build prunes those. */
   referencedBy?: string;
 }
 
@@ -106,7 +108,16 @@ export async function run(opts: RunOpts): Promise<number> {
   }
 
   const secrets = deriveSecretsFromVault(configAbs);
-  const playerJson = opts.referencedBy !== undefined ? readPlayerJson(opts.referencedBy) : null;
+  const referencedBy = opts.referencedBy;
+  const refs = referencedBy !== undefined ? readPlayerImageRefs(referencedBy) : null;
+  /** Whether the player build keeps this image. Mirrors prunePlayerImagesPlugin,
+   *  which only prunes under the atlas dir's `assets/`. */
+  const ships = (imgPath: string): boolean => {
+    if (refs === null || referencedBy === undefined) return true;
+    const rel = path.relative(referencedBy, imgPath).split(path.sep).join("/");
+    if (!rel.startsWith("assets/")) return true;
+    return isReferenced(rel, refs);
+  };
 
   const violations: string[] = [];
 
@@ -114,7 +125,7 @@ export async function run(opts: RunOpts): Promise<number> {
     const stem = path.basename(imgPath, path.extname(imgPath)).toLowerCase();
 
     // Check 1: filename contains a derived-secret name
-    const shipped = playerJson === null || isReferenced(path.basename(imgPath), playerJson);
+    const shipped = ships(imgPath);
     for (const s of shipped ? secrets : []) {
       if (stem.includes(s.name.toLowerCase())) {
         violations.push(

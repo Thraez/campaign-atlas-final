@@ -87,4 +87,29 @@ describe("check-image-privacy — the DM's asset store", () => {
     expect(await run({ dir, config: FIXTURE_CONFIG, referencedBy: dir })).toBe(13);
     expect(errSpy.mock.calls.flat().join("\n")).toContain("FILENAME LEAK");
   });
+
+  it("with referencedBy, a secret-named image named by its full path fails", async () => {
+    fs.writeFileSync(
+      path.join(dir, "atlas.json"),
+      '{"layers":[{"src":"atlas/assets/images/hidden-thing.png"}]}',
+    );
+    expect(await run({ dir, config: FIXTURE_CONFIG, referencedBy: dir })).toBe(13);
+  });
+
+  it("with referencedBy, an image the JSON names only in another folder passes, as the build prunes it", async () => {
+    fs.writeFileSync(
+      path.join(dir, "atlas.json"),
+      '{"layers":[{"src":"atlas/assets/maps/hidden-thing.png"}]}',
+    );
+    expect(await run({ dir, config: FIXTURE_CONFIG, referencedBy: dir })).toBe(0);
+  });
+
+  it("with referencedBy, a secret-named image outside assets/ fails: the build never prunes it", async () => {
+    fs.renameSync(
+      path.join(dir, "assets", "images", "hidden-thing.png"),
+      path.join(dir, "hidden-thing.png"),
+    );
+    fs.writeFileSync(path.join(dir, "atlas.json"), '{"entities":[]}');
+    expect(await run({ dir, config: FIXTURE_CONFIG, referencedBy: dir })).toBe(13);
+  });
 });
