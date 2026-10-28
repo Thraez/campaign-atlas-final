@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Key, Copy, Check, Trash2, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { saveAtlasPatchToLocalFs, hashContent, ConflictError } from "@/atlas/save/localFsSave";
@@ -11,11 +11,7 @@ import {
   type CharacterKeysRebase,
 } from "./characterKeysFile";
 
-interface CharacterRow {
-  name: string;
-  key: string;
-}
-
+// Ticket 39 consolidates source-file reads (canonClient.read); move this onto it then.
 /** The file's text, or null when it doesn't exist yet. Throws, with a reason fit for the DM, when it can't be read. */
 async function readKeysFile(keysPath: string): Promise<string | null> {
   let res: Response;
@@ -37,54 +33,64 @@ type ConflictNotice =
   | { kind: "merged"; deleted: boolean; rebase: CharacterKeysRebase }
   | { kind: "unreadable"; reason: string };
 
+/**
+ * - `load-failed`: the file couldn't be read; the list is hidden and Save is
+ *   off, so an empty list can never be written over it.
+ * - `unsupported`: entries that aren't a name and a key (nested maps, lists,
+ *   no key); saving would drop them, so Save is off. Can follow a conflict.
+ * - `conflict`: a save was refused and the DM's rows were merged onto the
+ *   file as it is now; Save is on and overwrites what the notice lists.
+ */
+type Status =
+  | { kind: "loading" }
+  | { kind: "ready" }
+  | { kind: "load-failed"; reason: string }
+  | { kind: "unsupported"; names: string[]; conflict: ConflictNotice | null }
+  | { kind: "conflict"; notice: ConflictNotice };
+
+const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
 interface Props {
   worldDir: string;
 }
 
 export function CharacterKeysPanel({ worldDir }: Props) {
   const keysPath = `${worldDir}/_dm/character-keys.yaml`;
-  const [rows, setRows] = useState<CharacterRow[]>([]);
+  const [rows, setRows] = useState<CharacterKeyEntry[]>([]);
   const [baseHash, setBaseHash] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  // Why the last load failed. While set, the list is hidden and Save is off,
-  // so an empty list can never be written over a file we couldn't read.
-  const [loadError, setLoadError] = useState<string | null>(null);
-  // Entries the panel can't show as a name and a key (nested maps, lists, no
-  // key). Saving would drop them, so Save is off while there are any.
-  const [unsupported, setUnsupported] = useState<string[]>([]);
+  const [status, setStatus] = useState<Status>({ kind: "loading" });
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // The file as last read or saved: the base a conflict merges against.
   const diskRef = useRef<CharacterKeyEntry[]>([]);
-  const [conflict, setConflict] = useState<ConflictNotice | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    setUnsupported([]);
-    setConflict(null);
+    setStatus({ kind: "loading" });
     try {
       const text = await readKeysFile(keysPath);
       if (text === null) {
         setRows([]);
         setBaseHash(null);
         diskRef.current = [];
+        setStatus({ kind: "ready" });
         return;
       }
       const parsed = parseCharacterKeys(text);
       if (!parsed.ok) {
-        setLoadError(parsed.error);
+        setStatus({ kind: "load-failed", reason: parsed.error });
         return;
       }
       setRows(parsed.entries);
-      setUnsupported(parsed.unsupported);
       setBaseHash(await hashContent(text));
       diskRef.current = parsed.entries;
+      setStatus(
+        parsed.unsupported.length > 0
+          ? { kind: "unsupported", names: parsed.unsupported, conflict: null }
+          : { kind: "ready" },
+      );
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
+      setStatus({ kind: "load-failed", reason: errorText(e) });
     }
   }, [keysPath]);
 
@@ -97,7 +103,7 @@ export function CharacterKeysPanel({ worldDir }: Props) {
       .map((b) => b.toString(36))
       .join("");
 
-  const persist = async (next: CharacterRow[]) => {
+  const persist = async (next: CharacterKeyEntry[]) => {
     const content = serializeCharacterKeys(next);
     setSaving(true);
     try {
@@ -113,14 +119,14 @@ export function CharacterKeysPanel({ worldDir }: Props) {
       setBaseHash(h);
       const saved = parseCharacterKeys(content);
       diskRef.current = saved.ok ? saved.entries : [];
-      setConflict(null);
+      setStatus({ kind: "ready" });
       toast.success("Character keys saved");
     } catch (e) {
       if (e instanceof ConflictError) {
         await recoverFromConflict(next, e.reason === "missing-base");
         return;
       }
-      toast.error(`Save failed: ${e instanceof Error ? e.message : String(e)}`);
+      toast.error(`Save failed: ${errorText(e)}`);
     } finally {
       setSaving(false);
     }
@@ -129,26 +135,33 @@ export function CharacterKeysPanel({ worldDir }: Props) {
   // The file changed on disk under the DM's rows. Re-read it, keep what the
   // DM changed, take the rest from disk, adopt the new baseHash and say what
   // moved, so the next Save goes through.
-  const recoverFromConflict = async (mine: CharacterRow[], deleted: boolean) => {
+  const recoverFromConflict = async (mine: CharacterKeyEntry[], deleted: boolean) => {
+    const unreadable = (reason: string) =>
+      setStatus({ kind: "conflict", notice: { kind: "unreadable", reason } });
     let text: string | null;
     try {
       text = await readKeysFile(keysPath);
     } catch (e) {
-      setConflict({ kind: "unreadable", reason: e instanceof Error ? e.message : String(e) });
+      unreadable(errorText(e));
       return;
     }
     const parsed = text === null ? null : parseCharacterKeys(text);
     if (parsed && !parsed.ok) {
-      setConflict({ kind: "unreadable", reason: parsed.error });
+      unreadable(parsed.error);
       return;
     }
     const theirs = parsed ? parsed.entries : [];
     const rebase = rebaseCharacterKeys(diskRef.current, mine, theirs);
     setRows(rebase.rows);
-    setUnsupported(parsed ? parsed.unsupported : []);
     setBaseHash(text === null ? null : await hashContent(text));
     diskRef.current = theirs;
-    setConflict({ kind: "merged", deleted: deleted || text === null, rebase });
+    const notice: ConflictNotice = { kind: "merged", deleted: deleted || text === null, rebase };
+    const names = parsed ? parsed.unsupported : [];
+    setStatus(
+      names.length > 0
+        ? { kind: "unsupported", names, conflict: notice }
+        : { kind: "conflict", notice },
+    );
   };
 
   const addRow = () => setRows((r) => [...r, { name: "", key: generate() }]);
@@ -173,9 +186,17 @@ export function CharacterKeysPanel({ worldDir }: Props) {
     });
   };
 
-  if (loading) {
+  if (status.kind === "loading") {
     return <div className="p-4 text-xs text-muted-foreground">Loading…</div>;
   }
+
+  const conflict =
+    status.kind === "conflict"
+      ? status.notice
+      : status.kind === "unsupported"
+        ? status.conflict
+        : null;
+  const saveBlocked = status.kind === "load-failed" || status.kind === "unsupported";
 
   return (
     <div className="flex flex-col h-full">
@@ -189,41 +210,23 @@ export function CharacterKeysPanel({ worldDir }: Props) {
         </div>
       </div>
 
-      {loadError && (
-        <div role="alert" className="m-3 rounded border border-amber-500/60 p-2 space-y-2 text-xs">
-          <p>
-            Couldn't load the character keys ({loadError}). Saving is off, so an empty list can't
-            overwrite the file.
-          </p>
-          <button
-            type="button"
-            className="h-7 px-2 text-xs rounded border"
-            onClick={() => void load()}
-          >
-            Retry
-          </button>
-        </div>
+      {status.kind === "load-failed" && (
+        <RetryAlert onRetry={() => void load()}>
+          Couldn't load the character keys ({status.reason}). Saving is off, so an empty list can't
+          overwrite the file.
+        </RetryAlert>
       )}
 
       {conflict && <ConflictBanner notice={conflict} />}
 
-      {unsupported.length > 0 && (
-        <div role="alert" className="m-3 rounded border border-amber-500/60 p-2 space-y-2 text-xs">
-          <p>
-            Not every entry in character-keys.yaml is a name and a key: {unsupported.join(", ")}.
-            Saving is off so they aren't lost. Fix them in the file by hand, then Retry.
-          </p>
-          <button
-            type="button"
-            className="h-7 px-2 text-xs rounded border"
-            onClick={() => void load()}
-          >
-            Retry
-          </button>
-        </div>
+      {status.kind === "unsupported" && (
+        <RetryAlert onRetry={() => void load()}>
+          Not every entry in character-keys.yaml is a name and a key: {status.names.join(", ")}.
+          Saving is off so they aren't lost. Fix them in the file by hand, then Retry.
+        </RetryAlert>
       )}
 
-      {loadError === null && (
+      {status.kind !== "load-failed" && (
         <div className="flex-1 overflow-auto p-3 space-y-3">
           {rows.length === 0 && (
             <div className="text-[10px] text-muted-foreground py-2">
@@ -297,13 +300,24 @@ export function CharacterKeysPanel({ worldDir }: Props) {
       <div className="p-3 border-t border-border">
         <button
           type="button"
-          disabled={saving || loadError !== null || unsupported.length > 0}
+          disabled={saving || saveBlocked}
           onClick={() => void persist(rows)}
           className="w-full h-7 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving ? "Saving…" : "Save keys"}
         </button>
       </div>
+    </div>
+  );
+}
+
+function RetryAlert({ children, onRetry }: { children: ReactNode; onRetry: () => void }) {
+  return (
+    <div role="alert" className="m-3 rounded border border-amber-500/60 p-2 space-y-2 text-xs">
+      <p>{children}</p>
+      <button type="button" className="h-7 px-2 text-xs rounded border" onClick={onRetry}>
+        Retry
+      </button>
     </div>
   );
 }
