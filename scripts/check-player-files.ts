@@ -11,9 +11,11 @@
  * Usage: tsx scripts/check-player-files.ts [dir]   (dir defaults to `dist`)
  *
  * Exit codes:
- *   0   clean (or no `<dir>/atlas/`, as before any build)
- *   18  a file not on the allowlist
+ *   0   clean, or no `<dir>` at all (as before any build; skipped)
+ *   18  a file not on the allowlist, a `<dir>` with no `atlas/` (a player
+ *       build always has one), or an `atlas.json` that is not valid JSON
  */
+import fs from "node:fs";
 import path from "node:path";
 import { disallowedPlayerFiles } from "./atlas/playerFiles";
 
@@ -23,12 +25,32 @@ export interface RunOpts {
 }
 
 export function run(opts: RunOpts): number {
-  const bad = disallowedPlayerFiles(path.join(opts.dir, "atlas"));
-  if (bad.length === 0) return 0;
+  if (!fs.existsSync(opts.dir)) {
+    console.log(`atlas:check-player-files: target "${opts.dir}" does not exist, skipping`);
+    return 0;
+  }
+  const atlasDir = path.join(opts.dir, "atlas");
+  if (!fs.existsSync(atlasDir)) {
+    console.error(
+      `check-player-files: "${opts.dir}" has no atlas/ dir, so this is not a player build to check — failing`,
+    );
+    return 18;
+  }
+  let bad: string[];
+  try {
+    bad = disallowedPlayerFiles(atlasDir);
+  } catch (err) {
+    console.error(`check-player-files: ${(err as Error).message}`);
+    return 18;
+  }
+  if (bad.length === 0) {
+    console.log("check-player-files: only allowed files — clean");
+    return 0;
+  }
   console.error(`\ncheck-player-files: ${bad.length} file(s) not allowed in a player build`);
   for (const rel of bad) console.error(`  ✗ atlas/${rel}`);
   console.error(
-    "  Only the atlas JSON, images, fog masks, hashed audio and the audio manifest may ship (scripts/atlas/playerFiles.ts).",
+    "  Only the atlas JSON, images and the hashed audio atlas.json references may ship (scripts/atlas/playerFiles.ts).",
   );
   return 18;
 }

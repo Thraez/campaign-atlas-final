@@ -5,7 +5,7 @@ import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 import { atlasSavePlugin } from "./scripts/vite-plugin-atlas-save";
 import { prunePlayerAudioPlugin } from "./scripts/vite-plugin-prune-player-audio";
-import { prunePlayerImagesPlugin } from "./scripts/vite-plugin-prune-player-images";
+import { prunePlayerFilesPlugin } from "./scripts/vite-plugin-prune-player-files";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -161,7 +161,7 @@ export default defineConfig(({ mode }) => {
       // Player builds only: strip images no player note shows and any file
       // off the player allowlist (the DM's asset store lives in public/ too).
       // See the plugin.
-      !includeEditor && prunePlayerImagesPlugin(),
+      !includeEditor && prunePlayerFilesPlugin(),
     ].filter(Boolean),
     resolve: {
       alias: {
