@@ -53,7 +53,7 @@ commands with shell variables (one plain command per call, absolute paths).
 
 - `main` was pushed once (f65c854..0c1d92a, docs only, on his yes) before this rule arrived.
 - PRs waiting for his yes to merge (each merge publishes), in stack order: #62 → #66 → #68;
-  #64 → #67 → #69 → #70; #63; #65; #71. See "Merge queue" for what each needs him to look at.
+  #64 → #67 → #69 → #70; #63; #65; #71; #72. See "Merge queue" for what each needs him to look at.
 - Local `main` commits since 0c1d92a: push them in the morning.
 - Code-retro 06 needs a real `npm run atlas:publish` run before it is done (the ticket asks for
   it; overnight only its parts ran).
@@ -78,15 +78,19 @@ So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logg
 | #69 | a-08   | The map waits for a size before flying         | #67 (stacked); his yes                           |
 | #70 | 20     | Pin labels switch mode when the zoom changes   | #69 (stacked); Isak zooms and looks; yes         |
 | #71 | 21     | Sound comes back after a reload                | Isak reloads with sound on (desktop, phone); yes |
+| #72 | 22     | `maps:optimize` keeps maps lossless            | His yes                                          |
 
 In flight (2026-10-28, overnight):
 
 - `code-retro-06-read-note`: three reviews done (Standards, Spec, player safety). The safety
   review found one leak (a `---x` line inside frontmatter now parsed as a key, so a note could
-  ship as player) and one place where the build no longer redacts on its own. Fixed in f575e7a;
-  a second safety review is running. No PR until it is clean.
-- `eval-22-maps-optimize-lossless`: review fixes with the builder.
+  ship as player) and one place where the build no longer redacts on its own. Fixed in f575e7a.
+  A second safety review found another: front matter gray-matter reads but the new parser drops
+  (`--- ` opening, or no closing fence) loses a secret note's name, so links to it aren't
+  redacted. Fix (fail closed, stop the build) is with the builder. No PR until it is clean.
 - `eval-23-crossfade-latest-wins`: building, stacked on #71.
+- `eval-24-one-test-runner`: building, from `main`.
+- Ticket 29 waits on #68 and #72 (both touch the save pipeline's map path).
 - Code-retro 07 and 08 wait on 06.
   Merged 2026-10-27 on Isak's relayed yes ("Atlas may merge #61 first, then #57, #58, #59 and #60 in
   order, each after its CI re-run is green; the publishes are fine"). Each PR's branch was updated
@@ -124,6 +128,7 @@ answer, logged here and built on; he reviews this list in batches, and a reversa
 | 2026-10-28 | eval-22 review: may `maps:optimize` delete the PNG once its WebP twin is in place and repointed? | Yes, as `images:optimize` does; git keeps it | Otherwise every map ships twice and every run re-encodes | 22 |
 | 2026-10-28 | eval-21 review: should Dismiss on the "resume sound" invite leave sound off? | Yes; taps on the invite's own buttons don't count as the gesture | Dismiss has to mean no sound | 21 |
 | 2026-10-28 | eval-21: does a bed set up while muted or in a hidden tab ("paused") count as playing? | Yes; the label can't show while muted anyway | Otherwise unmuting doesn't bring the label back until a pan | 21 |
+| 2026-10-28 | eval-22: sharp 0.34.5 has no WebP `exact`; what happens to a PNG with colour under transparent pixels? | Skipped by the script, refused by Save; nothing converts unless all 4 channels match | Lossless must mean exact; a sharp bump can lift it later | 22 |
 
 ## Retro, 2026-10-28 (overnight)
 
