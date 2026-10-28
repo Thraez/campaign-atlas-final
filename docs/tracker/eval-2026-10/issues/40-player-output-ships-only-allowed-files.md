@@ -37,3 +37,9 @@ types. (Unknown image types are fixed in ticket 34.)
   - Images may sit anywhere under `atlas/`, not only `assets/` (a map layer `src` outside
     `assets/` vanished). The image prune covers the same area.
   - `.gitkeep` only when empty; no images under `assets/audio/`.
+- Second safety review (6d1036d): no new leak, nothing the player needs lost. Fixed after it
+  (7dc1368): image refs read only `atlas.json` and `search-index.json`, not
+  `.last-published.json` (the previous publish kept an image the DM had hidden since).
+- Left, low and older than this ticket: a protocol-relative link (`//host/atlas/assets/x.png`)
+  counts as a reference to the local `assets/x.png`; an 8-hex-named file of any type in
+  `assets/audio/` passes when a bed names it (only the build's hashing makes such names).
