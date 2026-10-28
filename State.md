@@ -65,6 +65,22 @@ publish of the last state. For each PR: retarget it to `main` once its parent ha
 `main` in, wait for the PR check, then merge. **Stop at the first conflict or red check** and
 leave the rest for Isak (AGENTS.md: never resolve a merge conflict unattended).
 
+0. **Recommended first, ahead of #62-#82** (provisional call): the fifth sweep's fixes. Each is
+   on `main`, small, reviewed and gated. Trial merges are clean with each other and with the
+   PRs they touch files with (#63, #76, #79, #82, #75, #74).
+   - **#85** (eval 34): player-image pruning matched names, not paths, so a DM-only image could
+     ship. It's latent: current content prunes the same set.
+   - **#84** (eval 33): a failed, rolled-back write read as a save, clearing drafts and sync-map
+     entries.
+   - **#86** (eval 36): the character keys panel recovers from a failed load and from conflicts,
+     and keeps every key.
+   - **#83** (eval 35): dead credits links.
+
+   Their tickets, and 37-41, are on the local branch `eval-sweep5-docs` (docs only, committed
+   there): merge it into `main` with the docs push. Ticket 40 is a live player-safety bug: a
+   stale `public/atlas/assets/maps/world.yaml` with fog reveals ships to the player site. It's a
+   sample, with no DM rows. Ticket 41 explains why character secrets never reach a player build
+   (fails safe).
 1. **#75**: one test runner, and publish runs the tests. First, so every later merge's publish
    runs the suite.
 2. **#82's safety fix, early:** #74 → #76 → #82. Before #74 merges, Isak runs `npm run
