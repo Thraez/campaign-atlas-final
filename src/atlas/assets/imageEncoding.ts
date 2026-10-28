@@ -32,6 +32,54 @@ export const REENCODE_QUALITY = 85;
  */
 export const MAX_IMAGE_WIDTH = 1600;
 
+/**
+ * Sharp WebP options for a map. Maps are never lossy re-encoded: fog redaction
+ * and map labels both smear under a lossy encode. `maps:optimize` and the save
+ * pipeline's map branch both encode through scripts/atlas/mapWebp.ts, which
+ * uses exactly this. Maps are never resized either; MAX_IMAGE_WIDTH is for
+ * portraits, not cartography.
+ *
+ * libwebp would also want `exact` to keep the RGB under fully transparent
+ * pixels, but sharp 0.34 doesn't expose it (it would be silently ignored), so
+ * mapWebp.ts checks every pixel and refuses a map that wouldn't survive.
+ */
+export const MAP_WEBP_OPTIONS = { lossless: true } as const;
+
+/**
+ * Whether `maps:optimize` turns a map of this format into a lossless WebP twin.
+ *
+ * Only PNG, the one lossless source format WebP can hold exactly (8-bit;
+ * 16-bit PNGs are the caller's to check). Every other format is left as is;
+ * see `mapKeepReason`.
+ */
+export function shouldConvertMapToWebp(mimeOrExt: string): boolean {
+  return normalizeFormat(mimeOrExt) === "png";
+}
+
+/**
+ * Why a map of this format is published as is, or null when it is a PNG that
+ * `maps:optimize` converts. Never re-encode any of these:
+ *   - JPG is already lossy: a lossy re-encode adds a second generation of loss,
+ *     and a lossless one only makes it bigger;
+ *   - WebP is already the target;
+ *   - GIF may be animated, and a WebP twin would flatten it to one frame;
+ *   - anything else (SVG, unknown) is not ours to guess at.
+ */
+export function mapKeepReason(mimeOrExt: string): string | null {
+  const format = normalizeFormat(mimeOrExt);
+  if (format === "png") return null;
+  if (format === "jpg" || format === "jpeg") return "JPG map, already lossy; published as is";
+  if (format === "webp") return "already WebP";
+  if (format === "gif") return "GIF map, may be animated; published as is";
+  return `not a raster format maps:optimize converts (${format || "no extension"})`;
+}
+
+/** The normalised format of a file name's extension: "Region.PNG" → "png". */
+export function formatOfFileName(name: string): string {
+  const dot = name.lastIndexOf(".");
+  return dot === -1 ? "" : normalizeFormat(name.slice(dot));
+}
+
 /** Formats worth converting: lossless/legacy stills that WebP shrinks hard. */
 const CONVERTIBLE = new Set(["png", "jpeg", "jpg"]);
 
