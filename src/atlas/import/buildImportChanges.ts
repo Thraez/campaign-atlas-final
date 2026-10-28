@@ -13,7 +13,7 @@
  *     The modal already prevents toggling them on, but defending here means
  *     a misuse can't widen the surface.
  */
-import { ConflictError, hashContent, type FileChange } from "@/atlas/save/localFsSave";
+import { hashContent, type FileChange } from "@/atlas/save/localFsSave";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter";
 import { mergeImportFrontmatter } from "./mergeImportFrontmatter";
 import { readNote } from "@/atlas/content/readNote";
@@ -33,6 +33,8 @@ export class ImportCommitError extends Error {
 
 export interface BuildImportChangesDeps {
   fetchFn?: typeof fetch;
+  /** Reads an atlas file's current text; wins over `fetchFn` (Sync passes its vault port). */
+  readFile?: (path: string) => Promise<string>;
 }
 
 export async function readSourceFile(path: string, fetchFn: typeof fetch): Promise<string> {
@@ -58,7 +60,8 @@ export async function buildImportChanges(
   rows: StagingRow[],
   deps?: BuildImportChangesDeps,
 ): Promise<FileChange[]> {
-  const fetchFn = deps?.fetchFn ?? fetch;
+  const readFile =
+    deps?.readFile ?? ((path: string) => readSourceFile(path, deps?.fetchFn ?? fetch));
   const eligible = rows.filter((r) => r.included && r.pathAllowed && !r.parseError);
   if (eligible.length === 0) {
     throw new ImportCommitError("No rows selected for import");
@@ -71,7 +74,7 @@ export async function buildImportChanges(
 
     if (row.rowKind === "update") {
       // Read fresh disk content at commit time (not stale staging-time snapshot).
-      const currentRaw = await readSourceFile(row.targetPath, fetchFn);
+      const currentRaw = await readFile(row.targetPath);
       baseHash = await hashContent(currentRaw);
       const disk = readNote(currentRaw, row.targetPath);
       if (disk.parseError !== undefined) {
@@ -95,7 +98,7 @@ export async function buildImportChanges(
     } else {
       // path-collision: read disk for baseHash but still rewrite from vault.
       if (row.rowKind === "path-collision") {
-        const currentRaw = await readSourceFile(row.targetPath, fetchFn);
+        const currentRaw = await readFile(row.targetPath);
         baseHash = await hashContent(currentRaw);
       }
       // create/path-collision: the visibility Staging showed (the note's tag,
@@ -112,24 +115,4 @@ export async function buildImportChanges(
     changes.push({ path: row.targetPath, content, kind: "entity-md", baseHash });
   }
   return changes;
-}
-
-/**
- * The Save endpoint refuses a create whose target already exists (409). Check
- * that up front, so nothing else (image copies) runs for a commit that will be
- * refused.
- */
-export async function assertCreateTargetsFree(
-  changes: FileChange[],
-  fetchFn: typeof fetch,
-): Promise<void> {
-  for (const c of changes) {
-    if (c.baseHash !== null) continue;
-    const res = await fetchFn(`/__atlas/read?path=${encodeURIComponent(c.path)}`, {
-      method: "GET",
-    });
-    if (res.status === 404) continue;
-    if (res.ok) throw new ConflictError("already-exists", c.path);
-    throw new ImportCommitError(`Failed to read ${c.path}: status ${res.status}`, c.path);
-  }
 }

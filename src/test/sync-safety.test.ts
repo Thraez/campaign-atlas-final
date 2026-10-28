@@ -3,7 +3,7 @@
  *
  * Drives the real seams in the order the editor runs them:
  *   handleVaultScanRequest (GET /__atlas/vault-scan)
- *   → vaultScanResultToInputs → buildStagingRows (Staging)
+ *   → readVaultScanReply → buildStagingRows (Staging)
  *   → buildImportChanges (what the Save endpoint would write under content/)
  *   → scripts/build-atlas.ts --player (atlas.json, search-index.json).
  *
@@ -17,8 +17,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { handleVaultScanRequest } from "../../scripts/vite-plugin-atlas-save";
-import { readVaultScanReply, vaultScanResultToInputs } from "@/atlas/import/useMdImportFlow";
-import { buildStagingRows, type StagingContext } from "@/atlas/import/stagingState";
+import { readVaultScanReply } from "@/atlas/sync/devEndpointPort";
+import {
+  buildStagingRows,
+  type RawImportFile,
+  type StagingContext,
+} from "@/atlas/import/stagingState";
 import { buildImportChanges } from "@/atlas/import/buildImportChanges";
 import type { FileChange } from "@/atlas/save/localFsSave";
 import type { ImportFolderConfig } from "@/atlas/content/schema";
@@ -80,6 +84,14 @@ const stagingCtx = (): StagingContext => ({
   existingPaths: new Set(),
 });
 
+/** A scan reply as Staging inputs, the way planSync makes them. */
+const toInputs = (files: Record<string, string>): RawImportFile[] =>
+  Object.entries(files).map(([vaultRelPath, raw]) => ({
+    filename: vaultRelPath.split("/").pop()!,
+    raw,
+    vaultRelPath,
+  }));
+
 /**
  * Scan → the route's reply as the client reads it → Staging → the changes
  * Save would write. Nothing exists in the atlas yet. The reply is built the
@@ -92,7 +104,7 @@ async function runSync(candidateFolders: string[]): Promise<SyncRun> {
     new Response(JSON.stringify({ files: scan.files }), { status: 200 }),
   );
   if (!reply.ok) throw new Error(`client refused the scan: ${reply.error}`);
-  const rows = buildStagingRows(vaultScanResultToInputs(reply.files), stagingCtx());
+  const rows = buildStagingRows(toInputs(reply.files), stagingCtx());
   const changes = await buildImportChanges(rows);
   return { scanned: Object.keys(reply.files), changes };
 }
@@ -195,10 +207,7 @@ describe("Sync from Obsidian with no folders picked (the default)", () => {
     // had returned it, and check the visibility rule and the build still hold.
     const cabalPath = "10_DmNotesAndSecrets/The Cabal.md";
     const forced = await buildImportChanges(
-      buildStagingRows(
-        vaultScanResultToInputs({ [cabalPath]: VAULT_NOTES[cabalPath] }),
-        stagingCtx(),
-      ),
+      buildStagingRows(toInputs({ [cabalPath]: VAULT_NOTES[cabalPath] }), stagingCtx()),
     );
     const cabal = forced.find((c) => c.content.includes(SECRET));
     expect(cabal).toBeDefined();

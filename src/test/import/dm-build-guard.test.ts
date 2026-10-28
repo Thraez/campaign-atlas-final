@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DmBuildRequiredError, assertDmBuildLoaded } from "@/atlas/import/useMdImportFlow";
+import { DmBuildRequiredError, assertDmBuildLoaded } from "@/atlas/sync/sync";
 
 describe("assertDmBuildLoaded (Task 2.4 DM-build precondition guard)", () => {
   it("throws DmBuildRequiredError when existingById is empty", () => {
