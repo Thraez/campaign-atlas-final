@@ -18,6 +18,7 @@ import {
   PRECACHE_GLOB_PATTERNS,
   findMissingPrecacheEntries,
   listPrecacheUrls,
+  precacheShippedOnlyPlugin,
 } from "../../scripts/pwaPrecache";
 
 const ROOT = path.resolve(__dirname, "../..");
@@ -140,9 +141,9 @@ describe("vite.config wiring", () => {
     expect(config).toMatch(/globIgnores:\s*PRECACHE_GLOB_IGNORES/);
   });
 
-  it("checks the precache after the player prunes have run", () => {
-    const check = config.indexOf("precacheShippedOnlyPlugin()");
-    expect(check).toBeGreaterThan(config.indexOf("prunePlayerImagesPlugin()"));
-    expect(check).toBeGreaterThan(config.indexOf("prunePlayerAudioPlugin()"));
+  it("checks the precache after the SW is written and the player prunes have run", () => {
+    expect(config).toContain("precacheShippedOnlyPlugin()");
+    const hook = precacheShippedOnlyPlugin().closeBundle;
+    expect(hook).toMatchObject({ order: "post", sequential: true });
   });
 });

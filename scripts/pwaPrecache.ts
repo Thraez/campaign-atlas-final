@@ -56,7 +56,8 @@ export function findMissingPrecacheEntries(outDir: string, swFile = "sw.js"): st
 
 /**
  * Last build step: fail when the service worker precaches a file the build
- * does not ship. Must sit after every plugin that deletes from `dist/`.
+ * does not ship. `closeBundle` is ordered "post" and sequential, so it runs
+ * after the PWA plugin writes `sw.js` and after the prunes delete from `dist/`.
  */
 export function precacheShippedOnlyPlugin(): Plugin {
   let outDir = "dist";
@@ -67,14 +68,18 @@ export function precacheShippedOnlyPlugin(): Plugin {
     configResolved(config) {
       outDir = path.resolve(config.root, config.build.outDir);
     },
-    closeBundle() {
-      const missing = findMissingPrecacheEntries(outDir);
-      if (missing.length > 0) {
-        throw new Error(
-          `atlas-precache-shipped-only: sw.js precaches ${missing.length} file(s) missing from ${outDir}, ` +
-            `so the service worker would fail to install: ${missing.join(", ")}`,
-        );
-      }
+    closeBundle: {
+      order: "post",
+      sequential: true,
+      handler() {
+        const missing = findMissingPrecacheEntries(outDir);
+        if (missing.length > 0) {
+          throw new Error(
+            `atlas-precache-shipped-only: sw.js precaches ${missing.length} file(s) missing from ${outDir}, ` +
+              `so the service worker would fail to install: ${missing.join(", ")}`,
+          );
+        }
+      },
     },
   };
 }

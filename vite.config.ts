@@ -161,6 +161,11 @@ export default defineConfig(({ mode }) => {
           ],
         },
       }),
+      // Fail the build if sw.js precaches a file the build doesn't ship. Its
+      // closeBundle is ordered "post", so it runs after the SW is written and
+      // after the prunes below, wherever it sits in this list.
+      precacheShippedOnlyPlugin(),
+
       // Player builds only: strip the source-named audio beds from dist/ (the
       // player references content-hashed copies; the source names exist solely
       // for the DM picker in public/). Runs last so it fires after the public
@@ -169,8 +174,6 @@ export default defineConfig(({ mode }) => {
       // Player builds only: strip images no player note shows (the DM's asset
       // store lives in public/ too). See the plugin.
       !includeEditor && prunePlayerImagesPlugin(),
-      // Last: fail the build if sw.js precaches a file the prunes removed.
-      precacheShippedOnlyPlugin(),
     ].filter(Boolean),
     resolve: {
       alias: {
