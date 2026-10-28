@@ -2008,7 +2008,12 @@ function AtlasPlacementEditorInner() {
 
                   {/* Z-order: layers → regions → routes → fog → sound → pins → handles. */}
                   {showRegions && (
-                    <RegionLayer map={activeMap} api={regionDraft} visible={showRegions} />
+                    <RegionLayer
+                      map={activeMap}
+                      api={regionDraft}
+                      visible={showRegions}
+                      entityById={entitiesById}
+                    />
                   )}
                   <RouteLayer map={activeMap} api={routeDraft} />
                   <FogLayer
