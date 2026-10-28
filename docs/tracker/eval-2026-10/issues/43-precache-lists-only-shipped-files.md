@@ -18,3 +18,13 @@ The prune's header says the precache globs "never match images"; they do.
 - Fix the prune's header comment.
 - Own branch from `origin/main`. `eval-25-offline-menu-truth` (PR #78) edits `vite.config.ts` in the
   runtime caching block: trial-merge with it.
+
+## Built (branch `eval-43-precache-shipped-only`, local)
+
+- `globIgnores: ["atlas/**"]`, not reordering: reordering leans on the PWA plugin's hook order.
+  The runtime caches (`atlas-data`, `atlas-assets`) already own `atlas/`; nothing offline relied
+  on the precache for it (PR #78's offline menu fills those caches itself).
+- `scripts/pwaPrecache.ts` holds the globs and a build guard: `closeBundle` ordered "post" fails
+  the build when `sw.js` names a file `dist/` lacks, or when no URL can be read from it.
+  Checked on a real build: without the ignore it fails on `sample-overview.svg`.
+- The prune header's false claim is fixed in ticket 40, which renames that plugin.
