@@ -1,6 +1,6 @@
 # Sound comes back after a reload
 
-Status: ready-for-human (Isak tries a reload with sound on, on desktop and on a phone)
+Status: done (PR #71, merged 2026-10-28)
 Area: sound, player site
 
 Found by the third sweep (2026-10-28) and spot-checked. `soundEnabled` is kept in localStorage

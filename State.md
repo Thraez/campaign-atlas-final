@@ -1,6 +1,6 @@
 # State
 
-Updated 2026-10-27 on the Mac. Branch `main`.
+Updated 2026-10-28 on the Mac. Branch `main`.
 
 ## Where it stands
 
@@ -8,101 +8,42 @@ Updated 2026-10-27 on the Mac. Branch `main`.
   (`docs/GOALS.md`), ADR-0001 (a note with no visibility is DM-only), tickets in `docs/tracker/`.
 - The atlas becomes the players' atlas for the world, Tidemarrow first, filled from the vault by
   Sync from Obsidian. Today it still shows the old Astrath sample (three events).
-- The continuous-dev routine is retired; its docs are in `docs/archive/`.
-- react-router 7 is on `main` (audit-07). Mac launchers: npm commands only (audit-04).
-- Live site: https://thraez.github.io/campaign-atlas-final/. The player build now ships only
-  images a player note shows (the Corven and Edric portraits leaked until 2026-10-27).
-- code-retro 01-04 are on `main`: scan titles, Sync title and type, Sync order, Staging.
-- `eval-2026-10/01` and `06` are on `main`: one list of safety scans (`scanRegistry.ts`) for CI,
-  the editor's Publish check and the smoke; in-range dependency updates, `date-fns` gone.
-- The GitHub repo is public, so the DM notes in `content/` are readable there. Decided
-  2026-10-27: Isak makes it private and takes GitHub Pro so Pages keeps working.
+- Live site: https://thraez.github.io/campaign-atlas-final/. Every PR from #57 to #90 is merged and
+  published (2026-10-28); no PR is open. The player build ships only allowed files (eval 40), and
+  `world.yaml` and the audio manifest 404 on the live site.
+- Merges run on the full local gate plus an Opus review, without GitHub CI (`docs/agents/workflow.md`).
+  The PR check runs only by hand (#90).
+- The side sessions wound down on 2026-10-28; the redesign comes later at a normal pace. How the two
+  days went: `docs/tracker/agent-retro/`.
 
-## Next, ranked (evaluation 2026-10-27, second sweep)
+## Open work
 
-Size S/M/L; risk is what breaks if it goes wrong. Branches are pushed but not on `main`; merging
-needs Isak's yes.
+Lowest number first within each folder.
 
-1. Repo private plus GitHub Pro: Isak, in GitHub's settings. S.
-2. Done 2026-10-27: 02, 05, 03, 04 and 13 merged into `main` and pushed (9394f85).
-3. `eval-2026-10/17`: entity edits stuck after a save conflict. S.
-4. `eval-2026-10/08`: editor Save drops world.yaml's `import:` block (Sync's folder map). S.
-   Data loss; must land before Tidemarrow's first sync.
-5. `eval-2026-10/09`: Publish pushes `main` from any branch. S.
-6. `tidemarrow/01`-`03`: first sync, Tidemarrow map, remove the Astrath sample. M.
-7. `eval-2026-10/10` player import-graph test, `12` Save refuses missing image bytes. S each.
-8. `code-retro/06`-`08`: note reading module, Sync module with dry run, build core. L.
-9. `eval-2026-10/11`: pin layer rebuilds on every pan, keystroke and hover. M.
-10. `eval-2026-10/07`: Vite 8 with Vitest 5, after Tidemarrow. L.
-11. `audit-2026-10/08` (Leaflet `NaN`). S. Parked notes: `docs/tracker/eval-2026-10/README.md`.
+- `eval-2026-10/30`: a save drops other maps' region, route and fog drafts. Data loss: until it
+  ships, save before switching maps. Build it first.
+- `eval-2026-10/27` (one reduce-motion switch), `29` (editor map uploads stay lossless), `37`
+  (build lock), `38` (deep links), `39` (one canon client), `41` (the build reads the editor's
+  character keys).
+- `tidemarrow/01`-`03`: first sync, Tidemarrow map, remove the Astrath sample.
+- `eval-2026-10/07`: Vite 8 with Vitest 5, after Tidemarrow.
+- `agent-retro/01`-`03`: from the retro.
+- Parked notes: `docs/tracker/eval-2026-10/README.md`.
 
-Grill round 2 is ticketed on provisional calls (below): `eval-2026-10/14`-`17`. 17 (entity
-edits stuck after a 409) ranks ahead of code-retro 06-08.
+## Waiting on Isak
 
-## Morning queue
-
-Isak is away until the morning of 2026-10-28. His rule: commit locally and he pushes `main` in the
-morning. Overnight there are no pushes to `main` and no `atlas:publish` (the gate runs its local
-parts as separate calls: `atlas:snapshot`, `atlas:build:player`, `build`, `atlas:scan`; the script
-itself publishes nothing, but it is on the ask list). Any new PR whose merge would publish stays
-open and is listed here. Anything refused is logged here with its command and reason.
-
-Prompts Isak got overnight, and what replaced them: `npm run atlas:publish` (its parts, above);
-`git reset --hard` (`git -C <path> checkout -- .`, or remove and re-add the worktree); long chained
-commands with shell variables (one plain command per call, absolute paths).
-
-- `main` was pushed once (f65c854..0c1d92a, docs only, on his yes) before this rule arrived.
-- PRs waiting for his yes to merge (each merge publishes), in stack order: #62 → #66 → #68;
-  #64 → #67 → #69 → #70; #63; #65; #71; #72. See "Merge queue" for what each needs him to look at.
-- Local `main` commits since 0c1d92a: push them in the morning.
-- Code-retro 06 needs a real `npm run atlas:publish` run before it is done (the ticket asks for
-  it; overnight only its parts ran).
-- Filed overnight: ticket 20 (pin labels keep their first mode across zoom, from the eval-11
-  build) and 21-28 from the third sweep. 21-25 and 27 rest on provisional calls below.
-
-## Merge queue
-
-Isak's rule, 2026-10-27: sessions may merge their own PRs once checks pass and the code review is
-clean, but here every merge into `main` starts the publish workflow, which counts as publishing.
-So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logged here.
-
-| PR  | Ticket | What                                           | Waits on                                         |
-| --- | ------ | ---------------------------------------------- | ------------------------------------------------ |
-| #62 | 18     | Remove the entity-frontmatter save stream      | His yes                                          |
-| #63 | 14     | One search for palette, Browse and Timeline    | Isak tries search (Q2); his yes                  |
-| #64 | 15     | One drawing module for regions and routes      | Isak's look at the editor map (Q3); yes          |
-| #65 | 10     | A test walks the player entry's imports        | His yes                                          |
-| #66 | 12     | Save refuses when an image's bytes are missing | #62 (stacked); Isak sees the toast; yes          |
-| #67 | 11     | Pin layer stops rebuilding on every change     | #64 (stacked); Isak checks the map by eye; yes   |
-| #68 | 19     | Map layer uploads always get a real path       | #66 (stacked); Isak tries the path field; yes    |
-| #69 | a-08   | The map waits for a size before flying         | #67 (stacked); his yes                           |
-| #70 | 20     | Pin labels switch mode when the zoom changes   | #69 (stacked); Isak zooms and looks; yes         |
-| #71 | 21     | Sound comes back after a reload                | Isak reloads with sound on (desktop, phone); yes |
-| #72 | 22     | `maps:optimize` keeps maps lossless            | His yes                                          |
-
-In flight (2026-10-28, overnight):
-
-- `code-retro-06-read-note`: three reviews done (Standards, Spec, player safety). The safety
-  review found one leak (a `---x` line inside frontmatter now parsed as a key, so a note could
-  ship as player) and one place where the build no longer redacts on its own. Fixed in f575e7a.
-  A second safety review found another: front matter gray-matter reads but the new parser drops
-  (`--- ` opening, or no closing fence) loses a secret note's name, so links to it aren't
-  redacted. Fix (fail closed, stop the build) is with the builder. No PR until it is clean.
-- `eval-23-crossfade-latest-wins`: building, stacked on #71.
-- `eval-24-one-test-runner`: building, from `main`.
-- Ticket 29 waits on #68 and #72 (both touch the save pipeline's map path).
-- Code-retro 07 and 08 wait on 06.
-  Merged 2026-10-27 on Isak's relayed yes ("Atlas may merge #61 first, then #57, #58, #59 and #60 in
-  order, each after its CI re-run is green; the publishes are fine"). Each PR's branch was updated
-  from `main`, its CI re-run went green, then it merged and its publish run succeeded:
-
-| PR  | Ticket | Merge commit | Publish run |
-| --- | ------ | ------------ | ----------- |
-| #61 | -      | 835b1d1      | 40597133351 |
-| #57 | 09     | ea4531a      | 40597439999 |
-| #58 | 08     | 2cce474      | 40597664295 |
-| #59 | 16     | 3573f0c      | 40597942586 |
-| #60 | 17     | f65c854      | 40598204511 |
+- The repo is public, so the DM notes in `content/` are readable on GitHub. Decided 2026-10-27:
+  Isak makes it private and takes GitHub Pro so Pages keeps working.
+- The world's new name (`audit-2026-10/05`).
+- In the vault, in Obsidian: four notes have an unclosed DM block (`%%` or `:::dm`), so the build
+  refuses them after a sync: blood-moon-circle, the-sovereign-eternal, sister-peline-thrace,
+  the-penitent-of-harkafell.
+- Look-and-feel checks on merged work (a bad result becomes a ticket): search (#63), the editor map
+  (#64, #67), the missing-bytes toast (#66), the layer path field (#68), zooming pin labels (#70),
+  a reload with sound on, desktop and phone (#71), offline in a browser (#78), the Sync panel (#79),
+  the Save chip and the conflict notice (#80, #81).
+- The provisional calls below, in a batch.
+- On the PC: follow `docs/PC-CLEANUP.md` (turn the old routines off first).
 
 ## Provisional calls
 
@@ -123,44 +64,27 @@ answer, logged here and built on; he reviews this list in batches, and a reversa
 | 2026-10-28 | Sweep 3 Q3: the PR check and publish both run `test:ci`; publish is gated on tests?                     | Yes (about 3 min more per publish)                         | A merge in GitHub skips the hook, so publish trusts nothing    | 24     |
 | 2026-10-28 | Sweep 3 Q4: calm mode becomes the one "reduce motion" switch (map, ocean, transitions)?                 | Yes; moved out of sound settings, OR'd with the OS setting | Calm mode stops the waves but not the map's flights            | 27     |
 | 2026-10-28 | Sweep 3 Q5: the offline menu claims only what is stored; install caches atlas.json and the current map? | Yes; portraits and audio stay cached on visit              | Precaching every picture makes the install too heavy           | 25     |
-
 | 2026-10-28 | eval-22 review: may the editor re-encode a JPG map lossy to strip its metadata? | No; drop the metadata segments, keep the image data | Maps stay lossless; one more q85 pass smears labels | 29 |
 | 2026-10-28 | eval-22 review: may `maps:optimize` delete the PNG once its WebP twin is in place and repointed? | Yes, as `images:optimize` does; git keeps it | Otherwise every map ships twice and every run re-encodes | 22 |
 | 2026-10-28 | eval-21 review: should Dismiss on the "resume sound" invite leave sound off? | Yes; taps on the invite's own buttons don't count as the gesture | Dismiss has to mean no sound | 21 |
 | 2026-10-28 | eval-21: does a bed set up while muted or in a hidden tab ("paused") count as playing? | Yes; the label can't show while muted anyway | Otherwise unmuting doesn't bring the label back until a pan | 21 |
 | 2026-10-28 | eval-22: sharp 0.34.5 has no WebP `exact`; what happens to a PNG with colour under transparent pixels? | Skipped by the script, refused by Save; nothing converts unless all 4 channels match | Lossless must mean exact; a sharp bump can lift it later | 22 |
-
-## Retro, 2026-10-28 (overnight)
-
-- Merged and published: #61, #57, #58, #59, #60, each after a fresh CI run on top of the one
-  before. Opened overnight: #63-#69, all reviewed and gated; each waits on Isak because a merge
-  publishes.
-- The adversarial player-safety review (a third lens, run side by side against main's logic) found
-  a leak the Standards and Spec reviews both missed. Keep it for anything that touches
-  visibility, parsing or the scans.
-- Builders marked tickets done before review three times. The brief now says "review pending",
-  and the status is set after review.
-- Stacking branches that touch the same file (AtlasViewer, buildSaveBatch) kept the work
-  conflict-free, but merge order now matters: see the Morning queue.
-- Friction: permission prompts from `atlas:publish`, `git reset --hard` and chained commands with
-  shell variables. All three are replaced (Morning queue).
-- Third sweep: 5 verified bugs (sound after reload, lossy `maps:optimize`, crossfade race, offline
-  menu, timeline year 0) were found in areas no earlier sweep looked at. Areas not yet swept:
-  none left from the list; next is a second pass on the editor page itself (110 KB).
-
-## Retro, 2026-10-27
-
-- Shipped to `main`: the portrait leak fix (live, verified 404), react-router 7, npm audit fix,
-  the scan registry (01) and dependency updates (06). On branches: 02, 05; 03 and 04 in progress.
-- The two-axis review paid for itself each time: it found a lone `%%` that could ship, three
-  hand-written DM regexes the refactor missed, and image encode settings outside
-  `imageEncoding.ts`.
-- Reviewer and sweep claims need a spot check: one "case-sensitive search" bug was false (the
-  index body is lowercased on load), the world.yaml and Publish findings were real.
-- Friction: a main-wide reformat caused a merge conflict; stale `node_modules` broke the commit
-  hook until `npm ci`. Run `npm ci` after a dependency merge.
-
-## Waiting on Isak
-
-- The world's new name (`audit-2026-10/05`).
-- On the PC: follow `docs/PC-CLEANUP.md` (turn the old routines off first).
+| 2026-10-28 | eval-24 review: should the PR check keep its 4 parallel shard jobs? | Yes; each job calls a per-shard entry of the same runner; publish runs `test:ci` | One runner and retry rule, without making every PR wait for the shards one after another | 24 |
+| 2026-10-28 | eval-25 review: does "installing" mean the service-worker install, or a menu click? | The SW install: each new worker saves `atlas.json`, the search index and the current map; the menu item stays for other maps | Q5's reason ("too heavy") is about an automatic install; a new deploy also refreshes the saved map | 25 |
+| 2026-10-28 | eval-25 review: may "Clear offline cache" keep the app shell? | Yes; the label stays and says the app itself stays | Deleting the shell left the menu stuck until a new worker installed | 25 |
+| 2026-10-28 | code-retro 07 review: Staging now gets the sync map (match by sync map, type-conflict hold): keep it? | Yes; check it in the Sync panel | The editor never ran either check before; a renamed note now keeps its id | c-07 |
+| 2026-10-28 | code-retro 07 safety fix: hold every vault note more secret than its player entity, including untagged notes in DM-default folders (many `03_Entities` rows)? | Yes; the DM ticks them, or tags them `player` in the vault | A held row costs a click; a wrong tick leaks a secret | c-07 |
+| 2026-10-28 | Sweep 4: one save writes every map's drafts (rather than blocking map switches while dirty)? | Yes | All maps share one world.yaml; blocking switches would get in the DM's way | 30 |
+| 2026-10-28 | Sweep 4: undoing an edit made on another map switches to that map first? | Yes | Refusing would strand the undo stack; applying it in place corrupts the other map | 30 |
+| 2026-10-28 | Sweep 4: Save with only an entity edit pending points to the entity panel rather than saving it? | Yes | The entity panel owns that save and its conflict handling (ticket 17) | 31 |
+| 2026-10-28 | Sweep 5 Q1: the canon client returns a typed outcome union rather than throwing error classes? | Yes | Every caller already branches on the reason; the compiler then catches an unhandled case like the 207 | 39 |
+| 2026-10-28 | Sweep 5 Q2: fix the rolled-back write that reads as a save now, ahead of the canon client? | Yes | It loses drafts and sync-map entries today; 39 waits on two stacks | 33 |
+| 2026-10-28 | Sweep 5 Q3: an entity link with no center opens the URL's map if valid, else the entity's placement on the default map, else its first placement? | Yes | Respects the link, then the default view | 38 |
+| 2026-10-28 | Sweep 5 Q4: save protocol types and size caps live in `src/atlas/save/saveProtocol.ts`, imported by the plugin? | Yes | The plugin already imports from `src/atlas/save/`; no new dependency direction | 39 |
+| 2026-10-28 | Sweep 5 Q5: player-image pruning matches full asset paths, not file names? | Yes | Name matching keeps `elf.png` when `shelf.png` ships, and one folder's image keeps another's | 34 |
+| 2026-10-28 | eval-34 review: the image-privacy scan can't read `.ico`/`.bmp` metadata (sharp); check their names only and print each skipped file? | Yes | Otherwise the site's own `favicon.ico` fails every scan; the skip is named, not silent | 34 |
+| 2026-10-28 | eval-36 review: the build reads `character-keys.yaml` through the editor's parser, so `Bob: 12345` counts as key "12345"? | Yes | The editor offers Bob as a secret's target; the build skipped him until a re-save. Entries the parser rejects get the existing warning | 41 |
+| 2026-10-28 | eval-40 review: the player build both prunes off-allowlist files and fails a scan on them? | Yes | The prune keeps a normal build safe; the scan catches a build that skipped the plugin | 40 |
+| 2026-10-28 | eval-40 review: drop the audio manifest from the player build? | Yes | Only the editor reads it, and it lists the DM's source bed names | 40 |
+| 2026-10-28 | eval-40 review: hashed audio ships only when `atlas.json` references it, any extension? | Yes | A `.opus` bed was pruned silently; reference beats a format list | 40 |
+| 2026-10-28 | eval-40 review: images may sit anywhere under `atlas/`, and the image prune covers the same area? | Yes | A map layer outside `assets/` vanished; the prune still drops unreferenced ones | 40 |

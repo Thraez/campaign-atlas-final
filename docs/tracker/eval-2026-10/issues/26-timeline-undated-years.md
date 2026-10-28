@@ -1,6 +1,6 @@
 # Timeline events with no parsable year don't land in year 0
 
-Status: in-review (review pending)
+Status: done (PR #76, merged 2026-10-28)
 Area: timeline, build
 
 Found by the third sweep (2026-10-28). An entity with a `dateValue` but no date that parses gets

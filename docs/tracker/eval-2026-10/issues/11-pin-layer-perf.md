@@ -1,6 +1,6 @@
 # Pin layer stops rebuilding on every viewer change
 
-Status: ready-for-human
+Status: done (PR #67, merged 2026-10-28)
 Area: map
 
 `WrappedWorld` and `PlacementMarkers` (`src/pages/AtlasViewer.tsx` ~1101-1356) aren't memoised

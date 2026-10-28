@@ -1,6 +1,6 @@
 # `maps:optimize` keeps maps lossless
 
-Status: in-review (review pending)
+Status: done (PR #72, merged 2026-10-28)
 Area: images, publish
 Blocks: tidemarrow/02
 

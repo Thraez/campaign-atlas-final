@@ -1,6 +1,6 @@
 # The newest soundscape request always wins
 
-Status: in-review (review pending)
+Status: done (PR #73, merged 2026-10-28)
 Area: sound
 
 Found by the third sweep (2026-10-28). Enter area A and then B. If A's audio decodes first,

@@ -1,6 +1,6 @@
 # Publish refuses to run off `main`
 
-Status: ready-for-human
+Status: done (PR #57, merged 2026-10-27)
 Area: publish
 
 Bug, found 2026-10-27. `scripts/atlas/runPublishPush.ts` commits on whatever branch is checked

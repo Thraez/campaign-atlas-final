@@ -1,6 +1,6 @@
 # Editor draws regions and routes in the player style
 
-Status: ready-for-human
+Status: done (PR #64, merged 2026-10-28)
 Area: map, editor
 
 Provisional call (grill round 2, Q3), 2026-10-27: Isak hasn't answered yet; built on the

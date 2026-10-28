@@ -1,6 +1,6 @@
 # Save refuses when an image's bytes are missing
 
-Status: ready-for-human
+Status: done (PR #66, merged 2026-10-28)
 Area: editor, local save
 
 `AtlasPlacementEditor.tsx` ~862-878 warns about uploads with no bytes and then writes world.yaml

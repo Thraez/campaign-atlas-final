@@ -1,6 +1,6 @@
 # The Save chip names an unsaved entity edit instead of "No changes to save"
 
-Status: ready-for-human (review pending)
+Status: done (PR #80, merged 2026-10-28)
 Area: editor (save)
 
 Found by the fourth sweep (2026-10-28), verified by reading. The status count

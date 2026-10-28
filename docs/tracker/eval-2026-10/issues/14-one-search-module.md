@@ -1,6 +1,6 @@
 # One search for the palette, Browse and Timeline
 
-Status: ready-for-human
+Status: done (PR #63, merged 2026-10-28)
 Area: player site, search
 
 Provisional call (grill round 2, Q2), 2026-10-27: Isak hasn't answered yet; built on the
