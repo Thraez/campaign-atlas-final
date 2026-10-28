@@ -23,7 +23,7 @@ import {
   importNotesJson,
 } from "@/atlas/notes/playerNotes";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
-import { downloadBlob } from "@/atlas/tabs/download";
+import { downloadBlob } from "@/lib/download";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { printEntityHandout } from "@/atlas/printHandout";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";

@@ -24,6 +24,17 @@ describe("SaveStatus", () => {
     expect(screen.getAllByRole("button", { name: /discard/i }).length).toBeGreaterThan(0);
   });
 
+  it("names entity edits by their count, and claims none when there are none", () => {
+    const { rerender } = render(
+      <SaveStatus status="unsaved" unsavedCount={1} entityEditCount={1} {...base} />,
+    );
+    expect(screen.getByText("1 entity edit – open it to save")).toBeInTheDocument();
+    rerender(<SaveStatus status="unsaved" unsavedCount={3} entityEditCount={1} {...base} />);
+    expect(screen.getByText("2 unsaved changes · 1 entity edit open")).toBeInTheDocument();
+    rerender(<SaveStatus status="unsaved" unsavedCount={2} entityEditCount={0} {...base} />);
+    expect(screen.getByText("2 unsaved changes")).toBeInTheDocument();
+  });
+
   it("saving → 'Saving…' and Save disabled", () => {
     render(<SaveStatus status="saving" unsavedCount={3} {...base} />);
     expect(screen.getByText("Saving…")).toBeInTheDocument();

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { safeFilename } from "@/atlas/assets/mapLayerTarget";
 import {
   buildImportPlan,
   buildPatchFile,
@@ -7,7 +8,6 @@ import {
   idFromFilename,
   nameFromFilename,
   resolveSize,
-  safeFilename,
   validateImportPlan,
   type ImportImage,
   type ImportPlan,

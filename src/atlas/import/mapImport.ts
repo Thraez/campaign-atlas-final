@@ -7,6 +7,8 @@
  */
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import { dumpYaml, patchHeader } from "@/atlas/yaml/dump";
+// Map file naming has one owner, shared with editor uploads.
+import { defaultTargetPath, safeFilename } from "@/atlas/assets/mapLayerTarget";
 
 export type ImportMode = "layers" | "per-image" | "world-plus-regional" | "variants" | "custom";
 
@@ -81,19 +83,6 @@ export interface ImportPlan {
 
 const ID_SAFE = /[^a-z0-9-]/g;
 
-export function safeFilename(raw: string): string {
-  // Keep the original extension. Lowercase the stem and strip unsafe chars.
-  const dot = raw.lastIndexOf(".");
-  const stem = (dot >= 0 ? raw.slice(0, dot) : raw).toLowerCase();
-  const ext = (dot >= 0 ? raw.slice(dot + 1) : "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const safeStem = stem
-    .replace(/\s+/g, "-")
-    .replace(ID_SAFE, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-  return ext ? `${safeStem || "image"}.${ext}` : safeStem || "image";
-}
-
 export function idFromFilename(raw: string): string {
   const dot = raw.lastIndexOf(".");
   const stem = (dot >= 0 ? raw.slice(0, dot) : raw).toLowerCase();
@@ -116,10 +105,6 @@ export function nameFromFilename(raw: string): string {
       .trim()
       .replace(/\b\w/g, (c) => c.toUpperCase()) || "Untitled"
   );
-}
-
-export function defaultTargetPath(filename: string): string {
-  return `public/atlas/assets/maps/${filename}`;
 }
 
 // ---------- Default assignment ------------------------------------------------

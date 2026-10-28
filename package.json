@@ -25,6 +25,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ci": "tsx scripts/dev/run-sharded-tests.ts",
+    "test:shard": "tsx scripts/dev/run-sharded-tests.ts --shard",
+    "test:changed": "tsx scripts/dev/run-sharded-tests.ts --changed",
     "atlas:build": "tsx scripts/build-atlas.ts",
     "atlas:build:player": "tsx scripts/build-atlas.ts --player --strict",
     "atlas:snapshot": "tsx scripts/atlas/snapshot-baseline.ts",
@@ -41,7 +43,7 @@
     "atlas:backup": "tsx scripts/atlas/backup.ts",
     "atlas:restore": "tsx scripts/atlas/backup.ts",
     "audio:transcode": "node scripts/dev/transcode-audio.mjs",
-    "maps:optimize": "node scripts/dev/optimize-maps.mjs",
+    "maps:optimize": "tsx scripts/dev/optimize-maps.ts",
     "images:optimize": "tsx scripts/dev/optimize-images.ts",
     "prepare": "simple-git-hooks"
   },

@@ -6,6 +6,7 @@ import { useAtlasContent } from "@/atlas/content/useAtlasContent";
 import { AtlasLoadState } from "@/atlas/content/AtlasLoadState";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
+import { entityHref } from "@/atlas/deepLink";
 
 /** One row on the credits page. Sourced either from an entity's coarse
  *  `credit` field or from a world-level `assetCredits` registry entry. */
@@ -35,7 +36,7 @@ function buildCreditRows(project: AtlasProject | null): CreditRow[] {
       key: `entity:${e.id}`,
       title: e.title,
       typeLabel: e.type ? playerTypeLabel(e.type) : undefined,
-      href: `/?entity=${e.id}`,
+      href: entityHref(e.id),
       credit: e.credit as string,
     }));
 
@@ -62,7 +63,7 @@ function buildCreditRows(project: AtlasProject | null): CreditRow[] {
       key: `asset:${src}`,
       title: owner ? owner.title : (src.split("/").pop() ?? src),
       typeLabel: owner?.type ? playerTypeLabel(owner.type) : undefined,
-      href: owner ? `/?entity=${owner.id}` : undefined,
+      href: owner ? entityHref(owner.id) : undefined,
       credit: entry.credit,
     });
   }

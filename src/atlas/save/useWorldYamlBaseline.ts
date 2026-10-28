@@ -15,7 +15,9 @@
  *   - `error`   — non-null when the fetch failed with a non-404 status.
  *
  * `refresh()` re-fetches and updates the baseline; call it after a
- * successful Save so the next dirty cycle uses the fresh hash.
+ * successful Save so the next dirty cycle uses the fresh hash. It also
+ * resolves to the fresh values, so a caller (the save-conflict recovery) can
+ * use them before they have rendered.
  */
 import { useCallback, useEffect, useState } from "react";
 import { hashContent } from "./localFsSave";
@@ -26,9 +28,12 @@ export interface WorldYamlBaseline {
   hash: string | null;
   loading: boolean;
   error: string | null;
-  /** Re-fetch and recompute the baseline. */
-  refresh: () => Promise<void>;
+  /** Re-fetch and recompute the baseline; resolves to the fresh values. */
+  refresh: () => Promise<WorldYamlBaselineValues>;
 }
+
+/** A baseline read's result, as `refresh()` resolves it. */
+export type WorldYamlBaselineValues = Pick<WorldYamlBaseline, "raw" | "hash" | "loading" | "error">;
 
 export function worldYamlPath(worldId: string): string {
   return `content/${worldId}/_atlas/world.yaml`;
@@ -44,11 +49,14 @@ export function useWorldYamlBaseline(
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(
-    async (id: string) => {
+    async (id: string): Promise<WorldYamlBaselineValues> => {
       const relPath = worldYamlPath(id);
+      const failed = (message: string): WorldYamlBaselineValues => {
+        setError(message);
+        return { raw: null, hash: null, loading: false, error: message };
+      };
       if (!isWritableSourcePath(relPath)) {
-        setError(`Path not in source allowlist: ${relPath}`);
-        return;
+        return failed(`Path not in source allowlist: ${relPath}`);
       }
       setLoading(true);
       setError(null);
@@ -61,22 +69,21 @@ export function useWorldYamlBaseline(
           // New world: file doesn't exist yet. Treat as a create-only write target.
           setRaw(null);
           setHash(null);
-          return;
+          return { raw: null, hash: null, loading: false, error: null };
         }
         if (!res.ok) {
-          setError(`Failed to read ${relPath}: status ${res.status}`);
-          return;
+          return failed(`Failed to read ${relPath}: status ${res.status}`);
         }
         const body = (await res.json()) as { contents?: unknown };
         if (typeof body.contents !== "string") {
-          setError(`Malformed read response for ${relPath}`);
-          return;
+          return failed(`Malformed read response for ${relPath}`);
         }
         const h = await hashContent(body.contents);
         setRaw(body.contents);
         setHash(h);
+        return { raw: body.contents, hash: h, loading: false, error: null };
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        return failed(e instanceof Error ? e.message : String(e));
       } finally {
         setLoading(false);
       }
@@ -95,8 +102,9 @@ export function useWorldYamlBaseline(
     void load(worldId);
   }, [worldId, load]);
 
-  const refresh = useCallback(async () => {
-    if (worldId) await load(worldId);
+  const refresh = useCallback(async (): Promise<WorldYamlBaselineValues> => {
+    if (worldId) return load(worldId);
+    return { raw: null, hash: null, loading: false, error: "No active world" };
   }, [worldId, load]);
 
   return { raw, hash, loading, error, refresh };

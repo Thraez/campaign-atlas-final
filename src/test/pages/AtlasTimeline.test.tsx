@@ -142,6 +142,14 @@ describe("AtlasTimeline — URL filter state", () => {
   });
 });
 
+describe("AtlasTimeline — entity links", () => {
+  it("links an entry to the viewer with the id URI-encoded", async () => {
+    renderTimeline(makeProject([makeEntity({ id: "old keep/#1", title: "Siege of Old Keep" })]));
+    const link = await screen.findByRole("link", { name: /Siege of Old Keep/ });
+    expect(link).toHaveAttribute("href", "/atlas?entity=old%20keep%2F%231");
+  });
+});
+
 describe("AtlasTimeline — skip link and main landmark", () => {
   beforeEach(() => {
     vi.clearAllMocks();

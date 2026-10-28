@@ -10,11 +10,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
-import { entityMatchesQuery } from "@/atlas/search/entityMatchesQuery";
+import { compileQuery, entitySearchDoc, searchMatches } from "@/atlas/search/search";
 import {
   parseBrowseFilterParams,
   serializeBrowseFilterParams,
 } from "@/atlas/browse/browseFilterParams";
+import { entityHref } from "@/atlas/deepLink";
 
 type Mode = "browse" | "tag" | "type";
 
@@ -51,10 +52,11 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
 
   const facetFilteredEntries = useMemo(() => {
     const all = project?.entities ?? [];
+    const q = compileQuery(query);
     return all.filter((e) => {
       if (mode === "tag" && !e.tags.includes(facetDecoded)) return false;
       if (mode === "type" && e.type !== facetDecoded) return false;
-      return entityMatchesQuery(e, query);
+      return searchMatches(entitySearchDoc(e), q);
     });
   }, [project, mode, facetDecoded, query]);
 
@@ -279,7 +281,7 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
                                 (z-10 lifts them above the overlay). Nesting <a> in <a>
                                 is invalid HTML and breaks the chip clicks. */}
                               <Link
-                                to={`/atlas?entity=${encodeURIComponent(e.id)}`}
+                                to={entityHref(e.id)}
                                 className="font-medium text-sm truncate after:absolute after:inset-0 after:content-['']"
                               >
                                 {e.title}

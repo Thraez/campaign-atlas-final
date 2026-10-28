@@ -20,7 +20,8 @@ export function computeActiveId(
 
 export function SoundscapeLayer({ map: mapDoc }: { map: MapDocument }) {
   const leaflet = useMap();
-  const { soundEnabled, engine, setMapMasterGain, setAmbiencePlaying } = useSoundSettings();
+  const { soundEnabled, audioUnlocked, engine, setMapMasterGain, setAmbiencePlaying } =
+    useSoundSettings();
   const prepared = useMemo(() => prepareAreas(mapDoc), [mapDoc]);
   const activeId = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
@@ -31,8 +32,21 @@ export function SoundscapeLayer({ map: mapDoc }: { map: MapDocument }) {
   }, [setMapMasterGain, mapDoc.soundscape?.enabled, mapDoc.soundscape?.masterGain]);
 
   useEffect(() => {
-    if (!soundEnabled || mapDoc.soundscape?.enabled === false || prepared.length === 0) return;
+    // Before unlock there is no AudioContext and nothing can play, so don't
+    // pick a bed (and don't claim one is playing) until the gesture arrives.
+    if (
+      !soundEnabled ||
+      !audioUnlocked ||
+      mapDoc.soundscape?.enabled === false ||
+      prepared.length === 0
+    )
+      return;
 
+    let cancelled = false;
+    // The first settle of each run always reaches the engine, so the playing
+    // state is reported again after the cleanup cleared it (crossfadeTo the
+    // bed already playing reports it at once, and to null stops a stale bed).
+    let settledOnce = false;
     const settle = () => {
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => {
@@ -42,10 +56,17 @@ export function SoundscapeLayer({ map: mapDoc }: { map: MapDocument }) {
           mapDoc.height,
           activeId.current,
         );
-        if (next === activeId.current) return;
+        if (settledOnce && next === activeId.current) return;
+        settledOnce = true;
         activeId.current = next;
-        setAmbiencePlaying(next !== null);
-        void engine.crossfadeTo(prepared.find((a) => a.id === next) ?? null);
+        if (next === null) setAmbiencePlaying(false);
+        // Announce playback only once the bed has really started.
+        void engine.crossfadeTo(prepared.find((a) => a.id === next) ?? null).then((result) => {
+          // "paused" (context suspended while muted or hidden) still counts as
+          // the bed being active; SoundControl hides the label while muted.
+          if (!cancelled && activeId.current === next)
+            setAmbiencePlaying(result === "playing" || result === "paused");
+        });
       }, DEBOUNCE_MS);
     };
 
@@ -53,6 +74,7 @@ export function SoundscapeLayer({ map: mapDoc }: { map: MapDocument }) {
     leaflet.on("moveend", settle);
     leaflet.on("zoomend", settle);
     return () => {
+      cancelled = true;
       leaflet.off("moveend", settle);
       leaflet.off("zoomend", settle);
       if (timer.current) clearTimeout(timer.current);
@@ -61,6 +83,7 @@ export function SoundscapeLayer({ map: mapDoc }: { map: MapDocument }) {
   }, [
     leaflet,
     soundEnabled,
+    audioUnlocked,
     prepared,
     engine,
     mapDoc.height,
