@@ -264,18 +264,20 @@ export async function saveAtlasPatchToLocalFs(
   }
 
   // A rolled-back write answers 207, which passes `res.ok`: not a save.
-  const ok = parsed as {
+  const writeFailedBody = parsed as {
     error?: unknown;
     partialWrite?: unknown;
     failedPath?: unknown;
     rolledBack?: unknown;
     writeError?: unknown;
   } | null;
-  if (ok && (ok.error === "WriteFailed" || ok.partialWrite === true)) {
+  if (writeFailedBody?.error === "WriteFailed" && writeFailedBody.partialWrite === true) {
     throw new WriteFailedError(
-      typeof ok.failedPath === "string" ? ok.failedPath : "(unknown file)",
-      typeof ok.rolledBack === "number" ? ok.rolledBack : 0,
-      typeof ok.writeError === "string" ? ok.writeError : undefined,
+      typeof writeFailedBody.failedPath === "string"
+        ? writeFailedBody.failedPath
+        : "(unknown file)",
+      typeof writeFailedBody.rolledBack === "number" ? writeFailedBody.rolledBack : 0,
+      typeof writeFailedBody.writeError === "string" ? writeFailedBody.writeError : undefined,
     );
   }
 
