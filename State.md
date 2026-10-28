@@ -53,13 +53,13 @@ commands with shell variables (one plain command per call, absolute paths).
 
 - `main` was pushed once (f65c854..0c1d92a, docs only, on his yes) before this rule arrived.
 - PRs waiting for his yes to merge (each merge publishes), in stack order: #62 → #66 → #68;
-  #64 → #67 → #69 → #70; #63; #65; #71 → #73 → #77; #72; #74 → #76; #75; #78. See "Merge queue" for what each needs him to look at.
+  #64 → #67 → #69 → #70; #63; #65; #71 → #73 → #77; #72; #74 → #76, #74 → #79; #75; #78. See "Merge queue" for what each needs him to look at.
 - Local `main` commits since 0c1d92a: push them in the morning.
 - **In the vault, for Isak in Obsidian:** four notes have an unclosed DM block (`%%` or `:::dm`),
   so the DM build refuses them after a sync: blood-moon-circle, the-sovereign-eternal,
   sister-peline-thrace, the-penitent-of-harkafell. Found by the code-retro 07 sync-twice run (read
   only; nothing in the vault was changed).
-- **Safety, already on `main`** (found in the code-retro 07 review, being fixed on that branch):
+- **Safety, already on `main`** (found in the code-retro 07 review, fixed in PR #79):
   until it merges, a vault note marked `visibility: dm` whose title matches a player entity syncs
   as a ticked update with no warning, and the written file stays `player` with the secret body.
   Untick such rows in the Sync panel by hand. Also on `main`: a crafted `atlas.id` can make the
@@ -97,6 +97,7 @@ So each PR below is reviewed, gated and waiting for his yes. Merged PRs are logg
 | #76 | 26     | Timeline: undated events get their own last group        | #74 (stacked); his yes                           |
 | #77 | 28     | Sound URLs follow the image asset rule (`/atlas/` fix)   | #73 (stacked); his yes                           |
 | #78 | 25     | The offline menu says what is actually saved             | Isak tries it offline in a browser; his yes      |
+| #79 | c-07   | Sync behind a vault port + dry run; sync can't leak a DM note | #74 (stacked); Isak tries the Sync panel; yes |
 
 In flight (2026-10-28, overnight):
 
@@ -111,8 +112,8 @@ In flight (2026-10-28, overnight):
   Code-retro 08 builds next, stacked on #76.
 - Ticket 28 reproduced (sound broke at `/atlas/`, the editor manifest lost the base path) and is
   PR #77, stacked on #73.
-- Code-retro 07 (`code-retro-07-sync-module`, ba7e620) is built and in review. Standards and Spec
-  are back with no hard defects; fixes go out once the safety review reports.
+- Code-retro 07 is PR #79 (e6805a5). The safety review found two pre-existing sync bugs, and its
+  re-check found a third route (`publish: false`). All are fixed, with a 144-case secrecy test.
 - Fourth sweep (editor page, second pass) filed 30-32. 30 is the worst find tonight: saving on one
   map silently drops region, route and fog drafts on other maps, and undo after a map switch edits
   the wrong map. Until it ships, save before switching maps. 30 waits for the editor stacks
