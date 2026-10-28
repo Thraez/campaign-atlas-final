@@ -1,6 +1,6 @@
 # One Note reading module for id, title, type and visibility
 
-Status: in-review (review pending)
+Status: done
 Blocked by: 01, 02, 04
 Area: build, Sync, safety scans
 
@@ -81,3 +81,5 @@ Deepening: one browser-safe `readNote(raw, relPath)` plus one content-folder sca
     second caller needs less.
   - One badly formed note anywhere, `_dm/` and `_drafts/` included, now stops the build and so the
     publish (fail closed). The coordinator logged this as a provisional call.
+- 2026-10-28, agent (Opus): with main merged in (95ce5ad), the full local gate and a real
+  `npm run atlas:publish` pass: all 13 scans clean, check-secrets and check-derived clean on dist.
