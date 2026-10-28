@@ -230,6 +230,10 @@ answer, logged here and built on; he reviews this list in batches, and a reversa
 | 2026-10-28 | Sweep 5 Q5: player-image pruning matches full asset paths, not file names? | Yes | Name matching keeps `elf.png` when `shelf.png` ships, and one folder's image keeps another's | 34 |
 | 2026-10-28 | eval-34 review: the image-privacy scan can't read `.ico`/`.bmp` metadata (sharp); check their names only and print each skipped file? | Yes | Otherwise the site's own `favicon.ico` fails every scan; the skip is named, not silent | 34 |
 | 2026-10-28 | eval-36 review: the build reads `character-keys.yaml` through the editor's parser, so `Bob: 12345` counts as key "12345"? | Yes | The editor offers Bob as a secret's target; the build skipped him until a re-save. Entries the parser rejects get the existing warning | 41 |
+| 2026-10-28 | eval-40 review: the player build both prunes off-allowlist files and fails a scan on them? | Yes | The prune keeps a normal build safe; the scan catches a build that skipped the plugin | 40 |
+| 2026-10-28 | eval-40 review: drop the audio manifest from the player build? | Yes | Only the editor reads it, and it lists the DM's source bed names | 40 |
+| 2026-10-28 | eval-40 review: hashed audio ships only when `atlas.json` references it, any extension? | Yes | A `.opus` bed was pruned silently; reference beats a format list | 40 |
+| 2026-10-28 | eval-40 review: images may sit anywhere under `atlas/`, and the image prune covers the same area? | Yes | A map layer outside `assets/` vanished; the prune still drops unreferenced ones | 40 |
 
 ## Retro, 2026-10-28 (overnight)
 
