@@ -21,3 +21,19 @@ types. (Unknown image types are fixed in ticket 34.)
 - Delete the stale `public/atlas/assets/maps/world.yaml` (git keeps it).
 - `atlas:scan` gains the check, so `atlas:publish` covers it.
 - Player safety review (third lens) on the branch.
+
+## Built (branch `eval-40-player-files-allowlist`, local)
+
+- Both, on purpose: the prune removes anything off the allowlist (fail-safe, like the image prune),
+  and the `check-player-files` scan (exit 18) fails closed on `dist/atlas`. The scan catches a
+  build that skipped the plugin (an editor-mode or misconfigured build).
+- Whether an image is referenced stays with the image prune; the allowlist checks file kind and
+  place only.
+- Calls from the safety review (provisional, `State.md`):
+  - The audio manifest is off the allowlist. Only the editor reads it, and it lists the DM's source
+    bed names. (This changes the criterion above.)
+  - Hashed audio ships only when `atlas.json` references it, whatever its extension (a `.opus` bed
+    was pruned).
+  - Images may sit anywhere under `atlas/`, not only `assets/` (a map layer `src` outside
+    `assets/` vanished). The image prune covers the same area.
+  - `.gitkeep` only when empty; no images under `assets/audio/`.
