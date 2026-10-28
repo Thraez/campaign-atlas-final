@@ -11,7 +11,8 @@ vi.mock("react-leaflet", async () => {
   return makeReactLeafletModule();
 });
 
-import { render, waitFor, cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { act, render, waitFor, cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MemoryRouter } from "react-router";
 import AtlasViewer from "@/pages/AtlasViewer";
 import {
@@ -308,6 +309,201 @@ describe("MapController reduced-motion (Q28)", () => {
     await waitFor(() => expect(stableMap.flyTo).toHaveBeenCalled());
     expect(stableMap.flyTo).toHaveBeenCalledWith([600, 300], expect.any(Number), { duration: 0.6 });
     expect(stableMap.setView).not.toHaveBeenCalled();
+  });
+});
+
+// Stand-in, not real Leaflet: react-leaflet is mocked, and flyTo / setView /
+// fitBounds are made to throw while the map has no size, the way real
+// Leaflet's projection hits `Invalid LatLng (NaN, NaN)`.
+describe("Map moves wait for a sized map (audit-08)", () => {
+  const originalMatchMedia = window.matchMedia;
+  let size = { x: 0, y: 0 };
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+  let consoleSpy: ReturnType<typeof vi.spyOn>;
+
+  const throwIfZero = () => {
+    if (size.x === 0 || size.y === 0) throw new Error("Invalid LatLng object: (NaN, NaN)");
+  };
+
+  /** Fire Leaflet's `resize` on every handler still subscribed (on minus off). */
+  function fireResize() {
+    const removed = new Set(
+      vi
+        .mocked(stableMap.off)
+        .mock.calls.filter(([event]) => event === "resize")
+        .map(([, handler]) => handler),
+    );
+    const active = vi
+      .mocked(stableMap.on)
+      .mock.calls.filter(([event, handler]) => event === "resize" && !removed.has(handler))
+      .map(([, handler]) => handler as () => void);
+    expect(active.length).toBeGreaterThan(0);
+    act(() => active.forEach((h) => h()));
+  }
+
+  function stubReducedMotion(reduce: boolean) {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        matches: query.includes("prefers-reduced-motion") ? reduce : false,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+  }
+
+  function renderInBoundary() {
+    render(
+      <ErrorBoundary>
+        <MemoryRouter>
+          <AtlasViewer />
+        </MemoryRouter>
+      </ErrorBoundary>,
+    );
+  }
+
+  const panelShows = (title: string) =>
+    Array.from(document.querySelectorAll("h2")).some((h) => h.textContent === title);
+
+  beforeEach(() => {
+    size = { x: 0, y: 0 };
+    vi.spyOn(stableMap, "getSize").mockImplementation(() => size);
+    vi.mocked(stableMap.flyTo).mockImplementation(throwIfZero);
+    vi.mocked(stableMap.setView).mockImplementation(throwIfZero);
+    vi.mocked(stableMap.fitBounds).mockImplementation(throwIfZero);
+    vi.mocked(stableMap.on).mockClear();
+    vi.mocked(stableMap.off).mockClear();
+    errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.mocked(stableMap.getSize).mockRestore();
+    vi.mocked(stableMap.flyTo).mockReset();
+    vi.mocked(stableMap.setView).mockReset();
+    vi.mocked(stableMap.fitBounds).mockReset();
+    errorSpy.mockRestore();
+    consoleSpy.mockRestore();
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: originalMatchMedia,
+    });
+  });
+
+  it("does not fly while the map has no size, and flies once it gets one", async () => {
+    window.history.pushState({}, "", "/?entity=iron-tower");
+    renderInBoundary();
+    await waitFor(() => expect(panelShows("Iron Tower")).toBe(true));
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+    expect(stableMap.flyTo).not.toHaveBeenCalled();
+
+    // The pane becomes visible: Leaflet fires `resize` once the map has a size.
+    size = { x: 800, y: 600 };
+    fireResize();
+
+    expect(stableMap.flyTo).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+  });
+
+  it("flies only to the newest target when the target changes at zero size", async () => {
+    const project = makeProject({
+      entities: [
+        makeEntity({ id: "iron-tower", title: "Iron Tower" }),
+        makeEntity({ id: "silver-lake", title: "Silver Lake" }),
+      ],
+      placements: [
+        makePlacement({ id: "iron-tower@overview", entityId: "iron-tower", x: 500, y: 500 }),
+        makePlacement({ id: "silver-lake@overview", entityId: "silver-lake", x: 200, y: 100 }),
+      ],
+    });
+    const searchIndex = [
+      ...makeSearchIndex(),
+      {
+        id: "silver-lake",
+        title: "Silver Lake",
+        type: "settlement",
+        aliases: [],
+        tags: [],
+        summary: "A still silver lake.",
+        body: "a still silver lake.",
+      },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        const body = String(url).includes("search-index") ? searchIndex : project;
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(body) } as Response);
+      }),
+    );
+    window.history.pushState({}, "", "/?entity=iron-tower");
+    renderInBoundary();
+    await waitFor(() => expect(panelShows("Iron Tower")).toBe(true));
+
+    // Pick a second entity while the map is still hidden.
+    fireEvent.click(document.querySelector('[aria-label="Search atlas (Ctrl+K)"]')!);
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeInTheDocument());
+    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
+    fireEvent.change(within(dialog).getByLabelText("Search"), { target: { value: "silver" } });
+    await waitFor(() => expect(dialog.querySelector("#sp-result-silver-lake")).not.toBeNull());
+    fireEvent.click(dialog.querySelector("#sp-result-silver-lake")!);
+    await waitFor(() => expect(panelShows("Silver Lake")).toBe(true));
+
+    // The first wait was cancelled.
+    expect(stableMap.off).toHaveBeenCalledWith("resize", expect.any(Function));
+    expect(stableMap.flyTo).not.toHaveBeenCalled();
+
+    size = { x: 800, y: 600 };
+    fireResize();
+
+    expect(stableMap.flyTo).toHaveBeenCalledTimes(1);
+    expect(stableMap.flyTo).toHaveBeenCalledWith([900, 200], expect.any(Number), {
+      duration: 0.6,
+    });
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+  });
+
+  it("uses setView without animation after the resize when reduced motion is on", async () => {
+    stubReducedMotion(true);
+    window.history.pushState({}, "", "/?map=overview&cx=300&cy=400&cz=1");
+    renderInBoundary();
+    await waitFor(() => expect(document.querySelector("main#atlas-main")).toBeInTheDocument());
+    expect(stableMap.setView).not.toHaveBeenCalled();
+
+    size = { x: 800, y: 600 };
+    fireResize();
+
+    expect(stableMap.setView).toHaveBeenCalledTimes(1);
+    expect(stableMap.setView).toHaveBeenCalledWith([600, 300], expect.any(Number), {
+      animate: false,
+    });
+    expect(stableMap.flyTo).not.toHaveBeenCalled();
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+  });
+
+  it("FitBoundsController waits for a size before fitBounds", async () => {
+    renderInBoundary();
+    await waitFor(() => expect(document.querySelector("main#atlas-main")).toBeInTheDocument());
+    expect(stableMap.fitBounds).not.toHaveBeenCalled();
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+
+    size = { x: 800, y: 600 };
+    fireResize();
+
+    expect(stableMap.fitBounds).toHaveBeenCalledTimes(1);
+    expect(stableMap.fitBounds).toHaveBeenCalledWith(
+      [
+        [0, 0],
+        [1000, 1000],
+      ],
+      { animate: false },
+    );
   });
 });
 
