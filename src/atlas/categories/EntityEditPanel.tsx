@@ -13,6 +13,7 @@ import {
 import {
   saveAtlasPatchToLocalFs,
   hashContent,
+  rebuildFailure,
   ConflictError,
   type FileChange,
 } from "@/atlas/save/localFsSave";
@@ -241,12 +242,7 @@ export function EntityEditPanel({
       const result = await saveAtlasPatchToLocalFs([change], undefined, { rebuild: true });
       if (sourcePathRef.current !== startedFor) return;
       // The files are on disk either way; a failed rebuild is said, not hidden.
-      // Same detection as the review dialog (DiffPreviewModal).
-      if (result.build?.ok === false || result.rebuilt === false) {
-        setRebuildError(result.build?.stderr ?? result.rebuildError ?? "No details were reported.");
-      } else {
-        setRebuildError(null);
-      }
+      setRebuildError(rebuildFailure(result));
       setPhase("saved");
       setNotice(null);
       api.clear();
@@ -483,9 +479,14 @@ export function EntityEditPanel({
     );
   if (phase === "saved")
     return rebuildError ? (
-      <div role="alert" className="p-4 text-xs space-y-2">
-        <p>Saved, but the atlas rebuild failed:</p>
-        <pre className="font-mono whitespace-pre-wrap">{rebuildError}</pre>
+      <div
+        role="alert"
+        className="m-3 rounded border p-2 space-y-2 text-xs bg-destructive/10 border-destructive/30"
+      >
+        <p>Files saved, but the atlas rebuild failed:</p>
+        <pre className="font-mono text-[10px] whitespace-pre-wrap max-h-48 overflow-auto">
+          {rebuildError}
+        </pre>
       </div>
     ) : (
       <div className="p-4 text-xs">Saved.</div>
@@ -534,7 +535,10 @@ export function EntityEditPanel({
           </div>
         )}
         {saveError && (
-          <div role="alert" className="rounded border border-red-500/60 p-2 space-y-1">
+          <div
+            role="alert"
+            className="rounded border p-2 space-y-2 bg-destructive/10 border-destructive/30"
+          >
             <p>{saveError}</p>
             <p>Nothing was saved; your edits are still here.</p>
           </div>

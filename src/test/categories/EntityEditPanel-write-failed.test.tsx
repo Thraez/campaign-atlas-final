@@ -136,7 +136,7 @@ it("files written but the rebuild failed: says so with the build message, still 
   fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
   await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
-  expect(screen.getByText(/Saved, but the atlas rebuild failed:/)).toBeInTheDocument();
+  expect(screen.getByText(/Files saved, but the atlas rebuild failed:/)).toBeInTheDocument();
   expect(screen.getByText(/boom: bad frontmatter in x\.md/)).toBeInTheDocument();
   expect(screen.queryByText(/^Saved\.$/)).not.toBeInTheDocument();
 
