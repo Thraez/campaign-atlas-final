@@ -569,6 +569,8 @@ function AtlasPlacementEditorInner() {
   const [creatingIn, setCreatingIn] = useState<CategoryId | null>(null);
   /** Entity currently open in the EntityEditPanel (null = none). */
   const [editingEntityId, setEditingEntityId] = useState<string | null>(null);
+  /** eval-31: bumped when Save points to a parked entity edit, so the surface remounts in Edit. */
+  const [entitySurfaceNonce, setEntitySurfaceNonce] = useState(0);
   /**
    * In-flight "File as …" for a misfiled note: the type to pre-apply, plus the
    * category whose panel should host the edit surface. Without the category the
@@ -774,6 +776,23 @@ function AtlasPlacementEditorInner() {
   ]);
 
   /**
+   * eval-31: open the entity whose unsaved edit is parked in `entityEditDraft`,
+   * in Edit, so the DM can save it from its own panel (which owns that save).
+   */
+  const openPendingEntityEdit = () => {
+    const sourcePath = entityEditDraft.draft?.sourcePath;
+    const ent = project?.entities.find((e) => e.sourcePath === sourcePath);
+    if (!ent) {
+      toast.info("Your entity edit saves from its own panel: open the entity to save it.");
+      return;
+    }
+    setActivePanel(categoryForType(ent.type));
+    setEditingEntityId(ent.id);
+    setEntitySurfaceNonce((n) => n + 1);
+    toast.info(`Your edit to ${ent.title} saves from its own panel: it is open now.`);
+  };
+
+  /**
    * Save: rewrite the canonical entity .md frontmatter for every drafted
    * placement, route it through /__atlas/save (dev-only Vite plugin → disk),
    * and trigger an atlas rebuild so the player view picks up the changes
@@ -792,6 +811,9 @@ function AtlasPlacementEditorInner() {
    */
   const onSaveClick = async () => {
     if (!project || !activeMap) return;
+    // eval-31: an entity edit is counted in the chip but saved only by its own
+    // panel, so Save points to that panel instead of claiming nothing is unsaved.
+    const entityEditPending = entityEditDraft.isDirty();
     try {
       const plan = await planUnifiedSave(
         {
@@ -812,6 +834,10 @@ function AtlasPlacementEditorInner() {
         { fetchFn: fetch },
       );
       if (plan.kind === "nothing-to-save") {
+        if (entityEditPending) {
+          openPendingEntityEdit();
+          return;
+        }
         toast.info(plan.message);
         return;
       }
@@ -1205,6 +1231,7 @@ function AtlasPlacementEditorInner() {
         <SaveStatus
           status={session.status}
           unsavedCount={session.unsavedCount}
+          entityEditPending={entityEditDraft.isDirty()}
           savedAt={lastSavedAt}
           failedReason={session.failedReason}
           onSave={onSaveClick}
@@ -1338,9 +1365,15 @@ function AtlasPlacementEditorInner() {
               };
               return (
                 <EntitySurface
+                  key={entitySurfaceNonce}
                   entity={editingEntity}
                   entitiesById={entitiesById}
-                  startInEdit={!!refilingThis}
+                  startInEdit={
+                    !!refilingThis ||
+                    // eval-31: a parked unsaved edit for this entity reopens in Edit.
+                    (entityEditDraft.draft?.sourcePath === editingEntity.sourcePath &&
+                      entityEditDraft.isDirty())
+                  }
                   onClose={() => {
                     const intent = resolveEntityCloseIntent({ dirty: entityEditDraft.isDirty() });
                     if (intent.kind === "confirm-discard") {
@@ -2066,6 +2099,15 @@ function AtlasPlacementEditorInner() {
         onSaved={(result) => {
           void session.markSaved();
           setLastSavedAt(Date.now());
+          // eval-31: this batch never carries the entity edit; its panel saves it.
+          if (entityEditDraft.isDirty()) {
+            toast.info(
+              "Map changes saved. Your entity edit is still open: save it from its panel.",
+              {
+                action: { label: "Open it", onClick: openPendingEntityEdit },
+              },
+            );
+          }
           // Phase 1B B0 — capture pre-save snapshots so the save-boundary
           // undo entry below can restore the dirty local state when the DM
           // hits Cmd+Z across a save. Snapshots reflect the state RIGHT

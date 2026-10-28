@@ -14,6 +14,8 @@ import type { SaveLifecycle } from "./useEditorSession";
 interface Props {
   status: SaveLifecycle;
   unsavedCount: number;
+  /** eval-31: one of the unsaved changes is an entity edit, which saves from its own panel. */
+  entityEditPending?: boolean;
   savedAt: number | null;
   failedReason: string | null;
   onSave: () => void;
@@ -31,6 +33,7 @@ function savedAgo(ts: number, now: number): string {
 export function SaveStatus({
   status,
   unsavedCount,
+  entityEditPending = false,
   savedAt,
   failedReason,
   onSave,
@@ -43,7 +46,13 @@ export function SaveStatus({
     return () => window.clearInterval(id);
   }, [status]);
 
-  const countText = `${unsavedCount} unsaved ${unsavedCount === 1 ? "change" : "changes"}`;
+  const changesText = (n: number) => `${n} unsaved ${n === 1 ? "change" : "changes"}`;
+  // The entity edit is counted but saved from its own panel, so name it.
+  const countText = !entityEditPending
+    ? changesText(unsavedCount)
+    : unsavedCount <= 1
+      ? "1 entity edit – open it to save"
+      : `${changesText(unsavedCount - 1)} · 1 entity edit open`;
 
   let label: string;
   if (status === "clean") label = "All changes saved";
