@@ -65,6 +65,7 @@ import { ScaleBarController, type ScaleBarState } from "@/atlas/scale/ScaleBar";
 import { serializeDeepLink, parseDeepLink } from "@/atlas/deepLink";
 import { WrappedWorld } from "@/atlas/map/WrappedWorld";
 import { atlasToLatLng } from "@/atlas/map/coords";
+import { whenMapHasSize } from "@/atlas/map/whenMapHasSize";
 import { useVisitedPlaces } from "@/atlas/visited/useVisitedPlaces";
 import { selectWanderTarget } from "@/atlas/wander/selectWanderTarget";
 import { discoveryMeter } from "@/atlas/wander/discoveryMeter";
@@ -88,13 +89,18 @@ function MapController({
     if (!flyTo) return;
     const [lat, lng] = atlasToLatLng(flyTo.x, flyTo.y, flyTo.height);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    const targetZoom =
-      flyTo.zoom != null && Number.isFinite(flyTo.zoom) ? flyTo.zoom : Math.max(map.getZoom(), -1);
-    if (prefersReducedMotion) {
-      map.setView([lat, lng], targetZoom, { animate: false });
-    } else {
-      map.flyTo([lat, lng], targetZoom, { duration: 0.6 });
-    }
+    // A zero-size (hidden) map would make Leaflet project to NaN and throw.
+    return whenMapHasSize(map, () => {
+      const targetZoom =
+        flyTo.zoom != null && Number.isFinite(flyTo.zoom)
+          ? flyTo.zoom
+          : Math.max(map.getZoom(), -1);
+      if (prefersReducedMotion) {
+        map.setView([lat, lng], targetZoom, { animate: false });
+      } else {
+        map.flyTo([lat, lng], targetZoom, { duration: 0.6 });
+      }
+    });
   }, [flyTo, map, prefersReducedMotion]);
   return null;
 }
@@ -158,15 +164,22 @@ function FitBoundsController({
 
   useEffect(() => {
     if (seenMapIdRef.current === mapId) return;
-    seenMapIdRef.current = mapId;
-    if (flyTarget !== null) return; // fly already pending; MapController handles it
-    map.fitBounds(
-      [
-        [0, 0],
-        [mapHeight, mapWidth],
-      ],
-      { animate: false },
-    );
+    if (flyTarget !== null) {
+      seenMapIdRef.current = mapId;
+      return; // fly already pending; MapController handles it
+    }
+    // Mark the map as seen only once the fit runs, so a fit cancelled while
+    // the map had no size is rescheduled by the next run of this effect.
+    return whenMapHasSize(map, () => {
+      seenMapIdRef.current = mapId;
+      map.fitBounds(
+        [
+          [0, 0],
+          [mapHeight, mapWidth],
+        ],
+        { animate: false },
+      );
+    });
   }, [mapId, mapWidth, mapHeight, flyTarget, map]);
 
   return null;
