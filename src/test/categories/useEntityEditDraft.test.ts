@@ -9,6 +9,20 @@ const BASE_INIT = {
   body: "# Corven\n",
 } as const;
 
+describe("useEntityEditDraft — pendingFor", () => {
+  it("is true only for an unsaved edit, and only for its own file", () => {
+    const { result } = renderHook(() => useEntityEditDraft());
+    expect(result.current.pendingFor()).toBe(false);
+    act(() => result.current.load(BASE_INIT));
+    expect(result.current.pendingFor()).toBe(false);
+
+    act(() => result.current.setField("summary", "Changed."));
+    expect(result.current.pendingFor()).toBe(true);
+    expect(result.current.pendingFor(BASE_INIT.sourcePath)).toBe(true);
+    expect(result.current.pendingFor("content/world/npcs/other.md")).toBe(false);
+  });
+});
+
 describe("useEntityEditDraft — setField", () => {
   it("marks draft dirty after a field change", () => {
     const { result } = renderHook(() => useEntityEditDraft());
