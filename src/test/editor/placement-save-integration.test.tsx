@@ -125,7 +125,7 @@ function SaveHarness({
 
   // Mirrors AtlasPlacementEditor.onSaveClick: the B3 dirty-gate is delegated to
   // buildSavePlan, then either the "No changes" toast fires or the review modal
-  // opens. The exact FileChange content is exercised by canonicalEntitySave
+  // opens. The exact FileChange content is exercised by canonicalPlacementSave
   // tests — here a representative entity-md change per dirty placement is enough
   // for the modal to render.
   const onSaveClick = () => {
@@ -133,8 +133,6 @@ function SaveHarness({
       allDraftPlacements: draftPlacements,
       overrides,
       activeMapId: mapId,
-      entityDrafts: {},
-      projectEntities: [],
       worldYamlDirty: false,
     });
     if (plan.isEmpty && foreignDrafts.length === 0) {
@@ -221,12 +219,9 @@ describe("buildSavePlan (save-gate seam)", () => {
       allDraftPlacements: [{ entityId: "ghost", mapId: "m1", x: 5, y: 5 }],
       overrides: {},
       activeMapId: "m1",
-      entityDrafts: {},
-      projectEntities: [],
       worldYamlDirty: false,
     });
     expect(plan.dirtyPlacements).toEqual([]);
-    expect(plan.frontmatterPatches).toEqual([]);
     expect(plan.isEmpty).toBe(true);
   });
 
@@ -235,8 +230,6 @@ describe("buildSavePlan (save-gate seam)", () => {
       allDraftPlacements: [{ entityId: "hero", mapId: "m1", x: 1, y: 2 }],
       overrides: { "m1:hero": { x: 1, y: 2 } },
       activeMapId: "m1",
-      entityDrafts: {},
-      projectEntities: [],
       worldYamlDirty: false,
     });
     expect(plan.dirtyPlacements).toHaveLength(1);
@@ -248,8 +241,6 @@ describe("buildSavePlan (save-gate seam)", () => {
       allDraftPlacements: [],
       overrides: {},
       activeMapId: "m1",
-      entityDrafts: {},
-      projectEntities: [],
       worldYamlDirty: true,
     });
     expect(plan.dirtyPlacements).toEqual([]);
