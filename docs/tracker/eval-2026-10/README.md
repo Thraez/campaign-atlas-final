@@ -32,6 +32,9 @@ Fifth sweep, 2026-10-28 (the canon read/save seam, viewer deep links, and a retr
 fifth sweep's grill answers are provisional (`State.md`). Order: 33 and 34 first (data loss, a
 leak), then 35 and 36; 37 stacks on #82, 38 waits for the viewer PRs, 39 stacks on #79 and #81.
 40 came from 34's safety review: the player build ships any non-image file in `public/atlas/`.
+41 came from building 36: the build reads character keys from a different folder than the
+editor writes them to, so character secrets never reach a player build (fails safe).
+33-36 are built: PRs #84, #85, #83 and #86.
 
 Work the lowest open number first. Words as in `GLOSSARY.md`; module, interface, seam and depth
 as in the `codebase-design` skill.

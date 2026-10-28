@@ -228,6 +228,8 @@ answer, logged here and built on; he reviews this list in batches, and a reversa
 | 2026-10-28 | Sweep 5 Q3: an entity link with no center opens the URL's map if valid, else the entity's placement on the default map, else its first placement? | Yes | Respects the link, then the default view | 38 |
 | 2026-10-28 | Sweep 5 Q4: save protocol types and size caps live in `src/atlas/save/saveProtocol.ts`, imported by the plugin? | Yes | The plugin already imports from `src/atlas/save/`; no new dependency direction | 39 |
 | 2026-10-28 | Sweep 5 Q5: player-image pruning matches full asset paths, not file names? | Yes | Name matching keeps `elf.png` when `shelf.png` ships, and one folder's image keeps another's | 34 |
+| 2026-10-28 | eval-34 review: the image-privacy scan can't read `.ico`/`.bmp` metadata (sharp); check their names only and print each skipped file? | Yes | Otherwise the site's own `favicon.ico` fails every scan; the skip is named, not silent | 34 |
+| 2026-10-28 | eval-36 review: the build reads `character-keys.yaml` through the editor's parser, so `Bob: 12345` counts as key "12345"? | Yes | The editor offers Bob as a secret's target; the build skipped him until a re-save. Entries the parser rejects get the existing warning | 41 |
 
 ## Retro, 2026-10-28 (overnight)
 
