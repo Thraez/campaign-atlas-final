@@ -3,6 +3,11 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
+import {
+  PRECACHE_GLOB_IGNORES,
+  PRECACHE_GLOB_PATTERNS,
+  precacheShippedOnlyPlugin,
+} from "./scripts/pwaPrecache";
 import { atlasSavePlugin } from "./scripts/vite-plugin-atlas-save";
 import { prunePlayerAudioPlugin } from "./scripts/vite-plugin-prune-player-audio";
 import { prunePlayerFilesPlugin } from "./scripts/vite-plugin-prune-player-files";
@@ -80,7 +85,10 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           // Precache the built shell (HTML/JS/CSS) + small bundled assets.
-          globPatterns: ["**/*.{js,css,html,ico,svg,woff2}"],
+          // atlas/ is left to the runtime caches below: the prunes delete
+          // from it after this service worker is written. See the module.
+          globPatterns: PRECACHE_GLOB_PATTERNS,
+          globIgnores: PRECACHE_GLOB_IGNORES,
           // OAuth-style callbacks must always hit the network.
           navigateFallbackDenylist: [/^\/~oauth/, /^\/auth/],
           cleanupOutdatedCaches: true,
@@ -153,6 +161,11 @@ export default defineConfig(({ mode }) => {
           ],
         },
       }),
+      // Fail the build if sw.js precaches a file the build doesn't ship. Its
+      // closeBundle is ordered "post", so it runs after the SW is written and
+      // after the prunes below, wherever it sits in this list.
+      precacheShippedOnlyPlugin(),
+
       // Player builds only: strip the source-named audio beds from dist/ (the
       // player references content-hashed copies; the source names exist solely
       // for the DM picker in public/). Runs last so it fires after the public
