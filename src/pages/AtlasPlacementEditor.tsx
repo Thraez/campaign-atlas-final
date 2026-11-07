@@ -157,6 +157,7 @@ import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
 import { FlatCRS } from "@/atlas/map/flatCRS";
 import { whenMapHasSize } from "@/atlas/map/whenMapHasSize";
+import { FitMapOnOpen } from "@/atlas/map/FitMapOnOpen";
 
 function pinDivIcon(
   color: string,
@@ -575,6 +576,20 @@ function AtlasPlacementEditorInner() {
 
   // ☰ menu open/close state
   const [menuOpen, setMenuOpen] = useState(false);
+  // The open menu's toolbar sits above the palette and drop overlay: close it first.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k")) {
+        setMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
+  useEffect(() => {
+    if (isDraggingMd) setMenuOpen(false);
+  }, [isDraggingMd]);
   /** "Where does this save?" disclosure — replaces the old permanent banner. */
   const [saveHelpOpen, setSaveHelpOpen] = useState(false);
 
@@ -1265,7 +1280,10 @@ function AtlasPlacementEditorInner() {
           </p>
         </div>
       )}
-      <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
+      <header
+        className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border"
+        data-menu-open={menuOpen}
+      >
         <Link
           to="/"
           className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2"
@@ -2035,6 +2053,11 @@ function AtlasPlacementEditorInner() {
                         : undefined,
                   }}
                 >
+                  <FitMapOnOpen
+                    mapId={activeMap.id}
+                    mapWidth={activeMap.width}
+                    mapHeight={activeMap.height}
+                  />
                   <FlyTo target={flyTo} />
                   <RulerLayer
                     active={

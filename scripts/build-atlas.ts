@@ -74,6 +74,7 @@ import type {
   Point,
 } from "../src/atlas/content/schema";
 import { collectAssets } from "../src/atlas/assets/collectAssets";
+import { HOSTING_VALUES, type Hosting } from "../src/atlas/sync/hosting";
 
 interface Config {
   contentRoot: string;
@@ -138,6 +139,13 @@ function loadConfig(configPath: string): Config {
     if (!Array.isArray(c[key]) || (c[key] as unknown[]).some((x) => typeof x !== "string")) {
       throw new Error(`${configPath}: "${key}" must be an array of strings.`);
     }
+  }
+  // `hosting` (R-01) is read by `scripts/atlas/hosting.ts`, not the build. Warn
+  // rather than stop the build: an unknown value reads as "public".
+  if (c.hosting !== undefined && !HOSTING_VALUES.includes(c.hosting as Hosting)) {
+    console.warn(
+      `${configPath}: "hosting" must be one of ${HOSTING_VALUES.join(", ")}; treating ${JSON.stringify(c.hosting)} as "public".`,
+    );
   }
   return parsed as Config;
 }

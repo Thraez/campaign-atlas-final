@@ -21,6 +21,8 @@ import { ConflictError, LocalSaveError } from "../../src/atlas/save/localFsSave"
 import type { SyncMap } from "../../src/atlas/import/syncMap";
 import type { SyncSettings } from "../../src/atlas/sync/useSyncSettings";
 import { VaultScanError, type VaultPort } from "../../src/atlas/sync/vaultPort";
+import { HOSTING_PUBLIC_ERROR, HostingPublicError } from "../../src/atlas/sync/hosting";
+import { syncWritesAllowed } from "./hosting";
 
 export interface FsVaultPortOptions {
   /** The atlas repo: `content/`, `public/` and `.local-atlas/` live here. */
@@ -84,6 +86,7 @@ export function createFsVaultPort(opts: FsVaultPortOptions): VaultPort {
 
     async copyVaultImage(req) {
       refuseInDryRun(`an image copy of ${req.rawSrc}`);
+      if (!syncWritesAllowed(repoRoot)) throw new HostingPublicError();
       return handleVaultImageCopyRequest({ ...req, publicDir: path.join(repoRoot, "public") });
     },
 
@@ -97,11 +100,19 @@ export function createFsVaultPort(opts: FsVaultPortOptions): VaultPort {
       }
     },
 
-    async writeAtlasFiles(changes) {
+    async writeAtlasFiles(changes, writeOpts) {
       refuseInDryRun(`${changes.length} atlas file(s)`);
-      const r = await handleSaveRequest({ files: changes }, repoRoot);
+      const body = writeOpts?.origin
+        ? { files: changes, origin: writeOpts.origin }
+        : { files: changes };
+      const r = await handleSaveRequest(body, repoRoot);
       if (r.status === 200) return { saved: r.payload.saved };
       if (r.status === 409) throw new ConflictError(r.payload.reason, r.payload.failedPath);
+      if (r.status === 403 && r.payload.error === HOSTING_PUBLIC_ERROR) {
+        throw new HostingPublicError(
+          typeof r.payload.detail === "string" ? r.payload.detail : undefined,
+        );
+      }
       throw new LocalSaveError(`Save refused (${r.status})`, r.payload);
     },
 

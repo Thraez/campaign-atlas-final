@@ -7,6 +7,8 @@ export interface AtlasFieldPatch {
   type?: string;
   visibility?: string;
   summary?: string;
+  /** `atlas.source`: Sync's vault marker (`src/atlas/import/vaultSourceMarker.ts`). */
+  source?: string;
   tagsAdd?: string[];
 }
 
@@ -26,6 +28,7 @@ export function rewriteFrontmatter(rawFile: string, patch: AtlasFieldPatch): str
   if (patch.type !== undefined) atlas.type = patch.type;
   if (patch.visibility !== undefined) atlas.visibility = patch.visibility;
   if (patch.summary !== undefined) atlas.summary = patch.summary;
+  if (patch.source !== undefined) atlas.source = patch.source;
 
   const next: Record<string, unknown> =
     patch.title !== undefined ? { title: patch.title, ...data, atlas } : { ...data, atlas };
