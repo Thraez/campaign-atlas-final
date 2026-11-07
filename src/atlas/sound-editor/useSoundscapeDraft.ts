@@ -1,18 +1,19 @@
 /**
- * Soundscape draft state — the single source of truth for in-progress sound
- * work on the active map, modelled on `useRegionDraft`. Owns the working
- * `SoundscapeConfig` (areas + enabled/masterGain), selection, and the polygon
- * draw state machine for sound-only zones.
+ * The Sound tab's editing API for the active map's soundscape.
+ *
+ * There is no separate draft: the map's soundscape (its metadata override
+ * folded in) is the one source of truth. Every edit writes the next config
+ * through the editor's `patchMap({ soundscape })`, so it is kept per map,
+ * undone and redone with its map (the entry carries the mapId), persisted and
+ * discarded by the editor session with the rest of the map metadata, and saved
+ * via `soundscapeToYamlObject`. Only the drawing in progress and the selection
+ * live here; they reset when the map changes.
  *
  * EDITOR-ONLY. Reached solely from the DM editor (`AtlasPlacementEditor`);
  * never import this from the player runtime (`src/atlas/sound/`), AtlasViewer,
  * or Landing. Pure of Leaflet — it receives plain `[x, y]` map points.
- *
- * Persistence: the panel writes `effective` back through the editor's
- * `patchMap({ soundscape })` seam; the unified Save serialises it via
- * `soundscapeToYamlObject`. This hook only tracks LOCAL draft changes.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type {
   EntityVisibility,
   MapDocument,
@@ -21,21 +22,8 @@ import type {
   SoundBed,
   SoundscapeConfig,
 } from "@/atlas/content/schema";
-import type { UndoStackAPI } from "@/atlas/useUndoStack";
 import { uniqueId } from "@/atlas/content/slugify";
-
-export interface SoundscapeDraft {
-  /** Per-id partial overrides applied to existing canon areas. */
-  edits: Record<string, Partial<SoundArea>>;
-  /** Brand-new areas created in this session. */
-  added: SoundArea[];
-  /** Existing area ids removed in this session. */
-  deleted: string[];
-  /** Local override of `soundscape.enabled` (undefined ⇒ keep canon value). */
-  enabled?: boolean;
-  /** Local override of `soundscape.masterGain` (undefined ⇒ keep canon value). */
-  masterGain?: number;
-}
+import { soundAreaDraftToConfig } from "./soundAreaDraftToConfig";
 
 export interface SoundscapeIssue {
   severity: "blocking" | "warning";
@@ -44,14 +32,10 @@ export interface SoundscapeIssue {
   areaId?: string;
 }
 
-const EMPTY: SoundscapeDraft = { edits: {}, added: [], deleted: [] };
-
 export interface SoundscapeDraftAPI {
-  draft: SoundscapeDraft;
-  /** Canon soundscape merged with local edits/adds/deletes — feed the panel and the save merge. */
+  /** The map's soundscape as edited (its metadata override folded in). */
   effective: SoundscapeConfig;
-  /** True when there are any local changes to save. */
-  dirty: boolean;
+  /** Changes between `canon` and the map's soundscape. */
   dirtyCount: number;
   selectedId: string | null;
   setSelectedId: (id: string | null) => void;
@@ -71,98 +55,80 @@ export interface SoundscapeDraftAPI {
   setEnabled: (b: boolean) => void;
   setMasterGain: (g: number) => void;
   remove: (id: string) => void;
+  /** Put the map's saved soundscape back (undoable). */
   reset: () => void;
   issues: SoundscapeIssue[];
 }
 
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+/** Changes between the saved soundscape and the edited one: one per added,
+ *  removed or changed area, plus the map-wide on/off and volume. */
+function soundscapeChanges(canon: SoundscapeConfig, next: SoundscapeConfig): number {
+  const before = new Map((canon.areas ?? []).map((a) => [a.id, a]));
+  const after = new Map((next.areas ?? []).map((a) => [a.id, a]));
+  let n = 0;
+  for (const [id, a] of after) if (!same(before.get(id), a)) n++;
+  for (const id of before.keys()) if (!after.has(id)) n++;
+  if (canon.enabled !== next.enabled) n++;
+  if (canon.masterGain !== next.masterGain) n++;
+  return n;
+}
+
+/**
+ * @param map    the active map with its metadata override folded in.
+ * @param onPatch the editor's `patchMap`: every edit lands in the map's
+ *   override as `{ soundscape }`, which records the undo entry (with its map).
+ * @param canon  the map's soundscape before the override (for the change count).
+ */
 export function useSoundscapeDraft(
   map: MapDocument | undefined,
-  undoStack?: UndoStackAPI,
+  onPatch: (patch: Partial<MapDocument>) => void,
+  canon: SoundscapeConfig | undefined,
 ): SoundscapeDraftAPI {
-  const [draft, setDraft] = useState<SoundscapeDraft>(EMPTY);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [draftPoints, setDraftPoints] = useState<Point[]>([]);
 
-  // Synchronous mirror of `draft` so consecutive mutations and undo callbacks
-  // can read the latest state without waiting for React to flush.
-  const draftRef = useRef(draft);
-  useEffect(() => {
-    draftRef.current = draft;
-  }, [draft]);
-
-  const applyDraft = useCallback((next: SoundscapeDraft) => {
-    draftRef.current = next;
-    setDraft(next);
-  }, []);
-
-  /**
-   * Mutate the draft and (optionally) push an undo entry capturing the
-   * snapshot before/after. Use this in place of setDraft for any mutation
-   * the DM should be able to Cmd+Z.
-   */
-  const mutateDraft = useCallback(
-    (compute: (prev: SoundscapeDraft) => SoundscapeDraft, label: string) => {
-      const before = draftRef.current;
-      const after = compute(before);
-      if (after === before) return;
-      applyDraft(after);
-      if (undoStack) {
-        undoStack.push({
-          undo: () => applyDraft(before),
-          redo: () => applyDraft(after),
-          label,
-        });
-      }
-    },
-    [applyDraft, undoStack],
-  );
+  // A drawing or selection in progress belongs to the map it started on.
+  const mapId = map?.id;
+  const [shownMapId, setShownMapId] = useState(mapId);
+  if (shownMapId !== mapId) {
+    setShownMapId(mapId);
+    setSelectedId(null);
+    setDrawing(false);
+    setDraftPoints([]);
+  }
 
   const soundscape = map?.soundscape;
-  const canon = useMemo<SoundscapeConfig>(() => soundscape ?? {}, [soundscape]);
-  const baseAreas = useMemo(() => canon.areas ?? [], [canon]);
+  const effective = useMemo<SoundscapeConfig>(
+    () => ({ ...soundscape, areas: soundscape?.areas ?? [] }),
+    [soundscape],
+  );
+  const effectiveAreas = effective.areas!;
 
-  const effectiveAreas: SoundArea[] = useMemo(() => {
-    // The editor persistence loop feeds the panel's patched config back into
-    // `map.soundscape`, so an area added this session can also appear in
-    // canon. The draft copy is the live one — skip the fed-back canon copy so
-    // `effective` (and the issues scan) always hold one entry per id.
-    const addedIds = new Set(draft.added.map((a) => a.id));
-    const out: SoundArea[] = [];
-    for (const a of baseAreas) {
-      if (draft.deleted.includes(a.id)) continue;
-      if (addedIds.has(a.id)) continue;
-      const e = draft.edits[a.id];
-      out.push(e ? { ...a, ...e } : a);
-    }
-    out.push(...draft.added);
-    return out;
-  }, [baseAreas, draft]);
-
-  const effective: SoundscapeConfig = useMemo(() => {
-    const out: SoundscapeConfig = { ...canon, areas: effectiveAreas };
-    if (draft.enabled !== undefined) out.enabled = draft.enabled;
-    if (draft.masterGain !== undefined) out.masterGain = draft.masterGain;
-    return out;
-  }, [canon, effectiveAreas, draft.enabled, draft.masterGain]);
-
-  const takenIds = useMemo(
-    () => new Set(baseAreas.map((a) => a.id).concat(draft.added.map((a) => a.id))),
-    [baseAreas, draft.added],
+  /** Write the next soundscape into the map's override (one undo entry). */
+  const commit = useCallback(
+    (next: SoundscapeConfig) => {
+      if (!map) return;
+      onPatch({ soundscape: soundAreaDraftToConfig(next) });
+    },
+    [map, onPatch],
+  );
+  const setAreas = useCallback(
+    (areas: SoundArea[]) => commit({ ...effective, areas }),
+    [commit, effective],
   );
 
-  const dirty =
-    draft.added.length > 0 ||
-    draft.deleted.length > 0 ||
-    Object.keys(draft.edits).length > 0 ||
-    draft.enabled !== undefined ||
-    draft.masterGain !== undefined;
-  const dirtyCount =
-    draft.added.length +
-    draft.deleted.length +
-    Object.keys(draft.edits).length +
-    (draft.enabled !== undefined ? 1 : 0) +
-    (draft.masterGain !== undefined ? 1 : 0);
+  const takenIds = useMemo(
+    () => new Set([...(canon?.areas ?? []), ...effectiveAreas].map((a) => a.id)),
+    [canon, effectiveAreas],
+  );
+
+  const dirtyCount = useMemo(
+    () => soundscapeChanges(canon ?? {}, soundAreaDraftToConfig(effective) ?? {}),
+    [canon, effective],
+  );
 
   const startDraw = useCallback(() => {
     setDrawing(true);
@@ -191,12 +157,12 @@ export function useSoundscapeDraft(
       visibility: "dm",
       bed: { src: "" },
     };
-    mutateDraft((d) => ({ ...d, added: [...d.added, area] }), `add sound zone ${id}`);
+    setAreas([...effectiveAreas, area]);
     setDrawing(false);
     setDraftPoints([]);
     setSelectedId(id);
     return id;
-  }, [draftPoints, map, takenIds, mutateDraft]);
+  }, [draftPoints, map, takenIds, setAreas, effectiveAreas]);
 
   const addRideOn = useCallback(
     (regionId: string): string | null => {
@@ -204,42 +170,25 @@ export function useSoundscapeDraft(
       const id = uniqueId(`s${takenIds.size}`, takenIds);
       // Ride-on areas inherit the region's shape AND visibility (spec §10.1):
       // no `points`, no `visibility` field of their own.
-      const area: SoundArea = { id, regionId, bed: { src: "" } };
-      mutateDraft((d) => ({ ...d, added: [...d.added, area] }), `add sound for region ${regionId}`);
+      setAreas([...effectiveAreas, { id, regionId, bed: { src: "" } }]);
       setSelectedId(id);
       return id;
     },
-    [map, takenIds, mutateDraft],
+    [map, takenIds, setAreas, effectiveAreas],
   );
 
   const patchArea = useCallback(
-    (id: string, partial: Partial<SoundArea>) => {
-      mutateDraft((d) => {
-        // Added area? mutate it in place.
-        const addedIdx = d.added.findIndex((a) => a.id === id);
-        if (addedIdx >= 0) {
-          const added = d.added.slice();
-          added[addedIdx] = { ...added[addedIdx], ...partial };
-          return { ...d, added };
-        }
-        return { ...d, edits: { ...d.edits, [id]: { ...(d.edits[id] ?? {}), ...partial } } };
-      }, `patch sound area ${id}`);
-    },
-    [mutateDraft],
-  );
-
-  const getEffective = useCallback(
-    (id: string): SoundArea | null => effectiveAreas.find((a) => a.id === id) ?? null,
-    [effectiveAreas],
+    (id: string, partial: Partial<SoundArea>) =>
+      setAreas(effectiveAreas.map((a) => (a.id === id ? { ...a, ...partial } : a))),
+    [setAreas, effectiveAreas],
   );
 
   const patchBed = useCallback(
     (id: string, partial: Partial<SoundBed>) => {
-      const cur = getEffective(id);
-      if (!cur) return;
-      patchArea(id, { bed: { ...cur.bed, ...partial } });
+      const cur = effectiveAreas.find((a) => a.id === id);
+      if (cur) patchArea(id, { bed: { ...cur.bed, ...partial } });
     },
-    [getEffective, patchArea],
+    [effectiveAreas, patchArea],
   );
 
   const setVisibility = useCallback(
@@ -248,42 +197,29 @@ export function useSoundscapeDraft(
   );
 
   const setEnabled = useCallback(
-    (b: boolean) => mutateDraft((d) => ({ ...d, enabled: b }), "toggle soundscape"),
-    [mutateDraft],
+    (b: boolean) => commit({ ...effective, enabled: b }),
+    [commit, effective],
   );
 
   const setMasterGain = useCallback(
-    (g: number) => mutateDraft((d) => ({ ...d, masterGain: g }), "set volume"),
-    [mutateDraft],
+    (g: number) => commit({ ...effective, masterGain: g }),
+    [commit, effective],
   );
+
+  /** Put the map's saved soundscape back (one undo entry). */
+  const reset = useCallback(() => {
+    if (map) onPatch({ soundscape: canon });
+    setSelectedId(null);
+    cancelDraw();
+  }, [map, onPatch, canon, cancelDraw]);
 
   const remove = useCallback(
     (id: string) => {
-      mutateDraft((d) => {
-        const addedIdx = d.added.findIndex((a) => a.id === id);
-        if (addedIdx >= 0) {
-          return { ...d, added: d.added.filter((a) => a.id !== id) };
-        }
-        const { [id]: _drop, ...restEdits } = d.edits;
-        void _drop;
-        return {
-          ...d,
-          edits: restEdits,
-          deleted: d.deleted.includes(id) ? d.deleted : [...d.deleted, id],
-        };
-      }, `remove sound area ${id}`);
+      setAreas(effectiveAreas.filter((a) => a.id !== id));
       setSelectedId((s) => (s === id ? null : s));
     },
-    [mutateDraft],
+    [setAreas, effectiveAreas],
   );
-
-  // reset() is NOT undoable — mirrors useRegionDraft: it runs for save cleanup
-  // and map switching, both of which the DM confirms elsewhere.
-  const reset = useCallback(() => {
-    applyDraft(EMPTY);
-    setSelectedId(null);
-    cancelDraw();
-  }, [applyDraft, cancelDraw]);
 
   const regionIds = useMemo(() => new Set((map?.regions ?? []).map((r) => r.id)), [map?.regions]);
 
@@ -340,9 +276,7 @@ export function useSoundscapeDraft(
   }, [effectiveAreas, regionIds, effective.masterGain]);
 
   return {
-    draft,
     effective,
-    dirty,
     dirtyCount,
     selectedId,
     setSelectedId,

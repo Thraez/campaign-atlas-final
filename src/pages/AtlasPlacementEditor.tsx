@@ -421,12 +421,11 @@ function AtlasPlacementEditorInner() {
     undoStack,
   );
   const fogDraft = useFogDraft(activeMap, undoStack);
-  // Soundscape draft — shared between SoundscapeTab (panel) and the map
-  // (SoundAreaLayer), exactly as regionDraft is shared with RegionLayer.
-  // Persistence rides the patchMap seam: the panel writes { soundscape } into
-  // the map override, which activeMap folds in and the unified Save spreads
-  // into world.yaml via buildFullWorldYaml → soundscapeToYamlObject.
-  const soundscapeDraft = useSoundscapeDraft(activeMap, undoStack);
+  // Soundscape editing — shared between SoundscapeTab (panel) and the map
+  // (SoundAreaLayer). eval-44: no draft of its own; every edit goes through
+  // patchMap into this map's override (activeMap folds it in), so it stays on
+  // its map, undoes with its map, and the session persists and discards it.
+  const soundscapeDraft = useSoundscapeDraft(activeMap, patchMap, baseMap?.soundscape);
   // Audio files the Sound panel can offer (basenames under
   // public/atlas/assets/audio/). Loaded once; empty is fine — the panel
   // falls back to a free-text file field.
@@ -1829,7 +1828,6 @@ function AtlasPlacementEditorInner() {
                 map={activeMap}
                 onPatch={patchMap}
                 availableAudioFiles={availableAudio}
-                undoStack={undoStack}
                 api={soundscapeDraft}
               />
             ),

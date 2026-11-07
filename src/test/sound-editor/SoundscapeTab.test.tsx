@@ -1,5 +1,6 @@
 // src/test/sound-editor/SoundscapeTab.test.tsx
 import { describe, it, expect, vi } from "vitest";
+import { useState } from "react";
 import { render, screen, act } from "@testing-library/react";
 import { SoundscapeTab } from "@/atlas/tabs/SoundscapeTab";
 import { buildFullWorldYaml } from "@/atlas/yaml/buildFullWorldYaml";
@@ -56,8 +57,18 @@ describe("SoundscapeTab", () => {
   });
 
   it("does not surface the editor controls to a player path — pure render, no AudioContext", () => {
-    const onPatch = vi.fn();
-    render(<SoundscapeTab map={map()} onPatch={onPatch} availableAudioFiles={[]} />);
+    // Patches land back on the map, as the editor's patchMap does.
+    function Wired() {
+      const [m, setM] = useState(map);
+      return (
+        <SoundscapeTab
+          map={m}
+          onPatch={(p) => setM((s) => ({ ...s, ...p }))}
+          availableAudioFiles={[]}
+        />
+      );
+    }
+    render(<Wired />);
     // Create an area (it becomes selected) so the per-area form renders.
     const giveBtn = screen.getByRole("button", { name: /give a region a sound|add sound/i });
     act(() => giveBtn.click());

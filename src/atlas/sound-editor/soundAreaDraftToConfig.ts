@@ -1,9 +1,11 @@
 /**
- * Fold the soundscape draft's `effective` config into the exact
+ * Fold an edited soundscape into the exact
  * `SoundscapeConfig` to set on the active map via `patchMap({ soundscape })`:
  *
  * - no areas ⇒ `undefined` (drop the `soundscape` key entirely);
- * - blank `name` ⇒ omitted;
+ * - blank `name` ⇒ omitted; any other name is kept as typed (a trailing space
+ *   mid-word must survive the round trip through the map; the YAML emitter
+ *   trims it on save);
  * - `enabled: false` and any present `masterGain` are preserved as-is.
  *
  * Deliberately does NOT strip default `masterGain`/`gain` values — that is
@@ -20,8 +22,7 @@ export function soundAreaDraftToConfig(sc: SoundscapeConfig): SoundscapeConfig |
   if (areas.length === 0) return undefined;
 
   const cleanAreas: SoundArea[] = areas.map((a) => {
-    const name = a.name?.trim();
-    if (name) return { ...a, name };
+    if (a.name?.trim()) return a;
     if (a.name !== undefined) {
       const { name: _blank, ...rest } = a;
       void _blank;

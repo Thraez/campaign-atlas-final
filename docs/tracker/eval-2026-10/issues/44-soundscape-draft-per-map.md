@@ -1,6 +1,6 @@
 # The soundscape draft belongs to one map: sound edits never land on another map
 
-Status: ready-for-agent
+Status: in-review
 Area: editor (soundscape, undo)
 
 Found in the review of eval-30 (2026-11-07). Not a regression: it is the same on `main`.
@@ -27,3 +27,37 @@ there is one source of truth.
 - Undo of a soundscape change stays undone; redo restores it, on its own map.
 - The editor is checked by eye in the preview: draw a sound area on map A, switch to map B, save,
   reload; only A has the area (ready-for-human).
+
+## Comments
+
+### 2026-11-07
+
+Built on branch `eval-44-soundscape-draft-per-map`, stacked on `eval-47-discard-all-clears-world-settings`
+(PR #103, not merged): retarget to `main` once 47 merges.
+
+- `useSoundscapeDraft` no longer keeps a draft. The map's soundscape (its metadata override folded
+  in) is the one source of truth: every edit writes the next config through `patchMap({ soundscape })`.
+  So a sound edit stays on its map across switches and saves, undo/redo is the `patchMap` entry
+  (it carries the `mapId`, so redo from another map switches back first), and the session already
+  persists, restores and discards it with the rest of the map metadata. Only the drawing in progress
+  and the selection live in the hook; both reset on a map change.
+- The Sound tab's patch-back effect, `dedupeAreas` and the double `remove` are gone (they only existed
+  to reconcile the two copies). "Discard local" now puts the saved soundscape back as one undoable patch.
+- Names are no longer trimmed on every keystroke (that would eat a typed space mid-name); the YAML
+  emitter trims them on save instead.
+- Tests: `src/test/sound-editor/soundscape-per-map.test.tsx` wires the real hooks (undo stack, editor
+  session, the page's override + `patchMap`, the Sound tab) with two maps. The first two cases failed
+  on the old hook (area landed on B; undo was patched straight back); the third covers Discard all and
+  a reload. `useSoundscapeDraft.test.ts` and `SoundscapeTab.test.tsx` now feed patches back as the
+  editor does.
+
+Provisional call: derived from the map's metadata override rather than a per-map draft in
+`useEditorSession`. It is simpler (no new session slice, no snapshot/undo plumbing) and safer (one
+copy, so nothing can disagree or be re-patched), and it reuses machinery that already works per map.
+Cost: each sound edit is one map-metadata undo entry, and slider drags record one entry per step, as
+before.
+
+Provisional call: the Map settings reset (`resetMap`) clears the map's sound edits too, since they now
+live in the same override. Before, the old draft would have re-patched them straight away.
+
+Not done: the by-eye check in the preview (draw on A, switch to B, save, reload) is still for Isak.
