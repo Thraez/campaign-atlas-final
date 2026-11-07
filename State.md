@@ -148,7 +148,8 @@ Lowest number first within each folder.
 - Look-and-feel checks on merged work (a bad result becomes a ticket): search (#63), the editor map
   (#64, #67), the missing-bytes toast (#66), the layer path field (#68), zooming pin labels (#70),
   a reload with sound on, desktop and phone (#71), offline in a browser (#78), the Sync panel (#79),
-  the Save chip and the conflict notice (#80, #81); eval-30 (#92): draw on two maps, save once,
+  the Save chip and the conflict notice (#80, #81), the "Sync is off while the repo is public"
+  toast on a Sync commit (R-01); eval-30 (#92): draw on two maps, save once,
   reload, both keep their edits. After #99: delete a pin on map B, switch to map A, save, reload;
   the pin stays gone. After #104: the calm-mode button in the map toolbar (look and place). After
   #105: start a route with the ruler on; one click adds one vertex and no ruler point. After #103:

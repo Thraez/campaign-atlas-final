@@ -8,7 +8,15 @@
  */
 import { DEFAULT_ROUTE_COLOR, DEFAULT_ROUTE_WEIGHT } from "@/atlas/map/featureStyle";
 import { useCallback, useMemo, useState } from "react";
-import type { AtlasProject, MapDocument, Point, Route, RouteMode } from "@/atlas/content/schema";
+import type {
+  AtlasProject,
+  EntityVisibility,
+  MapDocument,
+  Point,
+  Route,
+  RouteMode,
+} from "@/atlas/content/schema";
+import { linkLeaksToPlayers, linkTargetLabel } from "@/atlas/content/visibility";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
 import { slugify as toSlug, uniqueId } from "@/atlas/content/slugify";
 import { applyCollectionDraft, useDraftCore } from "@/atlas/editor/useDraftCore";
@@ -73,7 +81,7 @@ function slugify(s: string): string {
 export function useRouteDraft(
   project: AtlasProject | null,
   map: MapDocument | undefined,
-  opts: { entityIds?: Set<string>; dmEntityIds?: Set<string> } = {},
+  opts: { entityIds?: Set<string>; entityVisibility?: ReadonlyMap<string, EntityVisibility> } = {},
   undoStack?: UndoStackAPI,
 ): RouteDraftAPI {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -323,11 +331,12 @@ export function useRouteDraft(
               routeId: r.id,
             });
           }
-          if (opts.dmEntityIds && r.visibility === "player" && opts.dmEntityIds.has(w.entityId)) {
+          const waypointVis = opts.entityVisibility?.get(w.entityId);
+          if (opts.entityVisibility && linkLeaksToPlayers(r.visibility, waypointVis)) {
             out.push({
               severity: "blocking",
               code: "spoiler-leak",
-              message: `Player route "${r.name}" uses DM-only entity waypoint "${w.entityId}"`,
+              message: `Player route "${r.name}" uses ${linkTargetLabel(waypointVis)} waypoint "${w.entityId}"`,
               routeId: r.id,
             });
           }
@@ -354,7 +363,7 @@ export function useRouteDraft(
       }
     }
     return out;
-  }, [effective, map, opts.entityIds, opts.dmEntityIds, placementByEntity]);
+  }, [effective, map, opts.entityIds, opts.entityVisibility, placementByEntity]);
 
   const snapshot = useCallback((): RouteDraft => getDraft(), [getDraft]);
   const applySnapshot = useCallback(

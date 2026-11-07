@@ -74,7 +74,13 @@ const project: AtlasProject = {
 };
 
 describe("useRouteDraft", () => {
-  const opts = { entityIds: new Set(["thornhold", "lair"]), dmEntityIds: new Set(["lair"]) };
+  const opts = {
+    entityIds: new Set(["thornhold", "lair"]),
+    entityVisibility: new Map([
+      ["thornhold", "player" as const],
+      ["lair", "dm" as const],
+    ]),
+  };
 
   it("draws and finalizes a route (≥2 waypoints)", () => {
     const { result } = renderHook(() => useRouteDraft(project, map, opts));

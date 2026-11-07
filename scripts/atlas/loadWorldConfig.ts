@@ -483,10 +483,16 @@ function sanitizeWater(
   return out;
 }
 
+/**
+ * A missing visibility is "player" (the DM writes world.yaml by hand); a value that is present but
+ * not a known visibility is "dm", so a typo hides the item instead of shipping it (ADR-0001
+ * addendum).
+ */
 function normalizeVis(v: unknown, warnings: string[], where: string): EntityVisibility {
   if (isValidVisibility(v)) return v;
-  if (v !== undefined) warnings.push(`${where}: invalid visibility "${v}", defaulting to "player"`);
-  return "player";
+  if (v === undefined) return "player";
+  warnings.push(`${where}: invalid visibility "${String(v)}", loading as "dm"`);
+  return "dm";
 }
 
 const SAFE_SEGMENT = /^[A-Za-z0-9_\-. ]+$/;

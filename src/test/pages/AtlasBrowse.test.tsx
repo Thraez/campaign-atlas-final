@@ -300,3 +300,25 @@ describe("AtlasBrowse — N124: Timeline link in the toolbar", () => {
     expect(mapLink).toHaveAttribute("href", "/atlas");
   });
 });
+
+describe("AtlasBrowse — type chips", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("expose their pressed state, not just a colour", async () => {
+    const project = makeProject([
+      makeEntity({ id: "tideshore", title: "Tideshore", type: "location" }),
+      makeEntity({ id: "mira", title: "Mira", type: "npc" }),
+    ]);
+    renderBrowse("/atlas/browse?type=npc", project);
+    await screen.findByText("Mira");
+    const pressed = screen.getAllByRole("button", { pressed: true });
+    expect(pressed).toHaveLength(1);
+    expect(pressed[0].textContent).toMatch(/person/i);
+    const all = screen.getByText(/^all/i, { selector: "button" });
+    expect(all.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(all);
+    expect(all.getAttribute("aria-pressed")).toBe("true");
+  });
+});

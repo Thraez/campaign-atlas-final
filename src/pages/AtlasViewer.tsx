@@ -57,7 +57,8 @@ import { ReadingPanelWelcome } from "@/atlas/entity/ReadingPanelWelcome";
 import { pickStarters } from "@/atlas/entity/pickStarters";
 import { MapCreditOverlay } from "@/atlas/map/MapCreditOverlay";
 import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
-import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
+import { useReduceMotion } from "@/hooks/use-reduce-motion";
+import { CalmModeToggle } from "@/atlas/CalmModeToggle";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
@@ -79,6 +80,7 @@ import { resolvePeekEntityId } from "@/atlas/peek/resolvePeekEntityId";
 import { FlatCRS } from "@/atlas/map/flatCRS";
 
 import { PinLegend } from "@/atlas/pins/PinLegend";
+import { FitMapOnOpen } from "@/atlas/map/FitMapOnOpen";
 
 function MapController({
   flyTo,
@@ -86,7 +88,7 @@ function MapController({
   flyTo: { x: number; y: number; height: number; zoom?: number } | null;
 }) {
   const map = useMap();
-  const prefersReducedMotion = usePrefersReducedMotion();
+  const reduceMotion = useReduceMotion();
   useEffect(() => {
     if (!flyTo) return;
     const [lat, lng] = atlasToLatLng(flyTo.x, flyTo.y, flyTo.height);
@@ -97,13 +99,13 @@ function MapController({
         flyTo.zoom != null && Number.isFinite(flyTo.zoom)
           ? flyTo.zoom
           : Math.max(map.getZoom(), -1);
-      if (prefersReducedMotion) {
+      if (reduceMotion) {
         map.setView([lat, lng], targetZoom, { animate: false });
       } else {
         map.flyTo([lat, lng], targetZoom, { duration: 0.6 });
       }
     });
-  }, [flyTo, map, prefersReducedMotion]);
+  }, [flyTo, map, reduceMotion]);
   return null;
 }
 
@@ -133,20 +135,16 @@ function ViewSyncController({
 }
 
 function FitBoundsController({
-  mapId,
   mapWidth,
   mapHeight,
-  flyTarget,
   fitRef,
 }: {
-  mapId: string;
   mapWidth: number;
   mapHeight: number;
-  flyTarget: { x: number; y: number; height: number; zoom?: number } | null;
   fitRef: MutableRefObject<(() => void) | null>;
 }) {
   const map = useMap();
-  const seenMapIdRef = useRef<string | null>(null);
+  const reduceMotion = useReduceMotion();
 
   // Keep the reset-view callback current after every render in which deps change
   useLayoutEffect(() => {
@@ -156,33 +154,13 @@ function FitBoundsController({
           [0, 0],
           [mapHeight, mapWidth],
         ],
-        { animate: true, duration: 0.5 },
+        { animate: !reduceMotion, duration: 0.5 },
       );
     };
     return () => {
       fitRef.current = null;
     };
-  }, [map, mapHeight, mapWidth, fitRef]);
-
-  useEffect(() => {
-    if (seenMapIdRef.current === mapId) return;
-    if (flyTarget !== null) {
-      seenMapIdRef.current = mapId;
-      return; // fly already pending; MapController handles it
-    }
-    // Mark the map as seen only once the fit runs, so a fit cancelled while
-    // the map had no size is rescheduled by the next run of this effect.
-    return whenMapHasSize(map, () => {
-      seenMapIdRef.current = mapId;
-      map.fitBounds(
-        [
-          [0, 0],
-          [mapHeight, mapWidth],
-        ],
-        { animate: false },
-      );
-    });
-  }, [mapId, mapWidth, mapHeight, flyTarget, map]);
+  }, [map, mapHeight, mapWidth, fitRef, reduceMotion]);
 
   return null;
 }
@@ -406,6 +384,11 @@ export default function AtlasViewer() {
     } as DOMRect;
     peekEnterRef.current(id, r);
   }, []);
+  // Turning the ruler on unbinds region handlers mid-hover, so no mouseout comes.
+  const { dismiss: dismissPeek } = peekCtl;
+  useEffect(() => {
+    if (rulerActive) dismissPeek();
+  }, [rulerActive, dismissPeek]);
 
   const openEntity = useCallback(
     (id: string, fly = true) => {
@@ -689,6 +672,7 @@ export default function AtlasViewer() {
           >
             <Ruler className="h-4 w-4" aria-hidden="true" />
           </Button>
+          <CalmModeToggle />
           <Button
             variant="secondary"
             size="sm"
@@ -770,11 +754,15 @@ export default function AtlasViewer() {
               }}
             >
               <MapController flyTo={flyTarget} />
-              <FitBoundsController
+              <FitMapOnOpen
                 mapId={activeMap.id}
                 mapWidth={activeMap.width}
                 mapHeight={activeMap.height}
-                flyTarget={flyTarget}
+                skip={flyTarget !== null}
+              />
+              <FitBoundsController
+                mapWidth={activeMap.width}
+                mapHeight={activeMap.height}
                 fitRef={fitMapRef}
               />
               <MaxBoundsController
@@ -811,6 +799,7 @@ export default function AtlasViewer() {
                   openId={openId}
                   onPinPeek={onPinPeek}
                   onPinPeekLeave={peekCtl.onTriggerLeave}
+                  peekEnabled={pointerFine}
                   rulerActive={rulerActive}
                 />
               ))}

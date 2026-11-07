@@ -3,6 +3,9 @@
  *
  * 6-step dialog (Select → Mode → Configure → Sizing → Preview → Export) that
  * generates a valid world.yaml map/layer patch + asset zip + apply README.
+ * The only place in the app that drafts a new map; the editor's upload adds
+ * layers to a map that exists. Zip images are stripped of metadata by the
+ * same dev-server step as an editor upload (./mapImportZip.ts).
  *
  * Storage rules:
  *   - YAML remains the canon storage format.
@@ -13,7 +16,6 @@
  */
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import JSZip from "jszip";
 import {
   Upload,
   ChevronLeft,
@@ -41,10 +43,12 @@ import {
   buildPlanYaml,
   buildReadme,
   defaultAssignment,
+  MAP_IMPORT_ZIP_NAME,
   validateImportPlan,
   type ImportImage,
   type ImportMode,
 } from "./mapImport";
+import { buildMapImportZip, cleanAssetViaDevServer } from "./mapImportZip";
 import { safeFilename } from "@/atlas/assets/mapLayerTarget";
 import { SelectStep } from "./wizard-steps/SelectStep";
 import { ModeStep } from "./wizard-steps/ModeStep";
@@ -154,19 +158,30 @@ export function MapImportWizard({
       toast.error("Fix blocking issues first.");
       return;
     }
-    const zip = new JSZip();
-    const patch = buildPatchFile(plan);
-    const readme = buildReadme(plan, images);
-    zip.file("world-map-patch.yaml", patch);
-    zip.file("README-apply-map-import.md", readme);
-    for (const a of plan.assets) {
-      const img = images.find((i) => i.id === a.sourceImageId);
-      if (!img?.dataUrl) continue;
-      const m = img.dataUrl.match(/^data:[^;]+;base64,(.*)$/);
-      if (m) zip.file(a.targetPath, m[1], { base64: true });
+    const assets = plan.assets.flatMap((a) => {
+      const dataUrl = images.find((i) => i.id === a.sourceImageId)?.dataUrl;
+      return dataUrl ? [{ targetPath: a.targetPath, dataUrl }] : [];
+    });
+    let built;
+    try {
+      // Each image gets the editor upload's metadata strip (eval-2026-10/48).
+      built = await buildMapImportZip(
+        { patch: buildPatchFile(plan), readme: buildReadme(plan, images) },
+        assets,
+        cleanAssetViaDevServer(),
+      );
+    } catch (e) {
+      toast.error(`Couldn't build the package: ${(e as Error).message}`);
+      return;
     }
-    const blob = await zip.generateAsync({ type: "blob" });
-    downloadBlob("atlas-map-import.zip", blob, { toast: false });
+    if (!built.ok) {
+      toast.error(
+        built.reason === "no-dev-server" ? built.detail : `${built.path}: ${built.detail}`,
+      );
+      return;
+    }
+    const blob = await built.zip.generateAsync({ type: "blob" });
+    downloadBlob(MAP_IMPORT_ZIP_NAME, blob, { toast: false });
     toast.success("Map import package downloaded.");
   };
 

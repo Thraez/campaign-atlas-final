@@ -229,7 +229,7 @@ function soundscapeToYamlObject(s: SoundscapeConfig): Record<string, unknown> {
       if (a.regionId) area.regionId = a.regionId;
       if (a.points && a.points.length > 0) area.points = a.points;
       if (a.visibility) area.visibility = a.visibility;
-      if (a.name) area.name = a.name;
+      if (a.name?.trim()) area.name = a.name.trim();
       return area;
     });
   }

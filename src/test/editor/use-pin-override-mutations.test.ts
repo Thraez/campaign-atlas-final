@@ -338,6 +338,21 @@ describe("usePinOverrideMutations", () => {
       expect(harness.labels).toEqual(["remove pin iron-tower"]);
     });
 
+    it("removeCoord on a pin that is only a draft drops the draft (eval-45)", () => {
+      // Nothing in canon to delete, so a tombstone would stay unsaved forever.
+      const project = makeProject({ placements: [] });
+      const activeMap = makeMap();
+      const { result, sync, harness } = renderMutations(project, activeMap);
+      harness.setOverridesUndoable(() => ({ "overview:iron-tower": { x: 9, y: 9 } }), "seed");
+      sync();
+
+      act(() => result.current.removeCoord("iron-tower"));
+      sync();
+
+      expect("overview:iron-tower" in harness.current).toBe(false);
+      expect(harness.labels).toEqual(["seed", "remove pin iron-tower"]);
+    });
+
     it("clearOverride deletes the key entirely (reverting to canon)", () => {
       const project = makeProject({ placements: [] });
       const activeMap = makeMap();

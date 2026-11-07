@@ -1,5 +1,6 @@
 import { FileCode, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MAP_IMPORT_ZIP_NAME } from "../mapImport";
 
 export function ExportStep({
   onDownload,
@@ -14,7 +15,7 @@ export function ExportStep({
     <div className="p-1 space-y-3">
       <div className="rounded-md border border-border p-4 bg-card/50">
         <div className="text-sm font-medium flex items-center gap-2">
-          <FileCode className="h-4 w-4 text-primary" /> Package contents
+          <FileCode className="h-4 w-4 text-primary" /> {MAP_IMPORT_ZIP_NAME} contains
         </div>
         <ul className="mt-2 text-xs space-y-1 text-muted-foreground">
           <li>
@@ -22,8 +23,8 @@ export function ExportStep({
             <span className="font-mono">content/&lt;world&gt;/_atlas/world.yaml</span>
           </li>
           <li>
-            • <span className="font-mono">atlas-assets.zip</span> — image files at their target
-            paths
+            • the image files at their repo paths, metadata (EXIF, GPS, XMP) stripped as in an
+            editor upload
           </li>
           <li>
             • <span className="font-mono">README-apply-map-import.md</span> — step-by-step apply
