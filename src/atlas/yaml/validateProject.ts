@@ -18,6 +18,8 @@ import {
   PLAYER_VISIBLE_VISIBILITY,
   VALID_VISIBILITY,
   isSecretVisibility,
+  linkLeaksToPlayers,
+  linkTargetLabel,
 } from "@/atlas/content/visibility";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import type { PlacementOverride } from "./buildPatches";
@@ -248,12 +250,13 @@ const checkRegionsAndRoutes: Rule = (ctx) => {
           scope: { mapId: m.id, entityId: r.entityId },
         });
       }
-      if (r.visibility === "player" && r.entityId && ctx.dmEntityIds.has(r.entityId)) {
+      const regionTargetVis = r.entityId ? ctx.entityById.get(r.entityId)?.visibility : undefined;
+      if (r.entityId && linkLeaksToPlayers(r.visibility, regionTargetVis)) {
         issues.push({
           severity: "blocking",
           code: "spoiler-leak-region",
           category: "safety",
-          message: `Player-visible region "${r.name}" links to DM-only entity "${r.entityId}"`,
+          message: `Player-visible region "${r.name}" links to ${linkTargetLabel(regionTargetVis)} "${r.entityId}"`,
           hint: "Players would see the region polygon and the entity title would leak. Either hide the region (visibility: dm) or unlink the entity.",
           scope: { mapId: m.id, entityId: r.entityId },
         });
@@ -302,12 +305,14 @@ const checkRegionsAndRoutes: Rule = (ctx) => {
               hint: "Fix the entity slug, create the markdown file, or replace the waypoint with raw coordinates.",
               scope: { mapId: m.id, entityId: w.entityId },
             });
-          } else if (route.visibility === "player" && ctx.dmEntityIds.has(w.entityId)) {
+          }
+          const waypointVis = ctx.entityById.get(w.entityId)?.visibility;
+          if (linkLeaksToPlayers(route.visibility, waypointVis)) {
             issues.push({
               severity: "blocking",
               code: "spoiler-leak-route",
               category: "safety",
-              message: `Player-visible route "${route.name}" routes through DM-only entity "${w.entityId}"`,
+              message: `Player-visible route "${route.name}" routes through ${linkTargetLabel(waypointVis)} "${w.entityId}"`,
               hint: "The waypoint label would expose the DM-only entity to players. Hide the route or replace the waypoint with raw coordinates.",
               scope: { mapId: m.id, entityId: w.entityId },
             });
