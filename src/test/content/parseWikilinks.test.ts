@@ -80,7 +80,7 @@ describe("renderLinkTokens — security invariant (player builds)", () => {
     expect(html).toContain("title=");
     expect(html).toContain("Planned link");
     expect(html).toContain("atlas-planned-link\"");
-    expect(html).not.toContain("atlas-planned-link-player");
+    expect(html).toContain('class="atlas-planned-link"');
   });
 
   it("default opts (no hideBroken) — same as hideBroken: false, title attribute present", () => {
@@ -115,13 +115,12 @@ describe("renderLinkTokens — security invariant (player builds)", () => {
     expect(html).toContain("&quot;xss&quot;");
   });
 
-  it("HTML-special chars in display text are escaped in rendered span", () => {
+  it("HTML-special chars in display text are escaped in player plain text", () => {
     const { tokenized, links } = tokenizeWikilinks('[[X|a <b> name]]', {
       resolveByName: () => undefined,
     });
     const html = renderLinkTokens(`<p>${tokenized}</p>`, links, { hideBroken: true });
-    expect(html).not.toContain("<b>");
-    expect(html).toContain("&lt;b&gt;");
+    expect(html).toBe("<p>a &lt;b&gt; name</p>");
   });
 
   it("resolved entity id with spaces → href is URL-encoded", () => {
@@ -379,7 +378,7 @@ describe("renderLinkTokens — planned-link cross-surface (N26)", () => {
     expect(html).toContain('class="atlas-planned-link"');
     expect(html).toContain('title="Planned link: Ghost Town"');
     expect(html).toContain("Ghost Town");
-    expect(html).not.toContain("atlas-planned-link-player");
+    expect(html).toContain('class="atlas-planned-link"');
     expect(html).not.toContain("atlas-unresolved");
   });
 
