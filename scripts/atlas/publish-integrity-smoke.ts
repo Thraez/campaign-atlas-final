@@ -320,6 +320,36 @@ function variantPlayerFiles(): VariantResult {
   );
 }
 
+// ---- Variant 8: a synced vault note in content/ (check-vault-content) -----
+function variantVaultContent(): VariantResult {
+  const plant = (label: string, withSyncMap: boolean) => {
+    const root = freshDir(label);
+    fs.writeFileSync(
+      path.join(root, "atlas.config.json"),
+      JSON.stringify({ contentRoot: "content", hosting: "public" }),
+    );
+    fs.mkdirSync(path.join(root, "content", "w"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, "content", "w", "smoke.md"),
+      "---\ntitle: Smoke\natlas:\n  id: smoke-vault-note\n---\nFrom the vault.\n",
+    );
+    if (withSyncMap) {
+      fs.mkdirSync(path.join(root, ".local-atlas"));
+      fs.writeFileSync(
+        path.join(root, ".local-atlas", "sync-map.json"),
+        JSON.stringify({ "03_Entities/Smoke.md": { id: "smoke-vault-note", baseType: "npc" } }),
+      );
+    }
+    return runScan("check-vault-content.ts", ["--root", root]);
+  };
+  return assertCleanThenDirty(
+    "Synced vault note while hosting is public",
+    "check-vault-content.ts",
+    () => plant("vault-content-clean", false),
+    () => plant("vault-content-dirty", true),
+  );
+}
+
 async function main(): Promise<number> {
   if (!fs.existsSync(PLAYER_ATLAS)) {
     console.error(
@@ -356,6 +386,7 @@ async function main(): Promise<number> {
     }),
   );
   results.push(variantPlayerFiles());
+  results.push(variantVaultContent());
 
   const pad = Math.max(...results.map((r) => r.name.length));
   for (const r of results) {
