@@ -8,7 +8,7 @@
 // Each step's output goes to .gate-logs/<n>-<step>.log (gitignored, cleared at
 // the start of each run); the console gets one line per step and, on failure,
 // the end of the failing step's log. atlas:publish rebuilds public/atlas/, so
-// afterwards (pass, fail or Ctrl-C) the gate puts it back: tracked files from
+// afterwards (pass, fail, Ctrl-C, SIGTERM or SIGHUP) the gate puts it back: tracked files from
 // git, files the build added removed, and the editor's ignored diff baseline
 // (.last-published.json, rewritten by atlas:snapshot) restored byte for byte.
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
@@ -17,13 +17,16 @@ import path from "node:path";
 import {
   failureMessage,
   formatDuration,
+  gateExitCode,
   logFileName,
   parseGateArgs,
   runGate,
+  STOP_SIGNALS,
   stepSummary,
   type GatePlan,
   type GateStep,
   type StepExit,
+  type StopSignal,
 } from "./gatePlan";
 
 const ROOT = process.cwd();
@@ -76,16 +79,19 @@ for (const f of fs.readdirSync(LOG_DIR)) {
 }
 
 let child: ChildProcess | null = null;
-let interrupted = false;
-// Ctrl-C reaches the step's npm process directly (same process group); this
-// keeps the gate alive long enough to restore public/atlas/ afterwards.
-process.on("SIGINT", () => {
-  interrupted = true;
-  child?.kill("SIGINT");
-});
+let stoppedBy: StopSignal | null = null;
+// Ctrl-C reaches the step's npm process directly (same process group); a tool
+// timeout (SIGTERM) or a closed terminal (SIGHUP) may only reach the gate. Either
+// way, stop the step and keep the gate alive long enough to restore public/atlas/.
+for (const sig of STOP_SIGNALS) {
+  process.on(sig, () => {
+    stoppedBy ??= sig;
+    child?.kill(sig);
+  });
+}
 
 function runStep(step: GateStep, index: number): Promise<StepExit> {
-  if (interrupted) return Promise.resolve({ status: null, signal: "SIGINT" });
+  if (stoppedBy) return Promise.resolve({ status: null, signal: stoppedBy });
   const logFd = fs.openSync(path.join(LOG_DIR, logFileName(index, step)), "w");
   return new Promise((resolve) => {
     let settled = false;
@@ -109,7 +115,7 @@ function runStep(step: GateStep, index: number): Promise<StepExit> {
       finish({ status: 127, signal: null });
     });
     child.on("close", (status, signal) => {
-      finish({ status, signal: signal ?? (interrupted ? "SIGINT" : null) });
+      finish({ status, signal: signal ?? stoppedBy });
     });
   });
 }
@@ -127,6 +133,7 @@ const result = await runGate(plan.steps, {
   runStep,
   restore,
   now: () => Date.now(),
+  distExists: () => fs.existsSync(path.join(ROOT, "dist")),
   onStepStart: (step, i) =>
     console.log(
       `[${i + 1}/${total}] ${step.name} ... (log: ${path.relative(ROOT, LOG_DIR)}/${logFileName(i, step)})`,
@@ -137,11 +144,14 @@ const result = await runGate(plan.steps, {
 if (result.failed) {
   const i = result.results.length - 1;
   const logPath = path.join(LOG_DIR, logFileName(i, result.failed.step));
-  const lines = fs.readFileSync(logPath, "utf8").trimEnd().split("\n");
-  console.error(
-    `\n--- last ${Math.min(TAIL_LINES, lines.length)} lines of ${path.relative(ROOT, logPath)} ---`,
-  );
-  console.error(lines.slice(-TAIL_LINES).join("\n"));
+  // No log when the step never ran (stopped between steps, or dist/ missing).
+  if (fs.existsSync(logPath)) {
+    const lines = fs.readFileSync(logPath, "utf8").trimEnd().split("\n");
+    console.error(
+      `\n--- last ${Math.min(TAIL_LINES, lines.length)} lines of ${path.relative(ROOT, logPath)} ---`,
+    );
+    console.error(lines.slice(-TAIL_LINES).join("\n"));
+  }
   console.error(`\n${failureMessage(result.failed, i, total)}`);
 }
 
@@ -159,4 +169,4 @@ if (result.restoreError !== undefined) {
 
 if (result.ok)
   console.log(`\ngate passed: ${total} step(s) in ${formatDuration(Date.now() - started)}`);
-process.exit(interrupted ? 130 : result.ok ? 0 : 1);
+process.exit(gateExitCode(result.ok, stoppedBy));

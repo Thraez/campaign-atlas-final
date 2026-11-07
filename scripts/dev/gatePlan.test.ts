@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   GATE_STEPS,
   failureMessage,
+  gateExitCode,
+  STOP_SIGNALS,
   logFileName,
   parseGateArgs,
   runGate,
@@ -157,5 +159,63 @@ describe("runGate", () => {
       onStepDone: (r, i) => seen.push(`${i}:${r.step.name}:${r.status}`),
     });
     expect(seen).toEqual(["0:typecheck:all:0", "1:lint:0", "2:format:check:1"]);
+  });
+});
+
+describe("dist scans without a build", () => {
+  const scans = GATE_STEPS.filter((s) => s.name.startsWith("atlas:check-"));
+
+  it("marks only the two dist scans as needing dist/", () => {
+    expect(GATE_STEPS.filter((s) => s.requiresDist).map((s) => s.name)).toEqual([
+      "atlas:check-secrets",
+      "atlas:check-derived",
+    ]);
+  });
+
+  it("fails a dist scan without running it when dist/ is missing, and says why", async () => {
+    const ran: string[] = [];
+    const result = await runGate(scans, {
+      runStep: async (step) => {
+        ran.push(step.name);
+        return { status: 0, signal: null };
+      },
+      restore: async () => {},
+      now: () => 0,
+      distExists: () => false,
+    });
+    expect(ran).toEqual([]);
+    expect(result.failed?.step.name).toBe("atlas:check-secrets");
+    expect(failureMessage(result.failed!, 0, scans.length)).toBe(
+      "gate FAILED at step 1/2 atlas:check-secrets (dist/ does not exist; run atlas:publish first)",
+    );
+  });
+
+  it("runs the scans when dist/ exists", async () => {
+    const ran: string[] = [];
+    const result = await runGate(scans, {
+      runStep: async (step) => {
+        ran.push(step.name);
+        return { status: 0, signal: null };
+      },
+      restore: async () => {},
+      now: () => 0,
+      distExists: () => true,
+    });
+    expect(ran).toEqual(["atlas:check-secrets", "atlas:check-derived"]);
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe("gateExitCode", () => {
+  it("exits 0 on pass, 1 on failure, 128+n when stopped by a signal", () => {
+    expect(gateExitCode(true, null)).toBe(0);
+    expect(gateExitCode(false, null)).toBe(1);
+    expect(gateExitCode(false, "SIGINT")).toBe(130);
+    expect(gateExitCode(false, "SIGTERM")).toBe(143);
+    expect(gateExitCode(false, "SIGHUP")).toBe(129);
+  });
+
+  it("names the signals the gate stops (and restores) on", () => {
+    expect(STOP_SIGNALS).toEqual(["SIGINT", "SIGTERM", "SIGHUP"]);
   });
 });

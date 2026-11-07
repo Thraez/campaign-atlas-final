@@ -11,10 +11,16 @@ export type GateStep = {
   name: string;
   /** Arguments after `npm`. */
   npmArgs: string[];
+  /** Scans dist/; the scan scripts skip (exit 0) when it is missing, so the gate fails first. */
+  requiresDist?: true;
 };
 
 function npmStep(name: string, ...extra: string[]): GateStep {
   return { name, npmArgs: extra.length ? ["run", name, "--", ...extra] : ["run", name] };
+}
+
+function distScan(name: string): GateStep {
+  return { ...npmStep(name, "dist"), requiresDist: true };
 }
 
 export const GATE_STEPS: readonly GateStep[] = [
@@ -23,8 +29,8 @@ export const GATE_STEPS: readonly GateStep[] = [
   npmStep("format:check"),
   npmStep("test:ci"),
   npmStep("atlas:publish"),
-  npmStep("atlas:check-secrets", "dist"),
-  npmStep("atlas:check-derived", "dist"),
+  distScan("atlas:check-secrets"),
+  distScan("atlas:check-derived"),
 ];
 
 export type GatePlan = { steps: GateStep[]; dryRun: boolean };
@@ -65,7 +71,12 @@ export function logFileName(index: number, step: GateStep): string {
 
 export type StepExit = { status: number | null; signal: NodeJS.Signals | null };
 
-export type StepResult = StepExit & { step: GateStep; durationMs: number };
+export type StepResult = StepExit & {
+  step: GateStep;
+  durationMs: number;
+  /** Why the gate failed the step without running it. */
+  reason?: string;
+};
 
 export type GateResult = {
   ok: boolean;
@@ -80,6 +91,8 @@ export type GateDeps = {
   runStep: (step: GateStep, index: number) => Promise<StepExit>;
   restore: () => Promise<void>;
   now: () => number;
+  /** Whether dist/ exists; checked before a step with `requiresDist`. */
+  distExists?: () => boolean;
   onStepStart?: (step: GateStep, index: number) => void;
   onStepDone?: (result: StepResult, index: number) => void;
 };
@@ -95,11 +108,19 @@ export async function runGate(steps: readonly GateStep[], deps: GateDeps): Promi
     for (const [index, step] of steps.entries()) {
       deps.onStepStart?.(step, index);
       const start = deps.now();
-      const exit = await deps.runStep(step, index);
-      const result: StepResult = { ...exit, step, durationMs: deps.now() - start };
+      const missingDist = step.requiresDist && deps.distExists && !deps.distExists();
+      const result: StepResult = missingDist
+        ? {
+            status: 1,
+            signal: null,
+            step,
+            durationMs: 0,
+            reason: "dist/ does not exist; run atlas:publish first",
+          }
+        : { ...(await deps.runStep(step, index)), step, durationMs: deps.now() - start };
       results.push(result);
       deps.onStepDone?.(result, index);
-      if (exit.status !== 0) {
+      if (result.status !== 0) {
         failed = result;
         break;
       }
@@ -122,7 +143,8 @@ export function formatDuration(ms: number): string {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m${String(s % 60).padStart(2, "0")}s`;
 }
 
-function exitText(r: StepExit): string {
+function exitText(r: StepExit & { reason?: string }): string {
+  if (r.reason) return r.reason;
   return r.signal ? `killed by ${r.signal}` : `exit ${r.status}`;
 }
 
@@ -133,4 +155,16 @@ export function stepSummary(r: StepResult, index: number, total: number): string
 
 export function failureMessage(r: StepResult, index: number, total: number): string {
   return `gate FAILED at step ${index + 1}/${total} ${r.step.name} (${exitText(r)})`;
+}
+
+/** Signals that stop the gate; it restores public/atlas/ before exiting. */
+export const STOP_SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP"] as const;
+export type StopSignal = (typeof STOP_SIGNALS)[number];
+
+const SIGNAL_NUMBERS: Record<StopSignal, number> = { SIGHUP: 1, SIGINT: 2, SIGTERM: 15 };
+
+/** 0 on pass, 1 on failure, 128+n when stopped by signal n (shell convention). */
+export function gateExitCode(ok: boolean, stoppedBy: StopSignal | null): number {
+  if (stoppedBy) return 128 + SIGNAL_NUMBERS[stoppedBy];
+  return ok ? 0 : 1;
 }

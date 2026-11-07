@@ -29,3 +29,7 @@ Provisional calls: the gate refuses to start if `public/atlas/` already has unco
 since the restore would discard them; it restores `.last-published.json` too, because
 `atlas:snapshot` rewrites the editor's diff baseline; it warns if `git status` differs from before
 the run, so stray build output elsewhere shows up.
+
+Review fixes: SIGTERM and SIGHUP stop and restore like Ctrl-C (exit 128+n); a step that never ran
+has no log and is reported without one; the `dist` scans fail when `dist/` is missing (they would
+skip with exit 0), which matters for `--only` runs without `atlas:publish`.
