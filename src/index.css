@@ -132,7 +132,23 @@
   border-bottom: 1px solid hsl(var(--border));
   background: linear-gradient(180deg, hsl(var(--card) / 0.96), hsl(var(--background) / 0.92));
   box-shadow: 0 10px 30px hsl(220 30% 3% / 0.32);
+  /* Stacking: above Leaflet (1-2) and the map overlays, below dialogs (z-50
+     portals). The blur lives on ::before: backdrop-filter on the header itself
+     would make it the containing block of the editor menu's fixed backdrop. */
+  position: relative;
+  z-index: 30;
+}
+.atlas-toolbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   backdrop-filter: blur(18px);
+}
+/* While the editor menu is open, sit above the z-[500] map overlays too. */
+.atlas-toolbar[data-menu-open="true"] {
+  z-index: 600;
 }
 .atlas-toolbar h1 {
   font-weight: 800;
