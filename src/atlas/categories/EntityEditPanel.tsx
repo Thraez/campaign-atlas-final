@@ -34,7 +34,7 @@ import { FormatToolbar } from "@/atlas/editor/FormatToolbar";
 import { ImagePickerPanel } from "@/atlas/editor/ImagePickerPanel";
 import { applyToolbarAction, type ToolbarActionId } from "@/atlas/editor/toolbarActions";
 import { secretMarkerIds } from "@/atlas/content/dmMarkup";
-import { parseCharacterKeys } from "@/atlas/secrets/characterKeysFile";
+import { characterKeysPath, parseCharacterKeys } from "@/atlas/secrets/characterKeysFile";
 
 /**
  * - `conflict`: Save hit a stale-base 409; the banner offers the rebase.
@@ -127,7 +127,7 @@ export function EntityEditPanel({
   useEffect(() => {
     const parts = sourcePath.replace(/\\/g, "/").split("/");
     if (parts.length < 2) return;
-    const keysPath = `${parts[0]}/${parts[1]}/_dm/character-keys.yaml`;
+    const keysPath = characterKeysPath(parts[0], parts[1]);
     readSourceFile(keysPath, fetch)
       .then((content) => {
         const parsed = parseCharacterKeys(content);

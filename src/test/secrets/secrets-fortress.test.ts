@@ -14,6 +14,7 @@ import os from "node:os";
 import path from "node:path";
 import { runBuildCli, type InProcessRun } from "../helpers/buildInProcess";
 import { run as checkPlayerSecrets } from "../../../scripts/check-player-secrets";
+import { decryptSecret, type SecretBlob } from "@/atlas/secrets/secretCrypto";
 
 const ROOT = path.resolve(__dirname, "../../..");
 // Builds from the repo root, as the CLI did; the vault comes in via --config.
@@ -116,6 +117,12 @@ describe("secrets fortress", () => {
     expect(secrets).toBeDefined();
     expect(secrets!.some((s) => "reveal" in s)).toBe(false);
     expect(secrets!.some((s) => "password" in s)).toBe(false);
+    // The character secret is encrypted with vesper's key from the world's
+    // _dm/character-keys.yaml (where the editor saves it), not skipped.
+    const signet = secrets!.find((s) => s.id === "signet") as SecretBlob | undefined;
+    expect(signet, `${result.stdout}\n${result.stderr}`).toBeDefined();
+    expect(await decryptSecret(signet!, "vesper-secret-key-abc")).toBe("you know the ring");
+    expect(`${result.stdout}\n${result.stderr}`).not.toContain('no character key for "vesper"');
 
     // Search index must not contain unstripped markers.
     const searchText = fs.readFileSync(path.join(out, "search-index.json"), "utf8");

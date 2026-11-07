@@ -2,14 +2,24 @@ import yaml from "js-yaml";
 
 /**
  * The one reader and writer for `content/<world>/_dm/character-keys.yaml`
- * (DM-only: character name -> secret key). Used by the Character Keys panel and
- * by the entity panel's "for:" dropdown. The build reads the file on its own in
- * `scripts/build-atlas.ts` (strings only); `serializeCharacterKeys` always
- * writes strings, so every key saved here reaches it.
+ * (DM-only: character name -> secret key). Used by the Character Keys panel,
+ * the entity panel's "for:" dropdown and the build (`scripts/build-atlas.ts`),
+ * which all find the file with `characterKeysPath` and read it with
+ * `parseCharacterKeys`. Pure (js-yaml only), so the build script can import it.
  *
  * Nothing here logs, and error messages never quote the file, so key values
  * stay out of consoles and toasts.
  */
+
+/**
+ * Where a world's character keys live: `<contentRoot>/<world>/_dm/character-keys.yaml`.
+ * `contentRoot` is a path as the caller uses it (`content` in the editor, the
+ * absolute content folder in the build); joined with `/`, which Node accepts
+ * on Windows too.
+ */
+export function characterKeysPath(contentRoot: string, world: string): string {
+  return `${contentRoot.replace(/[\\/]+$/, "")}/${world}/_dm/character-keys.yaml`;
+}
 
 export interface CharacterKeyEntry {
   name: string;
