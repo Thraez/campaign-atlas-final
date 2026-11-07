@@ -181,6 +181,7 @@ describe("publish mode: a missing artifact fails every scan (R-03)", () => {
     put("public/atlas/atlas.json", atlas);
     put("public/atlas/assets/maps/world.png", "png");
     put("content/world/place.md", "# Place");
+    put("atlas.config.json", JSON.stringify({ contentRoot: "content" }));
   }
 
   beforeEach(() => {
@@ -208,6 +209,18 @@ describe("publish mode: a missing artifact fails every scan (R-03)", () => {
       expect(own.length, s.id).toBeGreaterThan(0);
       for (const t of own) expect(t.requires.length, t.label).toBeGreaterThan(0);
     }
+  });
+
+  it("the secret-name and fog scans also need the config, and content/ for secret names", () => {
+    const tasks = scanTasks(ctx);
+    const needs = (id: string) =>
+      tasks.filter((t) => t.scan === id).map((t) => t.requires.map((a) => a.path));
+    for (const id of ["check-derived-secrets", "check-image-privacy"]) {
+      for (const paths of needs(id)) {
+        expect(paths, id).toEqual(expect.arrayContaining([ctx.configPath, ctx.contentDir]));
+      }
+    }
+    for (const paths of needs("check-fog-safety")) expect(paths).toContain(ctx.configPath);
   });
 
   it("the full fixture has every listed artifact (the control)", () => {

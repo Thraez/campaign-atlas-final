@@ -116,12 +116,14 @@ function perDir(
   id: ScanId,
   ctx: ScanContext,
   run: (dir: string, label: string, layout: ArtifactLayout) => number | Promise<number>,
+  /** Inputs besides the artifact, the same for both dirs (config, content/). */
+  extra: RequiredArtifact[] = [],
 ): TaskSpec[] {
   return artifactDirs(ctx).map(([label, d, layout]) => ({
     label: `${id} ${label}`,
     // The player atlas.json is in every player artifact; without it the dir
     // is not a build, whatever else it holds.
-    requires: [file(playerAtlasJsonPath(d, layout))],
+    requires: [file(playerAtlasJsonPath(d, layout)), ...extra],
     run: () => run(d, label, layout),
   }));
 }
@@ -136,8 +138,12 @@ export const SCANS: ScanEntry[] = [
     id: "check-derived-secrets",
     script: "check-derived-secrets.ts",
     tasks: (ctx) =>
-      perDir("check-derived-secrets", ctx, (dir) =>
-        checkDerivedSecrets({ dir, config: ctx.configPath }),
+      perDir(
+        "check-derived-secrets",
+        ctx,
+        (dir) => checkDerivedSecrets({ dir, config: ctx.configPath }),
+        // Secret names come from content/: with none, every artifact is "clean".
+        [file(ctx.configPath), dir(ctx.contentDir)],
       ),
   },
   {
@@ -160,20 +166,29 @@ export const SCANS: ScanEntry[] = [
     // On the source store, only images the player JSON names are checked by
     // filename: the rest stay in the DM's store and the player build prunes them.
     tasks: (ctx) =>
-      perDir("check-image-privacy", ctx, (dir, label) =>
-        checkImagePrivacy({
-          dir,
-          config: ctx.configPath,
-          ...(label === "public/atlas" ? { referencedBy: dir } : {}),
-        }),
+      perDir(
+        "check-image-privacy",
+        ctx,
+        (dir, label) =>
+          checkImagePrivacy({
+            dir,
+            config: ctx.configPath,
+            ...(label === "public/atlas" ? { referencedBy: dir } : {}),
+          }),
+        // The filename check matches secret names derived from content/.
+        [file(ctx.configPath), dir(ctx.contentDir)],
       ),
   },
   {
     id: "check-fog-safety",
     script: "check-fog-safety.ts",
     tasks: (ctx) =>
-      perDir("check-fog-safety", ctx, (dir, _label, layout) =>
-        checkFogSafety({ dir, config: ctx.configPath, layout }),
+      perDir(
+        "check-fog-safety",
+        ctx,
+        (dir, _label, layout) => checkFogSafety({ dir, config: ctx.configPath, layout }),
+        // Without the config the in-fog and alpha checks are skipped.
+        [file(ctx.configPath)],
       ),
   },
   {

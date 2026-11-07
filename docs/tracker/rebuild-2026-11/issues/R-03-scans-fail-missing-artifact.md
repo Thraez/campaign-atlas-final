@@ -14,7 +14,10 @@ publish could go green with nothing checked.
   (`runPublishScans`) reads the same list. No flag or env var was needed.
 - Each task in `scripts/atlas/scanRegistry.ts` lists the artifacts it scans (`requires`): the
   player `atlas.json` for the artifact scans (via `playerAtlasJsonPath(dir, layout)`), `content/`
-  for `check-vault-content`, `public/atlas/assets/` and `content/` for `audit-assets`.
+  for `check-vault-content`, `public/atlas/assets/` and `content/` for `audit-assets`. Review
+  hardening: `check-derived-secrets` and `check-image-privacy` also need `atlas.config.json` and
+  `content/` (they derive secret names from it and pass with none), `check-fog-safety` needs
+  `atlas.config.json` (without it the in-fog and alpha checks are skipped).
   `scanTasks` fails a task with exit 20 and names the path when a listed file is missing or empty,
   or a listed dir is missing or empty, before the scan runs. The Publish check shows a
   missing-artifact reason with the path as its locator.

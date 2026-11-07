@@ -141,7 +141,9 @@ If any scanner finds a problem, the publish chain fails before deploy.
 (`scripts/atlas/scanRegistry.ts`) is a publish run: `atlas:scan` runs only inside `atlas:publish`
 (so inside `npm run gate`) and the deploy workflow, and the editor's Publish check reads the same
 list. Each scan names the artifacts it reads: the player `atlas.json` (`dist/atlas/atlas.json` or
-`public/atlas/atlas.json`) for the artifact scans, `content/` for `check-vault-content`, and
+`public/atlas/atlas.json`) for the artifact scans, plus `atlas.config.json` and `content/` for
+`check-derived-secrets` and `check-image-privacy` (the secret names come from it) and
+`atlas.config.json` for `check-fog-safety`; `content/` for `check-vault-content`; and
 `public/atlas/assets/` plus `content/` for `audit-assets`. When one is missing or empty, the scan
 fails with exit 20 and names the path, without running: a publish never passes on "0 files
 checked". Run by hand (`npm run atlas:check-secrets dist` and the like), a scan still skips a dir
