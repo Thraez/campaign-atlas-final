@@ -279,11 +279,12 @@ function variantShape(): VariantResult {
   );
 }
 
-// ---- Variant 6: plaintext field on a player secret (check-player-secrets) ---
-function variantPlayerSecret(): VariantResult {
+// ---- Variants 6a/6b: what check-player-secrets guards, one fault each -------
+/** Clean = the real atlas in the built-site layout; dirty = it plus one planted entity. */
+function variantPlayerSecret(name: string, plant: Record<string, unknown>): VariantResult {
   const atlas = readPlayerAtlas();
   return assertCleanThenDirty(
-    "Forbidden field on a player secret",
+    name,
     "check-player-secrets.ts",
     () => {
       const dir = freshDir("player-secret-clean");
@@ -294,8 +295,7 @@ function variantPlayerSecret(): VariantResult {
       const dir = freshDir("player-secret-dirty");
       const dirty = readPlayerAtlas();
       const entities = Array.isArray(dirty.entities) ? (dirty.entities as unknown[]) : [];
-      // A secret that kept its plaintext reveal: the strip the scan guards.
-      entities.push({ id: "smoke-entity", secrets: [{ id: "s", reveal: "SMOKE_PLAINTEXT" }] });
+      entities.push(plant);
       dirty.entities = entities;
       writeBuiltSite(dir, dirty);
       return runScan("check-player-secrets.ts", [dir]);
@@ -343,7 +343,18 @@ async function main(): Promise<number> {
   results.push(await variantExif());
   results.push(variantFog());
   results.push(variantShape());
-  results.push(variantPlayerSecret());
+  results.push(
+    variantPlayerSecret("Forbidden field on a player secret", {
+      id: "smoke-entity",
+      secrets: [{ id: "s", reveal: "SMOKE_PLAINTEXT" }],
+    }),
+  );
+  results.push(
+    variantPlayerSecret("Unstripped secret marker", {
+      id: "smoke-entity",
+      body: "{{secret:SMOKE_TEST_SECRET}}",
+    }),
+  );
   results.push(variantPlayerFiles());
 
   const pad = Math.max(...results.map((r) => r.name.length));

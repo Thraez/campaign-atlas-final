@@ -174,6 +174,36 @@ describe("check-fog-safety", () => {
     expect(await run({ dir, config })).toBe(13);
   });
 
+  it.each([".webp", ".jpg"])(
+    "image-leak (13): a %s original ships beside the redacted one in dist",
+    async (ext) => {
+      const config = writeSourceConfig(CLEAN_WORLD_YAML);
+      const dir = plant("dist", fogAtlas(), {
+        [FOG_FILE]: await png(0),
+        [`assets/maps/world${ext}`]: Buffer.from("not really an image"),
+      });
+      expect(await run({ dir, config })).toBe(13);
+    },
+  );
+
+  it("a built site with no atlas/atlas.json fails (17) when the layout is given", async () => {
+    const dir = path.join(root, "dist");
+    fs.mkdirSync(dir);
+    fs.writeFileSync(path.join(dir, "index.html"), "<html>");
+    expect(await run({ dir, layout: "built-site" })).toBe(17);
+  });
+
+  it("a built site is not read from <dir>/atlas.json when the layout is given", async () => {
+    const dir = plant("store", fogAtlas()); // atlas.json at the top, as the store has it
+    expect(await run({ dir, layout: "built-site" })).toBe(17);
+  });
+
+  it("a store with no atlas.json is skipped (exit 0)", async () => {
+    const dir = path.join(root, "public", "atlas");
+    fs.mkdirSync(dir, { recursive: true });
+    expect(await run({ dir, layout: "store" })).toBe(0);
+  });
+
   it("the original map beside the redacted one in the source store is not a leak", async () => {
     // public/atlas is the DM's store: the build reads the original from there,
     // and the player build prunes it from dist.

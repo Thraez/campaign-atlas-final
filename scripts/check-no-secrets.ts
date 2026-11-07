@@ -75,7 +75,7 @@ export function scanFile(file: string): ScanHit[] {
 
 export function scanDir(dir: string): ScanResult {
   const result: ScanResult = { files: 0, dmHits: [], editorHits: [] };
-  for (const file of listTextFiles(dir, "check-no-secrets")) {
+  for (const file of listTextFiles(dir, "check-no-secrets").files) {
     result.files += 1;
     for (const h of scanFile(file)) {
       if (h.kind === "dm") result.dmHits.push(h);

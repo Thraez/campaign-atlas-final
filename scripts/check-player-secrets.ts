@@ -8,20 +8,24 @@
  * It does not search for a secret's plaintext itself.
  *
  * The dir is the built site (`dist`, JSON in `dist/atlas/`) or the source store
- * (`public/atlas`); see `atlas/playerArtifact.ts`.
+ * (`public/atlas`); see `atlas/playerArtifact.ts`. The scan registry passes
+ * which one; run by hand, the layout is inferred from where atlas.json sits.
  *
  * Exit codes:
  *   0   clean, or no `<dir>` at all
- *   13  leak found, or atlas.json / search-index.json is not valid JSON (so it
- *       cannot be checked)
+ *   13  leak found, or something that cannot be checked: atlas.json or
+ *       search-index.json not valid JSON, a built site (`layout: "built-site"`)
+ *       with no `atlas/atlas.json`, a file or dir that cannot be read
  */
 import fs from "node:fs";
 import path from "node:path";
 import { hasSecretMarker } from "../src/atlas/content/dmMarkup";
-import { listTextFiles, locatePlayerAtlas } from "./atlas/playerArtifact";
+import { listTextFiles, locatePlayerAtlas, type ArtifactLayout } from "./atlas/playerArtifact";
 
 export interface RunOpts {
   dir: string;
+  /** Where atlas.json must be; inferred when absent (a run by hand). */
+  layout?: ArtifactLayout;
 }
 
 /** Fields that must not appear on a PlayerSecret object in any player artifact. */
@@ -71,22 +75,29 @@ export function run(opts: RunOpts): number {
 
   const allHits: string[] = [];
 
-  const located = locatePlayerAtlas(dir);
+  const located = locatePlayerAtlas(dir, opts.layout);
   if (located) {
     allHits.push(...scanJson(located.atlasJson, scanAtlasJson));
     const searchIndex = path.join(located.atlasDir, "search-index.json");
+    // Parsed for validity only: its markers are found by the text scan below.
     if (fs.existsSync(searchIndex)) allHits.push(...scanJson(searchIndex, () => []));
+  } else if (opts.layout === "built-site") {
+    allHits.push(`${dir}: no atlas/atlas.json, so the built site cannot be checked`);
   }
 
-  // Every text file, the player JSON included, for unstripped markers.
-  for (const file of listTextFiles(dir, "check-player-secrets")) {
+  // Every text file, the player JSON included, for unstripped markers. What
+  // cannot be read cannot be certified.
+  const { files, unreadable } = listTextFiles(dir, "check-player-secrets");
+  for (const d of unreadable) allHits.push(`${d}: dir could not be read`);
+  for (const file of files) {
+    let text: string;
     try {
-      if (hasSecretMarker(fs.readFileSync(file, "utf8"))) {
-        allHits.push(`${file}: contains unstripped {{secret:}} marker`);
-      }
-    } catch {
-      /* unreadable file — skip */
+      text = fs.readFileSync(file, "utf8");
+    } catch (err) {
+      allHits.push(`${file}: could not be read (${(err as Error).message})`);
+      continue;
     }
+    if (hasSecretMarker(text)) allHits.push(`${file}: contains unstripped {{secret:}} marker`);
   }
 
   if (allHits.length > 0) {

@@ -177,7 +177,7 @@ export function scanArtifactForSecrets(dir: string, secrets: SecretEntry[]): Der
   // "Isle De Marque", while a name inside a longer word ("Mira" in
   // "miracle") is not.
   const patterns = secrets.map((s) => ({ s, re: wholeWordPattern(s.name) }));
-  const files = listTextFiles(dir, "check-derived-secrets");
+  const files = listTextFiles(dir, "check-derived-secrets").files;
   for (const full of files) {
     let text: string;
     try {

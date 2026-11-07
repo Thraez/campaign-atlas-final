@@ -23,13 +23,24 @@ describe("locatePlayerAtlas", () => {
   it("finds atlas.json at the top of the source store (public/atlas)", () => {
     const file = write("public/atlas/atlas.json");
     const dir = path.join(root, "public", "atlas");
-    expect(locatePlayerAtlas(dir)).toEqual({ atlasDir: dir, atlasJson: file });
+    expect(locatePlayerAtlas(dir)).toEqual({ atlasDir: dir, atlasJson: file, layout: "store" });
   });
 
   it("finds atlas.json under atlas/ in the built site (dist)", () => {
     const file = write("dist/atlas/atlas.json");
     const dir = path.join(root, "dist");
-    expect(locatePlayerAtlas(dir)).toEqual({ atlasDir: path.join(dir, "atlas"), atlasJson: file });
+    expect(locatePlayerAtlas(dir)).toEqual({
+      atlasDir: path.join(dir, "atlas"),
+      atlasJson: file,
+      layout: "built-site",
+    });
+  });
+
+  it("looks only where the given layout keeps atlas.json", () => {
+    write("dist/atlas.json");
+    expect(locatePlayerAtlas(path.join(root, "dist"), "built-site")).toBeNull();
+    write("public/atlas/atlas/atlas.json");
+    expect(locatePlayerAtlas(path.join(root, "public", "atlas"), "store")).toBeNull();
   });
 
   it("is null when neither layout has an atlas.json", () => {
@@ -58,6 +69,9 @@ describe("listTextFiles", () => {
     const a = write("site/index.html", "<html>");
     const b = write("site/atlas/atlas.json");
     write("site/atlas/assets/maps/world.png", "png");
-    expect(listTextFiles(path.join(root, "site"), "test").sort()).toEqual([b, a].sort());
+    expect(listTextFiles(path.join(root, "site"), "test")).toEqual({
+      files: expect.arrayContaining([a, b]),
+      unreadable: [],
+    });
   });
 });

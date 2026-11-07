@@ -12,17 +12,27 @@ import fs from "node:fs";
 import path from "node:path";
 import { toAssetPath } from "./playerImageRefs";
 
+/** The built site keeps atlas.json in `<dir>/atlas/`; the source store at `<dir>/`. */
+export type ArtifactLayout = "built-site" | "store";
+
 export interface PlayerAtlas {
   /** The dir holding atlas.json (and search-index.json beside it). */
   atlasDir: string;
   atlasJson: string;
+  layout: ArtifactLayout;
 }
 
-/** The player atlas.json in `dir` (the store layout) or `dir/atlas` (the built site), else null. */
-export function locatePlayerAtlas(dir: string): PlayerAtlas | null {
-  for (const atlasDir of [dir, path.join(dir, "atlas")]) {
+/**
+ * The player atlas.json in `dir` for the given layout, or null when it is not
+ * there. With no layout (a scan run by hand), either one is accepted, the
+ * store's first; the scan registry always passes the layout.
+ */
+export function locatePlayerAtlas(dir: string, layout?: ArtifactLayout): PlayerAtlas | null {
+  const layouts: ArtifactLayout[] = layout ? [layout] : ["store", "built-site"];
+  for (const l of layouts) {
+    const atlasDir = l === "built-site" ? path.join(dir, "atlas") : dir;
     const atlasJson = path.join(atlasDir, "atlas.json");
-    if (fs.existsSync(atlasJson)) return { atlasDir, atlasJson };
+    if (fs.existsSync(atlasJson)) return { atlasDir, atlasJson, layout: l };
   }
   return null;
 }
@@ -49,17 +59,23 @@ export const TEXT_EXTENSIONS = new Set([
 ]);
 
 /**
- * Every text file (`TEXT_EXTENSIONS`) under `dir`, at any depth. A dir that
- * cannot be read is skipped with a warning naming `scan`.
+ * Every text file (`TEXT_EXTENSIONS`) under `dir`, at any depth, and the dirs
+ * that could not be read (each skipped with a warning naming `scan`; a scan
+ * that must fail closed fails on them).
  */
-export function listTextFiles(dir: string, scan: string): string[] {
+export function listTextFiles(
+  dir: string,
+  scan: string,
+): { files: string[]; unreadable: string[] } {
   const out: string[] = [];
+  const unreadable: string[] = [];
   const walk = (d: string) => {
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(d, { withFileTypes: true });
     } catch (err) {
       console.warn(`${scan}: skipped unreadable dir ${d}: ${(err as Error).message}`);
+      unreadable.push(d);
       return;
     }
     for (const e of entries) {
@@ -71,5 +87,5 @@ export function listTextFiles(dir: string, scan: string): string[] {
     }
   };
   walk(dir);
-  return out;
+  return { files: out, unreadable };
 }
