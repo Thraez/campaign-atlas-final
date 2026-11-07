@@ -18,6 +18,7 @@ This file covers what worked, what slowed us, and the tickets that follow from i
 
   Standards and Spec caught none of the four. When the safety lens re-checked its own fixes, two of
   three re-checks found something more.
+
 - **Invariant tests over case-by-case fixes.** The `publish: false` bypass got past a fix aimed at
   that one case. It was caught by a 144-case test: write a note, read it back, and check it is never
   more visible than its source. For anything touching visibility, ask the builder for the invariant
@@ -54,6 +55,7 @@ This file covers what worked, what slowed us, and the tickets that follow from i
 
    Replacements now used: the publish steps run one by one; `git -C <path> checkout -- .`; one plain
    command per call. A merge that conflicted in GitHub was resolved locally in a worktree.
+
 6. **Approvals relayed between sessions don't count.** One push waited until Isak said yes in that
    session's own chat. That is correct, but plan for it: a session that will need a push needs
    Isak's yes in its own chat.
@@ -70,8 +72,8 @@ This file covers what worked, what slowed us, and the tickets that follow from i
 
 ## Tickets
 
-| #   | Ticket                                                                  | Status           |
-| --- | ----------------------------------------------------------------------- | ---------------- |
-| 01  | [One local gate command](issues/01-one-gate-command.md)                 | ready-for-agent  |
-| 02  | [Agent docs match the merge flow](issues/02-agent-docs-match-merge-flow.md) | done         |
-| 03  | [No scheduled CI](issues/03-no-scheduled-ci.md)                         | ready-for-human  |
+| #   | Ticket                                                                      | Status          |
+| --- | --------------------------------------------------------------------------- | --------------- |
+| 01  | [One local gate command](issues/01-one-gate-command.md)                     | done            |
+| 02  | [Agent docs match the merge flow](issues/02-agent-docs-match-merge-flow.md) | done            |
+| 03  | [No scheduled CI](issues/03-no-scheduled-ci.md)                             | ready-for-human |

@@ -132,7 +132,23 @@
   border-bottom: 1px solid hsl(var(--border));
   background: linear-gradient(180deg, hsl(var(--card) / 0.96), hsl(var(--background) / 0.92));
   box-shadow: 0 10px 30px hsl(220 30% 3% / 0.32);
+  /* Stacking: above Leaflet (1-2) and the map overlays, below dialogs (z-50
+     portals). The blur lives on ::before: backdrop-filter on the header itself
+     would make it the containing block of the editor menu's fixed backdrop. */
+  position: relative;
+  z-index: 30;
+}
+.atlas-toolbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   backdrop-filter: blur(18px);
+}
+/* While the editor menu is open, sit above the z-[500] map overlays too. */
+.atlas-toolbar[data-menu-open="true"] {
+  z-index: 600;
 }
 .atlas-toolbar h1 {
   font-weight: 800;
@@ -307,10 +323,6 @@
   color: hsl(var(--primary) / 0.7);
   border-bottom: 1px dashed hsl(var(--primary) / 0.5);
   cursor: help;
-}
-.atlas-prose .atlas-planned-link-player {
-  color: hsl(var(--muted-foreground));
-  border-bottom: 1px dotted hsl(var(--muted-foreground) / 0.4);
 }
 .atlas-prose .atlas-wikilink-anchor {
   color: inherit;
@@ -520,7 +532,9 @@
   letter-spacing: 0.03em;
 }
 
-/* Accessibility: respect users who prefer reduced motion. */
+/* Accessibility: reduce motion when the OS asks for it or calm mode is on
+   (`<html data-calm>`, set by src/hooks/use-reduce-motion.ts). Keep the two
+   blocks identical. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
@@ -533,6 +547,18 @@
   .leaflet-zoom-anim .leaflet-zoom-animated {
     transition: none !important;
   }
+}
+:root[data-calm="true"] *,
+:root[data-calm="true"] *::before,
+:root[data-calm="true"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+:root[data-calm="true"] .leaflet-fade-anim .leaflet-tile,
+:root[data-calm="true"] .leaflet-zoom-anim .leaflet-zoom-animated {
+  transition: none !important;
 }
 
 /* Skip-to-main link, only visible on keyboard focus. */
@@ -617,6 +643,8 @@
 @media (prefers-reduced-motion: reduce) {
   .atlas-secret-sealed, .atlas-secret-open { transition: none !important; }
 }
+:root[data-calm="true"] .atlas-secret-sealed,
+:root[data-calm="true"] .atlas-secret-open { transition: none !important; }
 
 /* Print: hide app chrome and print only the open entity panel.
    Players who hit Ctrl+P / Cmd+P from /atlas get a clean handout

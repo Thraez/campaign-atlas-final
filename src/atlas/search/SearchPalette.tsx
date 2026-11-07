@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Search, MapPin, CalendarClock } from "lucide-react";
 import { Link } from "react-router";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
+import { FilterChip } from "@/atlas/FilterChip";
 import { snippet, highlightMatch } from "@/atlas/search/snippet";
 import { compileQuery, highlightTerm, searchEntries } from "@/atlas/search/search";
 import { sanitizeAtlasHtml } from "@/atlas/sanitizeHtml";
@@ -268,59 +269,57 @@ export function SearchPalette({
         </div>
 
         <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-border/50 bg-muted/20">
-          <button
+          <FilterChip
+            pressed={thisMapOnly}
             onClick={() => setThisMapOnly((v) => !v)}
-            className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded inline-flex items-center gap-1 ${thisMapOnly ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+            className="inline-flex items-center gap-1"
             title={
               thisMapOnly
                 ? "Showing only entities placed on the current map"
                 : "Search within all maps"
             }
-            aria-pressed={thisMapOnly}
           >
             <MapPin className="h-3 w-3" /> {thisMapOnly ? "this map" : "all maps"}
-          </button>
+          </FilterChip>
           {recentlyRevealed && recentlyRevealed.size > 0 && (
-            <button
+            <FilterChip
+              pressed={recentOnly}
               onClick={() => setRecentOnly((v) => !v)}
-              className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded inline-flex items-center gap-1 ${recentOnly ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
+              className="inline-flex items-center gap-1"
               title={`${recentlyRevealed.size} entities revealed since the last publish`}
-              aria-pressed={recentOnly}
             >
               <CalendarClock className="h-3 w-3" /> recent ({recentlyRevealed.size})
-            </button>
+            </FilterChip>
           )}
           <span className="w-full h-0" />
           {(allTypes.length > 1 || allTags.length > 0) && (
             <>
-              <button
-                onClick={() => setActiveType(null)}
-                className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded ${activeType === null ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
-              >
+              <FilterChip pressed={activeType === null} onClick={() => setActiveType(null)}>
                 all
-              </button>
+              </FilterChip>
               {allTypes.map(([t, n]) => {
                 const label = playerTypeLabel(t);
                 if (!label) return null;
                 return (
-                  <button
+                  <FilterChip
                     key={t}
+                    pressed={activeType === t}
                     onClick={() => setActiveType(activeType === t ? null : t)}
-                    className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
                   >
                     {label} <span className="opacity-60">{n}</span>
-                  </button>
+                  </FilterChip>
                 );
               })}
               {allTags.length > 0 && <span className="w-full h-0" />}
               {allTags.map(([t, n]) => (
-                <button
+                <FilterChip
                   key={t}
+                  variant="tag"
+                  pressed={activeTag === t}
                   onClick={() => setActiveTag(activeTag === t ? null : t)}
-                  className={`text-[10px] filter-chip px-2 py-0.5 rounded ${activeTag === t ? "bg-secondary text-secondary-foreground" : "bg-muted/60 hover:bg-accent"}`}
                 >
                   #{t} <span className="opacity-60">{n}</span>
-                </button>
+                </FilterChip>
               ))}
             </>
           )}

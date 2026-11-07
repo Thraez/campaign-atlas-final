@@ -1,7 +1,20 @@
 import { describe, it, expect } from "vitest";
+import { useMemo, useState } from "react";
 import { renderHook, act } from "@testing-library/react";
 import { useSoundscapeDraft } from "@/atlas/sound-editor/useSoundscapeDraft";
 import type { MapDocument } from "@/atlas/content/schema";
+
+const region = {
+  id: "r1",
+  mapId: "m",
+  name: "R",
+  points: [
+    [0, 0],
+    [10, 0],
+    [10, 10],
+  ],
+  visibility: "player",
+} as never;
 
 const map = (over: Partial<MapDocument> = {}): MapDocument =>
   ({
@@ -14,42 +27,44 @@ const map = (over: Partial<MapDocument> = {}): MapDocument =>
     ...over,
   }) as MapDocument;
 
+/** The hook as the editor wires it: every patch lands back on the map it reads. */
+function useWired(base: MapDocument) {
+  const [soundscape, setSoundscape] = useState(base.soundscape);
+  const m = useMemo(() => ({ ...base, soundscape }), [base, soundscape]);
+  return useSoundscapeDraft(m, base.soundscape, {
+    patch: (p) => {
+      if ("soundscape" in p) setSoundscape(p.soundscape);
+    },
+    unpatch: () => setSoundscape(base.soundscape),
+  });
+}
+
+const wired = (base: MapDocument) => renderHook(() => useWired(base)).result;
+
 describe("useSoundscapeDraft", () => {
   it("starts empty when the map has no soundscape", () => {
-    const { result } = renderHook(() => useSoundscapeDraft(map()));
+    const result = wired(map());
     expect(result.current.effective.areas ?? []).toEqual([]);
-    expect(result.current.dirty).toBe(false);
+    expect(result.current.dirtyCount).toBe(0);
+  });
+
+  it("counts no change on an untouched map whose saved soundscape is not normalized", () => {
+    expect(wired(map({ soundscape: { enabled: false, areas: [] } })).current.dirtyCount).toBe(0);
+    const blankName = { areas: [{ id: "s0", regionId: "r1", name: "", bed: { src: "a.ogg" } }] };
+    expect(wired(map({ regions: [region], soundscape: blankName })).current.dirtyCount).toBe(0);
   });
 
   it("adds a ride-on area for an existing region (defaults to one bed, no leak surface)", () => {
-    const { result } = renderHook(() =>
-      useSoundscapeDraft(
-        map({
-          regions: [
-            {
-              id: "r1",
-              mapId: "m",
-              name: "R",
-              points: [
-                [0, 0],
-                [10, 0],
-                [10, 10],
-              ],
-              visibility: "player",
-            } as never,
-          ],
-        }),
-      ),
-    );
+    const result = wired(map({ regions: [region] }));
     act(() => result.current.addRideOn("r1"));
     expect(result.current.effective.areas).toHaveLength(1);
     expect(result.current.effective.areas![0].regionId).toBe("r1");
     expect(result.current.effective.areas![0].bed.src).toBe(""); // empty until DM picks a file
-    expect(result.current.dirty).toBe(true);
+    expect(result.current.dirtyCount).toBe(1);
   });
 
   it("draws a sound-only zone and the new area defaults to visibility dm (secrecy-safe)", () => {
-    const { result } = renderHook(() => useSoundscapeDraft(map()));
+    const result = wired(map());
     act(() => result.current.startDraw());
     act(() => {
       result.current.addDraftPoint([0, 0]);
@@ -68,7 +83,7 @@ describe("useSoundscapeDraft", () => {
   });
 
   it("rejects a draw with fewer than 3 points", () => {
-    const { result } = renderHook(() => useSoundscapeDraft(map()));
+    const result = wired(map());
     act(() => result.current.startDraw());
     act(() => result.current.addDraftPoint([0, 0]));
     let id: string | null = "x";
@@ -79,25 +94,7 @@ describe("useSoundscapeDraft", () => {
   });
 
   it("patches a bed file + per-bed gain and the master gain", () => {
-    const { result } = renderHook(() =>
-      useSoundscapeDraft(
-        map({
-          regions: [
-            {
-              id: "r1",
-              mapId: "m",
-              name: "R",
-              points: [
-                [0, 0],
-                [10, 0],
-                [10, 10],
-              ],
-              visibility: "player",
-            } as never,
-          ],
-        }),
-      ),
-    );
+    const result = wired(map({ regions: [region] }));
     act(() => result.current.addRideOn("r1"));
     const id = result.current.effective.areas![0].id;
     act(() => result.current.patchBed(id, { src: "wind.ogg", gain: 0.4 }));
@@ -106,69 +103,23 @@ describe("useSoundscapeDraft", () => {
     expect(result.current.effective.masterGain).toBe(0.8);
   });
 
-  it("keeps one copy per id after the panel's patch feeds back into map.soundscape", () => {
-    // The editor persistence loop: SoundscapeTab pushes the effective config
-    // through patchMap({ soundscape }) which lands back on the SAME map this
-    // hook reads (mapOverride → activeMap.soundscape). The draft's added copy
-    // must supersede the fed-back canon copy — one entry per id, no spurious
-    // duplicate-id issue, and later edits still land on the live copy.
-    const region = {
-      id: "r1",
-      mapId: "m",
-      name: "R",
-      points: [
-        [0, 0],
-        [10, 0],
-        [10, 10],
-      ],
-      visibility: "player",
-    } as never;
-    const base = map({ regions: [region] });
-    const { result, rerender } = renderHook(({ m }: { m: MapDocument }) => useSoundscapeDraft(m), {
-      initialProps: { m: base },
-    });
+  it("keeps a name as typed, spaces included, while the DM types it", () => {
+    const result = wired(map({ regions: [region] }));
     act(() => result.current.addRideOn("r1"));
     const id = result.current.effective.areas![0].id;
-    // Feed the patched config back, as the live editor does.
-    const fedBack = map({
-      regions: [region],
-      soundscape: { areas: result.current.effective.areas },
-    });
-    rerender({ m: fedBack });
-    expect(result.current.effective.areas!.filter((a) => a.id === id)).toHaveLength(1);
-    expect(result.current.issues.filter((i) => i.code === "duplicate-sound-area-id")).toEqual([]);
-    // The draft copy still wins for subsequent edits.
-    act(() => result.current.patchBed(id, { src: "wind.ogg" }));
-    expect(result.current.effective.areas!.find((a) => a.id === id)!.bed.src).toBe("wind.ogg");
+    act(() => result.current.patchArea(id, { name: "Wind " }));
+    expect(result.current.effective.areas![0].name).toBe("Wind ");
   });
 
-  it("removes an area and reset() clears all local changes", () => {
-    const { result } = renderHook(() =>
-      useSoundscapeDraft(
-        map({
-          regions: [
-            {
-              id: "r1",
-              mapId: "m",
-              name: "R",
-              points: [
-                [0, 0],
-                [10, 0],
-                [10, 10],
-              ],
-              visibility: "player",
-            } as never,
-          ],
-        }),
-      ),
-    );
-    act(() => result.current.addRideOn("r1"));
-    const id = result.current.effective.areas![0].id;
-    act(() => result.current.remove(id));
+  it("removes an area and reset() puts the saved soundscape back", () => {
+    const saved = { areas: [{ id: "s0", regionId: "r1", bed: { src: "sea.ogg" } }] };
+    const result = wired(map({ regions: [region], soundscape: saved }));
+    act(() => result.current.remove("s0"));
     expect(result.current.effective.areas ?? []).toEqual([]);
+    expect(result.current.dirtyCount).toBe(1);
     act(() => result.current.addRideOn("r1"));
     act(() => result.current.reset());
-    expect(result.current.dirty).toBe(false);
-    expect(result.current.effective.areas ?? []).toEqual([]);
+    expect(result.current.dirtyCount).toBe(0);
+    expect(result.current.effective.areas).toEqual(saved.areas);
   });
 });

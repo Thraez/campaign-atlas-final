@@ -8,13 +8,12 @@ import {
   type SoundPrefs,
 } from "@/atlas/sound/soundPrefs";
 import { isWebAudioAvailable } from "@/atlas/sound/probeWebAudio";
-import { readPrefersReducedMotion } from "@/atlas/sound/prefersReducedMotion";
+import { useCalmMode } from "@/hooks/use-reduce-motion";
 
 interface SoundSettings extends SoundPrefs {
   engine: AudioEngine;
   enableSound: () => void;
   setMuted: (m: boolean) => void;
-  setCalmMode: (c: boolean) => void;
   setVolume: (v: number) => void;
   setMapMasterGain: (g: number) => void;
   /**
@@ -32,8 +31,6 @@ interface SoundSettings extends SoundPrefs {
   setAmbiencePlaying: (v: boolean) => void;
   /** False when the Web Audio API is unavailable in this environment. */
   audioAvailable: boolean;
-  /** True when the OS reports prefers-reduced-motion: reduce. Audio is unaffected. */
-  motionReduced: boolean;
 }
 
 /**
@@ -71,14 +68,11 @@ export function SoundSettingsProvider({
   children,
   deps = realAudioDeps,
   audioAvailable = isWebAudioAvailable(),
-  motionReduced = readPrefersReducedMotion(),
 }: {
   children: React.ReactNode;
   deps?: AudioDeps;
   /** Injected in tests to simulate environments without Web Audio. */
   audioAvailable?: boolean;
-  /** Injected in tests to simulate a reduced-motion OS preference. */
-  motionReduced?: boolean;
 }) {
   const [prefs, setPrefs] = useState<SoundPrefs>(() =>
     typeof window === "undefined" ? DEFAULT_PREFS : loadSoundPrefs(),
@@ -91,6 +85,9 @@ export function SoundSettingsProvider({
   const [ambiencePlaying, setAmbiencePlaying] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [resumeDismissed, setResumeDismissed] = useState(false);
+  // Calm mode is the site's reduce-motion switch (view settings); it also
+  // silences audio. The OS reduced-motion setting never does.
+  const calmMode = useCalmMode();
 
   const update = useCallback((patch: Partial<SoundPrefs>) => {
     setPrefs((prev) => {
@@ -100,18 +97,10 @@ export function SoundSettingsProvider({
     });
   }, []);
 
-  // Reflect calm mode or system reduced-motion onto <html> for the ocean CSS hook.
-  // Audio muting is driven only by prefs.muted || prefs.calmMode — never by motionReduced.
-  useEffect(() => {
-    const root = document.documentElement;
-    if (prefs.calmMode || motionReduced) root.setAttribute("data-calm", "true");
-    else root.removeAttribute("data-calm");
-  }, [prefs.calmMode, motionReduced]);
-
   // Mirror mute/calm into the engine; suspend the AudioContext after the gain
   // ramp settles so the browser can reclaim CPU/battery while silent.
   useEffect(() => {
-    const silenced = prefs.muted || prefs.calmMode;
+    const silenced = prefs.muted || calmMode;
     engine.setMuted(silenced);
     if (silenced) {
       // 0.2s ramp + 50ms headroom, then suspend.
@@ -123,7 +112,7 @@ export function SoundSettingsProvider({
       if (document.visibilityState === "visible") void engine.resume();
       return undefined;
     }
-  }, [engine, prefs.muted, prefs.calmMode]);
+  }, [engine, prefs.muted, calmMode]);
 
   // Push combined effective master gain = playerVolume × mapMasterGain.
   useEffect(() => {
@@ -135,14 +124,14 @@ export function SoundSettingsProvider({
   useEffect(() => {
     const onVis = () => {
       if (document.visibilityState === "visible") {
-        if (!prefs.muted && !prefs.calmMode) void engine.resume();
+        if (!prefs.muted && !calmMode) void engine.resume();
       } else {
         void engine.suspend();
       }
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [engine, prefs.muted, prefs.calmMode]);
+  }, [engine, prefs.muted, calmMode]);
 
   // Explicit enable from the invite button. If Web Audio can't start at all,
   // roll soundEnabled back to false. If the context stays suspended, keep
@@ -193,7 +182,6 @@ export function SoundSettingsProvider({
       engine,
       enableSound,
       setMuted: (m) => update({ muted: m }),
-      setCalmMode: (c) => update({ calmMode: c }),
       setVolume: (v) => update({ volume: Math.min(1, Math.max(0, v)) }),
       setMapMasterGain,
       audioUnlocked,
@@ -202,7 +190,6 @@ export function SoundSettingsProvider({
       ambiencePlaying,
       setAmbiencePlaying,
       audioAvailable,
-      motionReduced,
     }),
     [
       prefs,
@@ -214,7 +201,6 @@ export function SoundSettingsProvider({
       dismissResume,
       ambiencePlaying,
       audioAvailable,
-      motionReduced,
     ],
   );
 

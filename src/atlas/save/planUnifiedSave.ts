@@ -7,16 +7,19 @@
  * the current entity .md files, and `worldYaml.buildContent`, which composes
  * world.yaml from the page's draft state. No React, no toast, no writes.
  */
-import type { Entity } from "@/atlas/content/schema";
+import type { Entity, MapPlacement } from "@/atlas/content/schema";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import type { FileChange } from "@/atlas/save/localFsSave";
 import type { WorldYamlBaseline } from "@/atlas/save/useWorldYamlBaseline";
 import { buildAssetBinaryChanges, uploadsMissingBytes } from "@/atlas/save/buildSaveBatch";
 import {
   buildCanonicalPlacementChanges,
+  isRemoval,
+  type PlacementChange,
   type PlacementDraft,
 } from "@/atlas/save/canonicalPlacementSave";
 import { buildSavePlan } from "@/atlas/editor/saveGate";
+import { dropStaleTombstones, overrideKey } from "@/atlas/editor/placementOverrides";
 
 export interface UnifiedSaveState {
   /** Every effective placement on the active map (canon + local overrides). */
@@ -24,9 +27,13 @@ export interface UnifiedSaveState {
   /** Session override map; key presence (`${mapId}:${entityId}`) marks a placement dirty. */
   overrides: Record<string, unknown>;
   activeMapId: string;
-  /** N100: overrides keyed to a map other than the active one. */
-  foreignMapDrafts: readonly PlacementDraft[];
+  /** N100: overrides keyed to a map other than the active one, removals included (eval-45). */
+  foreignMapDrafts: readonly PlacementChange[];
   entitiesById: Map<string, Entity>;
+  /** Canon placements: a removal is written only where canon has one to delete. */
+  canonPlacements: readonly Pick<MapPlacement, "entityId" | "mapId">[];
+  /** The project's first map, where a legacy `atlas.x/y` placement lives. */
+  primaryMapId: string | null;
   /** null when no map / region / route / fog / layer tab has a dirty draft. */
   worldYaml: null | {
     /** world.yaml path for the active world; null when there is no active world. */
@@ -63,13 +70,18 @@ export async function planUnifiedSave(
   deps: UnifiedSaveDeps,
 ): Promise<UnifiedSavePlan> {
   const { worldYaml } = state;
+  // Stale tombstones (no canon placement to delete) are left out of the batch.
+  const canonKeys = new Set(state.canonPlacements.map((p) => overrideKey(p.mapId, p.entityId)));
+  const foreignMapDrafts = state.foreignMapDrafts.filter(
+    (d) => !isRemoval(d) || canonKeys.has(overrideKey(d.mapId, d.entityId)),
+  );
   const plan = buildSavePlan({
     allDraftPlacements: state.allDraftPlacements,
-    overrides: state.overrides,
+    overrides: dropStaleTombstones(state.overrides, state.canonPlacements),
     activeMapId: state.activeMapId,
     worldYamlDirty: worldYaml !== null,
   });
-  if (plan.isEmpty && state.foreignMapDrafts.length === 0) {
+  if (plan.isEmpty && foreignMapDrafts.length === 0) {
     return { kind: "nothing-to-save", message: "No changes to save" };
   }
 
@@ -100,9 +112,9 @@ export async function planUnifiedSave(
 
   // One FileChange per entity .md path, however many maps it is placed on.
   const changes: FileChange[] = await buildCanonicalPlacementChanges(
-    [...plan.dirtyPlacements, ...state.foreignMapDrafts],
+    [...plan.dirtyPlacements, ...plan.removals, ...foreignMapDrafts],
     state.entitiesById,
-    { fetchFn: deps.fetchFn },
+    { fetchFn: deps.fetchFn, primaryMapId: state.primaryMapId },
   );
 
   if (worldYaml && yamlPath !== null) {

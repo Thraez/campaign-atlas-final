@@ -464,3 +464,24 @@ describe("listbox semantics and activedescendant (Q30)", () => {
     expect(screen.getByRole("status")).toHaveTextContent("No results");
   });
 });
+
+describe("filter chips expose their pressed state", () => {
+  it("marks 'all' pressed, then the type chip once picked", () => {
+    renderPalette({ query: "" });
+    const all = screen.getByRole("button", { name: /^all$/i });
+    const person = screen.getByRole("button", { name: /^Person\b/ });
+    expect(all).toHaveAttribute("aria-pressed", "true");
+    expect(person).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(person);
+    expect(all).toHaveAttribute("aria-pressed", "false");
+    expect(person).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("gives tag chips a pressed state too", () => {
+    renderPalette({ query: "" });
+    const tag = screen.getByRole("button", { name: /^#water\b/ });
+    expect(tag).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(tag);
+    expect(tag).toHaveAttribute("aria-pressed", "true");
+  });
+});
