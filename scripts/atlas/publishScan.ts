@@ -17,7 +17,7 @@ import {
   type DerivedScanResult,
 } from "../check-derived-secrets";
 import { scanArtifactShape, type ShapeResult } from "../check-artifact-shape";
-import { scanTasks, type ScanContext, type ScanTask } from "./scanRegistry";
+import { missingArtifacts, scanTasks, type ScanContext, type ScanTask } from "./scanRegistry";
 import type { PublishScanReason } from "./publishTypes";
 
 export const MSG: Record<PublishScanReason["scan"], string> = {
@@ -41,6 +41,10 @@ export const MSG: Record<PublishScanReason["scan"], string> = {
     "A note synced from the Obsidian vault is in the atlas content while the repo is public. Publishing is blocked until hosting is private (H-04).",
   "audit-assets": "An image is larger than the 4 MB limit and must be optimized before publishing.",
 };
+
+/** A task whose artifact is missing or empty (R-03): nothing was checked. */
+export const MISSING_ARTIFACT_MSG =
+  "The build is missing a file this safety check needs, so nothing could be checked. Publishing is blocked until the build is rerun.";
 
 export function reasonsFromNoSecrets(r: ScanResult, target: string): PublishScanReason[] {
   const out: PublishScanReason[] = [];
@@ -111,6 +115,17 @@ function scanLevelReason(scan: PublishScanReason["scan"], target: string): Publi
  *  has a structured export; otherwise one scan-level row. */
 function reasonsForFailure(task: ScanTask, ctx: ScanContext): PublishScanReason[] {
   const target = task.label.slice(task.scan.length + 1);
+  const scan = task.scan === "check-no-secrets" ? "check-no-secrets-dm" : task.scan;
+  const missing = task.requires.filter((a) => missingArtifacts({ requires: [a] }).length > 0);
+  if (missing.length > 0) {
+    return missing.map((a) => ({
+      scan,
+      target,
+      severity: "blocking",
+      message: MISSING_ARTIFACT_MSG,
+      locator: { file: path.relative(ctx.root, a.path).split(path.sep).join("/") },
+    }));
+  }
   const dir = path.join(ctx.root, target);
   let structured: PublishScanReason[] = [];
   if (task.scan === "check-no-secrets") {
@@ -129,7 +144,6 @@ function reasonsForFailure(task: ScanTask, ctx: ScanContext): PublishScanReason[
     }
   }
   if (structured.length > 0) return structured;
-  const scan = task.scan === "check-no-secrets" ? "check-no-secrets-dm" : task.scan;
   return [scanLevelReason(scan, target)];
 }
 

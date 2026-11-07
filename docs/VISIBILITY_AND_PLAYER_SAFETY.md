@@ -130,12 +130,22 @@ What each scanner catches:
 - **`check-image-privacy`** (`npm run atlas:check-image-privacy`) — catches two image-specific leak vectors a text scan can't see: leftover EXIF/IPTC/XMP metadata on a shipped image, and a filename that itself contains a derived-secret name.
 - **`check-fog-safety`** (`npm run atlas:check-fog`) — re-derives the fog boundary from the source `world.yaml` and asserts the player artifacts don't leak it: the original (un-redacted) layer PNG, unstripped fog geometry, a player pin/route/region inside the fogged area, or a redacted PNG that's still opaque at a fogged pixel.
 - **`check-player-secrets`** — verifies no secret plaintext, passphrase, character key, or unstripped `{{secret:}}` marker reached the player artifacts. Runs only inside the orchestrator — there is no standalone `atlas:check-player-secrets` npm alias.
-- **`check-player-files`** — fails when `dist/atlas/` is missing from a built `dist/` or holds any file outside the player allowlist (`scripts/atlas/playerFiles.ts`: the atlas JSON, images anywhere under `atlas/` except `assets/audio/`, the hashed audio `atlas.json` references, and empty `.gitkeep` files; not the audio manifest, which only the editor reads). Vite copies all of `public/atlas/` into `dist/`, so a DM file dropped there (a `world.yaml`, a note) would otherwise ship. The player build's prune plugin already removes such files; this scan fails closed if one gets through. Runs only inside the orchestrator.
+- **`check-player-files`** — fails when `dist/atlas/atlas.json` is missing from a built `dist/` or `dist/atlas/` holds any file outside the player allowlist (`scripts/atlas/playerFiles.ts`: the atlas JSON, images anywhere under `atlas/` except `assets/audio/`, the hashed audio `atlas.json` references, and empty `.gitkeep` files; not the audio manifest, which only the editor reads). Vite copies all of `public/atlas/` into `dist/`, so a DM file dropped there (a `world.yaml`, a note) would otherwise ship. The player build's prune plugin already removes such files; this scan fails closed if one gets through. Runs only inside the orchestrator.
 - **`check-vault-content`** (`npm run atlas:check-vault-content`, exit 19) — while `atlas.config.json` has `"hosting": "public"`, fails when `content/` holds a note from the DM's vault (Sync's `atlas.source: vault` marker, the sync map, or a hash match against this machine's vault) or any symlink. It doesn't look at maps, images or `world.yaml`. Details: [IMPORT_EXPORT.md](IMPORT_EXPORT.md), "Hosting guard".
 
 Separately, **`audit-assets`** (`npm run atlas:audit-assets`) isn't a safety scanner — it's a content-quality check: oversize images, orphaned files, and broken asset references.
 
 If any scanner finds a problem, the publish chain fails before deploy.
+
+**A missing artifact fails the scan (R-03).** Every run through the scan registry
+(`scripts/atlas/scanRegistry.ts`) is a publish run: `atlas:scan` runs only inside `atlas:publish`
+(so inside `npm run gate`) and the deploy workflow, and the editor's Publish check reads the same
+list. Each scan names the artifacts it reads: the player `atlas.json` (`dist/atlas/atlas.json` or
+`public/atlas/atlas.json`) for the artifact scans, `content/` for `check-vault-content`, and
+`public/atlas/assets/` plus `content/` for `audit-assets`. When one is missing or empty, the scan
+fails with exit 20 and names the path, without running: a publish never passes on "0 files
+checked". Run by hand (`npm run atlas:check-secrets dist` and the like), a scan still skips a dir
+that isn't built yet. Tests: `scanRegistry.test.ts`.
 
 ## Folder-level exclusion
 

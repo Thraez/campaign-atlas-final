@@ -6,9 +6,19 @@
  * everywhere or nowhere. `scanRegistry.test.ts` fails when a scanner script
  * isn't listed here, or when a listed scan has no integrity-smoke variant and
  * no reason for lacking one.
+ *
+ * Publish mode (R-03). Every run through this registry is a publish run: the
+ * orchestrator only runs inside `atlas:publish` (so the gate) and the deploy
+ * workflow, and `runPublishScans` is the editor's Publish check. So every task
+ * names the artifacts it scans (`requires`), and `scanTasks` fails a task whose
+ * artifact is missing or empty, naming the path, before the scan runs: a scan
+ * never reports "0 files checked, ok" on a publish. Run by hand
+ * (`npm run atlas:check-secrets dist` and the like), a scan keeps its own
+ * lenient behaviour for a dir that isn't built yet.
  */
+import fs from "node:fs";
 import path from "node:path";
-import type { ArtifactLayout } from "./playerArtifact.js";
+import { playerAtlasJsonPath, type ArtifactLayout } from "./playerArtifact.js";
 
 import { run as checkNoSecrets } from "../check-no-secrets.js";
 import { run as checkDerivedSecrets } from "../check-derived-secrets.js";
@@ -38,11 +48,24 @@ export interface ScanContext {
   contentDir: string;
 }
 
+/** An artifact a task scans: a file that must exist, or a dir that must hold something. */
+export interface RequiredArtifact {
+  path: string;
+  kind: "file" | "dir";
+}
+
 export interface ScanTask {
   scan: ScanId;
   label: string;
+  /** What the task scans; a publish fails the task when one is missing or empty. */
+  requires: RequiredArtifact[];
   run: () => number | Promise<number>;
 }
+
+/** Exit code of a task whose artifact is missing or empty (R-03). */
+export const MISSING_ARTIFACT_EXIT = 20;
+
+type TaskSpec = Omit<ScanTask, "scan">;
 
 interface ScanEntry {
   id: ScanId;
@@ -50,7 +73,35 @@ interface ScanEntry {
   script: string;
   /** Why the integrity smoke has no planted-fault variant, if it has none. */
   smokeSkip?: string;
-  tasks: (ctx: ScanContext) => Omit<ScanTask, "scan">[];
+  tasks: (ctx: ScanContext) => TaskSpec[];
+}
+
+const file = (p: string): RequiredArtifact => ({ path: p, kind: "file" });
+const dir = (p: string): RequiredArtifact => ({ path: p, kind: "dir" });
+
+/** Why `a` can't be scanned (missing, wrong kind, empty), or null when it can. */
+function artifactProblem(a: RequiredArtifact): string | null {
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(a.path);
+  } catch {
+    return `${a.path} is missing`;
+  }
+  if (a.kind === "file") {
+    if (!stat.isFile()) return `${a.path} is not a file`;
+    return stat.size === 0 ? `${a.path} is empty` : null;
+  }
+  if (!stat.isDirectory()) return `${a.path} is not a dir`;
+  try {
+    return fs.readdirSync(a.path).length === 0 ? `${a.path} is empty` : null;
+  } catch (e) {
+    return `${a.path} can't be read (${(e as Error).message})`;
+  }
+}
+
+/** Every artifact of `task` that is missing or empty, one line each. */
+export function missingArtifacts(task: Pick<ScanTask, "requires">): string[] {
+  return task.requires.flatMap((a) => artifactProblem(a) ?? []);
 }
 
 /** The built site and the source store it was copied from. */
@@ -65,10 +116,13 @@ function perDir(
   id: ScanId,
   ctx: ScanContext,
   run: (dir: string, label: string, layout: ArtifactLayout) => number | Promise<number>,
-): Omit<ScanTask, "scan">[] {
-  return artifactDirs(ctx).map(([label, dir, layout]) => ({
+): TaskSpec[] {
+  return artifactDirs(ctx).map(([label, d, layout]) => ({
     label: `${id} ${label}`,
-    run: () => run(dir, label, layout),
+    // The player atlas.json is in every player artifact; without it the dir
+    // is not a build, whatever else it holds.
+    requires: [file(playerAtlasJsonPath(d, layout))],
+    run: () => run(d, label, layout),
   }));
 }
 
@@ -92,6 +146,7 @@ export const SCANS: ScanEntry[] = [
     tasks: (ctx) => [
       {
         label: "check-artifact-shape public/atlas",
+        requires: [file(path.join(ctx.root, "public", "atlas", "atlas.json"))],
         run: () =>
           checkArtifactShape({
             atlasJsonPath: path.join(ctx.root, "public", "atlas", "atlas.json"),
@@ -137,6 +192,7 @@ export const SCANS: ScanEntry[] = [
     tasks: (ctx) => [
       {
         label: "check-player-files dist",
+        requires: [file(playerAtlasJsonPath(path.join(ctx.root, "dist"), "built-site"))],
         run: () => checkPlayerFiles({ dir: path.join(ctx.root, "dist") }),
       },
     ],
@@ -149,6 +205,7 @@ export const SCANS: ScanEntry[] = [
     tasks: (ctx) => [
       {
         label: "check-vault-content content",
+        requires: [dir(ctx.contentDir)],
         run: () =>
           checkVaultContent({
             root: ctx.root,
@@ -165,6 +222,7 @@ export const SCANS: ScanEntry[] = [
     tasks: (ctx) => [
       {
         label: "audit-assets public/atlas/assets",
+        requires: [dir(path.join(ctx.root, "public", "atlas", "assets")), dir(ctx.contentDir)],
         run: () =>
           auditAssets({
             assetsDir: path.join(ctx.root, "public", "atlas", "assets"),
@@ -176,8 +234,23 @@ export const SCANS: ScanEntry[] = [
   },
 ];
 
+/** Every task, in publish mode: one whose artifact is missing or empty fails
+ *  (MISSING_ARTIFACT_EXIT, the path named) without running its scan. */
 export function scanTasks(ctx: ScanContext): ScanTask[] {
-  return SCANS.flatMap((s) => s.tasks(ctx).map((t) => ({ ...t, scan: s.id })));
+  return SCANS.flatMap((s) =>
+    s.tasks(ctx).map((t) => ({
+      ...t,
+      scan: s.id,
+      run: () => {
+        const missing = missingArtifacts(t);
+        if (missing.length === 0) return t.run();
+        for (const m of missing) {
+          console.error(`${t.label}: ${m}, so there is nothing to check — failing the publish`);
+        }
+        return MISSING_ARTIFACT_EXIT;
+      },
+    })),
+  );
 }
 
 /** Run every task in parallel (scans are read-only). 0 when all are clean, else 1. */

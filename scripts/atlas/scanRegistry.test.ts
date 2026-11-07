@@ -7,8 +7,16 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { SCANS, scanTasks, runAll, type ScanTask } from "./scanRegistry";
-import { runPublishScans } from "./publishScan";
+import {
+  MISSING_ARTIFACT_EXIT,
+  SCANS,
+  missingArtifacts,
+  scanTasks,
+  runAll,
+  type ScanContext,
+  type ScanTask,
+} from "./scanRegistry";
+import { MISSING_ARTIFACT_MSG, runPublishScans } from "./publishScan";
 
 const SCRIPTS_DIR = path.resolve(__dirname, "..");
 const FIXTURE_CONTENT = path.resolve(__dirname, "../../src/test/fixtures/atlas-build/content");
@@ -70,6 +78,7 @@ describe("runAll", () => {
   const task = (label: string, code: number, ran: string[]): ScanTask => ({
     scan: "check-no-secrets",
     label,
+    requires: [],
     run: async () => {
       ran.push(label);
       return code;
@@ -92,6 +101,7 @@ describe("runAll", () => {
     const boom: ScanTask = {
       scan: "check-no-secrets",
       label: "boom",
+      requires: [],
       run: () => {
         throw new Error("x");
       },
@@ -128,6 +138,125 @@ describe("runPublishScans (the editor's Publish check)", () => {
     const reasons = await runPublishScans(root);
     expect(reasons.map((r) => r.scan)).toContain("check-player-secrets");
     expect(JSON.stringify(reasons)).not.toContain("vault-key");
+  });
+
+  it("blocks with the path when the built site is missing (R-03)", async () => {
+    const reasons = await runPublishScans(root);
+    const missing = reasons.filter((r) => r.message === MISSING_ARTIFACT_MSG);
+    expect(missing.map((r) => r.locator?.file)).toContain("dist/atlas/atlas.json");
+    expect(missing.map((r) => r.scan)).toEqual(
+      expect.arrayContaining(["check-player-files", "check-fog-safety", "check-no-secrets-dm"]),
+    );
+    // public/atlas/assets exists but is empty: the size audit has nothing to check.
+    expect(reasons).toContainEqual(
+      expect.objectContaining({
+        scan: "audit-assets",
+        message: MISSING_ARTIFACT_MSG,
+        locator: { file: "public/atlas/assets" },
+      }),
+    );
+  });
+});
+
+/**
+ * R-03: in publish mode a missing listed artifact fails every scan. One
+ * built-site fixture with every artifact a task lists; for each task and each
+ * artifact it lists, the artifact removed (and, separately, emptied) fails the
+ * task without running its scan, naming the path.
+ */
+describe("publish mode: a missing artifact fails every scan (R-03)", () => {
+  let root: string;
+  let ctx: ScanContext;
+
+  function writeBuiltSite(r: string) {
+    const put = (rel: string, body: string) => {
+      const abs = path.join(r, rel);
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, body);
+    };
+    const atlas = JSON.stringify({ version: "1", schemaVersion: 1, worlds: [], entities: [] });
+    put("dist/index.html", "<html>");
+    put("dist/atlas/atlas.json", atlas);
+    put("dist/atlas/search-index.json", "[]");
+    put("public/atlas/atlas.json", atlas);
+    put("public/atlas/assets/maps/world.png", "png");
+    put("content/world/place.md", "# Place");
+  }
+
+  beforeEach(() => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "scan-missing-"));
+    ctx = {
+      root,
+      configPath: path.join(root, "atlas.config.json"),
+      contentDir: path.join(root, "content"),
+    };
+    writeBuiltSite(root);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  const errors = () => vi.mocked(console.error).mock.calls.flat().join("\n");
+
+  it("every scan in the registry lists at least one artifact", () => {
+    const tasks = scanTasks(ctx);
+    for (const s of SCANS) {
+      const own = tasks.filter((t) => t.scan === s.id);
+      expect(own.length, s.id).toBeGreaterThan(0);
+      for (const t of own) expect(t.requires.length, t.label).toBeGreaterThan(0);
+    }
+  });
+
+  it("the full fixture has every listed artifact (the control)", () => {
+    for (const t of scanTasks(ctx)) expect(missingArtifacts(t), t.label).toEqual([]);
+  });
+
+  const cases = scanTasks({
+    root: "/r",
+    configPath: "/r/atlas.config.json",
+    contentDir: "/r/content",
+  }).flatMap((t) =>
+    t.requires.flatMap((a, i) =>
+      (["removed", "emptied"] as const).map((how) => ({
+        label: t.label,
+        rel: path.relative("/r", a.path),
+        i,
+        how,
+      })),
+    ),
+  );
+
+  it.each(cases)("$label fails when $rel is $how", async ({ label, rel, i, how }) => {
+    const task = scanTasks(ctx).find((t) => t.label === label)!;
+    const artifact = task.requires[i];
+    expect(path.relative(root, artifact.path)).toBe(rel);
+    if (how === "removed") {
+      fs.rmSync(artifact.path, { recursive: true, force: true });
+    } else if (artifact.kind === "file") {
+      fs.writeFileSync(artifact.path, "");
+    } else {
+      fs.rmSync(artifact.path, { recursive: true, force: true });
+      fs.mkdirSync(artifact.path);
+    }
+    expect(await task.run()).toBe(MISSING_ARTIFACT_EXIT);
+    expect(errors()).toContain(artifact.path);
+    expect(errors()).toContain(label);
+  });
+
+  it("a dist/atlas/ with no atlas.json fails every dist scan", async () => {
+    fs.rmSync(path.join(root, "dist", "atlas", "atlas.json"));
+    const distTasks = scanTasks(ctx).filter((t) => t.label.endsWith(" dist"));
+    expect(distTasks.length).toBeGreaterThanOrEqual(6);
+    for (const t of distTasks) expect(await t.run(), t.label).toBe(MISSING_ARTIFACT_EXIT);
+  });
+
+  it("runAll fails the publish when one artifact is missing", async () => {
+    fs.rmSync(path.join(root, "dist"), { recursive: true, force: true });
+    const tasks = scanTasks(ctx).filter((t) => t.label === "check-player-files dist");
+    expect(await runAll(tasks)).toBe(1);
   });
 });
 
