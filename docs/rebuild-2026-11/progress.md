@@ -86,8 +86,8 @@ sync map blocks saves of the notes it lists.
 
 ### Next (hand-off 2026-11-07, coordinator compacted 3x)
 
-1. Ask Isak (in the new chat) to push the five branches and open PRs with `pr-bodies/`; each
-   merge is a separate yes. Order R-01, Q-01, Q-02, Q-03, Q-04.
+1. Pushed and PRs open (Isak's yes, 2026-11-07): R-01 #111, Q-01 #112, Q-02 #113, Q-03 #114,
+   Q-04 #115. Not merged; each merge needs Isak's yes in the chat that merges. Order #111..#115.
 2. After push: add the State.md Morning queue entry (on R-01's branch or a docs branch).
 3. Fix later: `WORKFLOWS.md:22` still says "3 scanners" (now 14 scans after R-01).
 4. Q-01's first gate failed in test:ci with "entity y: unstripped {{secret:}}" (a test fixture,
