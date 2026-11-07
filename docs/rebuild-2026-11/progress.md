@@ -118,3 +118,15 @@ variant still drew a dotted "link" span. Not a resolver bug.
   notes folder (`p0docs-state-workflows.patch`), lands after #101 (both edit State.md); it also
   marks the provisional calls kept by Isak 2026-11-07 (relayed by the four-apps orchestrator).
 - Old-PR merges started: #109 gating.
+- Merged so far (gated each): #109 a2c4839, #110 884135f, #99 b011a19, #100 7ef5d34, #106 c9d47b1.
+  #102 conflict in vite-plugin-atlas-save.ts (both sides added a function; kept both, 6f066d9),
+  Opus review CLEAN, gate pass; chain 102 -> 103 -> 107 running (scratchpad `chain.sh`).
+- Remaining old PRs in order: #104 (conflict in AtlasViewer.tsx vs Q-02/Q-04), #105, #108, #101
+  (conflict in State.md; then apply `p0docs-state-workflows.patch` from the coordinator notes folder).
+- Builders running (Opus, medium): R-02 worktree `r02` (absent world.yaml visibility = dm, editor
+  must write explicit visibility, ADR-0001 addendum); R-03 worktree `r03` (publish mode fails every
+  scan on a missing artifact, folds arch-09). R-04 waits for a gate. R-05 after #101.
+- Push of this branch (rebuild-plan-2026-11) needs Isak's yes; not pushed.
+- 22:15 Merged #104 (0c54b4f), #105 (3c185b4, resolved AtlasPlacementEditor.tsx: kept eval-44 soundscape patch seam + mapClickTool), #108 (8f16f09). #101 gating.
+- R-02 Opus review CLEAN; ADR nit fixed (52ec3ab). Pre-existing leak confirmed, needs its own high-priority ticket: player `buildReport.warnings` carries world.yaml warnings naming dm region/route ids (build-atlas.ts:737, :1158; loadWorldConfig.ts warnings). Fix ~15 lines: in player builds replace world.yaml warnings with a count line.
+- 23:40 #101 merged (d9c3400): all 17 approved PRs merged. R-02 (merged main, conflicts in SoundscapeTab.tsx and buildFullWorldYaml.ts resolved keeping both), R-03, R-04 and docs follow-up (a24f765, State.md + WORKFLOWS 14 scans) all gate-green. Waiting on Isak's yes to push, open PRs and merge them. Then R-05 and the buildReport warnings leak ticket.
