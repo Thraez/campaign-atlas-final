@@ -46,6 +46,24 @@ export function isSecretVisibility(v: EntityVisibility): boolean {
   return !isPlayerVisible(v);
 }
 
+/**
+ * Spoiler-leak rule for world.yaml links (eval-46): a region or route that
+ * ships to players and names an entity leaks it unless that entity is
+ * player-visible too. An unknown entity (`undefined`) counts as a leak. The
+ * build, Publish Check and the region/route drafts all ask this.
+ */
+export function linkLeaksToPlayers(
+  itemVisibility: EntityVisibility,
+  targetVisibility: EntityVisibility | undefined,
+): boolean {
+  return isPlayerVisible(itemVisibility) && !(targetVisibility && isPlayerVisible(targetVisibility));
+}
+
+/** How a leak message names the target: "dm entity", "unknown entity". */
+export function linkTargetLabel(targetVisibility: EntityVisibility | undefined): string {
+  return `${targetVisibility ?? "unknown"} entity`;
+}
+
 /** Narrowing guard: is an arbitrary value one of the accepted visibilities? */
 export function isValidVisibility(v: unknown): v is EntityVisibility {
   return typeof v === "string" && (VALID_VISIBILITY as ReadonlySet<string>).has(v);

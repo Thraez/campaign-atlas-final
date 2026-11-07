@@ -59,6 +59,8 @@ const sample: SessionState = {
       },
     ],
   },
+  worldOverride: { w1: { name: "Renamed" } },
+  calendar: { value: { months: [{ name: "Frost", days: 30 }] } },
   savedAt: 1_700_000_000_000,
   entityEdit: null,
 };
@@ -92,9 +94,29 @@ const emptyBase = {
   routeByMap: {},
   fogByMap: {},
   layerByMap: {},
+  worldOverride: {},
+  calendar: null,
   savedAt: 1,
   entityEdit: null,
 };
+
+// eval-47: world settings and the calendar are session holders too.
+describe("world settings and calendar slices (backward compatible)", () => {
+  it("deserializes a v1 blob without them as empty, with no work", () => {
+    const { worldOverride: _w, calendar: _c, ...older } = emptyBase;
+    const s = deserializeSession({ version: 1, state: older })!;
+    expect(s.worldOverride).toEqual({});
+    expect(s.calendar).toBeNull();
+    expect(sessionHasWork(s)).toBe(false);
+  });
+  it("counts a non-empty world settings draft as work", () => {
+    expect(sessionHasWork({ ...emptyBase, worldOverride: { w1: { name: "Renamed" } } })).toBe(true);
+    expect(sessionHasWork({ ...emptyBase, worldOverride: { w1: {} } })).toBe(false);
+  });
+  it("counts any calendar draft as work, a cleared calendar included", () => {
+    expect(sessionHasWork({ ...emptyBase, calendar: { value: undefined } })).toBe(true);
+  });
+});
 
 describe("entityEdit slice (backward compatible)", () => {
   it("deserializes a v1 blob WITHOUT entityEdit (null default, no work)", () => {

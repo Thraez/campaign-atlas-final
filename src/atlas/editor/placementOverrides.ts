@@ -136,3 +136,21 @@ export function persistOverrides(overrides: Overrides): boolean {
     return false;
   }
 }
+
+/**
+ * Drop `null` overrides for placements canon doesn't have. A tombstone only
+ * means something when there is a canon placement to delete; before eval-45,
+ * removeCoord wrote one for draft-only pins too, so stored overrides can
+ * carry stale ones. Returns the same object when nothing is stale.
+ */
+export function dropStaleTombstones<T extends Record<string, unknown>>(
+  overrides: T,
+  canon: readonly { entityId: string; mapId: string }[],
+): T {
+  const canonKeys = new Set(canon.map((p) => overrideKey(p.mapId, p.entityId)));
+  const stale = Object.keys(overrides).filter((k) => overrides[k] === null && !canonKeys.has(k));
+  if (stale.length === 0) return overrides;
+  const next = { ...overrides };
+  for (const k of stale) delete next[k];
+  return next;
+}

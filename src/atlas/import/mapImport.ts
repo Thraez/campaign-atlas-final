@@ -15,6 +15,9 @@ import {
 } from "@/atlas/assets/mapLayerTarget";
 import { formatOfFileName, isJpegFormat } from "@/atlas/assets/imageEncoding";
 
+/** The file name the wizard downloads; the patch and README name it too. */
+export const MAP_IMPORT_ZIP_NAME = "atlas-map-import.zip";
+
 export type ImportMode = "layers" | "per-image" | "world-plus-regional" | "variants" | "custom";
 
 export type SizingMode =
@@ -405,7 +408,7 @@ export function buildPatchFile(plan: ImportPlan): string {
       notes: [
         "If a map id below already exists in world.yaml, REPLACE that entry.",
         "Otherwise APPEND it to the maps: list.",
-        "Image files for these layers live in atlas-assets.zip — extract into the repo root.",
+        `Image files for these layers are in ${MAP_IMPORT_ZIP_NAME}, at their repo paths.`,
       ],
     }) + yaml
   );
@@ -418,7 +421,7 @@ export function buildReadme(plan: ImportPlan, images: ImportImage[]): string {
     `Generated: ${new Date().toISOString()}`,
     "",
     "## 1. Asset files",
-    "Extract `atlas-assets.zip` at the repo root. It contains:",
+    `Copy these files from \`${MAP_IMPORT_ZIP_NAME}\` into the repo, at the same paths:`,
     "",
     ...plan.assets.map((a) => {
       const img = images.find((i) => i.id === a.sourceImageId);

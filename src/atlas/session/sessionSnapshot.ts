@@ -12,7 +12,7 @@
 import type { MapDocument } from "@/atlas/content/schema";
 import type { RegionDraft } from "@/atlas/regions/useRegionDraft";
 import type { RouteDraft } from "@/atlas/routes/useRouteDraft";
-import type { FogOverlay } from "@/atlas/content/schema";
+import type { FogOverlay, World, WorldCalendar } from "@/atlas/content/schema";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import type { PinOverride } from "@/atlas/pins/presets";
 import type { EntityEditSnapshot } from "@/atlas/categories/useEntityEditDraft";
@@ -21,6 +21,9 @@ export const SESSION_SCHEMA_VERSION = 1;
 
 export type OverrideValue = { x: number; y: number; label?: string; pin?: PinOverride };
 export type Overrides = Record<string, OverrideValue | null>;
+/** The world calendar draft. null = no draft, use canon; a value (its `value`
+ *  may be undefined: the DM cleared the calendar) = edited this session. */
+export type CalendarDraft = { value: WorldCalendar | undefined } | null;
 
 export interface SessionState {
   /** key = `${mapId}:${entityId}` */
@@ -31,6 +34,10 @@ export interface SessionState {
   /** null slice = "no fog override for this map" */
   fogByMap: Record<string, FogOverlay | null>;
   layerByMap: Record<string, LocalLayer[]>;
+  /** World settings (name, credits, assetCredits) keyed by world id. */
+  worldOverride: Record<string, Partial<World>>;
+  /** Project-level in world.yaml, so not per map or per world. */
+  calendar: CalendarDraft;
   /** wall-clock ms of the last working-state change */
   savedAt: number;
   /** global in-progress entity edit draft; null = no open edit */
@@ -65,7 +72,9 @@ export function deserializeSession(blob: unknown): SessionState | null {
     typeof s.savedAt !== "number"
   )
     return null;
-  s.entityEdit = (s as Partial<SessionState>).entityEdit ?? null;
+  s.entityEdit = s.entityEdit ?? null;
+  s.worldOverride = s.worldOverride ?? {};
+  s.calendar = s.calendar ?? null;
   return s as SessionState;
 }
 
@@ -81,9 +90,20 @@ export function sessionHasWork(s: SessionState): boolean {
   );
   const anyFog = Object.values(s.fogByMap).some((f) => f != null);
   const anyLayer = Object.values(s.layerByMap).some((l) => l.length > 0);
+  const anyWorld = Object.values(s.worldOverride).some((w) => Object.keys(w).length > 0);
   const anyEntityEdit =
     !!s.entityEdit &&
     JSON.stringify({ fields: s.entityEdit.fields, body: s.entityEdit.body }) !==
       s.entityEdit.pristine;
-  return anyOverride || anyMap || anyRegion || anyRoute || anyFog || anyLayer || anyEntityEdit;
+  return (
+    anyOverride ||
+    anyMap ||
+    anyRegion ||
+    anyRoute ||
+    anyFog ||
+    anyLayer ||
+    anyWorld ||
+    s.calendar !== null ||
+    anyEntityEdit
+  );
 }

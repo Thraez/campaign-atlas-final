@@ -119,6 +119,8 @@ function SaveHarness({
       fog: { snapshot: () => null, applySnapshot: () => {} },
       layer: { snapshot: () => ({}), applySnapshot: () => {} },
       editorEntity: { get: () => null, set: () => {} },
+      world: { get: () => ({}), set: () => {} },
+      calendar: { get: () => null, set: () => {} },
     },
     perMapDirtyCount,
   });

@@ -7,6 +7,7 @@ import { AtlasLoadState } from "@/atlas/content/AtlasLoadState";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { entityHref } from "@/atlas/deepLink";
+import { isPlayerVisible } from "@/atlas/content/visibility";
 
 /** One row on the credits page. Sourced either from an entity's coarse
  *  `credit` field or from a world-level `assetCredits` registry entry. */
@@ -28,7 +29,7 @@ interface CreditRow {
  */
 function buildCreditRows(project: AtlasProject | null): CreditRow[] {
   if (!project) return [];
-  const visibleEntities = (project.entities ?? []).filter((e) => e.visibility !== "dm");
+  const visibleEntities = (project.entities ?? []).filter((e) => isPlayerVisible(e.visibility));
 
   const entityRows: CreditRow[] = visibleEntities
     .filter((e) => e.credit && e.credit.trim() !== "")

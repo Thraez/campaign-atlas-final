@@ -8,8 +8,8 @@
  * When water.enabled === false the component renders nothing; the consumer's
  * existing background:oceanColor fallback on MapContainer applies unchanged.
  *
- * Animation is gated behind @media (prefers-reduced-motion:no-preference);
- * the still variant renders at full opacity with no motion.
+ * Animation stops when motion is reduced: the OS setting (media query) or
+ * calm mode (`<html data-calm>`, see use-reduce-motion.ts).
  */
 import type { MapDocument } from "@/atlas/content/schema";
 import { resolveWater } from "./resolveWater";

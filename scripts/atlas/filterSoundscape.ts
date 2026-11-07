@@ -31,7 +31,8 @@ export function filterSoundscapeForPlayer(
       const v = regionVisibility.get(a.regionId);
       return v !== undefined && PLAYER_VISIBLE_VISIBILITY.has(v);
     }
-    return !a.visibility || PLAYER_VISIBLE_VISIBILITY.has(a.visibility);
+    // Missing is player-visible; present but not player/rumor (typo, empty, null) is dropped.
+    return a.visibility === undefined || PLAYER_VISIBLE_VISIBILITY.has(a.visibility);
   };
 
   const kept: SoundArea[] = (sc.areas ?? [])

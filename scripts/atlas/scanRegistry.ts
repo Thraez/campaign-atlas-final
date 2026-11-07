@@ -8,6 +8,7 @@
  * no reason for lacking one.
  */
 import path from "node:path";
+import type { ArtifactLayout } from "./playerArtifact.js";
 
 import { run as checkNoSecrets } from "../check-no-secrets.js";
 import { run as checkDerivedSecrets } from "../check-derived-secrets.js";
@@ -16,6 +17,7 @@ import { run as checkFogSafety } from "../check-fog-safety.js";
 import { run as checkArtifactShape } from "../check-artifact-shape.js";
 import { run as checkPlayerSecrets } from "../check-player-secrets.js";
 import { run as checkPlayerFiles } from "../check-player-files.js";
+import { run as checkVaultContent } from "../check-vault-content.js";
 import { run as auditAssets } from "./audit-assets.js";
 
 export type ScanId =
@@ -26,6 +28,7 @@ export type ScanId =
   | "check-fog-safety"
   | "check-player-secrets"
   | "check-player-files"
+  | "check-vault-content"
   | "audit-assets";
 
 /** Absolute paths the scans run against. `root` is the repo root. */
@@ -51,21 +54,21 @@ interface ScanEntry {
 }
 
 /** The built site and the source store it was copied from. */
-function artifactDirs(ctx: ScanContext): [string, string][] {
+function artifactDirs(ctx: ScanContext): [string, string, ArtifactLayout][] {
   return [
-    ["dist", path.join(ctx.root, "dist")],
-    ["public/atlas", path.join(ctx.root, "public", "atlas")],
+    ["dist", path.join(ctx.root, "dist"), "built-site"],
+    ["public/atlas", path.join(ctx.root, "public", "atlas"), "store"],
   ];
 }
 
 function perDir(
   id: ScanId,
   ctx: ScanContext,
-  run: (dir: string, label: string) => number | Promise<number>,
+  run: (dir: string, label: string, layout: ArtifactLayout) => number | Promise<number>,
 ): Omit<ScanTask, "scan">[] {
-  return artifactDirs(ctx).map(([label, dir]) => ({
+  return artifactDirs(ctx).map(([label, dir, layout]) => ({
     label: `${id} ${label}`,
-    run: () => run(dir, label),
+    run: () => run(dir, label, layout),
   }));
 }
 
@@ -114,12 +117,17 @@ export const SCANS: ScanEntry[] = [
     id: "check-fog-safety",
     script: "check-fog-safety.ts",
     tasks: (ctx) =>
-      perDir("check-fog-safety", ctx, (dir) => checkFogSafety({ dir, config: ctx.configPath })),
+      perDir("check-fog-safety", ctx, (dir, _label, layout) =>
+        checkFogSafety({ dir, config: ctx.configPath, layout }),
+      ),
   },
   {
     id: "check-player-secrets",
     script: "check-player-secrets.ts",
-    tasks: (ctx) => perDir("check-player-secrets", ctx, (dir) => checkPlayerSecrets({ dir })),
+    tasks: (ctx) =>
+      perDir("check-player-secrets", ctx, (dir, _label, layout) =>
+        checkPlayerSecrets({ dir, layout }),
+      ),
   },
   {
     id: "check-player-files",
@@ -130,6 +138,23 @@ export const SCANS: ScanEntry[] = [
       {
         label: "check-player-files dist",
         run: () => checkPlayerFiles({ dir: path.join(ctx.root, "dist") }),
+      },
+    ],
+  },
+  {
+    id: "check-vault-content",
+    script: "check-vault-content.ts",
+    // The source, not an artifact: while hosting is public (R-01), content/
+    // must hold nothing Sync from Obsidian wrote.
+    tasks: (ctx) => [
+      {
+        label: "check-vault-content content",
+        run: () =>
+          checkVaultContent({
+            root: ctx.root,
+            config: ctx.configPath,
+            contentDir: ctx.contentDir,
+          }),
       },
     ],
   },

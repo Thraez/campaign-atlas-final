@@ -3,8 +3,10 @@ import App from "./App.tsx";
 import "./index.css";
 import { registerServiceWorker } from "./pwa";
 import { installGlobalErrorHandlers } from "./lib/installGlobalErrorHandlers";
+import { syncCalmModeToDocument } from "./hooks/use-reduce-motion";
 
 installGlobalErrorHandlers();
+syncCalmModeToDocument();
 
 createRoot(document.getElementById("root")!).render(<App />);
 
