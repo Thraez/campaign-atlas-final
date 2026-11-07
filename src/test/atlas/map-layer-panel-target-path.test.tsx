@@ -85,4 +85,22 @@ describe("MapLayerPanel target publish path", () => {
     expect(screen.getByText(/Save will use/)).toBeInTheDocument();
     expect(screen.getByText("public/atlas/assets/maps/sea-chart.png")).toBeInTheDocument();
   });
+
+  // eval-2026-10/29: a JPG map keeps its .jpg name, whatever the DM types.
+  it("typing a .webp name for a JPG map says Save will keep .jpg", () => {
+    renderPanel({
+      ...UPLOAD,
+      filename: "Tidemarrow.jpg",
+      dataUrl: "data:image/jpeg;base64,AAAA",
+      targetPath: "public/atlas/assets/maps/tidemarrow.jpg",
+    });
+    expect(screen.queryByText(/Save will use/)).toBeNull();
+
+    fireEvent.change(screen.getByDisplayValue("public/atlas/assets/maps/tidemarrow.jpg"), {
+      target: { value: "public/atlas/assets/maps/tidemarrow.webp" },
+    });
+
+    expect(screen.getByText(/never re-encoded/)).toBeInTheDocument();
+    expect(screen.getByText("public/atlas/assets/maps/tidemarrow.jpg")).toBeInTheDocument();
+  });
 });

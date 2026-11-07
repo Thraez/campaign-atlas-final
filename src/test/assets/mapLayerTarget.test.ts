@@ -3,7 +3,12 @@
  * public/atlas/assets/maps/, shared by editor uploads and the Map Import Wizard.
  */
 import { describe, it, expect } from "vitest";
-import { defaultTargetPath, mapLayerTargetPath, safeFilename } from "@/atlas/assets/mapLayerTarget";
+import {
+  defaultTargetPath,
+  mapLayerTargetPath,
+  mapTargetFitsSource,
+  safeFilename,
+} from "@/atlas/assets/mapLayerTarget";
 
 describe("mapLayerTargetPath", () => {
   it("keeps a typed path under the maps folder", () => {
@@ -58,5 +63,69 @@ describe("mapLayerTargetPath", () => {
       );
     }
     expect(safeFilename("Fog Overlay (v2).PNG")).toBe("fog-overlay-v2.png");
+  });
+});
+
+// eval-2026-10/29: a map is saved under its real format's extension, so the
+// save endpoint never has to re-encode it (a JPG map stays a JPG).
+describe("mapLayerTargetPath keeps the source's real extension", () => {
+  const jpg = "data:image/jpeg;base64,AAAA";
+
+  it("renames a JPG sent to a typed .webp target to .jpg", () => {
+    expect(
+      mapLayerTargetPath({
+        id: "l1",
+        filename: "Tidemarrow.jpg",
+        targetPath: "public/atlas/assets/maps/tidemarrow.webp",
+        dataUrl: jpg,
+      }),
+    ).toBe("public/atlas/assets/maps/tidemarrow.jpg");
+  });
+
+  it("renames a JPG sent to a typed .png target, keeping a .jpeg spelling", () => {
+    expect(
+      mapLayerTargetPath({
+        id: "l1",
+        filename: "Sea.jpeg",
+        targetPath: "public/atlas/assets/maps/sea.png",
+        dataUrl: jpg,
+      }),
+    ).toBe("public/atlas/assets/maps/sea.jpeg");
+  });
+
+  it("trusts the bytes' MIME type over a misleading file name", () => {
+    expect(mapLayerTargetPath({ id: "l1", filename: "Renamed.png", dataUrl: jpg })).toBe(
+      "public/atlas/assets/maps/renamed.jpg",
+    );
+  });
+
+  it("keeps a PNG under a typed .webp target (the endpoint encodes it lossless)", () => {
+    expect(
+      mapLayerTargetPath({
+        id: "l1",
+        filename: "Region.png",
+        targetPath: "public/atlas/assets/maps/region.webp",
+        dataUrl: "data:image/png;base64,AAAA",
+      }),
+    ).toBe("public/atlas/assets/maps/region.webp");
+  });
+
+  it("keeps a typed path when the source format is unknown", () => {
+    expect(mapLayerTargetPath({ id: "l1", targetPath: "public/atlas/assets/maps/keep.webp" })).toBe(
+      "public/atlas/assets/maps/keep.webp",
+    );
+  });
+});
+
+describe("mapTargetFitsSource", () => {
+  it("accepts the same format, jpg and jpeg alike, and PNG under .webp", () => {
+    expect(mapTargetFitsSource("public/atlas/assets/maps/a.jpeg", "image/jpeg")).toBe(true);
+    expect(mapTargetFitsSource("public/atlas/assets/maps/a.JPG", "jpeg")).toBe(true);
+    expect(mapTargetFitsSource("public/atlas/assets/maps/a.webp", "image/png")).toBe(true);
+  });
+
+  it("rejects a JPG under .webp or .png", () => {
+    expect(mapTargetFitsSource("public/atlas/assets/maps/a.webp", "image/jpeg")).toBe(false);
+    expect(mapTargetFitsSource("public/atlas/assets/maps/a.png", "jpg")).toBe(false);
   });
 });

@@ -39,7 +39,11 @@ import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import { normalizeAtlasAssetUrl } from "./url";
 import { centerAnchoredResize } from "./layerGeometry";
-import { defaultMapLayerTargetPath, isMapAssetPath } from "@/atlas/assets/mapLayerTarget";
+import {
+  defaultMapLayerTargetPath,
+  isMapAssetPath,
+  mapLayerTargetPath,
+} from "@/atlas/assets/mapLayerTarget";
 
 interface Props {
   map: MapDocument;
@@ -579,6 +583,14 @@ export function MapLayerPanel(props: Props) {
                         <code>{defaultMapLayerTargetPath(localSelected)}</code>.
                       </p>
                     )}
+                    {localSelected.targetPath &&
+                      isMapAssetPath(localSelected.targetPath) &&
+                      mapLayerTargetPath(localSelected) !== localSelected.targetPath && (
+                        <p className="mt-1 text-[10px] text-amber-300/90">
+                          Maps keep their own format, so they are never re-encoded. Save will use{" "}
+                          <code>{mapLayerTargetPath(localSelected)}</code>.
+                        </p>
+                      )}
                   </div>
                 )}
                 {localSelected.origin === "url" && /^https?:/i.test(localSelected.src) && (

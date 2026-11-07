@@ -1441,12 +1441,12 @@ describe("editor image add publishes WebP", () => {
       expect(fs.readFileSync(path.join(tmp, mapTarget)).equals(webp)).toBe(true);
     });
 
-    it("refuses a JPG, naming ticket 29", async () => {
+    it("refuses a JPG, telling the DM to save it under .jpg", async () => {
       const jpg = await rgba(false).img.flatten().jpeg().toBuffer();
       const r = await save(mapTarget, jpg, "image/jpeg");
       expect(r.status).toBe(400);
       expect(r.payload).toMatchObject({ reason: "map-format-refused" });
-      expect(JSON.stringify(r.payload)).toMatch(/eval-2026-10\/29/);
+      expect(JSON.stringify(r.payload)).toMatch(/\.jpg name/);
       expect(fs.existsSync(path.join(tmp, mapTarget))).toBe(false);
     });
 
@@ -1455,6 +1455,58 @@ describe("editor image add publishes WebP", () => {
       const r = await save(mapTarget, gif, "image/gif");
       expect(r.status).toBe(400);
       expect(r.payload).toMatchObject({ reason: "map-format-refused" });
+    });
+  });
+
+  // eval-2026-10/29: a JPG map is never re-encoded; only its metadata goes.
+  describe("a JPG map keeps its compressed image data", () => {
+    const scanData = (jpeg: Buffer) => jpeg.subarray(jpeg.indexOf(Buffer.from([0xff, 0xda])));
+    const gpsJpeg = () => {
+      const w = 40;
+      const h = 24;
+      const raw = Buffer.alloc(w * h * 3);
+      for (let i = 0; i < raw.length; i++) raw[i] = (i * 7919) % 251;
+      return sharp(raw, { raw: { width: w, height: h, channels: 3 } })
+        .jpeg({ quality: 70 })
+        .withExif({ IFD3: { GPSLatitudeRef: "N", GPSLatitude: "59/1 19/1 0/1" } })
+        .withXmp('<x:xmpmeta xmlns:x="adobe:ns:meta/"><secret-xmp/></x:xmpmeta>')
+        .toBuffer();
+    };
+
+    it("saves a JPG with GPS EXIF with its scan data unchanged and no EXIF", async () => {
+      const target = "public/atlas/assets/maps/tidemarrow.jpg";
+      const input = await gpsJpeg();
+      expect((await sharp(input).metadata()).exif).toBeTruthy();
+      const r = await save(target, input, "image/jpeg");
+      expect(r.status).toBe(200);
+      const written = fs.readFileSync(path.join(tmp, target));
+      expect(scanData(written).equals(scanData(input))).toBe(true);
+      const meta = await sharp(written).metadata();
+      expect(meta.exif).toBeUndefined();
+      expect(meta.xmp).toBeUndefined();
+      expect(written.toString("latin1")).not.toMatch(/GPS|secret/);
+    });
+
+    it("refuses a JPG sent to a .png map target", async () => {
+      const target = "public/atlas/assets/maps/tidemarrow.png";
+      const r = await save(target, await gpsJpeg(), "image/jpeg");
+      expect(r.status).toBe(400);
+      expect(r.payload).toMatchObject({ reason: "map-format-refused" });
+      expect(fs.existsSync(path.join(tmp, target))).toBe(false);
+    });
+
+    it("refuses a JPG map whose EXIF orientation would be lost", async () => {
+      const target = "public/atlas/assets/maps/turned.jpg";
+      const rotated = await sharp({
+        create: { width: 4, height: 2, channels: 3, background: "#123456" },
+      })
+        .jpeg()
+        .withMetadata({ orientation: 6 })
+        .toBuffer();
+      const r = await save(target, rotated, "image/jpeg");
+      expect(r.status).toBe(400);
+      expect(r.payload).toMatchObject({ reason: "map-format-refused" });
+      expect(JSON.stringify(r.payload)).toMatch(/orientation/);
     });
   });
 
