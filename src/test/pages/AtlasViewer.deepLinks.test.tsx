@@ -8,8 +8,8 @@ vi.mock("react-leaflet", async () => {
   return makeReactLeafletModule();
 });
 
-import { act, cleanup, render, waitFor, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { act, cleanup, fireEvent, render, waitFor, screen } from "@testing-library/react";
+import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router";
 import AtlasViewer from "@/pages/AtlasViewer";
 import { makeEntity, makeMap, makePlacement, makeProject, makeWorld } from "../helpers/makeProject";
 import { stableMap } from "../helpers/reactLeafletMock";
@@ -87,6 +87,7 @@ const urls: Array<[string, string]> = [
   ["/?map=bogus&entity=tower", "World"],
   ["/?map=bogus&cx=10&cy=20&cz=2", "World"],
   ["/?cx=10&cy=20", "World"],
+  ["/?map=removed&entity=cave&cx=1&cy=2", "City"],
 ];
 
 describe("deep links: load and Back agree", () => {
@@ -121,5 +122,42 @@ describe("phones: Back and Forward open the sheet", () => {
 
     popTo("/?map=world&entity=tower");
     await waitFor(() => expect(screen.getByRole("dialog")).toHaveTextContent("Tower"));
+  });
+});
+
+describe("popstate the viewer should ignore", () => {
+  it("an in-page # link keeps a closed sheet closed", async () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 375 });
+    await renderAt("/?map=world&entity=tower");
+    await waitFor(() => expect(screen.getByRole("dialog")).toHaveTextContent("Tower"));
+
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    // Back over a `#` link: the entry changes, the query string doesn't.
+    popTo(window.location.search + "#credits");
+    await act(async () => {});
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("Back from the viewer to another page leaves that page's URL alone", async () => {
+    window.history.replaceState(null, "", "/");
+    window.history.pushState(null, "", "/atlas?map=city");
+    render(
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<p>Landing page</p>} />
+          <Route path="/atlas" element={<AtlasViewer />} />
+        </Routes>
+      </BrowserRouter>,
+    );
+    await waitFor(() => expect(mapName()).toBe("City"));
+
+    act(() => window.history.back());
+    await screen.findByText("Landing page");
+    await act(async () => {});
+
+    expect(window.location.pathname).toBe("/");
+    expect(window.location.search).toBe("");
   });
 });

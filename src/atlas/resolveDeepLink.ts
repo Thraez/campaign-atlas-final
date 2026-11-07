@@ -29,11 +29,14 @@ export interface ResolveDeepLinkOptions {
  * opening an entity all go through here, so the same URL always lands the
  * same way whatever the viewer showed before.
  *
- * - Map: the URL's map when it exists. Otherwise, for an entity link with no
- *   center, the entity's placement on the default map, else its first
- *   placement. Otherwise the default map.
- * - Fly: to the URL's center on that map when it has one; else to the
- *   entity's placement on that map, if it has one there.
+ * - Map: the URL's map when it exists. Otherwise, for an entity link, the
+ *   entity's placement on the default map, else its first placement.
+ *   Otherwise the default map.
+ * - Center: kept only when the URL's map exists, or when there is no entity
+ *   (then it is flown to on the default map). An entity link whose map is
+ *   missing drops its center: those coordinates belong to the missing map.
+ * - Fly: to the kept center on the chosen map; else to the entity's
+ *   placement on that map, if it has one there.
  */
 export function resolveDeepLink(
   link: DeepLinkState,
@@ -49,12 +52,13 @@ export function resolveDeepLink(
       : (project.maps[0]?.id ?? null);
 
   const openId = link.entityId;
+  const center = mapExists(link.mapId) || !openId ? link.center : null;
   const entityPlacements = openId ? project.placements.filter((p) => p.entityId === openId) : [];
 
   let mapId: string | null;
   if (mapExists(link.mapId)) {
     mapId = link.mapId;
-  } else if (openId && !link.center) {
+  } else if (openId) {
     const onFallback = entityPlacements.find((p) => p.mapId === fallbackMapId);
     const first = entityPlacements.find((p) => mapExists(p.mapId));
     mapId = (onFallback ?? first)?.mapId ?? fallbackMapId;
@@ -64,8 +68,8 @@ export function resolveDeepLink(
 
   const map = project.maps.find((m) => m.id === mapId);
   let fly: DeepLinkFly | null = null;
-  if (map && link.center) {
-    fly = { x: link.center.x, y: link.center.y, height: map.height };
+  if (map && center) {
+    fly = { x: center.x, y: center.y, height: map.height };
     if (link.zoom != null) fly.zoom = link.zoom;
   } else if (map && openId) {
     const placement = entityPlacements.find((p) => p.mapId === map.id);

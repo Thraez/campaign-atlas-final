@@ -65,9 +65,14 @@ const cases: Array<[string, string, Expected]> = [
     { mapId: "city", openId: "tower", fly: { x: 1, y: 2, height: 500, zoom: 3 } },
   ],
   [
-    "entity with a center but an invalid map uses the default map",
-    "?map=bogus&entity=cave&cx=1&cy=2",
-    { mapId: "world", openId: "cave", fly: { x: 1, y: 2, height: 1000 } },
+    "entity with a center but an invalid map drops the center and finds the entity",
+    "?map=removed&entity=cave&cx=1&cy=2",
+    { mapId: "city", openId: "cave", fly: { x: 30, y: 40, height: 500 } },
+  ],
+  [
+    "entity with a center and no map drops the center too",
+    "?entity=tower&cx=1&cy=2",
+    { mapId: "world", openId: "tower", fly: { x: 100, y: 200, height: 1000 } },
   ],
   [
     "unplaced entity opens on the default map without flying",

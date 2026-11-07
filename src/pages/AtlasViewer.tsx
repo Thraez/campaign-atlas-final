@@ -267,9 +267,15 @@ export default function AtlasViewer() {
     viewCenterRef.current = vc;
   }, []);
 
+  // The viewer's own path, and the query string it last wrote or applied.
+  // Back from the viewer to another page, or Back over an in-page `#` link,
+  // fires popstate too; neither should re-apply (or rewrite) the viewer URL.
+  const viewerPathRef = useRef(typeof window === "undefined" ? "" : window.location.pathname);
+  const shownSearchRef = useRef<string | null>(null);
+
   // Keep URL in sync with viewport (replace — no new Back entries for pan/zoom)
   useEffect(() => {
-    if (!activeMapId) return;
+    if (!activeMapId || window.location.pathname !== viewerPathRef.current) return;
     replaceViewerSearch(
       serializeDeepLink({
         mapId: activeMapId,
@@ -278,6 +284,7 @@ export default function AtlasViewer() {
         zoom: viewCenter?.zoom ?? null,
       }),
     );
+    shownSearchRef.current = window.location.search;
   }, [activeMapId, openId, viewCenter]);
 
   // Load and Back/Forward read the viewport at call time, not at render.
@@ -288,6 +295,7 @@ export default function AtlasViewer() {
 
   /** Show what the current URL names: one rule for load and Back/Forward (resolveDeepLink). */
   const applyUrl = useCallback((project: AtlasProject, currentMapId: string | null) => {
+    shownSearchRef.current = window.location.search;
     const r = resolveDeepLink(parseDeepLink(window.location.search), project, {
       currentMapId,
       defaultMapId: project.worlds[0]?.defaultMapId ?? project.maps[0]?.id ?? null,
@@ -301,7 +309,9 @@ export default function AtlasViewer() {
 
   // Back navigation: restore entity/map when the user presses Back
   const popStateHandler = useCallback(() => {
-    if (data) applyUrl(data.project, activeMapId);
+    if (!data || window.location.pathname !== viewerPathRef.current) return;
+    if (window.location.search === shownSearchRef.current) return;
+    applyUrl(data.project, activeMapId);
   }, [data, activeMapId, applyUrl]);
 
   useEffect(() => {
@@ -409,6 +419,7 @@ export default function AtlasViewer() {
           zoom: vc?.zoom ?? null,
         }),
       );
+      shownSearchRef.current = window.location.search;
       // Same rule as a URL naming this map and entity with no center: stay on
       // the active map and fly to the entity's placement there, if it has one.
       const r =
