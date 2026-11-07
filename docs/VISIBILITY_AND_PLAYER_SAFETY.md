@@ -6,14 +6,19 @@ The atlas's central job is to ship a player-safe build that **never** leaks DM-o
 
 Every entity has a `visibility` value. The four valid states:
 
-| Visibility | Meaning | Ships to player build? | Search-indexed? | Mapped? |
-|---|---|---|---|---|
-| `player` | Canon, revealed | ✓ | ✓ | ✓ (placements) |
-| `rumor` | Public but uncertain — players know *of* this, may not know what's true | ✓ | ✓ | ✓ |
-| `dm` | DM-only, never published | ✗ | ✗ | ✗ |
-| `hidden` | Like `dm`, plus an indication the DM intends to never reveal | ✗ | ✗ | ✗ |
+| Visibility | Meaning                                                                 | Ships to player build? | Search-indexed? | Mapped?        |
+| ---------- | ----------------------------------------------------------------------- | ---------------------- | --------------- | -------------- |
+| `player`   | Canon, revealed                                                         | ✓                      | ✓               | ✓ (placements) |
+| `rumor`    | Public but uncertain — players know _of_ this, may not know what's true | ✓                      | ✓               | ✓              |
+| `dm`       | DM-only, never published                                                | ✗                      | ✗               | ✗              |
+| `hidden`   | Like `dm`, plus an indication the DM intends to never reveal            | ✗                      | ✗               | ✗              |
 
 Invalid visibility values are coerced to `dm` (fail-safe). In strict player builds, invalid values fail the build with exit 3.
+
+`world.yaml` regions and routes follow their own rule: a missing `visibility` is `player`, and a
+value that is present but invalid (a typo such as `secret` or `Player`) loads as `dm` with a build
+warning ([ADR-0001](adr/0001-missing-visibility-is-dm.md), addendum). Sound-only areas already drop
+on any value that isn't player-visible.
 
 ## Three mechanisms for hiding DM content
 
@@ -136,7 +141,7 @@ If any scanner finds a problem, the publish chain fails before deploy.
 Folders listed under `exclude` in `atlas.config.json` (default: `_drafts`, `_dm`, `archive`, `deprecated`) are excluded entirely:
 
 - Files in those folders never enter the build pipeline.
-- Their titles, ids, and aliases are loaded into the cross-reference index *only* to catch wikilinks from public entries — but they ship nothing.
+- Their titles, ids, and aliases are loaded into the cross-reference index _only_ to catch wikilinks from public entries — but they ship nothing.
 
 This means `_dm/Secret-Prep.md` and `_drafts/Wip.md` are safe to keep alongside published content.
 
@@ -148,7 +153,7 @@ This means `_dm/Secret-Prep.md` and `_drafts/Wip.md` are safe to keep alongside 
 - Rumor entities **are** search-indexed.
 - Rumor placements **do** render as pins on the map.
 - The viewer renders a `Rumored — uncertain` badge so players can see the canon status.
-- A `rumor`-visibility *relationship* on a player entity ships in player builds (it's public info, even if uncertain).
+- A `rumor`-visibility _relationship_ on a player entity ships in player builds (it's public info, even if uncertain).
 
 If you want player-visible-but-treat-as-fact, use `visibility: player`. If you want a piece of canon that players have heard of but the DM hasn't confirmed in-fiction, use `visibility: rumor`. If you want DM-only, use `visibility: dm` or `hidden`.
 
@@ -166,7 +171,7 @@ If you want player-visible-but-treat-as-fact, use `visibility: player`. If you w
 
 - **Inferable secrets.** A player can infer that a place is significant if it has a player-visible pin labeled "Vampire's Tomb" — the safety gate does not detect emotional spoilers, only data leaks.
 - **External assets.** External URLs (`https://...`) are not scanned. Don't link to a private CDN that publishes DM-only images.
-- **Service-worker cache.** A returning player's PWA may serve a cached `atlas.json` from before a visibility flip. Vite's content-hashed asset URLs handle this for code, but to fully unreveal an entity that previously shipped as `player`, publish a new build *and* expect cached clients to need a refresh. See [the caching note in WORKFLOWS.md](WORKFLOWS.md#cache-invalidation).
+- **Service-worker cache.** A returning player's PWA may serve a cached `atlas.json` from before a visibility flip. Vite's content-hashed asset URLs handle this for code, but to fully unreveal an entity that previously shipped as `player`, publish a new build _and_ expect cached clients to need a refresh. See [the caching note in WORKFLOWS.md](WORKFLOWS.md#cache-invalidation).
 - **The `git history`.** If you commit `visibility: player` and then change it to `dm`, the old version is still in `git log`. The published site is regenerated, but your repo's history retains it. Use `git filter-repo` if a true scrub matters.
 
 ## Recovering from a leak
