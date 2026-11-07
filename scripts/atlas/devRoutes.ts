@@ -20,6 +20,7 @@ export const DEV_API_PATHS = {
   localWrite: "/__atlas/local-write",
   assetsImages: "/__atlas/assets/images",
   save: "/__atlas/save",
+  cleanAsset: "/__atlas/clean-asset",
   publishPush: "/__atlas/publish-push",
   publishCheck: "/__atlas/publish-check",
 } as const;
