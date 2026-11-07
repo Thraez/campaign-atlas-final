@@ -93,14 +93,9 @@ describe("SoundControl", () => {
     expect(screen.getByRole("button", { name: "Unmute sound" })).toBeTruthy();
   });
 
-  it("calm mode button starts 'off', toggles 'on', and reflects aria-pressed", () => {
+  it("has no calm-mode switch (it lives in the toolbar's view toggles)", () => {
     renderControl();
-    const calmBtn = screen.getByRole("button", { name: /calm mode/i });
-    expect(calmBtn.textContent).toMatch(/off/i);
-    expect(calmBtn.getAttribute("aria-pressed")).toBe("false");
-    act(() => calmBtn.click());
-    expect(calmBtn.textContent).toMatch(/on/i);
-    expect(calmBtn.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByRole("button", { name: /calm mode/i })).toBeNull();
   });
 
   it("invite is hidden when sound is enabled, even if dismiss was not clicked", async () => {
@@ -188,11 +183,6 @@ describe("Q37 — graceful fallback when Web Audio is unavailable", () => {
     expect(screen.queryByRole("button", { name: /mute sound|unmute sound/i })).toBeNull();
     expect(screen.queryByRole("slider", { name: /volume/i })).toBeNull();
   });
-
-  it("calm mode toggle remains visible when audioAvailable is false", () => {
-    renderWithAudioAvailable(false);
-    expect(screen.getByRole("button", { name: /calm mode/i })).toBeTruthy();
-  });
 });
 
 describe("Q36 — hide sound controls when map has no soundscape", () => {
@@ -206,14 +196,8 @@ describe("Q36 — hide sound controls when map has no soundscape", () => {
     expect(screen.queryByRole("slider", { name: /volume/i })).toBeNull();
   });
 
-  it("calm mode toggle remains visible when hasSoundscape is false", () => {
-    renderControl({ hasSoundscape: false });
-    expect(screen.getByRole("button", { name: /calm mode/i })).toBeTruthy();
-  });
-
   it("all controls render when hasSoundscape is true", () => {
     renderControl({ hasSoundscape: true });
     expect(screen.getByRole("button", { name: /bring the world to life/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /calm mode/i })).toBeTruthy();
   });
 });

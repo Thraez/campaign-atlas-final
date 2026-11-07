@@ -520,7 +520,9 @@
   letter-spacing: 0.03em;
 }
 
-/* Accessibility: respect users who prefer reduced motion. */
+/* Accessibility: reduce motion when the OS asks for it or calm mode is on
+   (`<html data-calm>`, set by src/hooks/use-reduce-motion.ts). Keep the two
+   blocks identical. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
@@ -533,6 +535,18 @@
   .leaflet-zoom-anim .leaflet-zoom-animated {
     transition: none !important;
   }
+}
+:root[data-calm="true"] *,
+:root[data-calm="true"] *::before,
+:root[data-calm="true"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+:root[data-calm="true"] .leaflet-fade-anim .leaflet-tile,
+:root[data-calm="true"] .leaflet-zoom-anim .leaflet-zoom-animated {
+  transition: none !important;
 }
 
 /* Skip-to-main link, only visible on keyboard focus. */
@@ -617,6 +631,8 @@
 @media (prefers-reduced-motion: reduce) {
   .atlas-secret-sealed, .atlas-secret-open { transition: none !important; }
 }
+:root[data-calm="true"] .atlas-secret-sealed,
+:root[data-calm="true"] .atlas-secret-open { transition: none !important; }
 
 /* Print: hide app chrome and print only the open entity panel.
    Players who hit Ctrl+P / Cmd+P from /atlas get a clean handout

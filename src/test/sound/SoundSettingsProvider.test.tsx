@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import { SoundSettingsProvider, useSoundSettings } from "@/atlas/sound/SoundSettingsProvider";
 import { _resetSoundPrefsForTests, loadSoundPrefs } from "@/atlas/sound/soundPrefs";
+import { setCalmMode, _resetCalmModeForTests } from "@/hooks/use-reduce-motion";
 
 function makeStubDeps() {
   const gainNode = () => ({
@@ -34,13 +35,6 @@ function makeStubDeps() {
       canPlay: vi.fn(() => true),
     },
   };
-}
-
-function CalmProbe() {
-  const { calmMode, setCalmMode } = useSoundSettings();
-  return (
-    <button onClick={() => setCalmMode(!calmMode)}>{calmMode ? "calm-on" : "calm-off"}</button>
-  );
 }
 
 function EnableProbe() {
@@ -80,20 +74,7 @@ function GainProbe() {
 describe("SoundSettingsProvider", () => {
   beforeEach(() => {
     _resetSoundPrefsForTests();
-    document.documentElement.removeAttribute("data-calm");
-  });
-
-  it("starts from defaults and toggles calm mode, persisting + reflecting on <html>", () => {
-    render(
-      <SoundSettingsProvider>
-        <CalmProbe />
-      </SoundSettingsProvider>,
-    );
-    expect(screen.getByRole("button").textContent).toBe("calm-off");
-    act(() => screen.getByRole("button").click());
-    expect(screen.getByRole("button").textContent).toBe("calm-on");
-    expect(document.documentElement.getAttribute("data-calm")).toBe("true");
-    expect(loadSoundPrefs().calmMode).toBe(true);
+    _resetCalmModeForTests();
   });
 
   it("enableSound sets soundEnabled: true and persists it", async () => {
@@ -147,9 +128,9 @@ describe("SoundSettingsProvider", () => {
     const { deps } = makeStubDeps();
     const engines: any[] = [];
     function EngineCapture() {
-      const { engine, calmMode, setCalmMode } = useSoundSettings();
+      const { engine, muted, setMuted } = useSoundSettings();
       engines.push(engine);
-      return <button onClick={() => setCalmMode(!calmMode)}>toggle</button>;
+      return <button onClick={() => setMuted(!muted)}>toggle</button>;
     }
     render(
       <SoundSettingsProvider deps={deps}>
@@ -310,8 +291,8 @@ describe("SoundSettingsProvider", () => {
     });
   });
 
-  describe("Q38 — prefers-reduced-motion decoupled from audio", () => {
-    it("motionReduced=true sets data-calm on <html> without muting the engine", () => {
+  describe("calm mode (the reduce-motion switch) still silences audio", () => {
+    it("mutes the engine when calm mode is turned on from outside the sound settings", () => {
       const { deps } = makeStubDeps();
       const engines: any[] = [];
       function EngineCapture() {
@@ -320,58 +301,20 @@ describe("SoundSettingsProvider", () => {
         return null;
       }
       render(
-        <SoundSettingsProvider deps={deps} motionReduced={true}>
+        <SoundSettingsProvider deps={deps}>
           <EngineCapture />
         </SoundSettingsProvider>,
       );
-      expect(document.documentElement.getAttribute("data-calm")).toBe("true");
       const spy = vi.spyOn(engines[0], "setMuted");
-      // engine.setMuted should have been called with false (muted=false, calmMode=false)
-      expect(spy).not.toHaveBeenCalledWith(true);
-    });
-
-    it("motionReduced=false with calmMode=false leaves data-calm absent", () => {
-      const { deps } = makeStubDeps();
-      render(
-        <SoundSettingsProvider deps={deps} motionReduced={false}>
-          <div />
-        </SoundSettingsProvider>,
-      );
-      expect(document.documentElement.getAttribute("data-calm")).toBeNull();
-    });
-
-    it("calmMode=true still mutes the engine even when motionReduced=true", () => {
-      const { deps } = makeStubDeps();
-      const engines: any[] = [];
-      function Probe() {
-        const { engine, calmMode, setCalmMode } = useSoundSettings();
-        engines.push(engine);
-        return <button onClick={() => setCalmMode(!calmMode)}>toggle</button>;
-      }
-      render(
-        <SoundSettingsProvider deps={deps} motionReduced={true}>
-          <Probe />
-        </SoundSettingsProvider>,
-      );
-      const spy = vi.spyOn(engines[0], "setMuted");
-      act(() => screen.getByRole("button").click()); // calmMode → true
+      act(() => setCalmMode(true));
       expect(spy).toHaveBeenCalledWith(true);
+      act(() => setCalmMode(false));
+      expect(spy).toHaveBeenLastCalledWith(false);
     });
 
-    it("motionReduced prop is exposed in context", () => {
-      const { deps } = makeStubDeps();
-      let captured: boolean | undefined;
-      function Probe() {
-        const { motionReduced } = useSoundSettings();
-        captured = motionReduced;
-        return null;
-      }
-      render(
-        <SoundSettingsProvider deps={deps} motionReduced={true}>
-          <Probe />
-        </SoundSettingsProvider>,
-      );
-      expect(captured).toBe(true);
+    it("does not save calm mode in the sound prefs any more", () => {
+      act(() => setCalmMode(true));
+      expect(loadSoundPrefs()).not.toHaveProperty("calmMode");
     });
   });
 

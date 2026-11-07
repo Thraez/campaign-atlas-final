@@ -25,6 +25,7 @@ import {
 } from "../helpers/makeProject";
 import { stableMap } from "../helpers/reactLeafletMock";
 import { logger } from "@/lib/logger";
+import { getCalmMode, setCalmMode, _resetCalmModeForTests } from "@/hooks/use-reduce-motion";
 
 function stubFetch(project = makeProject()) {
   vi.stubGlobal(
@@ -281,6 +282,7 @@ describe("MapController reduced-motion (Q28)", () => {
       value: originalMatchMedia,
     });
     vi.mocked(stableMap.setView).mockClear();
+    _resetCalmModeForTests();
   });
 
   it("uses setView (no animation) when prefers-reduced-motion is active", async () => {
@@ -309,6 +311,38 @@ describe("MapController reduced-motion (Q28)", () => {
     await waitFor(() => expect(stableMap.flyTo).toHaveBeenCalled());
     expect(stableMap.flyTo).toHaveBeenCalledWith([600, 300], expect.any(Number), { duration: 0.6 });
     expect(stableMap.setView).not.toHaveBeenCalled();
+  });
+
+  it("calm mode stops the fly-to animation even with the OS setting off", async () => {
+    stubMatchMedia(false);
+    setCalmMode(true);
+    window.history.pushState({}, "", "/?map=overview&cx=300&cy=400&cz=1");
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(stableMap.setView).toHaveBeenCalled());
+    expect(stableMap.setView).toHaveBeenCalledWith([600, 300], expect.any(Number), {
+      animate: false,
+    });
+    expect(stableMap.flyTo).not.toHaveBeenCalled();
+  });
+
+  it("puts the calm-mode switch in the toolbar's view toggles, not the sound controls", async () => {
+    stubMatchMedia(false);
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    const toggle = await screen.findByRole("button", { name: /calm mode/i });
+    expect(toggle.closest("header")).not.toBeNull();
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    expect(getCalmMode()).toBe(true);
+    expect(screen.getAllByRole("button", { name: /calm mode/i })).toHaveLength(1);
   });
 });
 
