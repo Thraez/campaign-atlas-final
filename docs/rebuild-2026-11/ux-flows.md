@@ -4,6 +4,10 @@ Stage C input for the wireframes. Built on Isak's round-1 answers (`questions-ro
 `GOALS-proposed.md`. Screen ids (E1, P1...) are the names the wireframes use. Decisions marked
 **[confirm]** are listed at the end for Isak.
 
+Updated after Isak's 2026-11-07 follow-up: the repo goes private and hosting moves to Cloudflare
+before real content, so DM data is committed and the DM folder and `world.dm.yaml` are gone;
+campaigns differ by visibility as well as fog; player map images are tile pyramids.
+
 ## Design principles
 
 1. **Task-first.** The DM picks a job ("add a map", "hide this valley"), not a layer or a mode.
@@ -11,26 +15,29 @@ Stage C input for the wireframes. Built on Isak's round-1 answers (`questions-ro
 3. **One save state, one undo.** Every edit is a command on one document store, saved automatically
    to source; one chip shows the state; Ctrl+Z undoes any of them, in order.
 4. **The editor edits source data**, never the compiled atlas: `atlas.yaml`, `world.yaml`, notes,
-   campaign files, the DM folder, image assets.
+   campaign files, image assets.
 5. **Faithful preview.** "Preview as players" is the strict player build for one campaign, run
-   without the DM folder, not a CSS toggle over the DM atlas.
-6. **Fail closed.** Missing or invalid visibility is `dm`; anything in the DM folder never ships.
+   the same as publish, not a CSS toggle over the DM atlas.
+6. **Fail closed.** Missing or invalid visibility is `dm`, for every campaign; only each campaign's
+   player build ships, and every scan runs on it.
 7. Solo DM plus AI agents. No accounts, no multi-user, no hosted editing.
 
 ## Where things are stored (proposal)
 
-| File | Committed? | Holds |
-|---|---|---|
-| `content/_atlas/atlas.yaml` | yes | the ocean (size, sea style), each world map's place on it, the campaign list |
-| `content/<world>/_atlas/world.yaml` | yes | player-visible maps: image refs, parent, frame, scale, zoom range; regions, routes, placements |
-| `content/<world>/_atlas/images/` | yes | images of player-visible maps (raw; fog is baked at build) **[confirm 2]** |
-| `content/_atlas/campaigns/<id>.yaml` | yes | per map: fog reveals, conceals, and the map's state (unknown, fogged, open) for that campaign |
-| `content/<world>/<folder>/*.md` | yes | player-visible notes, player text only |
-| DM folder (gitignored, default `.atlas-dm/`) **[confirm 1]** | **no** | DM-visibility notes; `<id>.dm.md` sidecars with DM blocks split out of player notes; `world.dm.yaml` with hidden maps, zones, routes, pins; images of hidden maps |
+Everything is committed; the repo is private before it holds real content. What is DM-only is
+marked by visibility, not by where the file sits.
 
-Placements move out of note frontmatter into the map's `world.yaml` (or `world.dm.yaml` when hidden),
-because synced notes are read-only in the editor. The player build never reads the DM folder, so the
-CI build on GitHub (where the folder does not exist) is a player build by construction.
+| File | Holds |
+|---|---|
+| `content/_atlas/atlas.yaml` | the ocean (size, sea style), each top-level map's place on it, the campaign list |
+| `content/<world>/_atlas/world.yaml` | every map (image refs, parent, frame, scale, zoom range), regions, routes, placements, sound areas, each with a visibility (one value, or per campaign); a `notes:` block for per-campaign visibility and extras of read-only synced notes |
+| `content/<world>/_atlas/images/` | one lossless source image per map; the player build bakes fog and cuts tiles |
+| `content/_atlas/campaigns/<id>.yaml` | per map: fog reveals, conceals, and the map's state (unknown, fogged, open) for that campaign |
+| `content/<world>/<folder>/*.md` | every note, player and DM, with `atlas.visibility`; DM blocks (`%% %%`, `:::dm`) stay inline and are stripped from player builds |
+
+Placements move out of note frontmatter into the map's `world.yaml`, because synced notes are
+read-only in the editor. The publish builds and ships only player builds, one per campaign; the
+safety scans check each one.
 
 ## Editor
 
@@ -47,9 +54,9 @@ Goal: get a new picture into the atlas, either as a world map on the ocean or as
    player), scale (units per pixel, or "set later with the ruler").
 4. **Add**. The image uploads; E4 opens with the map ready to place.
 
-Underneath: image to `content/<world>/_atlas/images/` (or the DM folder while the map is dm, and
-moved when made player); a map entry in `world.yaml`/`world.dm.yaml` with `parent` set; for an ocean
-map, a placement in `atlas.yaml`. Encoding goes through `imageEncoding.ts`; maps stay lossless.
+Underneath: image to `content/<world>/_atlas/images/`; a map entry in `world.yaml` with `parent`
+set and `visibility: dm`; for an ocean map, a placement in `atlas.yaml`. Encoding goes through
+`imageEncoding.ts`; maps stay lossless; the player build tiles them.
 Save/undo: one command ("Add map"); undo removes the entry and deletes the uploaded file.
 Edge cases: very large image (warn above a size limit, offer tiling later; no silent downscale);
 duplicate file name (rename with a suffix); unsupported format (refuse, say which); new world name
@@ -103,9 +110,10 @@ Goal: keep a valley, a dungeon or a whole continent away from players.
    placed only there ("these 4 things will be hidden too").
 3. Name and optional note for the zone (DM-only by default).
 
-Underneath: the zone, and the pins, routes and frames only inside it, move to `world.dm.yaml` in the
-DM folder; a hidden map moves its entry and image there. Unhiding moves them back. Nothing hidden
-stays in a committed file.
+Step 3 also asks **Hidden in**: every campaign (default), or tick campaigns. The zone's visibility
+is written in `world.yaml` (one value, or per campaign); the pins, routes and frames only inside it
+are hidden in the same campaigns by the resolver. Unhiding changes the value back. Nothing moves
+between files.
 Save/undo: one command; undo moves everything back.
 Edge cases: a pin on the zone edge (inside test by the pin's point; the list shows it so the DM can
 nudge); a note placed both inside and outside (only that placement hides; the note stays player);
@@ -143,13 +151,14 @@ Goal: write about a town, pin it, connect it to people and places, feature it as
 6. A synced note opens read-only with a banner "From your vault: edit it in Obsidian, then Sync";
    placement, region link and monument picture can still be set (they live in `world.yaml`).
 
-Underneath: atlas-only player note to `content/<world>/<folder>/<id>.md`; dm note to the DM folder;
-DM blocks (`%% %%`, `:::dm`) in a player note are split to `<id>.dm.md` on save. Placement and region
-link in `world.yaml`.
+Underneath: atlas-only note to `content/<world>/<folder>/<id>.md` with `atlas.visibility` (one value,
+or per campaign: the visibility field offers "every campaign" or a row per campaign); DM blocks
+(`%% %%`, `:::dm`) stay inline. For a synced note, per-campaign visibility goes in `world.yaml`'s
+`notes:` block. Placement and region link in `world.yaml`.
 Save/undo: typing autosaves after a pause; undo inside the text box is the text box's own; leaving
 the box makes one "Edit note" command for the shell's undo.
-Edge cases: changing visibility player to dm (moves the file to the DM folder; links from player
-notes become plain text, listed); a link to a dm note from a player note (renders as plain text for
+Edge cases: changing visibility player to dm in a campaign (links to it from player notes become
+plain text in that campaign, listed); a link to a dm note from a player note (renders as plain text for
 players, flagged in E8); a monument with no picture (a warning, still a place); deleting a note with
 backlinks (lists them; goes to an `archive/` folder, not hard-deleted).
 
@@ -159,12 +168,12 @@ Goal: pull new and changed vault notes into the atlas.
 
 1. Task bar **Sync**. E10: the vault path (remembered per computer, local config), **Check**.
 2. Dry run list: creates, updates, renames, skips, with reasons; each line shows the visibility it
-   will arrive with (`01`/`02` player, `03`/`04` dm) and where it will be stored (repo or DM folder).
+   will arrive with (`01`/`02` player, `03`/`04` dm, for every campaign).
 3. Tick or untick lines; **Sync N notes**. Result: done count, and "3 notes have no place yet" with
    **Place them** (opens the unplaced list in E2).
 
-Underneath: player text to `content/`, DM notes and DM blocks to the DM folder, `sync-map.json`
-updated. Placements are untouched (they live in `world.yaml`).
+Underneath: notes to `content/` with their folder's visibility, `sync-map.json` updated. The first
+real run waits until the repo is private. Placements are untouched (they live in `world.yaml`).
 Save/undo: one command per sync run; undo restores the files the run wrote (kept as a snapshot).
 Edge cases: vault path missing (E10 says so, nothing written); a note renamed in the vault (updates in
 place via the sync map); a synced note deleted in the vault (listed, archived, never silently
@@ -175,8 +184,8 @@ removed); second run with no changes ("nothing to do").
 Goal: see exactly what campaign X's players will see, before publishing.
 
 1. Top bar **Preview as players**, campaign from the selector. E11 replaces the canvas.
-2. A strict player build of the current source runs (seconds; a progress bar), without the DM folder,
-   with campaign X's fog baked. The real player UI (P1–P6) loads in the frame.
+2. A strict player build of the current source runs for campaign X (seconds; a progress bar), with
+   its visibility applied and its fog baked. The real player UI (P1–P6) loads in the frame.
 3. A banner: "Preview: campaign X, built 12:04 from unsaved/saved state". **Back to editing** keeps
    the camera where it was.
 
@@ -191,8 +200,11 @@ Goal: put the current atlas live for every campaign, safely.
 
 1. Top bar **Publish**. E12: per campaign, what changes for players (new maps, notes, reveals,
    removed items), then the scan list running: secrets, derived secrets, player secrets, image
-   privacy, fog, shape, asset audit, plus "nothing in the DM folder is staged in git".
-2. All green: **Commit and open PR** (the agent or Isak pushes; the merge into `main` publishes).
+   privacy, fog, shape, asset audit, run on each campaign's build, plus the cross-campaign check
+   (an item hidden in A and shown in B is absent from A).
+2. All green: **Commit and open PR** (the agent or Isak pushes; the merge into `main` publishes, to
+   GitHub Pages with test content until the hosting move, then to Cloudflare Pages, one access-limited
+   path per campaign).
    Any red: the button is disabled, each failure names file, line and campaign, with **Show in editor**.
 
 Blocks publish: any scan failure; a DM-visibility note or DM markup in a committed path; a player item
@@ -237,14 +249,18 @@ Edge cases: a frame for a map unknown to this campaign is not drawn; fogged area
    type chips. Pick one: P2 opens on its map with P4 open.
 2. Every view has a URL (`?c=<campaign>&map=<id>&note=<id>&x&y&z`); sharing it opens the same view.
 Edge cases: a deep link to something not in this campaign opens the campaign's ocean with "not found
-in this campaign"; a link without a campaign opens P6.
+in this campaign" (never saying whether it exists elsewhere); a link without a campaign opens P6 on
+the test site.
 
 ### (p6) Pick a campaign (P6)
 
+On the hosted site each campaign has its own access-limited path, so players arrive by their
+campaign's link and see no list of other campaigns **[confirm 1]**. P6 is kept for the public test
+site and the editor preview:
+
 1. No campaign in the URL and none remembered: P6 lists campaigns (name, picture, one line). With
    only one campaign, it is skipped.
-2. Picking one opens P1 for it and remembers it in the browser; the campaign chip in the corner
-   reopens P6 to switch.
+2. Picking one opens P1 for it and remembers it in the browser.
 
 ### (p7) Phone (P7)
 
@@ -304,7 +320,7 @@ E0 shell
 | P3 | Story card | hover card for a region or place: summary, monuments, people |
 | P4 | Story panel | full note: body, inside lists, backlinks, Show on map |
 | P5 | Search | palette across the campaign's maps and notes |
-| P6 | Campaign picker | choose a campaign; skipped when there is one |
+| P6 | Campaign picker | test site and preview only: choose a campaign; skipped when there is one |
 | P7 | Phone layouts | P1–P6 at phone width: top bar, bottom sheet, tap preview |
 
 ## Data-model concepts the flows need
@@ -322,23 +338,25 @@ E0 shell
 - **Person**: a note of type `person`, placed or belonging to places.
 - **Placement**: a note's pin on a map, stored in the map's `world.yaml`, not in the note.
 - **Route**: a line on one map with a speed; distance and time from the map's scale.
-- **Campaign**: one group of players; its own fog, map states and published view.
-- **Fog (per campaign)**: per map, reveals minus conceals for one campaign; baked into its images.
-- **Visibility**: `player`, `rumor`, `dm`, `hidden` on notes and every `world.yaml` item; missing or
-  invalid is `dm`; a hidden map hides its subtree.
-- **DM folder**: the gitignored folder for every DM-only note, DM block, hidden item and hidden image.
+- **Campaign**: one group of players; its own visibility, fog, map states and published,
+  access-limited view. Later, maps of its own.
+- **Fog (per campaign)**: per map, reveals minus conceals for one campaign; baked into its images
+  before tiling.
+- **Visibility**: `player`, `rumor`, `dm`, `hidden` on notes and every `world.yaml` item, as one
+  value for every campaign or a value per campaign; missing, invalid, or a campaign not named is
+  `dm`; a hidden map hides its subtree in that campaign.
+- **Tile pyramid**: the player build's copy of a map image, cut into lossless WebP tiles per zoom
+  level, per campaign where fog differs.
 
 ## Decisions to confirm with Isak
 
-1. **Where the DM folder lives.** Gitignored and never on GitHub means it won't reach the PC by
-   itself. Proposal: default `.atlas-dm/` in the repo, path overridable in gitignored local config,
-   so he can point it at a folder that travels by his own means (for example inside the private D&D
-   campaign repo, if that repo is private). Synced DM notes can always be re-synced from the vault;
-   only editor-written DM notes and hidden-map work need the folder to travel.
-2. **Raw images of player maps are committed un-fogged.** Fog protects the site, but anyone browsing
-   the public repo sees the whole map, including what campaigns haven't found. Hidden maps' images go
-   to the DM folder. Alternative: keep every raw map image in the DM folder and commit only the baked
-   per-campaign images, built locally (CI then no longer bakes fog).
-3. **Campaigns differ only in fog and map state.** Visibility of notes and zones is the same for every
-   campaign; a place one party hasn't heard of is handled by fog or the map's "unknown" state, not by
-   per-campaign visibility.
+Settled by the 2026-11-07 follow-up: no DM folder (everything committed, repo private before real
+content); raw map images in the repo are fine; campaigns differ by visibility as well as fog.
+
+1. **How players get in [Q].** Proposal: Cloudflare Access, one-time email PIN, one allow list per
+   campaign path; no shared campaign picker on the hosted site (P6 becomes the test site's and the
+   preview's only).
+2. **Per-campaign visibility of synced notes** lives in `world.yaml`'s `notes:` block and wins over
+   the vault's folder default; the Publish check lists every such override.
+3. **Lossless tiles by default.** A lossy, high-quality tile setting per map only after Isak compares
+   one real map at max zoom.

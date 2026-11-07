@@ -42,3 +42,12 @@ Orchestrator session started 2026-11-07. Branch `rebuild-plan-2026-11`, worktree
   nested child maps below; one baked fog per campaign; Sync + editor-only notes; DM-only text in a
   gitignored local folder; missing world.yaml visibility = dm.
 - Stage C started: flows + GOALS update (Opus, medium); wireframes next.
+- Stage D first draft: `plan.md` (Opus). Recommends option B: rebuild editor + map model in this
+  repo behind `__INCLUDE_EDITOR__`, keep pipeline/scans/Sync/tests; ~45–55 ticket sessions. PRs:
+  merge #109, #110 first; #99, #103, #105, #107 moot.
+- Isak follow-up (2026-11-07, this chat): public is only for testing; later the site moves to
+  Cloudflare and the repo goes private, so the DM folder needn't be gitignored and raw map images
+  are fine; map compression undecided (he zooms a lot); campaigns start out separated by visibility,
+  later possibly by maps. This reverses round-1 Q4 and the plan's "campaigns differ only in fog".
+  Plan agent revising plan.md, GOALS-proposed.md, ux-flows.md. Wireframes still running.
+- Checked: Thraez/Dungeons-and-Dragons-Campaign-Repository is private; campaign-atlas-final public.

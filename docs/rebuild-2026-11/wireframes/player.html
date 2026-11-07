@@ -1,0 +1,437 @@
+<title>Atlas Player Wireframes</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IM+Fell+English:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: picker and redline callout, then the player site drawn inside a browser frame;
+   P7 swaps the frame for three phone frames. Same palette as editor.html. */
+:root{
+  --paper:#e9eef0; --panel:#fbfcfc; --ink:#1c2930; --muted:#596a73; --line:#c4cfd4;
+  --sea:#cfe1e7; --sea-line:#9fbfca; --land:#ece4cf; --land-line:#857654; --land-2:#dfd3b4;
+  --accent:#1d6b74; --accent-ink:#ffffff; --accent-soft:#d5e8ea;
+  --note:#7b3fb3; --note-soft:#f1e8f9;
+  --warn:#9a6200; --fog:#18232a; --glow:#f5c451;
+  --f-ui:"Atkinson Hyperlegible",ui-sans-serif,system-ui,sans-serif;
+  --f-map:"IM Fell English",Georgia,"Times New Roman",serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark;
+  --paper:#101619; --panel:#172025; --ink:#e1e8ea; --muted:#95a6ae; --line:#2b3a41;
+  --sea:#14303a; --sea-line:#25525e; --land:#3a3527; --land-line:#ab9b72; --land-2:#4a432f;
+  --accent:#62b8c0; --accent-ink:#0c1a1d; --accent-soft:#1c3a3e;
+  --note:#c79af2; --note-soft:#2a1f36; --warn:#e3a840; --fog:#05090b; --glow:#e0b245;
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#101619; --panel:#172025; --ink:#e1e8ea; --muted:#95a6ae; --line:#2b3a41;
+  --sea:#14303a; --sea-line:#25525e; --land:#3a3527; --land-line:#ab9b72; --land-2:#4a432f;
+  --accent:#62b8c0; --accent-ink:#0c1a1d; --accent-soft:#1c3a3e;
+  --note:#c79af2; --note-soft:#2a1f36; --warn:#e3a840; --fog:#05090b; --glow:#e0b245;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font:15px/1.45 var(--f-ui);
+  padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1240px;margin:0 auto;display:grid;gap:14px}
+h1{font:400 28px/1.1 var(--f-map);margin:0;text-wrap:balance}
+.lede{margin:0;color:var(--muted);max-width:70ch}
+.mono{font-family:var(--f-mono);font-size:12px}
+.tag{font:11px var(--f-mono);color:var(--muted)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--note);outline-offset:2px}
+.picker{display:flex;flex-wrap:wrap;gap:6px}
+.picker button{border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:5px 9px;cursor:pointer;display:flex;gap:6px;align-items:baseline;font-size:13px}
+.picker button b{font-family:var(--f-mono);font-size:11px;color:var(--muted);font-weight:500}
+.picker button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.picker button[aria-pressed="true"] b{color:inherit}
+.callout{border:1.5px dashed var(--note);background:var(--note-soft);border-radius:6px;padding:10px 14px;display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:baseline}
+.callout .cid{font:500 22px/1 var(--f-mono);color:var(--note)}
+.callout h2{margin:0;font-size:16px}
+.callout h2 span{font-weight:400;color:var(--note);font-family:var(--f-mono);font-size:12px;margin-left:8px;letter-spacing:.04em}
+.callout p{grid-column:2;margin:0;max-width:95ch}
+.callout .fix{grid-column:2;font-size:13px;color:var(--note)} .callout .fix:empty{display:none}
+
+/* browser frame */
+.browser{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.addr{display:flex;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);font:12px var(--f-mono);color:var(--muted);overflow-x:auto;white-space:nowrap}
+.addr i{width:9px;height:9px;border-radius:50%;background:var(--line);flex:none}
+.addr span{background:var(--paper);border-radius:999px;padding:2px 10px}
+.stage{position:relative;aspect-ratio:16/9.4;max-height:680px;width:100%;background:var(--sea);overflow:hidden}
+.stage>svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+/* player chrome */
+.pui{position:absolute;display:flex;gap:6px;align-items:center;z-index:3}
+.pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:13px;box-shadow:0 2px 8px rgb(0 0 0 / .12)}
+.crumb a{color:var(--accent);cursor:pointer;text-decoration:none} .crumb b{font-weight:700}
+.search{min-width:220px;color:var(--muted)} .search kbd{font:11px var(--f-mono);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:8px}
+.zoom{display:grid;padding:0;border-radius:6px} .zoom span{padding:2px 10px;text-align:center} .zoom span+span{border-top:1px solid var(--line)}
+.legend{border-radius:6px;font-size:12px;display:grid;gap:2px;padding:6px 10px}
+.legend span{display:flex;gap:6px;align-items:center}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--accent);display:inline-block}
+.dot.mon{background:var(--warn);border-radius:1px;transform:rotate(45deg)} .dot.per{background:var(--note)}
+
+/* map svg */
+.sea-t{fill:url(#waves)}
+.sea-t.anim{animation:drift 14s linear infinite}
+@keyframes drift{to{transform:translateX(40px)}}
+@media (prefers-reduced-motion:reduce){.sea-t.anim{animation:none}}
+.sheetimg{fill:var(--land-2);stroke:var(--land-line);opacity:.5}
+.land{fill:var(--land);stroke:var(--land-line);stroke-width:2}
+.reg{fill:none;stroke:var(--land-line);stroke-width:1;stroke-dasharray:4 3}
+.terr{fill:none;stroke:var(--land-line);stroke-width:1.2}
+.ml{font-family:var(--f-map);fill:var(--ink);paint-order:stroke;stroke:var(--land);stroke-width:3px}
+.ml.big{font-size:30px;letter-spacing:.18em} .ml.mid{font-size:17px;font-style:italic} .ml.sm{font-size:13px}
+.ml.sea{fill:var(--sea-line);stroke:none;font-size:26px;font-style:italic;letter-spacing:.1em}
+.hot{fill:var(--glow);fill-opacity:0;stroke:transparent;stroke-width:3;cursor:pointer;transition:fill-opacity .15s}
+.hot:hover,.hot.lit{fill-opacity:.28;stroke:var(--glow)}
+.mapsheet{cursor:pointer}
+.mapsheet:hover .sheetimg{opacity:.9;stroke:var(--glow);stroke-width:3}
+.frame{fill:var(--panel);fill-opacity:.12;stroke:var(--panel);stroke-width:2.5;cursor:pointer}
+.frame:hover{fill-opacity:.3}
+.pin{fill:var(--accent);stroke:var(--panel);stroke-width:2} .pin.mon{fill:var(--warn)} .pin.per{fill:var(--note)}
+.fogfill{fill:var(--fog);opacity:.86}
+.city-w{fill:var(--sea)} .city-b{fill:var(--land-2);stroke:var(--land-line)} .city-s{stroke:var(--land-line);stroke-width:1.5;fill:none}
+.nt{font:600 12px var(--f-mono);fill:var(--note)}
+
+/* story card (P3) */
+.card{position:absolute;z-index:4;width:300px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 28px rgb(0 0 0 / .22);padding:12px;display:grid;gap:8px;pointer-events:none}
+.card h3{margin:0;font:400 21px/1.1 var(--f-map)}
+.card p{margin:0;font-size:13px}
+.pic{display:block;border-radius:5px;background:linear-gradient(160deg,var(--sea) 0%,var(--land-2) 70%,var(--warn) 140%)}
+.mons{display:flex;gap:6px}
+.mons span{display:grid;gap:2px;font-size:11px;width:84px}
+.mons i{display:block;height:44px;border-radius:4px;background:linear-gradient(200deg,var(--sea),var(--warn))}
+.people{display:flex;flex-wrap:wrap;gap:4px}
+.people span{border:1px solid var(--line);border-radius:999px;padding:1px 8px 1px 3px;font-size:12px;display:flex;gap:4px;align-items:center}
+.people span::before{content:"";width:16px;height:16px;border-radius:50%;background:var(--note);opacity:.7}
+.more{font-size:12px;color:var(--accent);font-weight:700}
+
+/* story panel (P4) */
+.panel{position:absolute;z-index:5;top:0;right:0;bottom:0;width:min(380px,92%);background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:14px 16px;display:grid;gap:10px;align-content:start}
+.panel h3{margin:0;font:400 28px/1.05 var(--f-map);text-wrap:balance}
+.panel .bar{display:flex;justify-content:space-between;align-items:center;font-size:13px}
+.panel .bar button{border:1px solid var(--line);background:none;border-radius:4px;padding:2px 8px;cursor:pointer}
+.panel p{margin:0;font-size:14px;line-height:1.55;max-width:60ch}
+.panel a{color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.panel h4{margin:6px 0 0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ilist{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:14px}
+.ilist li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding:4px 0;align-items:baseline}
+.ilist li:last-child{border-bottom:0}
+.som{font-size:12px;color:var(--accent);white-space:nowrap}
+
+/* search palette (P5) */
+.scrim{position:absolute;inset:0;background:rgb(10 16 20 / .45);z-index:6;display:grid;place-items:start center;padding-top:60px}
+.pal{width:min(560px,92%);background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 16px 40px rgb(0 0 0 / .3);overflow:hidden}
+.pal .q{padding:12px 14px;border-bottom:1px solid var(--line);font-size:16px}
+.pal .grp{padding:6px 14px 2px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pal .res{display:flex;justify-content:space-between;gap:8px;padding:6px 14px;font-size:14px;align-items:baseline}
+.pal .res.on{background:var(--accent-soft)}
+.chipt{font:11px var(--f-mono);border:1px solid var(--line);border-radius:3px;padding:0 5px;color:var(--muted)}
+.pal .foot{border-top:1px solid var(--line);padding:6px 14px;font-size:12px;color:var(--muted)}
+mark{background:var(--glow);color:inherit;border-radius:2px}
+
+/* campaign picker (P6) */
+.pick6{position:absolute;inset:0;z-index:7;background:var(--sea);display:grid;place-items:center;padding:20px;overflow:auto}
+.pick6 .in{max-width:700px;width:100%;display:grid;gap:14px;text-align:center}
+.pick6 h3{margin:0;font:400 34px/1.1 var(--f-map)}
+.camps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;text-align:left}
+.camp{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer}
+.camp:hover{border-color:var(--accent)}
+.camp .pic{height:110px;border-radius:0}
+.camp div{padding:10px 12px;display:grid;gap:2px}
+.camp b{font:400 22px var(--f-map)}
+
+/* phones (P7) */
+.phones{display:flex;flex-wrap:wrap;gap:24px;justify-content:center;padding:20px 0}
+.phone{width:260px;display:grid;gap:8px;justify-items:center}
+.phone .scr{width:260px;height:540px;border:10px solid var(--ink);border-radius:34px;position:relative;overflow:hidden;background:var(--sea)}
+.phone .scr>svg{position:absolute;inset:0;width:100%;height:100%}
+.phone figcaption{font-size:13px;text-align:center;max-width:260px}
+.ptop{position:absolute;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;padding:30px 8px 8px;background:var(--panel);border-bottom:1px solid var(--line);font-size:12px;z-index:2}
+.ptop .s{flex:1;border:1px solid var(--line);border-radius:999px;padding:3px 8px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ptop .m{border:1px solid var(--line);border-radius:4px;padding:2px 6px}
+.strip{position:absolute;left:8px;right:8px;bottom:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;gap:8px;align-items:center;font-size:12px;box-shadow:0 6px 16px rgb(0 0 0 / .2);z-index:2}
+.strip .pic{width:48px;height:48px;flex:none}
+.sheet{position:absolute;left:0;right:0;bottom:0;height:58%;background:var(--panel);border-radius:16px 16px 0 0;border-top:1px solid var(--line);padding:6px 12px 12px;display:grid;gap:6px;align-content:start;font-size:12px;z-index:2;box-shadow:0 -6px 18px rgb(0 0 0 / .18)}
+.sheet .grab{width:40px;height:4px;border-radius:2px;background:var(--line);justify-self:center}
+.sheet h3{margin:0;font:400 20px var(--f-map)}
+.pmenu{position:absolute;right:8px;top:66px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:grid;gap:6px;font-size:12px;z-index:3;width:170px;box-shadow:0 8px 20px rgb(0 0 0 / .25)}
+
+@media (max-width:700px){
+  .stage{aspect-ratio:auto;height:560px}
+  .search{min-width:0} .search span{display:none}
+  .card{width:240px}
+  .callout{grid-template-columns:1fr} .callout p,.callout .fix{grid-column:1}
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <pattern id="waves" width="40" height="16" patternUnits="userSpaceOnUse">
+      <path d="M0 8 q10 -6 20 0 t20 0" fill="none" style="stroke:var(--sea-line)" stroke-width="1" opacity=".6"/>
+    </pattern>
+    <mask id="fogVarn"><rect width="1000" height="560" fill="#fff"/>
+      <circle cx="650" cy="345" r="130" fill="#000"/><circle cx="520" cy="430" r="80" fill="#000"/><circle cx="420" cy="470" r="60" fill="#000"/><circle cx="300" cy="340" r="80" fill="#000"/><circle cx="560" cy="250" r="90" fill="#000"/></mask>
+    <mask id="fogOcean"><rect x="560" y="100" width="340" height="300" fill="#fff" transform="rotate(4 730 260)"/>
+      <circle cx="640" cy="200" r="70" fill="#000"/></mask>
+    <path id="r-high" d="M240 82 L420 46 L585 76 L560 205 L380 222 L222 190 Z"/>
+    <path id="r-ash" d="M190 222 L382 232 L402 380 L332 472 L250 442 L186 330 Z"/>
+    <path id="r-coast" d="M572 205 L712 162 L752 282 L700 410 L562 492 L420 502 L410 362 L560 300 Z"/>
+    <symbol id="varnmap" viewBox="0 0 1000 560">
+      <path class="land" d="M222 62 L330 40 L430 30 L520 46 L605 60 L670 104 L722 152 L748 214 L762 282 L734 352 L700 420 L630 472 L560 512 L470 526 L380 520 L300 490 L250 450 L206 392 L180 330 L170 262 L172 190 L190 120 Z"/>
+      <use href="#r-high" class="reg"/><use href="#r-coast" class="reg"/>
+      <path class="terr" d="M290 140 l14 -20 l14 20 M330 120 l16 -24 l16 24 M380 150 l12 -18 l12 18 M440 110 l15 -22 l15 22 M500 150 l12 -17 l12 17"/>
+      <text class="ml mid" x="330" y="190">Highmoor</text>
+      <text class="ml mid" x="560" y="250">Saltmere Coast</text>
+    </symbol>
+    <symbol id="osserymap" viewBox="0 0 600 500">
+      <path class="land" d="M90 120 L190 60 L320 50 L450 86 L530 170 L540 280 L490 380 L380 440 L250 446 L150 400 L80 310 L64 210 Z"/>
+      <path class="reg" d="M200 70 L310 250 L180 420"/><path class="reg" d="M310 250 L520 230"/>
+      <path class="terr" d="M360 140 l14 -20 l14 20 M400 160 l14 -20 l14 20 M150 300 l12 -16 l12 16"/>
+    </symbol>
+    <symbol id="citymap" viewBox="0 0 300 200">
+      <rect width="300" height="200" class="city-b"/>
+      <path class="city-w" d="M180 0 H300 V200 H150 Q190 150 170 100 Q150 50 180 0 Z"/>
+      <g class="city-b"><rect x="20" y="20" width="40" height="30"/><rect x="70" y="20" width="50" height="30"/><rect x="20" y="60" width="30" height="40"/><rect x="60" y="60" width="60" height="40"/><rect x="20" y="110" width="50" height="35"/><rect x="80" y="110" width="40" height="60"/><rect x="130" y="20" width="30" height="50"/></g>
+      <path class="city-s" d="M10 55 H165 M10 105 H160 M65 10 V190 M125 10 V190"/>
+      <circle cx="160" cy="150" r="9" style="fill:var(--warn)"/>
+    </symbol>
+    <!-- Varn as players of Red Tide see it: fog baked -->
+    <symbol id="varnRT" viewBox="0 0 1000 560">
+      <use href="#varnmap" width="1000" height="560"/>
+      <rect width="1000" height="560" class="fogfill" mask="url(#fogVarn)"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <header style="display:grid;gap:6px">
+    <h1>Campaign Atlas player site, wireframes</h1>
+    <p class="lede">What the players of campaign Red Tide see of the Sundered Sea. Pick a screen; the violet dashed box explains it. Hover the regions and maps: the story card is live. In P2, click the Saltmere frame to enter the city.</p>
+  </header>
+  <nav class="picker" id="picker" aria-label="Screens"></nav>
+  <section class="callout" aria-live="polite">
+    <div class="cid" id="c-id">P1</div><h2 id="c-t">Ocean</h2>
+    <p id="c-w"></p><div class="fix" id="c-f"></div>
+  </section>
+
+  <div class="browser" data-on="P1 P2 P3 P4 P5 P6">
+    <div class="addr"><i></i><i></i><i></i><span id="url">thraez.github.io/campaign-atlas-final/?c=red-tide</span></div>
+    <div class="stage" id="stage">
+
+      <!-- P1 ocean -->
+      <svg viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid slice" data-on="P1 P6" role="img" aria-label="The Sundered Sea">
+        <rect x="-40" width="1080" height="560" class="sea-t anim"/>
+        <g class="mapsheet" data-card="varn" transform="rotate(-3 270 280)"><rect x="70" y="120" width="420" height="250" class="sheetimg"/><use href="#varnRT" x="70" y="120" width="420" height="250"/></g>
+        <g class="mapsheet" data-card="ossery" transform="rotate(4 730 260)"><rect x="560" y="100" width="340" height="300" class="sheetimg"/><use href="#osserymap" x="560" y="100" width="340" height="300"/></g>
+        <rect width="1000" height="560" class="fogfill" mask="url(#fogOcean)" style="pointer-events:none"/>
+        <text class="ml big" x="190" y="110" style="stroke:var(--sea)">VARN</text>
+        <text class="ml big" x="650" y="90" style="stroke:var(--sea)">OSSERY</text>
+        <text class="ml sea" x="380" y="480">The Sundered Sea</text>
+      </svg>
+
+      <!-- P2-P5 Varn -->
+      <svg viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid meet" data-on="P2 P3 P4 P5" id="varnView" role="img" aria-label="Varn">
+        <rect x="-40" width="1080" height="560" class="sea-t anim"/>
+        <use href="#varnRT" width="1000" height="560"/>
+        <use href="#r-coast" class="hot" id="hot-coast" data-card="coast"/>
+        <use href="#r-high" class="hot" data-card="high"/>
+        <g class="framegrp" id="saltFrame" style="cursor:pointer">
+          <rect x="600" y="300" width="96" height="62" class="frame" transform="rotate(-8 648 331)"/>
+          <text class="ml sm" x="604" y="292">Saltmere ↘</text>
+        </g>
+        <path class="pin mon" d="M660 386 l9 9 l-9 9 l-9 -9 Z"/><text class="ml sm" x="674" y="400">The Drowned Bell</text>
+        <circle cx="630" cy="322" r="6" class="pin per"/><circle cx="690" cy="420" r="6" class="pin per"/>
+        <circle cx="300" cy="340" r="0" class="pin"/>
+        <text class="nt" x="190" y="300" data-on="P2">Ashfen: hidden area, not shipped</text>
+        <text class="nt" x="270" y="100" data-on="P2" style="fill:#fff">fog baked into the image</text>
+      </svg>
+
+      <!-- P2b Saltmere city -->
+      <svg viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid meet" id="cityView" hidden role="img" aria-label="Saltmere">
+        <rect width="1000" height="560" class="sea-t"/>
+        <use href="#citymap" x="80" y="20" width="780" height="520"/>
+        <text class="ml mid" x="140" y="70">Saltmere</text>
+        <text class="ml sm" x="300" y="430">Bellwright's Row</text>
+        <path class="pin mon" d="M496 400 l11 11 l-11 11 l-11 -11 Z"/>
+        <text class="ml sm" x="516" y="416">The Drowned Bell</text>
+        <circle cx="420" cy="200" r="8" class="pin per"/><text class="ml sm" x="434" y="204">Harbour office</text>
+      </svg>
+
+      <!-- chrome -->
+      <div class="pui" style="left:12px;top:12px" data-on="P1 P2 P3 P4 P5"><span class="pill crumb" id="crumb"></span></div>
+      <div class="pui" style="right:12px;top:12px" data-on="P1 P2 P3 P5">
+        <span class="pill search" id="searchBtn" style="cursor:pointer">⌕ <span>Search places, people</span><kbd>Ctrl K</kbd></span>
+        <span class="pill" style="cursor:pointer" id="campChip">Red Tide ▾</span>
+      </div>
+      <div class="pui legend pill" style="left:12px;bottom:12px" data-on="P1 P2 P3 P5">
+        <span><i class="dot"></i>place</span><span><i class="dot mon"></i>monument</span><span><i class="dot per"></i>person</span><span>▭ map: zoom in or click</span>
+      </div>
+      <div class="pui pill zoom" style="right:12px;bottom:12px" data-on="P1 P2 P3 P5"><span>+</span><span>−</span><span>fit</span></div>
+
+      <!-- P3 story card -->
+      <div class="card" id="card" hidden>
+        <h3 id="cardT">Saltmere Coast</h3>
+        <p id="cardS">Salt flats and a drowned harbour. At the lowest tides a bell rings under the water.</p>
+        <span class="pic" style="height:90px" id="cardPic"></span>
+        <div id="cardMore">
+          <div class="tag" style="margin-bottom:4px">MONUMENTS</div>
+          <div class="mons"><span><i></i>The Drowned Bell</span></div>
+          <div class="tag" style="margin:8px 0 4px">PEOPLE</div>
+          <div class="people"><span>Ilse Marrow</span><span>Oduya Venn</span></div>
+        </div>
+        <span class="more">Click to read more</span>
+      </div>
+
+      <!-- P4 story panel -->
+      <aside class="panel" data-on="P4" id="panel"></aside>
+
+      <!-- P5 search -->
+      <div class="scrim" data-on="P5">
+        <div class="pal" role="dialog" aria-label="Search">
+          <div class="q">⌕ bell<span style="border-left:2px solid var(--accent);margin-left:1px"></span></div>
+          <div class="grp">Varn</div>
+          <div class="res on"><span><b>The Drowned <mark>Bell</mark></b> <span class="tag">Saltmere Coast</span></span><span class="chipt">monument</span></div>
+          <div class="res"><span>Oduya Venn <span class="tag"><mark>bell</mark>-keeper</span></span><span class="chipt">person</span></div>
+          <div class="grp">Varn › Saltmere</div>
+          <div class="res"><span><mark>Bell</mark>wright's Row</span><span class="chipt">place</span></div>
+          <div class="grp">Ossery</div>
+          <div class="res"><span>The Lantern Road <span class="tag">"…a <mark>bell</mark> at every mile"</span></span><span class="chipt">route</span></div>
+          <div class="foot">↑↓ choose · Enter opens its map with the note · only Red Tide's maps and notes</div>
+        </div>
+      </div>
+
+      <!-- P6 campaign picker -->
+      <div class="pick6" data-on="P6">
+        <div class="in">
+          <h3>The Sundered Sea</h3>
+          <p style="margin:0;color:var(--muted)">Which table are you at? Your choice is remembered in this browser.</p>
+          <div class="camps">
+            <div class="camp"><span class="pic"></span><div><b>Red Tide</b><span>Smugglers chasing the bell that rang under the sea.</span><span class="tag">Varn · 2 maps known</span></div></div>
+            <div class="camp"><span class="pic" style="background:linear-gradient(160deg,var(--fog),var(--sea))"></span><div><b>Grey Lantern</b><span>Pilgrims crossing Ossery by lamplight.</span><span class="tag">Ossery · 1 map known</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P7 phones -->
+  <div class="phones" data-on="P7">
+    <figure class="phone" style="margin:0">
+      <div class="scr">
+        <svg viewBox="560 160 360 740" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect x="0" y="0" width="1000" height="1000" class="sea-t"/><use href="#varnRT" x="-200" y="160" width="1800" height="1008"/></svg>
+        <div class="ptop"><span class="m">‹</span><span>Ocean › <b>Varn</b></span><span class="s">⌕ Search</span><span class="m">☰</span></div>
+        <div class="strip"><span class="pic"></span><div style="flex:1"><b>Saltmere Coast</b><div class="tag">1 monument · 2 people</div></div><span class="more">Open ›</span></div>
+      </div>
+      <figcaption><b>Map, tapped region.</b> One top bar with breadcrumb and search. A tap shows the preview strip; no hover card, no minimap, no toast.</figcaption>
+    </figure>
+    <figure class="phone" style="margin:0">
+      <div class="scr">
+        <svg viewBox="560 160 360 740" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="1000" height="1000" class="sea-t"/><use href="#varnRT" x="-200" y="160" width="1800" height="1008"/></svg>
+        <div class="ptop"><span class="m">‹</span><span>Ocean › <b>Varn</b></span><span class="s">⌕ Search</span><span class="m">☰</span></div>
+        <div class="sheet">
+          <span class="grab"></span>
+          <div style="display:flex;justify-content:space-between;align-items:center"><h3>Saltmere Coast</h3><span class="m" style="border:1px solid var(--line);border-radius:50%;width:24px;height:24px;display:grid;place-items:center">✕</span></div>
+          <span class="pic" style="height:70px"></span>
+          <p style="margin:0">Salt flats and a drowned harbour. The town of <a style="color:var(--accent);text-decoration:underline">Saltmere</a> keeps the old bell rope.</p>
+          <div class="tag">INSIDE</div>
+          <div>Saltmere <span class="tag">map</span> · The Drowned Bell <span class="tag">monument</span> · Ilse Marrow, Oduya Venn</div>
+          <div class="tag">peek · <b>half</b> · full</div>
+        </div>
+      </div>
+      <figcaption><b>Story panel as a bottom sheet.</b> Peek, half or full, with one close button.</figcaption>
+    </figure>
+    <figure class="phone" style="margin:0">
+      <div class="scr">
+        <svg viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="1000" height="560" class="sea-t"/><g transform="rotate(-3 270 280)"><use href="#varnRT" x="70" y="120" width="420" height="250"/></g><g transform="rotate(4 730 260)"><use href="#osserymap" x="560" y="100" width="340" height="300"/></g></svg>
+        <div class="ptop"><span>Ocean</span><span class="s">⌕ Search</span><span class="m">☰</span></div>
+        <div class="pmenu"><b>Red Tide</b><span class="tag">switch campaign ›</span><hr style="border:0;border-top:1px solid var(--line);width:100%;margin:2px 0"><span><i class="dot"></i> place</span><span><i class="dot mon"></i> monument</span><span><i class="dot per"></i> person</span><span>▭ map: pinch to enter</span></div>
+      </div>
+      <figcaption><b>Menu.</b> Legend and campaign chip move into the menu so nothing overlaps the map. Pinch past a frame enters the child map.</figcaption>
+    </figure>
+  </div>
+</div>
+
+<script>
+const S={
+ P1:{t:"Ocean",f:"flow p1",w:"The campaign link opens the ocean fitted to every map Red Tide knows. Varn shows with Red Tide's fog baked in; Ossery is mostly fogged, with one revealed bay. The sea drifts slowly. Corners hold the breadcrumb, search, campaign chip and legend. Hover a map for its one-line card; click or zoom to enter.",x:"Fixes today: opening view cropped with empty ocean, and a toast and chip sitting over the minimap.",u:"?c=red-tide",cr:"ocean"},
+ P2:{t:"Map view",f:"flow p2",w:"Zoomed past Varn's enter-at zoom, the view handed over to the Varn map with no page load; the breadcrumb reads Ocean › Varn. Saltmere's frame is a soft outline: click it (try it) to enter the city and the breadcrumb grows. Ashfen is a hidden area, so nothing of it ships. Zooming out past Varn's minimum returns to the ocean at the same spot.",x:"Fixes today: there was only one map and no way to switch maps.",u:"?c=red-tide&map=varn&x=640&y=330&z=1.2",cr:"varn"},
+ P3:{t:"Story card",f:"flow p3",w:"Hovering Saltmere Coast lights the region and shows its story card: name, one-line summary, picture, up to 3 monuments and up to 5 people. Highmoor has a card too. Clicking the region, or Read more, opens the story panel.",x:"",u:"?c=red-tide&map=varn&x=640&y=330&z=1.2",cr:"varn"},
+ P4:{t:"Story panel",f:"flows p3, p4",w:"The full note on the right: title, picture, body, then what is inside (places, people, monuments, child maps), each with Show on map, and backlinks. Click Oduya Venn in the text: the panel follows the link and offers Back. A link to an unpublished note is plain text.",x:"Fixes today: wikilinks were dead “planned” spans styled as links; entity open flew to pixelated max zoom (Show on map picks a sensible zoom).",u:"?c=red-tide&map=varn&note=saltmere-coast&x=640&y=330&z=1.6",cr:"varn"},
+ P5:{t:"Search",f:"flow p5",w:"The search box or Ctrl+K opens the palette. Results cover every map Red Tide knows, grouped by map, with type chips. Enter opens The Drowned Bell's map with its panel open, and the URL changes so the view can be shared.",x:"",u:"?c=red-tide&map=varn&note=the-drowned-bell",cr:"varn"},
+ P6:{t:"Campaign picker",f:"flow p6",w:"A link with no campaign, and none remembered, lands here. Each campaign has a picture and one line. Picking one opens its ocean and is remembered; the campaign chip reopens this to switch. With only one campaign this screen is skipped.",x:"",u:"",cr:"ocean"},
+ P7:{t:"Phone layouts",f:"flow p7",w:"P1 to P6 at phone width. Full-screen map, one top bar with breadcrumb and search, a tap preview strip in place of the hover card, the story panel as a bottom sheet, legend and campaign in the menu, no minimap.",x:"Fixes today: minimap, toast and calm-mode chip overlapped the sheet; two close buttons; title cut to “Astrath Dee…”.",u:"",cr:"varn"}
+};
+const cards={
+ coast:{t:"Saltmere Coast",s:"Salt flats and a drowned harbour. At the lowest tides a bell rings under the water.",more:true},
+ high:{t:"Highmoor",s:"Wind-cut uplands above the fens. Mostly unexplored by your party.",more:false},
+ varn:{t:"Varn",s:"The western continent: fens, uplands and the salt coast. 2 maps inside.",more:false,nop:true},
+ ossery:{t:"Ossery",s:"The eastern continent. Your party has only seen its western bay.",more:false,nop:true}
+};
+const notes={
+ coast:`<div class="bar"><span class="tag">REGION · VARN</span><button>✕ Close</button></div>
+  <h3>Saltmere Coast</h3><span class="pic" style="height:140px"></span>
+  <p>Salt flats run down to a harbour that the sea took back two hundred years ago. The town of <a data-go="salt">Saltmere</a> grew on the new shore. Its harbourmaster, <a data-go="ilse">Ilse Marrow</a>, counts every ship twice. At the lowest tides <a data-go="bell">The Drowned Bell</a> rings once, and <a data-go="oduya">Oduya Venn</a> rows out to listen. Old fishers blame the <span title="not published">Tide-Eater</span>.</p>
+  <h4>Inside</h4><ul class="ilist">
+   <li><span>Saltmere <span class="tag">city map</span></span><span class="som">Enter map ↘</span></li>
+   <li><span>The Drowned Bell <span class="tag">monument</span></span><span class="som">Show on map</span></li>
+   <li><span>Ilse Marrow <span class="tag">person · harbourmaster</span></span><span class="som">Show on map</span></li>
+   <li><span>Oduya Venn <span class="tag">person · bell-keeper</span></span><span class="som">Show on map</span></li></ul>
+  <h4>Mentioned in</h4><ul class="ilist"><li><span>The Lantern Road</span><span class="tag">Ossery</span></li></ul>`,
+ oduya:`<div class="bar"><button data-go="coast">‹ Back to Saltmere Coast</button><button>✕</button></div>
+  <h3>Oduya Venn</h3><span class="pic" style="height:120px;background:linear-gradient(160deg,var(--note),var(--sea))"></span>
+  <p>Bell-keeper of Saltmere, seventy winters old. Keeps the frayed rope that once rang <a data-go="bell">The Drowned Bell</a> from the old harbour tower. Trades stories for rum at the harbour office of <a data-go="ilse">Ilse Marrow</a>.</p>
+  <h4>Belongs to</h4><ul class="ilist"><li><span>Saltmere <span class="tag">city</span></span><span class="som">Show on map</span></li><li><span>Saltmere Coast <span class="tag">region</span></span><span class="som">Show on map</span></li></ul>
+  <h4>Mentioned in</h4><ul class="ilist"><li><span>Saltmere Coast</span></li><li><span>The Drowned Bell</span></li></ul>`
+};
+const $=id=>document.getElementById(id);
+const pk=$("picker");
+let cur="P1",inCity=false;
+Object.keys(S).forEach(k=>{const b=document.createElement("button");b.type="button";b.id="pick-"+k;b.innerHTML=`<b>${k}</b>${S[k].t}`;b.onclick=()=>show(k);pk.appendChild(b)});
+function crumb(){
+  const c=$("crumb");
+  if(S[cur].cr==="ocean") c.innerHTML="<b>Ocean</b>";
+  else if(inCity) c.innerHTML='<a data-c="ocean">Ocean</a> › <a data-c="varn">Varn</a> › <b>Saltmere</b>';
+  else c.innerHTML='<a data-c="ocean">Ocean</a> › <b>Varn</b>';
+}
+function setNote(k){$("panel").innerHTML=notes[k]||notes.coast}
+function show(k){
+  cur=k;inCity=false;
+  document.querySelectorAll("[data-on]").forEach(el=>el.toggleAttribute("hidden",!el.dataset.on.split(" ").includes(k)));
+  $("cityView").toggleAttribute("hidden",true);
+  pk.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.id==="pick-"+k));
+  const s=S[k];$("c-id").textContent=k;$("c-t").innerHTML=`${s.t}<span>${s.f.toUpperCase()}</span>`;$("c-w").textContent=s.w;$("c-f").textContent=s.x;
+  $("url").textContent="thraez.github.io/campaign-atlas-final/"+s.u;
+  crumb();
+  $("hot-coast").classList.toggle("lit",k==="P3"||k==="P4");
+  if(k==="P3")pinCard("coast",58,24);else $("card").hidden=true;
+  if(k==="P4")setNote("coast");
+  try{history.replaceState(null,"","#"+k)}catch(e){}
+}
+function fill(key){const c=cards[key];$("cardT").textContent=c.t;$("cardS").textContent=c.s;$("cardMore").hidden=!c.more;$("cardPic").hidden=!!c.nop}
+function pinCard(key,lp,tp){fill(key);const c=$("card");c.style.left=lp+"%";c.style.top=tp+"%";c.hidden=false}
+const stage=$("stage");
+stage.addEventListener("mousemove",e=>{
+  if(cur==="P3"||cur==="P4"||cur==="P5"||cur==="P6")return;
+  const t=e.target.closest("[data-card]");const c=$("card");
+  if(!t){c.hidden=true;return}
+  fill(t.dataset.card);const r=stage.getBoundingClientRect();
+  let x=e.clientX-r.left+16,y=e.clientY-r.top+16;
+  if(x+310>r.width)x=e.clientX-r.left-316; if(y+c.offsetHeight>r.height)y=Math.max(8,r.height-c.offsetHeight-8);
+  c.style.left=x+"px";c.style.top=y+"px";c.hidden=false;
+});
+stage.addEventListener("mouseleave",()=>{if(cur!=="P3")$("card").hidden=true});
+stage.addEventListener("click",e=>{
+  const g=e.target.closest("[data-go]");if(g){setNote(g.dataset.go==="oduya"?"oduya":"coast");return}
+  const cc=e.target.closest("[data-c]");
+  if(cc){if(cc.dataset.c==="ocean")show("P1");else{show(cur==="P1"?"P2":cur)}return}
+  if(e.target.closest("#saltFrame")&&cur==="P2"){inCity=true;$("varnView").setAttribute("hidden","");$("cityView").removeAttribute("hidden");$("url").textContent="thraez.github.io/campaign-atlas-final/?c=red-tide&map=saltmere&x=150&y=100&z=1";crumb();return}
+  const h=e.target.closest("[data-card]");
+  if(h){const k=h.dataset.card;if(k==="varn")show("P2");else if(k==="coast")show("P4")}
+});
+$("searchBtn").onclick=()=>show("P5");$("campChip").onclick=()=>show("P6");
+document.querySelectorAll(".camp").forEach(c=>c.onclick=()=>show("P1"));
+document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="k"){e.preventDefault();show("P5")}if(e.key==="Escape"&&cur==="P5")show("P2")});
+const h=(location.hash||"").slice(1);show(S[h]?h:"P1");
+</script>

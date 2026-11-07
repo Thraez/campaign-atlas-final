@@ -2,7 +2,7 @@
 
 Goals and acceptance criteria for the rebuild. Replaces `docs/GOALS.md` (2026-10-27) once Isak
 agrees. Words as in `GLOSSARY.md`; new words (ocean, map tree, frame, campaign, story panel,
-monument, DM folder) go there when agreed. Round-1 answers are in `questions-round-1.md`; the flows
+monument, tile pyramid) go there when agreed. Round-1 answers are in `questions-round-1.md`; the flows
 are in `ux-flows.md`. Places where the draft still guesses are marked [Q].
 
 ## What the atlas is for
@@ -17,8 +17,11 @@ hides, fogs and links them, and can write atlas-only notes; a publish puts a spo
 GitHub Pages, one view per campaign. Only Isak and AI agents use the editor. Players see only the
 published site.
 
-The repo is public on purpose, so the site can be tested. Content in the repo today is test
-material and its DM notes are scrap. The world name is undecided (`astrath-deeprealm` for now).
+Public is for testing only. The repo and the GitHub Pages site are public now and hold test
+material (its DM notes are scrap). Before real content is published, hosting moves to Cloudflare
+Pages with access limited to Isak's players ([Q] exact method; Cloudflare Access proposed), and the
+repo goes private. No real vault content is committed before that switch. The world name is
+undecided (`astrath-deeprealm` for now).
 
 ## Areas and when each counts as working
 
@@ -46,17 +49,18 @@ Working means:
 
 ### Campaigns
 
-- A **campaign** is one group of players exploring the same atlas. Each campaign has its own fog and
-  reveal state over the same maps and notes. Players pick their campaign on the site or arrive by its
-  link; the site remembers the choice in the browser.
-- The publish builds one player view per campaign. What is fogged in campaign A ships fogged in A
-  even if campaign B has revealed it.
-- [Q] A campaign changes fog and reveal state only; whether a note or zone is player-visible is the
-  same in every campaign (see `ux-flows.md`, decision 3).
+- A **campaign** is one group of players exploring the same atlas. Each campaign has its own
+  visibility (which notes, zones and maps its players see), its own fog and its own map states.
+  Later, campaigns may have maps of their own. Players arrive by their campaign's link.
+- Visibility can be one value for every campaign, or set per campaign. Unset or invalid counts as
+  `dm`, for every campaign; a campaign not named in a per-campaign value counts as `dm`.
+- The publish builds one player view per campaign. What is hidden or fogged in campaign A ships
+  hidden or fogged in A even if campaign B shows it, and A's players can't open B's view.
 
-Working means: a test with two campaigns that reveal different parts of one map shows each campaign
-only its own reveals, in its images, its atlas and its search index; a campaign link opens straight
-into that campaign.
+Working means: a test with two campaigns, where a note, a zone and a map are visible in one and not
+the other and the fog differs, shows each campaign only its own, in its images, its atlas and its
+search index; every safety scan runs on each campaign's build; a campaign link opens straight into
+that campaign.
 
 ### Story and exploration (player view)
 
@@ -81,7 +85,7 @@ or map, reveal fog for a campaign, draw a route, write about a place, preview as
 players, sync, publish.
 
 - One save state, always visible: saved, saving, or failed with the reason. One save path and one
-  undo for every edit, which changes the source (frontmatter, `world.yaml`, the DM folder, image
+  undo for every edit, which changes the source (frontmatter, `world.yaml`, campaign files, image
   assets), never the compiled atlas.
 - "Preview as players of campaign X" shows the strict player build of the current edits for that
   campaign: no DM headings, no `%%` text, that campaign's fog baked, hidden zones gone.
@@ -97,8 +101,9 @@ Working means:
 
 ### Hidden zones and fog
 
-- A zone (region) or a whole map can be hidden from players; a hidden zone or map and everything only
-  inside it (pins, routes, child maps) never ship.
+- A zone (region) or a whole map can be hidden from players, in every campaign or in some; a hidden
+  zone or map and everything only inside it (pins, routes, child maps) never ship to a campaign it
+  is hidden in.
 - Fog is per map **and per campaign**, baked into that campaign's player images at build time. The
   DM reveals fog in the editor with a campaign chosen; the published site shows each campaign its
   latest reveal. Per-player fog is not a goal.
@@ -120,38 +125,37 @@ Working means: a test checks distance and time on two maps of different scale.
 - Every pin, zone and map can carry a note. "Write about this place" opens its note or creates one.
 - Notes synced from the vault are read-only in the editor: the vault owns them, and the editor only
   places and links them. Notes written in the editor are atlas-only notes, owned by the atlas.
-- An atlas-only note gets a visibility the DM picks (default `dm`); its storage follows the rule
-  under Player safety.
+- An atlas-only note gets a visibility the DM picks (default `dm`), for every campaign or per
+  campaign.
 
 Working means: a test creates a note from a zone in the editor and finds the file with
-`atlas.visibility` set, in the right place for its visibility; the editor refuses to change the text
+`atlas.visibility` set; the editor refuses to change the text
 of a synced note; the Locations list counts every placed note.
 
 ### Player safety (the spine)
 
 - A note with no visibility, or an invalid one, never ships: it counts as `dm` everywhere. ADR-0001
   stays.
-- Every `world.yaml` item (map, layer, frame, region, route, fog reveal, sound area) follows one
-  rule, read in one place: missing or invalid visibility counts as `dm`. Fail closed everywhere.
-  (Decided 2026-11-07; needs an ADR-0001 addendum when built.)
-- A hidden map hides everything under it in the tree.
-- **Content storage: only player-visible text is committed.** DM-only notes, DM blocks split out of
-  player notes, and DM-only text from `world.yaml` items live in a gitignored local DM folder; the
-  build merges them back for the DM build and the editor. The public repo never holds DM text.
-  [Q] where that folder lives so it reaches both computers, and whether source images of fogged or
-  hidden maps count as DM content (see `ux-flows.md`, decisions 1 and 2).
-- What the vault keeps DM-only (`10_DmNotesAndSecrets`, `%%` blocks) never appears in the player
-  build, the search index, any shipped asset or any committed file.
-- Every safety scan passes before a publish, and the publish workflow stops if one fails. The scan
-  list is written once and every caller reads it. A scan of committed content checks that no DM
-  markup or DM-visibility note is staged.
+- Every `world.yaml` item (map, layer, frame, region, route, fog reveal, sound area) and every note
+  follows one rule, read in one place, for every campaign: missing or invalid visibility counts as
+  `dm`. Fail closed everywhere. (Decided 2026-11-07; needs an ADR-0001 addendum when built.)
+- A hidden map hides everything under it in the tree, in each campaign it is hidden in.
+- **Content storage (changed 2026-11-07, follow-up):** player and DM data are both committed, in
+  the same files, marked by visibility; the repo is private by the time it holds real content. The
+  split that matters is the build: only each campaign's player build ships. Until the repo is
+  private, nothing from the real vault is committed.
+- What the vault keeps DM-only (`10_DmNotesAndSecrets`, `%%` blocks) never appears in any player
+  build, search index or shipped asset.
+- Every safety scan passes on every campaign's build before a publish, and the publish stops if one
+  fails. The scan list is written once and every caller reads it. A cross-campaign check proves an
+  item hidden in A and visible in B is absent from A.
 - The weekly dependency audit is green.
 
 ### Sync from Obsidian
 
 Unchanged from 2026-10-27: `01_Lore`, `02_Regions`, `03_Entities`, `04_Factions` sync; the DM-only
-folders, templates, inbox and archive stay out. New: sync writes player-visible text to atlas content
-and DM text (DM-visibility notes, `%%` blocks) to the DM folder. Working means: a dry run over the
+folders, templates, inbox and archive stay out. Synced notes arrive in `content/` with their
+folder's visibility, as today. The first real sync waits for the private repo. Working means: a dry run over the
 real vault writes nothing and lists creates, updates and skips; `01`/`02` notes arrive `player`,
 `03`/`04` arrive `dm`; title, type and links survive; a second run changes nothing; a renamed note
 updates in place; no DM text lands in a committed path; and **Sync has run once end to end on the
@@ -159,9 +163,19 @@ real vault** (eval-13 found it never had).
 
 ### Publish
 
-A merge into `main` publishes. The editor's Publish job shows what will change for each campaign's
-players and the scan results before Isak pushes. Working means: a publish run's log shows every scan
-passing for every campaign, and the live site matches the last preview.
+A merge into `main` publishes: to GitHub Pages (public, test content) until the hosting move, then
+to Cloudflare Pages, one site path per campaign, each open only to that campaign's players. The
+editor's Publish job shows what will change for each campaign's players and the scan results before
+Isak pushes. Working means: a publish run's log shows every scan passing for every campaign; the
+live site matches the last preview; a request without access to any campaign's page, atlas or tile
+is refused.
+
+### Map images
+
+Players zoom in a lot, so map images stay lossless. In the player build each map is cut into a
+tile pyramid (lossless WebP tiles), with each campaign's fog baked into the full image before
+tiling, so the viewer loads only what is on screen and many large maps fit on the ocean. Working
+means: a 16,000 px test map opens on a phone and stays sharp at max zoom; the fog scan checks tiles.
 
 ### Tooling and the Mac
 
@@ -196,7 +210,7 @@ campaigns and fog first; then Tidemarrow with the vault's 16 pins.
 | Only Isak and agents use the editor | kept | |
 | Missing/invalid note visibility is `dm` | kept | extended to every `world.yaml` item |
 | Scans pass before publish, CI blocks | kept | scan list written once; per campaign |
-| DM-only folders never ship | kept | and DM text is never committed |
+| DM-only folders never ship | kept | per campaign; DM data is committed once the repo is private |
 | Weekly dependency audit green | kept | |
 | Sync folders, dry run, visibility, round-trip, idempotence | kept | plus one real end-to-end run |
 | Pins, clicks, fog land where drawn | kept | on every map in the tree and on the ocean |

@@ -1,0 +1,661 @@
+<title>Atlas Editor Wireframes</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IM+Fell+English:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a chart-room table. Picker and redline callout on top, then the E0 shell drawn as a
+   framed wireframe: top bar, labelled task bar + map tree, canvas, inspector. */
+:root{
+  --paper:#e9eef0; --panel:#fbfcfc; --ink:#1c2930; --muted:#596a73; --line:#c4cfd4;
+  --sea:#cfe1e7; --sea-line:#9fbfca; --land:#ece4cf; --land-line:#857654; --land-2:#dfd3b4;
+  --accent:#1d6b74; --accent-ink:#ffffff; --accent-soft:#d5e8ea;
+  --note:#7b3fb3; --note-soft:#f1e8f9;
+  --ok:#2c7a47; --warn:#9a6200; --bad:#b0281f; --fog:#18232a;
+  --f-ui:"Atkinson Hyperlegible",ui-sans-serif,system-ui,sans-serif;
+  --f-map:"IM Fell English",Georgia,"Times New Roman",serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark;
+  --paper:#101619; --panel:#172025; --ink:#e1e8ea; --muted:#95a6ae; --line:#2b3a41;
+  --sea:#14303a; --sea-line:#25525e; --land:#3a3527; --land-line:#ab9b72; --land-2:#4a432f;
+  --accent:#62b8c0; --accent-ink:#0c1a1d; --accent-soft:#1c3a3e;
+  --note:#c79af2; --note-soft:#2a1f36;
+  --ok:#6ac487; --warn:#e3a840; --bad:#f2786d; --fog:#05090b;
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#101619; --panel:#172025; --ink:#e1e8ea; --muted:#95a6ae; --line:#2b3a41;
+  --sea:#14303a; --sea-line:#25525e; --land:#3a3527; --land-line:#ab9b72; --land-2:#4a432f;
+  --accent:#62b8c0; --accent-ink:#0c1a1d; --accent-soft:#1c3a3e;
+  --note:#c79af2; --note-soft:#2a1f36;
+  --ok:#6ac487; --warn:#e3a840; --bad:#f2786d; --fog:#05090b;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font:15px/1.45 var(--f-ui);
+  padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1320px;margin:0 auto;display:grid;gap:14px}
+h1{font:400 28px/1.1 var(--f-map);margin:0;text-wrap:balance}
+.lede{margin:0;color:var(--muted);max-width:70ch}
+.mono{font-family:var(--f-mono);font-size:12px}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--note);outline-offset:2px}
+
+/* screen picker */
+.picker{display:flex;flex-wrap:wrap;gap:6px}
+.picker button{border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:5px 9px;cursor:pointer;display:flex;gap:6px;align-items:baseline;font-size:13px}
+.picker button b{font-family:var(--f-mono);font-size:11px;color:var(--muted);font-weight:500}
+.picker button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.picker button[aria-pressed="true"] b{color:inherit}
+
+/* redline callout */
+.callout{border:1.5px dashed var(--note);background:var(--note-soft);border-radius:6px;padding:10px 14px;display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:baseline}
+.callout .cid{font:500 22px/1 var(--f-mono);color:var(--note)}
+.callout h2{margin:0;font-size:16px}
+.callout h2 span{font-weight:400;color:var(--note);font-family:var(--f-mono);font-size:12px;margin-left:8px;letter-spacing:.04em}
+.callout p{grid-column:2;margin:0;max-width:95ch}
+.callout .fix{grid-column:2;font-size:13px;color:var(--note)}
+.callout .fix:empty{display:none}
+
+/* shell */
+.shell{border:1px solid var(--line);background:var(--panel);border-radius:6px;overflow:hidden;display:grid;
+  grid-template-columns:176px minmax(0,1fr) 312px;grid-template-rows:auto minmax(560px,1fr)}
+.top{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.crumb{display:flex;gap:4px;align-items:center;font-size:14px;flex-wrap:wrap}
+.crumb a{color:var(--accent);text-decoration:none;cursor:pointer}
+.crumb a:last-of-type{color:var(--ink);font-weight:700}
+.crumb .sep{color:var(--muted)}
+.crumb .caret{border:1px solid var(--line);border-radius:3px;padding:0 5px;font-size:11px;color:var(--muted);background:none;cursor:pointer}
+.spacer{flex:1}
+.sel{position:relative}
+.sel>button{border:1px solid var(--line);background:var(--paper);border-radius:4px;padding:4px 10px;cursor:pointer;font-size:13px}
+.sel>button small{color:var(--muted)}
+.menu{position:absolute;top:calc(100% + 4px);left:0;z-index:5;background:var(--panel);border:1px solid var(--line);border-radius:4px;box-shadow:0 6px 20px rgb(0 0 0 / .18);min-width:220px;padding:4px;font-size:13px}
+.menu div{padding:6px 8px;border-radius:3px}
+.menu .on{background:var(--accent-soft)}
+.menu hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+.chip{display:inline-flex;gap:6px;align-items:center;border-radius:999px;padding:3px 10px;font-size:13px;border:1px solid var(--line);cursor:pointer;background:var(--panel)}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--ok);display:block}
+.chip[data-s="saving"] i{background:var(--warn);animation:pulse 1s infinite}
+.chip[data-s="failed"]{border-color:var(--bad);color:var(--bad)} .chip[data-s="failed"] i{background:var(--bad)}
+.chip[data-s="disk"]{border-color:var(--warn)} .chip[data-s="disk"] i{background:var(--warn)}
+.chip u{text-decoration:none;border:1px solid currentColor;border-radius:3px;padding:0 5px;font-size:12px}
+@keyframes pulse{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.chip i{animation:none!important}}
+.iconbtn{border:1px solid var(--line);background:none;border-radius:4px;padding:3px 8px;font-size:13px;cursor:pointer}
+.btn{border:1px solid var(--accent);background:none;color:var(--accent);border-radius:4px;padding:5px 12px;font-size:13px;cursor:pointer;font-weight:700}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+/* left column */
+.left{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.tasks{display:grid;gap:2px;padding:8px}
+.tasks .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:6px 6px 2px}
+.tasks button{display:flex;justify-content:space-between;align-items:center;border:0;background:none;text-align:left;padding:6px 8px;border-radius:4px;cursor:pointer;font-size:14px}
+.tasks button:hover{background:var(--paper)}
+.tasks button kbd{font:11px var(--f-mono);color:var(--muted)}
+.tasks button.act{background:var(--accent);color:var(--accent-ink)} .tasks button.act kbd{color:inherit}
+.tree{border-top:1px solid var(--line);padding:8px 8px 10px 10px;font-size:13px;overflow:auto;flex:1}
+.tree ul{list-style:none;margin:0;padding-left:14px} .tree>ul{padding-left:0}
+.tree li{padding:2px 0}
+.tree .me{background:var(--accent-soft);border-radius:3px;padding:1px 4px}
+.tree .drag{outline:1.5px dashed var(--note);border-radius:3px;padding:1px 4px}
+.badge{font-size:10px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--muted);color:var(--muted);border-radius:3px;padding:0 4px;margin-left:4px}
+.badge.dm{border-color:var(--bad);color:var(--bad)}
+.unplaced{margin-top:8px;padding:6px;border:1px solid var(--warn);border-radius:4px;color:var(--warn)}
+
+/* canvas */
+.canvas{position:relative;background:var(--sea);min-height:0;overflow:hidden}
+.canvas>svg{display:block;width:100%;height:100%}
+.ovl{position:absolute;font-size:12px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:4px 8px}
+.zoom{right:10px;bottom:10px;display:grid;padding:0}
+.zoom span{padding:2px 9px;text-align:center} .zoom span+span{border-top:1px solid var(--line)}
+.scale{left:10px;bottom:10px}
+.strip{left:10px;right:60px;bottom:44px;background:var(--fog);color:#e8eef0;border-color:transparent}
+.sheet{position:absolute;inset:0;background:var(--panel);overflow:auto;padding:18px 20px}
+.sheet h3{margin:0 0 8px;font-size:18px}
+
+/* svg classes */
+.sea-t{fill:url(#waves)}
+.sheetimg{fill:var(--land-2);stroke:var(--land-line);stroke-width:1;opacity:.55}
+.land{fill:var(--land);stroke:var(--land-line);stroke-width:2}
+.reg{fill:none;stroke:var(--land-line);stroke-width:1;stroke-dasharray:4 3}
+.terr{fill:none;stroke:var(--land-line);stroke-width:1.2}
+.ml{font-family:var(--f-map);fill:var(--ink)}
+.ml.big{font-size:30px;letter-spacing:.18em}
+.ml.mid{font-size:17px;font-style:italic}
+.ml.sm{font-size:13px}
+.ml.sea{fill:var(--sea-line);font-size:26px;font-style:italic;letter-spacing:.1em}
+.frame{fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4}
+.pin{fill:var(--accent);stroke:var(--panel);stroke-width:2}
+.pin.mon{fill:var(--warn)} .pin.per{fill:var(--note)}
+.sel-outline{fill:var(--accent);fill-opacity:.14;stroke:var(--accent);stroke-width:2.5}
+.hatch{fill:url(#hatch);stroke:var(--bad);stroke-width:2.5}
+.handle{fill:var(--panel);stroke:var(--accent);stroke-width:2}
+.note-mark{fill:var(--note)} .note-line{stroke:var(--note);stroke-width:1.5;fill:none;stroke-dasharray:3 3}
+.nt{font:600 12px var(--f-mono);fill:var(--note)}
+.fogfill{fill:var(--fog);opacity:.78}
+.route{fill:none;stroke:var(--ink);stroke-width:1.8;stroke-dasharray:2 4;stroke-linecap:round}
+.city-w{fill:var(--sea)} .city-b{fill:var(--land-2);stroke:var(--land-line)} .city-s{stroke:var(--land-line);stroke-width:1.5;fill:none}
+
+/* inspector */
+.insp{border-left:1px solid var(--line);overflow:auto;padding:12px 14px;display:grid;gap:12px;align-content:start;font-size:14px}
+.insp h3{margin:0;font-size:16px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.insp h3 small{font:400 11px var(--f-mono);color:var(--muted)}
+.insp h4{margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.fld{display:grid;gap:3px}
+.fld label{font-size:12px;color:var(--muted)}
+.inp{border:1px solid var(--line);border-radius:4px;padding:5px 8px;background:var(--paper);font-size:13px;min-height:30px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>.fld{flex:1;min-width:90px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;font-size:13px}
+.seg span{padding:4px 10px} .seg span+span{border-left:1px solid var(--line)}
+.seg .on{background:var(--accent);color:var(--accent-ink)}
+.drop{border:2px dashed var(--line);border-radius:6px;padding:12px;text-align:center;color:var(--muted);font-size:13px}
+.file{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:4px;padding:6px}
+.thumb{width:56px;height:38px;border-radius:3px;background:var(--land-2);flex:none;display:block}
+.list{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:13px}
+.list li{display:flex;gap:8px;align-items:baseline;justify-content:space-between;border-bottom:1px solid var(--line);padding:3px 0}
+.list li:last-child{border-bottom:0}
+.tag{font:11px var(--f-mono);color:var(--muted)}
+.where{font:11px/1.4 var(--f-mono);color:var(--muted);border-top:1px solid var(--line);padding-top:8px}
+.ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+.banner{border-radius:4px;padding:6px 10px;font-size:13px;border:1px solid var(--warn);color:var(--warn)}
+.body{border:1px solid var(--line);border-radius:4px;padding:8px;background:var(--paper);font-size:13px;line-height:1.5;position:relative}
+.body a{color:var(--accent)}
+.body .plain{border-bottom:1.5px dotted var(--bad)}
+.pick{position:absolute;left:30px;top:84px;background:var(--panel);border:1px solid var(--line);border-radius:4px;box-shadow:0 6px 18px rgb(0 0 0 / .2);padding:4px;width:210px;z-index:2}
+.pick div{padding:4px 6px;border-radius:3px} .pick .on{background:var(--accent-soft)}
+.slider{height:4px;background:var(--line);border-radius:2px;position:relative;margin:8px 0}
+.slider i{position:absolute;top:-5px;width:14px;height:14px;border-radius:50%;background:var(--accent)}
+.tools{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tools span{border:1px solid var(--line);border-radius:4px;padding:6px;text-align:center;font-size:13px}
+.tools .on{border-color:var(--accent);background:var(--accent-soft);font-weight:700}
+.cbx{display:inline-block;width:13px;height:13px;border:1.5px solid var(--muted);border-radius:2px;vertical-align:-2px;margin-right:4px}
+.cbx.on{background:var(--accent);border-color:var(--accent)}
+
+/* sheets: preview, publish, campaigns */
+.pv{position:absolute;inset:0;display:grid;grid-template-rows:auto 1fr}
+.pvbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:8px 12px;background:var(--accent-soft);border-bottom:2px solid var(--ok);font-size:13px}
+.pvbody{position:relative;overflow:hidden}
+.pvbody svg{display:block;width:100%;height:100%}
+.pvui{position:absolute;font-size:12px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.card{border:1px solid var(--line);border-radius:6px;padding:12px;display:grid;gap:6px;align-content:start}
+.scan li span:first-child{display:flex;gap:6px}
+.pic{height:80px;border-radius:4px;background:linear-gradient(160deg,var(--sea),var(--land-2));display:block}
+
+@media (max-width:900px){
+  .shell{grid-template-columns:1fr;grid-template-rows:auto}
+  .left{border-right:0;border-bottom:1px solid var(--line)}
+  .tasks{grid-auto-flow:column;grid-auto-columns:max-content;overflow-x:auto}
+  .tasks .lbl{display:none}
+  .canvas{height:420px}
+  .insp{border-left:0;border-top:1px solid var(--line)}
+  .callout{grid-template-columns:1fr} .callout p,.callout .fix{grid-column:1}
+}
+</style>
+
+<!-- shared drawing defs -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <pattern id="waves" width="40" height="16" patternUnits="userSpaceOnUse">
+      <path d="M0 8 q10 -6 20 0 t20 0" fill="none" style="stroke:var(--sea-line)" stroke-width="1" opacity=".6"/>
+    </pattern>
+    <pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="10" height="10" style="fill:var(--bad)" opacity=".12"/>
+      <line x1="0" y1="0" x2="0" y2="10" style="stroke:var(--bad)" stroke-width="3" opacity=".5"/>
+    </pattern>
+    <mask id="fogmask">
+      <rect width="1000" height="560" fill="#fff"/>
+      <circle cx="650" cy="345" r="120" fill="#000"/>
+      <circle cx="520" cy="430" r="70" fill="#000"/>
+      <circle cx="420" cy="470" r="55" fill="#000"/>
+    </mask>
+    <path id="r-high" d="M240 82 L420 46 L585 76 L560 205 L380 222 L222 190 Z"/>
+    <path id="r-ash" d="M190 222 L382 232 L402 380 L332 472 L250 442 L186 330 Z"/>
+    <path id="r-coast" d="M572 205 L712 162 L752 282 L700 410 L562 492 L420 502 L410 362 L560 300 Z"/>
+    <!-- Varn map image, 1000x560 -->
+    <symbol id="varnmap" viewBox="0 0 1000 560">
+      <path class="land" d="M222 62 L330 40 L430 30 L520 46 L605 60 L670 104 L722 152 L748 214 L762 282 L734 352 L700 420 L630 472 L560 512 L470 526 L380 520 L300 490 L250 450 L206 392 L180 330 L170 262 L172 190 L190 120 Z"/>
+      <use href="#r-high" class="reg"/><use href="#r-ash" class="reg"/><use href="#r-coast" class="reg"/>
+      <path class="terr" d="M290 140 l14 -20 l14 20 M330 120 l16 -24 l16 24 M380 150 l12 -18 l12 18 M440 110 l15 -22 l15 22 M500 150 l12 -17 l12 17"/>
+      <path class="terr" d="M240 300 h18 M270 320 h14 M230 350 h16 M290 380 h18 M260 410 h14 M320 340 h16" />
+      <text class="ml mid" x="330" y="190">Highmoor</text>
+      <text class="ml mid" x="236" y="270">Ashfen</text>
+      <text class="ml mid" x="560" y="250">Saltmere Coast</text>
+    </symbol>
+    <!-- Ossery map image -->
+    <symbol id="osserymap" viewBox="0 0 600 500">
+      <path class="land" d="M90 120 L190 60 L320 50 L450 86 L530 170 L540 280 L490 380 L380 440 L250 446 L150 400 L80 310 L64 210 Z"/>
+      <path class="reg" d="M200 70 L310 250 L180 420"/><path class="reg" d="M310 250 L520 230"/>
+      <path class="terr" d="M360 140 l14 -20 l14 20 M400 160 l14 -20 l14 20 M150 300 l12 -16 l12 16"/>
+    </symbol>
+    <!-- Saltmere city image, 300x200 -->
+    <symbol id="citymap" viewBox="0 0 300 200">
+      <rect width="300" height="200" class="city-b"/>
+      <path class="city-w" d="M180 0 H300 V200 H150 Q190 150 170 100 Q150 50 180 0 Z"/>
+      <g class="city-b"><rect x="20" y="20" width="40" height="30"/><rect x="70" y="20" width="50" height="30"/><rect x="20" y="60" width="30" height="40"/><rect x="60" y="60" width="60" height="40"/><rect x="20" y="110" width="50" height="35"/><rect x="80" y="110" width="40" height="60"/><rect x="130" y="20" width="30" height="50"/></g>
+      <path class="city-s" d="M10 55 H165 M10 105 H160 M65 10 V190 M125 10 V190"/>
+      <circle cx="160" cy="150" r="9" style="fill:var(--warn)"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <header style="display:grid;gap:6px">
+    <h1>Campaign Atlas editor, wireframes</h1>
+    <p class="lede">The DM's editor for the Sundered Sea, drawn as the E0 shell with each screen from <span class="mono">ux-flows.md</span> as a state. Pick a screen; the violet dashed box explains it and names its flow. Click the save chip to cycle its four states.</p>
+  </header>
+
+  <nav class="picker" id="picker" aria-label="Screens"></nav>
+
+  <section class="callout" id="callout" aria-live="polite">
+    <div class="cid" id="c-id">E1</div><h2 id="c-t">Ocean home</h2>
+    <p id="c-w"></p>
+    <div class="fix" id="c-f"></div>
+  </section>
+
+  <div class="shell" id="shell">
+    <!-- E0 top bar: always visible -->
+    <div class="top">
+      <nav class="crumb" id="crumb" aria-label="Where you are"></nav>
+      <button class="caret" title="Open the map tree">tree ▾</button>
+      <span class="spacer"></span>
+      <div class="sel">
+        <button id="campBtn">Campaign: <b>Red Tide</b> <small>▾</small></button>
+        <div class="menu" data-on="E13">
+          <div class="on">Red Tide <span class="tag">· 4 players</span></div>
+          <div>Grey Lantern <span class="tag">· 3 players</span></div>
+          <hr><div>+ New campaign</div><div>Manage campaigns…</div>
+        </div>
+      </div>
+      <button class="chip" id="chip" data-s="saved" title="Save state. Click to see the other states."><i></i><span id="chipText">Saved</span></button>
+      <span class="row" style="gap:4px"><button class="iconbtn" title="Undo (Ctrl+Z)">↶ Undo</button><button class="iconbtn" title="Redo (Ctrl+Shift+Z)">↷</button></span>
+      <button class="btn" id="tPrev">Preview as players</button>
+      <button class="btn primary" id="tPub">Publish</button>
+    </div>
+
+    <!-- task bar + map tree -->
+    <aside class="left">
+      <div class="tasks" id="tasks">
+        <div class="lbl">Maps</div>
+        <button data-t="E3">Add map <kbd>A</kbd></button>
+        <button data-t="E4">Align <kbd>L</kbd></button>
+        <button data-t="E5">Frame &amp; nest <kbd>N</kbd></button>
+        <div class="lbl">Story</div>
+        <button data-t="E9">Place pin <kbd>P</kbd></button>
+        <button data-t="E8">Note <kbd>W</kbd></button>
+        <button data-t="E9">Route <kbd>R</kbd></button>
+        <div class="lbl">Secrets</div>
+        <button data-t="E6">Hide area <kbd>H</kbd></button>
+        <button data-t="E7">Fog <kbd>F</kbd></button>
+        <div class="lbl">Vault</div>
+        <button data-t="E10">Sync <kbd>S</kbd></button>
+        <button data-t="E2">Map tree <kbd>T</kbd></button>
+        <button data-t="E13">Campaigns</button>
+      </div>
+      <div class="tree" data-on="E2 E5 E6 E10">
+        <ul>
+          <li><b>Ocean</b> <span class="tag">atlas.yaml</span>
+            <ul>
+              <li>Varn <span class="tag">world</span>
+                <ul>
+                  <li><span class="me">Varn</span> <span class="tag">map</span>
+                    <ul>
+                      <li data-on="E5 E6 E10"><span class="drag" data-on="E5">Saltmere</span><span data-on="E6 E10">Saltmere</span> <span class="tag">city</span> <span class="badge dm">dm</span></li>
+                      <li>Ashfen Undercroft <span class="badge dm">hidden</span>
+                        <ul><li>Choir Vault <span class="badge dm">hidden</span></li></ul></li>
+                    </ul>
+                  </li>
+                </ul>
+              </li>
+              <li>Ossery <span class="tag">world</span>
+                <ul><li>Ossery <span class="tag">map</span></li></ul></li>
+            </ul>
+          </li>
+        </ul>
+        <div data-on="E2"><ul style="padding-left:14px"><li><span class="drag">Saltmere</span> <span class="tag">city · no parent</span> <span class="badge dm">dm</span></li></ul></div>
+        <div class="unplaced">12 notes with no place <a style="color:inherit;font-weight:700">Place them</a></div>
+      </div>
+    </aside>
+
+    <!-- canvas -->
+    <main class="canvas" id="canvas">
+      <!-- OCEAN VIEW -->
+      <svg viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid slice" data-on="E1 E2 E10 E13" role="img" aria-label="Ocean canvas with Varn and Ossery">
+        <rect width="1000" height="560" class="sea-t"/>
+        <g transform="rotate(-3 270 280)"><rect x="70" y="120" width="420" height="250" class="sheetimg"/><use href="#varnmap" x="70" y="120" width="420" height="250"/></g>
+        <g transform="rotate(4 730 260)"><rect x="560" y="100" width="340" height="300" class="sheetimg"/><use href="#osserymap" x="560" y="100" width="340" height="300"/></g>
+        <text class="ml big" x="190" y="110">VARN</text>
+        <text class="ml big" x="650" y="90">OSSERY</text>
+        <text class="ml sea" x="380" y="480">The Sundered Sea</text>
+        <circle cx="520" cy="300" r="6" class="land"/><circle cx="540" cy="320" r="4" class="land"/>
+        <g data-on="E1"><rect x="64" y="112" width="432" height="262" fill="none" class="note-line" transform="rotate(-3 270 280)"/>
+          <text class="nt" x="70" y="400">fit to every world map on open</text></g>
+        <g data-on="E2"><rect x="70" y="120" width="420" height="250" class="sel-outline" fill-opacity=".08" transform="rotate(-3 270 280)"/></g>
+      </svg>
+
+      <!-- VARN VIEW -->
+      <svg viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid meet" data-on="E3 E4 E5 E6 E7 E8 E9" role="img" aria-label="Varn map">
+        <rect width="1000" height="560" class="sea-t"/>
+        <use href="#varnmap" width="1000" height="560"/>
+        <!-- frame and pins, normal -->
+        <g data-on="E6 E7 E8 E9">
+          <rect x="600" y="300" width="96" height="62" class="frame" transform="rotate(-8 648 331)"/>
+          <text class="ml sm" x="602" y="292">Saltmere</text>
+        </g>
+        <g data-on="E3 E4 E6 E8 E9"><path class="route" d="M300 340 Q420 400 610 340"/></g>
+        <g data-on="E3 E4 E5 E6 E8 E9">
+          <circle cx="300" cy="340" r="7" class="pin"/><text class="ml sm" x="312" y="344">Fenwatch</text>
+        </g>
+        <g data-on="E5 E6 E7 E8 E9">
+          <path class="pin mon" d="M660 386 l9 9 l-9 9 l-9 -9 Z"/><text class="ml sm" x="674" y="400">The Drowned Bell</text>
+          <circle cx="630" cy="322" r="6" class="pin per"/><circle cx="690" cy="420" r="6" class="pin per"/>
+        </g>
+        <!-- E3: ghost of where the new map will go -->
+        <g data-on="E3"><rect x="580" y="285" width="130" height="90" fill="none" class="note-line"/><text class="nt" x="560" y="275">new map opens here, in Align</text></g>
+        <!-- E4: align overlay at 60% -->
+        <g data-on="E4">
+          <g transform="rotate(-8 648 331)">
+            <use href="#citymap" x="560" y="270" width="176" height="118" opacity=".6"/>
+            <rect x="560" y="270" width="176" height="118" fill="none" style="stroke:var(--accent)" stroke-width="2"/>
+            <rect x="554" y="264" width="12" height="12" class="handle"/><rect x="730" y="264" width="12" height="12" class="handle"/>
+            <rect x="554" y="382" width="12" height="12" class="handle"/><rect x="730" y="382" width="12" height="12" class="handle"/>
+            <line x1="648" y1="270" x2="648" y2="240" style="stroke:var(--accent)" stroke-width="2"/><circle cx="648" cy="236" r="7" class="handle"/>
+          </g>
+          <circle cx="589" cy="306" r="9" class="note-mark"/><text x="585" y="310" fill="#fff" font-size="11" font-family="monospace">1</text>
+          <circle cx="707" cy="364" r="9" class="note-mark"/><text x="703" y="368" fill="#fff" font-size="11" font-family="monospace">2</text>
+          <text class="nt" x="760" y="250">rotate · snaps 15°</text>
+          <text class="nt" x="760" y="300">two-point align: pick 1 and 2</text>
+        </g>
+        <!-- E5: frame being drawn with child preview -->
+        <g data-on="E5">
+          <g transform="rotate(-8 648 331)">
+            <use href="#citymap" x="600" y="300" width="96" height="62"/>
+            <rect x="600" y="300" width="96" height="62" fill="none" style="stroke:var(--accent)" stroke-width="3"/>
+            <rect x="594" y="294" width="12" height="12" class="handle"/><rect x="690" y="356" width="12" height="12" class="handle"/>
+          </g>
+          <text class="ml sm" x="602" y="290">Saltmere</text>
+          <path class="note-line" d="M180 120 C 380 110 520 220 600 300"/>
+          <text class="nt" x="140" y="110">dragged from the map tree onto Varn</text>
+          <text class="nt" x="712" y="300">double-click to enter</text>
+        </g>
+        <!-- E6 hidden zone -->
+        <g data-on="E6">
+          <use href="#r-ash" class="hatch"/>
+          <circle cx="190" cy="222" r="6" class="handle"/><circle cx="382" cy="232" r="6" class="handle"/><circle cx="402" cy="380" r="6" class="handle"/><circle cx="332" cy="472" r="6" class="handle"/><circle cx="186" cy="330" r="6" class="handle"/>
+          <rect x="250" y="400" width="44" height="30" fill="none" style="stroke:var(--bad)" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <text class="ml sm" x="214" y="452">Ashfen Undercroft</text>
+          <text class="nt" x="200" y="500">hidden from players · 4 things inside</text>
+        </g>
+        <!-- E7 fog -->
+        <g data-on="E7">
+          <rect width="1000" height="560" class="fogfill" mask="url(#fogmask)"/>
+          <circle cx="470" cy="300" r="40" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="5 4"/>
+          <text x="520" y="292" fill="#fff" font-size="12" font-family="monospace">reveal brush · 80 px</text>
+        </g>
+        <!-- E8 selection: monument pin -->
+        <g data-on="E8"><circle cx="660" cy="395" r="20" fill="none" style="stroke:var(--accent)" stroke-width="2.5"/></g>
+        <!-- E9 selection: region -->
+        <g data-on="E9"><use href="#r-coast" class="sel-outline"/></g>
+      </svg>
+
+      <div class="ovl scale mono" data-on="E1 E2 E3 E4 E5 E6 E7 E8 E9 E10 E13">0 ─── 100 leagues</div>
+      <div class="ovl zoom mono" data-on="E1 E2 E3 E4 E5 E6 E7 E8 E9 E10 E13"><span>+</span><span>−</span><span>fit</span></div>
+      <div class="ovl strip" data-on="E7">Campaign Red Tide: 3 maps fogged, 12 reveals · last published reveal 2 Nov · this map: <b>Fogged</b></div>
+
+      <!-- E11 preview -->
+      <div class="pv" data-on="E11">
+        <div class="pvbar">
+          <b>Preview: campaign Red Tide</b><span>built 12:04 from saved state</span>
+          <span class="ok">✓ secret scan</span><span class="ok">✓ derived-secret scan</span><span class="tag">no DM folder read</span>
+          <span class="spacer"></span><button class="btn">Back to editing</button>
+        </div>
+        <div class="pvbody" style="background:var(--sea)">
+          <svg viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Player preview of Varn">
+            <rect width="1000" height="560" class="sea-t"/>
+            <use href="#varnmap" width="1000" height="560"/>
+            <rect width="1000" height="560" class="fogfill" mask="url(#fogmask)"/>
+            <rect x="600" y="300" width="96" height="62" fill="none" style="stroke:var(--panel)" stroke-width="2" opacity=".8" transform="rotate(-8 648 331)"/>
+            <path class="pin mon" d="M660 386 l9 9 l-9 9 l-9 -9 Z"/>
+          </svg>
+          <span class="pvui" style="left:12px;top:12px">Ocean › <b>Varn</b></span>
+          <span class="pvui" style="right:12px;top:12px">Search Ctrl+K · Red Tide ▾</span>
+          <span class="pvui" style="left:12px;bottom:12px">Legend</span>
+          <span class="pvui" style="right:12px;bottom:12px;border-radius:4px;border-color:var(--note);color:var(--note)">Fenwatch and Ashfen are gone: hidden area</span>
+        </div>
+      </div>
+
+      <!-- E12 publish -->
+      <div class="sheet" data-on="E12">
+        <h3>Publish check</h3>
+        <div class="cols">
+          <div class="card"><h4 style="margin:0">Red Tide: what players get</h4>
+            <ul class="list"><li>New map <span>Saltmere</span></li><li>New notes <span>The Drowned Bell, Oduya Venn</span></li><li>Reveals <span>3 on Varn</span></li><li>Removed <span class="warn">Fenwatch pin (now hidden)</span></li></ul></div>
+          <div class="card"><h4 style="margin:0">Grey Lantern: what players get</h4>
+            <ul class="list"><li>New notes <span>The Drowned Bell, Oduya Venn</span></li><li>Reveals <span>none</span></li><li>Saltmere <span class="tag">unknown to this campaign</span></li></ul></div>
+          <div class="card scan"><h4 style="margin:0">Scans</h4>
+            <ul class="list">
+              <li><span><b class="ok">✓</b> Secrets</span><span class="tag">2 builds</span></li>
+              <li><span><b class="bad">✕</b> Derived secrets</span><span class="tag">Red Tide</span></li>
+              <li><span><b class="ok">✓</b> Player secrets</span></li>
+              <li><span><b class="ok">✓</b> Image privacy</span></li>
+              <li><span><b class="ok">✓</b> Fog baked</span><span class="tag">5 maps × 2</span></li>
+              <li><span><b class="ok">✓</b> Shape</span></li>
+              <li><span><b class="ok">✓</b> Asset audit</span></li>
+              <li><span><b class="ok">✓</b> DM folder not staged in git</span></li>
+            </ul></div>
+        </div>
+        <div class="banner" style="border-color:var(--bad);color:var(--bad);margin-top:14px">
+          <b>Blocked.</b> Derived secret in Red Tide's search index: "Tide-Eater" comes from <span class="mono">content/varn/people/oduya-venn.md</span>, line 14, a <span class="mono">:::dm</span> block that was not closed. <a style="color:inherit;font-weight:700;text-decoration:underline">Show in editor</a>
+        </div>
+        <div class="row" style="margin-top:8px"><span class="warn">Warnings: 1 monument with no picture · Saltmere has no scale</span><span class="spacer"></span><button class="btn primary" disabled>Commit and open PR</button></div>
+      </div>
+
+      <!-- E13 campaigns: overlays ocean -->
+      <div class="sheet" data-on="E13" style="inset:24px 24px auto auto;width:min(560px,calc(100% - 48px));border:1px solid var(--line);border-radius:6px;box-shadow:0 10px 30px rgb(0 0 0 / .2)">
+        <h3>Campaigns</h3>
+        <div class="cols" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+          <div class="card"><span class="pic"></span><b>Red Tide</b><span class="tag">red-tide · 4 players</span><span>Smugglers chasing the bell that rang under the sea.</span><span class="row"><button class="iconbtn">Rename</button><button class="iconbtn">Picture</button><button class="iconbtn">Copy link</button></span></div>
+          <div class="card"><span class="pic"></span><b>Grey Lantern</b><span class="tag">grey-lantern · 3 players</span><span>Pilgrims crossing Ossery by lamplight.</span><span class="row"><button class="iconbtn">Rename</button><button class="iconbtn">Picture</button><button class="iconbtn">Copy link</button></span></div>
+        </div>
+        <div class="card" style="margin-top:12px;border-style:dashed"><b>New campaign</b>
+          <div class="row"><div class="fld"><label>Name</label><div class="inp">Ember Court</div></div><div class="fld"><label>Starts with fog</label><div class="seg"><span class="on">All fogged</span><span>Copy Red Tide</span></div></div></div>
+          <div class="fld"><label>One line for players</label><div class="inp">A new table, starting in Saltmere.</div></div>
+          <span class="row"><span class="spacer"></span><button class="btn primary">Create campaign</button></span>
+        </div>
+      </div>
+    </main>
+
+    <!-- inspector -->
+    <aside class="insp" id="insp">
+      <!-- E1 -->
+      <div data-on="E1" style="display:grid;gap:10px">
+        <h3>Nothing selected <small>E9</small></h3>
+        <p style="margin:0;color:var(--muted)">Click a map, region or pin to see it here, or pick a job on the left.</p>
+        <h4>This atlas</h4>
+        <ul class="list"><li>Worlds <span>2</span></li><li>Maps <span>5 (2 hidden)</span></li><li>Campaigns <span>Red Tide, Grey Lantern</span></li><li>Notes with no place <span class="warn">12</span></li><li>Last publish <span>2 Nov, 21:40</span></li></ul>
+      </div>
+      <!-- E2 -->
+      <div data-on="E2" style="display:grid;gap:10px">
+        <h3>Map tree <small>E2</small></h3>
+        <p style="margin:0">Saltmere has no parent yet. Drag it onto <b>Varn</b> in the tree, or select it and choose <b>Frame &amp; nest</b>.</p>
+        <h4>Legend</h4>
+        <ul class="list"><li><span><span class="badge dm">hidden</span></span><span>hidden map: its whole subtree is hidden</span></li><li><span><span class="badge dm">dm</span></span><span>new map, not yet for players</span></li></ul>
+      </div>
+      <!-- E3 -->
+      <div data-on="E3" style="display:grid;gap:10px">
+        <h3>Add map <small>E3 · Esc closes</small></h3>
+        <div class="file"><span class="thumb"></span><div><b>saltmere-harbour.png</b><div class="tag">4096 × 2731 · 6.1 MB · PNG</div></div></div>
+        <div class="drop">Drop another PNG, JPEG or WebP, or <u>choose a file</u></div>
+        <div class="fld"><label>Where does it go?</label><div class="seg"><span>On the ocean</span><span class="on">Inside a map</span></div></div>
+        <div class="fld"><label>Parent map</label><div class="inp">Varn ▾ <span class="tag">(the map on screen)</span></div></div>
+        <div class="row"><div class="fld"><label>Name</label><div class="inp">Saltmere</div></div><div class="fld"><label>World</label><div class="inp">Varn ▾</div></div></div>
+        <div class="fld"><label>Visibility</label><div class="seg"><span class="on">DM only</span><span>Rumor</span><span>Player</span></div></div>
+        <div class="fld"><label>Scale</label><div class="inp">Set later with the ruler ▾</div></div>
+        <div class="row"><span class="spacer"></span><button class="btn primary">Add and align</button></div>
+        <div class="where">writes: .atlas-dm/images/saltmere.png, a map entry in world.dm.yaml (parent: varn). Undo removes both.</div>
+      </div>
+      <!-- E4 -->
+      <div data-on="E4" style="display:grid;gap:10px">
+        <h3>Align Saltmere <small>E4</small></h3>
+        <p style="margin:0;font-size:13px;color:var(--muted)">Drag to move, corners to scale (Shift keeps the ratio), top handle to rotate (Alt frees it).</p>
+        <div class="row"><div class="fld"><label>x</label><div class="inp mono">648</div></div><div class="fld"><label>y</label><div class="inp mono">331</div></div></div>
+        <div class="row"><div class="fld"><label>Scale</label><div class="inp mono">0.043</div></div><div class="fld"><label>Rotation</label><div class="inp mono">−8°</div></div></div>
+        <div class="fld"><label>Opacity while aligning · 60 %</label><div class="slider"><i style="left:58%"></i></div></div>
+        <h4>Two-point align</h4>
+        <ol style="margin:0;padding-left:18px;font-size:13px"><li class="ok">Harbour mouth on Saltmere, then on Varn ✓</li><li><b>Bell tower on Saltmere</b>, then on Varn</li></ol>
+        <div class="row"><button class="iconbtn">Send back</button><button class="iconbtn">Bring forward</button><span class="spacer"></span><button class="btn primary">Done</button></div>
+        <div class="where">each drag end is one undo step. writes the frame in Varn's coordinates; Saltmere's own pins never move.</div>
+      </div>
+      <!-- E5 -->
+      <div data-on="E5" style="display:grid;gap:10px">
+        <h3>Frame &amp; nest <small>E5</small></h3>
+        <p style="margin:0"><b>Saltmere</b> now lives inside <b>Varn</b>.</p>
+        <div class="fld"><label>Frame label</label><div class="inp">Saltmere</div></div>
+        <div class="fld"><label>Visibility</label><div class="inp">Same as Saltmere: DM only <span class="badge dm">dm</span></div></div>
+        <div class="fld"><label>Players enter at zoom · 3.5</label><div class="slider"><i style="left:64%"></i></div><span class="tag">Varn 0.5–4 · past 3.5 the view hands over to Saltmere</span></div>
+        <div class="fld"><label>Second way in</label><div class="inp">Pin "Saltmere" links to this map ✓</div></div>
+        <div class="row"><button class="iconbtn">Rotate frame</button><span class="spacer"></span><button class="btn primary">Enter Saltmere ↘</button></div>
+        <div class="where">writes parent + frame on Saltmere in world.yaml. A map can't nest under its own child (refused).</div>
+      </div>
+      <!-- E6 -->
+      <div data-on="E6" style="display:grid;gap:10px">
+        <h3>Hide area <small>E6</small></h3>
+        <div class="fld"><label>Shape</label><div class="seg"><span>Draw polygon</span><span class="on">Use region: Ashfen</span></div></div>
+        <div class="fld"><label>Name</label><div class="inp">Ashfen (the drowned choir)</div></div>
+        <h4>These 4 things will be hidden too</h4>
+        <ul class="list">
+          <li>Fenwatch <span class="tag">pin</span></li>
+          <li>Old Causeway <span class="tag">route, only inside</span></li>
+          <li>Ashfen Undercroft <span class="tag">child map + 1 below</span></li>
+          <li>The Drowning Choir <span class="tag">note placed only here</span></li>
+        </ul>
+        <div class="banner">Fenwatch sits 4 px from the edge. Nudge it out if players should see it.</div>
+        <div class="fld"><label>DM note (never shipped)</label><div class="inp">Choir cult hides here until session 9.</div></div>
+        <div class="row"><span class="tag">or hide the whole map:</span><span class="seg"><span>Varn: shown</span></span></div>
+        <div class="row"><span class="spacer"></span><button class="btn primary">Hide from players</button></div>
+        <div class="where">moves the zone and the 4 items to .atlas-dm/varn/world.dm.yaml. Nothing hidden stays in a committed file.</div>
+      </div>
+      <!-- E7 -->
+      <div data-on="E7" style="display:grid;gap:10px">
+        <h3>Fog for Red Tide <small>E7</small></h3>
+        <div class="fld"><label>This map for Red Tide</label><div class="seg"><span>Unknown</span><span class="on">Fogged</span><span>Open</span></div></div>
+        <h4>Tools</h4>
+        <div class="tools"><span class="on">Reveal: brush</span><span>Reveal: polygon</span><span>Reveal: circle</span><span>Cover again</span></div>
+        <div class="fld"><label>Reveal around a pin</label><div class="inp">Click a pin on the map, or pick: The Drowned Bell ▾</div></div>
+        <div class="fld"><label>Brush size · 80 px</label><div class="slider"><i style="left:35%"></i></div></div>
+        <h4>Reveals on Varn</h4>
+        <ul class="list"><li>Saltmere harbour <span class="tag">circle · 30 Oct</span></li><li>Road to Fenwatch <span class="tag">brush · 2 Nov</span></li><li>South landing <span class="tag">brush · today</span></li></ul>
+        <div class="where">writes content/_atlas/campaigns/red-tide.yaml. Fog bakes into Red Tide's images at build. One undo step per stroke.</div>
+      </div>
+      <!-- E8 -->
+      <div data-on="E8" style="display:grid;gap:10px">
+        <h3>The Drowned Bell <small>E8 · atlas-only note</small></h3>
+        <div class="row"><div class="fld"><label>Type</label><div class="inp">Monument ▾</div></div><div class="fld"><label>Visibility</label><div class="inp">Player ▾</div></div></div>
+        <div class="file"><span class="thumb" style="background:linear-gradient(160deg,var(--sea),var(--warn))"></span><div><b>bell-at-low-tide.webp</b><div class="tag">picture · featured in Saltmere Coast</div></div></div>
+        <div class="fld"><label>Body</label>
+          <div class="body">A bronze bell the size of a cottage, sunk off <a>[[Saltmere]]</a> harbour. At the lowest tides it rings once. <a>[[Oduya Venn]]</a> keeps the bell rope. Some say it called up <span class="plain">[[The Tide-Eater]]</span>. [[Bell|
+            <div class="pick"><div class="on">Bell Choir <span class="tag">+ create note</span></div><div>Bellwright's Row <span class="tag">place</span></div><div>Oduya Venn <span class="tag">person</span></div></div>
+          </div></div>
+        <div class="banner" style="border-color:var(--bad);color:var(--bad)">[[The Tide-Eater]] is a DM note. Players see it as plain text.</div>
+        <div class="fld"><label>Placed on</label><div class="inp">Varn · pin at 660, 395 <u>Move</u></div></div>
+        <h4>Backlinks</h4>
+        <ul class="list"><li>Saltmere <span class="tag">place</span></li><li>Oduya Venn <span class="tag">person · belongs to Saltmere</span></li></ul>
+        <div class="banner" style="border-color:var(--line);color:var(--muted)">For a synced note: "From your vault. Edit it in Obsidian, then Sync." Pin, region and picture stay editable here.</div>
+      </div>
+      <!-- E9 -->
+      <div data-on="E9" style="display:grid;gap:10px">
+        <h3>Saltmere Coast <small>E9 · region</small></h3>
+        <div class="banner">Changed on disk: an agent edited <span class="mono">varn/_atlas/world.yaml</span> at 12:02. <u>Reload</u> or <u>Keep mine</u>.</div>
+        <div class="row"><div class="fld"><label>Visibility</label><div class="inp">Player ▾</div></div><div class="fld"><label>On map</label><div class="inp">Varn</div></div></div>
+        <div class="fld"><label>Note</label><div class="inp">Saltmere Coast <span class="tag">synced from vault</span></div></div>
+        <h4>Inside this region</h4>
+        <ul class="list"><li>Saltmere <span class="tag">child map · frame</span></li><li>The Drowned Bell <span class="tag">monument</span></li><li>Ilse Marrow, Oduya Venn <span class="tag">people</span></li></ul>
+        <div class="fld"><label>Fog for Red Tide</label><div class="inp">Partly revealed (2 reveals)</div></div>
+        <div class="row"><button class="btn">Write about this place</button><button class="iconbtn">Edit shape</button><button class="iconbtn">Hide</button></div>
+        <div class="where">stored in content/varn/_atlas/world.yaml → regions.saltmere-coast</div>
+      </div>
+      <!-- E10 -->
+      <div data-on="E10" style="display:grid;gap:10px">
+        <h3>Sync from Obsidian <small>E10</small></h3>
+        <div class="fld"><label>Vault folder (this computer)</label><div class="row"><div class="inp mono" style="flex:1">~/Documents/DnD-Campaign-Repository/Vault-DnD</div><button class="btn">Check</button></div></div>
+        <h4>Dry run · 7 changes</h4>
+        <ul class="list">
+          <li><span><span class="cbx on"></span>Create Oduya Venn</span><span class="tag">02 → player · repo</span></li>
+          <li><span><span class="cbx on"></span>Update Saltmere</span><span class="tag">01 → player · repo</span></li>
+          <li><span><span class="cbx on"></span>Update Saltmere (DM block)</span><span class="tag">→ .atlas-dm</span></li>
+          <li><span><span class="cbx on"></span>Create The Tide-Eater</span><span class="tag">04 → dm · .atlas-dm</span></li>
+          <li><span><span class="cbx on"></span>Rename Gullwatch → Fenwatch</span><span class="tag">via sync map</span></li>
+          <li><span><span class="cbx"></span>Archive Old Ferry</span><span class="tag">deleted in vault</span></li>
+          <li><span class="tag">Skip Session 12 recap: no type folder</span></li>
+        </ul>
+        <div class="row"><span class="spacer"></span><button class="btn primary">Sync 5 notes</button></div>
+        <div class="banner" style="border-color:var(--ok);color:var(--ok)">Last run 11:48: 5 synced. 3 notes have no place yet. <u>Place them</u></div>
+        <div class="where">placements are untouched (they live in world.yaml). One undo step per run.</div>
+      </div>
+      <!-- E11 -->
+      <div data-on="E11" style="display:grid;gap:10px">
+        <h3>Previewing <small>E11</small></h3>
+        <p style="margin:0">The canvas shows the real player site, built strict for <b>Red Tide</b> without the DM folder.</p>
+        <ul class="list"><li>Build <span class="ok">done in 6 s</span></li><li>Fog <span>Red Tide, baked</span></li><li>Hidden areas <span>gone</span></li><li>Scans <span class="ok">2 of 2 passed</span></li></ul>
+        <p style="margin:0;font-size:13px;color:var(--muted)">If a scan fails the bar turns red and names the file and the string, with Show in editor.</p>
+      </div>
+      <!-- E12 -->
+      <div data-on="E12" style="display:grid;gap:10px">
+        <h3>Before it goes live <small>E12</small></h3>
+        <ul class="list"><li>Unsaved edits <span class="ok">none</span></li><li>Campaigns built <span>2</span></li><li>Blocking <span class="bad">1</span></li><li>Warnings <span class="warn">2</span></li></ul>
+        <p style="margin:0;font-size:13px">Commit and open PR stays off until every scan is green. Merging into main publishes the site.</p>
+      </div>
+      <!-- E13 -->
+      <div data-on="E13" style="display:grid;gap:10px">
+        <h3>Campaigns <small>E13</small></h3>
+        <p style="margin:0">Each campaign has its own fog and map states over the same maps and notes. Each gets its own link: <span class="mono">?c=red-tide</span>.</p>
+        <div class="where">writes content/_atlas/campaigns/&lt;id&gt;.yaml</div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+const S={
+ E1:{t:"Ocean home",f:"all flows start here",w:"The first screen. The ocean opens fitted to every world map, so Varn and Ossery both show whole on one canvas. Every job is one labelled button on the left; preview and publish are in the top bar. Nothing is selected, so the inspector shows the atlas at a glance.",x:"Fixes today: hidden menu under the map (there is no menu), opening camera at max zoom on one label (fit to all maps).",c:"saved",cr:["Ocean"]},
+ E2:{t:"Map tree",f:"flows a, c, d",w:"Ocean, then worlds, then their maps. Ashfen Undercroft is hidden, so its child shows the hidden badge too. The new Saltmere map has no parent yet; dragging it onto Varn starts Frame & nest. Unplaced notes wait at the bottom.",x:"Fixes today: no Maps entry anywhere and no way to see which map holds which.",c:"saved",cr:["Ocean"],tk:"E2"},
+ E3:{t:"Add map",f:"flow a",w:"The DM dropped saltmere-harbour.png while looking at Varn, so “Inside a map: Varn” is prefilled. A new map starts DM-only. Add and align uploads it and opens Align. A failed upload turns the chip to Failed and writes nothing.",x:"Fixes today: map import lived 4 clicks deep in an invisible menu and a 6-step wizard.",c:"saved",cr:["Ocean","Varn"],tk:"E3"},
+ E4:{t:"Align map",f:"flow b",w:"Saltmere shows at 60 % over Varn with move, scale and rotate handles. Two-point align: the harbour mouth is matched; next the DM clicks the bell tower on both maps and the map snaps. Each drag end is one undo step, so the chip reads Saving… for a moment.",x:"",c:"saving",cr:["Ocean","Varn"],tk:"E4"},
+ E5:{t:"Frame and nest",f:"flow c",w:"Saltmere was dragged from the tree onto Varn. Its frame is drawn on Varn and the city previews inside it. The DM sets when players switch from Varn to Saltmere (enter at zoom 3.5). Enter Saltmere, or a double-click on the frame, goes in and the breadcrumb grows to Ocean › Varn › Saltmere.",x:"Fixes today: there was no control to nest a map at all (task c was a dead end).",c:"saved",cr:["Ocean","Varn"],tk:"E5"},
+ E6:{t:"Hide area",f:"flow d",w:"The DM picked the Ashfen region as the zone. It hatches red and the inspector lists the 4 things that go with it, so nothing leaks by accident. A pin near the edge is flagged for a nudge. Hiding moves all of it into the gitignored DM folder.",x:"",c:"saved",cr:["Ocean","Varn"],tk:"E6"},
+ E7:{t:"Fog",f:"flow e",w:"Campaign Red Tide is chosen in the top bar, so this is Red Tide's fog only. The brush reveals; Cover again takes it back; Reveal around a pin works by clicking the pin, no typed ids. The strip at the bottom sums up the campaign. Each stroke saves and is one undo step.",x:"",c:"saving",cr:["Ocean","Varn"],tk:"E7"},
+ E8:{t:"Note editor",f:"flow f",w:"The Drowned Bell pin is selected and its note opens in the inspector. Type monument plus a picture features it in Saltmere Coast. Typing [[ opens the link picker with “create note”. A link to a DM note is flagged: players will see plain text, never a dead link.",x:"Fixes today: wikilinks rendered as dead “planned” links in the player view.",c:"saved",cr:["Ocean","Varn"],tk:"E8"},
+ E9:{t:"Inspector",f:"flows b, c, d, f",w:"The Saltmere Coast region is selected: its visibility, its note, what lies inside it, its fog for the chosen campaign, and the jobs that apply to it. The chip shows the fourth save state: an agent changed world.yaml on disk, so the editor asks before overwriting.",x:"Fixes today: no visible save state (“All changes saved” while the real save was elsewhere).",c:"disk",cr:["Ocean","Varn"],tk:""},
+ E10:{t:"Sync from Obsidian",f:"flow g",w:"Check runs a dry run against the vault folder. Each line shows what happens, the visibility it arrives with and where it is stored (repo or DM folder). Untick what to skip. After the run, notes with no place link to the map tree.",x:"",c:"saved",cr:["Ocean"],tk:"E10"},
+ E11:{t:"Player preview",f:"flow h",w:"Preview as players ran a strict player build for Red Tide, without the DM folder and with Red Tide's fog baked. The real player site loads in the canvas. Both secret scans passed, shown in the bar. Back to editing keeps the camera where it was.",x:"Fixes today: preview was a CSS toggle over the DM atlas.",c:"saved",cr:["Ocean","Varn"],tp:1},
+ E12:{t:"Publish check",f:"flow i",w:"Per campaign, what players will get, then every scan. One scan failed: a DM block in Oduya Venn's note was not closed, so a secret reached Red Tide's search index. The failure names file, line and campaign, with Show in editor, and the commit button stays off until it is fixed.",x:"Fixes today: Save, Publish and Sync meant overlapping things; now publish is one checked step.",c:"saved",cr:["Ocean"],tb:1},
+ E13:{t:"Campaigns",f:"flow e (no campaign yet), p6",w:"The campaign selector is open in the top bar with Manage campaigns. Each campaign has a name, a picture, a one-line blurb for players and its own link. A new campaign starts all fogged or copies another's fog.",x:"",c:"failed",cr:["Ocean"],tk:"E13"}
+};
+const chipTxt={saved:"Saved",saving:"Saving…",failed:"Failed: grey-lantern.yaml is read-only <u>Retry</u>",disk:"Changed on disk <u>Reload</u> <u>Keep mine</u>"};
+const order=["saved","saving","failed","disk"];
+const $=id=>document.getElementById(id);
+const pk=$("picker");
+Object.keys(S).forEach(k=>{const b=document.createElement("button");b.type="button";b.id="pick-"+k;b.innerHTML=`<b>${k}</b>${S[k].t}`;b.onclick=()=>show(k);pk.appendChild(b)});
+function setChip(s){const c=$("chip");c.dataset.s=s;$("chipText").innerHTML=chipTxt[s]}
+function show(k){
+  const s=S[k];
+  document.querySelectorAll("[data-on]").forEach(el=>el.toggleAttribute("hidden",!el.dataset.on.split(" ").includes(k)));
+  pk.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.id==="pick-"+k));
+  $("c-id").textContent=k;$("c-t").innerHTML=`${s.t}<span>${s.f.toUpperCase()}</span>`;$("c-w").textContent=s.w;$("c-f").textContent=s.x;
+  $("crumb").innerHTML=s.cr.map(c=>`<a>${c}</a>`).join('<span class="sep">›</span>');
+  document.querySelectorAll("#tasks button").forEach(b=>b.classList.toggle("act",b.dataset.t===s.tk&&!(k==="E9"&&b.textContent.startsWith("Route"))));
+  $("tPrev").classList.toggle("primary",!!s.tp);$("tPub").classList.toggle("primary",!s.tp);
+  $("tPub").style.outline=s.tb?"2px solid var(--note)":"";$("tPrev").style.outline=s.tp?"2px solid var(--note)":"";
+  $("campBtn").style.outline=(k==="E7"||k==="E13")?"2px solid var(--note)":"";
+  setChip(s.c);
+  try{history.replaceState(null,"","#"+k)}catch(e){}
+}
+$("chip").onclick=()=>setChip(order[(order.indexOf($("chip").dataset.s)+1)%4]);
+document.querySelectorAll("#tasks button").forEach(b=>b.addEventListener("click",()=>show(b.dataset.t)));
+$("tPrev").onclick=()=>show("E11");$("tPub").onclick=()=>show("E12");
+const h=(location.hash||"").slice(1);show(S[h]?h:"E1");
+</script>

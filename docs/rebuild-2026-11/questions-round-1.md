@@ -79,3 +79,10 @@ Answer:
 
 Defaults (index page, monument type, test world first) were not objected to; Q1's answer changes the
 first: the top of the atlas is the ocean canvas, not an index page.
+
+## Follow-up, same day (Isak)
+
+Q4 is reversed: public is only for testing. Before real content is published, hosting moves to
+Cloudflare with access for his players and the repo goes private, so DM data is committed (marked by
+visibility) and raw map images are no concern. Campaigns differ by visibility from the start (later
+perhaps by maps too). Map compression is open: he zooms in a lot. See the top note in `plan.md`.
