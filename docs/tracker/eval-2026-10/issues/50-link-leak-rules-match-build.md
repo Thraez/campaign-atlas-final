@@ -1,6 +1,6 @@
 # Publish Check's wikilink and relationship leak rules match the build
 
-Status: in-review
+Status: done
 Area: publish safety (Publish Check, player build)
 
 Found in the review of eval-46 (2026-11-07). eval-46 made the region and route rules ask one
@@ -34,6 +34,8 @@ What Publish Check did:
   relationship to an unknown note and to a `publish: false` note. All blocking.
 - Publish Check blocks exactly where the build fails: both rules ask `linkLeaksToPlayers` against
   the shipped-note visibility map from the player projection's own `buildProjectionContext`.
+- Only notes that ship are judged, as in the build: a `publish: false` player note linking or
+  relating to a dm note gets no `spoiler-leak-*`.
 - Nothing loosens: an unknown relationship target still warns `relationship-unresolved`, for any
   relationship visibility.
 
@@ -46,11 +48,13 @@ What Publish Check did:
   with code `spoiler-leak-wikilink` (was the warning `wikilink-to-dm`), so the "No DM-content
   leakage detected" check sees it. Tests: `src/test/publish-check-link-leaks.test.ts` (5 of 8
   failed on the old code), `src/test/atlas-publish-check.test.ts` (code renamed).
-- Merge with eval-46: this branch adds `linkLeaksToPlayers` and `linkTargetLabel` to
-  `src/atlas/content/visibility.ts` with text identical to eval-46's (same place, same diff), so
-  merging both keeps one copy. Leak messages here use their own wording
+- Stacked on eval-46 (PR #100), which is merged into this branch: merge #100 first. Both add
+  `linkLeaksToPlayers` and `linkTargetLabel` to `src/atlas/content/visibility.ts` with identical
+  text, so one copy remains. Leak messages here use their own wording
   (`describeHiddenTarget`), since `linkTargetLabel` can't name the `publish: false` case.
-- Provisional calls: a player relationship to an unknown target now gets both the blocking leak
-  and the existing `relationship-unresolved` warning. The source check stays "player-visible
-  visibility", so a `publish: false` note's own links are still checked although it doesn't
-  ship (stricter than the build, never looser).
+- Review fix (2026-11-07): both rules judge a note's links and relationships only when the
+  note ships (`shippedVisibility.has(e.id)`), since the build skips `publish: false` notes; the
+  relationship's own visibility check stays. The unresolved-target warning still fires for any
+  note. The relationship hint now says the build fails on the leak.
+- Provisional call: a player relationship to an unknown target gets both the blocking leak and
+  the existing `relationship-unresolved` warning.

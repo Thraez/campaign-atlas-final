@@ -406,7 +406,8 @@ const checkEntities: Rule = (ctx) => {
     // Player-visible wikilinks to a note players don't get (dm/hidden,
     // `publish: false`, or folder-excluded) leak its name. The strict player
     // build redacts them and fails (cross-ref leak, exit 8), so this blocks.
-    if (ctx.playerVisibleVis.has(e.visibility) && Array.isArray(e.links)) {
+    // Only notes that ship are judged: the build skips the rest.
+    if (ctx.shippedVisibility.has(e.id) && Array.isArray(e.links)) {
       for (const link of e.links) {
         if (!link.resolvedId) continue;
         if (!linkLeaksToPlayers(e.visibility, ctx.shippedVisibility.get(link.resolvedId))) continue;
@@ -465,7 +466,9 @@ const checkEntities: Rule = (ctx) => {
         // As the build's filterRelationshipsForPlayer: a player-visible
         // relationship to a note that doesn't ship (unknown ones included) is
         // a relationship leak, which fails the strict player build (exit 5).
+        // Only on notes that ship: the build skips the rest.
         if (
+          ctx.shippedVisibility.has(e.id) &&
           ctx.playerVisibleVis.has(relVis) &&
           linkLeaksToPlayers(relVis as EntityVisibility, ctx.shippedVisibility.get(targetId))
         ) {
@@ -474,7 +477,7 @@ const checkEntities: Rule = (ctx) => {
             code: "spoiler-leak-relationship",
             category: "safety",
             message: `Player-visible relationship on "${e.title}" points to "${targetId}", which players don't get (${describeHiddenTarget(ctx.entityById.get(targetId))})`,
-            hint: "Either mark the relationship visibility: dm, or unlink it. The strict player build will drop it but flagging here prevents accidental hints.",
+            hint: "Either mark the relationship visibility: dm, or unlink it. The strict player build fails on it (relationship leak).",
             scope: { entityId: e.id },
           });
         }

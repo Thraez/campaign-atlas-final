@@ -141,3 +141,20 @@ describe("Publish Check relationship leaks match the build (eval-50)", () => {
     expect(issues(entities, "relationship-unresolved")).toHaveLength(1);
   });
 });
+
+describe("Notes that don't ship are not judged (eval-50)", () => {
+  it("a publish: false player note linking and relating to a dm note gets no spoiler-leak", () => {
+    const entities = [
+      entity({ id: "boss", title: "Boss", visibility: "dm" }),
+      entity({
+        id: "draft",
+        visibility: "player",
+        frontmatter: unpublished,
+        links: linkTo("boss", "Boss"),
+        relationships: rel("boss"),
+      }),
+    ];
+    const r = validateProject({ project: project(entities), draftPlacements: [] });
+    expect(r.issues.filter((i) => i.code.startsWith("spoiler-leak"))).toEqual([]);
+  });
+});
