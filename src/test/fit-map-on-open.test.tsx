@@ -6,11 +6,8 @@ const fake = {
   size: { x: 800, y: 600 },
   handlers: new Map<string, Handler>(),
   minZoom: -6,
-  boundsZoom: -3,
   fitBounds: vi.fn(),
-  getBoundsZoom() {
-    return this.boundsZoom;
-  },
+  options: { zoomSnap: 1 },
   getMinZoom() {
     return this.minZoom;
   },
@@ -34,8 +31,8 @@ vi.mock("react-leaflet", () => ({ useMap: () => fake }));
 
 const { FitMapOnOpen } = await import("@/atlas/map/FitMapOnOpen");
 
-const el = (id: string, skip = false, h = 1000) => (
-  <FitMapOnOpen mapId={id} mapWidth={2000} mapHeight={h} skip={skip} />
+const el = (id: string, skip = false, h = 1000, w = 2000) => (
+  <FitMapOnOpen mapId={id} mapWidth={w} mapHeight={h} skip={skip} />
 );
 
 describe("FitMapOnOpen", () => {
@@ -45,7 +42,6 @@ describe("FitMapOnOpen", () => {
     fake.fitBounds.mockClear();
     fake.setMinZoom.mockClear();
     fake.minZoom = -6;
-    fake.boundsZoom = -3;
   });
 
   it("fits the whole map on open", () => {
@@ -87,13 +83,12 @@ describe("FitMapOnOpen", () => {
   });
 
   it("lowers the min zoom so a huge map still fits", () => {
-    fake.boundsZoom = -8;
-    render(el("a"));
-    expect(fake.setMinZoom).toHaveBeenCalledWith(-8);
+    render(el("a", false, 1000, 400000));
+    expect(fake.setMinZoom).toHaveBeenCalledWith(-9);
     expect(fake.fitBounds).toHaveBeenCalledWith(
       [
         [0, 0],
-        [1000, 2000],
+        [1000, 400000],
       ],
       { animate: false },
     );
@@ -101,15 +96,13 @@ describe("FitMapOnOpen", () => {
 
   it("never raises a lower min zoom", () => {
     fake.minZoom = -10;
-    fake.boundsZoom = -8;
-    render(el("a"));
+    render(el("a", false, 1000, 400000));
     expect(fake.setMinZoom).not.toHaveBeenCalled();
   });
 
   it("lowers the min zoom but does not fit on a deep-link open", () => {
-    fake.boundsZoom = -8;
-    render(el("a", true));
-    expect(fake.setMinZoom).toHaveBeenCalledWith(-8);
+    render(el("a", true, 1000, 400000));
+    expect(fake.setMinZoom).toHaveBeenCalledWith(-9);
     expect(fake.fitBounds).not.toHaveBeenCalled();
   });
 });

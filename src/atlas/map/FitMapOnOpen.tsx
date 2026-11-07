@@ -36,9 +36,13 @@ export function FitMapOnOpen({
         [0, 0],
         [mapHeight, mapWidth],
       ];
-      // fitBounds is clamped by minZoom; a huge map needs a lower floor to fit.
-      // Also done on a deep-link open so its zoom (cz) below the floor survives.
-      const fitZoom = map.getBoundsZoom(bounds);
+      // fitBounds is clamped by minZoom, and Leaflet's getBoundsZoom clamps too,
+      // so compute the fit zoom ourselves. CRS.Simple: pixels = units * 2^zoom.
+      const size = map.getSize();
+      const ratio = Math.min(size.x / mapWidth, size.y / mapHeight);
+      const snap = map.options.zoomSnap || 0;
+      const raw = Math.log2(ratio);
+      const fitZoom = snap ? Math.floor(raw / snap) * snap : raw;
       if (Number.isFinite(fitZoom) && fitZoom < map.getMinZoom()) map.setMinZoom(fitZoom);
       if (!skip) map.fitBounds(bounds, { animate: false });
     });
