@@ -118,8 +118,8 @@ WCAG 1.4.1 says color must not be the *only* way to convey information. The map 
 |---|---|
 | No hosted DM editor | by design — local + GitHub Pages model. See [NON_GOALS.md](NON_GOALS.md). |
 | No accounts, no auth | by design |
-| Player site is fully public | by design — anything in `public/atlas/` is web-accessible to anyone with the URL. Don't put DM content there. See [VISIBILITY_AND_PLAYER_SAFETY.md](VISIBILITY_AND_PLAYER_SAFETY.md). |
-| No "private link" mode | not built |
+| Player site is fully public | for now, while the repo and Pages site hold only test content — anything in `public/atlas/` is web-accessible to anyone with the URL. Don't put DM content there. Before real content, hosting moves to Cloudflare Access (one site per campaign) and the repo goes private (ADR-0002). See [VISIBILITY_AND_PLAYER_SAFETY.md](VISIBILITY_AND_PLAYER_SAFETY.md). |
+| No "private link" mode | not built; planned per campaign with Cloudflare Access (ADR-0002) |
 
 ## Privacy and security
 

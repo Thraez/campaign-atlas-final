@@ -8,7 +8,7 @@ A static, GitHub-Pages-hosted interactive atlas for D&D worlds, with Obsidian ma
 
 ## The user
 
-**One DM**, per world. Comfortable with markdown, comfortable with git, has an Obsidian vault or is willing to write canon in plain text. Wants:
+**One DM**, running one or several worlds. Comfortable with markdown, comfortable with git, has an Obsidian vault or is willing to write canon in plain text. Wants:
 
 - A map their players can browse without seeing DM-only content.
 - A search-and-wiki experience for the lore they've written.
@@ -74,7 +74,7 @@ See [NON_GOALS.md](NON_GOALS.md) for the explicit "won't build" list. In short:
 - Features that improve the player's "browse and discover" experience are prioritized.
 - Features that add multi-user / hosted / VTT scope are rejected.
 
-When in doubt, re-read this doc and ask: does this feature serve **one DM running one world**? If yes, it's on the table. If no, push back.
+When in doubt, re-read this doc and ask: does this feature serve **one DM running their worlds**? If yes, it's on the table. If no, push back.
 
 ## What to read next
 
