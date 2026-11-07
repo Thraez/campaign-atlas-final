@@ -486,7 +486,7 @@ regions:
     expect(cfg.warnings.filter((w) => w.includes("visibility"))).toHaveLength(0);
   });
 
-  it("region with invalid visibility warns and defaults to 'player'", () => {
+  it("region with invalid visibility warns and loads as 'dm' (ADR-0001 addendum)", () => {
     writeWorldYaml(`
 maps:
   - id: m1
@@ -499,8 +499,63 @@ regions:
     visibility: secret
 `);
     const cfg = loadWorldConfig(tmpRoot, WORLD)!;
-    expect(cfg.regions[0].visibility).toBe("player");
-    expect(cfg.warnings.some((w) => w.includes("invalid visibility"))).toBe(true);
+    expect(cfg.regions[0].visibility).toBe("dm");
+    expect(cfg.warnings).toContain(`region "r1": invalid visibility "secret", loading as "dm"`);
+  });
+
+  it("a visibility typo in any case or type loads as 'dm'", () => {
+    writeWorldYaml(`
+maps:
+  - id: m1
+    name: Main
+regions:
+  - id: r-case
+    mapId: m1
+    name: R1
+    points: [[0,0],[10,0],[10,10]]
+    visibility: Player
+  - id: r-bool
+    mapId: m1
+    name: R2
+    points: [[0,0],[10,0],[10,10]]
+    visibility: true
+  - id: r-null
+    mapId: m1
+    name: R3
+    points: [[0,0],[10,0],[10,10]]
+    visibility:
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.regions.map((r) => [r.id, r.visibility])).toEqual([
+      ["r-case", "dm"],
+      ["r-bool", "dm"],
+      ["r-null", "dm"],
+    ]);
+    expect(cfg.warnings.filter((w) => w.includes("invalid visibility"))).toHaveLength(3);
+  });
+
+  it("route with invalid visibility warns and loads as 'dm'; missing stays 'player'", () => {
+    writeWorldYaml(`
+maps:
+  - id: m1
+    name: Main
+routes:
+  - id: rt-typo
+    mapId: m1
+    name: Typo
+    visibility: rumour
+    waypoints: [[0,0],[10,10]]
+  - id: rt-missing
+    mapId: m1
+    name: Missing
+    waypoints: [[0,0],[10,10]]
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.routes.map((r) => [r.id, r.visibility])).toEqual([
+      ["rt-typo", "dm"],
+      ["rt-missing", "player"],
+    ]);
+    expect(cfg.warnings).toContain(`route "rt-typo": invalid visibility "rumour", loading as "dm"`);
   });
 
   it("region with fewer than 3 points warns and is dropped", () => {

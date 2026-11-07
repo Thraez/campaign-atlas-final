@@ -8,7 +8,9 @@ import { makeIgnore } from "@/atlas/import/ignoreRules";
 import { resolveVaultImage, vaultImageTargetName } from "@/atlas/import/resolveVaultImage";
 import type { SyncMap } from "@/atlas/import/syncMap";
 import { ConflictError, hashContent, type FileChange } from "@/atlas/save/localFsSave";
+import { HostingPublicError, type Hosting } from "@/atlas/sync/hosting";
 import type {
+  AtlasWriteOpts,
   AtlasWriteResult,
   SyncSource,
   VaultImageCopyRequest,
@@ -26,6 +28,12 @@ export interface MemoryVaultInit {
   syncMap?: SyncMap;
   /** Make every write report a failed rebuild (the files are still written). */
   rebuildFails?: boolean;
+  /**
+   * The repo's `hosting` (R-01). Defaults to "private" so tests can write;
+   * "public" makes image copies and `origin: "sync"` writes throw
+   * `HostingPublicError`, as the dev endpoint does.
+   */
+  hosting?: Hosting;
 }
 
 export interface MemoryVaultPort extends VaultPort {
@@ -61,6 +69,7 @@ export function createMemoryVaultPort(init: MemoryVaultInit = {}): MemoryVaultPo
     },
 
     async copyVaultImage(req: VaultImageCopyRequest): Promise<VaultImageCopyResult> {
+      if (init.hosting === "public") throw new HostingPublicError();
       const hit = resolveVaultImage(req.rawSrc, req.noteRelPath, port.images, req.candidateFolders);
       if (!hit.ok) return hit;
       const target = `/atlas/assets/images/${vaultImageTargetName(req.entityId, req.index, hit.relPath)}`;
@@ -72,7 +81,8 @@ export function createMemoryVaultPort(init: MemoryVaultInit = {}): MemoryVaultPo
       return port.atlas.get(path) ?? null;
     },
 
-    async writeAtlasFiles(changes: FileChange[]): Promise<AtlasWriteResult> {
+    async writeAtlasFiles(changes: FileChange[], opts?: AtlasWriteOpts): Promise<AtlasWriteResult> {
+      if (init.hosting === "public" && opts?.origin === "sync") throw new HostingPublicError();
       for (const c of changes) {
         const current = port.atlas.get(c.path);
         if (c.baseHash === null) {

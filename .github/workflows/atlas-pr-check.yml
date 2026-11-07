@@ -54,8 +54,8 @@ jobs:
         run: npm run build
 
       - name: Run full safety-scan orchestrator
-        # All 13 scans (secrets, derived-secrets, shape, image-privacy,
-        # fog-safety, player-secrets, player-files, audit-assets) against dist
+        # All 14 scans (secrets, derived-secrets, shape, image-privacy,
+        # fog-safety, player-secrets, player-files, vault-content, audit-assets) against dist
         # and public/atlas — the same orchestrator publish-atlas.yml runs post-merge.
         run: npm run atlas:scan
 

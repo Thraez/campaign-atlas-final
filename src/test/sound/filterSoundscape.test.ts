@@ -59,6 +59,15 @@ describe("filterSoundscapeForPlayer", () => {
     expect(result?.areas).toHaveLength(1);
   });
 
+  it("drops areas whose visibility is present but empty or not a string (ADR-0001 addendum)", () => {
+    const area = (id: string, visibility: unknown) =>
+      ({ id, bed: { src: `audio/${id}.ogg` }, visibility }) as unknown as SoundArea;
+    const sc: SoundscapeConfig = {
+      areas: [area("null", null), area("empty", ""), area("false", false), area("typo", "secret")],
+    };
+    expect(filterSoundscapeForPlayer(sc)?.areas).toEqual([]);
+  });
+
   it("neutralises area IDs to positional indices", () => {
     const sc: SoundscapeConfig = {
       areas: [makeArea("secret-cave", "player"), makeArea("town-square", "player")],

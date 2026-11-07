@@ -130,3 +130,28 @@ describe("runPublishScans (the editor's Publish check)", () => {
     expect(JSON.stringify(reasons)).not.toContain("vault-key");
   });
 });
+
+describe("scan layouts", () => {
+  let root: string;
+  beforeEach(() => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "scan-layouts-"));
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("a built site whose atlas.json is missing fails the fog and player-secrets scans", async () => {
+    fs.mkdirSync(path.join(root, "dist"));
+    fs.writeFileSync(path.join(root, "dist", "index.html"), "<html>");
+    // A stray atlas.json at the top of dist is not where the built site keeps it.
+    fs.writeFileSync(path.join(root, "dist", "atlas.json"), "{}");
+    const ctx = { root, configPath: path.join(root, "none.json"), contentDir: root };
+    const wanted = ["check-fog-safety dist", "check-player-secrets dist"];
+    const tasks = scanTasks(ctx).filter((t) => wanted.includes(t.label));
+    expect(tasks).toHaveLength(2);
+    for (const t of tasks) expect(await t.run(), t.label).not.toBe(0);
+  });
+});
