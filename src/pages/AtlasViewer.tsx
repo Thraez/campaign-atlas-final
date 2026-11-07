@@ -406,6 +406,11 @@ export default function AtlasViewer() {
     } as DOMRect;
     peekEnterRef.current(id, r);
   }, []);
+  // Turning the ruler on unbinds region handlers mid-hover, so no mouseout comes.
+  const { dismiss: dismissPeek } = peekCtl;
+  useEffect(() => {
+    if (rulerActive) dismissPeek();
+  }, [rulerActive, dismissPeek]);
 
   const openEntity = useCallback(
     (id: string, fly = true) => {
@@ -811,6 +816,7 @@ export default function AtlasViewer() {
                   openId={openId}
                   onPinPeek={onPinPeek}
                   onPinPeekLeave={peekCtl.onTriggerLeave}
+                  peekEnabled={pointerFine}
                   rulerActive={rulerActive}
                 />
               ))}

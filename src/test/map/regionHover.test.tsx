@@ -28,7 +28,7 @@ vi.mock("react-leaflet", async () => {
   return { ...base, Polygon: PolygonMock };
 });
 
-import { render, waitFor, cleanup, fireEvent, screen } from "@testing-library/react";
+import { render, waitFor, cleanup, fireEvent, screen, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import AtlasViewer from "@/pages/AtlasViewer";
 import {
@@ -79,8 +79,10 @@ const project = makeProject({
 });
 
 const originalMatchMedia = window.matchMedia;
+let pointerFine = true;
 
 beforeEach(() => {
+  pointerFine = true;
   vi.stubGlobal(
     "fetch",
     vi.fn((url: string) =>
@@ -95,7 +97,7 @@ beforeEach(() => {
     configurable: true,
     writable: true,
     value: (query: string) => ({
-      matches: query.includes("pointer: fine"),
+      matches: pointerFine && query.includes("pointer: fine"),
       media: query,
       onchange: null,
       addListener: () => {},
@@ -109,6 +111,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
   vi.unstubAllGlobals();
   Object.defineProperty(window, "matchMedia", {
@@ -147,12 +150,46 @@ describe("region hover card (Q-04)", () => {
 
   it("keeps the name tooltip and opens no card without an entity in the atlas", async () => {
     await renderViewer();
+    vi.useFakeTimers();
     for (const name of ["Open Plain", "Ghost Hills"]) {
       const region = byName(name);
       expect(tooltipOf(region)).not.toBeNull();
       fireEvent.mouseOver(region);
     }
-    await new Promise((r) => setTimeout(r, 400));
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("keeps the tooltip and opens no card on a coarse pointer", async () => {
+    pointerFine = false;
+    await renderViewer();
+    const region = byName("Cave Lands");
+    expect(tooltipOf(region)).not.toBeNull();
+    vi.useFakeTimers();
+    fireEvent.mouseOver(region);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("shows the tooltip, no card, in ruler mode and drops an open card", async () => {
+    await renderViewer();
+    const region = byName("Cave Lands");
+    fireEvent.mouseOver(region);
+    await screen.findByRole("dialog", { name: "Salt Cave preview" });
+    fireEvent.click(screen.getByRole("button", { name: "Toggle distance ruler" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Salt Cave preview" })).toBeNull(),
+    );
+    expect(tooltipOf(byName("Cave Lands"))).not.toBeNull();
+    vi.useFakeTimers();
+    fireEvent.mouseOver(byName("Cave Lands"));
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

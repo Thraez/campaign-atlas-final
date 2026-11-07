@@ -30,6 +30,8 @@ export interface WrappedWorldProps {
   openId: string | null;
   onPinPeek?: (id: string, ev: MouseEvent) => void;
   onPinPeekLeave?: () => void;
+  /** Region hover cards: true only for a fine pointer (touch can't hover). */
+  peekEnabled?: boolean;
   rulerActive?: boolean;
 }
 
@@ -44,6 +46,7 @@ export const WrappedWorld = memo(function WrappedWorld({
   openId,
   onPinPeek,
   onPinPeekLeave,
+  peekEnabled,
   rulerActive,
 }: WrappedWorldProps) {
   const H = map.height;
@@ -70,7 +73,7 @@ export const WrappedWorld = memo(function WrappedWorld({
           const ent = region.entityId ? entityById.get(region.entityId) : undefined;
           // Peek only for an entity the loaded atlas holds; anything else keeps
           // the name-only tooltip.
-          const peekId = ent && onPinPeek ? ent.id : undefined;
+          const peekId = ent && onPinPeek && peekEnabled ? ent.id : undefined;
           return (
             <RegionShape
               key={`${region.id}-${dx}`}
@@ -135,7 +138,18 @@ export const WrappedWorld = memo(function WrappedWorld({
           ))}
       </>
     ),
-    [map, dx, H, entityById, rulerActive, onOpenEntity, showGrid, onPinPeek, onPinPeekLeave],
+    [
+      map,
+      dx,
+      H,
+      entityById,
+      rulerActive,
+      onOpenEntity,
+      showGrid,
+      onPinPeek,
+      onPinPeekLeave,
+      peekEnabled,
+    ],
   );
 
   return (
