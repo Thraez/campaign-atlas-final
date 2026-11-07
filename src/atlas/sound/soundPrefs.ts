@@ -5,14 +5,12 @@ const STORAGE_KEY = "atlas-player-sound-v1";
 export interface SoundPrefs {
   soundEnabled: boolean;
   muted: boolean;
-  calmMode: boolean;
   volume: number;
 }
 
 export const DEFAULT_PREFS: SoundPrefs = {
   soundEnabled: false,
   muted: false,
-  calmMode: false,
   volume: 0.8,
 };
 
@@ -28,7 +26,6 @@ export function loadSoundPrefs(): SoundPrefs {
       soundEnabled:
         typeof p.soundEnabled === "boolean" ? p.soundEnabled : DEFAULT_PREFS.soundEnabled,
       muted: typeof p.muted === "boolean" ? p.muted : DEFAULT_PREFS.muted,
-      calmMode: typeof p.calmMode === "boolean" ? p.calmMode : DEFAULT_PREFS.calmMode,
       volume:
         typeof p.volume === "number" && p.volume >= 0 && p.volume <= 1
           ? p.volume
