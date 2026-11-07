@@ -57,3 +57,6 @@ previews/
 
 # `npm run gate` step logs (scripts/dev/run-gate.ts); rewritten each run.
 .gate-logs/
+
+# Rebuild-plan screenshots (local only)
+docs/rebuild-2026-11/audit/shots/
