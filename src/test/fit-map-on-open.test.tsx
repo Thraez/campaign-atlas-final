@@ -46,9 +46,9 @@ describe("FitMapOnOpen", () => {
     );
   });
 
-  it("fits again on map change but not on other re-renders", () => {
+  it("fits again on map change but not when the same map changes size", () => {
     const { rerender } = render(el("a"));
-    rerender(el("a", false, 1000));
+    rerender(el("a", false, 1400));
     expect(fake.fitBounds).toHaveBeenCalledTimes(1);
     rerender(el("b"));
     expect(fake.fitBounds).toHaveBeenCalledTimes(2);
