@@ -313,7 +313,7 @@ const checkRegionsAndRoutes: Rule = (ctx) => {
               code: "spoiler-leak-route",
               category: "safety",
               message: `Player-visible route "${route.name}" routes through ${linkTargetLabel(waypointVis)} "${w.entityId}"`,
-              hint: "The waypoint label would expose the DM-only entity to players. Hide the route or replace the waypoint with raw coordinates.",
+              hint: "The waypoint label would expose a DM-only or missing entity to players. Fix the slug, hide the route, or replace the waypoint with raw coordinates.",
               scope: { mapId: m.id, entityId: w.entityId },
             });
           }

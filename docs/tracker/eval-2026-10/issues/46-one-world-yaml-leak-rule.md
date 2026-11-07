@@ -1,6 +1,6 @@
 # One spoiler-leak rule for regions and routes
 
-Status: in-review
+Status: done
 Area: player safety, editor (Publish Check, region and route drafts)
 
 Found by the architecture review of 2026-11-07. Four places judge whether a player-visible region
@@ -34,3 +34,8 @@ and both draft hooks call them. The hooks now take `entityVisibility` (id → vi
 only the unresolved-waypoint warning. Same drift in the credits page: it filtered `!== "dm"`, so a
 `hidden` entity's credit showed; it now uses `isPlayerVisible`. Tests:
 `src/test/content/world-yaml-leak-rule.test.ts`, `atlas-credits-page.test.tsx`.
+
+2026-11-07 review (Opus, medium): clean. Fixed the nit that the route hint named only DM entities
+(an unknown waypoint is fixed by the slug). Follow-up, not this ticket: `validateProject` wikilink
+and relationship rules still use `dmEntityIds` with the player-vs-dm/hidden check; compare them with
+the build's rules.
