@@ -20,7 +20,7 @@ vi.mock("../../scripts/build-atlas", async (importOriginal) => ({
 
 import { DEV_ROUTES, createDevRouter } from "../../scripts/vite-plugin-atlas-save";
 import { DEV_API_PATHS } from "../../scripts/atlas/devRoutes";
-import { isBuildInFlight, releaseBuildLock } from "../../scripts/atlas/buildLock";
+import { isBuildInFlight, __resetBuildLockForTests } from "../../scripts/atlas/buildLock";
 
 function deferred<T>() {
   let resolve!: (v: T) => void;
@@ -60,17 +60,20 @@ function send(
 }
 
 let root: string;
+let warn: ReturnType<typeof vi.spyOn>;
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), "atlas-lock-"));
   runBuild.mockReset();
-  releaseBuildLock();
+  __resetBuildLockForTests();
+  warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 });
 
 afterEach(async () => {
   vi.useRealTimers();
-  releaseBuildLock();
+  warn.mockRestore();
+  __resetBuildLockForTests();
   await fs.rm(root, { recursive: true, force: true });
 });
 
@@ -108,9 +111,10 @@ async function saveThatOutlivesTheTimeout(
   const check = await send(router, DEV_API_PATHS.publishCheck, {});
   expect(check).toEqual({
     status: 423,
-    json: { error: "Locked", detail: "another build is in flight" },
+    json: { error: "Locked", detail: "a previous build is still running" },
   });
   expect(runBuild).toHaveBeenCalledTimes(1);
+  expect(warn).toHaveBeenCalledWith(expect.stringContaining("still running"));
 
   settle(build);
   await vi.waitFor(() => expect(isBuildInFlight()).toBe(false));
@@ -125,5 +129,40 @@ describe("build lock outlives a timed-out save rebuild", () => {
 
   it("is released once the slow build fails", async () => {
     await saveThatOutlivesTheTimeout((b) => b.reject(new Error("boom")));
+  });
+});
+
+describe("build lock outlives a timed-out publish-check player build", () => {
+  it("refuses a save with rebuild until the player build settles, then lets it through", async () => {
+    const build = deferred<BuildResult>();
+    runBuild.mockReturnValueOnce(build.promise);
+    const router = createDevRouter(DEV_ROUTES, root);
+
+    const check = send(router, DEV_API_PATHS.publishCheck, {});
+    await vi.waitFor(() => expect(runBuild).toHaveBeenCalledTimes(1));
+    expect(runBuild).toHaveBeenCalledWith({ player: true, strict: true });
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    const checkReply = await check;
+    expect(checkReply.status).toBe(200);
+    expect(checkReply.json).toMatchObject({ verdict: "build-failed" });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("still running"));
+
+    // The player build is still running: a save with rebuild is refused and starts no build.
+    expect(await send(router, DEV_API_PATHS.save, SAVE_BODY)).toEqual({
+      status: 423,
+      json: { error: "Locked", detail: "a previous build is still running" },
+    });
+    expect(runBuild).toHaveBeenCalledTimes(1);
+
+    build.resolve({ ok: true, exitCode: 0, durationMs: 61_000 });
+    await vi.waitFor(() => expect(isBuildInFlight()).toBe(false));
+
+    runBuild.mockResolvedValueOnce({ ok: true, exitCode: 0, durationMs: 5 });
+    const save = await send(router, DEV_API_PATHS.save, SAVE_BODY);
+    expect(save.status).toBe(200);
+    expect(save.json).toMatchObject({ saved: 1, rebuilt: true });
+    expect(runBuild).toHaveBeenCalledTimes(2);
+    expect(isBuildInFlight()).toBe(false);
   });
 });

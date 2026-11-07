@@ -80,6 +80,7 @@ import {
   tryAcquireBuildLock,
   releaseBuildLock,
   holdBuildLockUntilSettled,
+  buildLockHolder,
 } from "./atlas/buildLock";
 import { DEV_API_PATHS, DEV_API_PREFIX } from "./atlas/devRoutes";
 
@@ -1815,7 +1816,13 @@ async function runRoute(
   next: () => void,
 ): Promise<void> {
   if (route.takesBuildLock && !tryAcquireBuildLock()) {
-    sendJson(res, 423, { error: "Locked", detail: "another build is in flight" });
+    sendJson(res, 423, {
+      error: "Locked",
+      detail:
+        buildLockHolder() === "lingering-build"
+          ? "a previous build is still running"
+          : "another build is in flight",
+    });
     return;
   }
   try {

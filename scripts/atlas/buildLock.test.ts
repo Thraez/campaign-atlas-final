@@ -1,13 +1,15 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   tryAcquireBuildLock,
   releaseBuildLock,
   isBuildInFlight,
   holdBuildLockUntilSettled,
+  __resetBuildLockForTests,
 } from "./buildLock";
 
 describe("buildLock", () => {
-  beforeEach(() => releaseBuildLock());
+  beforeEach(() => __resetBuildLockForTests());
+  afterEach(() => __resetBuildLockForTests());
 
   it("acquires when free and blocks a second acquire", () => {
     expect(tryAcquireBuildLock()).toBe(true);

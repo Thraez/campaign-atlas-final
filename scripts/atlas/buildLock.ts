@@ -24,9 +24,25 @@ export function tryAcquireBuildLock(): boolean {
   return true;
 }
 
+/**
+ * Who holds the lock: nobody, a request, or only a build that outlived its
+ * request (so a 423 can say a previous build is still running).
+ */
+export function buildLockHolder(): "free" | "request" | "lingering-build" {
+  if (requestHolds) return "request";
+  return lingeringBuilds.size > 0 ? "lingering-build" : "free";
+}
+
 /** The request's hold ends; any build it left running keeps the lock until it settles. */
 export function releaseBuildLock(): void {
+  const wasHeld = requestHolds;
   requestHolds = false;
+  if (wasHeld && lingeringBuilds.size > 0) {
+    console.warn(
+      "[atlas] a build outlived its request's timeout and is still running; " +
+        "it holds the build lock (saves and publishes get 423) until it ends",
+    );
+  }
 }
 
 /** Keep the lock taken until `build` settles (resolves or rejects), past its request's release. */
@@ -36,4 +52,10 @@ export function holdBuildLockUntilSettled(build: Promise<unknown>): void {
     lingeringBuilds.delete(build);
   };
   build.then(done, done);
+}
+
+/** Test-only: clear the request hold and forget every held build. */
+export function __resetBuildLockForTests(): void {
+  requestHolds = false;
+  lingeringBuilds.clear();
 }

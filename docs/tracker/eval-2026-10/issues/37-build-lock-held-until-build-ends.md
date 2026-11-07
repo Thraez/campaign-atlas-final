@@ -29,3 +29,7 @@ publish-check can then start a player build alongside it, which is what the lock
   and failure), and two cases in `scripts/atlas/buildLock.test.ts`.
 - Provisional call: the publish-check player build had the same timeout race, so it gets the same
   one-line hold. No stacking on #82 was needed (already merged).
+- 2026-11-07, review fixes: when a request releases the lock while its build is still running,
+  the server logs one warning line; the 423 then says "a previous build is still running"
+  (`buildLockHolder()`). Added a publish-check timeout test (a save with rebuild gets 423 until the
+  player build settles, then 200) and `__resetBuildLockForTests()` for the lock tests.
