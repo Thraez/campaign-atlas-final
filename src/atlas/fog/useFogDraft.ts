@@ -147,10 +147,11 @@ export function useFogDraft(map: MapDocument | undefined, undoStack?: UndoStackA
           undo: () => applyOverride(before),
           redo: () => applyOverride(next),
           label: "fog",
+          mapId: map?.id,
         });
       }
     },
-    [baseFog, applyOverride, undoStack],
+    [baseFog, applyOverride, undoStack, map?.id],
   );
 
   const setEnabled = useCallback((v: boolean) => mutateDraft({ enabled: v }), [mutateDraft]);

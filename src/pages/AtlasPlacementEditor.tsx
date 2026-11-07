@@ -71,7 +71,10 @@ import {
   type WorldYamlBaselineValues,
 } from "@/atlas/save/useWorldYamlBaseline";
 import { describeWorldYamlConflict, worldYamlConflictNotice } from "@/atlas/save/worldYamlConflict";
-import { buildWorldYamlContent as pureBuildWorldYamlContent } from "@/atlas/save/buildSaveBatch";
+import {
+  buildWorldYamlContent as pureBuildWorldYamlContent,
+  type MapDraft,
+} from "@/atlas/save/buildSaveBatch";
 import { planUnifiedSave } from "@/atlas/save/planUnifiedSave";
 import { pointInPolygon } from "@/atlas/geometry/polygon";
 import { SyncPanel } from "@/atlas/sync/SyncPanel";
@@ -110,7 +113,8 @@ import {
   persistOverrides,
   LEGACY_STORAGE_KEY_V1,
 } from "@/atlas/editor/placementOverrides";
-import { foreignMapDraftPlacements } from "@/atlas/editor/foreignMapDrafts";
+import { foreignMapDraftPlacements, overridesAfterSave } from "@/atlas/editor/foreignMapDrafts";
+import { mapDraftsAfterSave, orphanDraftMapIds } from "@/atlas/session/mapDraftsAfterSave";
 import { targetMapHasPlacement } from "@/atlas/editor/duplicateOverwriteCheck";
 import { useBeforeUnloadWarning } from "@/atlas/editor/useBeforeUnloadWarning";
 import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
@@ -316,17 +320,6 @@ function AtlasPlacementEditorInner() {
     }
   }, [overrides]);
 
-  // Stamp a local edit timestamp on every override mutation AFTER mount.
-  // The first render (hydration from localStorage) doesn't count as an edit.
-  const overridesMountedRef = useRef(false);
-  useEffect(() => {
-    if (!overridesMountedRef.current) {
-      overridesMountedRef.current = true;
-      return;
-    }
-    setLastLocalEditAt(Date.now());
-  }, [overrides]);
-
   // Optional in-session, per-map settings override (size + ocean + wrapX + grid).
   const [mapOverride, setMapOverride] = useState<Record<string, Partial<MapDocument>>>({});
 
@@ -355,22 +348,32 @@ function AtlasPlacementEditorInner() {
     setMapOverrideUndoable(
       (s) => ({ ...s, [baseMap.id]: { ...(s[baseMap.id] ?? {}), ...patch } }),
       `map metadata ${baseMap.id}`,
+      baseMap.id,
     );
   };
   const resetMap = () => {
     if (!baseMap) return;
-    setMapOverrideUndoable((s) => {
-      const n = { ...s };
-      delete n[baseMap.id];
-      return n;
-    }, `reset map metadata ${baseMap.id}`);
+    setMapOverrideUndoable(
+      (s) => {
+        const n = { ...s };
+        delete n[baseMap.id];
+        return n;
+      },
+      `reset map metadata ${baseMap.id}`,
+      baseMap.id,
+    );
   };
 
   // Phase 1B — session undo stack. In-memory only; cleared on tab close.
   // Passed into useMapLayers + each draft hook so every per-tab mutation
   // records its inverse. Pin overrides + mapOverride mutations go through
   // setOverridesUndoable / setMapOverrideUndoable below.
-  const undoStack = useUndoStack();
+  // eval-30: an undo entry carries its map; undoing it switches there first
+  // (wired to the session's map switch once the session exists, below).
+  const switchToMapRef = useRef<(mapId: string) => void>(() => {});
+  const undoStack = useUndoStack(undefined, {
+    switchToMap: (mapId) => switchToMapRef.current(mapId),
+  });
 
   const layerEditor = useMapLayers(activeMap, undoStack);
 
@@ -487,6 +490,7 @@ function AtlasPlacementEditorInner() {
     (
       compute: (prev: Record<string, Partial<MapDocument>>) => Record<string, Partial<MapDocument>>,
       label: string,
+      mapId?: string,
     ) => {
       const before = mapOverrideRef.current;
       const after = compute(before);
@@ -503,6 +507,7 @@ function AtlasPlacementEditorInner() {
           setMapOverride(after);
         },
         label,
+        mapId,
       });
     },
     [undoStack],
@@ -704,21 +709,26 @@ function AtlasPlacementEditorInner() {
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<FileChange[]>([]);
   const [discardOpen, setDiscardOpen] = useState(false);
-  // Timestamp of the most recent local edit, and of the most recent successful
-  // canonical save. When editAt > saveAt, the unsaved-changes banner shows.
-  const [lastLocalEditAt, setLastLocalEditAt] = useState<number | null>(null);
+  // Timestamp of the most recent successful canonical save.
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
 
   // A13 dirty signals: collapse per-tab editor state into a single
   // "world.yaml is dirty" boolean. Each per-tab draft hook already exposes a
   // .dirty flag; layers/map-metadata don't, so we derive those from state
   // existence. The post-save clean-up at onSaved clears each of these.
-  const mapMetadataDirty = !!(
-    baseMap &&
-    mapOverride[baseMap.id] &&
-    Object.keys(mapOverride[baseMap.id]).length > 0
+  // eval-30: map metadata and layer drafts are kept for every map at once, so
+  // they count on every map, not only the active one. Only the project's maps
+  // count: a draft kept for a renamed or removed map (an orphan) can never be
+  // saved or cleared, so it must not hold the editor "unsaved" forever.
+  const projectMapIds = useMemo(() => project?.maps.map((m) => m.id), [project]);
+  const inProject = (id: string) => !projectMapIds || projectMapIds.includes(id);
+  const mapMetadataDirtyCount = Object.entries(mapOverride).filter(
+    ([id, o]) => inProject(id) && o && Object.keys(o).length > 0,
+  ).length;
+  const layerDraftCount = Object.entries(layerEditor.snapshot()).reduce(
+    (n, [id, layers]) => (inProject(id) ? n + layers.length : n),
+    0,
   );
-  const layersDirty = layerEditor.localLayers.length > 0;
   const worldSettingsDirty = !!(
     baseWorld &&
     worldOverride[baseWorld.id] &&
@@ -730,9 +740,11 @@ function AtlasPlacementEditorInner() {
     !!calendarDraft &&
     JSON.stringify(calendarDraft.value ?? null) !== JSON.stringify(project?.calendar ?? null);
 
-  const worldYamlDirty =
-    mapMetadataDirty ||
-    layersDirty ||
+  // Everything world.yaml holds except other maps' region/route/fog slices,
+  // which the session adds (worldYamlDirty, below the session).
+  const worldYamlDirtyHere =
+    mapMetadataDirtyCount > 0 ||
+    layerDraftCount > 0 ||
     regionDraft.dirty ||
     routeDraft.dirty ||
     fogDraft.dirty ||
@@ -755,39 +767,39 @@ function AtlasPlacementEditorInner() {
    * Returns null when there's no active world (editor still loading) or
    * when a baseline fetch error prevents a safe write.
    */
-  const buildWorldYamlContent = useCallback(
+  // A plain function, not a memo: it reads the session's per-map drafts, and
+  // the session is created further down.
+  const buildWorldYamlContent = (
     // existingRaw: the on-disk file to build on (the save-conflict recovery passes a fresh read).
-    (existingRaw: string | null = worldYamlBaseline.raw): string | null => {
-      if (!project || !activeMap) return null;
-      return pureBuildWorldYamlContent({
-        activeMap,
-        maps: project.maps,
-        calendar: effectiveCalendar,
-        schemaVersion: project.schemaVersion,
-        mergedLayers: layerEditor.mergedLayers,
-        localLayers: layerEditor.localLayers,
-        regionsEffective: regionDraft.effective,
-        routesEffective: routeDraft.effective,
-        fog: fogDraft.fog,
-        existingRaw,
-        name: effectiveWorld?.name,
-        credits: effectiveWorld?.credits,
-        assetCredits: effectiveWorld?.assetCredits,
-      });
-    },
-    [
-      project,
-      activeMap,
-      layerEditor.mergedLayers,
-      layerEditor.localLayers,
-      regionDraft.effective,
-      routeDraft.effective,
-      fogDraft.fog,
-      worldYamlBaseline.raw,
-      effectiveWorld,
-      effectiveCalendar,
-    ],
-  );
+    existingRaw: string | null = worldYamlBaseline.raw,
+  ): string | null => {
+    if (!project || !activeMap) return null;
+    return pureBuildWorldYamlContent({
+      maps: project.maps,
+      drafts: allMapDrafts(),
+      calendar: effectiveCalendar,
+      schemaVersion: project.schemaVersion,
+      existingRaw,
+      name: effectiveWorld?.name,
+      credits: effectiveWorld?.credits,
+      assetCredits: effectiveWorld?.assetCredits,
+    });
+  };
+
+  /** Every map's unsaved drafts (metadata, layers, regions, routes, fog). */
+  const allMapDrafts = (): Record<string, MapDraft> => {
+    const out: Record<string, MapDraft> = {};
+    const slices = session.mapDrafts();
+    const layerByMap = layerEditor.snapshot();
+    for (const m of project?.maps ?? []) {
+      out[m.id] = {
+        mapOverride: mapOverrideRef.current[m.id],
+        localLayers: layerByMap[m.id],
+        ...slices[m.id],
+      };
+    }
+    return out;
+  };
 
   /**
    * Open the entity whose unsaved edit is parked in `entityEditDraft`,
@@ -828,7 +840,8 @@ function AtlasPlacementEditorInner() {
               buildContent: () => buildWorldYamlContent(baseline.raw),
             }
           : null,
-        localLayers: layerEditor.localLayers,
+        // Every project map's layer drafts: an upload on another map writes too.
+        localLayers: project.maps.flatMap((m) => layerEditor.snapshot()[m.id] ?? []),
       },
       { fetchFn: fetch },
     );
@@ -975,21 +988,9 @@ function AtlasPlacementEditorInner() {
         : [],
     [overrides, activeMap, project],
   );
-  // Unsaved-changes signal: there are local pin overrides (on the active map
-  // OR duplicated onto another map) OR a dirty world.yaml signal. The
-  // pin-side gate also waits for an edit since the last successful save so a
-  // hydrated-but-clean session doesn't nag; the world.yaml gate fires
-  // immediately because the draft hooks already resolve to a "fresh state"
-  // on mount.
-  const pinSideUnsaved =
-    (dirtyCount > 0 || foreignMapDrafts.length > 0) &&
-    lastLocalEditAt !== null &&
-    (lastSavedAt === null || lastLocalEditAt > lastSavedAt);
-  const hasUnsavedChanges = pinSideUnsaved || worldYamlDirty;
-  useBeforeUnloadWarning(hasUnsavedChanges);
-
   const session = useEditorSession({
     activeMapId: activeMap?.id ?? null,
+    projectMapIds,
     undoStack,
     holders: {
       overrides: {
@@ -1038,8 +1039,8 @@ function AtlasPlacementEditorInner() {
       regionDraft.dirtyCount +
       routeDraft.dirtyCount +
       fogDraft.dirtyCount +
-      layerEditor.localLayers.length +
-      (mapMetadataDirty ? 1 : 0) +
+      layerDraftCount +
+      mapMetadataDirtyCount +
       (worldSettingsDirty ? 1 : 0) +
       // Without this the calendar draft would be invisible to SaveStatus: the
       // toolbar would report "All changes saved" and offer no Save button while
@@ -1048,6 +1049,35 @@ function AtlasPlacementEditorInner() {
       dirtyCount +
       foreignMapDrafts.length +
       (entityEditDraft.isDirty() ? 1 : 0),
+  });
+  // eval-30: one dirty signal across every map. The chip reads
+  // session.unsavedCount; beforeunload and the save batch read the same.
+  const worldYamlDirty = worldYamlDirtyHere || session.otherMapsDirtyCount > 0;
+  const hasUnsavedChanges = session.unsavedCount > 0;
+  useBeforeUnloadWarning(hasUnsavedChanges);
+  useEffect(() => {
+    switchToMapRef.current = (mapId) => {
+      if (!session.onMapWillChange(mapId)) return;
+      setActiveMapId(mapId);
+      setPendingId(null);
+    };
+  });
+  // Drafts kept for a map id the project no longer has are left untouched and
+  // not counted; say so once per distinct set so they are not lost unnoticed.
+  const warnedOrphansRef = useRef("");
+  useEffect(() => {
+    if (!projectMapIds || !session.hydrated) return;
+    const orphans = orphanDraftMapIds(
+      { layerByMap: layerEditor.snapshot(), mapOverride, slices: session.mapDrafts() },
+      projectMapIds,
+    );
+    const key = orphans.join(",");
+    if (key === warnedOrphansRef.current) return;
+    warnedOrphansRef.current = key;
+    if (orphans.length > 0)
+      console.warn(
+        `[editor] Unsaved drafts are kept for maps not in this project, and are not saved or counted: ${key}`,
+      );
   });
 
   useEditorKeyboardShortcuts({
@@ -2170,7 +2200,24 @@ function AtlasPlacementEditorInner() {
         onWriteFailed={(msg) => session.markFailed(msg)}
         onConflict={onSaveConflict}
         onSaved={(result) => {
-          void session.markSaved();
+          // Every map's region/route/fog drafts, captured before markSaved
+          // drops the written ones (the save-boundary undo puts them back).
+          const preSaveMapDrafts = session.mapDrafts();
+          const worldYamlWritten = !!(
+            activeWorldId && result.paths.includes(worldYamlPath(activeWorldId))
+          );
+          // world.yaml carries every project map's drafts, so all of them are
+          // written; drafts kept for orphan map ids are left alone.
+          const afterSave = mapDraftsAfterSave(
+            worldYamlWritten,
+            project.maps.map((m) => m.id),
+            {
+              layerByMap: layerEditor.snapshot(),
+              mapOverride: mapOverrideRef.current,
+              slices: preSaveMapDrafts,
+            },
+          );
+          void session.markSaved(afterSave.writtenMapIds);
           setLastSavedAt(Date.now());
           // This batch never carries the entity edit; its panel saves it.
           if (entityEditDraft.pendingFor()) {
@@ -2203,13 +2250,13 @@ function AtlasPlacementEditorInner() {
           const writtenEntityIds = new Set(
             project.entities.filter((e) => writtenPaths.has(e.sourcePath)).map((e) => e.id),
           );
-          const nextOverrides: Overrides = { ...preSave.overrides };
-          for (const k of Object.keys(nextOverrides)) {
-            const [mid, eid] = k.split(":");
-            if (mid === activeMap.id && writtenEntityIds.has(eid)) {
-              delete nextOverrides[k];
-            }
-          }
+          // eval-30: pins duplicated onto other maps were in the batch too
+          // (foreignMapDrafts), so they are clean now as well.
+          const nextOverrides = overridesAfterSave(preSave.overrides, {
+            activeMapId: activeMap.id,
+            writtenEntityIds,
+            foreignMapDrafts,
+          });
           overridesRef.current = nextOverrides;
           setOverrides(nextOverrides);
 
@@ -2218,9 +2265,6 @@ function AtlasPlacementEditorInner() {
           // All clears go through the *non-undoable* applySnapshot path so
           // the only undo entry we add for this save is the single
           // save-boundary entry below.
-          const worldYamlWritten = !!(
-            activeWorldId && writtenPaths.has(worldYamlPath(activeWorldId))
-          );
           let nextMapOverride = preSave.mapOverride;
           let nextWorldOverride = preSave.worldOverride;
           let nextLayerByMap = preSave.layerByMap;
@@ -2230,10 +2274,10 @@ function AtlasPlacementEditorInner() {
             regionDraft.applySnapshot(cleanRegionDraft);
             routeDraft.applySnapshot(cleanRouteDraft);
             fogDraft.applySnapshot(null);
-            nextLayerByMap = { ...preSave.layerByMap, [activeMap.id]: [] };
+            // Every project map's layers and metadata went into world.yaml.
+            nextLayerByMap = afterSave.nextLayerByMap;
+            nextMapOverride = afterSave.nextMapOverride as typeof preSave.mapOverride;
             layerEditor.applySnapshot(nextLayerByMap);
-            nextMapOverride = { ...preSave.mapOverride };
-            delete nextMapOverride[activeMap.id];
             mapOverrideRef.current = nextMapOverride;
             setMapOverride(nextMapOverride);
             // World-level settings (credits, assetCredits) now live in canon —
@@ -2255,6 +2299,9 @@ function AtlasPlacementEditorInner() {
           // prior in-memory state and flips the chip back to Unsaved."
           undoStack.push({
             label: "save (cleared local drafts)",
+            // The active map's drafts are restored into its holders, so undo
+            // switches back to it first.
+            mapId: activeMap.id,
             undo: () => {
               overridesRef.current = preSave.overrides;
               setOverrides(preSave.overrides);
@@ -2267,6 +2314,7 @@ function AtlasPlacementEditorInner() {
                 routeDraft.applySnapshot(preSave.routeDraft);
                 fogDraft.applySnapshot(preSave.fogDraft);
                 layerEditor.applySnapshot(preSave.layerByMap);
+                session.restoreOtherMapDrafts(preSaveMapDrafts);
               }
             },
             redo: () => {
@@ -2281,6 +2329,7 @@ function AtlasPlacementEditorInner() {
                 routeDraft.applySnapshot(cleanRouteDraft);
                 fogDraft.applySnapshot(null);
                 layerEditor.applySnapshot(nextLayerByMap);
+                session.restoreOtherMapDrafts(afterSave.cleanSlices);
               }
             },
           });

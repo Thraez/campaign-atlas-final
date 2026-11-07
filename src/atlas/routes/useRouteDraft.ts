@@ -11,7 +11,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { AtlasProject, MapDocument, Point, Route, RouteMode } from "@/atlas/content/schema";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
 import { slugify as toSlug, uniqueId } from "@/atlas/content/slugify";
-import { useDraftCore } from "@/atlas/editor/useDraftCore";
+import { applyCollectionDraft, useDraftCore } from "@/atlas/editor/useDraftCore";
 
 export type Waypoint = Point | { entityId: string };
 
@@ -83,6 +83,7 @@ export function useRouteDraft(
   const { draft, getDraft, applyDraft, mutateDraft, dirty, dirtyCount } = useDraftCore<RouteDraft>(
     EMPTY,
     undoStack,
+    map?.id,
   );
 
   // Memoized so the `?? []` fallback doesn't hand a fresh array to the memos below
@@ -91,14 +92,7 @@ export function useRouteDraft(
 
   const effective: Route[] = useMemo(() => {
     if (!map) return [];
-    const out: Route[] = [];
-    for (const r of baseRoutes) {
-      if (draft.deleted.includes(r.id)) continue;
-      const e = draft.edits[r.id];
-      out.push(e ? { ...r, ...e } : r);
-    }
-    out.push(...draft.added);
-    return out;
+    return applyCollectionDraft(baseRoutes, draft);
   }, [baseRoutes, draft, map]);
 
   const projectIds = useMemo(

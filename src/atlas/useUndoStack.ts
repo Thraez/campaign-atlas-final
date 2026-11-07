@@ -13,7 +13,7 @@
  * oldest entries are evicted from the past stack. The future stack is
  * cleared whenever a new action is pushed (standard branch semantics).
  */
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface UndoAction {
   /** Reverts the mutation. */
@@ -22,6 +22,16 @@ export interface UndoAction {
   redo: () => void;
   /** Optional human label, surfaced in the undo/redo toast. */
   label?: string;
+  /** The map this edit was made on. Undo/redo switch to it first (via
+   *  `switchToMap`) so a per-map draft slot never receives another map's
+   *  edit. Omit for edits that are not tied to one map. */
+  mapId?: string;
+}
+
+export interface UndoStackOptions {
+  /** Make `mapId` the active map before an entry for it is undone or redone.
+   *  Must swap the per-map draft slots synchronously. */
+  switchToMap?: (mapId: string) => void;
 }
 
 export interface UndoStackAPI {
@@ -43,7 +53,10 @@ export interface UndoStackAPI {
 
 const DEFAULT_CAP = 50;
 
-export function useUndoStack(cap: number = DEFAULT_CAP): UndoStackAPI {
+export function useUndoStack(
+  cap: number = DEFAULT_CAP,
+  options: UndoStackOptions = {},
+): UndoStackAPI {
   // Two parallel representations: React state drives renders, refs give the
   // callbacks synchronous access. The callbacks update both in lock-step
   // so they never disagree at the moment a mutation runs.
@@ -51,6 +64,10 @@ export function useUndoStack(cap: number = DEFAULT_CAP): UndoStackAPI {
   const [future, setFuture] = useState<UndoAction[]>([]);
   const pastRef = useRef<UndoAction[]>([]);
   const futureRef = useRef<UndoAction[]>([]);
+  const switchToMapRef = useRef(options.switchToMap);
+  useEffect(() => {
+    switchToMapRef.current = options.switchToMap;
+  });
 
   const push = useCallback(
     (action: UndoAction) => {
@@ -74,6 +91,7 @@ export function useUndoStack(cap: number = DEFAULT_CAP): UndoStackAPI {
     futureRef.current = nextFuture;
     setPast(nextPast);
     setFuture(nextFuture);
+    if (last.mapId) switchToMapRef.current?.(last.mapId);
     last.undo();
     return last.label;
   }, []);
@@ -88,6 +106,7 @@ export function useUndoStack(cap: number = DEFAULT_CAP): UndoStackAPI {
     futureRef.current = nextFuture;
     setPast(nextPast);
     setFuture(nextFuture);
+    if (last.mapId) switchToMapRef.current?.(last.mapId);
     last.redo();
     return last.label;
   }, []);

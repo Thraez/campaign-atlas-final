@@ -14,39 +14,49 @@ import type {
   CreditsConfig,
   FogOverlay,
   MapDocument,
-  MapLayer,
   Region,
   Route,
   WorldCalendar,
 } from "@/atlas/content/schema";
-import type { LocalLayer } from "@/atlas/useMapLayers";
+import { mergeMapLayers, type LocalLayer } from "@/atlas/useMapLayers";
+import { applyCollectionDraft } from "@/atlas/editor/useDraftCore";
 import type { FileChange } from "@/atlas/save/localFsSave";
 import { buildFullWorldYaml } from "@/atlas/yaml/buildFullWorldYaml";
 import { mapLayerTargetPath } from "@/atlas/assets/mapLayerTarget";
 
+/**
+ * One map's unsaved drafts, as the editor session keeps them per map. Every
+ * field is optional: a missing field means "no draft, keep canon".
+ */
+export interface MapDraft {
+  /** Map metadata patch (size, ocean, grid, soundscape...). */
+  mapOverride?: Partial<MapDocument>;
+  /** Local layer drafts (edits of built-ins, uploads, URL adds). */
+  localLayers?: readonly LocalLayer[];
+  region?: CollectionDraft<Region>;
+  route?: CollectionDraft<Route>;
+  /** null = no fog override for this map. */
+  fog?: FogOverlay | null;
+}
+
+interface CollectionDraft<I> {
+  edits: Record<string, Partial<I>>;
+  added: I[];
+  deleted: string[];
+}
+
 export interface BuildWorldYamlContentInputs {
-  /** The map whose layers/regions/routes/fog get the draft overlay applied. */
-  activeMap: MapDocument;
-  /** Every map in the project (canon). Only the entry matching `activeMap.id`
-   *  is replaced; every other map is passed through byte-identical. */
+  /** Every map in the project (canon). A map with no entry in `drafts` is
+   *  passed through byte-identical. */
   maps: MapDocument[];
+  /** Unsaved drafts keyed by map id, for every map (not only the active one). */
+  drafts: Record<string, MapDraft>;
   calendar?: WorldCalendar;
   schemaVersion?: number;
   /** Optional world display name; forwarded byte-for-byte, same drift-sensitivity
    *  as `credits` — this is what lets the World Details panel's name edit reach
    *  world.yaml at all. */
   name?: string;
-  /** The active map's layers with local edits/uploads/URL-adds merged in
-   *  (`useMapLayers().mergedLayers`). */
-  mergedLayers: MapLayer[];
-  /** The active map's local layer overrides (`useMapLayers().localLayers`),
-   *  used to resolve which merged layers are upload-origin. */
-  localLayers: LocalLayer[];
-  /** Effective (canon + draft) regions/routes for the active map. */
-  regionsEffective: Region[];
-  routesEffective: Route[];
-  /** Effective fog overlay for the active map. */
-  fog: FogOverlay;
   /** Current on-disk world.yaml contents, or null if it doesn't exist yet —
    *  forwarded to buildFullWorldYaml to preserve the leading comment block. */
   existingRaw: string | null;
@@ -59,12 +69,32 @@ export interface BuildWorldYamlContentInputs {
   assetCredits?: Record<string, AssetCredit>;
 }
 
+/** A map with its drafts applied, as world.yaml should store it. */
+export function applyMapDraft(canon: MapDocument, draft: MapDraft | undefined): MapDocument {
+  if (!draft) return canon;
+  const base: MapDocument = draft.mapOverride ? { ...canon, ...draft.mapOverride } : canon;
+  const out: MapDocument = { ...base };
+  if (draft.localLayers && draft.localLayers.length > 0) {
+    out.layers = mergeMapLayers(base, draft.localLayers).map((l) => {
+      const local = draft.localLayers!.find((ll) => ll.id === l.id);
+      if (!local || local.origin !== "upload") return l;
+      // upload: rewrite src to the canonical "atlas/assets/maps/<file>" form
+      // (strip the public/ prefix). The actual binary is written by the
+      // asset-binary FileChange built by buildAssetBinaryChanges.
+      return { ...l, src: mapLayerTargetPath(local).replace(/^public\//, "") };
+    });
+  }
+  if (draft.region) out.regions = applyCollectionDraft(base.regions ?? [], draft.region);
+  if (draft.route) out.routes = applyCollectionDraft(base.routes ?? [], draft.route);
+  if (draft.fog) out.fog = draft.fog;
+  return out;
+}
+
 /**
- * Compose the full world.yaml content for the active world by overlaying
- * the editor's per-tab draft state onto the canonical project.maps array.
- * Other maps in the world stay byte-identical to canon. The active map
- * gets its mapOverride applied with the merged layers and the effective
- * region / route / fog drafts.
+ * Compose the full world.yaml content by overlaying the editor's per-map
+ * drafts onto the canonical project.maps array. Every map's drafts are
+ * applied, not only the active map's: all maps share one world.yaml, so a
+ * save that wrote only the active map would drop the others' work.
  *
  * Upload-origin layers (binaries dragged into the browser) get their `src`
  * rewritten to the eventual on-disk path (e.g. `atlas/assets/maps/foo.png`)
@@ -73,43 +103,10 @@ export interface BuildWorldYamlContentInputs {
  * the endpoint runs after writes can then resolve every layer src.
  */
 export function buildWorldYamlContent(inputs: BuildWorldYamlContentInputs): string {
-  const {
-    activeMap,
-    maps,
-    calendar,
-    schemaVersion,
-    name,
-    mergedLayers,
-    localLayers,
-    regionsEffective,
-    routesEffective,
-    fog,
-    existingRaw,
-    credits,
-    assetCredits,
-  } = inputs;
-  const remappedLayers: MapLayer[] = mergedLayers.map((l) => {
-    const local = localLayers.find((ll) => ll.id === l.id);
-    if (!local || local.origin !== "upload") return l;
-    // upload: rewrite src to the canonical "atlas/assets/maps/<file>" form
-    // (strip the public/ prefix). The actual binary is written by the
-    // asset-binary FileChange we add in onSaveClick.
-    const target = mapLayerTargetPath(local);
-    const src = target.replace(/^public\//, "");
-    return { ...l, src };
-  });
-  const updatedMaps: MapDocument[] = maps.map((m) => {
-    if (m.id !== activeMap.id) return m;
-    return {
-      ...activeMap,
-      layers: remappedLayers,
-      regions: regionsEffective,
-      routes: routesEffective,
-      fog,
-    };
-  });
+  const { maps, drafts, calendar, schemaVersion, name, existingRaw, credits, assetCredits } =
+    inputs;
   return buildFullWorldYaml({
-    maps: updatedMaps,
+    maps: maps.map((m) => applyMapDraft(m, drafts[m.id])),
     calendar,
     schemaVersion,
     name,

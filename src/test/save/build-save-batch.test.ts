@@ -7,9 +7,9 @@
  *  - world-level `credits` / `assetCredits` keep flowing through to
  *    buildFullWorldYaml (a known drift-sensitive line — regressing this
  *    silently drops credit badges from a save).
- *  - the active-map overlay (regions/routes/fog draft merge) and the
- *    upload-origin `src` rewrite behave exactly like the original inline
- *    useCallback bodies.
+ *  - every map's drafts (regions/routes/fog/layers/metadata) are overlaid,
+ *    not only the active map's (eval-30), and the upload-origin `src`
+ *    rewrite behaves exactly like the original inline useCallback body.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { MapDocument, MapLayer, Region, Route, FogOverlay } from "@/atlas/content/schema";
@@ -90,16 +90,11 @@ describe("buildWorldYamlContent", () => {
     const assetCredits = { "atlas/assets/maps/a.png": { credit: "Jane Doe", enabled: true } };
 
     buildWorldYamlContent({
-      activeMap,
       maps: [activeMap],
+      drafts: {},
       calendar: undefined,
       schemaVersion: 3,
       name: "Astrath Deeprealm",
-      mergedLayers: [],
-      localLayers: [],
-      regionsEffective: REGIONS,
-      routesEffective: ROUTES,
-      fog: FOG,
       existingRaw: "# existing header\n",
       credits,
       assetCredits,
@@ -114,38 +109,39 @@ describe("buildWorldYamlContent", () => {
     expect(call.schemaVersion).toBe(3);
   });
 
-  it("replaces only the active map, applying regions/routes/fog from the passed drafts", () => {
-    const activeMap = makeMap({ id: "m1", name: "Active" });
-    const otherMap = makeMap({ id: "m2", name: "Other", regions: [], routes: [] });
+  it("applies regions/routes/fog/metadata drafts to every map that has them", () => {
+    const m1 = makeMap({ id: "m1", name: "Active" });
+    const m2 = makeMap({ id: "m2", name: "Other", regions: [], routes: [] });
+    const m3 = makeMap({ id: "m3", name: "Untouched" });
 
     buildWorldYamlContent({
-      activeMap,
-      maps: [activeMap, otherMap],
-      mergedLayers: [],
-      localLayers: [],
-      regionsEffective: REGIONS,
-      routesEffective: ROUTES,
-      fog: FOG,
+      maps: [m1, m2, m3],
+      drafts: {
+        m1: {
+          region: { edits: {}, added: REGIONS, deleted: [] },
+          route: { edits: {}, added: ROUTES, deleted: [] },
+          fog: FOG,
+        },
+        m2: {
+          mapOverride: { name: "Renamed" },
+          region: { edits: {}, added: [{ ...REGIONS[0], id: "r2", mapId: "m2" }], deleted: [] },
+        },
+      },
       existingRaw: null,
     });
 
     const call = buildFullWorldYamlMock.mock.calls[0][0];
     const maps = call.maps as MapDocument[];
-    expect(maps).toHaveLength(2);
-    // Other map is byte-identical to canon.
-    expect(maps[1]).toBe(otherMap);
-    // Active map gets the drafts overlaid.
-    expect(maps[0]).toMatchObject({
-      id: "m1",
-      regions: REGIONS,
-      routes: ROUTES,
-      fog: FOG,
-    });
+    expect(maps).toHaveLength(3);
+    expect(maps[0]).toMatchObject({ id: "m1", regions: REGIONS, routes: ROUTES, fog: FOG });
+    expect(maps[1]).toMatchObject({ id: "m2", name: "Renamed", routes: [] });
+    expect(maps[1].regions?.map((r) => r.id)).toEqual(["r2"]);
+    // A map with no drafts is byte-identical to canon.
+    expect(maps[2]).toBe(m3);
   });
 
   it("rewrites src for an upload-origin layer, stripping the public/ prefix", () => {
     const activeMap = makeMap();
-    const mergedLayer = makeLayer({ id: "layer-1", src: "blob:local" });
     const localUpload = makeLocalLayer({
       id: "layer-1",
       origin: "upload",
@@ -153,13 +149,8 @@ describe("buildWorldYamlContent", () => {
     });
 
     buildWorldYamlContent({
-      activeMap,
-      maps: [activeMap],
-      mergedLayers: [mergedLayer],
-      localLayers: [localUpload],
-      regionsEffective: [],
-      routesEffective: [],
-      fog: FOG,
+      maps: [{ ...activeMap, layers: [] }],
+      drafts: { [activeMap.id]: { localLayers: [localUpload] } },
       existingRaw: null,
     });
 
@@ -170,17 +161,11 @@ describe("buildWorldYamlContent", () => {
 
   it("falls back to the default target path when the upload has no targetPath", () => {
     const activeMap = makeMap();
-    const mergedLayer = makeLayer({ id: "layer-9", src: "blob:local" });
     const localUpload = makeLocalLayer({ id: "layer-9", origin: "upload", targetPath: undefined });
 
     buildWorldYamlContent({
-      activeMap,
-      maps: [activeMap],
-      mergedLayers: [mergedLayer],
-      localLayers: [localUpload],
-      regionsEffective: [],
-      routesEffective: [],
-      fog: FOG,
+      maps: [{ ...activeMap, layers: [] }],
+      drafts: { [activeMap.id]: { localLayers: [localUpload] } },
       existingRaw: null,
     });
 
@@ -191,37 +176,33 @@ describe("buildWorldYamlContent", () => {
 
   it("leaves a non-upload layer's src unchanged", () => {
     const activeMap = makeMap();
-    const mergedLayer = makeLayer({ id: "layer-2", src: "atlas/assets/maps/layer-2.png" });
-    const localEdit = makeLocalLayer({ id: "layer-2", origin: "edit" });
+    const canonLayer = makeLayer({ id: "layer-2", src: "atlas/assets/maps/layer-2.png" });
+    const localEdit = makeLocalLayer({
+      id: "layer-2",
+      origin: "edit",
+      src: "atlas/assets/maps/layer-2.png",
+      x: 50,
+    });
 
     buildWorldYamlContent({
-      activeMap,
-      maps: [activeMap],
-      mergedLayers: [mergedLayer],
-      localLayers: [localEdit],
-      regionsEffective: [],
-      routesEffective: [],
-      fog: FOG,
+      maps: [{ ...activeMap, layers: [canonLayer] }],
+      drafts: { [activeMap.id]: { localLayers: [localEdit] } },
       existingRaw: null,
     });
 
     const call = buildFullWorldYamlMock.mock.calls[0][0];
     const maps = call.maps as MapDocument[];
     expect(maps[0].layers[0].src).toBe("atlas/assets/maps/layer-2.png");
+    expect(maps[0].layers[0].x).toBe(50);
   });
 
-  it("leaves a merged layer with no matching local entry unchanged", () => {
+  it("leaves a canon layer with no matching local entry unchanged", () => {
     const activeMap = makeMap();
-    const mergedLayer = makeLayer({ id: "layer-3", src: "atlas/assets/maps/layer-3.png" });
+    const canonLayer = makeLayer({ id: "layer-3", src: "atlas/assets/maps/layer-3.png" });
 
     buildWorldYamlContent({
-      activeMap,
-      maps: [activeMap],
-      mergedLayers: [mergedLayer],
-      localLayers: [],
-      regionsEffective: [],
-      routesEffective: [],
-      fog: FOG,
+      maps: [{ ...activeMap, layers: [canonLayer] }],
+      drafts: { [activeMap.id]: { localLayers: [] } },
       existingRaw: null,
     });
 
@@ -305,13 +286,8 @@ describe("upload target path (eval-19)", () => {
     const local = makeLocalLayer({ id: "layer-9", filename: "Ruins.jpg", targetPath: "   " });
 
     buildWorldYamlContent({
-      activeMap,
-      maps: [activeMap],
-      mergedLayers: [makeLayer({ id: "layer-9", src: "blob:local" })],
-      localLayers: [local],
-      regionsEffective: [],
-      routesEffective: [],
-      fog: FOG,
+      maps: [{ ...activeMap, layers: [] }],
+      drafts: { [activeMap.id]: { localLayers: [local] } },
       existingRaw: null,
     });
 

@@ -1,6 +1,6 @@
 # Editor drafts are kept per map: a save never loses another map's work
 
-Status: ready-for-agent
+Status: done
 Area: editor (session, save, undo)
 
 Found by the fourth sweep (2026-10-28), the editor page's second pass. Region, route, fog, layer and
@@ -39,3 +39,37 @@ world.yaml; undoing an edit made on another map switches to that map first.
 - Pins duplicated to another map are clean after the save that wrote them.
 - The editor is checked by eye in the preview: draw on two maps, save once, reload, and both
   maps keep their edits (ready-for-human).
+
+## Comments
+
+2026-11-07 (agent, branch `eval-30-drafts-per-map`): done for the code; the last criterion (draw on
+two maps, save once, reload) is **ready-for-human**.
+
+- Save: `buildWorldYamlContent` takes `drafts: Record<mapId, MapDraft>` and applies each map's
+  metadata, layer, region, route and fog draft (`applyMapDraft`). The page builds that from the
+  map-override store, `useMapLayers` (already keyed by map) and the new `session.mapDrafts()`.
+  `markSaved(writtenMapIds)` clears only the maps the save wrote; a save without world.yaml clears
+  none.
+- One dirty signal: `session.unsavedCount` = active map + `otherMapsDirtyCount`. The chip,
+  beforeunload and `worldYamlDirty` all read it; `lastLocalEditAt` and `pinSideUnsaved` are gone.
+- Undo: entries carry `mapId` (`useDraftCore`, fog, layers, map metadata). `useUndoStack` takes a
+  `switchToMap` option and calls it before undo/redo; the page switches map through the session.
+- Pins: `overridesAfterSave` also clears written foreign-map override keys.
+- Tests: `src/test/session/drafts-per-map.test.tsx` (three bugs, real hooks, each red first);
+  `build-save-batch.test.ts` moved to the per-map interface.
+
+Provisional calls: every map is written in one world.yaml save, so a world.yaml save clears all
+maps' drafts; undo of another map's edit switches to that map first; beforeunload now also warns
+for restored (localStorage) pins, since it reads the one signal. A map without a fog draft no
+longer gets a default fog block written.
+
+Review fixes: drafts kept under a map id the project no longer has (renamed or removed map) are
+orphans. They are not counted, saved or cleared, only kept, and the editor logs one `console.warn`
+listing them. The `onSaved` map cleanup is now the pure `mapDraftsAfterSave`
+(`src/atlas/session/mapDraftsAfterSave.ts`, tested in `map-drafts-after-save.test.ts`). Mounting the
+page to drive layer and metadata drafts on two maps was too heavy. The save-boundary undo/redo
+through `restoreOtherMapDrafts` is tested in `drafts-per-map.test.tsx`.
+
+Not covered, filed as tickets: the soundscape draft is one slot (44); deleted pins on other maps
+are not counted or written (45). The page-level map-switch wiring is covered only through the hook
+tests and existing page-mount tests.
