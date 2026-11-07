@@ -1,5 +1,6 @@
 import { FileCode, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MAP_IMPORT_ZIP_NAME } from "../mapImport";
 
 export function ExportStep({
   onDownload,
@@ -14,7 +15,7 @@ export function ExportStep({
     <div className="p-1 space-y-3">
       <div className="rounded-md border border-border p-4 bg-card/50">
         <div className="text-sm font-medium flex items-center gap-2">
-          <FileCode className="h-4 w-4 text-primary" /> atlas-map-import.zip contains
+          <FileCode className="h-4 w-4 text-primary" /> {MAP_IMPORT_ZIP_NAME} contains
         </div>
         <ul className="mt-2 text-xs space-y-1 text-muted-foreground">
           <li>

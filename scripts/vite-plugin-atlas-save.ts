@@ -1553,9 +1553,9 @@ export function rejectNonLoopback(req: DevRequest, res: DevResponse): boolean {
 export const SAVE_BODY_LIMIT_BYTES = 128 * 1024 * 1024;
 /** `.local-atlas` config (the sync map grows with the vault). */
 export const LOCAL_WRITE_BODY_LIMIT_BYTES = 8 * 1024 * 1024;
-/** A vault-image-copy body is a couple of paths and a candidate-folder list. */
 /** One asset's data URL plus the JSON around it. */
 export const CLEAN_ASSET_BODY_LIMIT_BYTES = MAX_ASSET_DATAURL_BYTES + 64 * 1024;
+/** A vault-image-copy body is a couple of paths and a candidate-folder list. */
 export const VAULT_IMAGE_COPY_BODY_LIMIT_BYTES = 1024 * 1024;
 
 export interface DevRouteRequest {

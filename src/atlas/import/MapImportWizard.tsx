@@ -175,7 +175,9 @@ export function MapImportWizard({
       return;
     }
     if (!built.ok) {
-      toast.error(`${built.path}: ${built.detail}`);
+      toast.error(
+        built.reason === "no-dev-server" ? built.detail : `${built.path}: ${built.detail}`,
+      );
       return;
     }
     const blob = await built.zip.generateAsync({ type: "blob" });

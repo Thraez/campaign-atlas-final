@@ -1,6 +1,6 @@
 # The Map Import Wizard's zip strips map metadata like an editor upload
 
-Status: in-review
+Status: done
 Area: editor (map import, dev save endpoint)
 
 Found in the review of eval-29 (2026-11-07).
@@ -49,3 +49,9 @@ extract `atlas-assets.zip`, while the download is `atlas-map-import.zip`.
 - Not fixed here: a WebP map keeps its bytes in both paths (`cleanImageBytes` returns a `.webp`
   map unchanged so it never re-encodes), so a WebP's EXIF/XMP survives until `check-image-privacy`.
   The wizard's README still ends with `git push`.
+- Behaviour changes: the wizard's download now needs the editor's dev server (`npm run dev`); without
+  the route it says so in a toast and builds nothing. It also refuses a map over the editor's 6 MB
+  asset cap (`MAX_ASSET_BINARY_BYTES`), which it used to zip at any size.
+- Review fixes (same day): the Export step renders `MAP_IMPORT_ZIP_NAME`, the client uses
+  `DEV_API_PATHS.cleanAsset`, a 404 or failed fetch reads "Map cleaning needs the editor's dev
+  server (npm run dev)", and the path-refusal test checks the reason and path.

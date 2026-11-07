@@ -7,6 +7,10 @@
  * orientation other than normal, a JPG under a non-.jpg name). Editor-only.
  */
 import JSZip from "jszip";
+import { DEV_API_PATHS } from "../../../scripts/atlas/devRoutes";
+
+/** Shown when the route isn't there: the wizard opened outside `npm run dev`. */
+export const NEEDS_DEV_SERVER = "Map cleaning needs the editor's dev server (npm run dev)";
 
 export type CleanedAsset =
   { ok: true; base64: string } | { ok: false; reason: string; detail: string };
@@ -19,6 +23,7 @@ export type MapImportZipResult =
 
 /** Reads a `/__atlas/clean-asset` reply: 200 `{ base64 }`, else `{ error, reason?, detail? }`. */
 export function readCleanAssetReply(status: number, body: unknown): CleanedAsset {
+  if (status === 404) return { ok: false, reason: "no-dev-server", detail: NEEDS_DEV_SERVER };
   const o = (body ?? {}) as {
     base64?: unknown;
     error?: unknown;
@@ -37,11 +42,12 @@ export function cleanAssetViaDevServer(
   fetchFn: typeof fetch = (input, init) => fetch(input, init),
 ): CleanAsset {
   return async (targetPath, dataUrl) => {
-    const resp = await fetchFn("/__atlas/clean-asset", {
+    const resp = await fetchFn(DEV_API_PATHS.cleanAsset, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: targetPath, content: dataUrl }),
-    });
+    }).catch(() => null);
+    if (!resp) return { ok: false, reason: "no-dev-server", detail: NEEDS_DEV_SERVER };
     return readCleanAssetReply(resp.status, await resp.json().catch(() => ({})));
   };
 }

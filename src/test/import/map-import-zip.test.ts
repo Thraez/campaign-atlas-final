@@ -11,6 +11,8 @@ import sharp from "sharp";
 import { handleCleanAssetRequest } from "../../../scripts/vite-plugin-atlas-save";
 import {
   buildMapImportZip,
+  cleanAssetViaDevServer,
+  NEEDS_DEV_SERVER,
   readCleanAssetReply,
   type CleanAsset,
 } from "@/atlas/import/mapImportZip";
@@ -138,6 +140,20 @@ describe("Map Import Wizard zip strips map metadata", () => {
       clean,
     );
     expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.reason).toBe("DisallowedPath");
+    expect(r.path).toBe("content/evil.jpg");
+  });
+
+  it("says the dev server is needed when the route isn't there", async () => {
+    const notFound = (async () => new Response("Not found", { status: 404 })) as typeof fetch;
+    const offline = (async () => {
+      throw new TypeError("Failed to fetch");
+    }) as typeof fetch;
+    for (const fetchFn of [notFound, offline]) {
+      const r = await cleanAssetViaDevServer(fetchFn)("public/atlas/assets/maps/a.jpg", "data:,");
+      expect(r).toEqual({ ok: false, reason: "no-dev-server", detail: NEEDS_DEV_SERVER });
+    }
   });
 
   it("carries the patch and README, and the README names the zip the wizard downloads", async () => {
