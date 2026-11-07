@@ -29,4 +29,11 @@ describe("resolveMapClickTool: one tool owns a map click", () => {
   it("pauses the ruler while a pin is being placed", () => {
     expect(resolveMapClickTool({ ...idle, rulerOn: true, placingPin: true })).toBe("place-pin");
   });
+
+  it.each(["drawingRegion", "drawingRoute", "drawingFog", "drawingSoundscape"] as const)(
+    "gives the click to the drawing, not a pending pin, while %s",
+    (key) => {
+      expect(resolveMapClickTool({ ...idle, placingPin: true, [key]: true })).toBe("draw");
+    },
+  );
 });

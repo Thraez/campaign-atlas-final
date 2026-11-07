@@ -676,7 +676,7 @@ function AtlasPlacementEditorInner() {
   }, [mode, placed, entitiesById, activeMap, fogDraft.fog, effectivePlacement]);
 
   const onMapClick = (lng: number, lat: number) => {
-    if (!pendingId || !activeMap) return;
+    if (mapClickTool !== "place-pin" || !pendingId || !activeMap) return;
     const { x, y } = mapClickToAtlasCoord(lng, lat, activeMap.height);
     setCoord(pendingId, { x, y });
     toast.success(
@@ -697,7 +697,9 @@ function AtlasPlacementEditorInner() {
   // pin never reaches `onMapClick`. Returns true when it placed (so the
   // overlay stops propagation and the pin isn't placed twice).
   const handleLayerBackgroundClick = (latlng: L.LatLng): boolean => {
-    if (!pendingId) return false;
+    // While drawing, return false so the click reaches the map and the
+    // drawing layer adds its vertex.
+    if (mapClickTool !== "place-pin") return false;
     onMapClick(latlng.lng, latlng.lat);
     return true;
   };

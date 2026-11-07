@@ -1,6 +1,6 @@
 # Ruler and route/fog drawing both take the same map click
 
-Status: in-review
+Status: done
 Area: editor (map tools: ruler, drawing)
 
 Found in an architecture review (2026-11-07).
@@ -17,8 +17,9 @@ missing from that guard.
 ## Acceptance criteria
 
 - A failing test first, through one pure decision of which tool owns a map click.
-- While a pin is being placed or any drawing mode (region, route, fog, sound area) is active, the
-  ruler takes no clicks; it works again when that ends.
+- While any drawing mode (region, route, fog, sound area) is active, it owns the click: no pin is
+  placed and no ruler point added. While a pin is being placed, the ruler takes no clicks; it
+  works again when that ends.
 - The editor's map cursor and ruler both follow that one decision, not separate guards.
 - The player map's ruler (`AtlasViewer`) is unchanged.
 - Checked by eye in the preview: ruler on, start a route, click; only a vertex appears
@@ -36,6 +37,13 @@ missing from that guard.
   pins, regions and sound areas already did. The ruler toggle stays pressed; its points are
   cleared while paused (`RulerLayer` resets when it goes inactive) and it measures again once the
   drawing ends.
-- Not covered: a pending pin placement plus an active drawing can still both take a click
-  (`onMapClick` places the pin, the drawing layer adds a vertex). That is outside this ticket.
+- Review note (Opus review of the first commit): a pending pin plus an active drawing still took
+  one click twice on the bare map (`onMapClick` placed the pin, the drawing layer added a vertex),
+  while over a map-image layer `handleLayerBackgroundClick` placed only the pin and stopped the
+  click. Fixed here: the resolver ranks drawing before pin placement, and `onMapClick` and
+  `handleLayerBackgroundClick` act only when it returns `place-pin`. While drawing, the layer
+  handler returns false, so the click propagates to the map and the drawing layer gets it there
+  too. Test cases added for each drawing mode with a pending pin.
+- Provisional call: an active drawing owns the click over a pending pin. The pin stays pending and
+  is placed by the first click after the drawing ends.
 - Not checked in the preview pane.
