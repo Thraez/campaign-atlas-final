@@ -17,6 +17,7 @@ import {
   serializeSession,
   deserializeSession,
   sessionHasWork,
+  type CalendarDraft,
   type SessionState,
 } from "./sessionSnapshot";
 import type { EntityEditSnapshot } from "@/atlas/categories/useEntityEditDraft";
@@ -36,6 +37,22 @@ export interface MapSlices {
 }
 
 const EMPTY_COLLECTION = { edits: {}, added: [], deleted: [] };
+
+/** A session with no drafts in any holder. */
+function emptySession(): SessionState {
+  return {
+    overrides: {},
+    mapOverrideByMap: {},
+    regionByMap: {},
+    routeByMap: {},
+    fogByMap: {},
+    layerByMap: {},
+    worldOverride: {},
+    calendar: null,
+    entityEdit: null,
+    savedAt: Date.now(),
+  };
+}
 
 export function slicesDirtyCount(sl: Partial<MapSlices>): number {
   const n = (d?: { edits: object; added: unknown[]; deleted: unknown[] }) =>
@@ -86,6 +103,11 @@ export interface EditorSessionArgs {
     fog: Holder<unknown>;
     layer: Holder<unknown>;
     editorEntity: { get: () => EntityEditSnapshot; set: (v: EntityEditSnapshot) => void };
+    world: {
+      get: () => SessionState["worldOverride"];
+      set: (w: SessionState["worldOverride"]) => void;
+    };
+    calendar: { get: () => CalendarDraft; set: (c: CalendarDraft) => void };
   };
   /** Sum of every holder's change count that is not a swapped region/route/fog
    *  slice: the active map's region/route/fog plus everything kept for all maps
@@ -131,16 +153,7 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
   const { activeMapId, undoStack, holders, perMapDirtyCount, projectMapIds } = args;
 
   // Per-map slices live in a ref (synchronous, not render state).
-  const slicesRef = useRef<SessionState>({
-    overrides: {},
-    mapOverrideByMap: {},
-    regionByMap: {},
-    routeByMap: {},
-    fogByMap: {},
-    layerByMap: {},
-    entityEdit: null,
-    savedAt: Date.now(),
-  });
+  const slicesRef = useRef<SessionState>(emptySession());
   const [hydrated, setHydrated] = useState(false);
   const [status, setStatus] = useState<SaveLifecycle>("clean");
   const [failedReason, setFailedReason] = useState<string | null>(null);
@@ -175,6 +188,8 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
       const mo = holders.mapOverride.get();
       s.mapOverrideByMap = mo as never;
       s.entityEdit = holders.editorEntity.get();
+      s.worldOverride = holders.world.get();
+      s.calendar = holders.calendar.get();
       if (!mapId) return;
       s.regionByMap[mapId] = holders.region.snapshot() as never;
       s.routeByMap[mapId] = holders.route.snapshot() as never;
@@ -190,6 +205,8 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
       // layer.applySnapshot() expects the full byMap store
       holders.layer.applySnapshot(s.layerByMap as never);
       holders.editorEntity.set(s.entityEdit);
+      holders.world.set(s.worldOverride);
+      holders.calendar.set(s.calendar);
       if (!mapId) return;
       holders.region.applySnapshot(
         (s.regionByMap[mapId] ?? { edits: {}, added: [], deleted: [] }) as never,
@@ -334,14 +351,10 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
       const keep = <V>(byMap: Record<string, V>): Record<string, V> =>
         Object.fromEntries(Object.entries(byMap).filter(([id]) => !writtenMapIds.includes(id)));
       slicesRef.current = {
-        overrides: {},
-        mapOverrideByMap: {},
+        ...emptySession(),
         regionByMap: keep(prev.regionByMap),
         routeByMap: keep(prev.routeByMap),
         fogByMap: keep(prev.fogByMap),
-        layerByMap: {},
-        entityEdit: null,
-        savedAt: Date.now(),
       };
       refreshOtherMaps();
       await idbDelete(SESSION_IDB_KEY);
@@ -351,29 +364,8 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
     [refreshOtherMaps],
   );
   const discardAll = useCallback(async () => {
-    applyActiveFrom(
-      {
-        overrides: {},
-        mapOverrideByMap: {},
-        regionByMap: {},
-        routeByMap: {},
-        fogByMap: {},
-        layerByMap: {},
-        entityEdit: null,
-        savedAt: Date.now(),
-      },
-      mapRef.current,
-    );
-    slicesRef.current = {
-      overrides: {},
-      mapOverrideByMap: {},
-      regionByMap: {},
-      routeByMap: {},
-      fogByMap: {},
-      layerByMap: {},
-      entityEdit: null,
-      savedAt: Date.now(),
-    };
+    slicesRef.current = emptySession();
+    applyActiveFrom(slicesRef.current, mapRef.current);
     refreshOtherMaps();
     undoStack.clear();
     await idbDelete(SESSION_IDB_KEY);
