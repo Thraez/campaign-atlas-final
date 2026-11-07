@@ -125,6 +125,12 @@ function readPlayerAtlas(): Record<string, unknown> {
   return JSON.parse(fs.readFileSync(PLAYER_ATLAS, "utf8")) as Record<string, unknown>;
 }
 
+/** Write `atlas` where the built site keeps it (`<dir>/atlas/atlas.json`), as the scans see dist. */
+function writeBuiltSite(dir: string, atlas: Record<string, unknown>): void {
+  fs.mkdirSync(path.join(dir, "atlas"));
+  fs.writeFileSync(path.join(dir, "atlas", "atlas.json"), JSON.stringify(atlas));
+}
+
 // ---- Variant 1: sentinel DM secret (check-no-secrets) -----------------------
 function variantSecret(): VariantResult {
   const sentinel = DM_CONTENT_SENTINELS[0];
@@ -222,7 +228,7 @@ function variantFog(): VariantResult {
     "check-fog-safety.ts",
     () => {
       const dir = freshDir("fog-clean");
-      fs.writeFileSync(path.join(dir, "atlas.json"), JSON.stringify(atlas));
+      writeBuiltSite(dir, atlas);
       return runScan("check-fog-safety.ts", [dir, "--config", CONFIG_PATH]);
     },
     () => {
@@ -240,7 +246,7 @@ function variantFog(): VariantResult {
           [0, 10],
         ],
       };
-      fs.writeFileSync(path.join(dir, "atlas.json"), JSON.stringify(dirty));
+      writeBuiltSite(dir, dirty);
       return runScan("check-fog-safety.ts", [dir, "--config", CONFIG_PATH]);
     },
   );
@@ -273,19 +279,25 @@ function variantShape(): VariantResult {
   );
 }
 
-// ---- Variant 6: unstripped secret marker (check-player-secrets) -------------
-function variantPlayerSecret(): VariantResult {
+// ---- Variants 6a/6b: what check-player-secrets guards, one fault each -------
+/** Clean = the real atlas in the built-site layout; dirty = it plus one planted entity. */
+function variantPlayerSecret(name: string, plant: Record<string, unknown>): VariantResult {
+  const atlas = readPlayerAtlas();
   return assertCleanThenDirty(
-    "Unstripped secret marker",
+    name,
     "check-player-secrets.ts",
     () => {
       const dir = freshDir("player-secret-clean");
-      fs.writeFileSync(path.join(dir, "page.txt"), "nothing locked here");
+      writeBuiltSite(dir, atlas);
       return runScan("check-player-secrets.ts", [dir]);
     },
     () => {
       const dir = freshDir("player-secret-dirty");
-      fs.writeFileSync(path.join(dir, "page.txt"), "{{secret:SMOKE_TEST_SECRET}}");
+      const dirty = readPlayerAtlas();
+      const entities = Array.isArray(dirty.entities) ? (dirty.entities as unknown[]) : [];
+      entities.push(plant);
+      dirty.entities = entities;
+      writeBuiltSite(dir, dirty);
       return runScan("check-player-secrets.ts", [dir]);
     },
   );
@@ -305,6 +317,36 @@ function variantPlayerFiles(): VariantResult {
     "check-player-files.ts",
     () => plant("player-files-clean"),
     () => plant("player-files-dirty", "world.yaml"),
+  );
+}
+
+// ---- Variant 8: a synced vault note in content/ (check-vault-content) -----
+function variantVaultContent(): VariantResult {
+  const plant = (label: string, withSyncMap: boolean) => {
+    const root = freshDir(label);
+    fs.writeFileSync(
+      path.join(root, "atlas.config.json"),
+      JSON.stringify({ contentRoot: "content", hosting: "public" }),
+    );
+    fs.mkdirSync(path.join(root, "content", "w"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, "content", "w", "smoke.md"),
+      "---\ntitle: Smoke\natlas:\n  id: smoke-vault-note\n---\nFrom the vault.\n",
+    );
+    if (withSyncMap) {
+      fs.mkdirSync(path.join(root, ".local-atlas"));
+      fs.writeFileSync(
+        path.join(root, ".local-atlas", "sync-map.json"),
+        JSON.stringify({ "03_Entities/Smoke.md": { id: "smoke-vault-note", baseType: "npc" } }),
+      );
+    }
+    return runScan("check-vault-content.ts", ["--root", root]);
+  };
+  return assertCleanThenDirty(
+    "Synced vault note while hosting is public",
+    "check-vault-content.ts",
+    () => plant("vault-content-clean", false),
+    () => plant("vault-content-dirty", true),
   );
 }
 
@@ -331,8 +373,20 @@ async function main(): Promise<number> {
   results.push(await variantExif());
   results.push(variantFog());
   results.push(variantShape());
-  results.push(variantPlayerSecret());
+  results.push(
+    variantPlayerSecret("Forbidden field on a player secret", {
+      id: "smoke-entity",
+      secrets: [{ id: "s", reveal: "SMOKE_PLAINTEXT" }],
+    }),
+  );
+  results.push(
+    variantPlayerSecret("Unstripped secret marker", {
+      id: "smoke-entity",
+      body: "{{secret:SMOKE_TEST_SECRET}}",
+    }),
+  );
   results.push(variantPlayerFiles());
+  results.push(variantVaultContent());
 
   const pad = Math.max(...results.map((r) => r.name.length));
   for (const r of results) {

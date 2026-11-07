@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
-import { isSecretVisibility, VISIBILITY_MENU_ORDER } from "@/atlas/content/visibility";
+import { VISIBILITY_MENU_ORDER } from "@/atlas/content/visibility";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type {
   AtlasProject,
@@ -108,6 +108,7 @@ import {
   type Overrides,
   overrideKey,
   loadOverrides,
+  dropStaleTombstones,
   finishLegacyMigration,
   persistOverrides,
   LEGACY_STORAGE_KEY_V1,
@@ -159,6 +160,7 @@ import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
 import { FlatCRS } from "@/atlas/map/flatCRS";
 import { whenMapHasSize } from "@/atlas/map/whenMapHasSize";
+import { FitMapOnOpen } from "@/atlas/map/FitMapOnOpen";
 
 function pinDivIcon(
   color: string,
@@ -263,6 +265,12 @@ function AtlasPlacementEditorInner() {
       })
       .catch((e: Error) => setError(e.message));
   }, []);
+
+  // eval-45: a tombstone with no canon placement to delete would count as
+  // unsaved forever. Pruned on load and whenever canon reloads.
+  useEffect(() => {
+    if (project) setOverrides((o) => dropStaleTombstones(o, project.placements));
+  }, [project]);
 
   const { externalRebuildAt, reloadCanon } = useExternalRebuildDetector(project, setProject);
 
@@ -411,22 +419,19 @@ function AtlasPlacementEditorInner() {
 
   // Region draft state — shared between RegionsTab (form) and the map (RegionLayer).
   const entityIdSet = useMemo(() => new Set((project?.entities ?? []).map((e) => e.id)), [project]);
-  const dmEntityIdSet = useMemo(
-    () =>
-      new Set(
-        (project?.entities ?? []).filter((e) => isSecretVisibility(e.visibility)).map((e) => e.id),
-      ),
+  const entityVisibility = useMemo(
+    () => new Map((project?.entities ?? []).map((e) => [e.id, e.visibility] as const)),
     [project],
   );
   const regionDraft = useRegionDraft(
     activeMap,
-    { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet },
+    { entityIds: entityIdSet, entityVisibility },
     undoStack,
   );
   const routeDraft = useRouteDraft(
     project,
     activeMap,
-    { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet },
+    { entityIds: entityIdSet, entityVisibility },
     undoStack,
   );
   const fogDraft = useFogDraft(activeMap, undoStack);
@@ -553,6 +558,20 @@ function AtlasPlacementEditorInner() {
 
   // ☰ menu open/close state
   const [menuOpen, setMenuOpen] = useState(false);
+  // The open menu's toolbar sits above the palette and drop overlay: close it first.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k")) {
+        setMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
+  useEffect(() => {
+    if (isDraggingMd) setMenuOpen(false);
+  }, [isDraggingMd]);
   /** "Where does this save?" disclosure — replaces the old permanent banner. */
   const [saveHelpOpen, setSaveHelpOpen] = useState(false);
 
@@ -809,6 +828,8 @@ function AtlasPlacementEditorInner() {
         activeMapId: activeMap.id,
         foreignMapDrafts,
         entitiesById: new Map(project.entities.map((e) => [e.id, e])),
+        canonPlacements: project.placements,
+        primaryMapId: project.maps[0]?.id ?? null,
         worldYaml: worldYamlDirty
           ? {
               path: activeWorldId ? worldYamlPath(activeWorldId) : null,
@@ -1243,7 +1264,10 @@ function AtlasPlacementEditorInner() {
           </p>
         </div>
       )}
-      <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
+      <header
+        className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border"
+        data-menu-open={menuOpen}
+      >
         <Link
           to="/"
           className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2"
@@ -2011,6 +2035,11 @@ function AtlasPlacementEditorInner() {
                         : undefined,
                   }}
                 >
+                  <FitMapOnOpen
+                    mapId={activeMap.id}
+                    mapWidth={activeMap.width}
+                    mapHeight={activeMap.height}
+                  />
                   <FlyTo target={flyTo} />
                   <RulerLayer
                     active={

@@ -17,6 +17,7 @@
  * to its toast / modal; tests assert the result directly.
  */
 import { filterDirtyPlacements } from "./dirtyPlacements";
+import type { PlacementRemoval } from "@/atlas/save/canonicalPlacementSave";
 
 export interface SavePlanInput<TDraft extends { entityId: string }> {
   /** Every effective placement on the active map (canon + local overrides). */
@@ -31,6 +32,11 @@ export interface SavePlanInput<TDraft extends { entityId: string }> {
 export interface SavePlan<TDraft> {
   /** Placements the DM actually overrode this session (B3 gate applied). */
   dirtyPlacements: TDraft[];
+  /**
+   * eval-45: pins deleted on the active map (a `null` override). They have
+   * no effective placement, so `dirtyPlacements` can't carry them.
+   */
+  removals: PlacementRemoval[];
   /** True when there is genuinely nothing to write. */
   isEmpty: boolean;
 }
@@ -43,6 +49,14 @@ export function buildSavePlan<TDraft extends { entityId: string }>(
     input.overrides,
     input.activeMapId,
   );
-  const isEmpty = dirtyPlacements.length === 0 && !input.worldYamlDirty;
-  return { dirtyPlacements, isEmpty };
+  const prefix = `${input.activeMapId}:`;
+  const removals: PlacementRemoval[] = Object.entries(input.overrides)
+    .filter(([key, value]) => key.startsWith(prefix) && value === null)
+    .map(([key]) => ({
+      entityId: key.slice(prefix.length),
+      mapId: input.activeMapId,
+      removed: true,
+    }));
+  const isEmpty = dirtyPlacements.length === 0 && removals.length === 0 && !input.worldYamlDirty;
+  return { dirtyPlacements, removals, isEmpty };
 }
