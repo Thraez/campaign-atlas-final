@@ -12,7 +12,8 @@ import {
   DEFAULT_REGION_STROKE_OPACITY,
 } from "@/atlas/map/featureStyle";
 import { useCallback, useMemo, useState } from "react";
-import type { MapDocument, Point, Region } from "@/atlas/content/schema";
+import type { EntityVisibility, MapDocument, Point, Region } from "@/atlas/content/schema";
+import { linkLeaksToPlayers, linkTargetLabel } from "@/atlas/content/visibility";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
 import { slugify as toSlug, uniqueId } from "@/atlas/content/slugify";
 import { applyCollectionDraft, useDraftCore } from "@/atlas/editor/useDraftCore";
@@ -75,7 +76,7 @@ function slugify(s: string): string {
 
 export function useRegionDraft(
   map: MapDocument | undefined,
-  opts: { entityIds?: Set<string>; dmEntityIds?: Set<string> } = {},
+  opts: { entityIds?: Set<string>; entityVisibility?: ReadonlyMap<string, EntityVisibility> } = {},
   undoStack?: UndoStackAPI,
 ): RegionDraftAPI {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -287,15 +288,14 @@ export function useRegionDraft(
         });
       }
       if (
-        opts.dmEntityIds &&
-        r.visibility === "player" &&
+        opts.entityVisibility &&
         r.entityId &&
-        opts.dmEntityIds.has(r.entityId)
+        linkLeaksToPlayers(r.visibility, opts.entityVisibility.get(r.entityId))
       ) {
         out.push({
           severity: "blocking",
           code: "spoiler-leak",
-          message: `Player-visible region "${r.name}" links to DM-only entity`,
+          message: `Player-visible region "${r.name}" links to ${linkTargetLabel(opts.entityVisibility.get(r.entityId))}`,
           regionId: r.id,
         });
       }
@@ -327,7 +327,7 @@ export function useRegionDraft(
       }
     }
     return out;
-  }, [effective, map, opts.entityIds, opts.dmEntityIds]);
+  }, [effective, map, opts.entityIds, opts.entityVisibility]);
 
   const snapshot = useCallback((): RegionDraft => getDraft(), [getDraft]);
   const applySnapshot = useCallback(

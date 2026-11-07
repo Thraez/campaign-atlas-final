@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
+import { FilterChip } from "@/atlas/FilterChip";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { compileQuery, entitySearchDoc, searchMatches } from "@/atlas/search/search";
@@ -154,23 +155,20 @@ export default function AtlasTimeline() {
       {allTypes.length > 1 && (
         <div className="flex flex-wrap gap-1 px-3 md:px-4 py-2 border-b border-border/50 bg-muted/20 items-center">
           <Filter className="h-3.5 w-3.5 text-muted-foreground mr-1" />
-          <button
-            onClick={() => setActiveType(null)}
-            className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded ${activeType === null ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
-          >
+          <FilterChip pressed={activeType === null} onClick={() => setActiveType(null)}>
             all
-          </button>
+          </FilterChip>
           {allTypes.map(([t, n]) => {
             const label = playerTypeLabel(t);
             if (!label) return null;
             return (
-              <button
+              <FilterChip
                 key={t}
+                pressed={activeType === t}
                 onClick={() => setActiveType(activeType === t ? null : t)}
-                className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
               >
                 {label} <span className="opacity-60">{n}</span>
-              </button>
+              </FilterChip>
             );
           })}
         </div>

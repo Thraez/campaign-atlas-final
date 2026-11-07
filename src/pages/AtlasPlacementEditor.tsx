@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
-import { isSecretVisibility, VISIBILITY_MENU_ORDER } from "@/atlas/content/visibility";
+import { VISIBILITY_MENU_ORDER } from "@/atlas/content/visibility";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type {
   AtlasProject,
@@ -36,7 +36,6 @@ import type {
   MapDocument,
   MapLayer,
   World,
-  WorldCalendar,
 } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -109,6 +108,7 @@ import {
   type Overrides,
   overrideKey,
   loadOverrides,
+  dropStaleTombstones,
   finishLegacyMigration,
   persistOverrides,
   LEGACY_STORAGE_KEY_V1,
@@ -128,6 +128,7 @@ import { RouteLayer } from "@/atlas/routes/RouteLayer";
 import { useFogDraft } from "@/atlas/fog/useFogDraft";
 import { FogLayer } from "@/atlas/fog/FogLayer";
 import { SoundscapeTab } from "@/atlas/tabs/SoundscapeTab";
+import { withMapPatch, withoutMapKey } from "@/atlas/editor/mapOverride";
 import { useSoundscapeDraft } from "@/atlas/sound-editor/useSoundscapeDraft";
 import { SoundAreaLayer } from "@/atlas/sound-editor/SoundAreaLayer";
 import { loadAvailableAudio } from "@/atlas/sound-editor/listAvailableAudio";
@@ -145,6 +146,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { useUndoStack } from "@/atlas/useUndoStack";
+import { useUndoableState } from "@/atlas/useUndoableState";
+import { useCalendarDraft } from "@/atlas/calendar/useCalendarDraft";
 import { useEditorSession } from "@/atlas/session/useEditorSession";
 import { useEntityEditDraft } from "@/atlas/categories/useEntityEditDraft";
 import { EditorRail } from "@/atlas/shell/EditorRail";
@@ -155,8 +158,10 @@ import { CalendarPanel } from "@/atlas/calendar/CalendarPanel";
 import { ViewModeProvider, useViewMode } from "@/atlas/view/ViewModeProvider";
 import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
+import { resolveMapClickTool } from "@/atlas/editor/mapClickTool";
 import { FlatCRS } from "@/atlas/map/flatCRS";
 import { whenMapHasSize } from "@/atlas/map/whenMapHasSize";
+import { FitMapOnOpen } from "@/atlas/map/FitMapOnOpen";
 
 function pinDivIcon(
   color: string,
@@ -262,6 +267,12 @@ function AtlasPlacementEditorInner() {
       .catch((e: Error) => setError(e.message));
   }, []);
 
+  // eval-45: a tombstone with no canon placement to delete would count as
+  // unsaved forever. Pruned on load and whenever canon reloads.
+  useEffect(() => {
+    if (project) setOverrides((o) => dropStaleTombstones(o, project.placements));
+  }, [project]);
+
   const { externalRebuildAt, reloadCanon } = useExternalRebuildDetector(project, setProject);
 
   // Phase 1C: md-import orchestration. existingById maps entity id → sourcePath
@@ -323,11 +334,6 @@ function AtlasPlacementEditorInner() {
   // Optional in-session, per-map settings override (size + ocean + wrapX + grid).
   const [mapOverride, setMapOverride] = useState<Record<string, Partial<MapDocument>>>({});
 
-  // Optional in-session, per-world settings override (credits, assetCredits).
-  // Mirrors mapOverride — the editor had no world-level save path before, which
-  // is why the credits toggle (L1 Increment 2) was stuck. Keyed by world id.
-  const [worldOverride, setWorldOverride] = useState<Record<string, Partial<World>>>({});
-
   const baseMap: MapDocument | undefined = useMemo(
     () => project?.maps.find((m) => m.id === activeMapId),
     [project, activeMapId],
@@ -346,8 +352,16 @@ function AtlasPlacementEditorInner() {
   const patchMap = (patch: Partial<MapDocument>) => {
     if (!baseMap) return;
     setMapOverrideUndoable(
-      (s) => ({ ...s, [baseMap.id]: { ...(s[baseMap.id] ?? {}), ...patch } }),
+      (s) => withMapPatch(s, baseMap.id, patch),
       `map metadata ${baseMap.id}`,
+      baseMap.id,
+    );
+  };
+  const unpatchMap = (key: keyof MapDocument) => {
+    if (!baseMap) return;
+    setMapOverrideUndoable(
+      (s) => withoutMapKey(s, baseMap.id, key),
+      `reset map ${key} ${baseMap.id}`,
       baseMap.id,
     );
   };
@@ -377,6 +391,12 @@ function AtlasPlacementEditorInner() {
 
   const layerEditor = useMapLayers(activeMap, undoStack);
 
+  // Optional in-session, per-world settings override (name, credits,
+  // assetCredits), keyed by world id. Undo-tracked; a session holder, so it
+  // persists across reloads and "Discard all" clears it.
+  const worldDraft = useUndoableState<Record<string, Partial<World>>>({}, undoStack);
+  const worldOverride = worldDraft.value;
+
   // A13: baseline world.yaml content + hash for the active world. Pinned at
   // editor-load (and refreshed after each successful Save) so the unified
   // Save endpoint can detect on-disk divergence with baseHash and so
@@ -400,31 +420,38 @@ function AtlasPlacementEditorInner() {
 
   // Region draft state — shared between RegionsTab (form) and the map (RegionLayer).
   const entityIdSet = useMemo(() => new Set((project?.entities ?? []).map((e) => e.id)), [project]);
-  const dmEntityIdSet = useMemo(
-    () =>
-      new Set(
-        (project?.entities ?? []).filter((e) => isSecretVisibility(e.visibility)).map((e) => e.id),
-      ),
+  const entityVisibility = useMemo(
+    () => new Map((project?.entities ?? []).map((e) => [e.id, e.visibility] as const)),
     [project],
   );
   const regionDraft = useRegionDraft(
     activeMap,
-    { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet },
+    { entityIds: entityIdSet, entityVisibility },
     undoStack,
   );
   const routeDraft = useRouteDraft(
     project,
     activeMap,
-    { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet },
+    { entityIds: entityIdSet, entityVisibility },
     undoStack,
   );
   const fogDraft = useFogDraft(activeMap, undoStack);
-  // Soundscape draft — shared between SoundscapeTab (panel) and the map
-  // (SoundAreaLayer), exactly as regionDraft is shared with RegionLayer.
-  // Persistence rides the patchMap seam: the panel writes { soundscape } into
-  // the map override, which activeMap folds in and the unified Save spreads
-  // into world.yaml via buildFullWorldYaml → soundscapeToYamlObject.
-  const soundscapeDraft = useSoundscapeDraft(activeMap, undoStack);
+  // Soundscape editing — shared between SoundscapeTab (panel) and the map
+  // (SoundAreaLayer). eval-44: no draft of its own; every edit goes through
+  // patchMap into this map's override (activeMap folds it in), so it stays on
+  // its map, undoes with its map, and the session persists and discards it.
+  const soundscapeDraft = useSoundscapeDraft(activeMap, baseMap?.soundscape, {
+    patch: patchMap,
+    unpatch: unpatchMap,
+  });
+  const mapClickTool = resolveMapClickTool({
+    placingPin: !!pendingId,
+    drawingRegion: regionDraft.drawing,
+    drawingRoute: routeDraft.drawing,
+    drawingFog: fogDraft.tool !== null,
+    drawingSoundscape: soundscapeDraft.drawing,
+    rulerOn: rulerActive,
+  });
   // Audio files the Sound panel can offer (basenames under
   // public/atlas/assets/audio/). Loaded once; empty is fine — the panel
   // falls back to a free-text file field.
@@ -456,10 +483,6 @@ function AtlasPlacementEditorInner() {
   useEffect(() => {
     mapOverrideRef.current = mapOverride;
   }, [mapOverride]);
-  const worldOverrideRef = useRef(worldOverride);
-  useEffect(() => {
-    worldOverrideRef.current = worldOverride;
-  }, [worldOverride]);
 
   /** Undo-recording setter for pin overrides. Skip-recording mode is just
    *  raw setOverrides; use that for post-save cleanup. */
@@ -513,53 +536,22 @@ function AtlasPlacementEditorInner() {
     [undoStack],
   );
 
-  /** Undo-recording setter for world-level settings (credits, assetCredits). */
-  const setWorldOverrideUndoable = useCallback(
-    (
-      compute: (prev: Record<string, Partial<World>>) => Record<string, Partial<World>>,
-      label: string,
-    ) => {
-      const before = worldOverrideRef.current;
-      const after = compute(before);
-      if (after === before) return;
-      worldOverrideRef.current = after;
-      setWorldOverride(after);
-      undoStack.push({
-        undo: () => {
-          worldOverrideRef.current = before;
-          setWorldOverride(before);
-        },
-        redo: () => {
-          worldOverrideRef.current = after;
-          setWorldOverride(after);
-        },
-        label,
-      });
-    },
-    [undoStack],
-  );
-
   /** Merge a partial into the active world's session override (undo-tracked).
    *  This is the world-level equivalent of patchMap — the save path that lets
    *  name / credits / assetCredits changes reach world.yaml. */
   const patchWorld = (patch: Partial<World>) => {
     if (!baseWorld) return;
-    setWorldOverrideUndoable(
+    worldDraft.update(
       (s) => ({ ...s, [baseWorld.id]: { ...(s[baseWorld.id] ?? {}), ...patch } }),
       `world settings ${baseWorld.id}`,
     );
   };
 
   /**
-   * Session draft for the world calendar. `undefined` means "no draft — use
-   * canon"; a value (including an explicit `undefined` calendar wrapped in the
-   * object) means the DM has edited it this session. Kept separate from
-   * worldOverride because `calendar` is project-level in world.yaml, not a
-   * field on World.
+   * Session draft for the world calendar. Kept separate from worldOverride
+   * because `calendar` is project-level in world.yaml, not a field on World.
    */
-  const [calendarDraft, setCalendarDraft] = useState<{ value: WorldCalendar | undefined } | null>(
-    null,
-  );
+  const calendarDraft = useCalendarDraft(project, undoStack);
 
   // Shell state: which rail panel is open (null = closed).
   const [activePanel, setActivePanel] = useState<string | null>(null);
@@ -575,6 +567,20 @@ function AtlasPlacementEditorInner() {
 
   // ☰ menu open/close state
   const [menuOpen, setMenuOpen] = useState(false);
+  // The open menu's toolbar sits above the palette and drop overlay: close it first.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k")) {
+        setMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
+  useEffect(() => {
+    if (isDraggingMd) setMenuOpen(false);
+  }, [isDraggingMd]);
   /** "Where does this save?" disclosure — replaces the old permanent banner. */
   const [saveHelpOpen, setSaveHelpOpen] = useState(false);
 
@@ -667,7 +673,7 @@ function AtlasPlacementEditorInner() {
   }, [mode, placed, entitiesById, activeMap, fogDraft.fog, effectivePlacement]);
 
   const onMapClick = (lng: number, lat: number) => {
-    if (!pendingId || !activeMap) return;
+    if (mapClickTool !== "place-pin" || !pendingId || !activeMap) return;
     const { x, y } = mapClickToAtlasCoord(lng, lat, activeMap.height);
     setCoord(pendingId, { x, y });
     toast.success(
@@ -688,7 +694,9 @@ function AtlasPlacementEditorInner() {
   // pin never reaches `onMapClick`. Returns true when it placed (so the
   // overlay stops propagation and the pin isn't placed twice).
   const handleLayerBackgroundClick = (latlng: L.LatLng): boolean => {
-    if (!pendingId) return false;
+    // While drawing, return false so the click reaches the map and the
+    // drawing layer adds its vertex.
+    if (mapClickTool !== "place-pin") return false;
     onMapClick(latlng.lng, latlng.lat);
     return true;
   };
@@ -735,10 +743,8 @@ function AtlasPlacementEditorInner() {
     Object.keys(worldOverride[baseWorld.id]).length > 0
   );
   /** Calendar the UI should show and the save should write: draft over canon. */
-  const effectiveCalendar = calendarDraft ? calendarDraft.value : project?.calendar;
-  const calendarDirty =
-    !!calendarDraft &&
-    JSON.stringify(calendarDraft.value ?? null) !== JSON.stringify(project?.calendar ?? null);
+  const effectiveCalendar = calendarDraft.effective;
+  const calendarDirty = calendarDraft.dirty;
 
   // Everything world.yaml holds except other maps' region/route/fog slices,
   // which the session adds (worldYamlDirty, below the session).
@@ -833,6 +839,8 @@ function AtlasPlacementEditorInner() {
         activeMapId: activeMap.id,
         foreignMapDrafts,
         entitiesById: new Map(project.entities.map((e) => [e.id, e])),
+        canonPlacements: project.placements,
+        primaryMapId: project.maps[0]?.id ?? null,
         worldYaml: worldYamlDirty
           ? {
               path: activeWorldId ? worldYamlPath(activeWorldId) : null,
@@ -1034,6 +1042,8 @@ function AtlasPlacementEditorInner() {
         get: () => entityEditDraft.snapshot(),
         set: (v) => entityEditDraft.applySnapshot(v as never),
       },
+      world: { get: () => worldDraft.ref.current, set: worldDraft.set },
+      calendar: { get: () => calendarDraft.ref.current, set: calendarDraft.set },
     },
     perMapDirtyCount: () =>
       regionDraft.dirtyCount +
@@ -1265,7 +1275,10 @@ function AtlasPlacementEditorInner() {
           </p>
         </div>
       )}
-      <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
+      <header
+        className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border"
+        data-menu-open={menuOpen}
+      >
         <Link
           to="/"
           className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2"
@@ -1860,9 +1873,7 @@ function AtlasPlacementEditorInner() {
             sound: (
               <SoundscapeTab
                 map={activeMap}
-                onPatch={patchMap}
                 availableAudioFiles={availableAudio}
-                undoStack={undoStack}
                 api={soundscapeDraft}
               />
             ),
@@ -1977,7 +1988,7 @@ function AtlasPlacementEditorInner() {
             calendar: (
               <CalendarPanel
                 calendar={effectiveCalendar}
-                onPatch={(next) => setCalendarDraft({ value: next })}
+                onPatch={(next) => calendarDraft.update(() => ({ value: next }), "calendar")}
               />
             ),
             help: <HelpPanel />,
@@ -2029,17 +2040,17 @@ function AtlasPlacementEditorInner() {
                       activeMap.water?.enabled === false
                         ? (activeMap.oceanColor ?? "#18313f")
                         : "transparent",
-                    cursor:
-                      pendingId || regionDraft.drawing || soundscapeDraft.drawing || rulerActive
-                        ? "crosshair"
-                        : undefined,
+                    cursor: mapClickTool ? "crosshair" : undefined,
                   }}
                 >
+                  <FitMapOnOpen
+                    mapId={activeMap.id}
+                    mapWidth={activeMap.width}
+                    mapHeight={activeMap.height}
+                  />
                   <FlyTo target={flyTo} />
                   <RulerLayer
-                    active={
-                      rulerActive && !pendingId && !regionDraft.drawing && !soundscapeDraft.drawing
-                    }
+                    active={mapClickTool === "ruler"}
                     mapId={activeMap.id}
                     mapHeight={activeMap.height}
                     scale={activeMap.scale}
@@ -2235,7 +2246,7 @@ function AtlasPlacementEditorInner() {
           const preSave = {
             overrides: overridesRef.current,
             mapOverride: mapOverrideRef.current,
-            worldOverride: worldOverrideRef.current,
+            worldOverride: worldDraft.ref.current,
             regionDraft: regionDraft.snapshot(),
             routeDraft: routeDraft.snapshot(),
             fogDraft: fogDraft.snapshot(),
@@ -2285,8 +2296,7 @@ function AtlasPlacementEditorInner() {
             if (baseWorld) {
               nextWorldOverride = { ...preSave.worldOverride };
               delete nextWorldOverride[baseWorld.id];
-              worldOverrideRef.current = nextWorldOverride;
-              setWorldOverride(nextWorldOverride);
+              worldDraft.set(nextWorldOverride);
             }
             void worldYamlBaseline.refresh();
           }
@@ -2308,8 +2318,7 @@ function AtlasPlacementEditorInner() {
               if (worldYamlWritten) {
                 mapOverrideRef.current = preSave.mapOverride;
                 setMapOverride(preSave.mapOverride);
-                worldOverrideRef.current = preSave.worldOverride;
-                setWorldOverride(preSave.worldOverride);
+                worldDraft.set(preSave.worldOverride);
                 regionDraft.applySnapshot(preSave.regionDraft);
                 routeDraft.applySnapshot(preSave.routeDraft);
                 fogDraft.applySnapshot(preSave.fogDraft);
@@ -2323,8 +2332,7 @@ function AtlasPlacementEditorInner() {
               if (worldYamlWritten) {
                 mapOverrideRef.current = nextMapOverride;
                 setMapOverride(nextMapOverride);
-                worldOverrideRef.current = nextWorldOverride;
-                setWorldOverride(nextWorldOverride);
+                worldDraft.set(nextWorldOverride);
                 regionDraft.applySnapshot(cleanRegionDraft);
                 routeDraft.applySnapshot(cleanRouteDraft);
                 fogDraft.applySnapshot(null);

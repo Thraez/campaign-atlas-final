@@ -33,7 +33,8 @@
  *       files: [
  *         { path, content, kind: "entity-md" | "world-yaml", baseHash: "sha256:<hex>" | null }
  *       ],
- *       rebuild?: boolean
+ *       rebuild?: boolean,
+ *       origin?: "sync"   // Sync from Obsidian; 403 HostingPublic while hosting is public (R-01)
  *     }
  *
  * For A4 this plugin parses but does not yet enforce baseHash; conflict
@@ -86,6 +87,14 @@ import {
   buildLockHolder,
 } from "./atlas/buildLock";
 import { DEV_API_PATHS, DEV_API_PREFIX } from "./atlas/devRoutes";
+import { syncWritesAllowed } from "./atlas/hosting";
+import {
+  isVaultNote,
+  readSyncMapSignals,
+  SyncMapUnreadableError,
+  type SyncMapSignals,
+} from "./atlas/vaultContent";
+import { HOSTING_PUBLIC_ERROR, HOSTING_PUBLIC_SYNC_MESSAGE } from "../src/atlas/sync/hosting";
 
 const MAX_FILE_BYTES = 1024 * 1024;
 const MAX_VAULT_AGGREGATE_BYTES = 25 * 1024 * 1024;
@@ -353,7 +362,7 @@ export type HandlerResult =
       };
     }
   | {
-      status: 400 | 500;
+      status: 400 | 403 | 500;
       payload: { error: string; [k: string]: unknown };
     };
 
@@ -479,6 +488,124 @@ async function cleanImageBytes(buf: Buffer, source: string, target: string): Pro
   return s.toBuffer();
 }
 
+type AssetRefusal = { status: 400; payload: { error: string; [k: string]: unknown } };
+
+/**
+ * Decode one asset-binary data URL and strip its metadata (cleanImageBytes),
+ * with the size caps on both sides. Shared by `/__atlas/save` and
+ * `/__atlas/clean-asset` (the Map Import Wizard's zip), so an image published
+ * either way gets the same bytes. The caller has already checked the path.
+ */
+async function decodeAndCleanAsset(
+  targetPath: string,
+  content: string,
+): Promise<{ ok: true; bytes: Buffer } | { ok: false; result: AssetRefusal }> {
+  const refuse = (payload: AssetRefusal["payload"]) =>
+    ({ ok: false, result: { status: 400, payload } }) as const;
+  const m = DATA_URL_RE.exec(content);
+  if (!m) {
+    return refuse({
+      error: "InvalidContent",
+      reason: "asset-decode-failed",
+      failedPath: targetPath,
+      detail: "content is not a base64 data URL",
+    });
+  }
+  let buf: Buffer;
+  try {
+    buf = Buffer.from(m[1], "base64");
+  } catch (e) {
+    return refuse({
+      error: "InvalidContent",
+      reason: "asset-decode-failed",
+      failedPath: targetPath,
+      detail: (e as Error).message,
+    });
+  }
+  if (buf.length > MAX_ASSET_BINARY_BYTES) {
+    return refuse({ error: "OversizedContent", path: targetPath, bytes: buf.length });
+  }
+  // Strip EXIF/IPTC/XMP metadata (cleanImageBytes): a sharp re-encode for
+  // images, a segment strip with no re-encode for JPG maps.
+  let stripped: Buffer;
+  try {
+    const mime = content.slice(5, content.indexOf(";base64,"));
+    // The client already applied the shared encoding policy when it chose
+    // the filename, so a `.webp` target under assets/images/ IS the
+    // instruction to convert — one decider, and the name can never
+    // disagree with the bytes. Maps keep their own extension
+    // (src/atlas/assets/mapLayerTarget.ts) and never match:
+    // fog redaction and map labels both want lossless.
+    stripped = await cleanImageBytes(buf, mime, targetPath);
+  } catch (e) {
+    return refuse({
+      error: "InvalidContent",
+      reason: e instanceof MapFormatRefusedError ? "map-format-refused" : "image-decode-failed",
+      failedPath: targetPath,
+      detail: (e as Error).message,
+    });
+  }
+  if (stripped.length > MAX_ASSET_BINARY_BYTES) {
+    return refuse({ error: "OversizedContent", path: targetPath, bytes: stripped.length });
+  }
+  return { ok: true, bytes: stripped };
+}
+
+export type CleanAssetResult =
+  { status: 200; payload: { path: string; base64: string } } | AssetRefusal;
+
+/**
+ * Pure handler for POST /__atlas/clean-asset `{ path, content }`: the bytes
+ * `/__atlas/save` would write for this asset, returned instead of written
+ * (base64). The Map Import Wizard puts these in its zip (eval-2026-10/48), so
+ * a map extracted from it carries no more metadata than an editor upload.
+ */
+export async function handleCleanAssetRequest(body: unknown): Promise<CleanAssetResult> {
+  const o = (body ?? {}) as { path?: unknown; content?: unknown };
+  if (typeof o.path !== "string" || typeof o.content !== "string") {
+    return {
+      status: 400,
+      payload: { error: "InvalidBody", detail: "expected { path, content }" },
+    };
+  }
+  if (!isWritableAssetPath(o.path)) {
+    return { status: 400, payload: { error: "DisallowedPath", path: o.path } };
+  }
+  const bytes = Buffer.byteLength(o.content, "utf8");
+  if (bytes > MAX_ASSET_DATAURL_BYTES) {
+    return { status: 400, payload: { error: "OversizedContent", path: o.path, bytes } };
+  }
+  const cleaned = await decodeAndCleanAsset(o.path, o.content);
+  if (!cleaned.ok) return cleaned.result;
+  return { status: 200, payload: { path: o.path, base64: cleaned.bytes.toString("base64") } };
+}
+
+/** The 403 payload when a public-hosting save would write vault content, else null. */
+function vaultNoteRefusal(
+  list: FilePayload[],
+  repoRoot: string,
+): { error: string; [k: string]: unknown } | null {
+  const notes = list.filter((f) => f.kind === "entity-md");
+  if (notes.length === 0) return null;
+  let signals: SyncMapSignals;
+  try {
+    signals = readSyncMapSignals(repoRoot);
+  } catch (e) {
+    if (!(e instanceof SyncMapUnreadableError)) throw e;
+    return {
+      error: HOSTING_PUBLIC_ERROR,
+      detail: `${e.message}: can't tell vault notes apart while "hosting" is "public". Fix or delete it, then save again.`,
+    };
+  }
+  const paths = notes.filter((f) => isVaultNote(f.content, f.path, signals)).map((f) => f.path);
+  if (paths.length === 0) return null;
+  return {
+    error: HOSTING_PUBLIC_ERROR,
+    detail: `Not saved: ${paths.join(", ")} came from the vault (atlas.source: vault, or named in .local-atlas/sync-map.json), and atlas.config.json has "hosting": "public". The repo is public; real vault content waits until hosting is private (see H-04).`,
+    paths,
+  };
+}
+
 export async function handleSaveRequest(
   body: unknown,
   repoRoot: string,
@@ -488,6 +615,14 @@ export async function handleSaveRequest(
     return {
       status: 400,
       payload: { error: "InvalidBody", detail: "expected { files: FilePayload[] }" },
+    };
+  }
+  // R-01: a Sync from Obsidian write is refused while the repo is public.
+  // Sync marks its saves `origin: "sync"`; the editor's own saves don't.
+  if ((body as { origin?: unknown }).origin === "sync" && !syncWritesAllowed(repoRoot)) {
+    return {
+      status: 403,
+      payload: { error: HOSTING_PUBLIC_ERROR, detail: HOSTING_PUBLIC_SYNC_MESSAGE },
     };
   }
   const rawFiles = (body as { files: unknown[] }).files;
@@ -506,6 +641,13 @@ export async function handleSaveRequest(
     }
   }
   const list = rawFiles as FilePayload[];
+
+  // R-01: while public, no note from the vault is written, whatever `origin`
+  // says: a note carrying Sync's marker, or one the sync map names by id.
+  if (!syncWritesAllowed(repoRoot)) {
+    const refused = vaultNoteRefusal(list, repoRoot);
+    if (refused) return { status: 403, payload: refused };
+  }
 
   // Validate everything BEFORE writing anything.
 
@@ -580,79 +722,9 @@ export async function handleSaveRequest(
         };
       }
     } else if (f.kind === "asset-binary") {
-      const m = DATA_URL_RE.exec(f.content);
-      if (!m) {
-        return {
-          status: 400,
-          payload: {
-            error: "InvalidContent",
-            reason: "asset-decode-failed",
-            failedPath: f.path,
-            detail: "content is not a base64 data URL",
-          },
-        };
-      }
-      let buf: Buffer;
-      try {
-        buf = Buffer.from(m[1], "base64");
-      } catch (e) {
-        return {
-          status: 400,
-          payload: {
-            error: "InvalidContent",
-            reason: "asset-decode-failed",
-            failedPath: f.path,
-            detail: (e as Error).message,
-          },
-        };
-      }
-      if (buf.length > MAX_ASSET_BINARY_BYTES) {
-        return {
-          status: 400,
-          payload: { error: "OversizedContent", path: f.path, bytes: buf.length },
-        };
-      }
-      // Strip EXIF/IPTC/XMP metadata (cleanImageBytes): a sharp re-encode for
-      // images, a segment strip with no re-encode for JPG maps.
-      let stripped: Buffer;
-      try {
-        const mime = f.content.slice(5, f.content.indexOf(";base64,"));
-        // The client already applied the shared encoding policy when it chose
-        // the filename, so a `.webp` target under assets/images/ IS the
-        // instruction to convert — one decider, and the name can never
-        // disagree with the bytes. Maps keep their own extension
-        // (src/atlas/assets/mapLayerTarget.ts) and never match:
-        // fog redaction and map labels both want lossless.
-        stripped = await cleanImageBytes(buf, mime, f.path);
-      } catch (e) {
-        if (e instanceof MapFormatRefusedError) {
-          return {
-            status: 400,
-            payload: {
-              error: "InvalidContent",
-              reason: "map-format-refused",
-              failedPath: f.path,
-              detail: e.message,
-            },
-          };
-        }
-        return {
-          status: 400,
-          payload: {
-            error: "InvalidContent",
-            reason: "image-decode-failed",
-            failedPath: f.path,
-            detail: (e as Error).message,
-          },
-        };
-      }
-      if (stripped.length > MAX_ASSET_BINARY_BYTES) {
-        return {
-          status: 400,
-          payload: { error: "OversizedContent", path: f.path, bytes: stripped.length },
-        };
-      }
-      decoded.set(f.path, stripped);
+      const cleaned = await decodeAndCleanAsset(f.path, f.content);
+      if (!cleaned.ok) return cleaned.result;
+      decoded.set(f.path, cleaned.bytes);
     }
   }
 
@@ -1531,6 +1603,8 @@ export function rejectNonLoopback(req: DevRequest, res: DevResponse): boolean {
 export const SAVE_BODY_LIMIT_BYTES = 128 * 1024 * 1024;
 /** `.local-atlas` config (the sync map grows with the vault). */
 export const LOCAL_WRITE_BODY_LIMIT_BYTES = 8 * 1024 * 1024;
+/** One asset's data URL plus the JSON around it. */
+export const CLEAN_ASSET_BODY_LIMIT_BYTES = MAX_ASSET_DATAURL_BYTES + 64 * 1024;
 /** A vault-image-copy body is a couple of paths and a candidate-folder list. */
 export const VAULT_IMAGE_COPY_BODY_LIMIT_BYTES = 1024 * 1024;
 
@@ -1678,6 +1752,18 @@ export const DEV_ROUTES: readonly DevRoute[] = [
     takesBuildLock: false,
     body: { maxBytes: VAULT_IMAGE_COPY_BODY_LIMIT_BYTES },
     handle: async ({ body, root }) => {
+      // R-01: only a real sync copies vault images; refused while the repo is public.
+      if (!syncWritesAllowed(root)) {
+        return {
+          status: 403,
+          json: {
+            ok: false,
+            reason: "hosting-public",
+            error: HOSTING_PUBLIC_ERROR,
+            detail: HOSTING_PUBLIC_SYNC_MESSAGE,
+          },
+        };
+      }
       const result = await handleVaultImageCopyRequest({
         ...(body as VaultImageCopyArgs),
         publicDir: path.join(root, "public"),
@@ -1750,6 +1836,21 @@ export const DEV_ROUTES: readonly DevRoute[] = [
         afterWrite: rebuild ? async () => runAtlasBuild(root) : undefined,
         readPublishedAt: rebuild ? () => readAtlasPublishedAt(root) : undefined,
       });
+      return { status: result.status, json: result.payload };
+    },
+  },
+
+  // POST /__atlas/clean-asset  { path, content }
+  // The bytes /__atlas/save would write for one asset, returned, not written:
+  // the Map Import Wizard's zip (eval-2026-10/48). No build lock: nothing on
+  // disk changes.
+  {
+    method: "POST",
+    path: DEV_API_PATHS.cleanAsset,
+    takesBuildLock: false,
+    body: { maxBytes: CLEAN_ASSET_BODY_LIMIT_BYTES },
+    handle: async ({ body }) => {
+      const result = await handleCleanAssetRequest(body);
       return { status: result.status, json: result.payload };
     },
   },

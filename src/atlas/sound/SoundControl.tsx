@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useSoundSettings } from "@/atlas/sound/SoundSettingsProvider";
+import { useCalmMode } from "@/hooks/use-reduce-motion";
 
 /**
  * The sound invite pill. data-sound-invite tells the provider's gesture
@@ -48,15 +49,14 @@ export function SoundControl({ hasSoundscape = true }: SoundControlProps) {
     resumeDismissed,
     dismissResume,
     muted,
-    calmMode,
     volume,
     enableSound,
     setMuted,
-    setCalmMode,
     setVolume,
     ambiencePlaying,
     audioAvailable,
   } = useSoundSettings();
+  const calmMode = useCalmMode();
   const [dismissed, setDismissed] = useState(false);
 
   // Sound is on (saved from an earlier visit, or the browser kept the context
@@ -111,15 +111,6 @@ export function SoundControl({ hasSoundscape = true }: SoundControlProps) {
           </div>
         </>
       )}
-
-      <button
-        type="button"
-        aria-pressed={calmMode}
-        onClick={() => setCalmMode(!calmMode)}
-        className="rounded-full border border-border bg-card px-3 py-2 text-xs shadow-sm"
-      >
-        Calm mode {calmMode ? "on" : "off"}
-      </button>
     </div>
   );
 }

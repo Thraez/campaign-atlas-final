@@ -1,4 +1,6 @@
 // src/test/shell/EditorMenu.guardrail.test.tsx
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { EditorMenu, EDITOR_MENU_ITEMS } from "@/atlas/shell/EditorMenu";
@@ -38,5 +40,28 @@ describe("EditorMenu guardrail", () => {
     expect(screen.getByText("Name the months")).toBeInTheDocument();
     expect(screen.getByText("Manage assets")).toBeInTheDocument();
     expect(screen.getByText("Help")).toBeInTheDocument();
+  });
+});
+
+describe("toolbar stacking guard", () => {
+  it("keeps .atlas-toolbar above the Leaflet z-index and free of backdrop-filter", () => {
+    const css = readFileSync(resolve(__dirname, "../../index.css"), "utf8").replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const block = (sel: string) => {
+      const m = css.match(new RegExp(`(?:^|\\n)${sel}\\s*\\{([^}]*)\\}`));
+      expect(m, sel).not.toBeNull();
+      return m![1];
+    };
+    const toolbar = block("\\.atlas-toolbar");
+    const z = Number(/z-index:\s*(\d+)/.exec(toolbar)?.[1]);
+    expect(toolbar).toMatch(/position:\s*relative/);
+    expect(z).toBeGreaterThan(2);
+    expect(toolbar).not.toMatch(/backdrop-filter/);
+    const open = Number(
+      /z-index:\s*(\d+)/.exec(block('\\.atlas-toolbar\\[data-menu-open="true"\\]'))?.[1],
+    );
+    expect(open).toBeGreaterThan(500);
   });
 });

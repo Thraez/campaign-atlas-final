@@ -34,6 +34,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { listTextFiles } from "./atlas/playerArtifact";
 import { readContentFiles } from "./atlas/readContentFiles";
 import { scanContentFolder } from "../src/atlas/content/scanContentFolder";
 
@@ -44,20 +45,6 @@ interface Config {
   include: string[];
   exclude: string[];
 }
-
-const TEXT_EXTENSIONS = new Set([
-  ".html",
-  ".js",
-  ".mjs",
-  ".cjs",
-  ".css",
-  ".json",
-  ".txt",
-  ".xml",
-  ".webmanifest",
-  ".svg",
-  ".md",
-]);
 
 /** Names below this length are skipped to avoid noisy generic matches. */
 const MIN_NAME_LENGTH = 4;
@@ -186,47 +173,29 @@ export function deriveSecretsFromVault(configPath: string): SecretEntry[] {
 
 export function scanArtifactForSecrets(dir: string, secrets: SecretEntry[]): DerivedScanResult {
   const hits: DerivedScanHit[] = [];
-  let filesScanned = 0;
   // Any letter case, but whole words only: "isle de marque" is a hit for
   // "Isle De Marque", while a name inside a longer word ("Mira" in
   // "miracle") is not.
   const patterns = secrets.map((s) => ({ s, re: wholeWordPattern(s.name) }));
-  function walk(d: string) {
-    let entries: fs.Dirent[];
+  const files = listTextFiles(dir, "check-derived-secrets").files;
+  for (const full of files) {
+    let text: string;
     try {
-      entries = fs.readdirSync(d, { withFileTypes: true });
+      text = fs.readFileSync(full, "utf8");
     } catch (err) {
-      console.warn(`check-derived-secrets: skipped unreadable dir ${d}: ${(err as Error).message}`);
-      return;
+      // utf8 reads substitute U+FFFD for undecodable bytes rather than
+      // throwing, so this only fires on genuine OS-level I/O errors. Log the
+      // skip instead of swallowing it; the exit code is unaffected.
+      console.warn(
+        `check-derived-secrets: skipped unreadable file ${full}: ${(err as Error).message}`,
+      );
+      continue;
     }
-    for (const e of entries) {
-      const full = path.join(d, e.name);
-      if (e.isDirectory()) {
-        walk(full);
-      } else if (e.isFile()) {
-        const ext = path.extname(e.name).toLowerCase();
-        if (!TEXT_EXTENSIONS.has(ext)) continue;
-        filesScanned += 1;
-        let text: string;
-        try {
-          text = fs.readFileSync(full, "utf8");
-        } catch (err) {
-          // utf8 reads substitute U+FFFD for undecodable bytes rather than
-          // throwing, so this only fires on genuine OS-level I/O errors. Log the
-          // skip instead of swallowing it; the exit code is unaffected.
-          console.warn(
-            `check-derived-secrets: skipped unreadable file ${full}: ${(err as Error).message}`,
-          );
-          continue;
-        }
-        for (const { s, re } of patterns) {
-          if (re.test(text)) hits.push({ file: full, match: s });
-        }
-      }
+    for (const { s, re } of patterns) {
+      if (re.test(text)) hits.push({ file: full, match: s });
     }
   }
-  walk(dir);
-  return { derivedCount: secrets.length, filesScanned, hits };
+  return { derivedCount: secrets.length, filesScanned: files.length, hits };
 }
 
 function wholeWordPattern(name: string): RegExp {

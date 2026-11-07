@@ -569,7 +569,7 @@ Script	Purpose
 `npm run atlas:check-image-privacy`	Scan shipped images for leftover EXIF/IPTC/XMP metadata or a derived-secret filename.
 `npm run atlas:check-fog`	Re-derive the fog boundary and check for un-redacted map images, geometry, or in-fog content.
 `npm run atlas:audit-assets`	Content-quality check: oversize images, orphaned files, broken asset references (not a safety scanner).
-`npm run atlas:scan`	Runs all seven safety scanners (including check-player-secrets, which has no standalone alias, and check-player-files) plus audit-assets in parallel — what `atlas:publish` gates on.
+`npm run atlas:scan`	Runs all eight safety scanners (including check-player-secrets, which has no standalone alias, and check-player-files) plus audit-assets in parallel — what `atlas:publish` gates on.
 `npm run test:ci`	Runs the Vitest suite in 4 shards (`npm test` does the same).
 Generated files:
 ```text
@@ -787,7 +787,10 @@ Manage assets (browse uploaded assets, credits, export as a zip)
 Help
 Import is not a rail tab or menu panel. Markdown import runs from an "Import .md" button on each content
 tab (and the command palette); map-layer import has its own batch "Import Maps" wizard button inside the
-map-details panel.
+map-details panel. The wizard is the only way to draft a new map: it downloads `atlas-map-import.zip`
+holding `world-map-patch.yaml` (paste into `world.yaml`), `README-apply-map-import.md` and the images at
+their repo paths, with metadata stripped by the same dev-server step as an editor upload
+(`/__atlas/clean-asset`). Layers for an existing map are uploaded in the map-details panel.
 ---
 ## Save workflow (local repo)
 

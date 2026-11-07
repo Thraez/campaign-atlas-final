@@ -233,3 +233,25 @@ describe("AtlasTimeline — year groups", () => {
     expect(titlesIn("1000")).toEqual(["Early", "Late"]);
   });
 });
+
+describe("AtlasTimeline — type chips", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("expose their pressed state, not just a colour", async () => {
+    renderTimeline(
+      makeProject([
+        makeEntity({ id: "battle", title: "Battle", type: "event" }),
+        makeEntity({ id: "mira", title: "Mira", type: "npc", dateValue: 900, dateYear: 900 }),
+      ]),
+    );
+    const all = await screen.findByRole("button", { name: /^all$/i });
+    expect(all.getAttribute("aria-pressed")).toBe("true");
+    const unpressed = screen.getAllByRole("button", { pressed: false });
+    expect(unpressed).toHaveLength(2);
+    fireEvent.click(unpressed[0]);
+    expect(all.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getAllByRole("button", { pressed: true })).toEqual([unpressed[0]]);
+  });
+});

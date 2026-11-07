@@ -12,6 +12,46 @@ The atlas's content layer (`content/`) **is already an Obsidian-compatible vault
 
 This is the lowest-friction path. If you have an existing vault you want to fold in, just copy its folder under `content/<your-world>/` and add an `_atlas/world.yaml`.
 
+### Hosting guard (R-01, 2026-11-07)
+
+The GitHub repo is public, so real vault content waits until hosting is private (plan ticket H-04:
+Cloudflare Access, repo private). `atlas.config.json` carries `"hosting": "public"` (or
+`"private"`; missing or any other value reads as `"public"`). While it is public:
+
+- a real Sync from Obsidian is refused, in the editor and in `npm run atlas:sync -- --write`. The
+  save endpoint refuses writes marked `origin: "sync"` and the vault image copy with 403
+  `HostingPublic`; in the editor, pressing Commit in Staging shows that reason in a toast. A dry run
+  (`--dry-run`, or opening Staging) still works;
+- the save endpoint also refuses, whatever `origin` says, any note whose content carries Sync's
+  marker (below) or whose entity id `.local-atlas/sync-map.json` names. The server doesn't trust the
+  client to say where a write came from;
+- `check-vault-content` (one of the publish scans, so `npm run gate` runs it) fails if `content/`
+  holds a `.md` file that carries the marker, that the sync map names by entity id or by the hash of
+  what Sync wrote, or whose text matches a note in this machine's vault (the path saved in
+  `.local-atlas/editor-settings.json`; the same whole text or the same body, line endings
+  normalized, never titles). It also fails on any symlink under `content/`. The marker travels with
+  the file, so that signal works from any checkout (a fresh clone, the PC, CI); the sync map and the
+  vault comparison are machine-local and skipped where they don't exist (the output says when the
+  vault comparison is skipped).
+
+**Not covered: maps, images and `world.yaml`.** Neither the save guard nor the scan looks at map
+uploads, images or `world.yaml`. Until H-04 makes the repo private, keeping real maps out is up to
+the DM: the H-04 block is the only guard for map uploads.
+
+**The vault marker.** Every note Sync writes into `content/`, created or updated, gets
+`atlas.source: vault` in its frontmatter (`src/atlas/import/vaultSourceMarker.ts`). Files dropped
+into the Import wizard (no vault path) don't. Sync's own diffing doesn't see it: whether a note is
+unchanged is judged on the vault note's hash, and the sync map's `syncedFileHash` is taken from the
+bytes written, marker included, so an unchanged note stays unchanged. The build ignores the key and
+the player projection drops all frontmatter, so it never reaches players.
+
+**A stale sync map.** A machine whose old `.local-atlas/sync-map.json` lists sample notes fails the
+scan (and can't save those notes while public). The scan's message says to delete the map.
+
+Copying vault notes by hand or dropping them into the Import wizard isn't Sync: only the vault
+comparison above can catch it, and only on a machine that knows the vault's path. H-04 flips the value
+to `"private"`; `publish-atlas.yml` then refuses to publish unless the GitHub repo is private.
+
 ### Frontmatter the build actually reads
 
 The parser supports two forms for the same data: a **flat top-level form** (what most Obsidian vaults already use) and a **namespaced `atlas.*` form** (what the visual editor writes). Use whichever you prefer in any given file — the build accepts both. The namespaced form wins when both are present.

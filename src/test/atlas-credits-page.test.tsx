@@ -99,6 +99,17 @@ describe("AtlasCredits page", () => {
     expect(screen.queryByText(/DM_CREDIT_LEAK/)).not.toBeInTheDocument();
     expect(screen.queryByText("DM Secret")).not.toBeInTheDocument();
   });
+
+  it("SECRECY REGRESSION: hidden entity credit absent, rumor entity credit shown (eval-46)", async () => {
+    renderCredits(
+      makeProject([
+        makeEntity({ id: "h", title: "Hidden One", visibility: "hidden", credit: "HIDDEN_LEAK" }),
+        makeEntity({ id: "r", title: "Rumored One", visibility: "rumor", credit: "Art by R" }),
+      ]),
+    );
+    await screen.findByText("Rumored One");
+    expect(screen.queryByText(/HIDDEN_LEAK/)).not.toBeInTheDocument();
+  });
 });
 
 // ── Phase 3 — widened source: world.assetCredits registry ────────────────────

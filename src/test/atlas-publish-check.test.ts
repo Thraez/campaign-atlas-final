@@ -91,7 +91,7 @@ describe("validateProject — Publish Check", () => {
     });
     const p = baseProject({ entities: [dm, pub] });
     const r = validateProject({ project: p, draftPlacements: [] });
-    expect(r.issues.some((i) => i.code === "wikilink-to-dm")).toBe(true);
+    expect(r.issues.some((i) => i.code === "spoiler-leak-wikilink")).toBe(true);
   });
 
   it("flags player relationship to DM-only entity as blocking spoiler-leak", () => {

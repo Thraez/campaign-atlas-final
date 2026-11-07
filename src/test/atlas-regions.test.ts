@@ -101,7 +101,7 @@ describe("useRegionDraft", () => {
     const { result } = renderHook(() =>
       useRegionDraft(baseMap, {
         entityIds: new Set(["secret"]),
-        dmEntityIds: new Set(["secret"]),
+        entityVisibility: new Map([["secret", "dm" as const]]),
       }),
     );
     act(() => result.current.patch("thornhold", { entityId: "secret" }));
