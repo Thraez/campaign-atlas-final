@@ -2,6 +2,7 @@
   "contentRoot": "content",
   "outputDir": "public/atlas",
   "defaultWorld": "astrath-deeprealm",
+  "hosting": "public",
   "include": ["**/*.md"],
   "exclude": [
     "**/_drafts/**",

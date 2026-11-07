@@ -92,6 +92,19 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "$CHANGELOG_NOTE" >> "$GITHUB_STEP_SUMMARY"
 
+      # R-01: "hosting": "private" in atlas.config.json lets Sync write real
+      # vault content, so it must never be published from a public repo.
+      - name: Refuse private hosting from a public repo
+        env:
+          REPO_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          hosting=$(node -e 'try{const c=JSON.parse(require("fs").readFileSync("atlas.config.json","utf8"));process.stdout.write(String(c.hosting))}catch{process.stdout.write("")}')
+          if [ "$hosting" = "private" ] && [ "$REPO_PRIVATE" != "true" ]; then
+            echo "::error::atlas.config.json has \"hosting\": \"private\" but this repo is public. Make the repo private first (H-04)."
+            exit 1
+          fi
+          echo "hosting=${hosting:-unset}, repo private=${REPO_PRIVATE}"
+
       - uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
