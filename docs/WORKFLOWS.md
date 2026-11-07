@@ -19,7 +19,7 @@ content/<world>/**.md                         │                       │
         (full canon, never published)                                 │
                                                                       │
    ──► npm run atlas:publish ──► dist/  ─────────────────────────────►│ git push
-        (strict player build + 3 scanners)                            │
+        (strict player build + 14 scans)                              │
                                                                        ▼
                                                               GitHub Actions
                                                               GitHub Pages deploy
