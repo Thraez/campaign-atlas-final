@@ -109,6 +109,7 @@ import {
   type Overrides,
   overrideKey,
   loadOverrides,
+  dropStaleTombstones,
   finishLegacyMigration,
   persistOverrides,
   LEGACY_STORAGE_KEY_V1,
@@ -262,6 +263,12 @@ function AtlasPlacementEditorInner() {
       })
       .catch((e: Error) => setError(e.message));
   }, []);
+
+  // eval-45: a tombstone with no canon placement to delete would count as
+  // unsaved forever. Pruned on load and whenever canon reloads.
+  useEffect(() => {
+    if (project) setOverrides((o) => dropStaleTombstones(o, project.placements));
+  }, [project]);
 
   const { externalRebuildAt, reloadCanon } = useExternalRebuildDetector(project, setProject);
 
@@ -848,6 +855,8 @@ function AtlasPlacementEditorInner() {
         activeMapId: activeMap.id,
         foreignMapDrafts,
         entitiesById: new Map(project.entities.map((e) => [e.id, e])),
+        canonPlacements: project.placements,
+        primaryMapId: project.maps[0]?.id ?? null,
         worldYaml: worldYamlDirty
           ? {
               path: activeWorldId ? worldYamlPath(activeWorldId) : null,
