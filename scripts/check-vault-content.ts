@@ -4,13 +4,15 @@
  * the GitHub repo is public, and real vault content waits until hosting is
  * private (plan ticket H-04).
  *
- * A file counts as synced when Sync's map (`.local-atlas/sync-map.json`,
- * vault path → entity) names it, by either signal:
- *   - its entity id (`readNote`, the build's rule) is an entry's `id`;
- *   - its bytes hash to an entry's `syncedFileHash` (exactly what Sync wrote).
- * Sync stamps no marker of its own into frontmatter, so the map is the only
- * record. It is machine-local and gitignored: on a checkout with no map (CI,
- * a fresh clone) this scan has nothing to compare and passes.
+ * A file counts as synced on any of three signals:
+ *   - it carries Sync's frontmatter marker `atlas.source: vault`
+ *     (`src/atlas/import/vaultSourceMarker.ts`); this one travels with the
+ *     file, so it works from any checkout (a fresh clone, the PC, CI);
+ *   - its entity id (`readNote`, the build's rule) is an `id` in Sync's map
+ *     (`.local-atlas/sync-map.json`, machine-local and gitignored);
+ *   - its bytes hash to a map entry's `syncedFileHash` (exactly what Sync wrote).
+ * The map catches notes synced before the marker existed, or whose marker was
+ * edited away, on the machine that synced them.
  *
  * Usage: tsx scripts/check-vault-content.ts [--root <repo>] [--config <atlas.config.json>]
  *
@@ -25,6 +27,7 @@ import { readHosting } from "./atlas/hosting";
 import { readNote } from "../src/atlas/content/readNote";
 import { hashContent } from "../src/atlas/save/localFsSave";
 import type { SyncMap } from "../src/atlas/import/syncMap";
+import { hasVaultSourceMarker } from "../src/atlas/import/vaultSourceMarker";
 
 export interface RunOpts {
   /** The repo root: `.local-atlas/sync-map.json` is read from here. */
@@ -89,10 +92,6 @@ export async function run(opts: RunOpts): Promise<number> {
   }
 
   const contentDir = opts.contentDir ? path.resolve(opts.contentDir) : contentDirFrom(configPath);
-  if (ids.size === 0 && hashes.size === 0) {
-    console.log("check-vault-content: no sync map entries — clean");
-    return 0;
-  }
   if (!fs.existsSync(contentDir)) {
     console.log(`check-vault-content: no content dir at ${contentDir} — clean`);
     return 0;
@@ -103,7 +102,13 @@ export async function run(opts: RunOpts): Promise<number> {
     const raw = fs.readFileSync(abs, "utf8");
     const rel = path.relative(root, abs).split(path.sep).join("/");
     const note = readNote(raw, rel);
-    if (ids.has(note.id) || hashes.has(await hashContent(raw))) bad.push(rel);
+    if (
+      hasVaultSourceMarker(note.atlas) ||
+      ids.has(note.id) ||
+      hashes.has(await hashContent(raw))
+    ) {
+      bad.push(rel);
+    }
   }
   if (bad.length === 0) {
     console.log("check-vault-content: no content file came from the vault — clean");
@@ -114,7 +119,7 @@ export async function run(opts: RunOpts): Promise<number> {
   );
   for (const rel of bad) console.error(`  ✗ ${rel}`);
   console.error(
-    "  The repo is public: real vault content waits until hosting is private (see H-04). Remove these files (and their sync-map entries) before publishing.",
+    "  The repo is public: real vault content waits until hosting is private (see H-04). Remove these files (and any sync-map entries) before publishing.",
   );
   return EXIT;
 }

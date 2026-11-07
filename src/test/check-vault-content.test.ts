@@ -1,6 +1,7 @@
 /**
  * R-01: `check-vault-content` fails publish while hosting is public if
- * `content/` holds a file Sync from Obsidian wrote (named by the sync map).
+ * `content/` holds a file Sync from Obsidian wrote: one carrying Sync's
+ * `atlas.source: vault` marker, or one the machine-local sync map names.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "node:fs";
@@ -37,6 +38,27 @@ function syncMap(map: unknown) {
 }
 
 describe("check-vault-content", () => {
+  it("fails on a marked file with no sync map (a fresh clone), while public", async () => {
+    config("public");
+    fs.writeFileSync(
+      path.join(tmp, "content", "w", "npcs", "corven.md"),
+      "---\ntitle: Corven\natlas:\n  id: corven\n  source: vault\n---\nA smuggler.\n",
+    );
+    expect(fs.existsSync(path.join(tmp, ".local-atlas"))).toBe(false);
+    expect(await run({ root: tmp })).toBe(19);
+    config("private");
+    expect(await run({ root: tmp })).toBe(0);
+  });
+
+  it("ignores a `source` that isn't the vault marker", async () => {
+    config("public");
+    fs.writeFileSync(
+      path.join(tmp, "content", "w", "npcs", "corven.md"),
+      "---\ntitle: Corven\nsource: vault\natlas:\n  id: corven\n  source: handwritten\n---\nA smuggler.\n",
+    );
+    expect(await run({ root: tmp })).toBe(0);
+  });
+
   it("fails on a content file whose id the sync map names, while public", async () => {
     config("public");
     syncMap({ "03_Entities/Corven.md": { id: "corven", baseType: "npc" } });

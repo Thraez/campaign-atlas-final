@@ -23,9 +23,18 @@ Cloudflare Access, repo private). `atlas.config.json` carries `"hosting": "publi
   `HostingPublic`, and the Staging modal shows that reason. A dry run (`--dry-run`, or opening
   Staging) still works;
 - `check-vault-content` (one of the publish scans, so `npm run gate` runs it) fails if `content/`
-  holds a file the sync map (`.local-atlas/sync-map.json`) names, by entity id or by the hash of
-  what Sync wrote. Sync stamps no marker in frontmatter, so on a checkout without that map (CI, a
-  fresh clone) the scan has nothing to compare and passes.
+  holds a file that carries Sync's marker (below), or that the sync map
+  (`.local-atlas/sync-map.json`) names by entity id or by the hash of what Sync wrote. The marker
+  travels with the file, so the scan works from any checkout (a fresh clone, the PC, CI); the map,
+  machine-local and gitignored, also catches files whose marker was edited away.
+
+**The vault marker.** Every note Sync writes into `content/`, created or updated, gets
+`atlas.source: vault` in its frontmatter (`src/atlas/import/vaultSourceMarker.ts`). Files dropped
+into the Import wizard (no vault path) don't. Sync's own diffing doesn't see it: whether a note is
+unchanged is judged on the vault note's hash, and the sync map's `syncedFileHash` is taken from the
+bytes written, marker included, so an unchanged note stays unchanged. The build ignores the key and
+the player projection drops all frontmatter, so it never reaches players. Removing the marker by hand
+is how a file stops counting as vault content.
 
 Copying vault folders by hand or dropping files into the Import wizard isn't Sync and isn't guarded.
 H-04 flips the value to `"private"`.
