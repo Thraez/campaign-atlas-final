@@ -68,3 +68,14 @@ export function linkTargetLabel(targetVisibility: EntityVisibility | undefined):
 export function isValidVisibility(v: unknown): v is EntityVisibility {
   return typeof v === "string" && (VALID_VISIBILITY as ReadonlySet<string>).has(v);
 }
+
+/**
+ * The visibility of a world.yaml region, route or sound-only area: its own
+ * value when valid, otherwise `dm`. A missing key is `dm` too, so an item
+ * nobody marked never ships (ADR-0001 addendum, Isak 2026-11-07). The loader,
+ * the player build, the editor's player lens, its menus and its world.yaml
+ * writer all ask this, so they can't disagree.
+ */
+export function worldItemVisibility(v: unknown): EntityVisibility {
+  return isValidVisibility(v) ? v : "dm";
+}

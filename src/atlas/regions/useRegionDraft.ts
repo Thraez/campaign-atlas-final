@@ -13,7 +13,11 @@ import {
 } from "@/atlas/map/featureStyle";
 import { useCallback, useMemo, useState } from "react";
 import type { EntityVisibility, MapDocument, Point, Region } from "@/atlas/content/schema";
-import { linkLeaksToPlayers, linkTargetLabel } from "@/atlas/content/visibility";
+import {
+  linkLeaksToPlayers,
+  linkTargetLabel,
+  worldItemVisibility,
+} from "@/atlas/content/visibility";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
 import { slugify as toSlug, uniqueId } from "@/atlas/content/slugify";
 import { applyCollectionDraft, useDraftCore } from "@/atlas/editor/useDraftCore";
@@ -371,7 +375,8 @@ export function regionToYamlObject(r: Region): Record<string, unknown> {
     id: r.id,
     mapId: r.mapId,
     name: r.name,
-    visibility: r.visibility,
+    // Always explicit: a missing key loads as dm (ADR-0001 addendum).
+    visibility: worldItemVisibility(r.visibility),
     points: r.points.map(([x, y]) => [Math.round(x), Math.round(y)]),
   };
   if (r.entityId) out.entityId = r.entityId;

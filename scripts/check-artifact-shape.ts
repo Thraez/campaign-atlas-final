@@ -184,8 +184,15 @@ export function scanArtifactShape(atlas: unknown): ShapeResult {
             message: `soundscape area id "${a.id}" is not neutralised (expected area-N)`,
           });
         }
+        // A ride-on area (regionId) inherits its region's visibility; a
+        // sound-only area must carry its own, since a missing one is dm
+        // (ADR-0001 addendum).
         const vis = a.visibility as string | undefined;
-        if (vis !== undefined && !PLAYER_VISIBLE_VISIBILITY.has(vis as never)) {
+        const ownVisibilityRequired = typeof a.regionId !== "string" || a.regionId === "";
+        if (
+          (vis !== undefined || ownVisibilityRequired) &&
+          !PLAYER_VISIBLE_VISIBILITY.has(vis as never)
+        ) {
           violations.push({
             field: `map[${mapId}].soundscape.area[${aId}].visibility`,
             message: `soundscape area visibility "${vis}" not in PLAYER_VISIBLE_VISIBILITY`,

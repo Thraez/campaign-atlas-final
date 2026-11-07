@@ -26,7 +26,7 @@ import type {
   WaterConfig,
   WorldCalendar,
 } from "../../src/atlas/content/schema";
-import { isValidVisibility } from "./visibility";
+import { isValidVisibility, worldItemVisibility } from "./visibility";
 
 /** Pure helper: coerce a raw `credits` block to a CreditsConfig, defaulting both flags to true. */
 export function resolveCredits(raw: unknown): CreditsConfig {
@@ -484,15 +484,15 @@ function sanitizeWater(
 }
 
 /**
- * A missing visibility is "player" (the DM writes world.yaml by hand); a value that is present but
- * not a known visibility is "dm", so a typo hides the item instead of shipping it (ADR-0001
- * addendum).
+ * Anything but a valid visibility loads as "dm" (`worldItemVisibility`, ADR-0001 addendum): a
+ * missing key silently, since that is the deliberate default and the editor always writes the
+ * key; a value that is present but not a known visibility with a warning, since it is a typo.
  */
 function normalizeVis(v: unknown, warnings: string[], where: string): EntityVisibility {
-  if (isValidVisibility(v)) return v;
-  if (v === undefined) return "player";
-  warnings.push(`${where}: invalid visibility "${String(v)}", loading as "dm"`);
-  return "dm";
+  if (v !== undefined && !isValidVisibility(v)) {
+    warnings.push(`${where}: invalid visibility "${String(v)}", loading as "dm"`);
+  }
+  return worldItemVisibility(v);
 }
 
 const SAFE_SEGMENT = /^[A-Za-z0-9_\-. ]+$/;

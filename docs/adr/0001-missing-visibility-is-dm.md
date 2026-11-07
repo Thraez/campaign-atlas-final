@@ -19,8 +19,8 @@ Missing or invalid visibility is `dm` everywhere. A note ships only when somethi
 notes from the vault's already-public folders (`01_Lore`, `02_Regions`). A top-level
 `visibility:` outside the `atlas:` block isn't read.
 
-`world.yaml` items (regions, routes, sound areas) are out of scope: the DM writes them by hand in
-one file, and their defaults are untouched by this ADR.
+`world.yaml` items (regions, routes, sound areas) were out of scope at first: the DM writes them by
+hand in one file, and their defaults were untouched by this ADR. The addenda below bring them in.
 
 ## Consequences
 
@@ -41,3 +41,16 @@ build warning naming the item. Sound-only areas follow the same rule: missing sh
 value that isn't `player` or `rumor` drops. The code is `normalizeVis` in
 `scripts/atlas/loadWorldConfig.ts` and `filterSoundscapeForPlayer` in
 `scripts/atlas/filterSoundscape.ts`.
+
+### Later the same day: a missing world.yaml visibility is `dm` too
+
+Decision (Isak, 2026-11-07, rebuild round 1): a `world.yaml` region, route or sound-only area with no
+`visibility` key is `dm`, like a note. This replaces "missing is still `player`" above: world.yaml
+items are now in scope, and fail closed whether the key is missing or mistyped. A missing key loads
+silently (it is the default, not a mistake); an invalid value keeps its warning. Ride-on sound areas
+still take their region's visibility.
+
+The editor always writes an explicit `visibility:` for these items when it saves, so a region the
+DM marked `player` keeps shipping; new ones start as `dm`. One helper, `worldItemVisibility` in
+`src/atlas/content/visibility.ts`, decides the rule for the loader, the player build's soundscape
+filter, the editor's player lens and menus, the world.yaml writer and the artifact shape scan.

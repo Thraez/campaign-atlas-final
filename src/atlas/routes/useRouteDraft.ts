@@ -16,7 +16,11 @@ import type {
   Route,
   RouteMode,
 } from "@/atlas/content/schema";
-import { linkLeaksToPlayers, linkTargetLabel } from "@/atlas/content/visibility";
+import {
+  linkLeaksToPlayers,
+  linkTargetLabel,
+  worldItemVisibility,
+} from "@/atlas/content/visibility";
 import type { UndoStackAPI } from "@/atlas/useUndoStack";
 import { slugify as toSlug, uniqueId } from "@/atlas/content/slugify";
 import { applyCollectionDraft, useDraftCore } from "@/atlas/editor/useDraftCore";
@@ -409,7 +413,8 @@ export function routeToYamlObject(r: Route): Record<string, unknown> {
     id: r.id,
     mapId: r.mapId,
     name: r.name,
-    visibility: r.visibility,
+    // Always explicit: a missing key loads as dm (ADR-0001 addendum).
+    visibility: worldItemVisibility(r.visibility),
     waypoints: r.waypoints.map((w) =>
       Array.isArray(w) ? [Math.round(w[0]), Math.round(w[1])] : { entityId: w.entityId },
     ),

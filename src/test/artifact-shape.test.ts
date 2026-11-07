@@ -171,11 +171,21 @@ describe("scanArtifactShape — soundscape assertions", () => {
       enabled: true,
       areas: [
         { id: "area-0", bed: { src: "atlas/assets/audio/abc12345.ogg" }, visibility: "player" },
-        { id: "area-1", bed: { src: "atlas/assets/audio/def67890.ogg" } },
+        { id: "area-1", bed: { src: "atlas/assets/audio/def67890.ogg" }, regionId: "r1" },
       ],
     });
     const r = scanArtifactShape(atlas);
     expect(r.violations.filter((v) => v.field.includes("soundscape"))).toHaveLength(0);
+  });
+
+  it("flags a sound-only area with no visibility (missing is dm, ADR-0001 addendum)", async () => {
+    const atlas = makeAtlas({
+      areas: [{ id: "area-0", bed: { src: "audio/x.ogg" } }],
+    });
+    const r = scanArtifactShape(atlas);
+    expect(
+      r.violations.some((v) => v.field.includes("soundscape") && v.message.includes("visibility")),
+    ).toBe(true);
   });
 
   it("flags a DM-visibility area", async () => {
