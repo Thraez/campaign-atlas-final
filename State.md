@@ -19,7 +19,9 @@ improvement loop opened the PRs below. Each one is cut from `main`, gate-green a
 | 6     | #107 | eval-2026-10/44 soundscape draft per map          | `eval-44-soundscape-draft-per-map`          | stacked on #103            |
 | 7     | #104 | eval-2026-10/27 one reduce-motion switch          | `eval-27-one-reduce-motion-switch`          | Isak looks at the button   |
 | 8     | #105 | eval-2026-10/49 ruler and drawing, one click      | `eval-49-ruler-and-drawing-one-click`       | Isak checks in the preview |
-| 9     | #101 | This State.md, workflow retro notes               | `docs-2026-11-07-improve-loop`              | last                       |
+| 9     | #109 | arch-2026-11/01 publish scans find the real files | `arch-01-scans-find-real-artifacts`         |                            |
+| 10    | #108 | arch-2026-11/04 delete the dead EntityReadingView | `arch-04-delete-entity-reading-view`        |                            |
+| 11    | #101 | This State.md, workflow retro notes               | `docs-2026-11-07-improve-loop`              | last                       |
 
 Check each PR's mergeability just before its merge; a stacked PR only becomes clean once the PR
 under it is merged (GitHub then shows only its own commits):
@@ -69,6 +71,14 @@ gh pr merge 105 --merge
 ```
 
 ```bash
+gh pr merge 109 --merge
+```
+
+```bash
+gh pr merge 108 --merge
+```
+
+```bash
 gh pr merge 101 --merge
 ```
 
@@ -96,7 +106,10 @@ change dropping the `atlas:publish` ask rule, not applied: Isak's call) and bran
 
 Lowest number first within each folder.
 
-- Waiting to merge (Morning queue): `eval-2026-10/27`, `44`-`50`.
+- Waiting to merge (Morning queue): `eval-2026-10/27`, `44`-`50`; `arch-2026-11/01`, `04`.
+- `arch-2026-11/` (architecture pass on code outside the open PRs): ranked tickets 02-09 in its
+  `README.md`. 02 (sound areas inside fog ship) is the most important; 02, 03 and 05 wait for the
+  queue; 07 needs Isak (a world.yaml visibility typo fails open).
 - Next, by payoff (from the improvement loop; no ticket yet unless numbered):
   1. `eval-2026-10/39` (one canon client): after the queue merges; it touches the save plugin that
      #102 changes.
@@ -133,6 +146,7 @@ Lowest number first within each folder.
   soundscape, switch maps, save; only that map changes.
 - Agents were denied reads under `node_modules` (an unknown deny rule); worth a look.
 - The provisional calls below, in a batch.
+- `arch-2026-11/07`: should an invalid `visibility:` in world.yaml load as `dm` (fail closed)? Recommended yes, with an ADR-0001 addendum.
 - On the PC: follow `docs/PC-CLEANUP.md` (turn the old routines off first).
 
 ## Provisional calls
@@ -211,5 +225,6 @@ Built, reviewed and gated eight tickets, one PR each: 45 (#99), 46 (#100), 48 (#
 27 (#104), 49 (#105), 50 (#106, stacked on #100) and 44 (#107, stacked on #103). Wrote the retro notes
 into `docs/agents/workflow.md` (review before gate, worktree lint/format, zsh quoting, State.md
 after merge, queued merges) and added the `in-review` state. Stopped there: what's left is 39,
-which would conflict with the queue, the pin anchor (Isak's look) and L-sized work. Next session:
+which would conflict with the queue, the pin anchor (Isak's look) and L-sized work. A second round added an architecture pass
+(`docs/tracker/arch-2026-11/`) and built 01 (#109) and 04 (#108). Next session:
 merge the queue, then the "Open work" list from item 1.
