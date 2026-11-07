@@ -60,7 +60,7 @@ describe("toolbar stacking guard", () => {
     expect(z).toBeGreaterThan(2);
     expect(toolbar).not.toMatch(/backdrop-filter/);
     const open = Number(
-      /z-index:\s*(\d+)/.exec(block("\\.atlas-toolbar:has\\(\\[data-editor-menu\\]\\)"))?.[1],
+      /z-index:\s*(\d+)/.exec(block('\\.atlas-toolbar\\[data-menu-open="true"\\]'))?.[1],
     );
     expect(open).toBeGreaterThan(500);
   });
