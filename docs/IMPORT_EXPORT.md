@@ -12,6 +12,24 @@ The atlas's content layer (`content/`) **is already an Obsidian-compatible vault
 
 This is the lowest-friction path. If you have an existing vault you want to fold in, just copy its folder under `content/<your-world>/` and add an `_atlas/world.yaml`.
 
+### Hosting guard (R-01, 2026-11-07)
+
+The GitHub repo is public, so real vault content waits until hosting is private (plan ticket H-04:
+Cloudflare Access, repo private). `atlas.config.json` carries `"hosting": "public"` (or
+`"private"`; missing or any other value reads as `"public"`). While it is public:
+
+- a real Sync from Obsidian is refused, in the editor and in `npm run atlas:sync -- --write`. The
+  save endpoint refuses writes marked `origin: "sync"` and the vault image copy with 403
+  `HostingPublic`, and the Staging modal shows that reason. A dry run (`--dry-run`, or opening
+  Staging) still works;
+- `check-vault-content` (one of the publish scans, so `npm run gate` runs it) fails if `content/`
+  holds a file the sync map (`.local-atlas/sync-map.json`) names, by entity id or by the hash of
+  what Sync wrote. Sync stamps no marker in frontmatter, so on a checkout without that map (CI, a
+  fresh clone) the scan has nothing to compare and passes.
+
+Copying vault folders by hand or dropping files into the Import wizard isn't Sync and isn't guarded.
+H-04 flips the value to `"private"`.
+
 ### Frontmatter the build actually reads
 
 The parser supports two forms for the same data: a **flat top-level form** (what most Obsidian vaults already use) and a **namespaced `atlas.*` form** (what the visual editor writes). Use whichever you prefer in any given file — the build accepts both. The namespaced form wins when both are present.

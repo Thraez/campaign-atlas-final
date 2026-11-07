@@ -27,6 +27,7 @@ import {
   type SyncWorld,
 } from "../sync/sync";
 import { createDevEndpointPort } from "../sync/devEndpointPort";
+import { HostingPublicError } from "../sync/hosting";
 import { VaultScanError, type SyncSource, type VaultPort } from "../sync/vaultPort";
 
 export interface UseMdImportFlowArgs {
@@ -193,6 +194,12 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
         toast.error(`Import conflict: ${err.failedPath}`, {
           description: summary,
           duration: 12_000,
+        });
+      } else if (err instanceof HostingPublicError) {
+        // R-01: the server refused a real sync; say why instead of "Import failed".
+        toast.error("Sync is off while the repo is public", {
+          description: err.message,
+          duration: 15_000,
         });
       } else if (err instanceof SaveBusyError) {
         toast.error("Another save is already in flight — try again in a moment");

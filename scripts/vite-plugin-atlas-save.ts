@@ -33,7 +33,8 @@
  *       files: [
  *         { path, content, kind: "entity-md" | "world-yaml", baseHash: "sha256:<hex>" | null }
  *       ],
- *       rebuild?: boolean
+ *       rebuild?: boolean,
+ *       origin?: "sync"   // Sync from Obsidian; 403 HostingPublic while hosting is public (R-01)
  *     }
  *
  * For A4 this plugin parses but does not yet enforce baseHash; conflict
@@ -86,6 +87,8 @@ import {
   buildLockHolder,
 } from "./atlas/buildLock";
 import { DEV_API_PATHS, DEV_API_PREFIX } from "./atlas/devRoutes";
+import { syncWritesAllowed } from "./atlas/hosting";
+import { HOSTING_PUBLIC_ERROR, HOSTING_PUBLIC_SYNC_MESSAGE } from "../src/atlas/sync/hosting";
 
 const MAX_FILE_BYTES = 1024 * 1024;
 const MAX_VAULT_AGGREGATE_BYTES = 25 * 1024 * 1024;
@@ -353,7 +356,7 @@ export type HandlerResult =
       };
     }
   | {
-      status: 400 | 500;
+      status: 400 | 403 | 500;
       payload: { error: string; [k: string]: unknown };
     };
 
@@ -488,6 +491,14 @@ export async function handleSaveRequest(
     return {
       status: 400,
       payload: { error: "InvalidBody", detail: "expected { files: FilePayload[] }" },
+    };
+  }
+  // R-01: a Sync from Obsidian write is refused while the repo is public.
+  // Sync marks its saves `origin: "sync"`; the editor's own saves don't.
+  if ((body as { origin?: unknown }).origin === "sync" && !syncWritesAllowed(repoRoot)) {
+    return {
+      status: 403,
+      payload: { error: HOSTING_PUBLIC_ERROR, detail: HOSTING_PUBLIC_SYNC_MESSAGE },
     };
   }
   const rawFiles = (body as { files: unknown[] }).files;
@@ -1678,6 +1689,18 @@ export const DEV_ROUTES: readonly DevRoute[] = [
     takesBuildLock: false,
     body: { maxBytes: VAULT_IMAGE_COPY_BODY_LIMIT_BYTES },
     handle: async ({ body, root }) => {
+      // R-01: only a real sync copies vault images; refused while the repo is public.
+      if (!syncWritesAllowed(root)) {
+        return {
+          status: 403,
+          json: {
+            ok: false,
+            reason: "hosting-public",
+            error: HOSTING_PUBLIC_ERROR,
+            detail: HOSTING_PUBLIC_SYNC_MESSAGE,
+          },
+        };
+      }
       const result = await handleVaultImageCopyRequest({
         ...(body as VaultImageCopyArgs),
         publicDir: path.join(root, "public"),
