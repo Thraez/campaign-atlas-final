@@ -120,4 +120,31 @@ describe("EntityPanes", () => {
     fireEvent.click(screen.getByRole("button", { name: /－ player view|remove player/i }));
     expect(dm.scrollTop).toBe(240);
   });
+
+  it("DM pane resolves wikilinks via entity alias", () => {
+    localStorage.clear();
+    const edric = { ...corven, id: "edric", title: "Edric", aliases: ["Ed"], body: "" } as Entity;
+    const asker = { ...corven, body: "Ask [[Ed]] about it." } as Entity;
+    render(
+      <MemoryRouter>
+        <ViewModeProvider>
+          <EntityPanes
+            entity={asker}
+            entitiesById={
+              new Map([
+                [edric.id, edric],
+                [asker.id, asker],
+              ])
+            }
+            mode="reading"
+            renderEdit={() => null}
+          />
+        </ViewModeProvider>
+      </MemoryRouter>,
+    );
+    const link = screen
+      .getByTestId("entity-pane-dm")
+      .querySelector('a.atlas-wikilink[data-entity-id="edric"]');
+    expect(link?.textContent).toBe("Ed");
+  });
 });
