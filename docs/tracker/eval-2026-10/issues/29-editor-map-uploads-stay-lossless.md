@@ -34,7 +34,7 @@ segments, without decoding the image.
 
 - `scripts/atlas/jpegMetadata.ts` walks the JPEG's segments without decoding. It keeps the frame,
   tables and every scan (entropy-coded data copied byte for byte, progressive scans included), and
-  APP0 JFIF, APP2 ICC_PROFILE and APP14 Adobe, which change how the pixels render. It drops every
+  APP0 JFIF (without its thumbnail), APP2 ICC_PROFILE and APP14 Adobe, which change how the pixels render. It drops every
   other APPn (APP1 EXIF/XMP, APP13 IPTC, APP2 MPF, maker blocks), COM, and anything after EOI.
 - `cleanImageBytes` sends a JPG under `assets/maps/` there instead of the q85 re-encode. A JPG
   under a map name other than `.jpg`/`.jpeg` is refused (`map-format-refused`, "Save it under a
@@ -51,5 +51,12 @@ segments, without decoding the image.
   orientation can't survive the strip and a JPEG can't be rotated without decoding, so a JPG map
   whose orientation isn't 1 is refused with a clear error ("rotate it in an image editor"), rather
   than published sideways or kept with a minimal EXIF block.
-- Not covered: the Map Import Wizard's zip download copies the file's raw bytes (metadata and
-  all); that path never goes through the save endpoint.
+- Review fixes (same day): the walker allowlists the decoder's markers (SOFn, DHT, DAC, DQT, DRI,
+  DNL, DHP, EXP, SOS, RSTn, TEM) and calls anything else malformed, so a stray second SOI or a JPGn
+  segment can't carry an EXIF span through. APP0 JFIF is rebuilt with no embedded thumbnail; JFXX
+  is dropped. `cleanImageBytes` re-reads the stripped bytes with sharp and refuses the save
+  (400, nothing written) if EXIF, XMP or IPTC is still there.
+- Follow-up (not fixed here): the Map Import Wizard's zip download writes the file's raw bytes,
+  metadata and all; that path never goes through the save endpoint, and those bytes reach
+  `public/atlas` if the DM extracts the zip into the repo. `check-image-privacy` blocks EXIF, IPTC
+  and XMP but not COM segments or data after EOI.

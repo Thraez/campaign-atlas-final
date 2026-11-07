@@ -5,12 +5,16 @@
 // This walks the JPEG's segments instead and copies every one the decoder
 // needs, so the compressed image data comes out byte for byte.
 //
-// Kept: the frame, tables and scans (SOFn, DQT, DHT, DRI, SOS and the
-// entropy-coded data after it), plus three APPn segments that change how the
-// pixels render: APP0 JFIF, APP2 ICC_PROFILE (colour) and APP14 Adobe (tells
-// the decoder whether the components are RGB, YCbCr or YCCK).
+// Kept: the frame, tables and scans (SOFn, DQT, DHT, DAC, DRI, DNL, DHP, EXP,
+// SOS and the entropy-coded data after it), plus three APPn segments that
+// change how the pixels render: APP0 JFIF (rewritten without its embedded
+// thumbnail), APP2 ICC_PROFILE (colour) and APP14 Adobe (tells the decoder
+// whether the components are RGB, YCbCr or YCCK). Any other marker (a stray
+// second SOI, JPGn, reserved codes) makes the file malformed: an unknown
+// segment could carry anything, and guessing its length could carry the next
+// segment along with it.
 // Dropped: every other APPn (APP1 EXIF and XMP, APP13 IPTC/Photoshop, APP2
-// MPF, maker blocks) and COM comments, plus anything after EOI (MPF and some
+// MPF, APP0 JFXX thumbnails, maker blocks) and COM comments, plus anything after EOI (MPF and some
 // cameras append a second JPEG there, with its own EXIF).
 //
 // EXIF orientation: browsers rotate a JPEG by its EXIF Orientation tag, so
@@ -45,12 +49,40 @@ function startsWith(payload: Uint8Array, signature: string): boolean {
   return true;
 }
 
-/** The APPn segments a decoder needs to show the right pixels and colours. */
-function keepAppSegment(marker: number, payload: Uint8Array): boolean {
-  if (marker === 0xe0) return startsWith(payload, "JFIF\0");
-  if (marker === 0xe2) return startsWith(payload, "ICC_PROFILE\0");
-  if (marker === 0xee) return startsWith(payload, "Adobe");
-  return false;
+/**
+ * Markers of segments the decoder reads, besides SOS: SOFn (0xC0-0xCF except
+ * DHT 0xC4, JPG 0xC8 and DAC 0xCC), DHT, DAC, DQT, DNL, DRI, DHP and EXP.
+ */
+function isDecoderSegment(marker: number): boolean {
+  if (marker >= 0xc0 && marker <= 0xcf) return marker !== 0xc8;
+  return marker >= 0xdb && marker <= 0xdf;
+}
+
+/** Length of an APP0 JFIF payload up to and including the thumbnail size bytes. */
+const JFIF_HEADER_LENGTH = 14;
+
+/**
+ * The APPn segment to publish in place of this one, or null to drop it: the
+ * ones a decoder needs to show the right pixels and colours. APP0 JFIF is
+ * rebuilt with no embedded thumbnail (a thumbnail is a second picture, and it
+ * may not match the map).
+ */
+function keptAppSegment(
+  marker: number,
+  segment: Uint8Array,
+  payload: Uint8Array,
+): Uint8Array | null {
+  if (marker === 0xe0) {
+    if (!startsWith(payload, "JFIF\0") || payload.length < JFIF_HEADER_LENGTH) return null;
+    const app0 = Buffer.from(segment.subarray(0, 4 + JFIF_HEADER_LENGTH));
+    app0.writeUInt16BE(2 + JFIF_HEADER_LENGTH, 2);
+    app0[4 + 12] = 0; // Xthumbnail
+    app0[4 + 13] = 0; // Ythumbnail
+    return app0;
+  }
+  if (marker === 0xe2) return startsWith(payload, "ICC_PROFILE\0") ? segment : null;
+  if (marker === 0xee) return startsWith(payload, "Adobe") ? segment : null;
+  return null;
 }
 
 /**
@@ -112,6 +144,9 @@ export function stripJpegMetadata(buf: Uint8Array): StripJpegResult {
       i = m + 1;
       continue;
     }
+    if (marker !== SOS && !isApp(marker) && marker !== COM && !isDecoderSegment(marker)) {
+      return malformed(`unexpected marker 0x${marker.toString(16)} at offset ${m}`);
+    }
     if (m + 2 >= buf.length) return malformed("it ends inside a segment header");
     const length = (buf[m + 1] << 8) | buf[m + 2];
     const end = m + 1 + length;
@@ -153,9 +188,10 @@ export function stripJpegMetadata(buf: Uint8Array): StripJpegResult {
           };
         }
       }
-      if (isApp(marker) && keepAppSegment(marker, payload)) out.push(segment);
+      const kept = isApp(marker) ? keptAppSegment(marker, segment, payload) : null;
+      if (kept) out.push(kept);
     } else {
-      out.push(segment); // DQT, DHT, SOFn, DRI, DNL, ...: the decoder needs them
+      out.push(segment); // DQT, DHT, SOFn, DRI, ...: the decoder needs them
     }
     i = end;
   }

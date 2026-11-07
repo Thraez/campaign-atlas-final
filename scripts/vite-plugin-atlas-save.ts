@@ -424,7 +424,15 @@ async function cleanImageBytes(buf: Buffer, source: string, target: string): Pro
       );
     }
     const stripped = stripJpegMetadata(buf);
-    if (stripped.ok) return stripped.bytes;
+    if (stripped.ok) {
+      // Defence in depth: never publish a map that still reads as carrying
+      // EXIF, XMP or IPTC, whatever the segment walk missed.
+      const left = await sharp(stripped.bytes).metadata();
+      if (left.exif || left.xmp || left.iptc) {
+        throw new Error("metadata survived the JPEG strip; nothing was saved");
+      }
+      return stripped.bytes;
+    }
     if (stripped.code === "rotated") {
       throw new MapFormatRefusedError(
         `This JPG map can't be saved: ${stripped.reason}. ` +

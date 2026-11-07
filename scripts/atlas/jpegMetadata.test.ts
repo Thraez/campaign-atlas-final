@@ -113,4 +113,57 @@ describe("stripJpegMetadata", () => {
       code: "malformed",
     });
   });
+
+  it("refuses a stray second SOI rather than reading the next segment as its length", async () => {
+    const jpeg = await noisyJpeg();
+    const exif = segment(
+      0xe1,
+      Buffer.concat([Buffer.from("Exif\0\0GPS-SECRET"), Buffer.alloc(100)]),
+    );
+    // FF D8 followed by bytes that look like a length covering the EXIF segment.
+    const len = 2 + exif.length;
+    const fake = Buffer.from([0xff, 0xd8, (len >> 8) & 0xff, len & 0xff]);
+    expect(stripJpegMetadata(withSegments(jpeg, fake, exif))).toMatchObject({
+      ok: false,
+      code: "malformed",
+    });
+    expect(stripJpegMetadata(withSegments(jpeg, Buffer.from([0xff, 0xd8]), exif))).toMatchObject({
+      ok: false,
+      code: "malformed",
+    });
+  });
+
+  it("refuses a JPGn (0xF0) segment instead of passing it through", async () => {
+    const input = withSegments(await noisyJpeg(), segment(0xf0, Buffer.from("hidden-text")));
+    expect(stripJpegMetadata(input)).toMatchObject({ ok: false, code: "malformed" });
+  });
+
+  it("drops a JFIF thumbnail and JFXX extensions but keeps the JFIF header", async () => {
+    const thumb = Buffer.from("THUMBPIXELS!"); // 2x2 RGB = 12 bytes
+    const jfif = segment(
+      0xe0,
+      Buffer.concat([Buffer.from("JFIF\0"), Buffer.from([1, 2, 1, 0, 72, 0, 72, 2, 2]), thumb]),
+    );
+    const jfxx = segment(0xe0, Buffer.from("JFXX\0\x13JFXX-THUMB"));
+    const input = withSegments(await noisyJpeg(), jfif, jfxx);
+    const r = stripJpegMetadata(input);
+    if (!r.ok) throw new Error(r.reason);
+    const text = r.bytes.toString("latin1");
+    expect(text).not.toMatch(/THUMB|JFXX/);
+    // Every APP0 left is a bare 16-byte JFIF header with a 0x0 thumbnail.
+    for (let i = r.bytes.indexOf(Buffer.from([0xff, 0xe0])); i !== -1 && i < scanStart(r.bytes);) {
+      expect(r.bytes.readUInt16BE(i + 2)).toBe(16);
+      expect(r.bytes.subarray(i + 4, i + 9).toString("latin1")).toBe("JFIF\0");
+      expect([r.bytes[i + 16], r.bytes[i + 17]]).toEqual([0, 0]);
+      i = r.bytes.indexOf(Buffer.from([0xff, 0xe0]), i + 2);
+    }
+    expect(text).toContain("JFIF\0");
+    expect(scanData(r.bytes).equals(scanData(input))).toBe(true);
+    const px = (b: Buffer) => sharp(b).raw().toBuffer();
+    expect((await px(r.bytes)).equals(await px(input))).toBe(true);
+  });
 });
+
+function scanStart(jpeg: Buffer): number {
+  return jpeg.indexOf(Buffer.from([0xff, 0xda]));
+}
