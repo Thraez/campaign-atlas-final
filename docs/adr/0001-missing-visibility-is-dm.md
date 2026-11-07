@@ -53,4 +53,5 @@ still take their region's visibility.
 The editor always writes an explicit `visibility:` for these items when it saves, so a region the
 DM marked `player` keeps shipping; new ones start as `dm`. One helper, `worldItemVisibility` in
 `src/atlas/content/visibility.ts`, decides the rule for the loader, the player build's soundscape
-filter, the editor's player lens and menus, the world.yaml writer and the artifact shape scan.
+filter, the editor's player lens and menus and the world.yaml writer.
+The artifact shape scan checks the shipped value directly.
