@@ -10,6 +10,9 @@ local DM editor. Vite, React, TypeScript. Remote: github.com/Thraez/campaign-atl
   single unsharded `vitest run` of the whole suite runs out of memory), `npm run build`
 - `npm run atlas:build:player`: strict player atlas in `public/atlas/`
 - `npm run atlas:publish`: full build plus the safety scans
+- `npm run gate`: the full local gate a PR merges on (every check above plus `format:check` and
+  the `dist` secret scans), logs in `.gate-logs/`, `public/atlas/` restored after;
+  `-- --only typecheck:all,lint` runs a subset, `-- --dry-run` prints the plan
 - `npm run images:optimize`: convert PNG/JPEG to WebP and update references
 
 A ticket is done per `docs/agents/workflow.md` ("Done").
