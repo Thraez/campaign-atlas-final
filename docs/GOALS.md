@@ -5,7 +5,7 @@ Agreed with Isak on 2026-11-07 (rebuild planning; ADR-0002). It replaces the goa
 [`GLOSSARY.md`](../GLOSSARY.md); new words (ocean, map tree, frame, campaign, story panel,
 monument) go there when the tickets that build them land. Open work lives as tickets in
 `docs/tracker/`; this file says what "working" means. The detailed plan is
-`docs/rebuild-2026-11/plan.md`.
+`docs/rebuild-2026-11/plan.md` (on branch `rebuild-plan-2026-11` until it merges).
 
 ## What the atlas is for
 
@@ -171,7 +171,7 @@ real vault** (eval-13 found it never had).
 ### Publish
 
 A merge into `main` publishes: to GitHub Pages (public, test content) until the hosting move, then
-to Cloudflare Pages, one site path per campaign, each open only to that campaign's players. The
+to Cloudflare Pages, one Pages project (and address) per campaign, each open only to that campaign's players. The
 editor's Publish job shows what will change for each campaign's players and the scan results before
 Isak pushes. Working means: a publish run's log shows every scan passing for every campaign; the
 live site matches the last preview; a request without access to any campaign's page, atlas, search

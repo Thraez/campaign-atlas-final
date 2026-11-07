@@ -45,9 +45,9 @@ The atlas reads Obsidian-flavored markdown. Most Obsidian features work; a few d
 
 | Limitation | Status | Workaround |
 |---|---|---|
-| One map at a time in the viewer | by design | Switch maps via the viewer's map picker. Hierarchical, not spatial. |
+| One map at a time in the viewer | today; the ocean and map tree replace it (ADR-0002) | Switch maps via the viewer's map picker. |
 | No tile pyramid | not yet | Large maps (>4K px on the long side) work but eat memory on mobile. Plan: `scripts/atlas/tile-map.ts` slices maps into Leaflet tiles. Not built yet. |
-| No multi-map composite canvas | by design | World-canvas mode (multiple maps spatially composited) is on the [non-goals list](NON_GOALS.md) under "Full GIS-style multi-map alignment". |
+| No multi-map composite canvas | Today only; world maps move onto one ocean canvas (ADR-0002, `docs/GOALS.md`); below the world level maps nest. | See the [non-goals list](NON_GOALS.md) under "Full GIS-style multi-map alignment" for what stays out. |
 | `atlas.json` loaded whole | not yet | For 5+ maps with rich entity content, per-map data chunking is the planned scale-out. Today the whole atlas loads on first visit. |
 | Pin clustering at low zoom | not yet | At 200+ pins on the overview map, the cluster gets unreadable. Add Leaflet markercluster or priority-based culling. The schema's `pin.priority` is already in place. |
 

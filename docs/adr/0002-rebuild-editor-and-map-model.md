@@ -31,7 +31,7 @@ visibility and fog; per-campaign note visibility only in `world.yaml`'s `notes:`
 narrow a vault `dm` but never widen it. One resolver reads visibility for every item and note, for
 every campaign: missing, invalid, or a campaign not named counts as `dm`. The publish builds one
 player output per campaign. The plan, with the schema sketch and the phases, is
-`docs/rebuild-2026-11/plan.md`.
+`docs/rebuild-2026-11/plan.md` (on branch `rebuild-plan-2026-11` until it merges).
 
 **Stays** (extended, not rewritten): the content core, the scan registry and `check-*` scans (they
 learn one directory per campaign), the publish orchestrator, Sync (any target world), search, fog

@@ -11,7 +11,7 @@ This document lists what we have decided **not** to build. If a feature request 
 | Idea | Why we don't build it |
 |---|---|
 | **Combat tracker, initiative, rules content** | Out of scope. Foundry, Roll20, Owlbear Rodeo exist. We are a lore atlas, not a VTT. |
-| **Multi-user real-time editing** | Massive complexity (CRDTs, presence, conflict UI) for an audience of one DM per world. Git already handles single-author workflow. |
+| **Multi-user real-time editing** | Massive complexity (CRDTs, presence, conflict UI) for an audience of one DM. Git already handles single-author workflow. |
 | **Hosted DM editor with auth** | Defer until a real second user exists. The local + GitHub Pages model is solid. If we ever build it: GitHub fine-grained PAT in localStorage, save-as-PR-only, never direct-commit. |
 | **Server-backed player notes** | Player notes are deliberately local-only (browser storage, optional export). No accounts, no sync, no privacy surface. |
 | **AI-generated lore** | We are a tool, not a generator. The DM's voice is the product. |
