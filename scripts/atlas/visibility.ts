@@ -10,4 +10,6 @@ export {
   isPlayerVisible,
   isSecretVisibility,
   isValidVisibility,
+  linkLeaksToPlayers,
+  linkTargetLabel,
 } from "../../src/atlas/content/visibility";

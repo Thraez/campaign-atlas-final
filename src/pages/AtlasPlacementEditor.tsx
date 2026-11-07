@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
-import { isSecretVisibility, VISIBILITY_MENU_ORDER } from "@/atlas/content/visibility";
+import { VISIBILITY_MENU_ORDER } from "@/atlas/content/visibility";
 import { loadAtlasContent } from "@/atlas/content/loader";
 import type {
   AtlasProject,
@@ -400,22 +400,19 @@ function AtlasPlacementEditorInner() {
 
   // Region draft state — shared between RegionsTab (form) and the map (RegionLayer).
   const entityIdSet = useMemo(() => new Set((project?.entities ?? []).map((e) => e.id)), [project]);
-  const dmEntityIdSet = useMemo(
-    () =>
-      new Set(
-        (project?.entities ?? []).filter((e) => isSecretVisibility(e.visibility)).map((e) => e.id),
-      ),
+  const entityVisibility = useMemo(
+    () => new Map((project?.entities ?? []).map((e) => [e.id, e.visibility] as const)),
     [project],
   );
   const regionDraft = useRegionDraft(
     activeMap,
-    { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet },
+    { entityIds: entityIdSet, entityVisibility },
     undoStack,
   );
   const routeDraft = useRouteDraft(
     project,
     activeMap,
-    { entityIds: entityIdSet, dmEntityIds: dmEntityIdSet },
+    { entityIds: entityIdSet, entityVisibility },
     undoStack,
   );
   const fogDraft = useFogDraft(activeMap, undoStack);
