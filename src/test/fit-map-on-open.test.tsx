@@ -5,7 +5,18 @@ type Handler = () => void;
 const fake = {
   size: { x: 800, y: 600 },
   handlers: new Map<string, Handler>(),
+  minZoom: -6,
+  boundsZoom: -3,
   fitBounds: vi.fn(),
+  getBoundsZoom() {
+    return this.boundsZoom;
+  },
+  getMinZoom() {
+    return this.minZoom;
+  },
+  setMinZoom: vi.fn(function (this: { minZoom: number }, z: number) {
+    this.minZoom = z;
+  }),
   getSize() {
     return this.size;
   },
@@ -32,6 +43,9 @@ describe("FitMapOnOpen", () => {
     fake.size = { x: 800, y: 600 };
     fake.handlers.clear();
     fake.fitBounds.mockClear();
+    fake.setMinZoom.mockClear();
+    fake.minZoom = -6;
+    fake.boundsZoom = -3;
   });
 
   it("fits the whole map on open", () => {
@@ -70,5 +84,32 @@ describe("FitMapOnOpen", () => {
     fake.size = { x: 800, y: 600 };
     fake.handlers.get("resize")?.();
     expect(fake.fitBounds).toHaveBeenCalledTimes(1);
+  });
+
+  it("lowers the min zoom so a huge map still fits", () => {
+    fake.boundsZoom = -8;
+    render(el("a"));
+    expect(fake.setMinZoom).toHaveBeenCalledWith(-8);
+    expect(fake.fitBounds).toHaveBeenCalledWith(
+      [
+        [0, 0],
+        [1000, 2000],
+      ],
+      { animate: false },
+    );
+  });
+
+  it("never raises a lower min zoom", () => {
+    fake.minZoom = -10;
+    fake.boundsZoom = -8;
+    render(el("a"));
+    expect(fake.setMinZoom).not.toHaveBeenCalled();
+  });
+
+  it("lowers the min zoom but does not fit on a deep-link open", () => {
+    fake.boundsZoom = -8;
+    render(el("a", true));
+    expect(fake.setMinZoom).toHaveBeenCalledWith(-8);
+    expect(fake.fitBounds).not.toHaveBeenCalled();
   });
 });
