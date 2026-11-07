@@ -13,10 +13,11 @@ Matt's skills assume a team product. The atlas is Isak's solo tool whose one har
 
 A ticket is done when its PR is merged after:
 
-1. the full local gate passes on the branch with `main` merged in: `npm run typecheck:all`,
-   `npm run lint`, `npm run format:check`, `npm run test:ci`, `npm run atlas:publish` (build plus
-   the 13 scans), then `npm run atlas:check-secrets dist` and `npm run atlas:check-derived dist`,
-   then `git checkout -- public/atlas`. A shard that times out under load is rerun once;
+1. the full local gate passes on the branch with `main` merged in: `npm run gate`. It runs
+   `typecheck:all`, `lint`, `format:check`, `test:ci`, `atlas:publish` (build plus the 13 scans),
+   then `atlas:check-secrets dist` and `atlas:check-derived dist`, stops at the first failure and
+   names it, writes each step's log to `.gate-logs/`, and restores `public/atlas/` afterwards,
+   pass or fail. A shard that times out under load is rerun once (inside `test:ci`);
 2. `/code-review` has run on its diff and its findings are fixed. Anything touching visibility,
    parsing or the scans also gets an adversarial player-safety review, and a re-check of its fixes;
 3. a change Isak must see (map look, editor UI) is listed in `State.md` for his look.
