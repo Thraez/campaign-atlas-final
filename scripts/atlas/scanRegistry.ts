@@ -8,6 +8,7 @@
  * no reason for lacking one.
  */
 import path from "node:path";
+import type { ArtifactLayout } from "./playerArtifact.js";
 
 import { run as checkNoSecrets } from "../check-no-secrets.js";
 import { run as checkDerivedSecrets } from "../check-derived-secrets.js";
@@ -53,21 +54,21 @@ interface ScanEntry {
 }
 
 /** The built site and the source store it was copied from. */
-function artifactDirs(ctx: ScanContext): [string, string][] {
+function artifactDirs(ctx: ScanContext): [string, string, ArtifactLayout][] {
   return [
-    ["dist", path.join(ctx.root, "dist")],
-    ["public/atlas", path.join(ctx.root, "public", "atlas")],
+    ["dist", path.join(ctx.root, "dist"), "built-site"],
+    ["public/atlas", path.join(ctx.root, "public", "atlas"), "store"],
   ];
 }
 
 function perDir(
   id: ScanId,
   ctx: ScanContext,
-  run: (dir: string, label: string) => number | Promise<number>,
+  run: (dir: string, label: string, layout: ArtifactLayout) => number | Promise<number>,
 ): Omit<ScanTask, "scan">[] {
-  return artifactDirs(ctx).map(([label, dir]) => ({
+  return artifactDirs(ctx).map(([label, dir, layout]) => ({
     label: `${id} ${label}`,
-    run: () => run(dir, label),
+    run: () => run(dir, label, layout),
   }));
 }
 
@@ -116,12 +117,17 @@ export const SCANS: ScanEntry[] = [
     id: "check-fog-safety",
     script: "check-fog-safety.ts",
     tasks: (ctx) =>
-      perDir("check-fog-safety", ctx, (dir) => checkFogSafety({ dir, config: ctx.configPath })),
+      perDir("check-fog-safety", ctx, (dir, _label, layout) =>
+        checkFogSafety({ dir, config: ctx.configPath, layout }),
+      ),
   },
   {
     id: "check-player-secrets",
     script: "check-player-secrets.ts",
-    tasks: (ctx) => perDir("check-player-secrets", ctx, (dir) => checkPlayerSecrets({ dir })),
+    tasks: (ctx) =>
+      perDir("check-player-secrets", ctx, (dir, _label, layout) =>
+        checkPlayerSecrets({ dir, layout }),
+      ),
   },
   {
     id: "check-player-files",

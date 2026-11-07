@@ -1,33 +1,32 @@
 /**
- * Player-secrets leak scan. Fails publish if any secret PLAINTEXT, passphrase,
- * character key, or unstripped {{secret:}} marker reaches the player artifacts.
+ * Player-secrets leak scan. Fails publish when a player artifact still carries
+ * what the secret pipeline must remove:
+ *   - a forbidden field (`reveal`, `password`, `for`) on any entity's secret in
+ *     the player atlas.json, which may hold only the locked (ciphertext) form;
+ *   - an unstripped `{{secret:id}}` marker in any text file under the dir,
+ *     the player JSON included.
+ * It does not search for a secret's plaintext itself.
+ *
+ * The dir is the built site (`dist`, JSON in `dist/atlas/`) or the source store
+ * (`public/atlas`); see `atlas/playerArtifact.ts`. The scan registry passes
+ * which one; run by hand, the layout is inferred from where atlas.json sits.
  *
  * Exit codes:
- *   0   clean
- *   1   arg / IO error
- *   13  leak found
+ *   0   clean, or no `<dir>` at all
+ *   13  leak found, or something that cannot be checked: atlas.json or
+ *       search-index.json not valid JSON, a built site (`layout: "built-site"`)
+ *       with no `atlas/atlas.json`, a file or dir that cannot be read
  */
 import fs from "node:fs";
 import path from "node:path";
 import { hasSecretMarker } from "../src/atlas/content/dmMarkup";
+import { listTextFiles, locatePlayerAtlas, type ArtifactLayout } from "./atlas/playerArtifact";
 
 export interface RunOpts {
   dir: string;
+  /** Where atlas.json must be; inferred when absent (a run by hand). */
+  layout?: ArtifactLayout;
 }
-
-const TEXT_EXTENSIONS = new Set([
-  ".html",
-  ".js",
-  ".mjs",
-  ".cjs",
-  ".css",
-  ".json",
-  ".txt",
-  ".xml",
-  ".webmanifest",
-  ".svg",
-  ".md",
-]);
 
 /** Fields that must not appear on a PlayerSecret object in any player artifact. */
 const FORBIDDEN_KEYS = ["reveal", "password", "for"];
@@ -39,11 +38,6 @@ interface PlayerSecret {
   password?: unknown;
   for?: unknown;
   [k: string]: unknown;
-}
-
-function scanForbiddenInString(text: string): string | null {
-  if (hasSecretMarker(text)) return "unstripped {{secret:}} marker";
-  return null;
 }
 
 function scanEntity(entity: Record<string, unknown>): string[] {
@@ -60,47 +54,19 @@ function scanEntity(entity: Record<string, unknown>): string[] {
   return hits;
 }
 
-function scanAtlasJson(content: string): string[] {
-  const hits: string[] = [];
-  let parsed: { entities?: unknown[]; placements?: unknown[] };
-  try {
-    parsed = JSON.parse(content) as typeof parsed;
-  } catch {
-    return hits;
-  }
-  for (const entity of (parsed.entities ?? []) as Record<string, unknown>[]) {
-    hits.push(...scanEntity(entity));
-    const bodyHit = typeof entity.body === "string" ? scanForbiddenInString(entity.body) : null;
-    if (bodyHit) hits.push(`entity "${entity.id}": body has ${bodyHit}`);
-  }
-  return hits;
+function scanAtlasJson(parsed: { entities?: unknown[] }): string[] {
+  return ((parsed.entities ?? []) as Record<string, unknown>[]).flatMap(scanEntity);
 }
 
-function scanSearchIndex(content: string): string[] {
-  const hits: string[] = [];
-  let parsed: unknown[];
+/** Parse a player JSON file and scan it, or a hit naming the file when it is not valid JSON. */
+function scanJson<T>(file: string, scan: (parsed: T) => string[]): string[] {
+  let parsed: T;
   try {
-    parsed = JSON.parse(content) as unknown[];
-  } catch {
-    return hits;
+    parsed = JSON.parse(fs.readFileSync(file, "utf8")) as T;
+  } catch (err) {
+    return [`${file}: not valid JSON, so it cannot be checked (${(err as Error).message})`];
   }
-  for (const entry of parsed as Record<string, unknown>[]) {
-    for (const field of ["body", "bodyText", "excerpt", "summary"] as const) {
-      const val = entry[field];
-      if (typeof val === "string") {
-        const hit = scanForbiddenInString(val);
-        if (hit) hits.push(`search-index entry "${entry.id}": ${field} has ${hit}`);
-      }
-    }
-  }
-  return hits;
-}
-
-function scanTextFile(filePath: string, content: string): string[] {
-  if (hasSecretMarker(content)) {
-    return [`${filePath}: contains unstripped {{secret:}} marker`];
-  }
-  return [];
+  return scan(parsed);
 }
 
 export function run(opts: RunOpts): number {
@@ -109,34 +75,30 @@ export function run(opts: RunOpts): number {
 
   const allHits: string[] = [];
 
-  const atlasJson = path.join(dir, "atlas.json");
-  const searchIndex = path.join(dir, "search-index.json");
-
-  if (fs.existsSync(atlasJson)) {
-    allHits.push(...scanAtlasJson(fs.readFileSync(atlasJson, "utf8")));
+  const located = locatePlayerAtlas(dir, opts.layout);
+  if (located) {
+    allHits.push(...scanJson(located.atlasJson, scanAtlasJson));
+    const searchIndex = path.join(located.atlasDir, "search-index.json");
+    // Parsed for validity only: its markers are found by the text scan below.
+    if (fs.existsSync(searchIndex)) allHits.push(...scanJson(searchIndex, () => []));
+  } else if (opts.layout === "built-site") {
+    allHits.push(`${dir}: no atlas/atlas.json, so the built site cannot be checked`);
   }
-  if (fs.existsSync(searchIndex)) {
-    allHits.push(...scanSearchIndex(fs.readFileSync(searchIndex, "utf8")));
-  }
 
-  // Scan all other text files in the dir for unstripped markers.
-  const walk = (d: string) => {
-    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
-      const full = path.join(d, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-        continue;
-      }
-      if (!TEXT_EXTENSIONS.has(path.extname(entry.name))) continue;
-      if (full === atlasJson || full === searchIndex) continue;
-      try {
-        allHits.push(...scanTextFile(full, fs.readFileSync(full, "utf8")));
-      } catch {
-        /* unreadable file — skip */
-      }
+  // Every text file, the player JSON included, for unstripped markers. What
+  // cannot be read cannot be certified.
+  const { files, unreadable } = listTextFiles(dir, "check-player-secrets");
+  for (const d of unreadable) allHits.push(`${d}: dir could not be read`);
+  for (const file of files) {
+    let text: string;
+    try {
+      text = fs.readFileSync(file, "utf8");
+    } catch (err) {
+      allHits.push(`${file}: could not be read (${(err as Error).message})`);
+      continue;
     }
-  };
-  walk(dir);
+    if (hasSecretMarker(text)) allHits.push(`${file}: contains unstripped {{secret:}} marker`);
+  }
 
   if (allHits.length > 0) {
     console.error("\ncheck-player-secrets: LEAK DETECTED");
