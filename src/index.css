@@ -308,10 +308,6 @@
   border-bottom: 1px dashed hsl(var(--primary) / 0.5);
   cursor: help;
 }
-.atlas-prose .atlas-planned-link-player {
-  color: hsl(var(--muted-foreground));
-  border-bottom: 1px dotted hsl(var(--muted-foreground) / 0.4);
-}
 .atlas-prose .atlas-wikilink-anchor {
   color: inherit;
 }

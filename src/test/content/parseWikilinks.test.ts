@@ -68,8 +68,7 @@ describe("renderLinkTokens — security invariant (player builds)", () => {
     expect(html).toContain("the stranger");
     expect(html).not.toContain("DM-Secret NPC");
     expect(html).not.toContain("title=");
-    expect(html).toContain("atlas-planned-link-player");
-    expect(html).not.toContain("atlas-planned-link\"");
+    expect(html).toBe("<p>the stranger</p>");
   });
 
   it("hideBroken: false — broken link exposes target in title attribute (DM view)", () => {
@@ -342,10 +341,7 @@ describe("tokenizeWikilinks — alias-less folder-path display never leaks folde
     const html = renderLinkTokens(`<p>${tokenized}</p>`, links, { hideBroken: true });
     expect(html).toContain("Tidemarrow");
     expect(html).not.toContain("02_Regions");
-    // the rendered span text carries no path separator (tag syntax aside)
-    const spanText = html.match(/atlas-planned-link-player">([^<]*)</)?.[1];
-    expect(spanText).toBe("Tidemarrow");
-    expect(html).toContain("atlas-planned-link-player");
+    expect(html).toBe("<p>A smuggler-king of the Tidemarrow underworld.</p>");
   });
 });
 
@@ -387,11 +383,10 @@ describe("renderLinkTokens — planned-link cross-surface (N26)", () => {
     expect(html).not.toContain("atlas-unresolved");
   });
 
-  it("player surface (hideBroken: true): broken link → atlas-planned-link-player, no title, no raw target", () => {
+  it("player surface (hideBroken: true): broken link → plain text, no title, no raw target", () => {
     const { tokenized, links } = tokenizeWikilinks("[[Secret Place|the place]]", { resolveByName: RESOLVE });
     const html = renderLinkTokens(`<p>${tokenized}</p>`, links, { hideBroken: true });
-    expect(html).toContain('class="atlas-planned-link-player"');
-    expect(html).toContain("the place");
+    expect(html).toBe("<p>the place</p>");
     expect(html).not.toContain("Secret Place");
     expect(html).not.toContain("title=");
     expect(html).not.toContain("atlas-planned-link\"");
