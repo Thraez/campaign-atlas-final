@@ -82,6 +82,8 @@ function useHarness(projectMapIds?: readonly string[]) {
       },
       layer: { snapshot: layers.snapshot, applySnapshot: (s) => layers.applySnapshot(s as never) },
       editorEntity: { get: () => null, set: () => {} },
+      world: { get: () => ({}), set: () => {} },
+      calendar: { get: () => null, set: () => {} },
     },
     perMapDirtyCount: () => regionDraft.dirtyCount + fogDraft.dirtyCount,
   });

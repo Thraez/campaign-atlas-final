@@ -124,7 +124,7 @@ error; invalid `visibility` values coerce to `dm` (fail-safe); player mode write
 
 ### 2. Safety scans — `scripts/check-*.ts` + `scripts/atlas/publish-*`
 
-The gate between "built" and "shipped." Five scans + an asset audit, run in parallel
+The gate between "built" and "shipped." Eight scanners + an asset audit, run in parallel
 by the orchestrator; a fault-injection smoke test proves each scan still catches its
 target fault.
 
@@ -135,6 +135,7 @@ target fault.
 | `scripts/check-image-privacy.ts`           | EXIF/IPTC/XMP metadata + secret-name-in-filename scan (sharp)                           | 13                           |
 | `scripts/check-fog-safety.ts`              | Re-verifies player fog vs source geometry; refuses to certify when source unverifiable  | 13–16, **17 = unverifiable** |
 | `scripts/check-artifact-shape.ts`          | Structural gate on `atlas.json` (no `sourcePath`/`profile.dm`/unstripped `%%`)          | 11                           |
+| `scripts/check-vault-content.ts`           | Public hosting: vault notes (marker, map, vault hash) or symlinks in `content/`         | 19                           |
 | `scripts/atlas/publish-orchestrator.ts`    | Runs all scans in parallel; fails if any non-zero                                       | 0 / 1                        |
 | `scripts/atlas/publish-integrity-smoke.ts` | Clean/dirty variant pairs prove each scan still rejects faults                          | 0 / 1                        |
 | `scripts/atlas/snapshot-baseline.ts`       | Copies `atlas.json` → `.last-published.json` for the editor's "since last publish" diff | never fails                  |
@@ -161,7 +162,7 @@ atomic writes, backups, and optional in-process rebuild.
 
 | File                                    | Role                                                                                                                                                                                                                                                  | Key exports                                                                                                         |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `scripts/vite-plugin-atlas-save.ts`     | The plugin: one route table (`DEV_ROUTES`) for every dev endpoint and the DM-atlas overlay; `createDevRouter` applies the loopback gate, build lock, body cap and JSON parsing once                                                                   | `atlasSavePlugin`, `DEV_ROUTES`, `createDevRouter`, `handleSaveRequest`, `isAllowedDevRequest`, `rejectNonLoopback` |
+| `scripts/vite-plugin-atlas-save.ts`     | The plugin: one route table (`DEV_ROUTES`) for every dev endpoint and the DM-atlas overlay; `createDevRouter` applies the loopback gate, build lock, body cap and JSON parsing once                                                                   | `atlasSavePlugin`, `DEV_ROUTES`, `createDevRouter`, `handleSaveRequest`, `handleCleanAssetRequest`, `isAllowedDevRequest`, `rejectNonLoopback` |
 | `scripts/atlas/devRoutes.ts`            | The `/__atlas/*` path list, shared by the route table and the player-bundle fingerprints in `check-no-secrets.ts`                                                                                                                                     | `DEV_API_PATHS`, `DEV_API_PREFIX`                                                                                   |
 | `src/atlas/save/sourcePathAllowlist.ts` | Single source of truth for writable paths (shared client+server)                                                                                                                                                                                      | `isWritableSourcePath`, `isWritableAssetPath`                                                                       |
 | `src/atlas/save/localFsSave.ts`         | Browser client: validate → POST → typed errors                                                                                                                                                                                                        | `saveAtlasPatchToLocalFs`, `ConflictError`, `SaveBusyError`, `hashContent`                                          |

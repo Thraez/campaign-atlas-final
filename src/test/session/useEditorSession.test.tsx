@@ -3,6 +3,8 @@ import "fake-indexeddb/auto";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { idbGet, idbDelete } from "@/atlas/session/idbStore";
 import { useEditorSession, SESSION_IDB_KEY } from "@/atlas/session/useEditorSession";
+import type { CalendarDraft } from "@/atlas/session/sessionSnapshot";
+import type { World } from "@/atlas/content/schema";
 
 /**
  * Fake holder: tracks a count N. The overrides getter surfaces N fake entries
@@ -24,7 +26,16 @@ function makeHolder(initial = 0) {
   };
 }
 
-function useHarness(activeMapId: string, holder: ReturnType<typeof makeHolder>) {
+/** World settings and calendar drafts: whole-project holders, not per map. */
+function makeWorldDrafts(): { world: Record<string, Partial<World>>; calendar: CalendarDraft } {
+  return { world: {}, calendar: null };
+}
+
+function useHarness(
+  activeMapId: string,
+  holder: ReturnType<typeof makeHolder>,
+  drafts = makeWorldDrafts(),
+) {
   return useEditorSession({
     activeMapId,
     undoStack: { clear: vi.fn() } as any,
@@ -45,6 +56,18 @@ function useHarness(activeMapId: string, holder: ReturnType<typeof makeHolder>) 
       fog: { snapshot: () => null, applySnapshot: () => {} },
       layer: { snapshot: () => [], applySnapshot: () => {} },
       editorEntity: { get: () => null, set: () => {} },
+      world: {
+        get: () => drafts.world,
+        set: (w) => {
+          drafts.world = w;
+        },
+      },
+      calendar: {
+        get: () => drafts.calendar,
+        set: (c) => {
+          drafts.calendar = c;
+        },
+      },
     },
     perMapDirtyCount: () => holder.value.n,
   });
@@ -116,6 +139,47 @@ describe("useEditorSession", () => {
     rerender();
     expect(result.current.status).toBe("clean");
     expect(await idbGet(SESSION_IDB_KEY)).toBeNull();
+  });
+
+  // eval-47: the world settings and calendar drafts are session holders, so
+  // "Discard all" clears them like every other draft.
+  it("discardAll clears the world settings and calendar drafts", async () => {
+    const h = makeHolder();
+    const drafts = makeWorldDrafts();
+    const { result, rerender } = renderHook(() => useHarness("A", h, drafts));
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    drafts.world = { w1: { name: "Renamed" } };
+    drafts.calendar = { value: { months: [{ name: "Frost", days: 30 }] } };
+    await act(async () => {
+      await result.current.discardAll();
+    });
+    rerender();
+    expect(drafts.world).toEqual({});
+    expect(drafts.calendar).toBeNull();
+  });
+
+  it("persists the world settings and calendar drafts and restores them on reload", async () => {
+    vi.useFakeTimers();
+    const h = makeHolder();
+    const drafts = makeWorldDrafts();
+    const first = renderHook(() => useHarness("A", h, drafts));
+    await vi.waitFor(() => expect(first.result.current.hydrated).toBe(true));
+    act(() => {
+      drafts.world = { w1: { name: "Renamed" } };
+      drafts.calendar = { value: { months: [{ name: "Frost", days: 30 }] } };
+      h.bump(); // the count change is what schedules a persist
+      first.rerender();
+    });
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+    vi.useRealTimers();
+
+    const restored = makeWorldDrafts();
+    const second = renderHook(() => useHarness("A", makeHolder(), restored));
+    await waitFor(() => expect(second.result.current.hydrated).toBe(true));
+    expect(restored.world).toEqual({ w1: { name: "Renamed" } });
+    expect(restored.calendar).toEqual({ value: { months: [{ name: "Frost", days: 30 }] } });
   });
 
   it("markSaving → markSaved drives status and resets the count baseline", async () => {
