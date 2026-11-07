@@ -72,7 +72,7 @@ Answer:
    state) per campaign over the same atlas; players pick their campaign or get its link.
 3. **Sync + editor notes** (recommended): vault notes sync in read-only; the editor writes
    atlas-only notes.
-4. **DM-only text in a gitignored local folder** (recommended); only player-visible text is
+4. **DM-only text in a gitignored local folder** (recommended; REVERSED in the follow-up below); only player-visible text is
    committed to the public repo.
 5. **dm** (recommended): a `world.yaml` entry with no visibility loads as dm. Needs an ADR-0001
    addendum when built.

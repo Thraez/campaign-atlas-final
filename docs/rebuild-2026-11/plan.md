@@ -6,268 +6,259 @@ session (one implement-review run, one gate run), **M** = 2-3 sessions, **L** = 
 "Light pace" means 2-4 ticket sessions a week while Grimoire comes first, one `npm run gate` at a
 time on the Mac.
 
-## Changed after Isak's 2026-11-07 follow-up
+## Changed after Isak's 2026-11-07 follow-up and two plan reviews
 
-- **Private before real content.** Public is for testing only. Before real content is published,
-  hosting moves to Cloudflare Pages with access limited to his players, and the repo goes private.
-  So DM data is committed like everything else; the gitignored DM folder and `world.dm.yaml` are
-  dropped (section 4). This reverses round-1 Q4. Players still get only the per-campaign player
-  build, and every scan still runs on it.
-- **Raw map images** in the repo are no longer a concern (private repo); that question is gone.
-- **Campaigns differ by visibility** (notes, zones, maps), not only by fog; later they may have
-  different maps. Fail closed per campaign: unset or invalid is `dm`. This reverses old question 3.
-- **Map images become tile pyramids** in the player build, lossless WebP per tile, fog baked before
-  tiling (section 4, phase 4).
-- **New phase 3: private hosting** (Cloudflare Pages + access, repo private), with a pre-switch
-  safety check. The GitHub Pages site stays public with test content until then.
+- **Private before real content.** Hosting moves to Cloudflare Pages with player-only access and the
+  repo goes private before any real content. DM data is committed; the gitignored DM folder and
+  `world.dm.yaml` are dropped (reverses round-1 Q4). Until then a mechanical guard stops a real Sync
+  (R-01, the first ticket): `tidemarrow/01` is ready-for-agent today and would commit real DM notes
+  to the public repo.
+- **Campaigns differ by visibility**, not only fog. New campaigns start hidden: the migration writes
+  `{ main: player }`, never a bare `player`. Per-campaign note visibility lives only in `world.yaml`'s
+  `notes:` block and can never widen a vault `dm`.
+- **Quick wins first** (phase 0): working wikilinks, a fitted camera, the menu above the map, a
+  region hover card, in today's code. First visible win in week 1-2.
+- **The old editor lives until parity**, so all 12 open PRs are now recommended for merging.
+  Cutover is the last editor ticket, against a written parity list; before it, the new editor edits
+  only the v2 test world.
+- **Tiles are off the critical path**: the viewer ships on full lossless images with fog baked as
+  today; a tile phase runs only when a measured problem triggers it.
+- **Scans before outputs**: the one scan registry (`scripts/atlas/scanRegistry.ts`, 8 scans; earlier
+  text saying "four copies" and "13 scans" was stale) learns campaign dirs before any campaign output
+  lands; the fog scan becomes source-driven per campaign.
+- **Honest calendar**: about 80-95 sessions, **7-9 months at light pace**, with three safe stop
+  points.
 
 ## Recommendation
 
 **Option B: build the new editor and map model inside this repo, next to the old editor, behind the
 same `__INCLUDE_EDITOR__` gate, and keep the pipeline, the scans and Sync.**
 
-1. The safety spine (content core, 13 scans, publish, Sync, ~3,300 tests) is the part that works,
-   and B never stops running it: every ticket still merges on the full gate.
+1. The safety spine (content core, scan registry, publish, Sync, ~3,300 tests) is the part that
+   works, and B never stops running it: every ticket still merges on the full gate.
 2. The broken half (editor, map model) is rewritten, not patched, so the "draft per page, data per
    map" bug family ends instead of returning a seventh time.
-3. The old editor keeps working on today's files until the new one can add, nest and pin maps, so
-   Isak is never without an editor during the slow months.
-4. The live site changes only by additive steps until the hosting move; players see the ocean only
-   when it is ready.
-5. About 55-65 ticket sessions in total, roughly 5-6 months at light pace; A costs more for a worse
-   end state, C costs most and re-earns safety that already exists.
+3. Isak keeps the old editor, with all 12 open fixes merged, until the new one passes a parity list;
+   quick wins make the current site and editor better in the first two weeks.
+4. The live site changes only by additive, scanned steps, and nothing real is committed while the
+   repo is public.
+5. About 80-95 sessions, 7-9 months at light pace, stoppable after phase 0, after phase 3 and after
+   editor parity.
 
 ## 1. Options compared
 
-| | (A) Refactor in place | (B) Rebuild editor + map model in this repo | (C) New repo from scratch |
-|---|---|---|---|
-| Schema v2, per-campaign visibility, migration | M | M | M |
-| Build: multi-world, map tree, per-campaign output | M | M | L (rewrite stages) |
-| Map tiles (pyramid, fog per campaign) | M | M | M |
-| Scans, publish, hosting move to Cloudflare | M | M | L (port, re-prove, new host) |
-| Sync + vault adapter | S | S | M (port, rewire) |
-| Save endpoint | M (refactor, keep both save paths alive) | M (router, per-file routes) | M |
-| Viewer (ocean, tree, story card) | M | M | L (rebuild reading layer) |
-| Editor | XL: change the 2,876-line page one overlay at a time, each step gate-green, while the map tree and campaigns multiply every overlay | L: new shell and command store; reuse the pure helpers | L |
-| Retire old code, docs | S | S | M |
-| **Rough total** | **70-85 sessions, 7+ months light** | **55-65 sessions (phases 1-7), 5-6 months light** | **80-100 sessions, 8+ months light** |
-| Risk | High: the structure that causes the bugs stays to the end; every step touches live code | Medium: two editors for a while; one cutover (source migration) to get right | High: four leaks were found on `main` only by the adversarial review; a fresh pipeline would have to find them again |
-| Players meanwhile | Each refactor step publishes; regressions likely, as now | Nothing changes until phase 4; viewer changes are additive | Nothing until a big-bang switch |
-| Safety spine | Kept, but editor work keeps re-implementing rules | Kept; new code writes through the same save endpoint (loopback gate, `baseHash`) and the same scans judge every campaign's build | Copied, then trusted again from zero |
+| | (A) Refactor in place | (A′) Keep the shell, store underneath | (B) Rebuild editor + map model here | (C) New repo |
+|---|---|---|---|---|
+| Schema v2, campaigns, build, scans | M+M+M | M+M+M | M+M+M | L+L+L |
+| Viewer (ocean, tree, story) | M | M | M | L |
+| Editor | XL: every overlay re-keyed per map node and campaign | L+: 4 friction fixes, then a command store slid under 14 rail panels one at a time | L: new shell and store; pure helpers reused | L |
+| Hosting, Sync, retire | M | M | M | M+ |
+| **Rough total** | **95-110 sessions** | **85-100 sessions** | **80-95 sessions** | **100-120 sessions** |
+| Risk | High: the bug-causing shape stays to the end | Medium-high: two stores and the reverse-compile save coexist until the last panel moves | Medium: two editors coexist; one cutover | High: safety re-earned from zero |
+| Players meanwhile | Regressions likely, as now | Same as B | Additive, scanned steps only | Big-bang switch |
 
-Why not A: the editor's problem is its shape (it edits the compiled atlas, eight state homes, two
-save paths; `audit/code.md` B, F), not its size. Refactoring keeps that shape through every step,
-and per-campaign visibility would add one more overlay to each of them. Why not C: the half C
-rebuilds for free is exactly the half that is good, and C starts without the 3,300 tests.
+**A′, steelmanned.** Keep the rail and shell, fix the worst friction first (menu under the map,
+camera at max zoom, unclear save state: 4 S), then put one command store under the page and move the
+14 rail panels onto it one at a time (`railRegistry.tsx:59-78`: six content panels, Pins, Regions,
+Routes, Fog, Sound, Publish, Player keys, Sync), about 1-2 sessions each (20-25), plus map-tree and
+campaign awareness in each panel (about 10). Model, build, scans and viewer cost the same as B
+(about 35-40), and the spine, PRs, hosting and retire as in B (about 15-20). That gives 85-100:
+close to B. B still wins on `audit/code.md` §B and §F: until the
+last panel moves, A′ runs the page-as-store and the reverse-compile save of the compiled atlas next
+to the new store, which is exactly where the bug family lives; and it ends tool-first (14 panels),
+so the task-first shell would still be a second rewrite. B takes A′'s cheap part: the friction fixes
+are phase 0.
 
 ## 2. Keep / change / throw away
 
 | Module | Verdict | What changes | What gets deleted |
 |---|---|---|---|
-| Safety scans `scripts/check-*.ts`, `publish-integrity-smoke.ts` | Keep | Run once per campaign output; shape and fog checks learn v2 and tiles; new cross-campaign sentinel: an item `dm` in A and `player` in B is absent from A's atlas, search index and tiles | Nothing |
+| Scan registry `scripts/atlas/scanRegistry.ts` (8 scans), `check-*.ts`, `publish-integrity-smoke.ts` | Keep, extend | `artifactDirs` lists one dir per campaign from `atlas.yaml`; a missing listed dir fails every scan in publish mode; each campaign's must-not-ship set comes from the resolver; fog scan source-driven per campaign | Nothing |
 | Publish orchestrator, `publish-push` | Keep | Loops over campaigns | Nothing |
-| `publish-atlas.yml` (GitHub Pages) | Change at phase 3 | Deploys to Cloudflare Pages instead | The Pages deploy steps, after the switch |
-| Sync `src/atlas/sync/` + `VaultPort` adapters | Keep | Drop `worlds[0]` (`sync.ts:110`), pick the target world; never write placements. DM notes land in `content/` as `dm`, as today | Nothing |
-| Content core `src/atlas/content/` | Keep as is | Visibility read per campaign through the new resolver | Nothing |
-| Search, peek, wander, visited, secrets | Keep | Search index per campaign, grouped by map | Nothing |
-| Fog baking `redactFogMap.ts` | Keep | Per campaign × fogged map, on the full image, before tiling | `MapDocument.fog` (after migration) |
-| Image encoding `imageEncoding.ts`, `maps:optimize` | Keep, extend | Owns tile naming and the pyramid step; maps stay lossless | Nothing |
-| Loader `loadWorldConfig.ts`, `schema.ts` map types | Rewrite | v2 loader for `atlas.yaml`, `world.yaml`, campaigns; reads v1 until cutover; one visibility resolver | v1 `normalizeVis` (`loadWorldConfig.ts:486-489`); the v1 read path in phase 7 |
+| `publish-atlas.yml` (GitHub Pages) | Change at the hosting phase | Direct upload to Cloudflare Pages from the scanned job | The Pages deploy steps |
+| Sync `src/atlas/sync/` + `VaultPort` adapters | Keep | Any target world (`sync.ts:110`); refuses a real run while `hosting: public`; strips `atlas.placements` after cutover | Nothing |
+| Content core `src/atlas/content/` | Keep as is | Frontmatter visibility stays scalar | Nothing |
+| Search, peek, wander, visited, secrets | Keep | Index per campaign, grouped by map | Nothing |
+| Fog baking `redactFogMap.ts` | Keep | Per campaign × fogged map, on the full image | `MapDocument.fog` (after cutover) |
+| Image encoding `imageEncoding.ts`, `maps:optimize` | Keep as is | Tile step only in the triggered tile phase | Nothing |
+| Loader `loadWorldConfig.ts`, `schema.ts` map types | Rewrite | v2 loader; v1 only for a file with no `schemaVersion` or `1`; a mix of v1 and v2 files fails the build | v1 `normalizeVis` (486-489); the v1 path at retire |
 | `build-atlas.ts` | Refactor (M) | World assembly (715-1125) split into stages over worlds, the map tree and campaigns | `"Astrath Deeprealm"` fallback (1113), single `defaultWorld` |
-| Save endpoint `vite-plugin-atlas-save.ts` | Refactor (M) | Router + one module per route; per-file routes (atlas.yaml, world.yaml item, campaign, note) | Reverse-compile save `handleSaveRequest` (482-929), DM-atlas overlay routes (1582-1600), at retire |
-| Viewer `AtlasViewer.tsx`, `WrappedWorld`, `featureShapes`, `EntityPanel` | Refactor (M) | Ocean canvas (`src/atlas/ocean/` exists), tile layers, frames, zoom hand-over, breadcrumb, campaign link, region story card, plain-text dead links | Flat map `<Select>` (650-662), `worlds[0]` uses (301, 373) |
-| Editor page `AtlasPlacementEditor.tsx` | Throw away at retire | Replaced by the shell E0 | The page (2,876 L), `useMapLayers.ts`, `editor/placementOverrides.ts`, `useDraftCore` + per-feature drafts, `session/` (870 L), `useUndoStack.ts`, `save/planUnifiedSave` + `canonicalPlacementSave`, `tabs/` (2,564 L), `shell/` incl. `railRegistry`, `yaml/buildFullWorldYaml.ts` |
+| Save endpoint `vite-plugin-atlas-save.ts` | Refactor (M) | Router + one module per route; per-file routes | `handleSaveRequest` reverse-compile save (482-929), DM-atlas overlay routes (1582-1600), at retire |
+| Shared canvas (new) | New (M) | One ocean/frame/map-tree canvas component for the viewer and editor E1, on `src/atlas/ocean/` | Nothing |
+| Viewer `AtlasViewer.tsx`, `WrappedWorld`, `featureShapes`, `EntityPanel`; Browse, Timeline, Credits, Landing | Refactor (M) | On the shared canvas; breadcrumb, campaign links, region card, story panel with monument strip, people and Inside lists, route labels, deep links | Flat map `<Select>` (650-662), `worlds[0]` uses (301, 373) |
+| Editor page `AtlasPlacementEditor.tsx` | Throw away at retire | Lives, with all fixes merged, until cutover | The page (2,876 L), `useMapLayers.ts`, `editor/placementOverrides.ts`, `useDraftCore` + per-feature drafts, `session/` (870 L), `useUndoStack.ts`, `save/planUnifiedSave` + `canonicalPlacementSave`, `tabs/` (2,564 L), `shell/` incl. `railRegistry`, `yaml/buildFullWorldYaml.ts` |
 | Pure editor helpers | Keep | Used by the new editor | `layerGeometry`, `mapClickCoord`, `pinClickIntent`, `saveGate`, `map/geometry`, `ruler/` stay |
-| Map Import Wizard `import/MapImportWizard.tsx` | Throw away the UI | Replaced by Add map (E3) | The wizard; the server-side EXIF strip (#102) and import staging/merge logic stay |
-| Sound editor `src/atlas/sound-editor/` (597 L) | Throw away; park the job | Sound areas stay `world.yaml` items with fail-closed visibility; runtime `src/atlas/sound/` stays | The panel, at retire |
-| Categories `src/atlas/categories/` (1,223 L) | Throw away | Replaced by the note editor E8, the unplaced list and Ctrl+K | `CategoryPanel`, `EntityEditPanel`, `EntityEditorPanel`, `useEntityEditDraft` (the second save path) |
-| Calendar | Keep the Timeline page | Calendar fields in the world inspector (S, later) | `calendar/CalendarPanel.tsx`, at retire |
-| Tests | Keep the spine tests | Flow tests check files on disk and each campaign's player build, never response shapes | Editor-page integration tests (`placement-save-integration`, `world-override-save`, `world-yaml-conflict-recovers`, `save-entity-edit-pending`), session/undo hook tests, `useMapLayers` and override-migration tests |
-| Docs | Change | `GOALS-proposed.md` becomes `docs/GOALS.md`; PRODUCT_SPEC, NON_GOALS, KNOWN_LIMITATIONS rewritten; AGENTS.md "maps stay lossless" rule gains the tile step | Old "one DM, one world" pitch |
+| Map Import Wizard | Throw away the UI at retire | Replaced by Add map (E3) | The wizard; the server-side EXIF strip (#102) and staging/merge logic stay |
+| Sound editor `sound-editor/` (597 L) | Port or park per the parity list | Sound areas are `world.yaml` items with fail-closed visibility; runtime `sound/` stays | The old panel, at retire |
+| Categories `categories/` (1,223 L) | Throw away at retire | Replaced by E8, the unplaced list and Ctrl+K | `CategoryPanel`, `EntityEditPanel`, `EntityEditorPanel`, `useEntityEditDraft` |
+| Calendar | Keep Timeline | Calendar fields in the world inspector (parity list) | `calendar/CalendarPanel.tsx`, at retire |
+| Tests | Keep the spine tests | Flow tests check files on disk and each campaign's output | Editor-page integration tests (`placement-save-integration`, `world-override-save`, `world-yaml-conflict-recovers`, `save-entity-edit-pending`), session/undo hook tests, `useMapLayers` and override-migration tests, at retire |
 
 ## 3. The 12 open PRs
 
-Each merge needs `main` merged in and a fresh gate run, so merging all twelve costs twelve
-sequential gates for work mostly deleted in phase 7. Merge what protects players or carries over;
-close the rest with a note (branches stay, nothing deleted).
-
-**Merge first, safety on the live site:** #109, then #110. #109 is the real gap: the fog scan and
-image-twin check look in the wrong `dist` path today, so they skip and pass.
+**Recommendation: merge all 12**, in the State.md order (99, 100, 106, 102, 103, 107, 104, 105, 109,
+108, 110, 101), except **#109 and #110 first**: they fix the live site's checks now and touch only
+scans and the loader. All twelve are built, gated and reviewed, and the old editor now lives for
+months (including `tidemarrow/02` fog drawing), so its fixes matter. Alternative: close the four
+moot ones (#99, #103, #105, #107) and save four gate runs.
 
 | PR | Verdict | Reason |
 |---|---|---|
-| #109 arch-01 scans find real artifacts | **Merge, first** | Scans skip on `dist` today; the live publish is checked less than it claims |
-| #110 arch-07 invalid visibility is dm | **Merge, second** | Fails closed now; the v2 resolver keeps the rule per campaign |
-| #100 eval-46 one spoiler-leak rule | Merge then supersede | One `linkLeaksToPlayers` predicate; the v2 resolver absorbs it |
-| #106 eval-50 Publish Check matches build | Merge then supersede (after #100, stacked) | The new Publish check reuses the build's rule |
-| #102 eval-48 wizard zip strips EXIF | Merge then supersede | GPS EXIF could reach the still-public repo; the server-side strip stays |
-| #108 arch-04 delete dead EntityReadingView | Merge | Small deletion in the viewer, which carries over |
-| #104 eval-27 one reduce-motion switch | Merge then supersede (after Isak checks the button) | Viewer code carries over; low priority |
-| #101 docs State.md and workflow notes | Merge then supersede, last | Carries the arch-2026-11 tickets onto `main` |
-| #99 eval-45 deleted pins on any map | Moot, close | Old-editor draft bug; that model is deleted |
-| #103 eval-47 Discard all clears world settings | Moot, close | Same family; one store and one discard in the new editor |
-| #107 eval-44 soundscape draft per map | Moot, close (stacked on #103) | Sound editor is retired |
-| #105 eval-49 ruler and drawing one click | Moot, close | One active tool by construction; note the `resolveMapClickTool` idea in ADR-0005 |
-
-If Isak plans real editing in the old editor before cutover, merge #99 and #103 instead (they fix
-silent data loss there).
+| #109 arch-01 scans find real artifacts | Merge first | The fog and image-twin scans skip on `dist` today |
+| #110 arch-07 invalid visibility is dm | Merge second; superseded by R-11a | Fails closed now |
+| #99 eval-45 deleted pins on any map | Merge; superseded at retire | Safety effect once there are several maps: a deleted pin must really go |
+| #100 eval-46 one spoiler-leak rule | Merge; superseded by R-11a/c | One `linkLeaksToPlayers` predicate |
+| #106 eval-50 Publish Check matches build | Merge (stacked on #100); superseded by R-11c | Publish Check stops saying "no leakage" for a failing atlas |
+| #102 eval-48 wizard zip strips EXIF | Merge; wizard UI superseded at retire | GPS EXIF can reach the still-public repo |
+| #103 eval-47 Discard all clears world settings | Merge; superseded at retire | Prevents lost or phantom edits |
+| #107 eval-44 soundscape draft per map | Merge (stacked on #103); superseded at retire | Prevents edits landing on the wrong map |
+| #104 eval-27 one reduce-motion switch | Merge after Isak checks the button | Viewer code carries over |
+| #105 eval-49 ruler and drawing one click | Merge; superseded at retire | Safety effect with fog: a click meant for the ruler must not draw a reveal |
+| #108 arch-04 delete dead EntityReadingView | Merge | Small viewer deletion |
+| #101 docs State.md and workflow notes | Merge last; State.md superseded by R-05 | Carries the arch-2026-11 tickets onto `main` |
 
 ## 4. Schema v2 sketch
 
-Coordinates stay local to each map (`[x, y]`, top-left, `CODEBASE_MAP.md` invariant 3). The compiled
-`atlas.json` gains fields; nothing the current viewer reads is removed until phase 4.
+Coordinates stay local to each map (`[x, y]`, top-left, `CODEBASE_MAP.md` invariant 3).
 
 ```yaml
 # content/_atlas/atlas.yaml
 schemaVersion: 2
 ocean: { width: 400000, height: 300000, sea: default }
 worlds: [astrath-deeprealm]
-campaigns: [red-tide, sandbox]               # files in content/_atlas/campaigns/
-onOcean:                                     # top-level maps
-  - { map: varn, x: 0, y: 0, scale: 1, rotation: 0 }
+campaigns: [main, sandbox]                   # files in content/_atlas/campaigns/
+onOcean: [{ map: varn, x: 0, y: 0, scale: 1, rotation: 0 }]
 
 # content/<world>/_atlas/world.yaml
 schemaVersion: 2
 world: { id: astrath-deeprealm, name: Astrath Deeprealm }
 maps:
   - id: varn
-    visibility: player                       # one value = every campaign
+    visibility: { main: player, sandbox: rumor }       # a campaign not named = dm
     layers: [{ src: images/varn.png, x: 0, y: 0, width: 16000, height: 12000 }]
     scale: { unitsPerPixel: 0.5, unit: mi }
     zoom: { min: -4, max: 2 }
   - id: saltmere
-    visibility: { red-tide: player, sandbox: rumor }   # a campaign not listed = dm
-    parent: varn                             # absent = on the ocean
+    visibility: { main: player }
+    parent: varn                                       # absent = on the ocean
     frame: { x: 3100, y: 2200, width: 400, height: 300, rotation: 12 }   # in varn's pixels
     enterZoom: 1
     regions: [{ id: salt-marsh, polygon: [...], visibility: dm, note: salt-marsh }]
-    routes:  [{ id: coast-road, points: [...], speed: 24, visibility: { red-tide: player } }]
-    pins:    [{ note: harbour-master, x: 120, y: 340, visibility: player }]
-    sound:   [{ id: gulls, polygon: [...], visibility: player }]
-notes:                                       # editor-set extras for read-only synced notes
-  harbour-master: { visibility: { sandbox: player }, belongsTo: [saltmere] }
+    routes:  [{ id: coast-road, points: [...], speed: 24, visibility: { main: player } }]
+    pins:    [{ note: harbour-master, x: 120, y: 340, visibility: { main: player } }]
+    sound:   [{ id: gulls, polygon: [...], visibility: { main: player } }]
+notes:                                       # the only place for per-campaign note visibility
+  harbour-master: { visibility: { main: player, sandbox: dm }, basedOn: player, belongsTo: [saltmere] }
 
 # content/_atlas/campaigns/<id>.yaml
-id: red-tide
-name: Red Tide
+id: main
+name: Main campaign
 maps:                                        # fog and state; a map not listed = unknown
   varn: { state: fogged, reveals: [[...]], conceals: [], featherPx: 24 }
   saltmere: { state: open }
 ```
 
-- **Visibility, one resolver:** a value is either one visibility (every campaign) or a map of
-  campaign to visibility. Missing, invalid, or a campaign not in the map = `dm`. A map hidden in a
-  campaign hides its subtree there; a pin ships to a campaign only if its map is not unknown and it
-  is not under that campaign's fog. Notes take the same two forms in `atlas.visibility`.
-- **No `world.dm.yaml`, no DM folder.** With the repo private their only reason (keeping hidden
-  items out of public commits) is gone, and a file split by "hidden" cannot say "hidden in A,
-  visible in B". One file per world, one resolver, no move-between-files on hide/unhide (one less
-  save path to get wrong). The DM/player split is the projection: each campaign's player build is
-  the only thing that ships, and the scans check every one. DM blocks (`%% %%`, `:::dm`) stay inline
-  in notes, stripped by `dmMarkup.ts` as today.
-- **Frontmatter** keeps `atlas.visibility`, `atlas.type`, title, relationships; `atlas.placements`
-  moves into `world.yaml` (synced notes are read-only).
-- **Map images: tile pyramids in the player build.** Source stays one lossless image per map in
-  `images/`. At build, per campaign: bake fog on the full image (fogged maps only), then cut a
-  pyramid of 512 px tiles, lossless WebP; open maps share one tile set per campaign output. The
-  viewer loads only the tiles on screen. Compared with one lossless image per map: a 16k map is
-  tens of MB that every player downloads whole and phones may refuse to decode, and an ocean of many
-  maps multiplies that; tiles cost about 1.33× the base in storage, a build step (`sharp` is already
-  a dependency) and scans that read tiles. Lossy WebP would blur labels at deep zoom, so lossless
-  stays the default. Fog is baked before tiling, so no tile holds an unfogged pixel.
-- **Migration** (`atlas:migrate-v2`, dry run first, idempotent, run once at cutover): today's map
-  becomes a top-level ocean map with its six layers unchanged; its `fog` becomes `campaigns/main.yaml`;
-  the 6 notes with `atlas.placements` (of 7) move their pins into `world.yaml`; every item that ships
-  today gets an explicit `visibility: player`, so the fail-closed default hides nothing live.
-  Checked by diffing the player atlas before and after.
+- **One resolver, fail closed.** Missing, invalid, or a campaign not named = `dm`. A bare value is
+  allowed (every campaign), but the migration and the editor write the per-campaign form, so a new
+  campaign starts hidden. A map hidden in a campaign hides its subtree there; a pin ships only if its
+  map is not unknown and it is not under that campaign's fog. The scans take each campaign's
+  must-not-ship set from the same resolver.
+- **Notes.** Frontmatter `atlas.visibility` stays scalar. The `notes:` block can only narrow: an
+  override never widens a vault `dm`. `basedOn` records the vault value it was set against; if the
+  vault value changes, the override falls back to `dm` and the Publish check flags it.
+- **No `world.dm.yaml`, no DM folder.** The repo is private before real content, and a file split by
+  "hidden" can't say "hidden in A, shown in B". The split is the build: only each campaign's player
+  build ships, in its own dir, sharing no asset dir with another campaign, and its `atlas.json`
+  names only its own campaign. DM blocks stay inline, stripped by `dmMarkup.ts`.
+- **Placements** move from frontmatter into `world.yaml`. After cutover a v2 world where any note
+  still has `atlas.placements` fails the build, and Sync strips them.
+- **Images.** One lossless image per map, fog baked per campaign as today. Tile pyramids (lossless
+  WebP, fog baked before tiling) wait for the triggered tile phase.
+- **Migration** (`atlas:migrate-v2`, dry run first, idempotent, run in the cutover ticket): today's
+  map becomes a top-level ocean map, six layers unchanged; its `fog` becomes `campaigns/main.yaml`;
+  the 6 notes with `atlas.placements` (of 7) move pins into `world.yaml`; every map and item that
+  ships today gets `{ main: player }`. Checked by a before/after diff of every campaign output. A
+  v2-to-v1 down-migration is kept until retire; the rollback window ends at the first new-editor
+  save on real content.
 
 ## 5. Phases
 
-Each phase ends with something Isak can look at; every ticket merges on the gate.
+Every ticket merges on the gate. Phase 3 and 4 tickets are written before phase 2 ends.
 
-**Phase 1: spine closed (small; 4-6 sessions, about 2 weeks light).** Merge #109, #110, #100, #106,
-#102, then #108, #104, #101; close #99, #103, #105, #107. Tickets R-01..R-04. Exit: a publish log
-with the fog and image-twin scans reading `dist` (not skipping), the live site unchanged,
-`docs/GOALS.md` agreed. ADRs: ADR-0001 addendum (every `world.yaml` item, every campaign),
-ADR-0002 (option B).
+| Phase | What | Sessions | Weeks (light) | Isak looks at |
+|---|---|---|---|---|
+| 0 Guard and quick wins | R-01 guard first, #109, #110, Q-01..Q-04 | 6-7 | 2-3 | Links that work, a fitted map, the menu, a region card. **Safe stop** |
+| 1 Spine and PRs | Other 10 PRs, R-02..R-05, ADR-0001 addendum, ADR-0002 | 8-10 | 3-4 | A publish log with every scan reading `dist`; `docs/GOALS.md` agreed |
+| 2 Schema v2 and campaigns in the pipeline | R-10..R-20; ADR-0003, ADR-0004 | 17-20 | 6-8 | `npm run atlas:tree` on the v2 test world, per campaign; today's site unchanged |
+| 3 Shared canvas (4a) | Ocean/frame/map-tree component; viewer on it; campaign links | 6-8 | 3-4 | Ocean > continent > city > back on the local test world. **Safe stop** |
+| 4 Editor core | Router, command store, E0-E5, Place pin, E9, Draw route with distance/time; v2 test world only; ADR-0005, ADR-0006 | 12-14 | 5-6 | Add a map inside a map, pin it, draw a route, reload |
+| 5 Story (4b) | Region card and story panel, monument strip, people and Inside lists, route labels, deep links, Browse, Timeline, Credits, Landing on v2 | 8-10 | 3-4 | Read a region, a person, a monument; follow three links |
+| 6 Editor jobs, parity, cutover | E13 (start hidden / copy visibility from X), E6, E7, E8, E10 Sync, E11, E12, parity items; **cutover last** | 14-16 | 6-7 | Every job on the parity list in the new editor. **Safe stop** |
+| H Private hosting | H-01..H-04, ADR-0007; earliest after phase 2, default just before the first real Sync (`tidemarrow/01`), blocks no other phase | 4-5 | 2 | Each campaign site refuses a stranger; repo Private |
+| 7 Retire | Delete section 2's "deleted" column, v1 path, down-migration, arch-06 | 3 | 1-2 | `grep` finds no `AtlasPlacementEditor`, `worlds[0]`, `placementOverrides` |
+| T Tiles (only if triggered) | Pyramid step; fog scan replaced in the same PR; ADR-0008 | 5-6 | 2-3 | A real map > ~8k px that was slow on a phone, now smooth |
 
-**Phase 2: schema v2 and campaigns in the pipeline, invisible to players (13-15 sessions).** v2
-types, the per-campaign resolver, v2 loader that still reads v1, build stages over
-worlds/tree/campaigns, one player output per campaign (default at today's paths), scans per
-campaign, the test world. Exit: `npm run atlas:tree` prints ocean > world > continent > city per
-campaign, with different maps and notes per campaign; today's player atlas diffs as additive only.
-ADRs: ADR-0003 (schema v2), ADR-0004 (campaigns: visibility, fog, map state; unlisted = dm/unknown).
+Total without T: about 78-93 sessions plus slack, 31-40 weeks: **7-9 months at light pace**.
 
-**Phase 3: private hosting (3-4 sessions, plus Isak's clicks in Cloudflare and GitHub).** Can slip
-later, but must finish before any real vault content is committed. Tickets H-01..H-04. Exit: each
-campaign's site loads for an allowed player and refuses everyone else; the GitHub Pages site is off;
-the repo shows Private. ADR-0007 (private hosting; DM data committed; supersedes round-1 Q4). Then
-tidemarrow/01-03 (first real Sync) are unblocked.
+**Parity list (cutover blocks on every line Isak uses):** place and move pins; add map images and
+layers (wizard, upload); regions; routes; fog drawing; sound areas; entity/note editing for the six
+content types; world settings and calendar; player keys (character secrets); Sync; Publish check;
+paste markdown. Isak crosses out what he never uses at the start of phase 6.
 
-**Phase 4: tiles and the player viewer on v2 (11-13 sessions).** Tile pyramid step with per-campaign
-fog and its scans first, then ocean canvas, tile layers, frames, zoom hand-over, breadcrumb, deep
-links with `c` and map, campaign links, region story card and panel, dead links as plain text.
-Exit: Isak walks ocean > continent > city > back and compares two campaigns. ADR-0008 (map images as
-tile pyramids; amends "maps stay lossless" with the tile step).
+**Cutover ticket:** run the migration, check the every-campaign diff, disable the old editor's
+save, move the new editor to `/atlas/edit`, Sync strips placements.
 
-**Phase 5: new editor core and cutover (10-12 sessions).** Save endpoint router; command store over
-source files, one undo, autosave; E0, E1, E2, Add map E3, Align E4, Nest E5, Place pin, Inspector
-E9, at `/atlas/edit/next`. Cutover ticket: run the migration, disable the old editor's save, move
-the new one to `/atlas/edit`. Exit: Isak adds a map inside a map, places a pin, reloads, sees it in
-`world.yaml`. ADRs: ADR-0005 (editor document store), ADR-0006 (placements live in `world.yaml`).
+**Tile trigger and rule:** a measured problem on a real map (over about 8k px, slow or refused on a
+phone), or the ocean's total image weight. The tile ticket replaces the fog scan's check in the same
+PR: tile pixels against each campaign's mask, no unfogged twin, no other campaign's tiles.
 
-**Phase 6: campaigns, hiding, fog, notes, preview, publish in the editor (9-11 sessions).**
-Campaigns E13, per-campaign visibility in the inspector, Hide area E6, Fog E7, Note editor E8,
-Preview E11 per campaign, Publish check E12 per campaign. Exit: Isak makes a zone visible in one
-campaign only, reveals fog there, and previews both campaigns.
+## 6. Tickets: phases 0, 1, 2 and H
 
-**Phase 7: retire (3 sessions).** Delete the old editor and section 2's "deleted" column, the v1
-read path and arch-06's audio prune plugin; rewrite `CODEBASE_MAP.md` and the README table. Exit:
-`grep` finds no `AtlasPlacementEditor`, `worlds[0]` or `placementOverrides`; gate green.
+New folder `docs/tracker/rebuild-2026-11/issues/`, same format as `tidemarrow/issues/`.
 
-## 6. Tickets: phases 1, 2 and 3
-
-New folder `docs/tracker/rebuild-2026-11/issues/`, same format as `tidemarrow/issues/` (Status,
-Blocked by, Acceptance criteria). Merging the PRs is Isak's yes, not a ticket.
-
-| Id | Title | Size | One line |
-|---|---|---|---|
-| R-01 | Missing `world.yaml` visibility loads as dm | S | Extends #110 to the missing case for regions, routes and sound areas; ADR-0001 addendum; a fixture zone with no visibility is absent from the player build |
-| R-02 | check-player-files fails a site with no atlas.json | S | arch-09 as written |
-| R-03 | Adopt the rebuild goals | S | `GOALS-proposed.md` to `docs/GOALS.md`, contradicting docs rewritten, ADR-0002 |
-| R-04 | Rebuild queue in State.md; close the moot PRs | S | Phases and closed PRs with reasons; no branch deleted |
-| R-10 | Schema v2 types | S | `atlas.yaml`, map tree, frame, campaign, per-campaign visibility types; ADR-0003, ADR-0004 |
-| R-11 | One per-campaign visibility resolver | M | Maps, frames, regions, routes, pins, sound areas, notes, hidden subtree; unset/invalid/unlisted = dm; folds in arch-02 and arch-08; build, Publish Check and preview all call it |
-| R-12 | v2 loader that still reads v1 | M | Reads `atlas.yaml`, `world.yaml` v2, campaigns; a v1 file loads as one world, one ocean map, campaign `main` |
-| R-13 | Build assembles every world and the map tree | M | Split `build-atlas.ts:715-1125` into stages; two-world fixture builds both; `worlds[0]` grep in the gate |
-| R-14 | One player output per campaign | M | Visibility and fog per campaign; default campaign at today's `public/atlas/` paths |
-| R-15 | Scans read every campaign | S-M | Every scan per campaign dir; cross-campaign sentinel (dm in A, player in B); fault-injection smoke covers a second campaign |
-| R-16 | Three-level test world, two campaigns | S | Fixture and sample content that differ by visibility; `npm run atlas:tree` |
-| R-17 | Migration script, dry run only | S | `atlas:migrate-v2` tested on fixtures and a copy of `content/`; player atlas diff empty; not run until cutover |
-| H-01 | Cloudflare Pages deploy | M | Publish workflow deploys each campaign's build to Cloudflare Pages; scans gate the deploy as today |
-| H-02 | Player access per campaign | S | Access policy per campaign path [Q method]; a test fetch without login of every campaign's atlas, search index and a tile is refused |
-| H-03 | Pre-switch safety check | S | Before the switch: the repo holds only test content (no real-vault `sync-map.json`, no file from vault folders in history), all scans pass per campaign; after: GitHub Pages returns 404 and the repo is Private |
-| H-04 | Turn off GitHub Pages, make the repo private | S | Isak's clicks, listed step by step; README, AGENTS.md and GOALS updated with the new URL |
+| Id | Title | Size | Blocked by | One line |
+|---|---|---|---|---|
+| R-01 | Real Sync refuses while hosting is public | S | - | `hosting: public` in `atlas.config.json`; a non-dry-run Sync refuses; the gate fails if `content/` holds files from vault folders (in `sync-map.json` or carrying Sync's source marker); `tidemarrow/01-03` set Blocked by H-04 |
+| Q-01 | Wikilinks open; unpublished links are plain text | S | - | No dead "Planned link" in the player view; a test checks every player wikilink resolves or renders as text |
+| Q-02 | Maps open fitted to the screen | S | - | Player view and editor fit the map on open, not max zoom |
+| Q-03 | Menu renders above the map | S | - | The hamburger menu's z-index sits over Leaflet panes |
+| Q-04 | Region hover card in today's viewer | S | - | Hover shows name, summary and picture, built on `src/atlas/peek/` |
+| R-02 | Missing `world.yaml` visibility loads as dm | S | #110 | Regions, routes, sound areas; ADR-0001 addendum |
+| R-03 | Scans fail on a missing artifact | S | #109 | arch-09, widened: in publish mode a missing listed dir fails every scan |
+| R-04 | Adopt the rebuild goals | S | - | `docs/GOALS.md`, contradicting docs rewritten, ADR-0002 |
+| R-05 | Rebuild queue in State.md | S | #101 | Phases, stop points, PR outcomes |
+| R-10 | Schema v2 types | S | R-04 | Map tree, frame, campaign, per-campaign visibility, `notes:` block |
+| R-11a | Pure per-campaign resolver | S-M | R-10 | Every item and note, hidden subtree, narrow-only `notes:`, `basedOn` fallback; returns each campaign's must-not-ship set; folds arch-08 |
+| R-11b | Build calls the resolver | S | R-11a | Includes arch-02 (sound areas in fog) |
+| R-11c | Old Publish Check calls the resolver | S | R-11a | Same verdict as the build; preview wiring comes in phase 6 |
+| R-12 | v2 loader | M | R-10 | v1 only with no `schemaVersion` or `1`; a v1/v2 mix fails; v1 loads as one world, campaign `main` |
+| R-13 | Build assembles every world and the map tree | M | R-11b, R-12 | Split `build-atlas.ts:715-1125`; a `worlds[0]` grep over `scripts/` in the gate, with a shrinking allowlist |
+| R-14 | Sync targets any world | S-M | R-13 | Drop `sync.ts:110`'s `worlds[0]`; two-world memory-port test |
+| R-15 | Scan registry lists campaign dirs | S | R-03, R-12 | `artifactDirs` reads campaigns from `atlas.yaml` inside the one registry; lands before any campaign output |
+| R-16 | Three-level test world, two campaigns | S | R-12 | Own content root, differs by visibility and fog; `npm run atlas:tree` |
+| R-17 | One player output per campaign: visibility | M | R-15, R-16 | Own dir per campaign, no shared asset dir; `atlas.json` names only its campaign; unknown/dm maps and their frames absent; sentinel fixtures (item hidden only via `notes:`, item hidden in one campaign only) over every file: images, audio, search index |
+| R-18 | Fog baked per campaign; fog scan source-driven | M | R-17 | Every map fogged in C's source is fogged in C's output; missing source fog fails |
+| R-19 | Publish runs every campaign | S | R-17 | Orchestrator and integrity smoke cover a second campaign |
+| R-20 | Migration script and down-migration, dry run only | S-M | R-17, R-18 | `{ main: player }` form; before/after diff of every campaign output on a copy of `content/` is empty |
+| H-01 | Cloudflare Pages, one project per campaign | M | R-19 | Access on production and preview deployments before the first real deploy (canary only until then); direct upload from the scanned job only; Cloudflare Git builds and previews off |
+| H-02 | Access test | S | H-01 | Without login and with an A-only login, B's atlas, search index, an image and an audio file are refused |
+| H-03 | Pre-switch safety check | S | H-02 | Repo holds only test content (R-01's check, history included); all scans pass per campaign |
+| H-04 | Switch | S | H-03 | Isak's clicks: GitHub Pages off, repo Private, `hosting: private`; docs get the new URLs; unblocks `tidemarrow/01` |
 
 ## 7. Risks and open questions
 
-1. **How players get in [Q].** Recommendation: Cloudflare Access with a one-time email PIN and one
-   allow list per campaign path, because campaigns now differ by visibility and a Red Tide player
-   must not open Sandbox's build. No shared campaign picker on the hosted site; each campaign is
-   reached by its own link.
-2. **Per-campaign visibility on synced notes.** They are read-only, so a per-campaign choice can't be
-   written into the note. Recommendation: the `notes:` block in `world.yaml`, read by the one
-   resolver, which takes the editor's value over the vault's; the Publish check lists every note
-   whose visibility the editor changed.
-3. **Tile quality and file count.** Lossless tiles are large and many; Cloudflare Pages caps files
-   per deployment (20,000 on the free plan when last checked; verify in H-01), and each campaign
-   with fog has its own tiles. Recommendation: lossless WebP, 512 px tiles, open maps shared within
-   a campaign; if the count gets close, move tiles to R2 behind the same access. Isak compares a
-   high-quality lossy tile set on one real map before anything lossy is allowed per map.
-4. **The cutover moment.** Migrating sources to v2 breaks the old editor's write-back.
-   Recommendation: keep v1 sources and the old editor working until the new one can add, align,
-   nest and pin; migrate and disable the old save in one ticket; keep the v1 reader until phase 7.
+1. **How players get in [Q].** Recommendation: Cloudflare Access with a one-time email PIN, one
+   Pages project and hostname per campaign, each with its own allow list; no shared picker on the
+   hosted site.
+2. **What is on the parity list.** Cutover waits on every line, so an unused line costs weeks.
+   Recommendation: Isak crosses out lines at the start of phase 6; until then all stay. Sound areas
+   and paste markdown are the likeliest to go.
+3. **Where the v2 test world lives before cutover.** A v1/v2 mix fails the build, so it can't sit in
+   `content/`. Recommendation: its own content root (`content-next/`), built by its own command,
+   local only; not published until cutover.
+4. **When tiles are worth it.** Recommendation: measure once Tidemarrow's real map is in: open it on
+   Isak's phone; start phase T only if it is slow or refused, or the ocean's images pass a size
+   budget set then. Lossless stays the rule either way.
 5. **CI minutes once the repo is private.** Private repos get limited Actions minutes, and they ran
-   out once already (agent-retro/03). Recommendation: the local gate stays the merge bar; the
-   deploy job only builds, scans and uploads (no `test:ci`), or Cloudflare builds it. One ticket in
-   flight at a time also keeps the light pace safe: any phase can pause between two tickets.
+   out once (agent-retro/03). Recommendation: the local gate stays the merge bar; the deploy job only
+   builds, scans and uploads directly to Cloudflare, without `test:ci`.

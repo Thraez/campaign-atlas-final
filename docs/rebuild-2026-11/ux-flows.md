@@ -6,7 +6,8 @@ Stage C input for the wireframes. Built on Isak's round-1 answers (`questions-ro
 
 Updated after Isak's 2026-11-07 follow-up: the repo goes private and hosting moves to Cloudflare
 before real content, so DM data is committed and the DM folder and `world.dm.yaml` are gone;
-campaigns differ by visibility as well as fog; player map images are tile pyramids.
+campaigns differ by visibility as well as fog. After the plan reviews: maps ship as full lossless
+images (tiles only if measured to be needed), and note frontmatter visibility stays one value.
 
 ## Design principles
 
@@ -31,7 +32,7 @@ marked by visibility, not by where the file sits.
 |---|---|
 | `content/_atlas/atlas.yaml` | the ocean (size, sea style), each top-level map's place on it, the campaign list |
 | `content/<world>/_atlas/world.yaml` | every map (image refs, parent, frame, scale, zoom range), regions, routes, placements, sound areas, each with a visibility (one value, or per campaign); a `notes:` block for per-campaign visibility and extras of read-only synced notes |
-| `content/<world>/_atlas/images/` | one lossless source image per map; the player build bakes fog and cuts tiles |
+| `content/<world>/_atlas/images/` | one lossless source image per map; the player build bakes each campaign's fog into a copy |
 | `content/_atlas/campaigns/<id>.yaml` | per map: fog reveals, conceals, and the map's state (unknown, fogged, open) for that campaign |
 | `content/<world>/<folder>/*.md` | every note, player and DM, with `atlas.visibility`; DM blocks (`%% %%`, `:::dm`) stay inline and are stripped from player builds |
 
@@ -56,7 +57,7 @@ Goal: get a new picture into the atlas, either as a world map on the ocean or as
 
 Underneath: image to `content/<world>/_atlas/images/`; a map entry in `world.yaml` with `parent`
 set and `visibility: dm`; for an ocean map, a placement in `atlas.yaml`. Encoding goes through
-`imageEncoding.ts`; maps stay lossless; the player build tiles them.
+`imageEncoding.ts`; maps stay lossless; the player build bakes fog into a full-size copy.
 Save/undo: one command ("Add map"); undo removes the entry and deletes the uploaded file.
 Edge cases: very large image (warn above a size limit, offer tiling later; no silent downscale);
 duplicate file name (rename with a suffix); unsupported format (refuse, say which); new world name
@@ -151,10 +152,10 @@ Goal: write about a town, pin it, connect it to people and places, feature it as
 6. A synced note opens read-only with a banner "From your vault: edit it in Obsidian, then Sync";
    placement, region link and monument picture can still be set (they live in `world.yaml`).
 
-Underneath: atlas-only note to `content/<world>/<folder>/<id>.md` with `atlas.visibility` (one value,
-or per campaign: the visibility field offers "every campaign" or a row per campaign); DM blocks
-(`%% %%`, `:::dm`) stay inline. For a synced note, per-campaign visibility goes in `world.yaml`'s
-`notes:` block. Placement and region link in `world.yaml`.
+Underneath: atlas-only note to `content/<world>/<folder>/<id>.md` with `atlas.visibility` (one value);
+DM blocks (`%% %%`, `:::dm`) stay inline. The visibility field offers "every campaign" or a row per
+campaign; per-campaign rows, for any note, go in `world.yaml`'s `notes:` block and can only narrow
+(a vault `dm` note can't be shown). Placement and region link in `world.yaml`.
 Save/undo: typing autosaves after a pause; undo inside the text box is the text box's own; leaving
 the box makes one "Edit note" command for the shell's undo.
 Edge cases: changing visibility player to dm in a campaign (links to it from player notes become
@@ -199,7 +200,7 @@ file and string, **Show in editor**); build error (shows the error, editor untou
 Goal: put the current atlas live for every campaign, safely.
 
 1. Top bar **Publish**. E12: per campaign, what changes for players (new maps, notes, reveals,
-   removed items), then the scan list running: secrets, derived secrets, player secrets, image
+   removed items; for a new campaign, everything that becomes visible), then the scan list running: secrets, derived secrets, player secrets, image
    privacy, fog, shape, asset audit, run on each campaign's build, plus the cross-campaign check
    (an item hidden in A and shown in B is absent from A).
 2. All green: **Commit and open PR** (the agent or Isak pushes; the merge into `main` publishes, to
@@ -314,7 +315,7 @@ E0 shell
 | E10 | Sync from Obsidian | vault path, dry run list, sync result |
 | E11 | Player preview | strict player build for one campaign, with scan banner |
 | E12 | Publish check | per-campaign changes, scan list, commit and PR |
-| E13 | Campaigns | create, rename, picture and one-line blurb for each campaign |
+| E13 | Campaigns | create ("start hidden" or "copy visibility from X"), rename, picture and one-line blurb |
 | P1 | Ocean | arrival view, every map the campaign knows, fitted |
 | P2 | Map view | a continent, city or dungeon with breadcrumb and frames |
 | P3 | Story card | hover card for a region or place: summary, monuments, people |
@@ -341,12 +342,12 @@ E0 shell
 - **Campaign**: one group of players; its own visibility, fog, map states and published,
   access-limited view. Later, maps of its own.
 - **Fog (per campaign)**: per map, reveals minus conceals for one campaign; baked into its images
-  before tiling.
+  at build.
 - **Visibility**: `player`, `rumor`, `dm`, `hidden` on notes and every `world.yaml` item, as one
   value for every campaign or a value per campaign; missing, invalid, or a campaign not named is
   `dm`; a hidden map hides its subtree in that campaign.
-- **Tile pyramid**: the player build's copy of a map image, cut into lossless WebP tiles per zoom
-  level, per campaign where fog differs.
+- **Tile pyramid** (later, only if measured to be needed): a map image cut into lossless WebP tiles
+  per zoom level, fog baked before tiling.
 
 ## Decisions to confirm with Isak
 
@@ -356,7 +357,8 @@ content); raw map images in the repo are fine; campaigns differ by visibility as
 1. **How players get in [Q].** Proposal: Cloudflare Access, one-time email PIN, one allow list per
    campaign path; no shared campaign picker on the hosted site (P6 becomes the test site's and the
    preview's only).
-2. **Per-campaign visibility of synced notes** lives in `world.yaml`'s `notes:` block and wins over
-   the vault's folder default; the Publish check lists every such override.
-3. **Lossless tiles by default.** A lossy, high-quality tile setting per map only after Isak compares
-   one real map at max zoom.
+2. **Per-campaign visibility of notes** (decided) lives only in `world.yaml`'s `notes:` block;
+   frontmatter stays one value. An override can only narrow, never widen a vault `dm`; if the vault
+   value changes it falls back to `dm` and the Publish check flags it.
+3. **Tiles only when measured.** Maps ship as full lossless images; a tile phase starts only if the
+   largest real map is slow or refused on Isak's phone. Lossless stays the rule either way.

@@ -2,7 +2,7 @@
 
 Goals and acceptance criteria for the rebuild. Replaces `docs/GOALS.md` (2026-10-27) once Isak
 agrees. Words as in `GLOSSARY.md`; new words (ocean, map tree, frame, campaign, story panel,
-monument, tile pyramid) go there when agreed. Round-1 answers are in `questions-round-1.md`; the flows
+monument) go there when agreed. Round-1 answers are in `questions-round-1.md`; the flows
 are in `ux-flows.md`. Places where the draft still guesses are marked [Q].
 
 ## What the atlas is for
@@ -53,7 +53,12 @@ Working means:
   visibility (which notes, zones and maps its players see), its own fog and its own map states.
   Later, campaigns may have maps of their own. Players arrive by their campaign's link.
 - Visibility can be one value for every campaign, or set per campaign. Unset or invalid counts as
-  `dm`, for every campaign; a campaign not named in a per-campaign value counts as `dm`.
+  `dm`, for every campaign; a campaign not named in a per-campaign value counts as `dm`, so a new
+  campaign starts with everything hidden. Creating one offers "start hidden" or "copy visibility
+  from campaign X", and its first Publish check lists everything newly visible.
+- A note's frontmatter `atlas.visibility` is one value. Per-campaign values for notes live only in
+  `world.yaml`'s `notes:` block and can only narrow: they never make a vault `dm` note visible. If
+  the vault value changes, the override falls back to `dm` and the Publish check flags it.
 - The publish builds one player view per campaign. What is hidden or fogged in campaign A ships
   hidden or fogged in A even if campaign B shows it, and A's players can't open B's view.
 
@@ -125,8 +130,8 @@ Working means: a test checks distance and time on two maps of different scale.
 - Every pin, zone and map can carry a note. "Write about this place" opens its note or creates one.
 - Notes synced from the vault are read-only in the editor: the vault owns them, and the editor only
   places and links them. Notes written in the editor are atlas-only notes, owned by the atlas.
-- An atlas-only note gets a visibility the DM picks (default `dm`), for every campaign or per
-  campaign.
+- An atlas-only note gets a visibility the DM picks (default `dm`) in its frontmatter; per-campaign
+  differences go in `world.yaml`'s `notes:` block, as for synced notes.
 
 Working means: a test creates a note from a zone in the editor and finds the file with
 `atlas.visibility` set; the editor refuses to change the text
@@ -167,15 +172,15 @@ A merge into `main` publishes: to GitHub Pages (public, test content) until the 
 to Cloudflare Pages, one site path per campaign, each open only to that campaign's players. The
 editor's Publish job shows what will change for each campaign's players and the scan results before
 Isak pushes. Working means: a publish run's log shows every scan passing for every campaign; the
-live site matches the last preview; a request without access to any campaign's page, atlas or tile
-is refused.
+live site matches the last preview; a request without access to any campaign's page, atlas, search
+index, image or audio file is refused.
 
 ### Map images
 
-Players zoom in a lot, so map images stay lossless. In the player build each map is cut into a
-tile pyramid (lossless WebP tiles), with each campaign's fog baked into the full image before
-tiling, so the viewer loads only what is on screen and many large maps fit on the ocean. Working
-means: a 16,000 px test map opens on a phone and stays sharp at max zoom; the fog scan checks tiles.
+Players zoom in a lot, so map images stay lossless: one full image per map, with each campaign's fog
+baked in at build time, as today. Tile pyramids (lossless WebP tiles, fog baked before tiling) come
+only if a measured problem calls for them, such as a real map over about 8,000 px that is slow on a
+phone. Working means: the largest real map opens on Isak's phone and stays sharp at max zoom.
 
 ### Tooling and the Mac
 

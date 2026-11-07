@@ -8,10 +8,10 @@ Orchestrator session started 2026-11-07. Branch `rebuild-plan-2026-11`, worktree
 | Stage | Output | State |
 |---|---|---|
 | A. Audit | `audit.md` (+ `audit/`) | done |
-| B. Draft goals | `GOALS-proposed.md` (later replaces `docs/GOALS.md`) | running |
-| Round 1 questions to Isak | `questions-round-1.md` | waiting |
-| C. Editor and player UX | `ux-flows.md`, `wireframes/*.html` | waiting |
-| D. Plan | `plan.md` | waiting |
+| B. Draft goals | `GOALS-proposed.md` (later replaces `docs/GOALS.md`) | done |
+| Round 1 questions to Isak | `questions-round-1.md` | answered |
+| C. Editor and player UX | `ux-flows.md`, `wireframes/*.html` | done (browser-checked) |
+| D. Plan | `plan.md` | revising after two reviews |
 | Round 2 questions to Isak | `questions-round-2.md` | waiting |
 
 ## Inputs
@@ -51,3 +51,14 @@ Orchestrator session started 2026-11-07. Branch `rebuild-plan-2026-11`, worktree
   later possibly by maps. This reverses round-1 Q4 and the plan's "campaigns differ only in fog".
   Plan agent revising plan.md, GOALS-proposed.md, ux-flows.md. Wireframes still running.
 - Checked: Thraez/Dungeons-and-Dragons-Campaign-Repository is private; campaign-atlas-final public.
+- Wireframes (`wireframes/editor.html`, `player.html`): playwright check found D1–D5, fixed,
+  rechecked pass. Committed b0608e4 (plan aa6e24e, goals/flows 818d43e).
+- Plan reviewed by two Opus agents (goals/cost, safety/sequencing): both "needs changes". Main
+  points: quick-wins phase first; cutover only at editor parity; tiles off the critical path;
+  migration writes per-campaign visibility so new campaigns start hidden; `notes:` overrides never
+  widen a vault dm; scans per campaign from one resolver before per-campaign outputs land; Access
+  live before first deploy, direct upload only; merge all 12 PRs since the old editor lives months.
+- HIGH, open on main today: `tidemarrow/issues/01-first-sync.md` is ready-for-agent and would commit
+  real vault notes to the public repo. Orchestrator session warned; plan's first ticket blocks
+  tidemarrow/01–03 and adds a `hosting: public` guard. Main not edited from here.
+- Combined fixes sent to the plan agent; round 2 questions follow.
