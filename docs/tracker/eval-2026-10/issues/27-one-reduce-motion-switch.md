@@ -1,6 +1,6 @@
 # One "reduce motion" switch for the player site
 
-Status: in-review
+Status: done
 Area: accessibility, player site
 
 Found by the third sweep (2026-10-28). There are two readers of reduced motion:
@@ -56,3 +56,8 @@ since the player site has no settings panel. Isak should look at the new toolbar
 
 Provisional call: calm mode still silences the soundscape, as it did before the move; only the
 OS setting leaves audio alone. The button's title says so.
+
+Review (Opus, 2026-11-07, of 39f398d): clean. Nits fixed in the follow-up commit: `matchMedia`
+guarded (false where it is missing), calm mode follows a change made in another tab (`storage`
+event, `data-calm` too), a test that the OS setting never mutes audio, `_resetCalmModeForTests`
+marked `@internal`.

@@ -3,6 +3,7 @@ import { render, screen, act } from "@testing-library/react";
 import { SoundSettingsProvider, useSoundSettings } from "@/atlas/sound/SoundSettingsProvider";
 import { _resetSoundPrefsForTests, loadSoundPrefs } from "@/atlas/sound/soundPrefs";
 import { setCalmMode, _resetCalmModeForTests } from "@/hooks/use-reduce-motion";
+import { AudioEngine } from "@/atlas/sound/AudioEngine";
 
 function makeStubDeps() {
   const gainNode = () => ({
@@ -310,6 +311,38 @@ describe("SoundSettingsProvider", () => {
       expect(spy).toHaveBeenCalledWith(true);
       act(() => setCalmMode(false));
       expect(spy).toHaveBeenLastCalledWith(false);
+    });
+
+    it("the OS reduced-motion setting does not mute the engine", () => {
+      const original = window.matchMedia;
+      Object.defineProperty(window, "matchMedia", {
+        configurable: true,
+        writable: true,
+        value: (query: string) => ({
+          matches: query.includes("prefers-reduced-motion"),
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }),
+      });
+      try {
+        const { deps } = makeStubDeps();
+        const spy = vi.spyOn(AudioEngine.prototype, "setMuted");
+        render(
+          <SoundSettingsProvider deps={deps}>
+            <div />
+          </SoundSettingsProvider>,
+        );
+        expect(spy).toHaveBeenCalledWith(false);
+        expect(spy).not.toHaveBeenCalledWith(true);
+        spy.mockRestore();
+      } finally {
+        Object.defineProperty(window, "matchMedia", {
+          configurable: true,
+          writable: true,
+          value: original,
+        });
+      }
     });
 
     it("does not save calm mode in the sound prefs any more", () => {

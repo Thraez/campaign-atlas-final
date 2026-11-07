@@ -64,9 +64,22 @@ export function syncCalmModeToDocument(): void {
   applyToDocument(getCalmMode());
 }
 
+/** Another tab changed calm mode: follow it here too. */
+function onStorage(e: StorageEvent): void {
+  if (e.key !== STORAGE_KEY && e.key !== null) return;
+  calm = null;
+  const on = getCalmMode();
+  applyToDocument(on);
+  listeners.forEach((l) => l());
+}
+
 function subscribe(listener: () => void): () => void {
+  if (listeners.size === 0) window.addEventListener("storage", onStorage);
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0) window.removeEventListener("storage", onStorage);
+  };
 }
 
 /** Calm mode alone, updated live. */
@@ -76,11 +89,12 @@ export function useCalmMode(): boolean {
 
 function usePrefersReducedMotion(): boolean {
   const [prefersReduced, setPrefersReduced] = React.useState<boolean>(
-    () => typeof window !== "undefined" && window.matchMedia(OS_QUERY).matches,
+    () => typeof window !== "undefined" && (window.matchMedia?.(OS_QUERY).matches ?? false),
   );
 
   React.useEffect(() => {
-    const mql = window.matchMedia(OS_QUERY);
+    const mql = window.matchMedia?.(OS_QUERY);
+    if (!mql) return;
     const onChange = () => setPrefersReduced(mql.matches);
     mql.addEventListener("change", onChange);
     setPrefersReduced(mql.matches);
@@ -97,6 +111,7 @@ export function useReduceMotion(): boolean {
   return os || calmMode;
 }
 
+/** @internal Tests only. */
 export function _resetCalmModeForTests({ keepStorage = false } = {}): void {
   calm = null;
   if (!keepStorage) {

@@ -124,6 +124,27 @@ describe("useReduceMotion: calm mode", () => {
     expect(getCalmMode()).toBe(false);
   });
 
+  it("follows a change made in another tab", () => {
+    installMatchMedia(false);
+    const { result } = renderHook(() => useReduceMotion());
+    act(() => {
+      localStorage.setItem("atlas-calm-mode-v1", "true");
+      window.dispatchEvent(new StorageEvent("storage", { key: "atlas-calm-mode-v1" }));
+    });
+    expect(result.current).toBe(true);
+    expect(document.documentElement.getAttribute("data-calm")).toBe("true");
+  });
+
+  it("is false, not a crash, where matchMedia is missing", () => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+    const { result } = renderHook(() => useReduceMotion());
+    expect(result.current).toBe(false);
+  });
+
   it("syncCalmModeToDocument applies the saved value at boot", () => {
     localStorage.setItem("atlas-calm-mode-v1", "true");
     syncCalmModeToDocument();
