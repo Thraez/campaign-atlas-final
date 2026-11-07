@@ -31,8 +31,8 @@ function filesUnder(dir: string): string[] {
     .filter((p) => fs.statSync(p).isFile());
 }
 
-beforeAll(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), "build-character-keys-"));
+/** A one-world vault in `root` whose editor-saved keys file holds `keysText`. */
+function writeVault(root: string, keysText: string) {
   const contentRoot = path.join(root, "content");
   const world = path.join(contentRoot, "test-world");
   writeFile(
@@ -60,13 +60,7 @@ beforeAll(() => {
     ].join("\n"),
   );
   // Where the editor saves: the Character Keys panel writes this file.
-  writeFile(
-    characterKeysPath(contentRoot, "test-world"),
-    serializeCharacterKeys([{ name: "Ada", key: "ada-editor-key" }]) +
-      "Bob: 12345\nCara:\n  nested: cara-hidden-value\nDan:\n",
-  );
-  // The old content-root path: ignored, and its key must not be used.
-  writeFile(path.join(contentRoot, "_dm", "character-keys.yaml"), "Eve: eve-legacy-key\n");
+  writeFile(characterKeysPath(contentRoot, "test-world"), keysText);
   writeFile(
     path.join(world, "corven.md"),
     [
@@ -94,6 +88,21 @@ beforeAll(() => {
       "Ledgers. {{secret:for-ada}} {{secret:for-bob}} {{secret:for-cara}} {{secret:for-dan}} {{secret:for-eve}}",
     ].join("\n"),
   );
+}
+
+function filesText(dir: string): Array<[string, string]> {
+  return filesUnder(dir).map((p) => [p, fs.readFileSync(p, "utf8")]);
+}
+
+beforeAll(() => {
+  root = fs.mkdtempSync(path.join(os.tmpdir(), "build-character-keys-"));
+  writeVault(
+    root,
+    serializeCharacterKeys([{ name: "Ada", key: "ada-editor-key" }]) +
+      "Bob: 12345\nCara:\n  nested: cara-hidden-value\nDan:\n",
+  );
+  // The old content-root path: ignored, and its key must not be used.
+  writeFile(path.join(root, "content", "_dm", "character-keys.yaml"), "Eve: eve-legacy-key\n");
 });
 
 afterAll(() => {
@@ -158,5 +167,49 @@ describe("player build reads the character keys where the editor saves them", ()
       const text = fs.readFileSync(p, "utf8");
       for (const b of banned) expect(text.includes(b), `${b} in ${p}`).toBe(false);
     }
+  });
+});
+
+// js-yaml's error reason can quote the file: an alias or tag typed where a key
+// goes would put the key in the warning, and warnings ship in the player
+// build report (atlas.json). The build says only that the file is invalid.
+describe.each([
+  ["an alias", "Ada: *aliased-key-text\n"],
+  ["a tag", "Ada: !tagged-key-text x\n"],
+])("a keys file that isn't valid YAML because of %s", (_label, keysText) => {
+  let vault: string;
+  let result: InProcessRun;
+  const keyText = keysText.includes("aliased") ? "aliased-key-text" : "tagged-key-text";
+
+  beforeAll(async () => {
+    vault = fs.mkdtempSync(path.join(os.tmpdir(), "build-character-keys-bad-"));
+    writeVault(vault, keysText);
+    result = await runBuildCli(
+      [
+        "--player",
+        "--config",
+        path.join(vault, "atlas.config.json"),
+        "--out",
+        path.join(vault, "out"),
+      ],
+      ROOT,
+    );
+  }, 120_000);
+
+  afterAll(() => {
+    fs.rmSync(vault, { recursive: true, force: true });
+  });
+
+  it("warns that the file isn't valid YAML without quoting it", () => {
+    const output = `${result.stdout}\n${result.stderr}`;
+    expect(result.status, output).toBe(0);
+    expect(output).toMatch(/character-keys\.yaml: it isn't valid YAML/);
+    expect(output).not.toContain(keyText);
+  });
+
+  it("puts the key text in no player output file, atlas.json included", () => {
+    const files = filesText(path.join(vault, "out"));
+    expect(files.some(([p]) => p.endsWith("atlas.json"))).toBe(true);
+    for (const [p, text] of files) expect(text.includes(keyText), p).toBe(false);
   });
 });

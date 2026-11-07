@@ -42,3 +42,9 @@ that it is ignored and does not read it (one place for keys, the one the editor 
 file is tracked). Tests: `src/test/secrets/build-character-keys.test.ts` (editor-saved key
 encrypts and decrypts, numeric key, nested/empty entries, old path ignored, no key or plaintext
 in any output file); secrets-fortress now asserts `vesper`'s secret is encrypted and decrypts.
+
+2026-11-07 (agent, review fix): the invalid-YAML warning leaked. js-yaml's reason can quote an
+alias or tag (`Ada: *key` -> `unidentified alias "key"`), and warnings ship in the player
+build report. `parseCharacterKeys` failures now carry `brief` (at most a line number) beside
+`error` (full reason, editor panel only); the build prints `brief`. Tests: an alias and a tag
+in the keys file leave the key text out of the build output and every player file.

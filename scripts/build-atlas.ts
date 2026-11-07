@@ -508,7 +508,9 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
       if (parsed.ok) {
         for (const { name, key } of parsed.entries) charKeys.set(name, key);
       } else {
-        warnings.push(`${configRel(keysPath)}: ${parsed.error} — character secrets skipped`);
+        // `brief`, not `error`: the parser's reason can quote a key, and
+        // warnings ship in the player build report.
+        warnings.push(`${configRel(keysPath)}: ${parsed.brief} — character secrets skipped`);
       }
     }
   }

@@ -7,8 +7,9 @@ import yaml from "js-yaml";
  * which all find the file with `characterKeysPath` and read it with
  * `parseCharacterKeys`. Pure (js-yaml only), so the build script can import it.
  *
- * Nothing here logs, and error messages never quote the file, so key values
- * stay out of consoles and toasts.
+ * Nothing here logs. A parse failure's `error` keeps js-yaml's reason for the
+ * DM's panel, and that reason can quote an alias or tag (so a key); `brief`
+ * never quotes the file and is what the build may print or report.
  */
 
 /**
@@ -34,7 +35,17 @@ export type CharacterKeysParse =
       /** Names whose value isn't a single key (empty, nested map, list). */
       unsupported: string[];
     }
-  | { ok: false; error: string };
+  | {
+      ok: false;
+      /**
+       * For the DM in the editor. May quote the file (js-yaml's reason can
+       * name an alias or tag, which can be a key): never put it in a build
+       * log or report.
+       */
+      error: string;
+      /** Same failure without the parser's reason: at most a line number. */
+      brief: string;
+    };
 
 const isScalar = (v: unknown) =>
   typeof v === "number" || typeof v === "boolean" || v instanceof Date;
@@ -50,13 +61,18 @@ export function parseCharacterKeys(text: string): CharacterKeysParse {
   } catch (e) {
     if (e instanceof yaml.YAMLException) {
       const line = e.mark ? ` on line ${e.mark.line + 1}` : "";
-      return { ok: false, error: `it isn't valid YAML (${e.reason}${line})` };
+      return {
+        ok: false,
+        error: `it isn't valid YAML (${e.reason}${line})`,
+        brief: `it isn't valid YAML${line}`,
+      };
     }
-    return { ok: false, error: "it isn't valid YAML" };
+    return { ok: false, error: "it isn't valid YAML", brief: "it isn't valid YAML" };
   }
   if (typed === null || typed === undefined) return { ok: true, entries: [], unsupported: [] };
   if (typeof typed !== "object" || Array.isArray(typed)) {
-    return { ok: false, error: "it isn't a list of names and keys" };
+    const error = "it isn't a list of names and keys";
+    return { ok: false, error, brief: error };
   }
   const literalMap =
     literal && typeof literal === "object" && !Array.isArray(literal)
