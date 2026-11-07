@@ -12,6 +12,7 @@ Was a parked note; the fifth sweep (2026-10-28) verified it and found it wider.
   (`EntityEditPanel.tsx` ~49-50).
 - `FileKind`, `ConflictReason` and the size caps are defined in both `localFsSave.ts` and the
   plugin.
+- Keep R-01's `origin: "sync"` field and the 403 `HostingPublic` refusal (`HostingPublicError`) when refactoring the save client.
 - `InvalidContent` and `OversizedContent` reach the DM as a bare word, without `reason` or `path`.
 
 Provisional calls (State.md): the client returns a typed outcome union rather than throwing, and

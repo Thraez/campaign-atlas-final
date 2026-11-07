@@ -122,6 +122,11 @@ describe("commitSync", () => {
     const result = await commitSync(port, first.rows, first.source);
     expect(result.saved).toBe(3);
     expect(port.atlas.get("content/w/npcs/corven.md")).toContain("A smuggler.");
+    // R-01: every note Sync writes, created or updated, carries the vault marker.
+    const { readNote } = await import("@/atlas/content/readNote");
+    for (const p of ["content/w/npcs/corven.md", EXISTING, "content/w/imports/history.md"]) {
+      expect(readNote(port.atlas.get(p) ?? "", p).atlas.source).toBe("vault");
+    }
 
     // The editor reloads the DM build after a commit: the new notes now exist.
     const rebuilt = world({
@@ -146,6 +151,7 @@ describe("commitSync", () => {
     );
     await commitSync(port, rows, null);
     expect(port.atlas.has("content/w/npcs/corven.md")).toBe(true);
+    expect(port.atlas.get("content/w/npcs/corven.md")).not.toContain("source:");
     expect(port.writes.map((w) => w.kind)).toEqual(["atlas"]);
   });
 

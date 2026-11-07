@@ -25,6 +25,7 @@
  * builds.
  */
 import { isWritableAssetPath, isWritableSourcePath } from "./sourcePathAllowlist";
+import { HOSTING_PUBLIC_ERROR, HostingPublicError } from "../sync/hosting";
 
 export type FileKind = "entity-md" | "world-yaml" | "asset-binary";
 
@@ -179,6 +180,8 @@ function utf8ByteLength(s: string): number {
 export interface SaveOpts {
   /** Ask the dev plugin to run the atlas build after writes. Dev-only. */
   rebuild?: boolean;
+  /** "sync" marks a Sync from Obsidian write, which the endpoint refuses while hosting is public (R-01). */
+  origin?: "sync";
 }
 
 export async function saveAtlasPatchToLocalFs(
@@ -225,6 +228,7 @@ export async function saveAtlasPatchToLocalFs(
   const fetchFn = deps?.fetchFn ?? fetch;
   const body: Record<string, unknown> = { files };
   if (opts?.rebuild) body.rebuild = true;
+  if (opts?.origin) body.origin = opts.origin;
   const res = await fetchFn(ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -266,6 +270,9 @@ export async function saveAtlasPatchToLocalFs(
     }
     if (res.status === 423) {
       throw new SaveBusyError();
+    }
+    if (res.status === 403 && body?.error === HOSTING_PUBLIC_ERROR) {
+      throw new HostingPublicError(typeof body.detail === "string" ? body.detail : undefined);
     }
     throw new LocalSaveError(
       body && typeof body.error === "string" ? body.error : `Save failed with status ${res.status}`,
