@@ -158,6 +158,7 @@ import { CalendarPanel } from "@/atlas/calendar/CalendarPanel";
 import { ViewModeProvider, useViewMode } from "@/atlas/view/ViewModeProvider";
 import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
+import { resolveMapClickTool } from "@/atlas/editor/mapClickTool";
 import { FlatCRS } from "@/atlas/map/flatCRS";
 import { whenMapHasSize } from "@/atlas/map/whenMapHasSize";
 import { FitMapOnOpen } from "@/atlas/map/FitMapOnOpen";
@@ -443,6 +444,14 @@ function AtlasPlacementEditorInner() {
     patch: patchMap,
     unpatch: unpatchMap,
   });
+  const mapClickTool = resolveMapClickTool({
+    placingPin: !!pendingId,
+    drawingRegion: regionDraft.drawing,
+    drawingRoute: routeDraft.drawing,
+    drawingFog: fogDraft.tool !== null,
+    drawingSoundscape: soundscapeDraft.drawing,
+    rulerOn: rulerActive,
+  });
   // Audio files the Sound panel can offer (basenames under
   // public/atlas/assets/audio/). Loaded once; empty is fine — the panel
   // falls back to a free-text file field.
@@ -664,7 +673,7 @@ function AtlasPlacementEditorInner() {
   }, [mode, placed, entitiesById, activeMap, fogDraft.fog, effectivePlacement]);
 
   const onMapClick = (lng: number, lat: number) => {
-    if (!pendingId || !activeMap) return;
+    if (mapClickTool !== "place-pin" || !pendingId || !activeMap) return;
     const { x, y } = mapClickToAtlasCoord(lng, lat, activeMap.height);
     setCoord(pendingId, { x, y });
     toast.success(
@@ -685,7 +694,9 @@ function AtlasPlacementEditorInner() {
   // pin never reaches `onMapClick`. Returns true when it placed (so the
   // overlay stops propagation and the pin isn't placed twice).
   const handleLayerBackgroundClick = (latlng: L.LatLng): boolean => {
-    if (!pendingId) return false;
+    // While drawing, return false so the click reaches the map and the
+    // drawing layer adds its vertex.
+    if (mapClickTool !== "place-pin") return false;
     onMapClick(latlng.lng, latlng.lat);
     return true;
   };
@@ -2029,10 +2040,7 @@ function AtlasPlacementEditorInner() {
                       activeMap.water?.enabled === false
                         ? (activeMap.oceanColor ?? "#18313f")
                         : "transparent",
-                    cursor:
-                      pendingId || regionDraft.drawing || soundscapeDraft.drawing || rulerActive
-                        ? "crosshair"
-                        : undefined,
+                    cursor: mapClickTool ? "crosshair" : undefined,
                   }}
                 >
                   <FitMapOnOpen
@@ -2042,9 +2050,7 @@ function AtlasPlacementEditorInner() {
                   />
                   <FlyTo target={flyTo} />
                   <RulerLayer
-                    active={
-                      rulerActive && !pendingId && !regionDraft.drawing && !soundscapeDraft.drawing
-                    }
+                    active={mapClickTool === "ruler"}
                     mapId={activeMap.id}
                     mapHeight={activeMap.height}
                     scale={activeMap.scale}
