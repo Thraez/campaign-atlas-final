@@ -37,14 +37,20 @@ export interface MapSlices {
 
 const EMPTY_COLLECTION = { edits: {}, added: [], deleted: [] };
 
-function slicesDirtyCount(sl: Partial<MapSlices>): number {
+export function slicesDirtyCount(sl: Partial<MapSlices>): number {
   const n = (d?: { edits: object; added: unknown[]; deleted: unknown[] }) =>
     d ? Object.keys(d.edits).length + d.added.length + d.deleted.length : 0;
   return n(sl.region) + n(sl.route) + (sl.fog ? 1 : 0);
 }
 
-/** Region/route/fog changes parked on every map except `activeMapId`. */
-function otherMapsCount(s: SessionState, activeMapId: string | null): number {
+/** Region/route/fog changes parked on every map except `activeMapId`. With
+ *  `projectMapIds`, drafts kept for a map the project no longer has (renamed or
+ *  removed) are left out: nothing can save or clear them. */
+export function otherMapsCount(
+  s: Pick<SessionState, "regionByMap" | "routeByMap" | "fogByMap">,
+  activeMapId: string | null,
+  projectMapIds?: readonly string[],
+): number {
   const ids = new Set([
     ...Object.keys(s.regionByMap),
     ...Object.keys(s.routeByMap),
@@ -53,6 +59,7 @@ function otherMapsCount(s: SessionState, activeMapId: string | null): number {
   let n = 0;
   for (const id of ids) {
     if (id === activeMapId) continue;
+    if (projectMapIds && !projectMapIds.includes(id)) continue;
     n += slicesDirtyCount({
       region: s.regionByMap[id],
       route: s.routeByMap[id],
@@ -64,6 +71,9 @@ function otherMapsCount(s: SessionState, activeMapId: string | null): number {
 
 export interface EditorSessionArgs {
   activeMapId: string | null;
+  /** The project's maps. Drafts kept for any other id (an orphan) are not
+   *  counted as unsaved; they are kept, not deleted. Omitted: count them all. */
+  projectMapIds?: readonly string[];
   undoStack: Pick<UndoStackAPI, "clear">;
   holders: {
     overrides: {
@@ -118,7 +128,7 @@ export interface EditorSessionAPI {
 }
 
 export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
-  const { activeMapId, undoStack, holders, perMapDirtyCount } = args;
+  const { activeMapId, undoStack, holders, perMapDirtyCount, projectMapIds } = args;
 
   // Per-map slices live in a ref (synchronous, not render state).
   const slicesRef = useRef<SessionState>({
@@ -139,10 +149,22 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
   // Mirrors otherMapsCount(slicesRef.current, mapRef.current); refreshed at
   // every point the parked slices or the active map change.
   const [otherMapsDirtyCount, setOtherMapsDirtyCount] = useState(0);
+  const projectMapIdsRef = useRef(projectMapIds);
   const refreshOtherMaps = useCallback(
-    () => setOtherMapsDirtyCount(otherMapsCount(slicesRef.current, mapRef.current)),
+    () =>
+      setOtherMapsDirtyCount(
+        otherMapsCount(slicesRef.current, mapRef.current, projectMapIdsRef.current),
+      ),
     [],
   );
+  // The project's map list arrives (or changes) after mount: recount.
+  const projectMapIdsKey = projectMapIds?.join("\n");
+  useEffect(() => {
+    projectMapIdsRef.current = projectMapIds;
+    refreshOtherMaps();
+    // projectMapIdsKey stands for projectMapIds' contents.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectMapIdsKey, refreshOtherMaps]);
 
   // ---- collect / apply the active map's holder slices ----
   const collectActiveInto = useCallback(

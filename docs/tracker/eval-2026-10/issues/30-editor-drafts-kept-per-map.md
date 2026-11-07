@@ -63,6 +63,13 @@ maps' drafts; undo of another map's edit switches to that map first; beforeunloa
 for restored (localStorage) pins, since it reads the one signal. A map without a fog draft no
 longer gets a default fog block written.
 
-Not covered: the soundscape draft is still one slot (same cross-map undo issue); null (deleted-pin)
-overrides on other maps are not in `foreignMapDrafts`. The page-level switch wiring and `onSaved`
-cleanup are covered only through the hook tests and existing page-mount tests.
+Review fixes: drafts kept under a map id the project no longer has (renamed or removed map) are
+orphans. They are not counted, saved or cleared, only kept, and the editor logs one `console.warn`
+listing them. The `onSaved` map cleanup is now the pure `mapDraftsAfterSave`
+(`src/atlas/session/mapDraftsAfterSave.ts`, tested in `map-drafts-after-save.test.ts`). Mounting the
+page to drive layer and metadata drafts on two maps was too heavy. The save-boundary undo/redo
+through `restoreOtherMapDrafts` is tested in `drafts-per-map.test.tsx`.
+
+Not covered, filed as tickets: the soundscape draft is one slot (44); deleted pins on other maps
+are not counted or written (45). The page-level map-switch wiring is covered only through the hook
+tests and existing page-mount tests.

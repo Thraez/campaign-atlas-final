@@ -21,6 +21,7 @@ import { useEditorSession, SESSION_IDB_KEY } from "@/atlas/session/useEditorSess
 import { idbDelete } from "@/atlas/session/idbStore";
 import { buildWorldYamlContent } from "@/atlas/save/buildSaveBatch";
 import { foreignMapDraftPlacements, overridesAfterSave } from "@/atlas/editor/foreignMapDrafts";
+import { mapDraftsAfterSave } from "@/atlas/session/mapDraftsAfterSave";
 import type { MapDocument, Region } from "@/atlas/content/schema";
 
 function region(id: string, mapId: string, name: string): Region {
@@ -52,7 +53,7 @@ function map(id: string): MapDocument {
 
 const MAPS = [map("A"), map("B")];
 
-function useHarness() {
+function useHarness(projectMapIds?: readonly string[]) {
   const [activeMapId, setActiveMapId] = useState("A");
   const activeMap = MAPS.find((m) => m.id === activeMapId);
   // The page's own switch (map select): session first, then React state.
@@ -65,6 +66,7 @@ function useHarness() {
   const fogDraft = useFogDraft(activeMap, undoStack);
   const session = useEditorSession({
     activeMapId,
+    projectMapIds,
     undoStack,
     holders: {
       overrides: { get: () => ({}), set: () => {} },
@@ -86,8 +88,10 @@ function useHarness() {
   return { activeMapId, switchTo, undoStack, regionDraft, fogDraft, session };
 }
 
-async function mount() {
-  const h = renderHook(() => useHarness());
+async function mount(projectMapIds?: readonly string[]) {
+  const h = renderHook((ids: readonly string[] | undefined) => useHarness(ids), {
+    initialProps: projectMapIds,
+  });
   await waitFor(() => expect(h.result.current.session.hydrated).toBe(true));
   return h;
 }
@@ -191,5 +195,64 @@ describe("editor drafts are kept per map (eval-30)", () => {
     });
     // e1 was written on both maps; e2's file was not in this batch.
     expect(next).toEqual({ "B:e2": { x: 3, y: 3 } });
+  });
+
+  it("save-boundary undo puts other maps' drafts back; redo cleans them again", async () => {
+    const { result } = await mount(["A", "B"]);
+    act(() => result.current.switchTo("B"));
+    act(() => result.current.regionDraft.patch("r-B", { name: "Edited B" }));
+    act(() => result.current.switchTo("A"));
+    expect(result.current.session.unsavedCount).toBe(1);
+
+    // What the page's onSaved does when world.yaml was written.
+    const pre = result.current.session.mapDrafts();
+    const after = mapDraftsAfterSave(true, ["A", "B"], {
+      layerByMap: {},
+      mapOverride: {},
+      slices: pre,
+    });
+    await act(async () => {
+      await result.current.session.markSaved(after.writtenMapIds);
+    });
+    expect(result.current.session.unsavedCount).toBe(0);
+
+    act(() => result.current.session.restoreOtherMapDrafts(pre));
+    expect(result.current.session.unsavedCount).toBe(1);
+    expect(result.current.session.status).toBe("unsaved");
+    expect(result.current.session.mapDrafts().B.region.edits["r-B"]).toEqual({
+      name: "Edited B",
+    });
+
+    act(() => result.current.session.restoreOtherMapDrafts(after.cleanSlices));
+    expect(result.current.session.unsavedCount).toBe(0);
+  });
+
+  it("drafts kept for a map the project no longer has are not counted, and are kept", async () => {
+    const { result, rerender } = await mount(["A", "B"]);
+    act(() => result.current.switchTo("B"));
+    act(() => result.current.regionDraft.patch("r-B", { name: "Edited B" }));
+    act(() => result.current.switchTo("A"));
+    expect(result.current.session.unsavedCount).toBe(1);
+
+    // Map B is renamed away: its parked draft is an orphan.
+    rerender(["A"]);
+    expect(result.current.session.unsavedCount).toBe(0);
+    expect(result.current.session.mapDrafts().B.region.edits["r-B"]).toEqual({
+      name: "Edited B",
+    });
+
+    // A save of the project's maps leaves the orphan alone.
+    const after = mapDraftsAfterSave(true, ["A"], {
+      layerByMap: {},
+      mapOverride: {},
+      slices: result.current.session.mapDrafts(),
+    });
+    await act(async () => {
+      await result.current.session.markSaved(after.writtenMapIds);
+    });
+    expect(result.current.session.mapDrafts().B.region.edits["r-B"]).toEqual({
+      name: "Edited B",
+    });
+    expect(after.cleanSlices).not.toHaveProperty("B");
   });
 });

@@ -114,6 +114,7 @@ import {
   LEGACY_STORAGE_KEY_V1,
 } from "@/atlas/editor/placementOverrides";
 import { foreignMapDraftPlacements, overridesAfterSave } from "@/atlas/editor/foreignMapDrafts";
+import { mapDraftsAfterSave, orphanDraftMapIds } from "@/atlas/session/mapDraftsAfterSave";
 import { targetMapHasPlacement } from "@/atlas/editor/duplicateOverwriteCheck";
 import { useBeforeUnloadWarning } from "@/atlas/editor/useBeforeUnloadWarning";
 import { buildNewEntityChange } from "@/atlas/save/newEntitySave";
@@ -716,12 +717,16 @@ function AtlasPlacementEditorInner() {
   // .dirty flag; layers/map-metadata don't, so we derive those from state
   // existence. The post-save clean-up at onSaved clears each of these.
   // eval-30: map metadata and layer drafts are kept for every map at once, so
-  // they count on every map, not only the active one.
-  const mapMetadataDirtyCount = Object.values(mapOverride).filter(
-    (o) => o && Object.keys(o).length > 0,
+  // they count on every map, not only the active one. Only the project's maps
+  // count: a draft kept for a renamed or removed map (an orphan) can never be
+  // saved or cleared, so it must not hold the editor "unsaved" forever.
+  const projectMapIds = useMemo(() => project?.maps.map((m) => m.id), [project]);
+  const inProject = (id: string) => !projectMapIds || projectMapIds.includes(id);
+  const mapMetadataDirtyCount = Object.entries(mapOverride).filter(
+    ([id, o]) => inProject(id) && o && Object.keys(o).length > 0,
   ).length;
-  const layerDraftCount = Object.values(layerEditor.snapshot()).reduce(
-    (n, layers) => n + layers.length,
+  const layerDraftCount = Object.entries(layerEditor.snapshot()).reduce(
+    (n, [id, layers]) => (inProject(id) ? n + layers.length : n),
     0,
   );
   const worldSettingsDirty = !!(
@@ -835,8 +840,8 @@ function AtlasPlacementEditorInner() {
               buildContent: () => buildWorldYamlContent(baseline.raw),
             }
           : null,
-        // Every map's layer drafts: an upload on another map writes too.
-        localLayers: Object.values(layerEditor.snapshot()).flat(),
+        // Every project map's layer drafts: an upload on another map writes too.
+        localLayers: project.maps.flatMap((m) => layerEditor.snapshot()[m.id] ?? []),
       },
       { fetchFn: fetch },
     );
@@ -985,6 +990,7 @@ function AtlasPlacementEditorInner() {
   );
   const session = useEditorSession({
     activeMapId: activeMap?.id ?? null,
+    projectMapIds,
     undoStack,
     holders: {
       overrides: {
@@ -1055,6 +1061,23 @@ function AtlasPlacementEditorInner() {
       setActiveMapId(mapId);
       setPendingId(null);
     };
+  });
+  // Drafts kept for a map id the project no longer has are left untouched and
+  // not counted; say so once per distinct set so they are not lost unnoticed.
+  const warnedOrphansRef = useRef("");
+  useEffect(() => {
+    if (!projectMapIds || !session.hydrated) return;
+    const orphans = orphanDraftMapIds(
+      { layerByMap: layerEditor.snapshot(), mapOverride, slices: session.mapDrafts() },
+      projectMapIds,
+    );
+    const key = orphans.join(",");
+    if (key === warnedOrphansRef.current) return;
+    warnedOrphansRef.current = key;
+    if (orphans.length > 0)
+      console.warn(
+        `[editor] Unsaved drafts are kept for maps not in this project, and are not saved or counted: ${key}`,
+      );
   });
 
   useEditorKeyboardShortcuts({
@@ -2183,8 +2206,18 @@ function AtlasPlacementEditorInner() {
           const worldYamlWritten = !!(
             activeWorldId && result.paths.includes(worldYamlPath(activeWorldId))
           );
-          // world.yaml carries every map's drafts, so all of them are written.
-          void session.markSaved(worldYamlWritten ? project.maps.map((m) => m.id) : []);
+          // world.yaml carries every project map's drafts, so all of them are
+          // written; drafts kept for orphan map ids are left alone.
+          const afterSave = mapDraftsAfterSave(
+            worldYamlWritten,
+            project.maps.map((m) => m.id),
+            {
+              layerByMap: layerEditor.snapshot(),
+              mapOverride: mapOverrideRef.current,
+              slices: preSaveMapDrafts,
+            },
+          );
+          void session.markSaved(afterSave.writtenMapIds);
           setLastSavedAt(Date.now());
           // This batch never carries the entity edit; its panel saves it.
           if (entityEditDraft.pendingFor()) {
@@ -2241,13 +2274,9 @@ function AtlasPlacementEditorInner() {
             regionDraft.applySnapshot(cleanRegionDraft);
             routeDraft.applySnapshot(cleanRouteDraft);
             fogDraft.applySnapshot(null);
-            // Every map's layers and metadata went into world.yaml.
-            nextLayerByMap = { ...preSave.layerByMap };
-            nextMapOverride = { ...preSave.mapOverride };
-            for (const m of project.maps) {
-              delete nextLayerByMap[m.id];
-              delete nextMapOverride[m.id];
-            }
+            // Every project map's layers and metadata went into world.yaml.
+            nextLayerByMap = afterSave.nextLayerByMap;
+            nextMapOverride = afterSave.nextMapOverride as typeof preSave.mapOverride;
             layerEditor.applySnapshot(nextLayerByMap);
             mapOverrideRef.current = nextMapOverride;
             setMapOverride(nextMapOverride);
@@ -2300,14 +2329,7 @@ function AtlasPlacementEditorInner() {
                 routeDraft.applySnapshot(cleanRouteDraft);
                 fogDraft.applySnapshot(null);
                 layerEditor.applySnapshot(nextLayerByMap);
-                session.restoreOtherMapDrafts(
-                  Object.fromEntries(
-                    Object.keys(preSaveMapDrafts).map((id) => [
-                      id,
-                      { region: cleanRegionDraft, route: cleanRouteDraft, fog: null },
-                    ]),
-                  ),
-                );
+                session.restoreOtherMapDrafts(afterSave.cleanSlices);
               }
             },
           });
