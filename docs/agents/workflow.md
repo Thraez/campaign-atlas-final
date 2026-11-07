@@ -24,6 +24,9 @@ A ticket is done when its PR is merged after:
 
 Set `Status: done` after the review, never before.
 
+Order: review first, then the gate. Review findings change the code, and the gate takes about
+3 minutes, so a gate run before the review is usually wasted.
+
 ## Git
 
 - A branch and a PR per ticket, cut from `origin/main`. Tracker and `State.md` edits ride in that PR
@@ -32,6 +35,19 @@ Set `Status: done` after the review, never before.
   gate: nobody starts or waits on it.
 - Stack a branch on another only when both edit the same file; retarget it to `main` once its parent
   merges.
+- Whoever merges a PR updates `State.md` (what merged, what's queued) in the same or the next docs PR.
+- Unattended sessions: auto mode refuses `gh pr merge` (and sometimes `git push`). Plan on it: push,
+  open the PR, and list it in `State.md`'s "Morning queue" with the exact merge commands.
+
+## Worktrees
+
+- Ticket worktrees live under `.claude/worktrees/<name>`, with `node_modules` symlinked to the main
+  checkout's.
+- Run lint and format from the worktree: `npm --prefix <wt> run lint|format:check|format`, or
+  `<wt>/node_modules/.bin/prettier --ignore-path <wt>/.prettierignore --write <files>`. Run from the
+  main checkout, the tools read its ignore files, which ignore `.claude/`, and check nothing.
+- Shell: zsh globs in flags need quotes (`--include='*.ts'`), zsh doesn't word-split `$VAR` lists,
+  and `/bin/bash` is 3.2 (no `mapfile`). Anything longer goes in a script file.
 
 ## Tests and seams
 
