@@ -18,6 +18,7 @@ import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter";
 import { mergeImportFrontmatter } from "./mergeImportFrontmatter";
 import { readNote } from "@/atlas/content/readNote";
 import { rewriteFrontmatter } from "@/atlas/content/frontmatterRewrite";
+import { VAULT_SOURCE_KEY, VAULT_SOURCE_VALUE } from "./vaultSourceMarker";
 import type { StagingRow } from "./stagingState";
 
 export class ImportCommitError extends Error {
@@ -52,6 +53,8 @@ export async function buildImportChanges(
   for (const row of eligible) {
     let baseHash: string | null = null;
     let content: string;
+    // R-01: a note from a vault is stamped `atlas.source: vault`; dropped or pasted files aren't.
+    const fromVault = row.vaultRelPath !== undefined;
 
     if (row.rowKind === "update") {
       // Read fresh disk content at commit time (not stale staging-time snapshot).
@@ -78,6 +81,9 @@ export async function buildImportChanges(
       ) {
         (merged.data.atlas as Record<string, unknown>).visibility = row.resolvedVisibility;
       }
+      if (fromVault) {
+        (merged.data.atlas as Record<string, unknown>)[VAULT_SOURCE_KEY] = VAULT_SOURCE_VALUE;
+      }
       // The vault's title is its filename, which the merge doesn't see.
       content = stringifyFrontmatter(merged.content, { title: row.title, ...merged.data });
     } else {
@@ -94,6 +100,7 @@ export async function buildImportChanges(
         type: row.inferredType,
         visibility: row.resolvedVisibility,
         tagsAdd: row.inferredType ? [row.inferredType] : [],
+        ...(fromVault ? { source: VAULT_SOURCE_VALUE } : {}),
       });
     }
 

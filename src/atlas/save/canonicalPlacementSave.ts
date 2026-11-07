@@ -11,9 +11,10 @@
  *
  * Mirrors the merge rules in scripts/apply-placements.ts:
  *   - placements on maps NOT in this draft are preserved
- *   - placements on maps that ARE in this draft are replaced
- *   - legacy atlas.x / atlas.y are removed once a placements[] is written
- *     (single source of truth)
+ *   - placements on maps that ARE in this draft are replaced, or dropped for
+ *     a removal (eval-45)
+ *   - legacy atlas.x / atlas.y become a placement on the primary map, then
+ *     the x/y keys are removed (single source of truth)
  *
  * Each FileChange carries the `baseHash` of the .md file at read time so
  * the Save endpoint can detect "the file changed under us" before writing.
@@ -34,6 +35,18 @@ export interface PlacementDraft {
   pin?: PinOverride;
 }
 
+/** eval-45: a pin the DM deleted from one map. Save drops that map's placement. */
+export interface PlacementRemoval {
+  entityId: string;
+  mapId: string;
+  removed: true;
+}
+
+/** What Save writes for one entity on one map: a placement, or its removal. */
+export type PlacementChange = PlacementDraft | PlacementRemoval;
+
+export const isRemoval = (c: PlacementChange): c is PlacementRemoval => "removed" in c;
+
 export class CanonicalSaveError extends Error {
   constructor(
     message: string,
@@ -47,6 +60,8 @@ export class CanonicalSaveError extends Error {
 export interface CanonicalSaveDeps {
   /** Defaults to global fetch. Injectable for tests. */
   fetchFn?: typeof fetch;
+  /** The project's first map: where a legacy `atlas.x/y` placement lives. */
+  primaryMapId?: string | null;
 }
 
 /** Fetch the current on-disk contents of an allowlisted source file. */
@@ -72,24 +87,38 @@ export async function readSourceFile(relPath: string, fetchFn: typeof fetch): Pr
 /** Internal: merge a set of per-map drafts into an entity's parsed frontmatter. */
 export function mergePlacementsIntoFrontmatter(
   data: Record<string, unknown>,
-  drafts: PlacementDraft[],
+  drafts: readonly PlacementChange[],
+  primaryMapId?: string | null,
 ): Record<string, unknown> {
   const atlas = (data.atlas as Record<string, unknown>) ?? {};
-  const existing = Array.isArray(atlas.placements)
-    ? (atlas.placements as Array<Record<string, unknown>>)
-    : [];
+  // The build reads an entry with no mapId as a primary-map pin; name the map
+  // so the merge below keeps it.
+  const listed = (
+    Array.isArray(atlas.placements) ? (atlas.placements as Array<Record<string, unknown>>) : []
+  ).map((e) => (e.mapId === undefined && primaryMapId ? { ...e, mapId: primaryMapId } : e));
+  // Legacy x/y is a placement on the primary map (the build reads it that way
+  // when placements[] is empty); carry it over before the x/y keys go.
+  const existing =
+    listed.length === 0 &&
+    primaryMapId &&
+    typeof atlas.x === "number" &&
+    typeof atlas.y === "number"
+      ? [{ mapId: primaryMapId, x: atlas.x, y: atlas.y }]
+      : listed;
 
   const touchedMapIds = new Set(drafts.map((d) => d.mapId));
   const preserved = existing.filter(
     (e) => typeof e.mapId === "string" && !touchedMapIds.has(e.mapId),
   );
 
-  const fresh = drafts.map((d) => {
-    const o: Record<string, unknown> = { mapId: d.mapId, x: d.x, y: d.y };
-    if (d.label) o.label = d.label;
-    if (d.pin && Object.keys(d.pin).length > 0) o.pin = d.pin;
-    return o;
-  });
+  const fresh = drafts
+    .filter((d): d is PlacementDraft => !isRemoval(d))
+    .map((d) => {
+      const o: Record<string, unknown> = { mapId: d.mapId, x: d.x, y: d.y };
+      if (d.label) o.label = d.label;
+      if (d.pin && Object.keys(d.pin).length > 0) o.pin = d.pin;
+      return o;
+    });
 
   const next = [...preserved, ...fresh].sort((a, b) =>
     String(a.mapId).localeCompare(String(b.mapId)),
@@ -115,7 +144,7 @@ export function mergePlacementsIntoFrontmatter(
  *   editor was loaded against a player build, which strips it).
  */
 export async function buildCanonicalPlacementChanges(
-  drafts: PlacementDraft[],
+  drafts: readonly PlacementChange[],
   entitiesById: Map<string, Entity>,
   deps?: CanonicalSaveDeps,
 ): Promise<FileChange[]> {
@@ -124,7 +153,7 @@ export async function buildCanonicalPlacementChanges(
 
   // Group drafts by entity. One file write per entity, however many maps it
   // appears on in the draft set.
-  const byEntity = new Map<string, PlacementDraft[]>();
+  const byEntity = new Map<string, PlacementChange[]>();
   for (const d of drafts) {
     const list = byEntity.get(d.entityId) ?? [];
     list.push(d);
@@ -150,7 +179,7 @@ export async function buildCanonicalPlacementChanges(
     const currentRaw = await readSourceFile(sourcePath, fetchFn);
     const baseHash = await hashContent(currentRaw);
     const parsed = parseFrontmatter(currentRaw);
-    const nextData = mergePlacementsIntoFrontmatter(parsed.data, entityDrafts);
+    const nextData = mergePlacementsIntoFrontmatter(parsed.data, entityDrafts, deps?.primaryMapId);
     const nextRaw = stringifyFrontmatter(parsed.content, nextData);
     changes.push({ path: sourcePath, content: nextRaw, kind: "entity-md", baseHash });
   }

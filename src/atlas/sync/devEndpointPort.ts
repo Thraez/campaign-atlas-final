@@ -6,6 +6,7 @@ import { ImportCommitError } from "@/atlas/import/buildImportChanges";
 import { isWritableSourcePath } from "@/atlas/save/sourcePathAllowlist";
 import { saveAtlasPatchToLocalFs } from "@/atlas/save/localFsSave";
 import { loadSettings, loadSyncMap, saveSettings, saveSyncMap } from "./useSyncSettings";
+import { HOSTING_PUBLIC_ERROR, HostingPublicError } from "./hosting";
 import { VaultScanError, type VaultImageCopyResult, type VaultPort } from "./vaultPort";
 
 export type VaultScanReply =
@@ -51,7 +52,14 @@ export function createDevEndpointPort(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(req),
       });
-      return (await resp.json()) as VaultImageCopyResult;
+      const body = (await resp.json()) as VaultImageCopyResult & {
+        error?: unknown;
+        detail?: unknown;
+      };
+      if (resp.status === 403 && body.error === HOSTING_PUBLIC_ERROR) {
+        throw new HostingPublicError(typeof body.detail === "string" ? body.detail : undefined);
+      }
+      return body;
     },
 
     async readAtlasFile(path) {
@@ -71,7 +79,8 @@ export function createDevEndpointPort(
       return body.contents;
     },
 
-    writeAtlasFiles: (changes) => saveAtlasPatchToLocalFs(changes, { fetchFn }, { rebuild: true }),
+    writeAtlasFiles: (changes, opts) =>
+      saveAtlasPatchToLocalFs(changes, { fetchFn }, { rebuild: true, origin: opts?.origin }),
     loadSyncMap: () => loadSyncMap(),
     saveSyncMap: (map) => saveSyncMap(map),
     async markSynced(at) {

@@ -5,10 +5,18 @@
  * the source world.yaml's fog geometry. Complements the build-time enforcement
  * by re-deriving the boundary and asserting four invariants:
  *
- *   13  IMAGE-LEAK    original layer PNG referenced by player atlas
+ *   13  IMAGE-LEAK    original layer image referenced by the player atlas, or
+ *                     (built site only) shipped beside its redacted one
  *   14  GEOMETRY-LEAK fog geometry not stripped from player atlas
  *   15  IN-FOG-CONTENT player pin/route/region inside fog per source geometry
  *   16  ALPHA-LEAK    redacted PNG opaque at a known-fogged location
+ *
+ * The artifact dir is the built site (`dist`, atlas.json in `dist/atlas/`) or
+ * the source store (`public/atlas`); see `atlas/playerArtifact.ts`. The scan
+ * registry passes which one; run by hand, it is inferred. The store
+ * keeps each original map beside its redacted one (the build reads it there and
+ * the player build prunes it), so the "original beside redacted" check runs on
+ * the built site only.
  *
  * Usage:
  *   tsx scripts/check-fog-safety.ts <artifact-dir> [--config atlas.config.json]
@@ -23,12 +31,16 @@
  *   17  COULD-NOT-VERIFY-GEOMETRY — a source world config was present but failed
  *       to load, so the geometry-dependent checks (15, 16) never ran and the
  *       fog maps cannot be certified. (Config *absent* is a legitimate
- *       configless run and still exits 0.)
+ *       configless run and still exits 0.) Also a fog layer whose redacted
+ *       `.fog.png` is not in the artifact (the alpha check cannot run on it),
+ *       or a built site (`layout: "built-site"`) with no `atlas/atlas.json`.
  */
 import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
+import { IMAGE_EXTENSIONS } from "./atlas/assetRefs";
 import { loadWorldConfig } from "./atlas/loadWorldConfig";
+import { locatePlayerAtlas, resolveAssetFile, type ArtifactLayout } from "./atlas/playerArtifact";
 import { isLit } from "../src/atlas/fog/effectiveLit";
 import type { FogOverlay, Point } from "../src/atlas/content/schema";
 
@@ -96,6 +108,8 @@ function parseArgs(argv: string[]): Args | null {
 export interface RunOpts {
   dir: string;
   config?: string;
+  /** Where atlas.json must be; inferred when absent (a run by hand). */
+  layout?: ArtifactLayout;
 }
 
 export async function run(opts: RunOpts): Promise<number> {
@@ -108,13 +122,21 @@ export async function run(opts: RunOpts): Promise<number> {
     return 0;
   }
 
-  const atlasJsonPath = path.join(targetAbs, "atlas.json");
-  if (!fs.existsSync(atlasJsonPath)) {
-    console.log(`atlas:check-fog-safety: ${args.target}/atlas.json not found — skipping`);
+  const located = locatePlayerAtlas(targetAbs, opts.layout);
+  if (!located) {
+    if (opts.layout === "built-site") {
+      console.error(
+        `atlas:check-fog-safety: ${args.target} has no atlas/atlas.json — the built site cannot be checked`,
+      );
+      return 17;
+    }
+    console.log(`atlas:check-fog-safety: no atlas.json in ${args.target} — skipping`);
     return 0;
   }
+  const { atlasDir } = located;
+  const builtSite = located.layout === "built-site";
 
-  const atlas: PlayerAtlas = JSON.parse(fs.readFileSync(atlasJsonPath, "utf8"));
+  const atlas: PlayerAtlas = JSON.parse(fs.readFileSync(located.atlasJson, "utf8"));
 
   // Load source fog geometry from world config.
   // loadWorldConfig(contentRoot, worldId) — we derive these from atlas.config.json.
@@ -180,15 +202,24 @@ export async function run(opts: RunOpts): Promise<number> {
           code: 13,
           message: `map "${m.id}" layer "${layer.id}" src "${layer.src}" is not a redacted (.fog.png) file`,
         });
+        continue;
       }
-      // Also check: the original PNG is not present alongside the redacted in the artifact dir.
-      const originalCandidate = layer.src.replace(/\.fog\.png$/, ".png");
-      if (originalCandidate !== layer.src) {
-        const originalAbs = path.join(targetAbs, originalCandidate);
-        if (fs.existsSync(originalAbs)) {
+      const redacted = resolveAssetFile(atlasDir, layer.src);
+      if (!redacted || !fs.existsSync(redacted)) {
+        findings.push({
+          code: 17,
+          message: `map "${m.id}" layer "${layer.id}" redacted "${layer.src}" is not in the artifact — alpha check cannot run`,
+        });
+        continue;
+      }
+      // The original (any image type) must not ship beside the redacted one.
+      if (!builtSite) continue;
+      const base = redacted.slice(0, -".fog.png".length);
+      for (const ext of IMAGE_EXTENSIONS) {
+        if (fs.existsSync(base + ext)) {
           findings.push({
             code: 13,
-            message: `map "${m.id}" original "${originalCandidate}" still present in artifact dir alongside redacted`,
+            message: `map "${m.id}" original "${path.relative(targetAbs, base + ext)}" still present in artifact dir alongside redacted`,
           });
         }
       }
@@ -256,8 +287,8 @@ export async function run(opts: RunOpts): Promise<number> {
 
     for (const layer of m.layers) {
       if (!layer.src.endsWith(".fog.png")) continue; // already flagged by check 13
-      const layerAbs = path.join(targetAbs, layer.src);
-      if (!fs.existsSync(layerAbs)) continue;
+      const layerAbs = resolveAssetFile(atlasDir, layer.src);
+      if (!layerAbs || !fs.existsSync(layerAbs)) continue; // already flagged (17)
 
       // Convert map-space fogged point to layer-local coords.
       const lx = foggedPoint[0] - layer.x;
