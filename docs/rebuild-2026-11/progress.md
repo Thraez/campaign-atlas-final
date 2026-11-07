@@ -97,3 +97,24 @@ sync map blocks saves of the notes it lists.
 
 Q-01 root cause: the sample notes link to places with no note (Thornhold, Sunhaven, ...); the player
 variant still drew a dotted "link" span. Not a resolver bug.
+
+## Coordinator 2 (session ccb29df9, 2026-11-07 evening)
+
+- Isak's yes in this chat: merge #111..#115 in order (gate each after main moves), and merge the
+  12 older PRs here in plan order (#109, #110 first, #101 last), each gated.
+- #111 R-01 merged (d28b833); publish run started.
+- Q-01 gate on main+branch running. Gate script: scratchpad `gate-branch.sh <worktree>` (waits on
+  any running gate, merges origin/main, runs `npm run gate`).
+- Docs follow-up worktree `p0docs` (branch `docs-2026-11-07-phase0-followup`): State.md Morning
+  queue for the rebuild, WORKFLOWS.md "3 scanners" -> "14 scans". Uncommitted until Phase 0 merges.
+- R-04 (adopt goals, ADR-0002) builder: Sonnet, worktree `r04`, branch `rebuild-r04-adopt-goals`.
+- Phase 0 merged: #111 d28b833, #112 ec481a5, #113 5b9f694, #114 b1fb6c3, #115 9ca0e30, each gated
+  on main+branch first. Q-04's first gate flaked (`world-yaml-conflict-recovers`, passes alone);
+  rerun passed. `gh pr merge` right after a push can say "not mergeable" while GitHub recomputes:
+  check `mergeStateStatus` is CLEAN first.
+- R-04 built (811c7bf + review fixes 457c991), Opus review fixes applied; gate after the old PRs.
+- Old PRs: dry-run vs main shows conflicts in #102 (vite-plugin-atlas-save.ts vs R-01), #104
+  (AtlasViewer.tsx vs Q-02/Q-04), #101 (State.md). Docs follow-up patch saved in the coordinator's
+  notes folder (`p0docs-state-workflows.patch`), lands after #101 (both edit State.md); it also
+  marks the provisional calls kept by Isak 2026-11-07 (relayed by the four-apps orchestrator).
+- Old-PR merges started: #109 gating.
