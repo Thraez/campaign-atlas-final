@@ -125,6 +125,12 @@ function readPlayerAtlas(): Record<string, unknown> {
   return JSON.parse(fs.readFileSync(PLAYER_ATLAS, "utf8")) as Record<string, unknown>;
 }
 
+/** Write `atlas` where the built site keeps it (`<dir>/atlas/atlas.json`), as the scans see dist. */
+function writeBuiltSite(dir: string, atlas: Record<string, unknown>): void {
+  fs.mkdirSync(path.join(dir, "atlas"));
+  fs.writeFileSync(path.join(dir, "atlas", "atlas.json"), JSON.stringify(atlas));
+}
+
 // ---- Variant 1: sentinel DM secret (check-no-secrets) -----------------------
 function variantSecret(): VariantResult {
   const sentinel = DM_CONTENT_SENTINELS[0];
@@ -222,7 +228,7 @@ function variantFog(): VariantResult {
     "check-fog-safety.ts",
     () => {
       const dir = freshDir("fog-clean");
-      fs.writeFileSync(path.join(dir, "atlas.json"), JSON.stringify(atlas));
+      writeBuiltSite(dir, atlas);
       return runScan("check-fog-safety.ts", [dir, "--config", CONFIG_PATH]);
     },
     () => {
@@ -240,7 +246,7 @@ function variantFog(): VariantResult {
           [0, 10],
         ],
       };
-      fs.writeFileSync(path.join(dir, "atlas.json"), JSON.stringify(dirty));
+      writeBuiltSite(dir, dirty);
       return runScan("check-fog-safety.ts", [dir, "--config", CONFIG_PATH]);
     },
   );
@@ -273,19 +279,25 @@ function variantShape(): VariantResult {
   );
 }
 
-// ---- Variant 6: unstripped secret marker (check-player-secrets) -------------
+// ---- Variant 6: plaintext field on a player secret (check-player-secrets) ---
 function variantPlayerSecret(): VariantResult {
+  const atlas = readPlayerAtlas();
   return assertCleanThenDirty(
-    "Unstripped secret marker",
+    "Forbidden field on a player secret",
     "check-player-secrets.ts",
     () => {
       const dir = freshDir("player-secret-clean");
-      fs.writeFileSync(path.join(dir, "page.txt"), "nothing locked here");
+      writeBuiltSite(dir, atlas);
       return runScan("check-player-secrets.ts", [dir]);
     },
     () => {
       const dir = freshDir("player-secret-dirty");
-      fs.writeFileSync(path.join(dir, "page.txt"), "{{secret:SMOKE_TEST_SECRET}}");
+      const dirty = readPlayerAtlas();
+      const entities = Array.isArray(dirty.entities) ? (dirty.entities as unknown[]) : [];
+      // A secret that kept its plaintext reveal: the strip the scan guards.
+      entities.push({ id: "smoke-entity", secrets: [{ id: "s", reveal: "SMOKE_PLAINTEXT" }] });
+      dirty.entities = entities;
+      writeBuiltSite(dir, dirty);
       return runScan("check-player-secrets.ts", [dir]);
     },
   );

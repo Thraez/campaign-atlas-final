@@ -21,6 +21,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DEV_API_PATHS } from "./atlas/devRoutes";
+import { listTextFiles } from "./atlas/playerArtifact";
 
 export const DM_CONTENT_SENTINELS = [
   "SENTINEL_DM_BODY_001",
@@ -38,20 +39,6 @@ export const EDITOR_CODE_FINGERPRINTS: readonly string[] = [
   "AtlasPlacementEditor",
   "/atlas/edit",
 ];
-
-const TEXT_EXTENSIONS = new Set([
-  ".html",
-  ".js",
-  ".mjs",
-  ".cjs",
-  ".css",
-  ".json",
-  ".txt",
-  ".xml",
-  ".webmanifest",
-  ".svg",
-  ".md",
-]);
 
 export interface ScanHit {
   file: string;
@@ -88,30 +75,13 @@ export function scanFile(file: string): ScanHit[] {
 
 export function scanDir(dir: string): ScanResult {
   const result: ScanResult = { files: 0, dmHits: [], editorHits: [] };
-  function walk(d: string) {
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(d, { withFileTypes: true });
-    } catch (err) {
-      console.warn(`check-no-secrets: skipped unreadable dir ${d}: ${(err as Error).message}`);
-      return;
-    }
-    for (const e of entries) {
-      const full = path.join(d, e.name);
-      if (e.isDirectory()) {
-        walk(full);
-      } else if (e.isFile()) {
-        const ext = path.extname(e.name).toLowerCase();
-        if (!TEXT_EXTENSIONS.has(ext)) continue;
-        result.files += 1;
-        for (const h of scanFile(full)) {
-          if (h.kind === "dm") result.dmHits.push(h);
-          else result.editorHits.push(h);
-        }
-      }
+  for (const file of listTextFiles(dir, "check-no-secrets")) {
+    result.files += 1;
+    for (const h of scanFile(file)) {
+      if (h.kind === "dm") result.dmHits.push(h);
+      else result.editorHits.push(h);
     }
   }
-  walk(dir);
   return result;
 }
 

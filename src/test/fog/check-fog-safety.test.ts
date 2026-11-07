@@ -1,83 +1,90 @@
 /**
  * Tests for scripts/check-fog-safety.ts — fog safety scanner.
  *
- * Each test builds a minimal temp fixture (atlas.json + optional PNGs +
- * optional source config) in a scratch dir, then calls main() directly.
- *
- * CWD is changed per-test so the script resolves atlas.config.json from the
- * fixture root. Restored in afterEach.
+ * Each test plants a player artifact in a temp dir in one of the two layouts
+ * the scan registry runs it on (`scripts/atlas/scanRegistry.ts`):
+ *   - "dist":  the built site, `dist/atlas/atlas.json` + `dist/atlas/assets/…`
+ *   - "store": the source store, `public/atlas/atlas.json` + `public/atlas/assets/…`
+ * Layer `src` values are site-root relative (`atlas/assets/maps/…`), as the
+ * build writes them.
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
+import { main, run } from "../../../scripts/check-fog-safety";
 
-const origCwd = process.cwd();
+type Layout = "dist" | "store";
 
+let root: string;
+beforeEach(() => {
+  root = fs.mkdtempSync(path.join(os.tmpdir(), "fog-safety-"));
+});
 afterEach(() => {
-  // Ensure CWD is always restored so temp dirs can be deleted on Windows.
-  process.chdir(origCwd);
+  fs.rmSync(root, { recursive: true, force: true });
 });
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Create a temp dir and return its path. Caller cleans up. */
-function mkTmp(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "fog-safety-"));
+/** Write atlas.config.json + content/<worldId>/_atlas/world.yaml; returns the config path. */
+function writeSourceConfig(worldYaml: string | null): string {
+  const config = path.join(root, "atlas.config.json");
+  fs.writeFileSync(config, JSON.stringify({ contentRoot: "content", defaultWorld: "w" }));
+  if (worldYaml !== null) {
+    const worldAtlasDir = path.join(root, "content", "w", "_atlas");
+    fs.mkdirSync(worldAtlasDir, { recursive: true });
+    fs.writeFileSync(path.join(worldAtlasDir, "world.yaml"), worldYaml);
+  }
+  return config;
 }
 
-/** Write atlas.config.json + content/<worldId>/_atlas/world.yaml */
-function writeSourceConfig(dir: string, worldId: string, worldYaml: string): void {
-  fs.writeFileSync(
-    path.join(dir, "atlas.config.json"),
-    JSON.stringify({
-      contentRoot: "content",
-      outputDir: "out",
-      defaultWorld: worldId,
-      include: ["**/*.md"],
-      exclude: [],
-    }),
-  );
-  const worldAtlasDir = path.join(dir, "content", worldId, "_atlas");
-  fs.mkdirSync(worldAtlasDir, { recursive: true });
-  fs.writeFileSync(path.join(worldAtlasDir, "world.yaml"), worldYaml);
+/**
+ * Plant a player artifact: atlas.json plus `files` (paths relative to the
+ * atlas dir). Returns the dir the registry would hand the scan.
+ */
+function plant(layout: Layout, atlas: object, files: Record<string, Buffer> = {}): string {
+  const target = layout === "dist" ? path.join(root, "dist") : path.join(root, "public", "atlas");
+  const atlasDir = layout === "dist" ? path.join(target, "atlas") : target;
+  fs.mkdirSync(atlasDir, { recursive: true });
+  fs.writeFileSync(path.join(atlasDir, "atlas.json"), JSON.stringify(atlas));
+  for (const [rel, bytes] of Object.entries(files)) {
+    const file = path.join(atlasDir, rel);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, bytes);
+  }
+  return target;
 }
 
-/** Write a minimal player atlas.json to <dir>/atlas.json */
-function writePlayerAtlas(dir: string, atlas: object): void {
-  fs.writeFileSync(path.join(dir, "atlas.json"), JSON.stringify(atlas));
-}
-
-/** Build a 10×10 RGBA PNG that is fully transparent. */
-async function buildTransparentPng(): Promise<Buffer> {
+/** A 10×10 RGBA PNG, fully transparent or fully opaque white. */
+function png(alpha: 0 | 1): Promise<Buffer> {
   return sharp({
-    create: { width: 10, height: 10, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    create: { width: 10, height: 10, channels: 4, background: { r: 255, g: 255, b: 255, alpha } },
   })
     .png()
     .toBuffer();
 }
 
-/** Build a 10×10 RGBA PNG that is fully opaque (white). */
-async function buildOpaquePng(): Promise<Buffer> {
-  return sharp({
-    create: {
-      width: 10,
-      height: 10,
-      channels: 4,
-      background: { r: 255, g: 255, b: 255, alpha: 1 },
-    },
-  })
-    .png()
-    .toBuffer();
+const FOG_SRC = "atlas/assets/maps/world.fog.png";
+const FOG_FILE = "assets/maps/world.fog.png";
+
+/** A player atlas with one fog-enabled 100×100 map, stripped to {mapId, enabled}. */
+function fogAtlas(
+  over: { src?: string; fog?: object; placements?: object[] } = {},
+): Record<string, unknown> {
+  return {
+    maps: [
+      {
+        id: "world",
+        width: 100,
+        height: 100,
+        layers: [{ id: "lyr", src: over.src ?? FOG_SRC, x: 0, y: 0, width: 100, height: 100 }],
+        fog: over.fog ?? { mapId: "world", enabled: true },
+      },
+    ],
+    placements: over.placements ?? [],
+  };
 }
 
-// ---------------------------------------------------------------------------
-// World YAML with a reveal covering [20,20]-[60,60] inside a 100×100 map.
-// Corners (0,0) etc. are outside the reveal — guaranteed fogged.
-// ---------------------------------------------------------------------------
+// Reveal covering [20,20]-[60,60] inside a 100×100 map: the corners are fogged.
 const CLEAN_WORLD_YAML = `schemaVersion: 1
 maps:
   - id: world
@@ -102,363 +109,93 @@ fog:
     featherPx: 4
 `;
 
-// ---------------------------------------------------------------------------
-// Test 1: Clean fog-enabled map → exit 0
-// ---------------------------------------------------------------------------
 describe("check-fog-safety", () => {
-  it("clean fog-enabled map → exit 0", async () => {
-    const dir = mkTmp();
-    try {
-      // Source config: fog reveals [20,20]-[60,60]
-      writeSourceConfig(dir, "w", CLEAN_WORLD_YAML);
-
-      // Player atlas: .fog.png layer, fog stripped to {mapId, enabled}
-      const artifactDir = path.join(dir, "out");
-      fs.mkdirSync(artifactDir, { recursive: true });
-      writePlayerAtlas(artifactDir, {
-        maps: [
-          {
-            id: "world",
-            width: 100,
-            height: 100,
-            layers: [
-              {
-                id: "lyr",
-                src: "atlas/assets/maps/world.fog.png",
-                x: 0,
-                y: 0,
-                width: 100,
-                height: 100,
-              },
-            ],
-            fog: { mapId: "world", enabled: true },
-          },
-        ],
-        placements: [
-          // Placement inside the reveal — should be clean
-          { entityId: "e1", mapId: "world", x: 40, y: 40 },
-        ],
-      });
-
-      // Write a transparent .fog.png (all fogged pixels have alpha=0)
-      // The corner probe (0,0) is outside reveal → should be transparent.
-      const pngBuf = await buildTransparentPng();
-      const layerDir = path.join(artifactDir, "atlas", "assets", "maps");
-      fs.mkdirSync(layerDir, { recursive: true });
-      fs.writeFileSync(path.join(layerDir, "world.fog.png"), pngBuf);
-
-      process.chdir(dir);
-      const { main } = await import("../../../scripts/check-fog-safety");
-      process.argv = ["node", "check-fog-safety.ts", "out"];
-      const code = await main();
-      expect(code).toBe(0);
-    } finally {
-      process.chdir(origCwd);
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  // -------------------------------------------------------------------------
-  // Test 2: IMAGE-LEAK (13) — layer src does not end in .fog.png
-  // -------------------------------------------------------------------------
-  it("image-leak (13): layer src is plain .png on fog-enabled map", async () => {
-    const dir = mkTmp();
-    try {
-      const artifactDir = path.join(dir, "out");
-      fs.mkdirSync(artifactDir, { recursive: true });
-      writePlayerAtlas(artifactDir, {
-        maps: [
-          {
-            id: "world",
-            width: 100,
-            height: 100,
-            layers: [
-              {
-                id: "lyr",
-                src: "atlas/assets/maps/world.png", // NOT .fog.png
-                x: 0,
-                y: 0,
-                width: 100,
-                height: 100,
-              },
-            ],
-            fog: { mapId: "world", enabled: true },
-          },
-        ],
-        placements: [],
-      });
-
-      process.chdir(dir);
-      const { main } = await import("../../../scripts/check-fog-safety");
-      process.argv = ["node", "check-fog-safety.ts", "out"];
-      const code = await main();
-      expect(code).toBe(13);
-    } finally {
-      process.chdir(origCwd);
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  // -------------------------------------------------------------------------
-  // Test 3: GEOMETRY-LEAK (14) — fog object retains reveals
-  // -------------------------------------------------------------------------
-  it("geometry-leak (14): player atlas.fog.reveals not stripped", async () => {
-    const dir = mkTmp();
-    try {
-      const artifactDir = path.join(dir, "out");
-      fs.mkdirSync(artifactDir, { recursive: true });
-      writePlayerAtlas(artifactDir, {
-        maps: [
-          {
-            id: "world",
-            width: 100,
-            height: 100,
-            layers: [
-              {
-                id: "lyr",
-                src: "atlas/assets/maps/world.fog.png",
-                x: 0,
-                y: 0,
-                width: 100,
-                height: 100,
-              },
-            ],
-            fog: {
-              mapId: "world",
-              enabled: true,
-              reveals: [
-                [
-                  [1, 1],
-                  [2, 1],
-                  [2, 2],
-                  [1, 2],
-                ],
-              ], // LEAK: geometry not stripped
-            },
-          },
-        ],
-        placements: [],
-      });
-
-      process.chdir(dir);
-      const { main } = await import("../../../scripts/check-fog-safety");
-      process.argv = ["node", "check-fog-safety.ts", "out"];
-      const code = await main();
-      expect(code).toBe(14);
-    } finally {
-      process.chdir(origCwd);
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  // -------------------------------------------------------------------------
-  // Test 4: IN-FOG-CONTENT (15) — placement is inside fog by source geometry
-  // -------------------------------------------------------------------------
-  it("in-fog-content (15): placement at (90,90) is outside the source reveal", async () => {
-    const dir = mkTmp();
-    try {
-      writeSourceConfig(dir, "w", CLEAN_WORLD_YAML);
-
-      const artifactDir = path.join(dir, "out");
-      fs.mkdirSync(artifactDir, { recursive: true });
-      writePlayerAtlas(artifactDir, {
-        maps: [
-          {
-            id: "world",
-            width: 100,
-            height: 100,
-            layers: [
-              {
-                id: "lyr",
-                src: "atlas/assets/maps/world.fog.png",
-                x: 0,
-                y: 0,
-                width: 100,
-                height: 100,
-              },
-            ],
-            fog: { mapId: "world", enabled: true },
-          },
-        ],
-        placements: [
-          // (90,90) is outside the reveal [20,20]-[60,60] — should be in fog
-          { entityId: "secret-entity", mapId: "world", x: 90, y: 90 },
-        ],
-      });
-
-      process.chdir(dir);
-      const { main } = await import("../../../scripts/check-fog-safety");
-      process.argv = ["node", "check-fog-safety.ts", "out"];
-      const code = await main();
-      expect(code).toBe(15);
-    } finally {
-      process.chdir(origCwd);
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  // -------------------------------------------------------------------------
-  // Test 5: ALPHA-LEAK (16) — redacted PNG is opaque at a known-fogged corner
-  // -------------------------------------------------------------------------
-  it("alpha-leak (16): redacted PNG opaque at known-fogged corner (0,0)", async () => {
-    const dir = mkTmp();
-    try {
-      writeSourceConfig(dir, "w", CLEAN_WORLD_YAML);
-
-      const artifactDir = path.join(dir, "out");
-      fs.mkdirSync(artifactDir, { recursive: true });
-      writePlayerAtlas(artifactDir, {
-        maps: [
-          {
-            id: "world",
-            width: 100,
-            height: 100,
-            layers: [
-              {
-                id: "lyr",
-                src: "atlas/assets/maps/world.fog.png",
-                x: 0,
-                y: 0,
-                width: 100,
-                height: 100,
-              },
-            ],
-            fog: { mapId: "world", enabled: true },
-          },
-        ],
-        placements: [],
-      });
-
-      // Write a FULLY OPAQUE PNG — corner (0,0) is fogged but has alpha=255
-      const pngBuf = await buildOpaquePng();
-      const layerDir = path.join(artifactDir, "atlas", "assets", "maps");
-      fs.mkdirSync(layerDir, { recursive: true });
-      fs.writeFileSync(path.join(layerDir, "world.fog.png"), pngBuf);
-
-      process.chdir(dir);
-      const { main } = await import("../../../scripts/check-fog-safety");
-      process.argv = ["node", "check-fog-safety.ts", "out"];
-      const code = await main();
-      expect(code).toBe(16);
-    } finally {
-      process.chdir(origCwd);
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  // -------------------------------------------------------------------------
-  // Test 6: Missing artifact dir → exit 0 (skip message)
-  // -------------------------------------------------------------------------
-  it("missing artifact dir → exit 0", async () => {
-    const dir = mkTmp();
-    try {
-      process.chdir(dir);
-      const { main } = await import("../../../scripts/check-fog-safety");
-      process.argv = ["node", "check-fog-safety.ts", "nonexistent-dir"];
-      const code = await main();
-      expect(code).toBe(0);
-    } finally {
-      process.chdir(origCwd);
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  // -------------------------------------------------------------------------
-  // Test 7: Bad invocation (no args) → exit 1
-  // -------------------------------------------------------------------------
-  it("bad invocation (no args) → exit 1", async () => {
-    const dir = mkTmp();
-    try {
-      process.chdir(dir);
-      const { main } = await import("../../../scripts/check-fog-safety");
-      process.argv = ["node", "check-fog-safety.ts"];
-      const code = await main();
-      expect(code).toBe(1);
-    } finally {
-      process.chdir(origCwd);
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  /**
-   * Write only atlas.json for a fog-enabled map that is otherwise clean:
-   * a redacted .fog.png layer, fog stripped to {mapId, enabled}, no placements.
-   * With no source config this scans clean; the point of the two tests below is
-   * how the scanner behaves when source geometry can/can't be derived.
-   */
-  function writeCleanFogArtifact(dir: string): string {
-    const artifactDir = path.join(dir, "out");
-    fs.mkdirSync(artifactDir, { recursive: true });
-    writePlayerAtlas(artifactDir, {
-      maps: [
-        {
-          id: "world",
-          width: 100,
-          height: 100,
-          layers: [
-            {
-              id: "lyr",
-              src: "atlas/assets/maps/world.fog.png",
-              x: 0,
-              y: 0,
-              width: 100,
-              height: 100,
-            },
-          ],
-          fog: { mapId: "world", enabled: true },
-        },
-      ],
-      placements: [],
-    });
-    return artifactDir;
-  }
-
-  // -------------------------------------------------------------------------
-  // Test 8: source config PRESENT but world.yaml is broken → exit 17.
-  // The geometry-dependent checks (15, 16) cannot run, so an otherwise-clean
-  // fog map must NOT be reported clean — it is unverified.
-  // -------------------------------------------------------------------------
-  it("could-not-verify (17): present-but-broken world.yaml on a clean fog map", async () => {
-    const dir = mkTmp();
-    try {
-      // Markdown fences make loadWorldConfig throw (its hard-fail guard).
-      writeSourceConfig(dir, "w", "```yaml\nschemaVersion: 1\n```");
-      writeCleanFogArtifact(dir);
-
-      process.chdir(dir);
-      const { main } = await import("../../../scripts/check-fog-safety");
-      process.argv = ["node", "check-fog-safety.ts", "out"];
-      const code = await main();
-      expect(code).toBe(17);
-    } finally {
-      process.chdir(origCwd);
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  // -------------------------------------------------------------------------
-  // Test 9: source config present but world.yaml ABSENT → exit 0.
-  // loadWorldConfig returns null (not a throw) for an absent world.yaml, which
-  // is a legitimate configless state — it must stay distinct from the 17 above.
-  // -------------------------------------------------------------------------
-  it("absent world.yaml is legitimate → exit 0 (distinct from broken/17)", async () => {
-    const dir = mkTmp();
-    try {
-      // Config file only; no content/<world>/_atlas/world.yaml is created.
-      fs.writeFileSync(
-        path.join(dir, "atlas.config.json"),
-        JSON.stringify({ contentRoot: "content", outputDir: "out", defaultWorld: "w" }),
+  describe.each<Layout>(["dist", "store"])("%s layout", (layout) => {
+    it("clean fog-enabled map → exit 0", async () => {
+      const config = writeSourceConfig(CLEAN_WORLD_YAML);
+      const dir = plant(
+        layout,
+        fogAtlas({ placements: [{ entityId: "e1", mapId: "world", x: 40, y: 40 }] }),
+        { [FOG_FILE]: await png(0) },
       );
-      writeCleanFogArtifact(dir);
+      expect(await run({ dir, config })).toBe(0);
+    });
 
-      process.chdir(dir);
-      const { main } = await import("../../../scripts/check-fog-safety");
-      process.argv = ["node", "check-fog-safety.ts", "out"];
-      const code = await main();
-      expect(code).toBe(0);
+    it("alpha-leak (16): redacted PNG opaque at a known-fogged corner", async () => {
+      const config = writeSourceConfig(CLEAN_WORLD_YAML);
+      const dir = plant(layout, fogAtlas(), { [FOG_FILE]: await png(1) });
+      expect(await run({ dir, config })).toBe(16);
+    });
+
+    it("a fog layer whose .fog.png is missing is a finding (17), not a skip", async () => {
+      const config = writeSourceConfig(CLEAN_WORLD_YAML);
+      const dir = plant(layout, fogAtlas());
+      expect(await run({ dir, config })).toBe(17);
+    });
+
+    it("image-leak (13): layer src is a plain .png on a fog-enabled map", async () => {
+      const dir = plant(layout, fogAtlas({ src: "atlas/assets/maps/world.png" }));
+      expect(await run({ dir, config: path.join(root, "none.json") })).toBe(13);
+    });
+
+    it("geometry-leak (14): player atlas.fog.reveals not stripped", async () => {
+      const fog = { mapId: "world", enabled: true, reveals: [[[1, 1]]] };
+      const dir = plant(layout, fogAtlas({ fog }), { [FOG_FILE]: await png(0) });
+      expect(await run({ dir, config: path.join(root, "none.json") })).toBe(14);
+    });
+
+    it("in-fog-content (15): placement outside the source reveal", async () => {
+      const config = writeSourceConfig(CLEAN_WORLD_YAML);
+      const placements = [{ entityId: "secret-entity", mapId: "world", x: 90, y: 90 }];
+      const dir = plant(layout, fogAtlas({ placements }), { [FOG_FILE]: await png(0) });
+      expect(await run({ dir, config })).toBe(15);
+    });
+
+    it("could-not-verify (17): present-but-broken world.yaml on a clean fog map", async () => {
+      // Markdown fences make loadWorldConfig throw (its hard-fail guard).
+      const config = writeSourceConfig("```yaml\nschemaVersion: 1\n```");
+      const dir = plant(layout, fogAtlas(), { [FOG_FILE]: await png(0) });
+      expect(await run({ dir, config })).toBe(17);
+    });
+
+    it("absent world.yaml is legitimate → exit 0 (distinct from broken/17)", async () => {
+      const config = writeSourceConfig(null);
+      const dir = plant(layout, fogAtlas(), { [FOG_FILE]: await png(0) });
+      expect(await run({ dir, config })).toBe(0);
+    });
+  });
+
+  it("image-leak (13): the original map ships beside the redacted one in dist", async () => {
+    const config = writeSourceConfig(CLEAN_WORLD_YAML);
+    const dir = plant("dist", fogAtlas(), {
+      [FOG_FILE]: await png(0),
+      "assets/maps/world.png": await png(1),
+    });
+    expect(await run({ dir, config })).toBe(13);
+  });
+
+  it("the original map beside the redacted one in the source store is not a leak", async () => {
+    // public/atlas is the DM's store: the build reads the original from there,
+    // and the player build prunes it from dist.
+    const config = writeSourceConfig(CLEAN_WORLD_YAML);
+    const dir = plant("store", fogAtlas(), {
+      [FOG_FILE]: await png(0),
+      "assets/maps/world.png": await png(1),
+    });
+    expect(await run({ dir, config })).toBe(0);
+  });
+
+  it("missing artifact dir → exit 0", async () => {
+    expect(await run({ dir: path.join(root, "nonexistent-dir") })).toBe(0);
+  });
+
+  it("bad invocation (no args) → exit 1", async () => {
+    const argv = process.argv;
+    process.argv = ["node", "check-fog-safety.ts"];
+    try {
+      expect(await main()).toBe(1);
     } finally {
-      process.chdir(origCwd);
-      fs.rmSync(dir, { recursive: true, force: true });
+      process.argv = argv;
     }
   });
 });
