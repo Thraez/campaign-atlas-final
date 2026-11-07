@@ -5,15 +5,24 @@ Updated 2026-11-07 on the Mac. Branch `main` (= origin/main 983b5d0).
 ## Morning queue (2026-11-07, second round)
 
 The 2026-11-07 morning queue is done: PRs #92-#98 are merged and published. This round's
-improvement loop opened three more: two code PRs, each cut from `main`, independent of each other,
-gate-green and reviewed clean (Opus, medium), plus this docs PR. Auto mode refused `gh pr merge`,
-so they wait for Isak. In this order:
+improvement loop opened the PRs below. Each one is cut from `main`, gate-green and reviewed clean
+(Opus, medium). Two are stacked, because they need unmerged code. Auto mode refused
+`gh pr merge`, so they wait for Isak. Merge them in this order:
 
-| Order | PR   | Ticket                                    | Branch                             |
-| ----- | ---- | ----------------------------------------- | ---------------------------------- |
-| 1     | #99  | eval-2026-10/45 deleted pins on every map | `eval-45-deleted-pins-counted`     |
-| 2     | #100 | eval-2026-10/46 one spoiler-leak rule     | `eval-46-one-world-yaml-leak-rule` |
-| 3     | #101 | State.md, workflow retro notes            | `docs-2026-11-07-improve-loop`     |
+| Order | PR   | Ticket                                            | Branch                                      | Note                       |
+| ----- | ---- | ------------------------------------------------- | ------------------------------------------- | -------------------------- |
+| 1     | #99  | eval-2026-10/45 deleted pins on every map         | `eval-45-deleted-pins-counted`              |                            |
+| 2     | #100 | eval-2026-10/46 one spoiler-leak rule             | `eval-46-one-world-yaml-leak-rule`          |                            |
+| 3     | #106 | eval-2026-10/50 link leak rules match the build   | `eval-50-link-leak-rules-match-build`       | stacked on #100            |
+| 4     | #102 | eval-2026-10/48 the wizard's zip strips metadata  | `eval-48-wizard-zip-strips-metadata`        |                            |
+| 5     | #103 | eval-2026-10/47 Discard all clears world settings | `eval-47-discard-all-clears-world-settings` |                            |
+| 6     | #107 | eval-2026-10/44 soundscape draft per map          | `eval-44-soundscape-draft-per-map`          | stacked on #103            |
+| 7     | #104 | eval-2026-10/27 one reduce-motion switch          | `eval-27-one-reduce-motion-switch`          | Isak looks at the button   |
+| 8     | #105 | eval-2026-10/49 ruler and drawing, one click      | `eval-49-ruler-and-drawing-one-click`       | Isak checks in the preview |
+| 9     | #101 | This State.md, workflow retro notes               | `docs-2026-11-07-improve-loop`              | last                       |
+
+Check each PR's mergeability just before its merge; a stacked PR only becomes clean once the PR
+under it is merged (GitHub then shows only its own commits):
 
 ```bash
 gh pr merge 99 --merge
@@ -28,12 +37,45 @@ gh pr merge 100 --merge
 ```
 
 ```bash
+gh pr view 106 --json mergeable
+```
+
+```bash
+gh pr merge 106 --merge
+```
+
+```bash
+gh pr merge 102 --merge
+```
+
+```bash
+gh pr merge 103 --merge
+```
+
+```bash
+gh pr view 107 --json mergeable
+```
+
+```bash
+gh pr merge 107 --merge
+```
+
+```bash
+gh pr merge 104 --merge
+```
+
+```bash
+gh pr merge 105 --merge
+```
+
+```bash
 gh pr merge 101 --merge
 ```
 
-The two code PRs touch different files except the tracker; a conflict keeps both sides. Still kept:
-`stash@{0}` "pre-2026-11-07 local edits" (old State.md notes; a `.claude/settings.json` change
-dropping the `atlas:publish` ask rule, not applied: Isak's call) and branch
+Every code PR also edits its own ticket
+file only, so tracker conflicts are unlikely; a conflict keeps both sides, then the gate runs again.
+Still kept: `stash@{0}` "pre-2026-11-07 local edits" (old State.md notes; a `.claude/settings.json`
+change dropping the `atlas:publish` ask rule, not applied: Isak's call) and branch
 `local-main-backup-2026-11-07`. Both can go once Isak has looked.
 
 ## Where it stands
@@ -47,27 +89,25 @@ dropping the `atlas:publish` ask rule, not applied: Isak's call) and branch
 - Merges run on the full local gate plus an Opus review, without GitHub CI (`docs/agents/workflow.md`).
   The PR check runs only by hand (#90).
 - 2026-11-07 improvement loop (retro, architecture review, simplify): no rewrite. The editor page is
-  wiring around tested pure modules; extraction beats a rewrite. The ranked list it left is under
-  "Open work".
+  wiring around tested pure modules; extraction beats a rewrite. It built eight tickets (Morning
+  queue); what's left is under "Open work".
 
 ## Open work
 
 Lowest number first within each folder.
 
-- Waiting to merge (Morning queue): `eval-2026-10/45`, `46`.
+- Waiting to merge (Morning queue): `eval-2026-10/27`, `44`-`50`.
 - Next, by payoff (from the improvement loop; no ticket yet unless numbered):
-  1. Discard all leaves world settings and the calendar dirty (they aren't session holders); the
-     calendar bypasses undo and the session store.
-  2. `eval-2026-10/44`: soundscape draft per map.
-  3. The ruler and route/fog drawing both take the same click (`AtlasPlacementEditor`, ~line 2040).
-  4. Delete the Map Import Wizard (~900 lines): its zip writes raw JPG bytes; tidemarrow/02 uses the
-     editor upload instead (provisional call below).
-  5. Editor and player pin anchors differ by about 8px: needs Isak's look.
-  6. `validateProject` wikilink and relationship rules still use the old player-vs-dm/hidden check;
-     compare with the build's (found reviewing 46).
-  7. `eval-2026-10/39` (one canon client), `27` (one reduce-motion switch).
-  8. Later, L: map-space module and markers.json converter (tidemarrow/02), a draft registry
-     (reopen code-retro 09; it would absorb 44/45-style gaps), build-atlas stages.
+  1. `eval-2026-10/39` (one canon client): after the queue merges; it touches the save plugin that
+     #102 changes.
+  2. Editor and player pin anchors differ by about 8px: needs Isak's look.
+  3. A WebP map keeps its EXIF/XMP in the editor upload and the wizard's zip until
+     `check-image-privacy` (found in 48).
+  4. `sessionHasWork` counts a world settings override for any world id, the unsaved count only the
+     active one (found in 47).
+  5. Later, L: map-space module and markers.json converter (tidemarrow/02), a draft registry
+     (reopen code-retro 09; it would absorb 44/45/47-style gaps; pin overrides and map metadata
+     could move to `useUndoableState`), build-atlas stages.
 - `tidemarrow/01`-`03`: first sync, Tidemarrow map, remove the Astrath sample.
 - `eval-2026-10/07`: Vite 8 with Vitest 5, after Tidemarrow.
 - `agent-retro/03` (no scheduled CI): Isak decides what GitHub Actions may still spend.
@@ -87,7 +127,10 @@ Lowest number first within each folder.
   a reload with sound on, desktop and phone (#71), offline in a browser (#78), the Sync panel (#79),
   the Save chip and the conflict notice (#80, #81); eval-30 (#92): draw on two maps, save once,
   reload, both keep their edits. After #99: delete a pin on map B, switch to map A, save, reload;
-  the pin stays gone.
+  the pin stays gone. After #104: the calm-mode button in the map toolbar (look and place). After
+  #105: start a route with the ruler on; one click adds one vertex and no ruler point. After #103:
+  rename the world, edit the calendar, Discard all; both go back. After #107: change one map's
+  soundscape, switch maps, save; only that map changes.
 - Agents were denied reads under `node_modules` (an unknown deny rule); worth a look.
 - The provisional calls below, in a batch.
 - On the PC: follow `docs/PC-CLEANUP.md` (turn the old routines off first).
@@ -150,11 +193,23 @@ answer, logged here and built on; he reviews this list in batches, and a reversa
 | 2026-11-07 | eval-45: a deleted-pin override for a pin canon no longer has (stale tombstone)?                                                                              | Dropped on load and whenever canon reloads                                                                                   | Saving it threw "Unknown entity" on every Save, or wrote a removal nobody asked for                                                    | 45     |
 | 2026-11-07 | eval-46: a player-visible route or region naming an unknown entity?                                                                                           | Blocks Publish Check, as it blocks the strict build                                                                          | The check passed what the publish then refused                                                                                         | 46     |
 | 2026-11-07 | eval-46: credits of `hidden` entities on the credits page?                                                                                                    | Hidden, like `dm`                                                                                                            | Only player and rumor ship                                                                                                             | 46     |
-| 2026-11-07 | Improvement loop: delete the Map Import Wizard rather than fix its zip?                                                                                       | Yes, when its ticket comes up                                                                                                | ~900 lines; the editor upload already strips metadata losslessly                                                                       | —      |
+| 2026-11-07 | Improvement loop: delete the Map Import Wizard rather than fix its zip?                                                                                       | No (reversed while building 48); its zip now cleans each map through a dev route                                             | It is the only way to draft a new map; nothing else creates a map document                                                             | 48     |
+| 2026-11-07 | eval-48: the wizard's download needs the dev server and refuses maps over 6 MB?                                                                               | Yes; a toast says so                                                                                                         | The clean runs in Node (sharp); the same cap as the editor upload                                                                      | 48     |
+| 2026-11-07 | eval-47: does Save clear the calendar draft itself?                                                                                                           | No; the draft drops once it equals canon                                                                                     | Clearing at save would write the old calendar back if the rebuild failed                                                               | 47     |
+| 2026-11-07 | eval-27: where does the calm-mode switch live on the player site?                                                                                             | The map toolbar, beside grid and ruler                                                                                       | There is no settings panel; Isak looks at the button                                                                                   | 27     |
+| 2026-11-07 | eval-27: does calm mode still silence the soundscape?                                                                                                         | Yes; the OS setting alone leaves audio on                                                                                    | Unchanged behaviour; the button's title says so                                                                                        | 27     |
+| 2026-11-07 | eval-49: ruler on while drawing a route or fog shape?                                                                                                         | The drawing owns the click; the ruler pauses and clears its points                                                           | The drawing is work in progress, as pins, regions and sound areas already did                                                          | 49     |
+| 2026-11-07 | eval-49: a pending pin while drawing?                                                                                                                         | The drawing owns the click; the pin waits for the first click after                                                          | One click, one action                                                                                                                  | 49     |
+| 2026-11-07 | eval-50: a player relationship to an unknown target?                                                                                                          | The blocking leak plus the existing unresolved warning                                                                       | Matches the build, which refuses it                                                                                                    | 50     |
+| 2026-11-07 | eval-50: a `publish: false` note linking a DM note?                                                                                                           | Not judged                                                                                                                   | The build skips that note, so nothing leaks                                                                                            | 50     |
+| 2026-11-07 | eval-44: where does the sound draft live?                                                                                                                     | In the map's own metadata override, edited through `patchMap`                                                                | One copy per map: no new session data or undo code, nothing to patch back                                                              | 44     |
+| 2026-11-07 | eval-44: does Reset map settings clear sound edits?                                                                                                           | Yes                                                                                                                          | They now live in the same override                                                                                                     | 44     |
 
 ## End of the 2026-11-07 improvement loop
 
-Built and reviewed eval-45 (#99) and eval-46 (#100); wrote the retro notes into `docs/agents/workflow.md`
-(review before gate, worktree lint/format, zsh quoting, State.md after merge, queued merges) and
-added the `in-review` state. Stopped there: three PRs wait on Isak's merge, and stacking more
-unmerged work would only add conflicts. Next session: the "Open work" list, from item 1.
+Built, reviewed and gated eight tickets, one PR each: 45 (#99), 46 (#100), 48 (#102), 47 (#103),
+27 (#104), 49 (#105), 50 (#106, stacked on #100) and 44 (#107, stacked on #103). Wrote the retro notes
+into `docs/agents/workflow.md` (review before gate, worktree lint/format, zsh quoting, State.md
+after merge, queued merges) and added the `in-review` state. Stopped there: what's left is 39,
+which would conflict with the queue, the pin anchor (Isak's look) and L-sized work. Next session:
+merge the queue, then the "Open work" list from item 1.
