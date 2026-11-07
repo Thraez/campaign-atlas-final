@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { saveAtlasPatchToLocalFs, hashContent, ConflictError } from "@/atlas/save/localFsSave";
 import { copyToClipboard } from "@/lib/clipboard";
 import {
+  characterKeysPath,
   parseCharacterKeys,
   rebaseCharacterKeys,
   serializeCharacterKeys,
@@ -51,11 +52,13 @@ type Status =
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 interface Props {
-  worldDir: string;
+  /** The content folder as the save endpoint names it (`content`). */
+  contentRoot: string;
+  world: string;
 }
 
-export function CharacterKeysPanel({ worldDir }: Props) {
-  const keysPath = `${worldDir}/_dm/character-keys.yaml`;
+export function CharacterKeysPanel({ contentRoot, world }: Props) {
+  const keysPath = characterKeysPath(contentRoot, world);
   const [rows, setRows] = useState<CharacterKeyEntry[]>([]);
   const [baseHash, setBaseHash] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>({ kind: "loading" });

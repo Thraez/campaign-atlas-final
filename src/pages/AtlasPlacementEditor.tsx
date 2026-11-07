@@ -1972,7 +1972,7 @@ function AtlasPlacementEditorInner() {
               />
             ),
             characterKeys: activeWorldId ? (
-              <CharacterKeysPanel worldDir={`content/${activeWorldId}`} />
+              <CharacterKeysPanel contentRoot="content" world={activeWorldId} />
             ) : null,
             calendar: (
               <CalendarPanel

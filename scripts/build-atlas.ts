@@ -45,7 +45,7 @@ import {
 } from "./atlas/validateAsset";
 import { parseAtlasDate } from "./atlas/calendarDate";
 import { buildEntitySecrets } from "./atlas/buildSecrets";
-import yaml from "js-yaml";
+import { characterKeysPath, parseCharacterKeys } from "../src/atlas/secrets/characterKeysFile";
 import { PLAYER_VISIBLE_VISIBILITY } from "./atlas/visibility";
 import { isLit } from "../src/atlas/fog/effectiveLit";
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
@@ -485,26 +485,44 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     throw new BuildError(1, msg);
   }
 
-  // Load character keys file if present (content/_dm/character-keys.yaml).
-  // Keys are used only at encrypt time; they never appear in any build output.
-  const charKeys = new Map<string, string>();
-  try {
-    const keysPath = path.join(contentDir, "_dm", "character-keys.yaml");
-    if (fs.existsSync(keysPath)) {
-      const raw = fs.readFileSync(keysPath, "utf8");
-      const parsed = yaml.load(raw) as Record<string, string> | null;
-      if (parsed && typeof parsed === "object") {
-        for (const [k, v] of Object.entries(parsed)) {
-          if (typeof v === "string") charKeys.set(k, v);
-        }
-      }
-    }
-  } catch {
-    // No keys file → character secrets will be warned and skipped per-secret below.
-  }
-
   const warnings: string[] = [];
   const errors: string[] = [];
+
+  // Character keys (DM-only; used at encrypt time, never in any output) live
+  // where the editor saves them, the world's `_dm/character-keys.yaml`, and
+  // are read with the editor's parser: `Bob: 12345` is key "12345"; entries
+  // that aren't a name and a key are left out, so their secrets take the
+  // missing-key warning in the encrypt pass. Warnings name files, never keys.
+  const charKeys = new Map<string, string>();
+  const configRel = (p: string) => path.relative(path.dirname(configPath), p).replace(/\\/g, "/");
+  const keysPath = characterKeysPath(contentDir, cfg.defaultWorld);
+  if (fs.existsSync(keysPath)) {
+    let text: string | null = null;
+    try {
+      text = fs.readFileSync(keysPath, "utf8");
+    } catch {
+      warnings.push(`${configRel(keysPath)}: couldn't be read — character secrets skipped`);
+    }
+    if (text !== null) {
+      const parsed = parseCharacterKeys(text);
+      if (parsed.ok) {
+        for (const { name, key } of parsed.entries) charKeys.set(name, key);
+      } else {
+        // `brief`, not `error`: the parser's reason can quote a key, and
+        // warnings ship in the player build report.
+        warnings.push(`${configRel(keysPath)}: ${parsed.brief} — character secrets skipped`);
+      }
+    }
+  }
+  // The build once read `<contentRoot>/_dm/character-keys.yaml`, which the
+  // editor never wrote. A file left there is not read: say so, so the DM
+  // moves its keys rather than wondering why secrets are skipped.
+  const legacyKeysPath = path.join(contentDir, "_dm", "character-keys.yaml");
+  if (fs.existsSync(legacyKeysPath)) {
+    warnings.push(
+      `${configRel(legacyKeysPath)} is ignored: character keys belong in ${configRel(keysPath)} (where the editor's Character Keys panel saves them)`,
+    );
+  }
   let strippedDmBlocks = 0;
   let detectedDmBlocks = 0;
   let duplicateSlugs = 0;

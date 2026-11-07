@@ -1,6 +1,6 @@
 # The build reads the character keys the editor writes
 
-Status: ready-for-agent
+Status: done
 Area: build (character secrets)
 
 Found while building ticket 36 (2026-10-28), verified by reading. The build reads
@@ -27,3 +27,24 @@ the ticket 36 branch (bf95e9d, with a test) and reverted for the conflict with #
 - If a keys file exists at the old `content/_dm/` path, the build warns that it is ignored
   (or reads it as a fallback; say which).
 - Stack on code-retro-08 (#82), which reshapes `runBuildCore`. Player safety review (third lens).
+
+## Comments
+
+2026-11-07 (agent): `characterKeysPath(contentRoot, world)` in
+`src/atlas/secrets/characterKeysFile.ts` (pure, js-yaml only) names
+`<contentRoot>/<world>/_dm/character-keys.yaml`; the build (`cfg.defaultWorld`), the Character
+Keys panel (props are now `contentRoot` + `world`) and the entity panel use it. The build reads
+it with `parseCharacterKeys` (bf95e9d, adapted to the reshaped `buildAtlas`): `Bob: 12345` is
+key "12345"; empty or nested entries take the missing-key warning naming the entry. An
+unreadable or invalid keys file now warns (file name and parse reason, never a value) instead of
+being silent. Old `<contentRoot>/_dm/character-keys.yaml`: provisional call, the build warns
+that it is ignored and does not read it (one place for keys, the one the editor writes; no such
+file is tracked). Tests: `src/test/secrets/build-character-keys.test.ts` (editor-saved key
+encrypts and decrypts, numeric key, nested/empty entries, old path ignored, no key or plaintext
+in any output file); secrets-fortress now asserts `vesper`'s secret is encrypted and decrypts.
+
+2026-11-07 (agent, review fix): the invalid-YAML warning leaked. js-yaml's reason can quote an
+alias or tag (`Ada: *key` -> `unidentified alias "key"`), and warnings ship in the player
+build report. `parseCharacterKeys` failures now carry `brief` (at most a line number) beside
+`error` (full reason, editor panel only); the build prints `brief`. Tests: an alias and a tag
+in the keys file leave the key text out of the build output and every player file.

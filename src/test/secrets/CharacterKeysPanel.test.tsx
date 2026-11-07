@@ -45,7 +45,7 @@ describe("CharacterKeysPanel — load/add/remove/persist contract (N36)", () => 
   beforeEach(() => {
     vi.clearAllMocks();
     mockHash.mockResolvedValue("sha256:abc123");
-    mockSave.mockResolvedValue({ saved: 1, paths: ["/world/_dm/character-keys.yaml"] });
+    mockSave.mockResolvedValue({ saved: 1, paths: ["content/world/_dm/character-keys.yaml"] });
   });
 
   afterEach(() => {
@@ -54,19 +54,19 @@ describe("CharacterKeysPanel — load/add/remove/persist contract (N36)", () => 
 
   it("shows loading indicator while fetch is pending", () => {
     stubFetchHang();
-    render(<CharacterKeysPanel worldDir="/world" />);
+    render(<CharacterKeysPanel contentRoot="content" world="world" />);
     expect(screen.getByText("Loading…")).toBeInTheDocument();
   });
 
   it("shows empty state when no characters exist (404)", async () => {
     stubFetch404();
-    render(<CharacterKeysPanel worldDir="/world" />);
+    render(<CharacterKeysPanel contentRoot="content" world="world" />);
     await waitFor(() => expect(screen.getByText(/No characters yet/i)).toBeInTheDocument());
   });
 
   it("populates rows from saved YAML on mount", async () => {
     stubFetchOk({ contents: "Aria: key123\n" });
-    render(<CharacterKeysPanel worldDir="/world" />);
+    render(<CharacterKeysPanel contentRoot="content" world="world" />);
     await waitFor(() => {
       expect(screen.getByDisplayValue("Aria")).toBeInTheDocument();
       expect(screen.getByText("key123")).toBeInTheDocument();
@@ -75,7 +75,7 @@ describe("CharacterKeysPanel — load/add/remove/persist contract (N36)", () => 
 
   it("Add character button adds a new empty-name row", async () => {
     stubFetch404();
-    render(<CharacterKeysPanel worldDir="/world" />);
+    render(<CharacterKeysPanel contentRoot="content" world="world" />);
     await waitFor(() => screen.getByText(/No characters yet/i));
     fireEvent.click(screen.getByRole("button", { name: /Add character/i }));
     expect(screen.getAllByLabelText("Character name")).toHaveLength(1);
@@ -83,7 +83,7 @@ describe("CharacterKeysPanel — load/add/remove/persist contract (N36)", () => 
 
   it("Remove character removes the row from the list", async () => {
     stubFetchOk({ contents: "Aria: key123\n" });
-    render(<CharacterKeysPanel worldDir="/world" />);
+    render(<CharacterKeysPanel contentRoot="content" world="world" />);
     await waitFor(() => screen.getByDisplayValue("Aria"));
     fireEvent.click(screen.getByRole("button", { name: /Remove character/i }));
     expect(screen.queryByDisplayValue("Aria")).toBeNull();
@@ -91,14 +91,14 @@ describe("CharacterKeysPanel — load/add/remove/persist contract (N36)", () => 
 
   it("Save button calls saveAtlasPatchToLocalFs with correct path and kind", async () => {
     stubFetchOk({ contents: "Aria: key123\n" });
-    render(<CharacterKeysPanel worldDir="/world" />);
+    render(<CharacterKeysPanel contentRoot="content" world="world" />);
     await waitFor(() => screen.getByDisplayValue("Aria"));
     fireEvent.click(screen.getByRole("button", { name: /Save keys/i }));
     await waitFor(() =>
       expect(mockSave).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({
-            path: "/world/_dm/character-keys.yaml",
+            path: "content/world/_dm/character-keys.yaml",
             kind: "world-yaml",
           }),
         ]),
@@ -109,7 +109,7 @@ describe("CharacterKeysPanel — load/add/remove/persist contract (N36)", () => 
   it("Save button is disabled while save is in flight", async () => {
     stubFetchOk({ contents: "Aria: key123\n" });
     mockSave.mockReturnValue(new Promise(() => {}));
-    render(<CharacterKeysPanel worldDir="/world" />);
+    render(<CharacterKeysPanel contentRoot="content" world="world" />);
     await waitFor(() => screen.getByDisplayValue("Aria"));
     fireEvent.click(screen.getByRole("button", { name: /Save keys/i }));
     await waitFor(() => expect(screen.getByRole("button", { name: /Saving/i })).toBeDisabled());
@@ -117,7 +117,7 @@ describe("CharacterKeysPanel — load/add/remove/persist contract (N36)", () => 
 
   it("blank-name rows are excluded from the saved YAML", async () => {
     stubFetch404();
-    render(<CharacterKeysPanel worldDir="/world" />);
+    render(<CharacterKeysPanel contentRoot="content" world="world" />);
     await waitFor(() => screen.getByText(/No characters yet/i));
     fireEvent.click(screen.getByRole("button", { name: /Add character/i }));
     fireEvent.click(screen.getByRole("button", { name: /Save keys/i }));
@@ -130,7 +130,7 @@ describe("CharacterKeysPanel — load/add/remove/persist contract (N36)", () => 
   it("shows an error toast when copying a key fails (N135)", async () => {
     stubClipboard(vi.fn().mockRejectedValue(new Error("denied")));
     stubFetchOk({ contents: "Aria: key123\n" });
-    render(<CharacterKeysPanel worldDir="/world" />);
+    render(<CharacterKeysPanel contentRoot="content" world="world" />);
     await waitFor(() => screen.getByText("key123"));
     fireEvent.click(screen.getByRole("button", { name: /Copy key/i }));
     await waitFor(() => expect(mockToastError).toHaveBeenCalledWith("Could not copy key"));
@@ -149,7 +149,7 @@ describe("CharacterKeysPanel — a failed load never offers an empty list to sav
   beforeEach(() => {
     vi.clearAllMocks();
     mockHash.mockResolvedValue("sha256:abc123");
-    mockSave.mockResolvedValue({ saved: 1, paths: ["/world/_dm/character-keys.yaml"] });
+    mockSave.mockResolvedValue({ saved: 1, paths: ["content/world/_dm/character-keys.yaml"] });
   });
 
   afterEach(() => {
@@ -158,7 +158,7 @@ describe("CharacterKeysPanel — a failed load never offers an empty list to sav
 
   it("a server error says the keys couldn't load and keeps Save off", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
-    render(<CharacterKeysPanel worldDir="/world" />);
+    render(<CharacterKeysPanel contentRoot="content" world="world" />);
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(/Couldn't load the character keys/i),
     );
@@ -172,7 +172,7 @@ describe("CharacterKeysPanel — a failed load never offers an empty list to sav
       .mockRejectedValueOnce(new TypeError("Failed to fetch"))
       .mockResolvedValue({ ok: true, status: 200, json: async () => ({ contents: "Aria: k1\n" }) });
     vi.stubGlobal("fetch", fetchMock);
-    render(<CharacterKeysPanel worldDir="/world" />);
+    render(<CharacterKeysPanel contentRoot="content" world="world" />);
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(/Couldn't load the character keys/i),
     );
@@ -187,7 +187,7 @@ describe("CharacterKeysPanel — every key survives a load and a save (eval-2026
   beforeEach(() => {
     vi.clearAllMocks();
     mockHash.mockResolvedValue("sha256:abc123");
-    mockSave.mockResolvedValue({ saved: 1, paths: ["/world/_dm/character-keys.yaml"] });
+    mockSave.mockResolvedValue({ saved: 1, paths: ["content/world/_dm/character-keys.yaml"] });
   });
 
   afterEach(() => {
@@ -196,7 +196,7 @@ describe("CharacterKeysPanel — every key survives a load and a save (eval-2026
 
   it("a hand-edited numeric key loads as its text and is saved as a string", async () => {
     stubFetchOk({ contents: "Aria: k1\nBob: 12345\nCara: 0123\n" });
-    render(<CharacterKeysPanel worldDir="/world" />);
+    render(<CharacterKeysPanel contentRoot="content" world="world" />);
     await waitFor(() => expect(screen.getByDisplayValue("Bob")).toBeInTheDocument());
     expect(screen.getByText("12345")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Save keys/i }));
@@ -211,7 +211,7 @@ describe("CharacterKeysPanel — every key survives a load and a save (eval-2026
 
   it("an entry that isn't a name and a key blocks saving and is named", async () => {
     stubFetchOk({ contents: "Aria: k1\nBob:\n  nested: x\nCara: [a, b]\n" });
-    render(<CharacterKeysPanel worldDir="/world" />);
+    render(<CharacterKeysPanel contentRoot="content" world="world" />);
     await waitFor(() => expect(screen.getByDisplayValue("Aria")).toBeInTheDocument());
     const alert = screen.getByRole("alert");
     expect(alert).toHaveTextContent(/Bob/);
@@ -230,7 +230,7 @@ describe("CharacterKeysPanel — a save conflict re-reads the file and keeps the
   beforeEach(() => {
     vi.clearAllMocks();
     mockHash.mockImplementation(async (c: string) => `h:${c}`);
-    mockSave.mockResolvedValue({ saved: 1, paths: ["/world/_dm/character-keys.yaml"] });
+    mockSave.mockResolvedValue({ saved: 1, paths: ["content/world/_dm/character-keys.yaml"] });
   });
 
   afterEach(() => {
@@ -245,9 +245,9 @@ describe("CharacterKeysPanel — a save conflict re-reads the file and keeps the
       vi.fn().mockResolvedValueOnce(fileResponse(before)).mockResolvedValue(fileResponse(after)),
     );
     mockSave.mockRejectedValueOnce(
-      new ConflictError("stale-base", "/world/_dm/character-keys.yaml", "h:other"),
+      new ConflictError("stale-base", "content/world/_dm/character-keys.yaml", "h:other"),
     );
-    render(<CharacterKeysPanel worldDir="/world" />);
+    render(<CharacterKeysPanel contentRoot="content" world="world" />);
     await waitFor(() => screen.getByDisplayValue("Bob"));
 
     // The DM regenerates Bob's key and adds Cara, unsaved.
@@ -293,9 +293,9 @@ describe("CharacterKeysPanel — a save conflict re-reads the file and keeps the
         .mockResolvedValue(fileResponse(created)),
     );
     mockSave.mockRejectedValueOnce(
-      new ConflictError("already-exists", "/world/_dm/character-keys.yaml"),
+      new ConflictError("already-exists", "content/world/_dm/character-keys.yaml"),
     );
-    render(<CharacterKeysPanel worldDir="/world" />);
+    render(<CharacterKeysPanel contentRoot="content" world="world" />);
     await waitFor(() => screen.getByText(/No characters yet/i));
     fireEvent.click(screen.getByRole("button", { name: /Add character/i }));
     fireEvent.change(screen.getByLabelText("Character name"), { target: { value: "Cara" } });
