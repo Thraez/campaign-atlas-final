@@ -17,8 +17,8 @@ Invalid visibility values are coerced to `dm` (fail-safe). In strict player buil
 
 `world.yaml` regions and routes follow their own rule: a missing `visibility` is `player`, and a
 value that is present but invalid (a typo such as `secret` or `Player`) loads as `dm` with a build
-warning ([ADR-0001](adr/0001-missing-visibility-is-dm.md), addendum). Sound-only areas already drop
-on any value that isn't player-visible.
+warning ([ADR-0001](adr/0001-missing-visibility-is-dm.md), addendum). Sound-only areas follow the same rule: a missing value ships, and any other value
+that isn't `player` or `rumor` (a typo, empty, `false`) drops.
 
 ## Three mechanisms for hiding DM content
 

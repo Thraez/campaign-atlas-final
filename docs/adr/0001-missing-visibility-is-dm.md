@@ -31,10 +31,13 @@ one file, and their defaults are untouched by this ADR.
 ## Addendum (2026-11-07): an invalid world.yaml visibility is `dm`
 
 `world.yaml` defaults stay out of scope, but a typo is a different case. The loader turned a value
-such as `visibility: secret` into `player`, so a mistyped DM-only region or route shipped. The
-editor's player lens already assumed `dm` for such values, so the preview and the build disagreed.
+such as `visibility: secret` into `player`, so a mistyped DM-only region or route shipped (the
+editor showed it as `player` too, since it reads the loaded config). Sound-only areas dropped a typo
+but shipped an empty or `false` value.
 
 Decision (Isak): in `world.yaml`, a missing `visibility` is still `player`; a value that is present
 but not a valid visibility (any typo, a different case, `true`, an empty value) loads as `dm`, with a
-build warning naming the item. Sound-only areas already dropped on such values. The loader is
-`normalizeVis` in `scripts/atlas/loadWorldConfig.ts`.
+build warning naming the item. Sound-only areas follow the same rule: missing ships, any other
+value that isn't `player` or `rumor` drops. The code is `normalizeVis` in
+`scripts/atlas/loadWorldConfig.ts` and `filterSoundscapeForPlayer` in
+`scripts/atlas/filterSoundscape.ts`.
