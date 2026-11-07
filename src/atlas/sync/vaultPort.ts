@@ -16,6 +16,9 @@
  *     `baseHash: null` is create-only, otherwise the file on disk must still
  *     hash to `baseHash`. Either failure throws `ConflictError` and writes
  *     nothing.
+ *   - R-01: while `atlas.config.json` `hosting` is not "private", a vault
+ *     image copy and a write with `origin: "sync"` throw `HostingPublicError`
+ *     and write nothing (`./hosting.ts`). Scans and reads still work.
  */
 import type { FileChange } from "@/atlas/save/localFsSave";
 import type { SyncMap } from "@/atlas/import/syncMap";
@@ -62,6 +65,11 @@ export interface AtlasWriteResult {
   rebuildError?: string;
 }
 
+export interface AtlasWriteOpts {
+  /** "sync": a Sync from Obsidian write, refused while hosting is public. */
+  origin?: "sync";
+}
+
 export interface VaultPort {
   /** Vault-relative POSIX path → raw text of every note in scope. Throws `VaultScanError`. */
   scanVault(source: SyncSource): Promise<Record<string, string>>;
@@ -69,8 +77,8 @@ export interface VaultPort {
   copyVaultImage(req: VaultImageCopyRequest): Promise<VaultImageCopyResult>;
   /** An atlas content file's text (`content/...`), or null when there is none. */
   readAtlasFile(path: string): Promise<string | null>;
-  /** Write atlas content (see the contract above). */
-  writeAtlasFiles(changes: FileChange[]): Promise<AtlasWriteResult>;
+  /** Write atlas content (see the contract above). `origin: "sync"` marks a vault sync's write. */
+  writeAtlasFiles(changes: FileChange[], opts?: AtlasWriteOpts): Promise<AtlasWriteResult>;
   loadSyncMap(): Promise<SyncMap>;
   saveSyncMap(map: SyncMap): Promise<void>;
   /** Remember when the last sync wrote something (editor settings `lastSyncAt`). */
