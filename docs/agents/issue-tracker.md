@@ -7,7 +7,7 @@ Specs, tickets and wayfinder maps live as Markdown files in `docs/tracker/`, com
 - One feature or effort per folder: `docs/tracker/<slug>/`
 - The spec is `docs/tracker/<slug>/spec.md`
 - Tickets are one file each at `docs/tracker/<slug>/issues/<NN>-<slug>.md`, numbered from `01`, never one combined file
-- State is a `Status:` line near the top of each ticket: `ready-for-agent`, `ready-for-human` (needs Isak's look or a decision), `done` or `wontfix`
+- State is a `Status:` line near the top of each ticket: `ready-for-agent`, `ready-for-human` (needs Isak's look or a decision), `in-review` (built, reviewed and gate-green, PR open, waiting to merge), `done` or `wontfix`
 - Order is the number: work the lowest open, unblocked ticket first. A `Blocked by: NN, NN` line near the top holds a ticket back.
 - Comments append at the bottom under a `## Comments` heading
 

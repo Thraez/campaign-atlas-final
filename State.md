@@ -1,35 +1,40 @@
 # State
 
-Updated 2026-11-07 on the Mac. Branch `main` (= origin/main 2f4e7e6).
+Updated 2026-11-07 on the Mac. Branch `main` (= origin/main 983b5d0).
 
-## Morning queue (2026-11-07)
+## Morning queue (2026-11-07, second round)
 
-Six tickets are built, reviewed (Opus, medium, CLEAN) and pass the full local gate, each on its own
-local branch and worktree under `.claude/worktrees/`. Auto mode refused the first `git push`, so
-nothing is pushed, no PR is open, nothing is merged. With Isak's yes, for each branch in this order:
+The 2026-11-07 morning queue is done: PRs #92-#98 are merged and published. This round's
+improvement loop opened three more: two code PRs, each cut from `main`, independent of each other,
+gate-green and reviewed clean (Opus, medium), plus this docs PR. Auto mode refused `gh pr merge`,
+so they wait for Isak. In this order:
+
+| Order | PR   | Ticket                                    | Branch                             |
+| ----- | ---- | ----------------------------------------- | ---------------------------------- |
+| 1     | #99  | eval-2026-10/45 deleted pins on every map | `eval-45-deleted-pins-counted`     |
+| 2     | #100 | eval-2026-10/46 one spoiler-leak rule     | `eval-46-one-world-yaml-leak-rule` |
+| 3     | #101 | State.md, workflow retro notes            | `docs-2026-11-07-improve-loop`     |
 
 ```bash
-git push -u origin <branch>
-gh pr create --base main --head <branch> --title "<ticket title>" --body-file docs/tracker/pr-bodies-2026-11-07/<file>.md
-gh pr merge <N> --merge
+gh pr merge 99 --merge
 ```
 
-then re-check the next PR's mergeability (`gh pr view <N> --json mergeable`) before merging it.
+```bash
+gh pr view 100 --json mergeable
+```
 
-| Order | Ticket                                        | Branch                             | Body file           |
-| ----- | --------------------------------------------- | ---------------------------------- | ------------------- |
-| 1     | eval-2026-10/30 drafts per map                | `eval-30-drafts-per-map`           | `eval-30.md`        |
-| 2     | eval-2026-10/41 build reads the editor's keys | `eval-41-build-reads-editor-keys`  | `eval-41.md`        |
-| 3     | eval-2026-10/38 deep links, one resolver      | `eval-38-deep-links-one-resolver`  | `eval-38.md`        |
-| 4     | agent-retro/01 `npm run gate`                 | `agent-retro-01-gate-command`      | `agent-retro-01.md` |
-| 5     | eval-2026-10/37 build lock until settled      | `eval-37-build-lock-until-settled` | `eval-37.md`        |
-| 6     | eval-2026-10/29 lossless JPG maps             | `eval-29-lossless-jpg-maps`        | `eval-29.md`        |
+```bash
+gh pr merge 100 --merge
+```
 
-This docs branch (`docs-2026-11-07-morning-queue`) goes last. The branches touch different files
-except the tracker; a conflict there keeps both sides. Also kept: `stash@{0}` "pre-2026-11-07 local
-edits" (old State.md notes, superseded; a `.claude/settings.json` change dropping the
-`atlas:publish` ask rule, not applied: Isak's call) and branch `local-main-backup-2026-11-07` (old
-local main, two State.md commits about PRs since merged). Both can go once Isak has looked.
+```bash
+gh pr merge 101 --merge
+```
+
+The two code PRs touch different files except the tracker; a conflict keeps both sides. Still kept:
+`stash@{0}` "pre-2026-11-07 local edits" (old State.md notes; a `.claude/settings.json` change
+dropping the `atlas:publish` ask rule, not applied: Isak's call) and branch
+`local-main-backup-2026-11-07`. Both can go once Isak has looked.
 
 ## Where it stands
 
@@ -37,30 +42,40 @@ local main, two State.md commits about PRs since merged). Both can go once Isak 
   (`docs/GOALS.md`), ADR-0001 (a note with no visibility is DM-only), tickets in `docs/tracker/`.
 - The atlas becomes the players' atlas for the world, Tidemarrow first, filled from the vault by
   Sync from Obsidian. Today it still shows the old Astrath sample (three events).
-- Live site: https://thraez.github.io/campaign-atlas-final/. Every PR from #57 to #90 is merged and
-  published (2026-10-28); no PR is open. The player build ships only allowed files (eval 40), and
-  `world.yaml` and the audio manifest 404 on the live site.
+- Live site: https://thraez.github.io/campaign-atlas-final/. Every PR up to #98 is merged and
+  published; open: the Morning queue. The player build ships only allowed files (eval 40).
 - Merges run on the full local gate plus an Opus review, without GitHub CI (`docs/agents/workflow.md`).
   The PR check runs only by hand (#90).
-- The side sessions wound down on 2026-10-28; the redesign comes later at a normal pace. How the two
-  days went: `docs/tracker/agent-retro/`.
+- 2026-11-07 improvement loop (retro, architecture review, simplify): no rewrite. The editor page is
+  wiring around tested pure modules; extraction beats a rewrite. The ranked list it left is under
+  "Open work".
 
 ## Open work
 
 Lowest number first within each folder.
 
-- Built, waiting to merge (Morning queue): `eval-2026-10/30`, `41`, `38`, `37`, `29`,
-  `agent-retro/01`. Until 30 merges, save before switching maps.
-- `eval-2026-10/27` (one reduce-motion switch), `39` (one canon client), `44` (soundscape draft per
-  map), `45` (deleted pins on other maps counted). Ticket 29's comments: the Map Import Wizard's zip
-  still writes raw JPG bytes.
+- Waiting to merge (Morning queue): `eval-2026-10/45`, `46`.
+- Next, by payoff (from the improvement loop; no ticket yet unless numbered):
+  1. Discard all leaves world settings and the calendar dirty (they aren't session holders); the
+     calendar bypasses undo and the session store.
+  2. `eval-2026-10/44`: soundscape draft per map.
+  3. The ruler and route/fog drawing both take the same click (`AtlasPlacementEditor`, ~line 2040).
+  4. Delete the Map Import Wizard (~900 lines): its zip writes raw JPG bytes; tidemarrow/02 uses the
+     editor upload instead (provisional call below).
+  5. Editor and player pin anchors differ by about 8px: needs Isak's look.
+  6. `validateProject` wikilink and relationship rules still use the old player-vs-dm/hidden check;
+     compare with the build's (found reviewing 46).
+  7. `eval-2026-10/39` (one canon client), `27` (one reduce-motion switch).
+  8. Later, L: map-space module and markers.json converter (tidemarrow/02), a draft registry
+     (reopen code-retro 09; it would absorb 44/45-style gaps), build-atlas stages.
 - `tidemarrow/01`-`03`: first sync, Tidemarrow map, remove the Astrath sample.
 - `eval-2026-10/07`: Vite 8 with Vitest 5, after Tidemarrow.
-- `agent-retro/01`-`03`: from the retro.
+- `agent-retro/03` (no scheduled CI): Isak decides what GitHub Actions may still spend.
 - Parked notes: `docs/tracker/eval-2026-10/README.md`.
 
 ## Waiting on Isak
 
+- Merging the Morning queue (auto mode refused `gh pr merge`).
 - The repo is public, so the DM notes in `content/` are readable on GitHub. Decided 2026-10-27:
   Isak makes it private and takes GitHub Pro so Pages keeps working.
 - The world's new name (`audit-2026-10/05`).
@@ -70,9 +85,10 @@ Lowest number first within each folder.
 - Look-and-feel checks on merged work (a bad result becomes a ticket): search (#63), the editor map
   (#64, #67), the missing-bytes toast (#66), the layer path field (#68), zooming pin labels (#70),
   a reload with sound on, desktop and phone (#71), offline in a browser (#78), the Sync panel (#79),
-  the Save chip and the conflict notice (#80, #81). After the Morning queue: eval-30, draw on two
-  maps, save once, reload, both keep their edits.
-- Pushing and merging the Morning queue (auto mode refused the push).
+  the Save chip and the conflict notice (#80, #81); eval-30 (#92): draw on two maps, save once,
+  reload, both keep their edits. After #99: delete a pin on map B, switch to map A, save, reload;
+  the pin stays gone.
+- Agents were denied reads under `node_modules` (an unknown deny rule); worth a look.
 - The provisional calls below, in a batch.
 - On the PC: follow `docs/PC-CLEANUP.md` (turn the old routines off first).
 
@@ -131,3 +147,14 @@ answer, logged here and built on; he reviews this list in batches, and a reversa
 | 2026-11-07 | eval-30 review: drafts under a map id the project no longer has?                                                                                              | Kept, not counted, saved or cleared; one console warning                                                                     | Saving them would write a removed map back                                                                                             | 30     |
 | 2026-11-07 | agent-retro/01: `npm run gate` with `public/atlas/` already changed?                                                                                          | Refuses to start                                                                                                             | It restores that folder afterwards and would wipe the change                                                                           | r-01   |
 | 2026-11-07 | eval-37: does the publish check hold the build lock too?                                                                                                      | Yes; a build that never settles holds it until a server restart (logged)                                                     | Two builds into one folder is the bug                                                                                                  | 37     |
+| 2026-11-07 | eval-45: a deleted-pin override for a pin canon no longer has (stale tombstone)?                                                                              | Dropped on load and whenever canon reloads                                                                                   | Saving it threw "Unknown entity" on every Save, or wrote a removal nobody asked for                                                    | 45     |
+| 2026-11-07 | eval-46: a player-visible route or region naming an unknown entity?                                                                                           | Blocks Publish Check, as it blocks the strict build                                                                          | The check passed what the publish then refused                                                                                         | 46     |
+| 2026-11-07 | eval-46: credits of `hidden` entities on the credits page?                                                                                                    | Hidden, like `dm`                                                                                                            | Only player and rumor ship                                                                                                             | 46     |
+| 2026-11-07 | Improvement loop: delete the Map Import Wizard rather than fix its zip?                                                                                       | Yes, when its ticket comes up                                                                                                | ~900 lines; the editor upload already strips metadata losslessly                                                                       | —      |
+
+## End of the 2026-11-07 improvement loop
+
+Built and reviewed eval-45 (#99) and eval-46 (#100); wrote the retro notes into `docs/agents/workflow.md`
+(review before gate, worktree lint/format, zsh quoting, State.md after merge, queued merges) and
+added the `in-review` state. Stopped there: three PRs wait on Isak's merge, and stacking more
+unmerged work would only add conflicts. Next session: the "Open work" list, from item 1.
