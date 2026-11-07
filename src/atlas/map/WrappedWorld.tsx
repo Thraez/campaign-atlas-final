@@ -68,16 +68,30 @@ export const WrappedWorld = memo(function WrappedWorld({
 
         {(map.regions ?? []).map((region) => {
           const ent = region.entityId ? entityById.get(region.entityId) : undefined;
+          // Peek only for an entity the loaded atlas holds; anything else keeps
+          // the name-only tooltip.
+          const peekId = ent && onPinPeek ? ent.id : undefined;
           return (
             <RegionShape
               key={`${region.id}-${dx}`}
               region={region}
               entityType={ent?.type}
               positions={region.points.map(([x, y]) => [H - y, x + dx] as [number, number])}
+              hideTooltip={peekId !== undefined && !rulerActive}
               eventHandlers={
-                region.entityId && !rulerActive
-                  ? { click: () => onOpenEntity(region.entityId!, false) }
-                  : undefined
+                rulerActive
+                  ? undefined
+                  : {
+                      ...(region.entityId
+                        ? { click: () => onOpenEntity(region.entityId!, false) }
+                        : {}),
+                      ...(peekId
+                        ? {
+                            mouseover: (e) => onPinPeek?.(peekId, e.originalEvent as MouseEvent),
+                            mouseout: () => onPinPeekLeave?.(),
+                          }
+                        : {}),
+                    }
               }
             >
               <Popup>
@@ -121,7 +135,7 @@ export const WrappedWorld = memo(function WrappedWorld({
           ))}
       </>
     ),
-    [map, dx, H, entityById, rulerActive, onOpenEntity, showGrid],
+    [map, dx, H, entityById, rulerActive, onOpenEntity, showGrid, onPinPeek, onPinPeekLeave],
   );
 
   return (
