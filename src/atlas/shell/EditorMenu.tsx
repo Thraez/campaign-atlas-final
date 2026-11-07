@@ -41,7 +41,7 @@ export function EditorMenu({
     help: onHelp,
   };
   return (
-    <ul className="rounded-md border bg-background shadow-md text-sm w-48">
+    <ul data-editor-menu className="rounded-md border bg-background shadow-md text-sm w-48">
       {EDITOR_MENU_ITEMS.map((it) => (
         <li key={it.id}>
           <button

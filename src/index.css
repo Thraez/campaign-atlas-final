@@ -50,16 +50,26 @@
     --sidebar-ring: 36 70% 58%;
   }
 
-  .dark { /* same; app is dark-only */ }
+  .dark {
+    /* same; app is dark-only */
+  }
 }
 
 @layer base {
-  * { @apply border-border; }
+  * {
+    @apply border-border;
+  }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+    font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
   }
-  h1, h2, h3, h4 { font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif; letter-spacing: 0; }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    letter-spacing: 0;
+  }
 }
 
 /* Player-viewer pin (atlas-viewer-pin class on Leaflet DivIcon).
@@ -81,14 +91,24 @@
   border-radius: 50%;
 }
 /* Discovered pins appear fully opaque; undiscovered are slightly dimmed. */
-.atlas-pin--undiscovered { opacity: 0.55; }
-.atlas-pin--discovered   { opacity: 1; }
+.atlas-pin--undiscovered {
+  opacity: 0.55;
+}
+.atlas-pin--discovered {
+  opacity: 1;
+}
 
 /* Active-entity ring: highlights the open entity's pin(s) on the map. */
 @keyframes atlas-pin-active-ring {
-  0%   { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.7); }
-  70%  { box-shadow: 0 0 0 8px hsl(var(--primary) / 0); }
-  100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+  0% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 8px hsl(var(--primary) / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+  }
 }
 .atlas-viewer-pin--active > svg {
   filter: drop-shadow(0 0 4px hsl(var(--primary)));
@@ -132,7 +152,23 @@
   border-bottom: 1px solid hsl(var(--border));
   background: linear-gradient(180deg, hsl(var(--card) / 0.96), hsl(var(--background) / 0.92));
   box-shadow: 0 10px 30px hsl(220 30% 3% / 0.32);
+  /* Stacking: above Leaflet (1-2) and the map overlays, below dialogs (z-50
+     portals). The blur lives on ::before: backdrop-filter on the header itself
+     would make it the containing block of the editor menu's fixed backdrop. */
+  position: relative;
+  z-index: 30;
+}
+.atlas-toolbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   backdrop-filter: blur(18px);
+}
+/* While the editor menu is open, sit above the z-[500] map overlays too. */
+.atlas-toolbar:has([data-editor-menu]) {
+  z-index: 600;
 }
 .atlas-toolbar h1 {
   font-weight: 800;
@@ -147,7 +183,11 @@
 }
 .atlas-side-panel {
   border-left: 1px solid hsl(var(--border));
-  background: linear-gradient(180deg, hsl(var(--sidebar-background) / 0.98), hsl(var(--background) / 0.98));
+  background: linear-gradient(
+    180deg,
+    hsl(var(--sidebar-background) / 0.98),
+    hsl(var(--background) / 0.98)
+  );
   box-shadow: -18px 0 44px hsl(220 30% 3% / 0.35);
   backdrop-filter: blur(18px);
 }
@@ -161,18 +201,32 @@
 /* === Pins === */
 .atlas-pin-wrap {
   position: relative;
-  width: 34px; height: 42px;
-  display: flex; flex-direction: column; align-items: center;
+  width: 34px;
+  height: 42px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   filter: drop-shadow(0 3px 4px hsl(0 0% 0% / 0.55));
   transition: transform 120ms ease;
 }
-.atlas-pin-wrap:hover { transform: translateY(-2px) scale(1.05); z-index: 500; }
+.atlas-pin-wrap:hover {
+  transform: translateY(-2px) scale(1.05);
+  z-index: 500;
+}
 .atlas-pin {
   position: relative;
-  display: flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 25%, hsl(0 0% 100% / 0.48), hsl(var(--primary)) 62%, hsl(38 88% 34%));
+  background: radial-gradient(
+    circle at 30% 25%,
+    hsl(0 0% 100% / 0.48),
+    hsl(var(--primary)) 62%,
+    hsl(38 88% 34%)
+  );
   color: hsl(var(--primary-foreground));
   border: 2px solid hsl(28 35% 14%);
   box-shadow:
@@ -182,12 +236,21 @@
   overflow: hidden;
 }
 .atlas-pin > img {
-  width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
-  pointer-events: none; user-select: none;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  pointer-events: none;
+  user-select: none;
 }
-.atlas-pin-glyph { line-height: 1; filter: drop-shadow(0 1px 0 hsl(0 0% 0% / 0.4)); }
+.atlas-pin-glyph {
+  line-height: 1;
+  filter: drop-shadow(0 1px 0 hsl(0 0% 0% / 0.4));
+}
 .atlas-pin-tail {
-  width: 0; height: 0; margin-top: -3px;
+  width: 0;
+  height: 0;
+  margin-top: -3px;
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
   border-top: 8px solid hsl(28 35% 14%);
@@ -195,19 +258,26 @@
 .atlas-pin-label {
   position: absolute;
   bottom: -16px;
-  left: 50%; transform: translateX(-50%);
-  font-size: 10px; font-weight: 600;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 600;
   letter-spacing: 0.02em;
   color: hsl(var(--foreground));
   background: hsl(var(--card) / 0.92);
   border: 1px solid hsl(var(--border));
-  padding: 1px 6px; border-radius: 4px;
-  white-space: nowrap; pointer-events: none;
-  opacity: 0; transition: opacity 120ms ease;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
   box-shadow: 0 2px 4px hsl(0 0% 0% / 0.4);
 }
 .atlas-pin-wrap:hover .atlas-pin-label,
-.atlas-pin-wrap.is-selected .atlas-pin-label { opacity: 1; }
+.atlas-pin-wrap.is-selected .atlas-pin-label {
+  opacity: 1;
+}
 .atlas-pin-wrap.is-selected .atlas-pin {
   border-color: hsl(var(--primary));
   box-shadow:
@@ -221,7 +291,8 @@
   background:
     radial-gradient(circle at 30% 25%, hsl(0 0% 100% / 0.35), transparent 55%),
     var(--party-color, hsl(var(--accent)));
-  width: 36px; height: 36px;
+  width: 36px;
+  height: 36px;
   font-size: 18px;
 }
 
@@ -233,7 +304,9 @@
   box-shadow: 0 18px 44px hsl(220 30% 3% / 0.42);
   backdrop-filter: blur(14px);
 }
-.atlas-minimap svg { border-radius: 5px; }
+.atlas-minimap svg {
+  border-radius: 5px;
+}
 
 /* === Layer handles & selection === */
 .atlas-image-layer {
@@ -259,18 +332,30 @@
   box-shadow: 0 0 0 1px hsl(var(--primary) / 0.4);
 }
 .atlas-layer-handle {
-  display: flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
   background: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
   border: 1px solid hsl(28 35% 14%);
-  font-size: 14px; font-weight: bold;
-  cursor: move; user-select: none;
-  box-shadow: 0 2px 6px hsl(0 0% 0% / 0.55), inset 0 0 0 1px hsl(36 90% 88% / 0.4);
+  font-size: 14px;
+  font-weight: bold;
+  cursor: move;
+  user-select: none;
+  box-shadow:
+    0 2px 6px hsl(0 0% 0% / 0.55),
+    inset 0 0 0 1px hsl(36 90% 88% / 0.4);
   transition: transform 100ms ease;
 }
-.atlas-layer-handle:hover { transform: scale(1.1); }
-.atlas-layer-handle.resize { cursor: nwse-resize; }
+.atlas-layer-handle:hover {
+  transform: scale(1.1);
+}
+.atlas-layer-handle.resize {
+  cursor: nwse-resize;
+}
 
 /* Leaflet popup theming */
 .leaflet-popup-content-wrapper {
@@ -280,17 +365,35 @@
   border-radius: 6px;
   box-shadow: 0 6px 20px hsl(0 0% 0% / 0.5);
 }
-.leaflet-popup-tip { background: hsl(var(--card)) !important; }
-.leaflet-popup-close-button { color: hsl(var(--muted-foreground)) !important; }
-.leaflet-popup-content { margin: 10px 12px !important; font-size: 13px; }
+.leaflet-popup-tip {
+  background: hsl(var(--card)) !important;
+}
+.leaflet-popup-close-button {
+  color: hsl(var(--muted-foreground)) !important;
+}
+.leaflet-popup-content {
+  margin: 10px 12px !important;
+  font-size: 13px;
+}
 .leaflet-popup-content button {
-  margin-top: 6px; padding: 2px 8px; font-size: 11px;
-  background: hsl(var(--destructive)); color: hsl(var(--destructive-foreground));
-  border-radius: 4px; border: none; cursor: pointer;
+  margin-top: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  background: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
 }
 
-.leaflet-pane, .leaflet-control { z-index: 1 !important; }
-.leaflet-top, .leaflet-bottom { z-index: 2 !important; }
+.leaflet-pane,
+.leaflet-control {
+  z-index: 1 !important;
+}
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 2 !important;
+}
 
 /* Atlas viewer: rendered markdown link styling */
 .atlas-prose a.atlas-wikilink {
@@ -337,7 +440,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: opacity 0.15s ease, max-width 0.15s ease, white-space 0s 0.15s;
+  transition:
+    opacity 0.15s ease,
+    max-width 0.15s ease,
+    white-space 0s 0.15s;
   cursor: default;
 }
 .atlas-credit-badge:hover,
@@ -362,13 +468,21 @@
   color: hsl(var(--muted-foreground));
   font-style: italic;
 }
-.atlas-prose h1, .atlas-prose h2, .atlas-prose h3 {
+.atlas-prose h1,
+.atlas-prose h2,
+.atlas-prose h3 {
   font-family: var(--font-display, serif);
   color: hsl(var(--foreground));
   margin-top: 1em;
 }
-.atlas-prose ul { list-style: disc; padding-left: 1.25rem; }
-.atlas-prose p { margin: 0.5em 0; line-height: 1.55; }
+.atlas-prose ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.atlas-prose p {
+  margin: 0.5em 0;
+  line-height: 1.55;
+}
 
 /* Atlas viewer: Obsidian callout styling */
 .atlas-callout {
@@ -384,24 +498,41 @@
   list-style: none;
   color: hsl(var(--accent));
 }
-.atlas-callout > summary::-webkit-details-marker { display: none; }
-.atlas-callout > summary::before { content: "▸ "; }
-.atlas-callout[open] > summary::before { content: "▾ "; }
-.atlas-callout-warning, .atlas-callout-caution, .atlas-callout-attention,
+.atlas-callout > summary::-webkit-details-marker {
+  display: none;
+}
+.atlas-callout > summary::before {
+  content: "▸ ";
+}
+.atlas-callout[open] > summary::before {
+  content: "▾ ";
+}
+.atlas-callout-warning,
+.atlas-callout-caution,
+.atlas-callout-attention,
 .atlas-callout-important {
   border-left-color: hsl(var(--primary));
 }
-.atlas-callout-warning > summary, .atlas-callout-caution > summary,
-.atlas-callout-attention > summary, .atlas-callout-important > summary {
+.atlas-callout-warning > summary,
+.atlas-callout-caution > summary,
+.atlas-callout-attention > summary,
+.atlas-callout-important > summary {
   color: hsl(var(--primary));
 }
-.atlas-callout-danger, .atlas-callout-error, .atlas-callout-failure,
-.atlas-callout-fail, .atlas-callout-bug, .atlas-callout-missing {
+.atlas-callout-danger,
+.atlas-callout-error,
+.atlas-callout-failure,
+.atlas-callout-fail,
+.atlas-callout-bug,
+.atlas-callout-missing {
   border-left-color: hsl(var(--destructive));
 }
-.atlas-callout-danger > summary, .atlas-callout-error > summary,
-.atlas-callout-failure > summary, .atlas-callout-fail > summary,
-.atlas-callout-bug > summary, .atlas-callout-missing > summary {
+.atlas-callout-danger > summary,
+.atlas-callout-error > summary,
+.atlas-callout-failure > summary,
+.atlas-callout-fail > summary,
+.atlas-callout-bug > summary,
+.atlas-callout-missing > summary {
   color: hsl(var(--destructive));
 }
 
@@ -451,7 +582,8 @@
   margin: 0.75rem 0;
   font-size: 0.9em;
 }
-.atlas-prose th, .atlas-prose td {
+.atlas-prose th,
+.atlas-prose td {
   border: 1px solid hsl(var(--border));
   padding: 0.35rem 0.65rem;
   text-align: left;
@@ -466,10 +598,15 @@
 }
 
 /* Atlas viewer: ordered lists, inline code, fenced code, hr, h4–h6 */
-.atlas-prose ol { list-style: decimal; padding-left: 1.25rem; }
-.atlas-prose li { margin: 0.2em 0; }
+.atlas-prose ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+.atlas-prose li {
+  margin: 0.2em 0;
+}
 .atlas-prose code {
-  font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
   font-size: 0.85em;
   background: hsl(var(--muted) / 0.7);
   border: 1px solid hsl(var(--border));
@@ -522,7 +659,9 @@
 
 /* Accessibility: respect users who prefer reduced motion. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
@@ -615,7 +754,10 @@
   margin: 0.75rem 0;
 }
 @media (prefers-reduced-motion: reduce) {
-  .atlas-secret-sealed, .atlas-secret-open { transition: none !important; }
+  .atlas-secret-sealed,
+  .atlas-secret-open {
+    transition: none !important;
+  }
 }
 
 /* Print: hide app chrome and print only the open entity panel.
@@ -623,12 +765,15 @@
    (the dedicated "Print / Save as PDF" button uses a separate
    self-contained window — see src/atlas/printHandout.ts). */
 @media print {
-  html, body {
+  html,
+  body {
     background: #fff !important;
     color: #111 !important;
   }
   /* Hide everything by default... */
-  body * { visibility: hidden !important; }
+  body * {
+    visibility: hidden !important;
+  }
   /* ...then show the entity panel only. */
   aside .atlas-prose,
   aside .atlas-prose *,
@@ -639,7 +784,9 @@
   }
   aside {
     position: absolute !important;
-    left: 0; top: 0; right: 0;
+    left: 0;
+    top: 0;
+    right: 0;
     width: 100% !important;
     border: none !important;
     background: #fff !important;
@@ -651,6 +798,12 @@
   [role="status"] {
     display: none !important;
   }
-  a { color: inherit !important; text-decoration: none !important; }
-  @page { size: A4; margin: 18mm 16mm; }
+  a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+  @page {
+    size: A4;
+    margin: 18mm 16mm;
+  }
 }
