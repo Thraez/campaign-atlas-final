@@ -11,8 +11,8 @@ Orchestrator session started 2026-11-07. Branch `rebuild-plan-2026-11`, worktree
 | B. Draft goals | `GOALS-proposed.md` (later replaces `docs/GOALS.md`) | done |
 | Round 1 questions to Isak | `questions-round-1.md` | answered |
 | C. Editor and player UX | `ux-flows.md`, `wireframes/*.html` | done (browser-checked) |
-| D. Plan | `plan.md` | revising after two reviews |
-| Round 2 questions to Isak | `questions-round-2.md` | waiting |
+| D. Plan | `plan.md` | done, approved by Isak |
+| Round 2 questions to Isak | `questions-round-2.md` | answered |
 
 ## Inputs
 
@@ -62,3 +62,4 @@ Orchestrator session started 2026-11-07. Branch `rebuild-plan-2026-11`, worktree
   real vault notes to the public repo. Orchestrator session warned; plan's first ticket blocks
   tidemarrow/01–03 and adds a `hosting: public` guard. Main not edited from here.
 - Combined fixes sent to the plan agent; round 2 questions follow.
+- Round 2 answered: B approved; merge all 12 PRs in State.md order; Access email PIN per campaign; content-next/ local. Planning done (2627dbd + this commit), nothing pushed.

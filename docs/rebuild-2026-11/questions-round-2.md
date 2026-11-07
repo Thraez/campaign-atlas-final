@@ -53,3 +53,13 @@ Answer:
   uploads.
 - Before any of this: `tidemarrow/01–03` get marked blocked until hosting is private (R-01), since
   01 is ready-for-agent today and would put real vault notes in the public repo.
+
+## Isak's answers (2026-11-07, rebuild-planning session)
+
+1. **Yes, option B**, starting with phase 0 (R-01 guard, then quick wins).
+2. **Merge all 12 PRs** in the State.md order, #109 and #110 first. (Not merged from the planning
+   session; each merge still needs his yes in the session that does it.)
+3. **Cloudflare Access, email PIN, one Pages project per campaign.**
+4. **`content-next/`, local only**, never published, until cutover.
+
+Defaults above stand. Plan approved; building starts in its own sessions, one ticket per branch.
