@@ -233,7 +233,7 @@ function soundscapeToYamlObject(s: SoundscapeConfig): Record<string, unknown> {
       // as dm, ADR-0001 addendum); ride-on areas inherit their region's.
       if (!a.regionId) area.visibility = worldItemVisibility(a.visibility);
       else if (a.visibility) area.visibility = a.visibility;
-      if (a.name) area.name = a.name;
+      if (a.name?.trim()) area.name = a.name.trim();
       return area;
     });
   }

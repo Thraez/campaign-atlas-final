@@ -65,6 +65,8 @@ async function seedSession(over: Partial<SessionState>) {
     routeByMap: {},
     fogByMap: {},
     layerByMap: {},
+    worldOverride: {},
+    calendar: null,
     entityEdit: null,
     savedAt: Date.now(),
     ...over,

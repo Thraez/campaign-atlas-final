@@ -57,7 +57,8 @@ import { ReadingPanelWelcome } from "@/atlas/entity/ReadingPanelWelcome";
 import { pickStarters } from "@/atlas/entity/pickStarters";
 import { MapCreditOverlay } from "@/atlas/map/MapCreditOverlay";
 import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
-import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
+import { useReduceMotion } from "@/hooks/use-reduce-motion";
+import { CalmModeToggle } from "@/atlas/CalmModeToggle";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
@@ -87,7 +88,7 @@ function MapController({
   flyTo: { x: number; y: number; height: number; zoom?: number } | null;
 }) {
   const map = useMap();
-  const prefersReducedMotion = usePrefersReducedMotion();
+  const reduceMotion = useReduceMotion();
   useEffect(() => {
     if (!flyTo) return;
     const [lat, lng] = atlasToLatLng(flyTo.x, flyTo.y, flyTo.height);
@@ -98,13 +99,13 @@ function MapController({
         flyTo.zoom != null && Number.isFinite(flyTo.zoom)
           ? flyTo.zoom
           : Math.max(map.getZoom(), -1);
-      if (prefersReducedMotion) {
+      if (reduceMotion) {
         map.setView([lat, lng], targetZoom, { animate: false });
       } else {
         map.flyTo([lat, lng], targetZoom, { duration: 0.6 });
       }
     });
-  }, [flyTo, map, prefersReducedMotion]);
+  }, [flyTo, map, reduceMotion]);
   return null;
 }
 
@@ -143,6 +144,8 @@ function FitBoundsController({
   fitRef: MutableRefObject<(() => void) | null>;
 }) {
   const map = useMap();
+  const reduceMotion = useReduceMotion();
+
   // Keep the reset-view callback current after every render in which deps change
   useLayoutEffect(() => {
     fitRef.current = () => {
@@ -151,13 +154,13 @@ function FitBoundsController({
           [0, 0],
           [mapHeight, mapWidth],
         ],
-        { animate: true, duration: 0.5 },
+        { animate: !reduceMotion, duration: 0.5 },
       );
     };
     return () => {
       fitRef.current = null;
     };
-  }, [map, mapHeight, mapWidth, fitRef]);
+  }, [map, mapHeight, mapWidth, fitRef, reduceMotion]);
 
   return null;
 }
@@ -669,6 +672,7 @@ export default function AtlasViewer() {
           >
             <Ruler className="h-4 w-4" aria-hidden="true" />
           </Button>
+          <CalmModeToggle />
           <Button
             variant="secondary"
             size="sm"

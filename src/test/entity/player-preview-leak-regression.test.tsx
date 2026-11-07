@@ -15,7 +15,6 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { ViewModeProvider } from "@/atlas/view/ViewModeProvider";
 import { EntityPanes } from "@/atlas/entity/EntityPanes";
-import { EntityReadingView } from "@/atlas/entity/EntityReadingView";
 import {
   projectEntityForPlayer,
   buildProjectionContext,
@@ -64,9 +63,18 @@ const leakTestEntity: Entity = {
   ] as EntityRelationship[],
 };
 
+// A player-visible entity, the target of the control relationship.
+const publicAlly: Entity = {
+  ...dmEntity,
+  id: "public-ally",
+  title: "Public Ally",
+  visibility: "player",
+};
+
 const entitiesById = new Map([
   [leakTestEntity.id, leakTestEntity],
   [dmEntity.id, dmEntity],
+  [publicAlly.id, publicAlly],
 ]);
 
 // ── Unit layer ────────────────────────────────────────────────────────────────
@@ -95,167 +103,72 @@ describe("G1 — projectEntityForPlayer: all 4 DM channels stripped from entity 
   });
 });
 
-// ── EntityReadingView integration layer ──────────────────────────────────────
+// ── EntityPanes integration layer (what the editor renders, via EntitySurface) ─
 
-describe("G1 — EntityReadingView render: player mode hides DM content", () => {
-  beforeEach(() => localStorage.setItem("atlas.viewMode", "player"));
-  afterEach(() => localStorage.clear());
+function renderPanes(entity: Entity) {
+  return render(
+    <MemoryRouter>
+      <ViewModeProvider>
+        <EntityPanes
+          entity={entity}
+          entitiesById={entitiesById}
+          mode="reading"
+          renderEdit={() => null}
+        />
+      </ViewModeProvider>
+    </MemoryRouter>,
+  );
+}
 
-  it("DM body block absent from DOM in player mode (channel 1)", () => {
-    render(
-      <MemoryRouter>
-        <ViewModeProvider>
-          <EntityReadingView entity={leakTestEntity} entitiesById={entitiesById} />
-        </ViewModeProvider>
-      </MemoryRouter>,
-    );
-    expect(document.body.textContent).not.toContain("DM_BLOCK_SECRET");
-  });
-
-  it("DM entity title absent from DOM in player mode — link redacted (channel 4)", () => {
-    render(
-      <MemoryRouter>
-        <ViewModeProvider>
-          <EntityReadingView entity={leakTestEntity} entitiesById={entitiesById} />
-        </ViewModeProvider>
-      </MemoryRouter>,
-    );
-    expect(document.body.textContent).not.toContain("Secret Villain");
-  });
-});
-
-describe("G1 — EntityReadingView render: DM mode shows DM content", () => {
-  beforeEach(() => localStorage.clear());
-
-  it("DM body block IS in DOM in DM mode (channel 1)", () => {
-    render(
-      <MemoryRouter>
-        <ViewModeProvider>
-          <EntityReadingView entity={leakTestEntity} entitiesById={entitiesById} />
-        </ViewModeProvider>
-      </MemoryRouter>,
-    );
-    expect(document.body.textContent).toContain("DM_BLOCK_SECRET");
-  });
-
-  it("DM entity title IS in DOM in DM mode as a link (channel 4)", () => {
-    render(
-      <MemoryRouter>
-        <ViewModeProvider>
-          <EntityReadingView entity={leakTestEntity} entitiesById={entitiesById} />
-        </ViewModeProvider>
-      </MemoryRouter>,
-    );
-    expect(document.body.textContent).toContain("Secret Villain");
-  });
-});
-
-// ── EntityPanes integration layer (editor primary surface) ───────────────────
-
-describe("G1 — EntityPanes reading mode: player preview makes player pane primary", () => {
+describe("G1 — EntityPanes reading mode: player preview hides DM content", () => {
   beforeEach(() => localStorage.setItem("atlas.viewMode", "player"));
   afterEach(() => localStorage.clear());
 
   it("player pane is visible when player mode is on", () => {
-    render(
-      <MemoryRouter>
-        <ViewModeProvider>
-          <EntityPanes
-            entity={leakTestEntity}
-            entitiesById={entitiesById}
-            mode="reading"
-            renderEdit={() => null}
-          />
-        </ViewModeProvider>
-      </MemoryRouter>,
-    );
+    renderPanes(leakTestEntity);
     expect(screen.getByTestId("entity-pane-player")).toBeVisible();
   });
 
   it("DM pane is hidden by default in player mode", () => {
-    render(
-      <MemoryRouter>
-        <ViewModeProvider>
-          <EntityPanes
-            entity={leakTestEntity}
-            entitiesById={entitiesById}
-            mode="reading"
-            renderEdit={() => null}
-          />
-        </ViewModeProvider>
-      </MemoryRouter>,
-    );
+    renderPanes(leakTestEntity);
     expect(screen.getByTestId("entity-pane-dm")).not.toBeVisible();
   });
 
-  it("player pane contains none of the DM secrets (channels 1 & 4)", () => {
-    render(
-      <MemoryRouter>
-        <ViewModeProvider>
-          <EntityPanes
-            entity={leakTestEntity}
-            entitiesById={entitiesById}
-            mode="reading"
-            renderEdit={() => null}
-          />
-        </ViewModeProvider>
-      </MemoryRouter>,
-    );
-    const playerPane = screen.getByTestId("entity-pane-player");
-    expect(playerPane.textContent).not.toContain("DM_BLOCK_SECRET");
-    expect(playerPane.textContent).not.toContain("Secret Villain");
+  it("DM body block absent from the player pane in player mode (channel 1)", () => {
+    renderPanes(leakTestEntity);
+    expect(screen.getByTestId("entity-pane-player").textContent).not.toContain("DM_BLOCK_SECRET");
+  });
+
+  it("DM entity title absent from the player pane in player mode — link redacted (channel 4)", () => {
+    renderPanes(leakTestEntity);
+    expect(screen.getByTestId("entity-pane-player").textContent).not.toContain("Secret Villain");
   });
 
   it("shows a 'player preview' indicator when player mode is on", () => {
-    render(
-      <MemoryRouter>
-        <ViewModeProvider>
-          <EntityPanes
-            entity={leakTestEntity}
-            entitiesById={entitiesById}
-            mode="reading"
-            renderEdit={() => null}
-          />
-        </ViewModeProvider>
-      </MemoryRouter>,
-    );
+    renderPanes(leakTestEntity);
     expect(screen.getByTestId("player-preview-banner")).toBeInTheDocument();
   });
 });
 
-describe("G1 — EntityPanes reading mode: DM mode keeps DM pane as primary", () => {
+describe("G1 — EntityPanes reading mode: DM mode shows DM content", () => {
   beforeEach(() => localStorage.clear());
 
   it("DM pane is visible by default in DM mode", () => {
-    render(
-      <MemoryRouter>
-        <ViewModeProvider>
-          <EntityPanes
-            entity={leakTestEntity}
-            entitiesById={entitiesById}
-            mode="reading"
-            renderEdit={() => null}
-          />
-        </ViewModeProvider>
-      </MemoryRouter>,
-    );
+    renderPanes(leakTestEntity);
     expect(screen.getByTestId("entity-pane-dm")).toBeVisible();
   });
 
   it("DM pane contains DM body content in DM mode (channel 1)", () => {
-    render(
-      <MemoryRouter>
-        <ViewModeProvider>
-          <EntityPanes
-            entity={leakTestEntity}
-            entitiesById={entitiesById}
-            mode="reading"
-            renderEdit={() => null}
-          />
-        </ViewModeProvider>
-      </MemoryRouter>,
-    );
+    renderPanes(leakTestEntity);
     expect(screen.getByTestId("entity-pane-dm").textContent).toContain("DM_BLOCK_SECRET");
+  });
+
+  it("DM entity title IS in the DM pane in DM mode as a link (channel 4)", () => {
+    renderPanes(leakTestEntity);
+    const link = screen
+      .getByTestId("entity-pane-dm")
+      .querySelector('a.atlas-wikilink[data-entity-id="secret-villain"]');
+    expect(link?.textContent).toContain("Secret Villain");
   });
 });
 
@@ -265,6 +178,9 @@ describe("G1 — EntityPanes reading mode: DM mode keeps DM pane as primary", ()
 //   5. visibility:dm relationship  — "DM_RELATION_SECRET" (label) must be absent from player Connections
 //   6. player-visible relationship pointing at a DM-only target — "Secret Villain" title must be absent
 //      from player Connections (filterRelationshipsForPlayer drops it via the "leaking target" rule)
+//
+// Only the player pane renders Connections in EntityPanes (the DM pane is body-only), so the
+// non-vacuity control is a player-safe relationship that must still show there.
 
 // Extend leakTestEntity with an additional player-visible relationship pointing at the DM-only target.
 const connectionLeakEntity: Entity = {
@@ -279,60 +195,30 @@ const connectionLeakEntity: Entity = {
       label: "PLAYER_LINK_TO_DM_TARGET",
       visibility: "player",
     },
+    // Control: player-visible relationship to a player-visible target — must render
+    { entity: "public-ally", type: "ally", label: "PLAYER_SAFE_LINK", visibility: "player" },
   ] as EntityRelationship[],
 };
-
 describe("I1 — Connections section: player mode hides DM relationship channels", () => {
   beforeEach(() => localStorage.setItem("atlas.viewMode", "player"));
   afterEach(() => localStorage.clear());
 
-  it("dm-visibility relationship label absent from Connections in player mode (channel 5)", () => {
-    render(
-      <MemoryRouter>
-        <ViewModeProvider>
-          <EntityReadingView entity={connectionLeakEntity} entitiesById={entitiesById} />
-        </ViewModeProvider>
-      </MemoryRouter>,
-    );
+  it("dm-visibility relationship label absent from the DOM in player mode (channel 5)", () => {
+    renderPanes(connectionLeakEntity);
     expect(document.body.textContent).not.toContain("DM_RELATION_SECRET");
   });
 
-  it("player-visible relationship targeting a DM-only entity absent from Connections in player mode (channel 6)", () => {
-    render(
-      <MemoryRouter>
-        <ViewModeProvider>
-          <EntityReadingView entity={connectionLeakEntity} entitiesById={entitiesById} />
-        </ViewModeProvider>
-      </MemoryRouter>,
-    );
+  it("player-visible relationship targeting a DM-only entity absent from the DOM in player mode (channel 6)", () => {
+    renderPanes(connectionLeakEntity);
     // filterRelationshipsForPlayer drops this because secret-villain is dm-only
     expect(document.body.textContent).not.toContain("PLAYER_LINK_TO_DM_TARGET");
   });
-});
 
-describe("I1 — Connections section: DM mode shows all relationship channels", () => {
-  beforeEach(() => localStorage.clear());
-
-  it("dm-visibility relationship label present in Connections in DM mode (channel 5)", () => {
-    render(
-      <MemoryRouter>
-        <ViewModeProvider>
-          <EntityReadingView entity={connectionLeakEntity} entitiesById={entitiesById} />
-        </ViewModeProvider>
-      </MemoryRouter>,
-    );
-    expect(document.body.textContent).toContain("DM_RELATION_SECRET");
-  });
-
-  it("player-visible relationship to DM-only target present in Connections in DM mode (channel 6)", () => {
-    render(
-      <MemoryRouter>
-        <ViewModeProvider>
-          <EntityReadingView entity={connectionLeakEntity} entitiesById={entitiesById} />
-        </ViewModeProvider>
-      </MemoryRouter>,
-    );
-    expect(document.body.textContent).toContain("PLAYER_LINK_TO_DM_TARGET");
+  it("control: a player-safe relationship does render in player Connections", () => {
+    renderPanes(connectionLeakEntity);
+    const connections = screen.getByTestId("connections-section");
+    expect(connections.textContent).toContain("PLAYER_SAFE_LINK");
+    expect(connections.textContent).toContain("Public Ally");
   });
 });
 

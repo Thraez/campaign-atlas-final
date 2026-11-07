@@ -3,6 +3,7 @@ import { useMap } from "react-leaflet";
 import L from "leaflet";
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import { normalizeAtlasAssetUrl } from "@/atlas/url";
+import { useReduceMotion } from "@/hooks/use-reduce-motion";
 
 interface Props {
   map: MapDocument;
@@ -31,6 +32,7 @@ export function minimapHeightFor(map: Pick<MapDocument, "width" | "height">, wid
  */
 export function AtlasMinimap({ map, layers, width = 180, className }: Props) {
   const parent = useMap();
+  const reduceMotion = useReduceMotion();
   const ref = useRef<HTMLDivElement>(null);
   const [vp, setVp] = useState<{ x: number; y: number; w: number; h: number }>({
     x: 0,
@@ -67,7 +69,7 @@ export function AtlasMinimap({ map, layers, width = 180, className }: Props) {
     const r = el.getBoundingClientRect();
     const px = ((clientX - r.left) / r.width) * map.width;
     const py = ((clientY - r.top) / r.height) * map.height;
-    parent.panTo([map.height - py, px], { animate: true });
+    parent.panTo([map.height - py, px], { animate: !reduceMotion });
   };
 
   return (

@@ -4,13 +4,11 @@
  * Modelled on RegionsTab + MapSettingsPanel: the DM can give an existing
  * region a sound (ride-on area), draw a sound-only zone on the map, pick an
  * audio file per area, and set Volume (whole map) / Loudness (per area).
- * All draft state lives in `useSoundscapeDraft` so this panel and the on-map
- * `SoundAreaLayer` stay in sync when they share one instance.
- *
- * Persistence: on every mutation the panel writes the merged config back via
- * `onPatch({ soundscape: soundAreaDraftToConfig(...) })` — the editor's
- * existing `patchMap` seam — so the unified Save carries it into world.yaml
- * through `soundscapeToYamlObject`. No new persistence path.
+ * Editing goes through `useSoundscapeDraft` (shared with the on-map
+ * `SoundAreaLayer`), which writes every change straight into the map via
+ * the editor's `patchMap({ soundscape })` seam: the map's
+ * soundscape is the one source of truth, and the unified Save carries it into
+ * world.yaml through `soundscapeToYamlObject`. No new persistence path.
  *
  * DM-facing labels only: "Volume" (masterGain), "Loudness" (per-area gain),
  * "Sound: choose a file" (file). The word "bed" never appears in the UI.
@@ -18,12 +16,11 @@
  * EDITOR-ONLY. Reached solely from AtlasPlacementEditor; never import this
  * from the player runtime (src/atlas/sound/), AtlasViewer, or Landing.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ChevronRight, MapPin, Pen, Plus, RotateCcw, Trash2 } from "lucide-react";
 import type { EntityVisibility, MapDocument, SoundArea } from "@/atlas/content/schema";
 import { VISIBILITY_MENU_ORDER, worldItemVisibility } from "@/atlas/content/visibility";
-import type { UndoStackAPI } from "@/atlas/useUndoStack";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,47 +34,23 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { TabFrame } from "./TabFrame";
 import { ValidationChips } from "./ValidationChips";
-import {
-  useSoundscapeDraft,
-  type SoundscapeDraftAPI,
-} from "@/atlas/sound-editor/useSoundscapeDraft";
-import { soundAreaDraftToConfig } from "@/atlas/sound-editor/soundAreaDraftToConfig";
+import type { SoundscapeDraftAPI } from "@/atlas/sound-editor/useSoundscapeDraft";
 
 interface Props {
   map: MapDocument;
-  onPatch: (patch: Partial<MapDocument>) => void;
   /** Basenames under atlas/assets/audio/ — empty is fine (free-text fallback). */
   availableAudioFiles: string[];
-  undoStack?: UndoStackAPI;
-  /** Inject the editor-shared draft instance so the on-map layer stays in sync. */
-  api?: SoundscapeDraftAPI;
+  /** The editor's shared instance, so the on-map layer stays in sync. */
+  api: SoundscapeDraftAPI;
 }
 
 /** Schema defaults, surfaced as slider positions (never as raw field names). */
 const DEFAULT_VOLUME = 0.6; // SoundscapeConfig.masterGain default
 const DEFAULT_LOUDNESS = 0.7; // per-area loudness default
 
-/**
- * De-duplicate areas by id, keeping the LAST occurrence (the draft copy).
- * After a patch feeds back into `map.soundscape`, the canon and the local
- * draft can briefly hold the same area — `useSoundscapeDraft.effective`
- * appends draft-added areas after canon ones, so "last wins" always prefers
- * the freshest local edit.
- */
-function dedupeAreas(areas: SoundArea[]): SoundArea[] {
-  const byId = new Map<string, SoundArea>();
-  for (const a of areas) byId.set(a.id, a);
-  return [...byId.values()];
-}
-
-export function SoundscapeTab({ map, onPatch, availableAudioFiles, undoStack, api }: Props) {
-  // Hooks must run unconditionally; the internal instance simply goes unused
-  // when the editor injects its shared one.
-  const internal = useSoundscapeDraft(map, undoStack);
-  const draft = api ?? internal;
+export function SoundscapeTab({ map, availableAudioFiles, api: draft }: Props) {
   const {
     effective,
-    dirty,
     dirtyCount,
     selectedId,
     setSelectedId,
@@ -102,36 +75,8 @@ export function SoundscapeTab({ map, onPatch, availableAudioFiles, undoStack, ap
   const [rideOnRegionId, setRideOnRegionId] = useState<string>(regions[0]?.id ?? "");
   const rideOnTarget = regions.find((r) => r.id === rideOnRegionId) ?? regions[0] ?? null;
 
-  const areas = useMemo(() => dedupeAreas(effective.areas ?? []), [effective.areas]);
+  const areas = effective.areas ?? [];
   const selected = areas.find((a) => a.id === selectedId) ?? null;
-
-  // ---- Persistence: push every local change through the editor's patchMap seam.
-  // `soundAreaDraftToConfig` folds the draft into a save-ready config
-  // (undefined when there are no areas, which drops `soundscape` from YAML).
-  const config = useMemo(() => soundAreaDraftToConfig({ ...effective, areas }), [effective, areas]);
-  const configKey = JSON.stringify(config ?? null);
-  const canonKey = JSON.stringify(map.soundscape ?? null);
-  const sentRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!dirty) return; // nothing authored locally — never patch on mount
-    if (configKey === canonKey) return; // already persisted (patch fed back)
-    if (configKey === sentRef.current) return; // this exact config is in flight
-    sentRef.current = configKey;
-    onPatch({ soundscape: config });
-  }, [dirty, configKey, canonKey, config, onPatch]);
-
-  /**
-   * Remove an area everywhere it lives. After a patch feeds back, the same id
-   * can sit in BOTH the canon map and the draft's `added` list; the hook
-   * clears the draft copy first, so a second call marks the canon copy
-   * deleted (the hook's draft ref updates synchronously between calls).
-   */
-  const removeArea = (id: string) => {
-    const inAdded = draft.draft.added.some((a) => a.id === id);
-    const inCanon = (map.soundscape?.areas ?? []).some((a) => a.id === id);
-    remove(id);
-    if (inAdded && inCanon) remove(id);
-  };
 
   // Keyboard flow while drawing (copied from RegionsTab): Enter finishes,
   // Esc cancels, Backspace removes the last point.
@@ -276,7 +221,7 @@ export function SoundscapeTab({ map, onPatch, availableAudioFiles, undoStack, ap
             point. New sound areas start DM-only.
           </p>
         )}
-        {dirty && !drawing && (
+        {dirtyCount > 0 && !drawing && (
           <Button size="sm" variant="ghost" onClick={reset} className="h-7 text-xs gap-1">
             <RotateCcw className="h-3.5 w-3.5" /> Discard local
           </Button>
@@ -325,7 +270,7 @@ export function SoundscapeTab({ map, onPatch, availableAudioFiles, undoStack, ap
                 variant="ghost"
                 className="h-6 w-6 p-0 text-destructive"
                 title="Delete"
-                onClick={() => removeArea(selected.id)}
+                onClick={() => remove(selected.id)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>

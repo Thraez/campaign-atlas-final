@@ -67,6 +67,8 @@ beforeEach(async () => {
       routeByMap: {},
       fogByMap: {},
       layerByMap: {},
+      worldOverride: {},
+      calendar: null,
       entityEdit: null,
       savedAt: Date.now(),
     }),
