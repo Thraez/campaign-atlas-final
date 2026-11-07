@@ -63,3 +63,26 @@ Orchestrator session started 2026-11-07. Branch `rebuild-plan-2026-11`, worktree
   tidemarrow/01–03 and adds a `hosting: public` guard. Main not edited from here.
 - Combined fixes sent to the plan agent; round 2 questions follow.
 - Round 2 answered: B approved; merge all 12 PRs in State.md order; Access email PIN per campaign; content-next/ local. Planning done (2627dbd + this commit), nothing pushed.
+
+## Phase 0 build (started 2026-11-07, orchestrator's go after Isak approved B)
+
+One worktree and local branch per ticket, cut from origin/main; nothing pushed or merged (AGENTS.md:
+pushes and merges need Isak's yes in this chat). Builders don't run the gate; the coordinator runs
+`npm run gate` one at a time, then an Opus review per ticket.
+
+| Ticket | Branch | Builder | State |
+|---|---|---|---|
+| R-01 Sync guard + tidemarrow/01-03 blocked by H-04 | rebuild-r01-sync-guard (e5e15c5) | Opus | gate pass, review + safety review clean; not pushed |
+| Q-01 wikilinks plain text in player | rebuild-q01-wikilinks-plain-text (4a77fd1) | Sonnet | gate pass (one load flake rerun), review clean; not pushed |
+| Q-02 fit map on open | rebuild-q02-fit-map-on-open (7937ee3) | Sonnet | gate pass at 7937ee3, review clean, browser re-check pass; not pushed |
+| Q-03 menu above map | rebuild-q03-menu-above-map (7310908) | Sonnet | gate pass, review clean, browser pass; not pushed |
+| Q-04 region hover card | rebuild-q04-region-hover-card (c1f97ed) | Sonnet | gate pass, review clean, browser pass; not pushed |
+
+PR bodies: `pr-bodies/`. Push and PR need Isak's yes in the coordinator chat; merge order R-01,
+Q-01, Q-02, Q-03, Q-04. For Isak to look at: R-01's toast on a vault-note save; Q-02's fit on
+open and no view jump after an editor save. R-01 accepted gaps (documented in IMPORT_EXPORT.md):
+copied vault notes are caught only at gate time on a machine with the vault path set; a stale
+sync map blocks saves of the notes it lists.
+
+Q-01 root cause: the sample notes link to places with no note (Thornhold, Sunhaven, ...); the player
+variant still drew a dotted "link" span. Not a resolver bug.
