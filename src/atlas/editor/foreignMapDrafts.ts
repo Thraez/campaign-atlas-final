@@ -48,3 +48,30 @@ export function foreignMapDraftPlacements(
   }
   return out;
 }
+
+/**
+ * The pin overrides left after a save: every override the batch wrote is
+ * dropped, on the active map and on other maps alike. A written entity's
+ * active-map overrides went in through its draft placements, its other-map
+ * overrides through `foreignMapDrafts`; both now live in canon. An override
+ * whose entity file was not in the batch stays.
+ */
+export function overridesAfterSave(
+  overrides: Overrides,
+  opts: {
+    activeMapId: string;
+    writtenEntityIds: ReadonlySet<string>;
+    foreignMapDrafts: readonly Pick<PlacementOverride, "entityId" | "mapId">[];
+  },
+): Overrides {
+  const foreignKeys = new Set(opts.foreignMapDrafts.map((d) => `${d.mapId}:${d.entityId}`));
+  const next: Overrides = { ...overrides };
+  for (const k of Object.keys(next)) {
+    const sep = k.indexOf(":");
+    const mapId = k.slice(0, sep);
+    const entityId = k.slice(sep + 1);
+    if (!opts.writtenEntityIds.has(entityId)) continue;
+    if (mapId === opts.activeMapId || foreignKeys.has(k)) delete next[k];
+  }
+  return next;
+}

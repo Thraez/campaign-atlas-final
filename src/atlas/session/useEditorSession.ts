@@ -28,6 +28,40 @@ export type SaveLifecycle = "clean" | "unsaved" | "saving" | "saved" | "failed";
 
 type Holder<T> = { snapshot: () => T; applySnapshot: (s: T) => void };
 
+/** The region/route/fog drafts the session swaps in and out per map. */
+export interface MapSlices {
+  region: SessionState["regionByMap"][string];
+  route: SessionState["routeByMap"][string];
+  fog: SessionState["fogByMap"][string];
+}
+
+const EMPTY_COLLECTION = { edits: {}, added: [], deleted: [] };
+
+function slicesDirtyCount(sl: Partial<MapSlices>): number {
+  const n = (d?: { edits: object; added: unknown[]; deleted: unknown[] }) =>
+    d ? Object.keys(d.edits).length + d.added.length + d.deleted.length : 0;
+  return n(sl.region) + n(sl.route) + (sl.fog ? 1 : 0);
+}
+
+/** Region/route/fog changes parked on every map except `activeMapId`. */
+function otherMapsCount(s: SessionState, activeMapId: string | null): number {
+  const ids = new Set([
+    ...Object.keys(s.regionByMap),
+    ...Object.keys(s.routeByMap),
+    ...Object.keys(s.fogByMap),
+  ]);
+  let n = 0;
+  for (const id of ids) {
+    if (id === activeMapId) continue;
+    n += slicesDirtyCount({
+      region: s.regionByMap[id],
+      route: s.routeByMap[id],
+      fog: s.fogByMap[id],
+    });
+  }
+  return n;
+}
+
 export interface EditorSessionArgs {
   activeMapId: string | null;
   undoStack: Pick<UndoStackAPI, "clear">;
@@ -43,22 +77,38 @@ export interface EditorSessionArgs {
     layer: Holder<unknown>;
     editorEntity: { get: () => EntityEditSnapshot; set: (v: EntityEditSnapshot) => void };
   };
-  /** Sum of every holder's change count for the active map (honest, undo-aware). */
+  /** Sum of every holder's change count that is not a swapped region/route/fog
+   *  slice: the active map's region/route/fog plus everything kept for all maps
+   *  at once (pins, layers, map metadata, world settings). The session adds the
+   *  other maps' region/route/fog slices itself. */
   perMapDirtyCount: () => number;
 }
 
 export interface EditorSessionAPI {
   hydrated: boolean;
   status: SaveLifecycle;
+  /** The one unsaved count across every map: drives the chip, beforeunload
+   *  and whether Save writes world.yaml. */
   unsavedCount: number;
+  /** Region/route/fog changes parked on maps other than the active one. */
+  otherMapsDirtyCount: number;
+  /** Every map's region/route/fog drafts, the active map's read live. */
+  mapDrafts: () => Record<string, MapSlices>;
+  /** Put back other maps' drafts (the save-boundary undo). The active map's
+   *  entry, if any, is ignored: its holders are restored by the caller. */
+  restoreOtherMapDrafts: (drafts: Record<string, MapSlices>) => void;
   failedReason: string | null;
   /** Non-null exactly once after a reload that recovered real work. */
   restoredNotice: { savedAt: number } | null;
   dismissRestoredNotice: () => void;
-  /** Call when activeMapId is about to change (before React swaps it). */
-  onMapWillChange: (nextMapId: string | null) => void;
+  /** Call when activeMapId is about to change (before React swaps it).
+   *  Returns false (and does nothing) when `nextMapId` is already active. */
+  onMapWillChange: (nextMapId: string | null) => boolean;
   markSaving: () => void;
-  markSaved: () => Promise<void>;
+  /** A save landed. `writtenMapIds`: the maps whose region/route/fog drafts it
+   *  wrote (every map when world.yaml was in the batch, none otherwise); only
+   *  their parked slices are dropped. */
+  markSaved: (writtenMapIds?: readonly string[]) => Promise<void>;
   markFailed: (reason: string) => void;
   /** Drop a non-terminal "saving"/"failed" status back to the true dirty
    *  state (unsaved/clean). Used when the DM cancels the save-review modal:
@@ -86,6 +136,13 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
   const [failedReason, setFailedReason] = useState<string | null>(null);
   const [restoredNotice, setRestoredNotice] = useState<{ savedAt: number } | null>(null);
   const mapRef = useRef(activeMapId);
+  // Mirrors otherMapsCount(slicesRef.current, mapRef.current); refreshed at
+  // every point the parked slices or the active map change.
+  const [otherMapsDirtyCount, setOtherMapsDirtyCount] = useState(0);
+  const refreshOtherMaps = useCallback(
+    () => setOtherMapsDirtyCount(otherMapsCount(slicesRef.current, mapRef.current)),
+    [],
+  );
 
   // ---- collect / apply the active map's holder slices ----
   const collectActiveInto = useCallback(
@@ -134,6 +191,7 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
         slicesRef.current = restored;
         applyActiveFrom(restored, mapRef.current);
         setRestoredNotice({ savedAt: restored.savedAt });
+        refreshOtherMaps();
       }
       setHydrated(true);
     })();
@@ -148,11 +206,14 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
   const onMapWillChange = useCallback(
     (nextMapId: string | null) => {
       const cur = mapRef.current;
+      if (nextMapId === cur) return false;
       collectActiveInto(slicesRef.current, cur); // save outgoing
       mapRef.current = nextMapId;
       applyActiveFrom(slicesRef.current, nextMapId); // restore incoming
+      refreshOtherMaps();
+      return true;
     },
-    [collectActiveInto, applyActiveFrom],
+    [collectActiveInto, applyActiveFrom, refreshOtherMaps],
   );
 
   useEffect(() => {
@@ -160,7 +221,7 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
   }, [activeMapId, onMapWillChange]);
 
   // ---- derived count + status (recomputed each render) ----
-  const unsavedCount = perMapDirtyCount();
+  const unsavedCount = perMapDirtyCount() + otherMapsDirtyCount;
   useEffect(() => {
     if (!hydrated) return;
     setStatus((prev) => {
@@ -196,23 +257,77 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
   // a cancelled save that had already cleared everything must land on "clean".
   const markIdle = useCallback(() => {
     setFailedReason(null);
-    setStatus(perMapDirtyCount() > 0 ? "unsaved" : "clean");
-  }, [perMapDirtyCount]);
-  const markSaved = useCallback(async () => {
-    slicesRef.current = {
-      overrides: {},
-      mapOverrideByMap: {},
-      regionByMap: {},
-      routeByMap: {},
-      fogByMap: {},
-      layerByMap: {},
-      entityEdit: null,
-      savedAt: Date.now(),
-    };
-    await idbDelete(SESSION_IDB_KEY);
-    setRestoredNotice(null);
-    setStatus("saved");
-  }, []);
+    setStatus(perMapDirtyCount() + otherMapsDirtyCount > 0 ? "unsaved" : "clean");
+  }, [perMapDirtyCount, otherMapsDirtyCount]);
+
+  const mapDrafts = useCallback((): Record<string, MapSlices> => {
+    const s = slicesRef.current;
+    const out: Record<string, MapSlices> = {};
+    const ids = new Set([
+      ...Object.keys(s.regionByMap),
+      ...Object.keys(s.routeByMap),
+      ...Object.keys(s.fogByMap),
+    ]);
+    for (const id of ids) {
+      out[id] = {
+        region: s.regionByMap[id] ?? EMPTY_COLLECTION,
+        route: s.routeByMap[id] ?? EMPTY_COLLECTION,
+        fog: s.fogByMap[id] ?? null,
+      };
+    }
+    const active = mapRef.current;
+    if (active) {
+      out[active] = {
+        region: holders.region.snapshot() as MapSlices["region"],
+        route: holders.route.snapshot() as MapSlices["route"],
+        fog: holders.fog.snapshot() as MapSlices["fog"],
+      };
+    }
+    return out;
+  }, [holders]);
+
+  const restoreOtherMapDrafts = useCallback(
+    (drafts: Record<string, MapSlices>) => {
+      const s = slicesRef.current;
+      let restored = 0;
+      for (const [id, d] of Object.entries(drafts)) {
+        if (id === mapRef.current) continue;
+        s.regionByMap[id] = d.region;
+        s.routeByMap[id] = d.route;
+        s.fogByMap[id] = d.fog;
+        restored += slicesDirtyCount(d);
+      }
+      refreshOtherMaps();
+      if (restored > 0)
+        setStatus((prev) => (prev === "saved" || prev === "clean" ? "unsaved" : prev));
+    },
+    [refreshOtherMaps],
+  );
+
+  const markSaved = useCallback(
+    async (writtenMapIds: readonly string[] = []) => {
+      // Only the written maps' parked slices are clean now; every other map
+      // keeps its draft. The active map's holders are cleared by the caller.
+      const prev = slicesRef.current;
+      const keep = <V>(byMap: Record<string, V>): Record<string, V> =>
+        Object.fromEntries(Object.entries(byMap).filter(([id]) => !writtenMapIds.includes(id)));
+      slicesRef.current = {
+        overrides: {},
+        mapOverrideByMap: {},
+        regionByMap: keep(prev.regionByMap),
+        routeByMap: keep(prev.routeByMap),
+        fogByMap: keep(prev.fogByMap),
+        layerByMap: {},
+        entityEdit: null,
+        savedAt: Date.now(),
+      };
+      refreshOtherMaps();
+      await idbDelete(SESSION_IDB_KEY);
+      setRestoredNotice(null);
+      setStatus("saved");
+    },
+    [refreshOtherMaps],
+  );
   const discardAll = useCallback(async () => {
     applyActiveFrom(
       {
@@ -237,16 +352,20 @@ export function useEditorSession(args: EditorSessionArgs): EditorSessionAPI {
       entityEdit: null,
       savedAt: Date.now(),
     };
+    refreshOtherMaps();
     undoStack.clear();
     await idbDelete(SESSION_IDB_KEY);
     setRestoredNotice(null);
     setStatus("clean");
-  }, [applyActiveFrom, undoStack]);
+  }, [applyActiveFrom, undoStack, refreshOtherMaps]);
 
   return {
     hydrated,
     status,
     unsavedCount,
+    otherMapsDirtyCount,
+    mapDrafts,
+    restoreOtherMapDrafts,
     failedReason,
     restoredNotice,
     dismissRestoredNotice,

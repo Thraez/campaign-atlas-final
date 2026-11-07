@@ -23,9 +23,30 @@ export interface DraftCoreAPI<T extends DraftShape> {
   dirtyCount: number;
 }
 
+/**
+ * Canon items with a { edits, added, deleted } draft laid over them: deleted
+ * ids dropped, edits merged by id, added items appended. Pure, so the save
+ * batch can apply any map's draft, not only the one mounted in the hook.
+ */
+export function applyCollectionDraft<I extends { id: string }>(
+  base: readonly I[],
+  draft: { edits: Record<string, Partial<I>>; added: I[]; deleted: string[] },
+): I[] {
+  const out: I[] = [];
+  for (const item of base) {
+    if (draft.deleted.includes(item.id)) continue;
+    const e = draft.edits[item.id];
+    out.push(e ? { ...item, ...e } : item);
+  }
+  out.push(...draft.added);
+  return out;
+}
+
 export function useDraftCore<T extends DraftShape>(
   initial: T,
   undoStack?: UndoStackAPI,
+  /** The map this draft slot currently holds; undo entries carry it. */
+  mapId?: string,
 ): DraftCoreAPI<T> {
   const [draft, setDraft] = useState<T>(initial);
 
@@ -59,10 +80,11 @@ export function useDraftCore<T extends DraftShape>(
           undo: () => applyDraft(before),
           redo: () => applyDraft(after),
           label,
+          mapId,
         });
       }
     },
-    [applyDraft, undoStack],
+    [applyDraft, undoStack, mapId],
   );
 
   const dirty =
