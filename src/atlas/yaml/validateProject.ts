@@ -12,7 +12,7 @@
  * testable in isolation; the driver in `validateProject` just concatenates
  * their output in order and tallies the counts.
  */
-import type { AtlasProject, MapDocument, Entity } from "@/atlas/content/schema";
+import type { AtlasProject, MapDocument, Entity, EntityVisibility } from "@/atlas/content/schema";
 import { findDmMarkup } from "@/atlas/content/dmMarkup";
 import {
   PLAYER_VISIBLE_VISIBILITY,
@@ -21,6 +21,7 @@ import {
   linkLeaksToPlayers,
   linkTargetLabel,
 } from "@/atlas/content/visibility";
+import { buildProjectionContext } from "@/atlas/content/projectEntityForPlayer";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import type { PlacementOverride } from "./buildPatches";
 
@@ -87,8 +88,12 @@ interface ValidationContext {
   mapIds: Set<string>;
   /** All entity ids (slugs) in the project. */
   entityIds: Set<string>;
-  /** Entity ids that must never leak to players (visibility dm | hidden). */
-  dmEntityIds: Set<string>;
+  /**
+   * Entity id -> visibility for the notes a player build ships (player-visible
+   * and not `atlas.publish: false`), from the player projection's own context.
+   * A wikilink or relationship to an id missing here leaks, as in the build.
+   */
+  shippedVisibility: ReadonlyMap<string, EntityVisibility>;
   /** Visibilities that are shown to players (player | rumor). */
   playerVisibleVis: Set<string>;
   /** The complete set of accepted visibility values. */
@@ -104,6 +109,13 @@ interface RuleOutput {
 }
 
 type Rule = (ctx: ValidationContext) => RuleOutput;
+
+/** Why a linked note doesn't reach players, for leak messages. */
+function describeHiddenTarget(target: Entity | undefined): string {
+  if (!target) return "unknown or folder-excluded note";
+  if (isSecretVisibility(target.visibility)) return `${target.visibility} entity`;
+  return "atlas.publish: false";
+}
 
 // 1. Duplicate map IDs across project
 const checkMapIdUniqueness: Rule = (ctx) => {
@@ -393,21 +405,23 @@ const checkEntities: Rule = (ctx) => {
       }
     }
 
-    // Player-visible wikilinks pointing at DM-only entities leak titles via
-    // tooltips / autocomplete. The strict build already drops them but warn.
-    if (ctx.playerVisibleVis.has(e.visibility) && Array.isArray(e.links)) {
+    // Player-visible wikilinks to a note players don't get (dm/hidden,
+    // `publish: false`, or folder-excluded) leak its name. The strict player
+    // build redacts them and fails (cross-ref leak, exit 8), so this blocks.
+    // Only notes that ship are judged: the build skips the rest.
+    if (ctx.shippedVisibility.has(e.id) && Array.isArray(e.links)) {
       for (const link of e.links) {
-        if (link.resolvedId && ctx.dmEntityIds.has(link.resolvedId)) {
-          const target = ctx.entityById.get(link.resolvedId);
-          issues.push({
-            severity: "warning",
-            code: "wikilink-to-dm",
-            category: "safety",
-            message: `Player-visible "${e.title}" wikilinks to DM-only entity "${target?.title ?? link.resolvedId}"`,
-            hint: "The link text would be rendered as plain text in the player build, but consider rewriting it so players don't see hints about hidden content.",
-            scope: { entityId: e.id },
-          });
-        }
+        if (!link.resolvedId) continue;
+        if (!linkLeaksToPlayers(e.visibility, ctx.shippedVisibility.get(link.resolvedId))) continue;
+        const target = ctx.entityById.get(link.resolvedId);
+        issues.push({
+          severity: "blocking",
+          code: "spoiler-leak-wikilink",
+          category: "safety",
+          message: `Player-visible "${e.title}" wikilinks to "${target?.title ?? link.resolvedId}", which players don't get (${describeHiddenTarget(target)})`,
+          hint: "The strict player build fails on this: the link text names the hidden note. Rewrite the sentence or remove the link.",
+          scope: { entityId: e.id },
+        });
       }
     }
     // Broken wikilinks in player-visible entities render as dead, non-clickable
@@ -450,13 +464,22 @@ const checkEntities: Rule = (ctx) => {
             message: `Entity "${e.title}" has relationship to unknown "${targetId}"`,
             scope: { entityId: e.id },
           });
-        } else if (ctx.playerVisibleVis.has(relVis) && ctx.dmEntityIds.has(targetId)) {
+        }
+        // As the build's filterRelationshipsForPlayer: a player-visible
+        // relationship to a note that doesn't ship (unknown ones included) is
+        // a relationship leak, which fails the strict player build (exit 5).
+        // Only on notes that ship: the build skips the rest.
+        if (
+          ctx.shippedVisibility.has(e.id) &&
+          ctx.playerVisibleVis.has(relVis) &&
+          linkLeaksToPlayers(relVis as EntityVisibility, ctx.shippedVisibility.get(targetId))
+        ) {
           issues.push({
             severity: "blocking",
             code: "spoiler-leak-relationship",
             category: "safety",
-            message: `Player-visible relationship on "${e.title}" points to DM-only entity "${targetId}"`,
-            hint: "Either mark the relationship visibility: dm, or unlink it. The strict player build will drop it but flagging here prevents accidental hints.",
+            message: `Player-visible relationship on "${e.title}" points to "${targetId}", which players don't get (${describeHiddenTarget(ctx.entityById.get(targetId))})`,
+            hint: "Either mark the relationship visibility: dm, or unlink it. The strict player build fails on it (relationship leak).",
             scope: { entityId: e.id },
           });
         }
@@ -605,6 +628,7 @@ const RULES: Rule[] = [
 export function validateProject(opts: ValidateProjectOpts): ValidationReport {
   const { project, draftPlacements, draftMap, draftLocalLayers = [] } = opts;
 
+  const entityById = new Map(project.entities.map((e) => [e.id, e] as const));
   const ctx: ValidationContext = {
     project,
     draftPlacements,
@@ -612,12 +636,10 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
     draftLocalLayers,
     mapIds: new Set(project.maps.map((m) => m.id)),
     entityIds: new Set(project.entities.map((e) => e.id)),
-    dmEntityIds: new Set(
-      project.entities.filter((e) => isSecretVisibility(e.visibility)).map((e) => e.id),
-    ),
+    shippedVisibility: buildProjectionContext(entityById).entityVisibility,
     playerVisibleVis: new Set<string>(PLAYER_VISIBLE_VISIBILITY),
     validVis: new Set<string>(VALID_VISIBILITY),
-    entityById: new Map(project.entities.map((e) => [e.id, e] as const)),
+    entityById,
   };
 
   const issues: Issue[] = [];
