@@ -10,6 +10,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { runBuild } from "../build-atlas";
+import { holdBuildLockUntilSettled } from "./buildLock";
 import { runPublishScans } from "./publishScan";
 import { computeAtlasDiff } from "../../src/atlas/publish/computeAtlasDiff";
 import type { AtlasDiff } from "../../src/atlas/publish/computeAtlasDiff";
@@ -59,7 +60,10 @@ async function runPlayerBuildWithTimeout(): Promise<{ ok: boolean; error?: strin
     );
   });
   try {
-    const result = await Promise.race([runBuild({ player: true, strict: true }), timeout]);
+    // A timed-out build keeps running; it keeps the build lock until it settles.
+    const build = runBuild({ player: true, strict: true });
+    holdBuildLockUntilSettled(build);
+    const result = await Promise.race([build, timeout]);
     if (timer) clearTimeout(timer);
     if (result.ok) return { ok: true };
     const errStr = "error" in result && result.error ? result.error : "";
