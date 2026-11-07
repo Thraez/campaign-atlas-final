@@ -1,6 +1,6 @@
 # Deleted pins on other maps count as unsaved and save with the rest
 
-Status: in-review
+Status: done
 Area: editor (pins, save)
 
 Found in the review of eval-30 (2026-11-07).
