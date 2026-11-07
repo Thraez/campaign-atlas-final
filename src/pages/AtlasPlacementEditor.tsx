@@ -157,6 +157,7 @@ import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
 import { FlatCRS } from "@/atlas/map/flatCRS";
 import { whenMapHasSize } from "@/atlas/map/whenMapHasSize";
+import { FitMapOnOpen } from "@/atlas/map/FitMapOnOpen";
 
 function pinDivIcon(
   color: string,
@@ -2035,6 +2036,11 @@ function AtlasPlacementEditorInner() {
                         : undefined,
                   }}
                 >
+                  <FitMapOnOpen
+                    mapId={activeMap.id}
+                    mapWidth={activeMap.width}
+                    mapHeight={activeMap.height}
+                  />
                   <FlyTo target={flyTo} />
                   <RulerLayer
                     active={

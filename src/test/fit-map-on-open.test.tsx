@@ -1,0 +1,74 @@
+import { render } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+type Handler = () => void;
+const fake = {
+  size: { x: 800, y: 600 },
+  handlers: new Map<string, Handler>(),
+  fitBounds: vi.fn(),
+  getSize() {
+    return this.size;
+  },
+  on(ev: string, h: Handler) {
+    this.handlers.set(ev, h);
+  },
+  off(ev: string) {
+    this.handlers.delete(ev);
+  },
+  invalidateSize: vi.fn(),
+  getContainer: () => document.createElement("div"),
+};
+
+vi.mock("react-leaflet", () => ({ useMap: () => fake }));
+
+const { FitMapOnOpen } = await import("@/atlas/map/FitMapOnOpen");
+
+const el = (id: string, skip = false, h = 1000) => (
+  <FitMapOnOpen mapId={id} mapWidth={2000} mapHeight={h} skip={skip} />
+);
+
+describe("FitMapOnOpen", () => {
+  beforeEach(() => {
+    fake.size = { x: 800, y: 600 };
+    fake.handlers.clear();
+    fake.fitBounds.mockClear();
+  });
+
+  it("fits the whole map on open", () => {
+    render(el("a"));
+    expect(fake.fitBounds).toHaveBeenCalledTimes(1);
+    expect(fake.fitBounds).toHaveBeenCalledWith(
+      [
+        [0, 0],
+        [1000, 2000],
+      ],
+      { animate: false },
+    );
+  });
+
+  it("fits again on map change but not on other re-renders", () => {
+    const { rerender } = render(el("a"));
+    rerender(el("a", false, 1000));
+    expect(fake.fitBounds).toHaveBeenCalledTimes(1);
+    rerender(el("b"));
+    expect(fake.fitBounds).toHaveBeenCalledTimes(2);
+  });
+
+  it("skips the fit while a deep-link target exists", () => {
+    const { rerender } = render(el("a", true));
+    expect(fake.fitBounds).not.toHaveBeenCalled();
+    rerender(el("a", false));
+    expect(fake.fitBounds).not.toHaveBeenCalled();
+    rerender(el("b", false));
+    expect(fake.fitBounds).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for the container to have a size", () => {
+    fake.size = { x: 0, y: 0 };
+    render(el("a"));
+    expect(fake.fitBounds).not.toHaveBeenCalled();
+    fake.size = { x: 800, y: 600 };
+    fake.handlers.get("resize")?.();
+    expect(fake.fitBounds).toHaveBeenCalledTimes(1);
+  });
+});
