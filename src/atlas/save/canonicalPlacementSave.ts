@@ -91,9 +91,11 @@ export function mergePlacementsIntoFrontmatter(
   primaryMapId?: string | null,
 ): Record<string, unknown> {
   const atlas = (data.atlas as Record<string, unknown>) ?? {};
-  const listed = Array.isArray(atlas.placements)
-    ? (atlas.placements as Array<Record<string, unknown>>)
-    : [];
+  // The build reads an entry with no mapId as a primary-map pin; name the map
+  // so the merge below keeps it.
+  const listed = (
+    Array.isArray(atlas.placements) ? (atlas.placements as Array<Record<string, unknown>>) : []
+  ).map((e) => (e.mapId === undefined && primaryMapId ? { ...e, mapId: primaryMapId } : e));
   // Legacy x/y is a placement on the primary map (the build reads it that way
   // when placements[] is empty); carry it over before the x/y keys go.
   const existing =

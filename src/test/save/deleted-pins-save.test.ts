@@ -135,6 +135,18 @@ describe("deleted pins save (eval-45)", () => {
   });
 });
 
+describe("placements[] entry with no mapId (eval-45 review)", () => {
+  it("is kept as the primary-map pin when another map changes", () => {
+    const data = { atlas: { placements: [{ x: 5, y: 5 }] } };
+    const next = mergePlacementsIntoFrontmatter(
+      data,
+      [{ entityId: "e1", mapId: "m2", removed: true }],
+      "m1",
+    ) as { atlas: { placements: unknown[] } };
+    expect(next.atlas.placements).toEqual([{ x: 5, y: 5, mapId: "m1" }]);
+  });
+});
+
 describe("stale tombstones (eval-45 review)", () => {
   // Before eval-45, removeCoord wrote `null` even for a pin canon never had,
   // so localStorage can hold tombstones with nothing to delete.

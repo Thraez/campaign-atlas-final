@@ -257,12 +257,17 @@ function AtlasPlacementEditorInner() {
         setOverrides((o) => {
           const { overrides: next, migrated } = finishLegacyMigration(o, defaultMap);
           if (migrated) localStorage.removeItem(LEGACY_STORAGE_KEY_V1);
-          // eval-45: tombstones with no canon placement would count as unsaved forever.
-          return dropStaleTombstones(next, p.placements);
+          return next;
         });
       })
       .catch((e: Error) => setError(e.message));
   }, []);
+
+  // eval-45: a tombstone with no canon placement to delete would count as
+  // unsaved forever. Pruned on load and whenever canon reloads.
+  useEffect(() => {
+    if (project) setOverrides((o) => dropStaleTombstones(o, project.placements));
+  }, [project]);
 
   const { externalRebuildAt, reloadCanon } = useExternalRebuildDetector(project, setProject);
 
