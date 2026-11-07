@@ -37,3 +37,8 @@ Orchestrator session started 2026-11-07. Branch `rebuild-plan-2026-11`, worktree
   so `test:changed` failed silently). Replacing it with a symlink to the main checkout's (as t45 etc.
   have) was refused by auto mode. Work sits uncommitted in the worktree; `.gitignore` gained
   `docs/rebuild-2026-11/audit/shots/` (13 MB of PNGs, local only).
+- Commit unblocked: `npm ci` in the worktree (own node_modules), hook passed; 2802f22.
+- Round 1 answered by Isak (see `questions-round-1.md`): seamless ocean canvas at world level with
+  nested child maps below; one baked fog per campaign; Sync + editor-only notes; DM-only text in a
+  gitignored local folder; missing world.yaml visibility = dm.
+- Stage C started: flows + GOALS update (Opus, medium); wireframes next.
