@@ -36,7 +36,6 @@ import type {
   MapDocument,
   MapLayer,
   World,
-  WorldCalendar,
 } from "@/atlas/content/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,6 +145,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { useUndoStack } from "@/atlas/useUndoStack";
+import { useUndoableState } from "@/atlas/useUndoableState";
+import { useCalendarDraft } from "@/atlas/calendar/useCalendarDraft";
 import { useEditorSession } from "@/atlas/session/useEditorSession";
 import { useEntityEditDraft } from "@/atlas/categories/useEntityEditDraft";
 import { EditorRail } from "@/atlas/shell/EditorRail";
@@ -331,11 +332,6 @@ function AtlasPlacementEditorInner() {
   // Optional in-session, per-map settings override (size + ocean + wrapX + grid).
   const [mapOverride, setMapOverride] = useState<Record<string, Partial<MapDocument>>>({});
 
-  // Optional in-session, per-world settings override (credits, assetCredits).
-  // Mirrors mapOverride — the editor had no world-level save path before, which
-  // is why the credits toggle (L1 Increment 2) was stuck. Keyed by world id.
-  const [worldOverride, setWorldOverride] = useState<Record<string, Partial<World>>>({});
-
   const baseMap: MapDocument | undefined = useMemo(
     () => project?.maps.find((m) => m.id === activeMapId),
     [project, activeMapId],
@@ -384,6 +380,12 @@ function AtlasPlacementEditorInner() {
   });
 
   const layerEditor = useMapLayers(activeMap, undoStack);
+
+  // Optional in-session, per-world settings override (name, credits,
+  // assetCredits), keyed by world id. Undo-tracked; a session holder, so it
+  // persists across reloads and "Discard all" clears it.
+  const worldDraft = useUndoableState<Record<string, Partial<World>>>({}, undoStack);
+  const worldOverride = worldDraft.value;
 
   // A13: baseline world.yaml content + hash for the active world. Pinned at
   // editor-load (and refreshed after each successful Save) so the unified
@@ -461,10 +463,6 @@ function AtlasPlacementEditorInner() {
   useEffect(() => {
     mapOverrideRef.current = mapOverride;
   }, [mapOverride]);
-  const worldOverrideRef = useRef(worldOverride);
-  useEffect(() => {
-    worldOverrideRef.current = worldOverride;
-  }, [worldOverride]);
 
   /** Undo-recording setter for pin overrides. Skip-recording mode is just
    *  raw setOverrides; use that for post-save cleanup. */
@@ -518,53 +516,22 @@ function AtlasPlacementEditorInner() {
     [undoStack],
   );
 
-  /** Undo-recording setter for world-level settings (credits, assetCredits). */
-  const setWorldOverrideUndoable = useCallback(
-    (
-      compute: (prev: Record<string, Partial<World>>) => Record<string, Partial<World>>,
-      label: string,
-    ) => {
-      const before = worldOverrideRef.current;
-      const after = compute(before);
-      if (after === before) return;
-      worldOverrideRef.current = after;
-      setWorldOverride(after);
-      undoStack.push({
-        undo: () => {
-          worldOverrideRef.current = before;
-          setWorldOverride(before);
-        },
-        redo: () => {
-          worldOverrideRef.current = after;
-          setWorldOverride(after);
-        },
-        label,
-      });
-    },
-    [undoStack],
-  );
-
   /** Merge a partial into the active world's session override (undo-tracked).
    *  This is the world-level equivalent of patchMap — the save path that lets
    *  name / credits / assetCredits changes reach world.yaml. */
   const patchWorld = (patch: Partial<World>) => {
     if (!baseWorld) return;
-    setWorldOverrideUndoable(
+    worldDraft.update(
       (s) => ({ ...s, [baseWorld.id]: { ...(s[baseWorld.id] ?? {}), ...patch } }),
       `world settings ${baseWorld.id}`,
     );
   };
 
   /**
-   * Session draft for the world calendar. `undefined` means "no draft — use
-   * canon"; a value (including an explicit `undefined` calendar wrapped in the
-   * object) means the DM has edited it this session. Kept separate from
-   * worldOverride because `calendar` is project-level in world.yaml, not a
-   * field on World.
+   * Session draft for the world calendar. Kept separate from worldOverride
+   * because `calendar` is project-level in world.yaml, not a field on World.
    */
-  const [calendarDraft, setCalendarDraft] = useState<{ value: WorldCalendar | undefined } | null>(
-    null,
-  );
+  const calendarDraft = useCalendarDraft(project, undoStack);
 
   // Shell state: which rail panel is open (null = closed).
   const [activePanel, setActivePanel] = useState<string | null>(null);
@@ -754,10 +721,8 @@ function AtlasPlacementEditorInner() {
     Object.keys(worldOverride[baseWorld.id]).length > 0
   );
   /** Calendar the UI should show and the save should write: draft over canon. */
-  const effectiveCalendar = calendarDraft ? calendarDraft.value : project?.calendar;
-  const calendarDirty =
-    !!calendarDraft &&
-    JSON.stringify(calendarDraft.value ?? null) !== JSON.stringify(project?.calendar ?? null);
+  const effectiveCalendar = calendarDraft.effective;
+  const calendarDirty = calendarDraft.dirty;
 
   // Everything world.yaml holds except other maps' region/route/fog slices,
   // which the session adds (worldYamlDirty, below the session).
@@ -1055,6 +1020,8 @@ function AtlasPlacementEditorInner() {
         get: () => entityEditDraft.snapshot(),
         set: (v) => entityEditDraft.applySnapshot(v as never),
       },
+      world: { get: () => worldDraft.ref.current, set: worldDraft.set },
+      calendar: { get: () => calendarDraft.ref.current, set: calendarDraft.set },
     },
     perMapDirtyCount: () =>
       regionDraft.dirtyCount +
@@ -2001,7 +1968,7 @@ function AtlasPlacementEditorInner() {
             calendar: (
               <CalendarPanel
                 calendar={effectiveCalendar}
-                onPatch={(next) => setCalendarDraft({ value: next })}
+                onPatch={(next) => calendarDraft.update(() => ({ value: next }), "calendar")}
               />
             ),
             help: <HelpPanel />,
@@ -2264,7 +2231,7 @@ function AtlasPlacementEditorInner() {
           const preSave = {
             overrides: overridesRef.current,
             mapOverride: mapOverrideRef.current,
-            worldOverride: worldOverrideRef.current,
+            worldOverride: worldDraft.ref.current,
             regionDraft: regionDraft.snapshot(),
             routeDraft: routeDraft.snapshot(),
             fogDraft: fogDraft.snapshot(),
@@ -2314,8 +2281,7 @@ function AtlasPlacementEditorInner() {
             if (baseWorld) {
               nextWorldOverride = { ...preSave.worldOverride };
               delete nextWorldOverride[baseWorld.id];
-              worldOverrideRef.current = nextWorldOverride;
-              setWorldOverride(nextWorldOverride);
+              worldDraft.set(nextWorldOverride);
             }
             void worldYamlBaseline.refresh();
           }
@@ -2337,8 +2303,7 @@ function AtlasPlacementEditorInner() {
               if (worldYamlWritten) {
                 mapOverrideRef.current = preSave.mapOverride;
                 setMapOverride(preSave.mapOverride);
-                worldOverrideRef.current = preSave.worldOverride;
-                setWorldOverride(preSave.worldOverride);
+                worldDraft.set(preSave.worldOverride);
                 regionDraft.applySnapshot(preSave.regionDraft);
                 routeDraft.applySnapshot(preSave.routeDraft);
                 fogDraft.applySnapshot(preSave.fogDraft);
@@ -2352,8 +2317,7 @@ function AtlasPlacementEditorInner() {
               if (worldYamlWritten) {
                 mapOverrideRef.current = nextMapOverride;
                 setMapOverride(nextMapOverride);
-                worldOverrideRef.current = nextWorldOverride;
-                setWorldOverride(nextWorldOverride);
+                worldDraft.set(nextWorldOverride);
                 regionDraft.applySnapshot(cleanRegionDraft);
                 routeDraft.applySnapshot(cleanRouteDraft);
                 fogDraft.applySnapshot(null);
