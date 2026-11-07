@@ -13,8 +13,8 @@
  *   - placements on maps NOT in this draft are preserved
  *   - placements on maps that ARE in this draft are replaced, or dropped for
  *     a removal (eval-45)
- *   - legacy atlas.x / atlas.y are removed once a placements[] is written
- *     (single source of truth)
+ *   - legacy atlas.x / atlas.y become a placement on the primary map, then
+ *     the x/y keys are removed (single source of truth)
  *
  * Each FileChange carries the `baseHash` of the .md file at read time so
  * the Save endpoint can detect "the file changed under us" before writing.
@@ -60,6 +60,8 @@ export class CanonicalSaveError extends Error {
 export interface CanonicalSaveDeps {
   /** Defaults to global fetch. Injectable for tests. */
   fetchFn?: typeof fetch;
+  /** The project's first map: where a legacy `atlas.x/y` placement lives. */
+  primaryMapId?: string | null;
 }
 
 /** Fetch the current on-disk contents of an allowlisted source file. */
@@ -86,11 +88,21 @@ export async function readSourceFile(relPath: string, fetchFn: typeof fetch): Pr
 export function mergePlacementsIntoFrontmatter(
   data: Record<string, unknown>,
   drafts: readonly PlacementChange[],
+  primaryMapId?: string | null,
 ): Record<string, unknown> {
   const atlas = (data.atlas as Record<string, unknown>) ?? {};
-  const existing = Array.isArray(atlas.placements)
+  const listed = Array.isArray(atlas.placements)
     ? (atlas.placements as Array<Record<string, unknown>>)
     : [];
+  // Legacy x/y is a placement on the primary map (the build reads it that way
+  // when placements[] is empty); carry it over before the x/y keys go.
+  const existing =
+    listed.length === 0 &&
+    primaryMapId &&
+    typeof atlas.x === "number" &&
+    typeof atlas.y === "number"
+      ? [{ mapId: primaryMapId, x: atlas.x, y: atlas.y }]
+      : listed;
 
   const touchedMapIds = new Set(drafts.map((d) => d.mapId));
   const preserved = existing.filter(
@@ -165,7 +177,7 @@ export async function buildCanonicalPlacementChanges(
     const currentRaw = await readSourceFile(sourcePath, fetchFn);
     const baseHash = await hashContent(currentRaw);
     const parsed = parseFrontmatter(currentRaw);
-    const nextData = mergePlacementsIntoFrontmatter(parsed.data, entityDrafts);
+    const nextData = mergePlacementsIntoFrontmatter(parsed.data, entityDrafts, deps?.primaryMapId);
     const nextRaw = stringifyFrontmatter(parsed.content, nextData);
     changes.push({ path: sourcePath, content: nextRaw, kind: "entity-md", baseHash });
   }
