@@ -155,6 +155,7 @@ import { CalendarPanel } from "@/atlas/calendar/CalendarPanel";
 import { ViewModeProvider, useViewMode } from "@/atlas/view/ViewModeProvider";
 import { filterEntitiesForLens } from "@/atlas/view/filterEntitiesForLens";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
+import { resolveMapClickTool } from "@/atlas/editor/mapClickTool";
 import { FlatCRS } from "@/atlas/map/flatCRS";
 import { whenMapHasSize } from "@/atlas/map/whenMapHasSize";
 
@@ -425,6 +426,14 @@ function AtlasPlacementEditorInner() {
   // the map override, which activeMap folds in and the unified Save spreads
   // into world.yaml via buildFullWorldYaml → soundscapeToYamlObject.
   const soundscapeDraft = useSoundscapeDraft(activeMap, undoStack);
+  const mapClickTool = resolveMapClickTool({
+    placingPin: !!pendingId,
+    drawingRegion: regionDraft.drawing,
+    drawingRoute: routeDraft.drawing,
+    drawingFog: fogDraft.tool !== null,
+    drawingSoundscape: soundscapeDraft.drawing,
+    rulerOn: rulerActive,
+  });
   // Audio files the Sound panel can offer (basenames under
   // public/atlas/assets/audio/). Loaded once; empty is fine — the panel
   // falls back to a free-text file field.
@@ -2029,17 +2038,12 @@ function AtlasPlacementEditorInner() {
                       activeMap.water?.enabled === false
                         ? (activeMap.oceanColor ?? "#18313f")
                         : "transparent",
-                    cursor:
-                      pendingId || regionDraft.drawing || soundscapeDraft.drawing || rulerActive
-                        ? "crosshair"
-                        : undefined,
+                    cursor: mapClickTool ? "crosshair" : undefined,
                   }}
                 >
                   <FlyTo target={flyTo} />
                   <RulerLayer
-                    active={
-                      rulerActive && !pendingId && !regionDraft.drawing && !soundscapeDraft.drawing
-                    }
+                    active={mapClickTool === "ruler"}
                     mapId={activeMap.id}
                     mapHeight={activeMap.height}
                     scale={activeMap.scale}
