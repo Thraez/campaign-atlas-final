@@ -40,6 +40,7 @@
     "atlas:check-player-secrets": "tsx scripts/check-player-secrets.ts",
     "atlas:check-image-privacy": "tsx scripts/check-image-privacy.ts",
     "atlas:check-fog": "tsx scripts/check-fog-safety.ts",
+    "atlas:check-vault-content": "tsx scripts/check-vault-content.ts",
     "atlas:check-shape": "tsx scripts/check-artifact-shape.ts",
     "atlas:audit-assets": "tsx scripts/atlas/audit-assets.ts",
     "atlas:backup": "tsx scripts/atlas/backup.ts",

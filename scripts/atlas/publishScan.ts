@@ -37,6 +37,8 @@ export const MSG: Record<PublishScanReason["scan"], string> = {
     "A locked secret or its password would have been visible to players. Publishing is blocked.",
   "check-player-files":
     "A file that isn't part of the player site (such as a world.yaml or a note) would have been published. Publishing is blocked.",
+  "check-vault-content":
+    "A note synced from the Obsidian vault is in the atlas content while the repo is public. Publishing is blocked until hosting is private (H-04).",
   "audit-assets": "An image is larger than the 4 MB limit and must be optimized before publishing.",
 };
 

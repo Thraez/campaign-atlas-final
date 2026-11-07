@@ -16,6 +16,7 @@ import { run as checkFogSafety } from "../check-fog-safety.js";
 import { run as checkArtifactShape } from "../check-artifact-shape.js";
 import { run as checkPlayerSecrets } from "../check-player-secrets.js";
 import { run as checkPlayerFiles } from "../check-player-files.js";
+import { run as checkVaultContent } from "../check-vault-content.js";
 import { run as auditAssets } from "./audit-assets.js";
 
 export type ScanId =
@@ -26,6 +27,7 @@ export type ScanId =
   | "check-fog-safety"
   | "check-player-secrets"
   | "check-player-files"
+  | "check-vault-content"
   | "audit-assets";
 
 /** Absolute paths the scans run against. `root` is the repo root. */
@@ -130,6 +132,23 @@ export const SCANS: ScanEntry[] = [
       {
         label: "check-player-files dist",
         run: () => checkPlayerFiles({ dir: path.join(ctx.root, "dist") }),
+      },
+    ],
+  },
+  {
+    id: "check-vault-content",
+    script: "check-vault-content.ts",
+    // The source, not an artifact: while hosting is public (R-01), content/
+    // must hold nothing Sync from Obsidian wrote.
+    tasks: (ctx) => [
+      {
+        label: "check-vault-content content",
+        run: () =>
+          checkVaultContent({
+            root: ctx.root,
+            config: ctx.configPath,
+            contentDir: ctx.contentDir,
+          }),
       },
     ],
   },
