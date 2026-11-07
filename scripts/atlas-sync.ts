@@ -13,6 +13,9 @@
  * --ignore <glob> (repeatable), --world <id>, --repo <path> (default: cwd).
  * Folders and globs default to the editor's saved Sync settings.
  *
+ * `--write` refuses while `atlas.config.json` `hosting` is not "private"
+ * (R-01: the repo is public; see H-04). `--dry-run` always works.
+ *
  * Needs the DM build (`npm run atlas:build`, `.local-atlas/atlas.json`) to
  * tell an update from a create, as the editor does. `--write` does not
  * rebuild: run `npm run atlas:build` afterwards.
@@ -29,6 +32,8 @@ import {
 import type { SyncSettings } from "../src/atlas/sync/useSyncSettings";
 import type { SyncSource } from "../src/atlas/sync/vaultPort";
 import { createFsVaultPort, readLocalAtlasJson } from "./atlas/fsVaultPort";
+import { syncWritesAllowed } from "./atlas/hosting";
+import { HostingPublicError } from "../src/atlas/sync/hosting";
 
 export interface SyncCliArgs {
   mode: "dry-run" | "write";
@@ -115,6 +120,8 @@ export function formatCounts(counts: FolderCounts[]): string {
  * `--write`) any note that needs a person to look at it.
  */
 export async function runSyncCli(args: SyncCliArgs): Promise<string> {
+  // R-01: a real sync is refused while the repo is public; the port refuses too.
+  if (args.mode === "write" && !syncWritesAllowed(args.repoRoot)) throw new HostingPublicError();
   const project = await readLocalAtlasJson<AtlasProject | null>(args.repoRoot, "atlas.json", null);
   if (!project) throw new Error("No DM build in .local-atlas/ — run `npm run atlas:build` first.");
   const saved = await readLocalAtlasJson<SyncSettings>(args.repoRoot, "editor-settings.json", {});

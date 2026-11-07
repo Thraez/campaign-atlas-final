@@ -117,10 +117,10 @@ Every publish runs `npm run atlas:publish`, which chains:
 atlas:snapshot                # copy the current atlas.json to .last-published.json as a rollback baseline
 atlas:build:player --strict   # the build itself; exits 3-9 on safety failures
 build                         # vite build (excludes editor via __INCLUDE_EDITOR__)
-atlas:scan                    # runs all seven safety scanners + audit-assets in parallel (scripts/atlas/publish-orchestrator.ts)
+atlas:scan                    # runs all eight safety scanners + audit-assets in parallel (scripts/atlas/publish-orchestrator.ts)
 ```
 
-`atlas:scan` runs `publish-orchestrator.ts`, which fans out to seven player-safety scanners (each checked against both the `dist` bundle and `public/atlas`, except `check-shape`, which only checks `public/atlas/atlas.json`, and `check-player-files`, which only checks `dist`) plus `audit-assets`.
+`atlas:scan` runs `publish-orchestrator.ts`, which fans out to eight safety scanners (each checked against both the `dist` bundle and `public/atlas`, except `check-shape`, which only checks `public/atlas/atlas.json`, `check-player-files`, which only checks `dist`, and `check-vault-content`, which checks `content/`) plus `audit-assets`.
 
 What each scanner catches:
 
@@ -131,6 +131,7 @@ What each scanner catches:
 - **`check-fog-safety`** (`npm run atlas:check-fog`) — re-derives the fog boundary from the source `world.yaml` and asserts the player artifacts don't leak it: the original (un-redacted) layer PNG, unstripped fog geometry, a player pin/route/region inside the fogged area, or a redacted PNG that's still opaque at a fogged pixel.
 - **`check-player-secrets`** — verifies no secret plaintext, passphrase, character key, or unstripped `{{secret:}}` marker reached the player artifacts. Runs only inside the orchestrator — there is no standalone `atlas:check-player-secrets` npm alias.
 - **`check-player-files`** — fails when `dist/atlas/` is missing from a built `dist/` or holds any file outside the player allowlist (`scripts/atlas/playerFiles.ts`: the atlas JSON, images anywhere under `atlas/` except `assets/audio/`, the hashed audio `atlas.json` references, and empty `.gitkeep` files; not the audio manifest, which only the editor reads). Vite copies all of `public/atlas/` into `dist/`, so a DM file dropped there (a `world.yaml`, a note) would otherwise ship. The player build's prune plugin already removes such files; this scan fails closed if one gets through. Runs only inside the orchestrator.
+- **`check-vault-content`** (`npm run atlas:check-vault-content`, exit 19) — while `atlas.config.json` has `"hosting": "public"`, fails when `content/` holds a note from the DM's vault (Sync's `atlas.source: vault` marker, the sync map, or a hash match against this machine's vault) or any symlink. It doesn't look at maps, images or `world.yaml`. Details: [IMPORT_EXPORT.md](IMPORT_EXPORT.md), "Hosting guard".
 
 Separately, **`audit-assets`** (`npm run atlas:audit-assets`) isn't a safety scanner — it's a content-quality check: oversize images, orphaned files, and broken asset references.
 

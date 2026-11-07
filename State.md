@@ -70,7 +70,8 @@ Lowest number first within each folder.
 - Look-and-feel checks on merged work (a bad result becomes a ticket): search (#63), the editor map
   (#64, #67), the missing-bytes toast (#66), the layer path field (#68), zooming pin labels (#70),
   a reload with sound on, desktop and phone (#71), offline in a browser (#78), the Sync panel (#79),
-  the Save chip and the conflict notice (#80, #81). After the Morning queue: eval-30, draw on two
+  the Save chip and the conflict notice (#80, #81), the "Sync is off while the repo is public"
+  toast on a Sync commit (R-01). After the Morning queue: eval-30, draw on two
   maps, save once, reload, both keep their edits.
 - Pushing and merging the Morning queue (auto mode refused the push).
 - The provisional calls below, in a batch.

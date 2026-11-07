@@ -20,8 +20,9 @@
  *   1. builds the file changes and checks every create target is still free,
  *      so a commit the save will refuse copies no image (`ConflictError`);
  *   2. copies embedded images and rewrites the embeds (a refused one is
- *      dropped and counted in `skippedImages`);
- *   3. writes the files;
+ *      dropped and counted in `skippedImages`; a `HostingPublicError` from the
+ *      port stops the commit, R-01);
+ *   3. writes the files, marked `origin: "sync"` when they came from a vault;
  *   4. records every written vault note in the sync map, whether or not the
  *      rebuild worked, and stamps the sync time.
  * Errors: `ImportCommitError` (nothing to commit, unreadable atlas file),
@@ -315,7 +316,8 @@ export async function commitSync(
     ? await buildImportChanges(rowsForCommit, { readFile })
     : firstChanges;
 
-  const written = await port.writeAtlasFiles(changes);
+  // A vault sync says so, so the port can refuse it while hosting is public (R-01).
+  const written = await port.writeAtlasFiles(changes, source ? { origin: "sync" } : undefined);
 
   // The files are written whether or not the rebuild worked: record them.
   const vaultRows = rows.filter(

@@ -30,6 +30,8 @@ export interface WrappedWorldProps {
   openId: string | null;
   onPinPeek?: (id: string, ev: MouseEvent) => void;
   onPinPeekLeave?: () => void;
+  /** Region hover cards: true only for a fine pointer (touch can't hover). */
+  peekEnabled?: boolean;
   rulerActive?: boolean;
 }
 
@@ -44,6 +46,7 @@ export const WrappedWorld = memo(function WrappedWorld({
   openId,
   onPinPeek,
   onPinPeekLeave,
+  peekEnabled,
   rulerActive,
 }: WrappedWorldProps) {
   const H = map.height;
@@ -68,16 +71,30 @@ export const WrappedWorld = memo(function WrappedWorld({
 
         {(map.regions ?? []).map((region) => {
           const ent = region.entityId ? entityById.get(region.entityId) : undefined;
+          // Peek only for an entity the loaded atlas holds; anything else keeps
+          // the name-only tooltip.
+          const peekId = ent && onPinPeek && peekEnabled ? ent.id : undefined;
           return (
             <RegionShape
               key={`${region.id}-${dx}`}
               region={region}
               entityType={ent?.type}
               positions={region.points.map(([x, y]) => [H - y, x + dx] as [number, number])}
+              hideTooltip={peekId !== undefined && !rulerActive}
               eventHandlers={
-                region.entityId && !rulerActive
-                  ? { click: () => onOpenEntity(region.entityId!, false) }
-                  : undefined
+                rulerActive
+                  ? undefined
+                  : {
+                      ...(region.entityId
+                        ? { click: () => onOpenEntity(region.entityId!, false) }
+                        : {}),
+                      ...(peekId
+                        ? {
+                            mouseover: (e) => onPinPeek?.(peekId, e.originalEvent as MouseEvent),
+                            mouseout: () => onPinPeekLeave?.(),
+                          }
+                        : {}),
+                    }
               }
             >
               <Popup>
@@ -121,7 +138,18 @@ export const WrappedWorld = memo(function WrappedWorld({
           ))}
       </>
     ),
-    [map, dx, H, entityById, rulerActive, onOpenEntity, showGrid],
+    [
+      map,
+      dx,
+      H,
+      entityById,
+      rulerActive,
+      onOpenEntity,
+      showGrid,
+      onPinPeek,
+      onPinPeekLeave,
+      peekEnabled,
+    ],
   );
 
   return (
