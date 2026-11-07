@@ -76,7 +76,12 @@ import {
 } from "../src/atlas/assets/imageEncoding";
 import { encodeMapWebp } from "./atlas/mapWebp";
 import { runBuild, type BuildResult as InProcessBuildResult } from "./build-atlas";
-import { tryAcquireBuildLock, releaseBuildLock } from "./atlas/buildLock";
+import {
+  tryAcquireBuildLock,
+  releaseBuildLock,
+  holdBuildLockUntilSettled,
+  buildLockHolder,
+} from "./atlas/buildLock";
 import { DEV_API_PATHS, DEV_API_PREFIX } from "./atlas/devRoutes";
 
 const MAX_FILE_BYTES = 1024 * 1024;
@@ -927,7 +932,11 @@ async function runAtlasBuild(repoRoot: string): Promise<BuildResult> {
   try {
     // Default flags = dev rebuild (non-player, non-strict). Same as a bare
     // `npm run atlas:build` invocation, which is what the spawn version did.
-    const result: BuildResult | InProcessBuildResult = await Promise.race([runBuild(), timeout]);
+    // The timeout only stops the wait: the build keeps running, so it keeps
+    // the build lock until it settles (eval-2026-10/37).
+    const build = runBuild();
+    holdBuildLockUntilSettled(build);
+    const result: BuildResult | InProcessBuildResult = await Promise.race([build, timeout]);
     if (timer) clearTimeout(timer);
     if (result.ok) {
       return { ok: true, durationMs: result.durationMs };
@@ -979,8 +988,10 @@ export async function runPlayerBuildWithTimeout(): Promise<{ ok: boolean; error?
     );
   });
   try {
+    const build = runBuild({ player: true, strict: true });
+    holdBuildLockUntilSettled(build);
     const result: BuildResult | import("./build-atlas").BuildResult = await Promise.race([
-      runBuild({ player: true, strict: true }),
+      build,
       timeout,
     ]);
     if (timer) clearTimeout(timer);
@@ -1805,7 +1816,13 @@ async function runRoute(
   next: () => void,
 ): Promise<void> {
   if (route.takesBuildLock && !tryAcquireBuildLock()) {
-    sendJson(res, 423, { error: "Locked", detail: "another build is in flight" });
+    sendJson(res, 423, {
+      error: "Locked",
+      detail:
+        buildLockHolder() === "lingering-build"
+          ? "a previous build is still running"
+          : "another build is in flight",
+    });
     return;
   }
   try {
