@@ -394,6 +394,7 @@ describe("buildFullWorldYaml — soundscape round-trip", () => {
         areas: [
           {
             id: "area-tavern",
+            name: " Tavern ",
             bed: { src: "audio/tavern.ogg", gain: 0.8 },
             points: [
               [0, 0],
@@ -416,6 +417,7 @@ describe("buildFullWorldYaml — soundscape round-trip", () => {
     expect(sc!.areas![0].id).toBe("area-tavern");
     expect(sc!.areas![0].bed.src).toBe("audio/tavern.ogg");
     expect(sc!.areas![0].bed.gain).toBe(0.8);
+    expect(sc!.areas![0].name).toBe("Tavern"); // trimmed on save, not while typing
   });
 
   it("omits soundscape key when undefined", () => {

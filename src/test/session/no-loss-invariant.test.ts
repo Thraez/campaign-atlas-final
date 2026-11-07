@@ -32,6 +32,8 @@ function emptyState(savedAt = 1): SessionState {
     routeByMap: {},
     fogByMap: {},
     layerByMap: {},
+    worldOverride: {},
+    calendar: null,
     entityEdit: null,
     savedAt,
   };

@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
+import { FilterChip } from "@/atlas/FilterChip";
+import { useReduceMotion } from "@/hooks/use-reduce-motion";
 import { playerTypeLabel } from "@/atlas/content/typeLabel";
 import { compileQuery, entitySearchDoc, searchMatches } from "@/atlas/search/search";
 import {
@@ -36,6 +38,7 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
 
   const { project, error } = useAtlasContent();
   const [showAllTags, setShowAllTags] = useState(false);
+  const reduceMotion = useReduceMotion();
 
   const { q: query, type: activeType } = parseBrowseFilterParams(searchParams);
 
@@ -128,7 +131,7 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
   const scrollToSection = (letter: string) => {
     document
       .getElementById(sectionId(letter))
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      ?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
   };
 
   if (error || !project) {
@@ -177,23 +180,20 @@ export default function AtlasBrowse({ mode = "browse" }: { mode?: Mode }) {
 
       {mode !== "type" && allTypes.length > 1 && (
         <div className="flex flex-wrap gap-1 px-3 md:px-4 py-2 border-b border-border/50 bg-muted/20">
-          <button
-            onClick={() => setActiveType(null)}
-            className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded ${activeType === null ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
-          >
+          <FilterChip pressed={activeType === null} onClick={() => setActiveType(null)}>
             all <span className="opacity-60">{facetFilteredEntries.length}</span>
-          </button>
+          </FilterChip>
           {allTypes.map(([t, n]) => {
             const label = playerTypeLabel(t);
             if (!label) return null;
             return (
-              <button
+              <FilterChip
                 key={t}
+                pressed={activeType === t}
                 onClick={() => setActiveType(activeType === t ? null : t)}
-                className={`text-[10px] uppercase tracking-wider filter-chip px-2 py-0.5 rounded ${activeType === t ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"}`}
               >
                 {label} <span className="opacity-60">{n}</span>
-              </button>
+              </FilterChip>
             );
           })}
         </div>

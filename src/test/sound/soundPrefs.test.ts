@@ -19,11 +19,10 @@ describe("soundPrefs", () => {
   });
 
   it("round-trips saved prefs including volume", () => {
-    saveSoundPrefs({ soundEnabled: true, muted: false, calmMode: true, volume: 0.5 });
+    saveSoundPrefs({ soundEnabled: true, muted: false, volume: 0.5 });
     expect(loadSoundPrefs()).toEqual({
       soundEnabled: true,
       muted: false,
-      calmMode: true,
       volume: 0.5,
     });
   });
@@ -53,7 +52,6 @@ describe("soundPrefs", () => {
     expect(loadSoundPrefs()).toEqual({
       soundEnabled: true,
       muted: false,
-      calmMode: false,
       volume: 0.8,
     });
   });
