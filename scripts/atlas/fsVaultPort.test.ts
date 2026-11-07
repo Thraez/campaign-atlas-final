@@ -64,6 +64,8 @@ beforeEach(() => {
   write(vault, "01_Lore/History.md", "The old war.\n");
   write(vault, "10_DmNotesAndSecrets/Cabal.md", "secret\n");
   write(repo, `content/${WORLD}/npcs/placeholder.md`, PLACEHOLDER);
+  // R-01: a real sync writes only when hosting is private (see hosting-guard tests).
+  write(repo, "atlas.config.json", JSON.stringify({ contentRoot: "content", hosting: "private" }));
   writeDmBuild({ placeholder: `content/${WORLD}/npcs/placeholder.md` });
 });
 

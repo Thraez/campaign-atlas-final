@@ -52,6 +52,8 @@ const STABLE_MAP = {
   flyTo: vi.fn(),
   panTo: vi.fn(),
   fitBounds: vi.fn(),
+  getBoundsZoom: () => 0,
+  setMinZoom: vi.fn(),
   setZoom: vi.fn(),
   setMaxBounds: vi.fn(),
   invalidateSize: vi.fn(),
