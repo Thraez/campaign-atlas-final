@@ -63,6 +63,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
 import { ScaleBarController, type ScaleBarState } from "@/atlas/scale/ScaleBar";
 import { serializeDeepLink, parseDeepLink } from "@/atlas/deepLink";
+import { resolveDeepLink } from "@/atlas/resolveDeepLink";
+import { pushViewerSearch, replaceViewerSearch } from "@/atlas/viewerHistory";
 import { WrappedWorld } from "@/atlas/map/WrappedWorld";
 import { atlasToLatLng } from "@/atlas/map/coords";
 import { whenMapHasSize } from "@/atlas/map/whenMapHasSize";
@@ -265,43 +267,42 @@ export default function AtlasViewer() {
     viewCenterRef.current = vc;
   }, []);
 
-  // Keep URL in sync with viewport (replaceState — no new Back entries for pan/zoom)
+  // Keep URL in sync with viewport (replace — no new Back entries for pan/zoom)
   useEffect(() => {
     if (!activeMapId) return;
-    window.history.replaceState(
-      null,
-      "",
-      "?" +
-        serializeDeepLink({
-          mapId: activeMapId,
-          entityId: openId,
-          center: viewCenter ? { x: viewCenter.x, y: viewCenter.y } : null,
-          zoom: viewCenter?.zoom ?? null,
-        }),
+    replaceViewerSearch(
+      serializeDeepLink({
+        mapId: activeMapId,
+        entityId: openId,
+        center: viewCenter ? { x: viewCenter.x, y: viewCenter.y } : null,
+        zoom: viewCenter?.zoom ?? null,
+      }),
     );
   }, [activeMapId, openId, viewCenter]);
 
+  // Load and Back/Forward read the viewport at call time, not at render.
+  const hasDesktopAsideRef = useRef(hasDesktopAside);
+  useLayoutEffect(() => {
+    hasDesktopAsideRef.current = hasDesktopAside;
+  }, [hasDesktopAside]);
+
+  /** Show what the current URL names: one rule for load and Back/Forward (resolveDeepLink). */
+  const applyUrl = useCallback((project: AtlasProject, currentMapId: string | null) => {
+    const r = resolveDeepLink(parseDeepLink(window.location.search), project, {
+      currentMapId,
+      defaultMapId: project.worlds[0]?.defaultMapId ?? project.maps[0]?.id ?? null,
+      hasDesktopAside: hasDesktopAsideRef.current,
+    });
+    setActiveMapId(r.mapId);
+    setOpenId(r.openId);
+    setMobilePanelOpen(r.openSheet);
+    if (r.fly) setFlyTarget(r.fly);
+  }, []);
+
   // Back navigation: restore entity/map when the user presses Back
   const popStateHandler = useCallback(() => {
-    const dl = parseDeepLink(window.location.search);
-    setOpenId(dl.entityId);
-    if (dl.mapId && data?.project.maps.some((m) => m.id === dl.mapId)) {
-      setActiveMapId(dl.mapId);
-    }
-    if (dl.center && data) {
-      const mapIdForFly = dl.mapId ?? activeMapId;
-      const targetMap = data.project.maps.find((m) => m.id === mapIdForFly);
-      if (targetMap) {
-        setFlyTarget({
-          x: dl.center.x,
-          y: dl.center.y,
-          height: targetMap.height,
-          zoom: dl.zoom ?? undefined,
-        });
-      }
-    }
-    if (!dl.entityId) setMobilePanelOpen(false);
-  }, [data, activeMapId]);
+    if (data) applyUrl(data.project, activeMapId);
+  }, [data, activeMapId, applyUrl]);
 
   useEffect(() => {
     window.addEventListener("popstate", popStateHandler);
@@ -315,43 +316,10 @@ export default function AtlasViewer() {
       .then((project) => {
         setError(null);
         setData({ project });
-        const defaultMapId = project.worlds[0]?.defaultMapId ?? project.maps[0]?.id ?? null;
-        const dl = parseDeepLink(window.location.search);
-        // Use map from deep link if valid, else fall back to default
-        const targetMapId =
-          dl.mapId && project.maps.some((m) => m.id === dl.mapId) ? dl.mapId : defaultMapId;
-        setActiveMapId(targetMapId);
-        if (dl.entityId) {
-          setOpenId(dl.entityId);
-          // Sheet only matters when the aside isn't mounted.
-          if (!hasDesktopAside) setMobilePanelOpen(true);
-        }
-        if (dl.center) {
-          // Full deep link: fly to the exact shared viewport
-          const mapForFly = project.maps.find((m) => m.id === targetMapId);
-          if (mapForFly) {
-            setFlyTarget({
-              x: dl.center.x,
-              y: dl.center.y,
-              height: mapForFly.height,
-              zoom: dl.zoom ?? undefined,
-            });
-          }
-        } else if (dl.entityId) {
-          // Old-style ?entity= link: fly to the entity's placement (backward compat)
-          const placement = project.placements.find((p) => p.entityId === dl.entityId);
-          if (placement) {
-            const m = project.maps.find((mm) => mm.id === placement.mapId);
-            if (m) {
-              setActiveMapId(m.id);
-              setFlyTarget({ x: placement.x, y: placement.y, height: m.height });
-            }
-          }
-        }
+        applyUrl(project, null);
       })
       .catch((e: Error) => setError(e.message));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally stable; URL-driven entity open should respect the viewport at call time, not re-derive on every hasDesktopAside change
-  }, []);
+  }, [applyUrl]);
 
   useEffect(() => {
     attemptLoad();
@@ -433,30 +401,32 @@ export default function AtlasViewer() {
     (id: string, fly = true) => {
       // Push a history entry so Back returns to the previous entity (or no-entity state)
       const vc = viewCenterRef.current;
-      window.history.pushState(
-        null,
-        "",
-        "?" +
-          serializeDeepLink({
-            mapId: activeMapId,
-            entityId: id,
-            center: vc ? { x: vc.x, y: vc.y } : null,
-            zoom: vc?.zoom ?? null,
-          }),
+      pushViewerSearch(
+        serializeDeepLink({
+          mapId: activeMapId,
+          entityId: id,
+          center: vc ? { x: vc.x, y: vc.y } : null,
+          zoom: vc?.zoom ?? null,
+        }),
       );
+      // Same rule as a URL naming this map and entity with no center: stay on
+      // the active map and fly to the entity's placement there, if it has one.
+      const r =
+        data && activeMapId
+          ? resolveDeepLink(
+              { mapId: activeMapId, entityId: id, center: null, zoom: null },
+              data.project,
+              { currentMapId: activeMapId, defaultMapId: activeMapId, hasDesktopAside },
+            )
+          : null;
       setOpenId(id);
       // Only open the bottom sheet on viewports where the desktop aside
       // isn't rendered; otherwise the Radix overlay covers the screen
       // while the panel is the user-visible target (the gray-screen bug).
       if (!hasDesktopAside) setMobilePanelOpen(true);
-      if (fly && data && activeMap) {
-        const placement = data.project.placements.find(
-          (p) => p.entityId === id && p.mapId === activeMap.id,
-        );
-        if (placement) setFlyTarget({ x: placement.x, y: placement.y, height: activeMap.height });
-      }
+      if (fly && r?.fly) setFlyTarget(r.fly);
     },
-    [data, activeMap, hasDesktopAside, activeMapId],
+    [data, hasDesktopAside, activeMapId],
   );
 
   // "Discovered" = an entity panel opened by ANY means (click, search, wander,
