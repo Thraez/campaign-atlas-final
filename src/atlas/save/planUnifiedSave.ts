@@ -14,6 +14,7 @@ import type { WorldYamlBaseline } from "@/atlas/save/useWorldYamlBaseline";
 import { buildAssetBinaryChanges, uploadsMissingBytes } from "@/atlas/save/buildSaveBatch";
 import {
   buildCanonicalPlacementChanges,
+  type PlacementChange,
   type PlacementDraft,
 } from "@/atlas/save/canonicalPlacementSave";
 import { buildSavePlan } from "@/atlas/editor/saveGate";
@@ -24,8 +25,8 @@ export interface UnifiedSaveState {
   /** Session override map; key presence (`${mapId}:${entityId}`) marks a placement dirty. */
   overrides: Record<string, unknown>;
   activeMapId: string;
-  /** N100: overrides keyed to a map other than the active one. */
-  foreignMapDrafts: readonly PlacementDraft[];
+  /** N100: overrides keyed to a map other than the active one, removals included (eval-45). */
+  foreignMapDrafts: readonly PlacementChange[];
   entitiesById: Map<string, Entity>;
   /** null when no map / region / route / fog / layer tab has a dirty draft. */
   worldYaml: null | {
@@ -100,7 +101,7 @@ export async function planUnifiedSave(
 
   // One FileChange per entity .md path, however many maps it is placed on.
   const changes: FileChange[] = await buildCanonicalPlacementChanges(
-    [...plan.dirtyPlacements, ...state.foreignMapDrafts],
+    [...plan.dirtyPlacements, ...plan.removals, ...state.foreignMapDrafts],
     state.entitiesById,
     { fetchFn: deps.fetchFn },
   );

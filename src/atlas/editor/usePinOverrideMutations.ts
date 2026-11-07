@@ -133,10 +133,16 @@ export function usePinOverrideMutations({
   };
   const removeCoord = (entityId: string) => {
     if (!activeMap) return;
-    setOverridesUndoable(
-      (o) => ({ ...o, [overrideKey(activeMap.id, entityId)]: null }),
-      `remove pin ${entityId}`,
-    );
+    const k = overrideKey(activeMap.id, entityId);
+    // eval-45: a tombstone only means something when canon has a placement to
+    // delete; a pin that is only a draft just loses its draft.
+    const inCanon = canonPlacement(activeMap.id, entityId) !== null;
+    setOverridesUndoable((o) => {
+      const next = { ...o };
+      if (inCanon) next[k] = null;
+      else delete next[k];
+      return next;
+    }, `remove pin ${entityId}`);
   };
   const clearOverride = (entityId: string) => {
     if (!activeMap) return;

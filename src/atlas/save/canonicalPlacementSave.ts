@@ -11,7 +11,8 @@
  *
  * Mirrors the merge rules in scripts/apply-placements.ts:
  *   - placements on maps NOT in this draft are preserved
- *   - placements on maps that ARE in this draft are replaced
+ *   - placements on maps that ARE in this draft are replaced, or dropped for
+ *     a removal (eval-45)
  *   - legacy atlas.x / atlas.y are removed once a placements[] is written
  *     (single source of truth)
  *
@@ -33,6 +34,18 @@ export interface PlacementDraft {
   label?: string;
   pin?: PinOverride;
 }
+
+/** eval-45: a pin the DM deleted from one map. Save drops that map's placement. */
+export interface PlacementRemoval {
+  entityId: string;
+  mapId: string;
+  removed: true;
+}
+
+/** What Save writes for one entity on one map: a placement, or its removal. */
+export type PlacementChange = PlacementDraft | PlacementRemoval;
+
+export const isRemoval = (c: PlacementChange): c is PlacementRemoval => "removed" in c;
 
 export class CanonicalSaveError extends Error {
   constructor(
@@ -72,7 +85,7 @@ export async function readSourceFile(relPath: string, fetchFn: typeof fetch): Pr
 /** Internal: merge a set of per-map drafts into an entity's parsed frontmatter. */
 export function mergePlacementsIntoFrontmatter(
   data: Record<string, unknown>,
-  drafts: PlacementDraft[],
+  drafts: readonly PlacementChange[],
 ): Record<string, unknown> {
   const atlas = (data.atlas as Record<string, unknown>) ?? {};
   const existing = Array.isArray(atlas.placements)
@@ -84,12 +97,14 @@ export function mergePlacementsIntoFrontmatter(
     (e) => typeof e.mapId === "string" && !touchedMapIds.has(e.mapId),
   );
 
-  const fresh = drafts.map((d) => {
-    const o: Record<string, unknown> = { mapId: d.mapId, x: d.x, y: d.y };
-    if (d.label) o.label = d.label;
-    if (d.pin && Object.keys(d.pin).length > 0) o.pin = d.pin;
-    return o;
-  });
+  const fresh = drafts
+    .filter((d): d is PlacementDraft => !isRemoval(d))
+    .map((d) => {
+      const o: Record<string, unknown> = { mapId: d.mapId, x: d.x, y: d.y };
+      if (d.label) o.label = d.label;
+      if (d.pin && Object.keys(d.pin).length > 0) o.pin = d.pin;
+      return o;
+    });
 
   const next = [...preserved, ...fresh].sort((a, b) =>
     String(a.mapId).localeCompare(String(b.mapId)),
@@ -115,7 +130,7 @@ export function mergePlacementsIntoFrontmatter(
  *   editor was loaded against a player build, which strips it).
  */
 export async function buildCanonicalPlacementChanges(
-  drafts: PlacementDraft[],
+  drafts: readonly PlacementChange[],
   entitiesById: Map<string, Entity>,
   deps?: CanonicalSaveDeps,
 ): Promise<FileChange[]> {
@@ -124,7 +139,7 @@ export async function buildCanonicalPlacementChanges(
 
   // Group drafts by entity. One file write per entity, however many maps it
   // appears on in the draft set.
-  const byEntity = new Map<string, PlacementDraft[]>();
+  const byEntity = new Map<string, PlacementChange[]>();
   for (const d of drafts) {
     const list = byEntity.get(d.entityId) ?? [];
     list.push(d);
