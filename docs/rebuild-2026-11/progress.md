@@ -84,5 +84,16 @@ open and no view jump after an editor save. R-01 accepted gaps (documented in IM
 copied vault notes are caught only at gate time on a machine with the vault path set; a stale
 sync map blocks saves of the notes it lists.
 
+### Next (hand-off 2026-11-07, coordinator compacted 3x)
+
+1. Ask Isak (in the new chat) to push the five branches and open PRs with `pr-bodies/`; each
+   merge is a separate yes. Order R-01, Q-01, Q-02, Q-03, Q-04.
+2. After push: add the State.md Morning queue entry (on R-01's branch or a docs branch).
+3. Fix later: `WORKFLOWS.md:22` still says "3 scanners" (now 14 scans after R-01).
+4. Q-01's first gate failed in test:ci with "entity y: unstripped {{secret:}}" (a test fixture,
+   under load); the rerun passed. Gate it once more after any rebase.
+5. Report Phase 0 to the orchestrator session local_a8dba6ed-82b1-48f6-800e-b9733658539e.
+6. p0check worktree (`scratch-phase0-check`) is throwaway: never push; leave its edits.
+
 Q-01 root cause: the sample notes link to places with no note (Thornhold, Sunhaven, ...); the player
 variant still drew a dotted "link" span. Not a resolver bug.
