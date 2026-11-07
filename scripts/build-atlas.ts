@@ -46,7 +46,7 @@ import {
 import { parseAtlasDate } from "./atlas/calendarDate";
 import { buildEntitySecrets } from "./atlas/buildSecrets";
 import { characterKeysPath, parseCharacterKeys } from "../src/atlas/secrets/characterKeysFile";
-import { PLAYER_VISIBLE_VISIBILITY } from "./atlas/visibility";
+import { PLAYER_VISIBLE_VISIBILITY, linkLeaksToPlayers, linkTargetLabel } from "./atlas/visibility";
 import { isLit } from "../src/atlas/fog/effectiveLit";
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
 import { filterSoundscapeForPlayer } from "./atlas/filterSoundscape";
@@ -875,10 +875,10 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
       for (const w of r.waypoints) {
         if (Array.isArray(w)) continue;
         const targetVis = entityVisibility.get(w.entityId);
-        if (!targetVis || !PLAYER_VISIBLE_VISIBILITY.has(targetVis)) {
+        if (linkLeaksToPlayers(r.visibility, targetVis)) {
           routeLeaks += 1;
           warnings.push(
-            `route "${r.id}": player-visible route routes through ${targetVis ? `${targetVis} entity` : "unknown entity"} "${w.entityId}" — spoiler leak`,
+            `route "${r.id}": player-visible route routes through ${linkTargetLabel(targetVis)} "${w.entityId}" — spoiler leak`,
           );
         }
       }
@@ -992,12 +992,12 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   //
   // Region leak detection: player-visible region linked to DM/hidden/unknown entity.
   for (const r of regions) {
-    if (!PLAYER_VISIBLE_VISIBILITY.has(r.visibility) || !r.entityId) continue;
+    if (!r.entityId) continue;
     const targetVis = entityVisibility.get(r.entityId);
-    if (!targetVis || !PLAYER_VISIBLE_VISIBILITY.has(targetVis)) {
+    if (linkLeaksToPlayers(r.visibility, targetVis)) {
       regionLeaks += 1;
       warnings.push(
-        `region "${r.id}": player-visible region links to ${targetVis ? `${targetVis} entity` : "unknown entity"} "${r.entityId}" — spoiler leak`,
+        `region "${r.id}": player-visible region links to ${linkTargetLabel(targetVis)} "${r.entityId}" — spoiler leak`,
       );
     }
   }
