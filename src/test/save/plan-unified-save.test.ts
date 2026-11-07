@@ -42,6 +42,8 @@ function state(over: Partial<UnifiedSaveState> = {}): UnifiedSaveState {
     activeMapId: "m1",
     foreignMapDrafts: [],
     entitiesById: new Map<string, Entity>(),
+    canonPlacements: [],
+    primaryMapId: null,
     worldYaml: null,
     localLayers: [],
     ...over,
