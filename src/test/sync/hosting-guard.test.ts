@@ -133,6 +133,45 @@ describe("the save endpoint (server side)", () => {
     expect((await handleSaveRequest({ files: other }, tmp)).status).toBe(200);
   });
 
+  it("refuses a marked note while public even with no origin (the server doesn't trust the client)", async () => {
+    writeConfig(tmp, { hosting: "public" });
+    const marked = [
+      {
+        ...files[0],
+        content: "---\ntitle: Corven\natlas:\n  id: corven\n  source: vault\n---\nA smuggler.\n",
+      },
+    ];
+    const r = await handleSaveRequest({ files: marked }, tmp);
+    expect(r.status).toBe(403);
+    expect(r.payload).toMatchObject({
+      error: "HostingPublic",
+      paths: ["content/w/npcs/corven.md"],
+    });
+    expect(fs.existsSync(path.join(tmp, "content/w/npcs/corven.md"))).toBe(false);
+    writeConfig(tmp, { hosting: "private" });
+    expect((await handleSaveRequest({ files: marked }, tmp)).status).toBe(200);
+  });
+
+  it("refuses, with no origin, a note whose id the sync map names; fails closed on a broken map", async () => {
+    writeConfig(tmp, { hosting: "public" });
+    fs.mkdirSync(path.join(tmp, ".local-atlas"), { recursive: true });
+    const mapFile = path.join(tmp, ".local-atlas", "sync-map.json");
+    fs.writeFileSync(
+      mapFile,
+      JSON.stringify({ "03_Entities/Corven.md": { id: "corven", baseType: "npc" } }),
+    );
+    const named = [{ ...files[0], content: "---\ntitle: Corven\n---\nA smuggler.\n" }];
+    expect((await handleSaveRequest({ files: named }, tmp)).status).toBe(403);
+    const unnamed = [
+      { ...files[0], path: "content/w/npcs/other.md", content: "---\ntitle: Other\n---\nx\n" },
+    ];
+    expect((await handleSaveRequest({ files: unnamed }, tmp)).status).toBe(200);
+    fs.writeFileSync(mapFile, "{ broken");
+    const r = await handleSaveRequest({ files: unnamed }, tmp);
+    expect(r.status).toBe(403);
+    expect(JSON.stringify(r.payload)).toMatch(/sync-map\.json is not valid JSON/);
+  });
+
   it("refuses a vault image copy while public", async () => {
     writeConfig(tmp, { hosting: "public" });
     const route = DEV_ROUTES.find((r) => r.path === DEV_API_PATHS.vaultImageCopy)!;

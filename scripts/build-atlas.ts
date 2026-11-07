@@ -74,7 +74,7 @@ import type {
   Point,
 } from "../src/atlas/content/schema";
 import { collectAssets } from "../src/atlas/assets/collectAssets";
-import { HOSTING_VALUES, parseHosting, type Hosting } from "../src/atlas/sync/hosting";
+import { HOSTING_VALUES, type Hosting } from "../src/atlas/sync/hosting";
 
 interface Config {
   contentRoot: string;
@@ -82,8 +82,6 @@ interface Config {
   defaultWorld: string;
   include: string[];
   exclude: string[];
-  /** Where the site is hosted (R-01, `src/atlas/sync/hosting.ts`). Missing or invalid reads as "public". */
-  hosting?: Hosting;
 }
 
 /** One entity assembled and awaiting link resolution + placement. */
@@ -142,13 +140,14 @@ function loadConfig(configPath: string): Config {
       throw new Error(`${configPath}: "${key}" must be an array of strings.`);
     }
   }
-  // Fail closed rather than stop the build: an unknown value reads as "public".
+  // `hosting` (R-01) is read by `scripts/atlas/hosting.ts`, not the build. Warn
+  // rather than stop the build: an unknown value reads as "public".
   if (c.hosting !== undefined && !HOSTING_VALUES.includes(c.hosting as Hosting)) {
     console.warn(
       `${configPath}: "hosting" must be one of ${HOSTING_VALUES.join(", ")}; treating ${JSON.stringify(c.hosting)} as "public".`,
     );
   }
-  return { ...(parsed as Config), hosting: parseHosting(c.hosting) };
+  return parsed as Config;
 }
 
 function relImage(p: string): string {

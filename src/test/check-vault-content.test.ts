@@ -106,6 +106,72 @@ describe("check-vault-content", () => {
     expect(await run({ root: tmp })).toBe(0);
   });
 
+  describe("compared against this machine's vault", () => {
+    const BODY = "Corven runs the night docks and owes the harbourmaster a favour.";
+    function vault(notes: Record<string, string>) {
+      const v = path.join(tmp, "vault");
+      for (const [rel, raw] of Object.entries(notes)) {
+        fs.mkdirSync(path.dirname(path.join(v, rel)), { recursive: true });
+        fs.writeFileSync(path.join(v, rel), raw);
+      }
+      fs.mkdirSync(path.join(tmp, ".local-atlas"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmp, ".local-atlas", "editor-settings.json"),
+        JSON.stringify({ vaultPath: v }),
+      );
+    }
+
+    it("fails on a byte-for-byte copy, line endings aside", async () => {
+      config("public");
+      vault({ "03_Entities/Corven.md": NOTE.replace(/\n/g, "\r\n") });
+      expect(await run({ root: tmp })).toBe(19);
+    });
+
+    it("fails on the same body under rewritten frontmatter", async () => {
+      config("public");
+      vault({ "03_Entities/Corven.md": `---\ntags: [npc]\n---\n${BODY}\n` });
+      fs.writeFileSync(
+        path.join(tmp, "content", "w", "npcs", "corven.md"),
+        `---\ntitle: Corven\natlas:\n  id: corven\n---\n\n${BODY}\n`,
+      );
+      expect(await run({ root: tmp })).toBe(19);
+    });
+
+    it("matches on hashes only: same title, other text passes; short bodies and .obsidian/ are ignored", async () => {
+      config("public");
+      vault({
+        "03_Entities/Corven.md": "---\ntitle: Corven\n---\nSomeone else entirely.\n",
+        "Other/short.md": "---\ntitle: X\n---\nA smuggler.\n",
+        ".obsidian/copy.md": NOTE,
+      });
+      expect(await run({ root: tmp })).toBe(0);
+    });
+
+    it("skips the signal, and says so, when the vault path is missing", async () => {
+      config("public");
+      vault({});
+      fs.writeFileSync(
+        path.join(tmp, ".local-atlas", "editor-settings.json"),
+        JSON.stringify({ vaultPath: path.join(tmp, "nowhere") }),
+      );
+      expect(await run({ root: tmp })).toBe(0);
+      expect(vi.mocked(console.log).mock.calls.flat().join("\n")).toMatch(
+        /vault comparison skipped/,
+      );
+    });
+  });
+
+  it("fails on a symlink anywhere under content/ while public, and names it", async () => {
+    config("public");
+    const target = path.join(tmp, "elsewhere");
+    fs.mkdirSync(target);
+    fs.symlinkSync(target, path.join(tmp, "content", "w", "linked"));
+    expect(await run({ root: tmp })).toBe(19);
+    expect(vi.mocked(console.error).mock.calls.flat().join("\n")).toMatch(/content\/w\/linked/);
+    config("private");
+    expect(await run({ root: tmp })).toBe(0);
+  });
+
   it("passes on the repo's own sample content (Astrath)", async () => {
     // The real content dir and config, with a sync map naming none of it.
     config("public");

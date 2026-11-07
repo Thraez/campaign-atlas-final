@@ -88,6 +88,12 @@ import {
 } from "./atlas/buildLock";
 import { DEV_API_PATHS, DEV_API_PREFIX } from "./atlas/devRoutes";
 import { syncWritesAllowed } from "./atlas/hosting";
+import {
+  isVaultNote,
+  readSyncMapSignals,
+  SyncMapUnreadableError,
+  type SyncMapSignals,
+} from "./atlas/vaultContent";
 import { HOSTING_PUBLIC_ERROR, HOSTING_PUBLIC_SYNC_MESSAGE } from "../src/atlas/sync/hosting";
 
 const MAX_FILE_BYTES = 1024 * 1024;
@@ -482,6 +488,32 @@ async function cleanImageBytes(buf: Buffer, source: string, target: string): Pro
   return s.toBuffer();
 }
 
+/** The 403 payload when a public-hosting save would write vault content, else null. */
+function vaultNoteRefusal(
+  list: FilePayload[],
+  repoRoot: string,
+): { error: string; [k: string]: unknown } | null {
+  const notes = list.filter((f) => f.kind === "entity-md");
+  if (notes.length === 0) return null;
+  let signals: SyncMapSignals;
+  try {
+    signals = readSyncMapSignals(repoRoot);
+  } catch (e) {
+    if (!(e instanceof SyncMapUnreadableError)) throw e;
+    return {
+      error: HOSTING_PUBLIC_ERROR,
+      detail: `${e.message}: can't tell vault notes apart while "hosting" is "public". Fix or delete it, then save again.`,
+    };
+  }
+  const paths = notes.filter((f) => isVaultNote(f.content, f.path, signals)).map((f) => f.path);
+  if (paths.length === 0) return null;
+  return {
+    error: HOSTING_PUBLIC_ERROR,
+    detail: `Not saved: ${paths.join(", ")} came from the vault (atlas.source: vault, or named in .local-atlas/sync-map.json), and atlas.config.json has "hosting": "public". The repo is public; real vault content waits until hosting is private (see H-04).`,
+    paths,
+  };
+}
+
 export async function handleSaveRequest(
   body: unknown,
   repoRoot: string,
@@ -517,6 +549,13 @@ export async function handleSaveRequest(
     }
   }
   const list = rawFiles as FilePayload[];
+
+  // R-01: while public, no note from the vault is written, whatever `origin`
+  // says: a note carrying Sync's marker, or one the sync map names by id.
+  if (!syncWritesAllowed(repoRoot)) {
+    const refused = vaultNoteRefusal(list, repoRoot);
+    if (refused) return { status: 403, payload: refused };
+  }
 
   // Validate everything BEFORE writing anything.
 

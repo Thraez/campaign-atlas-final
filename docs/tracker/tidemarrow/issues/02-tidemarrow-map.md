@@ -3,7 +3,7 @@
 Status: ready-for-agent
 Blocked by: 01, H-04 (hosting private: Cloudflare Access, repo private)
 
-Waits for H-04 (R-01, 2026-11-07): the GitHub repo is public, so real vault notes can't land in `content/` until hosting is behind Cloudflare Access and the repo is private; Sync refuses real writes and `check-vault-content` fails publish until then.
+Waits for H-04 (R-01, 2026-11-07): the GitHub repo is public, so real vault notes can't land in `content/` until hosting is behind Cloudflare Access and the repo is private; Sync refuses real writes and `check-vault-content` fails publish until then. Neither covers maps, images or `world.yaml`: the H-04 block is the only guard for map uploads.
 
 ## Acceptance criteria
 
