@@ -1,6 +1,6 @@
 # "Discard all" leaves world settings and the calendar unsaved
 
-Status: in-review
+Status: done
 Area: editor (session, undo)
 
 Found in an architecture review (2026-11-07).
@@ -49,12 +49,25 @@ Both count in the unsaved total (`perMapDirtyCount`), so:
   rename and calendar show "2 unsaved changes"; Discard all lands on "All changes saved" and
   empties the stored session). The session tests failed before the fix.
 
-Provisional call: the calendar draft is handed to the session only while it differs from canon.
-After a save the draft lingers (equal to the new canon once it reloads), as it did before; clearing
-it on save instead would make a later save write the old calendar back whenever the rebuild failed
-and canon was not reloaded. So the save path is unchanged and the save-boundary undo does not
-cover the calendar, as before.
+**Review fix (2026-11-07).** After a save the calendar draft lingered, equal to the reloaded
+canon; if canon then changed underneath (a Sync from Obsidian), the stale draft turned dirty and the
+next save wrote the old calendar back. The calendar draft now lives in `useCalendarDraft`
+(`src/atlas/calendar/useCalendarDraft.ts`), which drops a draft once it equals canon, without an
+undo entry, and keeps a restored draft while canon is still loading. Tested in
+`src/test/editor/useCalendarDraft.test.tsx` (draft equal to canon is dropped; a later canon change
+stays clean and the save writes canon; failed without the fix).
 
+Provisional call: the save path still does not clear the calendar draft itself, and the
+save-boundary undo does not cover the calendar, as before. Clearing it at save time would make a
+later save write the old calendar back whenever the rebuild failed and canon was not reloaded.
+
+Known gaps:
+
+- `sessionHasWork` counts a world settings override for any world id, while the unsaved count uses
+  only the active world (`baseWorld.id`). An override kept for another world raises a restore
+  notice but no unsaved count.
+- Undo granularity: `CalendarPanel` calls `onPatch` per keystroke, so each keystroke is its own
+  undo entry. World settings already work the same way.
 Not done: pin overrides and map metadata still use their own hand-written undoable setters; they
 could move to `useUndoableState` too, but that is outside this ticket. Not checked in the preview
 pane.

@@ -145,7 +145,7 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { useUndoStack } from "@/atlas/useUndoStack";
 import { useUndoableState } from "@/atlas/useUndoableState";
-import type { CalendarDraft } from "@/atlas/session/sessionSnapshot";
+import { useCalendarDraft } from "@/atlas/calendar/useCalendarDraft";
 import { useEditorSession } from "@/atlas/session/useEditorSession";
 import { useEntityEditDraft } from "@/atlas/categories/useEntityEditDraft";
 import { EditorRail } from "@/atlas/shell/EditorRail";
@@ -523,11 +523,10 @@ function AtlasPlacementEditorInner() {
   };
 
   /**
-   * Session draft for the world calendar (`CalendarDraft`: null = use canon).
-   * Kept separate from worldOverride because `calendar` is project-level in
-   * world.yaml, not a field on World. Undo-tracked and a session holder.
+   * Session draft for the world calendar. Kept separate from worldOverride
+   * because `calendar` is project-level in world.yaml, not a field on World.
    */
-  const calendarDraft = useUndoableState<CalendarDraft>(null, undoStack);
+  const calendarDraft = useCalendarDraft(project, undoStack);
 
   // Shell state: which rail panel is open (null = closed).
   const [activePanel, setActivePanel] = useState<string | null>(null);
@@ -703,10 +702,8 @@ function AtlasPlacementEditorInner() {
     Object.keys(worldOverride[baseWorld.id]).length > 0
   );
   /** Calendar the UI should show and the save should write: draft over canon. */
-  const effectiveCalendar = calendarDraft.value ? calendarDraft.value.value : project?.calendar;
-  const calendarDirty =
-    !!calendarDraft.value &&
-    JSON.stringify(calendarDraft.value.value ?? null) !== JSON.stringify(project?.calendar ?? null);
+  const effectiveCalendar = calendarDraft.effective;
+  const calendarDirty = calendarDraft.dirty;
 
   // Everything world.yaml holds except other maps' region/route/fog slices,
   // which the session adds (worldYamlDirty, below the session).
@@ -1003,12 +1000,7 @@ function AtlasPlacementEditorInner() {
         set: (v) => entityEditDraft.applySnapshot(v as never),
       },
       world: { get: () => worldDraft.ref.current, set: worldDraft.set },
-      // A draft equal to canon (as after a save) is no work: keep it out of
-      // the session so it raises no restore notice.
-      calendar: {
-        get: () => (calendarDirty ? calendarDraft.ref.current : null),
-        set: calendarDraft.set,
-      },
+      calendar: { get: () => calendarDraft.ref.current, set: calendarDraft.set },
     },
     perMapDirtyCount: () =>
       regionDraft.dirtyCount +
