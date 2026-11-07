@@ -40,6 +40,7 @@ h1{font:400 28px/1.1 var(--f-map);margin:0;text-wrap:balance}
 .tag{font:11px var(--f-mono);color:var(--muted)}
 button{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--note);outline-offset:2px}
+[hidden]{display:none!important}
 .picker{display:flex;flex-wrap:wrap;gap:6px}
 .picker button{border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:5px 9px;cursor:pointer;display:flex;gap:6px;align-items:baseline;font-size:13px}
 .picker button b{font-family:var(--f-mono);font-size:11px;color:var(--muted);font-weight:500}
@@ -56,7 +57,8 @@ button{font:inherit;color:inherit}
 .browser{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
 .addr{display:flex;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);font:12px var(--f-mono);color:var(--muted);overflow-x:auto;white-space:nowrap}
 .addr i{width:9px;height:9px;border-radius:50%;background:var(--line);flex:none}
-.addr span{background:var(--paper);border-radius:999px;padding:2px 10px}
+.addr span{background:var(--paper);border-radius:999px;padding:2px 10px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.addr{overflow:hidden}
 .stage{position:relative;aspect-ratio:16/9.4;max-height:680px;width:100%;background:var(--sea);overflow:hidden}
 .stage>svg{position:absolute;inset:0;width:100%;height:100%;display:block}
 
@@ -161,7 +163,9 @@ mark{background:var(--glow);color:inherit;border-radius:2px}
 @media (max-width:700px){
   .stage{aspect-ratio:auto;height:560px}
   .search{min-width:0} .search span{display:none}
-  .card{width:240px}
+  .card{width:auto;max-width:calc(100% - 24px)}
+  #card.pinned{left:12px!important;right:12px;top:auto!important;bottom:12px}
+  .card .pic{display:none}
   .callout{grid-template-columns:1fr} .callout p,.callout .fix{grid-column:1}
 }
 </style>
@@ -245,7 +249,7 @@ mark{background:var(--glow);color:inherit;border-radius:2px}
         <circle cx="630" cy="322" r="6" class="pin per"/><circle cx="690" cy="420" r="6" class="pin per"/>
         <circle cx="300" cy="340" r="0" class="pin"/>
         <text class="nt" x="190" y="300" data-on="P2">Ashfen: hidden area, not shipped</text>
-        <text class="nt" x="270" y="100" data-on="P2" style="fill:#fff">fog baked into the image</text>
+        <text class="nt" x="270" y="100" data-on="P2" style="fill:#fff">fog painted into the map tiles</text>
       </svg>
 
       <!-- P2b Saltmere city -->
@@ -305,6 +309,7 @@ mark{background:var(--glow);color:inherit;border-radius:2px}
       <!-- P6 campaign picker -->
       <div class="pick6" data-on="P6">
         <div class="in">
+          <p style="margin:0"><span class="pill" style="border-color:var(--note);color:var(--note)">Test site and preview only. Hosted players arrive by their own campaign link and never see this list.</span></p>
           <h3>The Sundered Sea</h3>
           <p style="margin:0;color:var(--muted)">Which table are you at? Your choice is remembered in this browser.</p>
           <div class="camps">
@@ -346,7 +351,7 @@ mark{background:var(--glow);color:inherit;border-radius:2px}
       <div class="scr">
         <svg viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="1000" height="560" class="sea-t"/><g transform="rotate(-3 270 280)"><use href="#varnRT" x="70" y="120" width="420" height="250"/></g><g transform="rotate(4 730 260)"><use href="#osserymap" x="560" y="100" width="340" height="300"/></g></svg>
         <div class="ptop"><span>Ocean</span><span class="s">⌕ Search</span><span class="m">☰</span></div>
-        <div class="pmenu"><b>Red Tide</b><span class="tag">switch campaign ›</span><hr style="border:0;border-top:1px solid var(--line);width:100%;margin:2px 0"><span><i class="dot"></i> place</span><span><i class="dot mon"></i> monument</span><span><i class="dot per"></i> person</span><span>▭ map: pinch to enter</span></div>
+        <div class="pmenu"><b>Red Tide</b><span class="tag">your campaign (switching only on the test site)</span><hr style="border:0;border-top:1px solid var(--line);width:100%;margin:2px 0"><span><i class="dot"></i> place</span><span><i class="dot mon"></i> monument</span><span><i class="dot per"></i> person</span><span>▭ map: pinch to enter</span></div>
       </div>
       <figcaption><b>Menu.</b> Legend and campaign chip move into the menu so nothing overlaps the map. Pinch past a frame enters the child map.</figcaption>
     </figure>
@@ -355,12 +360,12 @@ mark{background:var(--glow);color:inherit;border-radius:2px}
 
 <script>
 const S={
- P1:{t:"Ocean",f:"flow p1",w:"The campaign link opens the ocean fitted to every map Red Tide knows. Varn shows with Red Tide's fog baked in; Ossery is mostly fogged, with one revealed bay. The sea drifts slowly. Corners hold the breadcrumb, search, campaign chip and legend. Hover a map for its one-line card; click or zoom to enter.",x:"Fixes today: opening view cropped with empty ocean, and a toast and chip sitting over the minimap.",u:"?c=red-tide",cr:"ocean"},
- P2:{t:"Map view",f:"flow p2",w:"Zoomed past Varn's enter-at zoom, the view handed over to the Varn map with no page load; the breadcrumb reads Ocean › Varn. Saltmere's frame is a soft outline: click it (try it) to enter the city and the breadcrumb grows. Ashfen is a hidden area, so nothing of it ships. Zooming out past Varn's minimum returns to the ocean at the same spot.",x:"Fixes today: there was only one map and no way to switch maps.",u:"?c=red-tide&map=varn&x=640&y=330&z=1.2",cr:"varn"},
+ P1:{t:"Ocean",f:"flow p1",w:"Red Tide's own link (access-limited to its players on the hosted site) opens the ocean fitted to every map Red Tide knows. Varn shows with Red Tide's fog baked in, meaning painted into the map tiles so the covered land isn't in the files at all; Ossery is mostly fogged, with one revealed bay. The sea drifts slowly. Corners hold the breadcrumb, search, campaign chip and legend. Hover a map for its one-line card; click or zoom to enter.",x:"Fixes today: opening view cropped with empty ocean, and a toast and chip sitting over the minimap.",u:"?c=red-tide",cr:"ocean"},
+ P2:{t:"Map view",f:"flow p2",w:"Zoomed past Varn's enter-at zoom, the view handed over to the Varn map with no page load; the breadcrumb reads Ocean › Varn. Saltmere's frame is a soft outline: click it (try it) to enter the city and the breadcrumb grows. Ashfen is hidden for Red Tide, so nothing of it is in Red Tide's build (Grey Lantern may see it as a rumor). Zooming out past Varn's minimum returns to the ocean at the same spot.",x:"Fixes today: there was only one map and no way to switch maps.",u:"?c=red-tide&map=varn&x=640&y=330&z=1.2",cr:"varn"},
  P3:{t:"Story card",f:"flow p3",w:"Hovering Saltmere Coast lights the region and shows its story card: name, one-line summary, picture, up to 3 monuments and up to 5 people. Highmoor has a card too. Clicking the region, or Read more, opens the story panel.",x:"",u:"?c=red-tide&map=varn&x=640&y=330&z=1.2",cr:"varn"},
- P4:{t:"Story panel",f:"flows p3, p4",w:"The full note on the right: title, picture, body, then what is inside (places, people, monuments, child maps), each with Show on map, and backlinks. Click Oduya Venn in the text: the panel follows the link and offers Back. A link to an unpublished note is plain text.",x:"Fixes today: wikilinks were dead “planned” spans styled as links; entity open flew to pixelated max zoom (Show on map picks a sensible zoom).",u:"?c=red-tide&map=varn&note=saltmere-coast&x=640&y=330&z=1.6",cr:"varn"},
+ P4:{t:"Story panel",f:"flows p3, p4",w:"The full note on the right: title, picture, body, then what is inside (places, people, monuments, child maps), each with Show on map, and backlinks. Click any link in the text (Saltmere, Ilse Marrow, The Drowned Bell, Oduya Venn): the panel follows it and offers Back. A link to a note this campaign can't see (Tide-Eater) is plain text.",x:"Fixes today: wikilinks were dead “planned” spans styled as links; entity open flew to pixelated max zoom (Show on map picks a sensible zoom).",u:"?c=red-tide&map=varn&note=saltmere-coast&x=640&y=330&z=1.6",cr:"varn"},
  P5:{t:"Search",f:"flow p5",w:"The search box or Ctrl+K opens the palette. Results cover every map Red Tide knows, grouped by map, with type chips. Enter opens The Drowned Bell's map with its panel open, and the URL changes so the view can be shared.",x:"",u:"?c=red-tide&map=varn&note=the-drowned-bell",cr:"varn"},
- P6:{t:"Campaign picker",f:"flow p6",w:"A link with no campaign, and none remembered, lands here. Each campaign has a picture and one line. Picking one opens its ocean and is remembered; the campaign chip reopens this to switch. With only one campaign this screen is skipped.",x:"",u:"",cr:"ocean"},
+ P6:{t:"Campaign picker",f:"flow p6",w:"Only on the public test site and in the editor's preview. On the hosted site each campaign has its own access-limited link, so players arrive straight in their campaign and never see a list of the others. Here, a link with no campaign lands on this picker; picking one opens its ocean and is remembered, and the campaign chip reopens it. With only one campaign it is skipped.",x:"On the hosted site the corner chip shows the campaign name only, with no switch.",u:"",cr:"ocean"},
  P7:{t:"Phone layouts",f:"flow p7",w:"P1 to P6 at phone width. Full-screen map, one top bar with breadcrumb and search, a tap preview strip in place of the hover card, the story panel as a bottom sheet, legend and campaign in the menu, no minimap.",x:"Fixes today: minimap, toast and calm-mode chip overlapped the sheet; two close buttons; title cut to “Astrath Dee…”.",u:"",cr:"varn"}
 };
 const cards={
@@ -383,7 +388,23 @@ const notes={
   <h3>Oduya Venn</h3><span class="pic" style="height:120px;background:linear-gradient(160deg,var(--note),var(--sea))"></span>
   <p>Bell-keeper of Saltmere, seventy winters old. Keeps the frayed rope that once rang <a data-go="bell">The Drowned Bell</a> from the old harbour tower. Trades stories for rum at the harbour office of <a data-go="ilse">Ilse Marrow</a>.</p>
   <h4>Belongs to</h4><ul class="ilist"><li><span>Saltmere <span class="tag">city</span></span><span class="som">Show on map</span></li><li><span>Saltmere Coast <span class="tag">region</span></span><span class="som">Show on map</span></li></ul>
-  <h4>Mentioned in</h4><ul class="ilist"><li><span>Saltmere Coast</span></li><li><span>The Drowned Bell</span></li></ul>`
+  <h4>Mentioned in</h4><ul class="ilist"><li><span>Saltmere Coast</span></li><li><span>The Drowned Bell</span></li></ul>`,
+ bell:`<div class="bar"><button data-go="coast">‹ Back to Saltmere Coast</button><button>✕</button></div>
+  <h3>The Drowned Bell</h3><span class="pic" style="height:130px;background:linear-gradient(200deg,var(--sea),var(--warn))"></span>
+  <p><span class="tag">MONUMENT · SALTMERE COAST</span></p>
+  <p>A bronze bell the size of a cottage, sunk off <a data-go="salt">Saltmere</a> when the old harbour drowned. At the lowest tides it rings once. <a data-go="oduya">Oduya Venn</a> keeps the rope that still runs down into the water.</p>
+  <h4>Where</h4><ul class="ilist"><li><span>Saltmere harbour <span class="tag">pin</span></span><span class="som">Show on map</span></li></ul>
+  <h4>Mentioned in</h4><ul class="ilist"><li><span>Saltmere Coast</span></li><li><span>Oduya Venn</span></li></ul>`,
+ salt:`<div class="bar"><button data-go="coast">‹ Back to Saltmere Coast</button><button>✕</button></div>
+  <h3>Saltmere</h3><span class="pic" style="height:120px"></span>
+  <p><span class="tag">CITY · SALTMERE COAST</span></p>
+  <p>A salt-trading town built on the shore the sea left behind. Ships pay their dues to <a data-go="ilse">Ilse Marrow</a> at the harbour office; pilgrims come to hear <a data-go="bell">The Drowned Bell</a>.</p>
+  <h4>Inside</h4><ul class="ilist"><li><span>Saltmere <span class="tag">city map</span></span><span class="som">Enter map ↘</span></li><li><span>Bellwright's Row <span class="tag">place</span></span><span class="som">Show on map</span></li><li><span>Ilse Marrow, Oduya Venn <span class="tag">people</span></span></li></ul>`,
+ ilse:`<div class="bar"><button data-go="coast">‹ Back to Saltmere Coast</button><button>✕</button></div>
+  <h3>Ilse Marrow</h3><span class="pic" style="height:120px;background:linear-gradient(160deg,var(--note),var(--land-2))"></span>
+  <p><span class="tag">PERSON · HARBOURMASTER</span></p>
+  <p>Harbourmaster of <a data-go="salt">Saltmere</a>. Counts every ship twice and every crate three times. She owes <a data-go="oduya">Oduya Venn</a> a debt she won't name.</p>
+  <h4>Belongs to</h4><ul class="ilist"><li><span>Saltmere <span class="tag">harbour office</span></span><span class="som">Show on map</span></li></ul>`
 };
 const $=id=>document.getElementById(id);
 const pk=$("picker");
@@ -404,26 +425,27 @@ function show(k){
   const s=S[k];$("c-id").textContent=k;$("c-t").innerHTML=`${s.t}<span>${s.f.toUpperCase()}</span>`;$("c-w").textContent=s.w;$("c-f").textContent=s.x;
   $("url").textContent="thraez.github.io/campaign-atlas-final/"+s.u;
   crumb();
-  $("hot-coast").classList.toggle("lit",k==="P3"||k==="P4");
+  document.querySelectorAll(".hot").forEach(h=>h.classList.toggle("lit",(k==="P3"||k==="P4")&&h.id==="hot-coast"));
   if(k==="P3")pinCard("coast",58,24);else $("card").hidden=true;
   if(k==="P4")setNote("coast");
   try{history.replaceState(null,"","#"+k)}catch(e){}
 }
 function fill(key){const c=cards[key];$("cardT").textContent=c.t;$("cardS").textContent=c.s;$("cardMore").hidden=!c.more;$("cardPic").hidden=!!c.nop}
-function pinCard(key,lp,tp){fill(key);const c=$("card");c.style.left=lp+"%";c.style.top=tp+"%";c.hidden=false}
+function pinCard(key,lp,tp){fill(key);const c=$("card");c.classList.add("pinned");c.style.left="min("+lp+"%, calc(100% - 312px))";c.style.top=tp+"%";c.hidden=false}
 const stage=$("stage");
 stage.addEventListener("mousemove",e=>{
-  if(cur==="P3"||cur==="P4"||cur==="P5"||cur==="P6")return;
+  if(cur==="P4"||cur==="P5"||cur==="P6")return;
   const t=e.target.closest("[data-card]");const c=$("card");
-  if(!t){c.hidden=true;return}
-  fill(t.dataset.card);const r=stage.getBoundingClientRect();
-  let x=e.clientX-r.left+16,y=e.clientY-r.top+16;
-  if(x+310>r.width)x=e.clientX-r.left-316; if(y+c.offsetHeight>r.height)y=Math.max(8,r.height-c.offsetHeight-8);
-  c.style.left=x+"px";c.style.top=y+"px";c.hidden=false;
+  if(!t){if(cur==="P3")pinCard("coast",58,24);else c.hidden=true;return}
+  if(cur==="P3"){document.querySelectorAll(".hot").forEach(h=>h.classList.toggle("lit",h===t))}
+  c.classList.remove("pinned");fill(t.dataset.card);c.hidden=false;const r=stage.getBoundingClientRect();
+  const w=c.offsetWidth;let x=e.clientX-r.left+16,y=e.clientY-r.top+16;
+  if(x+w>r.width-8)x=Math.max(8,e.clientX-r.left-w-16); if(y+c.offsetHeight>r.height)y=Math.max(8,r.height-c.offsetHeight-8);
+  c.style.left=x+"px";c.style.top=y+"px";
 });
-stage.addEventListener("mouseleave",()=>{if(cur!=="P3")$("card").hidden=true});
+stage.addEventListener("mouseleave",()=>{if(cur==="P3"){document.querySelectorAll(".hot").forEach(h=>h.classList.toggle("lit",h.id==="hot-coast"));pinCard("coast",58,24)}else $("card").hidden=true});
 stage.addEventListener("click",e=>{
-  const g=e.target.closest("[data-go]");if(g){setNote(g.dataset.go==="oduya"?"oduya":"coast");return}
+  const g=e.target.closest("[data-go]");if(g){setNote(g.dataset.go);$("panel").scrollTop=0;return}
   const cc=e.target.closest("[data-c]");
   if(cc){if(cc.dataset.c==="ocean")show("P1");else{show(cur==="P1"?"P2":cur)}return}
   if(e.target.closest("#saltFrame")&&cur==="P2"){inCity=true;$("varnView").setAttribute("hidden","");$("cityView").removeAttribute("hidden");$("url").textContent="thraez.github.io/campaign-atlas-final/?c=red-tide&map=saltmere&x=150&y=100&z=1";crumb();return}

@@ -41,6 +41,7 @@ h1{font:400 28px/1.1 var(--f-map);margin:0;text-wrap:balance}
 .mono{font-family:var(--f-mono);font-size:12px}
 button{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--note);outline-offset:2px}
+[hidden]{display:none!important}
 
 /* screen picker */
 .picker{display:flex;flex-wrap:wrap;gap:6px}
@@ -194,6 +195,20 @@ button{font:inherit;color:inherit}
   .canvas{height:420px}
   .insp{border-left:0;border-top:1px solid var(--line)}
   .callout{grid-template-columns:1fr} .callout p,.callout .fix{grid-column:1}
+}
+.insp>div,.insp .fld,.insp .row>*{min-width:0}
+.inp,.where,.banner,.list li,.file div{overflow-wrap:anywhere}
+@media (max-width:700px){
+  .shell{overflow:visible}
+  .top{overflow-x:auto;gap:6px 8px}
+  .top .spacer{flex-basis:100%;height:0}
+  .tasks{grid-auto-flow:row;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));overflow:visible}
+  .tasks button{white-space:nowrap}
+  .canvas{height:340px}
+  .row>.fld{min-width:0;flex-basis:100%}
+  .list li{flex-wrap:wrap}
+  .sheet{padding:12px}
+  .strip{right:10px;bottom:52px}
 }
 </style>
 
@@ -410,7 +425,7 @@ button{font:inherit;color:inherit}
       <div class="pv" data-on="E11">
         <div class="pvbar">
           <b>Preview: campaign Red Tide</b><span>built 12:04 from saved state</span>
-          <span class="ok">✓ secret scan</span><span class="ok">✓ derived-secret scan</span><span class="tag">no DM folder read</span>
+          <span class="ok">✓ secret scan</span><span class="ok">✓ derived-secret scan</span><span class="tag">Red Tide's own build: its visibility, its fog, its tiles</span>
           <span class="spacer"></span><button class="btn">Back to editing</button>
         </div>
         <div class="pvbody" style="background:var(--sea)">
@@ -436,20 +451,21 @@ button{font:inherit;color:inherit}
             <ul class="list"><li>New map <span>Saltmere</span></li><li>New notes <span>The Drowned Bell, Oduya Venn</span></li><li>Reveals <span>3 on Varn</span></li><li>Removed <span class="warn">Fenwatch pin (now hidden)</span></li></ul></div>
           <div class="card"><h4 style="margin:0">Grey Lantern: what players get</h4>
             <ul class="list"><li>New notes <span>The Drowned Bell, Oduya Venn</span></li><li>Reveals <span>none</span></li><li>Saltmere <span class="tag">unknown to this campaign</span></li></ul></div>
-          <div class="card scan"><h4 style="margin:0">Scans</h4>
+          <div class="card scan"><h4 style="margin:0">Scans, per campaign build</h4>
             <ul class="list">
-              <li><span><b class="ok">✓</b> Secrets</span><span class="tag">2 builds</span></li>
-              <li><span><b class="bad">✕</b> Derived secrets</span><span class="tag">Red Tide</span></li>
-              <li><span><b class="ok">✓</b> Player secrets</span></li>
-              <li><span><b class="ok">✓</b> Image privacy</span></li>
-              <li><span><b class="ok">✓</b> Fog baked</span><span class="tag">5 maps × 2</span></li>
-              <li><span><b class="ok">✓</b> Shape</span></li>
-              <li><span><b class="ok">✓</b> Asset audit</span></li>
-              <li><span><b class="ok">✓</b> DM folder not staged in git</span></li>
+              <li><span>&nbsp;</span><span class="tag">Red Tide · Grey Lantern</span></li>
+              <li><span>Secrets <span class="tag">DM text in output</span></span><span><b class="ok">✓</b> · <b class="ok">✓</b></span></li>
+              <li><span>Derived secrets <span class="tag">DM facts leaked another way, e.g. search</span></span><span><b class="bad">✕</b> · <b class="ok">✓</b></span></li>
+              <li><span>Player secrets</span><span><b class="ok">✓</b> · <b class="ok">✓</b></span></li>
+              <li><span>Image privacy</span><span><b class="ok">✓</b> · <b class="ok">✓</b></span></li>
+              <li><span>Fog painted into tiles</span><span><b class="ok">✓</b> · <b class="ok">✓</b></span></li>
+              <li><span>Shape</span><span><b class="ok">✓</b> · <b class="ok">✓</b></span></li>
+              <li><span>Asset audit</span><span><b class="ok">✓</b> · <b class="ok">✓</b></span></li>
+              <li><span><b style="white-space:nowrap">Cross-check</b> <span class="tag">hidden in one, shown in another: absent where hidden</span></span><span style="white-space:nowrap"><b class="ok">✓</b> 3</span></li>
             </ul></div>
         </div>
         <div class="banner" style="border-color:var(--bad);color:var(--bad);margin-top:14px">
-          <b>Blocked.</b> Derived secret in Red Tide's search index: "Tide-Eater" comes from <span class="mono">content/varn/people/oduya-venn.md</span>, line 14, a <span class="mono">:::dm</span> block that was not closed. <a style="color:inherit;font-weight:700;text-decoration:underline">Show in editor</a>
+          <b>Blocked.</b> A DM-only fact reached Red Tide's search index (a derived secret): "Tide-Eater" comes from <span class="mono">content/varn/people/oduya-venn.md</span>, line 14, a <span class="mono">:::dm</span> block that was not closed. <a style="color:inherit;font-weight:700;text-decoration:underline">Show in editor</a>
         </div>
         <div class="row" style="margin-top:8px"><span class="warn">Warnings: 1 monument with no picture · Saltmere has no scale</span><span class="spacer"></span><button class="btn primary" disabled>Commit and open PR</button></div>
       </div>
@@ -458,11 +474,13 @@ button{font:inherit;color:inherit}
       <div class="sheet" data-on="E13" style="inset:24px 24px auto auto;width:min(560px,calc(100% - 48px));border:1px solid var(--line);border-radius:6px;box-shadow:0 10px 30px rgb(0 0 0 / .2)">
         <h3>Campaigns</h3>
         <div class="cols" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
-          <div class="card"><span class="pic"></span><b>Red Tide</b><span class="tag">red-tide · 4 players</span><span>Smugglers chasing the bell that rang under the sea.</span><span class="row"><button class="iconbtn">Rename</button><button class="iconbtn">Picture</button><button class="iconbtn">Copy link</button></span></div>
-          <div class="card"><span class="pic"></span><b>Grey Lantern</b><span class="tag">grey-lantern · 3 players</span><span>Pilgrims crossing Ossery by lamplight.</span><span class="row"><button class="iconbtn">Rename</button><button class="iconbtn">Picture</button><button class="iconbtn">Copy link</button></span></div>
+          <div class="card"><span class="pic"></span><b>Red Tide</b><span class="tag">red-tide · 4 players</span><span>Smugglers chasing the bell that rang under the sea.</span><span class="tag">access: 4 player emails</span><span class="row"><button class="iconbtn">Rename</button><button class="iconbtn">Picture</button><button class="iconbtn">Copy player link</button></span></div>
+          <div class="card"><span class="pic"></span><b>Grey Lantern</b><span class="tag">grey-lantern · 3 players</span><span>Pilgrims crossing Ossery by lamplight.</span><span class="tag">access: 3 player emails</span><span class="row"><button class="iconbtn">Rename</button><button class="iconbtn">Picture</button><button class="iconbtn">Copy player link</button></span></div>
         </div>
         <div class="card" style="margin-top:12px;border-style:dashed"><b>New campaign</b>
           <div class="row"><div class="fld"><label>Name</label><div class="inp">Ember Court</div></div><div class="fld"><label>Starts with fog</label><div class="seg"><span class="on">All fogged</span><span>Copy Red Tide</span></div></div></div>
+          <div class="fld"><label>Starts with visibility</label><div class="seg"><span class="on">Every-campaign values</span><span>Copy Red Tide's</span></div></div>
+          <div class="fld"><label>Players allowed in (after the hosting move)</label><div class="inp">email addresses, one per line</div></div>
           <div class="fld"><label>One line for players</label><div class="inp">A new table, starting in Saltmere.</div></div>
           <span class="row"><span class="spacer"></span><button class="btn primary">Create campaign</button></span>
         </div>
@@ -493,10 +511,10 @@ button{font:inherit;color:inherit}
         <div class="fld"><label>Where does it go?</label><div class="seg"><span>On the ocean</span><span class="on">Inside a map</span></div></div>
         <div class="fld"><label>Parent map</label><div class="inp">Varn ▾ <span class="tag">(the map on screen)</span></div></div>
         <div class="row"><div class="fld"><label>Name</label><div class="inp">Saltmere</div></div><div class="fld"><label>World</label><div class="inp">Varn ▾</div></div></div>
-        <div class="fld"><label>Visibility</label><div class="seg"><span class="on">DM only</span><span>Rumor</span><span>Player</span></div></div>
+        <div class="fld"><label>Visibility</label><div class="seg"><span class="on">DM only</span><span>Rumor</span><span>Player</span></div><span class="tag">for every campaign ▾ (or set per campaign)</span></div>
         <div class="fld"><label>Scale</label><div class="inp">Set later with the ruler ▾</div></div>
         <div class="row"><span class="spacer"></span><button class="btn primary">Add and align</button></div>
-        <div class="where">writes: .atlas-dm/images/saltmere.png, a map entry in world.dm.yaml (parent: varn). Undo removes both.</div>
+        <div class="where">writes: content/varn/_atlas/images/saltmere.png (lossless; players get it cut into tiles) and a map entry in world.yaml, Varn's settings file (parent: varn, visibility: dm). Undo removes both.</div>
       </div>
       <!-- E4 -->
       <div data-on="E4" style="display:grid;gap:10px">
@@ -519,7 +537,7 @@ button{font:inherit;color:inherit}
         <div class="fld"><label>Players enter at zoom · 3.5</label><div class="slider"><i style="left:64%"></i></div><span class="tag">Varn 0.5–4 · past 3.5 the view hands over to Saltmere</span></div>
         <div class="fld"><label>Second way in</label><div class="inp">Pin "Saltmere" links to this map ✓</div></div>
         <div class="row"><button class="iconbtn">Rotate frame</button><span class="spacer"></span><button class="btn primary">Enter Saltmere ↘</button></div>
-        <div class="where">writes parent + frame on Saltmere in world.yaml. A map can't nest under its own child (refused).</div>
+        <div class="where">writes parent + frame on Saltmere in world.yaml (Varn's settings file). A map can't nest under its own child (refused).</div>
       </div>
       <!-- E6 -->
       <div data-on="E6" style="display:grid;gap:10px">
@@ -535,9 +553,11 @@ button{font:inherit;color:inherit}
         </ul>
         <div class="banner">Fenwatch sits 4 px from the edge. Nudge it out if players should see it.</div>
         <div class="fld"><label>DM note (never shipped)</label><div class="inp">Choir cult hides here until session 9.</div></div>
+        <div class="fld"><label>Hidden in</label><div class="seg"><span>Every campaign</span><span class="on">Ticked campaigns</span></div>
+          <div class="row" style="font-size:13px"><span><span class="cbx on"></span>Red Tide</span><span><span class="cbx"></span>Grey Lantern <span class="tag">(sees Ashfen as rumor)</span></span></div></div>
         <div class="row"><span class="tag">or hide the whole map:</span><span class="seg"><span>Varn: shown</span></span></div>
-        <div class="row"><span class="spacer"></span><button class="btn primary">Hide from players</button></div>
-        <div class="where">moves the zone and the 4 items to .atlas-dm/varn/world.dm.yaml. Nothing hidden stays in a committed file.</div>
+        <div class="row"><span class="spacer"></span><button class="btn primary">Hide from Red Tide</button></div>
+        <div class="where">marks the zone and the 4 items visibility: dm for Red Tide in world.yaml (Varn's settings file). Nothing moves between files; Red Tide's build simply leaves them out.</div>
       </div>
       <!-- E7 -->
       <div data-on="E7" style="display:grid;gap:10px">
@@ -549,12 +569,14 @@ button{font:inherit;color:inherit}
         <div class="fld"><label>Brush size · 80 px</label><div class="slider"><i style="left:35%"></i></div></div>
         <h4>Reveals on Varn</h4>
         <ul class="list"><li>Saltmere harbour <span class="tag">circle · 30 Oct</span></li><li>Road to Fenwatch <span class="tag">brush · 2 Nov</span></li><li>South landing <span class="tag">brush · today</span></li></ul>
-        <div class="where">writes content/_atlas/campaigns/red-tide.yaml. Fog bakes into Red Tide's images at build. One undo step per stroke.</div>
+        <div class="where">writes content/_atlas/campaigns/red-tide.yaml. At build the fog is baked: painted into Red Tide's map tiles, so the covered part is not in the published files at all. One undo step per stroke.</div>
       </div>
       <!-- E8 -->
       <div data-on="E8" style="display:grid;gap:10px">
         <h3>The Drowned Bell <small>E8 · atlas-only note</small></h3>
-        <div class="row"><div class="fld"><label>Type</label><div class="inp">Monument ▾</div></div><div class="fld"><label>Visibility</label><div class="inp">Player ▾</div></div></div>
+        <div class="fld"><label>Type</label><div class="inp">Monument ▾</div></div>
+        <div class="fld"><label>Visibility</label><div class="seg"><span>Every campaign</span><span class="on">Per campaign</span></div>
+          <ul class="list"><li>Red Tide <span>Player ▾</span></li><li>Grey Lantern <span>Rumor ▾ <span class="tag">heard of, not seen</span></span></li></ul></div>
         <div class="file"><span class="thumb" style="background:linear-gradient(160deg,var(--sea),var(--warn))"></span><div><b>bell-at-low-tide.webp</b><div class="tag">picture · featured in Saltmere Coast</div></div></div>
         <div class="fld"><label>Body</label>
           <div class="body">A bronze bell the size of a cottage, sunk off <a>[[Saltmere]]</a> harbour. At the lowest tides it rings once. <a>[[Oduya Venn]]</a> keeps the bell rope. Some say it called up <span class="plain">[[The Tide-Eater]]</span>. [[Bell|
@@ -570,49 +592,50 @@ button{font:inherit;color:inherit}
       <div data-on="E9" style="display:grid;gap:10px">
         <h3>Saltmere Coast <small>E9 · region</small></h3>
         <div class="banner">Changed on disk: an agent edited <span class="mono">varn/_atlas/world.yaml</span> at 12:02. <u>Reload</u> or <u>Keep mine</u>.</div>
-        <div class="row"><div class="fld"><label>Visibility</label><div class="inp">Player ▾</div></div><div class="fld"><label>On map</label><div class="inp">Varn</div></div></div>
+        <div class="row"><div class="fld"><label>Visibility</label><div class="inp">Player in every campaign ▾</div></div><div class="fld"><label>On map</label><div class="inp">Varn</div></div></div>
         <div class="fld"><label>Note</label><div class="inp">Saltmere Coast <span class="tag">synced from vault</span></div></div>
         <h4>Inside this region</h4>
         <ul class="list"><li>Saltmere <span class="tag">child map · frame</span></li><li>The Drowned Bell <span class="tag">monument</span></li><li>Ilse Marrow, Oduya Venn <span class="tag">people</span></li></ul>
         <div class="fld"><label>Fog for Red Tide</label><div class="inp">Partly revealed (2 reveals)</div></div>
         <div class="row"><button class="btn">Write about this place</button><button class="iconbtn">Edit shape</button><button class="iconbtn">Hide</button></div>
-        <div class="where">stored in content/varn/_atlas/world.yaml → regions.saltmere-coast</div>
+        <div class="where">stored in content/varn/_atlas/world.yaml (Varn's settings file) → regions.saltmere-coast</div>
       </div>
       <!-- E10 -->
       <div data-on="E10" style="display:grid;gap:10px">
         <h3>Sync from Obsidian <small>E10</small></h3>
         <div class="fld"><label>Vault folder (this computer)</label><div class="row"><div class="inp mono" style="flex:1">~/Documents/DnD-Campaign-Repository/Vault-DnD</div><button class="btn">Check</button></div></div>
-        <h4>Dry run · 7 changes</h4>
+        <h4>Dry run · 7 changes · arrives as</h4>
         <ul class="list">
-          <li><span><span class="cbx on"></span>Create Oduya Venn</span><span class="tag">02 → player · repo</span></li>
-          <li><span><span class="cbx on"></span>Update Saltmere</span><span class="tag">01 → player · repo</span></li>
-          <li><span><span class="cbx on"></span>Update Saltmere (DM block)</span><span class="tag">→ .atlas-dm</span></li>
-          <li><span><span class="cbx on"></span>Create The Tide-Eater</span><span class="tag">04 → dm · .atlas-dm</span></li>
+          <li><span><span class="cbx on"></span>Create Oduya Venn</span><span class="tag">folder 02 → player, every campaign</span></li>
+          <li><span><span class="cbx on"></span>Update Saltmere</span><span class="tag">01 → player, every campaign · Grey Lantern: rumor (set here)</span></li>
+          <li><span><span class="cbx on"></span>Update Saltmere, new DM block</span><span class="tag">stays in the note, cut from player builds</span></li>
+          <li><span><span class="cbx on"></span>Create The Tide-Eater</span><span class="tag">04 → dm, every campaign</span></li>
           <li><span><span class="cbx on"></span>Rename Gullwatch → Fenwatch</span><span class="tag">via sync map</span></li>
           <li><span><span class="cbx"></span>Archive Old Ferry</span><span class="tag">deleted in vault</span></li>
           <li><span class="tag">Skip Session 12 recap: no type folder</span></li>
         </ul>
         <div class="row"><span class="spacer"></span><button class="btn primary">Sync 5 notes</button></div>
         <div class="banner" style="border-color:var(--ok);color:var(--ok)">Last run 11:48: 5 synced. 3 notes have no place yet. <u>Place them</u></div>
-        <div class="where">placements are untouched (they live in world.yaml). One undo step per run.</div>
+        <div class="where">placements and per-campaign visibility set in the atlas are untouched (they live in world.yaml, the map's settings file). One undo step per run. The first real run waits until the repo is private.</div>
       </div>
       <!-- E11 -->
       <div data-on="E11" style="display:grid;gap:10px">
         <h3>Previewing <small>E11</small></h3>
-        <p style="margin:0">The canvas shows the real player site, built strict for <b>Red Tide</b> without the DM folder.</p>
-        <ul class="list"><li>Build <span class="ok">done in 6 s</span></li><li>Fog <span>Red Tide, baked</span></li><li>Hidden areas <span>gone</span></li><li>Scans <span class="ok">2 of 2 passed</span></li></ul>
+        <p style="margin:0">The canvas shows the real player site, built strict for <b>Red Tide</b> only, the same way publish builds it.</p>
+        <ul class="list"><li>Build <span class="ok">done in 6 s</span></li><li>Visibility <span>Red Tide's</span></li><li>Fog <span>Red Tide's, painted into the tiles</span></li><li>Hidden for Red Tide <span>gone (Ashfen, Fenwatch)</span></li><li>Scans on this build <span class="ok">2 of 2 passed</span></li></ul>
+        <p style="margin:0;font-size:13px;color:var(--muted)">The test-site campaign picker (P6) shows here too, to switch campaign.</p>
         <p style="margin:0;font-size:13px;color:var(--muted)">If a scan fails the bar turns red and names the file and the string, with Show in editor.</p>
       </div>
       <!-- E12 -->
       <div data-on="E12" style="display:grid;gap:10px">
         <h3>Before it goes live <small>E12</small></h3>
         <ul class="list"><li>Unsaved edits <span class="ok">none</span></li><li>Campaigns built <span>2</span></li><li>Blocking <span class="bad">1</span></li><li>Warnings <span class="warn">2</span></li></ul>
-        <p style="margin:0;font-size:13px">Commit and open PR stays off until every scan is green. Merging into main publishes the site.</p>
+        <p style="margin:0;font-size:13px">Commit and open PR stays off until every scan is green for every campaign. Merging into main publishes: to the public test site for now, and after the hosting move to Cloudflare, one access-limited link per campaign.</p>
       </div>
       <!-- E13 -->
       <div data-on="E13" style="display:grid;gap:10px">
         <h3>Campaigns <small>E13</small></h3>
-        <p style="margin:0">Each campaign has its own fog and map states over the same maps and notes. Each gets its own link: <span class="mono">?c=red-tide</span>.</p>
+        <p style="margin:0">Each campaign has its own visibility, fog and map states over the same maps and notes. On the hosted site each gets its own access-limited link, and players never see a list of other campaigns. The picker exists only on the test site and in preview.</p>
         <div class="where">writes content/_atlas/campaigns/&lt;id&gt;.yaml</div>
       </div>
     </aside>
@@ -626,14 +649,14 @@ const S={
  E3:{t:"Add map",f:"flow a",w:"The DM dropped saltmere-harbour.png while looking at Varn, so “Inside a map: Varn” is prefilled. A new map starts DM-only. Add and align uploads it and opens Align. A failed upload turns the chip to Failed and writes nothing.",x:"Fixes today: map import lived 4 clicks deep in an invisible menu and a 6-step wizard.",c:"saved",cr:["Ocean","Varn"],tk:"E3"},
  E4:{t:"Align map",f:"flow b",w:"Saltmere shows at 60 % over Varn with move, scale and rotate handles. Two-point align: the harbour mouth is matched; next the DM clicks the bell tower on both maps and the map snaps. Each drag end is one undo step, so the chip reads Saving… for a moment.",x:"",c:"saving",cr:["Ocean","Varn"],tk:"E4"},
  E5:{t:"Frame and nest",f:"flow c",w:"Saltmere was dragged from the tree onto Varn. Its frame is drawn on Varn and the city previews inside it. The DM sets when players switch from Varn to Saltmere (enter at zoom 3.5). Enter Saltmere, or a double-click on the frame, goes in and the breadcrumb grows to Ocean › Varn › Saltmere.",x:"Fixes today: there was no control to nest a map at all (task c was a dead end).",c:"saved",cr:["Ocean","Varn"],tk:"E5"},
- E6:{t:"Hide area",f:"flow d",w:"The DM picked the Ashfen region as the zone. It hatches red and the inspector lists the 4 things that go with it, so nothing leaks by accident. A pin near the edge is flagged for a nudge. Hiding moves all of it into the gitignored DM folder.",x:"",c:"saved",cr:["Ocean","Varn"],tk:"E6"},
- E7:{t:"Fog",f:"flow e",w:"Campaign Red Tide is chosen in the top bar, so this is Red Tide's fog only. The brush reveals; Cover again takes it back; Reveal around a pin works by clicking the pin, no typed ids. The strip at the bottom sums up the campaign. Each stroke saves and is one undo step.",x:"",c:"saving",cr:["Ocean","Varn"],tk:"E7"},
+ E6:{t:"Hide area",f:"flow d",w:"The DM picked the Ashfen region as the zone. It hatches red and the inspector lists the 4 things that go with it, so nothing leaks by accident. A pin near the edge is flagged for a nudge. Hidden in: every campaign, or only the ticked ones (here Red Tide; Grey Lantern keeps Ashfen as a rumor). Nothing moves between files; the zone and its items are simply marked DM-only for those campaigns, so their builds leave them out.",x:"",c:"saved",cr:["Ocean","Varn"],tk:"E6"},
+ E7:{t:"Fog",f:"flow e",w:"Campaign Red Tide is chosen in the top bar, so this is Red Tide's fog only. The brush reveals; Cover again takes it back; Reveal around a pin works by clicking the pin, no typed ids. The strip at the bottom sums up the campaign. Each stroke saves and is one undo step. At publish the fog is baked: painted into Red Tide's map tiles, so covered land is not in their files at all.",x:"",c:"saving",cr:["Ocean","Varn"],tk:"E7"},
  E8:{t:"Note editor",f:"flow f",w:"The Drowned Bell pin is selected and its note opens in the inspector. Type monument plus a picture features it in Saltmere Coast. Typing [[ opens the link picker with “create note”. A link to a DM note is flagged: players will see plain text, never a dead link.",x:"Fixes today: wikilinks rendered as dead “planned” links in the player view.",c:"saved",cr:["Ocean","Varn"],tk:"E8"},
- E9:{t:"Inspector",f:"flows b, c, d, f",w:"The Saltmere Coast region is selected: its visibility, its note, what lies inside it, its fog for the chosen campaign, and the jobs that apply to it. The chip shows the fourth save state: an agent changed world.yaml on disk, so the editor asks before overwriting.",x:"Fixes today: no visible save state (“All changes saved” while the real save was elsewhere).",c:"disk",cr:["Ocean","Varn"],tk:""},
- E10:{t:"Sync from Obsidian",f:"flow g",w:"Check runs a dry run against the vault folder. Each line shows what happens, the visibility it arrives with and where it is stored (repo or DM folder). Untick what to skip. After the run, notes with no place link to the map tree.",x:"",c:"saved",cr:["Ocean"],tk:"E10"},
- E11:{t:"Player preview",f:"flow h",w:"Preview as players ran a strict player build for Red Tide, without the DM folder and with Red Tide's fog baked. The real player site loads in the canvas. Both secret scans passed, shown in the bar. Back to editing keeps the camera where it was.",x:"Fixes today: preview was a CSS toggle over the DM atlas.",c:"saved",cr:["Ocean","Varn"],tp:1},
- E12:{t:"Publish check",f:"flow i",w:"Per campaign, what players will get, then every scan. One scan failed: a DM block in Oduya Venn's note was not closed, so a secret reached Red Tide's search index. The failure names file, line and campaign, with Show in editor, and the commit button stays off until it is fixed.",x:"Fixes today: Save, Publish and Sync meant overlapping things; now publish is one checked step.",c:"saved",cr:["Ocean"],tb:1},
- E13:{t:"Campaigns",f:"flow e (no campaign yet), p6",w:"The campaign selector is open in the top bar with Manage campaigns. Each campaign has a name, a picture, a one-line blurb for players and its own link. A new campaign starts all fogged or copies another's fog.",x:"",c:"failed",cr:["Ocean"],tk:"E13"}
+ E9:{t:"Inspector",f:"flows b, c, d, f",w:"The Saltmere Coast region is selected: its visibility, its note, what lies inside it, its fog for the chosen campaign, and the jobs that apply to it. The chip shows the fourth save state: an agent changed world.yaml (Varn's settings file, where regions and pins live) on disk, so the editor asks before overwriting.",x:"Fixes today: no visible save state (“All changes saved” while the real save was elsewhere).",c:"disk",cr:["Ocean","Varn"],tk:""},
+ E10:{t:"Sync from Obsidian",f:"flow g",w:"Check runs a dry run against the vault folder. Each line shows what happens and the visibility it arrives with, from its vault folder, for every campaign; per-campaign changes made in the atlas are kept. DM blocks stay inside the note and are cut from player builds. Untick what to skip. After the run, notes with no place link to the map tree.",x:"",c:"saved",cr:["Ocean"],tk:"E10"},
+ E11:{t:"Player preview",f:"flow h",w:"Preview as players ran Red Tide's own player build, exactly as publish will: Red Tide's visibility applied and its fog painted into the map tiles. The real player site loads in the canvas. Both secret scans (DM text, and DM facts leaking another way) ran on that build and passed. Back to editing keeps the camera where it was.",x:"Fixes today: preview was a CSS toggle over the DM atlas.",c:"saved",cr:["Ocean","Varn"],tp:1},
+ E12:{t:"Publish check",f:"flow i",w:"Per campaign, what players will get, then every scan run on each campaign's build, plus a cross-campaign check (anything hidden in one campaign and shown in another is absent where hidden). One scan failed for Red Tide: a DM block in Oduya Venn's note was not closed, so a DM-only fact reached Red Tide's search index (a “derived secret”). The failure names file, line and campaign, with Show in editor, and the commit button stays off until it is fixed.",x:"Fixes today: Save, Publish and Sync meant overlapping things; now publish is one checked step.",c:"saved",cr:["Ocean"],tb:1},
+ E13:{t:"Campaigns",f:"flow e (no campaign yet), p6",w:"The campaign selector is open in the top bar with Manage campaigns. Each campaign has a name, a picture, a one-line blurb, its own visibility and fog, and its own player link. After the hosting move each link is access-limited to that table's players, who never see the other campaigns. A new campaign starts all fogged or copies another's fog and visibility.",x:"",c:"failed",cr:["Ocean"],tk:"E13"}
 };
 const chipTxt={saved:"Saved",saving:"Saving…",failed:"Failed: grey-lantern.yaml is read-only <u>Retry</u>",disk:"Changed on disk <u>Reload</u> <u>Keep mine</u>"};
 const order=["saved","saving","failed","disk"];
