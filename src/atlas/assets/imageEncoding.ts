@@ -74,6 +74,12 @@ export function mapKeepReason(mimeOrExt: string): string | null {
   return `not a raster format maps:optimize converts (${format || "no extension"})`;
 }
 
+/** Whether a mime type or extension names a JPEG (`jpg` and `jpeg` alike). */
+export function isJpegFormat(mimeOrExt: string): boolean {
+  const format = normalizeFormat(mimeOrExt);
+  return format === "jpg" || format === "jpeg";
+}
+
 /** The normalised format of a file name's extension: "Region.PNG" → "png". */
 export function formatOfFileName(name: string): string {
   const dot = name.lastIndexOf(".");

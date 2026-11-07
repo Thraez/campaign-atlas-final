@@ -8,7 +8,12 @@
 import type { MapDocument, MapLayer } from "@/atlas/content/schema";
 import { dumpYaml, patchHeader } from "@/atlas/yaml/dump";
 // Map file naming has one owner, shared with editor uploads.
-import { defaultTargetPath, safeFilename } from "@/atlas/assets/mapLayerTarget";
+import {
+  defaultTargetPath,
+  mapTargetFitsSource,
+  safeFilename,
+} from "@/atlas/assets/mapLayerTarget";
+import { formatOfFileName, isJpegFormat } from "@/atlas/assets/imageEncoding";
 
 export type ImportMode = "layers" | "per-image" | "world-plus-regional" | "variants" | "custom";
 
@@ -342,6 +347,16 @@ export function validateImportPlan(plan: ImportPlan, images: ImportImage[]): Val
     }
   }
   for (const a of plan.assets) {
+    // eval-2026-10/29: a JPG map stays a JPG; under `.webp` or `.png` it would
+    // need a lossy (or bloating) re-encode.
+    const img = images.find((i) => i.id === a.sourceImageId);
+    const source = img ? img.mime || formatOfFileName(img.filename) : "";
+    if (source && isJpegFormat(source) && !mapTargetFitsSource(a.targetPath, source)) {
+      issues.push({
+        severity: "blocking",
+        message: `"${img?.originalFilename}" is a JPG: name its asset path .jpg (not "${a.targetPath}") so it is never re-encoded`,
+      });
+    }
     if (!a.targetPath.startsWith("public/atlas/assets/")) {
       issues.push({
         severity: "blocking",

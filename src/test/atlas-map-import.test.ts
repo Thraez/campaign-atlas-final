@@ -133,6 +133,23 @@ describe("mapImport helpers", () => {
     ).toBe(true);
   });
 
+  // eval-2026-10/29: a JPG map is never saved under .webp or .png.
+  it("validateImportPlan blocks a JPG whose target isn't named .jpg", () => {
+    const img = makeImage({
+      originalFilename: "Tidemarrow.jpg",
+      mime: "image/jpeg",
+      dataUrl: "data:image/jpeg;base64,AAA=",
+    });
+    expect(img.assignment.targetAssetPath).toBe("public/atlas/assets/maps/tidemarrow.jpg");
+    const ok = buildImportPlan({ images: [img], mode: "per-image", defaultWorldId: "astrath" });
+    expect(validateImportPlan(ok, [img]).filter((i) => i.severity === "blocking")).toEqual([]);
+
+    img.assignment.targetAssetPath = "public/atlas/assets/maps/tidemarrow.webp";
+    const plan = buildImportPlan({ images: [img], mode: "per-image", defaultWorldId: "astrath" });
+    const issues = validateImportPlan(plan, [img]);
+    expect(issues.some((i) => i.severity === "blocking" && /\.jpg/.test(i.message))).toBe(true);
+  });
+
   it("validateImportPlan rejects asset paths outside public/atlas/assets", () => {
     const img = makeImage();
     img.assignment.targetAssetPath = "src/random/file.png";

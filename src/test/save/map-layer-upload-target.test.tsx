@@ -10,7 +10,9 @@ import type { MapDocument } from "@/atlas/content/schema";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 vi.mock("@/atlas/content/browserFile", () => ({
-  fileToDataUrl: vi.fn(async () => "data:image/png;base64,AAAA"),
+  // The bytes' MIME type follows the file's, as FileReader's does; the target
+  // name follows the bytes (eval-2026-10/29).
+  fileToDataUrl: vi.fn(async (f: File) => `data:${f.type || "image/png"};base64,AAAA`),
   readImageSize: vi.fn(async () => ({ w: 640, h: 480 })),
 }));
 

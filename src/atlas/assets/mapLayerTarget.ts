@@ -14,6 +14,12 @@
 //
 // Kept free of node built-ins, like imageEncoding.ts, so the browser editor
 // and Node scripts can both import it.
+//
+// A map is saved under its real format's extension (ticket eval-2026-10/29):
+// a JPG map stays `.jpg`, so the save endpoint only strips its metadata and
+// never re-encodes it. The one rename the endpoint accepts is PNG to `.webp`,
+// which it encodes lossless (eval-22).
+import { formatOfFileName, isJpegFormat, shouldConvertMapToWebp } from "./imageEncoding";
 
 // The same folder is MAPS_DIR in scripts/dev/optimize-maps.mjs, a plain .mjs
 // script that can't import this TypeScript module; keep the two in step.
@@ -85,9 +91,44 @@ function nameFromId(layer: MapLayerTargetSource): string {
   return `${stem}.${ext}`;
 }
 
+/**
+ * Whether a map whose bytes are `source` (a MIME type or extension) can be
+ * saved under `targetPath` without a re-encode that loses anything: the same
+ * format (`jpg` and `jpeg` alike), or a PNG under `.webp`.
+ */
+export function mapTargetFitsSource(targetPath: string, source: string): boolean {
+  const target = formatOfFileName(targetPath);
+  const from = formatOfFileName(`.${source.replace(/^image\//i, "")}`);
+  if (isJpegFormat(from) || isJpegFormat(target)) return isJpegFormat(from) && isJpegFormat(target);
+  return target === from || (shouldConvertMapToWebp(from) && target === "webp");
+}
+
+/**
+ * `path` with the layer's real extension when its own one doesn't fit the
+ * bytes: the dataUrl's MIME type, or the original filename's extension when
+ * there are no bytes yet. Keeps the filename's spelling (`.jpeg`) when it
+ * names the same format. Unknown formats leave `path` alone.
+ */
+function withSourceExtension(path: string, layer: MapLayerTargetSource): string {
+  const fileExt = layer.filename ? extensionOf(layer.filename) : "";
+  const source = mimeExtension(layer.dataUrl) || (MAP_EXTENSIONS.has(fileExt) ? fileExt : "");
+  if (!source || mapTargetFitsSource(path, source)) return path;
+  const ext = mapTargetFitsSource(`x.${fileExt}`, source)
+    ? fileExt
+    : isJpegFormat(source)
+      ? "jpg"
+      : source;
+  const dot = path.lastIndexOf(".");
+  const stem = dot > path.lastIndexOf("/") ? path.slice(0, dot) : path;
+  return `${stem}.${ext}`;
+}
+
 /** Where Save writes the layer when the DM hasn't chosen a usable path. */
 export function defaultMapLayerTargetPath(layer: MapLayerTargetSource): string {
-  return defaultTargetPath(layer.filename ? safeFilename(layer.filename) : nameFromId(layer));
+  return withSourceExtension(
+    defaultTargetPath(layer.filename ? safeFilename(layer.filename) : nameFromId(layer)),
+    layer,
+  );
 }
 
 /**
@@ -98,9 +139,12 @@ export function defaultMapLayerTargetPath(layer: MapLayerTargetSource): string {
  * the original filename named exactly as a fresh upload or the Map Import
  * Wizard would name it, so an old layer saved without a path lands where it
  * would if uploaded today.
+ *
+ * Either way the extension follows the bytes (see mapTargetFitsSource): a JPG
+ * typed or defaulted as `.webp` or `.png` is saved as `.jpg`.
  */
 export function mapLayerTargetPath(layer: MapLayerTargetSource): string {
   const chosen = layer.targetPath?.trim();
-  if (chosen && isMapAssetPath(chosen)) return chosen;
+  if (chosen && isMapAssetPath(chosen)) return withSourceExtension(chosen, layer);
   return defaultMapLayerTargetPath(layer);
 }

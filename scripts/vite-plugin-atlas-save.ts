@@ -73,8 +73,11 @@ import {
   WEBP_QUALITY,
   MAX_IMAGE_WIDTH,
   shouldConvertMapToWebp,
+  formatOfFileName,
+  isJpegFormat,
 } from "../src/atlas/assets/imageEncoding";
 import { encodeMapWebp } from "./atlas/mapWebp";
+import { stripJpegMetadata } from "./atlas/jpegMetadata";
 import { runBuild, type BuildResult as InProcessBuildResult } from "./build-atlas";
 import {
   tryAcquireBuildLock,
@@ -99,15 +102,19 @@ const MAX_ASSET_BINARY_BYTES = 6 * 1024 * 1024;
  * re-encode, and `scripts/dev/optimize-maps.ts` owns their sizing instead.
  */
 function isWebpTargetIn(relPath: string, folder: "images" | "maps"): boolean {
-  const p = relPath.replace(/\\/g, "/").toLowerCase();
-  return p.includes(`/assets/${folder}/`) && p.endsWith(".webp");
+  return isTargetIn(relPath, folder) && relPath.toLowerCase().endsWith(".webp");
+}
+
+function isTargetIn(relPath: string, folder: "images" | "maps"): boolean {
+  return relPath.replace(/\\/g, "/").toLowerCase().includes(`/assets/${folder}/`);
 }
 
 /**
- * A map upload that can't reach a `.webp` map target without loss (JPG, or a
- * PNG that wouldn't come out pixel-identical) or without flattening an
- * animation (GIF). Turned into a 400 with reason `map-format-refused`. Ticket
- * eval-2026-10/29 owns the editor's JPG-map path.
+ * A map upload that can't be saved under its target name without loss (a JPG
+ * under any name but `.jpg`, a PNG that wouldn't come out of WebP
+ * pixel-identical), without flattening an animation (GIF to `.webp`), or
+ * without losing its EXIF rotation (a JPG map). Turned into a 400 with reason
+ * `map-format-refused`.
  */
 class MapFormatRefusedError extends Error {}
 
@@ -391,7 +398,9 @@ function hashBytes(buf: Buffer): string {
 /**
  * Re-encode an image so no EXIF/IPTC/XMP/ICC metadata (GPS included) survives:
  * sharp drops it all unless `withMetadata()` is called. Shared by the save
- * route and the vault image copy so both publish the same bytes.
+ * route and the vault image copy so both publish the same bytes. Maps are
+ * never lossy re-encoded: a JPG map only loses its metadata segments
+ * (scripts/atlas/jpegMetadata.ts), a WebP map keeps its bytes.
  * `source` is the input's mime type or extension; `target` is the published
  * path, whose name (chosen by the shared policy) says WebP or not.
  */
@@ -407,6 +416,36 @@ async function cleanImageBytes(buf: Buffer, source: string, target: string): Pro
         .webp({ quality: WEBP_QUALITY })
         .toBuffer()
     );
+  // A JPG map is already lossy, so it is never re-encoded (ticket
+  // eval-2026-10/29): its metadata segments are dropped and the compressed
+  // image data is kept byte for byte. Under any other name it would have to
+  // be re-encoded, so that is refused; the editor names it `.jpg`
+  // (mapLayerTarget.ts).
+  if (isTargetIn(target, "maps") && isJpegFormat(format)) {
+    if (!isJpegFormat(formatOfFileName(target))) {
+      throw new MapFormatRefusedError(
+        `A JPG map can't be saved as ${formatOfFileName(target) || "an extensionless file"} ` +
+          `without re-encoding it. Save it under a .jpg name instead.`,
+      );
+    }
+    const stripped = stripJpegMetadata(buf);
+    if (stripped.ok) {
+      // Defence in depth: never publish a map that still reads as carrying
+      // EXIF, XMP or IPTC, whatever the segment walk missed.
+      const left = await sharp(stripped.bytes).metadata();
+      if (left.exif || left.xmp || left.iptc) {
+        throw new Error("metadata survived the JPEG strip; nothing was saved");
+      }
+      return stripped.bytes;
+    }
+    if (stripped.code === "rotated") {
+      throw new MapFormatRefusedError(
+        `This JPG map can't be saved: ${stripped.reason}. ` +
+          `Rotate it in an image editor, save it, and upload it again.`,
+      );
+    }
+    throw new Error(stripped.reason);
+  }
   // A map named `.webp` (maps:optimize repoints world.yaml to a WebP twin)
   // is never lossy re-encoded and never resized: fog redaction and map labels
   // smear under a lossy encode.
@@ -426,7 +465,7 @@ async function cleanImageBytes(buf: Buffer, source: string, target: string): Pro
     if (format === "webp") return buf;
     throw new MapFormatRefusedError(
       `A ${format || "unknown"} file can't be saved as a WebP map without loss or ` +
-        `flattening; upload a PNG or WebP (JPG maps: ticket eval-2026-10/29).`,
+        `flattening; upload a PNG or WebP, or keep the file's own extension.`,
     );
   }
   // `animated: true` keeps every frame of a GIF or WebP; without it sharp
@@ -573,9 +612,8 @@ export async function handleSaveRequest(
           payload: { error: "OversizedContent", path: f.path, bytes: buf.length },
         };
       }
-      // Strip all EXIF/IPTC/XMP/ICC metadata via sharp re-encode.
-      // No withMetadata() call → sharp drops all metadata by default.
-      // { animated: true } preserves GIF/WebP animation frames.
+      // Strip EXIF/IPTC/XMP metadata (cleanImageBytes): a sharp re-encode for
+      // images, a segment strip with no re-encode for JPG maps.
       let stripped: Buffer;
       try {
         const mime = f.content.slice(5, f.content.indexOf(";base64,"));
