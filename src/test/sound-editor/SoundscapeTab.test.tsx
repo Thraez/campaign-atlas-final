@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, act } from "@testing-library/react";
 import { SoundscapeTab } from "@/atlas/tabs/SoundscapeTab";
+import { useSoundscapeDraft } from "@/atlas/sound-editor/useSoundscapeDraft";
 import { buildFullWorldYaml } from "@/atlas/yaml/buildFullWorldYaml";
 import type { MapDocument } from "@/atlas/content/schema";
 
@@ -29,10 +30,29 @@ const map = (): MapDocument =>
     ],
   }) as MapDocument;
 
+/** The tab as the editor wires it: patches land back on the map it shows. */
+function Wired({
+  onPatch,
+  files = [],
+}: {
+  onPatch?: (p: Partial<MapDocument>) => void;
+  files?: string[];
+}) {
+  const [m, setM] = useState(map);
+  const api = useSoundscapeDraft(m, undefined, {
+    patch: (p) => {
+      onPatch?.(p);
+      setM((s) => ({ ...s, ...p }));
+    },
+    unpatch: () => setM(map),
+  });
+  return <SoundscapeTab map={m} availableAudioFiles={files} api={api} />;
+}
+
 describe("SoundscapeTab", () => {
   it("shows DM-facing labels and an empty state, and lets the DM give a region a sound", () => {
     const onPatch = vi.fn();
-    render(<SoundscapeTab map={map()} onPatch={onPatch} availableAudioFiles={["wind.ogg"]} />);
+    render(<Wired onPatch={onPatch} files={["wind.ogg"]} />);
     // DM-facing copy, not jargon:
     expect(screen.getByText(/Volume/i)).toBeTruthy();
     expect(screen.queryByText(/masterGain/i)).toBeNull();
@@ -57,17 +77,6 @@ describe("SoundscapeTab", () => {
   });
 
   it("does not surface the editor controls to a player path — pure render, no AudioContext", () => {
-    // Patches land back on the map, as the editor's patchMap does.
-    function Wired() {
-      const [m, setM] = useState(map);
-      return (
-        <SoundscapeTab
-          map={m}
-          onPatch={(p) => setM((s) => ({ ...s, ...p }))}
-          availableAudioFiles={[]}
-        />
-      );
-    }
     render(<Wired />);
     // Create an area (it becomes selected) so the per-area form renders.
     const giveBtn = screen.getByRole("button", { name: /give a region a sound|add sound/i });

@@ -127,6 +127,7 @@ import { RouteLayer } from "@/atlas/routes/RouteLayer";
 import { useFogDraft } from "@/atlas/fog/useFogDraft";
 import { FogLayer } from "@/atlas/fog/FogLayer";
 import { SoundscapeTab } from "@/atlas/tabs/SoundscapeTab";
+import { withMapPatch, withoutMapKey } from "@/atlas/editor/mapOverride";
 import { useSoundscapeDraft } from "@/atlas/sound-editor/useSoundscapeDraft";
 import { SoundAreaLayer } from "@/atlas/sound-editor/SoundAreaLayer";
 import { loadAvailableAudio } from "@/atlas/sound-editor/listAvailableAudio";
@@ -342,8 +343,16 @@ function AtlasPlacementEditorInner() {
   const patchMap = (patch: Partial<MapDocument>) => {
     if (!baseMap) return;
     setMapOverrideUndoable(
-      (s) => ({ ...s, [baseMap.id]: { ...(s[baseMap.id] ?? {}), ...patch } }),
+      (s) => withMapPatch(s, baseMap.id, patch),
       `map metadata ${baseMap.id}`,
+      baseMap.id,
+    );
+  };
+  const unpatchMap = (key: keyof MapDocument) => {
+    if (!baseMap) return;
+    setMapOverrideUndoable(
+      (s) => withoutMapKey(s, baseMap.id, key),
+      `reset map ${key} ${baseMap.id}`,
       baseMap.id,
     );
   };
@@ -425,7 +434,10 @@ function AtlasPlacementEditorInner() {
   // (SoundAreaLayer). eval-44: no draft of its own; every edit goes through
   // patchMap into this map's override (activeMap folds it in), so it stays on
   // its map, undoes with its map, and the session persists and discards it.
-  const soundscapeDraft = useSoundscapeDraft(activeMap, patchMap, baseMap?.soundscape);
+  const soundscapeDraft = useSoundscapeDraft(activeMap, baseMap?.soundscape, {
+    patch: patchMap,
+    unpatch: unpatchMap,
+  });
   // Audio files the Sound panel can offer (basenames under
   // public/atlas/assets/audio/). Loaded once; empty is fine — the panel
   // falls back to a free-text file field.
@@ -1826,7 +1838,6 @@ function AtlasPlacementEditorInner() {
             sound: (
               <SoundscapeTab
                 map={activeMap}
-                onPatch={patchMap}
                 availableAudioFiles={availableAudio}
                 api={soundscapeDraft}
               />

@@ -31,13 +31,12 @@ const map = (over: Partial<MapDocument> = {}): MapDocument =>
 function useWired(base: MapDocument) {
   const [soundscape, setSoundscape] = useState(base.soundscape);
   const m = useMemo(() => ({ ...base, soundscape }), [base, soundscape]);
-  return useSoundscapeDraft(
-    m,
-    (p) => {
+  return useSoundscapeDraft(m, base.soundscape, {
+    patch: (p) => {
       if ("soundscape" in p) setSoundscape(p.soundscape);
     },
-    base.soundscape,
-  );
+    unpatch: () => setSoundscape(base.soundscape),
+  });
 }
 
 const wired = (base: MapDocument) => renderHook(() => useWired(base)).result;
@@ -47,6 +46,12 @@ describe("useSoundscapeDraft", () => {
     const result = wired(map());
     expect(result.current.effective.areas ?? []).toEqual([]);
     expect(result.current.dirtyCount).toBe(0);
+  });
+
+  it("counts no change on an untouched map whose saved soundscape is not normalized", () => {
+    expect(wired(map({ soundscape: { enabled: false, areas: [] } })).current.dirtyCount).toBe(0);
+    const blankName = { areas: [{ id: "s0", regionId: "r1", name: "", bed: { src: "a.ogg" } }] };
+    expect(wired(map({ regions: [region], soundscape: blankName })).current.dirtyCount).toBe(0);
   });
 
   it("adds a ride-on area for an existing region (defaults to one bed, no leak surface)", () => {

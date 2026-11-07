@@ -6,7 +6,7 @@
  * audio file per area, and set Volume (whole map) / Loudness (per area).
  * Editing goes through `useSoundscapeDraft` (shared with the on-map
  * `SoundAreaLayer`), which writes every change straight into the map via
- * `onPatch({ soundscape })`, the editor's `patchMap` seam: the map's
+ * the editor's `patchMap({ soundscape })` seam: the map's
  * soundscape is the one source of truth, and the unified Save carries it into
  * world.yaml through `soundscapeToYamlObject`. No new persistence path.
  *
@@ -34,29 +34,21 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { TabFrame } from "./TabFrame";
 import { ValidationChips } from "./ValidationChips";
-import {
-  useSoundscapeDraft,
-  type SoundscapeDraftAPI,
-} from "@/atlas/sound-editor/useSoundscapeDraft";
+import type { SoundscapeDraftAPI } from "@/atlas/sound-editor/useSoundscapeDraft";
 
 interface Props {
   map: MapDocument;
-  onPatch: (patch: Partial<MapDocument>) => void;
   /** Basenames under atlas/assets/audio/ — empty is fine (free-text fallback). */
   availableAudioFiles: string[];
-  /** Inject the editor-shared draft instance so the on-map layer stays in sync. */
-  api?: SoundscapeDraftAPI;
+  /** The editor's shared instance, so the on-map layer stays in sync. */
+  api: SoundscapeDraftAPI;
 }
 
 /** Schema defaults, surfaced as slider positions (never as raw field names). */
 const DEFAULT_VOLUME = 0.6; // SoundscapeConfig.masterGain default
 const DEFAULT_LOUDNESS = 0.7; // per-area loudness default
 
-export function SoundscapeTab({ map, onPatch, availableAudioFiles, api }: Props) {
-  // Hooks must run unconditionally; the internal instance simply goes unused
-  // when the editor injects its shared one.
-  const internal = useSoundscapeDraft(map, onPatch, map.soundscape);
-  const draft = api ?? internal;
+export function SoundscapeTab({ map, availableAudioFiles, api: draft }: Props) {
   const {
     effective,
     dirtyCount,

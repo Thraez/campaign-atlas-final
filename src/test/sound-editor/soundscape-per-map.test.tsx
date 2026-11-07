@@ -17,6 +17,7 @@ import { idbDelete } from "@/atlas/session/idbStore";
 import { useSoundscapeDraft } from "@/atlas/sound-editor/useSoundscapeDraft";
 import { SoundscapeTab } from "@/atlas/tabs/SoundscapeTab";
 import type { MapDocument } from "@/atlas/content/schema";
+import { withMapPatch, withoutMapKey, type MapOverrides } from "@/atlas/editor/mapOverride";
 
 function map(id: string): MapDocument {
   return {
@@ -44,7 +45,6 @@ function map(id: string): MapDocument {
 }
 
 const MAPS = [map("A"), map("B")];
-type Override = Record<string, Partial<MapDocument>>;
 
 function useHarness() {
   const [activeMapId, setActiveMapId] = useState("A");
@@ -54,9 +54,9 @@ function useHarness() {
   const undoStack = useUndoStack(undefined, { switchToMap: (id) => switchTo(id) });
 
   // The page's map metadata override and patchMap, as in AtlasPlacementEditor.
-  const [mapOverride, setMapOverride] = useState<Override>({});
+  const [mapOverride, setMapOverride] = useState<MapOverrides>({});
   const mapOverrideRef = useRef(mapOverride);
-  const setOverride = useCallback((m: Override) => {
+  const setOverride = useCallback((m: MapOverrides) => {
     mapOverrideRef.current = m;
     setMapOverride(m);
   }, []);
@@ -65,9 +65,10 @@ function useHarness() {
     () => ({ ...baseMap, ...(mapOverride[baseMap.id] ?? {}) }),
     [baseMap, mapOverride],
   );
-  const patchMap = (patch: Partial<MapDocument>) => {
+  const record = (compute: (s: MapOverrides) => MapOverrides) => {
     const before = mapOverrideRef.current;
-    const after = { ...before, [baseMap.id]: { ...(before[baseMap.id] ?? {}), ...patch } };
+    const after = compute(before);
+    if (after === before) return;
     setOverride(after);
     undoStack.push({
       undo: () => setOverride(before),
@@ -76,8 +77,14 @@ function useHarness() {
       mapId: baseMap.id,
     });
   };
+  const patchMap = (patch: Partial<MapDocument>) =>
+    record((s) => withMapPatch(s, baseMap.id, patch));
+  const unpatchMap = (key: keyof MapDocument) => record((s) => withoutMapKey(s, baseMap.id, key));
 
-  const sound = useSoundscapeDraft(activeMap, patchMap, baseMap.soundscape);
+  const sound = useSoundscapeDraft(activeMap, baseMap.soundscape, {
+    patch: patchMap,
+    unpatch: unpatchMap,
+  });
   const session = useEditorSession({
     activeMapId,
     undoStack,
@@ -85,7 +92,7 @@ function useHarness() {
       overrides: { get: () => ({}), set: () => {} },
       mapOverride: {
         get: () => mapOverrideRef.current as Record<string, unknown>,
-        set: (m) => setOverride(m as Override),
+        set: (m) => setOverride(m as MapOverrides),
       },
       region: { snapshot: () => ({ edits: {}, added: [], deleted: [] }), applySnapshot: () => {} },
       route: { snapshot: () => ({ edits: {}, added: [], deleted: [] }), applySnapshot: () => {} },
@@ -100,15 +107,13 @@ function useHarness() {
   });
   /** What a save would write for map `id`. */
   const soundOf = (id: string) => ({ ...map(id), ...(mapOverride[id] ?? {}) }).soundscape;
-  return { activeMapId, activeMap, switchTo, undoStack, sound, session, patchMap, soundOf };
+  return { activeMapId, activeMap, switchTo, undoStack, sound, session, soundOf, mapOverride };
 }
 
 let h: ReturnType<typeof useHarness>;
 function Harness() {
   h = useHarness();
-  return (
-    <SoundscapeTab map={h.activeMap} onPatch={h.patchMap} availableAudioFiles={[]} api={h.sound} />
-  );
+  return <SoundscapeTab map={h.activeMap} availableAudioFiles={[]} api={h.sound} />;
 }
 
 async function mount() {
@@ -167,6 +172,39 @@ describe("the soundscape draft belongs to one map (eval-44)", () => {
     expect(h.activeMapId).toBe("A");
     expect(h.soundOf("A")?.areas).toHaveLength(1);
     expect(h.soundOf("B")).toBeUndefined();
+  });
+
+  it("a drawing started on map A is dropped on a switch, never finished on B", async () => {
+    await mount();
+    act(() => h.sound.startDraw());
+    act(() => {
+      h.sound.addDraftPoint([0, 0]);
+      h.sound.addDraftPoint([50, 0]);
+      h.sound.addDraftPoint([50, 50]);
+    });
+    act(() => h.switchTo("B"));
+    expect(h.sound.drawing).toBe(false);
+    expect(h.sound.draftPoints).toEqual([]);
+    let id: string | null = "x";
+    act(() => {
+      id = h.sound.finishDraw();
+    });
+    expect(id).toBeNull();
+    expect(h.soundOf("B")).toBeUndefined();
+  });
+
+  it("Discard local leaves the map clean; undo brings the edit back", async () => {
+    await mount();
+    drawZone();
+    expect(h.session.unsavedCount).toBe(1);
+
+    act(() => h.sound.reset());
+    expect(h.mapOverride).toEqual({});
+    expect(h.session.unsavedCount).toBe(0);
+
+    act(() => h.undoStack.undo());
+    expect(h.soundOf("A")?.areas).toHaveLength(1);
+    expect(h.session.unsavedCount).toBe(1);
   });
 
   it("Discard all clears the sound draft, and a reload restores it", async () => {

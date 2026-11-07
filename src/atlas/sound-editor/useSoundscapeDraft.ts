@@ -75,17 +75,26 @@ function soundscapeChanges(canon: SoundscapeConfig, next: SoundscapeConfig): num
   return n;
 }
 
+/** The editor's undoable writes to the active map's metadata override. */
+export interface MapOverrideEdits {
+  /** `patchMap`: merge into the override. */
+  patch: (patch: Partial<MapDocument>) => void;
+  /** `unpatchMap`: drop one key from the override (back to the saved value). */
+  unpatch: (key: keyof MapDocument) => void;
+}
+
 /**
- * @param map    the active map with its metadata override folded in.
- * @param onPatch the editor's `patchMap`: every edit lands in the map's
- *   override as `{ soundscape }`, which records the undo entry (with its map).
- * @param canon  the map's soundscape before the override (for the change count).
+ * @param map   the active map with its metadata override folded in.
+ * @param canon the map's soundscape before the override (for the change count).
+ * @param edits every edit lands in the map's override as `{ soundscape }`; the
+ *   editor records the undo entry (with its map).
  */
 export function useSoundscapeDraft(
   map: MapDocument | undefined,
-  onPatch: (patch: Partial<MapDocument>) => void,
   canon: SoundscapeConfig | undefined,
+  edits: MapOverrideEdits,
 ): SoundscapeDraftAPI {
+  const { patch: onPatch, unpatch } = edits;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [draftPoints, setDraftPoints] = useState<Point[]>([]);
@@ -120,13 +129,19 @@ export function useSoundscapeDraft(
     [commit, effective],
   );
 
+  // Saved ids too: a saved area removed this session keeps its id, so a new
+  // area never takes over a saved area's id (the change count matches by id).
   const takenIds = useMemo(
     () => new Set([...(canon?.areas ?? []), ...effectiveAreas].map((a) => a.id)),
     [canon, effectiveAreas],
   );
 
   const dirtyCount = useMemo(
-    () => soundscapeChanges(canon ?? {}, soundAreaDraftToConfig(effective) ?? {}),
+    () =>
+      soundscapeChanges(
+        soundAreaDraftToConfig(canon ?? {}) ?? {},
+        soundAreaDraftToConfig(effective) ?? {},
+      ),
     [canon, effective],
   );
 
@@ -206,12 +221,13 @@ export function useSoundscapeDraft(
     [commit, effective],
   );
 
-  /** Put the map's saved soundscape back (one undo entry). */
+  /** Put the map's saved soundscape back: drop it from the override, so an
+   *  untouched map counts as unchanged (one undo entry). */
   const reset = useCallback(() => {
-    if (map) onPatch({ soundscape: canon });
+    if (map) unpatch("soundscape");
     setSelectedId(null);
     cancelDraw();
-  }, [map, onPatch, canon, cancelDraw]);
+  }, [map, unpatch, cancelDraw]);
 
   const remove = useCallback(
     (id: string) => {

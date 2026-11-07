@@ -42,7 +42,7 @@ Built on branch `eval-44-soundscape-draft-per-map`, stacked on `eval-47-discard-
   persists, restores and discards it with the rest of the map metadata. Only the drawing in progress
   and the selection live in the hook; both reset on a map change.
 - The Sound tab's patch-back effect, `dedupeAreas` and the double `remove` are gone (they only existed
-  to reconcile the two copies). "Discard local" now puts the saved soundscape back as one undoable patch.
+  to reconcile the two copies).
 - Names are no longer trimmed on every keystroke (that would eat a typed space mid-name); the YAML
   emitter trims them on save instead.
 - Tests: `src/test/sound-editor/soundscape-per-map.test.tsx` wires the real hooks (undo stack, editor
@@ -61,3 +61,16 @@ Provisional call: the Map settings reset (`resetMap`) clears the map's sound edi
 live in the same override. Before, the old draft would have re-patched them straight away.
 
 Not done: the by-eye check in the preview (draw on A, switch to B, save, reload) is still for Isak.
+
+### 2026-11-07, review fixes
+
+- "Discard local" now drops the `soundscape` key from the map's override (new `unpatchMap` beside
+  `patchMap`, both built on the pure `withMapPatch`/`withoutMapKey` in `src/atlas/editor/mapOverride.ts`),
+  and the map's entry once it is empty, so the map no longer counts as unsaved. It is one undo entry.
+  The hook now takes `{ patch, unpatch }`.
+- The Sound tab takes the editor's shared instance only (`api` required, no `onPatch`): its own
+  fallback instance read canon from a map that already had the override folded in.
+- The change count normalizes both sides, so an untouched map whose saved soundscape is
+  `{ enabled: false, areas: [] }` or has a `name: ""` area shows no change.
+- New tests: Discard local leaves the map clean and undo brings the edit back; a drawing started on A is
+  dropped on a switch and never finished on B; no phantom changes. The first and last failed before the fix.
