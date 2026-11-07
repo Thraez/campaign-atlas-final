@@ -13,8 +13,8 @@ metadata, the map-space module, a draft registry, build-atlas stages, Vite 8.
 | 04  | Delete the dead `EntityReadingView`                      | low-med  | S    | no                  |
 | 05  | "Recently revealed" works on the live site               | med-low  | M    | `SearchPalette.tsx` |
 | 06  | Delete the redundant audio prune plugin                  | low      | S    | no                  |
-| 07  | A world.yaml visibility typo fails closed (Isak's call)  | med      | S    | no                  |
+| 07  | A world.yaml visibility typo fails closed (Isak: `dm`)   | med      | S    | no                  |
 | 08  | One secret-note rule; body redaction from tokens         | low      | S    | no                  |
 | 09  | check-player-files fails a built site with no atlas.json | low-med  | S    | no (after 01)       |
 
-Built this round: 01 and 04 (their PRs are in State.md's Morning queue).
+Built this round: 01, 04 and 07 (their PRs are in State.md's Morning queue).

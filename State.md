@@ -21,7 +21,8 @@ improvement loop opened the PRs below. Each one is cut from `main`, gate-green a
 | 8     | #105 | eval-2026-10/49 ruler and drawing, one click      | `eval-49-ruler-and-drawing-one-click`       | Isak checks in the preview |
 | 9     | #109 | arch-2026-11/01 publish scans find the real files | `arch-01-scans-find-real-artifacts`         |                            |
 | 10    | #108 | arch-2026-11/04 delete the dead EntityReadingView | `arch-04-delete-entity-reading-view`        |                            |
-| 11    | #101 | This State.md, workflow retro notes               | `docs-2026-11-07-improve-loop`              | last                       |
+| 11    | #110 | arch-2026-11/07 world.yaml visibility typo is dm  | `arch-07-invalid-visibility-fails-closed`   |                            |
+| 12    | #101 | This State.md, workflow retro notes               | `docs-2026-11-07-improve-loop`              | last                       |
 
 Check each PR's mergeability just before its merge; a stacked PR only becomes clean once the PR
 under it is merged (GitHub then shows only its own commits):
@@ -79,14 +80,20 @@ gh pr merge 108 --merge
 ```
 
 ```bash
+gh pr merge 110 --merge
+```
+
+```bash
 gh pr merge 101 --merge
 ```
 
 Every code PR also edits its own ticket
 file only, so tracker conflicts are unlikely; a conflict keeps both sides, then the gate runs again.
-Still kept: `stash@{0}` "pre-2026-11-07 local edits" (old State.md notes; a `.claude/settings.json`
-change dropping the `atlas:publish` ask rule, not applied: Isak's call) and branch
-`local-main-backup-2026-11-07`. Both can go once Isak has looked.
+Cleaned 2026-11-07 (Isak: delete unless meaningful): branch `local-main-backup-2026-11-07` held two
+State.md commits about PRs since merged (#83-#89); deleted, tip kept as tag
+`archive/local-main-backup-2026-11-07` (pushed). `stash@{0}` is kept only for its
+`.claude/settings.json` change (drops the `atlas:publish` ask rule; not applied, Isak's call); its
+State.md part is the same stale notes. Drop it once Isak decides the settings change.
 
 ## Where it stands
 
@@ -106,10 +113,14 @@ change dropping the `atlas:publish` ask rule, not applied: Isak's call) and bran
 
 Lowest number first within each folder.
 
-- Waiting to merge (Morning queue): `eval-2026-10/27`, `44`-`50`; `arch-2026-11/01`, `04`.
+- 2026-11-07, Isak: the Atlas may need a rebuild or redesign. The orchestrator session is settling
+  goals with him; no new tickets until that's done.
+- 2026-11-07, Isak: the repo stays public on purpose (he tests the live site). Content in the repo
+  is test material and the DM notes are scrap.
+- Waiting to merge (Morning queue): `eval-2026-10/27`, `44`-`50`; `arch-2026-11/01`, `04`, `07`.
 - `arch-2026-11/` (architecture pass on code outside the open PRs): ranked tickets 02-09 in its
   `README.md`. 02 (sound areas inside fog ship) is the most important; 02, 03 and 05 wait for the
-  queue; 07 needs Isak (a world.yaml visibility typo fails open).
+  queue. 07 built (#110, Isak's call: an invalid world.yaml visibility loads as `dm`).
 - Next, by payoff (from the improvement loop; no ticket yet unless numbered):
   1. `eval-2026-10/39` (one canon client): after the queue merges; it touches the save plugin that
      #102 changes.
@@ -129,9 +140,8 @@ Lowest number first within each folder.
 ## Waiting on Isak
 
 - Merging the Morning queue (auto mode refused `gh pr merge`).
-- The repo is public, so the DM notes in `content/` are readable on GitHub. Decided 2026-10-27:
-  Isak makes it private and takes GitHub Pro so Pages keeps working.
-- The world's new name (`audit-2026-10/05`).
+- The world's new name (`audit-2026-10/05`): undecided; Astrath Deep Realm for now, and Isak isn't
+  keen on it.
 - In the vault, in Obsidian: four notes have an unclosed DM block (`%%` or `:::dm`), so the build
   refuses them after a sync: blood-moon-circle, the-sovereign-eternal, sister-peline-thrace,
   the-penitent-of-harkafell.
