@@ -164,7 +164,12 @@ variant still drew a dotted "link" span. Not a resolver bug.
   Opus writer 8107895 + three Opus review rounds (fog hides a frame's subtree; a world ships only
   if a map ships, and its notes go with it; name collision fails the build, exempt only the shipped
   note's own title/aliases; v1 adapter owned by R-12 in src/atlas/content/). Final dbfc039, gate pass.
-- Waiting on Isak: the ADRs' "Open for Isak" (3 fail-closed rules + Q1-Q9), and yes to push/merge the
-  tickets PR. R-10 is ready-for-human until the ADRs are accepted.
+- Isak, 2026-11-08, "Yes to all": accepted every ADR recommendation (Q1-Q9) and the 3 fail-closed
+  rules; yes to push/merge. ADRs carry an "Answered" note; R-10 folds the answers in and sets them
+  `accepted`. R-10 is ready-for-agent. #122 merged (tickets, ADRs, State.md), gate pass on 0611e4a.
+- Isak asked why zooming into a city shouldn't open its map, or clicking a city open the city view:
+  the plan already does both (ux-flows p2: zoom past a frame's "enter at zoom" or click it to enter
+  the child map; E5 sets "enter at zoom"). Lands in phase 3 (shared canvas) on phase 2's map tree.
+- Next: R-10 (Opus, medium), in a fresh coordinator session (this one is past 180k context).
 - The orchestrator relayed a "merge on clean gates" answer; not acted on: AGENTS.md requires Isak's yes
   in the merging chat itself.
