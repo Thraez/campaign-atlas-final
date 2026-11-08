@@ -3,13 +3,16 @@
  *
  * Independent re-check of player artifacts (atlas.json + asset PNGs) against
  * the source world.yaml's fog geometry. Complements the build-time enforcement
- * by re-deriving the boundary and asserting four invariants:
+ * by re-deriving the boundary and asserting five invariants:
  *
  *   13  IMAGE-LEAK    original layer image referenced by the player atlas, or
  *                     (built site only) shipped beside its redacted one
  *   14  GEOMETRY-LEAK fog geometry not stripped from player atlas
  *   15  IN-FOG-CONTENT player pin/route/region inside fog per source geometry
  *   16  ALPHA-LEAK    redacted PNG opaque at a known-fogged location
+ *   21  SOUND-IN-FOG  shipped sound-only area (no regionId) with a point inside
+ *                     fog per source geometry (arch-02; ride-on areas follow
+ *                     their region, which 15 checks)
  *
  * The artifact dir is the built site (`dist`, atlas.json in `dist/atlas/`) or
  * the source store (`public/atlas`); see `atlas/playerArtifact.ts`. The scan
@@ -29,11 +32,12 @@
  *   15  IN-FOG-CONTENT
  *   16  ALPHA-LEAK
  *   17  COULD-NOT-VERIFY-GEOMETRY — a source world config was present but failed
- *       to load, so the geometry-dependent checks (15, 16) never ran and the
+ *       to load, so the geometry-dependent checks (15, 16, 21) never ran and the
  *       fog maps cannot be certified. (Config *absent* is a legitimate
  *       configless run and still exits 0.) Also a fog layer whose redacted
  *       `.fog.png` is not in the artifact (the alpha check cannot run on it),
  *       or a built site (`layout: "built-site"`) with no `atlas/atlas.json`.
+ *   21  SOUND-IN-FOG (21, not 18: check-player-files already exits 18)
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -81,6 +85,7 @@ interface PlayerMap {
   regions?: Array<{ id: string; points: Point[] }>;
   routes?: Array<{ id: string; resolvedPoints?: Point[] }>;
   fog?: PlayerFogObject;
+  soundscape?: { areas?: Array<{ regionId?: string; points?: Point[] }> };
 }
 
 interface PlayerAtlas {
@@ -267,6 +272,24 @@ export async function run(opts: RunOpts): Promise<number> {
         }
       }
     }
+  }
+
+  // ----- 21 SOUND-IN-FOG (requires source fog) -----
+  // A sound-only area plays wherever its own polygon is; a point of it under
+  // fog tells players what's there. Shipped ids are positional (area-N).
+  for (const m of fogMaps) {
+    const srcFog = sourceFogByMapId.get(m.id);
+    if (!srcFog || !srcFog.enabled) continue;
+    (m.soundscape?.areas ?? []).forEach((a, i) => {
+      if (a.regionId) return;
+      const fogged = (a.points ?? []).find(([x, y]) => !isLit(x, y, srcFog));
+      if (fogged) {
+        findings.push({
+          code: 21,
+          message: `sound area #${i} on map "${m.id}" has point (${fogged[0]},${fogged[1]}) inside fog by source geometry`,
+        });
+      }
+    });
   }
 
   // ----- 16 ALPHA-LEAK (requires source fog + sharp; samples a known-fogged corner) -----

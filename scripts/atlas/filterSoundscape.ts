@@ -1,19 +1,13 @@
-import type { Region, SoundscapeConfig, SoundArea } from "../../src/atlas/content/schema";
-import {
-  PLAYER_VISIBLE_VISIBILITY,
-  isPlayerVisible as shipsToPlayers,
-  worldItemVisibility,
-} from "./visibility";
+import type { SoundscapeConfig, SoundArea } from "../../src/atlas/content/schema";
 
 /**
- * Strip DM-visible areas and neutralise identifying metadata for player builds.
+ * Keep the sound areas a player build ships and neutralise identifying
+ * metadata.
  *
- * - Ride-on areas (regionId set) have no visibility field of their own — they
- *   inherit the owning region's visibility. Drop them when the region is
- *   dm/hidden, or when the regionId no longer resolves to any region.
- * - Sound-only areas (own polygon) drop unless their own visibility is
- *   "player" or "rumor": a missing or invalid one is "dm" (worldItemVisibility,
- *   ADR-0001 addendum).
+ * - `ships` decides each area: the build passes the per-campaign resolver's
+ *   verdict (ADR-0004). A ride-on area (regionId set) follows its region; a
+ *   sound-only area ships only if its own visibility does and no point of it
+ *   is under fog (arch-02).
  * - Drops areas with no file chosen yet (blank/whitespace bed.src) — a
  *   half-configured sound zone must never reach hashAudioAssets, which
  *   would otherwise try to read the public dir itself and crash the build.
@@ -25,22 +19,12 @@ import {
  */
 export function filterSoundscapeForPlayer(
   sc: SoundscapeConfig | undefined,
-  regions: Region[] = [],
+  ships: (area: SoundArea) => boolean,
 ): SoundscapeConfig | undefined {
   if (!sc) return undefined;
 
-  const regionVisibility = new Map(regions.map((r) => [r.id, r.visibility]));
-
-  const isPlayerVisible = (a: SoundArea): boolean => {
-    if (a.regionId) {
-      const v = regionVisibility.get(a.regionId);
-      return v !== undefined && PLAYER_VISIBLE_VISIBILITY.has(v);
-    }
-    return shipsToPlayers(worldItemVisibility(a.visibility));
-  };
-
   const kept: SoundArea[] = (sc.areas ?? [])
-    .filter(isPlayerVisible)
+    .filter((a) => ships(a))
     .filter((a) => a.bed.src.trim().length > 0)
     .map((a, i): SoundArea => {
       const { name: _name, ...rest } = a;

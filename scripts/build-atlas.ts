@@ -47,9 +47,14 @@ import { parseAtlasDate } from "./atlas/calendarDate";
 import { buildEntitySecrets } from "./atlas/buildSecrets";
 import { characterKeysPath, parseCharacterKeys } from "../src/atlas/secrets/characterKeysFile";
 import { PLAYER_VISIBLE_VISIBILITY, linkLeaksToPlayers, linkTargetLabel } from "./atlas/visibility";
-import { isLit } from "../src/atlas/fog/effectiveLit";
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
 import { filterSoundscapeForPlayer } from "./atlas/filterSoundscape";
+import {
+  loadPlayerResolution,
+  resolverFailure,
+  type PlayerResolution,
+} from "./atlas/playerResolution";
+import { AtlasModelError } from "../src/atlas/content/atlasModel";
 import {
   applyAudioPlan,
   planAudioAssets,
@@ -213,7 +218,7 @@ export class BuildError extends Error {
 
 export interface BuildResult {
   ok: boolean;
-  /** CLI exit code (0 on success, 1-9 on various failure modes). */
+  /** CLI exit code (0 on success, 1-11 on various failure modes; 10 and 11 are the resolver's gates). */
   exitCode: number;
   durationMs: number;
   /** Short error message — only set when ok is false. */
@@ -294,6 +299,10 @@ export interface BuildAtlasReport {
   routeLeaks: number;
   routeWaypointMisses: number;
   crossRefLeaks: number;
+  /** Player builds: the resolver's rule-8 name collisions, one line each naming both items. DM-only. */
+  nameCollisions: string[];
+  /** Player builds: the resolver's orphan `notes:` entries, one line each naming world and key. DM-only. */
+  orphanEntries: string[];
   unresolvedRelationships: number;
   warnings: string[];
   errors: string[];
@@ -633,11 +642,37 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     for (const a of aliases) secretNames.add(a);
   }
 
+  // Player builds ship what the per-campaign resolver (ADR-0004) decides for
+  // campaign `main`, read through R-12's loader and its v1 adapter: notes,
+  // maps, regions, pins, routes and sound below ask it, never a visibility or
+  // fog rule of the build's own. Anything it has no verdict for doesn't ship.
+  // Its collision and orphan findings name DM-only items: the console keeps
+  // them, the shipped report doesn't (R-06).
+  let loaded: PlayerResolution | null = null;
+  if (flags.player) {
+    try {
+      loaded = loadPlayerResolution(
+        contentDir,
+        { defaultWorld: cfg.defaultWorld, include: cfg.include ?? [], exclude: cfg.exclude ?? [] },
+        ROOT,
+      );
+    } catch (e) {
+      if (!(e instanceof AtlasModelError)) throw e;
+      console.error(`\n✗ ${e.message}\n`);
+      throw new BuildError(1, e.message);
+    }
+    for (const w of [...loaded.collisionMessages, ...loaded.orphanMessages]) {
+      warnings.push(w);
+      hiddenFromPlayer.add(w);
+    }
+  }
+  const res = loaded;
+
   // PASS 2: build the DM-side entity for every note that ships (secrets
   // drop out of player builds here).
   let crossRefLeaks = 0;
   for (const item of allParsed) {
-    if (flags.player && item.isSecret) {
+    if (res && !res.noteShips(item.id)) {
       visibilityExcluded += 1;
       continue;
     }
@@ -793,26 +828,28 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   const fogs: FogOverlay[] = worldCfg?.fogs ?? [];
   let regionsExcluded = 0;
 
-  // Build a per-mapId fog checker for player builds.
-  const fogByMapId = new Map(fogs.map((f) => [f.mapId, f]));
-  const isFoggedOnMap = (mapId: string, x: number, y: number): boolean => {
-    const fog = fogByMapId.get(mapId);
-    return !!fog?.enabled && !isLit(x, y, fog);
-  };
+  // Regions the region-leak check reads: every one in the DM build; in the
+  // player build, the ones the resolver refused only for linking a note that
+  // doesn't ship, plus the shipped ones (the leak still warns and fails strict).
+  let leakCheckRegions: Region[] = regions;
 
-  if (flags.player) {
+  if (res) {
+    // A map the resolver doesn't ship takes everything on it along.
+    maps = maps.filter((m) => res.mapShips(m.id));
+    const verdict = (r: Region) => (r.mapId ? res.regionVerdict(r.mapId, r.id) : undefined);
+    leakCheckRegions = regions.filter((r) => {
+      const reason = verdict(r)?.reason;
+      return reason === "ships" || reason === "link-hidden";
+    });
     regions = regions
       .filter((r) => {
-        const keep = PLAYER_VISIBLE_VISIBILITY.has(r.visibility);
-        if (!keep) regionsExcluded += 1;
-        return keep;
+        const v = verdict(r);
+        if (v?.ships) return true;
+        if (v?.reason !== "fogged") regionsExcluded += 1;
+        return false;
       })
       // Region names ship to players; strip any %% blocks the DM left behind.
-      .map((r) => ({ ...r, name: stripDmFromShippingString(r.name) ?? r.name }))
-      .filter((r) => {
-        if (!r.mapId || !r.points?.length) return true;
-        return !r.points.some(([x, y]) => isFoggedOnMap(r.mapId!, x, y));
-      });
+      .map((r) => ({ ...r, name: stripDmFromShippingString(r.name) ?? r.name }));
     // Map names ship to players too; sanitize before attaching overlays below.
     maps = maps.map((m) => ({
       ...m,
@@ -834,10 +871,6 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
           ? [{ mapId: undefined, x: item.legacy.x, y: item.legacy.y }]
           : [];
     if (list.length === 0) continue;
-    if (flags.player && !PLAYER_VISIBLE_VISIBILITY.has(entity.visibility)) {
-      secretPlacementsExcluded += list.length;
-      continue;
-    }
     for (const p of list) {
       const mapId = p.mapId ?? primaryMapId;
       if (!validMapIds.has(mapId)) {
@@ -846,7 +879,8 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
         );
         continue;
       }
-      if (flags.player && isFoggedOnMap(mapId, p.x, p.y)) {
+      // The resolver's pin verdict: its note, visibility, map and fog.
+      if (res && !res.takePin(entity.id, mapId, p.x, p.y)) {
         secretPlacementsExcluded += 1;
         continue;
       }
@@ -875,15 +909,26 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   let routesExcluded = 0;
   // Routes must resolve waypoints using a placement on the SAME map. Using a
   // global entityId→placement map silently let a route on map B resolve via a
-  // pin on map A (regional-map spoiler bug).
+  // pin on map A (regional-map spoiler bug). The note's first pin on the map
+  // is its waypoint, as the resolver reads it.
   const placementByMapEntity = new Map<string, MapPlacement>();
-  placements.forEach((p) => placementByMapEntity.set(`${p.mapId}:${p.entityId}`, p));
+  for (const p of placements) {
+    const k = `${p.mapId}:${p.entityId}`;
+    if (!placementByMapEntity.has(k)) placementByMapEntity.set(k, p);
+  }
   let regionLeaks = 0;
   let routeLeaks = 0;
   let routeWaypointMisses = 0;
   const routes: Route[] = [];
   for (const r of worldCfg?.routes ?? []) {
-    if (flags.player && !PLAYER_VISIBLE_VISIBILITY.has(r.visibility)) {
+    // The resolver's verdict: visibility, map, waypoint pins, geometry and fog.
+    const routeVerdict = res?.routeVerdict(r.mapId, r.id);
+    if (
+      res &&
+      (!routeVerdict ||
+        routeVerdict.reason === "visibility" ||
+        routeVerdict.reason === "map-hidden")
+    ) {
       routesExcluded += 1;
       continue;
     }
@@ -929,7 +974,7 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
       hideRouteWarnings();
       continue;
     }
-    if (flags.player && resolved.some(([x, y]) => isFoggedOnMap(r.mapId, x, y))) {
+    if (res && !routeVerdict?.ships) {
       routesExcluded += 1;
       hideRouteWarnings();
       continue;
@@ -975,7 +1020,8 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   }
 
   // -------- Soundscape player-strip --------
-  // Drop DM-visibility areas, neutralise area IDs, strip names so DM location
+  // Keep the areas the resolver ships (a sound-only area with any point under
+  // fog doesn't, arch-02), neutralise area IDs, strip names so DM location
   // labels never reach the player artifact. Then content-hash audio filenames
   // so the original DM file paths never appear in the player build. Runs
   // unconditionally (even with zero areas) so a build that removes all sound
@@ -985,7 +1031,10 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   if (flags.player) {
     maps = maps.map((m) => {
       if (!m.soundscape) return m;
-      return { ...m, soundscape: filterSoundscapeForPlayer(m.soundscape, m.regions) };
+      return {
+        ...m,
+        soundscape: filterSoundscapeForPlayer(m.soundscape, (a) => !!res?.soundShips(m.id, a.id)),
+      };
     });
     const allAreas = maps.flatMap((m) => m.soundscape?.areas ?? []);
     // Hashed audio always lands in public/atlas/assets/audio, but only a
@@ -1019,7 +1068,7 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // LEAKS and warn here (and fail strict-player builds).
   //
   // Region leak detection: player-visible region linked to DM/hidden/unknown entity.
-  for (const r of regions) {
+  for (const r of leakCheckRegions) {
     if (!r.entityId) continue;
     const targetVis = entityVisibility.get(r.entityId);
     if (linkLeaksToPlayers(r.visibility, targetVis)) {
@@ -1233,6 +1282,8 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     routeLeaks,
     routeWaypointMisses,
     crossRefLeaks,
+    nameCollisions: res?.collisionMessages ?? [],
+    orphanEntries: res?.orphanMessages ?? [],
     unresolvedRelationships,
     warnings,
     errors,
@@ -1522,6 +1573,15 @@ function checkBuildGates(flags: BuildFlags, d: BuildAtlasReport): BuildFailure |
       exitCode: 8,
       message: `Strict player mode: ${d.crossRefLeaks} cross-reference leak(s): wikilinks from player-visible entries to DM/hidden entities. Failing build.`,
     };
+  }
+  // The per-campaign resolver's own gates (ADR-0004): a DM-only item and a
+  // shipped one sharing a name (rule 8) fail a strict player build (10); an
+  // orphan `notes:` entry fails any player build (11).
+  if (flags.player) {
+    return resolverFailure(
+      { collisionMessages: d.nameCollisions, orphanMessages: d.orphanEntries },
+      flags.strict,
+    );
   }
   return undefined;
 }
