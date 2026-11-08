@@ -1,6 +1,6 @@
 # R-11b Build calls the resolver
 
-Status: ready-for-agent
+Status: done
 Blocked by: R-11a, R-12
 Size: S
 Branch: `rebuild-r11b-build-resolver`
@@ -27,7 +27,7 @@ ship to players today, and the fog scan doesn't look at sound areas.
   (`build-atlas.ts` ~806-816), placements under fog (~849), routes and their waypoints (~932),
   the soundscape (`filterSoundscapeForPlayer` at ~988, `scripts/atlas/filterSoundscape.ts`). Leak
   warnings (`linkLeaksToPlayers`) stay, fed with the resolver's verdicts.
-- arch-02: a sound-only area with any point under fog is dropped from the player build (through
+- arch-02: a sound-only area with any part under fog is dropped from the player build (through
   the resolver). The fog scan (`scripts/check-fog-safety.ts`) checks the shipped soundscape
   against the source fog and fails with a new exit code (documented in its header) when a
   sound-only area has a point under fog. Add a clean/dirty variant for it to
@@ -55,3 +55,7 @@ ship to players today, and the fog scan doesn't look at sound areas.
 - The old Publish Check (R-11c). The editor's player lens (`projectMapForPlayer.ts`): it is replaced
   by the new editor's preview.
 - Splitting `build-atlas.ts` into stages (R-13).
+
+## Follow-ups
+
+- Route fog checks test the centre line only (stroke width can reach fog); check 21 walks only maps that ship a fog object.

@@ -13,6 +13,18 @@ describe("findCodeRanges", () => {
     expect(text.slice(ranges[0].start, ranges[0].end)).toBe("`code`");
   });
 
+  it("an inline span never crosses a blank line (markdown-it ends the paragraph there)", () => {
+    const text = "It`s [[Link]] plan.\n\nLater a `code` word.";
+    const ranges = findCodeRanges(text);
+    expect(ranges.map((r) => text.slice(r.start, r.end))).toEqual(["`code`"]);
+  });
+
+  it("an inline span may cross a single line break", () => {
+    const text = "a `one\ntwo` b";
+    const ranges = findCodeRanges(text);
+    expect(ranges.map((r) => text.slice(r.start, r.end))).toEqual(["`one\ntwo`"]);
+  });
+
   it("finds a fenced code block spanning multiple lines", () => {
     const text = "before\n```\n[[Link]]\n```\nafter";
     const ranges = findCodeRanges(text);

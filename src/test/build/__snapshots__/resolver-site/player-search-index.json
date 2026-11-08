@@ -1,0 +1,56 @@
+[
+  {
+    "id": "market-rumour",
+    "title": "Market Rumour",
+    "type": "lore",
+    "aliases": [],
+    "tags": [],
+    "excerpt": "# Market Rumour They say the [[Harbor]] hides something, and that the … walks at night.",
+    "bodyText": "Market Rumour They say the Harbor hides something, and that the … walks at night."
+  },
+  {
+    "id": "vault-keeper",
+    "title": "Vault Keeper",
+    "type": "npc",
+    "aliases": [],
+    "tags": [],
+    "excerpt": "# Vault Keeper Keeps the vault.",
+    "bodyText": "Vault Keeper Keeps the vault."
+  },
+  {
+    "id": "deep-cave",
+    "title": "Deep Cave",
+    "type": "dungeon",
+    "aliases": [],
+    "tags": [],
+    "excerpt": "# Deep Cave Dark and wet.",
+    "bodyText": "Deep Cave Dark and wet."
+  },
+  {
+    "id": "fogged-ruin",
+    "title": "Fogged Ruin",
+    "type": "landmark",
+    "aliases": [],
+    "tags": [],
+    "excerpt": "# Fogged Ruin Nobody has seen it yet.",
+    "bodyText": "Fogged Ruin Nobody has seen it yet."
+  },
+  {
+    "id": "harbor",
+    "title": "Harbor",
+    "type": "settlement",
+    "aliases": [],
+    "tags": [],
+    "excerpt": "# Harbor Fishing boats and [[Watchtower|the tower]] on the cliff. Ask about [[Market Rumour]].",
+    "bodyText": "Harbor Fishing boats and the tower on the cliff. Ask about Market Rumour."
+  },
+  {
+    "id": "watchtower",
+    "title": "Watchtower",
+    "type": "landmark",
+    "aliases": [],
+    "tags": [],
+    "excerpt": "# Watchtower It watches the [[Harbor]].",
+    "bodyText": "Watchtower It watches the Harbor."
+  }
+]

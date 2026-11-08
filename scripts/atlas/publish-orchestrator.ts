@@ -3,7 +3,8 @@
  * Parallel scan orchestrator for atlas:publish and CI (`npm run atlas:scan`).
  *
  * Runs every scan in `scanRegistry.ts` in one process (one tsx cold start
- * instead of one per scan). The editor's Publish check reads the same list.
+ * instead of one per scan), over every campaign's dirs (R-15). The editor's
+ * Publish check reads the same list.
  *
  * Exit codes:
  *   0   all scans clean
@@ -26,7 +27,16 @@ async function main(): Promise<number> {
   }
   const cfg = JSON.parse(fs.readFileSync(configPath, "utf8")) as Config;
   const contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
-  return runAll(scanTasks({ root, configPath, contentDir }));
+  let tasks: ReturnType<typeof scanTasks>;
+  try {
+    // The registry loads the campaign list from the content; it throws rather
+    // than scan zero campaign dirs.
+    tasks = scanTasks({ root, configPath, contentDir });
+  } catch (e) {
+    console.error(`publish-orchestrator: ${(e as Error).message}`);
+    return 1;
+  }
+  return runAll(tasks);
 }
 
 main().then((code) => process.exit(code));

@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  areaUnderFog,
   frameUnderFog,
   resolveCampaign,
   ResolveCampaignError,
@@ -362,7 +363,7 @@ describe("rule 2: a map that doesn't ship hides its whole subtree", () => {
 // Rule 3: fog on items
 // ---------------------------------------------------------------------------
 
-describe("rule 3: fog drops items with any point under it", () => {
+describe("rule 3: fog drops items with any part under it", () => {
   const fogMap = map("f", {
     pins: [
       { note: "n", x: 700, y: 500, visibility: "player" }, // under fog
@@ -451,6 +452,48 @@ describe("rule 3: fog drops items with any point under it", () => {
     expect(soundShips(b, "nothing")).toBe(false);
     expect(routeShips(b, "short")).toBe(false);
   });
+
+  it("a sound-only area with lit corners and fog between them doesn't ship (whole area tested)", () => {
+    // Lit strips x 0-300 and 700-1000, fog between; the area spans 100-900.
+    const strips: CampaignMapV2 = { state: "fogged", reveals: [rect(0, 0, 300, SIZE), rect(700, 0, SIZE, SIZE)] };
+    const m = map("m", {
+      sound: [
+        { id: "spanning", points: rect(100, 100, 900, 900), visibility: "player", bed: { src: "a.ogg" } },
+        { id: "in-strip", points: rect(100, 100, 200, 900), visibility: "player", bed: { src: "a.ogg" } },
+      ],
+    });
+    const r = resolveCampaign(model([world("w", [m])], [campaign("a", { m: strips })]), [], "a");
+    expect(find(r.sound, (x) => x.id === "spanning").reason).toBe("fogged");
+    expect(soundShips(r, "in-strip")).toBe(true);
+  });
+
+  it("a region with lit corners and fog between them doesn't ship (whole area tested)", () => {
+    // Lit strips x 0-300 and 700-1000, fog between; the region spans 100-900.
+    const strips: CampaignMapV2 = { state: "fogged", reveals: [rect(0, 0, 300, SIZE), rect(700, 0, SIZE, SIZE)] };
+    const m = map("m", {
+      regions: [
+        { id: "spanning", name: "Spanning", points: rect(100, 100, 900, 900), visibility: "player" },
+        { id: "in-strip", name: "In strip", points: rect(100, 100, 200, 900), visibility: "player" },
+      ],
+    });
+    const r = resolveCampaign(model([world("w", [m])], [campaign("a", { m: strips })]), [], "a");
+    expect(find(r.regions, (x) => x.id === "spanning").reason).toBe("fogged");
+    expect(regionShips(r, "in-strip")).toBe(true);
+  });
+
+  it("a route whose lit waypoints have a fog gap between them doesn't ship (every segment tested)", () => {
+    // Lit strips x 0-300 and 700-1000, fog between; the route runs 100 -> 900.
+    const strips: CampaignMapV2 = { state: "fogged", reveals: [rect(0, 0, 300, SIZE), rect(700, 0, SIZE, SIZE)] };
+    const m = map("m", {
+      routes: [
+        { id: "gap", name: "Gap", waypoints: [[100, 500], [900, 500]], visibility: "player" },
+        { id: "in-strip", name: "In strip", waypoints: [[100, 100], [200, 900]], visibility: "player" },
+      ],
+    });
+    const r = resolveCampaign(model([world("w", [m])], [campaign("a", { m: strips })]), [], "a");
+    expect(find(r.routes, (x) => x.id === "gap").reason).toBe("fogged");
+    expect(routeShips(r, "in-strip")).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -530,6 +573,32 @@ describe("rule 4: a frame with any part under its parent's fog hides the child a
     expect(find(resolveCampaign(mdl, [note("n")], "a").maps, (m) => m.id === "city").reason).toBe(
       "frame-fogged",
     );
+  });
+});
+
+describe("areaUnderFog tests the whole area and the outline", () => {
+  const fog = (reveals: Point[][], conceals: Point[][] = []): FogOverlay => ({
+    mapId: "m",
+    enabled: true,
+    reveals,
+    conceals,
+  });
+
+  it("a zero-area polygon drawn across a fog gap counts (its outline is tested)", () => {
+    const strips = fog([rect(0, 0, 300, SIZE), rect(700, 0, SIZE, SIZE)]);
+    const sliver: Point[] = [
+      [10, 10],
+      [990, 10],
+      [200, 10],
+    ];
+    expect(areaUnderFog(sliver, strips)).toBe(true);
+    expect(areaUnderFog(rect(10, 10, 200, 200), strips)).toBe(false);
+  });
+
+  it("a fog island (a conceal) inside a lit area counts", () => {
+    const island = fog([rect(0, 0, SIZE, SIZE)], [rect(200, 200, 210, 210)]);
+    expect(areaUnderFog(rect(100, 100, 400, 400), island)).toBe(true);
+    expect(areaUnderFog(rect(300, 300, 400, 400), island)).toBe(false);
   });
 });
 

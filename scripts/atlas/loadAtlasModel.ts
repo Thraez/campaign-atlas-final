@@ -76,8 +76,13 @@ export interface LoadAtlasModelOptions {
   root?: string;
 }
 
-/** A folder or file id used as a path segment: no separators, no `..`, no leading dot. */
-const SAFE_ID = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
+/**
+ * The one rule for an id used as a path segment (a world folder, a campaign
+ * file, a campaign's output dirs): letters, digits, `_`, `-` and `.`; no
+ * separators, no leading dot or dash, and no trailing dot (Windows drops it,
+ * so `a.` and `a` would be one folder). The scan registry reuses it.
+ */
+export const SAFE_ID = /^[A-Za-z0-9_](?:[A-Za-z0-9_.-]*[A-Za-z0-9_-])?$/;
 
 function isObj(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);

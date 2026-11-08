@@ -88,7 +88,10 @@ export function reasonsFromDerived(r: DerivedScanResult, target: string): Publis
   return out;
 }
 
-export function reasonsFromShape(r: ShapeResult): PublishScanReason[] {
+export function reasonsFromShape(
+  r: ShapeResult,
+  target = "public/atlas/atlas.json",
+): PublishScanReason[] {
   // D8: copy only entityId (never violation.message, which embeds leaked text).
   const seen = new Set<string>();
   const out: PublishScanReason[] = [];
@@ -98,7 +101,7 @@ export function reasonsFromShape(r: ShapeResult): PublishScanReason[] {
     seen.add(key);
     out.push({
       scan: "check-artifact-shape",
-      target: "public/atlas/atlas.json",
+      target,
       severity: "blocking",
       message: MSG["check-artifact-shape"],
       ...(v.entityId ? { locator: { entityId: v.entityId } } : {}),
@@ -126,7 +129,8 @@ function reasonsForFailure(task: ScanTask, ctx: ScanContext): PublishScanReason[
       locator: { file: path.relative(ctx.root, a.path).split(path.sep).join("/") },
     }));
   }
-  const dir = path.join(ctx.root, target);
+  // The campaign's artifact dir (R-15); the label names it relative to the root.
+  const dir = task.dir ?? path.join(ctx.root, target);
   let structured: PublishScanReason[] = [];
   if (task.scan === "check-no-secrets") {
     structured = reasonsFromNoSecrets(scanDir(dir), target);
@@ -136,10 +140,12 @@ function reasonsForFailure(task: ScanTask, ctx: ScanContext): PublishScanReason[
       target,
     );
   } else if (task.scan === "check-artifact-shape") {
-    const atlasJsonPath = path.join(ctx.root, "public", "atlas", "atlas.json");
+    // The task's one required file is the store's player atlas.json.
+    const atlasJsonPath = task.requires[0].path;
     if (fs.existsSync(atlasJsonPath)) {
       structured = reasonsFromShape(
         scanArtifactShape(JSON.parse(fs.readFileSync(atlasJsonPath, "utf8"))),
+        path.relative(ctx.root, atlasJsonPath).split(path.sep).join("/"),
       );
     }
   }
@@ -148,8 +154,10 @@ function reasonsForFailure(task: ScanTask, ctx: ScanContext): PublishScanReason[
 }
 
 /**
- * Run every scan in the registry (the same list CI runs) and collect reasons.
- * `repoRoot` is the dev-server cwd (the repo root).
+ * Run every scan in the registry (the same list CI runs, over the same
+ * campaign dirs) and collect reasons. `repoRoot` is the dev-server cwd (the
+ * repo root). Throws when the campaign list can't be loaded (fail closed: the
+ * Publish check answers with an error, never "safe").
  */
 export async function runPublishScans(repoRoot: string): Promise<PublishScanReason[]> {
   const configPath = path.resolve(repoRoot, "atlas.config.json");
