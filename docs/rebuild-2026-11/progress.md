@@ -190,3 +190,14 @@ variant still drew a dotted "link" span. Not a resolver bug.
 - R-11a (worktree `r11a`, branch `rebuild-r11a-campaign-resolver`) and R-12 (worktree `r12`,
   branch `rebuild-r12-v2-loader`) building side by side from 2c34adc, both Opus (medium). Both
   need the adversarial player-safety review. Gates one at a time.
+- R-11a: built c52a421 (Opus). Safety review (Opus) NOT CLEAN: orphan `notes:` entries dropped
+  silently so a narrowed note shipped in a vault campaign (blocker); duplicate note ids. Fixed
+  0bbde5f; round 2 (slug-matched orphans, per-map layer ids) 5dd8fd0; round 3 path nits d8f8130.
+  Final re-check CLEAN. R-11b/R-11c tickets now fail the build on orphanEntries; R-11b aligns the
+  resolver input on R-12's model. Gate pass on d8f8130 + tracker commits (main 2c34adc).
+- R-12: built c1ab015 (Opus). Safety review NOT CLEAN, no leak: fog default open, notes discarded,
+  no v1 pins, symlinks. Fixed 5f96e51; round 2 (publish:false pins dm, include/exclude required)
+  66cb670. Final re-check CLEAN. Gate running.
+- New follow-up R-07 (on the R-11a branch): a `_dm/` folder at the content root isn't excluded by
+  `**/_dm/**`. No such folder today, no leak.
+- Merge order: R-12 first, then merge main into R-11a, rerun gate, merge.
