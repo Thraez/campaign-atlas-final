@@ -1,6 +1,6 @@
 # R-15 Scan registry lists campaign dirs
 
-Status: ready-for-agent
+Status: done
 Blocked by: R-03 (done), R-12
 Size: S
 Branch: `rebuild-r15-scan-campaign-dirs`
