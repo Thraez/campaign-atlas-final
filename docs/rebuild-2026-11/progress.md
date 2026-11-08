@@ -150,3 +150,8 @@ variant still drew a dotted "link" span. Not a resolver bug.
   (world.yaml itself is in the public repo; moot once the repo goes private in phase H).
 - Waiting on Isak's yes to push, open PRs and merge: R-06 first, then R-05 (mark R-06 merged in
   its State.md, re-gate).
+- 2026-11-08 On Isak's yes ("Yes, push and merge"): merged #120 R-06 (0ff1503), then #121 R-05
+  (954ac27; State.md updated for R-06 and re-gated on 0ff1503 first). **Phase 1 done.** main = 954ac27.
+- Next: Phase 2 when Isak says go. First step: write the R-10..R-20 tickets and ADR-0003/0004 from
+  plan.md section 6 into `docs/tracker/rebuild-2026-11/issues/`, then R-10, then R-12 alongside R-11a.
+  Open follow-up (R-06 ticket): no scan derives DM region/route ids from world.yaml.
