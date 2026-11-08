@@ -1,6 +1,6 @@
 # State
 
-Updated 2026-11-07 on the Mac. Branch `main` (= origin/main d9c3400).
+Updated 2026-11-08 on the Mac. Branch `main` (= origin/main c97db8c).
 
 ## Morning queue (2026-11-07, night)
 
@@ -14,9 +14,8 @@ published:
   #115 (Q-04 region hover card).
 - The 12 older PRs: #109, #110, #99, #100, #106, #102, #103, #107, #104, #105, #108, #101.
 
-Next, phase 1: R-02 (a missing world.yaml visibility is dm), R-03 (scans fail on a missing
-artifact), R-04 (adopt the rebuild goals, ADR-0002), then R-05. Each needs Isak's yes to push and
-open its PR.
+Phase 1 so far, also merged: #116 (R-02 a missing world.yaml visibility is dm), #117 (R-03 scans
+fail on a missing artifact), #118 (R-04 adopt the rebuild goals, ADR-0002). Next: R-05.
 
 Cleaned 2026-11-07 (Isak: delete unless meaningful): branch `local-main-backup-2026-11-07` held two
 State.md commits about PRs since merged (#83-#89); deleted, tip kept as tag
@@ -30,7 +29,7 @@ State.md part is the same stale notes. Drop it once Isak decides the settings ch
   (`docs/GOALS.md`), ADR-0001 (a note with no visibility is DM-only), tickets in `docs/tracker/`.
 - The atlas becomes the players' atlas for the world, Tidemarrow first, filled from the vault by
   Sync from Obsidian. Today it still shows the old Astrath sample (three events).
-- Live site: https://thraez.github.io/campaign-atlas-final/. Every PR up to #115 is merged and
+- Live site: https://thraez.github.io/campaign-atlas-final/. Every PR up to #118 is merged and
   published. The player build ships only allowed files (eval 40).
 - Merges run on the full local gate plus an Opus review, without GitHub CI (`docs/agents/workflow.md`).
   The PR check runs only by hand (#90).
@@ -42,7 +41,7 @@ State.md part is the same stale notes. Drop it once Isak decides the settings ch
 
 Lowest number first within each folder.
 
-- Rebuild phase 1 (R-02 to R-05): Morning queue above.
+- Rebuild phase 1: R-05 next (Morning queue above).
 - Found in the R-02 review, needs a ticket (high): the player build's `buildReport.warnings`
   carries world.yaml warnings that name DM-only region and route ids (`scripts/build-atlas.ts`).
 - `arch-2026-11/` (architecture pass): ranked tickets 02-09 in its `README.md`. 02 (sound areas
