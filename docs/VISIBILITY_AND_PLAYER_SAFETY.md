@@ -82,7 +82,7 @@ The mayor's chief advisor is [[Vampire Lord]].
 
 Similarly, player-visible **regions** and **routes** that reference DM-only entities fail strict builds (exits 6 and 7).
 
-The player build ships what the per-campaign resolver ([ADR-0004](adr/0004-per-campaign-visibility-and-outputs.md)) decides for campaign `main`, read through the v1 adapter: notes, pins, regions, routes and sound areas, fog included. A region or sound-only area with any part of its area under fog, or a route with any part of its path under fog, doesn't ship (fog between lit corners or waypoints counts). A DM-only item and a shipped one that share a name (rule 8) fail a strict player build with exit 10, naming both; an orphan `notes:` entry fails any player build with exit 11, naming world and key. Both stay out of the shipped build report.
+The player build ships what the per-campaign resolver ([ADR-0004](adr/0004-per-campaign-visibility-and-outputs.md)) decides for campaign `main`, read through the v1 adapter: notes, pins, regions, routes and sound areas, fog included. A region or sound-only area with any part of its area under fog, or a route with any part of its path under fog, doesn't ship (fog between lit corners or waypoints counts). A DM-only item and a shipped one that share a name (rule 8) fail a strict player build with exit 10, naming both; an orphan `notes:` entry fails any player build with exit 11, naming world and key. A sound area with no id, or an id another area on its map shares, fails a strict player build with exit 22, and every player build drops all areas that id names (an area plays only on its own verdict). All three stay out of the shipped build report.
 
 ## Profiles and relationships
 

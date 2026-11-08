@@ -20,6 +20,7 @@
  */
 import type { AtlasProject, MapDocument, Entity } from "@/atlas/content/schema";
 import { findDmMarkup } from "@/atlas/content/dmMarkup";
+import { soundAreaIdProblems, soundAreaIdTrusted } from "@/atlas/content/soundAreaIds";
 import {
   PLAYER_VISIBLE_VISIBILITY,
   VALID_VISIBILITY,
@@ -334,6 +335,30 @@ const checkRegionsAndRoutes: Rule = (ctx) => {
         });
       }
     }
+    // Sound-area ids must name one area on their map: the player build looks
+    // verdicts up by id, so the strict build fails on a missing or shared one
+    // (exit 22) and every build drops the areas it names.
+    for (const p of soundAreaIdProblems(m.soundscape?.areas ?? [])) {
+      issues.push(
+        p.kind === "missing-id"
+          ? {
+              severity: "blocking",
+              code: "sound-area-missing-id",
+              category: "yaml",
+              message: `${p.count} sound area(s) on map "${m.id}" have no id`,
+              hint: "Give each sound area an id in the Sound tab; the player build won't publish until then.",
+              scope: { mapId: m.id },
+            }
+          : {
+              severity: "blocking",
+              code: "duplicate-sound-area-id",
+              category: "yaml",
+              message: `Duplicate sound area "${p.id}" (${p.count} areas on map "${m.id}")`,
+              hint: "Sound areas on one map share an id. Rename all but one in the Sound tab.",
+              scope: { mapId: m.id },
+            },
+      );
+    }
     // Route ids only need to be unique within a single map.
     const seenRoute = new Set<string>();
     for (const route of m.routes ?? []) {
@@ -590,7 +615,9 @@ const checkWhatShips: Rule = (ctx) => {
   const res = ctx.resolution;
   for (const m of ctx.project.maps) {
     if (!res.maps.some((v) => v.id === m.id)) continue; // the map itself is reported elsewhere
+    const idProblems = soundAreaIdProblems(m.soundscape?.areas ?? []);
     for (const [i, a] of (m.soundscape?.areas ?? []).entries()) {
+      if (!soundAreaIdTrusted(a, idProblems)) continue; // blocking above
       const label = `Sound area "${a.name ?? a.id ?? `#${i + 1}`}"`;
       const verdicts = typeof a.id === "string" ? verdictsFor(res.sound, m.id, a.id) : [];
       // The build doesn't fail on any of these; it leaves the area out, so
@@ -600,8 +627,8 @@ const checkWhatShips: Rule = (ctx) => {
           severity: "warning",
           code: "sound-area-malformed",
           category: "map",
-          message: `${label} won't play for players: it has no id, no sound file, or (without a region) fewer than 3 points, so the player build skips it`,
-          hint: "Give it an id and a sound file, and draw at least 3 points or attach it to a region.",
+          message: `${label} won't play for players: it has no sound file, or (without a region) fewer than 3 points, so the player build skips it`,
+          hint: "Choose a sound file, and draw at least 3 points or attach it to a region.",
           scope: { mapId: m.id },
         });
         continue;

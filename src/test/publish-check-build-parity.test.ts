@@ -54,6 +54,12 @@ function note(atlas: Record<string, unknown>, body = ""): string {
 const town = (body: string) =>
   note({ type: "settlement", visibility: "player", summary: "A town." }, body);
 
+/** Area "x" twice: a lit player area, and a dm one the v1 adapter skips (2 points). */
+const SHADOWED_AREAS = [
+  "        - { id: x, name: x, visibility: player, points: [[10, 10], [300, 10], [300, 300]], bed: { src: audio/drums.ogg } }",
+  "        - { id: x, name: x, visibility: dm, points: [[777, 777], [888, 888]], bed: { src: audio/dm-secret.ogg } }",
+];
+
 const FIXTURES: Fixture[] = [
   {
     name: "clean: player notes, a region and a route between shipped notes",
@@ -199,6 +205,27 @@ const FIXTURES: Fixture[] = [
     ],
     fails: false,
   },
+  {
+    name: "two sound areas share an id (a dm 2-point area behind a lit player one)",
+    notes: {},
+    mapYaml: [...MAP_YAML, "    soundscape:", "      areas:", ...SHADOWED_AREAS],
+    fails: true,
+    exitCode: 22,
+    code: "duplicate-sound-area-id",
+  },
+  {
+    name: "a sound area with no id",
+    notes: {},
+    mapYaml: [
+      ...MAP_YAML,
+      "    soundscape:",
+      "      areas:",
+      "        - { name: nameless, visibility: player, points: [[10, 10], [90, 10], [90, 90]], bed: { src: audio/drums.ogg } }",
+    ],
+    fails: true,
+    exitCode: 22,
+    code: "sound-area-missing-id",
+  },
 ];
 
 const roots: string[] = [];
@@ -233,6 +260,7 @@ function writeVault(f: Fixture): string {
   const audio = path.join(root, "public", "atlas", "assets", "audio");
   fs.mkdirSync(audio, { recursive: true });
   fs.writeFileSync(path.join(audio, "drums.ogg"), "OggS");
+  fs.writeFileSync(path.join(audio, "dm-secret.ogg"), "OggS");
   return root;
 }
 
@@ -443,6 +471,54 @@ describe("sound areas the player build leaves out for other reasons (R-11c)", ()
       },
     ]);
     expect(shippedAreas(dm.project)).toHaveLength(1);
+    expect(shippedAreas(player.project)).toEqual([]);
+  });
+});
+
+describe("sound-area ids the build can't trust (R-11c)", () => {
+  const shadowed = FIXTURES.find((f) => f.name.startsWith("two sound areas share an id"))!;
+
+  it("a duplicate id fails the strict player build and blocks the Publish Check, both naming it", async () => {
+    const { player, blocking } = await run(shadowed);
+    expect(player.report.failure?.exitCode).toBe(22);
+    expect(player.report.failure?.message).toContain('"x"');
+    expect(player.report.failure?.message).toContain('"m1"');
+    expect(blocking.map((i) => i.code)).toEqual(["duplicate-sound-area-id"]);
+    expect(blocking[0].message).toContain('"x"');
+    expect(blocking[0].scope).toEqual({ mapId: "m1" });
+  });
+
+  it("a non-strict player build ships neither area: no dm points, no dm audio file", async () => {
+    const root = writeVault(shadowed);
+    const player = await buildAtlas(root, { player: true, strict: false });
+    expect(player.report.failure).toBeUndefined();
+    expect(shippedAreas(player.project)).toEqual([]);
+    const json = JSON.stringify(player.project);
+    expect(json).not.toContain("777");
+    expect(json).not.toContain("dm-secret");
+  });
+
+  it("a bed src of only spaces is malformed: the Publish Check warns and the build drops it", async () => {
+    const f: Fixture = {
+      name: "blank src",
+      notes: {},
+      mapYaml: [
+        ...MAP_YAML,
+        "    soundscape:",
+        "      areas:",
+        '        - { id: hush, name: hush, visibility: player, points: [[10, 10], [90, 10], [90, 90]], bed: { src: "   " } }',
+      ],
+      fails: false,
+    };
+    const { player, report, blocking } = await run(f);
+    expect(player.report.failure).toBeUndefined();
+    expect(blocking).toEqual([]);
+    expect(soundIssues(report.issues)).toEqual([
+      expect.objectContaining({
+        code: "sound-area-malformed",
+        message: expect.stringContaining("hush"),
+      }),
+    ]);
     expect(shippedAreas(player.project)).toEqual([]);
   });
 });
