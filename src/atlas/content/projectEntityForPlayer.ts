@@ -226,7 +226,7 @@ function redactSecretLinkSpans(
   const redacted: ProjectionReport["redactedLinks"] = [];
   let out = "";
   let from = 0;
-  for (const { link, span, inCode } of findWikilinks(text, ctx)) {
+  for (const { link, span, inCode } of findWikilinks(text, resolveContext(ctx))) {
     if (where === "code" && !inCode) continue;
     if (!isSecretId(ctx, link.resolvedId)) continue;
     redacted.push({ target: link.target, resolvedId: link.resolvedId });
@@ -238,6 +238,15 @@ function redactSecretLinkSpans(
 
 function isSecretId(ctx: ProjectionContext, id: string | undefined): id is string {
   return id !== undefined && ctx.secretIds.has(id);
+}
+
+/** Wikilink resolution for the player: a malformed link that could name a secret note does. */
+function resolveContext(ctx: ProjectionContext) {
+  return {
+    resolveByName: ctx.resolveByName,
+    resolveByBasename: ctx.resolveByBasename,
+    isSecret: (id: string) => ctx.secretIds.has(id),
+  };
 }
 
 export function projectEntityForPlayer(entity: Entity, ctx: ProjectionContext): Entity {
@@ -277,10 +286,7 @@ export function projectEntityWithReport(
   // HTML). A link to a secret note inside code is shown literally, never
   // tokenized, so it is redacted from the HTML's source first.
   const htmlSource = redactSecretLinkSpans(bodyWithSecrets, ctx, "code").text;
-  const { tokenized, links } = tokenizeWikilinks(htmlSource, {
-    resolveByName: ctx.resolveByName,
-    resolveByBasename: ctx.resolveByBasename,
-  });
+  const { tokenized, links } = tokenizeWikilinks(htmlSource, resolveContext(ctx));
 
   // 3. Redact links to secret targets: the display text is usually the
   // secret's name. The shipped markdown loses each such link, code included,

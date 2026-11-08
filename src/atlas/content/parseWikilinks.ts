@@ -20,6 +20,9 @@ export interface ResolveContext {
   // against the title/alias index, but must return undefined when that name
   // is ambiguous (owned by more than one entity) rather than guessing.
   resolveByBasename?: (basename: string) => string | undefined;
+  // Player projection only: when a malformed link could name several notes,
+  // a secret one wins so the link is redacted (fail closed).
+  isSecret?: (id: string) => boolean;
 }
 
 const TOKEN_OPEN = "⁣LINK[";
@@ -51,11 +54,21 @@ function resolveWikilink(rawTarget: string, rawDisplay: string | undefined, ctx:
   const filePart = (hashIdx === -1 ? t : t.slice(0, hashIdx)).replace(/\.md$/i, "").trim();
   const isAnchor = hashIdx === 0;
   let resolved = filePart ? ctx.resolveByName(filePart) : undefined;
-  // Brackets fallback: `[[Note [old]]]` resolves to Note, so a link the
-  // player view can't open still redacts when Note is secret.
-  if (!resolved && /[[\]]/.test(filePart)) {
-    const bare = filePart.replace(/\[[^\]]*\]?|\]/g, " ").replace(/\s+/g, " ").trim();
-    if (bare) resolved = ctx.resolveByName(bare);
+  // Brackets fallback: `[[[Note]]]`, `[[Note [old]]]` and a link starting in
+  // a code span (`` `[[Note` ]] ``) resolve to Note, so a link the player
+  // view can't open still redacts when Note is secret. Candidates: brackets
+  // and backticks dropped, then bracketed parts dropped. Fail closed: a
+  // candidate that resolves to a secret note wins over the rest.
+  if (/[[\]`]/.test(filePart)) {
+    const squash = (s: string) => s.replace(/\s+/g, " ").trim();
+    const candidates = [
+      squash(filePart.replace(/[[\]`]/g, " ")),
+      squash(filePart.replace(/\[[^\]]*\]?|\]|`/g, " ")),
+    ].filter(Boolean);
+    const ids = [resolved, ...candidates.map((c) => ctx.resolveByName(c))].filter(
+      (id): id is string => !!id
+    );
+    resolved = ids.find((id) => ctx.isSecret?.(id)) ?? ids[0];
   }
   // Folder-path fallback: `[[Folder/Note]]` whose full string didn't
   // resolve rescues to Note via its basename, but only when unambiguous.
