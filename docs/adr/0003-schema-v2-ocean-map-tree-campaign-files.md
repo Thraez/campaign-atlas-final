@@ -91,6 +91,9 @@ cutover.
 
 ## Open for Isak
 
+**Answered 2026-11-08:** Isak accepted every recommendation below and the three rules decided
+fail-closed ("Yes to all"). R-10 folds the answers into the text and sets this ADR to `accepted`.
+
 1. **Should a top-level map that is missing from `onOcean` fail the build, or just not show on
    the ocean?** Recommended: fail. The new editor's Add map always places a map, and a silent
    missing map is harder to find than an error.

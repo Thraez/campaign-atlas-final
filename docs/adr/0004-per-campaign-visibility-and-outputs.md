@@ -108,6 +108,9 @@ through phase 2. Per-campaign dirs are used by v2 content (`content-next/` until
 
 ## Open for Isak
 
+**Answered 2026-11-08:** Isak accepted every recommendation below and the three rules decided
+fail-closed ("Yes to all"). R-10 folds the answers into the text and sets this ADR to `accepted`.
+
 Numbered across ADR-0003 (questions 1-4 and 9) and this ADR (5-8). Rules 4, 5 and 8 above were
 decided fail-closed by the agent; they are listed first so Isak can overrule them.
 

@@ -68,8 +68,8 @@ Follow-up noted in its ticket: no scan derives DM region/route ids, so none woul
 | R-20 | Migration script and down-migration, dry run only | R-17, R-18 |
 
 Tickets R-10..R-20 (with R-11d and R-17b) are written, with ADR-0003 (schema v2: ocean, map tree, campaign files) and
-ADR-0004 (per-campaign resolver and outputs), both `proposed`. Next: Isak answers the ADRs'
-"Open for Isak" questions 1-9 and the three rules decided fail-closed (R-10 is `ready-for-human` until then), then R-10, then R-11a and R-12
+ADR-0004 (per-campaign resolver and outputs), both `proposed`. Isak accepted every
+"Open for Isak" recommendation and the three fail-closed rules (2026-11-08). Next: R-10, then R-11a and R-12
 side by side. Phase H tickets, for later: H-01 Cloudflare
 Pages per campaign (after R-19), H-02 Access test, H-03 pre-switch safety check, H-04 the switch
 (Isak's clicks; unblocks `tidemarrow/01`).

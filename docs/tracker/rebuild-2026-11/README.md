@@ -45,9 +45,9 @@ R-17b are new (split out of R-11a and R-17 in review).
 
 ## Frontier
 
-- **Now:** Isak answers the "Open for Isak" questions in ADR-0003 and ADR-0004 (questions 1-9, plus
-  three rules decided fail-closed that he may overrule). That unblocks R-10.
-- **Then:** R-10; after it, R-11a and R-12 side by side; then R-11b, R-11c, R-11d, R-15, R-16.
+- **Done 2026-11-08:** Isak accepted every "Open for Isak" recommendation in ADR-0003 and ADR-0004
+  and the three fail-closed rules.
+- **Now:** R-10. **Then:** R-11a and R-12 side by side; then R-11b, R-11c, R-11d, R-15, R-16.
 
 Phase 3 and 4 tickets are written before phase 2 ends (plan.md section 5). Phase H (H-01..H-04)
 starts after R-19 at the earliest and before the first real Sync (`tidemarrow/01`).

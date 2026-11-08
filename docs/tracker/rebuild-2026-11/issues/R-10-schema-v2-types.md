@@ -1,7 +1,7 @@
 # R-10 Schema v2 types
 
-Status: ready-for-human
-Blocked by: R-04 (done); Isak accepts ADR-0003 and ADR-0004 (their "Open for Isak" answers change these types)
+Status: ready-for-agent
+Blocked by: R-04 (done); ADR answers (done 2026-11-08: Isak accepted every recommendation)
 Size: S
 Branch: `rebuild-r10-schema-v2-types`
 
