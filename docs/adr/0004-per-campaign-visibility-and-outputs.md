@@ -1,6 +1,6 @@
 # 0004. One per-campaign visibility resolver, one player output per campaign
 
-Status: proposed (2026-11-08)
+Status: accepted (2026-11-08)
 
 ## Context
 
@@ -35,7 +35,10 @@ decides visibility.
    (ADR-0001 and its addenda, unchanged).
 2. A map ships to a campaign only if its visibility ships there **and** its state in that campaign's
    file is not `unknown`. A map that doesn't ship hides its whole subtree there: its child maps,
-   their frames on it, and every pin, region, route and sound area on any of them.
+   their frames on it, and every pin, region, route and sound area on any of them. Both checks
+   stay because they answer different questions: visibility is the DM's spoiler call ("the drow
+   city is secret"), state is the party's progress ("they haven't found it yet"), and the editor's
+   Fog job (E7) sets state without touching visibility.
 3. Fog: on a map whose state is `fogged`, a pin under fog doesn't ship; a region, route or
    sound-only area with any point under fog doesn't ship (today's region and route rule,
    `scripts/build-atlas.ts:814` and `:932`). Ride-on sound areas take their region's verdict.
@@ -45,12 +48,13 @@ decides visibility.
 5. **Worlds.** A world ships to a campaign only if at least one of its maps ships there. Otherwise
    it is left out of that campaign's `worlds` and `ocean`, its id and name join that campaign's
    must-not-ship set, and none of its notes (entities whose world is that world) ship there either,
-   whatever their own visibility.
+   whatever their own visibility. So a world that has notes but no maps yet ships none of its
+   notes until one of its maps ships.
 6. Notes: frontmatter `atlas.visibility` stays one value. A `notes:` entry can only narrow it: if
    the frontmatter value doesn't ship, the note doesn't ship in any campaign, whatever the entry
    says (and the build warns). An entry's `basedOn` records the frontmatter value it was written
    against; if they differ, or `basedOn` is missing, the entry resolves to `dm` for every campaign
-   and the Publish Check flags it. Each campaign's note default (question 5) then applies.
+   and the Publish Check flags it. The campaign's note default (below) then applies.
 7. A pin ships only if its note and its map ship in that campaign and it is not under fog.
 8. **Name collisions fail the build.** When an item or note that doesn't ship to a campaign (hidden,
    fogged, or under a hidden map) has the same name, title or alias as a note that ships there, the
@@ -64,9 +68,27 @@ decides visibility.
    - a pin dropped by fog: it adds its location (map id, coordinates, that placement) to
      must-not-ship, not its note's name, so the note can still ship elsewhere.
 
+**The campaign note default (`notes:` in the campaign file).** Rule 1 makes every `world.yaml` item
+start hidden in a new campaign, but a note's frontmatter value is one value for every campaign, so
+without a default a new campaign would see every vault-`player` note in Browse and search at once.
+A campaign file's `notes:` field says how that campaign reads notes:
+
+- `hidden` (what the editor's "start hidden" writes): a note ships only if its `notes:` entry names
+  this campaign explicitly as `player` or `rumor`. A bare (one-value) entry doesn't count.
+- `vault` (what the migration writes for `main`): the frontmatter value, narrowed by `notes:`
+  (rule 6).
+- No `notes:` field means `hidden` (fail closed).
+
+Either way a vault `dm` note never ships. `vault` widens visibility for its campaign (every
+vault-`player` note at once), which is why it is an explicit switch and not the default. In v2 the
+build warns on notes whose frontmatter says `player` but that ship to no campaign, so the DM sees
+why. The alternative, a `notes:` entry per note for every new campaign, means hundreds of entries
+once the vault syncs.
+
 **One player output per campaign.** Each campaign gets its own output dir holding its `atlas.json`,
 search index, images (its fog baked in) and audio, sharing no asset dir with another campaign. Its
-`atlas.json` names only its own campaign: no other campaign's id, name, items or files. Every scan
+`atlas.json` names only its own campaign: its own `id` and `name` (the viewer shows them), never
+another campaign's id, name, items or files. Every scan
 in the registry runs on every campaign's output; the registry reads the campaign list from the
 loaded model, so a listed campaign whose output is missing fails the publish (R-03's rule).
 
@@ -79,7 +101,11 @@ files only for names at or over that threshold that aren't common words.
 
 **Today's output doesn't move.** v1 content (`content/` until cutover) is one campaign, `main`; its
 outputs stay `public/atlas/` and `dist/`, so the live site and `publish-atlas.yml` are unchanged
-through phase 2. Per-campaign dirs are used by v2 content (`content-next/` until cutover).
+through phase 2. Per-campaign dirs are used by v2 content (`content-next/` until cutover): the
+player store at `.atlas-campaigns/<id>/atlas/` and the site build at `dist-campaigns/<id>/`, both
+gitignored and outside `public/` (Vite copies all of `public/` into every site build, so a
+campaign store there would land in every campaign's site). Each campaign's site build uses its
+own store as the atlas dir.
 
 ## Options rejected
 
@@ -106,48 +132,11 @@ through phase 2. Per-campaign dirs are used by v2 content (`content-next/` until
   campaign's players) are thin callers of the resolver.
 - Hosting per campaign (one Cloudflare Pages project each) is ADR-0007, phase H.
 
-## Open for Isak
+## History
 
-**Answered 2026-11-08:** Isak accepted every recommendation below and the three rules decided
-fail-closed ("Yes to all"). R-10 folds the answers into the text and sets this ADR to `accepted`.
-
-Numbered across ADR-0003 (questions 1-4 and 9) and this ADR (5-8). Rules 4, 5 and 8 above were
-decided fail-closed by the agent; they are listed first so Isak can overrule them.
-
-- **Rule 4, a frame under fog hides the child map and its subtree:** decided fail-closed; say if you
-  want otherwise.
-- **Rule 5, a world with no shipped map is left out, its name guarded:** decided fail-closed; say
-  if you want otherwise.
-- **Rule 5, the notes of a world that doesn't ship to a campaign don't ship to it either:** decided
-  fail-closed; say if you want otherwise. Note: a world that has notes but no maps yet ships none of
-  its notes until one of its maps ships.
-- **Rule 8, a hidden item named like a shipped note fails the build** (unless the item links that
-  note, or is a fogged pin): decided fail-closed; say if you want otherwise.
-
-5. **Does a note with frontmatter `player` show in a brand-new campaign?** Rule 1 makes every
-   `world.yaml` item start hidden in a new campaign, but a note's frontmatter value is one value for
-   every campaign, so a new campaign would see every player note in Browse and search at once.
-   Recommended: a campaign file field `notes: vault | hidden`.
-   - `hidden` (what "start hidden" writes): a note ships only if its `notes:` entry names that
-     campaign explicitly as `player` or `rumor`; a bare (one-value) entry doesn't count. Still never
-     a vault `dm` note.
-   - `vault` (what the migration writes for `main`): the frontmatter value, narrowed by `notes:`.
-   - A campaign file with no `notes:` field means `hidden` (fail closed).
-   - In v2 the build warns on notes whose frontmatter says `player` but that ship to no campaign, so
-     the DM sees why.
-   Plainly: this **departs from plan.md**, which says per-campaign note visibility lives "only in
-   `world.yaml`'s `notes:` block". `notes: vault` is a campaign-level switch that **widens**
-   visibility (every vault-`player` note at once) for that campaign; it can never show a vault
-   `dm` note. The alternative within the plan is to write a `notes:` entry per note for every new
-   campaign (hundreds once the vault syncs).
-6. **Is `unknown` map state needed on top of map visibility?** Both hide a map. Recommended: keep
-   both: visibility is the DM's spoiler call ("the drow city is secret"), state is the party's
-   progress ("they haven't found it yet"); the editor's Fog job (E7) sets state without touching
-   visibility. A map ships only when both allow it.
-7. **Where do per-campaign outputs go?** Recommended: player stores at
-   `.atlas-campaigns/<id>/atlas/` and site builds at `dist-campaigns/<id>/`, both gitignored and
-   outside `public/` (Vite copies all of `public/` into every site build, so a campaign store
-   there would land in every campaign's site). Each campaign's site build uses its own store as
-   the atlas dir. Today's `public/atlas/` and `dist/` stay for v1 `main` until cutover.
-8. **May a campaign's own name appear in its output?** Recommended: yes, its own `id` and `name`
-   only (the viewer shows it); never another campaign's.
+- 2026-11-08: proposed with questions 5-8 (1-4 and 9 are in ADR-0003) and with rules 4, 5 and 8
+  decided fail-closed by the agent for Isak to overrule. Isak accepted every recommendation and
+  all three rules the same day; they are folded into the text above: the campaign note default
+  (question 5), keeping both `unknown` state and visibility (6), the per-campaign output dirs (7)
+  and a campaign's own id and name in its output (8). The campaign note default departs from
+  plan.md, which kept per-campaign note visibility only in `world.yaml`'s `notes:` block.

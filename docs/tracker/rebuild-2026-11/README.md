@@ -17,7 +17,7 @@ R-01 (#111, no ticket file), Q-01..Q-04 (#112-#115),
 Decisions: [ADR-0003](../../adr/0003-schema-v2-ocean-map-tree-campaign-files.md) (schema v2: the
 ocean, the map tree, campaign files) and
 [ADR-0004](../../adr/0004-per-campaign-visibility-and-outputs.md) (one per-campaign resolver, one
-player output per campaign). Both are `proposed`, with questions for Isak.
+player output per campaign). Both are `accepted` (2026-11-08), with Isak's answers folded in.
 
 | Order | Ticket | Size | Blocked by | Safety review |
 |---|---|---|---|---|
