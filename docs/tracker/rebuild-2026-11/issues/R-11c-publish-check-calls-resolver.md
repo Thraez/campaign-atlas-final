@@ -1,6 +1,6 @@
 # R-11c Old Publish Check calls the resolver
 
-Status: ready-for-agent
+Status: done
 Blocked by: R-11a, R-12
 Size: S
 Branch: `rebuild-r11c-publish-check-resolver`
