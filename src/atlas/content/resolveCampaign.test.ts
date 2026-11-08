@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  areaUnderFog,
   frameUnderFog,
   resolveCampaign,
   ResolveCampaignError,
@@ -572,6 +573,32 @@ describe("rule 4: a frame with any part under its parent's fog hides the child a
     expect(find(resolveCampaign(mdl, [note("n")], "a").maps, (m) => m.id === "city").reason).toBe(
       "frame-fogged",
     );
+  });
+});
+
+describe("areaUnderFog tests the whole area and the outline", () => {
+  const fog = (reveals: Point[][], conceals: Point[][] = []): FogOverlay => ({
+    mapId: "m",
+    enabled: true,
+    reveals,
+    conceals,
+  });
+
+  it("a zero-area polygon drawn across a fog gap counts (its outline is tested)", () => {
+    const strips = fog([rect(0, 0, 300, SIZE), rect(700, 0, SIZE, SIZE)]);
+    const sliver: Point[] = [
+      [10, 10],
+      [990, 10],
+      [200, 10],
+    ];
+    expect(areaUnderFog(sliver, strips)).toBe(true);
+    expect(areaUnderFog(rect(10, 10, 200, 200), strips)).toBe(false);
+  });
+
+  it("a fog island (a conceal) inside a lit area counts", () => {
+    const island = fog([rect(0, 0, SIZE, SIZE)], [rect(200, 200, 210, 210)]);
+    expect(areaUnderFog(rect(100, 100, 400, 400), island)).toBe(true);
+    expect(areaUnderFog(rect(300, 300, 400, 400), island)).toBe(false);
   });
 });
 

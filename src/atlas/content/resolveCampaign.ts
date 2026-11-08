@@ -325,14 +325,17 @@ export function pathUnderFog(points: readonly unknown[] | undefined, fog: FogOve
 /**
  * True when any part of the polygon `points` is under `fog`: its points, and
  * its whole area (`frameUnderFog`'s exact arrangement test, which holds for
- * any simple polygon, not only quads). No points, or a point that isn't a
- * pair of finite numbers, on a fogged map counts as under fog (fail closed).
+ * any simple polygon, not only quads), and its outline (`pathUnderFog` of the
+ * closed ring), so a zero-area or sliver polygon drawn across fog counts too.
+ * No points, or a point that isn't a pair of finite numbers, on a fogged map
+ * counts as under fog (fail closed).
  */
 export function areaUnderFog(points: readonly unknown[] | undefined, fog: FogOverlay | null): boolean {
   if (!fog) return false;
   if (!points || points.length === 0) return true;
   if (!points.every(isFinitePoint)) return true;
-  return frameUnderFog(points as Point[], fog);
+  const pts = points as Point[];
+  return frameUnderFog(pts, fog) || pathUnderFog([...pts, pts[0]], fog);
 }
 
 /**
