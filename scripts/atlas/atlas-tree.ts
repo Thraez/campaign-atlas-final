@@ -81,17 +81,15 @@ export function atlasTree(content: Pick<LoadedAtlasContent, "model" | "notes">):
   const { model, notes } = content;
   return model.campaigns.map((campaign) => {
     const r = resolveCampaign(model, notes, campaign.id);
-    const worlds: TreeWorld[] = model.worlds.map((world, wi) => {
-      const wv = r.worlds[wi];
-      const verdictOf = new Map(
-        r.maps.filter((m) => m.world === world.world.id).map((m) => [m.id, m]),
-      );
+    const worlds: TreeWorld[] = model.worlds.map((world) => {
+      const wv = r.worlds.find((w) => w.id === world.world.id)!;
       const ids = new Set(world.maps.map((m) => m.id));
       const visited = new Set<string>();
       const build = (id: string): TreeMap => {
         visited.add(id);
+        // Duplicate map ids are flagged by the resolver (`duplicate-id`); both lookups take the first.
         const map = world.maps.find((m) => m.id === id)!;
-        const v = verdictOf.get(id)!;
+        const v = r.maps.find((m) => m.world === world.world.id && m.id === id)!;
         const placement = model.onOcean.find((p) => p.map === id);
         return {
           id,
@@ -193,7 +191,11 @@ if (process.argv[1]?.endsWith("atlas-tree.ts") || process.argv[1]?.endsWith("atl
   const argv = process.argv.slice(2);
   const i = argv.findIndex((a) => a === "--config" || a.startsWith("--config="));
   const configArg =
-    i < 0 ? "atlas.config.json" : argv[i].includes("=") ? argv[i].slice(9) : argv[i + 1];
+    i < 0
+      ? "atlas.config.json"
+      : argv[i].includes("=")
+        ? argv[i].slice("--config=".length)
+        : argv[i + 1];
   const root = process.cwd();
   try {
     if (!configArg) throw new Error("--config needs a file");

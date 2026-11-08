@@ -220,16 +220,30 @@ describe("atlas:tree on content-next/", () => {
     ]);
   });
 
+  const insideMurkwater = (c: string) => {
+    const loaded = loadNext();
+    const r = resolveCampaign(loaded.model, loaded.notes, c);
+    return [
+      r.pins.find((p) => p.note === "mossbeck-well"),
+      r.routes.find((x) => x.id === "eel-path"),
+      r.sound.find((x) => x.id === "frog-chorus"),
+    ];
+  };
+
+  it("the pin, route and sound-only area inside the-murkwater all resolve", () => {
+    for (const c of ["main", "sandbox"]) {
+      for (const item of insideMurkwater(c)) expect(item).toBeDefined();
+    }
+  });
+
   // GOALS.md: a hidden zone and everything only inside it never ship. The
   // resolver (ADR-0004) has no containment rule yet, so this fails today; when
-  // it passes, drop `.fails` and update content-next/README.md.
+  // it passes, drop `.fails` and update content-next/README.md. A partial
+  // containment rule (hiding one or two of the three) keeps this green: it only
+  // passes once all three are hidden in both campaigns.
   it.fails("known gap: a pin, route and sound-only area inside a hidden region don't ship", () => {
-    const loaded = loadNext();
     for (const c of ["main", "sandbox"]) {
-      const r = resolveCampaign(loaded.model, loaded.notes, c);
-      expect(r.pins.find((p) => p.note === "mossbeck-well")?.ships).toBe(false);
-      expect(r.routes.find((x) => x.id === "eel-path")?.ships).toBe(false);
-      expect(r.sound.find((x) => x.id === "frog-chorus")?.ships).toBe(false);
+      for (const item of insideMurkwater(c)) expect(item!.ships).toBe(false);
     }
   });
 
@@ -325,6 +339,8 @@ describe("the vault checks leave content-next/ alone", () => {
 
 describe("content-next/ can't reach a published build", () => {
   const read = (rel: string) => fs.readFileSync(path.join(REPO, rel), "utf8");
+  // Matches literal strings only: a path built at runtime (joined, templated,
+  // read from env) would slip past this guard.
   const NEXT_REFS = /content-next|atlas\.next\.config/;
 
   it("the publish chain, the deploy workflow, the Vite build and the scan registry never name it", () => {
