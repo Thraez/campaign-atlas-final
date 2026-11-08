@@ -470,7 +470,7 @@ calendar:
 });
 
 describe("loadWorldConfig — normalizeVis, route edge-cases, region geometry", () => {
-  it("region with undefined visibility defaults to 'player' with no warning", () => {
+  it("region with no visibility loads as 'dm' with no warning (ADR-0001 addendum, 2026-11-07)", () => {
     writeWorldYaml(`
 maps:
   - id: m1
@@ -482,7 +482,7 @@ regions:
     points: [[0,0],[10,0],[10,10]]
 `);
     const cfg = loadWorldConfig(tmpRoot, WORLD)!;
-    expect(cfg.regions[0].visibility).toBe("player");
+    expect(cfg.regions[0].visibility).toBe("dm");
     expect(cfg.warnings.filter((w) => w.includes("visibility"))).toHaveLength(0);
   });
 
@@ -534,7 +534,7 @@ regions:
     expect(cfg.warnings.filter((w) => w.includes("invalid visibility"))).toHaveLength(3);
   });
 
-  it("route with invalid visibility warns and loads as 'dm'; missing stays 'player'", () => {
+  it("route with invalid visibility warns and loads as 'dm'; missing loads as 'dm' silently", () => {
     writeWorldYaml(`
 maps:
   - id: m1
@@ -553,9 +553,10 @@ routes:
     const cfg = loadWorldConfig(tmpRoot, WORLD)!;
     expect(cfg.routes.map((r) => [r.id, r.visibility])).toEqual([
       ["rt-typo", "dm"],
-      ["rt-missing", "player"],
+      ["rt-missing", "dm"],
     ]);
     expect(cfg.warnings).toContain(`route "rt-typo": invalid visibility "rumour", loading as "dm"`);
+    expect(cfg.warnings.filter((w) => w.includes("rt-missing"))).toHaveLength(0);
   });
 
   it("region with fewer than 3 points warns and is dropped", () => {

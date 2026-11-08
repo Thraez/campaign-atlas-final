@@ -1,9 +1,11 @@
 import type { Entity } from "@/atlas/content/schema";
 
-import { isPlayerVisible, isValidVisibility } from "./visibility";
+import { isPlayerVisible, isValidVisibility, worldItemVisibility } from "./visibility";
 
-// Region and route visibilities arrive as plain strings (world.yaml).
+// Entity visibilities arrive as plain strings.
 const ships = (v: string) => isValidVisibility(v) && isPlayerVisible(v);
+// Region and route visibilities come from world.yaml: missing or invalid is dm.
+const worldItemShips = (v: unknown) => isPlayerVisible(worldItemVisibility(v));
 
 interface Placementish { entityId: string; x: number; y: number; mapId?: string; }
 interface Visible { visibility?: string; id?: string; }
@@ -36,12 +38,12 @@ export function projectMapForPlayer<
     return true;
   });
   const regions = input.regions.filter((r) => {
-    if (!ships(r.visibility ?? "dm")) return false;
+    if (!worldItemShips(r.visibility)) return false;
     if (r.points?.some(([x, y]) => input.isFogged(x, y))) return false;
     return true;
   });
   const routes = input.routes.filter((t) => {
-    if (!ships(t.visibility ?? "dm")) return false;
+    if (!worldItemShips(t.visibility)) return false;
     if (t.resolvedPoints?.some(([x, y]) => input.isFogged(x, y))) return false;
     return true;
   });

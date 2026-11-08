@@ -30,11 +30,17 @@ export interface PlayerAtlas {
 export function locatePlayerAtlas(dir: string, layout?: ArtifactLayout): PlayerAtlas | null {
   const layouts: ArtifactLayout[] = layout ? [layout] : ["store", "built-site"];
   for (const l of layouts) {
-    const atlasDir = l === "built-site" ? path.join(dir, "atlas") : dir;
-    const atlasJson = path.join(atlasDir, "atlas.json");
-    if (fs.existsSync(atlasJson)) return { atlasDir, atlasJson, layout: l };
+    const atlasJson = playerAtlasJsonPath(dir, l);
+    if (fs.existsSync(atlasJson)) {
+      return { atlasDir: path.dirname(atlasJson), atlasJson, layout: l };
+    }
   }
   return null;
+}
+
+/** Where atlas.json must be in `dir` for the layout, whether or not it is there. */
+export function playerAtlasJsonPath(dir: string, layout: ArtifactLayout): string {
+  return path.join(layout === "built-site" ? path.join(dir, "atlas") : dir, "atlas.json");
 }
 
 /** The file a site-root asset URL (`atlas/assets/…`) points at, or null when it is not one of ours. */

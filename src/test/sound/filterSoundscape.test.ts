@@ -51,12 +51,13 @@ describe("filterSoundscapeForPlayer", () => {
     expect(result?.areas).toHaveLength(2);
   });
 
-  it("keeps areas with no visibility set (default player-visible)", () => {
+  it("drops sound-only areas with no visibility set (missing is dm, ADR-0001 addendum)", () => {
     const sc: SoundscapeConfig = {
-      areas: [makeArea("ambient")],
+      areas: [makeArea("ambient"), makeArea("tavern", "player")],
     };
     const result = filterSoundscapeForPlayer(sc);
     expect(result?.areas).toHaveLength(1);
+    expect(result?.areas?.[0].bed.src).toBe("audio/tavern.ogg");
   });
 
   it("drops areas whose visibility is present but empty or not a string (ADR-0001 addendum)", () => {

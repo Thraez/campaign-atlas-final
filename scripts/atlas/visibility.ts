@@ -12,4 +12,5 @@ export {
   isValidVisibility,
   linkLeaksToPlayers,
   linkTargetLabel,
+  worldItemVisibility,
 } from "../../src/atlas/content/visibility";
