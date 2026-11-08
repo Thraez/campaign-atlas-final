@@ -178,3 +178,10 @@ variant still drew a dotted "link" span. Not a resolver bug.
 
 - Took over Phase 2. R-10: worktree `r10`, branch `rebuild-r10-schema-v2-types` from origin/main
   2902a72, builder Opus (medium). Then: gate, one Opus review, fix, then Isak's push/merge yes.
+- R-10 built (Opus, f35e394). Opus review NOT CLEAN: MapV2 dropped the map's name/width/height/
+  grid/oceanColor/wrapX/soundscape (blocker); unknown keys dropped silently; prototype keys in
+  records; empty ids; plus nits. Fixed d72f5e4 (unknown keys are errors, null-prototype records,
+  real-content round-trip test). Re-check CLEAN; nits fixed 1279e6e (test guard, parent error,
+  R-20 ticket lists the v1 inputs v2 rejects). Gate pass on 1279e6e (main 2902a72).
+- Waiting on Isak's yes to push `rebuild-r10-schema-v2-types`, open the PR and merge. Then R-11a
+  and R-12 side by side.
