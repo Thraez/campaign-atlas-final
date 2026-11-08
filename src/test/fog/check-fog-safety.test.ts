@@ -68,7 +68,7 @@ const FOG_FILE = "assets/maps/world.fog.png";
 
 /** A player atlas with one fog-enabled 100×100 map, stripped to {mapId, enabled}. */
 function fogAtlas(
-  over: { src?: string; fog?: object; placements?: object[] } = {},
+  over: { src?: string; fog?: object; placements?: object[]; sound?: object[] } = {},
 ): Record<string, unknown> {
   return {
     maps: [
@@ -78,6 +78,7 @@ function fogAtlas(
         height: 100,
         layers: [{ id: "lyr", src: over.src ?? FOG_SRC, x: 0, y: 0, width: 100, height: 100 }],
         fog: over.fog ?? { mapId: "world", enabled: true },
+        ...(over.sound ? { soundscape: { areas: over.sound } } : {}),
       },
     ],
     placements: over.placements ?? [],
@@ -149,6 +150,147 @@ describe("check-fog-safety", () => {
       const placements = [{ entityId: "secret-entity", mapId: "world", x: 90, y: 90 }];
       const dir = plant(layout, fogAtlas({ placements }), { [FOG_FILE]: await png(0) });
       expect(await run({ dir, config })).toBe(15);
+    });
+
+    it("sound-in-fog (21): a shipped sound-only area with a point outside the source reveal", async () => {
+      const config = writeSourceConfig(CLEAN_WORLD_YAML);
+      const area = (points: number[][], regionId?: string) => ({
+        id: "area-0",
+        ...(regionId ? { regionId } : {}),
+        points,
+        bed: { src: "atlas/assets/audio/a.ogg" },
+      });
+      const lit = area([
+        [30, 30],
+        [50, 30],
+        [50, 50],
+      ]);
+      const fogged = area([
+        [30, 30],
+        [90, 30],
+        [50, 50],
+      ]);
+      const files = { [FOG_FILE]: await png(0) };
+      expect(await run({ dir: plant(layout, fogAtlas({ sound: [lit] }), files), config })).toBe(0);
+      expect(
+        await run({ dir: plant(layout, fogAtlas({ sound: [lit, fogged] }), files), config }),
+      ).toBe(21);
+      // A ride-on area plays in its region's polygon, which 15 checks.
+      const rideOn = area([[90, 90]], "r1");
+      expect(await run({ dir: plant(layout, fogAtlas({ sound: [rideOn] }), files), config })).toBe(
+        0,
+      );
+    });
+
+    it("sound-in-fog (21): fog between lit corners counts (whole area tested)", async () => {
+      // Lit strips x 0-300 and 700-1000, fog between; the area spans 100-900.
+      const config = writeSourceConfig(`schemaVersion: 1
+maps:
+  - id: world
+    worldId: w
+    name: World
+    width: 1000
+    height: 1000
+    layers: []
+fog:
+  - mapId: world
+    enabled: true
+    reveals:
+      - [[0, 0], [300, 0], [300, 1000], [0, 1000]]
+      - [[700, 0], [1000, 0], [1000, 1000], [700, 1000]]
+`);
+      const atlas = (x0: number, x1: number) => ({
+        maps: [
+          {
+            id: "world",
+            width: 1000,
+            height: 1000,
+            layers: [],
+            fog: { mapId: "world", enabled: true },
+            soundscape: {
+              areas: [
+                {
+                  id: "area-0",
+                  points: [
+                    [x0, 100],
+                    [x1, 100],
+                    [x1, 900],
+                    [x0, 900],
+                  ],
+                  bed: { src: "atlas/assets/audio/a.ogg" },
+                },
+              ],
+            },
+          },
+        ],
+        placements: [],
+      });
+      expect(await run({ dir: plant(layout, atlas(100, 200)), config })).toBe(0);
+      expect(await run({ dir: plant(layout, atlas(100, 900)), config })).toBe(21);
+    });
+
+    it("in-fog-content (15): a region or route spanning a fog gap between lit strips counts", async () => {
+      // Lit strips x 0-300 and 700-1000, fog between. A region over 100-900
+      // has every corner lit; so do a route's two points at x 100 and 900.
+      const config = writeSourceConfig(`schemaVersion: 1
+maps:
+  - id: world
+    worldId: w
+    name: World
+    width: 1000
+    height: 1000
+    layers: []
+fog:
+  - mapId: world
+    enabled: true
+    reveals:
+      - [[0, 0], [300, 0], [300, 1000], [0, 1000]]
+      - [[700, 0], [1000, 0], [1000, 1000], [700, 1000]]
+`);
+      const atlas = (extra: Record<string, unknown>) => ({
+        maps: [
+          {
+            id: "world",
+            width: 1000,
+            height: 1000,
+            layers: [],
+            fog: { mapId: "world", enabled: true },
+            ...extra,
+          },
+        ],
+        placements: [],
+      });
+      const region = (x1: number) => ({
+        regions: [
+          {
+            id: "r",
+            name: "R",
+            points: [
+              [100, 100],
+              [x1, 100],
+              [x1, 900],
+              [100, 900],
+            ],
+          },
+        ],
+      });
+      const route = (x1: number) => ({
+        routes: [
+          {
+            id: "t",
+            name: "T",
+            waypoints: [],
+            resolvedPoints: [
+              [100, 500],
+              [x1, 500],
+            ],
+          },
+        ],
+      });
+      expect(await run({ dir: plant(layout, atlas(region(200))), config })).toBe(0);
+      expect(await run({ dir: plant(layout, atlas(region(900))), config })).toBe(15);
+      expect(await run({ dir: plant(layout, atlas(route(200))), config })).toBe(0);
+      expect(await run({ dir: plant(layout, atlas(route(900))), config })).toBe(15);
     });
 
     it("could-not-verify (17): present-but-broken world.yaml on a clean fog map", async () => {

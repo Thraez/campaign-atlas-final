@@ -3,13 +3,18 @@
  *
  * Independent re-check of player artifacts (atlas.json + asset PNGs) against
  * the source world.yaml's fog geometry. Complements the build-time enforcement
- * by re-deriving the boundary and asserting four invariants:
+ * by re-deriving the boundary and asserting five invariants:
  *
  *   13  IMAGE-LEAK    original layer image referenced by the player atlas, or
  *                     (built site only) shipped beside its redacted one
  *   14  GEOMETRY-LEAK fog geometry not stripped from player atlas
- *   15  IN-FOG-CONTENT player pin/route/region inside fog per source geometry
+ *   15  IN-FOG-CONTENT player pin inside fog, or any part of a region's area or
+ *                     a route's path inside fog, per source geometry
  *   16  ALPHA-LEAK    redacted PNG opaque at a known-fogged location
+ *   21  SOUND-IN-FOG  shipped sound-only area (no regionId) with any part of its
+ *                     area inside fog per source geometry, fog between lit
+ *                     corners included (arch-02; ride-on areas follow their
+ *                     region, which 15 checks)
  *
  * The artifact dir is the built site (`dist`, atlas.json in `dist/atlas/`) or
  * the source store (`public/atlas`); see `atlas/playerArtifact.ts`. The scan
@@ -29,11 +34,12 @@
  *   15  IN-FOG-CONTENT
  *   16  ALPHA-LEAK
  *   17  COULD-NOT-VERIFY-GEOMETRY — a source world config was present but failed
- *       to load, so the geometry-dependent checks (15, 16) never ran and the
+ *       to load, so the geometry-dependent checks (15, 16, 21) never ran and the
  *       fog maps cannot be certified. (Config *absent* is a legitimate
  *       configless run and still exits 0.) Also a fog layer whose redacted
  *       `.fog.png` is not in the artifact (the alpha check cannot run on it),
  *       or a built site (`layout: "built-site"`) with no `atlas/atlas.json`.
+ *   21  SOUND-IN-FOG (21, not 18: check-player-files already exits 18)
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -42,6 +48,7 @@ import { IMAGE_EXTENSIONS } from "./atlas/assetRefs";
 import { loadWorldConfig } from "./atlas/loadWorldConfig";
 import { locatePlayerAtlas, resolveAssetFile, type ArtifactLayout } from "./atlas/playerArtifact";
 import { isLit } from "../src/atlas/fog/effectiveLit";
+import { areaUnderFog, pathUnderFog } from "../src/atlas/content/resolveCampaign";
 import type { FogOverlay, Point } from "../src/atlas/content/schema";
 
 interface Args {
@@ -81,6 +88,7 @@ interface PlayerMap {
   regions?: Array<{ id: string; points: Point[] }>;
   routes?: Array<{ id: string; resolvedPoints?: Point[] }>;
   fog?: PlayerFogObject;
+  soundscape?: { areas?: Array<{ regionId?: string; points?: Point[] }> };
 }
 
 interface PlayerAtlas {
@@ -242,31 +250,43 @@ export async function run(opts: RunOpts): Promise<number> {
       }
     }
 
-    // Check region vertices
+    // Regions: the whole area, fog between lit vertices included.
     for (const r of m.regions ?? []) {
-      for (const [x, y] of r.points) {
-        if (!isLit(x, y, srcFog)) {
-          findings.push({
-            code: 15,
-            message: `region "${r.id}" on map "${m.id}" has vertex (${x},${y}) inside fog by source geometry`,
-          });
-          break; // one finding per region is enough
-        }
+      if (areaUnderFog(r.points, srcFog)) {
+        findings.push({
+          code: 15,
+          message: `region "${r.id}" on map "${m.id}" has part of its area inside fog by source geometry`,
+        });
       }
     }
 
-    // Check route resolved points
+    // Routes: the whole resolved path, a fog gap between lit points included.
     for (const t of m.routes ?? []) {
-      for (const [x, y] of t.resolvedPoints ?? []) {
-        if (!isLit(x, y, srcFog)) {
-          findings.push({
-            code: 15,
-            message: `route "${t.id}" on map "${m.id}" has point (${x},${y}) inside fog by source geometry`,
-          });
-          break; // one finding per route is enough
-        }
+      if (t.resolvedPoints && pathUnderFog(t.resolvedPoints, srcFog)) {
+        findings.push({
+          code: 15,
+          message: `route "${t.id}" on map "${m.id}" has part of its path inside fog by source geometry`,
+        });
       }
     }
+  }
+
+  // ----- 21 SOUND-IN-FOG (requires source fog) -----
+  // A sound-only area plays wherever its own polygon is; any part of it under
+  // fog tells players what's there, so its whole area is tested, not only its
+  // points. Shipped ids are positional (area-N).
+  for (const m of fogMaps) {
+    const srcFog = sourceFogByMapId.get(m.id);
+    if (!srcFog || !srcFog.enabled) continue;
+    (m.soundscape?.areas ?? []).forEach((a, i) => {
+      if (a.regionId) return;
+      if (areaUnderFog(a.points, srcFog)) {
+        findings.push({
+          code: 21,
+          message: `sound area #${i} on map "${m.id}" has part of its area inside fog by source geometry`,
+        });
+      }
+    });
   }
 
   // ----- 16 ALPHA-LEAK (requires source fog + sharp; samples a known-fogged corner) -----

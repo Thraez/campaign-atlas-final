@@ -252,6 +252,77 @@ function variantFog(): VariantResult {
   );
 }
 
+// ---- Variant 4b: sound-only area under fog (check-fog-safety, code 21) ------
+// arch-02: the build drops a sound-only area with any part under fog, and the
+// fog scan re-checks the shipped soundscape against the source fog. Built from
+// a throwaway vault (one map, left half revealed), so it runs whatever the
+// live vault's maps and sound look like. The dirty half must exit 21 itself:
+// any other code means a different check caught something, not this one.
+function variantSoundFog(): VariantResult {
+  const SOUND_WORLD_YAML = [
+    "schemaVersion: 1",
+    "maps:",
+    "  - id: m1",
+    "    worldId: w",
+    "    name: Smoke",
+    "    width: 100",
+    "    height: 100",
+    "    layers: []",
+    "fog:",
+    "  - mapId: m1",
+    "    enabled: true",
+    "    reveals:",
+    "      - [[0, 0], [50, 0], [50, 100], [0, 100]]",
+    "",
+  ].join("\n");
+  const area = (points: number[][]) => ({
+    id: "area-0",
+    points,
+    bed: { src: "atlas/assets/audio/a.ogg" },
+  });
+  const plant = (label: string, points: number[][]) => {
+    const root = freshDir(label);
+    const config = path.join(root, "atlas.config.json");
+    fs.writeFileSync(config, JSON.stringify({ contentRoot: "content", defaultWorld: "w" }));
+    fs.mkdirSync(path.join(root, "content", "w", "_atlas"), { recursive: true });
+    fs.writeFileSync(path.join(root, "content", "w", "_atlas", "world.yaml"), SOUND_WORLD_YAML);
+    const site = path.join(root, "dist");
+    fs.mkdirSync(site);
+    writeBuiltSite(site, {
+      maps: [
+        {
+          id: "m1",
+          width: 100,
+          height: 100,
+          layers: [],
+          fog: { mapId: "m1", enabled: true },
+          soundscape: { areas: [area(points)] },
+        },
+      ],
+      placements: [],
+    });
+    return runScan("check-fog-safety.ts", [site, "--config", config]);
+  };
+  return assertCleanThenDirty(
+    "Sound-only area under fog",
+    "check-fog-safety.ts",
+    () =>
+      plant("sound-fog-clean", [
+        [10, 10],
+        [40, 10],
+        [40, 40],
+      ]),
+    () => {
+      const r = plant("sound-fog-dirty", [
+        [10, 10],
+        [90, 10],
+        [40, 40],
+      ]);
+      return r.code === 21 || r.code < 0 ? r : { code: 0, stderr: r.stderr };
+    },
+  );
+}
+
 // ---- Variant 5: corrupted player atlas shape (check-artifact-shape) ---------
 function variantShape(): VariantResult {
   const atlas = readPlayerAtlas();
@@ -372,6 +443,7 @@ async function main(): Promise<number> {
   results.push(variantDerived());
   results.push(await variantExif());
   results.push(variantFog());
+  results.push(variantSoundFog());
   results.push(variantShape());
   results.push(
     variantPlayerSecret("Forbidden field on a player secret", {
