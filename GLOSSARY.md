@@ -16,6 +16,18 @@ The atlas's words. Use these in tickets, tests, UI text and commit messages. Cod
 - **Map / layer**: a map is an image with its own coordinate space; a layer is one image stacked on a map (for example a floor or a revealed overlay).
 - **Fog**: the parts of a map players can't see yet. Baked into player images at build time, never just hidden by CSS.
 
+## Schema v2 (the rebuild)
+
+ADR-0003 and ADR-0004. Types in `src/atlas/content/schemaV2.ts`. Used by `content-next/` until cutover.
+
+- **Ocean**: the one canvas every world's top-level maps sit on, described in `_atlas/atlas.yaml` (size, sea style, and `onOcean`: where each top-level map sits) [`AtlasFileV2`].
+- **Map tree**: maps nested inside maps (continent, city, dungeon). A map with no `parent` is top-level and sits on the ocean; a child map sits inside its parent, in the same world. Map ids are unique across every world.
+- **Frame**: where a child map sits in its parent: `x`, `y`, `width`, `height`, `rotation` in the parent's pixels. `enterZoom` is the parent zoom at which the viewer enters the child. If any part of a frame is under its parent's fog, the child and its whole subtree don't ship to that campaign.
+- **Campaign**: one group of players over the same atlas, with its own map states, fog and visibility, and its own player output. Today's site is campaign `main`. _Avoid:_ "world" for a campaign; one campaign can span worlds.
+- **Campaign file**: `_atlas/campaigns/<id>.yaml`: a campaign's `id`, `name`, its `notes:` default and its map states and fog, keyed by map id [`CampaignFileV2`]. Every campaign in `atlas.yaml` has one.
+- **Map state**: a map's progress in one campaign: `unknown` (the party hasn't found it; doesn't ship), `fogged` (ships with that campaign's fog) or `open`. A map not listed in the campaign file is `unknown`. Separate from visibility, which is the DM's spoiler call: a map ships only when both allow it.
+- **`notes:` block**: two things share the name. In `world.yaml`, per-note entries that narrow a note's frontmatter visibility per campaign (`visibility`, `basedOn`, `belongsTo`) [`NoteOverride`]. In a campaign file, `notes: vault | hidden`, how that campaign treats notes with no entry for it: `vault` uses the frontmatter value, `hidden` ships only notes whose entry names the campaign as `player` or `rumor`. A missing campaign `notes:` means `hidden`.
+
 ## Who sees what
 
 - **Visibility**: per entity, and per `world.yaml` region, route and sound-only area, one of `player`, `rumor`, `dm`, `hidden`. `player` and `rumor` ship to players; `dm` and `hidden` never do. Missing or invalid means `dm`.

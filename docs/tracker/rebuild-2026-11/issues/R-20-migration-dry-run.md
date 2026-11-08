@@ -33,6 +33,19 @@ every campaign (today only `main`) must not change.
   - pins: each note's `atlas.placements` (6 notes today) moved into `maps[].pins` with
     `{ main: <placement visibility> }`, and removed from that note's frontmatter in the copy (other
     frontmatter and the body byte-identical).
+- v1 input that the v2 validators (R-10, `src/atlas/content/schemaV2.ts`) would reject is
+  converted, each case covered by a fixture test:
+  - per-map `water` moves to the world-level `water`; if two maps carry different `water`
+    blocks, the migration refuses and names both maps;
+  - a region or sound-only area with fewer than 3 points is dropped with a warning, as v1
+    does (`loadWorldConfig` skips such regions with a warning; `resolveSoundscape` skips such
+    sound areas);
+  - a v1 map's `soundscape.areas` move to the map's `sound:` list; the rest of `soundscape`
+    (`enabled`, `masterGain`) stays under `soundscape`;
+  - each map gets a `zoom` range (v2 requires one; v1 has none), and any `frame` written gets
+    `rotation: 0`.
+  The migrated `world.yaml` and campaign file pass `validateWorldFileV2` and
+  `validateCampaignFileV2`.
 - The diff: a test (and a script mode, `--check`) builds the v1 player output of the original and
   the v2 player output of the migrated copy for campaign `main`, and compares `atlas.json`,
   `search-index.json` and the set and bytes of asset files. Allowed differences, listed in one
