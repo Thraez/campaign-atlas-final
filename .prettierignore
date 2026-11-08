@@ -11,5 +11,5 @@ public/atlas
 content
 examples
 .claude
-# Build snapshots compared byte for byte (content-site-unchanged.test.ts).
+# Build snapshots compared byte for byte (resolver-site-unchanged.test.ts).
 src/test/build/__snapshots__

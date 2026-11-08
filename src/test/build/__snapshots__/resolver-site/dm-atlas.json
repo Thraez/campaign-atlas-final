@@ -1,0 +1,784 @@
+{
+  "schemaVersion": 1,
+  "worlds": [
+    {
+      "id": "vale",
+      "name": "The Vale",
+      "defaultMapId": "vale",
+      "importFolders": {
+        "folders": {},
+        "defaultFolder": "imports"
+      },
+      "credits": {
+        "badges": true,
+        "page": true
+      }
+    }
+  ],
+  "maps": [
+    {
+      "id": "vale",
+      "worldId": "vale",
+      "name": "Vale",
+      "width": 1000,
+      "height": 1000,
+      "oceanColor": "#18313f",
+      "soundscape": {
+        "masterGain": 0.6,
+        "areas": [
+          {
+            "id": "lit-gulls",
+            "name": "Gulls",
+            "visibility": "player",
+            "points": [
+              [
+                10,
+                10
+              ],
+              [
+                100,
+                10
+              ],
+              [
+                100,
+                100
+              ],
+              [
+                10,
+                100
+              ]
+            ],
+            "bed": {
+              "src": "atlas/assets/audio/gulls.ogg"
+            }
+          },
+          {
+            "id": "fog-wind",
+            "name": "Fog wind",
+            "visibility": "player",
+            "points": [
+              [
+                400,
+                10
+              ],
+              [
+                600,
+                10
+              ],
+              [
+                600,
+                100
+              ],
+              [
+                400,
+                100
+              ]
+            ],
+            "bed": {
+              "src": "atlas/assets/audio/wind.ogg"
+            }
+          },
+          {
+            "id": "dm-drums",
+            "name": "Drums",
+            "visibility": "dm",
+            "points": [
+              [
+                10,
+                10
+              ],
+              [
+                100,
+                10
+              ],
+              [
+                100,
+                100
+              ]
+            ],
+            "bed": {
+              "src": "atlas/assets/audio/drums.ogg"
+            }
+          },
+          {
+            "id": "ride-harbor",
+            "regionId": "harbor-ward",
+            "bed": {
+              "src": "atlas/assets/audio/harbor.ogg",
+              "gain": 0.5
+            }
+          },
+          {
+            "id": "ride-lair",
+            "regionId": "lair",
+            "visibility": "player",
+            "bed": {
+              "src": "atlas/assets/audio/lair.ogg"
+            }
+          },
+          {
+            "id": "ride-marsh",
+            "regionId": "fog-marsh",
+            "bed": {
+              "src": "atlas/assets/audio/marsh.ogg"
+            }
+          },
+          {
+            "name": "No id",
+            "visibility": "player",
+            "points": [
+              [
+                10,
+                200
+              ],
+              [
+                100,
+                200
+              ],
+              [
+                100,
+                300
+              ]
+            ],
+            "bed": {
+              "src": "atlas/assets/audio/noid.ogg"
+            }
+          },
+          {
+            "id": "too-small",
+            "visibility": "player",
+            "points": [
+              [
+                10,
+                10
+              ],
+              [
+                20,
+                20
+              ]
+            ],
+            "bed": {
+              "src": "atlas/assets/audio/small.ogg"
+            }
+          }
+        ]
+      },
+      "wrapX": false,
+      "layers": [],
+      "regions": [
+        {
+          "id": "harbor-ward",
+          "mapId": "vale",
+          "name": "Harbor Ward",
+          "entityId": "harbor",
+          "fillOpacity": 0.18,
+          "strokeOpacity": 0.85,
+          "points": [
+            [
+              10,
+              10
+            ],
+            [
+              250,
+              10
+            ],
+            [
+              250,
+              250
+            ],
+            [
+              10,
+              250
+            ]
+          ],
+          "visibility": "player"
+        },
+        {
+          "id": "fog-marsh",
+          "mapId": "vale",
+          "name": "Fog Marsh",
+          "fillOpacity": 0.18,
+          "strokeOpacity": 0.85,
+          "points": [
+            [
+              400,
+              400
+            ],
+            [
+              600,
+              400
+            ],
+            [
+              600,
+              600
+            ],
+            [
+              400,
+              600
+            ]
+          ],
+          "visibility": "player"
+        },
+        {
+          "id": "lair",
+          "mapId": "vale",
+          "name": "Lair",
+          "fillOpacity": 0.18,
+          "strokeOpacity": 0.85,
+          "points": [
+            [
+              300,
+              300
+            ],
+            [
+              350,
+              300
+            ],
+            [
+              350,
+              350
+            ]
+          ],
+          "visibility": "dm"
+        },
+        {
+          "id": "whisper-glade",
+          "mapId": "vale",
+          "name": "Whisper Glade",
+          "fillOpacity": 0.18,
+          "strokeOpacity": 0.85,
+          "points": [
+            [
+              50,
+              600
+            ],
+            [
+              150,
+              600
+            ],
+            [
+              150,
+              700
+            ]
+          ],
+          "visibility": "rumor"
+        }
+      ],
+      "fog": {
+        "mapId": "vale",
+        "enabled": true,
+        "color": "rgba(8, 12, 20, 0.55)",
+        "reveals": [
+          [
+            [
+              0,
+              0
+            ],
+            [
+              500,
+              0
+            ],
+            [
+              500,
+              1000
+            ],
+            [
+              0,
+              1000
+            ]
+          ]
+        ]
+      },
+      "routes": [
+        {
+          "id": "harbor-road",
+          "mapId": "vale",
+          "name": "Harbor Road",
+          "visibility": "player",
+          "waypoints": [
+            {
+              "entityId": "harbor"
+            },
+            [
+              200,
+              400
+            ],
+            {
+              "entityId": "watchtower"
+            }
+          ],
+          "resolvedPoints": [
+            [
+              100,
+              100
+            ],
+            [
+              200,
+              400
+            ],
+            [
+              300,
+              450
+            ]
+          ]
+        },
+        {
+          "id": "fog-road",
+          "mapId": "vale",
+          "name": "Fog Road",
+          "visibility": "player",
+          "waypoints": [
+            [
+              10,
+              900
+            ],
+            [
+              900,
+              900
+            ]
+          ],
+          "resolvedPoints": [
+            [
+              10,
+              900
+            ],
+            [
+              900,
+              900
+            ]
+          ]
+        },
+        {
+          "id": "smugglers-path",
+          "mapId": "vale",
+          "name": "Smugglers' Path",
+          "visibility": "rumor",
+          "waypoints": [
+            [
+              20,
+              20
+            ],
+            [
+              40,
+              480
+            ]
+          ],
+          "resolvedPoints": [
+            [
+              20,
+              20
+            ],
+            [
+              40,
+              480
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "depths",
+      "worldId": "vale",
+      "name": "Depths",
+      "width": 800,
+      "height": 600,
+      "oceanColor": "#18313f",
+      "wrapX": false,
+      "layers": [],
+      "regions": [],
+      "fog": {
+        "mapId": "depths",
+        "enabled": false,
+        "color": "rgba(8, 12, 20, 0.55)",
+        "reveals": []
+      },
+      "routes": []
+    }
+  ],
+  "entities": [
+    {
+      "id": "market-rumour",
+      "title": "Market Rumour",
+      "type": "lore",
+      "world": "vale",
+      "visibility": "rumor",
+      "canon": "canon",
+      "aliases": [],
+      "tags": [],
+      "images": [],
+      "body": "\n# Market Rumour\n\nThey say the [[Harbor]] hides something, and that the [[Vampire Lord]] walks at night.\n",
+      "bodyHtml": "<h1>Market Rumour</h1>\n<p>They say the <a class=\"atlas-wikilink\" data-entity-id=\"harbor\" href=\"#/entity/harbor\" aria-haspopup=\"dialog\">Harbor</a> hides something, and that the <a class=\"atlas-wikilink\" data-entity-id=\"vampire-lord\" href=\"#/entity/vampire-lord\" aria-haspopup=\"dialog\">Vampire Lord</a> walks at night.</p>\n",
+      "frontmatter": {
+        "title": "Market Rumour",
+        "atlas": {
+          "type": "lore",
+          "visibility": "rumor"
+        }
+      },
+      "sourcePath": "content/vale/lore/market-rumour.md",
+      "links": [
+        {
+          "target": "Harbor",
+          "display": "Harbor",
+          "resolvedId": "harbor",
+          "broken": false
+        },
+        {
+          "target": "Vampire Lord",
+          "display": "Vampire Lord",
+          "resolvedId": "vampire-lord",
+          "broken": false
+        }
+      ],
+      "backlinks": [
+        {
+          "id": "harbor",
+          "title": "Harbor"
+        }
+      ]
+    },
+    {
+      "id": "vampire-lord",
+      "title": "Vampire Lord",
+      "type": "npc",
+      "world": "vale",
+      "visibility": "dm",
+      "canon": "canon",
+      "aliases": [],
+      "tags": [],
+      "images": [],
+      "body": "\n# Vampire Lord\n\nThe real threat.\n",
+      "bodyHtml": "<h1>Vampire Lord</h1>\n<p>The real threat.</p>\n",
+      "frontmatter": {
+        "title": "Vampire Lord",
+        "atlas": {
+          "type": "npc",
+          "visibility": "dm",
+          "placements": [
+            {
+              "mapId": "vale",
+              "x": 320,
+              "y": 320
+            }
+          ]
+        }
+      },
+      "sourcePath": "content/vale/people/vampire.md",
+      "links": [],
+      "backlinks": [
+        {
+          "id": "market-rumour",
+          "title": "Market Rumour"
+        }
+      ]
+    },
+    {
+      "id": "vault-keeper",
+      "title": "Vault Keeper",
+      "type": "npc",
+      "world": "vale",
+      "visibility": "player",
+      "canon": "canon",
+      "aliases": [],
+      "tags": [],
+      "images": [],
+      "body": "\n# Vault Keeper\n\nKeeps the vault. \n",
+      "bodyHtml": "<h1>Vault Keeper</h1>\n<p>Keeps the vault. </p>\n",
+      "frontmatter": {
+        "title": "Vault Keeper",
+        "atlas": {
+          "type": "npc",
+          "visibility": "player",
+          "placements": [
+            {
+              "mapId": "vale",
+              "x": 150,
+              "y": 150
+            },
+            {
+              "mapId": "vale",
+              "x": 120,
+              "y": 400,
+              "secretId": "hidden-door"
+            }
+          ],
+          "secrets": [
+            {
+              "id": "hidden-door",
+              "password": "low tide",
+              "teaser": "a door under the pier",
+              "reveal": "the door opens at low tide"
+            }
+          ]
+        }
+      },
+      "sourcePath": "content/vale/people/vault-keeper.md",
+      "links": [],
+      "backlinks": [],
+      "secrets": [
+        {
+          "id": "hidden-door",
+          "lockType": "password",
+          "salt": "<random>",
+          "iv": "<random>",
+          "ciphertext": "<random>",
+          "teaser": "a door under the pier"
+        }
+      ]
+    },
+    {
+      "id": "deep-cave",
+      "title": "Deep Cave",
+      "type": "dungeon",
+      "world": "vale",
+      "visibility": "player",
+      "canon": "canon",
+      "aliases": [],
+      "tags": [],
+      "images": [],
+      "body": "\n# Deep Cave\n\nDark and wet.\n",
+      "bodyHtml": "<h1>Deep Cave</h1>\n<p>Dark and wet.</p>\n",
+      "frontmatter": {
+        "title": "Deep Cave",
+        "atlas": {
+          "type": "dungeon",
+          "visibility": "player",
+          "placements": [
+            {
+              "mapId": "depths",
+              "x": 100,
+              "y": 100
+            }
+          ]
+        }
+      },
+      "sourcePath": "content/vale/places/deep-cave.md",
+      "links": [],
+      "backlinks": []
+    },
+    {
+      "id": "fogged-ruin",
+      "title": "Fogged Ruin",
+      "type": "landmark",
+      "world": "vale",
+      "visibility": "player",
+      "canon": "canon",
+      "aliases": [],
+      "tags": [],
+      "images": [],
+      "body": "\n# Fogged Ruin\n\nNobody has seen it yet.\n",
+      "bodyHtml": "<h1>Fogged Ruin</h1>\n<p>Nobody has seen it yet.</p>\n",
+      "frontmatter": {
+        "title": "Fogged Ruin",
+        "atlas": {
+          "type": "landmark",
+          "visibility": "player",
+          "placements": [
+            {
+              "mapId": "vale",
+              "x": 800,
+              "y": 800
+            }
+          ]
+        }
+      },
+      "sourcePath": "content/vale/places/fogged-ruin.md",
+      "links": [],
+      "backlinks": []
+    },
+    {
+      "id": "harbor",
+      "title": "Harbor",
+      "type": "settlement",
+      "world": "vale",
+      "visibility": "player",
+      "canon": "canon",
+      "aliases": [],
+      "tags": [],
+      "images": [],
+      "body": "\n# Harbor\n\nFishing boats and [[Watchtower|the tower]] on the cliff. Ask about [[Market Rumour]].\n",
+      "bodyHtml": "<h1>Harbor</h1>\n<p>Fishing boats and <a class=\"atlas-wikilink\" data-entity-id=\"watchtower\" href=\"#/entity/watchtower\" aria-haspopup=\"dialog\">the tower</a> on the cliff. Ask about <a class=\"atlas-wikilink\" data-entity-id=\"market-rumour\" href=\"#/entity/market-rumour\" aria-haspopup=\"dialog\">Market Rumour</a>.</p>\n",
+      "frontmatter": {
+        "title": "Harbor",
+        "atlas": {
+          "type": "settlement",
+          "visibility": "player",
+          "placements": [
+            {
+              "mapId": "vale",
+              "x": 100,
+              "y": 100
+            },
+            {
+              "mapId": "vale",
+              "x": 220,
+              "y": 220
+            }
+          ]
+        }
+      },
+      "sourcePath": "content/vale/places/harbor.md",
+      "links": [
+        {
+          "target": "Watchtower",
+          "display": "the tower",
+          "resolvedId": "watchtower",
+          "broken": false
+        },
+        {
+          "target": "Market Rumour",
+          "display": "Market Rumour",
+          "resolvedId": "market-rumour",
+          "broken": false
+        }
+      ],
+      "backlinks": [
+        {
+          "id": "market-rumour",
+          "title": "Market Rumour"
+        },
+        {
+          "id": "watchtower",
+          "title": "Watchtower"
+        }
+      ]
+    },
+    {
+      "id": "watchtower",
+      "title": "Watchtower",
+      "type": "landmark",
+      "world": "vale",
+      "visibility": "player",
+      "canon": "canon",
+      "aliases": [],
+      "tags": [],
+      "images": [],
+      "body": "\n# Watchtower\n\nIt watches the [[Harbor]].\n",
+      "bodyHtml": "<h1>Watchtower</h1>\n<p>It watches the <a class=\"atlas-wikilink\" data-entity-id=\"harbor\" href=\"#/entity/harbor\" aria-haspopup=\"dialog\">Harbor</a>.</p>\n",
+      "frontmatter": {
+        "title": "Watchtower",
+        "atlas": {
+          "type": "landmark",
+          "visibility": "player",
+          "placements": [
+            {
+              "mapId": "vale",
+              "x": 300,
+              "y": 450
+            }
+          ]
+        }
+      },
+      "sourcePath": "content/vale/places/watchtower.md",
+      "links": [
+        {
+          "target": "Harbor",
+          "display": "Harbor",
+          "resolvedId": "harbor",
+          "broken": false
+        }
+      ],
+      "backlinks": [
+        {
+          "id": "harbor",
+          "title": "Harbor"
+        }
+      ]
+    }
+  ],
+  "placements": [
+    {
+      "id": "vampire-lord@vale",
+      "entityId": "vampire-lord",
+      "mapId": "vale",
+      "x": 320,
+      "y": 320,
+      "label": "Vampire Lord",
+      "visibility": "dm"
+    },
+    {
+      "id": "vault-keeper@vale",
+      "entityId": "vault-keeper",
+      "mapId": "vale",
+      "x": 150,
+      "y": 150,
+      "label": "Vault Keeper",
+      "visibility": "player"
+    },
+    {
+      "id": "vault-keeper@vale",
+      "entityId": "vault-keeper",
+      "mapId": "vale",
+      "x": 120,
+      "y": 400,
+      "label": "Vault Keeper",
+      "visibility": "player",
+      "secretId": "hidden-door"
+    },
+    {
+      "id": "deep-cave@depths",
+      "entityId": "deep-cave",
+      "mapId": "depths",
+      "x": 100,
+      "y": 100,
+      "label": "Deep Cave",
+      "visibility": "player"
+    },
+    {
+      "id": "fogged-ruin@vale",
+      "entityId": "fogged-ruin",
+      "mapId": "vale",
+      "x": 800,
+      "y": 800,
+      "label": "Fogged Ruin",
+      "visibility": "player"
+    },
+    {
+      "id": "harbor@vale",
+      "entityId": "harbor",
+      "mapId": "vale",
+      "x": 100,
+      "y": 100,
+      "label": "Harbor",
+      "visibility": "player"
+    },
+    {
+      "id": "harbor@vale",
+      "entityId": "harbor",
+      "mapId": "vale",
+      "x": 220,
+      "y": 220,
+      "label": "Harbor",
+      "visibility": "player"
+    },
+    {
+      "id": "watchtower@vale",
+      "entityId": "watchtower",
+      "mapId": "vale",
+      "x": 300,
+      "y": 450,
+      "label": "Watchtower",
+      "visibility": "player"
+    }
+  ],
+  "assets": [],
+  "buildReport": {
+    "scanned": 7,
+    "included": 7,
+    "excluded": 0,
+    "excludedByFolder": 0,
+    "excludedByVisibility": 0,
+    "excludedPaths": [],
+    "excludedNotes": [],
+    "warnings": [
+      "content/vale/_atlas/world.yaml: no schemaVersion declared — treating as legacy v1. Add \"schemaVersion: 1\" at the top of world.yaml to silence this warning."
+    ],
+    "brokenLinks": 0,
+    "unresolvedLinks": 0,
+    "duplicateSlugs": 0,
+    "strippedDmBlocks": 0,
+    "localAssets": 0,
+    "externalAssets": 0,
+    "missingAssets": 0
+  }
+}
