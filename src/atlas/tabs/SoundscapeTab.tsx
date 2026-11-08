@@ -20,7 +20,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ChevronRight, MapPin, Pen, Plus, RotateCcw, Trash2 } from "lucide-react";
 import type { EntityVisibility, MapDocument, SoundArea } from "@/atlas/content/schema";
-import { VISIBILITY_MENU_ORDER } from "@/atlas/content/visibility";
+import { VISIBILITY_MENU_ORDER, worldItemVisibility } from "@/atlas/content/visibility";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -339,7 +339,7 @@ export function SoundscapeTab({ map, availableAudioFiles, api: draft }: Props) {
               <div>
                 <Label className="text-[10px]">Visibility</Label>
                 <Select
-                  value={selected.visibility ?? "dm"}
+                  value={worldItemVisibility(selected.visibility)}
                   onValueChange={(v) => setVisibility(selected.id, v as EntityVisibility)}
                 >
                   <SelectTrigger className="h-7 text-xs">
