@@ -1,6 +1,6 @@
 # R-10 Schema v2 types
 
-Status: in-review
+Status: done (#123, 2026-11-08)
 Blocked by: R-04 (done); ADR answers (done 2026-11-08: Isak accepted every recommendation)
 Size: S
 Branch: `rebuild-r10-schema-v2-types`
