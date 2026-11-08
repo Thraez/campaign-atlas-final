@@ -348,3 +348,101 @@ describe("sound-only area under fog (R-11c, matching R-11b's build)", () => {
     ]);
   });
 });
+
+/** A map lit on its left half (x 0-500) with sound areas appended. */
+const halfLit = (areaLines: string[], world: string[] = []): Fixture => ({
+  name: "sound areas on a half-lit map",
+  notes: {},
+  mapYaml: [
+    ...MAP_YAML,
+    "    fog:",
+    "      enabled: true",
+    "      reveals:",
+    "        - [[0, 0], [500, 0], [500, 1000], [0, 1000]]",
+    "    soundscape:",
+    "      areas:",
+    ...areaLines,
+  ],
+  world,
+  fails: false,
+});
+
+const soundIssues = (issues: Issue[]) =>
+  issues
+    .filter((i) => i.code.startsWith("sound-area-"))
+    .map((i) => ({ code: i.code, severity: i.severity, message: i.message }));
+
+describe("sound areas the player build leaves out for other reasons (R-11c)", () => {
+  it("a ride-on area of a fogged region and of a dm region warns; a lit player region's ships", async () => {
+    const f = halfLit(
+      [
+        "        - { id: fog-ride, name: fog-ride, regionId: dark-wood, bed: { src: audio/drums.ogg } }",
+        "        - { id: dm-ride, name: dm-ride, regionId: lair, bed: { src: audio/drums.ogg } }",
+        "        - { id: lit-ride, name: lit-ride, regionId: meadow, bed: { src: audio/drums.ogg } }",
+      ],
+      [
+        "regions:",
+        "  - { id: dark-wood, name: dark-wood, mapId: m1, visibility: player, points: [[600, 100], [900, 100], [900, 400]] }",
+        "  - { id: lair, name: lair, mapId: m1, visibility: dm, points: [[100, 100], [300, 100], [300, 300]] }",
+        "  - { id: meadow, name: meadow, mapId: m1, visibility: player, points: [[100, 500], [300, 500], [300, 700]] }",
+      ],
+    );
+    const { dm, player, report, blocking } = await run(f);
+    expect(player.report.failure).toBeUndefined();
+    expect(blocking).toEqual([]);
+    const hits = soundIssues(report.issues);
+    expect(hits).toHaveLength(2);
+    for (const [h, name, region] of [
+      [hits[0], "fog-ride", "dark-wood"],
+      [hits[1], "dm-ride", "lair"],
+    ] as const) {
+      expect(h.code).toBe("sound-area-region-hidden");
+      expect(h.severity).toBe("warning");
+      expect(h.message).toContain(name);
+      expect(h.message).toContain(region);
+    }
+    expect(shippedAreas(dm.project)).toHaveLength(3);
+    expect(shippedAreas(player.project)).toEqual([expect.objectContaining({ regionId: "meadow" })]);
+  });
+
+  it('regionId: "" is a sound-only area in both: fogged, it warns as fogged; lit, it ships', async () => {
+    const f = halfLit([
+      '        - { id: blank-fog, name: blank-fog, regionId: "", visibility: player, points: [[100, 100], [900, 100], [900, 400]], bed: { src: audio/drums.ogg } }',
+      '        - { id: blank-lit, name: blank-lit, regionId: "", visibility: player, points: [[100, 500], [300, 500], [300, 700]], bed: { src: audio/drums.ogg } }',
+    ]);
+    const { player, report } = await run(f);
+    expect(player.report.failure).toBeUndefined();
+    expect(soundIssues(report.issues)).toEqual([
+      expect.objectContaining({
+        code: "sound-area-fogged",
+        message: expect.stringContaining("blank-fog"),
+      }),
+    ]);
+    const kept = shippedAreas(player.project) as { points: unknown }[];
+    expect(kept.map((a) => a.points)).toEqual([
+      [
+        [100, 500],
+        [300, 500],
+        [300, 700],
+      ],
+    ]);
+  });
+
+  it("an area the adapter skips (fewer than 3 points, no region) warns it won't play; the build drops it", async () => {
+    const f = halfLit([
+      "        - { id: stub, name: stub, visibility: player, points: [[100, 100], [200, 100]], bed: { src: audio/drums.ogg } }",
+    ]);
+    const { dm, player, report, blocking } = await run(f);
+    expect(player.report.failure).toBeUndefined();
+    expect(blocking).toEqual([]);
+    expect(soundIssues(report.issues)).toEqual([
+      {
+        code: "sound-area-malformed",
+        severity: "warning",
+        message: expect.stringContaining('"stub" won\'t play for players'),
+      },
+    ]);
+    expect(shippedAreas(dm.project)).toHaveLength(1);
+    expect(shippedAreas(player.project)).toEqual([]);
+  });
+});

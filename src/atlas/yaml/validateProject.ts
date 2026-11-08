@@ -584,23 +584,48 @@ const checkWhatShips: Rule = (ctx) => {
       hint: "A typo, a renamed note or an entry in the wrong world: the note it was meant to narrow may ship. Fix the key to the note's id, or remove the entry.",
     });
   }
+  // Sound areas: the build plays an area only on a "ships" verdict, so every
+  // other outcome the DM can fix gets a warning here. Ride-on or not is the
+  // resolver's call (via the v1 adapter), never re-derived from `regionId`.
+  const res = ctx.resolution;
   for (const m of ctx.project.maps) {
-    for (const a of m.soundscape?.areas ?? []) {
-      if (a.regionId) continue; // ride-on areas follow their region
-      const fogged = verdictsFor(ctx.resolution.sound, m.id, a.id).some(
-        (v) => v.reason === "fogged",
-      );
-      if (!fogged) continue;
-      issues.push({
-        // The player build asks the same resolver and leaves this area out
-        // (arch-02, R-11b); the build doesn't fail on it, so neither does this.
-        severity: "warning",
-        code: "sound-area-fogged",
-        category: "map",
-        message: `Sound area "${a.name ?? a.id}" is left out of the player atlas: part of its shape is under fog, so players won't hear it`,
-        hint: "Reveal its whole shape in the Fog tab, or shrink it to the revealed part, so it keeps playing for players.",
-        scope: { mapId: m.id },
-      });
+    if (!res.maps.some((v) => v.id === m.id)) continue; // the map itself is reported elsewhere
+    for (const [i, a] of (m.soundscape?.areas ?? []).entries()) {
+      const label = `Sound area "${a.name ?? a.id ?? `#${i + 1}`}"`;
+      const verdicts = typeof a.id === "string" ? verdictsFor(res.sound, m.id, a.id) : [];
+      // The build doesn't fail on any of these; it leaves the area out, so
+      // they warn rather than block.
+      if (verdicts.length === 0) {
+        issues.push({
+          severity: "warning",
+          code: "sound-area-malformed",
+          category: "map",
+          message: `${label} won't play for players: it has no id, no sound file, or (without a region) fewer than 3 points, so the player build skips it`,
+          hint: "Give it an id and a sound file, and draw at least 3 points or attach it to a region.",
+          scope: { mapId: m.id },
+        });
+        continue;
+      }
+      const reasons = new Set(verdicts.map((v) => v.reason));
+      if (reasons.has("fogged")) {
+        issues.push({
+          severity: "warning",
+          code: "sound-area-fogged",
+          category: "map",
+          message: `${label} is left out of the player atlas: part of its shape is under fog, so players won't hear it`,
+          hint: "Reveal its whole shape in the Fog tab, or shrink it to the revealed part, so it keeps playing for players.",
+          scope: { mapId: m.id },
+        });
+      } else if (reasons.has("region-hidden")) {
+        issues.push({
+          severity: "warning",
+          code: "sound-area-region-hidden",
+          category: "map",
+          message: `${label} is left out of the player atlas: its region "${a.regionId}" doesn't reach players (hidden, missing or under fog), so players won't hear it`,
+          hint: "Make the region visible to players and reveal it in the Fog tab, or detach the sound area and draw its own shape.",
+          scope: { mapId: m.id },
+        });
+      }
     }
   }
   return { issues };
