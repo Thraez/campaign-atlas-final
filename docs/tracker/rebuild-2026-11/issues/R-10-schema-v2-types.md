@@ -56,3 +56,21 @@ agent; set the ADRs to `accepted` with his answers in the same PR.
 - Any change to `src/atlas/content/schema.ts`'s v1 types or to the atlas.json output types (R-13).
 
 No adversarial player-safety review needed (types only, nothing ships differently).
+
+## Notes from the build
+
+- v2 items use v1's field names (`points`, `entityId`, `regionId`, `bed`, `unitLabel`), not
+  plan.md section 4's sketch names (`polygon`, `note`, `unit`), so the migration (R-20) copies
+  them unchanged. Pins use `note`, as above.
+- Maps also carry v1's `name`, `width`, `height` and optional `grid`, `oceanColor`, `wrapX`, so
+  today's map fits. v1's `soundscape: { enabled, masterGain, areas }` splits losslessly into
+  `soundscape: { enabled, masterGain }` and the map's `sound:` list (the areas).
+- `NoteOverride.basedOn` is optional: ADR-0004 rule 6 defines a missing `basedOn` (the entry
+  resolves to `dm`), so the validator keeps it rather than rejecting the file. Likewise
+  `visibility` is optional on maps and items (rule 1: missing means `dm`), and values are typed
+  `WrittenVisibility` (any string, kept as written).
+- `frame` and `enterZoom` are required on a map with a `parent` and refused on a top-level map.
+- `water` stays world-level as specified (in v1 it is per map; nothing in today's content sets it).
+- Unknown fields are errors everywhere; only `import.folders` is open (note type to folder).
+  Keyed records are built on a null prototype and refuse `__proto__`, `constructor`, `prototype`.
+- Left to R-12: duplicate entries in `worlds`, `campaigns` or `onOcean`, and duplicate map ids.
