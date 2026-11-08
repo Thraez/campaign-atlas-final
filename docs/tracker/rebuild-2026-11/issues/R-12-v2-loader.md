@@ -90,8 +90,8 @@ Decisions (fail-closed where the ticket was open):
 - v2 has one world-level `water`; v1 maps whose water differs (absent next to present counts) are
   refused, naming both maps, rather than one picked silently. R-20 must do the same.
 - The no-`world.yaml` fallback map (`<world>-overview`) moved into the adapter. The adapter also
-  takes optional v1 pins (no map id: the first map) for R-11b; `loadAtlasModel` passes none, as
-  v1 pins live in notes it doesn't read.
+  takes v1 pins (no map id: the first map); `loadAtlasModel` reads them from the notes (see
+  below).
 - Invalid visibility is kept as written with a warning; a non-string one in the v1 adapter loads
   as `dm`. Warnings come back separately so R-13 can put them in the hidden-from-player set.
 - Beyond the ticket's list, also refused: a world id that doesn't match its folder; an unlisted
@@ -108,5 +108,28 @@ Deviations:
   in its test instead of a committed root per case.
 - `validateProject` doesn't call the adapter yet; it can import it (everything is in `src/`).
   Wiring it is left to the ticket that moves validation onto the model.
-- R-11a was built in parallel: if its resolver defines its own model types, align on
-  `atlasModel.ts` (`MapModel.scale` is optional there, since v1 maps may have none).
+
+After the safety review (no leaks; two should-fixes and nits, all fixed):
+
+- v1 fog with no `enabled` field is now `fogged` (fail closed), as `loadWorldConfig` reads it;
+  only `enabled: false` is open. Tested.
+- The loader returns the notes the build reads (`notes: ModelNote[]`, each `{world, file,
+  note}` with `readNote`'s note: id, title, aliases, visibility, `atlas`), read through
+  `scanContentFolder` with the config's `include`/`exclude`, so folder-excluded notes (`_dm/`)
+  are left out. Their world: v1, the default world (as the build does); v2, the note's top-level
+  folder, or `""` at the root (no known world, so it ships nowhere). The v2 pin check still sees
+  every note, excluded ones too.
+- v1 pins: each read note's `atlas.placements` (legacy `atlas.x`/`y` when it has none) comes
+  through the adapter as pins on their maps, with the note's visibility (as R-20 writes them).
+  A placement behind a secret (`secretId`) loads as `dm` with a warning: the model has no secret
+  locks. `label` and pin style have no v2 field and are dropped. Tested by a round trip on
+  today's content against the build's own reading (six placed notes) and on the v1 fixture.
+- Symlinks: a symlinked note or folder anywhere in the content root is refused (this also covers a
+  symlinked world folder); a symlinked campaign file says it is a symlink; a world.yaml that is a
+  symlink or resolves outside the root is refused; so is a symlinked atlas.yaml. Tested.
+- `atlasModel.ts` is the canonical model: R-11a's resolver will type on `WorldModel`/`MapModel`
+  (and take `ModelNote`s) after this merges; R-11a's own types were not changed here.
+- R-20's ticket now says a water block on one map and none on another is refused, that a v1 map
+  with no `scale` needs one supplied (or a refusal), and how secret/label/style placements map.
+- Open for R-13: v1 pins behind a password secret ship today but load as `dm` here, so wiring the
+  build onto the model must decide them before claiming unchanged output.

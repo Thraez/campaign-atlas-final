@@ -299,6 +299,15 @@ describe("v1Model: fog becomes campaign main's map state", () => {
     expect(model.campaigns[0].maps.a).toEqual({ state: "fogged", reveals: [] });
   });
 
+  it("a fog with no enabled field is on (fail closed), as loadWorldConfig reads it", () => {
+    const { model } = v1Model({
+      worldId: W,
+      maps: [map("a")],
+      fogs: [{ mapId: "a", reveals: [] } as unknown as FogOverlay],
+    });
+    expect(model.campaigns[0].maps.a).toEqual({ state: "fogged", reveals: [] });
+  });
+
   it("warns about a fog on an unknown map and a second fog for one map", () => {
     const { model, warnings } = v1Model({
       worldId: W,

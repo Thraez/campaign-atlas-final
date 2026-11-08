@@ -10,11 +10,20 @@ import path from "node:path";
 import yaml from "js-yaml";
 import { AtlasModelError, loadAtlasModel, type ModelIssue } from "./loadAtlasModel";
 import { loadWorldConfig } from "./loadWorldConfig";
+import { parseNoteFields } from "./parseFrontmatter";
+import { readContentFiles } from "./readContentFiles";
+import { scanContentFolder } from "../../src/atlas/content/scanContentFolder";
 
 const REPO = path.resolve(__dirname, "../..");
 const FIX = path.join(REPO, "src/test/fixtures/atlas-model");
 const REAL = path.join(REPO, "content");
 const REAL_WORLD = "astrath-deeprealm";
+const REAL_CONFIG = JSON.parse(fs.readFileSync(path.join(REPO, "atlas.config.json"), "utf8")) as {
+  defaultWorld: string;
+  include: string[];
+  exclude: string[];
+};
+const EXCLUDE = ["**/_dm/**", "**/_drafts/**"];
 
 const temps: string[] = [];
 afterEach(() => {
@@ -38,8 +47,8 @@ function edit(root: string, rel: string, fn: (d: Record<string, any>) => void): 
   fs.writeFileSync(file, yaml.dump(d));
 }
 
-function load(root: string, defaultWorld = "aldmoor") {
-  return loadAtlasModel(root, { defaultWorld }, { root: path.dirname(root) });
+function load(root: string, defaultWorld = "aldmoor", exclude: string[] = []) {
+  return loadAtlasModel(root, { defaultWorld, exclude }, { root: path.dirname(root) });
 }
 
 /** The issues `fn` throws; fails the test if it doesn't throw AtlasModelError. */
@@ -542,5 +551,152 @@ describe("loadAtlasModel: ADR-0003 cross-file rules", () => {
     expect(msg).toMatch(/^2 problems/);
     expect(msg).toContain(`${MAIN}: maps.ghost:`);
     expect(msg).toContain(`${ALDMOOR}: maps[2].parent:`);
+  });
+});
+
+describe("loadAtlasModel: notes and v1 pins", () => {
+  it("round-trips today's placements: every placed note the build reads is a pin on its map", () => {
+    const { model, notes } = loadAtlasModel(REAL, REAL_CONFIG, { root: REPO });
+    // What the build reads today, by its own path.
+    const scan = scanContentFolder(readContentFiles(REAL, REPO), REAL_CONFIG);
+    const expected = scan.notes.flatMap((n) =>
+      (parseNoteFields(n).atlas.placements ?? []).map((p) => ({
+        note: n.id,
+        mapId: p.mapId ?? model.worlds[0].maps[0].id,
+        x: p.x,
+        y: p.y,
+        visibility: n.visibility,
+      })),
+    );
+    const pins = model.worlds[0].maps.flatMap((m) =>
+      (m.pins ?? []).map((p) => ({ ...p, mapId: m.id })),
+    );
+    const key = (p: { note: string; x: number }) => `${p.note}:${p.x}`;
+    expect(pins.sort((a, b) => key(a).localeCompare(key(b)))).toEqual(
+      expected.sort((a, b) => key(a).localeCompare(key(b))),
+    );
+    expect(pins.length).toBeGreaterThanOrEqual(6);
+    // And every note the build reads comes back, in the default world.
+    expect(notes.map((n) => n.note.relPath).sort()).toEqual(
+      scan.notes.map((n) => n.relPath).sort(),
+    );
+    expect(new Set(notes.map((n) => n.world))).toEqual(new Set([REAL_WORLD]));
+  });
+
+  it("puts v1 placements on their maps, the first map by default, legacy x/y as a fallback", () => {
+    const { model, warnings } = load(path.join(FIX, "v1/content"), "emberwold", EXCLUDE);
+    const [ov, depths] = model.worlds[0].maps;
+    expect(ov.pins).toEqual([
+      { note: "hermit", x: 300, y: 400, visibility: "rumor" },
+      { note: "smith", x: 10, y: 20, visibility: "player" },
+      { note: "smith", x: 7, y: 8, visibility: "player" },
+      { note: "vault-keeper", x: 50, y: 60, visibility: "dm" },
+    ]);
+    expect(depths.pins).toEqual([{ note: "smith", x: 5, y: 6, visibility: "player" }]);
+    // A placement on an unknown map is dropped (as the build drops it), with a warning.
+    expect(warnings.some((w) => w.includes("smith") && w.includes('"no-such-map"'))).toBe(true);
+    // A placement behind a secret can't ship from the model: dm, with a warning.
+    expect(warnings.some((w) => w.includes("vault-keeper.md") && w.includes("hidden-door"))).toBe(
+      true,
+    );
+  });
+
+  it("leaves folder-excluded notes out of the notes and the pins", () => {
+    const { model, notes } = load(path.join(FIX, "v1/content"), "emberwold", EXCLUDE);
+    const pinned = model.worlds[0].maps.flatMap((m) => (m.pins ?? []).map((p) => p.note));
+    expect(pinned).not.toContain("spy");
+    expect(notes.map((n) => n.note.id)).not.toContain("spy");
+    expect(notes.map((n) => n.note.id).sort()).toEqual([
+      "hermit",
+      "smith",
+      "unplaced",
+      "vault-keeper",
+    ]);
+    expect(notes.every((n) => n.world === "emberwold")).toBe(true);
+  });
+
+  it("returns v2 notes with their world folder; a note outside every world gets none", () => {
+    const { notes } = load(path.join(FIX, "v2/content"), "aldmoor", EXCLUDE);
+    const byId = Object.fromEntries(notes.map((n) => [n.note.id, n]));
+    expect(Object.keys(byId).sort()).toEqual(["miller", "stray"]);
+    expect(byId.miller.world).toBe("aldmoor");
+    expect(byId.miller.file).toBe("content/aldmoor/npcs/miller.md");
+    expect(byId.miller.note.visibility).toBe("player");
+    expect(byId.stray.world).toBe("");
+  });
+
+  it("checks folder-excluded v2 notes for pins too", () => {
+    const root = copy("v2");
+    fs.writeFileSync(
+      path.join(root, "aldmoor/_dm/mole.md"),
+      "---\natlas:\n  type: npc\n  placements:\n    - { x: 1, y: 2 }\n---\n",
+    );
+    const issues = issuesOf(() => load(root, "aldmoor", EXCLUDE));
+    expect(issues).toEqual([
+      expect.objectContaining({ file: "content/aldmoor/_dm/mole.md", path: "atlas.placements" }),
+    ]);
+  });
+});
+
+describe("loadAtlasModel: symlinks are refused", () => {
+  it("a symlinked note file or note folder, in v2 and v1", () => {
+    for (const fixture of ["v2", "v1"]) {
+      const world = fixture === "v2" ? "aldmoor" : "emberwold";
+      const root = copy(fixture);
+      const outside = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-outside-"));
+      temps.push(outside);
+      fs.writeFileSync(
+        path.join(outside, "pinned.md"),
+        "---\natlas:\n  placements:\n    - { x: 1, y: 2 }\n---\n",
+      );
+      fs.symlinkSync(path.join(outside, "pinned.md"), path.join(root, world, "linked.md"));
+      fs.symlinkSync(outside, path.join(root, world, "linked-folder"));
+      const issues = issuesOf(() => load(root, world));
+      expect(issues.map((i) => i.file).sort()).toEqual([
+        `content/${world}/linked-folder`,
+        `content/${world}/linked.md`,
+      ]);
+      expect(issues.every((i) => /is a symlink/.test(i.message))).toBe(true);
+    }
+  });
+
+  it("a symlinked campaign file says so, not that the file is missing", () => {
+    const root = copy("v2");
+    const main = path.join(root, "_atlas/campaigns/main.yaml");
+    const real = path.join(root, "aldmoor/main-campaign.yaml");
+    fs.renameSync(main, real);
+    fs.symlinkSync(real, main);
+    const issues = issuesOf(() => load(root));
+    expect(issues).toEqual([
+      expect.objectContaining({ file: MAIN, message: expect.stringMatching(/is a symlink/) }),
+    ]);
+  });
+
+  it("a listed world can't be a symlinked folder or lead outside the root", () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-outside-"));
+    temps.push(outside);
+    const root = copy("v2");
+    fs.cpSync(path.join(root, "brine"), path.join(outside, "brine"), { recursive: true });
+    fs.rmSync(path.join(root, "brine"), { recursive: true });
+    fs.symlinkSync(path.join(outside, "brine"), path.join(root, "brine"));
+    // Caught by the content-root walk, before atlas.yaml is read.
+    expect(issuesOf(() => load(root))).toEqual([
+      expect.objectContaining({
+        file: "content/brine",
+        message: expect.stringMatching(/is a symlink/),
+      }),
+    ]);
+
+    // A real folder whose world.yaml links out of the root.
+    const root2 = copy("v2");
+    const file = path.join(root2, "brine/_atlas/world.yaml");
+    fs.rmSync(file);
+    fs.symlinkSync(path.join(outside, "brine/_atlas/world.yaml"), file);
+    expect(issuesOf(() => load(root2))).toEqual([
+      expect.objectContaining({
+        file: BRINE,
+        message: expect.stringMatching(/outside the content root/),
+      }),
+    ]);
   });
 });

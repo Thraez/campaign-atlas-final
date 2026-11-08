@@ -10,6 +10,7 @@
  *
  * Types only, plus the loader's named error, so the app and `scripts/` share it.
  */
+import type { Note } from "./readNote";
 import type { MapScale } from "./schema";
 import type {
   CampaignFileV2,
@@ -47,6 +48,30 @@ export interface AtlasModel {
 export interface LoadedAtlasModel {
   model: AtlasModel;
   warnings: string[];
+}
+
+/**
+ * A note the build reads, with the world it belongs to: what the per-campaign
+ * resolver (R-11a) takes as `{ world, note }`. v1: every note is the default
+ * world's (as the build does today). v2: the world is the note's top-level
+ * folder under the content root; a note outside every listed world folder
+ * keeps that folder's name, or `""` at the root, so it belongs to no known
+ * world and ships nowhere.
+ */
+export interface ModelNote {
+  world: string;
+  /** Relative path, as in warnings. */
+  file: string;
+  /** As `readNote` read it: id, title, aliases, frontmatter visibility, `atlas` block. */
+  note: Note;
+}
+
+/**
+ * What `loadAtlasModel` returns: the model, its DM-only warnings, and the notes
+ * the build reads (folder-excluded notes, `_dm/` and the like, are left out).
+ */
+export interface LoadedAtlasContent extends LoadedAtlasModel {
+  notes: ModelNote[];
 }
 
 /** One reason the content can't load: the file (relative path) and where in it. */

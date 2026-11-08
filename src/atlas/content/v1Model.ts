@@ -289,8 +289,12 @@ function byMap<T>(
   return out;
 }
 
+/**
+ * No fog: open. A fog is on unless it says `enabled: false` (fail closed, as
+ * `loadWorldConfig` reads a missing `enabled`).
+ */
 function campaignMapState(fog: FogOverlay | undefined): CampaignMapV2 {
-  if (!fog || !fog.enabled) return { state: "open" };
+  if (!fog || fog.enabled === false) return { state: "open" };
   return compact<CampaignMapV2>({
     state: "fogged",
     reveals: fog.reveals ?? [],

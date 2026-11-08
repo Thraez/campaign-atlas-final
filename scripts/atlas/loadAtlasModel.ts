@@ -12,7 +12,12 @@
  *   - A mix fails: an `atlas.yaml` next to a v1 `world.yaml`, a v2 `world.yaml`
  *     or campaign files with no `atlas.yaml`. So does any version above 2.
  *
- * Returns the model and its warnings, or throws `AtlasModelError` naming every
+ * Every note is read as the build reads it (`scanContentFolder` with the
+ * config's `include`/`exclude`); symlinked notes and folders are refused. v1
+ * pins come from the notes' `atlas.placements`; a v2 note may carry none.
+ *
+ * Returns the model, its warnings and the notes the build reads (each with its
+ * world, for the resolver), or throws `AtlasModelError` naming every
  * problem's file and path. Warnings are DM-only: a caller must keep them out of
  * player artifacts (R-06: they go in the build's hidden-from-player set).
  */
@@ -22,31 +27,43 @@ import yaml from "js-yaml";
 import {
   AtlasModelError,
   WHOLE_FILE,
-  type LoadedAtlasModel,
+  type LoadedAtlasContent,
   type ModelIssue,
+  type ModelNote,
 } from "../../src/atlas/content/atlasModel";
-import { readNote } from "../../src/atlas/content/readNote";
+import { readNote, type Note } from "../../src/atlas/content/readNote";
+import { scanContentFolder, type ContentFile } from "../../src/atlas/content/scanContentFolder";
 import {
   validateAtlasFileV2,
   validateCampaignFileV2,
   validateWorldFileV2,
   type SchemaV2Error,
 } from "../../src/atlas/content/schemaV2";
-import { v1Model, V1ModelError } from "../../src/atlas/content/v1Model";
+import { v1Model, V1ModelError, type V1Pin } from "../../src/atlas/content/v1Model";
 import {
   assembleV2Model,
   type V2CampaignSource,
   type V2WorldSource,
 } from "../../src/atlas/content/v2Model";
 import { loadWorldConfig, WorldConfigError } from "./loadWorldConfig";
+import { parseNoteFields } from "./parseFrontmatter";
 import { readSchemaVersion, SchemaVersionError, type AtlasSchemaVersion } from "./schemaVersion";
 
 export { AtlasModelError } from "../../src/atlas/content/atlasModel";
-export type { AtlasModel, LoadedAtlasModel, ModelIssue } from "../../src/atlas/content/atlasModel";
+export type {
+  AtlasModel,
+  LoadedAtlasContent,
+  LoadedAtlasModel,
+  ModelIssue,
+  ModelNote,
+} from "../../src/atlas/content/atlasModel";
 
 export interface LoadAtlasModelConfig {
   /** `atlas.config.json` `defaultWorld`: the v1 world. Not used for v2. */
   defaultWorld: string;
+  /** `atlas.config.json` `include`/`exclude`: which notes the build reads (`scanContentFolder`). */
+  include?: readonly string[];
+  exclude?: readonly string[];
 }
 
 export interface LoadAtlasModelOptions {
@@ -127,20 +144,81 @@ class Loader {
     return out;
   }
 
-  /** Every `.md` file under the content root (not in dot folders or `_atlas`). */
-  noteFiles(dir = this.contentRoot): string[] {
-    const out: string[] = [];
+  /** True when `p` or anything it resolves through leaves the content root. */
+  outsideRoot(p: string): boolean {
+    const root = fs.realpathSync(this.contentRoot);
+    const real = fs.realpathSync(p);
+    return real !== root && !real.startsWith(root + path.sep);
+  }
+
+  /**
+   * Every `.md` file under the content root, walked as the build walks it
+   * (`readContentFiles`: every folder, `.md` exactly). A symlinked folder or
+   * note is refused: it could lead outside the root, and a walk that skipped
+   * it would skip its pin check too.
+   */
+  noteFiles(dir = this.contentRoot): ContentFile[] {
+    const out: ContentFile[] = [];
     for (const d of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (d.name.startsWith(".")) continue;
       const p = path.join(dir, d.name);
-      if (d.isDirectory()) {
-        if (d.name !== "_atlas") out.push(...this.noteFiles(p));
-      } else if (d.isFile() && d.name.toLowerCase().endsWith(".md")) {
-        out.push(p);
+      if (d.isSymbolicLink()) {
+        let isDir = false;
+        try {
+          isDir = fs.statSync(p).isDirectory();
+        } catch {
+          // a broken link: refused below only if it names a note
+        }
+        if (isDir || d.name.endsWith(".md")) {
+          this.issue(
+            p,
+            WHOLE_FILE,
+            `is a symlink; notes and folders in the content root must be real files and folders`,
+          );
+        }
+      } else if (d.isDirectory()) {
+        out.push(...this.noteFiles(p));
+      } else if (d.isFile() && d.name.endsWith(".md")) {
+        out.push({
+          contentPath: path.relative(this.contentRoot, p).replace(/\\/g, "/"),
+          relPath: this.rel(p),
+          raw: fs.readFileSync(p, "utf8"),
+        });
       }
     }
     return out;
   }
+}
+
+interface ReadNotes {
+  /** The notes the build reads, with their content-root-relative path. */
+  read: { contentPath: string; note: Note }[];
+  /** Every note, folder-excluded ones too (for checks that must see everything). */
+  all: Note[];
+}
+
+/** Read every note; a symlink or unreadable frontmatter is an issue. */
+function readNotes(l: Loader, config: LoadAtlasModelConfig): ReadNotes {
+  const files = l.noteFiles();
+  for (const f of files) {
+    const note = readNote(f.raw, f.relPath);
+    if (note.parseError !== undefined) {
+      l.issue(
+        path.join(l.root, f.relPath),
+        "frontmatter",
+        `can't be read, so it can't be checked: ${note.parseError}`,
+      );
+    }
+  }
+  l.check();
+  const scan = scanContentFolder(files, {
+    include: config.include ?? [],
+    exclude: config.exclude ?? [],
+  });
+  const contentPathOf = new Map(files.map((f) => [f.relPath, f.contentPath]));
+  return {
+    read: scan.notes.map((note) => ({ contentPath: contentPathOf.get(note.relPath)!, note })),
+    all: [...scan.notes, ...scan.excluded],
+  };
 }
 
 /** Load a content root into the atlas model. Throws `AtlasModelError`. */
@@ -148,7 +226,7 @@ export function loadAtlasModel(
   contentRoot: string,
   config: LoadAtlasModelConfig,
   opts: LoadAtlasModelOptions = {},
-): LoadedAtlasModel {
+): LoadedAtlasContent {
   const l = new Loader(contentRoot, opts.root ?? process.cwd());
   const atlasDir = path.join(contentRoot, "_atlas");
   const atlasFile = path.join(atlasDir, "atlas.yaml");
@@ -157,14 +235,46 @@ export function loadAtlasModel(
     l.issue(atlasYml, WHOLE_FILE, "the atlas file must be named atlas.yaml, not atlas.yml");
     l.check();
   }
-  return fs.existsSync(atlasFile) ? loadV2(l, atlasFile) : loadV1(l, config);
+  const notes = readNotes(l, config);
+  return fs.existsSync(atlasFile) ? loadV2(l, atlasFile, notes) : loadV1(l, config, notes);
 }
 
 // ---------------------------------------------------------------------------
 // v1
 // ---------------------------------------------------------------------------
 
-function loadV1(l: Loader, config: LoadAtlasModelConfig): LoadedAtlasModel {
+/**
+ * Today's pins: each read note's `atlas.placements` (the legacy `atlas.x`/`y`
+ * only when it has none), as the build reads them. A pin's visibility is its
+ * note's, as R-20 writes it. A placement behind a secret (`secretId`) loads as
+ * `dm`: the model has no secret locks, so it can't ship one safely.
+ */
+function v1Pins(notes: ReadNotes, warnings: string[]): V1Pin[] {
+  const pins: V1Pin[] = [];
+  for (const { note } of notes.read) {
+    const placements = parseNoteFields(note).atlas.placements ?? [];
+    const { x, y } = note.atlas;
+    const list =
+      placements.length > 0
+        ? placements
+        : typeof x === "number" && typeof y === "number"
+          ? [{ mapId: undefined, x, y, secretId: undefined }]
+          : [];
+    list.forEach((p, i) => {
+      let visibility: string = note.visibility;
+      if (p.secretId !== undefined) {
+        visibility = "dm";
+        warnings.push(
+          `${note.relPath}: atlas.placements[${i}] is behind secret "${p.secretId}"; its pin loads as "dm"`,
+        );
+      }
+      pins.push({ note: note.id, mapId: p.mapId, x: p.x, y: p.y, visibility });
+    });
+  }
+  return pins;
+}
+
+function loadV1(l: Loader, config: LoadAtlasModelConfig, notes: ReadNotes): LoadedAtlasContent {
   const campaignsDir = path.join(l.contentRoot, "_atlas", "campaigns");
   if (fs.existsSync(campaignsDir)) {
     l.issue(
@@ -209,9 +319,12 @@ function loadV1(l: Loader, config: LoadAtlasModelConfig): LoadedAtlasModel {
     ]);
   }
 
+  const pinWarnings: string[] = [];
+  const pins = v1Pins(notes, pinWarnings);
   try {
     const loaded = v1Model({
       worldId,
+      pins,
       name: wc?.name,
       maps: wc?.maps ?? [],
       regions: wc?.regions,
@@ -224,7 +337,12 @@ function loadV1(l: Loader, config: LoadAtlasModelConfig): LoadedAtlasModel {
     });
     return {
       model: loaded.model,
-      warnings: [...(wc?.warnings ?? []), ...loaded.warnings.map((w) => `${worldRel}: ${w}`)],
+      warnings: [
+        ...(wc?.warnings ?? []),
+        ...pinWarnings,
+        ...loaded.warnings.map((w) => `${worldRel}: ${w}`),
+      ],
+      notes: notes.read.map(({ note }) => ({ world: worldId, file: note.relPath, note })),
     };
   } catch (e) {
     if (!(e instanceof V1ModelError)) throw e;
@@ -236,7 +354,11 @@ function loadV1(l: Loader, config: LoadAtlasModelConfig): LoadedAtlasModel {
 // v2
 // ---------------------------------------------------------------------------
 
-function loadV2(l: Loader, atlasFile: string): LoadedAtlasModel {
+function loadV2(l: Loader, atlasFile: string, notes: ReadNotes): LoadedAtlasContent {
+  if (fs.lstatSync(atlasFile).isSymbolicLink()) {
+    l.issue(atlasFile, WHOLE_FILE, "is a symlink; atlas.yaml must be a real file");
+    l.check();
+  }
   const atlasRaw = l.readYaml(atlasFile);
   l.check();
   const atlasVersion = l.version(atlasFile, atlasRaw);
@@ -264,6 +386,8 @@ function loadV2(l: Loader, atlasFile: string): LoadedAtlasModel {
       l.issue(atlasFile, `worlds[${i}]`, `"${id}" is not a valid world folder name`);
       return;
     }
+    // A symlinked world folder never gets here: the note walk refuses every
+    // symlinked folder in the content root. world.yaml itself is checked below.
     const dir = path.join(l.contentRoot, id);
     if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
       l.issue(atlasFile, `worlds[${i}]`, `world "${id}" has no folder (${l.rel(dir)})`);
@@ -275,6 +399,14 @@ function loadV2(l: Loader, atlasFile: string): LoadedAtlasModel {
         file,
         WHOLE_FILE,
         `world "${id}" is listed in atlas.yaml but has no _atlas/world.yaml`,
+      );
+      return;
+    }
+    if (fs.lstatSync(file).isSymbolicLink() || l.outsideRoot(file)) {
+      l.issue(
+        file,
+        WHOLE_FILE,
+        "is a symlink or leads outside the content root; it must be a real file",
       );
       return;
     }
@@ -313,12 +445,17 @@ function loadV2(l: Loader, atlasFile: string): LoadedAtlasModel {
   // --- campaign files --------------------------------------------------------
   const campaignsDir = path.join(l.contentRoot, "_atlas", "campaigns");
   const files = new Map<string, string>();
+  const symlinked = new Set<string>();
   if (fs.existsSync(campaignsDir)) {
     for (const d of fs.readdirSync(campaignsDir, { withFileTypes: true })) {
       if (d.name.startsWith(".")) continue;
       const p = path.join(campaignsDir, d.name);
-      if (d.isFile() && d.name.endsWith(".yaml")) files.set(d.name.slice(0, -".yaml".length), p);
-      else if (d.isFile() && d.name.endsWith(".yml")) {
+      if (d.isSymbolicLink()) {
+        l.issue(p, WHOLE_FILE, "is a symlink; campaign files must be real files");
+        symlinked.add(d.name.replace(/\.ya?ml$/, ""));
+      } else if (d.isFile() && d.name.endsWith(".yaml")) {
+        files.set(d.name.slice(0, -".yaml".length), p);
+      } else if (d.isFile() && d.name.endsWith(".yml")) {
         l.issue(p, WHOLE_FILE, "campaign files must end in .yaml, not .yml");
       }
     }
@@ -331,6 +468,7 @@ function loadV2(l: Loader, atlasFile: string): LoadedAtlasModel {
       l.issue(atlasFile, `campaigns[${i}]`, `"${id}" is not a valid campaign id`);
       return;
     }
+    if (symlinked.has(id)) return;
     if (!files.has(id)) {
       l.issue(atlasFile, `campaigns[${i}]`, `campaign "${id}" has no file (${l.rel(file)})`);
       return;
@@ -356,16 +494,9 @@ function loadV2(l: Loader, atlasFile: string): LoadedAtlasModel {
   }
 
   // --- notes: pins live in world.yaml in v2 ----------------------------------
-  for (const file of l.noteFiles()) {
-    const note = readNote(fs.readFileSync(file, "utf8"), l.rel(file));
-    if (note.parseError !== undefined) {
-      l.issue(
-        file,
-        "frontmatter",
-        `can't be read, so it can't be checked for pins: ${note.parseError}`,
-      );
-      continue;
-    }
+  // Every note, folder-excluded ones too: none may carry a pin.
+  for (const note of notes.all) {
+    const file = path.join(l.root, note.relPath);
     for (const key of ["placements", "x", "y"] as const) {
       if (note.atlas[key] !== undefined) {
         l.issue(
@@ -384,5 +515,9 @@ function loadV2(l: Loader, atlasFile: string): LoadedAtlasModel {
     campaigns,
   });
   if (result.issues.length > 0) throw new AtlasModelError(result.issues);
-  return { model: result.model, warnings: result.warnings };
+  const modelNotes: ModelNote[] = notes.read.map(({ contentPath, note }) => {
+    const slash = contentPath.indexOf("/");
+    return { world: slash < 0 ? "" : contentPath.slice(0, slash), file: note.relPath, note };
+  });
+  return { model: result.model, warnings: result.warnings, notes: modelNotes };
 }
