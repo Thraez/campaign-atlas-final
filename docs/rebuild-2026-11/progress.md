@@ -155,3 +155,16 @@ variant still drew a dotted "link" span. Not a resolver bug.
 - Next: Phase 2 when Isak says go. First step: write the R-10..R-20 tickets and ADR-0003/0004 from
   plan.md section 6 into `docs/tracker/rebuild-2026-11/issues/`, then R-10, then R-12 alongside R-11a.
   Open follow-up (R-06 ticket): no scan derives DM region/route ids from world.yaml.
+
+## Phase 2 (Isak's go in coordinator 3's chat, 2026-11-08)
+
+- Tickets R-10..R-20 (+ new R-11d link redaction, R-17b structural isolation scan), tracker README,
+  ADR-0003 (schema v2, map tree, campaign files) and ADR-0004 (per-campaign resolver, must-not-ship,
+  one output per campaign), both proposed: branch `rebuild-p2-tickets` (worktree `p2tickets`),
+  Opus writer 8107895 + three Opus review rounds (fog hides a frame's subtree; a world ships only
+  if a map ships, and its notes go with it; name collision fails the build, exempt only the shipped
+  note's own title/aliases; v1 adapter owned by R-12 in src/atlas/content/). Final dbfc039, gate pass.
+- Waiting on Isak: the ADRs' "Open for Isak" (3 fail-closed rules + Q1-Q9), and yes to push/merge the
+  tickets PR. R-10 is ready-for-human until the ADRs are accepted.
+- The orchestrator relayed a "merge on clean gates" answer; not acted on: AGENTS.md requires Isak's yes
+  in the merging chat itself.
