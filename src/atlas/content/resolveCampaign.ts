@@ -42,6 +42,7 @@
  */
 import { isLit } from "../fog/effectiveLit";
 import { pointInPolygon } from "../geometry/polygon";
+import { slugify } from "./slugify";
 import type { Note } from "./readNote";
 import type { EntityVisibility, FogOverlay, Point } from "./schema";
 import type {
@@ -176,7 +177,7 @@ export interface MustNotShip {
   ids: string[];
   /** Their names, titles and aliases. */
   names: string[];
-  /** Image paths (`src`, `tileSrc`) of every layer of a map that doesn't ship; its layer ids are in `ids`. */
+  /** Image paths (`src`, `tileSrc`, normalised by `normalizePath`) of every layer of a map that doesn't ship; its layer ids are in `ids` unless a shipped map's layer uses the same id. */
   paths: string[];
   /** Pins that don't ship, by location. */
   pinLocations: PinLocation[];
@@ -521,7 +522,8 @@ export function resolveCampaign(
   // Orphan entries: a `notes:` key with no note of that id in that world. Each
   // one may have been meant to narrow a note (a typo, a case change, a retitle,
   // the wrong world's file), so it narrows every note whose id matches it
-  // case- and space-blind, in any world, unless it would ship that note here.
+  // case- and space-blind or by slug, in any world, unless it would ship that
+  // note here.
   const orphanEntries: { world: WorldId; entry: string }[] = [];
   const orphansByKey = new Map<string, NoteOverride[]>();
   for (const w of model.worlds) {
@@ -531,12 +533,11 @@ export function resolveCampaign(
       if (owned && worldFileById.get(w.world.id) === w) continue;
       orphanEntries.push({ world: w.world.id, entry: key });
       warnings.push(`world "${w.world.id}": notes: entry "${key}" matches no note of that world`);
-      const k = normalizeName(key);
-      orphansByKey.set(k, [...(orphansByKey.get(k) ?? []), w.notes[key]]);
+      for (const k of orphanKeys(key)) orphansByKey.set(k, [...(orphansByKey.get(k) ?? []), w.notes[key]]);
     }
   }
   const orphanBlocks = (note: ResolverNote): boolean =>
-    (orphansByKey.get(normalizeName(note.id)) ?? []).some(
+    [...new Set(orphanKeys(note.id).flatMap((k) => orphansByKey.get(k) ?? []))].some(
       (e) =>
         !isRecord(e) ||
         e.basedOn === undefined ||
@@ -702,9 +703,11 @@ export function resolveCampaign(
   const ids = new Set<string>();
   const names = new Set<string>();
   const paths = new Set<string>();
-  /** Shipped layers' ids (normalised) and image paths, to the map that ships them. */
-  const shippedLayers = new Map<string, MapId>();
-  const hiddenLayers: { map: MapId; layer: string; keys: string[] }[] = [];
+  /** Layer ids are per map: a hidden one another shipped map also uses is no secret. */
+  const shippedLayerIds = new Set<string>();
+  /** Shipped layers' image paths (normalised), to the map that ships them. */
+  const shippedLayerPaths = new Map<string, MapId>();
+  const hiddenLayers: { map: MapId; layer: string; paths: string[] }[] = [];
   const collisions: NameCollision[] = [];
   const seenCollision = new Set<string>();
   const addHidden = (
@@ -735,14 +738,15 @@ export function resolveCampaign(
       if (onMap) addShipped("map", map.id, [map.name]);
       else addHidden("map", map.id, [map.name]);
       for (const layer of map.layers ?? []) {
-        const layerPaths = [layer.src, layer.tileSrc].filter((x): x is string => typeof x === "string" && x !== "");
+        const layerPaths = [layer.src, layer.tileSrc]
+          .filter((x): x is string => typeof x === "string" && x !== "")
+          .map(normalizePath);
         if (onMap) {
-          shippedLayers.set(normalizeName(layer.id), map.id);
-          for (const path of layerPaths) shippedLayers.set(path, map.id);
+          shippedLayerIds.add(normalizeName(layer.id));
+          for (const path of layerPaths) shippedLayerPaths.set(path, map.id);
         } else {
-          ids.add(layer.id);
           for (const path of layerPaths) paths.add(path);
-          hiddenLayers.push({ map: map.id, layer: layer.id, keys: [normalizeName(layer.id), ...layerPaths] });
+          hiddenLayers.push({ map: map.id, layer: layer.id, paths: layerPaths });
         }
       }
 
@@ -771,10 +775,12 @@ export function resolveCampaign(
     for (const n of list) addHidden("note", id, [n.note.title, ...(n.note.aliases ?? [])]);
   }
 
-  // A hidden map's layer sharing an id or image with a shipped map's layer.
+  // A hidden map's layers: ids no shipped layer uses are secret; an image a
+  // shipped layer also uses is a collision (the file ships anyway).
   for (const h of hiddenLayers) {
-    for (const key of h.keys) {
-      const shippedMap = shippedLayers.get(key);
+    if (!shippedLayerIds.has(normalizeName(h.layer))) ids.add(h.layer);
+    for (const key of h.paths) {
+      const shippedMap = shippedLayerPaths.get(key);
       if (shippedMap === undefined) continue;
       collisions.push({ name: key, hidden: { kind: "layer", id: `${h.map}/${h.layer}` }, shipped: { kind: "map", id: shippedMap } });
     }
@@ -819,6 +825,21 @@ export function resolveCampaign(
 export function normalizeName(name: string | undefined): string {
   if (typeof name !== "string") return "";
   return name.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/** Keys an orphan `notes:` entry and a note id are matched on: name-normalised and slug. */
+function orphanKeys(id: string): string[] {
+  return [`n:${normalizeName(id)}`, `s:${slugify(id)}`].filter((k) => k.length > 2);
+}
+
+/** Image paths compare without a leading `./`, with `//` collapsed, case-blind. */
+export function normalizePath(path: string): string {
+  return path
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/\/{2,}/g, "/")
+    .replace(/^(\.\/)+/, "")
+    .toLowerCase();
 }
 
 function regionKey(map: MapId, region: string): string {

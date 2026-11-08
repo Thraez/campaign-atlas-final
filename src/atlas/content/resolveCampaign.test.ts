@@ -970,6 +970,18 @@ describe("orphan notes: entries narrow, never vanish", () => {
     expect(noteShips(resolveCampaign(mdl, notes, "b"), "x")).toBe(false);
   });
 
+  it("a key matching only by slug (underscores, punctuation) narrows the note, in both campaigns", () => {
+    const mdl = twoVault([world("w", [map("m")], { salt_marsh: { visibility: { a: "dm" }, basedOn: "player" } })]);
+    const a = resolveCampaign(mdl, [note("salt-marsh")], "a");
+    expect(find(a.notes, () => true)).toMatchObject({ ships: false, reason: "orphan-entry" });
+    expect(a.orphanEntries).toEqual([{ world: "w", entry: "salt_marsh" }]);
+    const b = resolveCampaign(mdl, [note("salt-marsh")], "b");
+    expect(find(b.notes, () => true)).toMatchObject({ ships: false, reason: "orphan-entry" });
+    const shipsB = twoVault([world("w", [map("m")], { "Salt Marsh!": narrow })]);
+    expect(noteShips(resolveCampaign(shipsB, [note("salt-marsh")], "a"), "salt-marsh")).toBe(false);
+    expect(noteShips(resolveCampaign(shipsB, [note("salt-marsh")], "b"), "salt-marsh")).toBe(true);
+  });
+
   it("a retitled note's entry is reported as an orphan", () => {
     const mdl = twoVault([world("w", [map("m")], { "old-name": narrow })]);
     const r = resolveCampaign(mdl, [note("new-name")], "a");
@@ -1026,5 +1038,30 @@ describe("a hidden map's layers", () => {
     const b = resolveCampaign(mdl, [], "b");
     expect(b.mustNotShip.paths).toEqual([]);
     expect(b.collisions).toEqual([]);
+  });
+});
+
+describe("layer ids are per map; only shared images collide", () => {
+  const layer = (id: string, src: string) => ({ id, src, x: 0, y: 0, width: SIZE, height: SIZE });
+  it("a hidden map and a shipped map both using layer id `base` is no collision, and `base` isn't secret", () => {
+    const hidden = map("drow-city", { visibility: "dm", layers: [layer("base", "maps/drow.webp"), layer("drow-only", "maps/drow2.webp")] });
+    const shown = map("m", { layers: [layer("Base", "maps/surface.webp")] });
+    const mdl = model([world("w", [shown, hidden])], [campaign("a", { m: OPEN, "drow-city": OPEN })]);
+    const a = resolveCampaign(mdl, [], "a");
+    expect(a.collisions).toEqual([]);
+    expect(a.mustNotShip.ids).not.toContain("base");
+    expect(a.mustNotShip.ids).toContain("drow-only");
+    expect(a.mustNotShip.paths).toEqual(["maps/drow.webp", "maps/drow2.webp"]);
+  });
+
+  it("paths are normalised (leading ./, doubled slashes, case) for must-not-ship and the collision", () => {
+    const hidden = map("drow-city", { visibility: "dm", layers: [layer("x", "./Maps//Common.WEBP")] });
+    const shown = map("m", { layers: [layer("y", "maps/common.webp")] });
+    const mdl = model([world("w", [shown, hidden])], [campaign("a", { m: OPEN, "drow-city": OPEN })]);
+    const a = resolveCampaign(mdl, [], "a");
+    expect(a.mustNotShip.paths).toEqual(["maps/common.webp"]);
+    expect(a.collisions).toEqual([
+      { name: "maps/common.webp", hidden: { kind: "layer", id: "drow-city/x" }, shipped: { kind: "map", id: "m" } },
+    ]);
   });
 });

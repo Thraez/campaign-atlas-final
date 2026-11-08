@@ -102,7 +102,7 @@ callers onto this. It also absorbs arch-08's first half: one secret-note predica
 - Orphan `notes:` entries (a key matching no note of its world: wrong world's file, case or
   spacing change, retitled note) are returned as `orphanEntries` with a warning, for R-11b/R-11c
   to fail on. Fail-closed reading: in either campaign mode, an orphan narrows every note whose id
-  matches its key case- and space-blind, in any world, unless the orphan is current
+  matches its key case- and space-blind or by `slugify`, in any world, unless the orphan is current
   (`basedOn` equals the note's frontmatter) and names this campaign as `player` or `rumor`
   (reason `orphan-entry`).
 - A note id shared by two notes: every copy is `duplicate-id` and doesn't ship.
@@ -112,3 +112,14 @@ callers onto this. It also absorbs arch-08's first half: one secret-note predica
 - Known limit, for a later ticket: regions, routes and sound-only areas use the vertex fog test
   (ADR-0004 rule 3) while frames use the exact area test, so a region whose vertices are all lit
   but whose middle crosses fog still ships.
+
+### Safety review fixes (round 2)
+
+- Orphan keys also match note ids by `slugify` (so `salt_marsh` narrows `salt-marsh`), as well as
+  case- and space-blind. R-11b and R-11c now require the build and Publish Check to fail on any
+  `orphanEntries`, naming the world and key.
+- Layer ids are per map: a hidden map's layer id collides with nothing, and one that a shipped
+  map's layer also uses is left out of `mustNotShip.ids` (other hidden layer ids stay in). Only a
+  shared image path is a `layer` collision.
+- Layer image paths are normalised (`normalizePath`: no leading `./`, `//` collapsed,
+  case-blind) in `mustNotShip.paths` and in the path collision.
