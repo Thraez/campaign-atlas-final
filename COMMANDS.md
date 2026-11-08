@@ -52,6 +52,14 @@ Step 2 alone. Use it to see in `public/atlas/atlas.json` exactly what players ge
 
 Step 4 alone: runs every scan below at once on what's already built.
 
+### `npm run atlas:tree`
+
+Prints, for each campaign, the ocean and the map tree: each map's verdict (ships, or why not) and
+its state, and per map how many pins, regions, routes and sound areas ship, of how many. It reads
+only; it names hidden things, so its output is for the DM. On `content/` it shows the one map for
+`main`. `npm run atlas:tree -- --config atlas.next.config.json` shows the v2 test world
+(`content-next/`, never published), where the two campaigns differ.
+
 ### `npm run build` · Windows: `bin/build.cmd`
 
 The player-safe production build into `dist/`. The editor and the save endpoint are left out
