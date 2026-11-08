@@ -132,3 +132,11 @@ variant still drew a dotted "link" span. Not a resolver bug.
 - 23:40 #101 merged (d9c3400): all 17 approved PRs merged. R-02 (merged main, conflicts in SoundscapeTab.tsx and buildFullWorldYaml.ts resolved keeping both), R-03, R-04 and docs follow-up (a24f765, State.md + WORKFLOWS 14 scans) all gate-green. Waiting on Isak's yes to push, open PRs and merge them. Then R-05 and the buildReport warnings leak ticket.
 - 2026-11-08 01:32 On Isak's yes ("Yes, push and merge"): merged #116 R-02 (b97cdda), #117 R-03 (6f62e26), #118 R-04 (c97db8c), #119 docs follow-up (5c75317; WORKFLOWS conflict kept R-03's "9 safety scans"). main = 5c75317.
 - Next: R-05 (rebuild queue in State.md), a ticket for the player buildReport.warnings leak (high; see R-02 review entry), ADR-0002 is in via R-04. Then Phase 2 per plan.md.
+
+## Coordinator 3 (session b6741b63, 2026-11-08)
+
+- Took over Phase 1. Worktrees from origin/main 5c75317: `r05` (branch `rebuild-r05-rebuild-queue`,
+  builder Sonnet) and `r06` (branch `rebuild-r06-player-report-leak`, builder Opus). The leak is
+  ticket R-06 (`docs/tracker/rebuild-2026-11/issues/R-06-player-build-report-leak.md`): player
+  `buildReport.warnings` drops world.yaml warnings for a count line; test that a DM-only region id
+  never reaches player atlas.json. Gate helper copied to this session's scratchpad.
