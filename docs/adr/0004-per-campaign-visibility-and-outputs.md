@@ -71,7 +71,7 @@ decides visibility.
      must-not-ship, not its note's name, so the note can still ship elsewhere.
 9. **A hidden region hides what is inside or reaching into it.** On a map that ships, a region that doesn't
    ship for its own sake (its visibility, or a hidden linked note; not fog) hides, there: a pin
-   inside it or on its edge; a route with any point inside it or any segment crossing into it;
+   inside it or on its edge; a route with any point inside it or any segment crossing into it, touching its edge or running along it;
    a sound-only area, region or child-map frame that overlaps its interior without wholly
    containing it (a child map so hidden takes its whole subtree, as rule 2). Hidden wins over any
    shipped region covering the same point. A region hidden only by fog or only by this rule hides

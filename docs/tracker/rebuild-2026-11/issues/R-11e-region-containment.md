@@ -52,7 +52,7 @@ Per item type, an item that ships by every other rule doesn't ship when:
 
 **Area items that wholly contain a hiding region still ship.** "Wholly contains" means the hiding
 region lies strictly inside the item, sharing no boundary: an area whose outline is identical to
-the hiding region, or shares part of its boundary so that the hidden outline would be exposed, does
+the hiding region, or shares any part of its boundary (even one vertex), does
 not count as containing it and hides. Without this, every hidden lair
 would hide the kingdom region drawn around it, its ambient sound, and the city map framed around
 it. A container doesn't reveal the hidden zone: the hidden region's shape, name and contents are
