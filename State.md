@@ -1,6 +1,6 @@
 # State
 
-Updated 2026-11-08 on the Mac. Branch `main` (= origin/main 5c75317).
+Updated 2026-11-08 on the Mac. Branch `main` (= origin/main 0ff1503).
 
 ## Rebuild queue
 
@@ -14,7 +14,7 @@ ticket merges on `npm run gate` plus an Opus review; a push or merge needs Isak'
 | Phase | Goal | Verified by | State |
 |---|---|---|---|
 | 0 Guard and quick wins | R-01 Sync guard, scans on real artifacts, Q-01..Q-04 | Links that work, a fitted map, the menu above the map, a region card. **Safe stop** | done |
-| 1 Spine and PRs | The other PRs, R-02..R-06, ADR-0001 addendum, ADR-0002 | A publish log with every scan reading `dist`; `docs/GOALS.md` agreed | R-05, R-06 open |
+| 1 Spine and PRs | The other PRs, R-02..R-06, ADR-0001 addendum, ADR-0002 | A publish log with every scan reading `dist`; `docs/GOALS.md` agreed | done |
 | 2 Schema v2 and campaigns in the pipeline | R-10..R-20, ADR-0003, ADR-0004 | `npm run atlas:tree` on the v2 test world, per campaign; today's site unchanged | next |
 | 3 Shared canvas | Ocean/frame/map-tree component; viewer on it; campaign links | Ocean > continent > city > back on the local test world. **Safe stop** | - |
 | 4 Editor core | Router, command store, E0-E5, Place pin, E9, Draw route with distance/time; v2 test world only; ADR-0005, ADR-0006 | Add a map inside a map, pin it, draw a route, reload | - |
@@ -38,17 +38,14 @@ Phase T starts only on a measured problem on a real map.
 |---|---|
 | Phase 0 | #111 R-01 Sync refuses while hosting is public, #112 Q-01 broken wikilinks are plain text, #113 Q-02 maps open fitted, #114 Q-03 editor menu above the map, #115 Q-04 region hover card |
 | The 12 older PRs, in merge order | #109, #110, #99, #100, #106, #102, #103, #107, #104, #105, #108, #101 |
-| Phase 1 so far | #116 R-02 a missing world.yaml visibility is dm, #117 R-03 scans fail on a missing artifact, #118 R-04 adopt the rebuild goals (ADR-0002), #119 docs follow-up |
+| Phase 1 so far | #116 R-02 a missing world.yaml visibility is dm, #117 R-03 scans fail on a missing artifact, #118 R-04 adopt the rebuild goals (ADR-0002), #119 docs follow-up, #120 R-06 player build no longer names DM-only regions and routes in warnings, #121 R-05 this queue |
 
 The plan offered closing the four moot PRs (#99, #103, #105, #107) to save gate runs; Isak chose to
 merge all twelve, and they are in. They are superseded when the old editor retires (phase 7).
 
-### Phase 1, still open
-
-- R-05 rebuild queue in State.md (this section).
-- R-06 player `buildReport.warnings` leak (high): world.yaml warnings that name DM-only region and
-  route ids ship in the player build (`scripts/build-atlas.ts`). Built in parallel; ticket
-  `docs/tracker/rebuild-2026-11/issues/R-06-player-build-report-leak.md` (lands in its own PR).
+Phase 1 is done (2026-11-08). R-06 came out of the R-02 review: world.yaml warnings and warnings
+about routes the player build drops named DM-only ids in the player `atlas.json`; now a count line.
+Follow-up noted in its ticket: no scan derives DM region/route ids, so none would catch this class.
 
 ### Phase 2, in order (sizes in plan.md section 6)
 
@@ -98,9 +95,7 @@ State.md part is the same stale notes. Drop it once Isak decides the settings ch
 
 Lowest number first within each folder.
 
-- Rebuild: phase 1 (R-05, R-06) then phase 2 (Rebuild queue above).
-- R-06 (high, Rebuild queue above): the player build's `buildReport.warnings`
-  carries world.yaml warnings that name DM-only region and route ids (`scripts/build-atlas.ts`).
+- Rebuild: phase 2 next; Isak decides when it starts (Rebuild queue above).
 - `arch-2026-11/` (architecture pass): ranked tickets 02-09 in its `README.md`. The rebuild folds
   02 (sound areas inside fog ship) into R-11b and 08 into R-11a: build them there, not here. 07 merged (#110: an invalid world.yaml visibility loads
   as `dm`).
