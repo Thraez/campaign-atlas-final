@@ -17,6 +17,7 @@ import {
 } from "@/atlas/content/resolveCampaign";
 import { V1_CAMPAIGN_ID, v1Model, type V1Pin, type V1Route } from "@/atlas/content/v1Model";
 import { noteIsSecret } from "@/atlas/content/visibility";
+import { v1PinVisibility } from "@/atlas/content/pinVisibility";
 
 export const PUBLISH_CHECK_CAMPAIGN = V1_CAMPAIGN_ID;
 
@@ -34,7 +35,10 @@ function noteAtlas(frontmatter: Record<string, unknown> | undefined): Record<str
 }
 
 /**
- * Resolve the project for campaign `main`. Throws the adapter's
+ * Resolve the project for campaign `main`. The input is built from the DM
+ * build's project (what the editor loads), not from the vault: folder excludes
+ * hold only because a folder-excluded note never becomes an entity, so the
+ * resolver never sees it and its links resolve to nothing. Throws the adapter's
  * `V1ModelError` (two maps sharing an id) or the resolver's error; the caller
  * fails closed on it.
  */
@@ -52,8 +56,7 @@ export function resolveProject(project: AtlasProject): CampaignResolution {
     }
   }
 
-  // A pin's visibility is its note's, `dm` for a secret note or a placement
-  // behind a secret lock (as `loadAtlasModel` reads v1 pins).
+  // A pin's visibility follows the one v1 rule the build's loader uses.
   const pins: V1Pin[] = project.placements.map((p) => {
     const e = entityById.get(p.entityId);
     const secret = !e || noteIsSecret(e.visibility, noteAtlas(e.frontmatter));
@@ -62,7 +65,7 @@ export function resolveProject(project: AtlasProject): CampaignResolution {
       mapId: p.mapId,
       x: p.x,
       y: p.y,
-      visibility: secret || p.secretId !== undefined ? "dm" : p.visibility,
+      visibility: v1PinVisibility(secret, p.visibility, p.secretId),
     };
   });
 

@@ -274,11 +274,12 @@ describe("Publish Check blocks exactly when the strict player build fails (R-11c
 describe("sound-only area under fog (R-11c; arch-02 lands in R-11b)", () => {
   const fixture = FIXTURES.find((f) => f.name.startsWith("a sound-only area"))!;
 
-  it("the Publish Check says it won't play for players, without blocking", async () => {
+  it("the Publish Check warns it ships under fog today, without blocking", async () => {
     const { report } = await run(fixture);
     const hits = report.issues.filter((i) => i.code === "sound-area-fogged");
     expect(hits).toHaveLength(1);
-    expect(hits[0].severity).toBe("suggestion");
+    expect(hits[0].severity).toBe("warning");
+    expect(hits[0].message).toContain("R-11b");
     expect(hits[0].message).toContain("war-drums");
     expect(hits[0].scope).toEqual({ mapId: "m1" });
   });

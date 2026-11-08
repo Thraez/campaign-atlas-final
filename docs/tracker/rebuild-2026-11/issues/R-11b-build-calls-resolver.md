@@ -32,6 +32,10 @@ ship to players today, and the fog scan doesn't look at sound areas.
   against the source fog and fails with a new exit code (documented in its header) when a
   sound-only area has a point under fog. Add a clean/dirty variant for it to
   `scripts/atlas/publish-integrity-smoke.ts`.
+- Once the build drops it, update R-11c's Publish Check to match: the `sound-area-fogged` issue in
+  `src/atlas/yaml/validateProject.ts` (today a warning saying the area still ships) gets its
+  wording and severity changed, and the `it.todo` in `src/test/publish-check-build-parity.test.ts`
+  becomes a test that the strict player atlas has no such area.
 - Today's site is unchanged: a test builds the player and DM atlases of `content/` before and after
   (or against a committed snapshot) and finds `atlas.json` and `search-index.json` identical apart
   from `version` and `publishedAt`. The same test asserts the resolver reports no rule-8 name

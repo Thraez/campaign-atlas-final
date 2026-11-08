@@ -40,6 +40,7 @@ import {
   type SchemaV2Error,
 } from "../../src/atlas/content/schemaV2";
 import { v1Model, V1ModelError, type V1Pin } from "../../src/atlas/content/v1Model";
+import { v1PinVisibility } from "../../src/atlas/content/pinVisibility";
 import {
   assembleV2Model,
   type V2CampaignSource,
@@ -275,9 +276,8 @@ function v1Pins(notes: ReadNotes, warnings: string[]): V1Pin[] {
     list.forEach((p, i) => {
       // A secret note (not player-visible, or `publish: false`) never ships, so
       // neither does its pin: the build drops it (`isSecret`).
-      let visibility: string = note.isSecret ? "dm" : note.visibility;
+      const visibility = v1PinVisibility(note.isSecret, note.visibility, p.secretId);
       if (p.secretId !== undefined) {
-        visibility = "dm";
         warnings.push(
           `${note.relPath}: atlas.placements[${i}] is behind secret "${p.secretId}"; its pin loads as "dm"`,
         );
