@@ -1,21 +1,76 @@
 # State
 
-Updated 2026-11-08 on the Mac. Branch `main` (= origin/main c97db8c).
+Updated 2026-11-08 on the Mac. Branch `main` (= origin/main 0ff1503).
 
-## Morning queue (2026-11-07, night)
+## Rebuild queue
 
-The atlas is being rebuilt (option B, approved 2026-11-07): plan, goals and progress in
-`docs/rebuild-2026-11/` on branch `rebuild-plan-2026-11`. Isak said yes to merging these in
-order, each after `main` was merged in and `npm run gate` passed again. All are merged and
-published:
+The atlas is being rebuilt (option B, approved 2026-11-07, ADR-0002): new editor and map model
+(schema v2) in this repo behind `__INCLUDE_EDITOR__`; pipeline, scans, Sync and tests stay. Full plan,
+goals and progress: `docs/rebuild-2026-11/` on branch `rebuild-plan-2026-11` (not on main). Every
+ticket merges on `npm run gate` plus an Opus review; a push or merge needs Isak's yes in the chat.
 
-- Phase 0: #111 (R-01 Sync refuses while hosting is public), #112 (Q-01 broken wikilinks are plain
-  text), #113 (Q-02 maps open fitted to the screen), #114 (Q-03 editor menu paints above the map),
-  #115 (Q-04 region hover card).
-- The 12 older PRs: #109, #110, #99, #100, #106, #102, #103, #107, #104, #105, #108, #101.
+### Phases (about 80-95 sessions, 7-9 months at light pace)
 
-Phase 1 so far, also merged: #116 (R-02 a missing world.yaml visibility is dm), #117 (R-03 scans
-fail on a missing artifact), #118 (R-04 adopt the rebuild goals, ADR-0002). Next: R-05.
+| Phase | Goal | Verified by | State |
+|---|---|---|---|
+| 0 Guard and quick wins | R-01 Sync guard, scans on real artifacts, Q-01..Q-04 | Links that work, a fitted map, the menu above the map, a region card. **Safe stop** | done |
+| 1 Spine and PRs | The other PRs, R-02..R-06, ADR-0001 addendum, ADR-0002 | A publish log with every scan reading `dist`; `docs/GOALS.md` agreed | done |
+| 2 Schema v2 and campaigns in the pipeline | R-10..R-20, ADR-0003, ADR-0004 | `npm run atlas:tree` on the v2 test world, per campaign; today's site unchanged | next |
+| 3 Shared canvas | Ocean/frame/map-tree component; viewer on it; campaign links | Ocean > continent > city > back on the local test world. **Safe stop** | - |
+| 4 Editor core | Router, command store, E0-E5, Place pin, E9, Draw route with distance/time; v2 test world only; ADR-0005, ADR-0006 | Add a map inside a map, pin it, draw a route, reload | - |
+| 5 Story | Region card and story panel, monument strip, people and Inside lists, route labels, deep links, Browse, Timeline, Credits, Landing on v2 | Read a region, a person, a monument; follow three links | - |
+| 6 Editor jobs, parity, cutover | E13, E6, E7, E8, E10 Sync, E11, E12, parity items; cutover last | Every job on the parity list in the new editor. **Safe stop** | - |
+| H Private hosting | H-01..H-04, ADR-0007; Cloudflare Pages per campaign, repo Private | Each campaign site refuses a stranger; repo Private | trigger below |
+| 7 Retire | Delete the old editor, the v1 path, the down-migration, arch-06 | `grep` finds no `AtlasPlacementEditor`, `worlds[0]`, `placementOverrides` | - |
+| T Tiles (only if triggered) | Pyramid step; fog scan replaced in the same PR; ADR-0008 | A real map over about 8k px that was slow on a phone, now smooth | - |
+
+Safe stops: after phase 3 (the viewer shows the ocean and map tree on today's content, nothing
+half-built is live) and after phase 6 (new editor at parity, old one retired next). Phase 0 was
+also a stop. Phase 3 and 4 tickets are written before phase 2 ends.
+
+Phase H runs before the first real Sync (`tidemarrow/01`), which stays blocked by H-04 (R-01's
+guard refuses a real Sync while `hosting: public`). Earliest after phase 2, blocks no other phase.
+Phase T starts only on a measured problem on a real map.
+
+### PR outcomes (all merged and published)
+
+| What | PRs |
+|---|---|
+| Phase 0 | #111 R-01 Sync refuses while hosting is public, #112 Q-01 broken wikilinks are plain text, #113 Q-02 maps open fitted, #114 Q-03 editor menu above the map, #115 Q-04 region hover card |
+| The 12 older PRs, in merge order | #109, #110, #99, #100, #106, #102, #103, #107, #104, #105, #108, #101 |
+| Phase 1 so far | #116 R-02 a missing world.yaml visibility is dm, #117 R-03 scans fail on a missing artifact, #118 R-04 adopt the rebuild goals (ADR-0002), #119 docs follow-up, #120 R-06 player build no longer names DM-only regions and routes in warnings, #121 R-05 this queue |
+
+The plan offered closing the four moot PRs (#99, #103, #105, #107) to save gate runs; Isak chose to
+merge all twelve, and they are in. They are superseded when the old editor retires (phase 7).
+
+Phase 1 is done (2026-11-08). R-06 came out of the R-02 review: world.yaml warnings and warnings
+about routes the player build drops named DM-only ids in the player `atlas.json`; now a count line.
+Follow-up noted in its ticket: no scan derives DM region/route ids, so none would catch this class.
+
+### Phase 2, in order (sizes in plan.md section 6)
+
+| Ticket | What | Blocked by |
+|---|---|---|
+| R-10 | Schema v2 types | R-04 (done) |
+| R-11a | Pure per-campaign resolver (also arch-08) | R-10 |
+| R-11b | Build calls the resolver (also arch-02, sound areas in fog) | R-11a |
+| R-11c | Old Publish Check calls the resolver | R-11a |
+| R-12 | v2 loader (v1 only with no `schemaVersion` or `1`; a mix fails) | R-10 |
+| R-13 | Build assembles every world and the map tree | R-11b, R-12 |
+| R-14 | Sync targets any world | R-13 |
+| R-15 | Scan registry lists campaign dirs | R-03 (done), R-12 |
+| R-16 | Three-level test world, two campaigns (`content-next/`, `npm run atlas:tree`) | R-12 |
+| R-17 | One player output per campaign: visibility | R-15, R-16 |
+| R-18 | Fog baked per campaign; fog scan source-driven | R-17 |
+| R-19 | Publish runs every campaign | R-17 |
+| R-20 | Migration script and down-migration, dry run only | R-17, R-18 |
+
+Next: write the R-10..R-20 tickets (and ADR-0003, ADR-0004) from plan.md section 6, then
+start R-10, then R-12 (parallel with R-11a). Phase H tickets, for later: H-01 Cloudflare
+Pages per campaign (after R-19), H-02 Access test, H-03 pre-switch safety check, H-04 the switch
+(Isak's clicks; unblocks `tidemarrow/01`).
+
+### Kept notes
 
 Cleaned 2026-11-07 (Isak: delete unless meaningful): branch `local-main-backup-2026-11-07` held two
 State.md commits about PRs since merged (#83-#89); deleted, tip kept as tag
@@ -29,25 +84,24 @@ State.md part is the same stale notes. Drop it once Isak decides the settings ch
   (`docs/GOALS.md`), ADR-0001 (a note with no visibility is DM-only), tickets in `docs/tracker/`.
 - The atlas becomes the players' atlas for the world, Tidemarrow first, filled from the vault by
   Sync from Obsidian. Today it still shows the old Astrath sample (three events).
-- Live site: https://thraez.github.io/campaign-atlas-final/. Every PR up to #118 is merged and
+- Live site: https://thraez.github.io/campaign-atlas-final/. Every PR up to #119 is merged and
   published. The player build ships only allowed files (eval 40).
 - Merges run on the full local gate plus an Opus review, without GitHub CI (`docs/agents/workflow.md`).
   The PR check runs only by hand (#90).
 - 2026-11-07 improvement loop (retro, architecture review, simplify): no rewrite. The editor page is
-  wiring around tested pure modules; extraction beats a rewrite. It built eight tickets (Morning
-  queue); what's left is under "Open work".
+  wiring around tested pure modules; extraction beats a rewrite. It built eight tickets (all merged); what's left is under "Open work".
 
 ## Open work
 
 Lowest number first within each folder.
 
-- Rebuild phase 1: R-05 next (Morning queue above).
-- Found in the R-02 review, needs a ticket (high): the player build's `buildReport.warnings`
-  carries world.yaml warnings that name DM-only region and route ids (`scripts/build-atlas.ts`).
-- `arch-2026-11/` (architecture pass): ranked tickets 02-09 in its `README.md`. 02 (sound areas
-  inside fog ship) is the most important. 07 merged (#110: an invalid world.yaml visibility loads
+- Rebuild: phase 2 next; Isak decides when it starts (Rebuild queue above).
+- `arch-2026-11/` (architecture pass): ranked tickets 02-09 in its `README.md`. The rebuild folds
+  02 (sound areas inside fog ship) into R-11b and 08 into R-11a: build them there, not here. 07 merged (#110: an invalid world.yaml visibility loads
   as `dm`).
-- Next, by payoff (from the improvement loop; no ticket yet unless numbered):
+- Next, by payoff (from the improvement loop; no ticket yet unless numbered). The Rebuild queue
+  comes first; take these only if still needed. 1 and 5 are largely superseded (the editor rebuild,
+  R-13 build stages):
   1. `eval-2026-10/39` (one canon client): touches the save plugin that #102 changed.
   2. Editor and player pin anchors differ by about 8px: needs Isak's look.
   3. A WebP map keeps its EXIF/XMP in the editor upload and the wizard's zip until
@@ -57,7 +111,8 @@ Lowest number first within each folder.
   5. Later, L: map-space module and markers.json converter (tidemarrow/02), a draft registry
      (reopen code-retro 09; it would absorb 44/45/47-style gaps; pin overrides and map metadata
      could move to `useUndoableState`), build-atlas stages.
-- `tidemarrow/01`-`03`: first sync, Tidemarrow map, remove the Astrath sample.
+- `tidemarrow/01`-`03`: first sync, Tidemarrow map, remove the Astrath sample. Blocked by H-04
+  (Phase H).
 - `eval-2026-10/07`: Vite 8 with Vitest 5, after Tidemarrow.
 - `agent-retro/03` (no scheduled CI): Isak decides what GitHub Actions may still spend.
 - Parked notes: `docs/tracker/eval-2026-10/README.md`.

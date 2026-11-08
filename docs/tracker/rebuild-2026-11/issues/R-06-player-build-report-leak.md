@@ -1,6 +1,6 @@
 # Player build report leaks DM region and route ids
 
-Status: in-review
+Status: done
 
 The player `atlas.json` carried every world.yaml warning in `buildReport.warnings`.
 `scripts/build-atlas.ts` copied `worldCfg.warnings` into the build's warning list, and the player
