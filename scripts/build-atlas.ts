@@ -734,7 +734,16 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   const fallbackMapId = `${worldId}-overview`;
 
   // worldCfg was loaded earlier (so entity dates can resolve against the calendar).
-  if (worldCfg) warnings.push(...worldCfg.warnings);
+  // world.yaml warnings name region and route ids, which are slugs of their
+  // names, DM-only ones included (R-06). The player build ships only a count;
+  // the DM build keeps the full text.
+  if (worldCfg && flags.player) {
+    const n = worldCfg.warnings.length;
+    if (n > 0)
+      warnings.push(
+        `${n} world.yaml warning${n === 1 ? "" : "s"} hidden in the player build; see the DM build`,
+      );
+  } else if (worldCfg) warnings.push(...worldCfg.warnings);
 
   let maps: MapDocument[] = worldCfg?.maps?.length
     ? worldCfg.maps
