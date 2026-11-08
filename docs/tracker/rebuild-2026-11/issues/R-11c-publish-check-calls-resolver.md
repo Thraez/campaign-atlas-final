@@ -18,6 +18,8 @@ verdict by construction. The old editor lives until cutover, so this matters for
   resolver, fed through R-12's v1 adapter (`src/atlas/content/v1Model.ts`, importable from
   `src/`); it keeps its own
   presentation (categories, messages, locators).
+- The Publish Check fails (a blocking issue) on any `orphanEntries` the resolver reports, naming
+  the world and key.
 - A parity test, table-driven over fixtures: missing visibility, invalid visibility, a region
   linking a `dm` note, a route waypoint on a `dm` note, a note with `atlas.publish: false`, a
   player note linking a folder-excluded note, a sound-only area in fog. For each, the Publish Check

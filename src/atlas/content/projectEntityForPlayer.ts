@@ -25,7 +25,7 @@ import {
   type RelationshipFilterResult,
 } from "../profiles/profileBuild";
 
-import { PLAYER_VISIBLE_VISIBILITY } from "./visibility";
+import { noteIsSecret } from "./visibility";
 
 /**
  * Tags that are organizational/meta for the DM but read as jargon to players
@@ -177,10 +177,10 @@ export function createProjectionContext(
   };
 }
 
-/** Is this DM-side entity kept out of player builds? Mirrors readNote's `isSecret`. */
+/** Is this DM-side entity kept out of player builds? The one rule, `noteIsSecret`. */
 function entityIsSecret(e: Entity): boolean {
-  const atlas = (e.frontmatter as { atlas?: { publish?: unknown } } | undefined)?.atlas;
-  return !PLAYER_VISIBLE_VISIBILITY.has(e.visibility) || atlas?.publish === false;
+  const atlas = (e.frontmatter as { atlas?: unknown } | undefined)?.atlas;
+  return noteIsSecret(e.visibility, atlas);
 }
 
 /**

@@ -5,6 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { readNote } from "@/atlas/content/readNote";
+import { noteIsSecret } from "@/atlas/content/visibility";
 
 const fm = (yaml: string, body = "Body.\n") => `---\n${yaml}\n---\n${body}`;
 
@@ -94,6 +95,27 @@ describe("readNote visibility (ADR-0001)", () => {
     const n = readNote("---\natlas:\n  visibility: player\n----\nbody", "a.md");
     expect(n.parseError).toBeTruthy();
     expect(n.visibility).toBe("dm");
+  });
+});
+
+describe("noteIsSecret, the one secret-note rule (arch-08)", () => {
+  it.each([
+    { visibility: "player", atlas: {}, secret: false },
+    { visibility: "rumor", atlas: { publish: true }, secret: false },
+    { visibility: "dm", atlas: {}, secret: true },
+    { visibility: "hidden", atlas: {}, secret: true },
+    { visibility: "player", atlas: { publish: false }, secret: true },
+    { visibility: "rumor", atlas: { publish: false }, secret: true },
+    { visibility: "player", atlas: undefined, secret: false },
+    { visibility: "player", atlas: "publish: false", secret: false },
+  ] as const)("$visibility with atlas $atlas: secret $secret", ({ visibility, atlas, secret }) => {
+    expect(noteIsSecret(visibility, atlas)).toBe(secret);
+  });
+
+  it("readNote's isSecret is the predicate's answer", () => {
+    const n = readNote(fm("atlas:\n  visibility: player\n  publish: false"), "x.md");
+    expect(n.isSecret).toBe(noteIsSecret(n.visibility, n.atlas));
+    expect(n.isSecret).toBe(true);
   });
 });
 

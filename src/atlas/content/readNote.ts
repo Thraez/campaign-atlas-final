@@ -24,7 +24,7 @@
  */
 import { parseFrontmatter } from "./frontmatter";
 import type { EntityVisibility } from "./schema";
-import { isPlayerVisible, isValidVisibility } from "./visibility";
+import { isValidVisibility, noteIsSecret } from "./visibility";
 import { slugify } from "./slugify";
 
 export interface Note {
@@ -88,7 +88,7 @@ export function readNote(raw: string, relPath: string): Note {
     visibility = "player";
     visibilityTagged = true;
   }
-  const isSecret = !isPlayerVisible(visibility) || atlas.publish === false;
+  const isSecret = noteIsSecret(visibility, atlas);
 
   const title = noteTitle(relPath, data.title);
   const idFromFrontmatter = typeof atlas.id === "string" && atlas.id.length > 0;

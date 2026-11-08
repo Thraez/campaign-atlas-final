@@ -1,6 +1,6 @@
 # State
 
-Updated 2026-11-08 on the Mac. Branch `main` (= origin/main 0ff1503).
+Updated 2026-11-08 on the Mac. Branch `main` (= origin/main cab9748).
 
 ## Rebuild queue
 
@@ -15,7 +15,7 @@ ticket merges on `npm run gate` plus an Opus review; a push or merge needs Isak'
 |---|---|---|---|
 | 0 Guard and quick wins | R-01 Sync guard, scans on real artifacts, Q-01..Q-04 | Links that work, a fitted map, the menu above the map, a region card. **Safe stop** | done |
 | 1 Spine and PRs | The other PRs, R-02..R-06, ADR-0001 addendum, ADR-0002 | A publish log with every scan reading `dist`; `docs/GOALS.md` agreed | done |
-| 2 Schema v2 and campaigns in the pipeline | R-10..R-20, ADR-0003, ADR-0004 | `npm run atlas:tree` on the v2 test world, per campaign; today's site unchanged | next |
+| 2 Schema v2 and campaigns in the pipeline | R-10..R-20, ADR-0003, ADR-0004 | `npm run atlas:tree` on the v2 test world, per campaign; today's site unchanged | in progress (R-10, R-11a, R-12 done; R-11b, R-11c, R-11d, R-15, R-16 next) |
 | 3 Shared canvas | Ocean/frame/map-tree component; viewer on it; campaign links | Ocean > continent > city > back on the local test world. **Safe stop** | - |
 | 4 Editor core | Router, command store, E0-E5, Place pin, E9, Draw route with distance/time; v2 test world only; ADR-0005, ADR-0006 | Add a map inside a map, pin it, draw a route, reload | - |
 | 5 Story | Region card and story panel, monument strip, people and Inside lists, route labels, deep links, Browse, Timeline, Credits, Landing on v2 | Read a region, a person, a monument; follow three links | - |
@@ -39,6 +39,7 @@ Phase T starts only on a measured problem on a real map.
 | Phase 0 | #111 R-01 Sync refuses while hosting is public, #112 Q-01 broken wikilinks are plain text, #113 Q-02 maps open fitted, #114 Q-03 editor menu above the map, #115 Q-04 region hover card |
 | The 12 older PRs, in merge order | #109, #110, #99, #100, #106, #102, #103, #107, #104, #105, #108, #101 |
 | Phase 1 so far | #116 R-02 a missing world.yaml visibility is dm, #117 R-03 scans fail on a missing artifact, #118 R-04 adopt the rebuild goals (ADR-0002), #119 docs follow-up, #120 R-06 player build no longer names DM-only regions and routes in warnings, #121 R-05 this queue |
+| Phase 2 so far | #122 phase 2 tickets and ADRs, #123 R-10 schema v2 types (ADR-0003, ADR-0004 accepted), #124 R-12 v2 loader and v1 adapter, R-11a per-campaign resolver (this PR) |
 
 The plan offered closing the four moot PRs (#99, #103, #105, #107) to save gate runs; Isak chose to
 merge all twelve, and they are in. They are superseded when the old editor retires (phase 7).
@@ -51,12 +52,12 @@ Follow-up noted in its ticket: no scan derives DM region/route ids, so none woul
 
 | Ticket | What | Blocked by |
 |---|---|---|
-| R-10 | Schema v2 types | R-04 (done); Isak accepts ADR-0003, ADR-0004 |
-| R-11a | Pure per-campaign resolver (also arch-08's secret-note predicate) | R-10 |
+| R-10 | Schema v2 types (done, #123) | R-04 (done); Isak accepts ADR-0003, ADR-0004 |
+| R-11a | Pure per-campaign resolver (also arch-08's secret-note predicate) (done) | R-10 |
 | R-11b | Build calls the resolver (also arch-02, sound areas in fog) | R-11a, R-12 |
 | R-11c | Old Publish Check calls the resolver | R-11a, R-12 |
 | R-11d | Link redaction from wikilink tokens (arch-08's other half) | R-11a |
-| R-12 | v2 loader and the one v1 adapter (v1 only with no `schemaVersion` or `1`; a mix fails) | R-10 |
+| R-12 | v2 loader and the one v1 adapter (v1 only with no `schemaVersion` or `1`; a mix fails) (done, #124) | R-10 |
 | R-13 | Build assembles every world and the map tree | R-11b, R-12 |
 | R-14 | Sync targets any world | R-13 |
 | R-15 | Scan registry lists campaign dirs | R-03 (done), R-12 |

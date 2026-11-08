@@ -1,6 +1,6 @@
 # R-11a Pure per-campaign visibility resolver
 
-Status: ready-for-agent
+Status: done (2026-11-08)
 Blocked by: R-10
 Size: S-M
 Branch: `rebuild-r11a-campaign-resolver`
@@ -59,3 +59,72 @@ callers onto this. It also absorbs arch-08's first half: one secret-note predica
   R-18). Failing the build on a collision is R-11b (v1) and R-13 (v2).
 - Writing visibility (editor, phase 4/6). Changing `worldItemVisibility` or ADR-0001's rules: the
   resolver applies them.
+
+## Notes from the build
+
+- `src/atlas/content/resolveCampaign.ts`: `resolveCampaign(model, notes, campaignId)`, plus
+  `visibilityFor`/`shipsIn` (rule 1) and `frameUnderFog` (rule 4). Input model is a structural
+  `CampaignResolverModel` (`worlds: WorldFileV2[]`, `campaigns: CampaignFileV2[]`), so R-12's model
+  fits without either ticket owning a shared type yet. Notes come as `{ world, note }` (a
+  `readNote` result's id, title, aliases, visibility, atlas block), because a `Note` doesn't know
+  its world and rule 5 needs it.
+- `noteIsSecret(visibility, atlas)` lives in `visibility.ts` (not `readNote.ts` as the ticket
+  suggested), so `projectEntityForPlayer` can use it without importing the YAML parser;
+  `readNote`, `entityIsSecret` and the resolver all call it. A player `vite build` has no js-yaml.
+- Fail-closed readings chosen where the ticket or ADRs are silent:
+  - Rule 4 is tested over the frame's whole area, exactly (slab decomposition over every reveal and
+    conceal edge), not by sampling. Rule 3 keeps today's vertex test for regions, routes and
+    sound-only areas, as ADR-0004 says. On a fogged map an item with no points doesn't ship.
+  - Frame `rotation` has no fixed pivot in ADR-0003: a rotated frame is tested turned about its
+    centre and about its top-left corner, and fog over either hides the child. Settle the pivot
+    when the viewer draws frames, then drop the second test.
+  - Pins follow rule 1 too: a pin with no `visibility` is `dm`.
+  - A region linking a note that doesn't ship (or doesn't exist) doesn't ship (eval-46's leak
+    rule); a route through a note with no shipped pin on that map doesn't ship.
+  - A stale entry (`basedOn` missing or different) is `dm` everywhere, whatever the campaign mode.
+  - A note's `notes:` entry is read from its own world's file only.
+  - Broken input the loader should already reject (duplicate map or world ids, unknown or
+    cross-world parent, cycle, child with no usable frame, non-finite fog point, invalid map state
+    or `notes:` mode) doesn't ship, rather than throwing. An unknown campaign id, or two files for
+    one, throws `ResolveCampaignError`.
+  - A note id shared by two notes ships (as a pin or link target) only if every copy ships.
+  - Rule 8 widened: collisions compare the hidden side's ids too, against shipped notes' ids,
+    titles and aliases and shipped worlds', maps', regions' and routes' ids and names (not only
+    notes), case- and space-blind (`normalizeName`). The link exemption covers the linked note's
+    id as well as its title and aliases (a region `salt-marsh` linking note `salt-marsh` would
+    otherwise put the note's own id in must-not-ship).
+  - Dropped pins add `{ map, index, x, y }` to `mustNotShip.pinLocations`, never the note's name.
+  - `belongsTo` on `notes:` entries is not read: no ADR rule uses it.
+- `warnings` and `staleEntries` name DM content; callers must keep them out of player artifacts.
+
+### Safety review fixes (round 1)
+
+- Orphan `notes:` entries (a key matching no note of its world: wrong world's file, case or
+  spacing change, retitled note) are returned as `orphanEntries` with a warning, for R-11b/R-11c
+  to fail on. Fail-closed reading: in either campaign mode, an orphan narrows every note whose id
+  matches its key case- and space-blind or by `slugify`, in any world, unless the orphan is current
+  (`basedOn` equals the note's frontmatter) and names this campaign as `player` or `rumor`
+  (reason `orphan-entry`).
+- A note id shared by two notes: every copy is `duplicate-id` and doesn't ship.
+- A hidden map's layer ids join `mustNotShip.ids`, and its layer `src`/`tileSrc` paths a new
+  `mustNotShip.paths`. A hidden layer sharing an id or image path with a shipped map's layer is a
+  collision (kind `layer`), since the shared file would ship anyway.
+- Known limit, for a later ticket: regions, routes and sound-only areas use the vertex fog test
+  (ADR-0004 rule 3) while frames use the exact area test, so a region whose vertices are all lit
+  but whose middle crosses fog still ships.
+
+### Safety review fixes (round 2)
+
+- Orphan keys also match note ids by `slugify` (so `salt_marsh` narrows `salt-marsh`), as well as
+  case- and space-blind. R-11b and R-11c now require the build and Publish Check to fail on any
+  `orphanEntries`, naming the world and key.
+- Layer ids are per map: a hidden map's layer id collides with nothing, and one that a shipped
+  map's layer also uses is left out of `mustNotShip.ids` (other hidden layer ids stay in). Only a
+  shared image path is a `layer` collision.
+- Layer image paths are normalised (`normalizePath`: no leading `./`, `//` collapsed,
+  case-blind) in `mustNotShip.paths` and in the path collision.
+
+### Safety review fixes (round 3)
+
+- `mustNotShip.paths` holds each hidden layer path as written and normalised, and `normalizePath`
+  also strips a leading `/`; R-17 now says scans compare with `normalizePath`.
