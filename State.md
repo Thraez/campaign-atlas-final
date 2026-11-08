@@ -60,7 +60,7 @@ Follow-up noted in its ticket: no scan derives DM region/route ids, so none woul
 | R-12 | v2 loader and the one v1 adapter (v1 only with no `schemaVersion` or `1`; a mix fails) (done, #124) | R-10 |
 | R-13 | Build assembles every world and the map tree | R-11b, R-12 |
 | R-14 | Sync targets any world | R-13 |
-| R-15 | Scan registry lists campaign dirs | R-03 (done), R-12 |
+| R-15 | Scan registry lists campaign dirs (done) | R-03 (done), R-12 |
 | R-16 | Three-level test world, two campaigns (`content-next/`, `npm run atlas:tree`) | R-12, R-11a |
 | R-17 | One player output per campaign: visibility | R-13, R-15, R-16 |
 | R-17b | Structural campaign isolation scan | R-17 |
