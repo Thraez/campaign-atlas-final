@@ -494,6 +494,10 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   }
 
   const warnings: string[] = [];
+  // Warnings the console log keeps but the player atlas.json must not ship,
+  // because they name DM-only world.yaml items or routes the player build
+  // drops (R-06). Only consulted in player builds.
+  const hiddenFromPlayer = new Set<string>();
   const errors: string[] = [];
 
   // Character keys (DM-only; used at encrypt time, never in any output) live
@@ -737,13 +741,17 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // world.yaml warnings name region and route ids, which are slugs of their
   // names, DM-only ones included (R-06). The player build ships only a count;
   // the DM build keeps the full text.
-  if (worldCfg && flags.player) {
+  if (worldCfg) {
+    warnings.push(...worldCfg.warnings);
     const n = worldCfg.warnings.length;
-    if (n > 0)
+    if (flags.player && n > 0) {
+      for (const w of worldCfg.warnings) hiddenFromPlayer.add(w);
       warnings.push(
-        `${n} world.yaml warning${n === 1 ? "" : "s"} hidden in the player build; see the DM build`,
+        `${n} world.yaml warning${n === 1 ? "" : "s"} hidden in the player build; ` +
+          "run `npm run atlas:build` (DM build) to see them",
       );
-  } else if (worldCfg) warnings.push(...worldCfg.warnings);
+    }
+  }
 
   let maps: MapDocument[] = worldCfg?.maps?.length
     ? worldCfg.maps
@@ -879,6 +887,13 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
       routesExcluded += 1;
       continue;
     }
+    // A route's warnings name its id and waypoint entity ids. If the player
+    // build then drops the route (waypoint miss, fog), they stay in the
+    // console log but not in the shipped report (R-06).
+    const warningsBefore = warnings.length;
+    const hideRouteWarnings = () => {
+      if (flags.player) for (const w of warnings.slice(warningsBefore)) hiddenFromPlayer.add(w);
+    };
     // Spoiler-leak: player-visible route mentions a DM/hidden/unknown entity.
     if (PLAYER_VISIBLE_VISIBILITY.has(r.visibility)) {
       for (const w of r.waypoints) {
@@ -910,9 +925,13 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
         resolved.push([p.x, p.y]);
       }
     }
-    if (dropped || resolved.length < 2) continue;
+    if (dropped || resolved.length < 2) {
+      hideRouteWarnings();
+      continue;
+    }
     if (flags.player && resolved.some(([x, y]) => isFoggedOnMap(r.mapId, x, y))) {
       routesExcluded += 1;
+      hideRouteWarnings();
       continue;
     }
     // Route names ship to players; strip any %% blocks the DM left behind.
@@ -1164,7 +1183,12 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
       // builds get the same diagnostic warnings, but every secret entity's
       // title/id/alias is scrubbed to "…" so a leak message about a hidden
       // entity doesn't itself leak the secret's name.
-      warnings: flags.player ? scrubSecretNames(warnings, secretNames) : warnings,
+      warnings: flags.player
+        ? scrubSecretNames(
+            warnings.filter((w) => !hiddenFromPlayer.has(w)),
+            secretNames,
+          )
+        : warnings,
       brokenLinks: unresolvedLinks, // back-compat alias
       unresolvedLinks,
       duplicateSlugs,

@@ -13,13 +13,21 @@ filtered out. Region and route ids are not entity names, so the scrub never touc
 
 ## What changed
 
-- In player builds, world.yaml warnings are dropped from `buildReport.warnings` and replaced by one
-  line: `N world.yaml warning(s) hidden in the player build; see the DM build`. DM and editor
-  builds keep the full text.
-- Other warning sources checked: the route waypoint, route-leak and region-leak warnings in
-  `build-atlas.ts` run only for routes and regions the player build keeps; fog-redaction and
-  placement warnings name map ids, which ship anyway; relationship warnings go through the secret
-  scrub. Soundscape warnings come from `loadWorldConfig` and are covered by this change.
+- `build-atlas.ts` keeps a set of warnings hidden from the player build (`hiddenFromPlayer`). The
+  shipped `buildReport.warnings` of a player build leaves them out; the console log and the DM
+  build keep every warning, so a strict player build that fails still names the route or region.
+- World.yaml warnings all go in that set, and the player report gets one line instead:
+  `N world.yaml warning(s) hidden in the player build; run npm run atlas:build (DM build) to see
+  them`.
+- Routes: the spoiler-leak and waypoint-miss warnings were pushed before the player build dropped
+  the route (a waypoint miss drops it, and so does a waypoint under fog), so a player-visible route
+  that never shipped still put its id and its waypoint entity ids in the report. Those warnings
+  now go in the hidden set when the route is dropped. `routeLeaks` and `routeWaypointMisses` still
+  count every problem, so strict player builds fail as before.
+- Other warning sources checked: region-leak warnings run after the player build's visibility and
+  fog filters, so they only name regions that ship; fog-redaction and placement warnings name map
+  ids, which ship anyway; relationship warnings go through the secret scrub. Soundscape warnings
+  come from `loadWorldConfig` and are covered by the world.yaml rule.
 
 ## Acceptance criteria
 
@@ -28,6 +36,12 @@ filtered out. Region and route ids are not entity names, so the scrub never touc
       `atlas.json`; the count line is there. Test: `src/test/player-build-report-leak.test.ts`
       (fails without the fix).
 - [x] The DM build still carries every one of those warnings in full (same test file).
+- [x] A player-visible route dropped from the player build after it warned (a waypoint placement
+      under fog, a waypoint on a DM entity) has neither its id nor the DM entity's id anywhere in
+      the player `atlas.json`; the DM build keeps the warning (same test file, fails without the
+      fix).
+- [x] Strict player builds still fail with exit 7 and name the leaking route on the console
+      (`src/test/atlas-region-route-strict.test.ts`).
 
 ## Follow-up
 

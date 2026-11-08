@@ -101,6 +101,57 @@ async function build(mode: "player" | "dm", outName: string) {
   return fs.readFileSync(path.join(outDir, "atlas.json"), "utf8");
 }
 
+// Player-visible routes that warn and then get dropped from the player build:
+// one through a fogged placement (waypoint miss), one through a DM entity
+// (spoiler-leak warning, then a miss because DM placements never ship).
+const FOG_WORLD_YAML = `schemaVersion: 1
+maps:
+  - id: m1
+    name: Map One
+    width: 1000
+    height: 1000
+    layers: []
+    fog:
+      enabled: true
+      reveals:
+        - [[0,0],[100,0],[100,100],[0,100]]
+    routes:
+      - id: veiled-pass
+        name: Veiled Pass
+        visibility: player
+        waypoints: [[10,10], { entityId: bob }]
+      - id: cult-road
+        name: Cult Road
+        visibility: player
+        waypoints: [[10,10], { entityId: cult-lair }]
+      - id: kings-road
+        name: King's Road
+        visibility: player
+        waypoints: [[10,10],[50,50]]
+`;
+
+function setupFog() {
+  write(
+    "atlas.config.json",
+    JSON.stringify({
+      contentRoot: "content",
+      outputDir: "out",
+      defaultWorld: "w",
+      include: ["**/*.md"],
+      exclude: [],
+    }),
+  );
+  write("content/w/_atlas/world.yaml", FOG_WORLD_YAML);
+  write(
+    "content/w/bob.md",
+    "---\ntitle: Bob\natlas:\n  type: npc\n  visibility: player\n  placements:\n    - mapId: m1\n      x: 500\n      y: 500\n---\nbody\n",
+  );
+  write(
+    "content/w/cult-lair.md",
+    "---\ntitle: Cult Lair\natlas:\n  type: location\n  visibility: dm\n  placements:\n    - mapId: m1\n      x: 20\n      y: 20\n---\nbody\n",
+  );
+}
+
 describe("player build report — world.yaml warnings (R-06)", () => {
   it("never puts a DM-only region or route id anywhere in the player atlas.json", async () => {
     setup();
@@ -118,5 +169,17 @@ describe("player build report — world.yaml warnings (R-06)", () => {
     const atlas = JSON.parse(raw) as { buildReport: { warnings: string[] } };
     const text = atlas.buildReport.warnings.join("\n");
     for (const id of SECRET_IDS) expect(text, id).toContain(id);
+  });
+
+  it("ships no warning about a route the player build drops after warning (fog, DM waypoint)", async () => {
+    setupFog();
+    const raw = await build("player", "out-player");
+    const atlas = JSON.parse(raw) as { maps: Array<{ routes?: Array<{ id: string }> }> };
+    expect((atlas.maps[0].routes ?? []).map((r) => r.id)).toEqual(["kings-road"]);
+    for (const id of ["veiled-pass", "cult-road", "cult-lair"]) expect(raw, id).not.toContain(id);
+
+    const dm = JSON.parse(await build("dm", "out-dm")) as { buildReport: { warnings: string[] } };
+    const text = dm.buildReport.warnings.join("\n");
+    expect(text).toContain("cult-road");
   });
 });
