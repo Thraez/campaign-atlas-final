@@ -109,8 +109,8 @@ Working means:
 ### Hidden zones and fog
 
 - A zone (region) or a whole map can be hidden from players, in every campaign or in some; a hidden
-  zone or map and everything inside it or reaching into it (pins, routes, child maps) never ship to a campaign it
-  is hidden in.
+  zone or map and everything inside it or reaching into it (pins, routes, child maps) never ship
+  to a campaign it is hidden in.
 - Fog is per map **and per campaign**, baked into that campaign's player images at build time. The
   DM reveals fog in the editor with a campaign chosen; the published site shows each campaign its
   latest reveal. Per-player fog is not a goal.

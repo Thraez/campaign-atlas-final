@@ -1,7 +1,7 @@
 # R-11e A hidden region hides what is only inside it
 
 Status: ready-for-agent
-Blocked by: R-11a (done). Blocks: R-17 (and R-11b should take the one line below)
+Blocked by: R-11a (done). Blocks: R-17. R-11b is done: check that the build drops a placement on any pin verdict other than `ships` (not only fog); if not, this ticket adds that (see Order)
 Size: S-M
 Branch: `rebuild-r11e-region-containment`
 Needs: the adversarial player-safety review (`docs/agents/workflow.md`, "Done")
