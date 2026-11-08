@@ -4,7 +4,8 @@
  * call it, so these rules are the rules everywhere.
  */
 import { describe, it, expect } from "vitest";
-import { noteIsSecret, readNote } from "@/atlas/content/readNote";
+import { readNote } from "@/atlas/content/readNote";
+import { noteIsSecret } from "@/atlas/content/visibility";
 
 const fm = (yaml: string, body = "Body.\n") => `---\n${yaml}\n---\n${body}`;
 

@@ -68,8 +68,9 @@ callers onto this. It also absorbs arch-08's first half: one secret-note predica
   fits without either ticket owning a shared type yet. Notes come as `{ world, note }` (a
   `readNote` result's id, title, aliases, visibility, atlas block), because a `Note` doesn't know
   its world and rule 5 needs it.
-- `noteIsSecret(visibility, atlas)` is exported from `readNote.ts`; `readNote` and
-  `entityIsSecret` both call it. A player `vite build` still has no js-yaml in it.
+- `noteIsSecret(visibility, atlas)` lives in `visibility.ts` (not `readNote.ts` as the ticket
+  suggested), so `projectEntityForPlayer` can use it without importing the YAML parser;
+  `readNote`, `entityIsSecret` and the resolver all call it. A player `vite build` has no js-yaml.
 - Fail-closed readings chosen where the ticket or ADRs are silent:
   - Rule 4 is tested over the frame's whole area, exactly (slab decomposition over every reveal and
     conceal edge), not by sampling. Rule 3 keeps today's vertex test for regions, routes and
@@ -95,3 +96,19 @@ callers onto this. It also absorbs arch-08's first half: one secret-note predica
   - Dropped pins add `{ map, index, x, y }` to `mustNotShip.pinLocations`, never the note's name.
   - `belongsTo` on `notes:` entries is not read: no ADR rule uses it.
 - `warnings` and `staleEntries` name DM content; callers must keep them out of player artifacts.
+
+### Safety review fixes (round 1)
+
+- Orphan `notes:` entries (a key matching no note of its world: wrong world's file, case or
+  spacing change, retitled note) are returned as `orphanEntries` with a warning, for R-11b/R-11c
+  to fail on. Fail-closed reading: in either campaign mode, an orphan narrows every note whose id
+  matches its key case- and space-blind, in any world, unless the orphan is current
+  (`basedOn` equals the note's frontmatter) and names this campaign as `player` or `rumor`
+  (reason `orphan-entry`).
+- A note id shared by two notes: every copy is `duplicate-id` and doesn't ship.
+- A hidden map's layer ids join `mustNotShip.ids`, and its layer `src`/`tileSrc` paths a new
+  `mustNotShip.paths`. A hidden layer sharing an id or image path with a shipped map's layer is a
+  collision (kind `layer`), since the shared file would ship anyway.
+- Known limit, for a later ticket: regions, routes and sound-only areas use the vertex fog test
+  (ADR-0004 rule 3) while frames use the exact area test, so a region whose vertices are all lit
+  but whose middle crosses fog still ships.

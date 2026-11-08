@@ -22,9 +22,12 @@
  *      whole area (`frameUnderFog`), not only its corners.
  *   5. A world ships only if one of its maps ships; otherwise none of its notes
  *      ship.
- *   6. Notes: the frontmatter value (`noteIsSecret`, `readNote.ts`) can only be
+ *   6. Notes: the frontmatter value (`noteIsSecret`, `visibility.ts`) can only be
  *      narrowed by a `world.yaml` `notes:` entry; a stale entry (`basedOn`
- *      missing or different) is `dm` everywhere. The campaign's `notes:` mode
+ *      missing or different) is `dm` everywhere. An orphan entry (a key matching
+ *      no note of its world) is reported and narrows any note whose id matches
+ *      it case- and space-blind. A note id shared by two notes ships for
+ *      neither. The campaign's `notes:` mode
  *      (`hidden`, the fail-closed default, or `vault`) decides notes with no
  *      entry naming the campaign.
  *   7. A pin ships only if its note and map ship, its own visibility ships, and
@@ -39,7 +42,7 @@
  */
 import { isLit } from "../fog/effectiveLit";
 import { pointInPolygon } from "../geometry/polygon";
-import { noteIsSecret, type Note } from "./readNote";
+import type { Note } from "./readNote";
 import type { EntityVisibility, FogOverlay, Point } from "./schema";
 import type {
   CampaignFileV2,
@@ -52,7 +55,7 @@ import type {
   WorldFileV2,
   WorldId,
 } from "./schemaV2";
-import { isPlayerVisible, isValidVisibility } from "./visibility";
+import { isPlayerVisible, isValidVisibility, noteIsSecret } from "./visibility";
 
 // ---------------------------------------------------------------------------
 // Input
@@ -96,7 +99,7 @@ export type ShipReason =
   | "no-frame"
   /** Part of the frame is under the parent's fog (rule 4). */
   | "frame-fogged"
-  /** Two maps (or two worlds) share an id; neither can be resolved safely. */
+  /** Two maps, worlds or notes share an id; none of them can be resolved safely. */
   | "duplicate-id"
   /** The world has no map that ships here (rule 5). */
   | "no-map-ships"
@@ -114,6 +117,8 @@ export type ShipReason =
   | "entry"
   /** `notes: hidden` and no entry names this campaign (rule 6). */
   | "not-named"
+  /** A `notes:` entry matching no note has this note's id (case- and space-blind) and doesn't ship it. */
+  | "orphan-entry"
   /** The pin's note doesn't ship (rule 7). */
   | "note-hidden"
   /** A region links a note that doesn't ship, or a note that doesn't exist. */
@@ -171,11 +176,13 @@ export interface MustNotShip {
   ids: string[];
   /** Their names, titles and aliases. */
   names: string[];
+  /** Image paths (`src`, `tileSrc`) of every layer of a map that doesn't ship; its layer ids are in `ids`. */
+  paths: string[];
   /** Pins that don't ship, by location. */
   pinLocations: PinLocation[];
 }
 
-export type ResolvedKind = "world" | "map" | "region" | "route" | "sound" | "note";
+export type ResolvedKind = "world" | "map" | "layer" | "region" | "route" | "sound" | "note";
 
 /** A name shared by something that doesn't ship and something that does (rule 8). */
 export interface NameCollision {
@@ -199,6 +206,11 @@ export interface CampaignResolution {
   collisions: NameCollision[];
   /** `notes:` entries whose `basedOn` is missing or differs from the frontmatter (rule 6). */
   staleEntries: { world: WorldId; note: NoteId }[];
+  /**
+   * `notes:` keys that match no note of their world (a typo, a case change, a
+   * retitled note, an entry in the wrong world). The build should fail on them.
+   */
+  orphanEntries: { world: WorldId; entry: string }[];
   /** DM-facing; never shipped. */
   warnings: string[];
 }
@@ -504,11 +516,41 @@ export function resolveCampaign(
   // --- Notes (rules 5 and 6) -----------------------------------------------
   const staleEntries: { world: WorldId; note: NoteId }[] = [];
   const noteVerdicts: NoteVerdict[] = [];
+  const noteIdCounts = countBy(notes.map(({ note }) => note.id));
+
+  // Orphan entries: a `notes:` key with no note of that id in that world. Each
+  // one may have been meant to narrow a note (a typo, a case change, a retitle,
+  // the wrong world's file), so it narrows every note whose id matches it
+  // case- and space-blind, in any world, unless it would ship that note here.
+  const orphanEntries: { world: WorldId; entry: string }[] = [];
+  const orphansByKey = new Map<string, NoteOverride[]>();
+  for (const w of model.worlds) {
+    if (!isRecord(w.notes)) continue;
+    for (const key of Object.keys(w.notes)) {
+      const owned = notes.some((n) => n.world === w.world.id && n.note.id === key);
+      if (owned && worldFileById.get(w.world.id) === w) continue;
+      orphanEntries.push({ world: w.world.id, entry: key });
+      warnings.push(`world "${w.world.id}": notes: entry "${key}" matches no note of that world`);
+      const k = normalizeName(key);
+      orphansByKey.set(k, [...(orphansByKey.get(k) ?? []), w.notes[key]]);
+    }
+  }
+  const orphanBlocks = (note: ResolverNote): boolean =>
+    (orphansByKey.get(normalizeName(note.id)) ?? []).some(
+      (e) =>
+        !isRecord(e) ||
+        e.basedOn === undefined ||
+        e.basedOn !== note.visibility ||
+        !shipsIn(e.visibility, campaignId),
+    );
+
   for (const { world, note } of notes) {
     const worldFile = worldFileById.get(world);
     const entry: NoteOverride | undefined =
       worldFile?.notes && hasOwn(worldFile.notes, note.id) ? worldFile.notes[note.id] : undefined;
-    const v = decideNote(note, entry, worldFile !== undefined && worldShipsById.get(world) === true);
+    let v = decideNote(note, entry, worldFile !== undefined && worldShipsById.get(world) === true);
+    if ((noteIdCounts.get(note.id) ?? 0) !== 1) v = { ...v, ships: false, reason: "duplicate-id" };
+    else if (v.ships && orphanBlocks(note)) v = { ...v, ships: false, reason: "orphan-entry" };
     if (v.stale) staleEntries.push({ world, note: note.id });
     if (v.widenAttempt) {
       warnings.push(
@@ -659,6 +701,10 @@ export function resolveCampaign(
   };
   const ids = new Set<string>();
   const names = new Set<string>();
+  const paths = new Set<string>();
+  /** Shipped layers' ids (normalised) and image paths, to the map that ships them. */
+  const shippedLayers = new Map<string, MapId>();
+  const hiddenLayers: { map: MapId; layer: string; keys: string[] }[] = [];
   const collisions: NameCollision[] = [];
   const seenCollision = new Set<string>();
   const addHidden = (
@@ -688,6 +734,17 @@ export function resolveCampaign(
       const onMap = mapShips.get(entry) === true;
       if (onMap) addShipped("map", map.id, [map.name]);
       else addHidden("map", map.id, [map.name]);
+      for (const layer of map.layers ?? []) {
+        const layerPaths = [layer.src, layer.tileSrc].filter((x): x is string => typeof x === "string" && x !== "");
+        if (onMap) {
+          shippedLayers.set(normalizeName(layer.id), map.id);
+          for (const path of layerPaths) shippedLayers.set(path, map.id);
+        } else {
+          ids.add(layer.id);
+          for (const path of layerPaths) paths.add(path);
+          hiddenLayers.push({ map: map.id, layer: layer.id, keys: [normalizeName(layer.id), ...layerPaths] });
+        }
+      }
 
       for (const r of map.regions ?? []) {
         if (onMap && allShip(regions, map.id, r.id)) addShipped("region", r.id, [r.name]);
@@ -714,6 +771,14 @@ export function resolveCampaign(
     for (const n of list) addHidden("note", id, [n.note.title, ...(n.note.aliases ?? [])]);
   }
 
+  // A hidden map's layer sharing an id or image with a shipped map's layer.
+  for (const h of hiddenLayers) {
+    for (const key of h.keys) {
+      const shippedMap = shippedLayers.get(key);
+      if (shippedMap === undefined) continue;
+      collisions.push({ name: key, hidden: { kind: "layer", id: `${h.map}/${h.layer}` }, shipped: { kind: "map", id: shippedMap } });
+    }
+  }
   for (const c of pendingCollisions) {
     const shipped = shippedIndex.get(c.key);
     if (!shipped) continue;
@@ -736,10 +801,12 @@ export function resolveCampaign(
     mustNotShip: {
       ids: [...ids].sort(),
       names: [...names].sort(),
+      paths: [...paths].sort(),
       pinLocations,
     },
     collisions,
     staleEntries,
+    orphanEntries,
     warnings,
   };
 }

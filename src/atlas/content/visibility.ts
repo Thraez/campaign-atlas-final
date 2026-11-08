@@ -41,6 +41,22 @@ export function isPlayerVisible(v: EntityVisibility): boolean {
   return PLAYER_VISIBLE_VISIBILITY.has(v);
 }
 
+/**
+ * The one secret-note rule (arch-08): a note must never reach players when its
+ * visibility doesn't ship (`dm`, `hidden`) or its `atlas:` block says
+ * `publish: false`. `readNote`, `entityIsSecret` (the editor preview) and the
+ * per-campaign resolver all ask this. `atlas` is the note's `atlas:` block as
+ * read (anything; a non-mapping has no `publish`). Lives here, not in
+ * `readNote.ts`, so player code can use it without pulling in the YAML parser.
+ */
+export function noteIsSecret(visibility: EntityVisibility, atlas: unknown): boolean {
+  const publish =
+    typeof atlas === "object" && atlas !== null && !Array.isArray(atlas)
+      ? (atlas as Record<string, unknown>).publish
+      : undefined;
+  return !isPlayerVisible(visibility) || publish === false;
+}
+
 /** True when `v` must never reach players (DM-only: `dm` | `hidden`). */
 export function isSecretVisibility(v: EntityVisibility): boolean {
   return !isPlayerVisible(v);

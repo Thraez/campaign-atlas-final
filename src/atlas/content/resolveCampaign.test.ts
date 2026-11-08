@@ -928,3 +928,103 @@ describe("the campaign id", () => {
     expect(JSON.stringify(mdl)).toBe(before);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Safety review fixes
+// ---------------------------------------------------------------------------
+
+describe("orphan notes: entries narrow, never vanish", () => {
+  const narrow: NoteOverride = { visibility: { a: "dm", b: "player" }, basedOn: "player" };
+  const twoVault = (worlds: WorldFileV2[]) =>
+    model(worlds, [
+      campaign("a", { m: OPEN, m2: OPEN }, "vault"),
+      campaign("b", { m: OPEN, m2: OPEN }, "vault"),
+    ]);
+
+  it("an entry in the wrong world's file narrows the note in vault mode, in both campaigns", () => {
+    const mdl = twoVault([world("w", [map("m")]), world("v", [map("m2")], { n: narrow })]);
+    const a = resolveCampaign(mdl, [note("n")], "a");
+    expect(find(a.notes, () => true)).toMatchObject({ ships: false, reason: "orphan-entry" });
+    expect(a.orphanEntries).toEqual([{ world: "v", entry: "n" }]);
+    expect(a.warnings.join("\n")).toMatch(/matches no note/);
+    const b = resolveCampaign(mdl, [note("n")], "b");
+    expect(noteShips(b, "n")).toBe(true);
+    expect(b.orphanEntries).toEqual([{ world: "v", entry: "n" }]);
+  });
+
+  it("a key differing in case or spacing narrows the note in vault mode, in both campaigns", () => {
+    const mdl = twoVault([world("w", [map("m")], { " N ": narrow })]);
+    expect(noteShips(resolveCampaign(mdl, [note("n")], "a"), "n")).toBe(false);
+    expect(noteShips(resolveCampaign(mdl, [note("n")], "b"), "n")).toBe(true);
+    expect(resolveCampaign(mdl, [note("n")], "a").orphanEntries).toEqual([{ world: "w", entry: " N " }]);
+  });
+
+  it("an orphan that doesn't name the campaign, or is stale, narrows it too", () => {
+    const mdl = twoVault([
+      world("w", [map("m")], { N: { visibility: { a: "player" }, basedOn: "player" }, X: { visibility: "player" } }),
+    ]);
+    const notes = [note("n"), note("x")];
+    expect(noteShips(resolveCampaign(mdl, notes, "a"), "n")).toBe(true);
+    expect(noteShips(resolveCampaign(mdl, notes, "b"), "n")).toBe(false);
+    expect(noteShips(resolveCampaign(mdl, notes, "a"), "x")).toBe(false);
+    expect(noteShips(resolveCampaign(mdl, notes, "b"), "x")).toBe(false);
+  });
+
+  it("a retitled note's entry is reported as an orphan", () => {
+    const mdl = twoVault([world("w", [map("m")], { "old-name": narrow })]);
+    const r = resolveCampaign(mdl, [note("new-name")], "a");
+    expect(r.orphanEntries).toEqual([{ world: "w", entry: "old-name" }]);
+    expect(noteShips(r, "new-name")).toBe(true);
+  });
+
+  it("an entry matching its note exactly is not an orphan", () => {
+    const mdl = twoVault([world("w", [map("m")], { n: narrow })]);
+    const a = resolveCampaign(mdl, [note("n")], "a");
+    expect(a.orphanEntries).toEqual([]);
+    expect(find(a.notes, () => true).reason).toBe("entry");
+  });
+});
+
+describe("duplicate note ids", () => {
+  it("every copy is hidden as duplicate-id, so no shipped note shares a guarded id or title", () => {
+    const mdl = model(
+      [world("w", [map("m")]), world("v", [map("m2")])],
+      [campaign("a", { m: OPEN, m2: OPEN }), campaign("b", { m: OPEN, m2: OPEN })],
+    );
+    const notes = [note("n", { title: "Shared" }), note("n", { world: "v", title: "Secret", visibility: "dm" })];
+    for (const c of ["a", "b"]) {
+      const r = resolveCampaign(mdl, notes, c);
+      expect(r.notes.map((n) => [n.ships, n.reason])).toEqual([
+        [false, "duplicate-id"],
+        [false, "duplicate-id"],
+      ]);
+      expect(r.mustNotShip.ids).toContain("n");
+      expect(r.mustNotShip.names).toEqual(expect.arrayContaining(["Shared", "Secret"]));
+      expect(r.collisions).toEqual([]);
+    }
+  });
+});
+
+describe("a hidden map's layers", () => {
+  const layer = (id: string, src: string) => ({ id, src, x: 0, y: 0, width: SIZE, height: SIZE });
+  it("its layer ids and image paths are in must-not-ship; a shared image is a collision", () => {
+    const hidden = map("drow-city", {
+      visibility: { a: "dm", b: "player" },
+      layers: [layer("drow-city-base", "maps/menzoberranzan.webp"), layer("shared", "maps/common.webp")],
+    });
+    const shown = map("m", { layers: [layer("surface", "maps/common.webp")] });
+    const mdl = model(
+      [world("w", [shown, hidden])],
+      [campaign("a", { m: OPEN, "drow-city": OPEN }), campaign("b", { m: OPEN, "drow-city": OPEN })],
+    );
+    const a = resolveCampaign(mdl, [], "a");
+    expect(a.mustNotShip.ids).toEqual(expect.arrayContaining(["drow-city-base", "shared"]));
+    expect(a.mustNotShip.paths).toEqual(["maps/common.webp", "maps/menzoberranzan.webp"]);
+    expect(a.collisions).toEqual([
+      { name: "maps/common.webp", hidden: { kind: "layer", id: "drow-city/shared" }, shipped: { kind: "map", id: "m" } },
+    ]);
+    const b = resolveCampaign(mdl, [], "b");
+    expect(b.mustNotShip.paths).toEqual([]);
+    expect(b.collisions).toEqual([]);
+  });
+});

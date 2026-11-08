@@ -25,7 +25,7 @@ import {
   type RelationshipFilterResult,
 } from "../profiles/profileBuild";
 
-import { noteIsSecret } from "./readNote";
+import { noteIsSecret } from "./visibility";
 
 /**
  * Tags that are organizational/meta for the DM but read as jargon to players
