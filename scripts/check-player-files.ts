@@ -11,12 +11,14 @@
  * Usage: tsx scripts/check-player-files.ts [dir]   (dir defaults to `dist`)
  *
  * Exit codes:
- *   0   clean, or no `<dir>` at all (as before any build; skipped)
- *   18  a file not on the allowlist, a `<dir>` with no `atlas/` (a player
- *       build always has one), or an `atlas.json` that is not valid JSON
+ *   0   clean, or no `<dir>` at all (as before any build; skipped when run by
+ *       hand — the publish scans fail it, see `scanRegistry.ts`)
+ *   18  a file not on the allowlist, a `<dir>` with no `atlas/atlas.json` (a
+ *       player build always has one), or an `atlas.json` that is not valid JSON
  */
 import fs from "node:fs";
 import path from "node:path";
+import { locatePlayerAtlas } from "./atlas/playerArtifact";
 import { disallowedPlayerFiles } from "./atlas/playerFiles";
 
 export interface RunOpts {
@@ -29,13 +31,14 @@ export function run(opts: RunOpts): number {
     console.log(`atlas:check-player-files: target "${opts.dir}" does not exist, skipping`);
     return 0;
   }
-  const atlasDir = path.join(opts.dir, "atlas");
-  if (!fs.existsSync(atlasDir)) {
+  const located = locatePlayerAtlas(opts.dir, "built-site");
+  if (!located) {
     console.error(
-      `check-player-files: "${opts.dir}" has no atlas/ dir, so this is not a player build to check — failing`,
+      `check-player-files: "${path.join(opts.dir, "atlas", "atlas.json")}" is missing, so this is not a player build to check — failing`,
     );
     return 18;
   }
+  const atlasDir = located.atlasDir;
   let bad: string[];
   try {
     bad = disallowedPlayerFiles(atlasDir);
