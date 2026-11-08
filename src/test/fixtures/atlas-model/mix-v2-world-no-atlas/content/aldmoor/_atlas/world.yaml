@@ -1,0 +1,14 @@
+# R-12 fixture: a second world. Invented content.
+schemaVersion: 2
+world:
+  id: aldmoor
+  name: The Brine
+maps:
+  - id: brine-isles
+    name: Brine Isles
+    width: 2000
+    height: 2000
+    visibility: dm
+    layers: []
+    scale: { unitsPerPixel: 0.2, unitLabel: mi }
+    zoom: { min: -2, max: 2 }

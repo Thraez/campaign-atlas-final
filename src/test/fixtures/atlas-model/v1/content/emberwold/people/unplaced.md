@@ -1,0 +1,6 @@
+---
+atlas:
+  type: npc
+---
+
+# Unplaced

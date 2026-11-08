@@ -1,0 +1,6 @@
+# No notes: field on purpose: it must load as `notes: hidden`, with a warning.
+id: sandbox
+name: Sandbox
+maps:
+  aldmoor-overview:
+    state: open

@@ -1,0 +1,63 @@
+# R-12 fixture: a three-level map tree. Invented content.
+schemaVersion: 2
+world:
+  id: aldmoor
+  name: Aldmoor
+maps:
+  - id: aldmoor-overview
+    name: Aldmoor
+    width: 4000
+    height: 3000
+    visibility: player
+    layers:
+      - { id: base, src: images/overview.webp, x: 0, y: 0, width: 4000, height: 3000 }
+    scale: { unitsPerPixel: 0.1, unitLabel: mi }
+    zoom: { min: -3, max: 2 }
+    regions:
+      - id: fen
+        name: The Fen
+        points: [[0, 0], [100, 0], [100, 100]]
+        visibility: { main: player, sandbox: dm }
+      - id: odd-region
+        name: Odd Region
+        points: [[0, 0], [50, 0], [50, 50]]
+        visibility: secret
+    routes:
+      - id: mill-road
+        name: Mill Road
+        waypoints: [[0, 0], [1000, 800]]
+        visibility: rumor
+  - id: millbrook
+    name: Millbrook
+    width: 800
+    height: 600
+    visibility: { main: player }
+    parent: aldmoor-overview
+    frame: { x: 1000, y: 800, width: 200, height: 150, rotation: 0 }
+    enterZoom: 1
+    layers:
+      - { id: base, src: images/millbrook.webp, x: 0, y: 0, width: 800, height: 600 }
+    scale: { unitsPerPixel: 0.001, unitLabel: mi }
+    zoom: { min: -1, max: 3 }
+    pins:
+      - { note: miller, x: 100, y: 100, visibility: player }
+  - id: millbrook-cellar
+    name: Cellar
+    width: 200
+    height: 200
+    visibility: player
+    parent: millbrook
+    frame: { x: 10, y: 10, width: 20, height: 20, rotation: 0 }
+    enterZoom: 2
+    layers: []
+    scale: { unitsPerPixel: 0.0001, unitLabel: mi }
+    zoom: { min: 0, max: 4 }
+    sound:
+      - id: drip
+        points: [[0, 0], [50, 0], [50, 50]]
+        visibility: rumor
+        bed: { src: audio/drip.ogg }
+notes:
+  miller:
+    visibility: { main: player }
+    basedOn: player

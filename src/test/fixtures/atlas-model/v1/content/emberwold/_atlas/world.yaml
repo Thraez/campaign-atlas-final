@@ -1,0 +1,78 @@
+# R-12 fixture: a v1 world (no schemaVersion: legacy v1). Invented content.
+name: The Emberwold
+maps:
+  - id: ember-overview
+    name: Overview
+    width: 4000
+    height: 3000
+    scale:
+      unitsPerPixel: 0.1
+      unitLabel: mi
+    water:
+      enabled: true
+      intensity: 0.4
+    soundscape:
+      masterGain: 0.5
+      areas:
+        - id: forge-roar
+          name: Forge roar
+          visibility: player
+          points: [[0, 0], [400, 0], [400, 400]]
+          bed: { src: audio/roar.ogg }
+        - id: ash-wind
+          regionId: ash-flats
+          bed: { src: audio/wind.ogg, gain: 0.4 }
+        - id: too-small
+          points: [[0, 0], [10, 10]]
+          bed: { src: audio/none.ogg }
+    layers:
+      - id: base
+        src: atlas/assets/maps/ember.png
+        width: 4000
+        height: 3000
+    regions:
+      - id: ash-flats
+        name: Ash Flats
+        points: [[0, 0], [500, 0], [500, 500]]
+        visibility: player
+      - id: cinder-vault
+        name: Cinder Vault
+        points: [[600, 600], [700, 600], [700, 700]]
+      - id: odd-region
+        name: Odd Region
+        points: [[800, 800], [900, 800], [900, 900]]
+        visibility: secret
+    fog:
+      enabled: true
+      reveals:
+        - [[0, 0], [1000, 0], [1000, 1000], [0, 1000]]
+  - id: ember-depths
+    name: Depths
+    width: 800
+    height: 600
+    water:
+      enabled: true
+      intensity: 0.4
+    layers: []
+    fog:
+      enabled: false
+      reveals: []
+routes:
+  - id: slag-road
+    mapId: ember-overview
+    name: Slag Road
+    visibility: rumor
+    waypoints: [[0, 0], [100, 100]]
+  - id: lost-road
+    mapId: no-such-map
+    name: Lost Road
+    visibility: player
+    waypoints: [[0, 0], [100, 100]]
+calendar:
+  name: Ash Reckoning
+  months:
+    - { name: Kindle, days: 30 }
+import:
+  folders:
+    npc: people
+  defaultFolder: imports

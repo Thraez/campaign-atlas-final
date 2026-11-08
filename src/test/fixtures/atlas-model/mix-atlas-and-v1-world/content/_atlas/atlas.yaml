@@ -1,0 +1,5 @@
+schemaVersion: 2
+ocean: { width: 1000, height: 1000, sea: default }
+worlds: [aldmoor]
+campaigns: []
+onOcean: []
