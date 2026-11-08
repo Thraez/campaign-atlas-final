@@ -12,3 +12,9 @@ shipped `body`; the strict build and the derived scan still catch it.
 
 - One exported predicate in `readNote.ts`, used by both.
 - Redaction works from wikilink token positions; a test with `[[ Name ]]`.
+
+## Comments
+
+- 2026-11-08 (rebuild phase 2 tickets): folded into
+  [R-11a](../../rebuild-2026-11/issues/R-11a-per-campaign-resolver.md) (the per-campaign
+  resolver): build it there, not here. Both criteria above are R-11a's.

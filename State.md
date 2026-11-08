@@ -47,11 +47,11 @@ Phase 1 is done (2026-11-08). R-06 came out of the R-02 review: world.yaml warni
 about routes the player build drops named DM-only ids in the player `atlas.json`; now a count line.
 Follow-up noted in its ticket: no scan derives DM region/route ids, so none would catch this class.
 
-### Phase 2, in order (sizes in plan.md section 6)
+### Phase 2, in order (tickets in `docs/tracker/rebuild-2026-11/`, see its `README.md`)
 
 | Ticket | What | Blocked by |
 |---|---|---|
-| R-10 | Schema v2 types | R-04 (done) |
+| R-10 | Schema v2 types | R-04 (done); Isak accepts ADR-0003, ADR-0004 |
 | R-11a | Pure per-campaign resolver (also arch-08) | R-10 |
 | R-11b | Build calls the resolver (also arch-02, sound areas in fog) | R-11a |
 | R-11c | Old Publish Check calls the resolver | R-11a |
@@ -59,14 +59,16 @@ Follow-up noted in its ticket: no scan derives DM region/route ids, so none woul
 | R-13 | Build assembles every world and the map tree | R-11b, R-12 |
 | R-14 | Sync targets any world | R-13 |
 | R-15 | Scan registry lists campaign dirs | R-03 (done), R-12 |
-| R-16 | Three-level test world, two campaigns (`content-next/`, `npm run atlas:tree`) | R-12 |
-| R-17 | One player output per campaign: visibility | R-15, R-16 |
+| R-16 | Three-level test world, two campaigns (`content-next/`, `npm run atlas:tree`) | R-12, R-11a |
+| R-17 | One player output per campaign: visibility | R-13, R-15, R-16 |
 | R-18 | Fog baked per campaign; fog scan source-driven | R-17 |
 | R-19 | Publish runs every campaign | R-17 |
 | R-20 | Migration script and down-migration, dry run only | R-17, R-18 |
 
-Next: write the R-10..R-20 tickets (and ADR-0003, ADR-0004) from plan.md section 6, then
-start R-10, then R-12 (parallel with R-11a). Phase H tickets, for later: H-01 Cloudflare
+Tickets R-10..R-20 are written, with ADR-0003 (schema v2: ocean, map tree, campaign files) and
+ADR-0004 (per-campaign resolver and outputs), both `proposed`. Next: Isak answers the ADRs'
+"Open for Isak" questions (R-10 is `ready-for-human` until then), then R-10, then R-11a and R-12
+side by side. Phase H tickets, for later: H-01 Cloudflare
 Pages per campaign (after R-19), H-02 Access test, H-03 pre-switch safety check, H-04 the switch
 (Isak's clicks; unblocks `tidemarrow/01`).
 
