@@ -185,3 +185,8 @@ variant still drew a dotted "link" span. Not a resolver bug.
   R-20 ticket lists the v1 inputs v2 rejects). Gate pass on 1279e6e (main 2902a72).
 - Waiting on Isak's yes to push `rebuild-r10-schema-v2-types`, open the PR and merge. Then R-11a
   and R-12 side by side.
+- Isak said yes (push and merge). R-10 merged as #123 (2c34adc), published. State.md and the
+  R-10 ticket marked done in commit dc6d1b2 on the R-11a branch (rides with that PR).
+- R-11a (worktree `r11a`, branch `rebuild-r11a-campaign-resolver`) and R-12 (worktree `r12`,
+  branch `rebuild-r12-v2-loader`) building side by side from 2c34adc, both Opus (medium). Both
+  need the adversarial player-safety review. Gates one at a time.
