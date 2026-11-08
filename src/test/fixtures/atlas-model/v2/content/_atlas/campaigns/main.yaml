@@ -1,0 +1,13 @@
+id: main
+name: Main
+notes: vault
+maps:
+  aldmoor-overview:
+    state: open
+  millbrook:
+    state: fogged
+    reveals:
+      - [[0, 0], [400, 0], [400, 300], [0, 300]]
+    featherPx: 12
+  brine-isles:
+    state: unknown

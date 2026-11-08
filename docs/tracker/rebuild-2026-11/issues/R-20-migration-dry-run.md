@@ -33,15 +33,21 @@ every campaign (today only `main`) must not change.
   - pins: each note's `atlas.placements` (6 notes today) moved into `maps[].pins` with
     `{ main: <placement visibility> }`, and removed from that note's frontmatter in the copy (other
     frontmatter and the body byte-identical).
+    v2 pins have no `label`, `pin` style or `secretId`: the R-12 v1 adapter drops the first two
+    and loads a placement behind a secret as `dm`; the migration matches that or refuses, and
+    says which in its report.
 - v1 input that the v2 validators (R-10, `src/atlas/content/schemaV2.ts`) would reject is
   converted, each case covered by a fixture test:
   - per-map `water` moves to the world-level `water`; if two maps carry different `water`
-    blocks, the migration refuses and names both maps;
+    blocks, the migration refuses and names both maps (a block on one map and none on another
+    counts as different, as the R-12 v1 adapter reads it);
   - a region or sound-only area with fewer than 3 points is dropped with a warning, as v1
     does (`loadWorldConfig` skips such regions with a warning; `resolveSoundscape` skips such
     sound areas);
   - a v1 map's `soundscape.areas` move to the map's `sound:` list; the rest of `soundscape`
     (`enabled`, `masterGain`) stays under `soundscape`;
+  - a v1 map with no `scale` (v2 requires one) gets one supplied by the migration, or the
+    migration refuses and names the map; it never writes a map without `scale`;
   - each map gets a `zoom` range (v2 requires one; v1 has none), and any `frame` written gets
     `rotation: 0`.
   The migrated `world.yaml` and campaign file pass `validateWorldFileV2` and

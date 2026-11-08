@@ -1,0 +1,7 @@
+# v1 world.yaml (no schemaVersion) next to a v2 atlas.yaml: must fail.
+maps:
+  - id: aldmoor-overview
+    name: Overview
+    width: 100
+    height: 100
+    layers: []
