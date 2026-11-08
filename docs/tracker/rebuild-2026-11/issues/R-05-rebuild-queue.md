@@ -18,6 +18,6 @@ State.md still described the Morning queue (phase 0 and the old PRs, all merged)
 ## Acceptance criteria
 
 - [x] Every phase has a goal and a done check; both safe stops are marked.
-- [x] PR outcomes match the merged list (#109-#119).
+- [x] PR outcomes match the merged list (#99-#119).
 - [x] Phase 2 tickets are listed in order with dependencies.
 - [ ] Full gate and review (coordinator).
