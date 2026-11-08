@@ -133,3 +133,16 @@ After the safety review (no leaks; two should-fixes and nits, all fixed):
   with no `scale` needs one supplied (or a refusal), and how secret/label/style placements map.
 - Open for R-13: v1 pins behind a password secret ship today but load as `dm` here, so wiring the
   build onto the model must decide them before claiming unchanged output.
+
+Safety review fixes (round 2):
+
+- A v1 pin now takes `dm` when its note is secret (`isSecret`: not player-visible, or
+  `atlas.publish: false`), as the build drops such notes. Before, a `visibility: player,
+  publish: false` note with a placement loaded as a `player` pin. Test: a temp v1 note with
+  exactly that frontmatter loads its pin as `dm`.
+- `include` and `exclude` are now required in `LoadAtlasModelConfig`, and checked at run time
+  (a missing or non-array list throws), so a caller can't silently read `_dm/` as shipping
+  content. Reading `atlas.config.json` instead was no safer: the build itself falls back to `[]`.
+  Test: omitting either list throws; with the repo's real lists, `_dm/spy.md` stays out of
+  notes and pins. The globs themselves are unchanged (root-level `content/_dm/` is a separate
+  ticket).

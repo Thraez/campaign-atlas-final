@@ -48,7 +48,7 @@ function edit(root: string, rel: string, fn: (d: Record<string, any>) => void): 
 }
 
 function load(root: string, defaultWorld = "aldmoor", exclude: string[] = []) {
-  return loadAtlasModel(root, { defaultWorld, exclude }, { root: path.dirname(root) });
+  return loadAtlasModel(root, { defaultWorld, include: [], exclude }, { root: path.dirname(root) });
 }
 
 /** The issues `fn` throws; fails the test if it doesn't throw AtlasModelError. */
@@ -71,7 +71,11 @@ const MAIN = "content/_atlas/campaigns/main.yaml";
 
 describe("loadAtlasModel: v1", () => {
   it("reads today's content as v1: one world, one campaign main", () => {
-    const { model } = loadAtlasModel(REAL, { defaultWorld: REAL_WORLD }, { root: REPO });
+    const { model } = loadAtlasModel(
+      REAL,
+      { ...REAL_CONFIG, defaultWorld: REAL_WORLD },
+      { root: REPO },
+    );
     expect(model.schemaVersion).toBe(1);
     expect(model.ocean).toBeNull();
     expect(model.worlds).toHaveLength(1);
@@ -82,7 +86,11 @@ describe("loadAtlasModel: v1", () => {
 
   it("round-trips today's world.yaml: the model holds everything loadWorldConfig reads", () => {
     const wc = loadWorldConfig(REAL, REAL_WORLD, REPO)!;
-    const { model, warnings } = loadAtlasModel(REAL, { defaultWorld: REAL_WORLD }, { root: REPO });
+    const { model, warnings } = loadAtlasModel(
+      REAL,
+      { ...REAL_CONFIG, defaultWorld: REAL_WORLD },
+      { root: REPO },
+    );
     // Nothing the adapter adds: every v1 item made it into the model.
     expect(warnings).toEqual(wc.warnings);
     const world = model.worlds[0];
@@ -613,6 +621,56 @@ describe("loadAtlasModel: notes and v1 pins", () => {
       "vault-keeper",
     ]);
     expect(notes.every((n) => n.world === "emberwold")).toBe(true);
+  });
+
+  it("loads a v1 secret note's pin (publish: false) as dm, whatever its visibility", () => {
+    const root = copy("v1");
+    fs.writeFileSync(
+      path.join(root, "emberwold/people/hidden.md"),
+      [
+        "---",
+        "atlas:",
+        "  type: npc",
+        "  visibility: player",
+        "  publish: false",
+        "  placements:",
+        "    - { mapId: ember-overview, x: 3, y: 3 }",
+        "---",
+        "",
+        "# Hidden",
+        "",
+      ].join("\n"),
+    );
+    const { model } = load(root, "emberwold", EXCLUDE);
+    const pins = model.worlds[0].maps.flatMap((m) => m.pins ?? []);
+    expect(pins.filter((p) => p.note === "hidden")).toEqual([
+      expect.objectContaining({ note: "hidden", x: 3, y: 3, visibility: "dm" }),
+    ]);
+  });
+
+  it("fails closed when include/exclude are omitted: no _dm/ note can come back", () => {
+    const root = path.join(FIX, "v1/content");
+    const ctx = { root: path.dirname(root) };
+    const loose = (cfg: object) =>
+      loadAtlasModel(root, cfg as Parameters<typeof loadAtlasModel>[1], ctx);
+    for (const cfg of [
+      { defaultWorld: "emberwold" },
+      { defaultWorld: "emberwold", include: [] },
+      { defaultWorld: "emberwold", exclude: EXCLUDE },
+      { defaultWorld: "emberwold", include: [], exclude: "**/_dm/**" },
+    ]) {
+      expect(() => loose(cfg)).toThrow(/config\.(include|exclude) must be/);
+    }
+    // With the repo's real lists, `_dm/` stays out.
+    const { model, notes } = loose({
+      defaultWorld: "emberwold",
+      include: REAL_CONFIG.include,
+      exclude: REAL_CONFIG.exclude,
+    });
+    expect(notes.map((n) => n.note.id)).not.toContain("spy");
+    expect(model.worlds[0].maps.flatMap((m) => m.pins ?? []).map((p) => p.note)).not.toContain(
+      "spy",
+    );
   });
 
   it("returns v2 notes with their world folder; a note outside every world gets none", () => {

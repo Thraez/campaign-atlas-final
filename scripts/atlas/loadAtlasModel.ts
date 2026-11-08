@@ -61,9 +61,13 @@ export type {
 export interface LoadAtlasModelConfig {
   /** `atlas.config.json` `defaultWorld`: the v1 world. Not used for v2. */
   defaultWorld: string;
-  /** `atlas.config.json` `include`/`exclude`: which notes the build reads (`scanContentFolder`). */
-  include?: readonly string[];
-  exclude?: readonly string[];
+  /**
+   * `atlas.config.json` `include`/`exclude`: which notes the build reads
+   * (`scanContentFolder`). Required, and checked at run time: a caller that
+   * forgot them would read `_dm/` notes as shipping ones.
+   */
+  include: readonly string[];
+  exclude: readonly string[];
 }
 
 export interface LoadAtlasModelOptions {
@@ -198,6 +202,14 @@ interface ReadNotes {
 
 /** Read every note; a symlink or unreadable frontmatter is an issue. */
 function readNotes(l: Loader, config: LoadAtlasModelConfig): ReadNotes {
+  for (const key of ["include", "exclude"] as const) {
+    const v: unknown = config[key];
+    if (!Array.isArray(v) || !v.every((g) => typeof g === "string")) {
+      throw new TypeError(
+        `loadAtlasModel: config.${key} must be atlas.config.json's ${key} list (got ${JSON.stringify(v)})`,
+      );
+    }
+  }
   const files = l.noteFiles();
   for (const f of files) {
     const note = readNote(f.raw, f.relPath);
@@ -211,8 +223,8 @@ function readNotes(l: Loader, config: LoadAtlasModelConfig): ReadNotes {
   }
   l.check();
   const scan = scanContentFolder(files, {
-    include: config.include ?? [],
-    exclude: config.exclude ?? [],
+    include: config.include,
+    exclude: config.exclude,
   });
   const contentPathOf = new Map(files.map((f) => [f.relPath, f.contentPath]));
   return {
@@ -261,7 +273,9 @@ function v1Pins(notes: ReadNotes, warnings: string[]): V1Pin[] {
           ? [{ mapId: undefined, x, y, secretId: undefined }]
           : [];
     list.forEach((p, i) => {
-      let visibility: string = note.visibility;
+      // A secret note (not player-visible, or `publish: false`) never ships, so
+      // neither does its pin: the build drops it (`isSecret`).
+      let visibility: string = note.isSecret ? "dm" : note.visibility;
       if (p.secretId !== undefined) {
         visibility = "dm";
         warnings.push(
