@@ -1059,9 +1059,20 @@ describe("layer ids are per map; only shared images collide", () => {
     const shown = map("m", { layers: [layer("y", "maps/common.webp")] });
     const mdl = model([world("w", [shown, hidden])], [campaign("a", { m: OPEN, "drow-city": OPEN })]);
     const a = resolveCampaign(mdl, [], "a");
-    expect(a.mustNotShip.paths).toEqual(["maps/common.webp"]);
+    expect(a.mustNotShip.paths).toEqual(["./Maps//Common.WEBP", "maps/common.webp"]);
     expect(a.collisions).toEqual([
       { name: "maps/common.webp", hidden: { kind: "layer", id: "drow-city/x" }, shipped: { kind: "map", id: "m" } },
+    ]);
+  });
+
+  it("keeps the hidden path as written too, and a leading / doesn't dodge the collision", () => {
+    const hidden = map("drow-city", { visibility: "dm", layers: [layer("x", "Maps/Drow.webp")] });
+    const shown = map("m", { layers: [layer("y", "/Maps/Drow.webp")] });
+    const mdl = model([world("w", [shown, hidden])], [campaign("a", { m: OPEN, "drow-city": OPEN })]);
+    const a = resolveCampaign(mdl, [], "a");
+    expect(a.mustNotShip.paths).toEqual(expect.arrayContaining(["Maps/Drow.webp", "maps/drow.webp"]));
+    expect(a.collisions).toEqual([
+      { name: "maps/drow.webp", hidden: { kind: "layer", id: "drow-city/x" }, shipped: { kind: "map", id: "m" } },
     ]);
   });
 });

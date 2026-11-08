@@ -123,3 +123,8 @@ callers onto this. It also absorbs arch-08's first half: one secret-note predica
   shared image path is a `layer` collision.
 - Layer image paths are normalised (`normalizePath`: no leading `./`, `//` collapsed,
   case-blind) in `mustNotShip.paths` and in the path collision.
+
+### Safety review fixes (round 3)
+
+- `mustNotShip.paths` holds each hidden layer path as written and normalised, and `normalizePath`
+  also strips a leading `/`; R-17 now says scans compare with `normalizePath`.

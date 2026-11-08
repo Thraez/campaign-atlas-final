@@ -177,7 +177,7 @@ export interface MustNotShip {
   ids: string[];
   /** Their names, titles and aliases. */
   names: string[];
-  /** Image paths (`src`, `tileSrc`, normalised by `normalizePath`) of every layer of a map that doesn't ship; its layer ids are in `ids` unless a shipped map's layer uses the same id. */
+  /** Image paths (`src`, `tileSrc`, as written and normalised by `normalizePath`) of every layer of a map that doesn't ship; its layer ids are in `ids` unless a shipped map's layer uses the same id. */
   paths: string[];
   /** Pins that don't ship, by location. */
   pinLocations: PinLocation[];
@@ -738,14 +738,14 @@ export function resolveCampaign(
       if (onMap) addShipped("map", map.id, [map.name]);
       else addHidden("map", map.id, [map.name]);
       for (const layer of map.layers ?? []) {
-        const layerPaths = [layer.src, layer.tileSrc]
-          .filter((x): x is string => typeof x === "string" && x !== "")
-          .map(normalizePath);
+        const rawPaths = [layer.src, layer.tileSrc].filter((x): x is string => typeof x === "string" && x !== "");
+        const layerPaths = rawPaths.map(normalizePath);
         if (onMap) {
           shippedLayerIds.add(normalizeName(layer.id));
           for (const path of layerPaths) shippedLayerPaths.set(path, map.id);
         } else {
-          for (const path of layerPaths) paths.add(path);
+          // Both as written and normalised, so an exact-match scan finds either.
+          for (const path of [...rawPaths, ...layerPaths]) paths.add(path);
           hiddenLayers.push({ map: map.id, layer: layer.id, paths: layerPaths });
         }
       }
@@ -832,13 +832,13 @@ function orphanKeys(id: string): string[] {
   return [`n:${normalizeName(id)}`, `s:${slugify(id)}`].filter((k) => k.length > 2);
 }
 
-/** Image paths compare without a leading `./`, with `//` collapsed, case-blind. */
+/** Image paths compare without a leading `./` or `/`, with `//` collapsed, case-blind. */
 export function normalizePath(path: string): string {
   return path
     .trim()
     .replace(/\\/g, "/")
     .replace(/\/{2,}/g, "/")
-    .replace(/^(\.\/)+/, "")
+    .replace(/^(\.?\/)+/, "")
     .toLowerCase();
 }
 

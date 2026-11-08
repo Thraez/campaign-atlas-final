@@ -36,6 +36,9 @@ Today's v1 output (`public/atlas/`, `dist/`) stays as it is.
   published; `.local-atlas/`).
 - v1: `npm run atlas:build:player` writes exactly what it wrote before (same check as R-11b).
 - `npm run gate` passes.
+- Scans that check output against `mustNotShip.paths` compare with `normalizePath` (from
+  `src/atlas/content/resolveCampaign.ts`) on both sides; the set holds each hidden path as written
+  and normalised.
 
 ## Touches
 
