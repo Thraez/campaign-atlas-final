@@ -293,6 +293,81 @@ fog:
       expect(await run({ dir: plant(layout, atlas(route(900))), config })).toBe(15);
     });
 
+    // R-07b: a fog shape (conceal) inside a reveal is fog for checks 15 and 21.
+    describe("a fog shape (conceal) island inside a lit area", () => {
+      const islandYaml = (conceals: boolean) => `schemaVersion: 1
+maps:
+  - id: world
+    worldId: w
+    name: World
+    width: 1000
+    height: 1000
+    layers: []
+fog:
+  - mapId: world
+    enabled: true
+    reveals:
+      - [[0, 0], [1000, 0], [1000, 1000], [0, 1000]]
+${conceals ? "    conceals:\n      - [[200, 200], [210, 200], [210, 210], [200, 210]]\n" : ""}`;
+      const AREA = [
+        [100, 100],
+        [400, 100],
+        [400, 400],
+        [100, 400],
+      ];
+      const atlas = (extra: Record<string, unknown>, placements: object[] = []) => ({
+        maps: [
+          {
+            id: "world",
+            width: 1000,
+            height: 1000,
+            layers: [],
+            fog: { mapId: "world", enabled: true },
+            ...extra,
+          },
+        ],
+        placements,
+      });
+      const sound = {
+        soundscape: {
+          areas: [{ id: "area-0", points: AREA, bed: { src: "atlas/assets/audio/a.ogg" } }],
+        },
+      };
+      const region = { regions: [{ id: "r", name: "R", points: AREA }] };
+      const route = {
+        routes: [
+          {
+            id: "t",
+            name: "T",
+            waypoints: [],
+            resolvedPoints: [
+              [100, 205],
+              [400, 205],
+            ],
+          },
+        ],
+      };
+      const pin = [{ entityId: "e1", mapId: "world", x: 205, y: 205 }];
+
+      it("sound-in-fog (21): a sound area around the island exits 21", async () => {
+        const dir = plant(layout, atlas(sound));
+        expect(await run({ dir, config: writeSourceConfig(islandYaml(false)) })).toBe(0);
+        expect(await run({ dir, config: writeSourceConfig(islandYaml(true)) })).toBe(21);
+      });
+
+      it("in-fog-content (15): a region, route or pin over the island exits 15", async () => {
+        for (const [extra, placements] of [
+          [region, []],
+          [route, []],
+          [{}, pin],
+        ] as const) {
+          const dir = plant(layout, atlas(extra, [...placements]));
+          expect(await run({ dir, config: writeSourceConfig(islandYaml(false)) })).toBe(0);
+          expect(await run({ dir, config: writeSourceConfig(islandYaml(true)) })).toBe(15);
+        }
+      });
+    });
+
     it("could-not-verify (17): present-but-broken world.yaml on a clean fog map", async () => {
       // Markdown fences make loadWorldConfig throw (its hard-fail guard).
       const config = writeSourceConfig("```yaml\nschemaVersion: 1\n```");
