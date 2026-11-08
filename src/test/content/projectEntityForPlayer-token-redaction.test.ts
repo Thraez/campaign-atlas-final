@@ -66,6 +66,13 @@ describe("token-span redaction of links to secret notes", () => {
     ["note embed", "Fear ![[Khal Azum]]."],
     ["escaped pipe in a table", "| who |\n| --- |\n| [[Khal Azum\\|the warlord]] |\n"],
     ["empty alias", "Fear [[Khal Azum|]]."],
+    ["note file name", "Fear [[Khal Azum.md]]."],
+    ["single ] in the alias", "Fear [[Khal Azum|a]b]]."],
+    ["bracketed word in the alias", "Fear [[Khal Azum|[the] warlord]]."],
+    ["bracketed word in the target", "Fear [[Khal Azum [old]]]."],
+    ["backtick before a blank line", "It`s [[Khal Azum]] plan.\n\nLater a `code` word."],
+    ["inside an inline code span", "Write `[[Khal Azum]]` here."],
+    ["inside a fenced code block", "Notes:\n\n```\nsee [[ Khal Azum | the warlord ]]\n```\n"],
   ];
 
   for (const [name, body] of forms) {

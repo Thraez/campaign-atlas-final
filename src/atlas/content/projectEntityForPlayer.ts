@@ -16,7 +16,7 @@ import {
   stripSecretMarkers,
 } from "./dmMarkup";
 import { resolveImageEmbeds } from "./renderEntityMarkdown";
-import { tokenizeWikilinks, renderLinkTokens } from "./parseWikilinks";
+import { findWikilinks, tokenizeWikilinks, renderLinkTokens } from "./parseWikilinks";
 import { sanitizeAtlasHtml } from "../sanitizeHtml";
 import {
   compactProfile,
@@ -213,28 +213,31 @@ export interface ProjectionReport {
 }
 
 /**
- * Replace every wikilink in `text` whose target `isSecret` with `…`, by the
- * span `tokenizeWikilinks` found it at, and list the links replaced.
+ * Replace each wikilink in `text` whose target is a secret note with `…`, by
+ * the span `findWikilinks` found it at, and list the links replaced. `where`
+ * picks every link, or only those inside code (shown literally, never
+ * tokenized, so the HTML must lose them before rendering).
  */
 function redactSecretLinkSpans(
   text: string,
   ctx: ProjectionContext,
-  isSecret: (l: { resolvedId?: string }) => boolean,
+  where: "all" | "code",
 ): { text: string; links: ProjectionReport["redactedLinks"] } {
-  const { links, spans } = tokenizeWikilinks(text, {
-    resolveByName: ctx.resolveByName,
-    resolveByBasename: ctx.resolveByBasename,
-  });
   const redacted: ProjectionReport["redactedLinks"] = [];
   let out = "";
   let from = 0;
-  links.forEach((l, i) => {
-    if (!isSecret(l) || !l.resolvedId) return;
-    redacted.push({ target: l.target, resolvedId: l.resolvedId });
-    out += text.slice(from, spans[i].start) + "…";
-    from = spans[i].end;
-  });
+  for (const { link, span, inCode } of findWikilinks(text, ctx)) {
+    if (where === "code" && !inCode) continue;
+    if (!isSecretId(ctx, link.resolvedId)) continue;
+    redacted.push({ target: link.target, resolvedId: link.resolvedId });
+    out += text.slice(from, span.start) + "…";
+    from = span.end;
+  }
   return { text: out + text.slice(from), links: redacted };
+}
+
+function isSecretId(ctx: ProjectionContext, id: string | undefined): id is string {
+  return id !== undefined && ctx.secretIds.has(id);
 }
 
 export function projectEntityForPlayer(entity: Entity, ctx: ProjectionContext): Entity {
@@ -270,24 +273,25 @@ export function projectEntityWithReport(
     return `<span class="atlas-secret-block" data-secret-id="${esc}"></span>`;
   });
 
-  // 2. Tokenise wikilinks (from embed-resolved text so <img> appears in rendered HTML)
-  const { tokenized, links } = tokenizeWikilinks(bodyWithSecrets, {
+  // 2. Tokenise wikilinks (from embed-resolved text so <img> appears in rendered
+  // HTML). A link to a secret note inside code is shown literally, never
+  // tokenized, so it is redacted from the HTML's source first.
+  const htmlSource = redactSecretLinkSpans(bodyWithSecrets, ctx, "code").text;
+  const { tokenized, links } = tokenizeWikilinks(htmlSource, {
     resolveByName: ctx.resolveByName,
     resolveByBasename: ctx.resolveByBasename,
   });
 
   // 3. Redact links to secret targets: the display text is usually the
-  // secret's name. The shipped markdown loses each such link by the span the
-  // tokenizer found (whatever its spacing, case or alias); the HTML's link is
-  // marked broken. The report lists the markdown's links: it is the authored
-  // text, where a note embed (`![[Secret]]`) is still a link.
-  const isSecretTarget = (l: { resolvedId?: string }) =>
-    !!l.resolvedId && ctx.secretIds.has(l.resolvedId);
-  const redacted = redactSecretLinkSpans(body, ctx, isSecretTarget);
+  // secret's name. The shipped markdown loses each such link, code included,
+  // by the span the tokenizer found (whatever its spacing, case or alias);
+  // the HTML's link is marked broken. The report lists the markdown's links:
+  // it is the authored text, where a note embed (`![[Secret]]`) is a link too.
+  const redacted = redactSecretLinkSpans(body, ctx, "all");
   body = redacted.text;
   const redactedLinks = redacted.links;
   for (const l of links) {
-    if (isSecretTarget(l)) {
+    if (isSecretId(ctx, l.resolvedId)) {
       l.resolvedId = undefined;
       l.display = "…";
       l.target = "";
