@@ -1,94 +1,22 @@
 # State
 
-Updated 2026-11-07 on the Mac. Branch `main` (= origin/main 983b5d0).
+Updated 2026-11-08 on the Mac. Branch `main` (= origin/main c97db8c).
 
-## Morning queue (2026-11-07, second round)
+## Morning queue (2026-11-07, night)
 
-The 2026-11-07 morning queue is done: PRs #92-#98 are merged and published. This round's
-improvement loop opened the PRs below. Each one is cut from `main`, gate-green and reviewed clean
-(Opus, medium). Two are stacked, because they need unmerged code. Auto mode refused
-`gh pr merge`, so they wait for Isak. Merge them in this order:
+The atlas is being rebuilt (option B, approved 2026-11-07): plan, goals and progress in
+`docs/rebuild-2026-11/` on branch `rebuild-plan-2026-11`. Isak said yes to merging these in
+order, each after `main` was merged in and `npm run gate` passed again. All are merged and
+published:
 
-| Order | PR   | Ticket                                            | Branch                                      | Note                       |
-| ----- | ---- | ------------------------------------------------- | ------------------------------------------- | -------------------------- |
-| 1     | #99  | eval-2026-10/45 deleted pins on every map         | `eval-45-deleted-pins-counted`              |                            |
-| 2     | #100 | eval-2026-10/46 one spoiler-leak rule             | `eval-46-one-world-yaml-leak-rule`          |                            |
-| 3     | #106 | eval-2026-10/50 link leak rules match the build   | `eval-50-link-leak-rules-match-build`       | stacked on #100            |
-| 4     | #102 | eval-2026-10/48 the wizard's zip strips metadata  | `eval-48-wizard-zip-strips-metadata`        |                            |
-| 5     | #103 | eval-2026-10/47 Discard all clears world settings | `eval-47-discard-all-clears-world-settings` |                            |
-| 6     | #107 | eval-2026-10/44 soundscape draft per map          | `eval-44-soundscape-draft-per-map`          | stacked on #103            |
-| 7     | #104 | eval-2026-10/27 one reduce-motion switch          | `eval-27-one-reduce-motion-switch`          | Isak looks at the button   |
-| 8     | #105 | eval-2026-10/49 ruler and drawing, one click      | `eval-49-ruler-and-drawing-one-click`       | Isak checks in the preview |
-| 9     | #109 | arch-2026-11/01 publish scans find the real files | `arch-01-scans-find-real-artifacts`         |                            |
-| 10    | #108 | arch-2026-11/04 delete the dead EntityReadingView | `arch-04-delete-entity-reading-view`        |                            |
-| 11    | #110 | arch-2026-11/07 world.yaml visibility typo is dm  | `arch-07-invalid-visibility-fails-closed`   |                            |
-| 12    | #101 | This State.md, workflow retro notes               | `docs-2026-11-07-improve-loop`              | last                       |
+- Phase 0: #111 (R-01 Sync refuses while hosting is public), #112 (Q-01 broken wikilinks are plain
+  text), #113 (Q-02 maps open fitted to the screen), #114 (Q-03 editor menu paints above the map),
+  #115 (Q-04 region hover card).
+- The 12 older PRs: #109, #110, #99, #100, #106, #102, #103, #107, #104, #105, #108, #101.
 
-Check each PR's mergeability just before its merge; a stacked PR only becomes clean once the PR
-under it is merged (GitHub then shows only its own commits):
+Phase 1 so far, also merged: #116 (R-02 a missing world.yaml visibility is dm), #117 (R-03 scans
+fail on a missing artifact), #118 (R-04 adopt the rebuild goals, ADR-0002). Next: R-05.
 
-```bash
-gh pr merge 99 --merge
-```
-
-```bash
-gh pr view 100 --json mergeable
-```
-
-```bash
-gh pr merge 100 --merge
-```
-
-```bash
-gh pr view 106 --json mergeable
-```
-
-```bash
-gh pr merge 106 --merge
-```
-
-```bash
-gh pr merge 102 --merge
-```
-
-```bash
-gh pr merge 103 --merge
-```
-
-```bash
-gh pr view 107 --json mergeable
-```
-
-```bash
-gh pr merge 107 --merge
-```
-
-```bash
-gh pr merge 104 --merge
-```
-
-```bash
-gh pr merge 105 --merge
-```
-
-```bash
-gh pr merge 109 --merge
-```
-
-```bash
-gh pr merge 108 --merge
-```
-
-```bash
-gh pr merge 110 --merge
-```
-
-```bash
-gh pr merge 101 --merge
-```
-
-Every code PR also edits its own ticket
-file only, so tracker conflicts are unlikely; a conflict keeps both sides, then the gate runs again.
 Cleaned 2026-11-07 (Isak: delete unless meaningful): branch `local-main-backup-2026-11-07` held two
 State.md commits about PRs since merged (#83-#89); deleted, tip kept as tag
 `archive/local-main-backup-2026-11-07` (pushed). `stash@{0}` is kept only for its
@@ -101,8 +29,8 @@ State.md part is the same stale notes. Drop it once Isak decides the settings ch
   (`docs/GOALS.md`), ADR-0001 (a note with no visibility is DM-only), tickets in `docs/tracker/`.
 - The atlas becomes the players' atlas for the world, Tidemarrow first, filled from the vault by
   Sync from Obsidian. Today it still shows the old Astrath sample (three events).
-- Live site: https://thraez.github.io/campaign-atlas-final/. Every PR up to #98 is merged and
-  published; open: the Morning queue. The player build ships only allowed files (eval 40).
+- Live site: https://thraez.github.io/campaign-atlas-final/. Every PR up to #118 is merged and
+  published. The player build ships only allowed files (eval 40).
 - Merges run on the full local gate plus an Opus review, without GitHub CI (`docs/agents/workflow.md`).
   The PR check runs only by hand (#90).
 - 2026-11-07 improvement loop (retro, architecture review, simplify): no rewrite. The editor page is
@@ -113,17 +41,14 @@ State.md part is the same stale notes. Drop it once Isak decides the settings ch
 
 Lowest number first within each folder.
 
-- 2026-11-07, Isak: the Atlas may need a rebuild or redesign. The orchestrator session is settling
-  goals with him; no new tickets until that's done.
-- 2026-11-07, Isak: the repo stays public on purpose (he tests the live site). Content in the repo
-  is test material and the DM notes are scrap.
-- Waiting to merge (Morning queue): `eval-2026-10/27`, `44`-`50`; `arch-2026-11/01`, `04`, `07`.
-- `arch-2026-11/` (architecture pass on code outside the open PRs): ranked tickets 02-09 in its
-  `README.md`. 02 (sound areas inside fog ship) is the most important; 02, 03 and 05 wait for the
-  queue. 07 built (#110, Isak's call: an invalid world.yaml visibility loads as `dm`).
+- Rebuild phase 1: R-05 next (Morning queue above).
+- Found in the R-02 review, needs a ticket (high): the player build's `buildReport.warnings`
+  carries world.yaml warnings that name DM-only region and route ids (`scripts/build-atlas.ts`).
+- `arch-2026-11/` (architecture pass): ranked tickets 02-09 in its `README.md`. 02 (sound areas
+  inside fog ship) is the most important. 07 merged (#110: an invalid world.yaml visibility loads
+  as `dm`).
 - Next, by payoff (from the improvement loop; no ticket yet unless numbered):
-  1. `eval-2026-10/39` (one canon client): after the queue merges; it touches the save plugin that
-     #102 changes.
+  1. `eval-2026-10/39` (one canon client): touches the save plugin that #102 changed.
   2. Editor and player pin anchors differ by about 8px: needs Isak's look.
   3. A WebP map keeps its EXIF/XMP in the editor upload and the wizard's zip until
      `check-image-privacy` (found in 48).
@@ -139,7 +64,6 @@ Lowest number first within each folder.
 
 ## Waiting on Isak
 
-- Merging the Morning queue (auto mode refused `gh pr merge`).
 - The world's new name (`audit-2026-10/05`): undecided; Astrath Deep Realm for now, and Isak isn't
   keen on it.
 - In the vault, in Obsidian: four notes have an unclosed DM block (`%%` or `:::dm`), so the build
@@ -149,21 +73,22 @@ Lowest number first within each folder.
   (#64, #67), the missing-bytes toast (#66), the layer path field (#68), zooming pin labels (#70),
   a reload with sound on, desktop and phone (#71), offline in a browser (#78), the Sync panel (#79),
   the Save chip and the conflict notice (#80, #81), the "Sync is off while the repo is public"
-  toast on a Sync commit (R-01); eval-30 (#92): draw on two maps, save once,
-  reload, both keep their edits. After #99: delete a pin on map B, switch to map A, save, reload;
-  the pin stays gone. After #104: the calm-mode button in the map toolbar (look and place). After
-  #105: start a route with the ruler on; one click adds one vertex and no ruler point. After #103:
-  rename the world, edit the calendar, Discard all; both go back. After #107: change one map's
-  soundscape, switch maps, save; only that map changes.
+  toast on a Sync commit (R-01); the fit on open and no view jump after an editor save (Q-02); the
+  editor menu above the map (Q-03); a region card on hover (Q-04); eval-30 (#92): draw on two maps,
+  save once, reload, both keep their edits. After #99: delete a pin on map B, switch to map A, save,
+  reload; the pin stays gone. After #104: the calm-mode button in the map toolbar (look and place).
+  After #105: start a route with the ruler on; one click adds one vertex and no ruler point. After
+  #103: rename the world, edit the calendar, Discard all; both go back. After #107: change one
+  map's soundscape, switch maps, save; only that map changes.
 - Agents were denied reads under `node_modules` (an unknown deny rule); worth a look.
-- The provisional calls below, in a batch.
-- `arch-2026-11/07`: should an invalid `visibility:` in world.yaml load as `dm` (fail closed)? Recommended yes, with an ADR-0001 addendum.
 - On the PC: follow `docs/PC-CLEANUP.md` (turn the old routines off first).
 
 ## Provisional calls
 
 Isak's rule, 2026-10-27: work never stops on a question. Each open question gets the recommended
 answer, logged here and built on; he reviews this list in batches, and a reversal becomes a ticket.
+
+All calls below were kept by Isak on 2026-11-07 (batch review: "Keep all").
 
 | Date       | Question                                                                                                                                                      | Call                                                                                                                         | Why                                                                                                                                    | Ticket |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------ |
