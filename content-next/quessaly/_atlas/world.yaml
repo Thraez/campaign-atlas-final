@@ -1,0 +1,122 @@
+# R-16 v2 test world, world 1: a three-level tree (quessaly-world on the ocean >
+# oskmark > brindlecross and tallowford). Made-up content only.
+# The cases are named in content-next/README.md.
+schemaVersion: 2
+world:
+  id: quessaly
+  name: Quessaly
+maps:
+  - id: quessaly-world
+    name: Quessaly
+    width: 600
+    height: 400
+    visibility: player
+    layers:
+      - { id: base, src: images/quessaly-world.png, x: 0, y: 0, width: 600, height: 400 }
+    scale: { unitsPerPixel: 5, unitLabel: mi }
+    zoom: { min: -2, max: 3 }
+    regions:
+      - id: saltmeadow
+        name: Saltmeadow
+        points: [[60, 320], [220, 300], [240, 380], [60, 390]]
+        visibility: player
+    routes:
+      - id: gull-road
+        name: Gull Road
+        waypoints: [[60, 300], [260, 220], [320, 140]]
+        visibility: player
+
+  - id: oskmark
+    name: Oskmark
+    width: 600
+    height: 400
+    visibility: player
+    parent: quessaly-world
+    frame: { x: 300, y: 80, width: 180, height: 120, rotation: 0 }
+    enterZoom: 1
+    layers:
+      - { id: base, src: images/oskmark.png, x: 0, y: 0, width: 600, height: 400 }
+    scale: { unitsPerPixel: 1, unitLabel: mi }
+    zoom: { min: -1, max: 3 }
+    pins:
+      # Under sandbox's fog (x >= 300); open in main.
+      - { note: haskel-thimbleby, x: 450, y: 120, visibility: player }
+      # Inside the hidden region the-murkwater.
+      - { note: mossbeck-well, x: 220, y: 300, visibility: player }
+      - { note: marra-quillon, x: 60, y: 180, visibility: player }
+    regions:
+      - id: reedmere
+        name: Reedmere
+        points: [[40, 240], [120, 240], [120, 320], [40, 320]]
+        visibility: { main: player }
+      - id: the-murkwater
+        name: The Murkwater
+        points: [[160, 220], [290, 220], [290, 380], [160, 380]]
+        visibility: dm
+    routes:
+      # Inside the hidden region the-murkwater.
+      - id: eel-path
+        name: Eel Path
+        waypoints: [[180, 260], [270, 350]]
+        visibility: player
+    sound:
+      # Sound-only, inside the hidden region the-murkwater.
+      - id: frog-chorus
+        name: Frog Chorus
+        points: [[200, 280], [260, 280], [260, 340]]
+        visibility: player
+        bed: { src: audio/frog-chorus.ogg }
+      # Rides on reedmere: follows its verdict.
+      - id: reed-whisper
+        regionId: reedmere
+        bed: { src: audio/reed-whisper.ogg }
+
+  - id: brindlecross
+    name: Brindlecross
+    width: 400
+    height: 300
+    visibility: { main: player }
+    parent: oskmark
+    frame: { x: 80, y: 60, width: 100, height: 75, rotation: 0 }
+    enterZoom: 2
+    layers:
+      - { id: base, src: images/brindlecross.png, x: 0, y: 0, width: 400, height: 300 }
+    scale: { unitsPerPixel: 0.01, unitLabel: mi }
+    zoom: { min: 0, max: 4 }
+    pins:
+      - { note: gilda-moth, x: 200, y: 150, visibility: player }
+
+  - id: tallowford
+    name: Tallowford
+    width: 400
+    height: 300
+    visibility: player
+    parent: oskmark
+    # Under sandbox's fog on oskmark (ADR-0004 rule 4).
+    frame: { x: 400, y: 250, width: 100, height: 75, rotation: 0 }
+    enterZoom: 2
+    layers:
+      - { id: base, src: images/tallowford.png, x: 0, y: 0, width: 400, height: 300 }
+    scale: { unitsPerPixel: 0.01, unitLabel: mi }
+    zoom: { min: 0, max: 4 }
+    pins:
+      - { note: pellam-ferry, x: 300, y: 200, visibility: player }
+
+notes:
+  haskel-thimbleby:
+    visibility: { main: player, sandbox: player }
+    basedOn: player
+  mossbeck-well:
+    visibility: { main: player, sandbox: player }
+    basedOn: player
+  # Hidden from main by this entry alone; its frontmatter says player.
+  marra-quillon:
+    visibility: { main: dm, sandbox: player }
+    basedOn: player
+  gilda-moth:
+    visibility: { main: player }
+    basedOn: player
+  # Stale: written against `rumor`, but the note now says `player`.
+  wexley-tarn:
+    visibility: { main: player, sandbox: player }
+    basedOn: rumor

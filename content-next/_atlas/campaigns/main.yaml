@@ -1,0 +1,17 @@
+# Campaign "main": reads notes as the vault says (narrowed by world.yaml notes:).
+id: main
+name: Lantern Road
+notes: vault
+maps:
+  quessaly-world:
+    state: open
+  oskmark:
+    state: open
+  brindlecross:
+    state: open
+  tallowford:
+    state: open
+  skerrow-isles:
+    state: open
+  hookhaven:
+    state: open
