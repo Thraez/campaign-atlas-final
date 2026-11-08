@@ -8,7 +8,9 @@ export interface CodeRange {
 }
 
 const FENCE_OPEN_RE = /^ {0,3}(`{3,}|~{3,})/;
-const INLINE_SPAN_RE = /(`+)([\s\S]*?)\1/g;
+// An inline span ends with its paragraph: it never crosses a blank line, as in
+// markdown-it, so a stray backtick can't turn the prose after it into "code".
+const INLINE_SPAN_RE = /(`+)((?:(?!\n[ \t]*\n)[\s\S])*?)\1/g;
 
 export function findCodeRanges(text: string): CodeRange[] {
   const ranges: CodeRange[] = [];

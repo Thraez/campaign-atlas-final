@@ -1,6 +1,6 @@
 # R-11d Link redaction from wikilink tokens
 
-Status: ready-for-agent
+Status: done
 Blocked by: R-11a
 Size: S
 Branch: `rebuild-r11d-token-redaction`

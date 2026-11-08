@@ -78,6 +78,7 @@ The mayor's chief advisor is [[Vampire Lord]].
 
 - In standard player builds: the link is rendered as `…` (redacted) and the build warns.
 - In **strict** player builds (`atlas:build:player`): the build fails with exit 8.
+- Redaction goes by the link's target only. Author-written text in a link to a shipped note (its display alias or heading, e.g. an alias that names a secret) is not redacted; only the name scan (`check-no-secrets`) covers it, and only for whole names.
 
 Similarly, player-visible **regions** and **routes** that reference DM-only entities fail strict builds (exits 6 and 7).
 
