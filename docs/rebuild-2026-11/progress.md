@@ -173,3 +173,8 @@ variant still drew a dotted "link" span. Not a resolver bug.
 - Next: R-10 (Opus, medium), in a fresh coordinator session (this one is past 180k context).
 - The orchestrator relayed a "merge on clean gates" answer; not acted on: AGENTS.md requires Isak's yes
   in the merging chat itself.
+
+## Coordinator 4 (session ba314e3c, 2026-11-08)
+
+- Took over Phase 2. R-10: worktree `r10`, branch `rebuild-r10-schema-v2-types` from origin/main
+  2902a72, builder Opus (medium). Then: gate, one Opus review, fix, then Isak's push/merge yes.
