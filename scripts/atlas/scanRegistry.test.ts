@@ -3,13 +3,15 @@
  * editor's Publish check and the integrity smoke all read SCANS, so a scan
  * can't be dropped from one of them without a test failing.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
+  LEGACY_OUTPUT,
   MISSING_ARTIFACT_EXIT,
   SCANS,
+  campaignArtifacts,
   missingArtifacts,
   scanTasks,
   runAll,
@@ -17,9 +19,28 @@ import {
   type ScanTask,
 } from "./scanRegistry";
 import { MISSING_ARTIFACT_MSG, runPublishScans } from "./publishScan";
+import { SAFE_ID } from "./loadAtlasModel";
 
 const SCRIPTS_DIR = path.resolve(__dirname, "..");
 const FIXTURE_CONTENT = path.resolve(__dirname, "../../src/test/fixtures/atlas-build/content");
+const V2_CONTENT = path.resolve(__dirname, "../../src/test/fixtures/scan-registry/v2/content");
+
+const temps: string[] = [];
+afterAll(() => {
+  for (const t of temps.splice(0)) fs.rmSync(t, { recursive: true, force: true });
+});
+
+/** A temp repo root whose atlas.config.json points at `contentRoot` (v1 by default). */
+function repoWith(contentRoot = FIXTURE_CONTENT, defaultWorld = "test-world"): ScanContext {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "scan-registry-"));
+  temps.push(root);
+  const configPath = path.join(root, "atlas.config.json");
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify({ contentRoot, defaultWorld, include: ["**/*.md"], exclude: ["**/_dm/**"] }),
+  );
+  return { root, configPath, contentDir: contentRoot };
+}
 
 describe("SCANS", () => {
   it("lists every scanner script under scripts/", () => {
@@ -45,8 +66,7 @@ describe("SCANS", () => {
   });
 
   it("each leak scan runs on both the built site and the source store", () => {
-    const ctx = { root: "/repo", configPath: "/repo/atlas.config.json", contentDir: "/c" };
-    const labels = scanTasks(ctx).map((t) => t.label);
+    const labels = scanTasks(repoWith()).map((t) => t.label);
     for (const id of [
       "check-no-secrets",
       "check-derived-secrets",
@@ -60,8 +80,7 @@ describe("SCANS", () => {
   });
 
   it("checks the built site's file types (the DM's store may hold other files)", () => {
-    const ctx = { root: "/repo", configPath: "/repo/atlas.config.json", contentDir: "/c" };
-    const labels = scanTasks(ctx).map((t) => t.label);
+    const labels = scanTasks(repoWith()).map((t) => t.label);
     expect(labels.filter((l) => l.startsWith("check-player-files"))).toEqual([
       "check-player-files dist",
     ]);
@@ -119,7 +138,12 @@ describe("runPublishScans (the editor's Publish check)", () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), "publish-scans-"));
     fs.writeFileSync(
       path.join(root, "atlas.config.json"),
-      JSON.stringify({ contentRoot: FIXTURE_CONTENT, include: ["**/*.md"], exclude: [] }),
+      JSON.stringify({
+        contentRoot: FIXTURE_CONTENT,
+        defaultWorld: "test-world",
+        include: ["**/*.md"],
+        exclude: [],
+      }),
     );
     fs.mkdirSync(path.join(root, "public", "atlas", "assets"), { recursive: true });
     fs.writeFileSync(
@@ -181,7 +205,15 @@ describe("publish mode: a missing artifact fails every scan (R-03)", () => {
     put("public/atlas/atlas.json", atlas);
     put("public/atlas/assets/maps/world.png", "png");
     put("content/world/place.md", "# Place");
-    put("atlas.config.json", JSON.stringify({ contentRoot: "content" }));
+    put(
+      "atlas.config.json",
+      JSON.stringify({
+        contentRoot: "content",
+        defaultWorld: "world",
+        include: ["**/*.md"],
+        exclude: [],
+      }),
+    );
   }
 
   beforeEach(() => {
@@ -227,15 +259,18 @@ describe("publish mode: a missing artifact fails every scan (R-03)", () => {
     for (const t of scanTasks(ctx)) expect(missingArtifacts(t), t.label).toEqual([]);
   });
 
+  const casesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "scan-cases-"));
+  temps.push(casesRoot);
+  writeBuiltSite(casesRoot);
   const cases = scanTasks({
-    root: "/r",
-    configPath: "/r/atlas.config.json",
-    contentDir: "/r/content",
+    root: casesRoot,
+    configPath: path.join(casesRoot, "atlas.config.json"),
+    contentDir: path.join(casesRoot, "content"),
   }).flatMap((t) =>
     t.requires.flatMap((a, i) =>
       (["removed", "emptied"] as const).map((how) => ({
         label: t.label,
-        rel: path.relative("/r", a.path),
+        rel: path.relative(casesRoot, a.path),
         i,
         how,
       })),
@@ -290,10 +325,289 @@ describe("scan layouts", () => {
     fs.writeFileSync(path.join(root, "dist", "index.html"), "<html>");
     // A stray atlas.json at the top of dist is not where the built site keeps it.
     fs.writeFileSync(path.join(root, "dist", "atlas.json"), "{}");
-    const ctx = { root, configPath: path.join(root, "none.json"), contentDir: root };
+    const ctx = { ...repoWith(), root };
     const wanted = ["check-fog-safety dist", "check-player-secrets dist"];
     const tasks = scanTasks(ctx).filter((t) => wanted.includes(t.label));
     expect(tasks).toHaveLength(2);
     for (const t of tasks) expect(await t.run(), t.label).not.toBe(0);
   });
+});
+
+/**
+ * R-15: the registry reads the campaign list from the loaded model. v1 content
+ * is campaign `main` on today's two dirs; v2 content gives every campaign its
+ * own store and built site (ADR-0004).
+ */
+describe("campaign dirs (R-15)", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  const rel = (ctx: ScanContext, p: string) => path.relative(ctx.root, p).split(path.sep).join("/");
+
+  it("v1: exactly today's task list, labelled campaign main", () => {
+    const ctx = repoWith();
+    const list = scanTasks(ctx).map((t) => ({
+      label: t.label,
+      campaign: t.campaign ?? null,
+      requires: t.requires.map((a) => `${a.kind} ${rel(ctx, a.path)}`),
+    }));
+    const cfg = "file atlas.config.json";
+    const content = `dir ${rel(ctx, FIXTURE_CONTENT)}`;
+    const dist = "file dist/atlas/atlas.json";
+    const store = "file public/atlas/atlas.json";
+    expect(list).toEqual([
+      { label: "check-no-secrets dist", campaign: "main", requires: [dist] },
+      { label: "check-no-secrets public/atlas", campaign: "main", requires: [store] },
+      { label: "check-derived-secrets dist", campaign: "main", requires: [dist, cfg, content] },
+      {
+        label: "check-derived-secrets public/atlas",
+        campaign: "main",
+        requires: [store, cfg, content],
+      },
+      { label: "check-artifact-shape public/atlas", campaign: "main", requires: [store] },
+      { label: "check-image-privacy dist", campaign: "main", requires: [dist, cfg, content] },
+      {
+        label: "check-image-privacy public/atlas",
+        campaign: "main",
+        requires: [store, cfg, content],
+      },
+      { label: "check-fog-safety dist", campaign: "main", requires: [dist, cfg] },
+      { label: "check-fog-safety public/atlas", campaign: "main", requires: [store, cfg] },
+      { label: "check-player-secrets dist", campaign: "main", requires: [dist] },
+      { label: "check-player-secrets public/atlas", campaign: "main", requires: [store] },
+      { label: "check-player-files dist", campaign: "main", requires: [dist] },
+      { label: "check-vault-content content", campaign: null, requires: [content] },
+      {
+        label: "audit-assets public/atlas/assets",
+        campaign: "main",
+        requires: [store, "dir public/atlas/assets", content],
+      },
+    ]);
+  });
+
+  it("v2: each campaign gets its own store and built site, and the deployed pair is still scanned", () => {
+    const ctx = repoWith(V2_CONTENT);
+    expect(campaignArtifacts(ctx).map((a) => [a.campaign, a.label, a.layout])).toEqual([
+      [LEGACY_OUTPUT, "dist", "built-site"],
+      [LEGACY_OUTPUT, "public/atlas", "store"],
+      ["a", "dist-campaigns/a", "built-site"],
+      ["a", ".atlas-campaigns/a/atlas", "store"],
+      ["b", "dist-campaigns/b", "built-site"],
+      ["b", ".atlas-campaigns/b/atlas", "store"],
+    ]);
+  });
+
+  // Every per-artifact scan, and the layouts it runs on.
+  const PER_ARTIFACT: [string, ("built-site" | "store")[]][] = [
+    ["check-no-secrets", ["built-site", "store"]],
+    ["check-derived-secrets", ["built-site", "store"]],
+    ["check-artifact-shape", ["store"]],
+    ["check-image-privacy", ["built-site", "store"]],
+    ["check-fog-safety", ["built-site", "store"]],
+    ["check-player-secrets", ["built-site", "store"]],
+    ["check-player-files", ["built-site"]],
+    ["audit-assets", ["store"]],
+  ];
+  const CONTENT_WIDE = ["check-vault-content"];
+  const DIRS = {
+    "built-site": (id: string) => `dist-campaigns/${id}`,
+    store: (id: string) => `.atlas-campaigns/${id}/atlas`,
+  };
+  const ATLAS_JSON = {
+    "built-site": (id: string) => `dist-campaigns/${id}/atlas/atlas.json`,
+    store: (id: string) => `.atlas-campaigns/${id}/atlas/atlas.json`,
+  };
+
+  it("the table covers every scan in the registry", () => {
+    expect([...PER_ARTIFACT.map(([id]) => id), ...CONTENT_WIDE].sort()).toEqual(
+      SCANS.map((s) => s.id).sort(),
+    );
+  });
+
+  describe.each(PER_ARTIFACT)("v2: %s", (scan, layouts) => {
+    it.each(["a", "b"])("one task per layout for campaign %s, requiring its atlas.json", (id) => {
+      const ctx = repoWith(V2_CONTENT);
+      const own = scanTasks(ctx).filter((t) => t.scan === scan && t.campaign === id);
+      expect(own.map((t) => t.label)).toEqual(
+        layouts.map((l) =>
+          scan === "audit-assets" ? `${scan} ${DIRS[l](id)}/assets` : `${scan} ${DIRS[l](id)}`,
+        ),
+      );
+      own.forEach((t, i) => {
+        expect(t.label).toContain(id);
+        expect(rel(ctx, t.requires[0].path)).toBe(ATLAS_JSON[layouts[i]](id));
+      });
+    });
+  });
+
+  it("v2: every scan of v1's deployed dirs still runs, labelled as the legacy output", () => {
+    const ctx = repoWith(V2_CONTENT);
+    const v1Labels = scanTasks(repoWith())
+      .filter((t) => t.campaign !== undefined)
+      .map((t) => t.label);
+    const legacy = scanTasks(ctx).filter((t) => t.campaign === LEGACY_OUTPUT);
+    expect(legacy.map((t) => t.label)).toEqual(v1Labels);
+  });
+
+  it.each(CONTENT_WIDE)("v2: %s runs once", (scan) => {
+    const tasks = scanTasks(repoWith(V2_CONTENT)).filter((t) => t.scan === scan);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].campaign).toBeUndefined();
+  });
+
+  /** Both campaigns' outputs, with every artifact a task lists. */
+  function writeCampaignOutputs(ctx: ScanContext) {
+    const atlas = JSON.stringify({ version: "1", schemaVersion: 1, worlds: [], entities: [] });
+    const put = (r: string, body: string) => {
+      const abs = path.join(ctx.root, r);
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, body);
+    };
+    // The legacy pair the deploy still ships.
+    put("dist/atlas/atlas.json", atlas);
+    put("public/atlas/atlas.json", atlas);
+    put("public/atlas/assets/maps/vale.webp", "webp");
+    for (const id of ["a", "b"]) {
+      put(`dist-campaigns/${id}/index.html`, "<html>");
+      put(ATLAS_JSON["built-site"](id), atlas);
+      put(ATLAS_JSON.store(id), atlas);
+      put(`.atlas-campaigns/${id}/atlas/assets/maps/vale.webp`, "webp");
+    }
+  }
+
+  it("v2: the full outputs have every listed artifact (the control)", () => {
+    const ctx = repoWith(V2_CONTENT);
+    writeCampaignOutputs(ctx);
+    for (const t of scanTasks(ctx)) expect(missingArtifacts(t), t.label).toEqual([]);
+  });
+
+  const removals = (["a", "b"] as const).flatMap((id) =>
+    (["built-site", "store"] as const).map((layout) => ({ id, layout })),
+  );
+
+  it.each(removals)(
+    "v2: removing $id's $layout atlas.json fails every $id task on it and none of the other's",
+    async ({ id, layout }) => {
+      const ctx = repoWith(V2_CONTENT);
+      writeCampaignOutputs(ctx);
+      const gone = path.join(ctx.root, ATLAS_JSON[layout](id));
+      fs.rmSync(gone);
+      const tasks = scanTasks(ctx);
+      const hit = tasks.filter((t) => t.campaign === id && t.label.includes(DIRS[layout](id)));
+      expect(hit.length).toBe(PER_ARTIFACT.filter(([, ls]) => ls.includes(layout)).length);
+      for (const t of hit) {
+        expect(await t.run(), t.label).toBe(MISSING_ARTIFACT_EXIT);
+      }
+      const errors = vi.mocked(console.error).mock.calls.flat().join("\n");
+      expect(errors).toContain(gone);
+      for (const t of tasks.filter((t) => !hit.includes(t))) {
+        expect(missingArtifacts(t), t.label).toEqual([]);
+      }
+    },
+  );
+
+  it("v2: removing a campaign's whole output fails every task for it, none for the other", async () => {
+    const ctx = repoWith(V2_CONTENT);
+    writeCampaignOutputs(ctx);
+    fs.rmSync(path.join(ctx.root, "dist-campaigns", "a"), { recursive: true });
+    fs.rmSync(path.join(ctx.root, ".atlas-campaigns", "a"), { recursive: true });
+    const tasks = scanTasks(ctx);
+    for (const t of tasks.filter((t) => t.campaign === "a")) {
+      expect(await t.run(), t.label).toBe(MISSING_ARTIFACT_EXIT);
+    }
+    for (const t of tasks.filter((t) => t.campaign !== "a")) {
+      expect(missingArtifacts(t), t.label).toEqual([]);
+    }
+  });
+
+  describe("fails closed when the campaign list can't be loaded", () => {
+    it("a missing config", () => {
+      const ctx = {
+        ...repoWith(),
+        configPath: path.join(os.tmpdir(), "no-such-atlas.config.json"),
+      };
+      expect(() => scanTasks(ctx)).toThrow(/campaign list can't be loaded/);
+    });
+
+    it("a config without include/exclude", () => {
+      const ctx = repoWith();
+      fs.writeFileSync(ctx.configPath, JSON.stringify({ contentRoot: FIXTURE_CONTENT }));
+      expect(() => scanTasks(ctx)).toThrow(/campaign list can't be loaded/);
+    });
+
+    /** v2 content with campaign b's file gone: it can't load. */
+    function brokenV2(): string {
+      const content = copyV2();
+      fs.rmSync(path.join(content, "_atlas", "campaigns", "b.yaml"));
+      return content;
+    }
+
+    /** A temp copy of the v2 fixture's content root. */
+    function copyV2(): string {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scan-v2-"));
+      temps.push(dir);
+      const content = path.join(dir, "content");
+      fs.cpSync(V2_CONTENT, content, { recursive: true });
+      return content;
+    }
+
+    /** A copy of the v2 fixture with `atlas.yaml`'s campaign list replaced. */
+    function v2WithCampaigns(campaigns: string[]): string {
+      const content = copyV2();
+      const file = path.join(content, "_atlas", "atlas.yaml");
+      const text = fs.readFileSync(file, "utf8");
+      const list = campaigns.length
+        ? campaigns.map((c) => `\n  - ${JSON.stringify(c)}`).join("")
+        : " []";
+      fs.writeFileSync(file, text.replace(/campaigns:\n {2}- a\n {2}- b/, `campaigns:${list}`));
+      return content;
+    }
+
+    it("v2 content that lists no campaigns", () => {
+      expect(() => scanTasks(repoWith(v2WithCampaigns([])))).toThrow(/campaign/);
+    });
+
+    it.each(["../a", "a/b", ".a", "a.", "a ", "con."])("an unsafe campaign id %j", (id) => {
+      expect(() => scanTasks(repoWith(v2WithCampaigns(["a", id])))).toThrow(
+        /is not a valid campaign id|can't name a dir/,
+      );
+    });
+
+    it("v2 content that doesn't load", () => {
+      expect(() => scanTasks(repoWith(brokenV2()))).toThrow(/campaign list can't be loaded/);
+    });
+
+    it("the editor's Publish check rejects rather than report safe", async () => {
+      const ctx = repoWith(brokenV2());
+      await expect(runPublishScans(ctx.root)).rejects.toThrow(/campaign list can't be loaded/);
+    });
+  });
+
+  it("the editor's Publish check names a v2 campaign's missing output", async () => {
+    const ctx = repoWith(V2_CONTENT);
+    writeCampaignOutputs(ctx);
+    fs.rmSync(path.join(ctx.root, ATLAS_JSON["built-site"]("b")));
+    const reasons = await runPublishScans(ctx.root);
+    const missing = reasons.filter((r) => r.message === MISSING_ARTIFACT_MSG);
+    expect(missing.length).toBeGreaterThan(0);
+    for (const r of missing) {
+      expect(r.target).toBe("dist-campaigns/b");
+      expect(r.locator).toEqual({ file: "dist-campaigns/b/atlas/atlas.json" });
+    }
+  });
+});
+
+describe("SAFE_ID (the one id rule for folders and campaign dirs)", () => {
+  it.each(["main", "a", "astrath-deeprealm", "v1.2", "_x", "a_b-c"])("accepts %j", (id) => {
+    expect(SAFE_ID.test(id)).toBe(true);
+  });
+  it.each(["", ".a", "..", "a/b", "a\\b", "a.", "a..", "a ", " a", "a b", "-a"])(
+    "rejects %j",
+    (id) => {
+      expect(SAFE_ID.test(id)).toBe(false);
+    },
+  );
 });

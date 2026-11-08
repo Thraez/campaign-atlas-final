@@ -1,6 +1,6 @@
 # R-15 Scan registry lists campaign dirs
 
-Status: ready-for-agent
+Status: done
 Blocked by: R-03 (done), R-12
 Size: S
 Branch: `rebuild-r15-scan-campaign-dirs`
@@ -34,6 +34,16 @@ every scan already covers them and a missing campaign output fails the publish (
 - Docs: the scan count and dirs in `docs/agents/workflow.md` ("Done") and
   `docs/VISIBILITY_AND_PLAYER_SAFETY.md` if they change.
 - `npm run gate` passes.
+
+## Built
+
+- `audit-assets` runs once per campaign store (`.atlas-campaigns/<id>/atlas/assets`), not once
+  for the content: v2 map images live outside `public/` (ADR-0003), so there is no shared assets
+  dir, and the size budget is what each campaign's site ships. Its content check (references in
+  `content/`) is the same input for each. `check-vault-content` is the one content-wide scan and
+  runs once.
+- A v2 run also scans `dist` and `public/atlas` (campaign `(legacy)`), which the build still
+  writes and the deploy ships; R-19 drops them.
 
 ## Touches
 
