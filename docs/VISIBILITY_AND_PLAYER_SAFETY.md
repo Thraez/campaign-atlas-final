@@ -146,10 +146,22 @@ list. Each scan names the artifacts it reads: the player `atlas.json` (`dist/atl
 `public/atlas/atlas.json`) for the artifact scans, plus `atlas.config.json` and `content/` for
 `check-derived-secrets` and `check-image-privacy` (the secret names come from it) and
 `atlas.config.json` for `check-fog-safety`; `content/` for `check-vault-content`; and
-`public/atlas/assets/` plus `content/` for `audit-assets`. When one is missing or empty, the scan
-fails with exit 20 and names the path, without running: a publish never passes on "0 files
-checked". Run by hand (`npm run atlas:check-secrets dist` and the like), a scan still skips a dir
-that isn't built yet. Tests: `scanRegistry.test.ts`.
+the store's `atlas.json` and `assets/` plus `content/` for `audit-assets`. When one is missing or
+empty, the scan fails with exit 20 and names the path, without running: a publish never passes on
+"0 files checked". Run by hand (`npm run atlas:check-secrets dist` and the like), a scan still
+skips a dir that isn't built yet. Tests: `scanRegistry.test.ts`.
+
+**Every campaign's dirs (R-15, ADR-0004).** The registry reads the campaign list from the loaded
+model (`loadAtlasModel`, through the `atlas.config.json` the scan context names), so there is no
+second list of dirs. v1 content is one campaign, `main`, on `dist` and `public/atlas` (14 tasks,
+as above). v2 content gives each campaign its built site `dist-campaigns/<id>/` and its store
+`.atlas-campaigns/<id>/atlas/`; every per-artifact scan (and `audit-assets`, a size budget per
+store) runs once per campaign per layout, labelled with the dir (`check-fog-safety
+dist-campaigns/a`) and requiring that campaign's player `atlas.json`, so a listed campaign with no
+output fails the publish. A v2 run also scans `dist` and `public/atlas` (campaign `(legacy)`):
+the build still writes them and the deploy ships `dist`, until R-19 retires them.
+`check-vault-content` runs once. If the model can't load, the
+orchestrator exits 1 and the editor's Publish check errors: the registry never runs on zero dirs.
 
 ## Folder-level exclusion
 

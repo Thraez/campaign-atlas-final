@@ -32,6 +32,10 @@ campaign. Phase H's Cloudflare projects (one per campaign, H-01) deploy these si
 - Publishing `content-next/` is local only: no workflow runs it, and the deploy job's upload path
   stays `dist/` (check `publish-atlas.yml`).
 - `README.md` / `COMMANDS.md` document the command for the test world.
+- R-15 scans `dist` and `public/atlas` in a v2 run too (campaign `(legacy)` in
+  `scanRegistry.ts`'s `campaignArtifacts`), because the build still writes them and
+  `publish-atlas.yml` deploys `dist`. Drop that pair from the v2 set only once publish and deploy
+  stop producing them, with the test that pins it updated in the same change.
 - `npm run gate` passes.
 
 ## Touches

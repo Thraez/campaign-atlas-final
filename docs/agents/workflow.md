@@ -15,7 +15,10 @@ A ticket is done when its PR is merged after:
 
 1. the full local gate passes on the branch with `main` merged in: `npm run gate`. It runs
    `typecheck:all`, `lint`, `format:check`, `test:ci`, `atlas:publish` (build plus the 9 scans, run 14 times across
-   `dist`, `public/atlas` and `content/`; a missing or empty artifact fails a scan), then `atlas:check-secrets dist` and `atlas:check-derived dist`, stops at the first failure and
+   `dist`, `public/atlas` and `content/`, the dirs of v1's one campaign `main`; v2 content runs
+   them on every campaign's `dist-campaigns/<id>` and `.atlas-campaigns/<id>/atlas`, plus `dist`
+   and `public/atlas`; a missing
+   or empty artifact fails a scan), then `atlas:check-secrets dist` and `atlas:check-derived dist`, stops at the first failure and
    names it, writes each step's log to `.gate-logs/`, and restores `public/atlas/` afterwards,
    pass or fail. A shard that times out under load is rerun once (inside `test:ci`);
 2. `/code-review` has run on its diff and its findings are fixed. Anything touching visibility,

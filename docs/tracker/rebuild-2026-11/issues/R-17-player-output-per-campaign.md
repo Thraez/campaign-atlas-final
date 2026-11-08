@@ -32,6 +32,9 @@ Today's v1 output (`public/atlas/`, `dist/`) stays as it is.
   (bytes for images and audio: the hidden map's image and the hidden audio file are absent) and
   finds each sentinel only where it may be.
 - Every existing scan in the registry passes on both campaigns' outputs (R-15 lists them).
+- Each campaign's store always has an `assets/` dir with something in it: R-15's `audit-assets`
+  task requires it per store and fails with exit 20 otherwise. A campaign that ships no image
+  needs the requirement relaxed here instead (in `scanRegistry.ts`, with a test).
 - The DM build is unchanged in shape for v1; for v2 it holds every campaign's data (it is never
   published; `.local-atlas/`).
 - v1: `npm run atlas:build:player` writes exactly what it wrote before (same check as R-11b).
