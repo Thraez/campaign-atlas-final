@@ -1,0 +1,8 @@
+{
+  "contentRoot": "content-next",
+  "outputDir": ".atlas-campaigns",
+  "defaultWorld": "quessaly",
+  "hosting": "public",
+  "include": ["**/*.md"],
+  "exclude": ["README.md", "**/_drafts/**", "**/_dm/**", "**/archive/**", "**/deprecated/**"]
+}

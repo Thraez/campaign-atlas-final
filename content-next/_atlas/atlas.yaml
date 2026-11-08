@@ -1,0 +1,16 @@
+# R-16 v2 test world: the ocean. Made-up content only (the repo is public).
+# The cases this world holds are listed in content-next/README.md.
+schemaVersion: 2
+ocean:
+  width: 3000
+  height: 2000
+  sea: default
+worlds:
+  - quessaly
+  - skerrow
+campaigns:
+  - main
+  - sandbox
+onOcean:
+  - { map: quessaly-world, x: 200, y: 300, scale: 2, rotation: 0 }
+  - { map: skerrow-isles, x: 2200, y: 600, scale: 1, rotation: 0 }

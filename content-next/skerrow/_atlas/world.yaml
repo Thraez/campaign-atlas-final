@@ -1,0 +1,37 @@
+# R-16 v2 test world, world 2: every map is hidden from sandbox
+# (skerrow-isles is unknown there), so the whole world is (ADR-0004 rule 5).
+# Made-up content only.
+schemaVersion: 2
+world:
+  id: skerrow
+  name: The Skerrow Isles
+maps:
+  - id: skerrow-isles
+    name: Skerrow Isles
+    width: 500
+    height: 500
+    visibility: player
+    layers:
+      - { id: base, src: images/skerrow-isles.png, x: 0, y: 0, width: 500, height: 500 }
+    scale: { unitsPerPixel: 2, unitLabel: mi }
+    zoom: { min: -2, max: 3 }
+    regions:
+      - id: gannet-rock
+        name: Gannet Rock
+        points: [[100, 110], [200, 110], [200, 210], [100, 210]]
+        visibility: player
+
+  - id: hookhaven
+    name: Hookhaven
+    width: 300
+    height: 300
+    visibility: player
+    parent: skerrow-isles
+    frame: { x: 300, y: 300, width: 60, height: 60, rotation: 0 }
+    enterZoom: 2
+    layers:
+      - { id: base, src: images/hookhaven.png, x: 0, y: 0, width: 300, height: 300 }
+    scale: { unitsPerPixel: 0.01, unitLabel: mi }
+    zoom: { min: 0, max: 4 }
+    pins:
+      - { note: the-tide-warden, x: 150, y: 110, visibility: player }

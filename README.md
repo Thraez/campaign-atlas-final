@@ -569,6 +569,7 @@ Script	Purpose
 `npm run atlas:check-image-privacy`	Scan shipped images for leftover EXIF/IPTC/XMP metadata or a derived-secret filename.
 `npm run atlas:check-fog`	Re-derive the fog boundary and check for un-redacted map images, geometry, or in-fog content.
 `npm run atlas:audit-assets`	Content-quality check: oversize images, orphaned files, broken asset references (not a safety scanner).
+`npm run atlas:tree`	Per campaign: the ocean and the map tree, each map's verdict and state, and how many pins, regions, routes and sound areas ship. Read-only, DM-facing. `-- --config atlas.next.config.json` shows the v2 test world (`content-next/`).
 `npm run atlas:scan`	Runs all eight safety scanners (including check-player-secrets, which has no standalone alias, and check-player-files) plus audit-assets in parallel — what `atlas:publish` gates on.
 `npm run test:ci`	Runs the Vitest suite in 4 shards (`npm test` does the same).
 Generated files:
