@@ -61,7 +61,7 @@ Follow-up noted in its ticket: no scan derives DM region/route ids, so none woul
 | R-13 | Build assembles every world and the map tree | R-11b, R-12 |
 | R-14 | Sync targets any world | R-13 |
 | R-15 | Scan registry lists campaign dirs | R-03 (done), R-12 |
-| R-16 | Three-level test world, two campaigns (`content-next/`, `npm run atlas:tree`) | R-12, R-11a |
+| R-16 | Three-level test world, two campaigns (done) (`content-next/`, `npm run atlas:tree`) | R-12, R-11a |
 | R-17 | One player output per campaign: visibility | R-13, R-15, R-16 |
 | R-17b | Structural campaign isolation scan | R-17 |
 | R-18 | Fog baked per campaign; fog scan source-driven | R-17, R-17b |

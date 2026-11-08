@@ -1,6 +1,6 @@
 # R-16 Three-level test world, two campaigns
 
-Status: ready-for-agent
+Status: done
 Blocked by: R-12, R-11a
 Size: S
 Branch: `rebuild-r16-test-world`
