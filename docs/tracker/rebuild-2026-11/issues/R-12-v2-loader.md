@@ -1,6 +1,6 @@
 # R-12 v2 loader
 
-Status: ready-for-agent
+Status: in-review
 Blocked by: R-10
 Size: M
 Branch: `rebuild-r12-v2-loader`
@@ -63,3 +63,50 @@ Can run in parallel with R-11a; R-11b and R-11c wait for both.
 - The build using the model (R-13). Writing v2 files (editor, migration R-20).
 - JSON schemas for v2 (`schemas/world.schema.json` stays v1).
 - Resolving visibility (R-11a).
+
+## Notes from the build
+
+What landed:
+
+- `scripts/atlas/loadAtlasModel.ts` is the one entry point: `loadAtlasModel(contentRoot,
+  {defaultWorld}, {root?})` returns `{model, warnings}` or throws `AtlasModelError`, whose
+  `issues` name the file and path of every problem at once.
+- `src/atlas/content/atlasModel.ts` holds the model types and the error; `v1Model.ts` is the v1
+  adapter (pure, input `V1WorldInput` defined in `src/`); `v2Model.ts` is the pure cross-file
+  check. `scripts/atlas/schemaVersion.ts` gained `readSchemaVersion`, the one version check
+  (missing, not a positive integer, above 2); the v1 path through `resolveAndMigrate` now refuses
+  version 2 with a message pointing at `loadAtlasModel`. `CURRENT_ATLAS_SCHEMA_VERSION` stays 1;
+  no existing test changed.
+- Tests: `src/atlas/content/v1Model.test.ts` (19) and `scripts/atlas/loadAtlasModel.test.ts`
+  (37), including a round trip of today's `world.yaml` and of the v1 fixture against
+  `loadWorldConfig`'s output.
+
+Decisions (fail-closed where the ticket was open):
+
+- v1 maps get map visibility `player` (they have none and always ship today; matches R-20's
+  `{main: player}`) and the viewer's zoom range, -6..4. The v1 campaign is named "Main".
+- v1 fog colour is dropped (v2 has none); `conceals` and `featherPx` are carried when present,
+  though `loadWorldConfig` drops them today.
+- v2 has one world-level `water`; v1 maps whose water differs (absent next to present counts) are
+  refused, naming both maps, rather than one picked silently. R-20 must do the same.
+- The no-`world.yaml` fallback map (`<world>-overview`) moved into the adapter. The adapter also
+  takes optional v1 pins (no map id: the first map) for R-11b; `loadAtlasModel` passes none, as
+  v1 pins live in notes it doesn't read.
+- Invalid visibility is kept as written with a warning; a non-string one in the v1 adapter loads
+  as `dm`. Warnings come back separately so R-13 can put them in the hidden-from-player set.
+- Beyond the ticket's list, also refused: a world id that doesn't match its folder; an unlisted
+  v2 world folder; a listed world folder with no `world.yaml`; `atlas.yml` and campaign `.yml`
+  files; duplicate entries in `worlds`/`campaigns`; ids that aren't safe path segments; campaign
+  files or a v2 `world.yaml` (in any folder) with no `atlas.yaml`; legacy `atlas.x`/`atlas.y` and
+  unreadable frontmatter in v2 notes (so a pin can't hide behind a parse error); `atlas.yaml`
+  without `schemaVersion: 2`.
+
+Deviations:
+
+- Fixture roots are committed for v1, v2, both mixes and version 3
+  (`src/test/fixtures/atlas-model/`); each cross-file failure mutates a temp copy of the v2 root
+  in its test instead of a committed root per case.
+- `validateProject` doesn't call the adapter yet; it can import it (everything is in `src/`).
+  Wiring it is left to the ticket that moves validation onto the model.
+- R-11a was built in parallel: if its resolver defines its own model types, align on
+  `atlasModel.ts` (`MapModel.scale` is optional there, since v1 maps may have none).

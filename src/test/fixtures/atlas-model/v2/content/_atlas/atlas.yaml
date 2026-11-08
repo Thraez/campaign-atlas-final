@@ -1,0 +1,15 @@
+# R-12 fixture: a valid v2 content root. Invented content.
+schemaVersion: 2
+ocean:
+  width: 10000
+  height: 8000
+  sea: default
+worlds:
+  - aldmoor
+  - brine
+campaigns:
+  - main
+  - sandbox
+onOcean:
+  - { map: aldmoor-overview, x: 0, y: 0, scale: 1, rotation: 0 }
+  - { map: brine-isles, x: 6000, y: 1000, scale: 0.5, rotation: 0 }
