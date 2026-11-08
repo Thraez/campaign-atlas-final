@@ -26,6 +26,8 @@ safely.
     regions, routes, sound areas) and every note/entity id is not in the must-not-ship set;
   - no field anywhere in the parsed tree is a key or value naming another campaign's id where a
     campaign id is expected (campaign fields, any per-campaign map left over).
+  - every entity's `world` field names a world listed in that output's `worlds` (ADR-0004 rule 5:
+    a world that doesn't ship takes its notes with it).
   The same structural check runs on `search-index.json` ids.
 - Text search over every text file in the output (`atlas.json`, `search-index.json`, any other
   JSON or JS) only for must-not-ship names, titles and aliases that pass `isReportableName` (import
@@ -41,7 +43,7 @@ safely.
 - Integrity-smoke variants (`scripts/atlas/publish-integrity-smoke.ts`), as `scanRegistry.test.ts`
   requires: clean passes; each of these planted sentinels fails: another campaign's id in the
   campaign field, a hidden map id of 1-3 characters (`c1`) in `maps`, a hidden world id in
-  `ocean`, a hidden long name in `search-index.json`, an unreferenced image in the store.
+  `ocean`, an entity whose `world` is a world not in `worlds`, a hidden long name in `search-index.json`, an unreferenced image in the store.
 - A test shows `main` and `a` appearing as ordinary substrings in the bundle don't trip the text
   search (no false hit).
 - Every existing scan still passes on both campaigns of `content-next/`; `npm run gate` passes.

@@ -39,12 +39,13 @@ decides visibility.
 3. Fog: on a map whose state is `fogged`, a pin under fog doesn't ship; a region, route or
    sound-only area with any point under fog doesn't ship (today's region and route rule,
    `scripts/build-atlas.ts:814` and `:932`). Ride-on sound areas take their region's verdict.
-4. **A frame under fog hides the child.** A child map whose frame has any corner under its parent's
-   fog doesn't ship to that campaign, with its whole subtree (as rule 2). Dropping only the frame
+4. **A frame under fog hides the child.** A child map whose frame has any part of its area under
+   its parent's fog (the region rule of rule 3, applied to the frame's rectangle) doesn't ship to that campaign, with its whole subtree (as rule 2). Dropping only the frame
    would ship a city the party can't have reached.
 5. **Worlds.** A world ships to a campaign only if at least one of its maps ships there. Otherwise
-   it is left out of that campaign's `worlds` and `ocean`, and its id and name join that campaign's
-   must-not-ship set.
+   it is left out of that campaign's `worlds` and `ocean`, its id and name join that campaign's
+   must-not-ship set, and none of its notes (entities whose world is that world) ship there either,
+   whatever their own visibility.
 6. Notes: frontmatter `atlas.visibility` stays one value. A `notes:` entry can only narrow it: if
    the frontmatter value doesn't ship, the note doesn't ship in any campaign, whatever the entry
    says (and the build warns). An entry's `basedOn` records the frontmatter value it was written
@@ -54,7 +55,12 @@ decides visibility.
 8. **Name collisions fail the build.** When an item or note that doesn't ship to a campaign (hidden,
    fogged, or under a hidden map) has the same name, title or alias as a note that ships there, the
    player build for that campaign fails and names both. Otherwise the shipped note would carry the
-   hidden name and no scan could tell them apart.
+   hidden name and no scan could tell them apart. Not a collision:
+   - a hidden or fogged item that links the very note that ships (a `dm` or fogged region
+     `salt-marsh` linking the `salt-marsh` note): the name belongs to that note, so the item's id
+     and name stay out of must-not-ship;
+   - a pin dropped by fog: it adds its location (map id, coordinates, that placement) to
+     must-not-ship, not its note's name, so the note can still ship elsewhere.
 
 **One player output per campaign.** Each campaign gets its own output dir holding its `atlas.json`,
 search index, images (its fog baked in) and audio, sharing no asset dir with another campaign. Its
@@ -107,8 +113,10 @@ decided fail-closed by the agent; they are listed first so Isak can overrule the
   want otherwise.
 - **Rule 5, a world with no shipped map is left out, its name guarded:** decided fail-closed; say
   if you want otherwise.
-- **Rule 8, a hidden item named like a shipped note fails the build:** decided fail-closed; say if
-  you want otherwise.
+- **Rule 5, the notes of a world that doesn't ship to a campaign don't ship to it either:** decided
+  fail-closed; say if you want otherwise.
+- **Rule 8, a hidden item named like a shipped note fails the build** (unless the item links that
+  note, or is a fogged pin): decided fail-closed; say if you want otherwise.
 
 5. **Does a note with frontmatter `player` show in a brand-new campaign?** Rule 1 makes every
    `world.yaml` item start hidden in a new campaign, but a note's frontmatter value is one value for

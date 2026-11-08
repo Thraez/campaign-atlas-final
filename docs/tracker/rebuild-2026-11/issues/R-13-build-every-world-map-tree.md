@@ -29,8 +29,9 @@ campaign `main` on v1); several campaigns come in R-17.
   sea and the `onOcean` placements of top-level maps that ship. Tests check both worlds' maps,
   pins and regions are present and land on the right map id.
 - World verdicts: on the same fixture with every map of one world hidden from the campaign, that
-  world is absent from `worlds`, from `ocean`, and from every other field, and its id and name are
-  in the build's must-not-ship set (so `check-derived-secrets` and R-17b look for them).
+  world is absent from `worlds`, from `ocean`, and from every other field, its notes are absent
+  from `entities` and the search index (even frontmatter `player` ones), and its id, name and those
+  notes' ids, titles and aliases are in the build's must-not-ship set (so `check-derived-secrets` and R-17b look for them).
 - A name collision the resolver reports (ADR-0004 rule 8) fails the strict player build, naming both
   items, for v2 as for v1 (R-11b).
 - In v2, a note whose frontmatter says `player` (or `rumor`) but that ships to no campaign gets a

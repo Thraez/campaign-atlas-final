@@ -28,7 +28,8 @@ ship to players today, and the fog scan doesn't look at sound areas.
   `scripts/atlas/publish-integrity-smoke.ts`.
 - Today's site is unchanged: a test builds the player and DM atlases of `content/` before and after
   (or against a committed snapshot) and finds `atlas.json` and `search-index.json` identical apart
-  from `version` and `publishedAt`.
+  from `version` and `publishedAt`. The same test asserts the resolver reports no rule-8 name
+  collision for `content/` (campaign `main`), so the new failure can't block today's publish.
 - Fixture tests: a sound-only area inside fog is absent from the strict player `atlas.json`; a
   region and a route in fog are still absent; a ride-on sound area of a DM region is still absent.
 - `npm run gate` passes.

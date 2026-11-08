@@ -26,7 +26,7 @@ campaign's source says is fogged.
 - The fog scan takes the source per campaign: for campaign C it loads C's campaign file through the
   R-12 loader, and every map fogged there must appear fogged in C's output (redacted image, no
   original, no fog geometry, nothing that ships under fog: pins, regions, routes, frames, sound
-  areas). A child map whose frame has any corner under the parent's fog in C must be absent from
+  areas). A child map whose frame has any part of its area under the parent's fog in C must be absent from
   C's output with its whole subtree (ADR-0004 rule 4): no map entry, no image, none of its items;
   the scan computes this from source, not from the output. A map fogged in source but not in the output fails with a new exit code. In publish mode,
   source fog that can't be loaded (missing or broken campaign file, missing config) fails; it no

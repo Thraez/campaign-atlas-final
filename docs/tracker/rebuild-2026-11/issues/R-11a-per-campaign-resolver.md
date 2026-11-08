@@ -30,12 +30,14 @@ callers onto this. It also absorbs arch-08's first half: one secret-note predica
   | 2 | map `dm` in `a`, two levels of child maps with pins, regions, routes, sound | whole subtree hidden in `a`, shipped in `b` |
   | 2 | map not listed in `a`'s campaign file (`unknown`), visibility `player` | same subtree hidden |
   | 3 | on a `fogged` map: pin under fog; region, route, sound-only area with one point under fog; ride-on sound area | dropped; dropped; follows its region (reuse `isLit`, `src/atlas/fog/effectiveLit.ts`) |
-  | 4 | city map whose frame has one corner under its `fogged` parent's fog | city, its frame, its child maps and everything on them hidden in that campaign; ships in a campaign where the parent is `open` |
-  | 5 | world whose every map is `dm` or `unknown` in `a` | world doesn't ship to `a`; its id and name are in `a`'s `mustNotShip`; ships to `b` |
+  | 4 | city map whose frame has part of its area under its `fogged` parent's fog, no corner fogged (fog crosses the middle); and one with a corner under fog | city, its frame, its child maps and everything on them hidden in that campaign; ships in a campaign where the parent is `open` |
+  | 5 | world whose every map is `dm` or `unknown` in `a`, with a frontmatter-`player` note in it | world and that note don't ship to `a`; world id, name and the note's id, title and aliases are in `a`'s `mustNotShip`; both ship to `b` |
   | 6 | frontmatter `dm` + entry `{ a: player }`; frontmatter `player` + `{ a: player, b: dm }`; `basedOn` differs or missing; `atlas.publish: false` | hidden (narrow only); ships in `a` only; `dm` everywhere, reported stale; secret |
   | 6 | campaign `notes: hidden`, `vault`, field missing; a bare `notes:` entry `player` | per ADR-0004 question 5 as accepted (recommended: frontmatter `player` with no entry naming the campaign doesn't ship under `hidden` or missing; a bare entry doesn't name a campaign) |
   | 7 | pin whose note or map doesn't ship, or under fog | dropped |
-  | 8 | hidden region named `Black Spire`, and a shipped note titled `Black Spire`; same with an alias and with a fogged pin's note | `collisions` names both items |
+  | 8 | hidden region named `Black Spire` (linking no note), and a shipped note titled `Black Spire`; same with an alias | `collisions` names both items |
+  | 8 | `dm` region `salt-marsh` linking the shipped `salt-marsh` note; the same region fogged | no collision; the region's id and name are not in `mustNotShip` |
+  | 8 | pin of the shipped `salt-marsh` note dropped by fog | no collision; `mustNotShip` holds the pin's location (map id, coordinates, placement), not the note's name |
 
 - arch-08: one exported secret-note predicate in `src/atlas/content/readNote.ts` (today
   `isSecret` is computed inline at `readNote.ts:91`); `entityIsSecret`
