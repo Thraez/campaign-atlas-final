@@ -1,6 +1,6 @@
 /**
  * Build-time fog redaction: takes a map layer's image bytes, builds an SVG
- * mask from the fog reveals/conceals, blurs the mask edge for a soft feather,
+ * mask from the fog reveals/conceals, softens its edge into the lit side only,
  * and joins it as the alpha channel of the image. Result: fogged pixels are
  * transparent, lit pixels opaque, with a soft band in between.
  *
@@ -61,15 +61,29 @@ export async function redactLayer(
   const blurSigma = Math.max(0.3, featherPx / 2);
   const { reveals, conceals } = effectivePolygons(fog);
 
-  // Build SVG mask at MAP size: black background, reveals filled white,
-  // conceals filled black on top. Blur applied via SVG filter so the
-  // edge feathers across ~featherPx pixels.
-  const svg = buildMaskSvg(mapSize, reveals, conceals, blurSigma);
+  // Fail closed (R-07b): no fogged pixel may show image, whatever the
+  // feather. The hard mask is rasterized at MAP size (black background,
+  // reveals white, conceals black on top) and only pixels it covers fully
+  // count as lit, so an anti-aliased edge pixel is fog. The blurred copy then
+  // only darkens: alpha = min(hard, blurred), so the feather softens into the
+  // lit side and fog stays at 0 however small the fog shape or gap.
+  const svg = buildMaskSvg(mapSize, reveals, conceals);
+  const raw = await sharp(Buffer.from(svg)).toColourspace("b-w").extractChannel(0).raw().toBuffer({
+    resolveWithObject: true,
+  });
+  const { width: mw, height: mh } = raw.info;
+  const hard = Buffer.alloc(mw * mh);
+  for (let i = 0; i < hard.length; i++) hard[i] = raw.data[i] === 255 ? 255 : 0;
+  const blurred = await sharp(hard, { raw: { width: mw, height: mh, channels: 1 } })
+    .blur(blurSigma)
+    .extractChannel(0)
+    .raw()
+    .toBuffer();
+  const mask = Buffer.alloc(hard.length);
+  for (let i = 0; i < mask.length; i++) mask[i] = Math.min(hard[i], blurred[i]);
 
-  // Rasterize mask at map size, extract the layer's portion, convert to
-  // single-channel (greyscale) to use as the alpha channel.
-  const maskPng = await sharp(Buffer.from(svg)).png().toBuffer();
-  const layerMask = await sharp(maskPng)
+  // Extract the layer's portion as the single-channel alpha.
+  const layerMask = await sharp(mask, { raw: { width: mw, height: mh, channels: 1 } })
     .extract({
       left: Math.round(layer.x),
       top: Math.round(layer.y),
@@ -98,28 +112,16 @@ export async function redactLayer(
   return out;
 }
 
-function buildMaskSvg(
-  mapSize: MapSize,
-  reveals: Point[][],
-  conceals: Point[][],
-  blurSigma: number,
-): string {
+function buildMaskSvg(mapSize: MapSize, reveals: Point[][], conceals: Point[][]): string {
   const pathFor = (poly: Point[]): string =>
     poly.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x} ${y}`).join(" ") + " Z";
 
   const revealPaths = reveals.map((p) => `<path d="${pathFor(p)}" fill="white" />`).join("");
   const concealPaths = conceals.map((p) => `<path d="${pathFor(p)}" fill="black" />`).join("");
 
-  // The filter extends 20% beyond the SVG viewport on each side so blur
-  // near the edges isn't clipped.
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${mapSize.width}" height="${mapSize.height}" viewBox="0 0 ${mapSize.width} ${mapSize.height}">
-  <defs>
-    <filter id="feather" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="${blurSigma}" />
-    </filter>
-  </defs>
   <rect width="${mapSize.width}" height="${mapSize.height}" fill="black" />
-  <g filter="url(#feather)">${revealPaths}${concealPaths}</g>
+  ${revealPaths}${concealPaths}
 </svg>`;
 }
