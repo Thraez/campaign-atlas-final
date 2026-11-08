@@ -12,6 +12,9 @@ R-01 (#111, no ticket file), Q-01..Q-04 (#112-#115),
 [R-05](issues/R-05-rebuild-queue.md),
 [R-06](issues/R-06-player-build-report-leak.md).
 
+Open safety follow-up (no leak today; any phase, before the first real Sync):
+[R-07](issues/R-07-root-dm-folder-exclude.md), a `_dm/` folder at the content root is not excluded.
+
 ## Phase 2: schema v2 and campaigns in the pipeline
 
 Decisions: [ADR-0003](../../adr/0003-schema-v2-ocean-map-tree-campaign-files.md) (schema v2: the
