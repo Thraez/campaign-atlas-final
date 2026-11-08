@@ -201,3 +201,8 @@ variant still drew a dotted "link" span. Not a resolver bug.
 - New follow-up R-07 (on the R-11a branch): a `_dm/` folder at the content root isn't excluded by
   `**/_dm/**`. No such folder today, no leak.
 - Merge order: R-12 first, then merge main into R-11a, rerun gate, merge.
+- Isak said yes. R-12 merged as #124 (cab9748); main merged into R-11a, gate pass on 0b3d3a3;
+  R-11a merged as #125 (3e4daac). State.md and tickets mark R-10, R-11a, R-12 done (in #125).
+- Next: R-11b, R-11c, R-11d, R-15, R-16 (R-11b first types the resolver input on R-12's
+  `atlasModel.ts`). R-07 open (root `_dm/` exclude), any time before the first real Sync.
+  Worktrees r10, r11a, r12 can be removed (branches merged); not deleted yet.
