@@ -8,6 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
+  LEGACY_OUTPUT,
   MISSING_ARTIFACT_EXIT,
   SCANS,
   campaignArtifacts,
@@ -18,6 +19,7 @@ import {
   type ScanTask,
 } from "./scanRegistry";
 import { MISSING_ARTIFACT_MSG, runPublishScans } from "./publishScan";
+import { SAFE_ID } from "./loadAtlasModel";
 
 const SCRIPTS_DIR = path.resolve(__dirname, "..");
 const FIXTURE_CONTENT = path.resolve(__dirname, "../../src/test/fixtures/atlas-build/content");
@@ -386,9 +388,11 @@ describe("campaign dirs (R-15)", () => {
     ]);
   });
 
-  it("v2: each campaign gets its own store and built site", () => {
+  it("v2: each campaign gets its own store and built site, and the deployed pair is still scanned", () => {
     const ctx = repoWith(V2_CONTENT);
     expect(campaignArtifacts(ctx).map((a) => [a.campaign, a.label, a.layout])).toEqual([
+      [LEGACY_OUTPUT, "dist", "built-site"],
+      [LEGACY_OUTPUT, "public/atlas", "store"],
       ["a", "dist-campaigns/a", "built-site"],
       ["a", ".atlas-campaigns/a/atlas", "store"],
       ["b", "dist-campaigns/b", "built-site"],
@@ -439,6 +443,15 @@ describe("campaign dirs (R-15)", () => {
     });
   });
 
+  it("v2: every scan of v1's deployed dirs still runs, labelled as the legacy output", () => {
+    const ctx = repoWith(V2_CONTENT);
+    const v1Labels = scanTasks(repoWith())
+      .filter((t) => t.campaign !== undefined)
+      .map((t) => t.label);
+    const legacy = scanTasks(ctx).filter((t) => t.campaign === LEGACY_OUTPUT);
+    expect(legacy.map((t) => t.label)).toEqual(v1Labels);
+  });
+
   it.each(CONTENT_WIDE)("v2: %s runs once", (scan) => {
     const tasks = scanTasks(repoWith(V2_CONTENT)).filter((t) => t.scan === scan);
     expect(tasks).toHaveLength(1);
@@ -448,12 +461,16 @@ describe("campaign dirs (R-15)", () => {
   /** Both campaigns' outputs, with every artifact a task lists. */
   function writeCampaignOutputs(ctx: ScanContext) {
     const atlas = JSON.stringify({ version: "1", schemaVersion: 1, worlds: [], entities: [] });
+    const put = (r: string, body: string) => {
+      const abs = path.join(ctx.root, r);
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, body);
+    };
+    // The legacy pair the deploy still ships.
+    put("dist/atlas/atlas.json", atlas);
+    put("public/atlas/atlas.json", atlas);
+    put("public/atlas/assets/maps/vale.webp", "webp");
     for (const id of ["a", "b"]) {
-      const put = (r: string, body: string) => {
-        const abs = path.join(ctx.root, r);
-        fs.mkdirSync(path.dirname(abs), { recursive: true });
-        fs.writeFileSync(abs, body);
-      };
       put(`dist-campaigns/${id}/index.html`, "<html>");
       put(ATLAS_JSON["built-site"](id), atlas);
       put(ATLAS_JSON.store(id), atlas);
@@ -523,13 +540,41 @@ describe("campaign dirs (R-15)", () => {
 
     /** v2 content with campaign b's file gone: it can't load. */
     function brokenV2(): string {
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scan-broken-v2-"));
-      temps.push(dir);
-      const content = path.join(dir, "content");
-      fs.cpSync(V2_CONTENT, content, { recursive: true });
+      const content = copyV2();
       fs.rmSync(path.join(content, "_atlas", "campaigns", "b.yaml"));
       return content;
     }
+
+    /** A temp copy of the v2 fixture's content root. */
+    function copyV2(): string {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scan-v2-"));
+      temps.push(dir);
+      const content = path.join(dir, "content");
+      fs.cpSync(V2_CONTENT, content, { recursive: true });
+      return content;
+    }
+
+    /** A copy of the v2 fixture with `atlas.yaml`'s campaign list replaced. */
+    function v2WithCampaigns(campaigns: string[]): string {
+      const content = copyV2();
+      const file = path.join(content, "_atlas", "atlas.yaml");
+      const text = fs.readFileSync(file, "utf8");
+      const list = campaigns.length
+        ? campaigns.map((c) => `\n  - ${JSON.stringify(c)}`).join("")
+        : " []";
+      fs.writeFileSync(file, text.replace(/campaigns:\n {2}- a\n {2}- b/, `campaigns:${list}`));
+      return content;
+    }
+
+    it("v2 content that lists no campaigns", () => {
+      expect(() => scanTasks(repoWith(v2WithCampaigns([])))).toThrow(/campaign/);
+    });
+
+    it.each(["../a", "a/b", ".a", "a.", "a ", "con."])("an unsafe campaign id %j", (id) => {
+      expect(() => scanTasks(repoWith(v2WithCampaigns(["a", id])))).toThrow(
+        /is not a valid campaign id|can't name a dir/,
+      );
+    });
 
     it("v2 content that doesn't load", () => {
       expect(() => scanTasks(repoWith(brokenV2()))).toThrow(/campaign list can't be loaded/);
@@ -553,4 +598,16 @@ describe("campaign dirs (R-15)", () => {
       expect(r.locator).toEqual({ file: "dist-campaigns/b/atlas/atlas.json" });
     }
   });
+});
+
+describe("SAFE_ID (the one id rule for folders and campaign dirs)", () => {
+  it.each(["main", "a", "astrath-deeprealm", "v1.2", "_x", "a_b-c"])("accepts %j", (id) => {
+    expect(SAFE_ID.test(id)).toBe(true);
+  });
+  it.each(["", ".a", "..", "a/b", "a\\b", "a.", "a..", "a ", " a", "a b", "-a"])(
+    "rejects %j",
+    (id) => {
+      expect(SAFE_ID.test(id)).toBe(false);
+    },
+  );
 });

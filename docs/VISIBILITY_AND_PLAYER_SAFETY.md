@@ -158,7 +158,9 @@ as above). v2 content gives each campaign its built site `dist-campaigns/<id>/` 
 `.atlas-campaigns/<id>/atlas/`; every per-artifact scan (and `audit-assets`, a size budget per
 store) runs once per campaign per layout, labelled with the dir (`check-fog-safety
 dist-campaigns/a`) and requiring that campaign's player `atlas.json`, so a listed campaign with no
-output fails the publish. `check-vault-content` runs once. If the model can't load, the
+output fails the publish. A v2 run also scans `dist` and `public/atlas` (campaign `(legacy)`):
+the build still writes them and the deploy ships `dist`, until R-19 retires them.
+`check-vault-content` runs once. If the model can't load, the
 orchestrator exits 1 and the editor's Publish check errors: the registry never runs on zero dirs.
 
 ## Folder-level exclusion

@@ -24,7 +24,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { playerAtlasJsonPath, type ArtifactLayout } from "./playerArtifact.js";
-import { loadAtlasModel } from "./loadAtlasModel.js";
+import { SAFE_ID, loadAtlasModel } from "./loadAtlasModel.js";
 
 import { run as checkNoSecrets } from "../check-no-secrets.js";
 import { run as checkDerivedSecrets } from "../check-derived-secrets.js";
@@ -130,8 +130,11 @@ export interface CampaignArtifact {
   layout: ArtifactLayout;
 }
 
-/** A campaign id used as a path segment: no separators, no `..`, no leading dot. */
-const SAFE_CAMPAIGN_ID = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
+/**
+ * The campaign of the shared output `dist` and `public/atlas` in a v2 run. Not
+ * a valid campaign id (`SAFE_ID`), so it can't collide with one.
+ */
+export const LEGACY_OUTPUT = "(legacy)";
 
 interface ScanConfig {
   defaultWorld: string;
@@ -144,6 +147,10 @@ interface ScanConfig {
  * campaign list the registry knows. v1 content is campaign `main`, whose
  * outputs stay `dist` and `public/atlas`; v2 content gives each listed
  * campaign `dist-campaigns/<id>` and `.atlas-campaigns/<id>/atlas`.
+ *
+ * A v2 run also scans `dist` and `public/atlas` (campaign `LEGACY_OUTPUT`):
+ * the build still writes them and `publish-atlas.yml` deploys `dist`, so they
+ * leave the list only when publish and deploy stop producing them (R-19).
  *
  * Fails closed: a config or content root that can't be loaded throws, so a
  * publish can never run with no campaign dirs and report "all clean".
@@ -174,17 +181,17 @@ export function campaignArtifacts(ctx: ScanContext): CampaignArtifact[] {
     dir,
     layout,
   });
-  if (schemaVersion === 1) {
-    return [
-      artifact(V1_CAMPAIGN, path.join(ctx.root, "dist"), "built-site"),
-      artifact(V1_CAMPAIGN, path.join(ctx.root, "public", "atlas"), "store"),
-    ];
-  }
+  const shared = (campaign: string) => [
+    artifact(campaign, path.join(ctx.root, "dist"), "built-site"),
+    artifact(campaign, path.join(ctx.root, "public", "atlas"), "store"),
+  ];
+  if (schemaVersion === 1) return shared(V1_CAMPAIGN);
   if (campaigns.length === 0) {
     throw new Error(`scan registry: ${where} lists no campaigns, so there is nothing to scan`);
   }
-  return campaigns.flatMap((id) => {
-    if (!SAFE_CAMPAIGN_ID.test(id)) {
+  const perCampaign = campaigns.flatMap((id) => {
+    // The loader already refuses such an id; checked again where it becomes a path.
+    if (!SAFE_ID.test(id)) {
       throw new Error(`scan registry: campaign id ${JSON.stringify(id)} can't name a dir`);
     }
     return [
@@ -192,6 +199,7 @@ export function campaignArtifacts(ctx: ScanContext): CampaignArtifact[] {
       artifact(id, path.join(ctx.root, ".atlas-campaigns", id, "atlas"), "store"),
     ];
   });
+  return [...shared(LEGACY_OUTPUT), ...perCampaign];
 }
 
 /** The task scanning `a`: its player atlas.json is always required. */

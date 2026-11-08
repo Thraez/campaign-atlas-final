@@ -35,6 +35,16 @@ every scan already covers them and a missing campaign output fails the publish (
   `docs/VISIBILITY_AND_PLAYER_SAFETY.md` if they change.
 - `npm run gate` passes.
 
+## Built
+
+- `audit-assets` runs once per campaign store (`.atlas-campaigns/<id>/atlas/assets`), not once
+  for the content: v2 map images live outside `public/` (ADR-0003), so there is no shared assets
+  dir, and the size budget is what each campaign's site ships. Its content check (references in
+  `content/`) is the same input for each. `check-vault-content` is the one content-wide scan and
+  runs once.
+- A v2 run also scans `dist` and `public/atlas` (campaign `(legacy)`), which the build still
+  writes and the deploy ships; R-19 drops them.
+
 ## Touches
 
 - `scripts/atlas/scanRegistry.ts` (+ test), `scripts/atlas/publish-orchestrator.ts` (passes the
