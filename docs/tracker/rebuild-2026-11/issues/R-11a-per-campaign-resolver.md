@@ -36,7 +36,8 @@ callers onto this. It also absorbs arch-08's first half: one secret-note predica
   | 6 | campaign `notes: hidden`, `vault`, field missing; a bare `notes:` entry `player` | per ADR-0004 question 5 as accepted (recommended: frontmatter `player` with no entry naming the campaign doesn't ship under `hidden` or missing; a bare entry doesn't name a campaign) |
   | 7 | pin whose note or map doesn't ship, or under fog | dropped |
   | 8 | hidden region named `Black Spire` (linking no note), and a shipped note titled `Black Spire`; same with an alias | `collisions` names both items |
-  | 8 | `dm` region `salt-marsh` linking the shipped `salt-marsh` note; the same region fogged | no collision; the region's id and name are not in `mustNotShip` |
+  | 8 | `dm` region `salt-marsh` linking the shipped `salt-marsh` note; the same region fogged | no collision; the names equal to the note's title or aliases are not in `mustNotShip` |
+  | 8 | `dm` region "Drow Ambush" (id `drow-ambush`) linking the shipped `salt-marsh` note | no collision; "Drow Ambush" and `drow-ambush` stay in `mustNotShip`; `salt-marsh` doesn't |
   | 8 | pin of the shipped `salt-marsh` note dropped by fog | no collision; `mustNotShip` holds the pin's location (map id, coordinates, placement), not the note's name |
 
 - arch-08: one exported secret-note predicate in `src/atlas/content/readNote.ts` (today

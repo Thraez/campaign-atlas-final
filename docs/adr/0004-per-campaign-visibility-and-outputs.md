@@ -56,9 +56,11 @@ decides visibility.
    fogged, or under a hidden map) has the same name, title or alias as a note that ships there, the
    player build for that campaign fails and names both. Otherwise the shipped note would carry the
    hidden name and no scan could tell them apart. Not a collision:
-   - a hidden or fogged item that links the very note that ships (a `dm` or fogged region
-     `salt-marsh` linking the `salt-marsh` note): the name belongs to that note, so the item's id
-     and name stay out of must-not-ship;
+   - a hidden or fogged item that links a note that ships, for the names equal to that note's
+     title or aliases only (a `dm` or fogged region `salt-marsh` linking the `salt-marsh` note):
+     those names belong to the note, so they stay out of must-not-ship. The exemption follows the
+     name, not the link: the item's own id and name, where they differ (a hidden region
+     "Drow Ambush" linking `salt-marsh`), stay in must-not-ship;
    - a pin dropped by fog: it adds its location (map id, coordinates, that placement) to
      must-not-ship, not its note's name, so the note can still ship elsewhere.
 
@@ -114,7 +116,8 @@ decided fail-closed by the agent; they are listed first so Isak can overrule the
 - **Rule 5, a world with no shipped map is left out, its name guarded:** decided fail-closed; say
   if you want otherwise.
 - **Rule 5, the notes of a world that doesn't ship to a campaign don't ship to it either:** decided
-  fail-closed; say if you want otherwise.
+  fail-closed; say if you want otherwise. Note: a world that has notes but no maps yet ships none of
+  its notes until one of its maps ships.
 - **Rule 8, a hidden item named like a shipped note fails the build** (unless the item links that
   note, or is a fogged pin): decided fail-closed; say if you want otherwise.
 
