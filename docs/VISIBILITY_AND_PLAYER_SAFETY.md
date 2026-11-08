@@ -78,8 +78,11 @@ The mayor's chief advisor is [[Vampire Lord]].
 
 - In standard player builds: the link is rendered as `…` (redacted) and the build warns.
 - In **strict** player builds (`atlas:build:player`): the build fails with exit 8.
+- Redaction goes by the link's target only. Author-written text in a link to a shipped note (its display alias or heading, e.g. an alias that names a secret) is not redacted; only the name scan (`check-no-secrets`) covers it, and only for whole names.
 
 Similarly, player-visible **regions** and **routes** that reference DM-only entities fail strict builds (exits 6 and 7).
+
+The player build ships what the per-campaign resolver ([ADR-0004](adr/0004-per-campaign-visibility-and-outputs.md)) decides for campaign `main`, read through the v1 adapter: notes, pins, regions, routes and sound areas, fog included. A region or sound-only area with any part of its area under fog, or a route with any part of its path under fog, doesn't ship (fog between lit corners or waypoints counts). A DM-only item and a shipped one that share a name (rule 8) fail a strict player build with exit 10, naming both; an orphan `notes:` entry fails any player build with exit 11, naming world and key. Both stay out of the shipped build report.
 
 ## Profiles and relationships
 
@@ -117,7 +120,7 @@ Every publish runs `npm run atlas:publish`, which chains:
 
 ```text
 atlas:snapshot                # copy the current atlas.json to .last-published.json as a rollback baseline
-atlas:build:player --strict   # the build itself; exits 3-9 on safety failures
+atlas:build:player --strict   # the build itself; exits 3-11 on safety failures
 build                         # vite build (excludes editor via __INCLUDE_EDITOR__)
 atlas:scan                    # runs all eight safety scanners + audit-assets in parallel (scripts/atlas/publish-orchestrator.ts)
 ```
@@ -130,7 +133,7 @@ What each scanner catches:
 - **`check-derived-secrets`** (`npm run atlas:check-derived`) — greps the output for DM-only profile values (e.g. the literal string from `profile.dm.secret`). Catches a content-fragment leak even if the entity name doesn't appear.
 - **`check-artifact-shape`** (`npm run atlas:check-shape`) — validates the structure of `atlas.json`: no entity has visibility `dm`/`hidden`, no placement points at a missing entity, etc.
 - **`check-image-privacy`** (`npm run atlas:check-image-privacy`) — catches two image-specific leak vectors a text scan can't see: leftover EXIF/IPTC/XMP metadata on a shipped image, and a filename that itself contains a derived-secret name.
-- **`check-fog-safety`** (`npm run atlas:check-fog`) — re-derives the fog boundary from the source `world.yaml` and asserts the player artifacts don't leak it: the original (un-redacted) layer PNG, unstripped fog geometry, a player pin/route/region inside the fogged area, or a redacted PNG that's still opaque at a fogged pixel.
+- **`check-fog-safety`** (`npm run atlas:check-fog`) — re-derives the fog boundary from the source `world.yaml` and asserts the player artifacts don't leak it: the original (un-redacted) layer PNG, unstripped fog geometry, a player pin inside the fogged area or a region or route with any part of its area or path inside it (exit 15), a shipped sound-only area with any part of its area inside it (exit 21), or a redacted PNG that's still opaque at a fogged pixel.
 - **`check-player-secrets`** — verifies no secret plaintext, passphrase, character key, or unstripped `{{secret:}}` marker reached the player artifacts. Runs only inside the orchestrator — there is no standalone `atlas:check-player-secrets` npm alias.
 - **`check-player-files`** — fails when `dist/atlas/atlas.json` is missing from a built `dist/` or `dist/atlas/` holds any file outside the player allowlist (`scripts/atlas/playerFiles.ts`: the atlas JSON, images anywhere under `atlas/` except `assets/audio/`, the hashed audio `atlas.json` references, and empty `.gitkeep` files; not the audio manifest, which only the editor reads). Vite copies all of `public/atlas/` into `dist/`, so a DM file dropped there (a `world.yaml`, a note) would otherwise ship. The player build's prune plugin already removes such files; this scan fails closed if one gets through. Runs only inside the orchestrator.
 - **`check-vault-content`** (`npm run atlas:check-vault-content`, exit 19) — while `atlas.config.json` has `"hosting": "public"`, fails when `content/` holds a note from the DM's vault (Sync's `atlas.source: vault` marker, the sync map, or a hash match against this machine's vault) or any symlink. It doesn't look at maps, images or `world.yaml`. Details: [IMPORT_EXPORT.md](IMPORT_EXPORT.md), "Hosting guard".
@@ -146,10 +149,22 @@ list. Each scan names the artifacts it reads: the player `atlas.json` (`dist/atl
 `public/atlas/atlas.json`) for the artifact scans, plus `atlas.config.json` and `content/` for
 `check-derived-secrets` and `check-image-privacy` (the secret names come from it) and
 `atlas.config.json` for `check-fog-safety`; `content/` for `check-vault-content`; and
-`public/atlas/assets/` plus `content/` for `audit-assets`. When one is missing or empty, the scan
-fails with exit 20 and names the path, without running: a publish never passes on "0 files
-checked". Run by hand (`npm run atlas:check-secrets dist` and the like), a scan still skips a dir
-that isn't built yet. Tests: `scanRegistry.test.ts`.
+the store's `atlas.json` and `assets/` plus `content/` for `audit-assets`. When one is missing or
+empty, the scan fails with exit 20 and names the path, without running: a publish never passes on
+"0 files checked". Run by hand (`npm run atlas:check-secrets dist` and the like), a scan still
+skips a dir that isn't built yet. Tests: `scanRegistry.test.ts`.
+
+**Every campaign's dirs (R-15, ADR-0004).** The registry reads the campaign list from the loaded
+model (`loadAtlasModel`, through the `atlas.config.json` the scan context names), so there is no
+second list of dirs. v1 content is one campaign, `main`, on `dist` and `public/atlas` (14 tasks,
+as above). v2 content gives each campaign its built site `dist-campaigns/<id>/` and its store
+`.atlas-campaigns/<id>/atlas/`; every per-artifact scan (and `audit-assets`, a size budget per
+store) runs once per campaign per layout, labelled with the dir (`check-fog-safety
+dist-campaigns/a`) and requiring that campaign's player `atlas.json`, so a listed campaign with no
+output fails the publish. A v2 run also scans `dist` and `public/atlas` (campaign `(legacy)`):
+the build still writes them and the deploy ships `dist`, until R-19 retires them.
+`check-vault-content` runs once. If the model can't load, the
+orchestrator exits 1 and the editor's Publish check errors: the registry never runs on zero dirs.
 
 ## Folder-level exclusion
 

@@ -1,0 +1,14 @@
+# R-15 fixture: one world, one map. Invented content.
+schemaVersion: 2
+world:
+  id: vale
+  name: The Vale
+maps:
+  - id: vale-overview
+    name: Vale
+    width: 1000
+    height: 1000
+    visibility: player
+    layers: []
+    scale: { unitsPerPixel: 0.1, unitLabel: mi }
+    zoom: { min: -2, max: 2 }

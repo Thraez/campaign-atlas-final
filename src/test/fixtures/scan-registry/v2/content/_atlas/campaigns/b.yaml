@@ -1,0 +1,6 @@
+id: b
+name: Campaign B
+notes: hidden
+maps:
+  vale-overview:
+    state: open

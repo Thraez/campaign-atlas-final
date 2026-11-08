@@ -58,6 +58,6 @@ previews/
 # `npm run gate` step logs (scripts/dev/run-gate.ts); rewritten each run.
 .gate-logs/
 
-# v2 test world outputs (ADR-0004: per-campaign player stores and site builds; never published)
-.atlas-campaigns/
+# Per-campaign player outputs (ADR-0004)
 dist-campaigns/
+.atlas-campaigns/
