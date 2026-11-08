@@ -40,8 +40,9 @@ decides visibility.
    city is secret"), state is the party's progress ("they haven't found it yet"), and the editor's
    Fog job (E7) sets state without touching visibility.
 3. Fog: on a map whose state is `fogged`, a pin under fog doesn't ship; a region, route or
-   sound-only area with any point under fog doesn't ship (today's region and route rule,
-   `scripts/build-atlas.ts:814` and `:932`). Ride-on sound areas take their region's verdict.
+   sound-only area with any part under fog doesn't ship: a region's or sound area's whole area,
+   a route's whole path, so fog between lit corners or lit waypoints counts. Ride-on sound areas
+   take their region's verdict.
 4. **A frame under fog hides the child.** A child map whose frame has any part of its area under
    its parent's fog (the region rule of rule 3, applied to the frame's rectangle) doesn't ship to that campaign, with its whole subtree (as rule 2). Dropping only the frame
    would ship a city the party can't have reached.

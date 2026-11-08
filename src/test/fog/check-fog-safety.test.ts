@@ -229,6 +229,70 @@ fog:
       expect(await run({ dir: plant(layout, atlas(100, 900)), config })).toBe(21);
     });
 
+    it("in-fog-content (15): a region or route spanning a fog gap between lit strips counts", async () => {
+      // Lit strips x 0-300 and 700-1000, fog between. A region over 100-900
+      // has every corner lit; so do a route's two points at x 100 and 900.
+      const config = writeSourceConfig(`schemaVersion: 1
+maps:
+  - id: world
+    worldId: w
+    name: World
+    width: 1000
+    height: 1000
+    layers: []
+fog:
+  - mapId: world
+    enabled: true
+    reveals:
+      - [[0, 0], [300, 0], [300, 1000], [0, 1000]]
+      - [[700, 0], [1000, 0], [1000, 1000], [700, 1000]]
+`);
+      const atlas = (extra: Record<string, unknown>) => ({
+        maps: [
+          {
+            id: "world",
+            width: 1000,
+            height: 1000,
+            layers: [],
+            fog: { mapId: "world", enabled: true },
+            ...extra,
+          },
+        ],
+        placements: [],
+      });
+      const region = (x1: number) => ({
+        regions: [
+          {
+            id: "r",
+            name: "R",
+            points: [
+              [100, 100],
+              [x1, 100],
+              [x1, 900],
+              [100, 900],
+            ],
+          },
+        ],
+      });
+      const route = (x1: number) => ({
+        routes: [
+          {
+            id: "t",
+            name: "T",
+            waypoints: [],
+            resolvedPoints: [
+              [100, 500],
+              [x1, 500],
+            ],
+          },
+        ],
+      });
+      expect(await run({ dir: plant(layout, atlas(region(200))), config })).toBe(0);
+      expect(await run({ dir: plant(layout, atlas(region(900))), config })).toBe(15);
+      expect(await run({ dir: plant(layout, atlas(route(200))), config })).toBe(0);
+      expect(await run({ dir: plant(layout, atlas(route(900))), config })).toBe(15);
+    });
+
     it("could-not-verify (17): present-but-broken world.yaml on a clean fog map", async () => {
       // Markdown fences make loadWorldConfig throw (its hard-fail guard).
       const config = writeSourceConfig("```yaml\nschemaVersion: 1\n```");

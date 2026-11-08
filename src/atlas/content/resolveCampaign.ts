@@ -14,11 +14,12 @@
  *      ship.
  *   2. A map ships only if its visibility ships, its state in the campaign file
  *      is `open` or `fogged` (not listed means `unknown`), and its parent ships.
- *   3. On a `fogged` map: a pin under fog, or a region or route with any point
- *      under fog, doesn't ship; nor does a sound-only area with any part of its
- *      area under fog (`areaUnderFog`: it plays over the whole polygon, so a
- *      fogged strip between lit corners counts). Ride-on sound areas follow
- *      their region. Points are tested with `isLit` (`src/atlas/fog/effectiveLit.ts`).
+ *   3. On a `fogged` map: a pin under fog doesn't ship, nor does a region or
+ *      sound-only area with any part of its area under fog (`areaUnderFog`, so
+ *      a fogged strip between lit corners counts), nor a route with any part
+ *      of its path under fog (`pathUnderFog`: every segment, so a fog gap
+ *      between lit waypoints counts). Ride-on sound areas follow their region.
+ *      Points are tested with `isLit` (`src/atlas/fog/effectiveLit.ts`).
  *   4. A child map whose frame has any part of its area under its fogged
  *      parent's fog doesn't ship, with its subtree. Tested over the frame's
  *      whole area (`frameUnderFog`), not only its corners.
@@ -286,11 +287,39 @@ function pointUnderFog(p: unknown, fog: FogOverlay | null): boolean {
   return !isLit(p[0], p[1], fog);
 }
 
-/** Rule 3: any point under fog, or no points to test on a fogged map. */
-function anyPointUnderFog(points: readonly unknown[] | undefined, fog: FogOverlay | null): boolean {
+/**
+ * True when any part of the path through `points` is under `fog`: its points,
+ * and every segment between them. Exact, not sampled: along a segment lit-ness
+ * only changes where it crosses a reveal or conceal edge, so the segment is cut
+ * at every such crossing and the middle of each piece is tested. No points, or
+ * a point that isn't a pair of finite numbers, on a fogged map counts as under
+ * fog (fail closed).
+ */
+export function pathUnderFog(points: readonly unknown[] | undefined, fog: FogOverlay | null): boolean {
   if (!fog) return false;
   if (!points || points.length === 0) return true;
-  return points.some((p) => pointUnderFog(p, fog));
+  if (!points.every(isFinitePoint)) return true;
+  const pts = points as Point[];
+  if (pts.some((p) => pointUnderFog(p, fog))) return true;
+  const edges: Segment[] = [];
+  for (const poly of [...fog.reveals, ...(fog.conceals ?? [])]) {
+    if (poly.length >= 3) edges.push(...edgesOf(poly));
+  }
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const [a, b] = [pts[i], pts[i + 1]];
+    const ts = [0, 1];
+    for (const e of edges) {
+      const t = crossingT([a, b], e);
+      if (t !== null) ts.push(t);
+    }
+    ts.sort((x, y) => x - y);
+    for (let k = 0; k + 1 < ts.length; k++) {
+      if (ts[k + 1] - ts[k] <= EPS) continue;
+      const t = (ts[k] + ts[k + 1]) / 2;
+      if (!isLit(a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]), fog)) return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -345,7 +374,7 @@ const EPS = 1e-9;
  * every crossing of two edges (no edges cross inside a slab), and each slab
  * into the trapezoids between the edges that span it. One test point inside
  * each trapezoid that lies in the quad covers every face of the arrangement.
- * The quad's corners are tested too, as rule 3 tests a region's points.
+ * The quad's corners are tested too.
  */
 export function frameUnderFog(quad: readonly Point[], fog: FogOverlay | null): boolean {
   if (!fog) return false;
@@ -416,14 +445,20 @@ function edgesOf(poly: readonly Point[]): Segment[] {
   return poly.map((p, i) => [p, poly[(i + 1) % poly.length]] as Segment);
 }
 
-/** The x of the single point where two segments cross, or null. */
-function crossingX([p1, p2]: Segment, [p3, p4]: Segment): number | null {
+/** Where along the first segment (0..1) two segments cross, or null. */
+function crossingT([p1, p2]: Segment, [p3, p4]: Segment): number | null {
   const d = (p2[0] - p1[0]) * (p4[1] - p3[1]) - (p2[1] - p1[1]) * (p4[0] - p3[0]);
   if (d === 0) return null;
   const t = ((p3[0] - p1[0]) * (p4[1] - p3[1]) - (p3[1] - p1[1]) * (p4[0] - p3[0])) / d;
   const u = ((p3[0] - p1[0]) * (p2[1] - p1[1]) - (p3[1] - p1[1]) * (p2[0] - p1[0])) / d;
   if (t < -EPS || t > 1 + EPS || u < -EPS || u > 1 + EPS) return null;
-  return p1[0] + t * (p2[0] - p1[0]);
+  return Math.min(1, Math.max(0, t));
+}
+
+/** The x of the single point where two segments cross, or null. */
+function crossingX(s1: Segment, s2: Segment): number | null {
+  const t = crossingT(s1, s2);
+  return t === null ? null : s1[0][0] + t * (s1[1][0] - s1[0][0]);
 }
 
 // ---------------------------------------------------------------------------
@@ -647,7 +682,7 @@ export function resolveCampaign(
         if (!onMap) v = { ships: false, reason: "map-hidden" };
         else if (!shipsIn(r.visibility, campaignId)) v = { ships: false, reason: "visibility" };
         else if (r.entityId !== undefined && !noteIdShips(r.entityId)) v = { ships: false, reason: "link-hidden" };
-        else if (anyPointUnderFog(r.points, fog)) v = { ships: false, reason: "fogged" };
+        else if (areaUnderFog(r.points, fog)) v = { ships: false, reason: "fogged" };
         else v = { ships: true, reason: "ships" };
         regionShips.set(r.id, (regionShips.get(r.id) ?? true) && v.ships);
         regions.push({ id: r.id, map: map.id, ...v });
@@ -686,7 +721,7 @@ export function resolveCampaign(
           }
           if (waypointHidden) v = { ships: false, reason: "waypoint-hidden" };
           else if (points.length < 2) v = { ships: false, reason: "no-geometry" };
-          else if (anyPointUnderFog(points, fog)) v = { ships: false, reason: "fogged" };
+          else if (pathUnderFog(points, fog)) v = { ships: false, reason: "fogged" };
           else v = { ships: true, reason: "ships" };
         }
         routes.push({ id: route.id, map: map.id, ...v });

@@ -5,7 +5,7 @@
  * are temp roots, built in process: buildAtlas only plans the fog and audio
  * files and writeBuildOutput (which writes them) isn't called.
  *
- * - arch-02: a sound-only area with any point under fog doesn't ship.
+ * - arch-02: a sound-only area with any part under fog doesn't ship.
  * - A region and a route under fog still don't ship; a ride-on sound area of a
  *   DM region still doesn't.
  * - A rule-8 name collision fails the strict player build (exit 10), naming

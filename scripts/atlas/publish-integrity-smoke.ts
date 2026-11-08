@@ -253,7 +253,7 @@ function variantFog(): VariantResult {
 }
 
 // ---- Variant 4b: sound-only area under fog (check-fog-safety, code 21) ------
-// arch-02: the build drops a sound-only area with any point under fog, and the
+// arch-02: the build drops a sound-only area with any part under fog, and the
 // fog scan re-checks the shipped soundscape against the source fog. Built from
 // a throwaway vault (one map, left half revealed), so it runs whatever the
 // live vault's maps and sound look like. The dirty half must exit 21 itself:

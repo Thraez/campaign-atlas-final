@@ -8,7 +8,8 @@
  *   13  IMAGE-LEAK    original layer image referenced by the player atlas, or
  *                     (built site only) shipped beside its redacted one
  *   14  GEOMETRY-LEAK fog geometry not stripped from player atlas
- *   15  IN-FOG-CONTENT player pin/route/region inside fog per source geometry
+ *   15  IN-FOG-CONTENT player pin inside fog, or any part of a region's area or
+ *                     a route's path inside fog, per source geometry
  *   16  ALPHA-LEAK    redacted PNG opaque at a known-fogged location
  *   21  SOUND-IN-FOG  shipped sound-only area (no regionId) with any part of its
  *                     area inside fog per source geometry, fog between lit
@@ -47,7 +48,7 @@ import { IMAGE_EXTENSIONS } from "./atlas/assetRefs";
 import { loadWorldConfig } from "./atlas/loadWorldConfig";
 import { locatePlayerAtlas, resolveAssetFile, type ArtifactLayout } from "./atlas/playerArtifact";
 import { isLit } from "../src/atlas/fog/effectiveLit";
-import { areaUnderFog } from "../src/atlas/content/resolveCampaign";
+import { areaUnderFog, pathUnderFog } from "../src/atlas/content/resolveCampaign";
 import type { FogOverlay, Point } from "../src/atlas/content/schema";
 
 interface Args {
@@ -249,29 +250,23 @@ export async function run(opts: RunOpts): Promise<number> {
       }
     }
 
-    // Check region vertices
+    // Regions: the whole area, fog between lit vertices included.
     for (const r of m.regions ?? []) {
-      for (const [x, y] of r.points) {
-        if (!isLit(x, y, srcFog)) {
-          findings.push({
-            code: 15,
-            message: `region "${r.id}" on map "${m.id}" has vertex (${x},${y}) inside fog by source geometry`,
-          });
-          break; // one finding per region is enough
-        }
+      if (areaUnderFog(r.points, srcFog)) {
+        findings.push({
+          code: 15,
+          message: `region "${r.id}" on map "${m.id}" has part of its area inside fog by source geometry`,
+        });
       }
     }
 
-    // Check route resolved points
+    // Routes: the whole resolved path, a fog gap between lit points included.
     for (const t of m.routes ?? []) {
-      for (const [x, y] of t.resolvedPoints ?? []) {
-        if (!isLit(x, y, srcFog)) {
-          findings.push({
-            code: 15,
-            message: `route "${t.id}" on map "${m.id}" has point (${x},${y}) inside fog by source geometry`,
-          });
-          break; // one finding per route is enough
-        }
+      if (t.resolvedPoints && pathUnderFog(t.resolvedPoints, srcFog)) {
+        findings.push({
+          code: 15,
+          message: `route "${t.id}" on map "${m.id}" has part of its path inside fog by source geometry`,
+        });
       }
     }
   }
