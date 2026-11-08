@@ -43,6 +43,7 @@
 import { isLit } from "../fog/effectiveLit";
 import { pointInPolygon } from "../geometry/polygon";
 import { slugify } from "./slugify";
+import type { MapModel, ModelNote, WorldModel } from "./atlasModel";
 import type { Note } from "./readNote";
 import type { EntityVisibility, FogOverlay, Point } from "./schema";
 import type {
@@ -50,10 +51,8 @@ import type {
   CampaignId,
   FrameV2,
   MapId,
-  MapV2,
   NoteId,
   NoteOverride,
-  WorldFileV2,
   WorldId,
 } from "./schemaV2";
 import { isPlayerVisible, isValidVisibility, noteIsSecret } from "./visibility";
@@ -63,21 +62,25 @@ import { isPlayerVisible, isValidVisibility, noteIsSecret } from "./visibility";
 // ---------------------------------------------------------------------------
 
 /**
- * The in-memory model the resolver reads: every world file and every campaign
- * file (R-12's loader builds it; v1 comes through its one adapter). Structural,
- * so any model carrying these two lists fits.
+ * The in-memory model the resolver reads: every world and every campaign of
+ * R-12's atlas model (`AtlasModel`; v1 comes through its one adapter), so
+ * `loadAtlasModel`'s `model` passes straight in. A v2 `WorldFileV2` (a
+ * `WorldModel` plus its `schemaVersion`) fits too.
  */
 export interface CampaignResolverModel {
-  worlds: readonly WorldFileV2[];
+  worlds: readonly WorldModel[];
   campaigns: readonly CampaignFileV2[];
 }
 
 /** The parts of a `readNote` result the resolver reads. */
 export type ResolverNote = Pick<Note, "id" | "title" | "aliases" | "visibility" | "atlas">;
 
-/** A note and the world it belongs to (its entity's world). */
-export interface WorldNote {
-  world: WorldId;
+/**
+ * A note and the world it belongs to (its entity's world): the loader's
+ * `ModelNote`, of which the resolver reads only `world` and these note fields,
+ * so `loadAtlasModel`'s `notes` pass straight in.
+ */
+export interface WorldNote extends Pick<ModelNote, "world"> {
   note: ResolverNote;
 }
 
@@ -413,8 +416,8 @@ function crossingX([p1, p2]: Segment, [p3, p4]: Segment): number | null {
 // ---------------------------------------------------------------------------
 
 interface MapEntry {
-  map: MapV2;
-  world: WorldFileV2;
+  map: MapModel;
+  world: WorldModel;
 }
 
 /**
@@ -511,7 +514,7 @@ export function resolveCampaign(
     worlds.push({ id, ...v });
     worldShipsById.set(id, (worldShipsById.get(id) ?? true) && v.ships);
   }
-  const worldFileById = new Map<WorldId, WorldFileV2>();
+  const worldFileById = new Map<WorldId, WorldModel>();
   for (const w of model.worlds) if (worldCounts.get(w.world.id) === 1) worldFileById.set(w.world.id, w);
 
   // --- Notes (rules 5 and 6) -----------------------------------------------
