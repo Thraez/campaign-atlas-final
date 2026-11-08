@@ -464,6 +464,8 @@ export function formatBuildReport(r: BuildAtlasReport): string {
   log(`Errors:                  ${r.errors.length}`);
   for (const e of r.errors) log(`  ✗ ${e}`);
   for (const w of r.warnings) log(`  ! ${w}`);
+  // DM-side only: these name sound areas, so they never go in the shipped buildReport.
+  for (const l of r.soundAreaIdProblems) log(`  ! sound area dropped: ${l}`);
   for (const a of r.assetErrors) log(`  ${a}`);
   return lines.join("\n");
 }
@@ -842,6 +844,21 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // doesn't ship, plus the shipped ones (the leak still warns and fails strict).
   let leakCheckRegions: Region[] = regions;
 
+  // Sound-area ids are checked on every map, shipped or not, before hidden
+  // maps go (the Publish Check checks them all too). See the soundscape strip.
+  const soundIdLines: string[] = [];
+  if (flags.player) {
+    for (const m of maps) {
+      for (const p of soundAreaIdProblems(m.soundscape?.areas ?? [])) {
+        soundIdLines.push(
+          p.kind === "missing-id"
+            ? `map "${m.id}": ${p.count} sound area(s) with no id — give each one`
+            : `map "${m.id}": ${p.count} sound areas share the id "${p.id}" — rename all but one`,
+        );
+      }
+    }
+  }
+
   if (res) {
     // A map the resolver doesn't ship takes everything on it along.
     maps = maps.filter((m) => res.mapShips(m.id));
@@ -1040,18 +1057,10 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // borrow another area's (the adapter skips malformed areas), so every area
   // such an id names is dropped, and a strict build fails on it (exit 22).
   let audioPlan: AudioPlan | undefined;
-  const soundIdLines: string[] = [];
   if (flags.player) {
     maps = maps.map((m) => {
       if (!m.soundscape) return m;
       const problems = soundAreaIdProblems(m.soundscape.areas ?? []);
-      for (const p of problems) {
-        soundIdLines.push(
-          p.kind === "missing-id"
-            ? `map "${m.id}": ${p.count} sound area(s) with no id — give each one`
-            : `map "${m.id}": ${p.count} sound areas share the id "${p.id}" — rename all but one`,
-        );
-      }
       return {
         ...m,
         soundscape: filterSoundscapeForPlayer(

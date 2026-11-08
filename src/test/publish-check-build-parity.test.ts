@@ -14,7 +14,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { buildAtlas } from "../../scripts/build-atlas";
+import { buildAtlas, formatBuildReport } from "../../scripts/build-atlas";
 import { validateProject, type Issue } from "@/atlas/yaml/validateProject";
 
 const WORLD = "parity-world";
@@ -496,6 +496,11 @@ describe("sound-area ids the build can't trust (R-11c)", () => {
     const json = JSON.stringify(player.project);
     expect(json).not.toContain("777");
     expect(json).not.toContain("dm-secret");
+    // The DM-side terminal report says why; the shipped atlas doesn't.
+    const line = 'map "m1": 2 sound areas share the id "x"';
+    expect(formatBuildReport(player.report)).toContain(line);
+    expect(json).not.toContain("share the id");
+    expect(JSON.stringify(player.project.buildReport ?? {})).not.toContain("sound area");
   });
 
   it("a bed src of only spaces is malformed: the Publish Check warns and the build drops it", async () => {
