@@ -1,0 +1,13 @@
+# R-15 fixture: the smallest v2 content root with two campaigns. Invented content.
+schemaVersion: 2
+ocean:
+  width: 1000
+  height: 1000
+  sea: default
+worlds:
+  - vale
+campaigns:
+  - a
+  - b
+onOcean:
+  - { map: vale-overview, x: 0, y: 0, scale: 1, rotation: 0 }
