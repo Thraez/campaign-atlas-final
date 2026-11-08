@@ -1,7 +1,7 @@
 # R-11c Old Publish Check calls the resolver
 
 Status: ready-for-agent
-Blocked by: R-11a
+Blocked by: R-11a, R-12
 Size: S
 Branch: `rebuild-r11c-publish-check-resolver`
 Needs: the adversarial player-safety review (`docs/agents/workflow.md`, "Done")
@@ -15,7 +15,8 @@ verdict by construction. The old editor lives until cutover, so this matters for
 ## Acceptance criteria
 
 - `validateProject` takes "does it ship" for entities, regions, routes and sound areas from the
-  resolver (through R-11b's v1 adapter, or a copy-free shared entry point to it); it keeps its own
+  resolver, fed through R-12's v1 adapter (`src/atlas/content/v1Model.ts`, importable from
+  `src/`); it keeps its own
   presentation (categories, messages, locators).
 - A parity test, table-driven over fixtures: missing visibility, invalid visibility, a region
   linking a `dm` note, a route waypoint on a `dm` note, a note with `atlas.publish: false`, a

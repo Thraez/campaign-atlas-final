@@ -1,7 +1,7 @@
 # R-19 Publish runs every campaign
 
 Status: ready-for-agent
-Blocked by: R-17
+Blocked by: R-17, R-17b
 Size: S
 Branch: `rebuild-r19-publish-campaigns`
 Needs: the adversarial player-safety review (`docs/agents/workflow.md`, "Done"): it changes the publish chain
@@ -21,7 +21,9 @@ campaign. Phase H's Cloudflare projects (one per campaign, H-01) deploy these si
   recommended `dist-campaigns/<id>/`), and the Vite build copies nothing from another campaign's
   store or from `public/atlas/` (test: a site dir holds no file that isn't in its own store or the
   app's static files).
-- Then the orchestrator runs the registry over every campaign (R-15) and fails if any task fails.
+- Then the orchestrator runs the registry over every campaign (R-15) and fails if any task fails,
+  including R-17b's isolation scan on each store and on each built site's atlas dir (its file list
+  must equal its store's).
 - v1 (`content/`): the chain behaves exactly as today (one campaign `main`, `public/atlas/` and
   `dist/`), so `publish-atlas.yml` and `npm run gate` need no change; the gate's step list is
   unchanged.

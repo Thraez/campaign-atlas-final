@@ -9,7 +9,8 @@ Needs: the adversarial player-safety review (`docs/agents/workflow.md`, "Done"):
 Load a content root into one in-memory model, whichever schema version it is (ADR-0003). v2 reads
 `_atlas/atlas.yaml`, every listed world's `_atlas/world.yaml` and every listed campaign file; v1
 reads today's single `world.yaml` (`scripts/atlas/loadWorldConfig.ts`) and presents it as one
-world with one campaign, `main`. A mix fails. Can run in parallel with R-11a.
+world with one campaign, `main`, through the one v1 adapter, which this ticket owns. A mix fails.
+Can run in parallel with R-11a; R-11b and R-11c wait for both.
 
 ## Acceptance criteria
 
@@ -23,9 +24,15 @@ world with one campaign, `main`. A mix fails. Can run in parallel with R-11a.
     above 2: fails, naming the file. Extend `scripts/atlas/schemaVersion.ts` (today
     `CURRENT_ATLAS_SCHEMA_VERSION = 1` and a stub `MIGRATIONS`) rather than adding a second
     version check; v1 content is not migrated in memory to a v2 file, only presented as the model.
-- v1 path: one world (`atlas.config.json` `defaultWorld`), campaign `main`, each map `open`, or
-  `fogged` with its v1 fog when enabled; scalar visibilities kept. It reuses or replaces R-11b's
-  adapter (one copy only). The v1 world name, when `world.yaml` has no `name:` (today it has none),
+- The v1 adapter: one pure module in `src/atlas/content/` (suggested
+  `src/atlas/content/v1Model.ts`), so both `scripts/` and `validateProject`
+  (`src/atlas/yaml/validateProject.ts`, compiled by `tsconfig.app.json`, which includes only `src/`)
+  can import it. Its input is a minimal v1 shape defined in `src/atlas/content/` (today's
+  `WorldConfig` lives in `scripts/atlas/loadWorldConfig.ts:141`, out of the app's reach; move the
+  needed part of the type or define the minimal input, and have both callers map into it). Output:
+  one world (`atlas.config.json` `defaultWorld`), campaign `main` with `notes: vault`, each map
+  `open`, or `fogged` with its v1 fog when enabled; scalar visibilities kept; no `notes:` entries.
+  This is the only place those v1 rules are written; a test pins each. The v1 world name, when `world.yaml` has no `name:` (today it has none),
   is the world id title-cased ("astrath-deeprealm" gives "Astrath Deeprealm"), so the hard-coded
   fallback at `scripts/build-atlas.ts:1149` can go in R-13 without changing the output.
 - v2 cross-file rules (ADR-0003), each failing with the file and path named, each tested: a world
@@ -35,7 +42,9 @@ world with one campaign, `main`. A mix fails. Can run in parallel with R-11a.
   entry naming a child map; a per-campaign visibility key that isn't a listed campaign; a campaign
   file naming an unknown map; a v2 note with `atlas.placements` (as decided in ADR-0003).
 - Invalid visibility values load as written and produce a warning naming the item; the resolver
-  makes them `dm`. Warnings never reach a player artifact (R-06's rule: they go in the build's
+  makes them `dm`.
+- A campaign file with no `notes:` field loads as `notes: hidden` (fail closed, ADR-0004 question 5),
+  with a warning naming the file. Warnings never reach a player artifact (R-06's rule: they go in the build's
   hidden-from-player set when R-13 wires them).
 - `loadWorldConfig` keeps working for existing callers (Publish Check, scans, the editor) until
   they move; no existing test changes except where it asserted the old "version above 1" message.
@@ -45,7 +54,8 @@ world with one campaign, `main`. A mix fails. Can run in parallel with R-11a.
 
 ## Touches
 
-- New `scripts/atlas/loadAtlasModel.ts` (+ tests), `scripts/atlas/schemaVersion.ts`,
+- New `src/atlas/content/v1Model.ts` (+ test), new `scripts/atlas/loadAtlasModel.ts` (+ tests),
+  `scripts/atlas/schemaVersion.ts`,
   `scripts/atlas/loadWorldConfig.ts` (only to share code), fixtures.
 
 ## Out of scope

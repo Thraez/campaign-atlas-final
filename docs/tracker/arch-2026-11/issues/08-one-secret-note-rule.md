@@ -18,3 +18,6 @@ shipped `body`; the strict build and the derived scan still catch it.
 - 2026-11-08 (rebuild phase 2 tickets): folded into
   [R-11a](../../rebuild-2026-11/issues/R-11a-per-campaign-resolver.md) (the per-campaign
   resolver): build it there, not here. Both criteria above are R-11a's.
+- 2026-11-08 (review of the phase 2 tickets): split. The one secret-note predicate stays in R-11a;
+  the redaction from token positions, with a before/after snapshot of today's player `body`, is
+  [R-11d](../../rebuild-2026-11/issues/R-11d-link-redaction-from-tokens.md) (blocked by R-11a).

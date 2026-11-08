@@ -23,10 +23,19 @@ campaign `main` on v1); several campaigns come in R-17.
 - Entities carry the world of the folder they live in (`content/<world>/`); today
   `atlas.world ?? opts.defaultWorld` (~1291). A note whose `atlas.world` disagrees with its folder
   warns.
-- v2 output (on a fixture with two worlds and a three-level tree): `worlds` lists both;
+- v2 output (on a fixture with two worlds and a three-level tree): `worlds` lists every world the
+  resolver ships to the campaign (ADR-0004 rule 5), here both;
   every map that ships is in `maps` with `parent`, `frame`, `enterZoom`; `ocean` holds the size,
   sea and the `onOcean` placements of top-level maps that ship. Tests check both worlds' maps,
   pins and regions are present and land on the right map id.
+- World verdicts: on the same fixture with every map of one world hidden from the campaign, that
+  world is absent from `worlds`, from `ocean`, and from every other field, and its id and name are
+  in the build's must-not-ship set (so `check-derived-secrets` and R-17b look for them).
+- A name collision the resolver reports (ADR-0004 rule 8) fails the strict player build, naming both
+  items, for v2 as for v1 (R-11b).
+- In v2, a note whose frontmatter says `player` (or `rumor`) but that ships to no campaign gets a
+  build warning naming the note and the reason (no `notes:` entry naming a `hidden` campaign), so
+  the DM sees why it is missing. Warnings go in the hidden-from-player set.
 - v1 output unchanged: the player and DM `atlas.json` and `search-index.json` of `content/` match
   the pre-change build apart from `version` and `publishedAt` (same check as R-11b). The world name
   fallback becomes the title-cased id (R-12), not a literal.

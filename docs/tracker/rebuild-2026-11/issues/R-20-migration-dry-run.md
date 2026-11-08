@@ -28,7 +28,7 @@ every campaign (today only `main`) must not change.
     (calendar, credits, import folders, water) carried over; the world name written explicitly
     (today's output name, "Astrath Deeprealm");
   - `_atlas/campaigns/main.yaml`: every map listed, `open`, or `fogged` with the v1 fog's reveals,
-    conceals and `featherPx`; and the note default ADR-0004 Q1 settles (recommended
+    conceals and `featherPx`; and the note default ADR-0004 question 5 settles (recommended
     `notes: vault`);
   - pins: each note's `atlas.placements` (6 notes today) moved into `maps[].pins` with
     `{ main: <placement visibility> }`, and removed from that note's frontmatter in the copy (other

@@ -1,7 +1,7 @@
 # R-18 Fog baked per campaign; fog scan source-driven
 
 Status: ready-for-agent
-Blocked by: R-17
+Blocked by: R-17, R-17b
 Size: M
 Branch: `rebuild-r18-campaign-fog`
 Needs: the adversarial player-safety review (`docs/agents/workflow.md`, "Done")
@@ -26,7 +26,9 @@ campaign's source says is fogged.
 - The fog scan takes the source per campaign: for campaign C it loads C's campaign file through the
   R-12 loader, and every map fogged there must appear fogged in C's output (redacted image, no
   original, no fog geometry, nothing that ships under fog: pins, regions, routes, frames, sound
-  areas). A map fogged in source but not in the output fails with a new exit code. In publish mode,
+  areas). A child map whose frame has any corner under the parent's fog in C must be absent from
+  C's output with its whole subtree (ADR-0004 rule 4): no map entry, no image, none of its items;
+  the scan computes this from source, not from the output. A map fogged in source but not in the output fails with a new exit code. In publish mode,
   source fog that can't be loaded (missing or broken campaign file, missing config) fails; it no
   longer counts as a "configless run" (exit 0 today, header of `check-fog-safety.ts`).
 - v1: campaign `main`'s fog is the v1 `world.yaml` fog; today's checks keep passing on `content/`
@@ -35,7 +37,11 @@ campaign's source says is fogged.
   `atlas.json` drops a source-fogged map's fog marker fails; one holding another campaign's
   unfogged image fails.
 - Tests on `content-next/`: the pin under one campaign's fog is absent from that campaign's
-  `atlas.json` and search index, present in the other's.
+  `atlas.json` and search index, present in the other's. A city whose frame is under fog on a
+  fogged parent ships nothing to that campaign (no map entry, image, pin, region, route or sound
+  area of it or its children), and ships in full to the campaign where the parent is open. An
+  integrity-smoke variant that plants that city's map entry back into the fogged campaign's
+  `atlas.json` fails the fog scan.
 - `npm run gate` passes.
 
 ## Touches

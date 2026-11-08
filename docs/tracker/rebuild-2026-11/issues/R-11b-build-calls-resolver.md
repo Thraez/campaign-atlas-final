@@ -1,7 +1,7 @@
 # R-11b Build calls the resolver
 
 Status: ready-for-agent
-Blocked by: R-11a
+Blocked by: R-11a, R-12
 Size: S
 Branch: `rebuild-r11b-build-resolver`
 Folds in: `docs/tracker/arch-2026-11/issues/02-sound-areas-in-fog.md`
@@ -9,15 +9,14 @@ Needs: the adversarial player-safety review (`docs/agents/workflow.md`, "Done")
 
 The player build in `scripts/build-atlas.ts` decides what ships with its own filters. Move it onto
 the resolver (R-11a) for campaign `main`, so the build and the resolver can't disagree. Today's
-content is v1, so this needs a thin v1 adapter. Also fixes arch-02: sound-only areas inside fog
+content is v1, so it goes through R-12's v1 adapter (`src/atlas/content/v1Model.ts`). Also fixes arch-02: sound-only areas inside fog
 ship to players today, and the fog scan doesn't look at sound areas.
 
 ## Acceptance criteria
 
-- A thin adapter turns the v1 `WorldConfig` (`scripts/atlas/loadWorldConfig.ts`) into the
-  resolver's input: one world, one campaign `main`, every map `open`, or `fogged` when its v1 fog is
-  enabled; v1 scalar visibilities apply to `main`; no note overrides; notes use the `vault` note
-  default. Keep it small and in one file: R-12's v1 path must reuse or replace it, not copy it.
+- The build gets the resolver's input from R-12's v1 adapter; it writes no v1 rule of its own.
+- A name collision the resolver reports (ADR-0004 rule 8) fails the strict player build, naming
+  both items; a fixture test covers it.
 - The player build asks the resolver for: entities (instead of `isSecret` alone), regions
   (`build-atlas.ts` ~806-816), placements under fog (~849), routes and their waypoints (~932),
   the soundscape (`filterSoundscapeForPlayer` at ~988, `scripts/atlas/filterSoundscape.ts`). Leak
@@ -37,8 +36,7 @@ ship to players today, and the fog scan doesn't look at sound areas.
 ## Touches
 
 - `scripts/build-atlas.ts`, `scripts/atlas/filterSoundscape.ts`, `scripts/check-fog-safety.ts`,
-  `scripts/atlas/publish-integrity-smoke.ts`, a new adapter module (suggested
-  `scripts/atlas/v1Model.ts`), tests under `src/test/` and `scripts/atlas/`.
+  `scripts/atlas/publish-integrity-smoke.ts`, tests under `src/test/` and `scripts/atlas/`.
 
 ## Out of scope
 

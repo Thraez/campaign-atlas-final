@@ -10,8 +10,8 @@ The rebuild's first code ticket. Write the TypeScript types for schema v2 (ADR-0
 visibility values and the `notes:` block. Types and pure validators only; nothing reads them yet.
 Every later phase 2 ticket (resolver, loader, build, test world) builds on these.
 
-Status is `ready-for-human` only until Isak answers the ADRs' open questions (notably ADR-0004 Q1,
-which adds a `notes: vault | hidden` field to the campaign type). After that it is ready for an
+Status is `ready-for-human` only until Isak answers the ADRs' open questions (notably question 5
+in ADR-0004, which adds a `notes: vault | hidden` field to the campaign type). After that it is ready for an
 agent; set the ADRs to `accepted` with his answers in the same PR.
 
 ## Acceptance criteria
@@ -27,8 +27,9 @@ agent; set the ADRs to `accepted` with his answers in the same PR.
     (`x`, `y`, `width`, `height`, `rotation`), `enterZoom`, and nested `regions`, `routes`, `pins`
     (`note`, `x`, `y`, `visibility`), `sound`;
   - `CampaignFileV2`: `id`, `name`, `maps: Record<mapId, { state: "unknown" | "fogged" | "open",
-    reveals?, conceals?, featherPx? }>`, plus whatever ADR-0004 Q1 settles (recommended
-    `notes: "vault" | "hidden"`);
+    reveals?, conceals?, featherPx? }>`, plus whatever ADR-0004 question 5 settles (recommended
+    `notes: "vault" | "hidden"`, optional in the file and read as `hidden` when missing: the
+    validator returns `hidden` for a missing field, never `vault`; a test pins it);
   - `VisibilityValue = EntityVisibility | Record<campaignId, EntityVisibility>`;
   - `NoteOverride`: `visibility: VisibilityValue`, `basedOn: EntityVisibility`, `belongsTo?: string[]`.
 - Pure shape validators (no file IO) for the three files that return typed values or a list of

@@ -60,11 +60,12 @@ enabled (then `fogged`), so today's site builds unchanged. The v1 path is delete
 
 **Output shape.** A v2 player `atlas.json` adds, and only adds: `ocean` (size, sea, the top-level
 placements of maps that ship), and per map `parent`, `frame`, `enterZoom`. The v1 output gains
-nothing.
+nothing. `worlds` and `ocean` list only worlds that ship to the campaign: a world with no map that
+ships there is left out, and its id and name are guarded (ADR-0004, rule 5).
 
 **Where the v2 test world lives.** `content-next/`, its own content root with its own config
 (`atlas.next.config.json`, read through `build-atlas.ts --config`), committed (it is made-up test
-content), built by its own commands into a gitignored dir outside `public/`, never published, until
+content; question 9), built by its own commands into a gitignored dir outside `public/`, never published, until
 cutover.
 
 ## Options rejected
@@ -102,3 +103,12 @@ cutover.
    that campaign may see. Applies to `content-next/` from the start; real content moves at cutover.
 4. **A campaign file present but not listed in `atlas.yaml`, or listed with no file.**
    Recommended: both fail the build, naming the file.
+
+Questions 5-8 are in ADR-0004.
+
+9. **Is `content-next/` committed, or local only?** Isak's round-2 answer was "local only".
+   Recommended: commit it, because its content is made up for testing (no real lore, no real
+   names), so the fixture tests in CI and on the PC run on the same files, and the other computer
+   gets it through git. The repo is public until phase H (ADR-0002), so anything in
+   `content-next/` is public too: it must stay invented. If Isak keeps "local only", R-16 puts it
+   in `.gitignore` and the tests use a small committed fixture under `tests/` instead.

@@ -13,7 +13,8 @@ blocks this on R-12 only; it also needs R-11a, because the tree is shown per cam
 
 ## Acceptance criteria
 
-- `content-next/` (committed, made-up content, no real vault text) with `_atlas/atlas.yaml`, two
+- `content-next/` (made-up content, no real vault text or names; committed or gitignored as
+  ADR-0003 question 9 settles, recommended committed; the repo is public until phase H) with `_atlas/atlas.yaml`, two
   worlds, `_atlas/campaigns/a.yaml` and `b.yaml` (pick short ids, for example `main` and
   `sandbox`), and in one world a three-level tree: a world map on the ocean, a continent framed in
   it, a city framed in the continent. Small lossless map images (a few hundred px), stored where
@@ -23,7 +24,9 @@ blocks this on R-12 only; it also needs R-11a, because the tree is shown per cam
   region visible in one campaign only; a map (the city) visible in one campaign only; a map
   `unknown` in one campaign; a pin, a route and a sound-only area inside a hidden region; one map
   fogged in one campaign and open in the other, with a pin under that fog; a note with frontmatter
-  `dm`; a `notes:` entry with a stale `basedOn`.
+  `dm`; a `notes:` entry with a stale `basedOn`; a second city whose frame sits under the fog of a
+  map fogged in one campaign (ADR-0004 rule 4); a second world whose every map is hidden from one
+  campaign (rule 5); one campaign file with `notes: hidden` and one with `notes: vault`.
 - `atlas.next.config.json` at the repo root points the build at `content-next/` (ADR-0003); its
   outputs go to a gitignored dir outside `public/`. R-01's vault check and `check-vault-content`
   don't flag `content-next/` (it has no vault source markers); confirm and test.
