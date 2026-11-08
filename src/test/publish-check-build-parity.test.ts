@@ -5,9 +5,10 @@
  * Publish Check (`validateProject`) blocks on it exactly when
  * `buildAtlas(--player --strict)` fails, and both name the same item.
  *
- * The sound-only-area-in-fog row: the Publish Check reads the resolver, which
- * drops the area; the build drops it only once R-11b (arch-02) moves the build
- * onto the resolver. Until then that half is an `it.todo`.
+ * The sound-only-area-in-fog rows: the build doesn't fail on them, and both the
+ * Publish Check and the build ask the resolver, which drops an area with any
+ * part under fog (arch-02, R-11b). The Publish Check warns; the strict player
+ * atlas leaves the area out.
  */
 import { afterAll, describe, expect, it } from "vitest";
 import fs from "node:fs";
@@ -271,21 +272,79 @@ describe("Publish Check blocks exactly when the strict player build fails (R-11c
   });
 });
 
-describe("sound-only area under fog (R-11c; arch-02 lands in R-11b)", () => {
+/** A map lit in two strips (y 0-300 and 700-1000) with fog between them. */
+const STRIPS_YAML = [
+  ...MAP_YAML,
+  "    fog:",
+  "      enabled: true",
+  "      reveals:",
+  "        - [[0, 0], [1000, 0], [1000, 300], [0, 300]]",
+  "        - [[0, 700], [1000, 700], [1000, 1000], [0, 1000]]",
+  "    soundscape:",
+  "      areas:",
+  "        - id: river-song",
+  "          name: river-song",
+  "          visibility: player",
+  "          points: [[100, 200], [900, 200], [900, 800], [100, 800]]",
+  "          bed: { src: audio/drums.ogg }",
+  "        - id: market-hum",
+  "          name: market-hum",
+  "          visibility: player",
+  "          points: [[100, 50], [900, 50], [900, 250], [100, 250]]",
+  "          bed: { src: audio/drums.ogg }",
+];
+
+const partlyFogged: Fixture = {
+  name: "a sound-only area whose corners are lit but whose middle crosses a fog gap",
+  notes: {},
+  mapYaml: STRIPS_YAML,
+  fails: false,
+};
+
+const shippedAreas = (project: { maps: { id: string; soundscape?: { areas?: unknown[] } }[] }) =>
+  project.maps.find((m) => m.id === "m1")?.soundscape?.areas ?? [];
+
+describe("sound-only area under fog (R-11c, matching R-11b's build)", () => {
   const fixture = FIXTURES.find((f) => f.name.startsWith("a sound-only area"))!;
 
-  it("the Publish Check warns it ships under fog today, without blocking", async () => {
+  it("the Publish Check warns the area is left out of the player atlas, without blocking", async () => {
     const { report } = await run(fixture);
     const hits = report.issues.filter((i) => i.code === "sound-area-fogged");
     expect(hits).toHaveLength(1);
     expect(hits[0].severity).toBe("warning");
-    expect(hits[0].message).toContain("R-11b");
     expect(hits[0].message).toContain("war-drums");
+    expect(hits[0].message).toContain("left out of the player atlas");
+    expect(hits[0].message).not.toContain("R-11b");
     expect(hits[0].scope).toEqual({ mapId: "m1" });
   });
 
-  // Today's build still ships the area (arch-02). R-11b drops it through the
-  // resolver; then this half of the parity holds and the todo becomes a test:
-  // the strict player atlas's m1 soundscape has no area.
-  it.todo("R-11b: the strict player atlas leaves the area out, as the Publish Check says");
+  it("the strict player atlas leaves the area out, as the Publish Check says", async () => {
+    const { dm, player } = await run(fixture);
+    expect(player.report.failure).toBeUndefined();
+    expect(shippedAreas(dm.project)).toHaveLength(1);
+    expect(shippedAreas(player.project)).toEqual([]);
+  });
+
+  it("an area only partly under fog (a fog gap between lit strips) is reported and left out; a lit one ships", async () => {
+    const { dm, player, report, blocking } = await run(partlyFogged);
+    expect(player.report.failure).toBeUndefined();
+    expect(blocking).toEqual([]);
+
+    const hits = report.issues.filter((i) => i.code === "sound-area-fogged");
+    expect(hits.map((i) => i.message)).toEqual([expect.stringContaining("river-song")]);
+    expect(hits[0].severity).toBe("warning");
+
+    // The DM atlas keeps both; the player atlas keeps only the lit one, with
+    // its name stripped and its id replaced.
+    expect(shippedAreas(dm.project)).toHaveLength(2);
+    const kept = shippedAreas(player.project) as { id: string; name?: string; points: unknown }[];
+    expect(kept).toHaveLength(1);
+    expect(kept[0].name).toBeUndefined();
+    expect(kept[0].points).toEqual([
+      [100, 50],
+      [900, 50],
+      [900, 250],
+      [100, 250],
+    ]);
+  });
 });

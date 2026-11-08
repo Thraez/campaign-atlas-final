@@ -592,12 +592,12 @@ const checkWhatShips: Rule = (ctx) => {
       );
       if (!fogged) continue;
       issues.push({
-        // Until R-11b moves the build onto the resolver, the build still ships
-        // this area (arch-02); then it drops it and this wording changes.
+        // The player build asks the same resolver and leaves this area out
+        // (arch-02, R-11b); the build doesn't fail on it, so neither does this.
         severity: "warning",
         code: "sound-area-fogged",
         category: "map",
-        message: `Sound area "${a.name ?? a.id}" ships today with part of its shape under fog; it will be dropped from the player build once R-11b lands`,
+        message: `Sound area "${a.name ?? a.id}" is left out of the player atlas: part of its shape is under fog, so players won't hear it`,
         hint: "Reveal its whole shape in the Fog tab, or shrink it to the revealed part, so it keeps playing for players.",
         scope: { mapId: m.id },
       });

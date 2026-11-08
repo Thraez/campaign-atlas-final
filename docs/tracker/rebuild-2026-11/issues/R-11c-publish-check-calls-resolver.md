@@ -25,6 +25,9 @@ verdict by construction. The old editor lives until cutover, so this matters for
   player note linking a folder-excluded note, a sound-only area in fog. For each, the Publish Check
   reports a blocking leak exactly when `npm run atlas:build:player` (strict) fails, and names the
   same item. Extend `src/test/publish-check-link-leaks.test.ts` or add a sibling.
+- With R-11b merged, a sound-only area with any part under fog (a fog gap between lit strips
+  included) gets a `sound-area-fogged` warning saying it is left out of the player atlas, and the
+  parity test checks the strict player atlas has no such area (`publish-check-build-parity.test.ts`).
 - The existing tests `src/test/atlas-publish-check.test.ts`, `src/test/publish-check-tab.test.tsx`
   and `src/test/publish-check-link-leaks.test.ts` pass (update expectations only where the old
   verdict was wrong, and say which in the PR).
