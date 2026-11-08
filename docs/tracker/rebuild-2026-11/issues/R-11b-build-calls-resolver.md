@@ -19,6 +19,10 @@ ship to players today, and the fog scan doesn't look at sound areas.
   both items; a fixture test covers it.
 - The build fails on any `orphanEntries` the resolver reports (a `notes:` key matching no note of
   its world), naming the world and key; a fixture test covers it.
+- The resolver's input (`CampaignResolverModel`, `WorldNote` in `resolveCampaign.ts`) is typed on
+  R-12's canonical model (`src/atlas/content/atlasModel.ts`: `WorldModel`, `MapModel`, `ModelNote`),
+  so `loadAtlasModel`'s result passes straight in; a type-level test pins it. R-11a and R-12 were
+  built side by side and their types differ today (`schemaVersion`, optional `scale`).
 - The player build asks the resolver for: entities (instead of `isSecret` alone), regions
   (`build-atlas.ts` ~806-816), placements under fog (~849), routes and their waypoints (~932),
   the soundscape (`filterSoundscapeForPlayer` at ~988, `scripts/atlas/filterSoundscape.ts`). Leak
