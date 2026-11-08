@@ -57,7 +57,7 @@ Follow-up noted in its ticket: no scan derives DM region/route ids, so none woul
 | R-11b | Build calls the resolver (also arch-02, sound areas in fog) (done) | R-11a, R-12 |
 | R-11c | Old Publish Check calls the resolver | R-11a, R-12 |
 | R-11d | Link redaction from wikilink tokens (arch-08's other half) (done) | R-11a |
-| R-11e | A hidden region hides what is only inside it (ADR-0004 rule 9) | R-11a |
+| R-11e | A hidden region hides what is inside or reaching into it (ADR-0004 rule 9) | R-11a |
 | R-12 | v2 loader and the one v1 adapter (v1 only with no `schemaVersion` or `1`; a mix fails) (done, #124) | R-10 |
 | R-07b | Loader drops fog shapes (conceals); before the first real Sync | - |
 | R-13 | Build assembles every world and the map tree | R-11b, R-12 |

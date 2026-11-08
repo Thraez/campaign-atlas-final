@@ -1,13 +1,13 @@
-# R-11e A hidden region hides what is only inside it
+# R-11e A hidden region hides what is inside or reaching into it
 
 Status: ready-for-agent
-Blocked by: R-11a (done). Blocks: R-17. R-11b is done: check that the build drops a placement on any pin verdict other than `ships` (not only fog); if not, this ticket adds that (see Order)
+Blocked by: R-11a (done). Blocks: R-17. R-11b is done: the build already drops on any non-`ships` verdict (pins `scripts/atlas/playerResolution.ts:94`, regions `build-atlas.ts:851-855`, routes `build-atlas.ts:982`, sound `soundShips`), so the new reasons take effect through the resolver
 Size: S-M
 Branch: `rebuild-r11e-region-containment`
 Needs: the adversarial player-safety review (`docs/agents/workflow.md`, "Done")
 
-`docs/GOALS.md` ("Hidden zones and fog") promises that a hidden zone and everything only inside it
-(pins, routes, child maps) never ship to a campaign it is hidden in, and its "Working means" asks
+`docs/GOALS.md` ("Hidden zones and fog") promises that a hidden zone and everything inside it or
+reaching into it (pins, routes, child maps) never ship to a campaign it is hidden in, and its "Working means" asks
 for a test that puts a pin inside a hidden zone and finds it absent. ADR-0004 has no such rule, so
 the resolver (`src/atlas/content/resolveCampaign.ts`) decides each pin, route and sound-only area
 on its own visibility, fog and links only. R-16's test world shows it: region `the-murkwater` on
@@ -44,13 +44,16 @@ Per item type, an item that ships by every other rule doesn't ship when:
 | Item | Geometry | Doesn't ship when | New reason |
 |---|---|---|---|
 | Pin | its point | the point is inside or on the edge of any hiding region on its map | `in-hidden-region` |
-| Route | the resolved polyline (written points and pin waypoints, as rule 3 resolves them) | any vertex is inside a hiding region, **or any segment crosses into one** (a road through a dm zone with no waypoint inside still hides) | `in-hidden-region` |
+| Route | the resolved polyline (written points and pin waypoints, as rule 3 resolves them) | any vertex is inside a hiding region, **or any segment crosses into, touches or runs along the edge of one** (a road through a dm zone with no waypoint inside still hides; an edge counts as inside, as for pins) | `in-hidden-region` |
 | Sound-only area | its polygon | it touches a hiding region and doesn't wholly contain it | `in-hidden-region` |
 | Ride-on sound area | its region | unchanged: it takes its region's verdict, so it hides when its region hides (including by this rule) | `region-hidden` |
 | Region (shipped on its own) | its polygon | it touches a hiding region and doesn't wholly contain it | `in-hidden-region` |
 | Frame / child map | the frame rectangle on the parent (both quads of `frameQuads` when rotated, as rule 4) | the frame touches a hiding region on the parent and doesn't wholly contain it; the child map doesn't ship, **with its whole subtree** (as rules 2 and 4) | `frame-in-hidden-region` |
 
-**Area items that wholly contain a hiding region still ship.** Without this, every hidden lair
+**Area items that wholly contain a hiding region still ship.** "Wholly contains" means the hiding
+region lies strictly inside the item, sharing no boundary: an area whose outline is identical to
+the hiding region, or shares part of its boundary so that the hidden outline would be exposed, does
+not count as containing it and hides. Without this, every hidden lair
 would hide the kingdom region drawn around it, its ambient sound, and the city map framed around
 it. A container doesn't reveal the hidden zone: the hidden region's shape, name and contents are
 still dropped. The child map of such a frame is decided by its own visibility and state; hidden
@@ -86,7 +89,8 @@ pin of a shipped note is hidden by this rule, naming the note and region, so the
   polygon-polygon touches and contains, with the shared-edge case) live in
   `src/atlas/geometry/polygon.ts`, with unit tests: shared edge, vertex on edge, collinear
   overlapping edges, a segment crossing a concave polygon with no vertex inside, a self-intersecting
-  hiding polygon (even-odd), and a rotated frame.
+  hiding polygon (even-odd), a rotated frame, a segment that only touches or runs along a hiding
+  region's edge (hides), and an area identical to the hiding region (hides, not a container).
 - New reasons `in-hidden-region` and `frame-in-hidden-region` in `ShipReason`, documented in the
   header comment (rule 9) and shown by `npm run atlas:tree`.
 - `content-next/` (R-16): flip the `it.fails` "known gap" test to `it`; the pin of
@@ -97,27 +101,30 @@ pin of a shipped note is hidden by this rule, naming the note and region, so the
   ships), a city frame partly over the hiding region (child hidden with its subtree), and a region
   hidden in one campaign only, so the two campaigns differ.
 - Resolver fixture tests for every row of the table, the container exception, a fogged-only region
-  (not hiding), no cascade, the malformed hiding region, and rule 8 (an item hidden by rule 9 whose
+  (not hiding), no cascade, the malformed hiding region, and rule 8 (a non-linking item hidden by rule 9 (a region that links the shipped note is exempt under rule 8) whose
   name equals a shipped note's title is a collision).
 - v1: `content/` has no regions, so the player and DM `atlas.json` and `search-index.json` of
-  `content/` are unchanged (R-11b's snapshot check, or its own if R-11b hasn't merged).
+  `content/` are unchanged (R-11b's snapshot check).
+- The strict player build (`scripts/build-atlas.ts`, `scripts/atlas/playerResolution.ts`) fails
+  naming the map and region when the resolver reports `badHidingRegions`; it warns naming the note
+  and region when every pin of a shipped note is hidden by rule 9. Both are tested.
 - ADR-0004 gets the addendum below; `docs/VISIBILITY_AND_PLAYER_SAFETY.md` names rule 9.
 - `npm run gate` passes.
 
 ## Order
 
-Order 3 in the phase 2 table, beside R-11b, R-11c, R-11d, R-15, R-16 (it touches the resolver,
-its tests and `content-next/`, not `build-atlas.ts`). R-17 adds `Blocked by: R-11e`: no
-per-campaign output ships before containment. R-11b and R-13 don't need to implement anything:
-the build takes verdicts from the resolver. One line for R-11b, so v1 gets rule 9 for free: "the
-build drops a placement when the resolver's pin verdict is not `ships` (any reason), not only on
-fog". R-17's sentinel list adds "a pin, route and sound file inside a hidden region" (the GOALS
-working-means test, across every file of every campaign's output). R-11c gets it through the
+Order 3 in the phase 2 table, beside R-11c, R-11d, R-15, R-16. It touches the resolver, its tests,
+`content-next/` and the build's wiring for the two new outcomes (the malformed-region failure and
+the warning), not the build's drop logic: the build already drops on any non-`ships` verdict, so
+R-13 needs nothing more. R-17 adds `Blocked by: R-11e`: no per-campaign output ships before
+containment. R-17's sentinel list adds "a pin, route and sound file inside a hidden region" (the
+GOALS working-means test, across every file of every campaign's output). R-11c gets it through the
 resolver.
 
 ## Touches
 
 - `src/atlas/content/resolveCampaign.ts` and its test, `src/atlas/geometry/polygon.ts` and a test,
+  `scripts/build-atlas.ts`, `scripts/atlas/playerResolution.ts`,
   `content-next/` and `scripts/atlas/atlas-tree.test.ts` (and the tree printer if it lists
   reasons), `docs/adr/0004-per-campaign-visibility-and-outputs.md`,
   `docs/VISIBILITY_AND_PLAYER_SAFETY.md`.
