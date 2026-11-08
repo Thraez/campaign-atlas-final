@@ -451,6 +451,20 @@ describe("rule 3: fog drops items with any point under it", () => {
     expect(soundShips(b, "nothing")).toBe(false);
     expect(routeShips(b, "short")).toBe(false);
   });
+
+  it("a sound-only area with lit corners and fog between them doesn't ship (whole area tested)", () => {
+    // Lit strips x 0-300 and 700-1000, fog between; the area spans 100-900.
+    const strips: CampaignMapV2 = { state: "fogged", reveals: [rect(0, 0, 300, SIZE), rect(700, 0, SIZE, SIZE)] };
+    const m = map("m", {
+      sound: [
+        { id: "spanning", points: rect(100, 100, 900, 900), visibility: "player", bed: { src: "a.ogg" } },
+        { id: "in-strip", points: rect(100, 100, 200, 900), visibility: "player", bed: { src: "a.ogg" } },
+      ],
+    });
+    const r = resolveCampaign(model([world("w", [m])], [campaign("a", { m: strips })]), [], "a");
+    expect(find(r.sound, (x) => x.id === "spanning").reason).toBe("fogged");
+    expect(soundShips(r, "in-strip")).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -596,6 +596,36 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     allParsed.push({ rel, parsed, title, id, visibility, isSecret });
   }
 
+  // Player builds ship what the per-campaign resolver (ADR-0004) decides for
+  // campaign `main`, read through R-12's loader and its v1 adapter: notes,
+  // maps, regions, pins, routes and sound below ask it, never a visibility or
+  // fog rule of the build's own. Anything it has no verdict for doesn't ship.
+  // Its collision and orphan findings name DM-only items: the console keeps
+  // them, the shipped report doesn't (R-06).
+  let loaded: PlayerResolution | null = null;
+  if (flags.player) {
+    try {
+      loaded = loadPlayerResolution(
+        contentDir,
+        { defaultWorld: cfg.defaultWorld, include: cfg.include ?? [], exclude: cfg.exclude ?? [] },
+        ROOT,
+      );
+    } catch (e) {
+      if (!(e instanceof AtlasModelError)) throw e;
+      console.error(`\n✗ ${e.message}\n`);
+      throw new BuildError(1, e.message);
+    }
+    for (const w of [...loaded.collisionMessages, ...loaded.orphanMessages]) {
+      warnings.push(w);
+      hiddenFromPlayer.add(w);
+    }
+  }
+  const res = loaded;
+  // In player builds a note is secret when the resolver doesn't ship it (an
+  // unknown id included), so link redaction and warning scrubbing below
+  // follow the resolver, not frontmatter alone.
+  if (res) for (const p of allParsed) p.isSecret = !res.noteShips(p.id);
+
   // Folder-excluded notes (`_dm/`, `_drafts/`, ...) are never read into
   // entities and never ship, but a public-entry wikilink to their title would
   // still leak the display text, so the cross-ref index treats them as secret
@@ -641,32 +671,6 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     secretNames.add(id);
     for (const a of aliases) secretNames.add(a);
   }
-
-  // Player builds ship what the per-campaign resolver (ADR-0004) decides for
-  // campaign `main`, read through R-12's loader and its v1 adapter: notes,
-  // maps, regions, pins, routes and sound below ask it, never a visibility or
-  // fog rule of the build's own. Anything it has no verdict for doesn't ship.
-  // Its collision and orphan findings name DM-only items: the console keeps
-  // them, the shipped report doesn't (R-06).
-  let loaded: PlayerResolution | null = null;
-  if (flags.player) {
-    try {
-      loaded = loadPlayerResolution(
-        contentDir,
-        { defaultWorld: cfg.defaultWorld, include: cfg.include ?? [], exclude: cfg.exclude ?? [] },
-        ROOT,
-      );
-    } catch (e) {
-      if (!(e instanceof AtlasModelError)) throw e;
-      console.error(`\n✗ ${e.message}\n`);
-      throw new BuildError(1, e.message);
-    }
-    for (const w of [...loaded.collisionMessages, ...loaded.orphanMessages]) {
-      warnings.push(w);
-      hiddenFromPlayer.add(w);
-    }
-  }
-  const res = loaded;
 
   // PASS 2: build the DM-side entity for every note that ships (secrets
   // drop out of player builds here).
@@ -733,9 +737,11 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
       for (const l of projected.report.redactedLinks) {
         crossRefLeaks += 1;
         const targetVis = allEntityVisibility.get(l.resolvedId) ?? "dm";
-        warnings.push(
-          `entity "${item.entity.id}": wikilink "${l.target}" resolves to ${targetVis} entity "${l.resolvedId}" — spoiler leak, redacted from player output`,
-        );
+        const w = `entity "${item.entity.id}": wikilink "${l.target}" resolves to ${targetVis} entity "${l.resolvedId}" — spoiler leak, redacted from player output`;
+        warnings.push(w);
+        // The link text can carry a #heading or folder path that name
+        // scrubbing misses: the player report drops the warning (count kept).
+        hiddenFromPlayer.add(w);
       }
     } else {
       const { entity } = item;
@@ -1073,9 +1079,11 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     const targetVis = entityVisibility.get(r.entityId);
     if (linkLeaksToPlayers(r.visibility, targetVis)) {
       regionLeaks += 1;
-      warnings.push(
-        `region "${r.id}": player-visible region links to ${linkTargetLabel(targetVis)} "${r.entityId}" — spoiler leak`,
-      );
+      const w = `region "${r.id}": player-visible region links to ${linkTargetLabel(targetVis)} "${r.entityId}" — spoiler leak`;
+      warnings.push(w);
+      // A region the resolver dropped stays unnamed in the shipped report,
+      // like a dropped route's warnings.
+      if (res && !(r.mapId && res.regionVerdict(r.mapId, r.id)?.ships)) hiddenFromPlayer.add(w);
     }
   }
 

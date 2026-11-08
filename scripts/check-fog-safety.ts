@@ -10,9 +10,10 @@
  *   14  GEOMETRY-LEAK fog geometry not stripped from player atlas
  *   15  IN-FOG-CONTENT player pin/route/region inside fog per source geometry
  *   16  ALPHA-LEAK    redacted PNG opaque at a known-fogged location
- *   21  SOUND-IN-FOG  shipped sound-only area (no regionId) with a point inside
- *                     fog per source geometry (arch-02; ride-on areas follow
- *                     their region, which 15 checks)
+ *   21  SOUND-IN-FOG  shipped sound-only area (no regionId) with any part of its
+ *                     area inside fog per source geometry, fog between lit
+ *                     corners included (arch-02; ride-on areas follow their
+ *                     region, which 15 checks)
  *
  * The artifact dir is the built site (`dist`, atlas.json in `dist/atlas/`) or
  * the source store (`public/atlas`); see `atlas/playerArtifact.ts`. The scan
@@ -46,6 +47,7 @@ import { IMAGE_EXTENSIONS } from "./atlas/assetRefs";
 import { loadWorldConfig } from "./atlas/loadWorldConfig";
 import { locatePlayerAtlas, resolveAssetFile, type ArtifactLayout } from "./atlas/playerArtifact";
 import { isLit } from "../src/atlas/fog/effectiveLit";
+import { areaUnderFog } from "../src/atlas/content/resolveCampaign";
 import type { FogOverlay, Point } from "../src/atlas/content/schema";
 
 interface Args {
@@ -275,18 +277,18 @@ export async function run(opts: RunOpts): Promise<number> {
   }
 
   // ----- 21 SOUND-IN-FOG (requires source fog) -----
-  // A sound-only area plays wherever its own polygon is; a point of it under
-  // fog tells players what's there. Shipped ids are positional (area-N).
+  // A sound-only area plays wherever its own polygon is; any part of it under
+  // fog tells players what's there, so its whole area is tested, not only its
+  // points. Shipped ids are positional (area-N).
   for (const m of fogMaps) {
     const srcFog = sourceFogByMapId.get(m.id);
     if (!srcFog || !srcFog.enabled) continue;
     (m.soundscape?.areas ?? []).forEach((a, i) => {
       if (a.regionId) return;
-      const fogged = (a.points ?? []).find(([x, y]) => !isLit(x, y, srcFog));
-      if (fogged) {
+      if (areaUnderFog(a.points, srcFog)) {
         findings.push({
           code: 21,
-          message: `sound area #${i} on map "${m.id}" has point (${fogged[0]},${fogged[1]}) inside fog by source geometry`,
+          message: `sound area #${i} on map "${m.id}" has part of its area inside fog by source geometry`,
         });
       }
     });

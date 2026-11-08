@@ -2,7 +2,8 @@
 /**
  * R-11b: the player build ships what the per-campaign resolver (ADR-0004)
  * decides for campaign `main`, read through R-12's v1 adapter. Fixture vaults
- * on disk, built in process (nothing written).
+ * are temp roots, built in process: buildAtlas only plans the fog and audio
+ * files and writeBuildOutput (which writes them) isn't called.
  *
  * - arch-02: a sound-only area with any point under fog doesn't ship.
  * - A region and a route under fog still don't ship; a ride-on sound area of a

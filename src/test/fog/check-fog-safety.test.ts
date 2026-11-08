@@ -182,6 +182,53 @@ describe("check-fog-safety", () => {
       );
     });
 
+    it("sound-in-fog (21): fog between lit corners counts (whole area tested)", async () => {
+      // Lit strips x 0-300 and 700-1000, fog between; the area spans 100-900.
+      const config = writeSourceConfig(`schemaVersion: 1
+maps:
+  - id: world
+    worldId: w
+    name: World
+    width: 1000
+    height: 1000
+    layers: []
+fog:
+  - mapId: world
+    enabled: true
+    reveals:
+      - [[0, 0], [300, 0], [300, 1000], [0, 1000]]
+      - [[700, 0], [1000, 0], [1000, 1000], [700, 1000]]
+`);
+      const atlas = (x0: number, x1: number) => ({
+        maps: [
+          {
+            id: "world",
+            width: 1000,
+            height: 1000,
+            layers: [],
+            fog: { mapId: "world", enabled: true },
+            soundscape: {
+              areas: [
+                {
+                  id: "area-0",
+                  points: [
+                    [x0, 100],
+                    [x1, 100],
+                    [x1, 900],
+                    [x0, 900],
+                  ],
+                  bed: { src: "atlas/assets/audio/a.ogg" },
+                },
+              ],
+            },
+          },
+        ],
+        placements: [],
+      });
+      expect(await run({ dir: plant(layout, atlas(100, 200)), config })).toBe(0);
+      expect(await run({ dir: plant(layout, atlas(100, 900)), config })).toBe(21);
+    });
+
     it("could-not-verify (17): present-but-broken world.yaml on a clean fog map", async () => {
       // Markdown fences make loadWorldConfig throw (its hard-fail guard).
       const config = writeSourceConfig("```yaml\nschemaVersion: 1\n```");

@@ -14,9 +14,11 @@
  *      ship.
  *   2. A map ships only if its visibility ships, its state in the campaign file
  *      is `open` or `fogged` (not listed means `unknown`), and its parent ships.
- *   3. On a `fogged` map: a pin under fog, or a region, route or sound-only area
- *      with any point under fog, doesn't ship. Ride-on sound areas follow their
- *      region. Points are tested with `isLit` (`src/atlas/fog/effectiveLit.ts`).
+ *   3. On a `fogged` map: a pin under fog, or a region or route with any point
+ *      under fog, doesn't ship; nor does a sound-only area with any part of its
+ *      area under fog (`areaUnderFog`: it plays over the whole polygon, so a
+ *      fogged strip between lit corners counts). Ride-on sound areas follow
+ *      their region. Points are tested with `isLit` (`src/atlas/fog/effectiveLit.ts`).
  *   4. A child map whose frame has any part of its area under its fogged
  *      parent's fog doesn't ship, with its subtree. Tested over the frame's
  *      whole area (`frameUnderFog`), not only its corners.
@@ -289,6 +291,19 @@ function anyPointUnderFog(points: readonly unknown[] | undefined, fog: FogOverla
   if (!fog) return false;
   if (!points || points.length === 0) return true;
   return points.some((p) => pointUnderFog(p, fog));
+}
+
+/**
+ * True when any part of the polygon `points` is under `fog`: its points, and
+ * its whole area (`frameUnderFog`'s exact arrangement test, which holds for
+ * any simple polygon, not only quads). No points, or a point that isn't a
+ * pair of finite numbers, on a fogged map counts as under fog (fail closed).
+ */
+export function areaUnderFog(points: readonly unknown[] | undefined, fog: FogOverlay | null): boolean {
+  if (!fog) return false;
+  if (!points || points.length === 0) return true;
+  if (!points.every(isFinitePoint)) return true;
+  return frameUnderFog(points as Point[], fog);
 }
 
 /**
@@ -684,7 +699,7 @@ export function resolveCampaign(
           v = regionShips.get(area.regionId) === true ? { ships: true, reason: "ships" } : { ships: false, reason: "region-hidden" };
         } else if (!shipsIn(area.visibility, campaignId)) v = { ships: false, reason: "visibility" };
         else if (!area.points || area.points.length === 0) v = { ships: false, reason: "no-geometry" };
-        else if (anyPointUnderFog(area.points, fog)) v = { ships: false, reason: "fogged" };
+        else if (areaUnderFog(area.points, fog)) v = { ships: false, reason: "fogged" };
         else v = { ships: true, reason: "ships" };
         sound.push({ id: area.id, map: map.id, ...v });
       }
