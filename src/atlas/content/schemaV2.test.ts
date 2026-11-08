@@ -177,29 +177,37 @@ describe("validateWorldFileV2", () => {
 
   it("keeps every field of today's overview map (content/astrath-deeprealm)", () => {
     const file = path.resolve(__dirname, "../../../content/astrath-deeprealm/_atlas/world.yaml");
-    const v1 = yaml.load(fs.readFileSync(file, "utf8")) as { maps: Record<string, unknown>[] };
+    const v1 = yaml.load(fs.readFileSync(file, "utf8")) as {
+      maps: Record<string, unknown>[];
+      import?: unknown;
+    };
     const { soundscape, ...overview } = v1.maps[0] as {
-      soundscape: { areas: unknown[] } & Record<string, unknown>;
+      soundscape?: { areas?: unknown[] } & Record<string, unknown>;
     } & Record<string, unknown>;
-    const { areas, ...settings } = soundscape;
+    const { areas, ...settings } = soundscape ?? {};
     // The v1 -> v2 move for this map: soundscape areas go to `sound`, the rest
     // of `soundscape` stays; v2 adds a zoom range.
     const map = {
       ...overview,
       ...(Object.keys(settings).length > 0 ? { soundscape: settings } : {}),
-      sound: areas,
+      ...(areas !== undefined ? { sound: areas } : {}),
       zoom: { min: -4, max: 2 },
     };
     for (const key of ["name", "width", "height", "oceanColor", "wrapX", "grid", "scale", "layers"]) {
       expect(map, key).toHaveProperty(key);
     }
+    expect(v1.import, "import").toBeDefined();
     const result = validateWorldFileV2({
       schemaVersion: 2,
       world: { id: "astrath-deeprealm", name: "Astrath Deeprealm" },
+      import: v1.import,
       maps: [map],
     });
-    expect(result.ok ? [] : result.errors).toEqual([]);
-    if (result.ok) expect(result.value.maps[0]).toEqual(map);
+    // On failure this shows every validator error with its path.
+    expect(result.ok ? [] : result.errors.map((e) => `${e.path}: ${e.message}`)).toEqual([]);
+    if (!result.ok) return;
+    expect(result.value.maps[0]).toEqual(map);
+    expect(result.value.import).toEqual(v1.import);
   });
 
   it("names a missing required field", () => {
@@ -292,6 +300,16 @@ describe("validateWorldFileV2", () => {
     const sample = worldSample();
     child(sample).parent = 5;
     expect(paths(validateWorldFileV2(sample))).toEqual(["maps[1].parent"]);
+  });
+
+  it("reports only the parent's error for an invalid parent on a map with no frame", () => {
+    for (const parent of ["", 5]) {
+      const sample = worldSample();
+      child(sample).parent = parent;
+      delete (child(sample) as Record<string, unknown>).frame;
+      delete child(sample).enterZoom;
+      expect(paths(validateWorldFileV2(sample)), String(parent)).toEqual(["maps[1].parent"]);
+    }
   });
 
   it("rejects empty id references", () => {

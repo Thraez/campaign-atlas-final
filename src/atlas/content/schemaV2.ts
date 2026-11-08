@@ -793,8 +793,11 @@ function readMap(r: Reader, v: unknown, p: string): MapV2 | undefined {
   const o = r.obj(v, p, KEYS.map);
   if (!o) return undefined;
   const before = r.errors.length;
-  const hasParent = o.parent !== undefined;
-  if (!hasParent) {
+  // A parent that is present but not a valid id reports only its own error
+  // (below): frame and enterZoom are then neither required nor refused.
+  const parentGiven = o.parent !== undefined;
+  const hasParent = typeof o.parent === "string" && o.parent.trim() !== "";
+  if (!parentGiven) {
     if (o.frame !== undefined) r.fail(join(p, "frame"), "only a map with a parent has a frame");
     if (o.enterZoom !== undefined) r.fail(join(p, "enterZoom"), "only a map with a parent has an enterZoom");
   }
