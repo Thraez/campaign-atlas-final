@@ -1,0 +1,21 @@
+# Campaign "sandbox": a note ships only if a world.yaml notes: entry names it.
+# oskmark is fogged: only its western half (x < 300) is revealed.
+# skerrow-isles isn't listed, so it is `unknown` here; hookhaven is open but
+# sits inside it.
+id: sandbox
+name: Sandbox
+notes: hidden
+maps:
+  quessaly-world:
+    state: open
+  oskmark:
+    state: fogged
+    reveals:
+      - [[0, 0], [300, 0], [300, 400], [0, 400]]
+    featherPx: 8
+  brindlecross:
+    state: open
+  tallowford:
+    state: open
+  hookhaven:
+    state: open

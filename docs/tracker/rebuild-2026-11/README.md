@@ -31,7 +31,7 @@ player output per campaign). Both are `accepted` (2026-11-08), with Isak's answe
 | 3 | [R-11c Old Publish Check calls the resolver](issues/R-11c-publish-check-calls-resolver.md) | S | R-11a, R-12 | yes |
 | 3 | [R-11d Link redaction from wikilink tokens (done)](issues/R-11d-link-redaction-from-tokens.md) (+ arch-08 redaction) | S | R-11a | yes |
 | 3 | [R-15 Scan registry lists campaign dirs (done)](issues/R-15-scan-registry-campaign-dirs.md) | S | R-12 | yes |
-| 3 | [R-16 Three-level test world, two campaigns](issues/R-16-test-world-two-campaigns.md) | S | R-12, R-11a | light |
+| 3 | [R-16 Three-level test world, two campaigns (done)](issues/R-16-test-world-two-campaigns.md) | S | R-12, R-11a | light |
 | 4 | [R-13 Build assembles every world and the map tree](issues/R-13-build-every-world-map-tree.md) | M | R-11b, R-12 | yes |
 | 5 | [R-17 One player output per campaign](issues/R-17-player-output-per-campaign.md) | M | R-13, R-15, R-16 | yes |
 | 5 | [R-14 Sync targets any world](issues/R-14-sync-any-world.md) | S-M | R-13 | if visibility |
