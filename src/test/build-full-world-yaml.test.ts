@@ -638,3 +638,108 @@ describe("buildFullWorldYaml — keeps keys the editor doesn't model", () => {
     expect(after.maps.map((m) => m.id)).toEqual(before.maps.map((m) => m.id));
   });
 });
+
+// R-02: a world.yaml item with no `visibility` loads as dm (ADR-0001 addendum),
+// so Save must always write the key, or a player region the DM drew would
+// silently drop off the player site on the next build.
+describe("buildFullWorldYaml — always writes visibility on regions, routes and sound-only areas", () => {
+  const square: [number, number][] = [
+    [0, 0],
+    [100, 0],
+    [100, 100],
+  ];
+
+  it("writes an explicit visibility for every region and route, and it round-trips", () => {
+    const out = buildFullWorldYaml({
+      maps: [
+        makeMap({
+          regions: [
+            { id: "r-player", mapId: "m1", name: "P", points: square, visibility: "player" },
+            { id: "r-rumor", mapId: "m1", name: "R", points: square, visibility: "rumor" },
+          ],
+          routes: [
+            {
+              id: "rt-player",
+              mapId: "m1",
+              name: "Road",
+              visibility: "player",
+              waypoints: [
+                [0, 0],
+                [10, 10],
+              ],
+            },
+          ],
+        }),
+      ],
+      existing: null,
+    });
+    const doc = yaml.load(out) as {
+      maps: Array<{
+        regions: Array<Record<string, unknown>>;
+        routes: Array<Record<string, unknown>>;
+      }>;
+    };
+    expect(doc.maps[0].regions.map((r) => r.visibility)).toEqual(["player", "rumor"]);
+    expect(doc.maps[0].routes.map((r) => r.visibility)).toEqual(["player"]);
+    const cfg = loadEmitted(out)!;
+    expect(cfg.regions.map((r) => r.visibility)).toEqual(["player", "rumor"]);
+    expect(cfg.routes.map((r) => r.visibility)).toEqual(["player"]);
+  });
+
+  it("writes dm for a region or route whose in-memory visibility is missing", () => {
+    const out = buildFullWorldYaml({
+      maps: [
+        makeMap({
+          regions: [{ id: "r1", mapId: "m1", name: "R", points: square } as unknown as Region],
+          routes: [
+            {
+              id: "rt1",
+              mapId: "m1",
+              name: "Road",
+              waypoints: [
+                [0, 0],
+                [10, 10],
+              ],
+            } as unknown as Route,
+          ],
+        }),
+      ],
+      existing: null,
+    });
+    const doc = yaml.load(out) as {
+      maps: Array<{
+        regions: Array<Record<string, unknown>>;
+        routes: Array<Record<string, unknown>>;
+      }>;
+    };
+    expect(doc.maps[0].regions[0].visibility).toBe("dm");
+    expect(doc.maps[0].routes[0].visibility).toBe("dm");
+  });
+
+  it("writes visibility on sound-only areas (dm when missing) and none on ride-on areas", () => {
+    const out = buildFullWorldYaml({
+      maps: [
+        makeMap({
+          soundscape: {
+            areas: [
+              { id: "s-player", points: square, bed: { src: "a.ogg" }, visibility: "player" },
+              { id: "s-missing", points: square, bed: { src: "b.ogg" } },
+              { id: "s-ride", regionId: "r1", bed: { src: "c.ogg" } },
+            ],
+          },
+        }),
+      ],
+      existing: null,
+    });
+    const doc = yaml.load(out) as {
+      maps: Array<{ soundscape: { areas: Array<Record<string, unknown>> } }>;
+    };
+    const areas = doc.maps[0].soundscape.areas;
+    expect(areas.map((a) => [a.id, a.visibility])).toEqual([
+      ["s-player", "player"],
+      ["s-missing", "dm"],
+      ["s-ride", undefined],
+    ]);
+    expect("visibility" in areas[2]).toBe(false);
+  });
+});

@@ -11,12 +11,12 @@ This document lists what we have decided **not** to build. If a feature request 
 | Idea | Why we don't build it |
 |---|---|
 | **Combat tracker, initiative, rules content** | Out of scope. Foundry, Roll20, Owlbear Rodeo exist. We are a lore atlas, not a VTT. |
-| **Multi-user real-time editing** | Massive complexity (CRDTs, presence, conflict UI) for an audience of one DM per world. Git already handles single-author workflow. |
+| **Multi-user real-time editing** | Massive complexity (CRDTs, presence, conflict UI) for an audience of one DM. Git already handles single-author workflow. |
 | **Hosted DM editor with auth** | Defer until a real second user exists. The local + GitHub Pages model is solid. If we ever build it: GitHub fine-grained PAT in localStorage, save-as-PR-only, never direct-commit. |
 | **Server-backed player notes** | Player notes are deliberately local-only (browser storage, optional export). No accounts, no sync, no privacy surface. |
 | **AI-generated lore** | We are a tool, not a generator. The DM's voice is the product. |
-| **Per-party fog / multiple view profiles** _(deferred)_ | Base fog is a per-map enforced player secret. Per-party variants would multiply state across parties, sessions, and entities — useful in ~5% of campaigns; complexity tax on 100% of users. Revisit once the base mechanic has lived through a campaign. See `docs/superpowers/specs/2026-05-19-fog-player-mechanic-design.md`. |
-| **Full GIS-style multi-map alignment** | Maps link hierarchically (overview → city → dungeon), not by world coordinates. A unified spatial canvas is a bigger commitment than the world content needs. |
+| **Per-party / per-player fog** _(deferred)_ | Fog is baked per map and per campaign (one shared state for a campaign's players; ADR-0002, `docs/GOALS.md`). Per-party or per-player variants inside a campaign would multiply state across parties, sessions, and entities — useful in ~5% of campaigns; complexity tax on 100% of users. See `docs/superpowers/specs/2026-05-19-fog-player-mechanic-design.md`. |
+| **Full GIS-style multi-map alignment** | World-level maps sit on one ocean canvas, each at its own position, scale and rotation; below that, maps nest (continent → city → dungeon) and keep their own coordinates. No seamless canvas or shared coordinate system below the world level. |
 | **Combat-tracker-shaped player suggestion approval workflow** | Player-submitted suggestions are a separate product. Don't bolt one on. |
 | **Travel-time crunch beyond route speed** | We render `MapScale` and route speed. Dragon-vs-horse-vs-weather calculators belong elsewhere. |
 | **Fuzzy search (fuse.js, character-skip tolerance)** | The current substring search is "you know the name." Add fuzzy only when scale proves the current UX insufficient. |
@@ -34,4 +34,4 @@ These are not hard nos — they're explicitly parked until evidence justifies th
 
 ## If you find yourself drawn to one of these
 
-Re-read [docs/PRODUCT_SPEC.md](PRODUCT_SPEC.md) (or the README's "Core design model" section if PRODUCT_SPEC hasn't been extracted yet). The spine is: one DM, one (or a few) worlds, Obsidian as canon, GitHub Pages as the player site. Everything else is a tax.
+Re-read [docs/PRODUCT_SPEC.md](PRODUCT_SPEC.md) (or the README's "Core design model" section if PRODUCT_SPEC hasn't been extracted yet). The spine is: one DM, one or several worlds on one ocean, Obsidian as canon, GitHub Pages as the player site. Everything else is a tax.

@@ -1,5 +1,9 @@
 import type { Region, SoundscapeConfig, SoundArea } from "../../src/atlas/content/schema";
-import { PLAYER_VISIBLE_VISIBILITY } from "./visibility";
+import {
+  PLAYER_VISIBLE_VISIBILITY,
+  isPlayerVisible as shipsToPlayers,
+  worldItemVisibility,
+} from "./visibility";
 
 /**
  * Strip DM-visible areas and neutralise identifying metadata for player builds.
@@ -7,8 +11,9 @@ import { PLAYER_VISIBLE_VISIBILITY } from "./visibility";
  * - Ride-on areas (regionId set) have no visibility field of their own — they
  *   inherit the owning region's visibility. Drop them when the region is
  *   dm/hidden, or when the regionId no longer resolves to any region.
- * - Sound-only areas (own polygon) drop when their own visibility is "dm" or
- *   "hidden".
+ * - Sound-only areas (own polygon) drop unless their own visibility is
+ *   "player" or "rumor": a missing or invalid one is "dm" (worldItemVisibility,
+ *   ADR-0001 addendum).
  * - Drops areas with no file chosen yet (blank/whitespace bed.src) — a
  *   half-configured sound zone must never reach hashAudioAssets, which
  *   would otherwise try to read the public dir itself and crash the build.
@@ -31,8 +36,7 @@ export function filterSoundscapeForPlayer(
       const v = regionVisibility.get(a.regionId);
       return v !== undefined && PLAYER_VISIBLE_VISIBILITY.has(v);
     }
-    // Missing is player-visible; present but not player/rumor (typo, empty, null) is dropped.
-    return a.visibility === undefined || PLAYER_VISIBLE_VISIBILITY.has(a.visibility);
+    return shipsToPlayers(worldItemVisibility(a.visibility));
   };
 
   const kept: SoundArea[] = (sc.areas ?? [])

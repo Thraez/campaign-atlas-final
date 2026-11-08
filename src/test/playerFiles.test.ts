@@ -306,9 +306,17 @@ describe("check-player-files", () => {
     expect(vi.mocked(console.log).mock.calls.flat().join("\n")).toMatch(/does not exist/);
   });
 
-  it("fails a dist with no atlas/ dir, saying so", () => {
+  it("fails a dist with no atlas/ dir, naming the missing atlas.json", () => {
     fs.mkdirSync(path.join(root, "dist"));
     expect(scan()).not.toBe(0);
-    expect(errors()).toMatch(/no atlas\//);
+    expect(errors()).toContain(path.join("dist", "atlas", "atlas.json"));
+  });
+
+  it("fails a dist whose atlas/ dir has no atlas.json (arch-09)", () => {
+    write("dist/atlas/assets/maps/world.fog.png");
+    write("dist/atlas/search-index.json", "[]");
+    expect(scan()).not.toBe(0);
+    expect(errors()).toContain(path.join("dist", "atlas", "atlas.json"));
+    expect(errors()).toMatch(/missing/);
   });
 });
