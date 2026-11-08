@@ -33,6 +33,7 @@ import type {
   WaterConfig,
   WorldCalendar,
 } from "@/atlas/content/schema";
+import { worldItemVisibility } from "@/atlas/content/visibility";
 import { DEFAULT_WATER } from "@/atlas/ocean/resolveWater";
 import { fogToYamlObject } from "@/atlas/fog/useFogDraft";
 import { regionToYamlObject } from "@/atlas/regions/useRegionDraft";
@@ -228,7 +229,10 @@ function soundscapeToYamlObject(s: SoundscapeConfig): Record<string, unknown> {
       };
       if (a.regionId) area.regionId = a.regionId;
       if (a.points && a.points.length > 0) area.points = a.points;
-      if (a.visibility) area.visibility = a.visibility;
+      // Sound-only areas always get an explicit visibility (a missing key loads
+      // as dm, ADR-0001 addendum); ride-on areas inherit their region's.
+      if (!a.regionId) area.visibility = worldItemVisibility(a.visibility);
+      else if (a.visibility) area.visibility = a.visibility;
       if (a.name?.trim()) area.name = a.name.trim();
       return area;
     });

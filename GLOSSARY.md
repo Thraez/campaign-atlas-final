@@ -18,7 +18,7 @@ The atlas's words. Use these in tickets, tests, UI text and commit messages. Cod
 
 ## Who sees what
 
-- **Visibility**: per entity, one of `player`, `rumor`, `dm`, `hidden`. `player` and `rumor` ship to players; `dm` and `hidden` never do. Missing or invalid means `dm`.
+- **Visibility**: per entity, and per `world.yaml` region, route and sound-only area, one of `player`, `rumor`, `dm`, `hidden`. `player` and `rumor` ship to players; `dm` and `hidden` never do. Missing or invalid means `dm`.
 - **DM block**: DM-only text inside a player-visible entity, written `%% ... %%` or `:::dm ... :::`. Stripped from every player string.
 - **Secret marker**: `{{secret:...}}` text revealed only in DM builds.
 - **DM markup**: DM blocks and secret markers together, the syntax a player build must never contain. Owned by `src/atlas/content/dmMarkup.ts`.
