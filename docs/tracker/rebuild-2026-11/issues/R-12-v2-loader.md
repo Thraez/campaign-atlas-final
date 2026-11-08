@@ -1,6 +1,6 @@
 # R-12 v2 loader
 
-Status: in-review
+Status: done (2026-11-08)
 Blocked by: R-10
 Size: M
 Branch: `rebuild-r12-v2-loader`

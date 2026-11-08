@@ -1,6 +1,6 @@
 # R-11a Pure per-campaign visibility resolver
 
-Status: in-review
+Status: done (2026-11-08)
 Blocked by: R-10
 Size: S-M
 Branch: `rebuild-r11a-campaign-resolver`
