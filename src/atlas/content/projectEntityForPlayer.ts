@@ -212,6 +212,31 @@ export interface ProjectionReport {
   strippedDmProfile: boolean;
 }
 
+/**
+ * Replace every wikilink in `text` whose target `isSecret` with `…`, by the
+ * span `tokenizeWikilinks` found it at, and list the links replaced.
+ */
+function redactSecretLinkSpans(
+  text: string,
+  ctx: ProjectionContext,
+  isSecret: (l: { resolvedId?: string }) => boolean,
+): { text: string; links: ProjectionReport["redactedLinks"] } {
+  const { links, spans } = tokenizeWikilinks(text, {
+    resolveByName: ctx.resolveByName,
+    resolveByBasename: ctx.resolveByBasename,
+  });
+  const redacted: ProjectionReport["redactedLinks"] = [];
+  let out = "";
+  let from = 0;
+  links.forEach((l, i) => {
+    if (!isSecret(l) || !l.resolvedId) return;
+    redacted.push({ target: l.target, resolvedId: l.resolvedId });
+    out += text.slice(from, spans[i].start) + "…";
+    from = spans[i].end;
+  });
+  return { text: out + text.slice(from), links: redacted };
+}
+
 export function projectEntityForPlayer(entity: Entity, ctx: ProjectionContext): Entity {
   return projectEntityWithReport(entity, ctx).entity;
 }
@@ -252,15 +277,17 @@ export function projectEntityWithReport(
   });
 
   // 3. Redact links to secret targets: the display text is usually the
-  // secret's name, so redact it in the body string AND mark the link broken.
-  const redactedLinks: ProjectionReport["redactedLinks"] = [];
+  // secret's name. The shipped markdown loses each such link by the span the
+  // tokenizer found (whatever its spacing, case or alias); the HTML's link is
+  // marked broken. The report lists the markdown's links: it is the authored
+  // text, where a note embed (`![[Secret]]`) is still a link.
+  const isSecretTarget = (l: { resolvedId?: string }) =>
+    !!l.resolvedId && ctx.secretIds.has(l.resolvedId);
+  const redacted = redactSecretLinkSpans(body, ctx, isSecretTarget);
+  body = redacted.text;
+  const redactedLinks = redacted.links;
   for (const l of links) {
-    if (l.resolvedId && ctx.secretIds.has(l.resolvedId)) {
-      redactedLinks.push({ target: l.target, resolvedId: l.resolvedId });
-      if (l.target) {
-        const escTarget = l.target.replace(/[.+*?^${}()|[\]\\]/g, "\\$&");
-        body = body.replace(new RegExp(`\\[\\[${escTarget}(?:\\|[^\\]]+)?\\]\\]`, "g"), "…");
-      }
+    if (isSecretTarget(l)) {
       l.resolvedId = undefined;
       l.display = "…";
       l.target = "";

@@ -1,7 +1,10 @@
 import type { ResolvedLink } from "./schema";
 import { replaceOutsideCode } from "./codeRegions";
 
-const WIKILINK = /\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+?))?\]\]/g;
+// `[[target]]` or `[[target|alias]]`. An empty alias (`[[Note|]]`) reads as
+// no alias, and `\|` (the escaped pipe Obsidian writes inside tables) as a
+// pipe: its backslash is dropped from the target below.
+const WIKILINK = /\[\[([^[\]|\n]+?)(?:\|([^[\]\n]*?))?\]\]/g;
 
 export interface ResolveContext {
   // Map of normalized title/alias -> entity id
@@ -16,17 +19,27 @@ export interface ResolveContext {
 const TOKEN_OPEN = "⁣LINK[";
 const TOKEN_CLOSE = "]⁣";
 
+/** Where one link sits in the string given to `tokenizeWikilinks`: `[start, end)`. */
+export interface WikilinkSpan {
+  start: number;
+  end: number;
+}
+
 // First pass: replace wikilinks with placeholder tokens that survive markdown
-// rendering. Returns links found.
+// rendering. Returns the links found and, at the same index, each link's span
+// in `body` (the player projection redacts links to secret notes by span).
 export function tokenizeWikilinks(
   body: string,
   ctx: ResolveContext
-): { tokenized: string; links: ResolvedLink[] } {
+): { tokenized: string; links: ResolvedLink[]; spans: WikilinkSpan[] } {
   const links: ResolvedLink[] = [];
+  const spans: WikilinkSpan[] = [];
   const tokenized = replaceOutsideCode(body, WIKILINK, (...args: unknown[]) => {
+    const match = args[0] as string;
     const target = args[1] as string;
-    const display = args[2] as string | undefined;
-    const t = target.trim();
+    const display = (args[2] as string | undefined)?.trim() || undefined;
+    const offset = args[3] as number;
+    const t = target.replace(/\\$/, "").trim();
     // Heading (and block-ref) anchors: only the part before the first `#` is
     // used to resolve the note. `[[Note#Heading]]` resolves to Note (the
     // `#Heading`/`#^blockid` suffix is never used to scroll to a block —
@@ -61,10 +74,11 @@ export function tokenizeWikilinks(
       broken: !isAnchor && !resolved,
     };
     links.push(link);
+    spans.push({ start: offset, end: offset + match.length });
     const idx = links.length - 1;
     return `${TOKEN_OPEN}${idx}${TOKEN_CLOSE}`;
   });
-  return { tokenized, links };
+  return { tokenized, links, spans };
 }
 
 // Second pass (after HTML render): replace tokens with anchor tags.
