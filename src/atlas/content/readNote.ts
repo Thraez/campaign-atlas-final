@@ -88,7 +88,7 @@ export function readNote(raw: string, relPath: string): Note {
     visibility = "player";
     visibilityTagged = true;
   }
-  const isSecret = !isPlayerVisible(visibility) || atlas.publish === false;
+  const isSecret = noteIsSecret(visibility, atlas);
 
   const title = noteTitle(relPath, data.title);
   const idFromFrontmatter = typeof atlas.id === "string" && atlas.id.length > 0;
@@ -114,6 +114,18 @@ export function readNote(raw: string, relPath: string): Note {
     warnings,
     ...(parseError !== undefined ? { parseError } : {}),
   };
+}
+
+/**
+ * The one secret-note rule (arch-08): a note must never reach players when its
+ * visibility doesn't ship (`dm`, `hidden`) or its `atlas:` block says
+ * `publish: false`. `readNote`, `entityIsSecret` (the editor preview) and the
+ * per-campaign resolver all ask this. `atlas` is the note's `atlas:` block as
+ * read (anything; a non-mapping has no `publish`).
+ */
+export function noteIsSecret(visibility: EntityVisibility, atlas: unknown): boolean {
+  const publish = isRecord(atlas) ? atlas.publish : undefined;
+  return !isPlayerVisible(visibility) || publish === false;
 }
 
 function noteTitle(relPath: string, fmTitle: unknown): string {

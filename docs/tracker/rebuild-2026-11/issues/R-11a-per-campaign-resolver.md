@@ -1,6 +1,6 @@
 # R-11a Pure per-campaign visibility resolver
 
-Status: ready-for-agent
+Status: in-review
 Blocked by: R-10
 Size: S-M
 Branch: `rebuild-r11a-campaign-resolver`
@@ -59,3 +59,39 @@ callers onto this. It also absorbs arch-08's first half: one secret-note predica
   R-18). Failing the build on a collision is R-11b (v1) and R-13 (v2).
 - Writing visibility (editor, phase 4/6). Changing `worldItemVisibility` or ADR-0001's rules: the
   resolver applies them.
+
+## Notes from the build
+
+- `src/atlas/content/resolveCampaign.ts`: `resolveCampaign(model, notes, campaignId)`, plus
+  `visibilityFor`/`shipsIn` (rule 1) and `frameUnderFog` (rule 4). Input model is a structural
+  `CampaignResolverModel` (`worlds: WorldFileV2[]`, `campaigns: CampaignFileV2[]`), so R-12's model
+  fits without either ticket owning a shared type yet. Notes come as `{ world, note }` (a
+  `readNote` result's id, title, aliases, visibility, atlas block), because a `Note` doesn't know
+  its world and rule 5 needs it.
+- `noteIsSecret(visibility, atlas)` is exported from `readNote.ts`; `readNote` and
+  `entityIsSecret` both call it. A player `vite build` still has no js-yaml in it.
+- Fail-closed readings chosen where the ticket or ADRs are silent:
+  - Rule 4 is tested over the frame's whole area, exactly (slab decomposition over every reveal and
+    conceal edge), not by sampling. Rule 3 keeps today's vertex test for regions, routes and
+    sound-only areas, as ADR-0004 says. On a fogged map an item with no points doesn't ship.
+  - Frame `rotation` has no fixed pivot in ADR-0003: a rotated frame is tested turned about its
+    centre and about its top-left corner, and fog over either hides the child. Settle the pivot
+    when the viewer draws frames, then drop the second test.
+  - Pins follow rule 1 too: a pin with no `visibility` is `dm`.
+  - A region linking a note that doesn't ship (or doesn't exist) doesn't ship (eval-46's leak
+    rule); a route through a note with no shipped pin on that map doesn't ship.
+  - A stale entry (`basedOn` missing or different) is `dm` everywhere, whatever the campaign mode.
+  - A note's `notes:` entry is read from its own world's file only.
+  - Broken input the loader should already reject (duplicate map or world ids, unknown or
+    cross-world parent, cycle, child with no usable frame, non-finite fog point, invalid map state
+    or `notes:` mode) doesn't ship, rather than throwing. An unknown campaign id, or two files for
+    one, throws `ResolveCampaignError`.
+  - A note id shared by two notes ships (as a pin or link target) only if every copy ships.
+  - Rule 8 widened: collisions compare the hidden side's ids too, against shipped notes' ids,
+    titles and aliases and shipped worlds', maps', regions' and routes' ids and names (not only
+    notes), case- and space-blind (`normalizeName`). The link exemption covers the linked note's
+    id as well as its title and aliases (a region `salt-marsh` linking note `salt-marsh` would
+    otherwise put the note's own id in must-not-ship).
+  - Dropped pins add `{ map, index, x, y }` to `mustNotShip.pinLocations`, never the note's name.
+  - `belongsTo` on `notes:` entries is not read: no ADR rule uses it.
+- `warnings` and `staleEntries` name DM content; callers must keep them out of player artifacts.

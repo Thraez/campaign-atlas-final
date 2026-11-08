@@ -1,0 +1,930 @@
+/**
+ * The per-campaign resolver (ADR-0004), one block per rule, each run in two
+ * campaigns (`a`, `b`). Every fail-closed path is pinned here: the
+ * adversarial player-safety review reads this file first.
+ */
+import { describe, expect, it } from "vitest";
+import {
+  frameUnderFog,
+  resolveCampaign,
+  ResolveCampaignError,
+  visibilityFor,
+  type CampaignResolution,
+  type CampaignResolverModel,
+  type WorldNote,
+} from "./resolveCampaign";
+import type { FogOverlay, Point } from "./schema";
+import type {
+  CampaignFileV2,
+  CampaignMapV2,
+  MapV2,
+  NoteOverride,
+  VisibilityValue,
+  WorldFileV2,
+} from "./schemaV2";
+
+// ---------------------------------------------------------------------------
+// Builders
+// ---------------------------------------------------------------------------
+
+const SIZE = 1000;
+/** Fog whose reveal is the left half of a 1000 x 1000 map: x > 500 is fogged. */
+const LEFT_HALF: CampaignMapV2 = {
+  state: "fogged",
+  reveals: [
+    [
+      [0, 0],
+      [500, 0],
+      [500, SIZE],
+      [0, SIZE],
+    ],
+  ],
+};
+const OPEN: CampaignMapV2 = { state: "open" };
+
+function rect(x0: number, y0: number, x1: number, y1: number): Point[] {
+  return [
+    [x0, y0],
+    [x1, y0],
+    [x1, y1],
+    [x0, y1],
+  ];
+}
+
+function map(id: string, extra: Partial<MapV2> = {}): MapV2 {
+  return {
+    id,
+    name: `Map ${id}`,
+    width: SIZE,
+    height: SIZE,
+    visibility: "player",
+    layers: [],
+    scale: { unitsPerPixel: 1, unitLabel: "mi" },
+    zoom: { min: 0, max: 4 },
+    ...extra,
+  };
+}
+
+function child(id: string, parent: string, extra: Partial<MapV2> = {}): MapV2 {
+  return map(id, {
+    parent,
+    frame: { x: 100, y: 100, width: 200, height: 200, rotation: 0 },
+    enterZoom: 2,
+    ...extra,
+  });
+}
+
+function world(id: string, maps: MapV2[], notes?: Record<string, NoteOverride>): WorldFileV2 {
+  return { schemaVersion: 2, world: { id, name: `World ${id}` }, maps, ...(notes ? { notes } : {}) };
+}
+
+function campaign(
+  id: string,
+  maps: Record<string, CampaignMapV2>,
+  notes: CampaignFileV2["notes"] = "vault",
+): CampaignFileV2 {
+  return { id, name: `Campaign ${id}`, maps, notes };
+}
+
+function note(
+  id: string,
+  opts: {
+    world?: string;
+    visibility?: WorldNote["note"]["visibility"];
+    title?: string;
+    aliases?: string[];
+    atlas?: Record<string, unknown>;
+  } = {},
+): WorldNote {
+  return {
+    world: opts.world ?? "w",
+    note: {
+      id,
+      title: opts.title ?? id,
+      aliases: opts.aliases ?? [],
+      visibility: opts.visibility ?? "player",
+      atlas: opts.atlas ?? {},
+    },
+  };
+}
+
+function model(worlds: WorldFileV2[], campaigns: CampaignFileV2[]): CampaignResolverModel {
+  return { worlds, campaigns };
+}
+
+const find = <T extends { ships: boolean }>(list: T[], pred: (t: T) => boolean): T => {
+  const hit = list.find(pred);
+  if (!hit) throw new Error("verdict not found");
+  return hit;
+};
+const mapShips = (r: CampaignResolution, id: string) => find(r.maps, (m) => m.id === id).ships;
+const regionShips = (r: CampaignResolution, id: string) => find(r.regions, (x) => x.id === id).ships;
+const routeShips = (r: CampaignResolution, id: string) => find(r.routes, (x) => x.id === id).ships;
+const soundShips = (r: CampaignResolution, id: string) => find(r.sound, (x) => x.id === id).ships;
+const noteShips = (r: CampaignResolution, id: string) => find(r.notes, (x) => x.id === id).ships;
+const pinShips = (r: CampaignResolution, mapId: string, index = 0) =>
+  find(r.pins, (p) => p.map === mapId && p.index === index).ships;
+const worldShips = (r: CampaignResolution, id: string) => find(r.worlds, (w) => w.id === id).ships;
+
+/** A map full of one of everything, all `player`, linked to note `n`. */
+function furnished(id: string, extra: Partial<MapV2> = {}): MapV2 {
+  return map(id, {
+    pins: [{ note: "n", x: 50, y: 50, visibility: "player" }],
+    regions: [{ id: `${id}-region`, name: `${id} Region`, points: rect(10, 10, 90, 90), visibility: "player" }],
+    routes: [
+      {
+        id: `${id}-route`,
+        name: `${id} Route`,
+        waypoints: [
+          [10, 10],
+          [90, 90],
+        ],
+        visibility: "player",
+      },
+    ],
+    sound: [
+      { id: `${id}-ride`, name: `${id} Ride`, regionId: `${id}-region`, bed: { src: "a.ogg" } },
+      { id: `${id}-sound`, name: `${id} Sound`, points: rect(10, 10, 90, 90), visibility: "player", bed: { src: "b.ogg" } },
+    ],
+    ...extra,
+  });
+}
+
+function everyItemOn(r: CampaignResolution, mapId: string): boolean[] {
+  return [
+    ...r.pins.filter((p) => p.map === mapId),
+    ...r.regions.filter((p) => p.map === mapId),
+    ...r.routes.filter((p) => p.map === mapId),
+    ...r.sound.filter((p) => p.map === mapId),
+  ].map((v) => v.ships);
+}
+
+// ---------------------------------------------------------------------------
+// Rule 1: visibility values
+// ---------------------------------------------------------------------------
+
+describe("rule 1: a visibility value, per campaign", () => {
+  const rows: { label: string; value: unknown; a: boolean; b: boolean }[] = [
+    { label: "bare player", value: "player", a: true, b: true },
+    { label: "{ a: player }", value: { a: "player" }, a: true, b: false },
+    { label: "missing", value: undefined, a: false, b: false },
+    { label: "invalid 'secret'", value: "secret", a: false, b: false },
+    { label: "invalid 'Player'", value: "Player", a: false, b: false },
+    { label: "invalid true", value: true, a: false, b: false },
+    { label: "invalid empty", value: "", a: false, b: false },
+    { label: "unnamed campaign { c: player }", value: { c: "player" }, a: false, b: false },
+    { label: "per-campaign invalid { a: Player }", value: { a: "Player" }, a: false, b: false },
+    { label: "rumor", value: "rumor", a: true, b: true },
+    { label: "hidden", value: "hidden", a: false, b: false },
+    { label: "dm", value: "dm", a: false, b: false },
+    { label: "an array", value: ["player"], a: false, b: false },
+    { label: "null", value: null, a: false, b: false },
+  ];
+
+  it.each(rows)("visibilityFor: $label", ({ value, a, b }) => {
+    expect(["player", "rumor"].includes(visibilityFor(value, "a"))).toBe(a);
+    expect(["player", "rumor"].includes(visibilityFor(value, "b"))).toBe(b);
+    if (!a) expect(visibilityFor(value, "a")).toMatch(/^(dm|hidden)$/);
+  });
+
+  it("a prototype key never reads as a campaign's value", () => {
+    expect(visibilityFor({}, "constructor")).toBe("dm");
+    expect(visibilityFor({}, "__proto__")).toBe("dm");
+    expect(visibilityFor({}, "toString")).toBe("dm");
+  });
+
+  // Every kind of item applies the rule, in both campaigns.
+  it.each(rows)("every item kind: $label", ({ value, a, b }) => {
+    const v = value as VisibilityValue;
+    const m = map("m", {
+      visibility: "player",
+      pins: [{ note: "n", x: 50, y: 50, visibility: v }],
+      regions: [{ id: "r", name: "Reg", points: rect(10, 10, 90, 90), visibility: v }],
+      routes: [
+        {
+          id: "rt",
+          name: "Rt",
+          waypoints: [
+            [1, 1],
+            [2, 2],
+          ],
+          visibility: v,
+        },
+      ],
+      sound: [{ id: "s", points: rect(10, 10, 90, 90), visibility: v, bed: { src: "x.ogg" } }],
+    });
+    const sub = map("sub", { visibility: v });
+    const mdl = model([world("w", [m, sub])], [campaign("a", { m: OPEN, sub: OPEN }), campaign("b", { m: OPEN, sub: OPEN })]);
+    for (const [c, expected] of [
+      ["a", a],
+      ["b", b],
+    ] as const) {
+      const r = resolveCampaign(mdl, [note("n")], c);
+      expect(pinShips(r, "m"), `pin in ${c}`).toBe(expected);
+      expect(regionShips(r, "r"), `region in ${c}`).toBe(expected);
+      expect(routeShips(r, "rt"), `route in ${c}`).toBe(expected);
+      expect(soundShips(r, "s"), `sound in ${c}`).toBe(expected);
+      expect(mapShips(r, "sub"), `map in ${c}`).toBe(expected);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rule 2: a hidden or unknown map hides its subtree
+// ---------------------------------------------------------------------------
+
+describe("rule 2: a map that doesn't ship hides its whole subtree", () => {
+  const tree = (rootVisibility: VisibilityValue) =>
+    world("w", [
+      furnished("root", { visibility: rootVisibility }),
+      { ...furnished("continent"), parent: "root", frame: { x: 100, y: 100, width: 200, height: 200, rotation: 0 }, enterZoom: 1 },
+      { ...furnished("city"), parent: "continent", frame: { x: 100, y: 100, width: 200, height: 200, rotation: 0 }, enterZoom: 1 },
+    ]);
+  const all = { root: OPEN, continent: OPEN, city: OPEN };
+
+  function expectSubtree(r: CampaignResolution, ships: boolean) {
+    for (const id of ["root", "continent", "city"]) {
+      expect(mapShips(r, id), id).toBe(ships);
+      expect(everyItemOn(r, id).every((s) => s === ships), `items on ${id}`).toBe(true);
+    }
+    expect(r.frames.map((f) => f.ships)).toEqual([ships, ships]);
+  }
+
+  it("root map dm in a: hidden in a, shipped in b", () => {
+    const mdl = model([tree({ a: "dm", b: "player" })], [campaign("a", all), campaign("b", all)]);
+    const a = resolveCampaign(mdl, [note("n")], "a");
+    expectSubtree(a, false);
+    expect(find(a.maps, (m) => m.id === "city").reason).toBe("parent-hidden");
+    expectSubtree(resolveCampaign(mdl, [note("n")], "b"), true);
+  });
+
+  it("root map not listed in a's campaign file (unknown), visibility player: same subtree hidden", () => {
+    const mdl = model(
+      [tree("player")],
+      [campaign("a", { continent: OPEN, city: OPEN }), campaign("b", all)],
+    );
+    const a = resolveCampaign(mdl, [note("n")], "a");
+    expectSubtree(a, false);
+    expect(find(a.maps, (m) => m.id === "root").reason).toBe("unknown-state");
+    expectSubtree(resolveCampaign(mdl, [note("n")], "b"), true);
+  });
+
+  it("explicit state unknown, or an invalid state, hides the map", () => {
+    const mdl = model(
+      [world("w", [map("m1"), map("m2")])],
+      [campaign("a", { m1: { state: "unknown" }, m2: { state: "Open" as never } })],
+    );
+    const r = resolveCampaign(mdl, [], "a");
+    expect(mapShips(r, "m1")).toBe(false);
+    expect(mapShips(r, "m2")).toBe(false);
+  });
+
+  it("a child map listed open stays hidden when its parent is hidden, and a child's own dm hides it", () => {
+    const mdl = model(
+      [world("w", [map("root"), child("kid", "root", { visibility: { a: "player", b: "dm" } })])],
+      [campaign("a", { root: OPEN, kid: OPEN }), campaign("b", { root: OPEN, kid: OPEN })],
+    );
+    expect(mapShips(resolveCampaign(mdl, [], "a"), "kid")).toBe(true);
+    expect(mapShips(resolveCampaign(mdl, [], "b"), "kid")).toBe(false);
+  });
+
+  it("must-not-ship holds the id and name of every hidden map, region, route and sound area", () => {
+    const mdl = model([tree({ a: "dm", b: "player" })], [campaign("a", all), campaign("b", all)]);
+    const a = resolveCampaign(mdl, [note("n")], "a");
+    for (const id of ["root", "continent", "city"]) {
+      expect(a.mustNotShip.ids).toEqual(
+        expect.arrayContaining([id, `${id}-region`, `${id}-route`, `${id}-ride`, `${id}-sound`]),
+      );
+      expect(a.mustNotShip.names).toEqual(
+        expect.arrayContaining([`Map ${id}`, `${id} Region`, `${id} Route`, `${id} Ride`, `${id} Sound`]),
+      );
+    }
+    const b = resolveCampaign(mdl, [note("n")], "b");
+    expect(b.mustNotShip.ids).toEqual([]);
+    expect(b.mustNotShip.names).toEqual([]);
+  });
+
+  describe("a broken tree fails closed", () => {
+    it("unknown parent", () => {
+      const mdl = model([world("w", [child("kid", "nope")])], [campaign("a", { kid: OPEN })]);
+      expect(find(resolveCampaign(mdl, [], "a").maps, (m) => m.id === "kid").reason).toBe("bad-parent");
+    });
+    it("parent in another world", () => {
+      const mdl = model(
+        [world("w", [map("root")]), world("v", [child("kid", "root")])],
+        [campaign("a", { root: OPEN, kid: OPEN })],
+      );
+      const r = resolveCampaign(mdl, [], "a");
+      expect(mapShips(r, "root")).toBe(true);
+      expect(find(r.maps, (m) => m.id === "kid").reason).toBe("bad-parent");
+    });
+    it("a cycle", () => {
+      const mdl = model(
+        [world("w", [child("x", "y"), child("y", "x")])],
+        [campaign("a", { x: OPEN, y: OPEN })],
+      );
+      const r = resolveCampaign(mdl, [], "a");
+      expect(mapShips(r, "x")).toBe(false);
+      expect(mapShips(r, "y")).toBe(false);
+    });
+    it("a duplicate map id, in one world or across worlds", () => {
+      const mdl = model(
+        [world("w", [map("dup"), map("solo")]), world("v", [map("dup")])],
+        [campaign("a", { dup: OPEN, solo: OPEN })],
+      );
+      const r = resolveCampaign(mdl, [], "a");
+      expect(r.maps.filter((m) => m.id === "dup").map((m) => m.reason)).toEqual(["duplicate-id", "duplicate-id"]);
+      expect(mapShips(r, "solo")).toBe(true);
+      expect(worldShips(r, "v")).toBe(false);
+    });
+    it("a duplicate world id hides both", () => {
+      const mdl = model([world("w", [map("m1")]), world("w", [map("m2")])], [campaign("a", { m1: OPEN, m2: OPEN })]);
+      const r = resolveCampaign(mdl, [note("n")], "a");
+      expect(r.worlds.every((w) => !w.ships)).toBe(true);
+      expect(mapShips(r, "m1")).toBe(false);
+      expect(noteShips(r, "n")).toBe(false);
+    });
+    it("a child with no frame, or a non-finite or zero-size one", () => {
+      const noFrame = map("k1", { parent: "root", enterZoom: 1 });
+      const nanFrame = child("k2", "root", { frame: { x: NaN, y: 0, width: 10, height: 10, rotation: 0 } });
+      const flat = child("k3", "root", { frame: { x: 0, y: 0, width: 0, height: 10, rotation: 0 } });
+      const mdl = model(
+        [world("w", [map("root"), noFrame, nanFrame, flat])],
+        [campaign("a", { root: OPEN, k1: OPEN, k2: OPEN, k3: OPEN })],
+      );
+      const r = resolveCampaign(mdl, [], "a");
+      for (const id of ["k1", "k2", "k3"]) expect(find(r.maps, (m) => m.id === id).reason).toBe("no-frame");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rule 3: fog on items
+// ---------------------------------------------------------------------------
+
+describe("rule 3: fog drops items with any point under it", () => {
+  const fogMap = map("f", {
+    pins: [
+      { note: "n", x: 700, y: 500, visibility: "player" }, // under fog
+      { note: "n", x: 100, y: 500, visibility: "player" }, // lit
+    ],
+    regions: [
+      { id: "foggy-region", name: "Foggy", points: [[100, 100], [700, 100], [100, 300]], visibility: "player" },
+      { id: "lit-region", name: "Lit", points: rect(100, 400, 300, 600), visibility: "player" },
+    ],
+    routes: [
+      { id: "foggy-route", name: "FR", waypoints: [[100, 100], [200, 200], [800, 200]], visibility: "player" },
+      { id: "lit-route", name: "LR", waypoints: [[100, 100], [200, 200]], visibility: "player" },
+      { id: "pin-route", name: "PR", waypoints: [[100, 100], { entityId: "n" }], visibility: "player" },
+    ],
+    sound: [
+      { id: "foggy-sound", points: [[100, 100], [900, 900], [100, 900]], visibility: "player", bed: { src: "a.ogg" } },
+      { id: "lit-sound", points: rect(10, 10, 90, 90), visibility: "player", bed: { src: "a.ogg" } },
+      { id: "ride-foggy", regionId: "foggy-region", bed: { src: "a.ogg" } },
+      { id: "ride-lit", regionId: "lit-region", bed: { src: "a.ogg" } },
+      { id: "ride-missing", regionId: "no-such-region", bed: { src: "a.ogg" } },
+    ],
+  });
+  const mdl = model([world("w", [fogMap])], [campaign("a", { f: LEFT_HALF }), campaign("b", { f: OPEN })]);
+
+  it("in the fogged campaign a: fogged pin, region, route, sound-only area and ride-on area are dropped", () => {
+    const r = resolveCampaign(mdl, [note("n")], "a");
+    expect(pinShips(r, "f", 0)).toBe(false);
+    expect(find(r.pins, (p) => p.index === 0).reason).toBe("fogged");
+    expect(pinShips(r, "f", 1)).toBe(true);
+    expect(regionShips(r, "foggy-region")).toBe(false);
+    expect(regionShips(r, "lit-region")).toBe(true);
+    expect(routeShips(r, "foggy-route")).toBe(false);
+    expect(routeShips(r, "lit-route")).toBe(true);
+    // The route's entity waypoint resolves to the first pin of "n", which is fogged.
+    expect(find(r.routes, (x) => x.id === "pin-route").reason).toBe("waypoint-hidden");
+    expect(soundShips(r, "foggy-sound")).toBe(false);
+    expect(soundShips(r, "lit-sound")).toBe(true);
+    expect(soundShips(r, "ride-foggy")).toBe(false);
+    expect(soundShips(r, "ride-lit")).toBe(true);
+    expect(soundShips(r, "ride-missing")).toBe(false);
+  });
+
+  it("in the open campaign b: all ship except the ride-on area with no region", () => {
+    const r = resolveCampaign(mdl, [note("n")], "b");
+    expect(r.pins.every((p) => p.ships)).toBe(true);
+    expect(r.regions.every((p) => p.ships)).toBe(true);
+    expect(r.routes.every((p) => p.ships)).toBe(true);
+    expect(r.sound.filter((s) => s.id !== "ride-missing").every((p) => p.ships)).toBe(true);
+    expect(soundShips(r, "ride-missing")).toBe(false);
+  });
+
+  it("conceals fog points inside a reveal", () => {
+    const m = map("c", { pins: [{ note: "n", x: 250, y: 250, visibility: "player" }] });
+    const mdl2 = model(
+      [world("w", [m])],
+      [campaign("a", { c: { ...LEFT_HALF, conceals: [rect(200, 200, 300, 300)] } })],
+    );
+    expect(pinShips(resolveCampaign(mdl2, [note("n")], "a"), "c")).toBe(false);
+  });
+
+  it("a fogged map with no reveals fogs everything", () => {
+    const mdl2 = model([world("w", [furnished("m")])], [campaign("a", { m: { state: "fogged" } })]);
+    const r = resolveCampaign(mdl2, [note("n")], "a");
+    expect(mapShips(r, "m")).toBe(true);
+    expect(everyItemOn(r, "m").every((s) => !s)).toBe(true);
+  });
+
+  it("a fog polygon with a non-finite point fogs the whole map", () => {
+    const bad: CampaignMapV2 = { state: "fogged", reveals: [rect(0, 0, SIZE, SIZE)], conceals: [[[NaN, 0], [10, 10], [0, 10]]] };
+    const mdl2 = model([world("w", [furnished("m")])], [campaign("a", { m: bad })]);
+    expect(everyItemOn(resolveCampaign(mdl2, [note("n")], "a"), "m").every((s) => !s)).toBe(true);
+  });
+
+  it("items with no geometry on a fogged map don't ship", () => {
+    const m = map("m", {
+      regions: [{ id: "empty", name: "E", points: [], visibility: "player" }],
+      sound: [{ id: "nothing", visibility: "player", bed: { src: "a.ogg" } }],
+      routes: [{ id: "short", name: "S", waypoints: [[1, 1]], visibility: "player" }],
+    });
+    const mdl2 = model([world("w", [m])], [campaign("a", { m: LEFT_HALF }), campaign("b", { m: OPEN })]);
+    const a = resolveCampaign(mdl2, [], "a");
+    expect(regionShips(a, "empty")).toBe(false);
+    expect(soundShips(a, "nothing")).toBe(false);
+    expect(routeShips(a, "short")).toBe(false);
+    const b = resolveCampaign(mdl2, [], "b");
+    expect(soundShips(b, "nothing")).toBe(false);
+    expect(routeShips(b, "short")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rule 4: a frame under fog hides the child
+// ---------------------------------------------------------------------------
+
+describe("rule 4: a frame with any part under its parent's fog hides the child and its subtree", () => {
+  // Reveal: everything except a horizontal band y 450..550 across the whole map.
+  const bandFog: CampaignMapV2 = {
+    state: "fogged",
+    reveals: [rect(0, 0, SIZE, 450), rect(0, 550, SIZE, SIZE)],
+  };
+  // Reveal: everything, with a small conceal wholly inside the frame (no edge crosses the frame's).
+  const holeFog: CampaignMapV2 = {
+    state: "fogged",
+    reveals: [rect(0, 0, SIZE, SIZE)],
+    conceals: [rect(180, 480, 220, 520)],
+  };
+  // Reveal: the left half only; the frame's right-bottom corner pokes over x=500.
+  const cornerFog = LEFT_HALF;
+  const frame = { x: 100, y: 300, width: 200, height: 400, rotation: 0 }; // 100..300 x 300..700
+  const cornerFrame = { x: 350, y: 300, width: 200, height: 200, rotation: 0 }; // 350..550: corner x=550 fogged
+
+  const subtree = (f: typeof frame) =>
+    world("w", [
+      map("land"),
+      { ...furnished("city"), parent: "land", frame: f, enterZoom: 2 },
+      { ...furnished("dungeon"), parent: "city", frame: { x: 10, y: 10, width: 50, height: 50, rotation: 0 }, enterZoom: 2 },
+    ]);
+  const states = (land: CampaignMapV2) => ({ land, city: OPEN, dungeon: OPEN });
+
+  it.each([
+    { label: "fog crosses the middle, no corner fogged", fog: bandFog, f: frame },
+    { label: "a fog hole wholly inside the frame", fog: holeFog, f: frame },
+    { label: "a corner under fog", fog: cornerFog, f: cornerFrame },
+  ])("$label: hidden in a (parent fogged), shipped in b (parent open)", ({ fog, f }) => {
+    const mdl = model([subtree(f)], [campaign("a", states(fog)), campaign("b", states(OPEN))]);
+    const a = resolveCampaign(mdl, [note("n")], "a");
+    expect(mapShips(a, "land")).toBe(true);
+    expect(find(a.maps, (m) => m.id === "city").reason).toBe("frame-fogged");
+    expect(mapShips(a, "dungeon")).toBe(false);
+    expect(a.frames.every((x) => !x.ships)).toBe(true);
+    expect(everyItemOn(a, "city").every((s) => !s)).toBe(true);
+    expect(everyItemOn(a, "dungeon").every((s) => !s)).toBe(true);
+    expect(a.mustNotShip.ids).toEqual(expect.arrayContaining(["city", "dungeon", "city-region", "dungeon-route"]));
+
+    const b = resolveCampaign(mdl, [note("n")], "b");
+    expect(mapShips(b, "city")).toBe(true);
+    expect(mapShips(b, "dungeon")).toBe(true);
+    expect(b.frames.every((x) => x.ships)).toBe(true);
+  });
+
+  it("a frame wholly in the lit part ships", () => {
+    const mdl = model([subtree({ x: 100, y: 100, width: 200, height: 200, rotation: 0 })], [campaign("a", states(cornerFog))]);
+    const a = resolveCampaign(mdl, [note("n")], "a");
+    expect(mapShips(a, "city")).toBe(true);
+    expect(mapShips(a, "dungeon")).toBe(true);
+  });
+
+  it("a rotated frame whose turned corner reaches the fog is hidden", () => {
+    // 360..480 x 100..220 is lit unrotated; turned 45 degrees about its centre a corner reaches x≈505.
+    const f = { x: 360, y: 100, width: 120, height: 120, rotation: 45 };
+    const unrotated = model([subtree({ ...f, rotation: 0 })], [campaign("a", states(cornerFog))]);
+    expect(mapShips(resolveCampaign(unrotated, [note("n")], "a"), "city")).toBe(true);
+    const rotated = model([subtree(f)], [campaign("a", states(cornerFog))]);
+    expect(find(resolveCampaign(rotated, [note("n")], "a").maps, (m) => m.id === "city").reason).toBe(
+      "frame-fogged",
+    );
+  });
+
+  it("a rotated frame is also tested turned about its top-left corner (pivot not fixed yet)", () => {
+    // 420..499 x 100..120 turned 180 degrees: about its centre it covers the same lit rectangle;
+    // about its top-left corner (420, 100) it lands on 341..420 x 80..100, which this fog conceals.
+    const fog: CampaignMapV2 = { ...LEFT_HALF, conceals: [rect(340, 80, 420, 100)] };
+    const f = { x: 420, y: 100, width: 79, height: 20, rotation: 180 };
+    const mdl = model([subtree(f)], [campaign("a", states(fog))]);
+    expect(find(resolveCampaign(mdl, [note("n")], "a").maps, (m) => m.id === "city").reason).toBe(
+      "frame-fogged",
+    );
+  });
+});
+
+describe("frameUnderFog is exact over the area", () => {
+  const fog = (reveals: Point[][], conceals: Point[][] = []): FogOverlay => ({
+    mapId: "m",
+    enabled: true,
+    reveals,
+    conceals,
+  });
+  const quad = rect(100, 100, 300, 300);
+
+  it("overlapping reveals that cover the frame between them: not fogged", () => {
+    // Their edges cross inside the frame; every face is still lit.
+    expect(frameUnderFog(quad, fog([rect(0, 0, 220, 400), rect(180, 0, 400, 400)]))).toBe(false);
+  });
+  it("a thin gap between two reveals inside the frame: fogged", () => {
+    expect(frameUnderFog(quad, fog([rect(0, 0, 199.5, 400), rect(200.5, 0, 400, 400)]))).toBe(true);
+  });
+  it("a diagonal conceal sliver crossing the frame: fogged", () => {
+    const sliver: Point[] = [
+      [0, 0],
+      [400, 399],
+      [400, 400],
+      [0, 1],
+    ];
+    expect(frameUnderFog(quad, fog([rect(0, 0, 400, 400)], [sliver]))).toBe(true);
+  });
+  it("no fog (open map): not fogged", () => {
+    expect(frameUnderFog(quad, null)).toBe(false);
+  });
+  it("a disabled fog: not fogged", () => {
+    expect(frameUnderFog(quad, { mapId: "m", enabled: false, reveals: [] })).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rule 5: worlds
+// ---------------------------------------------------------------------------
+
+describe("rule 5: a world ships only if one of its maps ships, and its notes go with it", () => {
+  const mdl = model(
+    [
+      world("home", [map("hm")]),
+      world("far", [map("f1", { visibility: { a: "dm", b: "player" } }), map("f2")]),
+    ],
+    [
+      campaign("a", { hm: OPEN, f1: OPEN }), // f2 unknown in a
+      campaign("b", { hm: OPEN, f1: OPEN, f2: OPEN }),
+    ],
+  );
+  const notes = [
+    note("far-note", { world: "far", title: "Far Note", aliases: ["The Far One"] }),
+    note("home-note", { world: "home" }),
+  ];
+
+  it("in a: the world and its player note don't ship; their names are guarded", () => {
+    const r = resolveCampaign(mdl, notes, "a");
+    expect(worldShips(r, "far")).toBe(false);
+    expect(find(r.worlds, (w) => w.id === "far").reason).toBe("no-map-ships");
+    expect(noteShips(r, "far-note")).toBe(false);
+    expect(find(r.notes, (n) => n.id === "far-note").reason).toBe("world-hidden");
+    expect(r.mustNotShip.ids).toEqual(expect.arrayContaining(["far", "far-note"]));
+    expect(r.mustNotShip.names).toEqual(expect.arrayContaining(["World far", "Far Note", "The Far One"]));
+    expect(worldShips(r, "home")).toBe(true);
+    expect(noteShips(r, "home-note")).toBe(true);
+  });
+
+  it("in b: both ship", () => {
+    const r = resolveCampaign(mdl, notes, "b");
+    expect(worldShips(r, "far")).toBe(true);
+    expect(noteShips(r, "far-note")).toBe(true);
+    expect(r.mustNotShip.ids).not.toContain("far");
+  });
+
+  it("a world with no maps ships none of its notes; a note of an unknown world doesn't ship", () => {
+    const m2 = model([world("empty", []), world("home", [map("hm")])], [campaign("a", { hm: OPEN })]);
+    const r = resolveCampaign(m2, [note("x", { world: "empty" }), note("y", { world: "nowhere" })], "a");
+    expect(worldShips(r, "empty")).toBe(false);
+    expect(noteShips(r, "x")).toBe(false);
+    expect(noteShips(r, "y")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rule 6: notes
+// ---------------------------------------------------------------------------
+
+describe("rule 6: a notes: entry can only narrow the frontmatter", () => {
+  const base = (entries: Record<string, NoteOverride>, aMode: CampaignFileV2["notes"] = "vault", bMode = aMode) =>
+    model([world("w", [map("m")], entries)], [campaign("a", { m: OPEN }, aMode), campaign("b", { m: OPEN }, bMode)]);
+  const both = (mdl: CampaignResolverModel, n: WorldNote) =>
+    [resolveCampaign(mdl, [n], "a"), resolveCampaign(mdl, [n], "b")].map((r) => noteShips(r, n.note.id));
+
+  it("frontmatter dm + entry { a: player }: hidden everywhere, with a warning", () => {
+    const mdl = base({ n: { visibility: { a: "player" }, basedOn: "dm" } });
+    const n = note("n", { visibility: "dm" });
+    expect(both(mdl, n)).toEqual([false, false]);
+    const a = resolveCampaign(mdl, [n], "a");
+    expect(find(a.notes, () => true).reason).toBe("secret");
+    expect(a.warnings.join("\n")).toMatch(/can only narrow/);
+  });
+
+  it("frontmatter player + { a: player, b: dm }: ships in a only", () => {
+    const mdl = base({ n: { visibility: { a: "player", b: "dm" }, basedOn: "player" } });
+    expect(both(mdl, note("n"))).toEqual([true, false]);
+  });
+
+  it.each([
+    { label: "basedOn differs", entry: { visibility: { a: "player", b: "player" }, basedOn: "rumor" } },
+    { label: "basedOn missing", entry: { visibility: { a: "player", b: "player" } } },
+  ])("$label: dm everywhere, reported stale", ({ entry }) => {
+    const mdl = base({ n: entry as NoteOverride });
+    expect(both(mdl, note("n"))).toEqual([false, false]);
+    const r = resolveCampaign(mdl, [note("n")], "a");
+    expect(find(r.notes, () => true).reason).toBe("stale-entry");
+    expect(r.staleEntries).toEqual([{ world: "w", note: "n" }]);
+  });
+
+  it("atlas.publish: false is secret, whatever the visibility and entry", () => {
+    const mdl = base({ n: { visibility: { a: "player", b: "player" }, basedOn: "player" } });
+    const n = note("n", { atlas: { publish: false, visibility: "player" } });
+    expect(both(mdl, n)).toEqual([false, false]);
+  });
+
+  it("frontmatter hidden or rumor", () => {
+    const mdl = base({});
+    expect(both(mdl, note("n", { visibility: "hidden" }))).toEqual([false, false]);
+    expect(both(mdl, note("n", { visibility: "rumor" }))).toEqual([true, true]);
+  });
+
+  describe("the campaign note default (question 5)", () => {
+    const player = note("n");
+    it("frontmatter player, no entry: ships under vault only", () => {
+      expect(both(base({}, "vault", "hidden"), player)).toEqual([true, false]);
+      expect(both(base({}, "hidden", "vault"), player)).toEqual([false, true]);
+    });
+    it("a missing or invalid campaign notes: field reads as hidden", () => {
+      // (Not through `base`: its default parameter would turn `undefined` into "vault".)
+      const { notes: _dropped, ...noNotes } = campaign("a", { m: OPEN });
+      const mdl = model([world("w", [map("m")])], [noNotes as CampaignFileV2, campaign("b", { m: OPEN }, "Vault" as never)]);
+      expect(both(mdl, player)).toEqual([false, false]);
+    });
+    it("a bare entry doesn't name a campaign: ships under vault, not under hidden", () => {
+      const mdl = base({ n: { visibility: "player", basedOn: "player" } }, "vault", "hidden");
+      expect(both(mdl, player)).toEqual([true, false]);
+    });
+    it("a bare dm entry narrows under vault", () => {
+      const mdl = base({ n: { visibility: "dm", basedOn: "player" } }, "vault", "vault");
+      expect(both(mdl, player)).toEqual([false, false]);
+    });
+    it("an entry naming the campaign as player or rumor ships under hidden; naming it dm doesn't", () => {
+      const mdl = base({ n: { visibility: { a: "rumor", b: "dm" }, basedOn: "player" } }, "hidden", "hidden");
+      expect(both(mdl, player)).toEqual([true, false]);
+    });
+    it("under vault, an entry that doesn't name the campaign is dm for it", () => {
+      const mdl = base({ n: { visibility: { a: "player" }, basedOn: "player" } }, "vault", "vault");
+      expect(both(mdl, player)).toEqual([true, false]);
+    });
+    it("an entry in another world's file doesn't apply", () => {
+      const mdl = model(
+        [world("w", [map("m")]), world("v", [map("m2")], { n: { visibility: { a: "player" }, basedOn: "player" } })],
+        [campaign("a", { m: OPEN, m2: OPEN }, "hidden")],
+      );
+      expect(noteShips(resolveCampaign(mdl, [player], "a"), "n")).toBe(false);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rule 7: pins
+// ---------------------------------------------------------------------------
+
+describe("rule 7: a pin ships only if its note and map ship and it is not under fog", () => {
+  const m = map("m", {
+    visibility: { a: "player", b: "player" },
+    pins: [
+      { note: "dm-note", x: 10, y: 10, visibility: "player" },
+      { note: "missing-note", x: 10, y: 10, visibility: "player" },
+      { note: "n", x: 900, y: 10, visibility: "player" },
+      { note: "n", x: 10, y: 10 }, // no visibility of its own
+      { note: "n", x: 10, y: 10, visibility: "player" },
+    ],
+  });
+  const hiddenMap = map("h", { visibility: { a: "dm", b: "player" }, pins: [{ note: "n", x: 1, y: 1, visibility: "player" }] });
+  const mdl = model(
+    [world("w", [m, hiddenMap])],
+    [campaign("a", { m: LEFT_HALF, h: OPEN }), campaign("b", { m: OPEN, h: OPEN })],
+  );
+  const notes = [note("dm-note", { visibility: "dm" }), note("n")];
+
+  it("in a (fogged)", () => {
+    const r = resolveCampaign(mdl, notes, "a");
+    expect(r.pins.filter((p) => p.map === "m").map((p) => p.reason)).toEqual([
+      "note-hidden",
+      "note-hidden",
+      "fogged",
+      "visibility",
+      "ships",
+    ]);
+    expect(find(r.pins, (p) => p.map === "h").reason).toBe("map-hidden");
+  });
+
+  it("in b (open)", () => {
+    const r = resolveCampaign(mdl, notes, "b");
+    expect(r.pins.filter((p) => p.map === "m").map((p) => p.ships)).toEqual([false, false, true, false, true]);
+    expect(pinShips(r, "h")).toBe(true);
+  });
+
+  it("a note id shared by two notes ships only if both do", () => {
+    const r = resolveCampaign(mdl, [note("n"), note("n", { visibility: "dm" })], "b");
+    expect(r.pins.filter((p) => p.map === "m").every((p) => !p.ships)).toBe(true);
+  });
+});
+
+describe("links: a shipped item never points at a note that doesn't ship", () => {
+  it("a region linking a hidden or missing note doesn't ship", () => {
+    const m = map("m", {
+      regions: [
+        { id: "r1", name: "R1", entityId: "secret-note", points: rect(1, 1, 9, 9), visibility: "player" },
+        { id: "r2", name: "R2", entityId: "ghost", points: rect(1, 1, 9, 9), visibility: "player" },
+        { id: "r3", name: "R3", entityId: "n", points: rect(1, 1, 9, 9), visibility: "player" },
+      ],
+    });
+    const mdl = model([world("w", [m])], [campaign("a", { m: OPEN })]);
+    const r = resolveCampaign(mdl, [note("secret-note", { visibility: "dm" }), note("n")], "a");
+    expect(find(r.regions, (x) => x.id === "r1").reason).toBe("link-hidden");
+    expect(find(r.regions, (x) => x.id === "r2").reason).toBe("link-hidden");
+    expect(regionShips(r, "r3")).toBe(true);
+  });
+
+  it("a route through a note with no pin on the map, or a hidden pin, doesn't ship", () => {
+    const m = map("m", {
+      pins: [{ note: "secret-note", x: 5, y: 5, visibility: "player" }],
+      routes: [
+        { id: "via-ghost", name: "G", waypoints: [[1, 1], { entityId: "ghost" }], visibility: "player" },
+        { id: "via-secret", name: "S", waypoints: [[1, 1], { entityId: "secret-note" }], visibility: "player" },
+      ],
+    });
+    const mdl = model([world("w", [m])], [campaign("a", { m: OPEN })]);
+    const r = resolveCampaign(mdl, [note("secret-note", { visibility: "dm" })], "a");
+    expect(routeShips(r, "via-ghost")).toBe(false);
+    expect(routeShips(r, "via-secret")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rule 8: name collisions
+// ---------------------------------------------------------------------------
+
+describe("rule 8: name collisions and must-not-ship", () => {
+  const twoCampaigns = (m: MapV2, aState: CampaignMapV2 = OPEN) =>
+    model([world("w", [m])], [campaign("a", { m: aState }), campaign("b", { m: OPEN })]);
+
+  it.each([
+    { label: "title", n: note("black-spire-note", { title: "Black Spire" }) },
+    { label: "alias", n: note("spire", { title: "The Spire", aliases: ["Black Spire"] }) },
+    { label: "title, case and spacing differ", n: note("bs", { title: "  black   SPIRE " }) },
+  ])("a hidden region named like a shipped note's $label is a collision naming both", ({ n }) => {
+    const m = map("m", {
+      regions: [{ id: "spire-region", name: "Black Spire", points: rect(1, 1, 9, 9), visibility: { a: "dm", b: "player" } }],
+    });
+    const a = resolveCampaign(twoCampaigns(m), [n], "a");
+    expect(a.collisions).toEqual([
+      { name: "Black Spire", hidden: { kind: "region", id: "spire-region" }, shipped: { kind: "note", id: n.note.id } },
+    ]);
+    expect(a.mustNotShip.names).toContain("Black Spire");
+    // In b the region ships: no collision.
+    expect(resolveCampaign(twoCampaigns(m), [n], "b").collisions).toEqual([]);
+  });
+
+  it("a hidden note titled like a shipped note collides; so does a hidden map named like one", () => {
+    const m = map("m", { name: "Old Harbour" });
+    const hiddenMap = map("h", { name: "Port Vell", visibility: "dm" });
+    const mdl = model([world("w", [m, hiddenMap])], [campaign("a", { m: OPEN, h: OPEN })]);
+    const r = resolveCampaign(
+      mdl,
+      [note("x", { title: "Old Harbour", visibility: "dm" }), note("port", { title: "Port Vell" })],
+      "a",
+    );
+    expect(r.collisions).toEqual(
+      expect.arrayContaining([
+        { name: "Old Harbour", hidden: { kind: "note", id: "x" }, shipped: { kind: "map", id: "m" } },
+        { name: "Port Vell", hidden: { kind: "map", id: "h" }, shipped: { kind: "note", id: "port" } },
+      ]),
+    );
+  });
+
+  const saltMarsh = note("salt-marsh", { title: "Salt Marsh", aliases: ["The Marsh"] });
+
+  it.each([
+    { label: "dm", vis: { a: "dm", b: "player" } as VisibilityValue, state: OPEN },
+    { label: "fogged", vis: "player" as VisibilityValue, state: LEFT_HALF },
+  ])("a $label region salt-marsh linking the shipped salt-marsh note: no collision, its names stay out", ({ vis, state }) => {
+    const m = map("m", {
+      regions: [
+        {
+          id: "salt-marsh",
+          name: "Salt Marsh",
+          entityId: "salt-marsh",
+          points: rect(600, 600, 700, 700),
+          visibility: vis,
+        },
+        { id: "marsh-edge", name: "The Marsh", entityId: "salt-marsh", points: rect(600, 600, 700, 700), visibility: vis },
+      ],
+    });
+    const a = resolveCampaign(twoCampaigns(m, state), [saltMarsh], "a");
+    expect(regionShips(a, "salt-marsh")).toBe(false);
+    expect(noteShips(a, "salt-marsh")).toBe(true);
+    expect(a.collisions).toEqual([]);
+    expect(a.mustNotShip.ids).not.toContain("salt-marsh");
+    expect(a.mustNotShip.names).not.toContain("Salt Marsh");
+    expect(a.mustNotShip.names).not.toContain("The Marsh");
+    // The other region's own id differs from the note's names: it stays guarded.
+    expect(a.mustNotShip.ids).toContain("marsh-edge");
+    expect(resolveCampaign(twoCampaigns(m, state), [saltMarsh], "b").mustNotShip.ids).toEqual([]);
+  });
+
+  it("a dm region Drow Ambush linking salt-marsh: no collision; its own id and name stay guarded", () => {
+    const m = map("m", {
+      regions: [
+        {
+          id: "drow-ambush",
+          name: "Drow Ambush",
+          entityId: "salt-marsh",
+          points: rect(1, 1, 9, 9),
+          visibility: { a: "dm", b: "player" },
+        },
+      ],
+    });
+    const a = resolveCampaign(twoCampaigns(m), [saltMarsh], "a");
+    expect(a.collisions).toEqual([]);
+    expect(a.mustNotShip.ids).toContain("drow-ambush");
+    expect(a.mustNotShip.names).toContain("Drow Ambush");
+    expect(a.mustNotShip.ids).not.toContain("salt-marsh");
+    expect(a.mustNotShip.names).not.toContain("Salt Marsh");
+    const b = resolveCampaign(twoCampaigns(m), [saltMarsh], "b");
+    expect(b.mustNotShip.ids).not.toContain("drow-ambush");
+  });
+
+  it("the exemption follows the link: an unlinked hidden region named like the note collides", () => {
+    const m = map("m", {
+      regions: [{ id: "decoy", name: "Salt Marsh", points: rect(1, 1, 9, 9), visibility: "dm" }],
+    });
+    const a = resolveCampaign(twoCampaigns(m), [saltMarsh], "a");
+    expect(a.collisions).toEqual([
+      { name: "Salt Marsh", hidden: { kind: "region", id: "decoy" }, shipped: { kind: "note", id: "salt-marsh" } },
+    ]);
+  });
+
+  it("a pin of the shipped salt-marsh note dropped by fog: its location is guarded, not the note's name", () => {
+    const m = map("m", { pins: [{ note: "salt-marsh", x: 800, y: 300, visibility: "player" }] });
+    const a = resolveCampaign(twoCampaigns(m, LEFT_HALF), [saltMarsh], "a");
+    expect(pinShips(a, "m")).toBe(false);
+    expect(noteShips(a, "salt-marsh")).toBe(true);
+    expect(a.collisions).toEqual([]);
+    expect(a.mustNotShip.pinLocations).toEqual([{ map: "m", index: 0, x: 800, y: 300 }]);
+    expect(a.mustNotShip.names).toEqual([]);
+    expect(a.mustNotShip.ids).toEqual([]);
+    const b = resolveCampaign(twoCampaigns(m, LEFT_HALF), [saltMarsh], "b");
+    expect(b.mustNotShip.pinLocations).toEqual([]);
+  });
+
+  it("a hidden note puts its id, title and aliases in must-not-ship", () => {
+    const mdl = model([world("w", [map("m")])], [campaign("a", { m: OPEN })]);
+    const r = resolveCampaign(mdl, [note("drow-city", { title: "Menzo", aliases: ["The Dark City"], visibility: "dm" })], "a");
+    expect(r.mustNotShip.ids).toEqual(["drow-city"]);
+    expect(r.mustNotShip.names).toEqual(["Menzo", "The Dark City"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The campaign itself
+// ---------------------------------------------------------------------------
+
+describe("the campaign id", () => {
+  it("an unknown campaign throws", () => {
+    const mdl = model([world("w", [map("m")])], [campaign("a", { m: OPEN })]);
+    expect(() => resolveCampaign(mdl, [], "z")).toThrow(ResolveCampaignError);
+  });
+  it("two files for one campaign throw", () => {
+    const mdl = model([world("w", [map("m")])], [campaign("a", { m: OPEN }), campaign("a", { m: OPEN })]);
+    expect(() => resolveCampaign(mdl, [], "a")).toThrow(/2 campaign files/);
+  });
+  it("only the named campaign's states and fog apply", () => {
+    const mdl = model([world("w", [furnished("m")])], [campaign("a", { m: OPEN }), campaign("b", { m: { state: "fogged" } })]);
+    expect(everyItemOn(resolveCampaign(mdl, [note("n")], "a"), "m").every(Boolean)).toBe(true);
+    expect(everyItemOn(resolveCampaign(mdl, [note("n")], "b"), "m").every((s) => !s)).toBe(true);
+  });
+  it("is pure: the same input gives the same output and isn't mutated", () => {
+    const mdl = model([world("w", [furnished("m")])], [campaign("a", { m: LEFT_HALF })]);
+    const before = JSON.stringify(mdl);
+    const r1 = resolveCampaign(mdl, [note("n")], "a");
+    const r2 = resolveCampaign(mdl, [note("n")], "a");
+    expect(r1).toEqual(r2);
+    expect(JSON.stringify(mdl)).toBe(before);
+  });
+});
