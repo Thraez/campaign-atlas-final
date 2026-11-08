@@ -140,3 +140,13 @@ variant still drew a dotted "link" span. Not a resolver bug.
   ticket R-06 (`docs/tracker/rebuild-2026-11/issues/R-06-player-build-report-leak.md`): player
   `buildReport.warnings` drops world.yaml warnings for a count line; test that a DM-only region id
   never reaches player atlas.json. Gate helper copied to this session's scratchpad.
+- R-05 built (Sonnet, 33d0b57), Opus review: 7 findings (stale open-work lines in State.md,
+  tidemarrow blocked by H-04, arch-02/08 folded into R-11a/b, "write R-10..R-20 tickets first"),
+  fixed b9c979a; gate pass.
+- R-06 built (Opus, ac25b16); adversarial review found the same leak via fog (a player-visible
+  route dropped after warning shipped its id); fixed ec9821d with a `hiddenFromPlayer` filter on
+  the player buildReport (console keeps every warning, strict counters unchanged); re-check CLEAN;
+  gate pass on main 5c75317. Known, accepted: CI console logs still print full world.yaml warnings
+  (world.yaml itself is in the public repo; moot once the repo goes private in phase H).
+- Waiting on Isak's yes to push, open PRs and merge: R-06 first, then R-05 (mark R-06 merged in
+  its State.md, re-gate).
