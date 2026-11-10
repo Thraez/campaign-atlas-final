@@ -15,6 +15,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   deriveSecretsFromVault,
+  foreignCampaignRefs,
   run,
   scanArtifactForSecrets,
   secretsFromMustNotShip,
@@ -303,7 +304,7 @@ describe("must-not-ship file (R-17)", () => {
       JSON.stringify({
         campaign: "sandbox",
         ids: ["brindlecross", "dm"],
-        names: ["Brindlecross Bells", "Map"],
+        names: ["Brindlecross Bells", "Map", 'The "Bell" Tower'],
         paths: ["./Images\\Brindlecross.PNG"],
         pinLocations: [],
         otherCampaigns: [{ id: "main", name: "Lantern Road" }],
@@ -318,22 +319,39 @@ describe("must-not-ship file (R-17)", () => {
     return scanArtifactForSecrets(store, secrets).hits.map((h) => h.match.name);
   };
 
-  it("reads ids and names (generic ones dropped), the other campaigns, and normalised paths", () => {
+  it("reads ids and names (generic ones dropped), other campaigns' names, and normalised paths", () => {
     const s = secretsFromMustNotShip(file);
     expect(s.map((e) => [e.field, e.name])).toEqual([
       ["id", "brindlecross"],
-      ["id", "main"],
       ["title", "Brindlecross Bells"],
+      ["title", 'The "Bell" Tower'],
       ["title", "Lantern Road"],
       ["path", "images/brindlecross.png"],
     ]);
   });
 
-  it("flags another campaign's name or id", () => {
+  it("flags another campaign's name, but not its id as a word", () => {
     expect(hitsFor(JSON.stringify({ body: "Unlike the Lantern Road crew." }))).toEqual([
       "Lantern Road",
     ]);
-    expect(hitsFor(JSON.stringify({ campaign: { id: "main" } }))).toEqual(["main"]);
+    expect(hitsFor(JSON.stringify({ body: "She works the main road." }))).toEqual([]);
+  });
+
+  it("flags a name holding a quote in its JSON-escaped form", () => {
+    expect(hitsFor(JSON.stringify({ body: 'Up The "Bell" Tower.' }))).toEqual(['The "Bell" Tower']);
+  });
+
+  it("run exits 12 on another campaign's id in a campaign field, or a store not its own", () => {
+    const own = { campaign: { id: "sandbox", name: "Sandbox" } };
+    const runWith = (json: unknown) => {
+      fs.writeFileSync(path.join(store, "atlas.json"), JSON.stringify(json));
+      return run({ dir: store, config: FIXTURE_CONFIG, mustNotShip: file });
+    };
+    expect(runWith({ ...own, body: "the main road" })).toBe(0);
+    expect(runWith({ ...own, entities: [{ id: "x", campaignId: "main" }] })).toBe(12);
+    expect(runWith({ ...own, maps: [{ id: "m", visibility: { main: "open" } }] })).toBe(12);
+    expect(runWith({ campaign: { id: "main", name: "Main" } })).toBe(12);
+    expect(runWith({ body: "no campaign field" })).toBe(12);
   });
 
   it("flags a path in a markdown link or image and in an unquoted HTML attribute", () => {
@@ -375,7 +393,34 @@ describe("must-not-ship file (R-17)", () => {
   it("run exits 12 on a hit from the must-not-ship file", () => {
     fs.writeFileSync(path.join(store, "atlas.json"), JSON.stringify({ name: "Brindlecross" }));
     expect(run({ dir: store, config: FIXTURE_CONFIG, mustNotShip: file })).toBe(12);
-    fs.writeFileSync(path.join(store, "atlas.json"), JSON.stringify({ name: "Tallowford" }));
+    fs.writeFileSync(
+      path.join(store, "atlas.json"),
+      JSON.stringify({ campaign: { id: "sandbox" }, name: "Tallowford" }),
+    );
     expect(run({ dir: store, config: FIXTURE_CONFIG, mustNotShip: file })).toBe(0);
+  });
+});
+
+describe("foreignCampaignRefs (R-17)", () => {
+  const others = ["main"];
+  it("finds another campaign's id in campaign fields and per-campaign map keys", () => {
+    expect(foreignCampaignRefs({ campaign: "main" }, others)).toEqual([
+      'campaign: another campaign\'s id "main"',
+    ]);
+    expect(foreignCampaignRefs({ a: [{ campaigns: ["sandbox", "MAIN"] }] }, others)).toEqual([
+      'a[0].campaigns: another campaign\'s id "MAIN"',
+    ]);
+    expect(foreignCampaignRefs({ x: { visibility: { main: "dm" } } }, others)).toEqual([
+      "x.visibility.main: another campaign's id as a key",
+    ]);
+  });
+  it("leaves the id alone anywhere else", () => {
+    expect(
+      foreignCampaignRefs({ body: "main", main: 1, layers: { main: {} }, id: "main" }, others),
+    ).toEqual([]);
+  });
+  it("with own, requires the top-level campaign to be it", () => {
+    expect(foreignCampaignRefs({ campaign: { id: "sandbox" } }, others, "sandbox")).toEqual([]);
+    expect(foreignCampaignRefs({}, others, "sandbox")).toHaveLength(1);
   });
 });

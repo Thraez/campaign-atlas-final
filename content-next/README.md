@@ -68,5 +68,6 @@ it names on purpose: map `brindlecross` and its image (sandbox), world `skerrow`
 `frog-chorus.ogg` (rule 9, both), sound `reed-whisper` with `reed-whisper.ogg` (sandbox), note
 `marra-quillon` (main). A note body linking a hidden map (`[[Brindlecross]]`, `[[Hookhaven]]`)
 is added by the test in a temp copy, since a strict build fails on it. So are plain-text
-mentions of a hidden item or of the other campaign (body, heading, `summary`, `tags`, a markdown
-link), each of which fails every player build with exit 12.
+mentions of a hidden item or of the other campaign's name (body, heading, `summary`, `tags`), each
+of which fails every player build with exit 12, and local file URLs (markdown and HTML images and
+links, reference definitions), which fail it with exit 1.

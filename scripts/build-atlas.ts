@@ -13,6 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { markdownToHtml } from "../src/atlas/content/markdownCore";
+import { Marked } from "marked";
 import {
   resolveImageEmbeds,
   DEFAULT_RESOLVE_ASSET,
@@ -70,7 +71,11 @@ import {
   type StoreFiles,
   type StoresRootGuard,
 } from "./atlas/build/campaignStore";
-import { findSecretsInText, mustNotShipSecrets } from "./check-derived-secrets";
+import {
+  findSecretsInText,
+  foreignCampaignRefs,
+  mustNotShipSecrets,
+} from "./check-derived-secrets";
 import { loadAtlasModel } from "./atlas/loadAtlasModel";
 import {
   applyAudioPlan,
@@ -233,18 +238,43 @@ function hiddenItemLinkTargets(
   return out;
 }
 
+const URL_ATTR =
+  /\s(src|srcset|href|poster|data|action|formaction|background|cite|longdesc|xlink:href|ping)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi;
+const NOT_LOCAL = /^(https?:|data:|blob:|mailto:|#)/i;
+
+function decodeEntities(v: string): string {
+  return v
+    .replace(/&#x([0-9a-f]+);?/gi, (_, h: string) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);?/g, (_, d: string) => String.fromCodePoint(Number(d)))
+    .replace(
+      /&(colon|sol|period|amp|quot|apos|lt|gt);/gi,
+      (_, n: string) =>
+        ({ colon: ":", sol: "/", period: ".", amp: "&", quot: '"', apos: "'", lt: "<", gt: ">" })[
+          n.toLowerCase()
+        ] ?? "",
+    );
+}
+
 /**
- * The local image refs a note body names besides wikilink embeds: markdown
- * `![alt](src)` and HTML `<img src>` (quoted or not). External URLs and
- * `data:`/`blob:` aren't local.
+ * Every URL a note body yields that isn't external (`http(s):`, `data:`,
+ * `blob:`, `mailto:` or a `#fragment`): each `src`, `srcset` candidate,
+ * `href`, `poster` and the like of the body rendered as the site renders
+ * it (so markdown links, images and reference-style ones are read as marked
+ * resolves them), every `url(...)`, and every reference definition, used or
+ * not. Wikilinks and `![[embeds]]` aren't URLs here: the build resolves them.
  */
-function localBodyImageRefs(body: string): string[] {
-  const out: string[] = [];
-  for (const m of body.matchAll(/!\[[^\]]*\]\(\s*<?([^)\s>]+)/g)) out.push(m[1]);
-  for (const m of body.matchAll(/<img\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)) {
-    out.push(m[1] ?? m[2] ?? m[3] ?? "");
+function localBodyUrls(body: string): string[] {
+  const urls: string[] = [];
+  const html = markdownToHtml(body);
+  for (const m of html.matchAll(URL_ATTR)) {
+    const value = decodeEntities(m[2] ?? m[3] ?? m[4] ?? "");
+    if (m[1].toLowerCase() === "srcset") {
+      for (const c of value.split(",")) urls.push(c.trim().split(/\s+/)[0] ?? "");
+    } else urls.push(value);
   }
-  return out.filter((src) => src.trim() !== "" && !/^(https?:|data:|blob:)/i.test(src.trim()));
+  for (const m of html.matchAll(/url\(\s*(?:&quot;|["'])?([^"')\s&]+)/gi)) urls.push(m[1]);
+  for (const def of Object.values(new Marked().lexer(body).links ?? {})) urls.push(def.href);
+  return [...new Set(urls.map((u) => u.trim()))].filter((u) => u !== "" && !NOT_LOCAL.test(u));
 }
 
 /** Matches `name` in any case, with dashes, underscores and spaces interchangeable. */
@@ -1017,8 +1047,8 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
       });
     }
     if (flags.player && v2) {
-      for (const raw of localBodyImageRefs(rawBody)) {
-        bodyImageRefs.push({ raw, owner: `entity ${item.entity.id} (markdown or HTML image)` });
+      for (const raw of localBodyUrls(rawBody)) {
+        bodyImageRefs.push({ raw, owner: `entity ${item.entity.id} (link or image URL)` });
       }
     }
     if (flags.player) {
@@ -1584,8 +1614,13 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
         }
       }
     }
-    for (const ref of [...embeddedAssetRefs, ...bodyImageRefs]) {
+    for (const ref of embeddedAssetRefs) {
       storeErrors.push(`${ref.owner}: note images aren't published per campaign yet (${ref.raw})`);
+    }
+    for (const ref of bodyImageRefs) {
+      storeErrors.push(
+        `${ref.owner}: a note may link only to the web or an atlas note; local files aren't published per campaign yet (${ref.raw})`,
+      );
     }
     // Validation errors fail the build (exit 1), so nothing is written.
     errors.push(...storeErrors);
@@ -1769,12 +1804,16 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
         }
       : undefined;
   // Every v2 player store, strict or not: nothing the campaign's must-not-ship
-  // set names (or another campaign's id or name) may be in its atlas.json or
-  // search index, as text or as a path. The same matcher as
-  // check-derived-secrets --must-not-ship, on the exact text to be written.
+  // set names (or another campaign's name) may be in its atlas.json or search
+  // index, as text or as a path, and no campaign field may name another
+  // campaign. The same checks as check-derived-secrets --must-not-ship, on the
+  // exact JSON to be written.
   if (store && !report.failure) {
     const secrets = mustNotShipSecrets(store.mustNotShip, "must-not-ship");
+    const otherIds = store.mustNotShip.otherCampaigns.map((c) => c.id);
     const hits = [
+      ...foreignCampaignRefs(project, otherIds, store.campaign).map((h) => `atlas.json: ${h}`),
+      ...foreignCampaignRefs(searchIndex, otherIds).map((h) => `search-index.json: ${h}`),
       ...findSecretsInText(JSON.stringify(project), secrets).map(
         (s) => `atlas.json: ${s.field} "${s.name}"`,
       ),

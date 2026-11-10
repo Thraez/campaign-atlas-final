@@ -510,8 +510,10 @@ describe("campaign dirs (R-15)", () => {
     put("public/atlas/assets/maps/vale.webp", "webp");
     for (const id of ["a", "b"]) {
       put(`dist-campaigns/${id}/index.html`, "<html>");
-      put(ATLAS_JSON["built-site"](id), atlas);
-      put(ATLAS_JSON.store(id), withMap(atlas, "atlas/assets/maps/vale.webp"));
+      // Each campaign's atlas.json names its own campaign (check-derived-secrets checks it).
+      const own = JSON.stringify({ ...JSON.parse(atlas), campaign: { id, name: id } });
+      put(ATLAS_JSON["built-site"](id), own);
+      put(ATLAS_JSON.store(id), withMap(own, "atlas/assets/maps/vale.webp"));
       put(`.atlas-campaigns/${id}/atlas/assets/maps/vale.webp`, "webp");
       put(MUST_NOT_SHIP(id), mustNotShipFile(id));
     }
@@ -682,6 +684,7 @@ describe("campaign dirs (R-15)", () => {
         schemaVersion: 1,
         worlds: [],
         entities: [],
+        campaign: { id: "b", name: "b" },
         note: "Gloomharbour",
       }),
     );

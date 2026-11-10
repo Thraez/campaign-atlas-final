@@ -179,8 +179,9 @@ A store holds `atlas.json`, `search-index.json` and `assets/`: copies, never lin
 map images and audio its `atlas.json` names (maps under `assets/maps/<sha256-16><ext>`, byte for
 byte, so they stay lossless; audio under `assets/audio/<hash>.ogg`). No asset dir is shared. Each
 store is built whole in a temp folder beside it and renamed over the old one, so nothing of the
-last build survives; a build of every campaign also removes any folder in the root that isn't a
-current campaign. Stores are written only after every campaign has built and passed the check
+last build survives (a campaign's folder that isn't a store is refused); a build of every campaign
+also removes every other store-shaped folder (`<id>/atlas/atlas.json`) and leftover `.tmp-`/`.old-`
+folder in the root, and warns about, but leaves, anything else. Stores are written only after every campaign has built and passed the check
 below; if any fails, no store is written. (The swaps are one rename per campaign, not one atomic
 step across campaigns.) Each
 `atlas.json` names only its own campaign (`campaign: {id, name}`); the DM build carries every
@@ -200,15 +201,22 @@ stores under the config's `outputDir`, where the build writes them.
 The same match runs inside the build: every v2 player build, strict or not, checks each
 campaign's `atlas.json` and `search-index.json` in memory against its must-not-ship set before
 anything is written, and fails with exit 12, writing nothing, on a hit, wherever the name sits
-(body text, a heading, `summary`, `tags`, a markdown link). The set it checks, here and in
-`check-derived-secrets`, adds every other campaign's name and id (when they're specific enough to
-report).
+(body text, a heading, `summary`, `tags`). The set it checks, here and in
+`check-derived-secrets`, adds every other campaign's name (when specific enough to report); a
+name holding `"` or `\` is also matched in its JSON-escaped form. Other campaigns' ids are too
+common as words ("main"), so they are checked by structure instead (`foreignCampaignRefs`): the
+store's top-level `campaign.id` must be its own, and no `campaign`, `campaigns`, `campaignId` or
+`campaignIds` value, nor any key of a map under a key naming visibility or campaigns, may be
+another campaign's id. R-17b's isolation scan goes further.
 
 A note body that links a hidden item (a hidden map or world, or any must-not-ship id or name, as
 in `[[Hookhaven]]`) has that link redacted to `…`, as a link to a hidden note is, and the link
-counts as a cross-reference leak: a `--strict` build fails with exit 8. Entity images, embedded
-assets and markdown or HTML images (`![x](images/a.png)`, `<img src="images/a.png">`) in v2 notes
-aren't published per campaign yet: the player build fails closed on one. Tests:
+counts as a cross-reference leak: a `--strict` build fails with exit 8. Entity images and embedded
+assets in v2 notes aren't published per campaign yet, and a v2 note may link only to the web or to
+atlas notes: the player build fails closed (exit 1) on any URL the body yields (each `src`,
+`srcset` candidate, `href`, `poster` and the like of the rendered body, `url(...)`, and every
+reference definition) that isn't `http(s):`, `data:`, `blob:`, `mailto:` or a `#fragment`.
+Wikilinks and `![[embeds]]` are resolved by the build, not read as URLs. Tests:
 `src/test/build/campaign-stores.test.ts` (sentinels listed in `content-next/README.md`).
 
 ## Folder-level exclusion

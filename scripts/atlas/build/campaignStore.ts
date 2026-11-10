@@ -238,9 +238,12 @@ export function checkStoresRoot(outputRoot: string, guard: StoresRootGuard): voi
  * `<outputRoot>/<id>/atlas` with its must-not-ship file beside it.
  *
  * Each campaign dir is built whole in a temp sibling, then renamed over the
- * old one, so no file of an earlier build survives in it. With `prune` (a
- * build of every campaign) every other entry of the root goes too: a removed
- * campaign's store doesn't linger. The root is checked first
+ * old one, so no file of an earlier build survives in it. A campaign dir that
+ * is there but isn't a store (`looksLikeStore`) is refused, before anything
+ * is written. With `prune` (a build of every campaign) every other entry of
+ * the root that looks like a store, or is a leftover `.tmp-`/`.old-` dir,
+ * goes too, so a removed campaign's store doesn't linger; anything else is
+ * left and warned about. The root is checked first
  * (`checkStoresRoot`) and marked, and the swap starts only when every temp
  * dir is written. Not atomic across campaigns: a crash during the renames can
  * leave some campaigns new and some old (never a half-written store).
@@ -258,6 +261,14 @@ export function writeCampaignStores(
     }
   }
   const root = realPathNearest(outputRoot);
+  for (const { campaign } of stores) {
+    const final = path.join(root, campaign);
+    if (exists(final) && !looksLikeStore(final)) {
+      throw new Error(
+        `refusing to replace ${final}: it isn't a campaign store (no atlas/atlas.json in a real dir)`,
+      );
+    }
+  }
   fs.mkdirSync(root, { recursive: true });
   fs.writeFileSync(path.join(root, STORES_ROOT_MARKER), "");
   const tag = `${process.pid}-${crypto.randomBytes(4).toString("hex")}`;
@@ -283,10 +294,43 @@ export function writeCampaignStores(
   if (prune) {
     const keep = new Set([STORES_ROOT_MARKER, ...stores.map((s) => s.campaign)]);
     for (const entry of fs.readdirSync(root)) {
-      if (!keep.has(entry)) fs.rmSync(path.join(root, entry), { recursive: true, force: true });
+      if (keep.has(entry)) continue;
+      const full = path.join(root, entry);
+      if (looksLikeStore(full) || (/^\.(tmp|old)-/.test(entry) && isRealDir(full))) {
+        fs.rmSync(full, { recursive: true, force: true });
+      } else {
+        console.warn(`  ! left ${full} in the campaign stores root: it isn't a campaign store`);
+      }
     }
   }
   return stores.map(({ campaign }) => campaignStoreDir(root, campaign));
+}
+
+function exists(p: string): boolean {
+  try {
+    fs.lstatSync(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isRealDir(p: string): boolean {
+  try {
+    return fs.lstatSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** A real dir (not a link) holding `atlas/atlas.json`: what this build writes. */
+function looksLikeStore(dir: string): boolean {
+  if (!isRealDir(dir) || !isRealDir(path.join(dir, "atlas"))) return false;
+  try {
+    return fs.lstatSync(path.join(dir, "atlas", "atlas.json")).isFile();
+  } catch {
+    return false;
+  }
 }
 
 /** A store's files, JSON and must-not-ship file, into a fresh `storeDir`. */

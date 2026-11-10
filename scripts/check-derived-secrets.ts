@@ -191,16 +191,16 @@ export function secretsFromMustNotShip(file: string): SecretEntry[] {
 
 /**
  * A must-not-ship set as secret entries: its ids and names and every other
- * campaign's id and name (each as the vault's secret names are filtered), and
- * its paths through `normalizePath`. The build checks every campaign store
- * with these before writing it; the scan, from the file.
+ * campaign's name (each as the vault's secret names are filtered), and its
+ * paths through `normalizePath`. Other campaigns' ids aren't words to look
+ * for ("main" is too common): `foreignCampaignRefs` checks them by structure.
+ * The build checks every campaign store with these before writing it; the
+ * scan, from the file.
  */
 export function mustNotShipSecrets(m: MustNotShipFile, source: string): SecretEntry[] {
   const others = m.otherCampaigns;
   const out: SecretEntry[] = [
-    ...[...m.ids, ...others.map((c) => c.id)]
-      .filter(isReportableName)
-      .map((name) => ({ name, source, field: "id" as const })),
+    ...m.ids.filter(isReportableName).map((name) => ({ name, source, field: "id" as const })),
     ...[...m.names, ...others.map((c) => c.name)]
       .filter(isReportableName)
       .map((name) => ({ name, source, field: "title" as const })),
@@ -231,11 +231,18 @@ export function findSecretsInText(text: string, secrets: SecretEntry[]): SecretE
 
 type SecretPattern = { s: SecretEntry; re: RegExp };
 
+/**
+ * One pattern per entry, and for a name holding `"` or `\` a second one for
+ * its JSON-escaped form, as it reads inside a JSON string.
+ */
 function secretPatterns(secrets: SecretEntry[]): SecretPattern[] {
-  return secrets.map((s) => ({
-    s,
-    re: s.field === "path" ? pathPattern(s.name) : wholeWordPattern(s.name),
-  }));
+  return secrets.flatMap((s) => {
+    if (s.field === "path") return [{ s, re: pathPattern(s.name) }];
+    const out = [{ s, re: wholeWordPattern(s.name) }];
+    const escaped = JSON.stringify(s.name).slice(1, -1);
+    if (escaped !== s.name) out.push({ s, re: wholeWordPattern(escaped) });
+    return out;
+  });
 }
 
 function findWith(text: string, patterns: SecretPattern[]): SecretEntry[] {
@@ -244,9 +251,66 @@ function findWith(text: string, patterns: SecretPattern[]): SecretEntry[] {
     .replace(/\\/g, "/")
     .replace(/\/{2,}/g, "/")
     .toLowerCase();
-  return patterns
-    .filter(({ s, re }) => re.test(s.field === "path" ? asPath : text))
-    .map((p) => p.s);
+  return [
+    ...new Set(
+      patterns.filter(({ s, re }) => re.test(s.field === "path" ? asPath : text)).map((p) => p.s),
+    ),
+  ];
+}
+
+const CAMPAIGN_FIELD = /^campaign(s|_?ids?)?$/i;
+const PER_CAMPAIGN_MAP = /visib|campaign/i;
+
+/**
+ * Campaign isolation by structure (R-17; R-17b's isolation scan goes further).
+ * Another campaign's id must not be the value of a campaign field (`campaign`,
+ * `campaigns`, `campaignId`, `campaignIds`; a string, a list, or an object's
+ * `id`) or a key of a per-campaign map (one under a key naming visibility or
+ * campaigns), anywhere in the JSON. With `own`, the top-level `campaign` must
+ * be that campaign. Returns one line per problem.
+ */
+export function foreignCampaignRefs(
+  json: unknown,
+  others: readonly string[],
+  own?: string,
+): string[] {
+  const foreign = new Set(others.map((o) => o.toLowerCase()));
+  const hits: string[] = [];
+  if (own !== undefined) {
+    const top = (json as { campaign?: unknown } | null)?.campaign;
+    const id = typeof top === "string" ? top : (top as { id?: unknown } | undefined)?.id;
+    if (id !== own) hits.push(`campaign: is ${JSON.stringify(id ?? null)}, not "${own}"`);
+  }
+  const idsIn = (v: unknown): string[] => {
+    if (typeof v === "string") return [v];
+    if (Array.isArray(v)) return v.flatMap(idsIn);
+    if (v && typeof v === "object") {
+      const id = (v as { id?: unknown }).id;
+      return typeof id === "string" ? [id] : [];
+    }
+    return [];
+  };
+  const walk = (v: unknown, at: string, parentKey: string) => {
+    if (Array.isArray(v)) {
+      v.forEach((x, i) => walk(x, `${at}[${i}]`, parentKey));
+      return;
+    }
+    if (!v || typeof v !== "object") return;
+    for (const [k, child] of Object.entries(v)) {
+      const here = at ? `${at}.${k}` : k;
+      if (foreign.has(k.toLowerCase()) && PER_CAMPAIGN_MAP.test(parentKey)) {
+        hits.push(`${here}: another campaign's id as a key`);
+      }
+      if (CAMPAIGN_FIELD.test(k)) {
+        for (const id of idsIn(child)) {
+          if (foreign.has(id.toLowerCase())) hits.push(`${here}: another campaign's id "${id}"`);
+        }
+      }
+      walk(child, here, k);
+    }
+  };
+  walk(json, "", "");
+  return hits;
 }
 
 export function scanArtifactForSecrets(dir: string, secrets: SecretEntry[]): DerivedScanResult {
@@ -284,6 +348,26 @@ function wholeWordPattern(name: string): RegExp {
 function pathPattern(normalized: string): RegExp {
   const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(?<![^\\s"'/(=])${escaped}(?![\\p{L}\\p{N}._-])`, "u");
+}
+
+/** `foreignCampaignRefs` on every JSON file of a store; its atlas.json must name its own campaign. */
+function campaignStructureHits(dir: string, m: MustNotShipFile): string[] {
+  const others = m.otherCampaigns.map((c) => c.id);
+  const hits: string[] = [];
+  for (const full of listTextFiles(dir, "check-derived-secrets").files) {
+    if (!full.endsWith(".json")) continue;
+    const rel = path.relative(process.cwd(), full);
+    let json: unknown;
+    try {
+      json = JSON.parse(fs.readFileSync(full, "utf8"));
+    } catch {
+      hits.push(`${rel}: not valid JSON, so its campaign fields can't be checked`);
+      continue;
+    }
+    const own = path.basename(full) === "atlas.json" ? m.campaign : undefined;
+    for (const h of foreignCampaignRefs(json, others, own)) hits.push(`${rel}: ${h}`);
+  }
+  return hits;
 }
 
 function resolveConfig(configHint?: string): string | null {
@@ -339,14 +423,21 @@ export function run(opts: RunOpts): number {
     return 1;
   }
   const secrets = deriveSecretsFromVault(configAbs);
+  const structural: string[] = [];
   if (opts.mustNotShip) {
     // Fail closed: a store whose must-not-ship file can't be read isn't checked.
     try {
-      secrets.push(...secretsFromMustNotShip(path.resolve(process.cwd(), opts.mustNotShip)));
+      const m = readMustNotShip(path.resolve(process.cwd(), opts.mustNotShip));
+      secrets.push(...mustNotShipSecrets(m, path.basename(opts.mustNotShip)));
+      structural.push(...campaignStructureHits(targetAbs, m));
     } catch (err) {
       console.error(`atlas:check-derived-secrets: ${(err as Error).message}`);
       return 1;
     }
+  }
+  if (structural.length > 0) {
+    for (const h of structural) console.error(`  CAMPAIGN LEAK ${h}`);
+    return 12;
   }
   if (secrets.length === 0) {
     console.log("atlas:check-derived-secrets: vault has no dm/hidden notes — nothing to check");

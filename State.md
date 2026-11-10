@@ -107,9 +107,11 @@ Lowest number first within each folder.
 
 - Rebuild: phase 2 next; Isak decides when it starts (Rebuild queue above).
 - Hidden map and world names in note bodies (e.g. `[[Hookhaven]]`): since R-17 a link to one is
-  redacted to `…` (and fails `--strict`, exit 8); a plain-text mention isn't cut but fails
-  `check-derived-secrets` (exit 12) through the campaign's `must-not-ship.json`. R-17b's
-  isolation scan reads the same file.
+  redacted to `…` (and fails `--strict`, exit 8); a plain-text mention fails every v2 player
+  build (exit 12) and `check-derived-secrets` through the campaign's `must-not-ship.json`.
+  R-17b's isolation scan reads the same file.
+- An `.atlas-campaigns/` left by a build before R-17's review fixes has no `.atlas-campaigns-root`
+  marker, so the player build refuses it: delete it once.
 - Sync follow-ups from R-14: (a) the map-import wizard (`mapImport.ts`, `MapImportWizard.tsx`) still
   reads `defaultWorldId`; rework it to pick a world, then widen the default-world tripwire to
   `src/atlas/import`. (b) Sync writes notes before saving the sync map; with no DM build it fails

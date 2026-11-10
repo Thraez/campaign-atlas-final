@@ -455,7 +455,6 @@ describe("R-17: shipped text naming what the campaign hides fails the build (exi
       "a hidden id in tags",
       (t) => t.replace("  visibility: player", "  visibility: player\n  tags: [hookhaven]"),
     ],
-    ["a markdown link to a hidden id", (t) => t + "\nSee [the harbour](hookhaven).\n"],
     ["a hidden region's id", (t) => t + "\nNear gannet-rock.\n"],
     ["the other campaign's name", (t) => t + "\nUnlike the Lantern Road crew.\n"],
   ];
@@ -475,12 +474,21 @@ describe("R-17: shipped text naming what the campaign hides fails the build (exi
   });
 });
 
-describe("R-17: markdown and HTML images in a v2 note fail closed", () => {
+describe("R-17: a local file URL in a v2 note fails closed", () => {
   it.each([
-    ["markdown", "\n![x](images/oskmark.png)\n"],
-    ["HTML", '\n<img src="images/oskmark.png">\n'],
-    ["HTML, unquoted", "\n<img src=images/oskmark.png>\n"],
-  ])("%s image: exit 1, nothing written", async (_label, add) => {
+    ["markdown image", "\n![x](images/oskmark.png)\n"],
+    ["HTML image", '\n<img src="images/oskmark.png">\n'],
+    ["HTML image, unquoted", "\n<img src=images/oskmark.png>\n"],
+    ["reference-style image", "\n![x][r]\n\n[r]: images/oskmark.png\n"],
+    ["unused reference definition", "\ntext\n\n[r]: images/oskmark.png\n"],
+    [
+      "picture source srcset",
+      '\n<picture><source srcset="a.webp 1x, images/oskmark.png 2x"></picture>\n',
+    ],
+    ["HTML link", '\n<a href="images/oskmark.png">map</a>\n'],
+    ["markdown link to a file", "\n[map](images/oskmark.png)\n"],
+    ["markdown link to a hidden id", "\nSee [the harbour](hookhaven).\n"],
+  ])("%s: exit 1, nothing written", async (_label, add) => {
     const root = testWorld();
     const file = content(root, "quessaly/npcs/marra-quillon.md");
     fs.appendFileSync(file, add);
@@ -489,6 +497,21 @@ describe("R-17: markdown and HTML images in a v2 note fail closed", () => {
     vi.restoreAllMocks();
     expect(r).toMatchObject({ ok: false, exitCode: 1 });
     expect(fs.existsSync(path.join(root, ".atlas-campaigns"))).toBe(false);
+  });
+});
+
+describe("R-17: what a v2 note may link to", () => {
+  it("the web, mail, a fragment and wikilinks build; another campaign's id as a word is fine", async () => {
+    const root = testWorld();
+    fs.appendFileSync(
+      content(root, "quessaly/npcs/marra-quillon.md"),
+      "\n[site](https://example.com/a.png) [mail](mailto:a@b.c) [top](#top)\n" +
+        "She works the main road.\n",
+    );
+    silence();
+    const r = await runBuild({ player: true, strict: true, campaign: "sandbox" }, root);
+    vi.restoreAllMocks();
+    expect(r).toMatchObject({ ok: true, exitCode: 0 });
   });
 });
 
@@ -516,6 +539,43 @@ describe("R-17: stores are replaced whole", () => {
     expect(await runBuild({ player: true, strict: true }, root)).toMatchObject({ ok: true });
     vi.restoreAllMocks();
     expect(fs.readdirSync(stores).sort()).toEqual([STORES_ROOT_MARKER, "main", "sandbox"]);
+  });
+});
+
+describe("R-17: pruning leaves what isn't a store", () => {
+  it("a marked folder keeps its other files, with a warning", async () => {
+    const root = testWorld();
+    const out = path.join(root, "notes");
+    fs.mkdirSync(path.join(out, "sub"), { recursive: true });
+    fs.writeFileSync(path.join(out, STORES_ROOT_MARKER), "");
+    fs.writeFileSync(path.join(out, "keep.txt"), "x");
+    fs.writeFileSync(path.join(out, "sub", "keep.md"), "x");
+    fs.mkdirSync(path.join(out, "gone", "atlas"), { recursive: true });
+    fs.writeFileSync(path.join(out, "gone", "atlas", "atlas.json"), "{}");
+    silence();
+    const r = await runBuild({ player: true, strict: true, outDir: "notes" }, root);
+    const warned = vi.mocked(console.warn).mock.calls.flat().join("\n");
+    vi.restoreAllMocks();
+    expect(r).toMatchObject({ ok: true });
+    expect(fs.readdirSync(out).sort()).toEqual(
+      [STORES_ROOT_MARKER, "keep.txt", "main", "sandbox", "sub"].sort(),
+    );
+    expect(fs.existsSync(path.join(out, "sub", "keep.md"))).toBe(true);
+    expect(warned).toMatch(/keep\.txt.*isn't a campaign store/);
+  });
+
+  it("a campaign's folder that isn't a store is refused, nothing written", async () => {
+    const root = testWorld();
+    const out = path.join(root, "notes");
+    fs.mkdirSync(path.join(out, "main"), { recursive: true });
+    fs.writeFileSync(path.join(out, STORES_ROOT_MARKER), "");
+    fs.writeFileSync(path.join(out, "main", "keep.txt"), "x");
+    silence();
+    const r = await runBuild({ player: true, strict: true, outDir: "notes" }, root);
+    vi.restoreAllMocks();
+    expect(r).toMatchObject({ ok: false, exitCode: 1 });
+    expect(fs.readdirSync(out).sort()).toEqual([STORES_ROOT_MARKER, "main"].sort());
+    expect(fs.readdirSync(path.join(out, "main"))).toEqual(["keep.txt"]);
   });
 });
 

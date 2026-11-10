@@ -97,7 +97,20 @@ Review round 1 (five should-fixes):
   matches a path after `(` or `=`.
 - v1 output is still identical; the link redaction runs only for v2.
 
-Left out: markdown reference-style images and `<source>`/`<video>` tags aren't matched by the
-S5 check (the in-build path match still catches a hidden path); entity images and embedded assets in v2 notes fail the player build closed (not
+Review round 2:
+- Every URL a v2 note body yields (rendered `src`, `srcset`, `href`, `poster` and the like,
+  `url(...)`, reference definitions) fails the player build (exit 1) unless it is `http(s):`,
+  `data:`, `blob:`, `mailto:` or a `#fragment`: reference-style images, `<picture><source>`,
+  `<a href>` and markdown links to files are covered.
+- Other campaigns' ids left the word scan ("the main road" builds); `foreignCampaignRefs` checks
+  them by structure, in the build and in `check-derived-secrets`. Names stay in the word scan.
+- Pruning deletes only store-shaped folders and `.tmp-`/`.old-` leftovers and warns about the
+  rest; a campaign folder that isn't a store is refused. Names with `"` or `\` also match
+  JSON-escaped.
+
+Left out for R-17b: text split by markup or invisible characters (`Mire*fold*`, a soft hyphen)
+isn't matched; a campaign's name that is a common word ("Sandbox") fails another campaign's
+build when written as prose; the structural check knows only campaign-named fields and
+visibility/campaign-keyed maps. Entity images and embedded assets in v2 notes fail the player build closed (not
 published per campaign yet); a tiled map layer is an error; fogged v2 maps ship with no fog mask
 (R-18). `check-player-files` and the v1 store comments still describe the v1 layout (R-19).
