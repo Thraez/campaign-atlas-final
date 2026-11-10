@@ -45,6 +45,13 @@ unchanged is judged on the vault note's hash, and the sync map's `syncedFileHash
 bytes written, marker included, so an unchanged note stays unchanged. The build ignores the key and
 the player projection drops all frontmatter, so it never reaches players.
 
+**One world per sync (R-14).** A sync writes into one world: the editor's Sync panel uses the
+world of the open map and says which; `npm run atlas:sync` needs `--world <id>` when the DM build has
+more than one world. It only matches notes against that world's entities and only writes under
+`content/<world>/`. `.local-atlas/sync-map.json` keeps one map per world
+(`{"version": 2, "worlds": {...}}`); an older flat map reads as `defaultWorld`'s from
+`atlas.config.json`. The save guard and the scan read every world's entries.
+
 **A stale sync map.** A machine whose old `.local-atlas/sync-map.json` lists sample notes fails the
 scan (and can't save those notes while public). The scan's message says to delete the map.
 

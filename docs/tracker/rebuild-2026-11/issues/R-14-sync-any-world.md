@@ -1,6 +1,6 @@
 # R-14 Sync targets any world
 
-Status: ready-for-agent
+Status: done
 Blocked by: R-13
 Size: S-M
 Branch: `rebuild-r14-sync-any-world`
@@ -42,3 +42,16 @@ the wrong folder. The CLI already takes `--world` (`scripts/atlas-sync.ts:72`).
 
 No adversarial player-safety review needed unless the change touches what visibility Sync writes;
 if it does, it needs one.
+
+## Done
+
+A sync names its world: `syncWorldFromProject` refuses an unknown world and, with several worlds
+and none named, lists them; one world is the default. `worldEntities` keeps only the target
+world's entities (a worldless entity counts only in a one-world build), so a shared id matches
+the target's file only. `commitSync` refuses any change outside `content/<world>/`.
+`.local-atlas/sync-map.json` is now `{version: 2, worlds}`, read and written per world; an old
+flat map reads as `defaultWorld`'s (the dev route and the CLI port normalize it; the browser
+never guesses), and a failed read throws instead of reading as empty. R-01's guard and the scan
+read every world's entries. The Sync panel shows and passes the open map's world and is disabled
+without one. Beyond the spec: `SyncWorld.dmBuildSize` lets a sync create notes in a world that
+has no entities yet while the DM-build check still covers the whole build.

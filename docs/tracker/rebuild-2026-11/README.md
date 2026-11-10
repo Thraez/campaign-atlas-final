@@ -37,7 +37,7 @@ player output per campaign). Both are `accepted` (2026-11-08), with Isak's answe
 | 4 | [R-07b Fog shapes (conceals) dropped by the loader (done)](issues/R-07b-fog-conceals-dropped.md) | S | - | yes |
 | 4 | [R-13 Build assembles every world and the map tree (done)](issues/R-13-build-every-world-map-tree.md) | M | R-11b, R-12 | yes |
 | 5 | [R-17 One player output per campaign](issues/R-17-player-output-per-campaign.md) | M | R-13, R-15, R-16, R-11e | yes |
-| 5 | [R-14 Sync targets any world](issues/R-14-sync-any-world.md) | S-M | R-13 | if visibility |
+| 5 | [R-14 Sync targets any world (done)](issues/R-14-sync-any-world.md) | S-M | R-13 | if visibility |
 | 6 | [R-17b Structural campaign isolation scan](issues/R-17b-campaign-isolation-scan.md) | S-M | R-17 | yes |
 | 7 | [R-18 Fog per campaign, source-driven fog scan](issues/R-18-fog-per-campaign.md) | M | R-17, R-17b | yes |
 | 7 | [R-19 Publish runs every campaign](issues/R-19-publish-every-campaign.md) | S | R-17, R-17b | yes |
