@@ -1,6 +1,6 @@
 # R-17b Structural campaign isolation scan
 
-Status: ready-for-agent
+Status: done
 Blocked by: R-17
 Size: S-M
 Branch: `rebuild-r17b-isolation-scan`
