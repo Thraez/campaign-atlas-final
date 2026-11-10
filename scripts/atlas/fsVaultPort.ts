@@ -18,11 +18,12 @@ import {
 } from "../vite-plugin-atlas-save";
 import { isWritableSourcePath } from "../../src/atlas/save/sourcePathAllowlist";
 import { ConflictError, LocalSaveError } from "../../src/atlas/save/localFsSave";
-import type { SyncMap } from "../../src/atlas/import/syncMap";
+import { withWorldSyncMap, worldSyncMap } from "../../src/atlas/import/syncMap";
 import type { SyncSettings } from "../../src/atlas/sync/useSyncSettings";
 import { VaultScanError, type VaultPort } from "../../src/atlas/sync/vaultPort";
 import { HOSTING_PUBLIC_ERROR, HostingPublicError } from "../../src/atlas/sync/hosting";
 import { syncWritesAllowed } from "./hosting";
+import { readRepoSyncMapFile } from "./syncMapFile";
 
 export interface FsVaultPortOptions {
   /** The atlas repo: `content/`, `public/` and `.local-atlas/` live here. */
@@ -116,13 +117,14 @@ export function createFsVaultPort(opts: FsVaultPortOptions): VaultPort {
       throw new LocalSaveError(`Save refused (${r.status})`, r.payload);
     },
 
-    async loadSyncMap() {
-      return readLocalAtlasJson<SyncMap>(repoRoot, "sync-map.json", {});
+    async loadSyncMap(worldId) {
+      return worldSyncMap(await readRepoSyncMapFile(repoRoot), worldId);
     },
 
-    async saveSyncMap(map) {
+    async saveSyncMap(worldId, map) {
       refuseInDryRun("the sync map");
-      await writeLocalAtlasJson(repoRoot, "sync-map.json", map);
+      const file = await readRepoSyncMapFile(repoRoot);
+      await writeLocalAtlasJson(repoRoot, "sync-map.json", withWorldSyncMap(file, worldId, map));
     },
 
     async markSynced(at) {

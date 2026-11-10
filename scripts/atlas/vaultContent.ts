@@ -14,7 +14,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { readNote } from "../../src/atlas/content/readNote";
-import type { SyncMap } from "../../src/atlas/import/syncMap";
+import { allSyncMapEntries } from "../../src/atlas/import/syncMap";
 import { hasVaultSourceMarker } from "../../src/atlas/import/vaultSourceMarker";
 
 export interface SyncMapSignals {
@@ -25,21 +25,24 @@ export interface SyncMapSignals {
 
 export class SyncMapUnreadableError extends Error {}
 
-/** Ids and hashes from the sync map; empty sets when there is none. Throws on invalid JSON. */
+/**
+ * Ids and hashes from the sync map, every world's (R-14) and the old flat
+ * shape alike; empty sets when there is none. Throws on invalid JSON.
+ */
 export function readSyncMapSignals(repoRoot: string): SyncMapSignals {
   const ids = new Set<string>();
   const hashes = new Set<string>();
   const mapPath = path.join(repoRoot, ".local-atlas", "sync-map.json");
   if (!fs.existsSync(mapPath)) return { ids, hashes };
-  let map: SyncMap;
+  let map: unknown;
   try {
-    map = JSON.parse(fs.readFileSync(mapPath, "utf8")) as SyncMap;
+    map = JSON.parse(fs.readFileSync(mapPath, "utf8"));
   } catch (e) {
     throw new SyncMapUnreadableError(
       `.local-atlas/sync-map.json is not valid JSON (${(e as Error).message})`,
     );
   }
-  for (const entry of Object.values(map ?? {})) {
+  for (const entry of allSyncMapEntries(map)) {
     if (typeof entry?.id === "string" && entry.id) ids.add(entry.id);
     if (typeof entry?.syncedFileHash === "string") hashes.add(entry.syncedFileHash);
   }

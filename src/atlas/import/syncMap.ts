@@ -93,3 +93,95 @@ export function recordSync(
     },
   };
 }
+
+// ── The sync-map file, per world (R-14) ─────────────────────────────────────
+
+/**
+ * `.local-atlas/sync-map.json` since R-14: one `SyncMap` per world, so the
+ * same vault note synced into two worlds keeps an entry in each. A file
+ * written before R-14 is a bare `SyncMap` (path → entry); it reads as the
+ * v1 default world's (`atlas.config.json` `defaultWorld`), the only world
+ * Sync could write into then.
+ */
+export interface SyncMapFile {
+  version: 2;
+  /** World id → that world's sync map. */
+  worlds: Record<string, SyncMap>;
+}
+
+export const EMPTY_SYNC_MAP_FILE: SyncMapFile = { version: 2, worlds: {} };
+
+/** Thrown when a sync-map file can't be read as either shape. */
+export class SyncMapFormatError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SyncMapFormatError";
+  }
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+function isSyncMapFileShape(raw: Record<string, unknown>): boolean {
+  return raw.version === 2 && isRecord(raw.worlds);
+}
+
+/**
+ * A parsed sync-map file as `SyncMapFile`. A pre-R-14 map (no `version`)
+ * becomes `legacyWorldId`'s map; with `legacyWorldId` null, a non-empty old
+ * map throws, since nothing says which world it belongs to. Missing (null or
+ * undefined) reads as empty.
+ */
+export function readSyncMapFile(raw: unknown, legacyWorldId: string | null): SyncMapFile {
+  if (raw === null || raw === undefined) return { version: 2, worlds: {} };
+  if (!isRecord(raw)) throw new SyncMapFormatError("sync-map.json is not a JSON object");
+  if (isSyncMapFileShape(raw)) {
+    const worlds: Record<string, SyncMap> = {};
+    for (const [worldId, map] of Object.entries(raw.worlds as Record<string, unknown>)) {
+      if (!isRecord(map)) {
+        throw new SyncMapFormatError(`sync-map.json: world "${worldId}" is not an object`);
+      }
+      worlds[worldId] = { ...(map as SyncMap) };
+    }
+    return { version: 2, worlds };
+  }
+  if ("version" in raw) {
+    throw new SyncMapFormatError(`sync-map.json has an unknown version ${String(raw.version)}`);
+  }
+  if (Object.keys(raw).length === 0) return { version: 2, worlds: {} };
+  if (!legacyWorldId) {
+    throw new SyncMapFormatError(
+      "sync-map.json predates worlds (R-14) and no default world is known to read it as",
+    );
+  }
+  return { version: 2, worlds: { [legacyWorldId]: { ...(raw as SyncMap) } } };
+}
+
+/** One world's sync map (empty when the world has none yet). */
+export function worldSyncMap(file: SyncMapFile, worldId: string): SyncMap {
+  return { ...(file.worlds[worldId] ?? {}) };
+}
+
+/** The file with one world's map replaced; every other world is kept as it was. */
+export function withWorldSyncMap(file: SyncMapFile, worldId: string, map: SyncMap): SyncMapFile {
+  return { version: 2, worlds: { ...file.worlds, [worldId]: { ...map } } };
+}
+
+/**
+ * Every entry in a parsed sync-map file of either shape, whatever its world.
+ * For the R-01 vault-content signals, which must see every world's entries.
+ */
+export function allSyncMapEntries(raw: unknown): SyncMapEntry[] {
+  if (!isRecord(raw)) return [];
+  const maps: unknown[] = isSyncMapFileShape(raw)
+    ? Object.values(raw.worlds as Record<string, unknown>)
+    : [raw];
+  const out: SyncMapEntry[] = [];
+  for (const map of maps) {
+    if (!isRecord(map)) continue;
+    for (const entry of Object.values(map)) {
+      if (isRecord(entry)) out.push(entry as unknown as SyncMapEntry);
+    }
+  }
+  return out;
+}

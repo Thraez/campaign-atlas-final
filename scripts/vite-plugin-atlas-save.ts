@@ -88,6 +88,7 @@ import {
 } from "./atlas/buildLock";
 import { DEV_API_PATHS, DEV_API_PREFIX } from "./atlas/devRoutes";
 import { syncWritesAllowed } from "./atlas/hosting";
+import { readRepoSyncMapFile } from "./atlas/syncMapFile";
 import {
   isVaultNote,
   readSyncMapSignals,
@@ -1773,9 +1774,25 @@ export const DEV_ROUTES: readonly DevRoute[] = [
   },
 
   // GET /__atlas/local/editor-settings.json — reads .local-atlas/editor-settings.json
-  // GET /__atlas/local/sync-map.json — reads .local-atlas/sync-map.json
   overlayRoute(DEV_API_PATHS.localEditorSettings),
-  overlayRoute(DEV_API_PATHS.localSyncMap),
+
+  // GET /__atlas/local/sync-map.json — .local-atlas/sync-map.json as the
+  // per-world file (R-14): a missing map is empty, an old flat map reads as
+  // atlas.config.json `defaultWorld`'s. A corrupt map is 500, never "empty",
+  // so the editor can't overwrite it.
+  {
+    method: "GET",
+    path: DEV_API_PATHS.localSyncMap,
+    takesBuildLock: false,
+    body: null,
+    handle: async ({ root }) => {
+      try {
+        return { status: 200, json: await readRepoSyncMapFile(root) };
+      } catch (e) {
+        return { status: 500, json: { error: "SyncMapUnreadable", detail: (e as Error).message } };
+      }
+    },
+  },
 
   // POST /__atlas/local-write { name, contents }
   // Writes machine-local config (editor-settings.json or sync-map.json) only.

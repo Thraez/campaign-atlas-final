@@ -7,20 +7,20 @@
  *   - loadSettings: fetch throws → empty object (network error path)
  *   - saveSettings: POSTs with correct name + serialized contents
  *   - saveSettings: non-ok response → rejects (write failure surfaces, not swallowed)
- *   - loadSyncMap: successful fetch → parsed map
- *   - loadSyncMap: non-ok response → empty object
- *   - saveSyncMap: POSTs with correct name + serialized contents
- *   - saveSyncMap: non-ok response → rejects (write failure surfaces, not swallowed)
+ *   - loadSyncMapFile: successful fetch → the per-world file (R-14)
+ *   - loadSyncMapFile: non-ok response → rejects (a broken map is never read as empty)
+ *   - saveSyncMapFile: POSTs with correct name + serialized contents
+ *   - saveSyncMapFile: non-ok response → rejects (write failure surfaces, not swallowed)
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   loadSettings,
   saveSettings,
-  loadSyncMap,
-  saveSyncMap,
+  loadSyncMapFile,
+  saveSyncMapFile,
   type SyncSettings,
 } from "@/atlas/sync/useSyncSettings";
-import type { SyncMap } from "@/atlas/import/syncMap";
+import type { SyncMapFile } from "@/atlas/import/syncMap";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -88,32 +88,46 @@ describe("saveSettings", () => {
   });
 });
 
-// ── loadSyncMap ───────────────────────────────────────────────────────────────
+// ── loadSyncMapFile ───────────────────────────────────────────────────────────
 
-describe("loadSyncMap", () => {
-  it("returns the parsed sync map when fetch succeeds", async () => {
-    const map: SyncMap = {
-      "notes/corven.md": { id: "corven", baseType: "npc" },
-      "places/hall.md": { id: "great-hall", baseType: "location" },
+describe("loadSyncMapFile", () => {
+  it("returns the per-world file when fetch succeeds", async () => {
+    const file: SyncMapFile = {
+      version: 2,
+      worlds: {
+        a: { "notes/corven.md": { id: "corven", baseType: "npc" } },
+        b: { "places/hall.md": { id: "great-hall", baseType: "location" } },
+      },
     };
-    stubFetch(true, map);
-    expect(await loadSyncMap()).toEqual(map);
+    stubFetch(true, file);
+    expect(await loadSyncMapFile()).toEqual(file);
   });
 
-  it("returns {} when the response is not ok", async () => {
-    stubFetch(false);
-    expect(await loadSyncMap()).toEqual({});
+  it("rejects when the response is not ok, so a broken map is never overwritten as empty", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => "not valid JSON" }),
+    );
+    await expect(loadSyncMapFile()).rejects.toThrow(/500/);
+  });
+
+  it("rejects an old flat map: the dev server upgrades it, the browser can't tell its world", async () => {
+    stubFetch(true, { "notes/corven.md": { id: "corven", baseType: "npc" } });
+    await expect(loadSyncMapFile()).rejects.toThrow(/predates worlds/);
   });
 });
 
-// ── saveSyncMap ───────────────────────────────────────────────────────────────
+// ── saveSyncMapFile ───────────────────────────────────────────────────────────
 
-describe("saveSyncMap", () => {
-  it("POSTs to /__atlas/local-write with the correct name and serialized sync map", async () => {
+describe("saveSyncMapFile", () => {
+  it("POSTs to /__atlas/local-write with the correct name and serialized file", async () => {
     const stub = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", stub);
-    const map: SyncMap = { "notes/corven.md": { id: "corven", baseType: "npc" } };
-    await saveSyncMap(map);
+    const file: SyncMapFile = {
+      version: 2,
+      worlds: { w: { "notes/corven.md": { id: "corven", baseType: "npc" } } },
+    };
+    await saveSyncMapFile(file);
     expect(stub).toHaveBeenCalledWith(
       "/__atlas/local-write",
       expect.objectContaining({
@@ -121,7 +135,7 @@ describe("saveSyncMap", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: "sync-map.json",
-          contents: JSON.stringify(map, null, 2),
+          contents: JSON.stringify(file, null, 2),
         }),
       }),
     );
@@ -132,6 +146,6 @@ describe("saveSyncMap", () => {
       "fetch",
       vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => "disk full" }),
     );
-    await expect(saveSyncMap({})).rejects.toThrow(/500/);
+    await expect(saveSyncMapFile({ version: 2, worlds: {} })).rejects.toThrow(/500/);
   });
 });

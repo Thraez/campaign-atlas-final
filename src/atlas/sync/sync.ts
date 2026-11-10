@@ -6,6 +6,8 @@
  *
  * planSync, in order:
  *   1. refuses without the DM build (`DmBuildRequiredError`);
+ *      the `SyncWorld` holds only the target world's entities and sync map
+ *      (`syncWorldFromProject`, R-14);
  *   2. scans the vault (`VaultScanError` from the port);
  *   3. classifies each note against the sync map: a note with no entry at its
  *      path whose bytes match an entry elsewhere has moved, so it counts as
@@ -17,13 +19,14 @@
  * A dry run reads only.
  *
  * commitSync, in order:
- *   1. builds the file changes and checks every create target is still free,
+ *   1. builds the file changes, refuses any outside `content/<world>/`
+ *      (`ImportCommitError`), and checks every create target is still free,
  *      so a commit the save will refuse copies no image (`ConflictError`);
  *   2. copies embedded images and rewrites the embeds (a refused one is
  *      dropped and counted in `skippedImages`; a `HostingPublicError` from the
  *      port stops the commit, R-01);
  *   3. writes the files, marked `origin: "sync"` when they came from a vault;
- *   4. records every written vault note in the sync map, whether or not the
+ *   4. records every written vault note in the world's sync map, whether or not the
  *      rebuild worked, and stamps the sync time.
  * Errors: `ImportCommitError` (nothing to commit, unreadable atlas file),
  * `ConflictError`, and whatever the port's write throws (`SaveBusyError`).
@@ -55,9 +58,15 @@ import type { SyncSource, VaultPort } from "./vaultPort";
 export interface SyncWorld {
   worldId: string;
   importConfig: ImportFolderConfig;
-  /** Entity id → its content path. */
+  /** Entity id → its content path: this world's entities only (R-14). */
   existingById: ReadonlyMap<string, string>;
   entityMeta?: StagingContext["entityMeta"];
+  /**
+   * Entities with a source file in the whole DM build, every world's. Tells
+   * "no DM build loaded" apart from "a world with nothing in it yet"; when
+   * absent, `existingById.size` stands in (one world).
+   */
+  dmBuildSize?: number;
 }
 
 /** What a plan would do in one top-level vault folder. */
@@ -103,16 +112,25 @@ export function assertDmBuildLoaded(existingById: ReadonlyMap<string, string>): 
   if (existingById.size === 0) throw new DmBuildRequiredError();
 }
 
+/** Thrown when a sync names no world, or one the DM build doesn't have (R-14). */
+export class SyncWorldError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SyncWorldError";
+  }
+}
+
 /**
- * The sync world from a DM build: every entity with a source file, and the
- * world's import folders (the first world when `worldId` is not given).
+ * One world's entities in a DM build: id → source path, and the meta Staging
+ * reads. An entity of another world is left out, so a vault note can never
+ * match, update or overwrite it (R-14). An entity with no `world` counts only
+ * when the build has a single world (an older build).
  */
-export function syncWorldFromProject(project: AtlasProject, worldId?: string): SyncWorld {
-  const w = worldId ? project.worlds.find((x) => x.id === worldId) : project.worlds[0];
-  if (!w)
-    throw new Error(
-      worldId ? `No world "${worldId}" in the DM build` : "The DM build has no world",
-    );
+export function worldEntities(
+  project: Pick<AtlasProject, "worlds" | "entities">,
+  worldId: string,
+): { existingById: Map<string, string>; entityMeta: NonNullable<SyncWorld["entityMeta"]> } {
+  const oneWorld = project.worlds.length === 1 && project.worlds[0].id === worldId;
   const existingById = new Map<string, string>();
   const entityMeta = new Map<
     string,
@@ -120,14 +138,42 @@ export function syncWorldFromProject(project: AtlasProject, worldId?: string): S
   >();
   for (const e of project.entities) {
     if (!e.id || !e.sourcePath) continue;
+    if (e.world !== undefined && e.world !== "" ? e.world !== worldId : !oneWorld) continue;
     existingById.set(e.id, e.sourcePath);
     entityMeta.set(e.id, { visibility: e.visibility, type: e.type, sourcePath: e.sourcePath });
+  }
+  return { existingById, entityMeta };
+}
+
+/**
+ * The sync world from a DM build: the target world's entities with a source
+ * file (`worldEntities`) and its import folders. With more than one world the
+ * caller must name one; with exactly one, it is the default.
+ */
+export function syncWorldFromProject(project: AtlasProject, worldId?: string): SyncWorld {
+  const ids = project.worlds.map((x) => x.id);
+  let w: AtlasProject["worlds"][number] | undefined;
+  if (worldId) {
+    w = project.worlds.find((x) => x.id === worldId);
+    if (!w) {
+      throw new SyncWorldError(
+        `No world "${worldId}" in the DM build. Worlds: ${ids.join(", ") || "(none)"}.`,
+      );
+    }
+  } else if (ids.length === 1) {
+    w = project.worlds[0];
+  } else if (ids.length === 0) {
+    throw new SyncWorldError("The DM build has no world.");
+  } else {
+    throw new SyncWorldError(
+      `The DM build has ${ids.length} worlds; name the one to sync into. Worlds: ${ids.join(", ")}.`,
+    );
   }
   return {
     worldId: w.id,
     importConfig: w.importFolders ?? { folders: {}, defaultFolder: "imports" },
-    existingById,
-    entityMeta,
+    ...worldEntities(project, w.id),
+    dmBuildSize: project.entities.filter((e) => e.id && e.sourcePath).length,
   };
 }
 
@@ -153,9 +199,9 @@ export async function planSync(
   source: SyncSource,
   opts: { dryRun?: boolean } = {},
 ): Promise<SyncPlan> {
-  assertDmBuildLoaded(world.existingById);
+  if ((world.dmBuildSize ?? world.existingById.size) === 0) throw new DmBuildRequiredError();
   const files = await port.scanVault(source);
-  let syncMap = await port.loadSyncMap();
+  let syncMap = await port.loadSyncMap(world.worldId);
 
   // A sync-map path this scan could have seen. An entry outside it isn't
   // "gone from the vault", only unscanned, so nothing may move away from it.
@@ -183,7 +229,7 @@ export async function planSync(
     });
   }
   for (const [from, to] of moves) syncMap = moveSyncEntry(syncMap, from, to);
-  if (moves.length > 0 && !opts.dryRun) await port.saveSyncMap(syncMap);
+  if (moves.length > 0 && !opts.dryRun) await port.saveSyncMap(world.worldId, syncMap);
 
   const staged = buildStagingRows(inputs, stagingContext(world, syncMap));
   const rows: StagingRow[] = [];
@@ -270,6 +316,7 @@ export function existingFileReader(port: VaultPort): (path: string) => Promise<s
 
 export async function commitSync(
   port: VaultPort,
+  world: Pick<SyncWorld, "worldId">,
   rows: StagingRow[],
   source: SyncSource | null,
 ): Promise<SyncCommitResult> {
@@ -277,6 +324,16 @@ export async function commitSync(
 
   // Conflicts first: a commit the save will refuse must not copy images.
   const firstChanges = await buildImportChanges(rows, { readFile });
+  // R-14: rows staged for another world never write here (nor into its sync map).
+  const worldRoot = `content/${world.worldId}/`;
+  for (const c of firstChanges) {
+    if (!world.worldId || !c.path.startsWith(worldRoot)) {
+      throw new ImportCommitError(
+        `${c.path} is outside the world being synced (${worldRoot})`,
+        c.path,
+      );
+    }
+  }
   for (const c of firstChanges) {
     if (c.baseHash === null && (await port.readAtlasFile(c.path)) !== null) {
       throw new ConflictError("already-exists", c.path);
@@ -325,7 +382,7 @@ export async function commitSync(
   );
   if (vaultRows.length > 0) {
     const contentByPath = new Map(changes.map((c) => [c.path, c.content]));
-    let syncMap = await port.loadSyncMap();
+    let syncMap = await port.loadSyncMap(world.worldId);
     for (const r of vaultRows) {
       const content = contentByPath.get(r.targetPath);
       const syncedFileHash = content !== undefined ? await hashContent(content) : undefined;
@@ -338,7 +395,7 @@ export async function commitSync(
         syncedFileHash,
       );
     }
-    await port.saveSyncMap(syncMap);
+    await port.saveSyncMap(world.worldId, syncMap);
     await port.markSynced(new Date().toISOString());
   }
 

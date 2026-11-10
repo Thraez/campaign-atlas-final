@@ -80,6 +80,7 @@ import { SyncPanel } from "@/atlas/sync/SyncPanel";
 import { ImportStagingModal } from "@/atlas/import/ImportStagingModal";
 import { PasteMarkdownDialog } from "@/atlas/import/PasteMarkdownDialog";
 import { useMdImportFlow } from "@/atlas/import/useMdImportFlow";
+import { worldEntities } from "@/atlas/sync/sync";
 import { useMdDropZone } from "@/atlas/import/useMdDropZone";
 import { TabFrame } from "@/atlas/tabs/TabFrame";
 import { RegionsTab } from "@/atlas/tabs/RegionsTab";
@@ -278,36 +279,40 @@ function AtlasPlacementEditorInner() {
   // Phase 1C: md-import orchestration. existingById maps entity id → sourcePath
   // so the staging layer can detect same-id imports and route them to the
   // existing file in-place (update), rather than creating a parallel copy.
-  const importExistingById = useMemo(() => {
-    const m = new Map<string, string>();
-    if (!project) return m;
-    for (const e of project.entities) {
-      if (e.id && e.sourcePath) m.set(e.id, e.sourcePath);
-    }
-    return m;
-  }, [project]);
-
+  // R-14: import and Sync target the active map's world, and see only that
+  // world's entities, so a note never updates another world's entity.
   const importWorldId = project?.maps.find((m) => m.id === activeMapId)?.worldId ?? "";
+  const importEntities = useMemo(
+    () =>
+      project && importWorldId
+        ? worldEntities(project, importWorldId)
+        : {
+            existingById: new Map<string, string>(),
+            entityMeta: new Map<
+              string,
+              { visibility: EntityVisibility; type: string; sourcePath: string }
+            >(),
+          },
+    [project, importWorldId],
+  );
+  const importExistingById = importEntities.existingById;
+  const importEntityMeta = importEntities.entityMeta;
+  const dmBuildSize = useMemo(
+    () => (project?.entities ?? []).filter((e) => e.id && e.sourcePath).length,
+    [project],
+  );
+
   const importConfig = useMemo((): ImportFolderConfig => {
     const world = project?.worlds.find((w) => w.id === importWorldId);
     return world?.importFolders ?? { folders: {}, defaultFolder: "imports" };
   }, [project, importWorldId]);
-
-  const importEntityMeta = useMemo(() => {
-    const m = new Map<string, { visibility: EntityVisibility; type: string; sourcePath: string }>();
-    for (const e of project?.entities ?? []) {
-      if (e.id && e.sourcePath) {
-        m.set(e.id, { visibility: e.visibility, type: e.type, sourcePath: e.sourcePath });
-      }
-    }
-    return m;
-  }, [project]);
 
   const importFlow = useMdImportFlow({
     worldId: importWorldId,
     importConfig,
     existingById: importExistingById,
     entityMeta: importEntityMeta,
+    dmBuildSize,
     onImported: reloadCanon,
   });
   const [pasteOpen, setPasteOpen] = useState(false);
@@ -1959,10 +1964,12 @@ function AtlasPlacementEditorInner() {
             ),
             sync: (
               <SyncPanel
-                onSync={(root, globs, candidateFolders) =>
-                  void importFlow.openWithVaultScan(root, globs, candidateFolders)
+                worldId={importWorldId}
+                worldName={project.worlds.find((w) => w.id === importWorldId)?.name}
+                onSync={(root, globs, candidateFolders, worldId) =>
+                  void importFlow.openWithVaultScan(root, globs, candidateFolders, worldId)
                 }
-                hasDmBuild={importExistingById.size > 0}
+                hasDmBuild={dmBuildSize > 0}
               />
             ),
             // Menu-reachable panels (no rail icon — opened via ☰ menu or CommandPalette).

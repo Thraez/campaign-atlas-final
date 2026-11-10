@@ -158,7 +158,7 @@ describe("npm run atlas:sync", () => {
 
   it("a dry-run port refuses every write", async () => {
     const port = createFsVaultPort({ repoRoot: repo, dryRun: true });
-    await expect(port.saveSyncMap({})).rejects.toBeInstanceOf(DryRunWriteError);
+    await expect(port.saveSyncMap(WORLD, {})).rejects.toBeInstanceOf(DryRunWriteError);
     await expect(port.markSynced("now")).rejects.toBeInstanceOf(DryRunWriteError);
     await expect(
       port.writeAtlasFiles([

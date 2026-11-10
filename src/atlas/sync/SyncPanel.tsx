@@ -8,10 +8,18 @@ import { Label } from "@/components/ui/label";
 import { loadSettings, saveSettings, type SyncSettings } from "./useSyncSettings";
 
 export interface SyncPanelProps {
+  /**
+   * The world a sync writes into (R-14). Empty means none: Sync is off. The
+   * panel passes it back with every `onSync`, so the caller never guesses.
+   */
+  worldId: string;
+  /** Shown beside the id; defaults to the id. */
+  worldName?: string;
   onSync: (
     vaultRoot: string,
     ignoreGlobs: string[],
     candidateFolders: string[],
+    worldId: string,
   ) => void | Promise<void>;
   /** False when no DM build/entities are loaded — Sync merges against the full DM atlas. */
   hasDmBuild?: boolean;
@@ -54,7 +62,7 @@ export function VaultFolderPicker({ folders, selected, onChange }: VaultFolderPi
   );
 }
 
-export function SyncPanel({ onSync, hasDmBuild = true }: SyncPanelProps) {
+export function SyncPanel({ worldId, worldName, onSync, hasDmBuild = true }: SyncPanelProps) {
   const [settings, setSettings] = useState<SyncSettings>({});
   const [vaultPath, setVaultPath] = useState("");
   const [globsText, setGlobsText] = useState("");
@@ -111,23 +119,32 @@ export function SyncPanel({ onSync, hasDmBuild = true }: SyncPanelProps) {
 
   const handleSync = useCallback(async () => {
     const root = vaultPath.trim();
-    if (!root) return;
+    if (!root || !worldId) return;
     setIsSyncing(true);
     try {
       const globs = globsText
         .split("\n")
         .map((l) => l.trim())
         .filter(Boolean);
-      await onSync(root, globs, candidateFolders);
+      await onSync(root, globs, candidateFolders, worldId);
     } finally {
       setIsSyncing(false);
     }
-  }, [vaultPath, globsText, candidateFolders, onSync]);
+  }, [vaultPath, globsText, candidateFolders, onSync, worldId]);
 
   const lastSync = settings.lastSyncAt ? new Date(settings.lastSyncAt).toLocaleString() : null;
 
   return (
     <div className="flex flex-col gap-4 p-4">
+      <p className="text-xs text-muted-foreground" data-testid="sync-target-world">
+        {worldId ? (
+          <>
+            Syncs into <strong>{worldName || worldId}</strong> (<code>content/{worldId}/</code>)
+          </>
+        ) : (
+          "No world to sync into: open a map first."
+        )}
+      </p>
       <div className="space-y-1.5">
         <Label className="text-xs">Obsidian vault path</Label>
         <Input
@@ -189,7 +206,7 @@ export function SyncPanel({ onSync, hasDmBuild = true }: SyncPanelProps) {
           size="sm"
           variant="default"
           className="flex-1 gap-1.5"
-          disabled={!vaultPath.trim() || isSyncing || !hasDmBuild}
+          disabled={!vaultPath.trim() || isSyncing || !hasDmBuild || !worldId}
           onClick={() => void handleSync()}
         >
           <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`} />

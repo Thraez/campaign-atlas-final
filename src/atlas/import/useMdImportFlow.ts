@@ -31,15 +31,25 @@ import { HostingPublicError } from "../sync/hosting";
 import { VaultScanError, type SyncSource, type VaultPort } from "../sync/vaultPort";
 
 export interface UseMdImportFlowArgs {
-  /** Active world id; drives target-path allowlist. */
+  /**
+   * The world this flow imports and syncs into; drives the target-path
+   * allowlist and which world's sync map a vault sync uses (R-14). Empty
+   * means none picked: a vault sync is refused.
+   */
   worldId: string;
   /** Folder configuration for the active world; drives the allowed-folder set. */
   importConfig: ImportFolderConfig;
-  /** Map of entity id → sourcePath for conflict detection (update vs create). */
+  /**
+   * Entity id → sourcePath for conflict detection (update vs create): this
+   * world's entities only (`worldEntities` in `../sync/sync`), so a note can
+   * never update another world's entity.
+   */
   existingById: ReadonlyMap<string, string>;
   /** Entity id → its visibility and type in the DM atlas, so an update row shows
    *  the visibility it keeps and a secrecy increase is held for review. */
   entityMeta?: StagingContext["entityMeta"];
+  /** Entities with a source file in the whole DM build (see `SyncWorld.dmBuildSize`). */
+  dmBuildSize?: number;
   /** Called after a successful import so the editor can reload canon. */
   onImported: () => void | Promise<void>;
   /** Where sync reads and writes; the dev endpoint unless a test passes another. */
@@ -47,7 +57,7 @@ export interface UseMdImportFlowArgs {
 }
 
 export function useMdImportFlow(args: UseMdImportFlowArgs) {
-  const { worldId, importConfig, existingById, entityMeta, onImported } = args;
+  const { worldId, importConfig, existingById, entityMeta, dmBuildSize, onImported } = args;
   const [rows, setRows] = useState<StagingRow[]>([]);
   const [open, setOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -57,8 +67,8 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
   const sourceRef = useRef<SyncSource | null>(null);
 
   const world = useMemo(
-    (): SyncWorld => ({ worldId, importConfig, existingById, entityMeta }),
-    [worldId, importConfig, existingById, entityMeta],
+    (): SyncWorld => ({ worldId, importConfig, existingById, entityMeta, dmBuildSize }),
+    [worldId, importConfig, existingById, entityMeta, dmBuildSize],
   );
   const ctx = useMemo(() => stagingContext(world), [world]);
 
@@ -95,7 +105,21 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
   );
 
   const openWithVaultScan = useCallback(
-    async (vaultRoot: string, ignoreGlobs: string[], candidateFolders: string[] = []) => {
+    async (
+      vaultRoot: string,
+      ignoreGlobs: string[],
+      candidateFolders: string[],
+      /** The world to sync into, named by the caller (R-14); must be this flow's world. */
+      targetWorldId: string,
+    ) => {
+      if (!targetWorldId || targetWorldId !== worldId) {
+        toast.error(
+          targetWorldId
+            ? `Sync can't target "${targetWorldId}" here: this view works on "${worldId || "no world"}".`
+            : "Pick a world to sync into first.",
+        );
+        return;
+      }
       const source: SyncSource = { vaultRoot, ignoreGlobs, candidateFolders };
       let planned: StagingRow[];
       try {
@@ -113,6 +137,11 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
           );
           return;
         }
+        // e.g. an unreadable sync map: say so rather than lose it in a rejected promise.
+        if (err instanceof Error) {
+          toast.error(`Sync failed: ${err.message}`);
+          return;
+        }
         throw err;
       }
       if (planned.length === 0) {
@@ -123,7 +152,7 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
       setRows(planned);
       setOpen(true);
     },
-    [port, world],
+    [port, world, worldId],
   );
 
   const patchRow = useCallback(
@@ -141,7 +170,7 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
   const commit = useCallback(async () => {
     setIsImporting(true);
     try {
-      const result = await commitSync(port, rows, sourceRef.current);
+      const result = await commitSync(port, world, rows, sourceRef.current);
       const count = result.saved;
       if (result.skippedImages > 0) {
         const n = result.skippedImages;
@@ -218,7 +247,7 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
     } finally {
       setIsImporting(false);
     }
-  }, [port, rows, onImported]);
+  }, [port, world, rows, onImported]);
 
   return {
     open,
