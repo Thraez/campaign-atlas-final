@@ -62,6 +62,8 @@ export const TEXT_EXTENSIONS = new Set([
   ".webmanifest",
   ".svg",
   ".md",
+  // Source maps carry the sources' text.
+  ".map",
 ]);
 
 /**

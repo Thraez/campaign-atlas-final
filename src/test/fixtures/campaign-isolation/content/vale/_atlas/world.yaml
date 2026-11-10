@@ -1,0 +1,42 @@
+# R-17b fixture. `c1` and `hookhaven` aren't in campaign a's file, so a hides them.
+schemaVersion: 2
+world:
+  id: vale
+  name: The Vale
+maps:
+  - id: vale-overview
+    name: Vale
+    width: 1000
+    height: 1000
+    visibility: player
+    scale: { unitsPerPixel: 0.1, unitLabel: mi }
+    zoom: { min: -2, max: 2 }
+    layers: []
+    regions:
+      - id: meadow
+        name: Meadow
+        visibility: player
+        points: [[0, 0], [10, 0], [10, 10]]
+    pins:
+      - { note: inn, x: 1, y: 1, visibility: player }
+      - { note: gloomharbour-vault, x: 500, y: 600, visibility: player }
+      # The shipped inn's second pin, dropped by visibility: its spot is guarded.
+      - { note: inn, x: 300, y: 300, visibility: dm }
+  - id: c1
+    name: Bog
+    width: 100
+    height: 100
+    visibility: player
+    scale: { unitsPerPixel: 0.1, unitLabel: mi }
+    zoom: { min: -2, max: 2 }
+    layers:
+      - { id: base-cellar, src: images/c1.png, x: 0, y: 0, width: 100, height: 100 }
+  - id: hookhaven
+    name: Hookhaven
+    width: 100
+    height: 100
+    visibility: player
+    scale: { unitsPerPixel: 0.1, unitLabel: mi }
+    zoom: { min: -2, max: 2 }
+    layers:
+      - { id: chart, src: images/hookhaven-chart.png, x: 0, y: 0, width: 100, height: 100 }

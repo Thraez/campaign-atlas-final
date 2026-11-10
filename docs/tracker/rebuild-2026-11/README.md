@@ -38,7 +38,7 @@ player output per campaign). Both are `accepted` (2026-11-08), with Isak's answe
 | 4 | [R-13 Build assembles every world and the map tree (done)](issues/R-13-build-every-world-map-tree.md) | M | R-11b, R-12 | yes |
 | 5 | [R-17 One player output per campaign (done)](issues/R-17-player-output-per-campaign.md) | M | R-13, R-15, R-16, R-11e | yes |
 | 5 | [R-14 Sync targets any world (done)](issues/R-14-sync-any-world.md) | S-M | R-13 | if visibility |
-| 6 | [R-17b Structural campaign isolation scan](issues/R-17b-campaign-isolation-scan.md) | S-M | R-17 | yes |
+| 6 | [R-17b Structural campaign isolation scan](issues/R-17b-campaign-isolation-scan.md) (done) | S-M | R-17 | yes |
 | 7 | [R-18 Fog per campaign, source-driven fog scan](issues/R-18-fog-per-campaign.md) | M | R-17, R-17b | yes |
 | 7 | [R-19 Publish runs every campaign](issues/R-19-publish-every-campaign.md) | S | R-17, R-17b | yes |
 | 8 | [R-20 Migration and down-migration, dry run](issues/R-20-migration-dry-run.md) | S-M | R-17, R-18 | yes |
@@ -53,7 +53,7 @@ R-17b are new (split out of R-11a and R-17 in review).
 
 - **Done 2026-11-08:** Isak accepted every "Open for Isak" recommendation in ADR-0003 and ADR-0004
   and the three fail-closed rules.
-- **Done:** R-11c (merged), R-07b, R-13, R-11e, R-14, R-17, R-07. **Now:** R-17b. **Then:** R-18 and R-19; R-20.
+- **Done:** R-11c (merged), R-07b, R-13, R-11e, R-14, R-17, R-07, R-17b. **Now:** R-18 and R-19. **Then:** R-20.
 
 Phase 3 and 4 tickets are written before phase 2 ends (plan.md section 5). Phase H (H-01..H-04)
 starts after R-19 at the earliest and before the first real Sync (`tidemarrow/01`).

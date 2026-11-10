@@ -27,16 +27,22 @@
  * store whose player JSON names no `assets/` file has nothing for
  * `audit-assets` to measure, so its `assets/` dir is required only when
  * that JSON names one (or can't be read: fail closed).
+ *
+ * Campaign isolation (R-17b). `check-campaign-isolation` runs on each v2
+ * campaign's store and built site only (`v2Only`): the legacy pair and v1
+ * content have no must-not-ship file to check against, so a v1 run has none
+ * of its tasks.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { playerAtlasJsonPath, type ArtifactLayout } from "./playerArtifact.js";
 import { SAFE_ID, loadAtlasModel } from "./loadAtlasModel.js";
-import { campaignStoreDir, mustNotShipPath } from "./build/campaignStore.js";
+import { STORE_DIR, campaignStoreDir, mustNotShipPath } from "./build/campaignStore.js";
 import { readPlayerImageRefs } from "./playerImageRefs.js";
 
 import { run as checkNoSecrets } from "../check-no-secrets.js";
 import { run as checkDerivedSecrets } from "../check-derived-secrets.js";
+import { run as checkCampaignIsolation } from "../check-campaign-isolation.js";
 import { run as checkImagePrivacy } from "../check-image-privacy.js";
 import { run as checkFogSafety } from "../check-fog-safety.js";
 import { run as checkArtifactShape } from "../check-artifact-shape.js";
@@ -48,6 +54,7 @@ import { run as auditAssets } from "./audit-assets.js";
 export type ScanId =
   | "check-no-secrets"
   | "check-derived-secrets"
+  | "check-campaign-isolation"
   | "check-artifact-shape"
   | "check-image-privacy"
   | "check-fog-safety"
@@ -98,6 +105,12 @@ interface ScanEntry {
   script: string;
   /** Why the integrity smoke has no planted-fault variant, if it has none. */
   smokeSkip?: string;
+  /**
+   * Why this scan has tasks only on v2 per-campaign outputs (none on v1
+   * content or the legacy pair), if so. `scanRegistry.test.ts` exempts such a
+   * scan, and only it, from "every scan has a task" on v1 content.
+   */
+  v2Only?: string;
   /** `artifacts`: every campaign's artifacts (`campaignArtifacts`), loaded once per run. */
   tasks: (ctx: ScanContext, artifacts: CampaignArtifact[]) => TaskSpec[];
 }
@@ -313,6 +326,41 @@ export const SCANS: ScanEntry[] = [
           ],
         ),
       ),
+  },
+  {
+    id: "check-campaign-isolation",
+    script: "check-campaign-isolation.ts",
+    v2Only:
+      "it checks a campaign's output against that campaign's must-not-ship file, which only v2 builds write",
+    // Each v2 campaign's store and built site; a built site is also compared
+    // with its store, so that store's atlas.json is required too.
+    tasks: (ctx, arts) =>
+      arts.flatMap((a) => {
+        if (!a.mustNotShip) return [];
+        const mustNotShip = a.mustNotShip;
+        const atlasDir = path.dirname(playerAtlasJsonPath(a.dir, a.layout));
+        const store = path.join(path.dirname(mustNotShip), STORE_DIR);
+        return [
+          artifactTask(
+            "check-campaign-isolation",
+            a,
+            () =>
+              checkCampaignIsolation({
+                dir: a.dir,
+                layout: a.layout,
+                config: ctx.configPath,
+                mustNotShip,
+              }),
+            [
+              file(path.join(atlasDir, "search-index.json")),
+              file(mustNotShip),
+              file(ctx.configPath),
+              dir(ctx.contentDir),
+              ...(a.layout === "built-site" ? [file(path.join(store, "atlas.json"))] : []),
+            ],
+          ),
+        ];
+      }),
   },
   {
     id: "check-artifact-shape",

@@ -955,7 +955,7 @@ describe("rule 8: name collisions and must-not-ship", () => {
     expect(pinShips(a, "m")).toBe(false);
     expect(noteShips(a, "salt-marsh")).toBe(true);
     expect(a.collisions).toEqual([]);
-    expect(a.mustNotShip.pinLocations).toEqual([{ map: "m", index: 0, x: 800, y: 300 }]);
+    expect(a.mustNotShip.pinLocations).toEqual([{ map: "m", index: 0, note: "salt-marsh", x: 800, y: 300 }]);
     expect(a.mustNotShip.names).toEqual([]);
     expect(a.mustNotShip.ids).toEqual([]);
     const b = resolveCampaign(twoCampaigns(m, LEFT_HALF), [saltMarsh], "b");
@@ -1192,9 +1192,9 @@ describe("rule 9: a hidden region hides what is inside or reaching into it", () 
     it("a hidden pin adds its location, not its note's name; the note still ships", () => {
       expect(noteShips(a, "n")).toBe(true);
       expect(a.mustNotShip.pinLocations).toEqual([
-        { map: "m", index: 0, x: 500, y: 500 },
-        { map: "m", index: 1, x: 400, y: 500 },
-        { map: "m", index: 2, x: 600, y: 600 },
+        { map: "m", index: 0, note: "n", x: 500, y: 500 },
+        { map: "m", index: 1, note: "n", x: 400, y: 500 },
+        { map: "m", index: 2, note: "n", x: 600, y: 600 },
       ]);
       expect(a.mustNotShip.names).toEqual(["The Lair"]);
       expect(a.mustNotShip.ids).toEqual(["lair"]);

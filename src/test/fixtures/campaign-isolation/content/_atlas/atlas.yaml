@@ -1,0 +1,17 @@
+# R-17b fixture: campaign `a` hides a world, two maps, a note and a pin. Invented content.
+schemaVersion: 2
+ocean:
+  width: 1000
+  height: 1000
+  sea: default
+worlds:
+  - vale
+  - fen
+campaigns:
+  - a
+  - main
+onOcean:
+  - { map: vale-overview, x: 0, y: 0, scale: 1, rotation: 0 }
+  - { map: c1, x: 200, y: 0, scale: 1, rotation: 0 }
+  - { map: hookhaven, x: 400, y: 0, scale: 1, rotation: 0 }
+  - { map: fen-reach, x: 600, y: 0, scale: 1, rotation: 0 }

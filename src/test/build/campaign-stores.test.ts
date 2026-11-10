@@ -337,6 +337,10 @@ describe("R-17: one player store per campaign", () => {
     vi.restoreAllMocks();
     expect(results.filter(([, code]) => code !== 0)).toEqual([]);
     expect(results.length).toBeGreaterThan(20);
+    // R-17b: the isolation scan ran on each campaign's store and built site.
+    expect(results.filter(([label]) => label.startsWith("check-campaign-isolation ")).length).toBe(
+      4,
+    );
   });
 });
 

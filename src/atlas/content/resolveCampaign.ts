@@ -202,6 +202,8 @@ export interface NoteVerdict extends Verdict {
 export interface PinLocation {
   map: MapId;
   index: number;
+  /** The pin's note: a placement of this note at this spot is the dropped pin shipping. */
+  note: NoteId;
   x: number;
   y: number;
 }
@@ -854,7 +856,7 @@ export function resolveCampaign(
       else v = { ships: true, reason: "ships" };
       pinShips.push(v.ships);
       pins.push({ map: map.id, index, note: pin.note, ...v });
-      if (!v.ships) pinLocations.push({ map: map.id, index, x: pin.x, y: pin.y });
+      if (!v.ships) pinLocations.push({ map: map.id, index, note: pin.note, x: pin.x, y: pin.y });
       const seen = pinsByNote.get(pin.note) ?? { anyShips: false, hiddenBy: [] };
       seen.anyShips ||= v.ships;
       for (const h of hitBy) seen.hiddenBy.push({ map: map.id, region: h.region.id });

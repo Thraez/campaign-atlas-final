@@ -1,0 +1,14 @@
+# R-17b fixture: a world whose one map campaign a doesn't list.
+schemaVersion: 2
+world:
+  id: fen
+  name: Fen
+maps:
+  - id: fen-reach
+    name: Fen Reach
+    width: 100
+    height: 100
+    visibility: player
+    scale: { unitsPerPixel: 0.1, unitLabel: mi }
+    zoom: { min: -2, max: 2 }
+    layers: []

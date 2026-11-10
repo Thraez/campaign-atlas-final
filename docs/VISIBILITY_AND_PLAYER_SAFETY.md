@@ -84,7 +84,7 @@ Similarly, player-visible **regions** and **routes** that reference DM-only enti
 
 The player build ships what the per-campaign resolver ([ADR-0004](adr/0004-per-campaign-visibility-and-outputs.md)) decides for campaign `main`, read through the v1 adapter: notes, pins, regions, routes and sound areas, fog included. A region or sound-only area with any part of its area under fog, or a route with any part of its path under fog, doesn't ship (fog between lit corners or waypoints counts). A DM-only item and a shipped one that share a name (rule 8) fail every player build, strict or not, with exit 10, naming both; an orphan `notes:` entry fails any player build with exit 11, naming world and key. A sound area with no id, or an id another area on its map shares, fails a strict player build with exit 22, and every player build drops all areas that id names (an area plays only on its own verdict). All three stay out of the shipped build report.
 
-A hidden region hides what is inside it or reaching into it (ADR-0004 rule 9). On a map that ships, a region hidden for its own sake (its visibility, or a linked note that doesn't ship) is a *hiding region*; one hidden only by fog or only by this rule is not. These don't ship, with reason `in-hidden-region`: a pin inside a hiding region or on its edge; a route with any point inside one, or any segment crossing into it, touching it or running along its edge; and a sound-only area or region that shares interior with one without wholly containing it. A child map whose frame does the same doesn't ship either (`frame-in-hidden-region`), and takes its whole subtree with it. "Wholly contains" means strictly inside, sharing no boundary, so an area identical to the hiding region hides. Hidden wins over a shipped region covering the same point. A hiding region with fewer than 3 finite points, or with no area, can't be tested (in v1, neither can a region the world loader drops, a repeated id or one short of 3 points, unless it is marked `visibility: player`): it hides everything on its map that this rule tests, and fails every player build with exit 12, naming map and region. A note whose every pin this rule hides still ships if its own visibility says so; the build warns, naming the note and the region. These messages stay out of the shipped build report too. `npm run atlas:tree` lists each shipped map's hidden items and why.
+A hidden region hides what is inside it or reaching into it (ADR-0004 rule 9). On a map that ships, a region hidden for its own sake (its visibility, or a linked note that doesn't ship) is a _hiding region_; one hidden only by fog or only by this rule is not. These don't ship, with reason `in-hidden-region`: a pin inside a hiding region or on its edge; a route with any point inside one, or any segment crossing into it, touching it or running along its edge; and a sound-only area or region that shares interior with one without wholly containing it. A child map whose frame does the same doesn't ship either (`frame-in-hidden-region`), and takes its whole subtree with it. "Wholly contains" means strictly inside, sharing no boundary, so an area identical to the hiding region hides. Hidden wins over a shipped region covering the same point. A hiding region with fewer than 3 finite points, or with no area, can't be tested (in v1, neither can a region the world loader drops, a repeated id or one short of 3 points, unless it is marked `visibility: player`): it hides everything on its map that this rule tests, and fails every player build with exit 12, naming map and region. A note whose every pin this rule hides still ships if its own visibility says so; the build warns, naming the note and the region. These messages stay out of the shipped build report too. `npm run atlas:tree` lists each shipped map's hidden items and why.
 
 ## Profiles and relationships
 
@@ -124,15 +124,16 @@ Every publish runs `npm run atlas:publish`, which chains:
 atlas:snapshot                # copy the current atlas.json to .last-published.json as a rollback baseline
 atlas:build:player --strict   # the build itself; exits 3-11 on safety failures
 build                         # vite build (excludes editor via __INCLUDE_EDITOR__)
-atlas:scan                    # runs all eight safety scanners + audit-assets in parallel (scripts/atlas/publish-orchestrator.ts)
+atlas:scan                    # runs all nine safety scanners + audit-assets in parallel (scripts/atlas/publish-orchestrator.ts)
 ```
 
-`atlas:scan` runs `publish-orchestrator.ts`, which fans out to eight safety scanners (each checked against both the `dist` bundle and `public/atlas`, except `check-shape`, which only checks `public/atlas/atlas.json`, `check-player-files`, which only checks `dist`, and `check-vault-content`, which checks `content/`) plus `audit-assets`.
+`atlas:scan` runs `publish-orchestrator.ts`, which fans out to nine safety scanners (each checked against both the `dist` bundle and `public/atlas`, except `check-shape`, which only checks `public/atlas/atlas.json`, `check-player-files`, which only checks `dist`, `check-vault-content`, which checks `content/`, and `check-campaign-isolation`, which runs only on v2 content, over each campaign's store and built site) plus `audit-assets`.
 
 What each scanner catches:
 
 - **`check-no-secrets`** (`npm run atlas:check-secrets`) — greps the output for verbatim DM entity titles, ids, and aliases. Catches whole-name leaks.
 - **`check-derived-secrets`** (`npm run atlas:check-derived`) — greps the output for DM-only profile values (e.g. the literal string from `profile.dm.secret`). Catches a content-fragment leak even if the entity name doesn't appear.
+- **`check-campaign-isolation`** (`npm run atlas:check-isolation`, v2 only, exits 23/24/25) — checks one campaign's output against its must-not-ship file by structure, text and assets, so a hidden id or name too short for a text search still fails. See "Campaign isolation (R-17b)" below.
 - **`check-artifact-shape`** (`npm run atlas:check-shape`) — validates the structure of `atlas.json`: no entity has visibility `dm`/`hidden`, no placement points at a missing entity, etc.
 - **`check-image-privacy`** (`npm run atlas:check-image-privacy`) — catches two image-specific leak vectors a text scan can't see: leftover EXIF/IPTC/XMP metadata on a shipped image, and a filename that itself contains a derived-secret name.
 - **`check-fog-safety`** (`npm run atlas:check-fog`) — re-derives the fog boundary from the source `world.yaml` and asserts the player artifacts don't leak it: the original (un-redacted) layer PNG, unstripped fog geometry, a player pin inside the fogged area or a region or route with any part of its area or path inside it (exit 15), a shipped sound-only area with any part of its area inside it (exit 21), or a redacted PNG that's still opaque at a fogged pixel.
@@ -208,6 +209,55 @@ common as words ("main"), so they are checked by structure instead (`foreignCamp
 store's top-level `campaign.id` must be its own, and no `campaign`, `campaigns`, `campaignId` or
 `campaignIds` value, nor any key of a map under a key naming visibility or campaigns, may be
 another campaign's id. R-17b's isolation scan goes further.
+
+**Campaign isolation (R-17b).** `check-campaign-isolation`
+(`scripts/check-campaign-isolation.ts`, `npm run atlas:check-isolation <dir> --must-not-ship <file>
+[--config <file>] [--layout store|built-site]`) checks one v2 campaign's output, the store
+`.atlas-campaigns/<id>/atlas` or the built site `dist-campaigns/<id>`, against that campaign's
+must-not-ship file. It doesn't trust that file: it resolves the campaign again from the content
+(`resolveCampaign` on the loaded model), fails with 23 on any difference between the two (ids,
+names, paths, pin locations, other campaigns; a stale or hand-edited file can't vouch for the
+output, so rebuild), and scans for the union of both. The registry runs it on both dirs of every v2 campaign; v1 content has no
+must-not-ship file, so it doesn't run there (the one scan the registry test lets have no v1 task).
+It prints every finding and exits with the first kind it found, in this order:
+
+- **23, structure.** Reads `atlas.json` and `search-index.json` as data, so short ids count
+  (every string compared in one Unicode form, NFC, and any letter case):
+  `campaign` must be exactly this campaign's `{id, name}` (no top-level `campaigns`); no
+  campaign field names another campaign; no value under an id key (`id`, `map`, `world`,
+  `parent`, `backlinks`, `…Id`, `…Ids`, both halves of a `note@map` id) is a hidden id, and
+  no value under a name key (`name`, `title`, `label`, `aliases`, `target`, `display`, `alt`,
+  `caption`, `excerpt`, `summary`, `description`, `teaser`, `heading`, `text`, `bodyText`,
+  `tags`) is exactly a hidden name, whatever its length; no string anywhere (a rendered body's
+  wikilink included) carries a hidden id as a `data-entity-id` value or a `#/entity/<id>` link; no path value, %-decoded, is a hidden path or has a
+  hidden path's file name. Every reference must resolve: an entity's `world` and a map's
+  `worldId` name a shipped world; a world's `defaultMapId`, a map's `parent`, an ocean entry's
+  `map` and a placement's `mapId` name a shipped map. Every map has a `worldId`, every
+  placement's `entityId` is a shipped entity, and every search-index id is an atlas entity. No
+  placement of a note sits where that note's dropped pin sat (the must-not-ship `pinLocations`,
+  each `{map, index, note, x, y}`: same note, same map, x and y within 1e-6; the build copies pin
+  coordinates as written, so the dropped pin shipping is an exact match). Another note's
+  placement at the same spot carries nothing of the dropped pin and passes.
+- **24, text.** Every text file (the bundle and `index.html` too, on a built site) is searched
+  for the must-not-ship names and ids as whole words, and for hidden paths and their file names
+  (when long enough to report, as in `check-derived-secrets`), in four forms: as written, with
+  JSON escapes, HTML entities and %-encoding decoded and invisible characters (`&shy;`,
+  zero-width spaces) removed, the same with inline tags removed (`Hook<em>haven</em>`), and, for
+  JSON, every string and key decoded the same way; every form is compared in NFC, so a decomposed
+  `Séverine` matches the composed one (`check-derived-secrets` does the same). Source maps
+  (`.map`) count as text. Not decoded: base64 `data:` text and look-alike letters (homoglyphs,
+  a Cyrillic `а` for a Latin `a`); the structural checks and the build's own filtering are the
+  defence there. A file it can't read counts as a hit.
+- **25, assets.** Every file in the store is `atlas.json`, `search-index.json` or a file
+  `atlas.json` references, and each reference exists as a regular file (no links). A built site's
+  `atlas/` holds exactly the store's files.
+- **20**: the dir, its `atlas.json` or `search-index.json`, the must-not-ship file, or (for a
+  built site) the store's `atlas.json` is missing. **1**: bad arguments, v1 content, an
+  unreadable must-not-ship file, or a campaign the content doesn't list.
+
+Other campaigns' ids aren't searched as text (`main` and `a` are everywhere in a bundle); the
+structural checks cover them. The scan has eight planted-fault variants in
+`scripts/atlas/publish-integrity-smoke.ts`.
 
 A note body that links a hidden item (a hidden map or world, or any must-not-ship id or name, as
 in `[[Hookhaven]]`) has that link redacted to `…`, as a link to a hidden note is, and the link

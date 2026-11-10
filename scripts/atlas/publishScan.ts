@@ -27,6 +27,8 @@ export const MSG: Record<PublishScanReason["scan"], string> = {
     "The editor itself leaked into the player build — this is a code bug, not a content problem. Publishing is blocked; this needs a developer.",
   "check-derived-secrets":
     "The name of a hidden person or place would have leaked into the player site. Publishing is blocked.",
+  "check-campaign-isolation":
+    "Something this campaign hides, or another campaign's content, would have reached this campaign's player site. Publishing is blocked.",
   "check-image-privacy":
     "An image that's marked DM-only would have been published. Publishing is blocked.",
   "check-fog-safety":

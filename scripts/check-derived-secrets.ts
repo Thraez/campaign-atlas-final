@@ -131,7 +131,7 @@ function loadConfig(configPath: string): Config {
 }
 
 /** Should the candidate name be included in the must-not-appear list? */
-function isReportableName(name: string): boolean {
+export function isReportableName(name: string): boolean {
   const trimmed = name.trim();
   if (trimmed.length < MIN_NAME_LENGTH) return false;
   if (GENERIC_NAMES.has(trimmed.toLowerCase())) return false;
@@ -229,6 +229,9 @@ export function findSecretsInText(text: string, secrets: SecretEntry[]): SecretE
   return findWith(text, secretPatterns(secrets));
 }
 
+/** Text and names are compared in one Unicode form (NFC), so a decomposed `é` matches. */
+const nfc = (s: string) => s.normalize("NFC");
+
 type SecretPattern = { s: SecretEntry; re: RegExp };
 
 /**
@@ -237,15 +240,17 @@ type SecretPattern = { s: SecretEntry; re: RegExp };
  */
 function secretPatterns(secrets: SecretEntry[]): SecretPattern[] {
   return secrets.flatMap((s) => {
-    if (s.field === "path") return [{ s, re: pathPattern(s.name) }];
-    const out = [{ s, re: wholeWordPattern(s.name) }];
-    const escaped = JSON.stringify(s.name).slice(1, -1);
-    if (escaped !== s.name) out.push({ s, re: wholeWordPattern(escaped) });
+    const name = nfc(s.name);
+    if (s.field === "path") return [{ s, re: pathPattern(name) }];
+    const out = [{ s, re: wholeWordPattern(name) }];
+    const escaped = JSON.stringify(name).slice(1, -1);
+    if (escaped !== name) out.push({ s, re: wholeWordPattern(escaped) });
     return out;
   });
 }
 
-function findWith(text: string, patterns: SecretPattern[]): SecretEntry[] {
+function findWith(raw: string, patterns: SecretPattern[]): SecretEntry[] {
+  const text = nfc(raw);
   const asPath = text
     .replace(/\\\\/g, "/")
     .replace(/\\/g, "/")

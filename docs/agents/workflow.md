@@ -14,7 +14,7 @@ Matt's skills assume a team product. The atlas is Isak's solo tool whose one har
 A ticket is done when its PR is merged after:
 
 1. the full local gate passes on the branch with `main` merged in: `npm run gate`. It runs
-   `typecheck:all`, `lint`, `format:check`, `test:ci`, `atlas:publish` (build plus the 9 scans, run 14 times across
+   `typecheck:all`, `lint`, `format:check`, `test:ci`, `atlas:publish` (build plus the 10 scans; on v1 content 9 of them, run 14 times across
    `dist`, `public/atlas` and `content/`, the dirs of v1's one campaign `main`; v2 content runs
    them on every campaign's `dist-campaigns/<id>` and `.atlas-campaigns/<id>/atlas`, plus `dist`
    and `public/atlas`; a missing
