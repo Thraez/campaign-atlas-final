@@ -154,3 +154,207 @@ describe("redactLayer never shows image under fog", () => {
     }
   }
 });
+
+/** Every image pixel whose centre (mapped onto the layer rect) is fogged by
+ *  isLit must be alpha 0. Returns the first few leaks. */
+async function leaksIn(
+  out: Buffer,
+  fog: FogOverlay,
+  layer: { x: number; y: number; width: number; height: number },
+): Promise<{
+  leaks: string[];
+  width: number;
+  height: number;
+  alpha: (x: number, y: number) => number;
+}> {
+  const { data, info } = await sharp(out).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const alpha = (x: number, y: number) => data[(y * info.width + x) * info.channels + 3];
+  const leaks: string[] = [];
+  for (let y = 0; y < info.height; y++) {
+    for (let x = 0; x < info.width; x++) {
+      const mx = layer.x + ((x + 0.5) * layer.width) / info.width;
+      const my = layer.y + ((y + 0.5) * layer.height) / info.height;
+      if (!isLit(mx, my, fog) && alpha(x, y) !== 0) leaks.push(`(${x},${y})=${alpha(x, y)}`);
+    }
+  }
+  return { leaks: leaks.slice(0, 5), width: info.width, height: info.height, alpha };
+}
+
+describe("redactLayer: source images that already have alpha", () => {
+  it("fogs an RGBA source and never makes a pixel more opaque", async () => {
+    // 200x200 RGBA: opaque red, except a half-transparent block (alpha 100)
+    // at 20-40 in the lit half and another at 150-170 in the fogged half.
+    const w = 200;
+    const px = Buffer.alloc(w * w * 4);
+    for (let y = 0; y < w; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        px[i] = 255;
+        const soft =
+          (x >= 20 && x < 40 && y >= 20 && y < 40) || (x >= 150 && x < 170 && y >= 20 && y < 40);
+        px[i + 3] = soft ? 100 : 255;
+      }
+    }
+    const input = await sharp(px, { raw: { width: w, height: w, channels: 4 } })
+      .png()
+      .toBuffer();
+    // Fog over x 100-200: only the left half is revealed.
+    const fog: FogOverlay = {
+      mapId: "m",
+      enabled: true,
+      reveals: [sq(0, 0, 100, 200)],
+      featherPx: 4,
+    };
+    const rect = { x: 0, y: 0, width: w, height: w };
+    const out = await redactLayer(input, { width: w, height: w }, fog, rect);
+
+    const { leaks, alpha, width, height } = await leaksIn(out, fog, rect);
+    expect([width, height]).toEqual([w, w]);
+    expect(leaks).toEqual([]);
+    expect(alpha(150, 100)).toBe(0); // the reviewer's probe
+    expect(alpha(160, 30)).toBe(0); // half-transparent and fogged
+    expect(alpha(30, 30)).toBe(100); // half-transparent and lit: unchanged
+    expect(alpha(30, 100)).toBe(255); // opaque and lit
+    // No pixel got more opaque than its source.
+    const { data } = await sharp(out).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    let raised = 0;
+    for (let i = 3; i < data.length; i += 4) if (data[i] > px[i]) raised++;
+    expect(raised).toBe(0);
+  });
+
+  it("fogs a greyscale+alpha source and a 16-bit RGBA source", async () => {
+    const fog: FogOverlay = {
+      mapId: "m",
+      enabled: true,
+      reveals: [sq(0, 0, 50, 100)],
+      featherPx: 0,
+    };
+    const rect = { x: 0, y: 0, width: 100, height: 100 };
+    const grey = await sharp({
+      create: {
+        width: 100,
+        height: 100,
+        channels: 4,
+        background: { r: 128, g: 128, b: 128, alpha: 1 },
+      },
+    })
+      .toColourspace("b-w")
+      .png()
+      .toBuffer();
+    const deep = await sharp({
+      create: {
+        width: 100,
+        height: 100,
+        channels: 4,
+        background: { r: 255, g: 0, b: 0, alpha: 1 },
+      },
+    })
+      .toColourspace("rgb16")
+      .png()
+      .toBuffer();
+    for (const input of [grey, deep]) {
+      const out = await redactLayer(input, { width: 100, height: 100 }, fog, rect);
+      const { leaks, alpha } = await leaksIn(out, fog, rect);
+      expect(leaks).toEqual([]);
+      expect(alpha(75, 50)).toBe(0);
+      expect(alpha(10, 50)).toBe(255);
+    }
+  });
+});
+
+/**
+ * The layer rect, not the image size, places the image on the map: live
+ * content draws a 1448 px image into a 31250-unit rect. The mask must be
+ * tested at each image pixel's map position.
+ */
+describe("redactLayer: scaled and offset layers", () => {
+  // Reveal the map, then a fog shape and a fog gap so both edges are tested.
+  const fog = (featherPx: number): FogOverlay => ({
+    mapId: "m",
+    enabled: true,
+    reveals: [sq(0, 0, 1000, 1000)],
+    conceals: [sq(330, 230, 371, 262), sq(100, 50, 103, 150)],
+    featherPx,
+  });
+
+  const cases: Array<
+    [string, number, number, { x: number; y: number; width: number; height: number }]
+  > = [
+    [
+      "a 400 px image in a 200-unit rect (up-scaled)",
+      400,
+      400,
+      { x: 250, y: 150, width: 200, height: 200 },
+    ],
+    [
+      "a 100 px image in a 400-unit rect (down-scaled)",
+      100,
+      100,
+      { x: 0, y: 0, width: 400, height: 400 },
+    ],
+    ["a 1:1 image offset to (300, 200)", 120, 80, { x: 300, y: 200, width: 120, height: 80 }],
+    [
+      "a non-uniform scale (300x100 px in a 150x400 rect)",
+      300,
+      100,
+      { x: 60, y: 0, width: 150, height: 400 },
+    ],
+  ];
+
+  for (const [label, iw, ih, rect] of cases) {
+    for (const featherPx of [0, 16]) {
+      it(`${label}: every fogged pixel is alpha 0 at featherPx ${featherPx}`, async () => {
+        const f = fog(featherPx);
+        const out = await redactLayer(
+          await solidRed(iw, ih),
+          { width: 1000, height: 1000 },
+          f,
+          rect,
+        );
+        const { leaks, width, height, alpha } = await leaksIn(out, f, rect);
+        // Output stays at the image's size, not the rect's or the map's.
+        expect([width, height]).toEqual([iw, ih]);
+        expect(leaks).toEqual([]);
+        // And something away from the fog still shows.
+        let lit = 0;
+        for (let y = 0; y < height; y++)
+          for (let x = 0; x < width; x++) if (alpha(x, y) >= 250) lit++;
+        expect(lit).toBeGreaterThan(0);
+      });
+    }
+  }
+
+  it("puts the fog shape where the rect says, not where the image pixels would be at 1:1", async () => {
+    // Fog shape at map 300-400; the image covers map 200-1800 at 0.25 px/unit,
+    // so the fog lands at image x 25-50, and image x 300-400 is lit.
+    const f: FogOverlay = {
+      mapId: "m",
+      enabled: true,
+      reveals: [sq(0, 0, 2000, 1000)],
+      conceals: [sq(300, 0, 400, 1000)],
+      featherPx: 0,
+    };
+    const rect = { x: 200, y: 0, width: 1600, height: 400 };
+    const out = await redactLayer(await solidRed(400, 100), { width: 2000, height: 1000 }, f, rect);
+    const { alpha } = await leaksIn(out, f, rect);
+    expect(alpha(30, 50)).toBe(0);
+    expect(alpha(350, 50)).toBe(255);
+  });
+
+  it("rejects a feather wider than sharp can blur", async () => {
+    const f: FogOverlay = {
+      mapId: "m",
+      enabled: true,
+      reveals: [sq(0, 0, 10, 10)],
+      featherPx: 2001,
+    };
+    await expect(
+      redactLayer(await solidRed(10, 10), { width: 10, height: 10 }, f, {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+      }),
+    ).rejects.toBeInstanceOf(FogRedactionError);
+  });
+});
