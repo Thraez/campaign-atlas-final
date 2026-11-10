@@ -117,10 +117,21 @@ export async function redactLayer(
     .raw()
     .toBuffer();
 
+  // Alpha alone is not redaction: a PNG keeps RGB under alpha 0, so stripping
+  // alpha would bring the fogged image back. Premultiply by the mask (RGB ×
+  // m/255): fog is RGB 0 and the feather carries only scaled colour. Any
+  // pixel left at alpha 0 (fog, or transparent in the source) is zeroed whole,
+  // which check-fog-safety's 27 relies on.
   const px = src.data;
   for (let i = 0, a = 3; i < hard.length; i++, a += 4) {
     const m = Math.min(hard[i], blurred[i]);
+    if (m < 255) {
+      px[a - 3] = Math.floor((px[a - 3] * m) / 255);
+      px[a - 2] = Math.floor((px[a - 2] * m) / 255);
+      px[a - 1] = Math.floor((px[a - 1] * m) / 255);
+    }
     if (m < px[a]) px[a] = m;
+    if (px[a] === 0) px[a - 3] = px[a - 2] = px[a - 1] = 0;
   }
 
   return sharp(px, { raw: { width: iw, height: ih, channels: 4 } })

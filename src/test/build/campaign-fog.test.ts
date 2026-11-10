@@ -366,9 +366,9 @@ describe("R-18: fog baked per campaign", () => {
 });
 
 describe("R-18: a fog that can't be baked fails the build (fail closed)", () => {
-  async function failing(change: (root: string) => void) {
+  async function failing(change: (root: string) => void | Promise<void>) {
     const root = await cityWorld();
-    change(root);
+    await change(root);
     silence();
     const r = await runBuild({ player: true, strict: true }, root);
     const logged = [console.log, console.warn, console.error]
@@ -399,6 +399,20 @@ describe("R-18: a fog that can't be baked fails the build (fail closed)", () => 
     );
     expect(r).toMatchObject({ ok: false, exitCode: 1 });
     expect(logged).toMatch(/map "oskmark": its unfogged image would ship/);
+    expect(fs.existsSync(path.join(root, ".atlas-campaigns"))).toBe(false);
+  });
+
+  it("an open map using a re-encoded copy of a fogged map's image: exit 1, nothing written", async () => {
+    const { root, r, logged } = await failing(async (root) => {
+      const images = content(root, "quessaly/_atlas/images");
+      const original = fs.readFileSync(path.join(images, "oskmark.png"));
+      // Same pixels, other bytes: a byte compare alone would let it ship.
+      await sharp(original).png({ compressionLevel: 1 }).toFile(path.join(images, "copy.png"));
+      expect(fs.readFileSync(path.join(images, "copy.png")).equals(original)).toBe(false);
+      edit(root, "quessaly/_atlas/world.yaml", "images/quessaly-world.png", "images/copy.png");
+    });
+    expect(r).toMatchObject({ ok: false, exitCode: 1 });
+    expect(logged).toMatch(/map "oskmark": its unfogged image would ship as .* \(same pixels;/);
     expect(fs.existsSync(path.join(root, ".atlas-campaigns"))).toBe(false);
   });
 });

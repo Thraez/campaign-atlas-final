@@ -54,10 +54,15 @@ function plant(layout: Layout, atlas: object, files: Record<string, Buffer> = {}
   return target;
 }
 
-/** A 10×10 RGBA PNG, fully transparent or fully opaque white. */
-function png(alpha: 0 | 1): Promise<Buffer> {
+/**
+ * A 10×10 RGBA PNG: fully transparent (black, as the build writes fog) or
+ * fully opaque white; `"hidden"` is transparent white, colour kept under fog.
+ */
+function png(alpha: 0 | 1 | "hidden"): Promise<Buffer> {
+  const v = alpha === 0 ? 0 : 255;
+  const a = alpha === 1 ? 1 : 0;
   return sharp({
-    create: { width: 10, height: 10, channels: 4, background: { r: 255, g: 255, b: 255, alpha } },
+    create: { width: 10, height: 10, channels: 4, background: { r: v, g: v, b: v, alpha: a } },
   })
     .png()
     .toBuffer();
@@ -126,6 +131,12 @@ describe("check-fog-safety", () => {
       const config = writeSourceConfig(CLEAN_WORLD_YAML);
       const dir = plant(layout, fogAtlas(), { [FOG_FILE]: await png(1) });
       expect(await run({ dir, config })).toBe(16);
+    });
+
+    it("colour-under-fog (27): a redacted PNG keeps colour at alpha 0", async () => {
+      const config = writeSourceConfig(CLEAN_WORLD_YAML);
+      const dir = plant(layout, fogAtlas(), { [FOG_FILE]: await png("hidden") });
+      expect(await run({ dir, config })).toBe(27);
     });
 
     it("a fog layer whose .fog.png is missing is a finding (17), not a skip", async () => {

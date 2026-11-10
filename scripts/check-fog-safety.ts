@@ -34,7 +34,8 @@
  * output: a map fogged in source must ship its fog marker (26), and on v2
  * every file under the artifact dir is hashed against the fogged maps'
  * original images (13) and the images of maps hidden under fog by ADR-0004
- * rule 4 (a child whose frame is under fog, and its subtree); those maps'
+ * rule 4 (a child whose frame is under fog, and its subtree, using the
+ * resolver's own frame geometry, so not independent of it); those maps'
  * ids must not appear in maps, placements, the ocean or a world's default
  * map (15). No world is picked from the config's default (R-13).
  *
@@ -60,6 +61,7 @@
  *       or a built site (`layout: "built-site"`) with no `atlas/atlas.json`.
  *   21  SOUND-IN-FOG (21, not 18: check-player-files already exits 18)
  *   26  FOG-MARKER-MISSING a map fogged in source ships without `fog.enabled`
+ *   27  COLOUR-UNDER-FOG a redacted layer keeps colour (RGB ≠ 0) at alpha 0
  */
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -578,6 +580,31 @@ export async function run(opts: RunOpts): Promise<number> {
           message:
             `layer "${layer.id}" on map "${m.id}" alpha=${a} at known-fogged corner ` +
             `(${foggedPoint[0]},${foggedPoint[1]}) — should be 0`,
+        });
+      }
+    }
+  }
+
+  // ----- 27 COLOUR-UNDER-FOG (every redacted layer, every pixel; no source needed) -----
+  // A PNG keeps RGB under alpha 0, so stripping alpha would bring a fogged
+  // image back. redactLayer zeroes it; any colour at alpha 0 is a leak.
+  for (const m of fogMaps) {
+    for (const layer of m.layers) {
+      if (!layer.src.endsWith(".fog.png")) continue; // already flagged by check 13
+      const layerAbs = resolveAssetFile(atlasDir, layer.src);
+      if (!layerAbs || !fs.existsSync(layerAbs)) continue; // already flagged (17)
+      const { data } = await sharp(fs.readFileSync(layerAbs))
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      let hidden = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] === 0 && (data[i] | data[i + 1] | data[i + 2]) !== 0) hidden++;
+      }
+      if (hidden > 0) {
+        findings.push({
+          code: 27,
+          message: `layer "${layer.id}" on map "${m.id}" keeps colour in ${hidden} pixel(s) at alpha 0 — stripping alpha would show the fogged image`,
         });
       }
     }

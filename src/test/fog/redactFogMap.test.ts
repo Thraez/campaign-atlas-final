@@ -371,3 +371,56 @@ describe("redactLayer: scaled and offset layers", () => {
     }
   });
 });
+
+describe("redactLayer: no colour survives under fog (R-18 review)", () => {
+  const map = { width: 100, height: 100 };
+  const layerRect = { x: 0, y: 0, width: 100, height: 100 };
+  const fog: FogOverlay = { mapId: "m", enabled: true, reveals: [sq(0, 0, 50, 100)], featherPx: 8 };
+
+  /** A noisy opaque image, so a kept colour would be recoverable. */
+  async function noisy(): Promise<{ png: Buffer; raw: Buffer }> {
+    const raw = Buffer.alloc(100 * 100 * 4);
+    let s = 7;
+    for (let i = 0; i < raw.length; i++) {
+      s = (s * 1103515245 + 12345) & 0x7fffffff;
+      raw[i] = i % 4 === 3 ? 255 : (s >> 16) & 0xff || 1;
+    }
+    const png = await sharp(raw, { raw: { width: 100, height: 100, channels: 4 } })
+      .png()
+      .toBuffer();
+    return { png, raw };
+  }
+
+  it("stripping alpha recovers nothing: alpha 0 is RGB 0, the feather carries only scaled colour", async () => {
+    const { png, raw } = await noisy();
+    const out = await redactLayer(png, map, fog, layerRect);
+    const { data } = await sharp(out).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const leaks: string[] = [];
+    let fogged = 0;
+    for (let i = 0; i < 100 * 100; i++) {
+      const a = data[i * 4 + 3];
+      if (a === 0) fogged++;
+      for (let c = 0; c < 3; c++) {
+        const v = data[i * 4 + c];
+        const cap = Math.ceil((raw[i * 4 + c] * a) / 255);
+        if (a === 0 ? v !== 0 : v > cap) leaks.push(`px ${i} c${c}=${v} a=${a} cap=${cap}`);
+      }
+    }
+    expect(fogged).toBeGreaterThanOrEqual(50 * 100);
+    expect(leaks.slice(0, 5)).toEqual([]);
+  });
+
+  it("zeroes the colour of a pixel the source already made transparent", async () => {
+    const raw = Buffer.alloc(100 * 100 * 4, 0);
+    for (let i = 0; i < 100 * 100; i++) raw.set([200, 100, 50, i % 2 ? 255 : 0], i * 4);
+    const png = await sharp(raw, { raw: { width: 100, height: 100, channels: 4 } })
+      .png()
+      .toBuffer();
+    const out = await redactLayer(png, map, fog, layerRect);
+    const { data } = await sharp(out).raw().toBuffer({ resolveWithObject: true });
+    for (let i = 0; i < 100 * 100; i++) {
+      if (data[i * 4 + 3] === 0)
+        expect([data[i * 4], data[i * 4 + 1], data[i * 4 + 2]]).toEqual([0, 0, 0]);
+    }
+  });
+});

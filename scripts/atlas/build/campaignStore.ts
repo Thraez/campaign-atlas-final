@@ -21,6 +21,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import sharp from "sharp";
 import type {
   AtlasCampaign,
   FogOverlay,
@@ -175,7 +176,48 @@ export async function planMapImages(
       }
     }
   }
+  // The same pixels under other bytes (a lossless re-encode) are the same
+  // leak. A lossy re-encode, a crop or a resize is not caught: see
+  // docs/VISIBILITY_AND_PLAYER_SAFETY.md, "Fog per campaign".
+  const decoded = new Map<string, Promise<Raw | null>>();
+  const decode = (key: string, b: Buffer) => {
+    if (!decoded.has(key)) decoded.set(key, decodeRaw(b));
+    return decoded.get(key)!;
+  };
+  for (const { map, bytes } of fogged) {
+    const orig = await decode(`fogged:${map}:${bytes.length}`, bytes);
+    if (!orig) continue; // unreadable: redactLayer already failed on it
+    for (const [rel, held] of files) {
+      if (rel.endsWith(".fog.png") || held.equals(bytes)) continue;
+      const size = await sharp(held)
+        .metadata()
+        .catch(() => null); // not an image (audio)
+      if (size?.width !== orig.width || size?.height !== orig.height) continue;
+      const other = await decode(rel, held);
+      if (other?.data.equals(orig.data)) {
+        errors.push(
+          `map "${map}": its unfogged image would ship as "${rel}" (same pixels; fogged in this campaign)`,
+        );
+      }
+    }
+  }
   return out;
+}
+
+type Raw = { width: number; height: number; data: Buffer };
+
+/** RGBA pixels of an image, or null when it isn't one sharp can decode (audio). */
+async function decodeRaw(bytes: Buffer): Promise<Raw | null> {
+  try {
+    const { data, info } = await sharp(bytes)
+      .toColourspace("srgb")
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    return { width: info.width, height: info.height, data };
+  } catch {
+    return null;
+  }
 }
 
 /** `<sha256 prefix><ext>`, the extension lower-cased (`.fog.png` kept whole). */

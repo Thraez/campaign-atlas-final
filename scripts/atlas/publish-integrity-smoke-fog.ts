@@ -12,6 +12,7 @@
  *   - m1's fog marker dropped                     -> 26 FOG-MARKER-MISSING
  *   - b's unfogged m1 image in a's store           -> 13 IMAGE-LEAK
  *   - the city's map entry planted back into a     -> 15 IN-FOG-CONTENT
+ *   - a fog file keeping m1's colour at alpha 0     -> 27 COLOUR-UNDER-FOG
  *
  * Kept apart from `publish-integrity-smoke.ts`, which runs these through its
  * own harness (passed in, so the scan runs the same way as every variant).
@@ -156,6 +157,14 @@ export async function variantsCampaignFog(h: SmokeHarness): Promise<VariantResul
     .png()
     .toBuffer();
 
+  // m1's colour kept everywhere, alpha 0 in the fogged east half: looks
+  // redacted, but stripping alpha shows the fogged image.
+  const raw = Buffer.alloc(100 * 100 * 4);
+  for (let i = 0; i < 100 * 100; i++) raw.set([200, 40, 40, i % 100 < 50 ? 255 : 0], i * 4);
+  const hidden = await sharp(raw, { raw: { width: 100, height: 100, channels: 4 } })
+    .png()
+    .toBuffer();
+
   let n = 0;
   const plant = (
     atlas: Record<string, unknown>,
@@ -207,6 +216,14 @@ export async function variantsCampaignFog(h: SmokeHarness): Promise<VariantResul
         const atlas = cleanAtlas();
         atlas.maps.push({ id: "city", parent: "m1", width: 100, height: 100, layers: [] });
         return expect(15, scan(plant(atlas)));
+      },
+    ),
+    h.assertCleanThenDirty(
+      "Campaign fog: colour kept under alpha 0 (27)",
+      SCAN,
+      () => scan(plant(cleanAtlas())),
+      () => {
+        return expect(27, scan(plant(cleanAtlas(), { [FOG_FILE]: hidden })));
       },
     ),
   ];
