@@ -208,10 +208,7 @@ function write(o: Out) {
 /** The built site: the store under `atlas/`, plus an app shell named for campaign A and a bundle. */
 function buildSite(o: Out) {
   fs.cpSync(o.store, path.join(o.site, "atlas"), { recursive: true });
-  put(
-    path.join(o.site, "index.html"),
-    brandIndexHtml(INDEX_HTML, "Campaign A").replace("<body>", '<body><div id="main"></div>'),
-  );
+  put(path.join(o.site, "index.html"), brandIndexHtml(INDEX_HTML, "Campaign A"));
   put(
     path.join(o.site, "manifest.webmanifest"),
     JSON.stringify({ ...brandManifest("Campaign A"), start_url: "./atlas" }),

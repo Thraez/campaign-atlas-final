@@ -333,10 +333,15 @@ export async function run(opts: RunOpts): Promise<number> {
     } catch (e) {
       configLoadFailed = true;
       noCampaign = e instanceof NoCampaignError;
-      console.error(
-        `atlas:check-fog-safety: failed to load the source fog — the source-driven checks could not run`,
-        e,
-      );
+      if (noCampaign) {
+        // The legacy pair of a v2 run: expected, so one plain line, no trace.
+        console.log("atlas:check-fog-safety: no campaign: v1 store, fog campaign checks skipped");
+      } else {
+        console.error(
+          `atlas:check-fog-safety: failed to load the source fog — the source-driven checks could not run`,
+          e,
+        );
+      }
     }
   } else if (opts.publish) {
     configLoadFailed = true;

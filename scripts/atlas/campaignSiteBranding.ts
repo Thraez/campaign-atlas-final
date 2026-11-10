@@ -124,6 +124,32 @@ const NEUTRAL_MANIFEST: Record<string, RegExp> = {
   purpose: /^(any|maskable|any maskable)$/,
 };
 
+/** A local asset path, or Google Fonts (the shell's one off-site link). */
+const LOCAL_PATH = /^\.?\/[\w\-./]*$/;
+const FONT_URL = /^https:\/\/fonts\.(googleapis|gstatic)\.com(\/[\w\-./?=&:;@%+]*)?$/;
+const CROSSORIGIN = /^(|anonymous)$/;
+
+/**
+ * Every tag other than `<meta>` the site build writes, with each attribute it
+ * may carry and that attribute's neutral values. Any other tag or attribute,
+ * or a value off its pattern, is a finding.
+ */
+const TAG_ATTRS: Record<string, Record<string, RegExp>> = {
+  html: { lang: /^[a-z]{2}(-[A-Za-z]{2})?$/ },
+  head: {},
+  body: {},
+  title: {},
+  div: { id: /^root$/ },
+  link: {
+    rel: /^(manifest|icon|apple-touch-icon|preconnect|modulepreload|stylesheet)$/,
+    href: new RegExp(`${LOCAL_PATH.source}|${FONT_URL.source}`),
+    type: /^image\/png$/,
+    sizes: /^\d+x\d+$/,
+    crossorigin: CROSSORIGIN,
+  },
+  script: { type: /^module$/, src: LOCAL_PATH, crossorigin: CROSSORIGIN },
+};
+
 const unescapeHtml = (s: string): string =>
   s
     .replace(/&quot;/g, '"')
@@ -135,9 +161,10 @@ const unescapeHtml = (s: string): string =>
 /** A tag's attributes, in any order, names lower-cased, values unescaped. */
 function attributes(tag: string): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const m of tag.matchAll(/([^\s=/<>"']+)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g)) {
+  for (const m of tag
+    .replace(/^<[\w-]+/, "")
+    .matchAll(/([^\s=/<>"']+)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g)) {
     const key = m[1].toLowerCase();
-    if (key === "meta") continue;
     out[key] = unescapeHtml(m[2] ?? m[3] ?? m[4] ?? "");
   }
   return out;
@@ -151,7 +178,11 @@ function attributes(tag: string): Record<string, string> {
  *     description of it), or a neutral tag with its one known value; any
  *     other meta, a share image included, is a finding;
  *   - every `<title>` is the name, and there is one; no other page text
- *     (outside scripts and styles) exists, so a `<noscript>` can't name a world;
+ *     exists, so a `<noscript>` can't name a world;
+ *   - every other tag is one the build writes (`TAG_ATTRS`), each attribute
+ *     with a neutral value, so a canonical link, `data-*` or `alt` can't name
+ *     one either; a script is a module `src` tag with an empty body, so no
+ *     inline script or JSON-LD ships, and no `<style>` ships at all;
  *   - every string in the manifest is a naming key with the name, or a
  *     neutral key matching its pattern; anything else is a finding.
  * The isolation text pass searches both files for other campaigns' and
@@ -187,6 +218,27 @@ export function siteIdentityFindings(siteDir: string, name: string): string[] {
     }
   }
 
+  const markup = html.replace(/<!--[\s\S]*?-->/g, " ");
+  for (const [tag, tagName] of markup.matchAll(/<([a-zA-Z][\w-]*)\b[^>]*>/g)) {
+    const t = tagName.toLowerCase();
+    if (t === "meta") continue;
+    const allowedAttrs = TAG_ATTRS[t];
+    if (!allowedAttrs) {
+      out.push(`index.html ${tag}: a <${t}> the site build doesn't write`);
+      continue;
+    }
+    for (const [k, v] of Object.entries(attributes(tag))) {
+      if (!(k in allowedAttrs) || !allowedAttrs[k].test(v)) {
+        out.push(`index.html <${t}> ${k}=${show(v)}: not a value the site build writes`);
+      }
+    }
+  }
+  for (const [script, body] of markup.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
+    if (body.trim() || attributes(script.slice(0, script.indexOf(">") + 1)).src === undefined) {
+      out.push(`index.html ${script.slice(0, 80)}: an inline script; only a module src tag ships`);
+    }
+  }
+
   const titles = [...html.matchAll(/<title\b[^>]*>([\s\S]*?)<\/title>/gi)];
   if (titles.length === 0) out.push("index.html: no title");
   for (const t of titles) {
@@ -194,9 +246,9 @@ export function siteIdentityFindings(siteDir: string, name: string): string[] {
     if (!allowed.has(v)) out.push(`index.html title is ${show(v)}, not this campaign's own name`);
   }
   const text = unescapeHtml(
-    html
-      .replace(/<!--[\s\S]*?-->/g, " ")
-      .replace(/<(script|style|title)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    markup
+      .replace(/<title\b[^>]*>[\s\S]*?<\/title>/gi, " ")
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
       .replace(/<[^>]*>/g, " "),
   )
     .replace(/\s+/g, " ")

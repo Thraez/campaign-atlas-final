@@ -163,4 +163,52 @@ describe("siteIdentityFindings: an allowlist over the whole head and manifest", 
     const e = site(undefined, { ...brandManifest(NAME), display: "Astrath" });
     expect(siteIdentityFindings(e, NAME).join("\n")).toMatch(/display/);
   });
+
+  // The tags Vite writes into a built site's head (dist-campaigns/<id>/index.html).
+  const VITE_BUILT = (h: string) =>
+    h
+      .replace(/\s*<script type="module" src="\/src\/main.tsx"><\/script>/, "")
+      .replace(
+        "</head>",
+        [
+          '<script type="module" crossorigin src="/assets/index-DgmPsCUA.js"></script>',
+          '<link rel="modulepreload" crossorigin href="/assets/vendor-react-DSYwmbq_.js">',
+          '<link rel="stylesheet" crossorigin href="/assets/index-XLezLh9Q.css">',
+          '<link rel="manifest" href="/manifest.webmanifest"></head>',
+        ].join("\n"),
+      );
+
+  it("passes the site as Vite builds it", () => {
+    expect(siteIdentityFindings(site(VITE_BUILT), NAME)).toEqual([]);
+  });
+
+  it("fails a link, html or img attribute naming another world", () => {
+    const canonical = site(
+      addToHead('<link rel="canonical" href="https://atlas.example/astrath-deeprealm">'),
+    );
+    expect(siteIdentityFindings(canonical, NAME).join("\n")).toMatch(/canonical/);
+    const htmlAttr = site((h) =>
+      h.replace('<html lang="en">', '<html lang="en" data-world="Astrath">'),
+    );
+    expect(siteIdentityFindings(htmlAttr, NAME).join("\n")).toMatch(/data-world/);
+    const img = site((h) =>
+      h.replace("<body>", '<body><img alt="Astrath Deeprealm" src="/a.png">'),
+    );
+    expect(siteIdentityFindings(img, NAME).join("\n")).toMatch(/img/);
+    const offsite = site(addToHead('<link rel="stylesheet" href="https://evil.example/x.css">'));
+    expect(siteIdentityFindings(offsite, NAME).join("\n")).toMatch(/href/);
+  });
+
+  it("refuses every inline script, a JSON-LD block included", () => {
+    const ld = site(
+      addToHead(
+        '<script type="application/ld+json">{"@type":"WebSite","name":"Astrath Deeprealm"}</script>',
+      ),
+    );
+    expect(siteIdentityFindings(ld, NAME).join("\n")).toMatch(/script/);
+    const inline = site(addToHead('<script type="module">window.x = 1</script>'));
+    expect(siteIdentityFindings(inline, NAME).join("\n")).toMatch(/script/);
+    const style = site(addToHead("<style>body::after{content:'Astrath'}</style>"));
+    expect(siteIdentityFindings(style, NAME).join("\n")).toMatch(/style/);
+  });
 });
