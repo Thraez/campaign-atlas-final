@@ -5,6 +5,11 @@ import {
   findPathByApprovedHash,
   hasLocalEdits,
   type SyncMap,
+  readSyncMapFile,
+  worldSyncMap,
+  withWorldSyncMap,
+  allSyncMapEntries,
+  SyncMapFormatError,
 } from "@/atlas/import/syncMap";
 
 const H1 = "sha256:1111";
@@ -79,5 +84,42 @@ describe("hasLocalEdits", () => {
 
   it("is false when we have no record — never cry wolf on a first sync", () => {
     expect(hasLocalEdits({}, "03_Entities/Corven.md", H1)).toBe(false);
+  });
+});
+
+describe("sync-map file, one map per world (R-14)", () => {
+  const entry = { id: "corven", baseType: "npc" as const, approvedHash: H1 };
+
+  it("reads nothing as empty", () => {
+    expect(readSyncMapFile(null, "a")).toEqual({ version: 2, worlds: {} });
+    expect(readSyncMapFile({}, null)).toEqual({ version: 2, worlds: {} });
+  });
+
+  it("reads an old flat map as the default world's", () => {
+    const file = readSyncMapFile({ "Corven.md": entry }, "a");
+    expect(worldSyncMap(file, "a")).toEqual({ "Corven.md": entry });
+    expect(worldSyncMap(file, "b")).toEqual({});
+  });
+
+  it("refuses an old flat map when no default world is known", () => {
+    expect(() => readSyncMapFile({ "Corven.md": entry }, null)).toThrow(SyncMapFormatError);
+  });
+
+  it("refuses an unknown version", () => {
+    expect(() => readSyncMapFile({ version: 3, worlds: {} }, "a")).toThrow(SyncMapFormatError);
+  });
+
+  it("replaces one world's map and keeps the others", () => {
+    const file = readSyncMapFile({ version: 2, worlds: { a: { "A.md": entry } } }, null);
+    const next = withWorldSyncMap(file, "b", { "B.md": entry });
+    expect(next.worlds).toEqual({ a: { "A.md": entry }, b: { "B.md": entry } });
+    expect(file.worlds.b).toBeUndefined();
+  });
+
+  it("lists every world's entries, from either shape", () => {
+    expect(allSyncMapEntries({ "Old.md": entry })).toEqual([entry]);
+    const other = { ...entry, id: "mara" };
+    const v2 = { version: 2, worlds: { a: { "A.md": entry }, b: { "B.md": other } } };
+    expect(allSyncMapEntries(v2)).toEqual([entry, other]);
   });
 });
