@@ -1,6 +1,6 @@
 # R-07b Fog shapes (conceals) are dropped by the loader
 
-Status: ready-for-agent
+Status: done
 Size: S
 Branch: `rebuild-r07b-fog-conceals`
 Builder: Opus
@@ -33,3 +33,10 @@ the loaded fog, so both only see conceals once the loader carries them).
 - A check-21 variant with a sound-only area and a conceal island (R(200,200,210,210) inside area R(100,100,400,400))
   exits 21.
 - `npm run gate` passes.
+
+## Done
+
+Conceals and `featherPx` are kept by the loader. The fog mask is built in image pixel space via the
+layer rect, and alpha = min(source, mask). The loader fails closed on duplicate fog blocks,
+`featherPx` above 2000, and degenerate or malformed fog shapes or reveals. A rotated layer makes
+fog redaction throw.
