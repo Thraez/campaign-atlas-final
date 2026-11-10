@@ -49,6 +49,7 @@ import { PLAYER_VISIBLE_VISIBILITY, linkLeaksToPlayers, linkTargetLabel } from "
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
 import { filterSoundscapeForPlayer } from "./atlas/filterSoundscape";
 import { playerResolution, resolverFailure, type PlayerResolution } from "./atlas/playerResolution";
+import { soundAreaIdProblems, soundAreaIdTrusted } from "../src/atlas/content/soundAreaIds";
 import { AtlasModelError } from "../src/atlas/content/atlasModel";
 import { resolveCampaign, type MustNotShip } from "../src/atlas/content/resolveCampaign";
 import { BuildStageError, loadBuildModel, type BuildModel } from "./atlas/build/loadBuildModel";
@@ -223,7 +224,7 @@ export class BuildError extends Error {
 
 export interface BuildResult {
   ok: boolean;
-  /** CLI exit code (0 on success, 1-11 on various failure modes; 10 and 11 are the resolver's gates). */
+  /** CLI exit code (0 on success, 1-11 or 22 on various failure modes; 10 and 11 are the resolver's gates). */
   exitCode: number;
   durationMs: number;
   /** Short error message — only set when ok is false. */
@@ -318,6 +319,8 @@ export interface BuildAtlasReport {
   mustNotShip?: MustNotShip;
   /** Loader notes the build never reported in `warnings` (v1's adapter): console only. */
   consoleWarnings: string[];
+  /** Player builds: sound areas with a missing or shared id on their map, one line each. DM-only. */
+  soundAreaIdProblems: string[];
   unresolvedRelationships: number;
   warnings: string[];
   errors: string[];
@@ -477,6 +480,8 @@ export function formatBuildReport(r: BuildAtlasReport): string {
   for (const e of r.errors) log(`  ✗ ${e}`);
   for (const w of r.warnings) log(`  ! ${w}`);
   for (const w of r.consoleWarnings) log(`  · ${w}`);
+  // DM-side only: these name sound areas, so they never go in the shipped buildReport.
+  for (const l of r.soundAreaIdProblems) log(`  ! sound area dropped: ${l}`);
   for (const a of r.assetErrors) log(`  ${a}`);
   return lines.join("\n");
 }
@@ -851,6 +856,22 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // map a v1 placement without a `mapId` lands on.
   const defaultMapIds = new Map<string, string>();
 
+  // Sound-area ids are checked on every map of every world, shipped or not,
+  // before hidden maps go (the Publish Check checks them all too). See the
+  // soundscape strip.
+  const soundIdLines: string[] = [];
+  if (flags.player) {
+    for (const m of sources.flatMap((w) => w.maps)) {
+      for (const p of soundAreaIdProblems(m.soundscape?.areas ?? [])) {
+        soundIdLines.push(
+          p.kind === "missing-id"
+            ? `map "${m.id}": ${p.count} sound area(s) with no id — give each one`
+            : `map "${m.id}": ${p.count} sound areas share the id "${p.id}" — rename all but one`,
+        );
+      }
+    }
+  }
+
   for (const w of shippedWorlds) {
     let wMaps = w.maps;
     let wRegions = w.regions;
@@ -1129,19 +1150,30 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // unconditionally (even with zero areas) so a build that removes all sound
   // still prunes previously-hashed files instead of leaving them orphaned.
   // The copies and the prune are planned here and written by writeBuildOutput.
+  // An area plays only on its own verdict: a missing or shared id could
+  // borrow another area's (the adapter skips malformed areas), so every area
+  // such an id names is dropped, and a strict build fails on it (exit 22).
   let audioPlan: AudioPlan | undefined;
   if (flags.player && v2) {
     maps = maps.map((m) => {
       if (!m.soundscape) return m;
-      const sc = filterSoundscapeForPlayer(m.soundscape, (a) => !!res?.soundShips(m.id, a.id));
+      const problems = soundAreaIdProblems(m.soundscape.areas ?? []);
+      const sc = filterSoundscapeForPlayer(
+        m.soundscape,
+        (a) => soundAreaIdTrusted(a, problems) && !!res?.soundShips(m.id, a.id),
+      );
       return { ...m, soundscape: v2PlayerAudio(m, sc, sourceById, warnings, hiddenFromPlayer) };
     });
   } else if (flags.player) {
     maps = maps.map((m) => {
       if (!m.soundscape) return m;
+      const problems = soundAreaIdProblems(m.soundscape.areas ?? []);
       return {
         ...m,
-        soundscape: filterSoundscapeForPlayer(m.soundscape, (a) => !!res?.soundShips(m.id, a.id)),
+        soundscape: filterSoundscapeForPlayer(
+          m.soundscape,
+          (a) => soundAreaIdTrusted(a, problems) && !!res?.soundShips(m.id, a.id),
+        ),
       };
     });
     const allAreas = maps.flatMap((m) => m.soundscape?.areas ?? []);
@@ -1411,6 +1443,7 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     orphanEntries: res?.orphanMessages ?? [],
     ...(res ? { mustNotShip: res.resolution.mustNotShip } : {}),
     consoleWarnings: bm.consoleWarnings,
+    soundAreaIdProblems: soundIdLines,
     unresolvedRelationships,
     warnings,
     errors,
@@ -1662,8 +1695,8 @@ function buildSearchIndex(pending: Pending[]): SearchIndexEntry[] {
  * codes the CLI contract depends on. Any validation error fails the build
  * (exit 1); strict / strict-player builds additionally fail on invalid
  * visibility (3), missing assets (4), bad extensions (9), duplicate slugs (2),
- * relationship leaks (5), region leaks (6), route leaks (7), and cross-ref
- * leaks (8). Returns the first failure, or undefined when every gate passes.
+ * relationship leaks (5), region leaks (6), route leaks (7), cross-ref
+ * leaks (8), and sound areas with a missing or shared id (22). Returns the first failure, or undefined when every gate passes.
  */
 function checkBuildGates(flags: BuildFlags, d: BuildAtlasReport): BuildFailure | undefined {
   if (d.errors.length > 0) return { exitCode: 1, message: "validation errors" };
@@ -1728,6 +1761,14 @@ function checkBuildGates(flags: BuildFlags, d: BuildAtlasReport): BuildFailure |
     return {
       exitCode: 8,
       message: `Strict player mode: ${d.crossRefLeaks} cross-reference leak(s): wikilinks from player-visible entries to DM/hidden entities. Failing build.`,
+    };
+  }
+  // A sound area's id must name it alone on its map: the player build looks
+  // verdicts up by id, so a missing or shared one could ship a DM area.
+  if (strictPlayer && d.soundAreaIdProblems.length > 0) {
+    return {
+      exitCode: 22,
+      message: `Strict player mode: ${d.soundAreaIdProblems.length} sound-area id problem(s). Failing build.\n  ${d.soundAreaIdProblems.join("\n  ")}`,
     };
   }
   // The per-campaign resolver's own gates (ADR-0004): a DM-only item and a

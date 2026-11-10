@@ -56,7 +56,8 @@ decides visibility.
    says (and the build warns). An entry's `basedOn` records the frontmatter value it was written
    against; if they differ, or `basedOn` is missing, the entry resolves to `dm` for every campaign
    and the Publish Check flags it. The campaign's note default (below) then applies.
-7. A pin ships only if its note and its map ship in that campaign and it is not under fog.
+7. A pin ships only if its note and its map ship in that campaign, it is not under fog and it is
+   not hidden by rule 9.
 8. **Name collisions fail the build.** When an item or note that doesn't ship to a campaign (hidden,
    fogged, or under a hidden map) has the same name, title or alias as a note that ships there, the
    player build for that campaign fails and names both. Otherwise the shipped note would carry the
@@ -68,6 +69,16 @@ decides visibility.
      "Drow Ambush" linking `salt-marsh`), stay in must-not-ship;
    - a pin dropped by fog: it adds its location (map id, coordinates, that placement) to
      must-not-ship, not its note's name, so the note can still ship elsewhere.
+9. **A hidden region hides what is inside or reaching into it.** On a map that ships, a region that doesn't
+   ship for its own sake (its visibility, or a hidden linked note; not fog) hides, there: a pin
+   inside it or on its edge; a route with any point inside it or any segment crossing into it, touching its edge or running along it;
+   a sound-only area, region or child-map frame that overlaps its interior without wholly
+   containing it (a child map so hidden takes its whole subtree, as rule 2). Hidden wins over any
+   shipped region covering the same point. A region hidden only by fog or only by this rule hides
+   nothing (rule 3 tests fog per point; no cascade). A hidden region too malformed to test fails
+   the player build. Items hidden by this rule join must-not-ship as in rule 8; a note stays
+   decided by rule 6, with a build warning when all its pins are hidden this way. A pin hidden by
+   this rule adds its location to must-not-ship, not its note's name.
 
 **The campaign note default (`notes:` in the campaign file).** Rule 1 makes every `world.yaml` item
 start hidden in a new campaign, but a note's frontmatter value is one value for every campaign, so
@@ -141,3 +152,8 @@ own store as the atlas dir.
   (question 5), keeping both `unknown` state and visibility (6), the per-campaign output dirs (7)
   and a campaign's own id and name in its output (8). The campaign note default departs from
   plan.md, which kept per-campaign note visibility only in `world.yaml`'s `notes:` block.
+- 2026-11-08: rule 9 added (R-11e) for the GOALS "hidden zones" promise, found by R-16's test
+  world. Isak chose that an item partly inside a hidden region hides whole, and that hidden wins
+  over a shipped region covering the same point. Fail closed like rules 3 and 4. The container
+  exception (an area wholly containing a hidden region still ships) and leaving fog-only regions
+  out were decided by the agent for Isak to overrule.
