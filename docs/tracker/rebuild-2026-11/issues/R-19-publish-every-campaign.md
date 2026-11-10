@@ -1,6 +1,6 @@
 # R-19 Publish runs every campaign
 
-Status: ready-for-agent
+Status: done
 Blocked by: R-17, R-17b
 Size: S
 Branch: `rebuild-r19-publish-campaigns`
