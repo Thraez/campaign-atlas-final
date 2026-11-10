@@ -155,6 +155,57 @@ export interface WorldConfig {
 
 export class WorldConfigError extends Error {}
 
+/**
+ * Fog shapes (`conceals` and `reveals`) re-fog part of a reveal, so dropping one would ship
+ * what it hides. Fail closed: anything but a list of polygons of at least 3
+ * finite `[x, y]` points stops the build instead of being skipped.
+ */
+function fogShapes(raw: unknown, where: string, key: "conceals" | "reveals"): Point[][] {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) {
+    throw new WorldConfigError(`${where}: "${key}" must be a list of polygons.`);
+  }
+  return raw.map((poly, i) => {
+    const bad = (why: string) =>
+      new WorldConfigError(`${where}: fog shape #${i} in "${key}" ${why}.`);
+    if (!Array.isArray(poly)) throw bad("is not a list of [x, y] points");
+    if (poly.length < 3) throw bad("needs at least 3 points");
+    const points = poly.map((pt: unknown) => {
+      if (
+        !Array.isArray(pt) ||
+        pt.length !== 2 ||
+        !pt.every((n) => typeof n === "number" && Number.isFinite(n))
+      ) {
+        throw bad(`has a point that isn't a pair of finite numbers (${JSON.stringify(pt)})`);
+      }
+      return [pt[0], pt[1]] as Point;
+    });
+    // A shape with no area hides nothing, so the DM's fog would silently not
+    // apply: stop instead.
+    if (new Set(points.map(([x, y]) => `${x},${y}`)).size < 3) {
+      throw bad("needs at least 3 distinct points");
+    }
+    if (allOnOneLine(points)) throw bad("has no area (its points are all on one line)");
+    return points;
+  });
+}
+
+/** True when every point lies on the line through the first two distinct
+ *  points. (Not a shoelace test: a self-crossing shape can sum to 0 area.) */
+function allOnOneLine(points: Point[]): boolean {
+  const [ax, ay] = points[0];
+  const b = points.find(([x, y]) => x !== ax || y !== ay);
+  if (!b) return true;
+  const [bx, by] = b;
+  return points.every(([x, y]) => (bx - ax) * (y - ay) - (by - ay) * (x - ax) === 0);
+}
+
+/**
+ * Upper bound for `featherPx`. The build blurs the fog mask with sigma
+ * featherPx / 2 and sharp refuses a sigma above 1000.
+ */
+export const MAX_FEATHER_PX = 2000;
+
 export function loadWorldConfig(
   contentRoot: string,
   worldId: string,
@@ -309,16 +360,37 @@ export function loadWorldConfig(
   const seenFogMaps = new Set<string>();
   const fogs: FogOverlay[] = rawFogs.flatMap((f) => {
     if (seenFogMaps.has(f.mapId)) {
-      warnings.push(`fog defined twice for map "${f.mapId}" — keeping first definition`);
-      return [];
+      // Fail closed: keeping one block would drop the other's fog shapes.
+      throw new WorldConfigError(
+        `${rel}: fog defined twice for map "${f.mapId}" (top-level "fog:" and/or the map's own ` +
+          `"fog:" block). Merge them into one.`,
+      );
     }
     seenFogMaps.add(f.mapId);
+    const where = `${rel}: fog for map "${f.mapId}"`;
+    const conceals = fogShapes(f.conceals, where, "conceals");
+    const reveals = fogShapes(f.reveals, where, "reveals");
+    const featherPx = f.featherPx;
+    if (
+      featherPx !== undefined &&
+      !(typeof featherPx === "number" && Number.isFinite(featherPx) && featherPx >= 0)
+    ) {
+      throw new WorldConfigError(`${where}: "featherPx" must be a number of pixels, 0 or more.`);
+    }
+    if (featherPx !== undefined && featherPx > MAX_FEATHER_PX) {
+      throw new WorldConfigError(
+        `${where}: "featherPx" is ${featherPx}; the most the build can blur is ${MAX_FEATHER_PX}.`,
+      );
+    }
     return [
       {
         mapId: f.mapId,
         enabled: f.enabled !== false,
         color: f.color ?? "rgba(8, 12, 20, 0.55)",
-        reveals: (f.reveals ?? []) as Point[][],
+        reveals,
+        // Only when present, so a world without fog shapes builds as before.
+        ...(conceals.length > 0 ? { conceals } : {}),
+        ...(featherPx !== undefined ? { featherPx } : {}),
       },
     ];
   });

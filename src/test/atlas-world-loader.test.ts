@@ -120,7 +120,7 @@ regions:
     expect(cfg.regions.map((r) => r.id).sort()).toEqual(["rn", "rt"]);
   });
 
-  it("warns on duplicate region/route ids and on duplicate fog per map", () => {
+  it("warns on duplicate region/route ids", () => {
     writeWorldYaml(`
 maps:
   - id: m1
@@ -152,15 +152,10 @@ routes:
     name: B
     visibility: player
     waypoints: [[0,0],[2,2]]
-fog:
-  - mapId: m1
-    enabled: true
-    reveals: []
 `);
     const cfg = loadWorldConfig(tmpRoot, WORLD)!;
     expect(cfg.warnings.some((w) => w.includes("duplicate region id"))).toBe(true);
     expect(cfg.warnings.some((w) => w.includes("duplicate route id"))).toBe(true);
-    expect(cfg.warnings.some((w) => w.includes("fog defined twice"))).toBe(true);
     // First definition wins.
     expect(cfg.regions.filter((r) => r.id === "dup")).toHaveLength(1);
     expect(cfg.routes.filter((r) => r.id === "dup-route")).toHaveLength(1);

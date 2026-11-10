@@ -15,7 +15,7 @@ ticket merges on `npm run gate` plus an Opus review; a push or merge needs Isak'
 |---|---|---|---|
 | 0 Guard and quick wins | R-01 Sync guard, scans on real artifacts, Q-01..Q-04 | Links that work, a fitted map, the menu above the map, a region card. **Safe stop** | done |
 | 1 Spine and PRs | The other PRs, R-02..R-06, ADR-0001 addendum, ADR-0002 | A publish log with every scan reading `dist`; `docs/GOALS.md` agreed | done |
-| 2 Schema v2 and campaigns in the pipeline | R-10..R-20, ADR-0003, ADR-0004 | `npm run atlas:tree` on the v2 test world, per campaign; today's site unchanged | in progress (R-10, R-11a, R-11b, R-11d, R-12, R-15, R-16 done; R-11c, R-11e, R-07b, R-13 next) |
+| 2 Schema v2 and campaigns in the pipeline | R-10..R-20, ADR-0003, ADR-0004 | `npm run atlas:tree` on the v2 test world, per campaign; today's site unchanged | in progress (R-10, R-11a, R-11b, R-11c, R-11d, R-12, R-15, R-16, R-07b done; R-13, R-11e next) |
 | 3 Shared canvas | Ocean/frame/map-tree component; viewer on it; campaign links | Ocean > continent > city > back on the local test world. **Safe stop** | - |
 | 4 Editor core | Router, command store, E0-E5, Place pin, E9, Draw route with distance/time; v2 test world only; ADR-0005, ADR-0006 | Add a map inside a map, pin it, draw a route, reload | - |
 | 5 Story | Region card and story panel, monument strip, people and Inside lists, route labels, deep links, Browse, Timeline, Credits, Landing on v2 | Read a region, a person, a monument; follow three links | - |
@@ -59,7 +59,7 @@ Follow-up noted in its ticket: no scan derives DM region/route ids, so none woul
 | R-11d | Link redaction from wikilink tokens (arch-08's other half) (done) | R-11a |
 | R-11e | A hidden region hides what is inside or reaching into it (ADR-0004 rule 9) | R-11a |
 | R-12 | v2 loader and the one v1 adapter (v1 only with no `schemaVersion` or `1`; a mix fails) (done, #124) | R-10 |
-| R-07b | Loader drops fog shapes (conceals); before the first real Sync | - |
+| R-07b | Loader drops fog shapes (conceals) (done) | - |
 | R-13 | Build assembles every world and the map tree | R-11b, R-12 |
 | R-14 | Sync targets any world | R-13 |
 | R-15 | Scan registry lists campaign dirs (done) | R-03 (done), R-12 |
@@ -98,6 +98,9 @@ State.md part is the same stale notes. Drop it once Isak decides the settings ch
 - 2026-11-07 improvement loop (retro, architecture review, simplify): no rewrite. The editor page is
   wiring around tested pure modules; extraction beats a rewrite. It built eight tickets (all merged); what's left is under "Open work".
 
+- Main has R-11c (PR #129) and the R-07b/R-11e ticket docs with ADR-0004 rule 9 (PR #131). R-07b is
+  done on its branch `rebuild-r07b-fog-conceals`, not merged yet.
+
 ## Open work
 
 Lowest number first within each folder.
@@ -118,6 +121,9 @@ Lowest number first within each folder.
   5. Later, L: map-space module and markers.json converter (tidemarrow/02), a draft registry
      (reopen code-retro 09; it would absorb 44/45/47-style gaps; pin overrides and map metadata
      could move to `useUndoableState`), build-atlas stages.
+- Fog editor follow-up: the editor should refuse fog shapes that become flat after integer rounding
+  (the build now rejects them). A shape that runs back along itself (A,B,C,B) still passes the
+  loader's checks.
 - `tidemarrow/01`-`03`: first sync, Tidemarrow map, remove the Astrath sample. Blocked by H-04
   (Phase H).
 - `eval-2026-10/07`: Vite 8 with Vitest 5, after Tidemarrow.
@@ -142,6 +148,10 @@ Lowest number first within each folder.
   After #105: start a route with the ruler on; one click adds one vertex and no ruler point. After
   #103: rename the world, edit the calendar, Discard all; both go back. After #107: change one
   map's soundscape, switch maps, save; only that map changes.
+- Look at fog once it is switched on (today's content has none): redaction now uses a sharp mask
+  (alpha = min(sharp, blurred)), so a thin dark seam can show where two reveals share an edge that
+  falls off a pixel boundary; and `featherPx` is in image pixels, so on scaled layers the soft edge
+  looks about 20x wider on the map than the number suggests.
 - Agents were denied reads under `node_modules` (an unknown deny rule); worth a look.
 - On the PC: follow `docs/PC-CLEANUP.md` (turn the old routines off first).
 
