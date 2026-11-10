@@ -1,6 +1,6 @@
 # R-17 One player output per campaign: visibility
 
-Status: ready-for-agent
+Status: done
 Blocked by: R-13, R-15, R-16 (plan.md lists R-15, R-16; it builds on R-13's build stages). R-11e (no per-campaign output ships before containment) was a blocker; done 2026-11-10
 Size: M
 Branch: `rebuild-r17-campaign-outputs`
@@ -54,3 +54,32 @@ Today's v1 output (`public/atlas/`, `dist/`) stays as it is.
 - Fog per campaign and the source-driven fog scan (R-18).
 - The Vite site build per campaign and publish (R-19). Hosting (phase H).
 - Moving today's `content/` to v2 (R-20 dry run; cutover in phase 6).
+
+## Done
+
+On v2 content the player build writes one store per campaign, `.atlas-campaigns/<id>/atlas/`
+(`scripts/atlas/build/campaignStore.ts`; `--campaign <id>` builds one, `--out` moves the root, a
+store inside `public/` is refused). Every campaign is built before any is written, so one failure
+writes nothing. Each store holds `atlas.json` (with `campaign: {id, name}` and no other campaign's
+id), `search-index.json` and `assets/`: byte copies of the map images it names
+(`assets/maps/<sha256-16><ext>`) and its audio (`assets/audio/<hash>.ogg`), replaced on every
+write. Hidden maps (with frames, subtree and images) and pins, routes and sound areas hidden by
+rule 9 are absent. The must-not-ship set is written beside the store
+(`.atlas-campaigns/<id>/must-not-ship.json`, with `otherCampaigns`); `check-derived-secrets
+--must-not-ship` reads it (whole-word ids and names, `normalizePath` on both sides for paths,
+fail closed on an unreadable file) and the scan registry passes and requires it for every v2
+campaign dir. `check-fog-safety` reads a v2 campaign's fog from the campaign file. `audit-assets`
+requires `assets/` only when the store names a file there. The DM build carries every campaign
+file (`campaigns`). v1 player and DM `atlas.json` and `search-index.json` are identical to
+before (ignoring `version` and `publishedAt`).
+
+The State.md leak (a hidden map or world name in a shipped note body): a link to any must-not-ship
+id or name is redacted to `…` like a link to a hidden note, and counts as a cross-reference leak,
+so `--strict` fails with exit 8. The must-not-ship scan catches any plain-text mention.
+
+Sentinels on `content-next/` (listed in its README) and `src/test/build/campaign-stores.test.ts`
+build both campaigns and grep every file of each store, bytes for images and audio.
+
+Left out: entity images and embedded assets in v2 notes fail the player build closed (not
+published per campaign yet); a tiled map layer is an error; fogged v2 maps ship with no fog mask
+(R-18). `check-player-files` and the v1 store comments still describe the v1 layout (R-19).

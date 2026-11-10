@@ -168,6 +168,32 @@ the build still writes them and the deploy ships `dist`, until R-19 retires them
 `check-vault-content` runs once. If the model can't load, the
 orchestrator exits 1 and the editor's Publish check errors: the registry never runs on zero dirs.
 
+**One store per campaign (R-17, ADR-0004).** On v2 content, `npm run atlas:build:player` builds
+every campaign (`--campaign <id>` builds one) and writes each to its own store,
+`.atlas-campaigns/<id>/atlas/` (`--out <dir>` moves the root; a store under `public/` is refused).
+A store holds `atlas.json`, `search-index.json` and `assets/`: copies, never links, of exactly the
+map images and audio its `atlas.json` names (maps under `assets/maps/<sha256-16><ext>`, byte for
+byte, so they stay lossless; audio under `assets/audio/<hash>.ogg`). No asset dir is shared, and
+`assets/` is replaced on every write. If any campaign fails, no store is written. Each
+`atlas.json` names only its own campaign (`campaign: {id, name}`); the DM build carries every
+campaign file instead. v1 output is unchanged.
+
+What the resolver hides for a campaign (maps that are `dm` or `unknown`, their frames, subtree and
+images; pins, routes and sound areas inside a hidden region) is absent from that store. The
+resolver's must-not-ship set goes to `.atlas-campaigns/<id>/must-not-ship.json`, beside the store
+and never inside it: `{campaign, ids, names, paths, pinLocations, otherCampaigns}`.
+`check-derived-secrets` reads it (`--must-not-ship <file>`; the registry passes it for every v2
+campaign dir and requires the file, and an unreadable file fails closed) and fails with 12 on any
+of its ids or names as a whole word, or any of its paths (compared with `normalizePath` on both
+sides). `check-fog-safety` reads a v2 campaign's fog from the campaign file. `audit-assets`
+requires `assets/` only when the store's `atlas.json` names a file there.
+
+A note body that links a hidden item (a hidden map or world, or any must-not-ship id or name, as
+in `[[Hookhaven]]`) has that link redacted to `…`, as a link to a hidden note is, and the link
+counts as a cross-reference leak: a `--strict` build fails with exit 8. Entity images and embedded
+assets in v2 notes aren't published per campaign yet: the player build fails closed on one. Tests:
+`src/test/build/campaign-stores.test.ts` (sentinels listed in `content-next/README.md`).
+
 ## Folder-level exclusion
 
 Folders listed under `exclude` in `atlas.config.json` (default: `_drafts`, `_dm`, `archive`, `deprecated`) are excluded entirely:
