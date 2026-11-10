@@ -35,7 +35,7 @@ player output per campaign). Both are `accepted` (2026-11-08), with Isak's answe
 | 3 | [R-15 Scan registry lists campaign dirs (done)](issues/R-15-scan-registry-campaign-dirs.md) | S | R-12 | yes |
 | 3 | [R-16 Three-level test world, two campaigns (done)](issues/R-16-test-world-two-campaigns.md) | S | R-12, R-11a | light |
 | 4 | [R-07b Fog shapes (conceals) dropped by the loader (done)](issues/R-07b-fog-conceals-dropped.md) | S | - | yes |
-| 4 | [R-13 Build assembles every world and the map tree](issues/R-13-build-every-world-map-tree.md) | M | R-11b, R-12 | yes |
+| 4 | [R-13 Build assembles every world and the map tree (done)](issues/R-13-build-every-world-map-tree.md) | M | R-11b, R-12 | yes |
 | 5 | [R-17 One player output per campaign](issues/R-17-player-output-per-campaign.md) | M | R-13, R-15, R-16, R-11e | yes |
 | 5 | [R-14 Sync targets any world](issues/R-14-sync-any-world.md) | S-M | R-13 | if visibility |
 | 6 | [R-17b Structural campaign isolation scan](issues/R-17b-campaign-isolation-scan.md) | S-M | R-17 | yes |
@@ -53,7 +53,7 @@ R-17b are new (split out of R-11a and R-17 in review).
 
 - **Done 2026-11-08:** Isak accepted every "Open for Isak" recommendation in ADR-0003 and ADR-0004
   and the three fail-closed rules.
-- **Done:** R-11c (merged), R-07b. **Now:** R-13, R-11e. **Then:** R-17 (after R-11e) and R-14; R-17b; R-18 and R-19; R-20. R-07 before the first real Sync.
+- **Done:** R-11c (merged), R-07b, R-13. **Now:** R-11e. **Then:** R-17 (after R-11e) and R-14; R-17b; R-18 and R-19; R-20. R-07 before the first real Sync.
 
 Phase 3 and 4 tickets are written before phase 2 ends (plan.md section 5). Phase H (H-01..H-04)
 starts after R-19 at the earliest and before the first real Sync (`tidemarrow/01`).
