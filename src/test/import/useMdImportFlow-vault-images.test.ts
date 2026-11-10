@@ -32,8 +32,8 @@ vi.mock("@/atlas/save/localFsSave", async (importOriginal) => {
 });
 
 vi.mock("@/atlas/sync/useSyncSettings", () => ({
-  loadSyncMap: vi.fn(() => Promise.resolve({})),
-  saveSyncMap: vi.fn(() => Promise.resolve()),
+  loadSyncMapFile: vi.fn(() => Promise.resolve({ version: 2, worlds: {} })),
+  saveWorldSyncMap: vi.fn(() => Promise.resolve()),
   loadSettings: vi.fn(() => Promise.resolve({})),
   saveSettings: vi.fn(() => Promise.resolve()),
 }));
@@ -91,7 +91,7 @@ describe("useMdImportFlow commit — rewrites vault image embeds (V12/C3)", () =
 
     const { result } = setup();
     await act(async () => {
-      await result.current.openWithVaultScan("/vault", [], ["03_Entities"]);
+      await result.current.openWithVaultScan("/vault", [], ["03_Entities"], "w");
     });
 
     const { buildImportChanges } = await import("@/atlas/import/buildImportChanges");

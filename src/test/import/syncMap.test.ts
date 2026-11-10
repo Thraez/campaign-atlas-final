@@ -1,10 +1,16 @@
 import { describe, it, expect } from "vitest";
 import {
+  legacySyncMapWorld,
   classifyVaultNote,
   recordSync,
   findPathByApprovedHash,
   hasLocalEdits,
   type SyncMap,
+  readSyncMapFile,
+  worldSyncMap,
+  withWorldSyncMap,
+  allSyncMapEntries,
+  SyncMapFormatError,
 } from "@/atlas/import/syncMap";
 
 const H1 = "sha256:1111";
@@ -79,5 +85,92 @@ describe("hasLocalEdits", () => {
 
   it("is false when we have no record — never cry wolf on a first sync", () => {
     expect(hasLocalEdits({}, "03_Entities/Corven.md", H1)).toBe(false);
+  });
+});
+
+describe("sync-map file, one map per world (R-14)", () => {
+  const entry = { id: "corven", baseType: "npc" as const, approvedHash: H1 };
+
+  it("reads nothing as empty", () => {
+    expect(readSyncMapFile(null, "a")).toEqual({ version: 2, worlds: {} });
+    expect(readSyncMapFile({}, null)).toEqual({ version: 2, worlds: {} });
+  });
+
+  it("reads an old flat map as the default world's", () => {
+    const file = readSyncMapFile({ "Corven.md": entry }, "a");
+    expect(worldSyncMap(file, "a")).toEqual({ "Corven.md": entry });
+    expect(worldSyncMap(file, "b")).toEqual({});
+  });
+
+  it("refuses an old flat map when the DM build has no single world to give it to", () => {
+    expect(() => readSyncMapFile({ "Corven.md": entry }, null)).toThrow(SyncMapFormatError);
+  });
+
+  it("refuses an unknown version", () => {
+    expect(() => readSyncMapFile({ version: 3, worlds: {} }, "a")).toThrow(SyncMapFormatError);
+  });
+
+  it("replaces one world's map and keeps the others", () => {
+    const file = readSyncMapFile({ version: 2, worlds: { a: { "A.md": entry } } }, null);
+    const next = withWorldSyncMap(file, "b", { "B.md": entry });
+    expect(next.worlds).toEqual({ a: { "A.md": entry }, b: { "B.md": entry } });
+    expect(file.worlds.b).toBeUndefined();
+  });
+
+  it("lists every world's entries, from either shape", () => {
+    expect(allSyncMapEntries({ "Old.md": entry })).toEqual([entry]);
+    const other = { ...entry, id: "mara" };
+    const v2 = { version: 2, worlds: { a: { "A.md": entry }, b: { "B.md": other } } };
+    expect(allSyncMapEntries(v2)).toEqual([entry, other]);
+  });
+
+  it("says when `worlds` isn't an object", () => {
+    expect(() => readSyncMapFile({ version: 2, worlds: [] }, "a")).toThrow(
+      /`worlds` is not an object/,
+    );
+  });
+
+  it("keeps unknown top-level fields through a write", () => {
+    const file = readSyncMapFile({ version: 2, worlds: {}, writtenBy: "later" }, null);
+    expect(withWorldSyncMap(file, "a", {})).toEqual({
+      version: 2,
+      worlds: { a: {} },
+      writtenBy: "later",
+    });
+  });
+
+  it("refuses reserved world ids instead of dropping them", () => {
+    const raw: unknown = JSON.parse('{"version":2,"worlds":{"__proto__":{}}}');
+    expect(() => readSyncMapFile(raw, null)).toThrow(/can't be a world id/);
+    const empty = readSyncMapFile(null, null);
+    expect(() => withWorldSyncMap(empty, "constructor", {})).toThrow(SyncMapFormatError);
+    expect(() => worldSyncMap(empty, "prototype")).toThrow(SyncMapFormatError);
+  });
+
+  it("lists entries only from a file Sync can read", () => {
+    expect(allSyncMapEntries(null)).toEqual([]);
+    expect(() => allSyncMapEntries({ version: 3, worlds: {} })).toThrow(SyncMapFormatError);
+    expect(() => allSyncMapEntries({ version: 2, worlds: [] })).toThrow(SyncMapFormatError);
+    expect(() => allSyncMapEntries([entry])).toThrow(SyncMapFormatError);
+  });
+
+  it("an old flat map belongs to the DM build's only world, or none", () => {
+    expect(legacySyncMapWorld(["astrath"])).toBe("astrath");
+    expect(legacySyncMapWorld(["astrath", "nyr"])).toBeNull();
+    expect(legacySyncMapWorld([])).toBeNull();
+    expect(legacySyncMapWorld(null)).toBeNull();
+  });
+
+  it("every entry must be an object with a string id", () => {
+    const bad = [
+      { version: 2, worlds: { a: { "x.md": "str" } } },
+      { version: 2, worlds: { a: { "x.md": { baseType: "npc" } } } },
+      { version: 2, worlds: { a: { "x.md": { id: 3 } } } },
+      { "x.md": null },
+    ];
+    for (const raw of bad) {
+      expect(() => readSyncMapFile(raw, "a"), JSON.stringify(raw)).toThrow(SyncMapFormatError);
+      expect(() => allSyncMapEntries(raw), JSON.stringify(raw)).toThrow(SyncMapFormatError);
+    }
   });
 });

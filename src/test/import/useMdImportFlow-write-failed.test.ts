@@ -8,7 +8,7 @@ import { renderHook, act } from "@testing-library/react";
 import { toast } from "sonner";
 import { useMdImportFlow } from "@/atlas/import/useMdImportFlow";
 import { saveAtlasPatchToLocalFs, WriteFailedError } from "@/atlas/save/localFsSave";
-import { saveSyncMap, saveSettings } from "@/atlas/sync/useSyncSettings";
+import { saveWorldSyncMap, saveSettings } from "@/atlas/sync/useSyncSettings";
 import type { ImportFolderConfig } from "@/atlas/content/schema";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), warning: vi.fn(), success: vi.fn() } }));
@@ -19,8 +19,8 @@ vi.mock("@/atlas/save/localFsSave", async (importOriginal) => {
 });
 
 vi.mock("@/atlas/sync/useSyncSettings", () => ({
-  loadSyncMap: vi.fn(() => Promise.resolve({})),
-  saveSyncMap: vi.fn(() => Promise.resolve()),
+  loadSyncMapFile: vi.fn(() => Promise.resolve({ version: 2, worlds: {} })),
+  saveWorldSyncMap: vi.fn(() => Promise.resolve()),
   loadSettings: vi.fn(() => Promise.resolve({})),
   saveSettings: vi.fn(() => Promise.resolve()),
 }));
@@ -64,7 +64,7 @@ describe("Sync commit on a rolled-back write (eval-2026-10/33)", () => {
       }),
     );
     await act(async () => {
-      await result.current.openWithVaultScan("/vault", [], ["03_Entities"]);
+      await result.current.openWithVaultScan("/vault", [], ["03_Entities"], "w");
     });
     expect(result.current.rows[0].targetPath).toBe(TARGET);
 
@@ -73,7 +73,7 @@ describe("Sync commit on a rolled-back write (eval-2026-10/33)", () => {
     });
 
     expect(saveAtlasPatchToLocalFs).toHaveBeenCalledTimes(1);
-    expect(saveSyncMap).not.toHaveBeenCalled();
+    expect(saveWorldSyncMap).not.toHaveBeenCalled();
     expect(saveSettings).not.toHaveBeenCalled();
     expect(onImported).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();

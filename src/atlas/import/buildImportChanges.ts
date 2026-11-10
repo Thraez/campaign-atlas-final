@@ -19,7 +19,7 @@ import { mergeImportFrontmatter } from "./mergeImportFrontmatter";
 import { readNote } from "@/atlas/content/readNote";
 import { rewriteFrontmatter } from "@/atlas/content/frontmatterRewrite";
 import { VAULT_SOURCE_KEY, VAULT_SOURCE_VALUE } from "./vaultSourceMarker";
-import type { StagingRow } from "./stagingState";
+import { isHeldForOtherWorld, otherWorldMessage, type StagingRow } from "./stagingState";
 
 export class ImportCommitError extends Error {
   constructor(
@@ -45,6 +45,14 @@ export async function buildImportChanges(
   { readFile }: BuildImportChangesDeps,
 ): Promise<FileChange[]> {
   const eligible = rows.filter((r) => r.included && r.pathAllowed && !r.parseError);
+  const otherWorld = eligible.find(isHeldForOtherWorld);
+  if (otherWorld) {
+    // R-14: note ids are global across worlds; never write a second copy.
+    throw new ImportCommitError(
+      `${otherWorld.targetPath}: ${otherWorldMessage(otherWorld)}`,
+      otherWorld.targetPath,
+    );
+  }
   if (eligible.length === 0) {
     throw new ImportCommitError("No rows selected for import");
   }

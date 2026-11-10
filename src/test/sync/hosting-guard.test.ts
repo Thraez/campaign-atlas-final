@@ -78,7 +78,7 @@ describe("Sync refuses real writes while hosting is public", () => {
     });
     const plan = await planSync(port, WORLD, SOURCE, { dryRun: true });
     expect(plan.rows.some((r) => r.included)).toBe(true);
-    await expect(commitSync(port, plan.rows, SOURCE)).rejects.toThrow(HostingPublicError);
+    await expect(commitSync(port, WORLD, plan.rows, SOURCE)).rejects.toThrow(HostingPublicError);
     expect(port.copiedImages).toEqual([]);
     expect(port.writes).toEqual([]);
     expect(port.atlas.size).toBe(0);
@@ -90,7 +90,9 @@ describe("Sync refuses real writes while hosting is public", () => {
       hosting: "public",
     });
     const plan = await planSync(port, WORLD, SOURCE, { dryRun: true });
-    await expect(commitSync(port, plan.rows, SOURCE)).rejects.toThrow(/hosting.*public.*H-04/s);
+    await expect(commitSync(port, WORLD, plan.rows, SOURCE)).rejects.toThrow(
+      /hosting.*public.*H-04/s,
+    );
     expect(port.writes).toEqual([]);
   });
 
@@ -101,7 +103,7 @@ describe("Sync refuses real writes while hosting is public", () => {
       hosting: "private",
     });
     const plan = await planSync(port, WORLD, SOURCE);
-    const result = await commitSync(port, plan.rows, SOURCE);
+    const result = await commitSync(port, WORLD, plan.rows, SOURCE);
     expect(result.saved).toBe(1);
     expect(port.copiedImages).toHaveLength(1);
   });

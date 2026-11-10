@@ -1,7 +1,8 @@
 // @vitest-environment node
 /**
- * R-13: the build picks no world. Non-test files under `scripts/` may say
- * `defaultWorld` or `worlds[0]` (or another way to take the first world)
+ * R-13: the build picks no world. Non-test files under `scripts/`, and
+ * Sync's own code under `src/atlas/sync/` (R-14), may say `defaultWorld` or
+ * `worlds[0]` (or another way to take the first world; any letter case)
  * only as often as
  * `scripts/atlas/default-world-allowlist.json` allows, and that list only
  * shrinks: a new hit fails, and so does a listed count above today's hits.
@@ -15,7 +16,10 @@ const ALLOWLIST = "scripts/atlas/default-world-allowlist.json";
 // A tripwire, not a parser: `defaultWorld`, `worlds[0]` (spaces allowed),
 // `worlds.at(0)`, and destructuring the first world (`const [w] = x.worlds`).
 const PATTERN =
-  /defaultWorld|worlds\s*\[\s*0\s*\]|worlds\s*\.\s*at\s*\(\s*0\s*\)|\[\s*[\w$]+\s*(?:,[^\]=]*)?\]\s*=\s*[\w$.?]*worlds\b/g;
+  /defaultWorld|worlds\s*\[\s*0\s*\]|worlds\s*\.\s*at\s*\(\s*0\s*\)|\[\s*[\w$]+\s*(?:,[^\]=]*)?\]\s*=\s*[\w$.?]*worlds\b/gi;
+// `src/atlas/import` is not scanned yet: the map-import wizard
+// (`mapImport.ts`, `MapImportWizard.tsx`) has older `defaultWorldId` hits.
+const SCANNED = ["scripts", "src/atlas/sync"];
 
 function nonTestFiles(dir: string): string[] {
   return fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((e) => {
@@ -28,14 +32,14 @@ function nonTestFiles(dir: string): string[] {
 
 function hits(): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const rel of nonTestFiles("scripts")) {
+  for (const rel of SCANNED.flatMap(nonTestFiles)) {
     const n = fs.readFileSync(path.join(ROOT, rel), "utf8").match(PATTERN)?.length ?? 0;
     if (n > 0) out[rel] = n;
   }
   return out;
 }
 
-describe("defaultWorld / worlds[0] in scripts/ (R-13)", () => {
+describe("defaultWorld / worlds[0] in scripts/ and src/atlas/sync (R-13)", () => {
   it("the pattern catches the usual ways to take the first world", () => {
     const n = (src: string) => src.match(PATTERN)?.length ?? 0;
     for (const src of [
@@ -45,6 +49,7 @@ describe("defaultWorld / worlds[0] in scripts/ (R-13)", () => {
       "model.worlds.at(0)",
       "const [w] = model.worlds",
       "const [first, ...rest] = worlds",
+      "readDefaultWorld(root)",
     ]) {
       expect(n(src), src).toBe(1);
     }

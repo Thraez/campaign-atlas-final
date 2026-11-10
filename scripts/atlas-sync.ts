@@ -13,6 +13,10 @@
  * --ignore <glob> (repeatable), --world <id>, --repo <path> (default: cwd).
  * Folders and globs default to the editor's saved Sync settings.
  *
+ * `--world` names the world to sync into; it is required when the DM build
+ * has more than one world (the error lists them), and defaults to the only
+ * world otherwise (R-14). Only that world's entities and sync map are used.
+ *
  * `--write` refuses while `atlas.config.json` `hosting` is not "private"
  * (R-01: the repo is public; see H-04). `--dry-run` always works.
  *
@@ -181,7 +185,7 @@ export async function runSyncCli(args: SyncCliArgs): Promise<string> {
   }
 
   if (!plan.rows.some((r) => r.included)) return [...out, "", "Nothing to write."].join("\n");
-  const result = await commitSync(port, plan.rows, source);
+  const result = await commitSync(port, world, plan.rows, source);
   out.push("", `Wrote ${result.saved} file(s). Run \`npm run atlas:build\` to rebuild.`);
   if (result.skippedImages > 0) out.push(`${result.skippedImages} image(s) skipped.`);
   return out.join("\n");

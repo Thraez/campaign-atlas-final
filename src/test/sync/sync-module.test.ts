@@ -119,7 +119,7 @@ describe("commitSync", () => {
     });
     const first = await planSync(port, world(), source());
     expect(changesOf(first.counts)).toBe(3);
-    const result = await commitSync(port, first.rows, first.source);
+    const result = await commitSync(port, world(), first.rows, first.source);
     expect(result.saved).toBe(3);
     expect(port.atlas.get("content/w/npcs/corven.md")).toContain("A smuggler.");
     // R-01: every note Sync writes, created or updated, carries the vault marker.
@@ -149,7 +149,7 @@ describe("commitSync", () => {
       [{ filename: "corven.md", raw: CORVEN }],
       stagingContext(world()),
     );
-    await commitSync(port, rows, null);
+    await commitSync(port, world(), rows, null);
     expect(port.atlas.has("content/w/npcs/corven.md")).toBe(true);
     expect(port.atlas.get("content/w/npcs/corven.md")).not.toContain("source:");
     expect(port.writes.map((w) => w.kind)).toEqual(["atlas"]);
@@ -163,9 +163,9 @@ describe("commitSync", () => {
       rebuildFails: true,
     });
     const plan = await planSync(port, world(), source());
-    const result = await commitSync(port, plan.rows, plan.source);
+    const result = await commitSync(port, world(), plan.rows, plan.source);
     expect(result.rebuilt).toBe(false);
-    expect(port.syncMap["03_Entities/corven.md"]).toMatchObject({
+    expect(port.syncMapOf("w")["03_Entities/corven.md"]).toMatchObject({
       id: "corven",
       approvedHash: await hashContent(CORVEN),
       syncedFileHash: await hashContent(port.atlas.get("content/w/npcs/corven.md")!),
@@ -180,7 +180,9 @@ describe("commitSync", () => {
     const plan = await planSync(port, world(), source());
     // The file appears after Staging looked.
     port.atlas.set("content/w/npcs/corven.md", "someone else's note");
-    await expect(commitSync(port, plan.rows, plan.source)).rejects.toBeInstanceOf(ConflictError);
+    await expect(commitSync(port, world(), plan.rows, plan.source)).rejects.toBeInstanceOf(
+      ConflictError,
+    );
     expect(port.copiedImages).toEqual([]);
     expect(port.writes).toEqual([]);
   });
@@ -191,7 +193,7 @@ describe("commitSync", () => {
       images: ["03_Entities/portrait.png", "10_DMNotesAndSecrets/lair.png"],
     });
     const plan = await planSync(port, world(), source(["03_Entities"]));
-    const result = await commitSync(port, plan.rows, plan.source);
+    const result = await commitSync(port, world(), plan.rows, plan.source);
     expect(result.skippedImages).toBe(1);
     const written = port.atlas.get("content/w/npcs/corven.md")!;
     expect(written).toContain("![](/atlas/assets/images/corven-1.webp)");
@@ -205,8 +207,8 @@ describe("commitSync", () => {
       syncMap: { "03_Entities/corven.md": { id: "corven", baseType: "npc", approvedHash: hash } },
     });
     await planSync(port, world(), source());
-    expect(Object.keys(port.syncMap)).toEqual(["03_Entities/People/corven.md"]);
-    expect(port.syncMap["03_Entities/People/corven.md"]).toMatchObject({ id: "corven" });
+    expect(Object.keys(port.syncMapOf("w"))).toEqual(["03_Entities/People/corven.md"]);
+    expect(port.syncMapOf("w")["03_Entities/People/corven.md"]).toMatchObject({ id: "corven" });
 
     const again = await planSync(port, world(), source());
     expect(again.rows.map((r) => [r.vaultState, r.included])).toEqual([["unchanged", false]]);
@@ -263,7 +265,7 @@ describe("planSync / commitSync safety", () => {
       expect(plan.counts[0]).toMatchObject({ held: 1, update: 0 });
 
       // A DM who ticks it gets the vault's secrecy, never player.
-      await commitSync(port, [{ ...row, included: true }], plan.source);
+      await commitSync(port, world(), [{ ...row, included: true }], plan.source);
       expect(port.atlas.get(P)).toMatch(/visibility:\s*dm\b/);
     },
   );
@@ -277,7 +279,7 @@ describe("planSync / commitSync safety", () => {
       images: ["03_Entities/p.png"],
     });
     const plan = await planSync(port, world(), source());
-    await commitSync(port, plan.rows, plan.source);
+    await commitSync(port, world(), plan.rows, plan.source);
     expect(port.copiedImages).toHaveLength(1);
     expect(port.copiedImages[0]).toMatch(/^\/atlas\/assets\/images\/[a-z0-9-]+\.webp$/);
   });
@@ -290,7 +292,7 @@ describe("planSync / commitSync safety", () => {
       syncMap: { "01_Lore/real.md": { id: "real", baseType: "lore", approvedHash: hash } },
     });
     await planSync(port, world(), source(["03_Entities"]));
-    expect(Object.keys(port.syncMap)).toEqual(["01_Lore/real.md"]);
+    expect(Object.keys(port.syncMapOf("w"))).toEqual(["01_Lore/real.md"]);
     expect(port.writes).toEqual([]);
   });
 });

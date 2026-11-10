@@ -10,6 +10,8 @@
  *     `npm run atlas:sync`.
  *
  * Rules every adapter keeps:
+ *   - The sync map is per world: an adapter reads and writes only the world
+ *     it is given, and reads an old (pre-R-14) map as the v1 default world's.
  *   - The vault is only ever read. Writes go to atlas content, the published
  *     image folder and the local sync files (`.local-atlas/`).
  *   - `writeAtlasFiles` is the Save endpoint's contract: a change with
@@ -79,8 +81,13 @@ export interface VaultPort {
   readAtlasFile(path: string): Promise<string | null>;
   /** Write atlas content (see the contract above). `origin: "sync"` marks a vault sync's write. */
   writeAtlasFiles(changes: FileChange[], opts?: AtlasWriteOpts): Promise<AtlasWriteResult>;
-  loadSyncMap(): Promise<SyncMap>;
-  saveSyncMap(map: SyncMap): Promise<void>;
+  /**
+   * One world's sync map (R-14: `.local-atlas/sync-map.json` keeps one per
+   * world; a pre-R-14 map reads as the v1 default world's, `syncMap.ts`).
+   */
+  loadSyncMap(worldId: string): Promise<SyncMap>;
+  /** Replace one world's sync map, keeping every other world's. */
+  saveSyncMap(worldId: string, map: SyncMap): Promise<void>;
   /** Remember when the last sync wrote something (editor settings `lastSyncAt`). */
   markSynced(at: string): Promise<void>;
 }

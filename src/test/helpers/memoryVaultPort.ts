@@ -6,7 +6,13 @@
  */
 import { makeIgnore } from "@/atlas/import/ignoreRules";
 import { resolveVaultImage, vaultImageTargetName } from "@/atlas/import/resolveVaultImage";
-import type { SyncMap } from "@/atlas/import/syncMap";
+import {
+  readSyncMapFile,
+  withWorldSyncMap,
+  worldSyncMap,
+  type SyncMap,
+  type SyncMapFile,
+} from "@/atlas/import/syncMap";
 import { ConflictError, hashContent, type FileChange } from "@/atlas/save/localFsSave";
 import { HostingPublicError, type Hosting } from "@/atlas/sync/hosting";
 import type {
@@ -25,7 +31,16 @@ export interface MemoryVaultInit {
   images?: string[];
   /** Atlas content path → text. */
   atlas?: Record<string, string>;
-  syncMap?: SyncMap;
+  /**
+   * The stored `sync-map.json`: a per-world file, or an old flat map, which
+   * belongs to `legacyWorld` (R-14).
+   */
+  syncMap?: SyncMap | SyncMapFile;
+  /**
+   * The DM build's only world, which an old flat map belongs to. Default "w";
+   * null stands for a build with several worlds (the old map is refused).
+   */
+  legacyWorld?: string | null;
   /** Make every write report a failed rebuild (the files are still written). */
   rebuildFails?: boolean;
   /**
@@ -40,7 +55,10 @@ export interface MemoryVaultPort extends VaultPort {
   notes: Record<string, string>;
   images: string[];
   atlas: Map<string, string>;
-  syncMap: SyncMap;
+  /** The stored sync-map file, every world's map. */
+  syncMapFile: SyncMapFile;
+  /** One world's stored sync map. */
+  syncMapOf(worldId: string): SyncMap;
   /** Published image paths, in copy order. */
   copiedImages: string[];
   /** Every write the port took: atlas batches, sync-map saves and sync stamps. */
@@ -52,7 +70,11 @@ export function createMemoryVaultPort(init: MemoryVaultInit = {}): MemoryVaultPo
     notes: { ...init.notes },
     images: [...(init.images ?? [])],
     atlas: new Map(Object.entries(init.atlas ?? {})),
-    syncMap: { ...init.syncMap },
+    syncMapFile: readSyncMapFile(
+      init.syncMap ?? null,
+      init.legacyWorld === undefined ? "w" : init.legacyWorld,
+    ),
+    syncMapOf: (worldId: string) => worldSyncMap(port.syncMapFile, worldId),
     copiedImages: [],
     writes: [],
 
@@ -100,13 +122,16 @@ export function createMemoryVaultPort(init: MemoryVaultInit = {}): MemoryVaultPo
         : { saved: changes.length, rebuilt: true };
     },
 
-    async loadSyncMap() {
-      return { ...port.syncMap };
+    async loadSyncMap(worldId: string) {
+      return worldSyncMap(port.syncMapFile, worldId);
     },
 
-    async saveSyncMap(map: SyncMap) {
-      port.syncMap = { ...map };
-      port.writes.push({ kind: "sync-map", detail: Object.keys(map).join(", ") });
+    async saveSyncMap(worldId: string, map: SyncMap) {
+      port.syncMapFile = withWorldSyncMap(port.syncMapFile, worldId, map);
+      port.writes.push({
+        kind: "sync-map",
+        detail: `${worldId}: ${Object.keys(map).join(", ")}`,
+      });
     },
 
     async markSynced(at: string) {

@@ -84,7 +84,7 @@ describe("a ticked sync is never more player-visible than the vault note", () =>
       const [row] = plan.rows;
       expect(row.rowKind).toBe("update");
       expect(row.resolvedId).toBe("corven");
-      await commitSync(port, [{ ...row, included: true }], source);
+      await commitSync(port, world, [{ ...row, included: true }], source);
 
       const written = readNote(port.atlas.get(TARGET)!, TARGET);
       if (!vaultIsPlayerVisible(tag, publish, folder)) {

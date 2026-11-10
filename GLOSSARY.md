@@ -44,5 +44,6 @@ ADR-0003 and ADR-0004. Types in `src/atlas/content/schemaV2.ts`. Used by `conten
 - **Editor**: the DM-only app at `/atlas/edit` in `npm run dev` [`AtlasPlacementEditor`]. Tree-shaken out of player builds. Also called the Creator Cockpit in older docs.
 - **Save endpoint**: `/__atlas/save`, the dev-only, loopback-only route the editor writes through.
 - **Sync from Obsidian**: the editor panel that reads the vault, shows what changed, and writes chosen notes into atlas content. _Avoid:_ "import" for the whole flow (import is one step of it).
-- **Sync map**: `sync-map.json`, which remembers which vault note became which entity.
+- **Sync map**: `sync-map.json`, which remembers which vault note became which entity, one map per
+  world.
 - **Staging**: sync's preview of changes before they are written.

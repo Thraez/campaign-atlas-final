@@ -7,8 +7,8 @@ import { renderHook, act } from "@testing-library/react";
 import { toast } from "sonner";
 import { useMdImportFlow } from "@/atlas/import/useMdImportFlow";
 import { hashContent, saveAtlasPatchToLocalFs } from "@/atlas/save/localFsSave";
-import { loadSyncMap, saveSyncMap } from "@/atlas/sync/useSyncSettings";
-import type { SyncMap } from "@/atlas/import/syncMap";
+import { loadSyncMapFile, saveWorldSyncMap } from "@/atlas/sync/useSyncSettings";
+import type { SyncMap, SyncMapFile } from "@/atlas/import/syncMap";
 import type { ImportFolderConfig } from "@/atlas/content/schema";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), warning: vi.fn(), success: vi.fn() } }));
@@ -22,8 +22,8 @@ vi.mock("@/atlas/save/localFsSave", async (importOriginal) => {
 });
 
 vi.mock("@/atlas/sync/useSyncSettings", () => ({
-  loadSyncMap: vi.fn(() => Promise.resolve({})),
-  saveSyncMap: vi.fn(() => Promise.resolve()),
+  loadSyncMapFile: vi.fn(() => Promise.resolve({ version: 2, worlds: {} })),
+  saveWorldSyncMap: vi.fn(() => Promise.resolve()),
   loadSettings: vi.fn(() => Promise.resolve({})),
   saveSettings: vi.fn(() => Promise.resolve()),
 }));
@@ -85,7 +85,7 @@ describe("Sync commit order (code-retro 03)", () => {
     });
     const { result } = setup();
     await act(async () => {
-      await result.current.openWithVaultScan("/vault", [], ["03_Entities"]);
+      await result.current.openWithVaultScan("/vault", [], ["03_Entities"], "w");
     });
     await act(async () => {
       await result.current.commit();
@@ -95,7 +95,8 @@ describe("Sync commit order (code-retro 03)", () => {
       expect.stringMatching(/rebuild failed/),
       expect.anything(),
     );
-    const saved = vi.mocked(saveSyncMap).mock.calls.at(-1)?.[0] as SyncMap;
+    const [savedWorld, saved] = vi.mocked(saveWorldSyncMap).mock.calls.at(-1) as [string, SyncMap];
+    expect(savedWorld).toBe("w");
     expect(saved["03_Entities/corven.md"]).toMatchObject({ id: "corven" });
   });
 
@@ -106,7 +107,7 @@ describe("Sync commit order (code-retro 03)", () => {
     });
     const { result } = setup();
     await act(async () => {
-      await result.current.openWithVaultScan("/vault", [], ["03_Entities"]);
+      await result.current.openWithVaultScan("/vault", [], ["03_Entities"], "w");
     });
     expect(result.current.rows[0].targetPath).toBe(TARGET);
     await act(async () => {
@@ -122,7 +123,7 @@ describe("Sync commit order (code-retro 03)", () => {
     const fetchMock = fakeServer({ files: { "03_Entities/corven.md": NOTE } });
     const { result } = setup();
     await act(async () => {
-      await result.current.openWithVaultScan("/vault", [], ["03_Entities"]);
+      await result.current.openWithVaultScan("/vault", [], ["03_Entities"], "w");
     });
     await act(async () => {
       await result.current.commit();
@@ -135,27 +136,31 @@ describe("Sync commit order (code-retro 03)", () => {
 
   it("a note moved in the vault is re-recorded at its new path, and the next sync changes nothing", async () => {
     const hash = await hashContent(NOTE);
-    let stored: SyncMap = {
-      "03_Entities/corven.md": { id: "corven", baseType: "npc", approvedHash: hash },
+    let file: SyncMapFile = {
+      version: 2,
+      worlds: {
+        w: { "03_Entities/corven.md": { id: "corven", baseType: "npc", approvedHash: hash } },
+      },
     };
-    vi.mocked(loadSyncMap).mockImplementation(async () => stored);
-    vi.mocked(saveSyncMap).mockImplementation(async (m: SyncMap) => {
-      stored = m;
+    vi.mocked(loadSyncMapFile).mockImplementation(async () => file);
+    vi.mocked(saveWorldSyncMap).mockImplementation(async (worldId: string, map: SyncMap) => {
+      file = { ...file, worlds: { ...file.worlds, [worldId]: map } };
     });
+    const stored = (): SyncMap => file.worlds.w;
     fakeServer({ files: { "03_Entities/People/corven.md": NOTE } });
     const { result } = setup();
 
     await act(async () => {
-      await result.current.openWithVaultScan("/vault", [], ["03_Entities"]);
+      await result.current.openWithVaultScan("/vault", [], ["03_Entities"], "w");
     });
-    expect(Object.keys(stored)).toEqual(["03_Entities/People/corven.md"]);
-    expect(stored["03_Entities/People/corven.md"]).toMatchObject({
+    expect(Object.keys(stored())).toEqual(["03_Entities/People/corven.md"]);
+    expect(stored()["03_Entities/People/corven.md"]).toMatchObject({
       id: "corven",
       approvedHash: hash,
     });
 
     await act(async () => {
-      await result.current.openWithVaultScan("/vault", [], ["03_Entities"]);
+      await result.current.openWithVaultScan("/vault", [], ["03_Entities"], "w");
     });
     expect(result.current.rows.map((r) => [r.vaultState, r.included])).toEqual([
       ["unchanged", false],
@@ -164,15 +169,18 @@ describe("Sync commit order (code-retro 03)", () => {
 
   it("a copy of a note (the original still there) does not move its sync-map entry", async () => {
     const hash = await hashContent(NOTE);
-    const stored: SyncMap = {
-      "03_Entities/corven.md": { id: "corven", baseType: "npc", approvedHash: hash },
+    const stored: SyncMapFile = {
+      version: 2,
+      worlds: {
+        w: { "03_Entities/corven.md": { id: "corven", baseType: "npc", approvedHash: hash } },
+      },
     };
-    vi.mocked(loadSyncMap).mockImplementation(async () => stored);
+    vi.mocked(loadSyncMapFile).mockImplementation(async () => stored);
     fakeServer({ files: { "03_Entities/corven.md": NOTE, "03_Entities/corven copy.md": NOTE } });
     const { result } = setup();
     await act(async () => {
-      await result.current.openWithVaultScan("/vault", [], ["03_Entities"]);
+      await result.current.openWithVaultScan("/vault", [], ["03_Entities"], "w");
     });
-    expect(saveSyncMap).not.toHaveBeenCalled();
+    expect(saveWorldSyncMap).not.toHaveBeenCalled();
   });
 });

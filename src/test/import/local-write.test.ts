@@ -47,12 +47,12 @@ describe("handleLocalWriteRequest", () => {
     expect(JSON.parse(written)).toEqual(settings);
   });
 
-  it("accepts sync-map.json and writes to .local-atlas/", async () => {
+  it("refuses sync-map.json: it is written per world through the merge route (R-14)", async () => {
     const syncMap = { "notes/corven.md": { id: "corven", baseType: "npc" } };
     const r = await handleLocalWriteRequest("sync-map.json", JSON.stringify(syncMap), tmpDir);
-    expect(r.ok).toBe(true);
-    const written = await fs.readFile(path.join(tmpDir, ".local-atlas", "sync-map.json"), "utf8");
-    expect(JSON.parse(written)).toEqual(syncMap);
+    expect(r).toMatchObject({ ok: false, status: 400 });
+    expect(JSON.stringify(r)).toContain("/__atlas/local/sync-map/world");
+    await expect(fs.access(path.join(tmpDir, ".local-atlas", "sync-map.json"))).rejects.toThrow();
   });
 
   it("creates .local-atlas/ directory if it doesn't exist", async () => {

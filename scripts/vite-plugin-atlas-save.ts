@@ -88,6 +88,13 @@ import {
 } from "./atlas/buildLock";
 import { DEV_API_PATHS, DEV_API_PREFIX } from "./atlas/devRoutes";
 import { syncWritesAllowed } from "./atlas/hosting";
+import { readDmWorldIds, readRepoSyncMapFile, saveWorldSyncMap } from "./atlas/syncMapFile";
+import {
+  assertWorldId,
+  readWorldSyncMap,
+  SyncMapFormatError,
+  type SyncMap,
+} from "../src/atlas/import/syncMap";
 import {
   isVaultNote,
   readSyncMapSignals,
@@ -1499,8 +1506,10 @@ export async function handleVaultImageCopyRequest(
 
 /**
  * Pure handler for POST /__atlas/local-write.
- * Writes `contents` to `.local-atlas/<name>`, where `name` must be one of the
- * two allowed filenames (editor-settings.json or sync-map.json).
+ * Writes `contents` to `.local-atlas/<name>`, where `name` must be
+ * editor-settings.json. sync-map.json is refused here: a whole-file write
+ * would skip the lock and the format check and drop the other worlds, so it
+ * goes through POST /__atlas/local/sync-map/world (R-14). Reads still work.
  * This is the only write that targets `.local-atlas/` — never `content/`, never
  * the vault. Validated by `isReadableLocalAtlasPath`.
  */
@@ -1510,6 +1519,13 @@ export async function handleLocalWriteRequest(
   repoRoot: string,
 ): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
   const relPath = `.local-atlas/${name}`;
+  if (name === "sync-map.json") {
+    return {
+      ok: false,
+      status: 400,
+      error: `sync-map.json is written per world: POST ${DEV_API_PATHS.localSyncMapWorld} { worldId, map }`,
+    };
+  }
   if (!isReadableLocalAtlasPath(relPath)) {
     return { ok: false, status: 400, error: "DisallowedPath" };
   }
@@ -1773,9 +1789,65 @@ export const DEV_ROUTES: readonly DevRoute[] = [
   },
 
   // GET /__atlas/local/editor-settings.json — reads .local-atlas/editor-settings.json
-  // GET /__atlas/local/sync-map.json — reads .local-atlas/sync-map.json
   overlayRoute(DEV_API_PATHS.localEditorSettings),
-  overlayRoute(DEV_API_PATHS.localSyncMap),
+
+  // GET /__atlas/local/sync-map.json — .local-atlas/sync-map.json as the
+  // per-world file (R-14): a missing map is empty, an old flat map belongs to
+  // the DM build's only world (refused when it has several). A corrupt map is 500, never "empty",
+  // so the editor can't overwrite it.
+  {
+    method: "GET",
+    path: DEV_API_PATHS.localSyncMap,
+    takesBuildLock: false,
+    body: null,
+    handle: async ({ root }) => {
+      try {
+        return { status: 200, json: await readRepoSyncMapFile(root) };
+      } catch (e) {
+        return { status: 500, json: { error: "SyncMapUnreadable", detail: (e as Error).message } };
+      }
+    },
+  },
+
+  // POST /__atlas/local/sync-map/world { worldId, map } — replaces one world's
+  // map and keeps the others, merged here under a lock (R-14), so two saves
+  // for different worlds both land. 400 for a body that isn't an object, a
+  // reserved world id, a world the DM build doesn't have, or a map entry that
+  // isn't an object with a string id.
+  {
+    method: "POST",
+    path: DEV_API_PATHS.localSyncMapWorld,
+    takesBuildLock: false,
+    body: { maxBytes: LOCAL_WRITE_BODY_LIMIT_BYTES },
+    handle: async ({ body, root }) => {
+      const bad = (detail: string) => ({ status: 400, json: { error: "BadRequest", detail } });
+      if (typeof body !== "object" || body === null || Array.isArray(body)) {
+        return bad("the body must be an object { worldId, map }");
+      }
+      const b = body as { worldId?: unknown; map?: unknown };
+      if (typeof b.worldId !== "string" || !b.worldId) return bad("worldId is required");
+      let map: SyncMap;
+      try {
+        assertWorldId(b.worldId);
+        map = readWorldSyncMap(b.map, `world "${b.worldId}"`);
+      } catch (e) {
+        if (e instanceof SyncMapFormatError) return bad(e.message);
+        throw e;
+      }
+      const worlds = await readDmWorldIds(root);
+      if (!worlds?.includes(b.worldId)) {
+        return bad(
+          `"${b.worldId}" is not a world in the DM build (${worlds?.join(", ") || "no build"})`,
+        );
+      }
+      try {
+        await saveWorldSyncMap(root, b.worldId, map);
+        return { status: 200, json: { ok: true } };
+      } catch (e) {
+        return { status: 500, json: { error: "SyncMapWriteFailed", detail: (e as Error).message } };
+      }
+    },
+  },
 
   // POST /__atlas/local-write { name, contents }
   // Writes machine-local config (editor-settings.json or sync-map.json) only.

@@ -22,20 +22,20 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
   });
 
   it("Sync button is disabled when no vault path is saved", async () => {
-    render(<SyncPanel onSync={vi.fn()} />);
+    render(<SyncPanel worldId="w" onSync={vi.fn()} />);
     await waitFor(() => expect(loadSettings).toHaveBeenCalled());
     expect(screen.getByRole("button", { name: /sync now/i })).toBeDisabled();
   });
 
   it("populates vault path input from saved settings", async () => {
     mockLoad.mockResolvedValue({ vaultPath: "/Users/dm/My Vault" });
-    render(<SyncPanel onSync={vi.fn()} />);
+    render(<SyncPanel worldId="w" onSync={vi.fn()} />);
     await waitFor(() => expect(screen.getByDisplayValue("/Users/dm/My Vault")).toBeTruthy());
   });
 
   it("populates globs textarea from saved settings", async () => {
     mockLoad.mockResolvedValue({ ignoreGlobs: ["Templates/**", "_assets/**"] });
-    render(<SyncPanel onSync={vi.fn()} />);
+    render(<SyncPanel worldId="w" onSync={vi.fn()} />);
     // getByDisplayValue struggles with multiline; query the textarea directly
     await waitFor(() => {
       const ta = document.querySelector("textarea") as HTMLTextAreaElement | null;
@@ -46,7 +46,7 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
 
   it("Sync button becomes enabled when vault path is loaded", async () => {
     mockLoad.mockResolvedValue({ vaultPath: "/Vault" });
-    render(<SyncPanel onSync={vi.fn()} />);
+    render(<SyncPanel worldId="w" onSync={vi.fn()} />);
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /sync now/i })).not.toBeDisabled(),
     );
@@ -54,7 +54,7 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
 
   it("Save button calls saveSettings with vault path and parsed globs", async () => {
     mockLoad.mockResolvedValue({ vaultPath: "/My Vault", ignoreGlobs: ["Templates/**"] });
-    render(<SyncPanel onSync={vi.fn()} />);
+    render(<SyncPanel worldId="w" onSync={vi.fn()} />);
     await waitFor(() => expect(screen.getByDisplayValue("/My Vault")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: /save settings/i }));
     await waitFor(() =>
@@ -67,7 +67,7 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
   it("shows an error toast when saveSettings rejects (write failure)", async () => {
     mockSave.mockRejectedValue(new Error("POST /__atlas/local-write failed (500): disk full"));
     mockLoad.mockResolvedValue({ vaultPath: "/My Vault" });
-    render(<SyncPanel onSync={vi.fn()} />);
+    render(<SyncPanel worldId="w" onSync={vi.fn()} />);
     await waitFor(() => expect(screen.getByDisplayValue("/My Vault")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: /save settings/i }));
     await waitFor(() =>
@@ -80,12 +80,12 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
   it("Sync now button calls onSync with vault root and parsed globs", async () => {
     const onSync = vi.fn().mockResolvedValue(undefined);
     mockLoad.mockResolvedValue({ vaultPath: "/MyVault", ignoreGlobs: ["_hidden/**"] });
-    render(<SyncPanel onSync={onSync} />);
+    render(<SyncPanel worldId="w" onSync={onSync} />);
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /sync now/i })).not.toBeDisabled(),
     );
     fireEvent.click(screen.getByRole("button", { name: /sync now/i }));
-    await waitFor(() => expect(onSync).toHaveBeenCalledWith("/MyVault", ["_hidden/**"], []));
+    await waitFor(() => expect(onSync).toHaveBeenCalledWith("/MyVault", ["_hidden/**"], [], "w"));
   });
 
   it("shows last-sync timestamp when lastSyncAt is set", async () => {
@@ -93,24 +93,42 @@ describe("SyncPanel — render/interaction contract (N35)", () => {
       vaultPath: "/Vault",
       lastSyncAt: "2026-06-21T10:00:00.000Z",
     });
-    render(<SyncPanel onSync={vi.fn()} />);
+    render(<SyncPanel worldId="w" onSync={vi.fn()} />);
     await waitFor(() => expect(screen.getByText(/Last synced:/i)).toBeTruthy());
   });
 
   it("shows a DM-build-required note and disables Sync when hasDmBuild is false", async () => {
     mockLoad.mockResolvedValue({ vaultPath: "/Vault" });
-    render(<SyncPanel onSync={vi.fn()} hasDmBuild={false} />);
+    render(<SyncPanel worldId="w" onSync={vi.fn()} hasDmBuild={false} />);
     await waitFor(() => expect(screen.getByText(/Rebuild in DM mode first/i)).toBeTruthy());
     expect(screen.getByRole("button", { name: /sync now/i })).toBeDisabled();
   });
 
   it("does not show the DM-build-required note when hasDmBuild is true", async () => {
     mockLoad.mockResolvedValue({ vaultPath: "/Vault" });
-    render(<SyncPanel onSync={vi.fn()} hasDmBuild={true} />);
+    render(<SyncPanel worldId="w" onSync={vi.fn()} hasDmBuild={true} />);
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /sync now/i })).not.toBeDisabled(),
     );
     expect(screen.queryByText(/Rebuild in DM mode first/i)).toBeNull();
+  });
+
+  // R-14: Sync names its world; with none it stays off.
+  it("names the world it syncs into", async () => {
+    mockLoad.mockResolvedValue({ vaultPath: "/Vault" });
+    render(<SyncPanel worldId="astrath" worldName="Astrath" onSync={vi.fn()} />);
+    await waitFor(() =>
+      expect(screen.getByTestId("sync-target-world").textContent).toMatch(
+        /Syncs into Astrath \(content\/astrath\/\)/,
+      ),
+    );
+  });
+
+  it("disables Sync when there is no world to sync into", async () => {
+    mockLoad.mockResolvedValue({ vaultPath: "/Vault" });
+    render(<SyncPanel worldId="" onSync={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText(/No world to sync into/i)).toBeTruthy());
+    expect(screen.getByRole("button", { name: /sync now/i })).toBeDisabled();
   });
 });
 

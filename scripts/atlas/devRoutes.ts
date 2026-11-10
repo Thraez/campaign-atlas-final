@@ -17,6 +17,7 @@ export const DEV_API_PATHS = {
   vaultImageCopy: "/__atlas/vault-image-copy",
   localEditorSettings: "/__atlas/local/editor-settings.json",
   localSyncMap: "/__atlas/local/sync-map.json",
+  localSyncMapWorld: "/__atlas/local/sync-map/world",
   localWrite: "/__atlas/local-write",
   assetsImages: "/__atlas/assets/images",
   save: "/__atlas/save",
