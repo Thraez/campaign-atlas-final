@@ -357,4 +357,17 @@ describe("redactLayer: scaled and offset layers", () => {
       }),
     ).rejects.toBeInstanceOf(FogRedactionError);
   });
+
+  it("throws on a rotated layer, accepts rotation 0 or undefined", async () => {
+    const f: FogOverlay = { mapId: "m", enabled: true, reveals: [sq(0, 0, 10, 10)] };
+    const base = { x: 0, y: 0, width: 10, height: 10 };
+    await expect(
+      redactLayer(await solidRed(10, 10), { width: 10, height: 10 }, f, { ...base, rotation: 15 }),
+    ).rejects.toBeInstanceOf(FogRedactionError);
+    for (const rotation of [0, undefined]) {
+      await expect(
+        redactLayer(await solidRed(10, 10), { width: 10, height: 10 }, f, { ...base, rotation }),
+      ).resolves.toBeInstanceOf(Buffer);
+    }
+  });
 });

@@ -156,18 +156,18 @@ export interface WorldConfig {
 export class WorldConfigError extends Error {}
 
 /**
- * Fog shapes (`conceals`) re-fog part of a reveal, so dropping one would ship
+ * Fog shapes (`conceals` and `reveals`) re-fog part of a reveal, so dropping one would ship
  * what it hides. Fail closed: anything but a list of polygons of at least 3
  * finite `[x, y]` points stops the build instead of being skipped.
  */
-function fogShapes(raw: unknown, where: string): Point[][] {
+function fogShapes(raw: unknown, where: string, key: "conceals" | "reveals"): Point[][] {
   if (raw === undefined || raw === null) return [];
   if (!Array.isArray(raw)) {
-    throw new WorldConfigError(`${where}: "conceals" must be a list of polygons.`);
+    throw new WorldConfigError(`${where}: "${key}" must be a list of polygons.`);
   }
   return raw.map((poly, i) => {
     const bad = (why: string) =>
-      new WorldConfigError(`${where}: fog shape #${i} in "conceals" ${why}.`);
+      new WorldConfigError(`${where}: fog shape #${i} in "${key}" ${why}.`);
     if (!Array.isArray(poly)) throw bad("is not a list of [x, y] points");
     if (poly.length < 3) throw bad("needs at least 3 points");
     const points = poly.map((pt: unknown) => {
@@ -368,7 +368,8 @@ export function loadWorldConfig(
     }
     seenFogMaps.add(f.mapId);
     const where = `${rel}: fog for map "${f.mapId}"`;
-    const conceals = fogShapes(f.conceals, where);
+    const conceals = fogShapes(f.conceals, where, "conceals");
+    const reveals = fogShapes(f.reveals, where, "reveals");
     const featherPx = f.featherPx;
     if (
       featherPx !== undefined &&
@@ -386,7 +387,7 @@ export function loadWorldConfig(
         mapId: f.mapId,
         enabled: f.enabled !== false,
         color: f.color ?? "rgba(8, 12, 20, 0.55)",
-        reveals: (f.reveals ?? []) as Point[][],
+        reveals,
         // Only when present, so a world without fog shapes builds as before.
         ...(conceals.length > 0 ? { conceals } : {}),
         ...(featherPx !== undefined ? { featherPx } : {}),

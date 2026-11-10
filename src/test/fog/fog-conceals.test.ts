@@ -194,6 +194,38 @@ describe("loadWorldConfig carries fog shapes (conceals)", () => {
   });
 });
 
+describe("loadWorldConfig fails closed on malformed reveals", () => {
+  const tri = (b: unknown) => [[[0, 0], [100, 0], b]];
+  it.each([
+    ["a string coordinate", tri([100, "100"])],
+    ["a NaN coordinate", tri([100, Number.NaN])],
+    ["an Infinity coordinate", tri([100, Number.POSITIVE_INFINITY])],
+    [
+      "a collinear reveal",
+      [
+        [
+          [0, 0],
+          [50, 50],
+          [100, 100],
+        ],
+      ],
+    ],
+    [
+      "fewer than 3 points",
+      [
+        [
+          [0, 0],
+          [100, 100],
+        ],
+      ],
+    ],
+    ["not a list", "nope"],
+  ])("rejects %s", (_label, reveals) => {
+    const root = vault(world({ enabled: true, reveals }));
+    expect(() => loadWorldConfig(path.join(root, "content"), "w", root)).toThrow(WorldConfigError);
+  });
+});
+
 describe("loadWorldConfig: fog for one map defined twice", () => {
   it("fails closed when a map has both a top-level and a nested fog block", () => {
     // Keeping either block would drop the other's fog shapes.

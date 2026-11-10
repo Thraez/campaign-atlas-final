@@ -30,6 +30,8 @@ export interface LayerRect {
   width: number;
   height: number;
   tileSrc?: string;
+  /** Degrees; fog redaction only supports 0 or undefined. */
+  rotation?: number;
 }
 
 /** sharp refuses a blur sigma above this. */
@@ -63,6 +65,11 @@ export async function redactLayer(
   if (layer.tileSrc) {
     throw new FogRedactionError(
       `Tiled layer is not supported for fog redaction (layer rect ${JSON.stringify(layer)}).`,
+    );
+  }
+  if (layer.rotation !== undefined && layer.rotation !== 0) {
+    throw new FogRedactionError(
+      `Layer rotation is not supported by fog redaction (rotation ${layer.rotation}); the mask would not line up with the image.`,
     );
   }
   if (!(layer.width > 0 && layer.height > 0)) {
@@ -101,6 +108,7 @@ export async function redactLayer(
   // the lit side and fog stays 0 however small the fog shape or gap.
   const centre = centreLitMask(iw, ih, layer, reveals, conceals);
   const cover = await coverageMask(iw, ih, layer, reveals, conceals);
+  // Lit only if centre lit AND fully covered: both are required, so neither may be dropped alone.
   const hard = Buffer.alloc(iw * ih);
   for (let i = 0; i < hard.length; i++) hard[i] = centre[i] === 1 && cover[i] === 255 ? 255 : 0;
   const blurred = await sharp(hard, { raw: { width: iw, height: ih, channels: 1 } })
