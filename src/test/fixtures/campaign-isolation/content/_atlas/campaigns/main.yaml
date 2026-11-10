@@ -1,0 +1,12 @@
+id: main
+name: Lantern Road
+notes: vault
+maps:
+  vale-overview:
+    state: open
+  c1:
+    state: open
+  hookhaven:
+    state: open
+  fen-reach:
+    state: open

@@ -3,9 +3,9 @@
  * R-17b: the structural campaign isolation scan (`scripts/check-campaign-isolation.ts`).
  *
  * A hand-made v2 output for campaign `a` of a two-campaign content root (`a`
- * "Campaign A" and `main` "Lantern Road", a copy of the scan-registry v2
- * fixture), with a must-not-ship file listing short and long hidden ids,
- * names and paths. Each test plants one fault in a clean copy and checks the
+ * "Campaign A" and `main` "Lantern Road", `fixtures/campaign-isolation`),
+ * whose resolver hides short and long ids, names, image paths and a pin from
+ * `a`; the must-not-ship file holds exactly that set. Each test plants one fault in a clean copy and checks the
  * exit code: 23 structural, 24 text, 25 assets, 20 output missing. The real
  * build's outputs (content-next) pass it in `campaign-stores.test.ts`.
  */
@@ -20,8 +20,9 @@ import {
   run,
 } from "../../scripts/check-campaign-isolation";
 import type { MustNotShipFile } from "../../scripts/atlas/build/campaignStore";
+import { findSecretsInText } from "../../scripts/check-derived-secrets";
 
-const V2_CONTENT = path.resolve(__dirname, "fixtures/scan-registry/v2/content");
+const ISO_CONTENT = path.resolve(__dirname, "fixtures/campaign-isolation/content");
 
 const tmps: string[] = [];
 afterAll(() => {
@@ -117,15 +118,26 @@ function cleanIndex(): Json[] {
   ];
 }
 
+/** Exactly what the resolver hides from `a` in the fixture content (checked by the scan). */
 function cleanMustNotShip(): MustNotShipFile {
   return {
     campaign: "a",
-    // `c1` (a hidden map, 2 chars), `fen` (a hidden world, 3 chars),
-    // `gloomharbour-vault` (a hidden note), `hookhaven` (a hidden map).
-    ids: ["c1", "fen", "gloomharbour-vault", "hookhaven", "base-cellar"],
-    names: ["Gloomharbour Vault", "Hookhaven", "Fen", "Bog"],
-    paths: ["images/hookhaven-chart.png", "images/c1.png"],
-    pinLocations: [],
+    // `c1` (a map, 2 chars, named "Bog"), `fen` (a world, 3 chars),
+    // `gloomharbour-vault` (a dm note), `hookhaven` (a map), their layers.
+    ids: [
+      "base-cellar",
+      "c1",
+      "chart",
+      "fen",
+      "fen-reach",
+      "gloomharbour-vault",
+      "hookhaven",
+      "severine",
+    ],
+    names: ["Bog", "Fen", "Fen Reach", "Gloomharbour Vault", "Hookhaven", "S\u00e9verine"],
+    paths: ["images/c1.png", "images/hookhaven-chart.png"],
+    // The vault's pin on the shipped map.
+    pinLocations: [{ map: "vale-overview", index: 1, x: 500, y: 600 }],
     otherCampaigns: [{ id: "main", name: "Lantern Road" }],
   };
 }
@@ -146,18 +158,7 @@ function output(): Out {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "isolation-"));
   tmps.push(root);
   const content = path.join(root, "content");
-  fs.cpSync(V2_CONTENT, content, { recursive: true });
-  const campaigns = path.join(content, "_atlas", "campaigns");
-  fs.rmSync(path.join(campaigns, "b.yaml"));
-  fs.writeFileSync(
-    path.join(campaigns, "main.yaml"),
-    "id: main\nname: Lantern Road\nnotes: hidden\nmaps:\n  vale-overview:\n    state: open\n",
-  );
-  const atlasYaml = path.join(content, "_atlas", "atlas.yaml");
-  fs.writeFileSync(
-    atlasYaml,
-    fs.readFileSync(atlasYaml, "utf8").replace("  - a\n  - b", "  - a\n  - main"),
-  );
+  fs.cpSync(ISO_CONTENT, content, { recursive: true });
   const config = path.join(root, "atlas.config.json");
   fs.writeFileSync(
     config,
@@ -463,6 +464,174 @@ describe("check-campaign-isolation: text (exit 24)", () => {
     const o = output();
     plantBody(o, "<p>Hookhavens and the maintenance of a remain.</p>");
     expect(scan(o), errors()).toBe(0);
+  });
+});
+
+describe("check-campaign-isolation: hidden pin locations (exit 23)", () => {
+  it("a placement at a dropped pin's map and coordinates", () => {
+    const o = output();
+    (o.atlas.placements as Json[]).push({
+      id: "inn@vale-overview",
+      entityId: "inn",
+      mapId: "vale-overview",
+      x: 500,
+      y: 600,
+      label: "Inn",
+    });
+    write(o);
+    expect(scan(o)).toBe(EXIT.structural);
+    expect(errors()).toContain("a pin that doesn't ship");
+  });
+
+  it("within the tolerance (float noise) still counts", () => {
+    const o = output();
+    const p = (o.atlas.placements as Json[])[0];
+    Object.assign(p, { x: 500 + 1e-9, y: 600 - 1e-9 });
+    write(o);
+    expect(scan(o)).toBe(EXIT.structural);
+  });
+
+  it("a placement a pixel away, or on another map, passes", () => {
+    const o = output();
+    Object.assign((o.atlas.placements as Json[])[0], { x: 501, y: 600 });
+    write(o);
+    expect(scan(o), errors()).toBe(0);
+  });
+});
+
+describe("check-campaign-isolation: the must-not-ship file is checked against the content (exit 23)", () => {
+  it("an emptied file can't vouch for an output holding a hidden note", () => {
+    const o = output();
+    o.m.ids = [];
+    o.m.names = [];
+    entities(o).push({
+      id: "gloomharbour-vault",
+      title: "Gloomharbour Vault",
+      type: "location",
+      world: "vale",
+    });
+    write(o);
+    expect(scan(o)).toBe(EXIT.structural);
+    expect(errors()).toContain("must-not-ship.json");
+    expect(errors()).toContain("gloomharbour-vault");
+  });
+
+  it("an entry the content doesn't hide", () => {
+    const o = output();
+    o.m.ids.push("nowhere");
+    write(o);
+    expect(scan(o)).toBe(EXIT.structural);
+  });
+
+  it("a missing image path or pin location", () => {
+    const o = output();
+    o.m.paths = [];
+    o.m.pinLocations = [];
+    write(o);
+    expect(scan(o)).toBe(EXIT.structural);
+  });
+
+  it("the order of the entries doesn't matter", () => {
+    const o = output();
+    o.m.ids.reverse();
+    o.m.names.reverse();
+    write(o);
+    expect(scan(o), errors()).toBe(0);
+  });
+});
+
+describe("check-campaign-isolation: hidden ids and names outside id and name keys (exit 23)", () => {
+  it("a wikilink to a hidden short id in bodyHtml", () => {
+    const o = output();
+    entities(o)[0].bodyHtml =
+      '<p>See <a class="atlas-wikilink" data-entity-id="c1" href="#/entity/c1" aria-haspopup="dialog">the cellar</a>.</p>';
+    write(o);
+    expect(scan(o)).toBe(EXIT.structural);
+    expect(errors()).toContain('"c1"');
+  });
+
+  it("an entity route to a hidden id, percent-encoded or alone", () => {
+    for (const html of ['<a href="#/entity/fen">x</a>', '<a href="#/entity/c%31">x</a>']) {
+      vi.mocked(console.error).mockClear();
+      const o = output();
+      entities(o)[0].bodyHtml = html;
+      write(o);
+      expect(scan(o), html).toBe(EXIT.structural);
+    }
+  });
+
+  it("a hidden short name as a link's display text", () => {
+    const o = output();
+    entities(o)[0].links = [{ target: "Marsh", display: "Fen", broken: true }];
+    write(o);
+    expect(scan(o)).toBe(EXIT.structural);
+  });
+
+  it("a hidden short name as a search excerpt", () => {
+    const o = output();
+    o.index[0].excerpt = "Fen";
+    write(o);
+    expect(scan(o)).toBe(EXIT.structural);
+  });
+});
+
+describe("check-campaign-isolation: Unicode normalisation", () => {
+  const NFD = "Se\u0301verine";
+
+  it("a hidden name written decomposed (NFD) in a body", () => {
+    const o = output();
+    entities(o)[0].body = `The road to ${NFD}.`;
+    write(o);
+    expect(scan(o)).toBe(EXIT.text);
+  });
+
+  it("a hidden name written decomposed as a title", () => {
+    const o = output();
+    entities(o)[0].title = NFD;
+    write(o);
+    expect(scan(o)).toBe(EXIT.structural);
+  });
+
+  it("findSecretsInText matches either form against either form", () => {
+    const nfc = "S\u00e9verine";
+    const entry = (name: string) => ({ name, source: "t", field: "title" as const });
+    expect(findSecretsInText(`at ${NFD}`, [entry(nfc)])).toHaveLength(1);
+    expect(findSecretsInText(`at ${nfc}`, [entry(NFD)])).toHaveLength(1);
+  });
+});
+
+describe("check-campaign-isolation: every reference resolves (exit 23)", () => {
+  it("a map with no worldId", () => {
+    const o = output();
+    delete maps(o)[0].worldId;
+    write(o);
+    expect(scan(o)).toBe(EXIT.structural);
+  });
+
+  it("a placement whose entity isn't in entities", () => {
+    const o = output();
+    (o.atlas.placements as Json[])[0].entityId = "hut";
+    write(o);
+    expect(scan(o)).toBe(EXIT.structural);
+  });
+
+  it("a search-index entry that isn't an entity of atlas.json", () => {
+    const o = output();
+    o.index.push({ id: "hut", title: "Hut", type: "location", excerpt: "", bodyText: "" });
+    write(o);
+    expect(scan(o)).toBe(EXIT.structural);
+  });
+});
+
+describe("check-campaign-isolation: source maps are text (exit 24)", () => {
+  it("a hidden name in a built site's .map file", () => {
+    const o = output();
+    buildSite(o);
+    put(
+      path.join(o.site, "assets", "index-abc123.js.map"),
+      JSON.stringify({ version: 3, sourcesContent: ["// Gloomharbour Vault"] }),
+    );
+    expect(scan(o, "built-site")).toBe(EXIT.text);
   });
 });
 

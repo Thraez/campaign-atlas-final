@@ -423,7 +423,9 @@ function variantVaultContent(): VariantResult {
 
 // ---- Variants: one campaign's output against its must-not-ship file ---------
 // (check-campaign-isolation, R-17b). A hand-made clean store for campaign `a`
-// of the two-campaign scan-registry fixture; each variant plants one sentinel
+// of the campaign-isolation fixture, with the must-not-ship file the build
+// would write for it (the scan recomputes it from the content and fails on any
+// difference). Each variant plants one sentinel
 // and must fail with the exit code for its kind (23 structure, 24 text, 25
 // assets), so a fault caught only by accident doesn't count.
 const ISOLATION_CONTENT = path.join(
@@ -431,8 +433,7 @@ const ISOLATION_CONTENT = path.join(
   "src",
   "test",
   "fixtures",
-  "scan-registry",
-  "v2",
+  "campaign-isolation",
   "content",
 );
 const ISOLATION_MAP = "assets/maps/0123456789abcdef.png";
@@ -477,10 +478,40 @@ function cleanIsolationOutput(): IsolationOutput {
   };
 }
 
+type IsolationMustNotShip = {
+  campaign: string;
+  ids: string[];
+  names: string[];
+  paths: string[];
+  pinLocations: { map: string; index: number; x: number; y: number }[];
+  otherCampaigns: { id: string; name: string }[];
+};
+
+/** What the build writes for campaign `a` of the fixture. */
+function cleanIsolationMustNotShip(): IsolationMustNotShip {
+  return {
+    campaign: "a",
+    ids: [
+      "base-cellar",
+      "c1",
+      "chart",
+      "fen",
+      "fen-reach",
+      "gloomharbour-vault",
+      "hookhaven",
+      "severine",
+    ],
+    names: ["Bog", "Fen", "Fen Reach", "Gloomharbour Vault", "Hookhaven", "S\u00e9verine"],
+    paths: ["images/c1.png", "images/hookhaven-chart.png"],
+    pinLocations: [{ map: "vale-overview", index: 1, x: 500, y: 600 }],
+    otherCampaigns: [{ id: "main", name: "Lantern Road" }],
+  };
+}
+
 function variantIsolation(
   name: string,
   wantExit: number,
-  plant: (o: IsolationOutput) => void,
+  plant: (o: IsolationOutput, mns: IsolationMustNotShip) => void,
 ): VariantResult {
   const run = (label: string, dirty: boolean) => {
     const root = freshDir(label);
@@ -497,7 +528,8 @@ function variantIsolation(
       }),
     );
     const out = cleanIsolationOutput();
-    if (dirty) plant(out);
+    const mnsData = cleanIsolationMustNotShip();
+    if (dirty) plant(out, mnsData);
     const store = path.join(root, ".atlas-campaigns", "a", "atlas");
     for (const rel of [ISOLATION_MAP, ...out.extra]) {
       fs.mkdirSync(path.dirname(path.join(store, rel)), { recursive: true });
@@ -506,17 +538,7 @@ function variantIsolation(
     fs.writeFileSync(path.join(store, "atlas.json"), JSON.stringify(out.atlas));
     fs.writeFileSync(path.join(store, "search-index.json"), JSON.stringify(out.index));
     const mns = path.join(root, ".atlas-campaigns", "a", "must-not-ship.json");
-    fs.writeFileSync(
-      mns,
-      JSON.stringify({
-        campaign: "a",
-        ids: ["c1", "fen", "gloomharbour-vault"],
-        names: ["Gloomharbour Vault", "Fen"],
-        paths: [],
-        pinLocations: [],
-        otherCampaigns: [{ id: "b", name: "Campaign B" }],
-      }),
-    );
+    fs.writeFileSync(mns, JSON.stringify(mnsData));
     const args = [store, "--must-not-ship", mns, "--config", config, "--layout", "store"];
     return runScan("check-campaign-isolation.ts", args);
   };
@@ -535,7 +557,7 @@ function variantIsolation(
 function variantsIsolation(): VariantResult[] {
   return [
     variantIsolation("Another campaign's id in the campaign field", 23, (o) => {
-      o.atlas.campaign = { id: "b", name: "Campaign A" };
+      o.atlas.campaign = { id: "main", name: "Campaign A" };
     }),
     variantIsolation("Hidden short map id in maps", 23, (o) => {
       o.atlas.maps.push({ ...o.atlas.maps[0], id: "c1", name: "Chart" });
@@ -551,6 +573,26 @@ function variantsIsolation(): VariantResult[] {
     }),
     variantIsolation("Unreferenced image in the store", 25, (o) => {
       o.extra.push("assets/maps/fedcba9876543210.png");
+    }),
+    variantIsolation("Placement at a dropped pin's location", 23, (o) => {
+      (o.atlas.placements as Record<string, unknown>[]).push({
+        id: "inn@vale-overview#2",
+        entityId: "inn",
+        mapId: "vale-overview",
+        x: 500,
+        y: 600,
+        label: "Inn",
+      });
+    }),
+    variantIsolation("Emptied must-not-ship file with a hidden note", 23, (o, mns) => {
+      mns.ids = [];
+      mns.names = [];
+      o.atlas.entities.push({
+        id: "gloomharbour-vault",
+        title: "Gloomharbour Vault",
+        type: "location",
+        world: "vale",
+      });
     }),
   ];
 }

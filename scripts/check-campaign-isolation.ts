@@ -3,8 +3,9 @@
  *
  * Proves a v2 campaign's player output holds nothing that campaign hides and
  * nothing of another campaign. It reads the campaign's must-not-ship file
- * (`<outputDir>/<id>/must-not-ship.json`, beside the store) and the loaded
- * model's campaign list, then:
+ * (`<outputDir>/<id>/must-not-ship.json`, beside the store), resolves the
+ * campaign again from the loaded content (`resolveCampaign`), and scans for
+ * the union of the two. Every compare is in NFC and any letter case. Then:
  *
  * Structural (exit 23), on the parsed `atlas.json` and `search-index.json`,
  * exact matches of any length (any letter case):
@@ -17,15 +18,22 @@
  *     `backlinks`, any `…Id`/`…Ids`: worlds, ocean, maps and their parents,
  *     pins, regions, routes, sound areas, notes, links) holds a must-not-ship
  *     id, whole or as a part of a `note@map` pin id;
- *   - no name field (`name`, `title`, `label`, `aliases`, `target`, `alt`,
- *     `caption`) is a must-not-ship name;
+ *   - no name field (`NAME_KEY`: `name`, `title`, `display`, `excerpt`, …)
+ *     is a must-not-ship name;
+ *   - no string anywhere links a hidden id (`data-entity-id`, `#/entity/<id>`,
+ *     `linkedIds`);
+ *   - no placement sits at a must-not-ship pin location (same map, x/y within
+ *     `PIN_EPSILON`);
  *   - no single-token value is a hidden image path, ends in one, or has a
  *     hidden image's file name (percent-decoded, through `normalizePath`);
  *   - every note's `world` and every map's `worldId` is a world in `worlds`
- *     (ADR-0004 rule 5), and every map a map's `parent`, a world's
- *     `defaultMapId`, an ocean placement or a pin names is in `maps`;
- *   - the must-not-ship file's campaigns are the content's (a stale file
- *     can't vouch for the output), and both JSON files parse.
+ *     (ADR-0004 rule 5), every map has a `worldId`, every map a map's
+ *     `parent`, a world's `defaultMapId`, an ocean placement or a pin names
+ *     is in `maps`, every pin's entity is in `entities`, and every
+ *     search-index id is an atlas entity;
+ *   - the must-not-ship file equals the set resolved from the content
+ *     (`mustNotShipDiff`; a stale or edited file can't vouch for the
+ *     output), and both JSON files parse.
  *
  * Text (exit 24), over every text file of the output (`listTextFiles`: the
  * store, or the whole built site with Vite's bundle): the must-not-ship ids
@@ -79,7 +87,12 @@ import {
   mustNotShipSecrets,
   type SecretEntry,
 } from "./check-derived-secrets";
-import { normalizePath } from "../src/atlas/content/resolveCampaign";
+import {
+  normalizePath,
+  resolveCampaign,
+  type MustNotShip,
+  type PinLocation,
+} from "../src/atlas/content/resolveCampaign";
 import type { AtlasCampaign } from "../src/atlas/content/schema";
 
 const SCAN = "check-campaign-isolation";
@@ -135,7 +148,16 @@ export function isolationSecrets(m: MustNotShipFile): {
 // ---------------------------------------------------------------------------
 
 const ID_KEY = /^(id|ids|map|world|worlds|parent|backlinks)$|[a-z]Ids?$/;
-const NAME_KEY = /^(name|title|label|aliases|target|alt|caption)$/;
+/** Keys whose whole value may be a name: compared exactly, so a short name counts. */
+const NAME_KEY =
+  /^(name|title|label|aliases|target|display|alt|caption|excerpt|summary|description|teaser|heading|text|bodyText|tags)$/;
+
+/**
+ * A placement within this many pixels of a dropped pin's location (same map)
+ * is that pin: the build copies pin coordinates as written, so only float
+ * noise is allowed for.
+ */
+export const PIN_EPSILON = 1e-6;
 
 interface Isolation {
   campaign: AtlasCampaign;
@@ -146,7 +168,25 @@ interface Isolation {
 const strings = (v: unknown): string[] =>
   typeof v === "string" ? [v] : Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
 
-const lower = (xs: readonly string[]) => new Set(xs.map((x) => x.trim().toLowerCase()));
+/** One form for comparing ids and names: NFC, trimmed, lower case. */
+const norm = (x: string) => x.normalize("NFC").trim().toLowerCase();
+const lower = (xs: readonly string[]) => new Set(xs.map(norm));
+
+/**
+ * The note ids a string links to, as the player body renders a wikilink
+ * (`data-entity-id="<id>"`, `href="#/entity/<id>"`), entities and
+ * percent-encoding decoded.
+ */
+export function linkedIds(s: string): string[] {
+  if (!s.includes("entity")) return [];
+  const text = decodeForSearch(s, false);
+  const out: string[] = [];
+  for (const m of text.matchAll(/data-entity-id\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)) {
+    out.push(m[1] ?? m[2] ?? m[3] ?? "");
+  }
+  for (const m of text.matchAll(/#\/entity\/([^\s"'<>?#]+)/gi)) out.push(m[1]);
+  return out.filter((x) => x.length > 0);
+}
 
 /** A value read as one path: percent-decoded, without query or hash, through `normalizePath`. */
 function asPath(value: string): string | null {
@@ -194,6 +234,9 @@ export function structuralFindings(json: unknown, file: string, iso: Isolation):
 
   const walk = (v: unknown, at: string) => {
     if (typeof v === "string") {
+      for (const id of linkedIds(v)) {
+        if (hiddenIds.has(norm(id))) out.push(`${at}: links a hidden id "${id}"`);
+      }
       const p = asPath(v);
       if (p && (hiddenPaths.has(p) || [...hiddenPaths].some((h) => p.endsWith(`/${h}`)))) {
         out.push(`${at}: a hidden image path`);
@@ -211,13 +254,13 @@ export function structuralFindings(json: unknown, file: string, iso: Isolation):
       const here = at ? `${at}.${k}` : k;
       if (ID_KEY.test(k)) {
         for (const s of strings(child)) {
-          const parts = [s, ...s.split("@")].map((x) => x.trim().toLowerCase());
+          const parts = [s, ...s.split("@")].map(norm);
           if (parts.some((x) => hiddenIds.has(x))) out.push(`${here}: a hidden id "${s}"`);
         }
       }
       if (NAME_KEY.test(k)) {
         for (const s of strings(child)) {
-          if (hiddenNames.has(s.trim().toLowerCase())) out.push(`${here}: a hidden name "${s}"`);
+          if (hiddenNames.has(norm(s))) out.push(`${here}: a hidden name "${s}"`);
         }
       }
       walk(child, here);
@@ -225,18 +268,56 @@ export function structuralFindings(json: unknown, file: string, iso: Isolation):
   };
   walk(json, "");
 
-  if (file === "atlas.json") out.push(...referenceFindings(json));
+  if (file === "atlas.json") {
+    out.push(...referenceFindings(json));
+    out.push(...pinLocationFindings(json, iso.m.pinLocations));
+  }
   return out;
+}
+
+const list = (v: unknown) =>
+  (Array.isArray(v) ? v : []).filter(
+    (x): x is Record<string, unknown> => !!x && typeof x === "object",
+  );
+
+/** A placement at a dropped pin's location (its map, x and y within `PIN_EPSILON`). */
+function pinLocationFindings(json: unknown, pins: MustNotShipFile["pinLocations"]): string[] {
+  const top = (json ?? {}) as Record<string, unknown>;
+  const out: string[] = [];
+  list(top.placements).forEach((p, i) => {
+    const hit = pins.find(
+      (l) =>
+        p.mapId === l.map &&
+        typeof p.x === "number" &&
+        typeof p.y === "number" &&
+        Math.abs(p.x - l.x) <= PIN_EPSILON &&
+        Math.abs(p.y - l.y) <= PIN_EPSILON,
+    );
+    if (hit) {
+      out.push(
+        `placements[${i}]: at the location of a pin that doesn't ship (map "${hit.map}", ${hit.x}, ${hit.y})`,
+      );
+    }
+  });
+  return out;
+}
+
+/** Every search-index entry is a note of the store's atlas.json. */
+export function indexFindings(atlas: unknown, index: unknown): string[] {
+  const ids = new Set(list((atlas as Record<string, unknown> | null)?.entities).map((e) => e.id));
+  if (!Array.isArray(index)) return ["search-index.json: not a list"];
+  return list(index)
+    .map((e, i) => [e, i] as const)
+    .filter(([e]) => !ids.has(e.id))
+    .map(
+      ([e, i]) => `search-index.json: [${i}] ${JSON.stringify(e.id)} is not a note of atlas.json`,
+    );
 }
 
 /** References that must resolve inside the output: a note's or map's world, and every map ref. */
 function referenceFindings(json: unknown): string[] {
   const out: string[] = [];
   const top = (json ?? {}) as Record<string, unknown>;
-  const list = (v: unknown) =>
-    (Array.isArray(v) ? v : []).filter(
-      (x): x is Record<string, unknown> => !!x && typeof x === "object",
-    );
   const worlds = new Set(list(top.worlds).map((w) => w.id));
   const maps = new Set(list(top.maps).map((m) => m.id));
   const need = (set: Set<unknown>, v: unknown, what: string, at: string) => {
@@ -252,12 +333,18 @@ function referenceFindings(json: unknown): string[] {
     need(maps, w.defaultMapId, "map", `worlds[${i}].defaultMapId`),
   );
   list(top.maps).forEach((m, i) => {
-    need(worlds, m.worldId, "world", `maps[${i}].worldId`);
+    if (typeof m.worldId !== "string") out.push(`maps[${i}].worldId: missing`);
+    else need(worlds, m.worldId, "world", `maps[${i}].worldId`);
     need(maps, m.parent, "map", `maps[${i}].parent`);
   });
   const ocean = top.ocean as Record<string, unknown> | undefined;
   list(ocean?.onOcean).forEach((o, i) => need(maps, o.map, "map", `ocean.onOcean[${i}].map`));
-  list(top.placements).forEach((p, i) => need(maps, p.mapId, "map", `placements[${i}].mapId`));
+  const entities = new Set(list(top.entities).map((e) => e.id));
+  list(top.placements).forEach((p, i) => {
+    need(maps, p.mapId, "map", `placements[${i}].mapId`);
+    if (typeof p.entityId !== "string") out.push(`placements[${i}].entityId: missing`);
+    else need(entities, p.entityId, "entity", `placements[${i}].entityId`);
+  });
   return out;
 }
 
@@ -319,7 +406,9 @@ function decodeOnce(text: string, stripTags: boolean): string {
     })
     // Invisible characters; a non-breaking space and any whitespace run as one space.
     .replace(/[\u00AD\u200B-\u200D\u2060\uFEFF]/g, "")
-    .replace(/[\s\u00A0]+/g, " ");
+    .replace(/[\s\u00A0]+/g, " ")
+    // One Unicode form (NFC): a decomposed accented letter reads as the composed one.
+    .normalize("NFC");
   if (!stripTags) return decoded;
   // Markup: an inline tag goes with no gap, any other is a word break.
   return decoded.replace(/<\\?\/?([a-z][a-z0-9]*)\b[^<>]*>/gi, (_, tag: string) =>
@@ -466,8 +555,14 @@ const isNonEmptyFile = (p: string) => {
   }
 };
 
-/** The campaign list of the content the config names. Throws when it can't load or is v1. */
-function loadCampaigns(configPath: string): AtlasCampaign[] {
+interface Content {
+  campaigns: AtlasCampaign[];
+  /** The resolver's must-not-ship set for a campaign, as the build writes it. */
+  mustNotShip: (campaign: string) => MustNotShip;
+}
+
+/** The content the config names. Throws when it can't load or is v1. */
+function loadContent(configPath: string): Content {
   const cfg = JSON.parse(fs.readFileSync(configPath, "utf8")) as Config;
   const root = path.dirname(configPath);
   const loaded = loadAtlasModel(
@@ -478,8 +573,50 @@ function loadCampaigns(configPath: string): AtlasCampaign[] {
   if (loaded.model.schemaVersion !== 2) {
     throw new Error("the content is v1: campaign isolation is checked on v2 outputs only");
   }
-  return loaded.model.campaigns.map((c) => ({ id: c.id, name: c.name }));
+  return {
+    campaigns: loaded.model.campaigns.map((c) => ({ id: c.id, name: c.name })),
+    mustNotShip: (id) => resolveCampaign(loaded.model, loaded.notes, id).mustNotShip,
+  };
 }
+
+const pinKey = (p: PinLocation) => `${p.map} #${p.index} (${p.x}, ${p.y})`;
+const campaignKey = (c: AtlasCampaign) => `${c.id} "${c.name}"`;
+
+/**
+ * How the must-not-ship file differs from what the content gives now (the
+ * resolver's set, and the other campaigns): entries the file lacks, and
+ * entries it has that the content doesn't. Order doesn't matter.
+ */
+export function mustNotShipDiff(file: MustNotShipFile, expected: MustNotShipFile): string[] {
+  const out: string[] = [];
+  const cmp = (what: string, have: string[], want: string[]) => {
+    const h = new Set(have);
+    const w = new Set(want);
+    const lacks = [...w].filter((x) => !h.has(x));
+    const extra = [...h].filter((x) => !w.has(x));
+    if (lacks.length) out.push(`must-not-ship.json ${what}: lacks ${lacks.join(", ")}`);
+    if (extra.length)
+      out.push(
+        `must-not-ship.json ${what}: has ${extra.join(", ")}, which the content doesn't hide`,
+      );
+  };
+  cmp("ids", file.ids, expected.ids);
+  cmp("names", file.names, expected.names);
+  cmp("paths", file.paths, expected.paths);
+  cmp("pinLocations", file.pinLocations.map(pinKey), expected.pinLocations.map(pinKey));
+  cmp(
+    "otherCampaigns",
+    file.otherCampaigns.map(campaignKey),
+    expected.otherCampaigns.map(campaignKey),
+  );
+  return out;
+}
+
+const union = <T>(a: T[], b: T[], key: (x: T) => string = String) => {
+  const seen = new Map<string, T>();
+  for (const x of [...a, ...b]) if (!seen.has(key(x))) seen.set(key(x), x);
+  return [...seen.values()];
+};
 
 export function run(opts: RunOpts): number {
   const dir = path.resolve(process.cwd(), opts.dir);
@@ -513,33 +650,44 @@ export function run(opts: RunOpts): number {
   }
 
   // Inputs.
-  let m: MustNotShipFile;
-  let campaigns: AtlasCampaign[];
+  let file: MustNotShipFile;
+  let content: Content;
+  let resolved: MustNotShip;
   try {
-    m = readMustNotShip(mnsFile);
-    campaigns = loadCampaigns(configPath);
+    file = readMustNotShip(mnsFile);
+    content = loadContent(configPath);
   } catch (e) {
     return fail(EXIT.input, [(e as Error).message]);
   }
-  const campaign = campaigns.find((c) => c.id === m.campaign);
+  const campaign = content.campaigns.find((c) => c.id === file.campaign);
   if (!campaign) {
-    return fail(EXIT.input, [`campaign "${m.campaign}" is not in the content's campaign list`]);
+    return fail(EXIT.input, [`campaign "${file.campaign}" is not in the content's campaign list`]);
   }
-  const others = campaigns.filter((c) => c.id !== campaign.id);
+  try {
+    resolved = content.mustNotShip(campaign.id);
+  } catch (e) {
+    return fail(EXIT.input, [(e as Error).message]);
+  }
+  const others = content.campaigns.filter((c) => c.id !== campaign.id);
+  // The file is the build's; the content is the truth now. Any difference
+  // fails (a stale or edited file can't vouch for the output), and every
+  // check below runs on the union of both.
+  const expected: MustNotShipFile = { campaign: campaign.id, ...resolved, otherCampaigns: others };
+  const m: MustNotShipFile = {
+    campaign: campaign.id,
+    ids: union(file.ids, expected.ids),
+    names: union(file.names, expected.names),
+    paths: union(file.paths, expected.paths),
+    pinLocations: union(file.pinLocations, expected.pinLocations, pinKey),
+    otherCampaigns: union(file.otherCampaigns, others, campaignKey),
+  };
   const iso: Isolation = { campaign, others, m };
 
   // Structural.
-  const structural: string[] = [];
-  const listed = [m.campaign, ...m.otherCampaigns.map((c) => c.id)].sort().join(",");
-  const actual = campaigns
-    .map((c) => c.id)
-    .sort()
-    .join(",");
-  if (listed !== actual) {
-    structural.push(
-      `must-not-ship.json lists campaigns ${listed}, the content ${actual}: rebuild before scanning`,
-    );
-  }
+  const structural: string[] = mustNotShipDiff(file, expected).map(
+    (d) => `${d} (rebuild before scanning)`,
+  );
+  const parsed: Partial<Record<(typeof PLAYER_JSON)[number], unknown>> = {};
   for (const f of PLAYER_JSON) {
     let json: unknown;
     try {
@@ -548,7 +696,11 @@ export function run(opts: RunOpts): number {
       structural.push(`${f}: not valid JSON, so it can't be checked (${(e as Error).message})`);
       continue;
     }
+    parsed[f] = json;
     structural.push(...structuralFindings(json, f, iso).map((h) => `${f}: ${h}`));
+  }
+  if ("atlas.json" in parsed && "search-index.json" in parsed) {
+    structural.push(...indexFindings(parsed["atlas.json"], parsed["search-index.json"]));
   }
 
   // Text.
