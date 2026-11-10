@@ -393,7 +393,7 @@ describe("R-18: fog baked per campaign", () => {
       expect(args.some((a) => a instanceof Error)).toBe(false);
       expect(args.map(String).join("\n")).not.toMatch(/\n\s+at /);
       expect(args.map(String).join("\n")).toMatch(
-        /no campaign: v1 store, fog campaign checks skipped/,
+        /legacy pair: no campaign, fog campaign checks skipped/,
       );
 
       const open = await run(

@@ -10,6 +10,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { CAMPAIGN_PUBLIC_DIR_ENV } from "./campaignSitePublicDir";
 
 /** The campaign name a campaign site build names itself by; null for any other build. */
@@ -124,9 +125,36 @@ const NEUTRAL_MANIFEST: Record<string, RegExp> = {
   purpose: /^(any|maskable|any maskable)$/,
 };
 
-/** A local asset path, or Google Fonts (the shell's one off-site link). */
-const LOCAL_PATH = /^\.?\/[\w\-./]*$/;
-const FONT_URL = /^https:\/\/fonts\.(googleapis|gstatic)\.com(\/[\w\-./?=&:;@%+]*)?$/;
+/** The app shell, whose link and script URLs are the only ones a site may carry. */
+const SOURCE_INDEX_HTML = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "index.html",
+);
+/** A bundle file Vite writes: `/assets/<chunk>-<8-char hash>.(js|css)`. */
+const VITE_ASSET = /^\/assets\/[A-Za-z][\w-]*-[\w-]{8}\.(js|css)$/;
+/** The manifest link vite-plugin-pwa adds. */
+const PWA_MANIFEST = "/manifest.webmanifest";
+
+let sourceUrls: Set<string> | undefined;
+/** Every href and src in the source `index.html` (icons, manifest, fonts, entry). */
+function shellUrls(): Set<string> {
+  if (!sourceUrls) {
+    const html = fs.readFileSync(SOURCE_INDEX_HTML, "utf8");
+    sourceUrls = new Set();
+    for (const [tag] of html.matchAll(/<(?:link|script)\b[^>]*>/gi)) {
+      const a = attributes(tag);
+      for (const v of [a.href, a.src]) if (v) sourceUrls.add(v);
+    }
+  }
+  return sourceUrls;
+}
+const shellUrl = (v: string) => shellUrls().has(v) || v === PWA_MANIFEST || VITE_ASSET.test(v);
+
+type Check = RegExp | ((v: string) => boolean);
+const passes = (c: Check, v: string) => (c instanceof RegExp ? c.test(v) : c(v));
+
 const CROSSORIGIN = /^(|anonymous)$/;
 
 /**
@@ -134,7 +162,7 @@ const CROSSORIGIN = /^(|anonymous)$/;
  * may carry and that attribute's neutral values. Any other tag or attribute,
  * or a value off its pattern, is a finding.
  */
-const TAG_ATTRS: Record<string, Record<string, RegExp>> = {
+const TAG_ATTRS: Record<string, Record<string, Check>> = {
   html: { lang: /^[a-z]{2}(-[A-Za-z]{2})?$/ },
   head: {},
   body: {},
@@ -142,12 +170,12 @@ const TAG_ATTRS: Record<string, Record<string, RegExp>> = {
   div: { id: /^root$/ },
   link: {
     rel: /^(manifest|icon|apple-touch-icon|preconnect|modulepreload|stylesheet)$/,
-    href: new RegExp(`${LOCAL_PATH.source}|${FONT_URL.source}`),
+    href: shellUrl,
     type: /^image\/png$/,
     sizes: /^\d+x\d+$/,
     crossorigin: CROSSORIGIN,
   },
-  script: { type: /^module$/, src: LOCAL_PATH, crossorigin: CROSSORIGIN },
+  script: { type: /^module$/, src: shellUrl, crossorigin: CROSSORIGIN },
 };
 
 const unescapeHtml = (s: string): string =>
@@ -182,7 +210,9 @@ function attributes(tag: string): Record<string, string> {
  *   - every other tag is one the build writes (`TAG_ATTRS`), each attribute
  *     with a neutral value, so a canonical link, `data-*` or `alt` can't name
  *     one either; a script is a module `src` tag with an empty body, so no
- *     inline script or JSON-LD ships, and no `<style>` ships at all;
+ *     inline script or JSON-LD ships, and no `<style>` ships at all; every
+ *     href and src is one in the source `index.html`, a Vite bundle file or
+ *     the PWA manifest link; and no HTML comment ships;
  *   - every string in the manifest is a naming key with the name, or a
  *     neutral key matching its pattern; anything else is a finding.
  * The isolation text pass searches both files for other campaigns' and
@@ -218,7 +248,10 @@ export function siteIdentityFindings(siteDir: string, name: string): string[] {
     }
   }
 
-  const markup = html.replace(/<!--[\s\S]*?-->/g, " ");
+  for (const [c] of html.matchAll(/<!--[\s\S]*?(-->|$)/g)) {
+    out.push(`index.html: a comment the site build doesn't write (${show(c.slice(0, 80))})`);
+  }
+  const markup = html.replace(/<!--[\s\S]*?(-->|$)/g, " ");
   for (const [tag, tagName] of markup.matchAll(/<([a-zA-Z][\w-]*)\b[^>]*>/g)) {
     const t = tagName.toLowerCase();
     if (t === "meta") continue;
@@ -228,7 +261,7 @@ export function siteIdentityFindings(siteDir: string, name: string): string[] {
       continue;
     }
     for (const [k, v] of Object.entries(attributes(tag))) {
-      if (!(k in allowedAttrs) || !allowedAttrs[k].test(v)) {
+      if (!(k in allowedAttrs) || !passes(allowedAttrs[k], v)) {
         out.push(`index.html <${t}> ${k}=${show(v)}: not a value the site build writes`);
       }
     }

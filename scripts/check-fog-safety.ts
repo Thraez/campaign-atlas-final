@@ -335,7 +335,9 @@ export async function run(opts: RunOpts): Promise<number> {
       noCampaign = e instanceof NoCampaignError;
       if (noCampaign) {
         // The legacy pair of a v2 run: expected, so one plain line, no trace.
-        console.log("atlas:check-fog-safety: no campaign: v1 store, fog campaign checks skipped");
+        console.log(
+          "atlas:check-fog-safety: legacy pair: no campaign, fog campaign checks skipped",
+        );
       } else {
         console.error(
           `atlas:check-fog-safety: failed to load the source fog — the source-driven checks could not run`,

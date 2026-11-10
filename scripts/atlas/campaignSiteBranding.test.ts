@@ -211,4 +211,24 @@ describe("siteIdentityFindings: an allowlist over the whole head and manifest", 
     const style = site(addToHead("<style>body::after{content:'Astrath'}</style>"));
     expect(siteIdentityFindings(style, NAME).join("\n")).toMatch(/style/);
   });
+
+  it("fails any HTML comment", () => {
+    const d = site(addToHead("<!-- Astrath Deeprealm -->"));
+    expect(siteIdentityFindings(d, NAME).join("\n")).toMatch(/comment.*Astrath/);
+  });
+
+  it("pins every href and src to a shape the build writes", () => {
+    const icon = site(addToHead('<link rel="icon" href="/astrath-deeprealm.png">'));
+    expect(siteIdentityFindings(icon, NAME).join("\n")).toMatch(/href.*astrath-deeprealm/);
+    const asset = site(addToHead('<link rel="stylesheet" href="/assets/astrath/deeprealm.css">'));
+    expect(siteIdentityFindings(asset, NAME).join("\n")).toMatch(/href/);
+    const src = site(addToHead('<script type="module" src="/astrath.js"></script>'));
+    expect(siteIdentityFindings(src, NAME).join("\n")).toMatch(/src.*astrath/);
+    const font = site(
+      addToHead(
+        '<link href="https://fonts.googleapis.com/css2?family=Astrath+Deeprealm&display=swap" rel="stylesheet">',
+      ),
+    );
+    expect(siteIdentityFindings(font, NAME).join("\n")).toMatch(/href.*Astrath/);
+  });
 });
