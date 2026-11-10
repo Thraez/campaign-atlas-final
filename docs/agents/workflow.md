@@ -34,7 +34,8 @@ Order: review first, then the gate. Review findings change the code, and the gat
 
 - A branch and a PR per ticket, cut from `origin/main`. Tracker and `State.md` edits ride in that PR
   or in a docs PR; local `main` holds nothing that isn't on `origin`.
-- Merging publishes, so it needs Isak's yes (`AGENTS.md`, "Git and deploy"). GitHub CI is not a
+- Merging publishes; the session merges its own PR once the gate and review pass, without asking
+  (`AGENTS.md`, "Git and deploy"). GitHub CI is not a
   gate: nobody starts or waits on it.
 - Stack a branch on another only when both edit the same file; retarget it to `main` once its parent
   merges.

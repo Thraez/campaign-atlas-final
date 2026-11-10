@@ -13,7 +13,7 @@ R-01 (#111, no ticket file), Q-01..Q-04 (#112-#115),
 [R-06](issues/R-06-player-build-report-leak.md).
 
 Open safety follow-up (no leak today; any phase, before the first real Sync):
-[R-07](issues/R-07-root-dm-folder-exclude.md), a `_dm/` folder at the content root is not excluded;
+[R-07](issues/R-07-root-dm-folder-exclude.md), a `_dm/` folder at the content root is not excluded (done);
 [R-07b](issues/R-07b-fog-conceals-dropped.md), the loader drops fog shapes (conceals) (done).
 
 ## Phase 2: schema v2 and campaigns in the pipeline
@@ -53,7 +53,7 @@ R-17b are new (split out of R-11a and R-17 in review).
 
 - **Done 2026-11-08:** Isak accepted every "Open for Isak" recommendation in ADR-0003 and ADR-0004
   and the three fail-closed rules.
-- **Done:** R-11c (merged), R-07b, R-13, R-11e, R-14, R-17. **Now:** R-17b. **Then:** R-18 and R-19; R-20. R-07 before the first real Sync.
+- **Done:** R-11c (merged), R-07b, R-13, R-11e, R-14, R-17, R-07. **Now:** R-17b. **Then:** R-18 and R-19; R-20.
 
 Phase 3 and 4 tickets are written before phase 2 ends (plan.md section 5). Phase H (H-01..H-04)
 starts after R-19 at the earliest and before the first real Sync (`tidemarrow/01`).

@@ -57,6 +57,78 @@ describe("scanContentFolder", () => {
     expect(scan.notes).toHaveLength(0);
   });
 
+  describe("an excluded folder directly under the content root (R-07)", () => {
+    // The repo's real list: `**/` must also mean zero folders.
+    const real = {
+      include: ["**/*.md"],
+      exclude: ["**/_drafts/**", "**/_dm/**", "**/archive/**", "**/deprecated/**"],
+    };
+    const playerNote = "---\natlas:\n  visibility: player\n---\nBody\n";
+    for (const folder of ["_dm", "_drafts", "archive", "deprecated"]) {
+      it(`excludes content/${folder}/, even a player note`, () => {
+        const scan = scanContentFolder(
+          [file(`${folder}/spy.md`, playerNote), file(`${folder}/deep/er.md`, playerNote)],
+          real,
+        );
+        expect(scan.notes).toEqual([]);
+        expect(scan.excluded.map((n) => n.relPath)).toEqual([
+          `content/${folder}/spy.md`,
+          `content/${folder}/deep/er.md`,
+        ]);
+      });
+    }
+
+    it("matches excluded folder names case-blind (the Mac's file system is)", () => {
+      const scan = scanContentFolder(
+        [
+          file("_DM/spy.md", playerNote),
+          file("w/_Dm/spy.md", playerNote),
+          file("w/Archive/old.md", playerNote),
+          file("DEPRECATED/x.md", playerNote),
+          file("w/_Drafts/wip.md", playerNote),
+          file("w/npcs/corven.md", playerNote),
+        ],
+        real,
+      );
+      expect(scan.notes.map((n) => n.relPath)).toEqual(["content/w/npcs/corven.md"]);
+      expect(scan.excluded).toHaveLength(5);
+    });
+
+    describe("odd exclude glob forms still fail closed", () => {
+      const forms: Array<[string, string, string]> = [
+        ["a trailing slash", "**/_dm/", "w/_dm/spy.md"],
+        ["a leading slash", "/_dm/**", "_dm/spy.md"],
+        ["a leading ./", "./_dm/**", "_dm/spy.md"],
+        ["backslash separators", "**\\_dm\\**", "w/_dm/spy.md"],
+        ["brackets in a folder name", "**/[dm]/**", "w/[dm]/spy.md"],
+        ["other regex characters", "**/a+b(c)/**", "w/a+b(c)/spy.md"],
+      ];
+      for (const [name, glob, notePath] of forms) {
+        it(`${name}: ${glob}`, () => {
+          const scan = scanContentFolder([file(notePath, playerNote)], {
+            include: [],
+            exclude: [glob],
+          });
+          expect(scan.notes).toEqual([]);
+          expect(scan.excluded).toHaveLength(1);
+        });
+      }
+
+      it("brackets are literal, not a character class", () => {
+        const scan = scanContentFolder([file("w/d/spy.md")], {
+          include: [],
+          exclude: ["**/[dm]/**"],
+        });
+        expect(scan.notes).toHaveLength(1);
+      });
+    });
+
+    it("still needs a whole folder name: _dm-notes/ and my_dm/ are read", () => {
+      const scan = scanContentFolder([file("_dm-notes/a.md"), file("w/my_dm/b.md")], real);
+      expect(scan.notes).toHaveLength(2);
+    });
+  });
+
   it("keeps the order it was given", () => {
     const scan = scanContentFolder([file("w/b.md"), file("w/a.md")], rules);
     expect(scan.notes.map((n) => n.relPath)).toEqual(["content/w/b.md", "content/w/a.md"]);
