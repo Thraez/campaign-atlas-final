@@ -239,7 +239,7 @@ function hiddenItemLinkTargets(
 }
 
 const URL_ATTR =
-  /\s(src|srcset|href|poster|data|action|formaction|background|cite|longdesc|xlink:href|ping)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi;
+  /[\s/"'](src|srcset|href|poster|data|action|formaction|background|cite|longdesc|xlink:href|ping|content)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi;
 const NOT_LOCAL = /^(https?:|data:|blob:|mailto:|#)/i;
 
 function decodeEntities(v: string): string {
@@ -268,8 +268,19 @@ function localBodyUrls(body: string): string[] {
   const html = markdownToHtml(body);
   for (const m of html.matchAll(URL_ATTR)) {
     const value = decodeEntities(m[2] ?? m[3] ?? m[4] ?? "");
-    if (m[1].toLowerCase() === "srcset") {
+    const attr = m[1].toLowerCase();
+    if (attr === "srcset") {
       for (const c of value.split(",")) urls.push(c.trim().split(/\s+/)[0] ?? "");
+    } else if (attr === "content") {
+      // <meta http-equiv=refresh content="0;url=...">: only the part after url=.
+      const at = value.search(/url\s*=/i);
+      if (at >= 0)
+        urls.push(
+          value
+            .slice(at)
+            .replace(/^url\s*=\s*['"]?/i, "")
+            .replace(/['"]$/, ""),
+        );
     } else urls.push(value);
   }
   for (const m of html.matchAll(/url\(\s*(?:&quot;|["'])?([^"')\s&]+)/gi)) urls.push(m[1]);

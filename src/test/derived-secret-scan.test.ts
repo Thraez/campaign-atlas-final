@@ -371,6 +371,20 @@ describe("must-not-ship file (R-17)", () => {
     expect(hitsFor(JSON.stringify({ body: "brindlecrossing" }))).toEqual([]);
   });
 
+  it("flags a path after any character that can't be part of a path", () => {
+    for (const body of [
+      "See <images/brindlecross.png>.",
+      "&lt;images/brindlecross.png&gt;",
+      "<b>images/brindlecross.png</b>",
+      "art:images/brindlecross.png",
+      "a,images/brindlecross.png",
+      "[images/brindlecross.png]",
+    ]) {
+      expect(hitsFor(JSON.stringify({ body }), "path"), body).toEqual(["images/brindlecross.png"]);
+    }
+    expect(hitsFor(JSON.stringify({ body: "my_images/brindlecross.png" }), "path")).toEqual([]);
+  });
+
   it("flags a path as written or inside a longer one, but not inside a longer file name", () => {
     expect(hitsFor(JSON.stringify({ src: "images/brindlecross.png" }), "path")).toEqual([
       "images/brindlecross.png",

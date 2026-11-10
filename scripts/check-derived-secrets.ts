@@ -341,13 +341,14 @@ function wholeWordPattern(name: string): RegExp {
 }
 
 /**
- * A normalised path, whole, after start, a quote, a space, a `/`, a `(`
- * (a markdown link or image) or a `=` (an unquoted HTML attribute), so a
- * longer path ending in it is a hit.
+ * A normalised path, whole: not inside a longer name (no letter, digit, `.`,
+ * `_` or `-` on either side), but after anything else (a quote, space, `/`,
+ * `(`, `=`, `<`, `>`, `;` of an HTML entity, `:`, `,`, `[`), so a longer
+ * path ending in it is a hit too.
  */
 function pathPattern(normalized: string): RegExp {
   const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?<![^\\s"'/(=])${escaped}(?![\\p{L}\\p{N}._-])`, "u");
+  return new RegExp(`(?<![\\p{L}\\p{N}._-])${escaped}(?![\\p{L}\\p{N}._-])`, "u");
 }
 
 /** `foreignCampaignRefs` on every JSON file of a store; its atlas.json must name its own campaign. */

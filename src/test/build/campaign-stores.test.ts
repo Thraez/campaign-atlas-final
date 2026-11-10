@@ -488,6 +488,8 @@ describe("R-17: a local file URL in a v2 note fails closed", () => {
     ["HTML link", '\n<a href="images/oskmark.png">map</a>\n'],
     ["markdown link to a file", "\n[map](images/oskmark.png)\n"],
     ["markdown link to a hidden id", "\nSee [the harbour](hookhaven).\n"],
+    ["HTML image, attribute after a slash", '\n<img/src="images/oskmark.png">\n'],
+    ["meta refresh", '\n<meta http-equiv="refresh" content="0;url=images/oskmark.png">\n'],
   ])("%s: exit 1, nothing written", async (_label, add) => {
     const root = testWorld();
     const file = content(root, "quessaly/npcs/marra-quillon.md");
@@ -620,5 +622,31 @@ describe("R-17: where the stores root may be", () => {
     await refused(root, "other");
     expect(fs.existsSync(path.join(root, "src", "atlas", "assets", "keep.ts"))).toBe(true);
     expect(fs.readdirSync(path.join(root, "other"))).toEqual(["keep.txt"]);
+  });
+});
+
+describe("R-17: a hidden path after any non-path character fails the build (exit 12)", () => {
+  // main hides mirefold; its image is renamed so no id or name matches it,
+  // leaving only the path match to catch it.
+  it.each([
+    ["an autolink", "\nSee <images/zq-vault-art.png>.\n"],
+    ["after a colon", "\nart:images/zq-vault-art.png\n"],
+    ["between tags", "\n<span>images/zq-vault-art.png</span>\n"],
+    ["after a comma", "\nsee a,images/zq-vault-art.png\n"],
+    ["after a bracket", "\nsee [images/zq-vault-art.png]\n"],
+  ])("%s", async (_label, add) => {
+    const root = testWorld();
+    const wy = content(root, "quessaly/_atlas/world.yaml");
+    const yaml = fs.readFileSync(wy, "utf8");
+    expect(yaml).toContain("src: images/mirefold.png");
+    fs.writeFileSync(wy, yaml.replace("src: images/mirefold.png", "src: images/zq-vault-art.png"));
+    const img = content(root, "quessaly/_atlas/images/mirefold.png");
+    fs.renameSync(img, path.join(path.dirname(img), "zq-vault-art.png"));
+    fs.appendFileSync(content(root, "quessaly/places/pellam-ferry.md"), add);
+    silence();
+    const r = await runBuild({ player: true, strict: true, campaign: "main" }, root);
+    vi.restoreAllMocks();
+    expect(r).toMatchObject({ ok: false, exitCode: 12 });
+    expect(fs.existsSync(path.join(root, ".atlas-campaigns"))).toBe(false);
   });
 });
