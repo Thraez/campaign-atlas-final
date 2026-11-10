@@ -103,6 +103,13 @@ State.md part is the same stale notes. Drop it once Isak decides the settings ch
 
 ## Open work
 
+**Paused 2026-11-10 (usage).** Phase 2 done through R-17 (#136). R-17b in progress: worktree
+`.claude/worktrees/r17b`, branch `rebuild-r17b-isolation-scan` at 4140336f, no code yet. Planned:
+`scripts/check-campaign-isolation.ts` (v2 outputs only; exits 23 structural, 24 text, 25 assets,
+20 missing), export `isReportableName`/`pathPattern`, plus the R-17 leftovers (markup-split names,
+hidden asset basenames, %-decoding). Next: R-17b, then R-18 and R-19, then R-20; R-07 before the
+first real Sync. Coordinator log: `docs/rebuild-2026-11/progress.md` on `rebuild-plan-2026-11`.
+
 Lowest number first within each folder.
 
 - Rebuild: phase 2 next; Isak decides when it starts (Rebuild queue above).
