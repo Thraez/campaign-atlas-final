@@ -1641,6 +1641,7 @@ async function redactMapsForPlayer(
         y: layer.y,
         width: layer.width,
         height: layer.height,
+        rotation: layer.rotation,
       });
       // Output path: insert ".fog" before the extension. Strip any query/hash.
       const cleanSrc = layer.src.replace(/[?#].*$/, "");

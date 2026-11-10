@@ -16,6 +16,9 @@
  *                     corners included (arch-02; ride-on areas follow their
  *                     region, which 15 checks)
  *
+ * "Inside fog" means outside every reveal or inside a fog shape (`conceals`),
+ * which loadWorldConfig carries through (R-07b).
+ *
  * The artifact dir is the built site (`dist`, atlas.json in `dist/atlas/`) or
  * the source store (`public/atlas`); see `atlas/playerArtifact.ts`. The scan
  * registry passes which one; run by hand, it is inferred. The store
