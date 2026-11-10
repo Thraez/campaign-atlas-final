@@ -65,10 +65,12 @@ import {
   fileInside,
   planMapImages,
   storeAudioFile,
-  writeCampaignStore,
+  writeCampaignStores,
   type MustNotShipFile,
   type StoreFiles,
+  type StoresRootGuard,
 } from "./atlas/build/campaignStore";
+import { findSecretsInText, mustNotShipSecrets } from "./check-derived-secrets";
 import { loadAtlasModel } from "./atlas/loadAtlasModel";
 import {
   applyAudioPlan,
@@ -229,6 +231,20 @@ function hiddenItemLinkTargets(
     out.push({ id: `${HIDDEN_ITEM_ID}${value}`, title: value, aliases: [] });
   }
   return out;
+}
+
+/**
+ * The local image refs a note body names besides wikilink embeds: markdown
+ * `![alt](src)` and HTML `<img src>` (quoted or not). External URLs and
+ * `data:`/`blob:` aren't local.
+ */
+function localBodyImageRefs(body: string): string[] {
+  const out: string[] = [];
+  for (const m of body.matchAll(/!\[[^\]]*\]\(\s*<?([^)\s>]+)/g)) out.push(m[1]);
+  for (const m of body.matchAll(/<img\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)) {
+    out.push(m[1] ?? m[2] ?? m[3] ?? "");
+  }
+  return out.filter((src) => src.trim() !== "" && !/^(https?:|data:|blob:)/i.test(src.trim()));
 }
 
 /** Matches `name` in any case, with dashes, underscores and spaces interchangeable. */
@@ -414,6 +430,8 @@ export interface BuildCampaignStore {
   campaign: string;
   files: StoreFiles;
   mustNotShip: MustNotShipFile;
+  /** Where the stores root may not be (the repo, `public/`, source folders). */
+  guard: StoresRootGuard;
 }
 
 export interface BuildAtlasResult {
@@ -477,6 +495,23 @@ export async function runBuild(
     return { ok: false, exitCode, durationMs: Date.now() - started, error };
   }
   try {
+    // v2 player builds: every campaign's store in one write, after every
+    // campaign built and passed its gates; a build of every campaign also
+    // removes stores of campaigns the content no longer has.
+    const stores = results.flatMap((r) => (r.store ? [r] : []));
+    if (stores.length > 0 && stores.length === results.length) {
+      const dirs = writeCampaignStores(
+        campaignStoresRoot(root, flags, stores[0]),
+        stores[0].store!.guard,
+        stores.map((r) => ({ campaign: r.store!.campaign, store: storeContent(r) })),
+        { prune: flags.campaign === undefined },
+      );
+      for (const dir of dirs) {
+        console.log(`\nWrote ${path.relative(root, path.join(dir, "atlas.json"))}`);
+        console.log(`Wrote ${path.relative(root, path.join(dir, "search-index.json"))}\n`);
+      }
+      return { ok: true, exitCode: 0, durationMs: Date.now() - started };
+    }
     for (const result of results) {
       const outDir = writeBuildOutput(root, flags, result);
       console.log(`\nWrote ${path.relative(root, path.join(outDir, "atlas.json"))}`);
@@ -541,15 +576,12 @@ export function writeBuildOutput(
     throw new Error(`writeBuildOutput: refusing a failed build (${report.failure.message})`);
   }
   if (store) {
-    const storeDir = flags.outDir
-      ? campaignStoreDir(path.resolve(root, flags.outDir), store.campaign)
-      : report.defaultOutDir;
-    writeCampaignStore(storeDir, assets.publicDir, {
-      atlasJson: JSON.stringify(project),
-      searchIndexJson: JSON.stringify(searchIndex),
-      files: store.files,
-      mustNotShip: store.mustNotShip,
-    });
+    const [storeDir] = writeCampaignStores(
+      campaignStoresRoot(root, flags, { report }),
+      store.guard,
+      [{ campaign: store.campaign, store: storeContent({ project, searchIndex, store }) }],
+      { prune: false },
+    );
     // Nothing goes to public/: v1's fog masks and audio folder aren't this store's.
     return storeDir;
   }
@@ -573,6 +605,31 @@ export function writeBuildOutput(
     JSON.stringify(searchIndex, null, jsonIndent),
   );
   return outDir;
+}
+
+/** The root of the campaign stores: `--out`, else the config's `outputDir`. */
+function campaignStoresRoot(
+  root: string,
+  flags: BuildFlags,
+  { report }: Pick<BuildAtlasResult, "report">,
+): string {
+  return flags.outDir
+    ? path.resolve(root, flags.outDir)
+    : path.dirname(path.dirname(report.defaultOutDir));
+}
+
+/** A built campaign's store as written: the JSON exactly as the must-not-ship check read it. */
+function storeContent({
+  project,
+  searchIndex,
+  store,
+}: Pick<BuildAtlasResult, "project" | "searchIndex" | "store">) {
+  return {
+    atlasJson: JSON.stringify(project),
+    searchIndexJson: JSON.stringify(searchIndex),
+    files: store!.files,
+    mustNotShip: store!.mustNotShip,
+  };
 }
 
 /** The console build report, as the CLI prints it. */
@@ -750,6 +807,9 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // resolveImageEmbeds() below and validated once runAssetCheck exists
   // further down — see the "Asset validation" section.
   const embeddedAssetRefs: { raw: string; owner: string }[] = [];
+  // v2 player builds: markdown and HTML image refs in note bodies (R-17).
+  // They have no per-campaign copy yet, so each one fails the build.
+  const bodyImageRefs: { raw: string; owner: string }[] = [];
 
   const pending: Pending[] = [];
   const slugSeen = new Map<string, string>();
@@ -857,7 +917,10 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     })),
     [
       ...excludedNotes,
-      ...(res ? hiddenItemLinkTargets(res.resolution.mustNotShip, allParsed, excludedNotes) : []),
+      // v2 only: v1 output stays as it was.
+      ...(res && v2
+        ? hiddenItemLinkTargets(res.resolution.mustNotShip, allParsed, excludedNotes)
+        : []),
     ],
   );
 
@@ -952,6 +1015,11 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
         raw: DEFAULT_RESOLVE_ASSET(filename),
         owner: `entity ${item.entity.id} (embedded image)`,
       });
+    }
+    if (flags.player && v2) {
+      for (const raw of localBodyImageRefs(rawBody)) {
+        bodyImageRefs.push({ raw, owner: `entity ${item.entity.id} (markdown or HTML image)` });
+      }
     }
     if (flags.player) {
       const projected = projectEntityWithReport(item.entity, projectionCtx);
@@ -1516,7 +1584,7 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
         }
       }
     }
-    for (const ref of embeddedAssetRefs) {
+    for (const ref of [...embeddedAssetRefs, ...bodyImageRefs]) {
       storeErrors.push(`${ref.owner}: note images aren't published per campaign yet (${ref.raw})`);
     }
     // Validation errors fail the build (exit 1), so nothing is written.
@@ -1693,8 +1761,36 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
               .filter((c) => c.id !== campaignFile.id)
               .map((c) => ({ id: c.id, name: c.name })),
           },
+          guard: {
+            repoRoot: ROOT,
+            publicDir: path.join(ROOT, "public"),
+            protectedDirs: [path.join(ROOT, "src"), path.join(ROOT, "scripts"), contentDir],
+          },
         }
       : undefined;
+  // Every v2 player store, strict or not: nothing the campaign's must-not-ship
+  // set names (or another campaign's id or name) may be in its atlas.json or
+  // search index, as text or as a path. The same matcher as
+  // check-derived-secrets --must-not-ship, on the exact text to be written.
+  if (store && !report.failure) {
+    const secrets = mustNotShipSecrets(store.mustNotShip, "must-not-ship");
+    const hits = [
+      ...findSecretsInText(JSON.stringify(project), secrets).map(
+        (s) => `atlas.json: ${s.field} "${s.name}"`,
+      ),
+      ...findSecretsInText(JSON.stringify(searchIndex), secrets).map(
+        (s) => `search-index.json: ${s.field} "${s.name}"`,
+      ),
+    ];
+    if (hits.length > 0) {
+      report.failure = {
+        exitCode: 12,
+        message:
+          `Player build: campaign "${store.campaign}" would ship ${hits.length} name(s) or path(s) it hides. Failing build.\n` +
+          hits.map((h) => `  ${h}`).join("\n"),
+      };
+    }
+  }
   return { project, searchIndex, report, assets, ...(store ? { store } : {}) };
 }
 

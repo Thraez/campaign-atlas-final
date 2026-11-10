@@ -80,6 +80,24 @@ so `--strict` fails with exit 8. The must-not-ship scan catches any plain-text m
 Sentinels on `content-next/` (listed in its README) and `src/test/build/campaign-stores.test.ts`
 build both campaigns and grep every file of each store, bytes for images and audio.
 
-Left out: entity images and embedded assets in v2 notes fail the player build closed (not
+Review round 1 (five should-fixes):
+- S1: every v2 player build, strict or not, matches each campaign's `atlas.json` and
+  `search-index.json` against its must-not-ship set in memory and fails with exit 12, writing
+  nothing (`findSecretsInText` in `check-derived-secrets.ts`). The scan registry takes the stores
+  root from the config's `outputDir`.
+- S2: the set adds every other campaign's name and id (when `isReportableName`), in the build and
+  the scan.
+- S3: the stores root is compared on the real path of its nearest existing folder, case-folded on
+  macOS and Windows, so `--out PUBLIC` and a symlink to `public/` are refused.
+- S4: each store is built in a temp folder and renamed over the old one; a full build removes
+  root folders that aren't current campaigns. The root may not be the repo, `src/`, `scripts/`
+  or the content folder, and a non-empty root needs the `.atlas-campaigns-root` marker. Stores are
+  written only after every campaign passes; the per-campaign renames aren't one atomic step.
+- S5: markdown and HTML images in a v2 note fail the player build (exit 1); the path scan
+  matches a path after `(` or `=`.
+- v1 output is still identical; the link redaction runs only for v2.
+
+Left out: markdown reference-style images and `<source>`/`<video>` tags aren't matched by the
+S5 check (the in-build path match still catches a hidden path); entity images and embedded assets in v2 notes fail the player build closed (not
 published per campaign yet); a tiled map layer is an error; fogged v2 maps ship with no fog mask
 (R-18). `check-player-files` and the v1 store comments still describe the v1 layout (R-19).

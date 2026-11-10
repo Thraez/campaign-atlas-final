@@ -110,6 +110,9 @@ describe("R-13: every world and the map tree", () => {
     const { root, edit } = testWorld();
     // Read notes as the vault says, so only the hidden world keeps the-tide-warden out.
     edit("_atlas/campaigns/sandbox.yaml", "notes: hidden", "notes: vault");
+    // pellam-ferry then ships, and its body names Tallowford, which sandbox hides
+    // (fogged out of oskmark): the in-build check (exit 12) would fail the build.
+    edit("quessaly/places/pellam-ferry.md", "below Tallowford", "below the hills");
     const r = await buildAtlas(root, player("sandbox"));
     expect(r.report.failure).toBeUndefined();
 

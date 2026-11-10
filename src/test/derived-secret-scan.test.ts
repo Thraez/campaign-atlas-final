@@ -318,12 +318,30 @@ describe("must-not-ship file (R-17)", () => {
     return scanArtifactForSecrets(store, secrets).hits.map((h) => h.match.name);
   };
 
-  it("reads ids and names (generic ones dropped) and normalised paths", () => {
+  it("reads ids and names (generic ones dropped), the other campaigns, and normalised paths", () => {
     const s = secretsFromMustNotShip(file);
     expect(s.map((e) => [e.field, e.name])).toEqual([
       ["id", "brindlecross"],
+      ["id", "main"],
       ["title", "Brindlecross Bells"],
+      ["title", "Lantern Road"],
       ["path", "images/brindlecross.png"],
+    ]);
+  });
+
+  it("flags another campaign's name or id", () => {
+    expect(hitsFor(JSON.stringify({ body: "Unlike the Lantern Road crew." }))).toEqual([
+      "Lantern Road",
+    ]);
+    expect(hitsFor(JSON.stringify({ campaign: { id: "main" } }))).toEqual(["main"]);
+  });
+
+  it("flags a path in a markdown link or image and in an unquoted HTML attribute", () => {
+    expect(hitsFor(JSON.stringify({ body: "![x](images/brindlecross.png)" }), "path")).toEqual([
+      "images/brindlecross.png",
+    ]);
+    expect(hitsFor(JSON.stringify({ body: "<img src=images/brindlecross.png>" }), "path")).toEqual([
+      "images/brindlecross.png",
     ]);
   });
 

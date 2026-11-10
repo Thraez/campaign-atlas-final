@@ -67,4 +67,6 @@ it names on purpose: map `brindlecross` and its image (sandbox), world `skerrow`
 `hookhaven.png` (sandbox), pin of `mossbeck-well`, route `eel-path` and sound `frog-chorus` with
 `frog-chorus.ogg` (rule 9, both), sound `reed-whisper` with `reed-whisper.ogg` (sandbox), note
 `marra-quillon` (main). A note body linking a hidden map (`[[Brindlecross]]`, `[[Hookhaven]]`)
-is added by the test in a temp copy, since a strict build fails on it.
+is added by the test in a temp copy, since a strict build fails on it. So are plain-text
+mentions of a hidden item or of the other campaign (body, heading, `summary`, `tags`, a markdown
+link), each of which fails every player build with exit 12.

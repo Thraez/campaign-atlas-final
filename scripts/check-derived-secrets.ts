@@ -45,7 +45,7 @@ import { listTextFiles } from "./atlas/playerArtifact";
 import { readContentFiles } from "./atlas/readContentFiles";
 import { scanContentFolder } from "../src/atlas/content/scanContentFolder";
 import { normalizePath } from "../src/atlas/content/resolveCampaign";
-import { readMustNotShip } from "./atlas/build/campaignStore";
+import { readMustNotShip, type MustNotShipFile } from "./atlas/build/campaignStore";
 
 interface Config {
   contentRoot: string;
@@ -186,11 +186,24 @@ export function deriveSecretsFromVault(configPath: string): SecretEntry[] {
  * file is missing or malformed.
  */
 export function secretsFromMustNotShip(file: string): SecretEntry[] {
-  const m = readMustNotShip(file);
-  const source = path.basename(file);
+  return mustNotShipSecrets(readMustNotShip(file), path.basename(file));
+}
+
+/**
+ * A must-not-ship set as secret entries: its ids and names and every other
+ * campaign's id and name (each as the vault's secret names are filtered), and
+ * its paths through `normalizePath`. The build checks every campaign store
+ * with these before writing it; the scan, from the file.
+ */
+export function mustNotShipSecrets(m: MustNotShipFile, source: string): SecretEntry[] {
+  const others = m.otherCampaigns;
   const out: SecretEntry[] = [
-    ...m.ids.filter(isReportableName).map((name) => ({ name, source, field: "id" as const })),
-    ...m.names.filter(isReportableName).map((name) => ({ name, source, field: "title" as const })),
+    ...[...m.ids, ...others.map((c) => c.id)]
+      .filter(isReportableName)
+      .map((name) => ({ name, source, field: "id" as const })),
+    ...[...m.names, ...others.map((c) => c.name)]
+      .filter(isReportableName)
+      .map((name) => ({ name, source, field: "title" as const })),
     ...m.paths
       .map(normalizePath)
       .filter((p) => p.length > 0)
@@ -205,15 +218,40 @@ export function secretsFromMustNotShip(file: string): SecretEntry[] {
   });
 }
 
-export function scanArtifactForSecrets(dir: string, secrets: SecretEntry[]): DerivedScanResult {
-  const hits: DerivedScanHit[] = [];
-  // Any letter case, but whole words only: "isle de marque" is a hit for
-  // "Isle De Marque", while a name inside a longer word ("Mira" in
-  // "miracle") is not. Paths match on the text read as a path (pathPattern).
-  const patterns = secrets.map((s) => ({
+/**
+ * The entries of `secrets` found in `text`. Any letter case, but whole words
+ * only: "isle de marque" is a hit for "Isle De Marque", while a name inside a
+ * longer word ("Mira" in "miracle") is not. Paths match on the text read as a
+ * path (`pathPattern`): `\` (JSON-escaped or not) as `/`, `//` collapsed,
+ * lower case, as `normalizePath` reads one.
+ */
+export function findSecretsInText(text: string, secrets: SecretEntry[]): SecretEntry[] {
+  return findWith(text, secretPatterns(secrets));
+}
+
+type SecretPattern = { s: SecretEntry; re: RegExp };
+
+function secretPatterns(secrets: SecretEntry[]): SecretPattern[] {
+  return secrets.map((s) => ({
     s,
     re: s.field === "path" ? pathPattern(s.name) : wholeWordPattern(s.name),
   }));
+}
+
+function findWith(text: string, patterns: SecretPattern[]): SecretEntry[] {
+  const asPath = text
+    .replace(/\\\\/g, "/")
+    .replace(/\\/g, "/")
+    .replace(/\/{2,}/g, "/")
+    .toLowerCase();
+  return patterns
+    .filter(({ s, re }) => re.test(s.field === "path" ? asPath : text))
+    .map((p) => p.s);
+}
+
+export function scanArtifactForSecrets(dir: string, secrets: SecretEntry[]): DerivedScanResult {
+  const hits: DerivedScanHit[] = [];
+  const patterns = secretPatterns(secrets);
   const files = listTextFiles(dir, "check-derived-secrets").files;
   for (const full of files) {
     let text: string;
@@ -228,16 +266,7 @@ export function scanArtifactForSecrets(dir: string, secrets: SecretEntry[]): Der
       );
       continue;
     }
-    // The text read as paths, as normalizePath reads one: `\` (JSON-escaped
-    // or not) as `/`, `//` collapsed, lower case.
-    const asPath = text
-      .replace(/\\\\/g, "/")
-      .replace(/\\/g, "/")
-      .replace(/\/{2,}/g, "/")
-      .toLowerCase();
-    for (const { s, re } of patterns) {
-      if (re.test(s.field === "path" ? asPath : text)) hits.push({ file: full, match: s });
-    }
+    for (const match of findWith(text, patterns)) hits.push({ file: full, match });
   }
   return { derivedCount: secrets.length, filesScanned: files.length, hits };
 }
@@ -247,10 +276,14 @@ function wholeWordPattern(name: string): RegExp {
   return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "iu");
 }
 
-/** A normalised path, whole, after start, a quote, a space or a `/` (so a longer path ending in it is a hit). */
+/**
+ * A normalised path, whole, after start, a quote, a space, a `/`, a `(`
+ * (a markdown link or image) or a `=` (an unquoted HTML attribute), so a
+ * longer path ending in it is a hit.
+ */
 function pathPattern(normalized: string): RegExp {
   const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?<![^\\s"'/])${escaped}(?![\\p{L}\\p{N}._-])`, "u");
+  return new RegExp(`(?<![^\\s"'/(=])${escaped}(?![\\p{L}\\p{N}._-])`, "u");
 }
 
 function resolveConfig(configHint?: string): string | null {

@@ -53,13 +53,23 @@ function mustNotShipFile(id: string, over: Record<string, unknown> = {}): string
 }
 
 /** A temp repo root whose atlas.config.json points at `contentRoot` (v1 by default). */
-function repoWith(contentRoot = FIXTURE_CONTENT, defaultWorld = "test-world"): ScanContext {
+function repoWith(
+  contentRoot = FIXTURE_CONTENT,
+  defaultWorld = "test-world",
+  outputDir = ".atlas-campaigns",
+): ScanContext {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "scan-registry-"));
   temps.push(root);
   const configPath = path.join(root, "atlas.config.json");
   fs.writeFileSync(
     configPath,
-    JSON.stringify({ contentRoot, defaultWorld, include: ["**/*.md"], exclude: ["**/_dm/**"] }),
+    JSON.stringify({
+      contentRoot,
+      defaultWorld,
+      outputDir,
+      include: ["**/*.md"],
+      exclude: ["**/_dm/**"],
+    }),
   );
   return { root, configPath, contentDir: contentRoot };
 }
@@ -550,6 +560,28 @@ describe("campaign dirs (R-15)", () => {
     for (const t of tasks.filter((t) => t.campaign !== "a")) {
       expect(missingArtifacts(t), t.label).toEqual([]);
     }
+  });
+
+  describe("v2 (R-17): the stores root is the config's outputDir", () => {
+    it("scans the stores where the build writes them", () => {
+      const ctx = repoWith(V2_CONTENT, "test-world", "out/stores");
+      const derived = scanTasks(ctx).filter(
+        (t) => t.label.startsWith("check-derived-secrets") && t.campaign === "a",
+      );
+      const reqs = JSON.stringify(derived.map((t) => t.requires));
+      expect(derived.length).toBeGreaterThan(0);
+      expect(reqs).toContain("out/stores/a/must-not-ship.json");
+      expect(reqs).toContain("out/stores/a/atlas");
+      expect(reqs).not.toContain(".atlas-campaigns");
+    });
+
+    it("refuses a v2 config with no outputDir", () => {
+      const ctx = repoWith(V2_CONTENT);
+      const cfg = JSON.parse(fs.readFileSync(ctx.configPath, "utf8"));
+      delete cfg.outputDir;
+      fs.writeFileSync(ctx.configPath, JSON.stringify(cfg));
+      expect(() => scanTasks(ctx)).toThrow(/names no outputDir/);
+    });
   });
 
   describe("fails closed when the campaign list can't be loaded", () => {

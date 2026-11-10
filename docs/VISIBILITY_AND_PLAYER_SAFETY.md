@@ -170,11 +170,19 @@ orchestrator exits 1 and the editor's Publish check errors: the registry never r
 
 **One store per campaign (R-17, ADR-0004).** On v2 content, `npm run atlas:build:player` builds
 every campaign (`--campaign <id>` builds one) and writes each to its own store,
-`.atlas-campaigns/<id>/atlas/` (`--out <dir>` moves the root; a store under `public/` is refused).
+`<outputDir>/<id>/atlas/` (`.atlas-campaigns/` for `atlas.next.config.json`; `--out <dir>` moves the
+root). The stores root is refused when it is at or under `public/` (compared on the real path of
+its nearest existing folder, case-folded on macOS and Windows, so `PUBLIC` or a symlink doesn't get
+round it), when it is or holds the repo root, overlaps `src/`, `scripts/` or the content folder, or
+is a non-empty folder without the `.atlas-campaigns-root` marker the build writes there.
 A store holds `atlas.json`, `search-index.json` and `assets/`: copies, never links, of exactly the
 map images and audio its `atlas.json` names (maps under `assets/maps/<sha256-16><ext>`, byte for
-byte, so they stay lossless; audio under `assets/audio/<hash>.ogg`). No asset dir is shared, and
-`assets/` is replaced on every write. If any campaign fails, no store is written. Each
+byte, so they stay lossless; audio under `assets/audio/<hash>.ogg`). No asset dir is shared. Each
+store is built whole in a temp folder beside it and renamed over the old one, so nothing of the
+last build survives; a build of every campaign also removes any folder in the root that isn't a
+current campaign. Stores are written only after every campaign has built and passed the check
+below; if any fails, no store is written. (The swaps are one rename per campaign, not one atomic
+step across campaigns.) Each
 `atlas.json` names only its own campaign (`campaign: {id, name}`); the DM build carries every
 campaign file instead. v1 output is unchanged.
 
@@ -186,12 +194,21 @@ and never inside it: `{campaign, ids, names, paths, pinLocations, otherCampaigns
 campaign dir and requires the file, and an unreadable file fails closed) and fails with 12 on any
 of its ids or names as a whole word, or any of its paths (compared with `normalizePath` on both
 sides). `check-fog-safety` reads a v2 campaign's fog from the campaign file. `audit-assets`
-requires `assets/` only when the store's `atlas.json` names a file there.
+requires `assets/` only when the store's `atlas.json` names a file there. The registry finds the
+stores under the config's `outputDir`, where the build writes them.
+
+The same match runs inside the build: every v2 player build, strict or not, checks each
+campaign's `atlas.json` and `search-index.json` in memory against its must-not-ship set before
+anything is written, and fails with exit 12, writing nothing, on a hit, wherever the name sits
+(body text, a heading, `summary`, `tags`, a markdown link). The set it checks, here and in
+`check-derived-secrets`, adds every other campaign's name and id (when they're specific enough to
+report).
 
 A note body that links a hidden item (a hidden map or world, or any must-not-ship id or name, as
 in `[[Hookhaven]]`) has that link redacted to `…`, as a link to a hidden note is, and the link
-counts as a cross-reference leak: a `--strict` build fails with exit 8. Entity images and embedded
-assets in v2 notes aren't published per campaign yet: the player build fails closed on one. Tests:
+counts as a cross-reference leak: a `--strict` build fails with exit 8. Entity images, embedded
+assets and markdown or HTML images (`![x](images/a.png)`, `<img src="images/a.png">`) in v2 notes
+aren't published per campaign yet: the player build fails closed on one. Tests:
 `src/test/build/campaign-stores.test.ts` (sentinels listed in `content-next/README.md`).
 
 ## Folder-level exclusion

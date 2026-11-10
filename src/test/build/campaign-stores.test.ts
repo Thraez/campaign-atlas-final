@@ -17,13 +17,22 @@
  * - A note body linking a hidden map or note: the link is redacted, the
  *   name and id are absent, and a strict build fails (exit 8).
  * - `--campaign` builds one; one campaign failing writes nothing at all.
+ * - Review round 1: a hidden name, id or path (or another campaign's) in any
+ *   shipped text fails every v2 player build (exit 12, nothing written);
+ *   stores are replaced whole and a full build drops removed campaigns; the
+ *   stores root can't be public/ (case or symlink), the repo, a source folder
+ *   or an unmarked folder; markdown and HTML images fail closed.
  */
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 import { runBuild } from "../../../scripts/build-atlas";
-import { readMustNotShip, type MustNotShipFile } from "../../../scripts/atlas/build/campaignStore";
+import {
+  readMustNotShip,
+  STORES_ROOT_MARKER,
+  type MustNotShipFile,
+} from "../../../scripts/atlas/build/campaignStore";
 import { scanTasks } from "../../../scripts/atlas/scanRegistry";
 import { readPlayerImageRefs } from "../../../scripts/atlas/playerImageRefs";
 import { run as checkFogSafety } from "../../../scripts/check-fog-safety";
@@ -151,7 +160,11 @@ describe("R-17: one player store per campaign", () => {
   });
 
   it("writes each store with its JSON and assets, and the must-not-ship file beside it", () => {
-    expect(fs.readdirSync(path.join(root, ".atlas-campaigns")).sort()).toEqual(["main", "sandbox"]);
+    expect(fs.readdirSync(path.join(root, ".atlas-campaigns")).sort()).toEqual([
+      STORES_ROOT_MARKER,
+      "main",
+      "sandbox",
+    ]);
     for (const c of Object.keys(CAMPAIGNS) as Campaign[]) {
       expect(fs.readdirSync(path.join(root, ".atlas-campaigns", c)).sort()).toEqual([
         "atlas",
@@ -383,7 +396,10 @@ describe("R-17: which campaigns a run builds", () => {
     const r = await runBuild({ player: true, strict: true, campaign: "sandbox" }, root);
     vi.restoreAllMocks();
     expect(r, r.error).toMatchObject({ ok: true });
-    expect(fs.readdirSync(path.join(root, ".atlas-campaigns"))).toEqual(["sandbox"]);
+    expect(fs.readdirSync(path.join(root, ".atlas-campaigns")).sort()).toEqual([
+      STORES_ROOT_MARKER,
+      "sandbox",
+    ]);
   });
 
   it("--out is the root of the stores", async () => {
@@ -421,5 +437,128 @@ describe("R-17: which campaigns a run builds", () => {
     vi.restoreAllMocks();
     expect(r).toMatchObject({ ok: false, exitCode: 1 });
     expect(fs.existsSync(path.join(root, ".atlas-campaigns"))).toBe(false);
+  });
+});
+
+describe("R-17: shipped text naming what the campaign hides fails the build (exit 12)", () => {
+  // marra-quillon ships in sandbox; each case adds one plain-text leak to it.
+  const NOTE = "quessaly/npcs/marra-quillon.md";
+  const cases: [string, (t: string) => string][] = [
+    ["a hidden map in the body", (t) => t + "\nShe once sailed to Hookhaven.\n"],
+    ["a hidden world in a heading", (t) => t + "\n## The Skerrow Isles\n\ntext\n"],
+    [
+      "a hidden map in summary",
+      (t) =>
+        t.replace("  visibility: player", "  visibility: player\n  summary: Rumours of Hookhaven"),
+    ],
+    [
+      "a hidden id in tags",
+      (t) => t.replace("  visibility: player", "  visibility: player\n  tags: [hookhaven]"),
+    ],
+    ["a markdown link to a hidden id", (t) => t + "\nSee [the harbour](hookhaven).\n"],
+    ["a hidden region's id", (t) => t + "\nNear gannet-rock.\n"],
+    ["the other campaign's name", (t) => t + "\nUnlike the Lantern Road crew.\n"],
+  ];
+  it.each(cases)("%s: strict and not, nothing written", async (_label, change) => {
+    const root = testWorld();
+    const file = content(root, NOTE);
+    const before = fs.readFileSync(file, "utf8");
+    fs.writeFileSync(file, change(before));
+    expect(fs.readFileSync(file, "utf8")).not.toBe(before);
+    silence();
+    const strict = await runBuild({ player: true, strict: true, campaign: "sandbox" }, root);
+    const loose = await runBuild({ player: true, strict: false }, root);
+    vi.restoreAllMocks();
+    expect(strict).toMatchObject({ ok: false, exitCode: 12 });
+    expect(loose).toMatchObject({ ok: false, exitCode: 12 });
+    expect(fs.existsSync(path.join(root, ".atlas-campaigns"))).toBe(false);
+  });
+});
+
+describe("R-17: markdown and HTML images in a v2 note fail closed", () => {
+  it.each([
+    ["markdown", "\n![x](images/oskmark.png)\n"],
+    ["HTML", '\n<img src="images/oskmark.png">\n'],
+    ["HTML, unquoted", "\n<img src=images/oskmark.png>\n"],
+  ])("%s image: exit 1, nothing written", async (_label, add) => {
+    const root = testWorld();
+    const file = content(root, "quessaly/npcs/marra-quillon.md");
+    fs.appendFileSync(file, add);
+    silence();
+    const r = await runBuild({ player: true, strict: false, campaign: "sandbox" }, root);
+    vi.restoreAllMocks();
+    expect(r).toMatchObject({ ok: false, exitCode: 1 });
+    expect(fs.existsSync(path.join(root, ".atlas-campaigns"))).toBe(false);
+  });
+});
+
+describe("R-17: stores are replaced whole", () => {
+  it("a rebuild leaves no file of the last one; a full build drops a removed campaign's dir", async () => {
+    const root = testWorld();
+    silence();
+    expect(await runBuild({ player: true, strict: true }, root)).toMatchObject({ ok: true });
+    const stores = path.join(root, ".atlas-campaigns");
+    fs.writeFileSync(path.join(storeOf(root, "main"), "stale-old.json"), '{"x":"Mirefold"}');
+    fs.mkdirSync(path.join(storeOf(root, "main"), "fog"));
+    fs.writeFileSync(path.join(storeOf(root, "main"), "fog", "old.png"), "x");
+    fs.mkdirSync(path.join(stores, "gone", "atlas"), { recursive: true });
+    fs.writeFileSync(path.join(stores, "gone", "atlas", "atlas.json"), "{}");
+
+    // --campaign: that store is replaced whole; other dirs are left alone.
+    expect(await runBuild({ player: true, strict: true, campaign: "main" }, root)).toMatchObject({
+      ok: true,
+    });
+    expect(fs.existsSync(path.join(storeOf(root, "main"), "stale-old.json"))).toBe(false);
+    expect(fs.existsSync(path.join(storeOf(root, "main"), "fog"))).toBe(false);
+    expect(fs.existsSync(path.join(stores, "gone"))).toBe(true);
+
+    // Every campaign: anything else in the stores root goes.
+    expect(await runBuild({ player: true, strict: true }, root)).toMatchObject({ ok: true });
+    vi.restoreAllMocks();
+    expect(fs.readdirSync(stores).sort()).toEqual([STORES_ROOT_MARKER, "main", "sandbox"]);
+  });
+});
+
+describe("R-17: where the stores root may be", () => {
+  async function refused(root: string, outDir: string) {
+    silence();
+    const r = await runBuild({ player: true, strict: true, outDir }, root);
+    vi.restoreAllMocks();
+    expect(r, outDir).toMatchObject({ ok: false, exitCode: 1 });
+    expect(r.error).toMatch(/refusing to write campaign stores/);
+  }
+
+  it("not public/ through a symlink", async () => {
+    const root = testWorld();
+    fs.mkdirSync(path.join(root, "public"));
+    fs.symlinkSync(path.join(root, "public"), path.join(root, "pub-link"));
+    await refused(root, "pub-link");
+    await refused(root, "pub-link/x");
+    expect(fs.readdirSync(path.join(root, "public"))).toEqual([]);
+  });
+
+  it.runIf(process.platform === "darwin" || process.platform === "win32")(
+    "not public/ in another letter case (case-insensitive disk)",
+    async () => {
+      const root = testWorld();
+      fs.mkdirSync(path.join(root, "public"));
+      await refused(root, "PUBLIC");
+      await refused(root, "Public/x");
+      expect(fs.readdirSync(path.join(root, "public"))).toEqual([]);
+    },
+  );
+
+  it("not the repo root, a source folder, or a folder of other files", async () => {
+    const root = testWorld();
+    fs.mkdirSync(path.join(root, "src", "atlas", "assets"), { recursive: true });
+    fs.writeFileSync(path.join(root, "src", "atlas", "assets", "keep.ts"), "");
+    fs.mkdirSync(path.join(root, "other"));
+    fs.writeFileSync(path.join(root, "other", "keep.txt"), "");
+    await refused(root, ".");
+    await refused(root, "src");
+    await refused(root, "content-next/out");
+    await refused(root, "other");
+    expect(fs.existsSync(path.join(root, "src", "atlas", "assets", "keep.ts"))).toBe(true);
+    expect(fs.readdirSync(path.join(root, "other"))).toEqual(["keep.txt"]);
   });
 });

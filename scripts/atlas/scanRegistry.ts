@@ -32,7 +32,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { playerAtlasJsonPath, type ArtifactLayout } from "./playerArtifact.js";
 import { SAFE_ID, loadAtlasModel } from "./loadAtlasModel.js";
-import { mustNotShipPath } from "./build/campaignStore.js";
+import { campaignStoreDir, mustNotShipPath } from "./build/campaignStore.js";
 import { readPlayerImageRefs } from "./playerImageRefs.js";
 
 import { run as checkNoSecrets } from "../check-no-secrets.js";
@@ -169,13 +169,16 @@ interface ScanConfig {
   defaultWorld: string;
   include: string[];
   exclude: string[];
+  /** v2: the root of the campaign stores, as the build reads it (relative to the root). */
+  outputDir?: unknown;
 }
 
 /**
  * Every campaign's artifacts, from the loaded model (ADR-0004, R-15): the one
  * campaign list the registry knows. v1 content is campaign `main`, whose
  * outputs stay `dist` and `public/atlas`; v2 content gives each listed
- * campaign `dist-campaigns/<id>` and `.atlas-campaigns/<id>/atlas`.
+ * campaign `dist-campaigns/<id>` and its store `<outputDir>/<id>/atlas` (`.atlas-campaigns`
+ * in the v2 test config).
  *
  * A v2 run also scans `dist` and `public/atlas` (campaign `LEGACY_OUTPUT`):
  * the build still writes them and `publish-atlas.yml` deploys `dist`, so they
@@ -188,8 +191,10 @@ export function campaignArtifacts(ctx: ScanContext): CampaignArtifact[] {
   const where = path.relative(ctx.root, ctx.contentDir).split(path.sep).join("/") || ".";
   let campaigns: string[];
   let schemaVersion: 1 | 2;
+  let outputDir: unknown;
   try {
     const cfg = JSON.parse(fs.readFileSync(ctx.configPath, "utf8")) as ScanConfig;
+    outputDir = cfg.outputDir;
     const loaded = loadAtlasModel(
       ctx.contentDir,
       { defaultWorld: cfg.defaultWorld, include: cfg.include, exclude: cfg.exclude },
@@ -224,12 +229,19 @@ export function campaignArtifacts(ctx: ScanContext): CampaignArtifact[] {
   if (campaigns.length === 0) {
     throw new Error(`scan registry: ${where} lists no campaigns, so there is nothing to scan`);
   }
+  // The stores are where the build writes them: the config's outputDir.
+  if (typeof outputDir !== "string" || outputDir.trim() === "") {
+    throw new Error(
+      "scan registry: the config names no outputDir, so the campaign stores can't be found",
+    );
+  }
+  const storesRoot = path.resolve(ctx.root, outputDir);
   const perCampaign = campaigns.flatMap((id) => {
     // The loader already refuses such an id; checked again where it becomes a path.
     if (!SAFE_ID.test(id)) {
       throw new Error(`scan registry: campaign id ${JSON.stringify(id)} can't name a dir`);
     }
-    const store = path.join(ctx.root, ".atlas-campaigns", id, "atlas");
+    const store = campaignStoreDir(storesRoot, id);
     const mustNotShip = mustNotShipPath(store);
     return [
       artifact(id, path.join(ctx.root, "dist-campaigns", id), "built-site", mustNotShip),
