@@ -446,3 +446,51 @@ ${conceals ? "    conceals:\n      - [[200, 200], [210, 200], [210, 210], [200, 
     }
   });
 });
+
+describe("check-fog-safety reads the fog from source (R-18)", () => {
+  /** The clean map with its fog marker dropped: an unredacted map, as the scan sees it. */
+  const unmarked = () => {
+    const atlas = fogAtlas();
+    delete (atlas.maps as Record<string, unknown>[])[0].fog;
+    return atlas;
+  };
+
+  it("a map fogged in the source but shipped without its fog marker → 26", async () => {
+    const config = writeSourceConfig(CLEAN_WORLD_YAML);
+    const dir = plant("dist", unmarked(), { [FOG_FILE]: await png(0) });
+    expect(await run({ dir, config })).toBe(26);
+  });
+
+  it("a map open in the source may ship without a marker → 0", async () => {
+    const config = writeSourceConfig(CLEAN_WORLD_YAML.replace("enabled: true", "enabled: false"));
+    const dir = plant("dist", unmarked(), { [FOG_FILE]: await png(0) });
+    expect(await run({ dir, config })).toBe(0);
+  });
+
+  it("publish: no config → 17, even with no fog map in the output", async () => {
+    const dir = plant("dist", unmarked());
+    const config = path.join(root, "atlas.config.json");
+    expect(await run({ dir, config })).toBe(0);
+    expect(await run({ dir, config, publish: true })).toBe(17);
+  });
+
+  it("publish: no content → 17, even with no fog map in the output", async () => {
+    const config = writeSourceConfig(null);
+    const dir = plant("dist", unmarked());
+    expect(await run({ dir, config })).toBe(0);
+    expect(await run({ dir, config, publish: true })).toBe(17);
+  });
+
+  it("publish: a broken world.yaml → 17, even with no fog map in the output", async () => {
+    const config = writeSourceConfig("maps: [unclosed");
+    const dir = plant("dist", unmarked());
+    expect(await run({ dir, config, publish: true })).toBe(17);
+  });
+
+  it("publish: v1 content checked as another campaign → 17", async () => {
+    const config = writeSourceConfig(CLEAN_WORLD_YAML);
+    const dir = plant("dist", fogAtlas(), { [FOG_FILE]: await png(0) });
+    expect(await run({ dir, config, publish: true })).toBe(0);
+    expect(await run({ dir, config, publish: true, campaign: "other" })).toBe(17);
+  });
+});

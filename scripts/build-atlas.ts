@@ -57,7 +57,11 @@ import {
 } from "./atlas/playerResolution";
 import { soundAreaIdProblems, soundAreaIdTrusted } from "../src/atlas/content/soundAreaIds";
 import { AtlasModelError } from "../src/atlas/content/atlasModel";
-import { resolveCampaign, type MustNotShip } from "../src/atlas/content/resolveCampaign";
+import {
+  campaignFog,
+  resolveCampaign,
+  type MustNotShip,
+} from "../src/atlas/content/resolveCampaign";
 import { BuildStageError, loadBuildModel, type BuildModel } from "./atlas/build/loadBuildModel";
 import { worldSources, type WorldSource } from "./atlas/build/worldSources";
 import { notesShippingNowhere } from "./atlas/build/notesShippingNowhere";
@@ -1215,19 +1219,11 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
         ...m,
         name: stripDmFromShippingString(m.name) ?? m.name,
       }));
-      // v2 fogged maps: per-campaign fog is R-18. Until then their imagery
-      // doesn't ship at all (fail closed); only the items the resolver let
-      // through (outside the fog) do.
+      // v2: each map fogged in this campaign carries the campaign's fog
+      // (reveals, conceals, feather) until the store is planned, which bakes
+      // it into the map's images and strips it to the marker (R-18).
       if (w.pins !== null) {
-        wFogs = [];
-        wMaps = wMaps.map((m) => {
-          if (campaignFile?.maps[m.id]?.state !== "fogged") return m;
-          const note = `map "${m.id}": fogged in campaign "${bm.campaign}" — its layers don't ship until per-campaign fog (R-18)`;
-          warnings.push(note);
-          hiddenFromPlayer.add(note);
-          wFogs.push({ mapId: m.id, enabled: true } as FogOverlay);
-          return { ...m, layers: [] };
-        });
+        wFogs = wMaps.flatMap((m) => (campaignFile ? (campaignFog(m.id, campaignFile) ?? []) : []));
       }
     } else if (w.pins !== null) {
       // A v2 DM build has no campaign, so no campaign's fog.
@@ -1423,8 +1419,9 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // mask PNG, write <name>.fog.png next to the source, rewrite the layer src
   // in the player atlas, and strip fog geometry so reveal polygons never ship.
   // (See docs/superpowers/specs/2026-05-19-fog-player-mechanic-design.md.)
-  // v1 only: v2 maps never write into public/ (their fogged imagery doesn't
-  // ship yet, above), and the prune must never touch v1's masks for them.
+  // v1 only: v2 maps never write into public/ (their fog is baked into the
+  // campaign's store, `planMapImages`), and the prune must never touch v1's
+  // masks for them.
   let fogWrites: BuildAssetWrites["fog"];
   if (flags.player && !v2) {
     const redacted = await redactMapsForPlayer(maps, ROOT, warnings);
@@ -1615,7 +1612,7 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // rather than naming a file its store doesn't hold.
   if (flags.player && v2) {
     const storeErrors: string[] = [];
-    maps = planMapImages(maps, (id) => sourceById.get(id)?.assetDir, storeFiles, storeErrors);
+    maps = await planMapImages(maps, (id) => sourceById.get(id)?.assetDir, storeFiles, storeErrors);
     for (const { entity } of pending) {
       for (const img of entity.images) {
         if (img && !/^(https?:|data:|blob:)/i.test(img)) {

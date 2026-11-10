@@ -106,6 +106,8 @@ State.md part is the same stale notes. Drop it once Isak decides the settings ch
 R-17b (done): `npm run atlas:check-isolation` scans v2 per-campaign outputs (exit 23 structural,
 24 text, 25 assets, 20 missing) and recomputes must-not-ship from the content. It runs on real
 content once R-19 wires publish to v2. Next: R-18 and R-19, then R-20.
+Since R-17b, each `must-not-ship.json` `pinLocations` entry carries `note` (the dropped pin's
+note), and the isolation scan flags only that note at that spot.
 
 Lowest number first within each folder.
 

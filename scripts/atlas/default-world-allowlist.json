@@ -7,7 +7,6 @@
     "scripts/atlas/publish-integrity-smoke.ts": 1,
     "scripts/atlas/scanRegistry.ts": 3,
     "scripts/build-atlas.ts": 4,
-    "scripts/check-derived-secrets.ts": 1,
-    "scripts/check-fog-safety.ts": 2
+    "scripts/check-derived-secrets.ts": 1
   }
 }
