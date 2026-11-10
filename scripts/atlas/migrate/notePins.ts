@@ -23,7 +23,14 @@ export interface PlacementText {
   y: number;
 }
 
-export type NoteEdit = { ok: true; raw: string } | { ok: false; reason: string };
+export type NoteEdit =
+  | {
+      ok: true;
+      raw: string;
+      /** Removed lines that held a YAML comment (`stripPinFields`); 0 when none. */
+      droppedComments?: number;
+    }
+  | { ok: false; reason: string };
 
 interface Split {
   /** Everything before the first YAML line (BOM and the opening fence). */
@@ -60,6 +67,8 @@ function split(raw: string): Split | null {
 const bare = (line: string) => line.replace(/\r?\n$/, "");
 const isBlankOrComment = (line: string) => /^\s*(#.*)?$/.test(bare(line));
 const indentOf = (line: string) => /^ */.exec(line)![0].length;
+/** A line with a YAML comment in it (a `#` at its start or after a space; strings may give a false yes). */
+const hasComment = (line: string) => /(^|\s)#/.test(bare(line));
 
 /** The `atlas:` block: its key line and the index after its last line, or null. */
 function atlasBlock(lines: string[]): { key: number; end: number; flow: boolean } | null {
@@ -120,6 +129,7 @@ export function stripPinFields(raw: string): NoteEdit {
   const childIndent = child ? indentOf(child) : 2;
   const keyRe = new RegExp(`^ {${childIndent}}(?:placements|x|y|"x"|"y"|'x'|'y')[ \\t]*:`);
   const kept: string[] = [];
+  let droppedComments = 0;
   for (let i = 0; i < body.length; i++) {
     if (!keyRe.test(body[i])) {
       kept.push(body[i]);
@@ -136,9 +146,11 @@ export function stripPinFields(raw: string): NoteEdit {
       j++;
     }
     while (j > i + 1 && isBlankOrComment(body[j - 1])) j--;
+    for (let k = i; k < j; k++) if (hasComment(body[k])) droppedComments++;
     i = j - 1;
   }
   const empty = kept.every(isBlankOrComment);
+  if (empty && hasComment(parts.lines[block.key])) droppedComments++;
   const lines = [
     ...parts.lines.slice(0, block.key),
     ...(empty ? [] : [parts.lines[block.key]]),
@@ -155,7 +167,7 @@ export function stripPinFields(raw: string): NoteEdit {
   if (typeof after === "string" || !isDeepStrictEqual(after, expected)) {
     return { ok: false, reason: "removing the pin fields would change other frontmatter" };
   }
-  return { ok: true, raw: out };
+  return { ok: true, raw: out, droppedComments };
 }
 
 function placementLines(pins: PlacementText[], indent: string, eol: string): string[] {

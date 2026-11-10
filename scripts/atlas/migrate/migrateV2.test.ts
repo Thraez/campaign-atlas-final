@@ -5,6 +5,7 @@
  * reads or writes the live `content/` except the last test, which migrates a
  * temp copy of it.
  */
+import { spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -17,7 +18,7 @@ import {
   validateWorldFileV2,
 } from "../../../src/atlas/content/schemaV2";
 import { parseFrontmatter } from "../../../src/atlas/content/frontmatter";
-import { checkMigration, readConfig } from "./checkMigration";
+import { checkMigration, checkMigrationDown, readConfig } from "./checkMigration";
 import {
   MigrationRefused,
   checkOutDir,
@@ -48,16 +49,18 @@ function copyProject(from: string, edit?: (dir: string) => void): string {
   return d;
 }
 
-function opts(project: string) {
+function opts(project: string, allowDropPinStyle = true) {
   const config = readConfig(path.join(project, "atlas.config.json"));
   return {
     contentRoot: path.join(project, config.contentRoot),
     config,
     root: project,
     publicDir: path.join(project, "public"),
+    allowDropPinStyle,
   };
 }
 
+/** The fixture's harbor pin has a label and style: most tests allow dropping them. */
 const up = (project: string) => planMigrateUp(opts(project));
 const fileText = (plan: MigrationPlan, rel: string) => {
   const b = plan.files.get(rel);
@@ -98,6 +101,13 @@ const replaceIn = (file: string, from: string | RegExp, to: string) => {
   if (n === t) throw new Error(`no match in ${file}`);
   fs.writeFileSync(file, n);
 };
+
+/** Load a YAML file, edit it, write it back. */
+function editYaml(file: string, edit: (v: any) => void): void {
+  const v = yaml.load(fs.readFileSync(file, "utf8"));
+  edit(v);
+  fs.writeFileSync(file, yaml.dump(v, { lineWidth: -1 }));
+}
 
 describe("up: the fixture's migrated files", () => {
   const plan = up(FIXTURE);
@@ -222,6 +232,14 @@ describe("up: the fixture's migrated files", () => {
       /harbor\.md: atlas\.placements\[1\] label and pin style dropped/,
     );
     expect(plan.warnings.join("\n")).toMatch(/vault-keeper\.md: .*secret "hidden-door".*dm/);
+    expect(plan.dropped).toContain("pinStyle:harbor@vale:220,220");
+  });
+
+  it("keep the v1 world.yaml's comment header, and carry every key it has", () => {
+    expect(fileText(plan, "vale/_atlas/world.yaml")).toMatch(
+      /^# R-20 fixture: a v1 vault[^]*\n# Schema v2 \(ADR-0003\)/,
+    );
+    expect(plan.warnings.join("\n")).not.toMatch(/not carried over/);
   });
 
   it("write campaign main: the fogged map with its reveals and feather, the other open, notes: vault", () => {
@@ -308,6 +326,67 @@ describe("up: refusals and conversions on edited copies", () => {
     expect(refusal(() => up(d)).join("\n")).toMatch(/thin-strip/);
   });
 
+  it("refuses a shipping pin's label or style by default; --allow-drop-pin-style drops them", () => {
+    expect(refusal(() => planMigrateUp(opts(FIXTURE, false)))).toEqual([
+      expect.stringMatching(
+        /harbor\.md: atlas\.placements\[1\] ships with a label and pin style .*--allow-drop-pin-style/,
+      ),
+    ]);
+  });
+
+  it("warns about every world.yaml key it doesn't carry, at any depth", () => {
+    const d = copyProject(FIXTURE, (d) => {
+      replaceIn(worldYaml(d), "schemaVersion: 1\n", "schemaVersion: 1\nbanner: old\n");
+      replaceIn(worldYaml(d), "        opacity: 1\n", "        opacity: 1\n        tint: red\n");
+      replaceIn(worldYaml(d), "      featherPx: 12\n", "      featherPx: 12\n      blur: 3\n");
+    });
+    const w = up(d).warnings.join("\n");
+    expect(w).toMatch(/world\.yaml: banner is not carried over/);
+    expect(w).toMatch(/world\.yaml: maps\[vale\]\.layers\[base\]\.tint is not carried over/);
+    expect(w).toMatch(/world\.yaml: maps\[vale\]\.fog\.blur is not carried over/);
+  });
+
+  it("warns when comments inside removed pin fields are dropped", () => {
+    const d = copyProject(FIXTURE, (d) =>
+      replaceIn(
+        path.join(d, "content/vale/places/harbor.md"),
+        "    - { mapId: vale, x: 220",
+        "    # the old pier\n    - { mapId: vale, x: 220",
+      ),
+    );
+    expect(up(d).warnings.join("\n")).toMatch(/harbor\.md: 1 comment line\(s\) .* dropped/);
+  });
+
+  it("maps hidden to hidden and a missing or invalid value to dm", () => {
+    const d = copyProject(FIXTURE, (d) => {
+      replaceIn(
+        worldYaml(d),
+        "    visibility: rumor\n    points: [[50",
+        "    visibility: hidden\n    points: [[50",
+      );
+      replaceIn(
+        worldYaml(d),
+        "    visibility: dm\n    points: [[300",
+        "    visibility: sekrit\n    points: [[300",
+      );
+    });
+    const world = yamlOf(up(d), "vale/_atlas/world.yaml") as {
+      maps: { id: string; regions?: { id: string; visibility: unknown }[] }[];
+    };
+    const vis = Object.fromEntries(
+      world.maps.flatMap((m) => m.regions ?? []).map((r) => [r.id, r.visibility]),
+    );
+    expect(vis).toMatchObject({ "whisper-glade": "hidden", lair: "dm", cellar: "dm" });
+  });
+
+  it("migrates a fog with no enabled: as fogged", () => {
+    const d = copyProject(FIXTURE, (d) => replaceIn(worldYaml(d), "      enabled: true\n", ""));
+    const c = yamlOf(up(d), "_atlas/campaigns/main.yaml") as {
+      maps: Record<string, { state: string }>;
+    };
+    expect(c.maps.vale.state).toBe("fogged");
+  });
+
   it("refuses a flow-style atlas: block holding pins, naming the note", () => {
     const d = copyProject(FIXTURE, (d) =>
       fs.writeFileSync(
@@ -345,6 +424,27 @@ describe("--out", () => {
     }
   });
 
+  it("refuses the vault, a folder inside it, and one that holds it", () => {
+    const vault = path.join(tmp(), "Vault");
+    for (const out of [vault, path.join(vault, "x"), path.dirname(vault)]) {
+      expect(() => checkOutDir(out, content, [vault])).toThrow(/the vault/);
+    }
+  });
+
+  it("leaves nothing at --out when a write fails", () => {
+    const parent = tmp();
+    const out = path.join(parent, "migrated");
+    const bad: MigrationPlan = {
+      ...up(FIXTURE),
+      files: new Map([
+        ["a", Buffer.from("file")],
+        ["a/b", Buffer.from("a file under a file")],
+      ]),
+    };
+    expect(() => writeMigration(bad, out, content)).toThrow();
+    expect(fs.readdirSync(parent)).toEqual([]);
+  });
+
   it("refuses a folder that already has files", () => {
     const d = tmp();
     fs.writeFileSync(path.join(d, "x"), "");
@@ -372,7 +472,8 @@ describe("down: refusals", () => {
     edit?.(path.join(d, "content"));
     return d;
   }
-  const down = (d: string) => planMigrateDown(opts(d));
+  const down = (d: string) =>
+    planMigrateDown({ ...opts(d), publicDir: path.join(FIXTURE, "public") });
 
   it("plans the fixture's copy back down", () => {
     const plan = down(v2Project());
@@ -417,6 +518,69 @@ describe("down: refusals", () => {
     );
   });
 
+  const worldOf = (c: string) => path.join(c, "vale/_atlas/world.yaml");
+  const pinOf = (w: any, note: string) =>
+    w.maps.find((m: any) => m.id === "vale").pins.find((p: any) => p.note === note && p.x === 100);
+
+  it("refuses a pin whose value v1 can't give it (v1 shows the note's)", () => {
+    const d = v2Project((c) =>
+      editYaml(worldOf(c), (w) => (pinOf(w, "harbor").visibility = { main: "rumor" })),
+    );
+    expect(refusal(() => down(d)).join("\n")).toMatch(
+      /pin of note "harbor" is "rumor" but v1 would show it as "player"/,
+    );
+  });
+
+  it("drops, with a warning, a hidden pin of a shipping note (v1 can't hide one pin)", () => {
+    const d = v2Project((c) => editYaml(worldOf(c), (w) => (pinOf(w, "harbor").visibility = "dm")));
+    const plan = down(d);
+    expect(plan.warnings.join("\n")).toMatch(
+      /pin of note "harbor" doesn't ship .*can't hide one pin/,
+    );
+    const harbor = parseFrontmatter(fileText(plan, "vale/places/harbor.md")).data as any;
+    expect(harbor.atlas.placements).toEqual([{ mapId: "vale", x: 220, y: 220 }]);
+  });
+
+  it("refuses a map unknown to main, and one that doesn't ship", () => {
+    const d = v2Project((c) => {
+      editYaml(path.join(c, "_atlas/campaigns/main.yaml"), (m) => delete m.maps.depths);
+      editYaml(worldOf(c), (w) => (w.maps.find((m: any) => m.id === "vale").visibility = "dm"));
+    });
+    const r = refusal(() => down(d)).join("\n");
+    expect(r).toMatch(/map "depths" is unknown to "main"/);
+    expect(r).toMatch(/map "vale" doesn't ship to "main"/);
+  });
+
+  it("refuses a campaign that reads notes hidden", () => {
+    const d = v2Project((c) =>
+      replaceIn(path.join(c, "_atlas/campaigns/main.yaml"), "notes: vault", "notes: hidden"),
+    );
+    expect(refusal(() => down(d)).join("\n")).toMatch(/reads notes "hidden"/);
+  });
+
+  it("refuses an image or sound only under the world's _atlas/, not in public/", () => {
+    const d = v2Project();
+    const empty = tmp();
+    const reasons = refusal(() => planMigrateDown({ ...opts(d), publicDir: empty })).join("\n");
+    expect(reasons).toMatch(/"atlas\/assets\/maps\/vale-base\.png" is only under vale\/_atlas\//);
+    expect(reasons).toMatch(/"atlas\/assets\/audio\/gulls\.ogg" is only under/);
+  });
+
+  it("refuses an image whose v2 copy differs from public/'s", () => {
+    const d = v2Project((c) =>
+      fs.appendFileSync(path.join(c, "vale/_atlas/atlas/assets/maps/vale-base.png"), "x"),
+    );
+    const reasons = refusal(() =>
+      planMigrateDown({ ...opts(d), publicDir: path.join(FIXTURE, "public") }),
+    ).join("\n");
+    expect(reasons).toMatch(/vale-base\.png" differs between/);
+  });
+
+  it("lists the public/ files v1 needs, checked against the v2 copies", () => {
+    const plan = planMigrateDown({ ...opts(v2Project()), publicDir: path.join(FIXTURE, "public") });
+    expect([...plan.publicAssets.keys()]).toContain("atlas/assets/maps/vale-base.png");
+  });
+
   it("refuses a notes: block", () => {
     const d = v2Project((c) =>
       fs.appendFileSync(
@@ -429,24 +593,48 @@ describe("down: refusals", () => {
 });
 
 describe("--check: the migration changes nothing a player sees", () => {
-  it("fixture: v1 vs v2 differ only by the declared pin label/style drop; DM keeps everything; round trip the same", async () => {
+  it("fixture: v1 vs v2 differ only by the dropped region's warning; DM keeps everything; round trip the same", async () => {
     const r = await checkMigration({
       root: FIXTURE,
       configPath: "atlas.config.json",
       roundTrip: true,
+      allowDropPinStyle: true,
     });
     expect(r.failures).toEqual([]);
-    // Harbor's second pin had a label and a pin style, which v2 pins can't
-    // carry (declared, warned); the thin-strip region's hidden-warning count
-    // goes with it. Nothing else differs.
-    const declared = [
-      expect.stringMatching(/^atlas\.json placements\[\d+\]\.label: "Old pier" -> "Harbor"$/),
-      expect.stringMatching(/^atlas\.json placements\[\d+\]\.pin: only in the original$/),
-      "atlas.json buildReport.warnings: length 1 -> 0",
-    ];
+    // Harbor's pin label and style are a declared drop (allowed, not
+    // compared); the dropped thin-strip region takes its hidden-warning
+    // count with it, a difference the check reports. The secret matches.
+    const declared = ["atlas.json buildReport.warnings: length 1 -> 0"];
     expect(r.player).toEqual(declared);
     expect(r.dmMissing).toEqual([]);
     expect(r.roundTrip).toEqual(declared);
+  }, 180_000);
+
+  it("fails when the migrated copy shows players a dm region", async () => {
+    const r = await checkMigration({
+      root: FIXTURE,
+      configPath: "atlas.config.json",
+      allowDropPinStyle: true,
+      editMigrated: (c) =>
+        editYaml(path.join(c, "vale/_atlas/world.yaml"), (w) => {
+          w.maps
+            .find((m: any) => m.id === "vale")
+            .regions.find((x: any) => x.id === "lair").visibility = { main: "player" };
+        }),
+    });
+    expect(r.ok).toBe(false);
+    expect(r.player.join("\n")).toMatch(/Lair|lair/);
+  }, 180_000);
+
+  it("down: the v1 copy of a v2 project shows players what the v2 original does", async () => {
+    const d = tmp();
+    fs.copyFileSync(path.join(FIXTURE, "atlas.config.json"), path.join(d, "atlas.config.json"));
+    writeMigration(up(FIXTURE), path.join(d, "content"), path.join(FIXTURE, "content"));
+    fs.cpSync(path.join(FIXTURE, "public"), path.join(d, "public"), { recursive: true });
+    const r = await checkMigrationDown({ root: d, configPath: "atlas.config.json" });
+    expect(r.failures).toEqual([]);
+    expect(r.player).toEqual([]);
+    expect(r.ok).toBe(true);
   }, 180_000);
 
   it("a temp copy of today's content/: no difference", async () => {
@@ -462,5 +650,34 @@ describe("--check: the migration changes nothing a player sees", () => {
     );
     const r = await checkMigration({ root: d, configPath: "atlas.config.json", roundTrip: true });
     expect(r).toMatchObject({ ok: true, failures: [], player: [], dmMissing: [], roundTrip: [] });
+  }, 180_000);
+});
+
+describe("the CLI", () => {
+  const tsx = path.join(ROOT, "node_modules/.bin/tsx");
+  const cli = path.join(ROOT, "scripts/atlas/migrate-v2.ts");
+  const run = (cwd: string, ...args: string[]) =>
+    spawnSync(tsx, [cli, ...args], { cwd, encoding: "utf8", timeout: 170_000 });
+
+  it("dry run: prints the plan and writes nothing; refuses without --allow-drop-pin-style", () => {
+    const d = copyProject(FIXTURE);
+    const before = treeHash(d);
+    const ok = run(d, "--dry-run", "--allow-drop-pin-style");
+    expect(ok.status).toBe(0);
+    expect(ok.stdout).toMatch(/v1 -> v2[^]*maps: 2[^]*dry run: nothing written/);
+    const refused = run(d);
+    expect(refused.status).toBe(2);
+    expect(refused.stderr).toMatch(/migration refused[^]*--allow-drop-pin-style/);
+    expect(treeHash(d)).toBe(before);
+  }, 180_000);
+
+  it("--out: writes nothing when the check fails", () => {
+    const d = copyProject(FIXTURE);
+    const out = path.join(tmp(), "migrated");
+    const r = run(d, "--out", out, "--allow-drop-pin-style");
+    expect(r.status).toBe(2);
+    expect(r.stdout).toMatch(/check FAILED/);
+    expect(r.stderr).toMatch(/--out was not written/);
+    expect(fs.existsSync(out)).toBe(false);
   }, 180_000);
 });

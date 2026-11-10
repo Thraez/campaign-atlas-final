@@ -16,23 +16,56 @@ import fs from "node:fs";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import type { BuildAtlasResult } from "../../build-atlas";
+import { decryptSecret, type SecretBlob } from "../../../src/atlas/secrets/secretCrypto";
+import { V1_CAMPAIGN_ID, V1_CAMPAIGN_NAME } from "../../../src/atlas/content/v1Model";
 
 /**
  * Everything a v2 build of migrated content may say differently from the v1
- * build of the original (ADR-0003 "Versions", R-20). Nothing else may differ.
+ * build of the original (ADR-0003 "Versions", R-20), each only in the form
+ * `allowedViolations` checks. Nothing else may differ; v2's map nesting
+ * (`parent`, `frame`, `enterZoom`) is compared like any key, so a migrated
+ * map that has one is a difference.
  */
 export const ALLOWED_DIFFERENCES = {
-  /** Top-level `atlas.json` keys: build stamps, the version, the ocean and the campaign's own id/name. */
+  /**
+   * Top-level `atlas.json` keys: build stamps and the version; the ocean,
+   * whose `onOcean` may place only maps the output ships; the campaign,
+   * exactly `EXPECTED_CAMPAIGN`.
+   */
   atlas: ["version", "publishedAt", "schemaVersion", "ocean", "campaign"],
-  /** Keys of each map in `atlas.json.maps`: v2's map nesting. */
-  map: ["parent", "frame", "enterZoom"],
 } as const;
+
+/** The one campaign a migrated output may name: v1's. */
+export const EXPECTED_CAMPAIGN = { id: V1_CAMPAIGN_ID, name: V1_CAMPAIGN_NAME } as const;
+
+/** Where an output uses an allowed difference in a form it may not. */
+export function allowedViolations(project: unknown, label: string): string[] {
+  const p = asWritten(project) as Record<string, unknown>;
+  const out: string[] = [];
+  if (p.campaign !== undefined && !isDeepStrictEqual(p.campaign, EXPECTED_CAMPAIGN)) {
+    out.push(`${label} atlas.json campaign: ${JSON.stringify(p.campaign)} is not "main"/"Main"`);
+  }
+  if (p.ocean !== undefined) {
+    const shipped = new Set(
+      (Array.isArray(p.maps) ? p.maps : []).map((m: { id?: unknown }) => m.id),
+    );
+    const ocean = p.ocean as { onOcean?: { map?: unknown }[] };
+    if (!Array.isArray(ocean.onOcean)) out.push(`${label} atlas.json ocean.onOcean: missing`);
+    for (const o of ocean.onOcean ?? []) {
+      if (!shipped.has(o.map)) {
+        out.push(`${label} atlas.json ocean.onOcean: "${String(o.map)}" is not a map it ships`);
+      }
+    }
+  }
+  return out;
+}
 
 /**
  * Forms that say the same thing to a player, made equal before comparing;
  * not differences, since each side renders the same:
  * - `secrets`: an encrypted secret's salt, iv and ciphertext are random per
- *   build; compared by the ciphertext's length (the plaintext's).
+ *   build, so the JSON comparison masks all three; `compareSecrets` decrypts
+ *   both sides with the configured keys and compares the plaintext.
  * - `disabledFog`: a map fog that is off and reveals nothing (v1 ships it,
  *   v2 says "open") is no fog.
  * - `pinOrder`: placements are a set; v2 lists them by map, v1 by note.
@@ -104,21 +137,26 @@ function maskSecrets(v: unknown): unknown {
   if (!v || typeof v !== "object") return v;
   const out: Record<string, unknown> = {};
   for (const [k, x] of Object.entries(v)) {
-    if ((k === "salt" || k === "iv") && typeof x === "string") out[k] = "<random>";
-    else if (k === "ciphertext" && typeof x === "string") out[k] = `<random:${x.length}>`;
-    else out[k] = maskSecrets(x);
+    if ((k === "salt" || k === "iv" || k === "ciphertext") && typeof x === "string") {
+      out[k] = "<encrypted>";
+    } else {
+      out[k] = maskSecrets(x);
+    }
   }
   return out;
 }
 
+/** A placement's key in `pinStyle:` drops (`MigrationPlan.dropped`). */
+const pinKey = (x: { entityId?: unknown; mapId?: unknown; x?: unknown; y?: unknown }) =>
+  `pinStyle:${String(x.entityId)}@${String(x.mapId)}:${String(x.x)},${String(x.y)}`;
+
 /** `atlas.json` as written, without the allowed differences, in its equivalent forms. */
-function withoutAllowed(project: unknown): unknown {
+function withoutAllowed(project: unknown, pinStyleDrops: ReadonlySet<string>): unknown {
   const p = maskSecrets(asWritten(project)) as Record<string, unknown>;
   for (const k of ALLOWED_DIFFERENCES.atlas) delete p[k];
   if (Array.isArray(p.maps)) {
     p.maps = p.maps.map((m: Record<string, unknown>) => {
       const c = { ...m };
-      for (const k of ALLOWED_DIFFERENCES.map) delete c[k];
       const fog = c.fog as { enabled?: unknown; reveals?: unknown[] } | undefined;
       if (fog && fog.enabled === false && (fog.reveals ?? []).length === 0) delete c.fog;
       return c;
@@ -126,6 +164,12 @@ function withoutAllowed(project: unknown): unknown {
   }
   if (Array.isArray(p.placements)) {
     p.placements = p.placements
+      .map((x: Record<string, unknown>) => {
+        if (!pinStyleDrops.has(pinKey(x))) return x;
+        // A declared drop (--allow-drop-pin-style): the label and style go.
+        const { label: _l, pin: _p, ...rest } = x;
+        return rest;
+      })
       .map((x: unknown) => [JSON.stringify(x), x] as const)
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([, x]) => x);
@@ -178,12 +222,19 @@ export function comparePlayerOutputs(
   migratedAssets: AssetResolver,
   /** Every asset file the migrated build ships (v2: the store); default: the ones it names. */
   migratedShipped?: Iterable<Buffer>,
+  /** Declared `pinStyle:` drops: these placements' label and style aren't compared. */
+  dropped: Iterable<string> = [],
 ): OutputComparison {
   const usedA = new Set<string>();
   const usedB = new Set<string>();
-  const a = normalizeAssets(withoutAllowed(original.project), originalAssets, usedA);
-  const b = normalizeAssets(withoutAllowed(migrated.project), migratedAssets, usedB);
-  const differences = diffPaths(a, b).map((d) => `atlas.json ${d}`);
+  const drops = new Set([...dropped].filter((d) => d.startsWith("pinStyle:")));
+  const differences = [
+    ...allowedViolations(original.project, "original"),
+    ...allowedViolations(migrated.project, "migrated"),
+  ];
+  const a = normalizeAssets(withoutAllowed(original.project, drops), originalAssets, usedA);
+  const b = normalizeAssets(withoutAllowed(migrated.project, drops), migratedAssets, usedB);
+  differences.push(...diffPaths(a, b).map((d) => `atlas.json ${d}`));
   const sa = normalizeAssets(asWritten(original.searchIndex), originalAssets, usedA);
   const sb = normalizeAssets(asWritten(migrated.searchIndex), migratedAssets, usedB);
   differences.push(...diffPaths(sa, sb).map((d) => `search-index.json ${d}`));
@@ -193,6 +244,47 @@ export function comparePlayerOutputs(
   for (const h of onlyA) differences.push(`asset ${h.slice(0, 16)}: only in the original`);
   for (const h of onlyB) differences.push(`asset ${h.slice(0, 16)}: only in the migrated`);
   return { differences };
+}
+
+/** The passphrase for a secret, by `<entity id>/<secret id>`; undefined when none is configured. */
+export type SecretKeys = (entityId: string, secretId: string) => string | undefined;
+
+/**
+ * Each shipped secret, decrypted on both sides with its configured key and
+ * the plaintexts compared. Reports only match or mismatch per secret, never a
+ * key or a plaintext. A secret on one side only is the JSON comparison's.
+ */
+export async function compareSecrets(
+  original: BuildAtlasResult,
+  migrated: BuildAtlasResult,
+  keyFor: SecretKeys,
+): Promise<string[]> {
+  type Ent = { id: string; secrets?: SecretBlob[] };
+  const index = (b: BuildAtlasResult) => {
+    const m = new Map<string, SecretBlob>();
+    for (const e of (b.project as unknown as { entities?: Ent[] }).entities ?? []) {
+      for (const s of e.secrets ?? []) m.set(`${e.id}/${s.id}`, s);
+    }
+    return m;
+  };
+  const a = index(original);
+  const b = index(migrated);
+  const out: string[] = [];
+  for (const [k, sa] of a) {
+    const sb = b.get(k);
+    if (!sb) continue;
+    const [entity, secret] = [k.slice(0, k.indexOf("/")), k.slice(k.indexOf("/") + 1)];
+    const key = keyFor(entity, secret);
+    if (key === undefined) {
+      out.push(`secret ${k}: no configured key, can't compare (fails closed)`);
+      continue;
+    }
+    const [pa, pb] = await Promise.all([decryptSecret(sa, key), decryptSecret(sb, key)]);
+    if (pa === null) out.push(`secret ${k}: the original doesn't decrypt with its key`);
+    if (pb === null) out.push(`secret ${k}: the migrated doesn't decrypt with its key`);
+    if (pa !== null && pb !== null && pa !== pb) out.push(`secret ${k}: plaintext mismatch`);
+  }
+  return out;
 }
 
 /** Ids of everything a DM build holds, one `kind:id` each. */

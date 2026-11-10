@@ -4,20 +4,28 @@
  *
  *   atlas:migrate-v2                      print the plan; write nothing (dry run)
  *   atlas:migrate-v2 --dry-run            the same
- *   atlas:migrate-v2 --out <dir>          write the migrated tree to <dir>
- *   atlas:migrate-v2 --down --out <dir>   write the v2 -> v1 tree to <dir>
+ *   atlas:migrate-v2 --out <dir>          check, then write the migrated tree to <dir>
+ *   atlas:migrate-v2 --down --out <dir>   check, then write the v2 -> v1 tree to <dir>
  *   atlas:migrate-v2 --check              build both and compare the player output
+ *   --allow-drop-pin-style                drop shipping pins' label and style instead of refusing
  *   --config <file>                       the atlas config (default atlas.config.json)
  *
- * It never writes to the content root: `--out` must be a new or empty folder
- * outside it. Replacing the content root with the copy is a separate, manual
+ * It never writes to the content root or the vault: `--out` must be a new or
+ * empty folder outside both, and is written only when the check passes.
+ * Replacing the content root with the copy is a separate, manual
  * step (ADR-0003 "Versions").
  */
 import path from "node:path";
-import { checkMigration, readConfig } from "./migrate/checkMigration";
+import {
+  checkMigration,
+  checkMigrationDown,
+  readConfig,
+  type CheckResult,
+} from "./migrate/checkMigration";
 import {
   MigrationRefused,
   checkOutDir,
+  vaultPathOf,
   planMigrateDown,
   planMigrateUp,
   writeMigration,
@@ -29,11 +37,18 @@ interface Args {
   dryRun: boolean;
   down: boolean;
   check: boolean;
+  allowDropPinStyle: boolean;
   config: string;
 }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { dryRun: false, down: false, check: false, config: "atlas.config.json" };
+  const a: Args = {
+    dryRun: false,
+    down: false,
+    check: false,
+    allowDropPinStyle: false,
+    config: "atlas.config.json",
+  };
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i];
     if (v === "--out") a.out = argv[++i];
@@ -41,6 +56,7 @@ function parseArgs(argv: string[]): Args {
     else if (v === "--dry-run") a.dryRun = true;
     else if (v === "--down") a.down = true;
     else if (v === "--check") a.check = true;
+    else if (v === "--allow-drop-pin-style") a.allowDropPinStyle = true;
     else if (v === "--config") a.config = argv[++i];
     else if (v.startsWith("--config=")) a.config = v.slice(9);
     else throw new MigrationRefused([`unknown argument "${v}"`]);
@@ -65,38 +81,70 @@ function printPlan(plan: MigrationPlan, wrote: string | null): void {
   );
 }
 
+function section(title: string, lines: string[] | undefined): void {
+  if (!lines) return;
+  console.log(
+    `  ${title}: ${lines.length === 0 ? "no difference" : `${lines.length} difference(s)`}`,
+  );
+  for (const l of lines) console.log(`    - ${l}`);
+}
+
+function printCheck(title: string, r: Pick<CheckResult, "ok" | "warnings" | "failures">): void {
+  console.log(`\n${title}`);
+  for (const w of r.warnings) console.log(`  ! ${w}`);
+  for (const f of r.failures) console.log(`  x ${f}`);
+}
+
+/** Run the check for this direction and print it; true when it passed. */
+async function runCheck(args: Args, root: string, configPath: string): Promise<boolean> {
+  if (args.down) {
+    const r = await checkMigrationDown({ root, configPath });
+    printCheck("atlas:migrate-v2 --down check", r);
+    section("player output, v2 original (campaign main) vs v1 down-migrated", r.player);
+    console.log(r.ok ? "\n  check passed\n" : "\n  check FAILED\n");
+    return r.ok;
+  }
+  const r = await checkMigration({
+    root,
+    configPath,
+    roundTrip: true,
+    allowDropPinStyle: args.allowDropPinStyle,
+  });
+  printCheck("atlas:migrate-v2 --check", r);
+  section("player output, v1 original vs v2 migrated (campaign main)", r.player);
+  section("DM build, items missing from the migrated", r.dmMissing);
+  section("player output, v1 original vs v1 round trip", r.roundTrip);
+  console.log(r.ok ? "\n  check passed\n" : "\n  check FAILED\n");
+  return r.ok;
+}
+
 async function main(): Promise<number> {
   const args = parseArgs(process.argv.slice(2));
   const root = process.cwd();
   const configPath = path.resolve(root, args.config);
-  if (args.check) {
-    const r = await checkMigration({ root, configPath, roundTrip: true });
-    console.log("\natlas:migrate-v2 --check");
-    for (const w of r.warnings) console.log(`  ! ${w}`);
-    for (const f of r.failures) console.log(`  x ${f}`);
-    const section = (title: string, lines: string[] | undefined) => {
-      if (!lines) return;
-      console.log(
-        `  ${title}: ${lines.length === 0 ? "no difference" : `${lines.length} difference(s)`}`,
-      );
-      for (const l of lines) console.log(`    - ${l}`);
-    };
-    section("player output, v1 original vs v2 migrated (campaign main)", r.player);
-    section("DM build, items missing from the migrated", r.dmMissing);
-    section("player output, v1 original vs v1 round trip", r.roundTrip);
-    console.log(r.ok ? "\n  check passed\n" : "\n  check FAILED\n");
-    return r.ok ? 0 : 1;
-  }
+  if (args.check) return (await runCheck(args, root, configPath)) ? 0 : 1;
   const config = readConfig(configPath);
   const contentRoot = path.resolve(path.dirname(configPath), config.contentRoot);
-  const opts = { contentRoot, config, root, publicDir: path.join(root, "public") };
-  const out = args.dryRun ? undefined : args.out;
+  const vault = vaultPathOf(root);
+  const guarded = vault ? [vault] : [];
+  const opts = {
+    contentRoot,
+    config,
+    root,
+    publicDir: path.join(root, "public"),
+    allowDropPinStyle: args.allowDropPinStyle,
+  };
+  const out = args.dryRun || !args.out ? undefined : path.resolve(root, args.out);
   // Refuse a bad --out before the work, so a dry run says so too.
-  if (args.out) checkOutDir(path.resolve(root, args.out), contentRoot);
+  if (args.out) checkOutDir(path.resolve(root, args.out), contentRoot, guarded);
   const plan = args.down ? planMigrateDown(opts) : planMigrateUp(opts);
   if (out && !plan.alreadyDone) {
-    writeMigration(plan, path.resolve(root, out), contentRoot);
-    printPlan(plan, path.resolve(root, out));
+    // Written only when the check passes: same plan, built and compared first.
+    if (!(await runCheck(args, root, configPath))) {
+      throw new MigrationRefused(["the check failed (above); --out was not written"]);
+    }
+    writeMigration(plan, out, contentRoot, guarded);
+    printPlan(plan, out);
   } else {
     printPlan(plan, null);
   }

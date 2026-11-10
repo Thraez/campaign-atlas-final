@@ -6,7 +6,14 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildAtlas, type BuildAtlasResult } from "../../build-atlas";
-import { comparePlayerOutputs, dmItems, v1Assets, type AssetResolver } from "./compareOutputs";
+import { encryptSecret } from "../../../src/atlas/secrets/secretCrypto";
+import {
+  comparePlayerOutputs,
+  compareSecrets,
+  dmItems,
+  v1Assets,
+  type AssetResolver,
+} from "./compareOutputs";
 
 const FIXTURE = path.resolve(__dirname, "../../../src/test/fixtures/migrate-v2-site");
 
@@ -30,13 +37,31 @@ describe("comparePlayerOutputs", () => {
           p.version = "x";
           p.publishedAt = "y";
           p.schemaVersion = 2;
-          p.ocean = { width: 1, height: 1 };
+          p.ocean = {
+            width: 1,
+            height: 1,
+            sea: "default",
+            onOcean: [{ map: p.maps[0].id, x: 0, y: 0, scale: 1, rotation: 0 }],
+          };
           p.campaign = { id: "main", name: "Main" };
-          p.maps[1].parent = "vale";
           p.placements.reverse();
         }),
       ),
     ).toEqual([]);
+
+    // The allowed keys only in their allowed form; v2 map nesting not at all.
+    expect(same(tweak(a, (p) => (p.campaign = { id: "other", name: "Main" }))).join()).toMatch(
+      /campaign/,
+    );
+    expect(
+      same(
+        tweak(a, (p) => {
+          p.ocean = { width: 1, height: 1, sea: "default", onOcean: [{ map: "nowhere" }] };
+        }),
+      ).join(),
+    ).toMatch(/"nowhere" is not a map it ships/);
+    expect(same(tweak(a, (p) => (p.maps[1].parent = "vale"))).join()).toMatch(/parent/);
+    expect(same(tweak(a, (p) => (p.maps[1].enterZoom = 1))).join()).toMatch(/enterZoom/);
 
     // A DM entity that leaks, a pin moved, a fog reveal grown: all differences.
     expect(same(tweak(a, (p) => p.entities.push({ id: "vampire-lord" })))).not.toEqual([]);
@@ -63,5 +88,45 @@ describe("comparePlayerOutputs", () => {
       expect(items.has(i)).toBe(true);
     }
     expect([...items].some((i) => i.startsWith("pin:vault-keeper@vale:120,400"))).toBe(true);
+  }, 120_000);
+
+  it("compares secrets by their plaintext: a wrong key or a same-length plaintext fails", async () => {
+    const a = await buildAtlas(FIXTURE, { player: true, strict: true });
+    const keyFor = (e: string, s: string) =>
+      e === "vault-keeper" && s === "hidden-door" ? "low tide" : undefined;
+    const reseal = async (plaintext: string, key: string) =>
+      tweak(a, (p) => {
+        const s = p.entities.find((e: { id: string }) => e.id === "vault-keeper").secrets[0];
+        Object.assign(s, sealed.get(`${plaintext}|${key}`));
+      });
+    const sealed = new Map<string, unknown>();
+    for (const [pt, key] of [
+      ["the door opens at low tide", "low tide"],
+      ["the door opens at low tide", "high tide"],
+      ["the door opens at hi9h tide", "low tide"],
+    ] as const) {
+      sealed.set(`${pt}|${key}`, await encryptSecret(pt, key));
+    }
+    // Same plaintext, new salt and iv: equal.
+    const same = await reseal("the door opens at low tide", "low tide");
+    expect(comparePlayerOutputs(a, v1Assets(a), same, v1Assets(same)).differences).toEqual([]);
+    expect(await compareSecrets(a, same, keyFor)).toEqual([]);
+    // Sealed under another key: the JSON can't tell, the decryption does.
+    const wrongKey = await reseal("the door opens at low tide", "high tide");
+    expect(comparePlayerOutputs(a, v1Assets(a), wrongKey, v1Assets(wrongKey)).differences).toEqual(
+      [],
+    );
+    expect(await compareSecrets(a, wrongKey, keyFor)).toEqual([
+      "secret vault-keeper/hidden-door: the migrated doesn't decrypt with its key",
+    ]);
+    // Another plaintext of the same length: a mismatch, and nothing printed of it.
+    const other = await reseal("the door opens at hi9h tide", "low tide");
+    const r = await compareSecrets(a, other, keyFor);
+    expect(r).toEqual(["secret vault-keeper/hidden-door: plaintext mismatch"]);
+    expect(r.join()).not.toMatch(/door opens|low tide/);
+    // No configured key: fails closed.
+    expect(await compareSecrets(a, same, () => undefined)).toEqual([
+      expect.stringMatching(/no configured key/),
+    ]);
   }, 120_000);
 });

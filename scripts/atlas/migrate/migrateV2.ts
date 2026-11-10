@@ -91,9 +91,16 @@ export interface MigrationPlan {
   summary: string[];
   /**
    * Items the v1 build reads and the migration leaves out on purpose (the
-   * ticket's conversions), `kind:map/id`. The DM comparison allows exactly these.
+   * ticket's conversions), `kind:map/id`, and, with `allowDropPinStyle`, the
+   * shipping pins whose label or style is dropped, `pinStyle:<note>@<map>:<x>,<y>`.
+   * The comparisons allow exactly these.
    */
   dropped: string[];
+  /**
+   * Down only: the map images and audio the v1 tree reads from `public/`, by
+   * src, each checked equal to the v2 copy under `<world>/_atlas/`.
+   */
+  publicAssets: Map<string, Buffer>;
 }
 
 export interface MigrateOptions {
@@ -103,8 +110,13 @@ export interface MigrateOptions {
   config: LoadAtlasModelConfig;
   /** Paths in messages are relative to this. */
   root: string;
-  /** v1's `public/` folder, where v1 map images and audio live (up only). */
+  /** v1's `public/` folder, where v1 map images and audio live (up: read; down: checked). */
   publicDir?: string;
+  /**
+   * Up: drop a shipping pin's label and pin style (a change players see)
+   * instead of refusing. Off unless asked (`--allow-drop-pin-style`).
+   */
+  allowDropPinStyle?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -181,6 +193,128 @@ function localAsset(src: string | undefined): string | null {
   return src;
 }
 
+/** The comment and blank lines a YAML file starts with (its header), kept as written. */
+function leadingComments(text: string): string {
+  const lines = text.replace(/^\uFEFF/, "").split(/(?<=\n)/);
+  let out = "";
+  for (const l of lines) {
+    if (!/^\s*(#.*)?\r?\n?$/.test(l) || l === "") break;
+    out += l.endsWith("\n") ? l : `${l}\n`;
+  }
+  return out.replace(/\s+$/, "") === "" ? "" : out;
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  !!v && typeof v === "object" && !Array.isArray(v);
+
+/** Paths of keys in `src` that `dst` has no key for (null values and empty lists carry nothing). */
+function missingKeys(src: unknown, dst: unknown, at: string, out: string[]): void {
+  const empty = (v: unknown) => v === null || v === undefined || (Array.isArray(v) && !v.length);
+  if (empty(src)) return;
+  if (Array.isArray(src)) {
+    if (!Array.isArray(dst)) {
+      out.push(at);
+      return;
+    }
+    src.forEach((s, i) => {
+      // Items with an id are matched by it; one the migration left out is warned about already.
+      if (isRecord(s) && typeof s.id === "string") {
+        const d = dst.find((x) => isRecord(x) && x.id === s.id);
+        if (d !== undefined) missingKeys(s, d, `${at}[${s.id}]`, out);
+      } else if (i < dst.length) {
+        missingKeys(s, dst[i], `${at}[${i}]`, out);
+      }
+    });
+    return;
+  }
+  if (isRecord(src)) {
+    if (!isRecord(dst)) {
+      out.push(at);
+      return;
+    }
+    for (const [k, v] of Object.entries(src)) {
+      if (empty(v)) continue;
+      const p = at ? `${at}.${k}` : k;
+      if (!(k in dst)) out.push(p);
+      else missingKeys(v, dst[k], p, out);
+    }
+  }
+}
+
+/**
+ * Every key of the v1 world.yaml (`rawText`) the migrated files don't carry:
+ * the v1 file is moved into v2's places (regions and routes under their map,
+ * sound areas to `sound`, water to the world, fog to the campaign) and then
+ * compared key by key, at every depth, with what was written.
+ */
+function uncarriedKeys(
+  rawText: string,
+  worldFile: WorldFileV2,
+  campaign: CampaignFileV2,
+): string[] {
+  let raw: unknown;
+  try {
+    raw = yaml.load(rawText);
+  } catch {
+    return ["(the file)"];
+  }
+  if (!isRecord(raw)) return [];
+  const out: string[] = [];
+  const written = JSON.parse(JSON.stringify(worldFile)) as Record<string, unknown>;
+  const states = JSON.parse(JSON.stringify(campaign.maps)) as Record<string, unknown>;
+  const {
+    schemaVersion: _v,
+    name,
+    id,
+    maps,
+    regions,
+    routes,
+    ...rest
+  } = raw as Record<string, unknown>;
+  const byMap = (list: unknown, mapId: unknown) =>
+    (Array.isArray(list) ? list : [])
+      .filter((x) => isRecord(x) && x.mapId === mapId)
+      .map((x) => {
+        const { mapId: _m, ...r } = x as Record<string, unknown>;
+        return r;
+      });
+  const movedMaps = (Array.isArray(maps) ? maps : []).map((m) => {
+    if (!isRecord(m)) return m;
+    const { water, fog, soundscape, ...mm } = m;
+    const moved: Record<string, unknown> = { ...mm };
+    if (isRecord(soundscape)) {
+      const { areas, ...ss } = soundscape;
+      if (Object.keys(ss).length > 0) moved.soundscape = ss;
+      moved.sound = areas;
+    }
+    moved.regions = byMap(regions, m.id);
+    moved.routes = byMap(routes, m.id);
+    const where = `maps[${String(m.id)}]`;
+    missingKeys(water, written.water, `${where}.water`, out);
+    if (isRecord(fog)) {
+      // `enabled` is the state; `color` is warned about on its own.
+      const { enabled: _e, color: _c, ...f } = fog;
+      missingKeys(f, states[String(m.id)], `${where}.fog`, out);
+    }
+    return moved;
+  });
+  missingKeys({ name, id }, written.world, "", out);
+  missingKeys({ ...rest, maps: movedMaps }, written, "", out);
+  // Regions and routes naming no map that exists are not carried either.
+  const mapIds = new Set<unknown>(
+    (Array.isArray(maps) ? maps : []).map((m) => isRecord(m) && m.id),
+  );
+  for (const [k, list] of [
+    ["regions", regions],
+    ["routes", routes],
+  ] as const) {
+    for (const x of Array.isArray(list) ? list : []) {
+      if (isRecord(x) && !mapIds.has(x.mapId as string)) out.push(`${k}[${String(x.id)}]`);
+    }
+  }
+  return out;
+}
+
 /** Plan the v1 -> v2 migration of `opts.contentRoot`. Throws `MigrationRefused`. */
 export function planMigrateUp(opts: MigrateOptions): MigrationPlan {
   const plan: MigrationPlan = {
@@ -191,6 +325,7 @@ export function planMigrateUp(opts: MigrateOptions): MigrationPlan {
     warnings: [],
     summary: [],
     dropped: [],
+    publicAssets: new Map(),
   };
   if (hasAtlasFile(opts.contentRoot)) {
     plan.alreadyDone = true;
@@ -310,7 +445,10 @@ export function planMigrateUp(opts: MigrateOptions): MigrationPlan {
       onOcean.push({ map: m.id, x: oceanWidth, y: 0, scale: 1, rotation: 0 });
       oceanWidth += m.width;
       oceanHeight = Math.max(oceanHeight, m.height);
-      campaign.maps[m.id] = v1Campaign?.maps[m.id] ?? { state: "open" };
+      const state = v1Campaign?.maps[m.id];
+      if (state) campaign.maps[m.id] = state;
+      else
+        refuse.push(`map "${m.id}" has no state in v1's campaign "main"; nothing to migrate it to`);
       counts.maps++;
       counts.layers += m.layers.length;
       counts.regions += regions.length;
@@ -360,10 +498,18 @@ export function planMigrateUp(opts: MigrateOptions): MigrationPlan {
         refuse.push(`world "${world.world.id}" ${e.path}: ${e.message}`);
     }
     const rel = `${world.world.id}/_atlas/world.yaml`;
+    const rawText = tree.get(rel)?.toString("utf8");
+    if (rawText === undefined) {
+      plan.warnings.push(`${rel} not found as a file; its keys and comments weren't checked`);
+    } else {
+      for (const k of uncarriedKeys(rawText, worldFile, campaign)) {
+        plan.warnings.push(`${rel}: ${k} is not carried over (the loader doesn't model it)`);
+      }
+    }
     plan.files.set(
       rel,
       dumpYaml(
-        `# Schema v2 (ADR-0003), written by atlas:migrate-v2 from the v1 world.yaml.\n`,
+        `${leadingComments(rawText ?? "")}# Schema v2 (ADR-0003), written by atlas:migrate-v2 from the v1 world.yaml.\n`,
         worldFile,
       ),
     );
@@ -421,12 +567,17 @@ export function planMigrateUp(opts: MigrateOptions): MigrationPlan {
         `${rel}: pin fields removed; the build doesn't read this note, so its pins never shipped`,
       );
     } else {
-      warnPinFieldsDropped(note, rel, plan.warnings);
+      pinFieldsDropped(note, rel, plan, refuse, !!opts.allowDropPinStyle);
     }
     const edit = stripPinFields(raw);
     if (!edit.ok) {
       refuse.push(`${rel}: ${edit.reason}`);
       continue;
+    }
+    if (edit.droppedComments) {
+      plan.warnings.push(
+        `${rel}: ${edit.droppedComments} comment line(s) inside the removed pin fields are dropped`,
+      );
     }
     plan.files.set(rel, Buffer.from(edit.raw, "utf8"));
     plan.changed.push(rel);
@@ -446,20 +597,37 @@ export function planMigrateUp(opts: MigrateOptions): MigrationPlan {
   return plan;
 }
 
-/** Warn about what a placement carries that a v2 pin can't (the adapter drops it too). */
-function warnPinFieldsDropped(note: ModelNote, rel: string, warnings: string[]): void {
+/**
+ * What a placement carries that a v2 pin can't (the adapter drops it too). On
+ * a pin that ships, a dropped label or style is a change players see: refused
+ * unless `allow`, then warned and declared in `plan.dropped`.
+ */
+function pinFieldsDropped(
+  note: ModelNote,
+  rel: string,
+  plan: MigrationPlan,
+  refuse: string[],
+  allow: boolean,
+): void {
   const placements = parseNoteFields(note.note).atlas.placements ?? [];
   placements.forEach((p, i) => {
     const lost = [p.label !== undefined && "label", p.pin !== undefined && "pin style"].filter(
       Boolean,
     );
-    if (lost.length > 0) {
-      warnings.push(
+    const ships = SHIPS.has(v1PinVisibility(note.note.isSecret, note.note.visibility, p.secretId));
+    if (lost.length > 0 && ships && !allow) {
+      refuse.push(
+        `${rel}: atlas.placements[${i}] ships with a ${lost.join(" and ")} v2 pins can't carry; ` +
+          `players would see it change (remove it, or pass --allow-drop-pin-style)`,
+      );
+    } else if (lost.length > 0) {
+      plan.warnings.push(
         `${rel}: atlas.placements[${i}] ${lost.join(" and ")} dropped (v2 pins have none)`,
       );
+      if (ships) plan.dropped.push(`pinStyle:${note.note.id}@${p.mapId}:${p.x},${p.y}`);
     }
     if (p.secretId !== undefined) {
-      warnings.push(
+      plan.warnings.push(
         `${rel}: atlas.placements[${i}] is behind secret "${p.secretId}"; its pin is written as dm, as the v1 adapter loads it`,
       );
     }
@@ -495,6 +663,7 @@ export function planMigrateDown(opts: MigrateOptions): MigrationPlan {
     warnings: [],
     summary: [],
     dropped: [],
+    publicAssets: new Map(),
   };
   if (!hasAtlasFile(opts.contentRoot)) {
     plan.alreadyDone = true;
@@ -526,7 +695,18 @@ export function planMigrateDown(opts: MigrateOptions): MigrationPlan {
   const counts = { maps: 0, regions: 0, routes: 0, pins: 0, sound: 0, notes: 0 };
   const pinsByNote = new Map<string, PlacementText[]>();
   const noteById = new Map<string, ModelNote>();
-  for (const n of notes) if (!noteById.has(n.note.id)) noteById.set(n.note.id, n);
+  for (const n of notes) {
+    const first = noteById.get(n.note.id);
+    if (first) {
+      refuse.push(
+        `notes ${first.file} and ${n.file} share the id "${n.note.id}"; a pin can't say which it belongs to`,
+      );
+    } else {
+      noteById.set(n.note.id, n);
+    }
+  }
+  if (!opts.publicDir)
+    refuse.push("no public/ folder given; v1 reads map images and audio from it");
 
   for (const world of model.worlds) {
     if (world.notes !== undefined) {
@@ -637,6 +817,31 @@ export function planMigrateDown(opts: MigrateOptions): MigrationPlan {
         pinsByNote.set(n.file, list);
         counts.pins++;
       }
+      // v1 reads images and audio from public/: each must be there, the same bytes as the v2 copy.
+      const srcs = [
+        ...m.layers.flatMap((l) => [l.src, l.tileSrc]),
+        ...(m.sound ?? []).flatMap((a) => [a.bed.src, a.bed.srcFallback]),
+      ];
+      for (const src of new Set(srcs.map(localAsset))) {
+        if (!src || !opts.publicDir) continue;
+        const inAtlas = tree.get(`${world.world.id}/_atlas/${src}`);
+        const pub = path.join(opts.publicDir, src);
+        const inPublic =
+          fs.existsSync(pub) && fs.statSync(pub).isFile() ? fs.readFileSync(pub) : undefined;
+        if (!inPublic && inAtlas) {
+          refuse.push(
+            `${where}: "${src}" is only under ${world.world.id}/_atlas/, not in public/; v1 reads public/`,
+          );
+        } else if (inPublic && inAtlas && !inPublic.equals(inAtlas)) {
+          refuse.push(
+            `${where}: "${src}" differs between ${world.world.id}/_atlas/ and public/; v1 would show public/'s`,
+          );
+        } else if (!inPublic) {
+          plan.warnings.push(`${where}: "${src}" is in neither public/ nor the world's _atlas/`);
+        } else {
+          plan.publicAssets.set(src, inPublic);
+        }
+      }
       counts.maps++;
       counts.regions += (m.regions ?? []).length;
       counts.routes += (m.routes ?? []).length;
@@ -659,10 +864,13 @@ export function planMigrateDown(opts: MigrateOptions): MigrationPlan {
   }
 
   const contentRel = path.relative(opts.root, opts.contentRoot).replace(/\\/g, "/");
+  const consumed = new Set<string>();
   for (const [rel, bytes] of tree) {
     if (plan.files.has(rel)) continue;
     if (rel === "_atlas/atlas.yaml" || rel.startsWith("_atlas/campaigns/")) continue;
-    const pins = pinsByNote.get(contentRel ? `${contentRel}/${rel}` : rel);
+    const noteFile = contentRel ? `${contentRel}/${rel}` : rel;
+    const pins = pinsByNote.get(noteFile);
+    if (pins) consumed.add(noteFile);
     if (!pins) {
       plan.files.set(rel, bytes);
       continue;
@@ -675,6 +883,9 @@ export function planMigrateDown(opts: MigrateOptions): MigrationPlan {
     plan.files.set(rel, Buffer.from(edit.raw, "utf8"));
     plan.changed.push(rel);
     counts.notes++;
+  }
+  for (const file of pinsByNote.keys()) {
+    if (!consumed.has(file)) refuse.push(`${file}: has pins but no file to write them back into`);
   }
   if (refuse.length > 0) throw new MigrationRefused(refuse);
 
@@ -715,36 +926,70 @@ function realNearest(p: string): string {
 }
 
 /**
- * Refuse an output folder that is the content root, inside it, holds it, or
- * already has files: the migration only ever writes a fresh copy.
+ * The DM's vault, when this machine knows it (`.local-atlas/editor-settings.json`
+ * `vaultPath`, as the editor's Sync panel saves it): `--out` stays out of it too.
  */
-export function checkOutDir(outDir: string, contentRoot: string): void {
+export function vaultPathOf(root: string): string | null {
+  try {
+    const s = JSON.parse(
+      fs.readFileSync(path.join(root, ".local-atlas", "editor-settings.json"), "utf8"),
+    ) as { vaultPath?: unknown };
+    return typeof s.vaultPath === "string" && s.vaultPath.trim() ? s.vaultPath.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Refuse an output folder that is the content root (or another folder that
+ * must never be written, such as the vault: `guarded`), inside one, holds one
+ * (any ancestor), or already has files: the migration only writes a fresh copy.
+ */
+export function checkOutDir(outDir: string, contentRoot: string, guarded: string[] = []): void {
   const fold = (p: string) =>
     process.platform === "darwin" || process.platform === "win32" ? p.toLowerCase() : p;
   const out = fold(realNearest(outDir));
-  const content = fold(realNearest(contentRoot));
-  if (atOrUnder(out, content)) {
-    throw new MigrationRefused([
-      `--out ${outDir} is the content root or inside it; write the copy elsewhere`,
-    ]);
+  const reasons: string[] = [];
+  for (const [what, dir] of [
+    ["the content root", contentRoot],
+    ...guarded.map((g) => ["the vault", g] as const),
+  ] as const) {
+    const g = fold(realNearest(dir));
+    if (atOrUnder(out, g)) reasons.push(`--out ${outDir} is ${what} or inside it (${dir})`);
+    else if (atOrUnder(g, out)) reasons.push(`--out ${outDir} holds ${what} (${dir})`);
   }
-  if (atOrUnder(content, out)) {
-    throw new MigrationRefused([
-      `--out ${outDir} holds the content root; write the copy elsewhere`,
-    ]);
-  }
+  if (reasons.length > 0) throw new MigrationRefused([...reasons, "write the copy elsewhere"]);
   if (fs.existsSync(outDir) && fs.readdirSync(outDir).length > 0) {
     throw new MigrationRefused([`--out ${outDir} is not empty; give an empty or new folder`]);
   }
 }
 
-/** Write a plan's tree to `outDir` (checked by `checkOutDir` first). */
-export function writeMigration(plan: MigrationPlan, outDir: string, contentRoot: string): void {
-  checkOutDir(outDir, contentRoot);
-  for (const [rel, bytes] of plan.files) {
-    const to = path.join(outDir, ...rel.split("/"));
-    fs.mkdirSync(path.dirname(to), { recursive: true });
-    fs.writeFileSync(to, bytes);
+/**
+ * Write a plan's tree to `outDir` (checked by `checkOutDir` first): into a
+ * sibling temp folder, renamed into place once every file is written, so a
+ * failure never leaves half a tree at `outDir`.
+ */
+export function writeMigration(
+  plan: MigrationPlan,
+  outDir: string,
+  contentRoot: string,
+  guarded: string[] = [],
+): void {
+  checkOutDir(outDir, contentRoot, guarded);
+  const target = path.resolve(outDir);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const staging = fs.mkdtempSync(path.join(path.dirname(target), `.${path.basename(target)}-`));
+  try {
+    for (const [rel, bytes] of plan.files) {
+      const to = path.join(staging, ...rel.split("/"));
+      fs.mkdirSync(path.dirname(to), { recursive: true });
+      fs.writeFileSync(to, bytes);
+    }
+    if (fs.existsSync(target)) fs.rmdirSync(target); // empty, as checked
+    fs.renameSync(staging, target);
+  } catch (e) {
+    fs.rmSync(staging, { recursive: true, force: true });
+    throw e;
   }
 }
 
