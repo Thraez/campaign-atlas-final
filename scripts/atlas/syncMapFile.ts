@@ -70,23 +70,53 @@ const LOCK_RETRY_MS = 25;
 /** Serializes sync-map writes inside this process (the dev server, the CLI). */
 let inProcess: Promise<unknown> = Promise.resolve();
 
+/** Thrown when a stale-lock cleanup collides with another waiter; the save can be retried. */
+export class SyncMapLockContentionError extends Error {
+  constructor() {
+    super(".local-atlas/sync-map.json lock contention: another sync took the lock; retry");
+    this.name = "SyncMapLockContentionError";
+  }
+}
+
 /**
- * Removes a lock left behind by a dead process. It is moved aside first and
- * checked: if what was moved isn't the stale lock that was read (another
- * waiter cleared it and took a fresh one in between), it is put back, so a
- * live holder's lock is never deleted.
+ * Removes a lock left behind by a dead process, given the `stat` that found
+ * it stale. The lock is moved aside (atomic, so only one waiter gets it) and
+ * the moved file is checked again: it is deleted only if it is the same file
+ * (same inode) and still older than 30 s. Anything else is a fresh lock
+ * another waiter took after that `stat`, and is put back. If it can't be put
+ * back because yet another lock now sits in its place, this throws
+ * `SyncMapLockContentionError` rather than guess which holder wins. Either
+ * way nothing is left behind but the lock path itself, and a lock there that
+ * nobody releases is cleared once it is 30 s old.
  */
-async function clearStaleLock(lockPath: string): Promise<void> {
-  const seen = await fs.readFile(lockPath, "utf8").catch(() => null);
-  if (seen === null) return;
+async function clearStaleLock(
+  lockPath: string,
+  stale: { ino: number; mtimeMs: number },
+): Promise<void> {
   const aside = `${lockPath}.${process.pid}.${randomUUID()}.stale`;
   try {
     await fs.rename(lockPath, aside);
   } catch {
-    return; // someone else moved it first
+    return; // someone else moved it first, or it was released
   }
-  const moved = await fs.readFile(aside, "utf8").catch(() => null);
-  if (moved !== seen) await fs.link(aside, lockPath).catch(() => undefined);
+  const moved = await fs.stat(aside).catch(() => null);
+  const stillStale =
+    moved !== null &&
+    moved.ino === stale.ino &&
+    moved.mtimeMs === stale.mtimeMs &&
+    Date.now() - moved.mtimeMs > LOCK_STALE_MS;
+  if (stillStale) {
+    await fs.rm(aside, { force: true });
+    return;
+  }
+  // A live lock: put it back. link() fails with EEXIST if a lock is there now.
+  try {
+    await fs.link(aside, lockPath);
+  } catch (e) {
+    await fs.rm(aside, { force: true });
+    if ((e as NodeJS.ErrnoException).code === "EEXIST") throw new SyncMapLockContentionError();
+    throw e;
+  }
   await fs.rm(aside, { force: true });
 }
 
@@ -114,12 +144,9 @@ async function withSyncMapFileLock<T>(repoRoot: string, fn: () => Promise<T>): P
       break;
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
-      const age = await fs
-        .stat(lockPath)
-        .then((s) => Date.now() - s.mtimeMs)
-        .catch(() => 0);
-      if (age > LOCK_STALE_MS) {
-        await clearStaleLock(lockPath);
+      const st = await fs.stat(lockPath).catch(() => null);
+      if (st && Date.now() - st.mtimeMs > LOCK_STALE_MS) {
+        await clearStaleLock(lockPath, st);
         continue;
       }
       if (Date.now() > deadline) {

@@ -69,9 +69,11 @@ export interface SyncWorld {
    */
   idsInOtherWorlds?: ReadonlyMap<string, string>;
   /**
-   * Entities with a source file in the whole DM build, every world's. Tells
-   * "no DM build loaded" apart from "a world with nothing in it yet"; when
-   * absent, `existingById.size` stands in (one world).
+   * Entities with a source file in the whole DM build, every world's. Zero
+   * means no DM build is loaded (or it has no notes), so a world with nothing
+   * in it yet can still be synced into while other worlds have notes. When
+   * absent, `planSync` falls back to `existingById.size`, the target world's
+   * own count.
    */
   dmBuildSize?: number;
 }
@@ -117,6 +119,25 @@ export class DmBuildRequiredError extends Error {
 
 export function assertDmBuildLoaded(existingById: ReadonlyMap<string, string>): void {
   if (existingById.size === 0) throw new DmBuildRequiredError();
+}
+
+/**
+ * Thrown when a sync wrote its notes but then couldn't record them in the sync
+ * map (for example, the DM rebuild failed and the map route found no build).
+ * The notes are on disk; the next sync after fixing the build records them.
+ */
+export class SyncMapNotSavedError extends Error {
+  readonly saved: number;
+  constructor(saved: number, cause: unknown, rebuildError?: string) {
+    const why = cause instanceof Error ? cause.message : String(cause);
+    super(
+      `${saved} note(s) were saved, but the sync map wasn't (${why}).` +
+        (rebuildError ? ` The DM rebuild failed: ${rebuildError}.` : "") +
+        " Fix the DM build (npm run atlas:build) and sync again.",
+    );
+    this.name = "SyncMapNotSavedError";
+    this.saved = saved;
+  }
 }
 
 /** Thrown when a sync names no world, or one the DM build doesn't have (R-14). */
@@ -432,7 +453,11 @@ export async function commitSync(
         syncedFileHash,
       );
     }
-    await port.saveSyncMap(world.worldId, syncMap);
+    try {
+      await port.saveSyncMap(world.worldId, syncMap);
+    } catch (e) {
+      throw new SyncMapNotSavedError(written.saved, e, written.rebuildError);
+    }
     await port.markSynced(new Date().toISOString());
   }
 

@@ -19,6 +19,7 @@ import {
   SyncWorldError,
   unattendedRefusal,
   worldEntities,
+  SyncMapNotSavedError,
 } from "@/atlas/sync/sync";
 import { HostingPublicError } from "@/atlas/sync/hosting";
 import { ImportCommitError } from "@/atlas/import/buildImportChanges";
@@ -30,6 +31,7 @@ import { createMemoryVaultPort } from "../helpers/memoryVaultPort";
 import { DEV_ROUTES, handleSaveRequest } from "../../../scripts/vite-plugin-atlas-save";
 import { DEV_API_PATHS } from "../../../scripts/atlas/devRoutes";
 import { parseSyncArgs, runSyncCli } from "../../../scripts/atlas-sync";
+import { saveWorldSyncMap, SyncMapLockContentionError } from "../../../scripts/atlas/syncMapFile";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), warning: vi.fn(), success: vi.fn() } }));
 
@@ -201,6 +203,21 @@ describe("a sync into world B over the memory port", () => {
     );
     expect(p.writes).toEqual([]);
     expect(p.atlas.has(B_CORVEN)).toBe(false);
+  });
+
+  it("says the notes were saved when only the sync-map save fails", async () => {
+    const p = port();
+    p.saveSyncMap = async () => {
+      throw new Error("no DM build");
+    };
+    const world = syncWorldFromProject(twoWorlds(), "b");
+    const plan = await planSync(p, world, SOURCE);
+    const err = await commitSync(p, world, plan.rows, plan.source).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SyncMapNotSavedError);
+    expect((err as Error).message).toMatch(
+      /^1 note\(s\) were saved, but the sync map wasn't \(no DM build\)\..*sync again\.$/,
+    );
+    expect(p.atlas.get(B_SELA)).toContain("The vault's Sela.");
   });
 
   it("creates under content/b/ a note whose id no world has", async () => {
@@ -454,6 +471,97 @@ describe("the sync-map file on disk", () => {
       spy.mockRestore();
     }
     expect(fs.readFileSync(lock, "utf8")).toBe("other:2");
+  });
+
+  /**
+   * Waiter B finds a dead lock (older than 30 s). `afterStat` runs right after
+   * B's stat of the lock path saw it stale (where waiter A clears it and takes
+   * a fresh lock), `afterRename` right after B moves the lock path aside.
+   */
+  const raceStaleLock = (hooks: { afterStat?: () => void; afterRename?: () => void }) => {
+    const lock = path.join(tmp, ".local-atlas/sync-map.json.lock");
+    write(".local-atlas/sync-map.json.lock", "dead:1");
+    const old = new Date(Date.now() - 60_000);
+    fs.utimesSync(lock, old, old);
+    const realStat = fs.promises.stat.bind(fs.promises);
+    const realRename = fs.promises.rename.bind(fs.promises);
+    let statted = false;
+    let renamed = false;
+    const statSpy = vi.spyOn(fs.promises, "stat").mockImplementation((async (
+      f: Parameters<typeof realStat>[0],
+    ) => {
+      const st = await realStat(f);
+      if (!statted && String(f) === lock) {
+        statted = true;
+        hooks.afterStat?.();
+      }
+      return st;
+    }) as typeof fs.promises.stat);
+    const renameSpy = vi.spyOn(fs.promises, "rename").mockImplementation(async (from, to) => {
+      await realRename(from, to);
+      if (!renamed && String(from) === lock) {
+        renamed = true;
+        hooks.afterRename?.();
+      }
+    });
+    const restore = () => {
+      statSpy.mockRestore();
+      renameSpy.mockRestore();
+    };
+    return { lock, restore };
+  };
+  const staleLeftovers = () =>
+    fs.readdirSync(path.join(tmp, ".local-atlas")).filter((f) => f.endsWith(".stale"));
+
+  it("a waiter never deletes a fresh lock taken after it saw the old one as stale", async () => {
+    let releasedAt = 0;
+    let lockAtRelease: string | null = null;
+    const lockPath = path.join(tmp, ".local-atlas/sync-map.json.lock");
+    const { lock, restore } = raceStaleLock({
+      afterStat: () => {
+        fs.rmSync(lockPath);
+        fs.writeFileSync(lockPath, "A:live");
+        // A finishes a moment later and releases its own lock.
+        setTimeout(() => {
+          lockAtRelease = fs.existsSync(lockPath) ? fs.readFileSync(lockPath, "utf8") : null;
+          if (lockAtRelease === "A:live") fs.rmSync(lockPath);
+          releasedAt = Date.now();
+        }, 150);
+      },
+    });
+    try {
+      await saveWorldSyncMap(tmp, "b", { "x.md": { id: "x", baseType: "npc" } });
+    } finally {
+      restore();
+    }
+    const savedAt = Date.now();
+    expect(lockAtRelease).toBe("A:live"); // B put A's lock back instead of deleting it
+    expect(releasedAt).toBeGreaterThan(0);
+    expect(savedAt).toBeGreaterThanOrEqual(releasedAt); // B waited for A
+    expect(Object.keys(readMap().worlds.b)).toEqual(["x.md"]);
+    expect(fs.existsSync(lock)).toBe(false);
+    expect(staleLeftovers()).toEqual([]);
+  });
+
+  it("a stale-lock cleanup that collides with a third lock fails loudly, leaving no orphan", async () => {
+    const lockPath = path.join(tmp, ".local-atlas/sync-map.json.lock");
+    const { lock, restore } = raceStaleLock({
+      afterStat: () => {
+        fs.rmSync(lockPath);
+        fs.writeFileSync(lockPath, "A:live");
+      },
+      afterRename: () => fs.writeFileSync(lockPath, "C:live"),
+    });
+    try {
+      await expect(saveWorldSyncMap(tmp, "b", {})).rejects.toBeInstanceOf(
+        SyncMapLockContentionError,
+      );
+    } finally {
+      restore();
+    }
+    expect(fs.readFileSync(lock, "utf8")).toBe("C:live");
+    expect(staleLeftovers()).toEqual([]);
+    expect(fs.existsSync(path.join(tmp, ".local-atlas/sync-map.json"))).toBe(false);
   });
 
   it("the merge route keeps unknown top-level fields and refuses a bad body", async () => {
