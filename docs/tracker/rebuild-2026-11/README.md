@@ -13,7 +13,8 @@ R-01 (#111, no ticket file), Q-01..Q-04 (#112-#115),
 [R-06](issues/R-06-player-build-report-leak.md).
 
 Open safety follow-up (no leak today; any phase, before the first real Sync):
-[R-07](issues/R-07-root-dm-folder-exclude.md), a `_dm/` folder at the content root is not excluded.
+[R-07](issues/R-07-root-dm-folder-exclude.md), a `_dm/` folder at the content root is not excluded;
+[R-07b](issues/R-07b-fog-conceals-dropped.md), the loader drops fog shapes (conceals).
 
 ## Phase 2: schema v2 and campaigns in the pipeline
 
@@ -30,10 +31,12 @@ player output per campaign). Both are `accepted` (2026-11-08), with Isak's answe
 | 3 | [R-11b Build calls the resolver](issues/R-11b-build-calls-resolver.md) (+ arch-02) (done) | S | R-11a, R-12 | yes |
 | 3 | [R-11c Old Publish Check calls the resolver (done)](issues/R-11c-publish-check-calls-resolver.md) | S | R-11a, R-12 | yes |
 | 3 | [R-11d Link redaction from wikilink tokens (done)](issues/R-11d-link-redaction-from-tokens.md) (+ arch-08 redaction) | S | R-11a | yes |
+| 3 | [R-11e A hidden region hides what is inside or reaching into it](issues/R-11e-region-containment.md) | S-M | R-11a | yes |
 | 3 | [R-15 Scan registry lists campaign dirs (done)](issues/R-15-scan-registry-campaign-dirs.md) | S | R-12 | yes |
 | 3 | [R-16 Three-level test world, two campaigns (done)](issues/R-16-test-world-two-campaigns.md) | S | R-12, R-11a | light |
+| 4 | [R-07b Fog shapes (conceals) dropped by the loader](issues/R-07b-fog-conceals-dropped.md) (before first real Sync) | S | - | yes |
 | 4 | [R-13 Build assembles every world and the map tree](issues/R-13-build-every-world-map-tree.md) | M | R-11b, R-12 | yes |
-| 5 | [R-17 One player output per campaign](issues/R-17-player-output-per-campaign.md) | M | R-13, R-15, R-16 | yes |
+| 5 | [R-17 One player output per campaign](issues/R-17-player-output-per-campaign.md) | M | R-13, R-15, R-16, R-11e | yes |
 | 5 | [R-14 Sync targets any world](issues/R-14-sync-any-world.md) | S-M | R-13 | if visibility |
 | 6 | [R-17b Structural campaign isolation scan](issues/R-17b-campaign-isolation-scan.md) | S-M | R-17 | yes |
 | 7 | [R-18 Fog per campaign, source-driven fog scan](issues/R-18-fog-per-campaign.md) | M | R-17, R-17b | yes |
@@ -50,7 +53,7 @@ R-17b are new (split out of R-11a and R-17 in review).
 
 - **Done 2026-11-08:** Isak accepted every "Open for Isak" recommendation in ADR-0003 and ADR-0004
   and the three fail-closed rules.
-- **Now:** R-10. **Then:** R-11a and R-12 side by side; then R-11b, R-11c, R-11d, R-15, R-16.
+- **Now:** R-11c (merging), R-11e. **Then:** R-13 with R-07b beside it; R-17 (after R-11e) and R-14; R-17b; R-18 and R-19; R-20. R-07 and R-07b before the first real Sync.
 
 Phase 3 and 4 tickets are written before phase 2 ends (plan.md section 5). Phase H (H-01..H-04)
 starts after R-19 at the earliest and before the first real Sync (`tidemarrow/01`).

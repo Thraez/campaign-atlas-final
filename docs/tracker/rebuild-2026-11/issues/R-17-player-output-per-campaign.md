@@ -1,7 +1,7 @@
 # R-17 One player output per campaign: visibility
 
 Status: ready-for-agent
-Blocked by: R-13, R-15, R-16 (plan.md lists R-15, R-16; it builds on R-13's build stages)
+Blocked by: R-13, R-15, R-16, R-11e (plan.md lists R-15, R-16; it builds on R-13's build stages; R-11e: no per-campaign output ships before containment)
 Size: M
 Branch: `rebuild-r17-campaign-outputs`
 Needs: the adversarial player-safety review (`docs/agents/workflow.md`, "Done")
@@ -26,7 +26,7 @@ Today's v1 output (`public/atlas/`, `dist/`) stays as it is.
 - Sentinel fixtures (test-only content roots or `content-next/` items) with unique strings of at
   least 4 characters, not common words, in their names, ids and bodies: an item hidden only via
   `notes:`, an item hidden in one campaign only, a map visible in one campaign only (with a unique
-  image file), a sound area with a unique audio file inside a hidden region, and a world with no
+  image file), a pin, route and sound area with a unique audio file inside a hidden region, and a world with no
   map that ships to one campaign (its id and name are absent from that campaign's output, `worlds`
   and `ocean` included; ADR-0004 rule 5). A test builds both campaigns and greps every file of each output
   (bytes for images and audio: the hidden map's image and the hidden audio file are absent) and
