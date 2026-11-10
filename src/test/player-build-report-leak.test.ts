@@ -28,9 +28,11 @@ function write(rel: string, body: string) {
   fs.writeFileSync(full, body);
 }
 
-// Each DM-only item trips a different world.yaml warning: a region with too
-// few points, a region with a typo'd visibility (loads as dm), a route nested
-// under the wrong map, and a duplicated route id.
+// Each DM-only item trips a different world.yaml warning: a region nested
+// under the wrong map, a region with a typo'd visibility (loads as dm), a
+// route nested under the wrong map, and a duplicated route id. (A DM region
+// the loader drops, too few points or a repeated id, now fails the player
+// build instead: ADR-0004 rule 9, src/test/build/player-build-resolver.test.ts.)
 const WORLD_YAML = `maps:
   - id: m1
     name: Map One
@@ -39,9 +41,10 @@ const WORLD_YAML = `maps:
     layers: []
     regions:
       - id: drow-crypt-entrance
+        mapId: elsewhere
         name: Drow Crypt Entrance
         visibility: dm
-        points: [[0,0],[10,0]]
+        points: [[0,0],[10,0],[10,10]]
       - id: lichs-sanctum
         name: Lich's Sanctum
         visibility: dmm

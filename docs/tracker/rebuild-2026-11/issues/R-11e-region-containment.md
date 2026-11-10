@@ -144,9 +144,10 @@ resolver.
 loop to a fixed point. New reasons `in-hidden-region` and `frame-in-hidden-region`;
 `atlas:tree` lists each shipped map's hidden items with their reasons. The geometry helpers
 (`polygon.ts`) treat an edge as inside, "touches" as shared interior and "contains" as strictly
-inside with no shared boundary. A rotated frame is tested both ways. A hiding region too malformed
-to test hides everything rule 9 tests on its map and fails every player build (exit 12, naming map
-and region). A shipped note left with no pin warns (DM-side only). Rule 8 collisions now fail every
+inside with no shared boundary; an edge running through the other's interior, even entering only
+through its corners (a shape with no width, a zero-width spike), touches. A rotated frame is tested
+both ways. A hiding region too malformed to test (fewer than 3 finite points, or no area) hides
+everything rule 9 tests on its map and fails every player build (exit 12, naming map and region). A shipped note left with no pin warns (DM-side only). Rule 8 collisions now fail every
 player build, not only strict ones (exit 10). The v1 adapter keeps a region with invalid points so
 the resolver can test it.
 
@@ -159,9 +160,13 @@ cross-world parent is `bad-parent`, so frame containment never changes a world o
 test covers the closest case: a `link-hidden` region (its note's world has no shipped map) hides a
 frame and its subtree.
 
-Left as is: v1's world loader (`loadWorldConfig.ts`) still drops a region with fewer than 3 points
-before the resolver, for both the DM and the player build, so that case can't reach exit 12 in v1. In v2 the
-schema refuses it at load, so the build fails.
+v1's world loader (`loadWorldConfig.ts`) still drops a region with fewer than 3 points, or one
+repeating an earlier id, before the resolver; the DM build is unchanged. It now lists what it
+dropped (`droppedRegions`), and the player build fails with exit 12, naming map and region, on any
+of them not marked `visibility: player`. In v2 the schema refuses a short region at load, so the
+build fails.
+
+Review fixes (2026-11-10): the touch test above, the no-area rule, and the dropped-region gate.
 
 ## Answered
 

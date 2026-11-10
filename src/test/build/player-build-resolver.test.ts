@@ -249,8 +249,8 @@ describe("player build: rule 9, hidden regions (R-11e)", () => {
           name: "Drowned Crypt",
           visibility: "dm",
           // A non-finite point (YAML `.nan`): v1's world loader keeps it,
-          // so the resolver sees a region it can't test. (A region with
-          // fewer than 3 points never reaches it: the loader drops it.)
+          // so the resolver sees a region it can't test. (One the loader
+          // drops is covered below.)
           points: [
             [10, 10],
             [90, Number.NaN],
@@ -277,6 +277,132 @@ describe("player build: rule 9, hidden regions (R-11e)", () => {
       const { report } = await build(vault(world, harbor), false, true);
       expect(report.failure).toBeUndefined();
     });
+  });
+
+  describe("a hidden region with no area (all on one line)", () => {
+    const world = foggedWorld({
+      regions: [
+        {
+          id: "seam",
+          mapId: "m1",
+          name: "Seam",
+          visibility: "dm",
+          points: [
+            [10, 10],
+            [50, 50],
+            [90, 90],
+          ],
+        },
+      ],
+    });
+    it("fails the player build with exit 12; the DM build is unaffected", async () => {
+      const { report } = await build(vault(world, harbor), true);
+      expect(report.failure?.exitCode).toBe(12);
+      expect(report.failure?.message).toContain('hidden region "seam"');
+      expect((await build(vault(world, harbor), false, true)).report.failure).toBeUndefined();
+    });
+  });
+
+  describe("a region v1's world loader drops before the resolver sees it (review)", () => {
+    /** Clear of the harbor pin at (100, 100). */
+    const ELSEWHERE = rect(200, 200, 300, 300);
+    const cases: [string, unknown[], boolean][] = [
+      [
+        "a dm region repeating an earlier id",
+        [
+          { id: "vault", mapId: "m1", name: "Vault", visibility: "player", points: ELSEWHERE },
+          {
+            id: "vault",
+            mapId: "m1",
+            name: "Drowned Vault",
+            visibility: "dm",
+            points: rect(50, 50, 150, 150),
+          },
+        ],
+        true,
+      ],
+      [
+        "a dm region with 2 points",
+        [
+          {
+            id: "vault",
+            mapId: "m1",
+            name: "Drowned Vault",
+            visibility: "dm",
+            points: [
+              [50, 50],
+              [150, 150],
+            ],
+          },
+        ],
+        true,
+      ],
+      [
+        "a region with no visibility and 2 points (loads as dm)",
+        [
+          {
+            id: "vault",
+            mapId: "m1",
+            name: "Drowned Vault",
+            points: [
+              [50, 50],
+              [150, 150],
+            ],
+          },
+        ],
+        true,
+      ],
+      [
+        "a player region with 2 points",
+        [
+          {
+            id: "vault",
+            mapId: "m1",
+            name: "Vault",
+            visibility: "player",
+            points: [
+              [50, 50],
+              [150, 150],
+            ],
+          },
+        ],
+        false,
+      ],
+      [
+        "a player region repeating an earlier dm id",
+        [
+          { id: "vault", mapId: "m1", name: "Drowned Vault", visibility: "dm", points: ELSEWHERE },
+          {
+            id: "vault",
+            mapId: "m1",
+            name: "Vault",
+            visibility: "player",
+            points: rect(50, 50, 150, 150),
+          },
+        ],
+        false,
+      ],
+    ];
+
+    it.each(cases)(
+      "%s (the player build fails with exit 12 only if not marked player)",
+      async (_label, regions, fails) => {
+        const world = foggedWorld({ regions });
+        for (const strict of [true, false]) {
+          const { project, report } = await build(vault(world, harbor), true, strict);
+          if (fails) {
+            expect(report.failure?.exitCode).toBe(12);
+            expect(report.failure?.message).toContain('map "m1": region "vault" was dropped');
+            expect(report.badHidingRegions.join("\n")).toContain('region "vault"');
+          } else {
+            expect(report.failure).toBeUndefined();
+          }
+          expect(JSON.stringify(project.buildReport)).not.toContain("Drowned");
+          expect(JSON.stringify(project.buildReport)).not.toContain("was dropped");
+        }
+        expect((await build(vault(world, harbor), false, true)).report.failure).toBeUndefined();
+      },
+    );
   });
 
   describe("a shipped note whose every pin a hidden region hides", () => {

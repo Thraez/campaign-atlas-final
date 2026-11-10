@@ -48,7 +48,12 @@ import { characterKeysPath, parseCharacterKeys } from "../src/atlas/secrets/char
 import { PLAYER_VISIBLE_VISIBILITY, linkLeaksToPlayers, linkTargetLabel } from "./atlas/visibility";
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
 import { filterSoundscapeForPlayer } from "./atlas/filterSoundscape";
-import { playerResolution, resolverFailure, type PlayerResolution } from "./atlas/playerResolution";
+import {
+  droppedRegionMessages,
+  playerResolution,
+  resolverFailure,
+  type PlayerResolution,
+} from "./atlas/playerResolution";
 import { soundAreaIdProblems, soundAreaIdTrusted } from "../src/atlas/content/soundAreaIds";
 import { AtlasModelError } from "../src/atlas/content/atlasModel";
 import { resolveCampaign, type MustNotShip } from "../src/atlas/content/resolveCampaign";
@@ -676,6 +681,13 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
       warnings.push(w);
       hiddenFromPlayer.add(w);
     }
+  }
+  // v1: regions the world loader dropped before the resolver saw them fail
+  // the player build unless marked player (rule 9; exit 12 below).
+  const droppedRegions = flags.player ? droppedRegionMessages(bm.v1Source?.droppedRegions) : [];
+  for (const w of droppedRegions) {
+    warnings.push(w);
+    hiddenFromPlayer.add(w);
   }
   // v2: a note whose frontmatter ships but that no campaign ships says why.
   for (const w of notesShippingNowhere(
@@ -1483,7 +1495,7 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     crossRefLeaks,
     nameCollisions: res?.collisionMessages ?? [],
     orphanEntries: res?.orphanMessages ?? [],
-    badHidingRegions: res?.badHidingRegionMessages ?? [],
+    badHidingRegions: [...(res?.badHidingRegionMessages ?? []), ...droppedRegions],
     hiddenPinNotes: res?.hiddenPinNoteMessages ?? [],
     ...(res ? { mustNotShip: res.resolution.mustNotShip } : {}),
     consoleWarnings: bm.consoleWarnings,
