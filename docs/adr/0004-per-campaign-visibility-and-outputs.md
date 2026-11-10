@@ -79,6 +79,17 @@ decides visibility.
    the player build. Items hidden by this rule join must-not-ship as in rule 8; a note stays
    decided by rule 6, with a build warning when all its pins are hidden this way. A pin hidden by
    this rule adds its location to must-not-ship, not its note's name.
+   Geometry is in the map's pixels, even-odd, on the points as written. A point on a hiding
+   region's edge is inside. Two areas *touch* when they share interior: a vertex of one strictly
+   inside the other, two edges properly crossing, or (for overlaps with no such vertex or crossing,
+   such as identical shapes) a point of both interiors. Neighbours sharing only an edge or a
+   corner don't touch. *Wholly contains* means every point of the hiding region is strictly
+   inside the item, sharing no boundary. A rotated frame is tested as both quads of `frameQuads`.
+   Frames need note verdicts (a `link-hidden` region), so the resolver repeats maps, worlds, notes,
+   region verdicts and frame containment until nothing more hides. "Too malformed to test" means
+   fewer than 3 finite points. Such a region hides everything this rule tests on its map, and
+   every player build, strict or not, fails (exit 12). Rule 8's collisions also fail every player
+   build, strict or not (exit 10).
 
 **The campaign note default (`notes:` in the campaign file).** Rule 1 makes every `world.yaml` item
 start hidden in a new campaign, but a note's frontmatter value is one value for every campaign, so
@@ -157,3 +168,9 @@ own store as the atlas dir.
   over a shipped region covering the same point. Fail closed like rules 3 and 4. The container
   exception (an area wholly containing a hidden region still ships) and leaving fog-only regions
   out were decided by the agent for Isak to overrule.
+- 2026-11-10: R-11e built rule 9 and filled in its gaps. It defines the geometry ("touches",
+  "wholly contains", rotated frames), the fixed point for frames, and what "too malformed" means.
+  A malformed hiding region now fails every player build, not only strict ones, and hides what
+  rule 9 tests on its map. The warning fires when a shipped note has no shipping pin and at
+  least one of its pins was hidden by rule 9. Rule 8 collisions fail every player build, as the
+  rule says; the code had failed only strict ones (coordinator call, `State.md`).

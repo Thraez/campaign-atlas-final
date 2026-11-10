@@ -1,6 +1,6 @@
 # R-11e A hidden region hides what is inside or reaching into it
 
-Status: ready-for-agent
+Status: done
 Blocked by: R-11a (done). Blocks: R-17. R-11b is done: the build already drops on any non-`ships` verdict (pins `scripts/atlas/playerResolution.ts:94`, regions `build-atlas.ts:851-855`, routes `build-atlas.ts:982`, sound `soundShips`), so the new reasons take effect through the resolver
 Size: S-M
 Branch: `rebuild-r11e-region-containment`
@@ -137,6 +137,31 @@ resolver.
 - Hiding a note because its pins are hidden (a warning only; the note's visibility is the DM's).
 - The editor showing what a hidden region hides (E11 preview is a caller of the resolver).
 - The fog scan and isolation scan (R-17b, R-18 read the resolver's must-not-ship set).
+
+## Done
+
+`resolveCampaign` applies rule 9: region own-verdicts come first, then pins, routes and sound; frames
+loop to a fixed point. New reasons `in-hidden-region` and `frame-in-hidden-region`;
+`atlas:tree` lists each shipped map's hidden items with their reasons. The geometry helpers
+(`polygon.ts`) treat an edge as inside, "touches" as shared interior and "contains" as strictly
+inside with no shared boundary. A rotated frame is tested both ways. A hiding region too malformed
+to test hides everything rule 9 tests on its map and fails every player build (exit 12, naming map
+and region). A shipped note left with no pin warns (DM-side only). Rule 8 collisions now fail every
+player build, not only strict ones (exit 10). The v1 adapter keeps a region with invalid points so
+the resolver can test it.
+
+`content-next/` has the new cases, and the known-gap test is a plain test. The v1 player and DM
+`atlas.json` and `search-index.json` are unchanged (checked against origin/main from a
+`git archive` copy).
+
+Not reachable: a world losing its last map in pass 2. A world's root maps have no frame, and a
+cross-world parent is `bad-parent`, so frame containment never changes a world or note verdict. The
+test covers the closest case: a `link-hidden` region (its note's world has no shipped map) hides a
+frame and its subtree.
+
+Left as is: v1's world loader (`loadWorldConfig.ts`) still drops a region with fewer than 3 points
+before the resolver, for both the DM and the player build, so that case can't reach exit 12 in v1. In v2 the
+schema refuses it at load, so the build fails.
 
 ## Answered
 
