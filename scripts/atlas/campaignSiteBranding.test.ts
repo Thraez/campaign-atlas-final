@@ -8,7 +8,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { CAMPAIGN_PUBLIC_DIR_ENV } from "./campaignSitePublicDir";
-import { brandIndexHtml, brandManifest, campaignSiteName } from "./campaignSiteBranding";
+import {
+  brandIndexHtml,
+  brandManifest,
+  campaignSiteName,
+  siteIdentityFindings,
+} from "./campaignSiteBranding";
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const INDEX_HTML = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
@@ -86,5 +91,76 @@ describe("brandManifest", () => {
     expect(m.short_name).toBe("Lantern Road");
     expect(m.description).toContain("Lantern Road");
     expect(JSON.stringify(m)).not.toMatch(/Astrath/i);
+  });
+});
+
+describe("siteIdentityFindings: an allowlist over the whole head and manifest", () => {
+  const NAME = "Lantern Road";
+  function site(edit: (html: string) => string = (h) => h, manifest?: unknown): string {
+    const d = fs.mkdtempSync(path.join(os.tmpdir(), "identity-"));
+    tmp.push(d);
+    fs.writeFileSync(path.join(d, "index.html"), edit(brandIndexHtml(INDEX_HTML, NAME)));
+    fs.writeFileSync(
+      path.join(d, "manifest.webmanifest"),
+      JSON.stringify(
+        manifest ?? {
+          ...brandManifest(NAME),
+          start_url: "./atlas",
+          display: "standalone",
+          background_color: "#0f1a22",
+          theme_color: "#18313f",
+          lang: "en",
+          scope: "./",
+          icons: [{ src: "icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+        },
+      ),
+    );
+    return d;
+  }
+  const addToHead = (tag: string) => (h: string) => h.replace("</head>", `${tag}\n</head>`);
+
+  it("passes the site the build writes", () => {
+    expect(siteIdentityFindings(site(), NAME)).toEqual([]);
+  });
+
+  it("checks a naming tag whatever its attribute order", () => {
+    const d = site((h) =>
+      h.replace(
+        /<meta property="og:title" content="[^"]*">/,
+        '<meta content="Astrath Deeprealm" property="og:title">',
+      ),
+    );
+    expect(siteIdentityFindings(d, NAME).join("\n")).toMatch(/og:title.*Astrath/);
+  });
+
+  it("fails a meta it does not know, such as og:site_name naming another world", () => {
+    const d = site(addToHead('<meta property="og:site_name" content="Astrath Deeprealm">'));
+    expect(siteIdentityFindings(d, NAME).join("\n")).toMatch(/og:site_name/);
+    const e = site(addToHead('<meta name="application-name" content="Sandbox">'));
+    expect(siteIdentityFindings(e, NAME).join("\n")).toMatch(/application-name/);
+  });
+
+  it("fails a neutral meta whose value is not the known one", () => {
+    const d = site((h) => h.replace('content="website"', 'content="Astrath Deeprealm"'));
+    expect(siteIdentityFindings(d, NAME).join("\n")).toMatch(/og:type/);
+  });
+
+  it("fails any share image left in", () => {
+    const d = site(addToHead('<meta name="twitter:image" content="https://x/y.png">'));
+    expect(siteIdentityFindings(d, NAME).join("\n")).toMatch(/twitter:image/);
+  });
+
+  it("fails page text outside the title, such as noscript", () => {
+    const d = site((h) =>
+      h.replace("<body>", "<body><noscript>The complete world of Astrath Deeprealm</noscript>"),
+    );
+    expect(siteIdentityFindings(d, NAME).join("\n")).toMatch(/text.*Astrath/);
+  });
+
+  it("fails any manifest text it does not know", () => {
+    const d = site(undefined, { ...brandManifest(NAME), categories: ["Astrath Deeprealm"] });
+    expect(siteIdentityFindings(d, NAME).join("\n")).toMatch(/categories/);
+    const e = site(undefined, { ...brandManifest(NAME), display: "Astrath" });
+    expect(siteIdentityFindings(e, NAME).join("\n")).toMatch(/display/);
   });
 });

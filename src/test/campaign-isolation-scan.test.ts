@@ -22,6 +22,7 @@ import {
 import type { MustNotShipFile } from "../../scripts/atlas/build/campaignStore";
 import { findSecretsInText } from "../../scripts/check-derived-secrets";
 import { brandIndexHtml, brandManifest } from "../../scripts/atlas/campaignSiteBranding";
+import { listTextFiles } from "../../scripts/atlas/playerArtifact";
 
 const ISO_CONTENT = path.resolve(__dirname, "fixtures/campaign-isolation/content");
 const INDEX_HTML = fs.readFileSync(path.resolve(__dirname, "../../index.html"), "utf8");
@@ -807,5 +808,14 @@ describe("check-campaign-isolation: a built site names only its own campaign (ex
     buildSite(p);
     edit(p, "index.html", (h) => h.replace(/<title>[^<]*<\/title>/, ""));
     expect(scan(p, "built-site")).toBe(EXIT.structural);
+  });
+});
+
+describe("check-campaign-isolation: the text pass reads the site's head and manifest", () => {
+  it("searches index.html and manifest.webmanifest for hidden and other campaigns' names", () => {
+    const o = output();
+    buildSite(o);
+    const files = listTextFiles(o.site, "test").files.map((f) => path.relative(o.site, f));
+    expect(files).toEqual(expect.arrayContaining(["index.html", "manifest.webmanifest"]));
   });
 });

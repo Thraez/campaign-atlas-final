@@ -88,16 +88,41 @@ export function brandManifest(name: string): {
   return { name, short_name: name, description: `${description(name)}.` };
 }
 
-/** The head tags that name the site, as `brandIndexHtml` writes them. */
-const NAMING_TAGS: Array<[label: string, re: RegExp]> = [
-  ["title", /<title>([^<]*)<\/title>/g],
-  ["description", /<meta name="description" content="([^"]*)"/g],
-  ["apple-mobile-web-app-title", /<meta name="apple-mobile-web-app-title" content="([^"]*)"/g],
-  ["og:title", /<meta property="og:title" content="([^"]*)"/g],
-  ["twitter:title", /<meta name="twitter:title" content="([^"]*)"/g],
-  ["og:description", /<meta property="og:description" content="([^"]*)"/g],
-  ["twitter:description", /<meta name="twitter:description" content="([^"]*)"/g],
-];
+/** Meta keys (`name`/`property`) whose content names the site: it must be this campaign's. */
+const NAMING_META = new Set([
+  "description",
+  "apple-mobile-web-app-title",
+  "og:title",
+  "twitter:title",
+  "og:description",
+  "twitter:description",
+]);
+
+/** Meta keys that name nothing, each with the one value the app's shell gives it. */
+const NEUTRAL_META: Record<string, string> = {
+  charset: "utf-8",
+  viewport: "width=device-width, initial-scale=1.0, viewport-fit=cover",
+  "theme-color": "#18313f",
+  "apple-mobile-web-app-capable": "yes",
+  "apple-mobile-web-app-status-bar-style": "black-translucent",
+  "og:type": "website",
+  "twitter:card": "summary_large_image",
+};
+
+/** Manifest keys holding the site's name, and the keys that name nothing. */
+const NAMING_MANIFEST = new Set(["name", "short_name", "description"]);
+const NEUTRAL_MANIFEST: Record<string, RegExp> = {
+  start_url: /^\.?\/[\w\-./]*$/,
+  scope: /^\.?\/[\w\-./]*$/,
+  display: /^(standalone|fullscreen|minimal-ui|browser)$/,
+  background_color: /^#[0-9a-f]{3,8}$/i,
+  theme_color: /^#[0-9a-f]{3,8}$/i,
+  lang: /^[a-z]{2}(-[A-Za-z]{2})?$/,
+  src: /^icons\/[\w\-.]+\.png$/,
+  sizes: /^\d+x\d+$/,
+  type: /^image\/png$/,
+  purpose: /^(any|maskable|any maskable)$/,
+};
 
 const unescapeHtml = (s: string): string =>
   s
@@ -107,42 +132,101 @@ const unescapeHtml = (s: string): string =>
     .replace(/&gt;/g, ">")
     .replace(/&amp;/g, "&");
 
+/** A tag's attributes, in any order, names lower-cased, values unescaped. */
+function attributes(tag: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const m of tag.matchAll(/([^\s=/<>"']+)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g)) {
+    const key = m[1].toLowerCase();
+    if (key === "meta") continue;
+    out[key] = unescapeHtml(m[2] ?? m[3] ?? m[4] ?? "");
+  }
+  return out;
+}
+
 /**
  * A built campaign site names only its own campaign (the isolation scan's
- * site pass): every naming tag in `index.html` and the manifest's `name`,
- * `short_name` and `description` are exactly what `brandIndexHtml` and
- * `brandManifest` write for `name`. Anything else (another campaign, the v1
- * world, a hidden note's name of any length) is a finding, as is a missing
- * title, manifest or manifest name.
+ * site pass). An allowlist, not a search:
+ *   - every `<meta>` in `index.html` (attributes in any order) is a naming
+ *     tag whose content is this campaign's name (or `brandIndexHtml`'s
+ *     description of it), or a neutral tag with its one known value; any
+ *     other meta, a share image included, is a finding;
+ *   - every `<title>` is the name, and there is one; no other page text
+ *     (outside scripts and styles) exists, so a `<noscript>` can't name a world;
+ *   - every string in the manifest is a naming key with the name, or a
+ *     neutral key matching its pattern; anything else is a finding.
+ * The isolation text pass searches both files for other campaigns' and
+ * must-not-ship names besides.
  */
 export function siteIdentityFindings(siteDir: string, name: string): string[] {
   const allowed = new Set([name, description(name), `${description(name)}.`]);
   const out: string[] = [];
-  const check = (where: string, value: unknown) => {
-    if (typeof value !== "string" || !allowed.has(value)) {
-      out.push(`${where} is ${JSON.stringify(value)}, not this campaign's own name ("${name}")`);
-    }
-  };
+  const show = (v: unknown) => JSON.stringify(v);
   let html: string;
   try {
     html = fs.readFileSync(path.join(siteDir, "index.html"), "utf8");
   } catch {
-    return [...out, "index.html: missing, so the site's name can't be checked"];
+    return ["index.html: missing, so the site's name can't be checked"];
   }
-  for (const [label, re] of NAMING_TAGS) {
-    const hits = [...html.matchAll(re)];
-    if (label === "title" && hits.length === 0) out.push("index.html: no title");
-    for (const h of hits) check(`index.html ${label}`, unescapeHtml(h[1]));
+
+  for (const [tag] of html.matchAll(/<meta\b[^>]*>/gi)) {
+    const a = attributes(tag);
+    const key = a.charset !== undefined ? "charset" : (a.name ?? a.property ?? a["http-equiv"]);
+    const value = key === "charset" ? a.charset.toLowerCase() : a.content;
+    if (key === undefined) {
+      out.push(`index.html ${tag}: a meta naming no key`);
+    } else if (NAMING_META.has(key)) {
+      if (!allowed.has(value ?? "")) {
+        out.push(`index.html ${key} is ${show(value)}, not this campaign's own name ("${name}")`);
+      }
+    } else if (key in NEUTRAL_META) {
+      if (value !== NEUTRAL_META[key]) {
+        out.push(`index.html ${key} is ${show(value)}, not ${show(NEUTRAL_META[key])}`);
+      }
+    } else {
+      out.push(`index.html ${key}: a meta the site build doesn't write (${show(value)})`);
+    }
   }
-  let manifest: Record<string, unknown>;
+
+  const titles = [...html.matchAll(/<title\b[^>]*>([\s\S]*?)<\/title>/gi)];
+  if (titles.length === 0) out.push("index.html: no title");
+  for (const t of titles) {
+    const v = unescapeHtml(t[1]).trim();
+    if (!allowed.has(v)) out.push(`index.html title is ${show(v)}, not this campaign's own name`);
+  }
+  const text = unescapeHtml(
+    html
+      .replace(/<!--[\s\S]*?-->/g, " ")
+      .replace(/<(script|style|title)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+      .replace(/<[^>]*>/g, " "),
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+  if (text) out.push(`index.html text outside the title: ${show(text)}`);
+
+  let manifest: unknown;
   try {
     manifest = JSON.parse(fs.readFileSync(path.join(siteDir, "manifest.webmanifest"), "utf8"));
   } catch (e) {
     return [...out, `manifest.webmanifest: missing or not JSON (${(e as Error).message})`];
   }
-  for (const k of ["name", "short_name", "description"]) {
-    if (k === "description" && manifest[k] === undefined) continue;
-    check(`manifest.webmanifest ${k}`, manifest[k]);
+  const m = manifest as Record<string, unknown>;
+  for (const k of ["name", "short_name"]) {
+    if (m?.[k] === undefined) out.push(`manifest.webmanifest: no ${k}`);
   }
+  const walk = (v: unknown, where: string, key: string) => {
+    if (Array.isArray(v)) v.forEach((x, i) => walk(x, `${where}[${i}]`, key));
+    else if (v && typeof v === "object") {
+      for (const [k, x] of Object.entries(v)) walk(x, where ? `${where}.${k}` : k, k);
+    } else if (typeof v === "string") {
+      if (NAMING_MANIFEST.has(key) && where === key) {
+        if (!allowed.has(v)) {
+          out.push(`manifest.webmanifest ${key} is ${show(v)}, not this campaign's own name`);
+        }
+      } else if (!(key in NEUTRAL_MANIFEST) || !NEUTRAL_MANIFEST[key].test(v)) {
+        out.push(`manifest.webmanifest ${where} is ${show(v)}: not a value the site build writes`);
+      }
+    }
+  };
+  walk(manifest, "", "");
   return out;
 }
