@@ -28,6 +28,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 import { runBuild } from "../../../scripts/build-atlas";
+import { brandIndexHtml, brandManifest } from "../../../scripts/atlas/campaignSiteBranding";
 import {
   readMustNotShip,
   STORES_ROOT_MARKER,
@@ -317,11 +318,22 @@ describe("R-17: one player store per campaign", () => {
   });
 
   it("every registry scan passes on both campaigns' outputs", async () => {
-    // The built site is the store under `atlas/` beside the app (R-18 builds it).
+    // The built site is the store under `atlas/` beside the app, named for its
+    // campaign as the site build names it (R-19).
+    const shell = fs.readFileSync(path.resolve(__dirname, "../../../index.html"), "utf8");
     for (const c of Object.keys(CAMPAIGNS)) {
       const site = path.join(root, "dist-campaigns", c);
       fs.cpSync(storeOf(root, c), path.join(site, "atlas"), { recursive: true });
-      fs.writeFileSync(path.join(site, "index.html"), "<!doctype html><title>Atlas</title>");
+      const name = (
+        JSON.parse(fs.readFileSync(path.join(storeOf(root, c), "atlas.json"), "utf8")) as {
+          campaign: { name: string };
+        }
+      ).campaign.name;
+      fs.writeFileSync(path.join(site, "index.html"), brandIndexHtml(shell, name));
+      fs.writeFileSync(
+        path.join(site, "manifest.webmanifest"),
+        JSON.stringify(brandManifest(name)),
+      );
     }
     const ctx = {
       root,

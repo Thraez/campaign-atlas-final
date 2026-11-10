@@ -351,6 +351,8 @@ export default function AtlasViewer() {
   const worldCredits = data?.project.worlds[0]?.credits;
   const worldAssetCredits = data?.project.worlds[0]?.assetCredits;
   const worldName = data?.project.worlds[0]?.name ?? "Atlas";
+  /** The loaded atlas's own name: its campaign in a v2 build, else its world. */
+  const siteName = data?.project.campaign?.name ?? worldName;
 
   /** A few entries to offer in the reading panel before anything is opened. */
   const starterEntries = useMemo(() => {
@@ -913,6 +915,7 @@ export default function AtlasViewer() {
                 }
                 credits={worldCredits}
                 assetCredits={worldAssetCredits}
+                siteName={siteName}
               />
             </aside>
           ) : (
@@ -955,6 +958,7 @@ export default function AtlasViewer() {
                 onPeekLeave={peekCtl.onTriggerLeave}
                 credits={worldCredits}
                 assetCredits={worldAssetCredits}
+                siteName={siteName}
               />
             </SheetContent>
           </Sheet>

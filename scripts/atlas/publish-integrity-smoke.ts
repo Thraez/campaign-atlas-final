@@ -857,6 +857,17 @@ async function campaignVariants(configPath: string): Promise<VariantResult[]> {
     isolation("A file in the site's atlas dir that its store lacks", 25, "built-site", (c) => {
       fs.writeFileSync(path.join(c.site, "atlas", "extra.json"), "{}");
     });
+    const otherName =
+      readMustNotShip(mns).otherCampaigns.find((o) => o.id === other)?.name ?? "Astrath Deeprealm";
+    isolation("Another campaign's name in the site's title", 23, "built-site", (c) => {
+      const html = path.join(c.site, "index.html");
+      fs.writeFileSync(
+        html,
+        fs
+          .readFileSync(html, "utf8")
+          .replace(/<title>[^<]*<\/title>/, `<title>${otherName}</title>`),
+      );
+    });
   }
   return results;
 }

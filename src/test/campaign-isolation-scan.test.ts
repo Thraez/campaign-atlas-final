@@ -21,8 +21,10 @@ import {
 } from "../../scripts/check-campaign-isolation";
 import type { MustNotShipFile } from "../../scripts/atlas/build/campaignStore";
 import { findSecretsInText } from "../../scripts/check-derived-secrets";
+import { brandIndexHtml, brandManifest } from "../../scripts/atlas/campaignSiteBranding";
 
 const ISO_CONTENT = path.resolve(__dirname, "fixtures/campaign-isolation/content");
+const INDEX_HTML = fs.readFileSync(path.resolve(__dirname, "../../index.html"), "utf8");
 
 const tmps: string[] = [];
 afterAll(() => {
@@ -202,10 +204,17 @@ function write(o: Out) {
   put(o.mns, JSON.stringify(o.m));
 }
 
-/** The built site: the store under `atlas/`, plus an app shell and a bundle. */
+/** The built site: the store under `atlas/`, plus an app shell named for campaign A and a bundle. */
 function buildSite(o: Out) {
   fs.cpSync(o.store, path.join(o.site, "atlas"), { recursive: true });
-  put(path.join(o.site, "index.html"), '<!doctype html><div id="main"></div>');
+  put(
+    path.join(o.site, "index.html"),
+    brandIndexHtml(INDEX_HTML, "Campaign A").replace("<body>", '<body><div id="main"></div>'),
+  );
+  put(
+    path.join(o.site, "manifest.webmanifest"),
+    JSON.stringify({ ...brandManifest("Campaign A"), start_url: "./atlas" }),
+  );
   // Short ids as ordinary substrings of a bundle: `main`, `a`.
   put(
     path.join(o.site, "assets", "index-abc123.js"),
@@ -753,5 +762,50 @@ describe("check-campaign-isolation: bad input fails closed (exit 1)", () => {
     o.m.campaign = "zzz";
     write(o);
     expect(scan(o)).toBe(1);
+  });
+});
+
+describe("check-campaign-isolation: a built site names only its own campaign (exit 23)", () => {
+  const site = (o: Out, rel: string) => path.join(o.site, rel);
+  const edit = (o: Out, rel: string, fn: (s: string) => string) =>
+    put(site(o, rel), fn(fs.readFileSync(site(o, rel), "utf8")));
+
+  it("fails a title naming another campaign", () => {
+    const o = output();
+    buildSite(o);
+    edit(o, "index.html", (h) =>
+      h.replace("<title>Campaign A</title>", "<title>Lantern Road</title>"),
+    );
+    expect(scan(o, "built-site")).toBe(EXIT.structural);
+    expect(errors()).toMatch(/index\.html.*title/);
+  });
+
+  it("fails an og:title naming a world that is not this campaign (the v1 shell)", () => {
+    const o = output();
+    buildSite(o);
+    const branded = fs.readFileSync(site(o, "index.html"), "utf8");
+    const v1Og = INDEX_HTML.match(/<meta property="og:title"[^>]*>/)![0];
+    put(site(o, "index.html"), branded.replace(/<meta property="og:title"[^>]*>/, v1Og));
+    expect(scan(o, "built-site")).toBe(EXIT.structural);
+    expect(errors()).toMatch(/og:title/);
+  });
+
+  it("fails a manifest short_name holding a short must-not-ship name the text search skips", () => {
+    const o = output();
+    buildSite(o);
+    edit(o, "manifest.webmanifest", (j) => JSON.stringify({ ...JSON.parse(j), short_name: "Bog" }));
+    expect(scan(o, "built-site")).toBe(EXIT.structural);
+    expect(errors()).toMatch(/manifest\.webmanifest.*short_name/);
+  });
+
+  it("fails a site with no manifest or no title", () => {
+    const o = output();
+    buildSite(o);
+    fs.rmSync(site(o, "manifest.webmanifest"));
+    expect(scan(o, "built-site")).toBe(EXIT.structural);
+    const p = output();
+    buildSite(p);
+    edit(p, "index.html", (h) => h.replace(/<title>[^<]*<\/title>/, ""));
+    expect(scan(p, "built-site")).toBe(EXIT.structural);
   });
 });

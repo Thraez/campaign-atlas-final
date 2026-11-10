@@ -99,9 +99,6 @@ const GENERIC_NAMES = new Set([
   "secret",
   "note",
   "notes",
-  // A content root's README.md is excluded, so its title is derived, and every
-  // site build's bundle holds the word (R-19).
-  "readme",
 ]);
 
 export interface SecretEntry {
@@ -150,7 +147,20 @@ export function deriveSecretsFromVault(configPath: string): SecretEntry[] {
     include: cfg.include ?? [],
     exclude: cfg.exclude ?? [],
   });
-  const secretNotes = [...scan.notes.filter((n) => n.isSecret), ...scan.excluded];
+  // The content root's own README.md, with no frontmatter, is the folder's
+  // readme, not a note: its derived title ("README") is in every site bundle
+  // (R-19 review). Any other excluded file, a hidden note titled "Readme" or a
+  // README.md with frontmatter included, still counts.
+  const rootReadme = path
+    .relative(path.dirname(configPath), path.join(contentDir, "README.md"))
+    .replace(/\\/g, "/")
+    .toLowerCase();
+  const secretNotes = [
+    ...scan.notes.filter((n) => n.isSecret),
+    ...scan.excluded.filter(
+      (n) => n.relPath.toLowerCase() !== rootReadme || Object.keys(n.data).length > 0,
+    ),
+  ];
   const secrets: SecretEntry[] = [];
   for (const note of secretNotes) {
     const rel = note.relPath;

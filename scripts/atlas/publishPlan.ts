@@ -6,7 +6,7 @@
  * build into `dist/`, then the scan registry. So `publish-atlas.yml` and the
  * gate need no change.
  *
- * v2 content (`atlas.next.config.json`): the strict player build writes every
+ * v2 content (a v2 config): the strict player build writes every
  * campaign's store (`<outputDir>/<id>/atlas/`, R-17); the plain site build
  * still writes `dist/` (R-15 scans it as the `(legacy)` pair, and the deploy
  * uploads it); then, per campaign, a public dir is staged holding the app's
@@ -140,9 +140,25 @@ export function publishPlan({
 }
 
 /**
- * Write `dest` (replacing it) as a campaign site's public dir: every entry of
- * `publicDir` but `atlas/`, then the campaign's store as `atlas/`. Refuses a
- * store without `atlas.json` and any link in either source.
+ * The app's static files a campaign site copies from `public/` (posix, relative).
+ * An allowlist: anything else in `public/` but `atlas/` (and macOS's
+ * `.DS_Store`, never copied) fails the staging, so a stray file can't ship.
+ * Add a file here when the app gains one.
+ */
+export const CAMPAIGN_SITE_STATIC_FILES: readonly string[] = [
+  "favicon.ico",
+  "icons/apple-touch-icon.png",
+  "icons/icon-192.png",
+  "icons/icon-512.png",
+  "placeholder.svg",
+  "robots.txt",
+];
+
+/**
+ * Write `dest` (replacing it) as a campaign site's public dir: the
+ * `CAMPAIGN_SITE_STATIC_FILES` from `publicDir`, then the campaign's store as
+ * `atlas/`. Refuses a store without `atlas.json`, a file in `publicDir` the
+ * list doesn't name, a listed file that is missing, and any link.
  */
 export function stageCampaignPublicDir({
   publicDir,
@@ -162,14 +178,35 @@ export function stageCampaignPublicDir({
     }
     return true;
   };
+  const allowed = new Set(CAMPAIGN_SITE_STATIC_FILES);
+  const unexpected: string[] = [];
+  const walk = (dir: string, rel: string) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (r === "atlas" || e.name === ".DS_Store") continue;
+      noLinks(path.join(dir, e.name));
+      if (e.isDirectory()) walk(path.join(dir, e.name), r);
+      else if (!allowed.has(r)) unexpected.push(r);
+    }
+  };
+  walk(publicDir, "");
+  const missing = CAMPAIGN_SITE_STATIC_FILES.filter(
+    (r) => !fs.statSync(path.join(publicDir, r), { throwIfNoEntry: false })?.isFile(),
+  );
+  if (unexpected.length > 0 || missing.length > 0) {
+    throw new Error(
+      `stage: ${publicDir} is not the app's static files (CAMPAIGN_SITE_STATIC_FILES): ` +
+        [
+          ...unexpected.map((r) => `${r} is not on the list`),
+          ...missing.map((r) => `${r} is missing`),
+        ].join("; "),
+    );
+  }
   fs.rmSync(dest, { recursive: true, force: true });
   fs.mkdirSync(dest, { recursive: true });
-  for (const name of fs.readdirSync(publicDir)) {
-    if (name === "atlas") continue;
-    fs.cpSync(path.join(publicDir, name), path.join(dest, name), {
-      recursive: true,
-      filter: noLinks,
-    });
+  for (const r of CAMPAIGN_SITE_STATIC_FILES) {
+    fs.mkdirSync(path.dirname(path.join(dest, r)), { recursive: true });
+    fs.copyFileSync(path.join(publicDir, r), path.join(dest, r));
   }
   fs.cpSync(storeDir, path.join(dest, "atlas"), { recursive: true, filter: noLinks });
 }

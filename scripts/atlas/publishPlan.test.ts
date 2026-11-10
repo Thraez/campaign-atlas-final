@@ -11,6 +11,7 @@ import path from "node:path";
 import {
   parsePublishArgs,
   publishPlan,
+  CAMPAIGN_SITE_STATIC_FILES,
   stageCampaignPublicDir,
   type PublishStep,
 } from "./publishPlan";
@@ -140,12 +141,59 @@ describe("publishPlan: v2 content", () => {
   });
 });
 
+/** The app's static files, as public/ holds them. */
+function writeStatic(pub: string) {
+  for (const f of CAMPAIGN_SITE_STATIC_FILES) write(path.join(pub, f));
+}
+
 describe("stageCampaignPublicDir", () => {
+  it("allows exactly the app's static files in public/ today", () => {
+    const pub = path.join(ROOT, "public");
+    const today = filesUnder(pub).filter(
+      (f) => !f.startsWith("atlas/") && !f.endsWith(".DS_Store"),
+    );
+    expect(today).toEqual([...CAMPAIGN_SITE_STATIC_FILES].sort());
+  });
+
+  it("fails on a file in public/ it does not know, and copies no .DS_Store", () => {
+    const root = tmp("stray");
+    const pub = path.join(root, "public");
+    writeStatic(pub);
+    write(path.join(pub, ".DS_Store"));
+    write(path.join(pub, "icons", ".DS_Store"));
+    const store = path.join(root, "store", "atlas");
+    write(path.join(store, "atlas.json"));
+    const dest = path.join(root, "d");
+    stageCampaignPublicDir({ publicDir: pub, storeDir: store, dest });
+    expect(filesUnder(dest).filter((f) => f.includes(".DS_Store"))).toEqual([]);
+
+    write(path.join(pub, "secret.txt"));
+    expect(() => stageCampaignPublicDir({ publicDir: pub, storeDir: store, dest })).toThrow(
+      /secret\.txt/,
+    );
+    fs.rmSync(path.join(pub, "secret.txt"));
+    write(path.join(pub, "icons", "dm-map.png"));
+    expect(() => stageCampaignPublicDir({ publicDir: pub, storeDir: store, dest })).toThrow(
+      /icons\/dm-map\.png/,
+    );
+  });
+
+  it("fails when an allowed static file is missing", () => {
+    const root = tmp("missing-static");
+    const pub = path.join(root, "public");
+    writeStatic(pub);
+    fs.rmSync(path.join(pub, "robots.txt"));
+    const store = path.join(root, "store", "atlas");
+    write(path.join(store, "atlas.json"));
+    expect(() =>
+      stageCampaignPublicDir({ publicDir: pub, storeDir: store, dest: path.join(root, "d") }),
+    ).toThrow(/robots\.txt/);
+  });
+
   it("holds the app's static files and this campaign's store as atlas/, nothing else", () => {
     const root = tmp("stage");
     const pub = path.join(root, "public");
-    write(path.join(pub, "robots.txt"));
-    write(path.join(pub, "icons", "icon-192.png"));
+    writeStatic(pub);
     write(path.join(pub, "atlas", "atlas.json"), "v1");
     write(path.join(pub, "atlas", ".last-published.json"), "v1");
     write(path.join(pub, "atlas", "assets", "maps", "v1.webp"));
@@ -163,32 +211,33 @@ describe("stageCampaignPublicDir", () => {
       storeDir: path.join(stores, "a", "atlas"),
       dest,
     });
-    expect(filesUnder(dest)).toEqual([
-      "atlas/assets/maps/0123456789abcdef.png",
-      "atlas/atlas.json",
-      "atlas/search-index.json",
-      "icons/icon-192.png",
-      "robots.txt",
-    ]);
+    expect(filesUnder(dest)).toEqual(
+      [
+        "atlas/assets/maps/0123456789abcdef.png",
+        "atlas/atlas.json",
+        "atlas/search-index.json",
+        ...CAMPAIGN_SITE_STATIC_FILES,
+      ].sort(),
+    );
     expect(fs.readFileSync(path.join(dest, "atlas", "atlas.json"), "utf8")).toBe("a");
   });
 
   it("replaces an earlier staging whole", () => {
     const root = tmp("restage");
     const pub = path.join(root, "public");
-    write(path.join(pub, "robots.txt"));
+    writeStatic(pub);
     const store = path.join(root, "store", "atlas");
     write(path.join(store, "atlas.json"));
     const dest = path.join(root, "staged");
     write(path.join(dest, "atlas", "stale.json"));
     stageCampaignPublicDir({ publicDir: pub, storeDir: store, dest });
-    expect(filesUnder(dest)).toEqual(["atlas/atlas.json", "robots.txt"]);
+    expect(filesUnder(dest)).toEqual(["atlas/atlas.json", ...CAMPAIGN_SITE_STATIC_FILES].sort());
   });
 
   it("refuses a store with no atlas.json and copies no link", () => {
     const root = tmp("nostore");
     const pub = path.join(root, "public");
-    write(path.join(pub, "robots.txt"));
+    writeStatic(pub);
     const store = path.join(root, "store", "atlas");
     fs.mkdirSync(store, { recursive: true });
     expect(() =>

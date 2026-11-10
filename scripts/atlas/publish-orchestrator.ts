@@ -7,8 +7,8 @@
  * Publish check reads the same list.
  *
  * Usage: `tsx scripts/atlas/publish-orchestrator.ts [--config <file>]`
- * (default `atlas.config.json`; `atlas.next.config.json` scans every campaign
- * of the test world, R-19).
+ * (default `atlas.config.json`; a v2 config scans every campaign
+ * of its content, R-19).
  *
  * Exit codes:
  *   0   all scans clean

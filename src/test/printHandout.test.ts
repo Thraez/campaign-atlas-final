@@ -387,3 +387,73 @@ describe("Q16: pop-up guard — toast instead of alert", () => {
     expect(fakeDoc.write).toHaveBeenCalledOnce();
   });
 });
+
+describe("R-19: handout names the loaded atlas, sanitizes, and opens", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  function mockPopupAllowed() {
+    const fakeDoc = { open: vi.fn(), write: vi.fn(), close: vi.fn() };
+    const fakeWin = { document: fakeDoc, opener: {} } as unknown as Window;
+    const open = vi.spyOn(window, "open").mockReturnValue(fakeWin);
+    return { fakeDoc, fakeWin, open };
+  }
+
+  it("titles and signs the handout with the site name it is given", () => {
+    const html = buildHandoutHtml(
+      [entity({ id: "a", title: "Alpha" })],
+      undefined,
+      undefined,
+      undefined,
+      "Lantern Road",
+    );
+    expect(html).toContain("<title>Alpha — Lantern Road handout</title>");
+    expect(html).toContain("<span>Lantern Road — player handout</span>");
+    expect(html).not.toContain("Astrath");
+  });
+
+  it("names no world when no site name is given", () => {
+    const html = buildHandoutHtml([entity({ id: "a", title: "Alpha" })]);
+    expect(html).not.toContain("Astrath");
+    expect(html).toContain("Alpha — Atlas handout");
+  });
+
+  it("escapes the site name", () => {
+    const html = buildHandoutHtml(
+      [entity({ id: "a", title: "Alpha" })],
+      undefined,
+      undefined,
+      undefined,
+      "<b>X</b>",
+    );
+    expect(html).not.toContain("<b>X</b>");
+    expect(html).toContain("&lt;b&gt;X&lt;/b&gt;");
+  });
+
+  it("never writes a <script> from bodyHtml into the print window", () => {
+    const { fakeDoc } = mockPopupAllowed();
+    const e = entity({
+      id: "a",
+      title: "Alpha",
+      bodyHtml: '<p>Hi</p><script>alert("pwn")</script><img src="x" onerror="alert(2)">',
+    });
+    expect(printEntityHandout(e, undefined, undefined, undefined, "Lantern Road")).toBe(true);
+    const written = String(fakeDoc.write.mock.calls[0][0]);
+    expect(written).not.toContain('alert("pwn")');
+    expect(written).not.toContain("onerror");
+    // Only the handout's own print-trigger script remains.
+    expect(written.match(/<script>/g) ?? []).toHaveLength(1);
+    expect(written).toContain("<p>Hi</p>");
+  });
+
+  it("opens without noopener (which makes window.open return null) and cuts the opener", () => {
+    const { fakeWin, open } = mockPopupAllowed();
+    expect(printEntityBundle([entity({ id: "a", title: "Alpha" })])).toBe(true);
+    const features = String(open.mock.calls[0][2] ?? "");
+    expect(features).not.toMatch(/noopener/);
+    expect(fakeWin.opener).toBeNull();
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
+  });
+});

@@ -58,13 +58,34 @@ campaign. Phase H's Cloudflare projects (one per campaign, H-01) deploy these si
   compared before/after: identical but for `version`/`publishedAt`). v2: clean `dist-campaigns/`,
   player build (every store), `vite build` (dist, the legacy pair), then per campaign a staged
   public dir (app static files + that store as `atlas/`, in a temp dir) and `vite build --mode
-  production --outDir dist-campaigns/<id>` with `ATLAS_CAMPAIGN_PUBLIC_DIR` (vite.config's
+production --outDir dist-campaigns/<id>` with `ATLAS_CAMPAIGN_PUBLIC_DIR` (vite.config's
   `publicDir`, refused in an editor build), then `atlas:scan --config`. `atlas:publish:next` is
   the test-world shortcut. On `content-next/`: 44 scans clean.
-- `check-derived-secrets` now treats `readme` as generic: `content-next/README.md` is excluded, so
-  its title was derived, and every site bundle holds the word.
-- Integrity smoke `-- --config atlas.next.config.json`: 9 pairs per campaign on copies of the real
-  store and site; 36 pass.
-- Open: check-fog-safety warns on the `(legacy)` pair in a v2 run (no campaign; R-18's area);
-  `printHandout` writes `bodyHtml` into its window without a render-time sanitize (build-time
-  sanitize only).
+- `check-derived-secrets` skips the content root's own `README.md` when it is excluded and has no
+  frontmatter (the folder's readme, not a note; "README" is in every site bundle). A hidden note
+  titled "Readme" still counts.
+- Integrity smoke `-- --config atlas.next.config.json`: 10 pairs per campaign on copies of the real
+  store and site.
+- Open: check-fog-safety warns on the `(legacy)` pair in a v2 run (no campaign; R-18's area).
+
+### Review fixes (2026-11-10)
+
+- A campaign site names its own campaign, not the v1 world: `scripts/atlas/campaignSiteBranding.ts`
+  reads `campaign.name` from the staged store; `vite.config.ts` rewrites `index.html`'s title,
+  description, apple, og and twitter tags (dropping the v1 share image) and the PWA manifest's
+  name, short_name and description. v1 builds are unchanged. `check-campaign-isolation`'s site
+  pass fails (23) any of those that isn't what the build writes for this campaign
+  (`siteIdentityFindings`); the smoke plants another campaign's name in a site title.
+- The printed handout names the loaded atlas (its campaign, else its world), sanitizes `bodyHtml`
+  with `sanitizeAtlasHtml` before `document.write`, and opens its window without `noopener`
+  (with it, `window.open` returns null by spec, so the handout always said pop-ups were blocked);
+  it sets `opener = null` instead.
+- Staging copies `public/` by an allowlist (`CAMPAIGN_SITE_STATIC_FILES`): an unknown file fails
+  the publish, a missing one too; `.DS_Store` is never copied.
+
+### For H-01 (deploy; its ticket isn't written yet)
+
+- `atlas:publish` builds and scans one campaign at a time. A failure part way leaves the earlier
+  `dist-campaigns/<id>` dirs built and later ones missing or unscanned, and the scans run only
+  after every site build. Deploy must run only when `atlas:publish` exits 0, never on the mere
+  presence of a `dist-campaigns/<id>` dir.

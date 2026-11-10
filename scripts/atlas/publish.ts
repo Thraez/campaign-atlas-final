@@ -3,7 +3,7 @@
  * `npm run atlas:publish [-- --config <file>]` (R-19): runs `publishPlan`.
  *
  *   npm run atlas:publish                                  v1: public/atlas, dist
- *   npm run atlas:publish -- --config atlas.next.config.json   v2: every campaign
+ *   npm run atlas:publish -- --config <v2 config>   v2: every campaign
  *
  * Fails closed: the first step that fails (a campaign's player build, its
  * site build, staging, any scan) stops the publish with a non-zero exit.
