@@ -27,7 +27,11 @@
  * so it keeps guarding the scans no matter how the publish chain is rearranged.
  *
  * Usage:
- *   tsx scripts/atlas/publish-integrity-smoke.ts
+ *   tsx scripts/atlas/publish-integrity-smoke.ts [--config atlas.next.config.json]
+ *
+ * With a v2 config (R-19), the pairs also run on a copy of every campaign's
+ * real store and built site (`campaignVariants`); run that config's
+ * `atlas:publish` first.
  *
  * Exit codes:
  *   0   every fault was caught (or legitimately skipped)
@@ -40,7 +44,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { DM_CONTENT_SENTINELS } from "../check-no-secrets";
-import { deriveSecretsFromVault } from "../check-derived-secrets";
+import { deriveSecretsFromVault, isReportableName } from "../check-derived-secrets";
+import { LEGACY_OUTPUT, campaignArtifacts } from "./scanRegistry";
+import { readMustNotShip } from "./build/campaignStore";
+import { parsePublishArgs } from "./publishPlan";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPTS_DIR = path.resolve(HERE, "..");
@@ -599,6 +606,261 @@ function variantsIsolation(): VariantResult[] {
   ];
 }
 
+// ---- Every campaign's real output (R-19) ------------------------------------
+// `--config <v2 config>`: after `atlas:publish` with that config, each scan's
+// clean/dirty pair runs again on a copy of each campaign's real store and
+// built site, so a scan that passes campaign one's output but not campaign
+// two's (or skips it) fails here. Missing output is an ERROR, not a SKIP.
+
+function copyOf(src: string, label: string): string {
+  const dir = path.join(freshDir(label), path.basename(src));
+  fs.cpSync(src, dir, { recursive: true });
+  return dir;
+}
+
+function editJson(file: string, edit: (j: Record<string, unknown>) => void): void {
+  const j = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, unknown>;
+  edit(j);
+  fs.writeFileSync(file, JSON.stringify(j));
+}
+
+/** A copy of a campaign's store and its must-not-ship file beside it, and of its site. */
+function campaignCopy(label: string, store: string, mns: string, site: string) {
+  const root = freshDir(label);
+  const storeCopy = path.join(root, "c", "atlas");
+  fs.cpSync(store, storeCopy, { recursive: true });
+  const mnsCopy = path.join(root, "c", "must-not-ship.json");
+  fs.copyFileSync(mns, mnsCopy);
+  const siteCopy = path.join(root, "site");
+  fs.cpSync(site, siteCopy, { recursive: true });
+  return { store: storeCopy, mns: mnsCopy, site: siteCopy };
+}
+
+async function campaignVariants(configPath: string): Promise<VariantResult[]> {
+  const cfg = JSON.parse(fs.readFileSync(configPath, "utf8")) as { contentRoot: string };
+  const contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
+  const arts = campaignArtifacts({ root: PROJECT_ROOT, configPath, contentDir }).filter(
+    (a) => a.mustNotShip && a.campaign !== LEGACY_OUTPUT,
+  );
+  const ids = [...new Set(arts.map((a) => a.campaign))];
+  if (ids.length === 0) {
+    return [
+      {
+        name: "Every campaign's output",
+        scan: "(all)",
+        outcome: "ERROR",
+        detail: `${path.relative(PROJECT_ROOT, configPath)} lists no v2 campaign`,
+      },
+    ];
+  }
+  const exif = await sharp({
+    create: { width: 8, height: 8, channels: 3, background: { r: 1, g: 2, b: 3 } },
+  })
+    .withExif({ IFD0: { Copyright: "SMOKE_TEST_EXIF_LEAK" } })
+    .jpeg()
+    .toBuffer();
+  const results: VariantResult[] = [];
+  for (const id of ids) {
+    const store = arts.find((a) => a.campaign === id && a.layout === "store")!;
+    const site = arts.find((a) => a.campaign === id && a.layout === "built-site")!;
+    const mns = store.mustNotShip!;
+    const tag = ` [campaign ${id}]`;
+    const missing = [
+      path.join(store.dir, "atlas.json"),
+      path.join(site.dir, "atlas", "atlas.json"),
+      mns,
+    ].filter((p) => !fs.existsSync(p));
+    if (missing.length > 0) {
+      results.push({
+        name: `Campaign output${tag}`,
+        scan: "(all)",
+        outcome: "ERROR",
+        detail:
+          `missing ${missing.map((p) => path.relative(PROJECT_ROOT, p)).join(", ")}: ` +
+          `run \`npm run atlas:publish -- --config ${path.relative(PROJECT_ROOT, configPath)}\` first`,
+      });
+      continue;
+    }
+    const pair = (
+      name: string,
+      scan: string,
+      clean: () => { code: number; stderr: string },
+      dirty: () => { code: number; stderr: string },
+    ) => results.push(assertCleanThenDirty(name + tag, scan, clean, dirty));
+
+    pair(
+      "DM sentinel secret",
+      "check-no-secrets.ts",
+      () => runScan("check-no-secrets.ts", [copyOf(store.dir, "c-secret-clean")]),
+      () => {
+        const dir = copyOf(store.dir, "c-secret-dirty");
+        fs.writeFileSync(path.join(dir, "leak.json"), JSON.stringify(DM_CONTENT_SENTINELS[0]));
+        return runScan("check-no-secrets.ts", [dir]);
+      },
+    );
+    const hiddenName = readMustNotShip(mns).names.find(isReportableName);
+    if (hiddenName === undefined) {
+      results.push({
+        name: `Campaign-hidden name${tag}`,
+        scan: "check-derived-secrets.ts",
+        outcome: "SKIP",
+        detail: "the campaign hides no name long enough to scan for",
+      });
+    } else {
+      const derived = (label: string, plant: boolean) => {
+        const c = campaignCopy(label, store.dir, mns, site.dir);
+        if (plant) fs.writeFileSync(path.join(c.site, "page.txt"), `leaked: ${hiddenName}`);
+        return runScan("check-derived-secrets.ts", [
+          c.site,
+          "--config",
+          configPath,
+          "--must-not-ship",
+          c.mns,
+        ]);
+      };
+      pair(
+        "Campaign-hidden name",
+        "check-derived-secrets.ts",
+        () => derived("c-derived-clean", false),
+        () => derived("c-derived-dirty", true),
+      );
+    }
+    pair(
+      "Image EXIF leak",
+      "check-image-privacy.ts",
+      () =>
+        runScan("check-image-privacy.ts", [
+          copyOf(site.dir, "c-exif-clean"),
+          "--config",
+          configPath,
+        ]),
+      () => {
+        const dir = copyOf(site.dir, "c-exif-dirty");
+        fs.mkdirSync(path.join(dir, "atlas", "assets"), { recursive: true });
+        fs.writeFileSync(path.join(dir, "atlas", "assets", "leak.jpg"), exif);
+        return runScan("check-image-privacy.ts", [dir, "--config", configPath]);
+      },
+    );
+    const siteAtlas = (dir: string) => path.join(dir, "atlas", "atlas.json");
+    const maps = JSON.parse(fs.readFileSync(siteAtlas(site.dir), "utf8")).maps as unknown[];
+    if (!Array.isArray(maps) || maps.length === 0) {
+      results.push({
+        name: `Fog geometry leak${tag}`,
+        scan: "check-fog-safety.ts",
+        outcome: "SKIP",
+        detail: "the campaign's site has no maps",
+      });
+    } else {
+      const fogArgs = (dir: string) => [dir, "--config", configPath, "--campaign", id];
+      pair(
+        "Fog geometry leak",
+        "check-fog-safety.ts",
+        () => runScan("check-fog-safety.ts", fogArgs(copyOf(site.dir, "c-fog-clean"))),
+        () => {
+          const dir = copyOf(site.dir, "c-fog-dirty");
+          editJson(siteAtlas(dir), (j) => {
+            (j.maps as Record<string, unknown>[])[0].fog = {
+              enabled: true,
+              reveals: [
+                [0, 0],
+                [10, 0],
+                [10, 10],
+              ],
+            };
+          });
+          return runScan("check-fog-safety.ts", fogArgs(dir));
+        },
+      );
+    }
+    pair(
+      "Atlas shape violation",
+      "check-artifact-shape.ts",
+      () =>
+        runScan("check-artifact-shape.ts", [
+          path.join(copyOf(store.dir, "c-shape-clean"), "atlas.json"),
+        ]),
+      () => {
+        const file = path.join(copyOf(store.dir, "c-shape-dirty"), "atlas.json");
+        editJson(file, (j) => {
+          (j.entities as unknown[]).push({
+            id: "smoke-bad-entity",
+            visibility: "dm",
+            sourcePath: "content/secret.md",
+          });
+        });
+        return runScan("check-artifact-shape.ts", [file]);
+      },
+    );
+    pair(
+      "Unstripped secret marker",
+      "check-player-secrets.ts",
+      () => runScan("check-player-secrets.ts", [copyOf(site.dir, "c-psecret-clean")]),
+      () => {
+        const dir = copyOf(site.dir, "c-psecret-dirty");
+        editJson(siteAtlas(dir), (j) => {
+          (j.entities as unknown[]).push({
+            id: "smoke-entity",
+            body: "{{secret:SMOKE_TEST_SECRET}}",
+          });
+        });
+        return runScan("check-player-secrets.ts", [dir]);
+      },
+    );
+    pair(
+      "DM file in player build",
+      "check-player-files.ts",
+      () => runScan("check-player-files.ts", [copyOf(site.dir, "c-files-clean")]),
+      () => {
+        const dir = copyOf(site.dir, "c-files-dirty");
+        fs.mkdirSync(path.join(dir, "atlas", "assets", "maps"), { recursive: true });
+        fs.writeFileSync(path.join(dir, "atlas", "assets", "maps", "world.yaml"), "fog: {}");
+        return runScan("check-player-files.ts", [dir]);
+      },
+    );
+    // Isolation: the exit code for the planted kind, as variantIsolation asks.
+    const isolation = (
+      name: string,
+      wantExit: number,
+      layout: "store" | "built-site",
+      plant: (c: { store: string; site: string }) => void,
+    ) => {
+      const go = (label: string, dirty: boolean) => {
+        const c = campaignCopy(label, store.dir, mns, site.dir);
+        if (dirty) plant(c);
+        const dir = layout === "store" ? c.store : c.site;
+        return runScan("check-campaign-isolation.ts", [
+          dir,
+          "--must-not-ship",
+          c.mns,
+          "--config",
+          configPath,
+          "--layout",
+          layout,
+        ]);
+      };
+      pair(
+        name,
+        "check-campaign-isolation.ts",
+        () => go("c-iso-clean", false),
+        () => {
+          const r = go("c-iso-dirty", true);
+          return r.code === wantExit || r.code < 0 ? r : { code: 0, stderr: r.stderr };
+        },
+      );
+    };
+    const other = ids.find((o) => o !== id) ?? "another-campaign";
+    isolation("Another campaign's id in the store's campaign field", 23, "store", (c) => {
+      editJson(path.join(c.store, "atlas.json"), (j) => {
+        j.campaign = { ...(j.campaign as Record<string, unknown>), id: other };
+      });
+    });
+    isolation("A file in the site's atlas dir that its store lacks", 25, "built-site", (c) => {
+      fs.writeFileSync(path.join(c.site, "atlas", "extra.json"), "{}");
+    });
+  }
+  return results;
+}
+
 async function main(): Promise<number> {
   if (!fs.existsSync(PLAYER_ATLAS)) {
     console.error(
@@ -638,6 +900,11 @@ async function main(): Promise<number> {
   results.push(variantPlayerFiles());
   results.push(variantVaultContent());
   results.push(...variantsIsolation());
+  // R-19: `--config <v2 config>` also runs the pairs on every campaign's output.
+  const { configPath } = parsePublishArgs(process.argv.slice(2));
+  if (path.resolve(PROJECT_ROOT, configPath) !== CONFIG_PATH) {
+    results.push(...(await campaignVariants(path.resolve(PROJECT_ROOT, configPath))));
+  }
 
   const pad = Math.max(...results.map((r) => r.name.length));
   for (const r of results) {

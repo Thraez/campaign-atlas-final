@@ -50,3 +50,21 @@ campaign. Phase H's Cloudflare projects (one per campaign, H-01) deploy these si
 
 - Hosting and deploy (H-01..H-04). The editor's Publish job per campaign (E12, phase 6).
 - The every-campaign diff of the migration (R-20).
+
+## Build notes (2026-11-10)
+
+- `atlas:publish` is `scripts/atlas/publish.ts [--config <file>]`, running `publishPlan`
+  (`scripts/atlas/publishPlan.ts`). v1: snapshot, player build, `vite build`, scans (output
+  compared before/after: identical but for `version`/`publishedAt`). v2: clean `dist-campaigns/`,
+  player build (every store), `vite build` (dist, the legacy pair), then per campaign a staged
+  public dir (app static files + that store as `atlas/`, in a temp dir) and `vite build --mode
+  production --outDir dist-campaigns/<id>` with `ATLAS_CAMPAIGN_PUBLIC_DIR` (vite.config's
+  `publicDir`, refused in an editor build), then `atlas:scan --config`. `atlas:publish:next` is
+  the test-world shortcut. On `content-next/`: 44 scans clean.
+- `check-derived-secrets` now treats `readme` as generic: `content-next/README.md` is excluded, so
+  its title was derived, and every site bundle holds the word.
+- Integrity smoke `-- --config atlas.next.config.json`: 9 pairs per campaign on copies of the real
+  store and site; 36 pass.
+- Open: check-fog-safety warns on the `(legacy)` pair in a v2 run (no campaign; R-18's area);
+  `printHandout` writes `bodyHtml` into its window without a render-time sanitize (build-time
+  sanitize only).

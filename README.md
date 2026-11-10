@@ -563,6 +563,7 @@ Script	Purpose
 `npm run atlas:build`	DM build to `.local-atlas/`. Keeps DM content.
 `npm run atlas:build:player`	Strict player build to `public/atlas/`.
 `npm run atlas:publish`	Player build plus Vite production build + all safety scans.
+`npm run atlas:publish:next`	The v2 test world (`content-next/`), local only: every campaign's store, its own site in `dist-campaigns/<id>/`, then every scan per campaign. Same as `atlas:publish -- --config atlas.next.config.json`.
 `npm run atlas:check-secrets`	Scan a built artifact for sentinel-string DM leaks.
 `npm run atlas:check-derived`	Scan a built artifact for verbatim hidden/dm entity name leaks.
 `npm run atlas:check-shape`	Structural check on `atlas.json` (visibility / sourcePath / frontmatter / DM block).

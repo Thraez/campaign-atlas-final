@@ -11,6 +11,7 @@ import {
 import { atlasSavePlugin } from "./scripts/vite-plugin-atlas-save";
 import { prunePlayerAudioPlugin } from "./scripts/vite-plugin-prune-player-audio";
 import { prunePlayerFilesPlugin } from "./scripts/vite-plugin-prune-player-files";
+import { sitePublicDir } from "./scripts/atlas/campaignSitePublicDir";
 import {
   ATLAS_ASSETS_CACHE,
   ATLAS_DATA_CACHE,
@@ -32,6 +33,10 @@ export default defineConfig(({ mode }) => {
     // Defaults to "/" for local dev and Lovable preview.
     base: process.env.ATLAS_BASE || "/",
     define: { __INCLUDE_EDITOR__: JSON.stringify(includeEditor) },
+    // public/, or a campaign site's staged public dir (R-19, atlas:publish with a
+    // v2 config): the app's static files and that campaign's store only. Refused
+    // in an editor build. See scripts/atlas/campaignSitePublicDir.ts.
+    publicDir: sitePublicDir(process.env, includeEditor),
     server: {
       // Loopback by default. The dev server mounts /__atlas/* — file reads and
       // writes, vault scans, character keys, and publish-to-main. Binding every

@@ -16,6 +16,7 @@ import path from "node:path";
 import {
   deriveSecretsFromVault,
   foreignCampaignRefs,
+  isReportableName,
   run,
   scanArtifactForSecrets,
   secretsFromMustNotShip,
@@ -61,6 +62,13 @@ describe("deriveSecretsFromVault", () => {
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
+  });
+
+  // R-19: a content root's README.md is excluded from the build, so its title
+  // is derived; "README" is in every built site's bundle, so it can't be flagged.
+  it("does not flag README, a file name every site build holds", () => {
+    expect(isReportableName("README")).toBe(false);
+    expect(isReportableName("readme")).toBe(false);
   });
 
   it("does NOT derive secrets from public/rumor entities", () => {

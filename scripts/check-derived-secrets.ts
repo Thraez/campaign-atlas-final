@@ -99,6 +99,9 @@ const GENERIC_NAMES = new Set([
   "secret",
   "note",
   "notes",
+  // A content root's README.md is excluded, so its title is derived, and every
+  // site build's bundle holds the word (R-19).
+  "readme",
 ]);
 
 export interface SecretEntry {
