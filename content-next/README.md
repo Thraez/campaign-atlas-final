@@ -20,8 +20,12 @@ See it per campaign: `npm run atlas:tree -- --config atlas.next.config.json`.
   `mirefold-cellars`.
 - `skerrow/`: a second world, `skerrow-isles` (on the ocean) > `hookhaven`.
 - Map images: lossless PNGs in `<world>/_atlas/images/`, drawn by
-  `scripts/dev/generate-test-world-maps.mjs`. Sound beds name `audio/*.ogg` files that don't exist
-  yet (R-17 adds audio).
+  `scripts/dev/generate-test-world-maps.mjs`.
+- Sound beds: `quessaly/_atlas/audio/frog-chorus.ogg` and `reed-whisper.ogg`, half-second Opus
+  tones (ffmpeg `sine`), one file per area so a test can look for each file's bytes in an output.
+- Note bodies are one plain sentence each and name no campaign, region id or other test detail:
+  every shipped body reaches some campaign's output, and an output must name no other campaign
+  and nothing hidden from it (R-17). The cases live in this file, not in the notes.
 
 ## Cases
 
@@ -53,3 +57,17 @@ region `gannet-rock` on `skerrow-isles` (hidden in `sandbox` with its map).
 The loader reads this root with no warnings; the resolver finds no orphan `notes:` entries and no
 name collisions, one stale entry (`wexley-tarn`) per campaign, and one shipped note whose every
 pin rule 9 hides (`mossbeck-well`, in `the-murkwater`) per campaign.
+
+## Sentinels (R-17)
+
+`src/test/build/campaign-stores.test.ts` builds both campaigns and checks that nothing hidden
+from a campaign reaches its store: every id and name in its `must-not-ship.json`, the other
+campaign's id and name, and the bytes of every hidden map image and sound bed. The hidden items
+it names on purpose: map `brindlecross` and its image (sandbox), world `skerrow` and
+`hookhaven.png` (sandbox), pin of `mossbeck-well`, route `eel-path` and sound `frog-chorus` with
+`frog-chorus.ogg` (rule 9, both), sound `reed-whisper` with `reed-whisper.ogg` (sandbox), note
+`marra-quillon` (main). A note body linking a hidden map (`[[Brindlecross]]`, `[[Hookhaven]]`)
+is added by the test in a temp copy, since a strict build fails on it. So are plain-text
+mentions of a hidden item or of the other campaign's name (body, heading, `summary`, `tags`), each
+of which fails every player build with exit 12, and local file URLs (markdown and HTML images and
+links, reference definitions), which fail it with exit 1.

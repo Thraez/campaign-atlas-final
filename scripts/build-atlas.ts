@@ -13,6 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { markdownToHtml } from "../src/atlas/content/markdownCore";
+import { Marked } from "marked";
 import {
   resolveImageEmbeds,
   DEFAULT_RESOLVE_ASSET,
@@ -60,6 +61,22 @@ import { resolveCampaign, type MustNotShip } from "../src/atlas/content/resolveC
 import { BuildStageError, loadBuildModel, type BuildModel } from "./atlas/build/loadBuildModel";
 import { worldSources, type WorldSource } from "./atlas/build/worldSources";
 import { notesShippingNowhere } from "./atlas/build/notesShippingNowhere";
+import {
+  campaignStoreDir,
+  fileInside,
+  planMapImages,
+  storeAudioFile,
+  writeCampaignStores,
+  type MustNotShipFile,
+  type StoreFiles,
+  type StoresRootGuard,
+} from "./atlas/build/campaignStore";
+import {
+  findSecretsInText,
+  foreignCampaignRefs,
+  mustNotShipSecrets,
+} from "./check-derived-secrets";
+import { loadAtlasModel } from "./atlas/loadAtlasModel";
 import {
   applyAudioPlan,
   planAudioAssets,
@@ -189,6 +206,88 @@ function scrubSecretNames(warnings: string[], secretNames: Set<string>): string[
   });
 }
 
+/** The id prefix of a hidden item registered as a link target; no note id has a space. */
+const HIDDEN_ITEM_ID = "(hidden item) ";
+
+/**
+ * The ids and names the campaign's resolution says must not ship that no note
+ * already owns (a hidden world, map, region, route, sound area or layer), each
+ * as a secret link target, so a wikilink to one is redacted like a link to a
+ * hidden note. Names a note owns are left to the note's own entry: it is
+ * secret too (a shipped note can't share a hidden name: rule 8 fails the build).
+ */
+function hiddenItemLinkTargets(
+  mustNotShip: MustNotShip,
+  notes: readonly AllParsed[],
+  excluded: readonly ExcludedNoteName[],
+): ExcludedNoteName[] {
+  const owned = new Set<string>();
+  for (const n of notes) {
+    for (const name of [n.id, n.title, ...(n.parsed.atlas.aliases ?? [])])
+      owned.add(name.toLowerCase());
+  }
+  for (const n of excluded) {
+    for (const name of [n.id, n.title, ...(n.aliases ?? [])]) owned.add(name.toLowerCase());
+  }
+  const out: ExcludedNoteName[] = [];
+  for (const value of new Set([...mustNotShip.ids, ...mustNotShip.names])) {
+    if (!value.trim() || owned.has(value.toLowerCase())) continue;
+    owned.add(value.toLowerCase());
+    out.push({ id: `${HIDDEN_ITEM_ID}${value}`, title: value, aliases: [] });
+  }
+  return out;
+}
+
+const URL_ATTR =
+  /[\s/"'](src|srcset|href|poster|data|action|formaction|background|cite|longdesc|xlink:href|ping|content)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi;
+const NOT_LOCAL = /^(https?:|data:|blob:|mailto:|#)/i;
+
+function decodeEntities(v: string): string {
+  return v
+    .replace(/&#x([0-9a-f]+);?/gi, (_, h: string) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);?/g, (_, d: string) => String.fromCodePoint(Number(d)))
+    .replace(
+      /&(colon|sol|period|amp|quot|apos|lt|gt);/gi,
+      (_, n: string) =>
+        ({ colon: ":", sol: "/", period: ".", amp: "&", quot: '"', apos: "'", lt: "<", gt: ">" })[
+          n.toLowerCase()
+        ] ?? "",
+    );
+}
+
+/**
+ * Every URL a note body yields that isn't external (`http(s):`, `data:`,
+ * `blob:`, `mailto:` or a `#fragment`): each `src`, `srcset` candidate,
+ * `href`, `poster` and the like of the body rendered as the site renders
+ * it (so markdown links, images and reference-style ones are read as marked
+ * resolves them), every `url(...)`, and every reference definition, used or
+ * not. Wikilinks and `![[embeds]]` aren't URLs here: the build resolves them.
+ */
+function localBodyUrls(body: string): string[] {
+  const urls: string[] = [];
+  const html = markdownToHtml(body);
+  for (const m of html.matchAll(URL_ATTR)) {
+    const value = decodeEntities(m[2] ?? m[3] ?? m[4] ?? "");
+    const attr = m[1].toLowerCase();
+    if (attr === "srcset") {
+      for (const c of value.split(",")) urls.push(c.trim().split(/\s+/)[0] ?? "");
+    } else if (attr === "content") {
+      // <meta http-equiv=refresh content="0;url=...">: only the part after url=.
+      const at = value.search(/url\s*=/i);
+      if (at >= 0)
+        urls.push(
+          value
+            .slice(at)
+            .replace(/^url\s*=\s*['"]?/i, "")
+            .replace(/['"]$/, ""),
+        );
+    } else urls.push(value);
+  }
+  for (const m of html.matchAll(/url\(\s*(?:&quot;|["'])?([^"')\s&]+)/gi)) urls.push(m[1]);
+  for (const def of Object.values(new Marked().lexer(body).links ?? {})) urls.push(def.href);
+  return [...new Set(urls.map((u) => u.trim()))].filter((u) => u !== "" && !NOT_LOCAL.test(u));
+}
+
 /** Matches `name` in any case, with dashes, underscores and spaces interchangeable. */
 function looseNamePattern(name: string): RegExp {
   const parts = name
@@ -201,12 +300,17 @@ function looseNamePattern(name: string): RegExp {
 export interface BuildFlags {
   player: boolean;
   strict: boolean;
+  /**
+   * Where the output goes instead of the default. v1 and DM builds: the dir
+   * holding `atlas.json`. v2 player builds: the root of the campaign stores
+   * (in place of the config's `outputDir`), each at `<outDir>/<id>/atlas`.
+   */
   outDir?: string;
   configPath?: string;
   /**
-   * The campaign a player build resolves. Defaults to the content's only
-   * campaign (v1: `main`); content with several needs it (one output per run
-   * until R-17).
+   * The campaign a player build resolves. `runBuild` without one builds every
+   * campaign of v2 content (R-17), and v1's only campaign, `main`.
+   * `buildAtlas` builds one campaign: content with several needs it.
    */
   campaign?: string;
 }
@@ -358,11 +462,26 @@ export interface BuildAssetWrites {
   publicDir: string;
 }
 
+/**
+ * A v2 player build's campaign store (R-17): the files its `atlas.json`
+ * references, copied under hashed names, and the must-not-ship set written
+ * beside it for the scans.
+ */
+export interface BuildCampaignStore {
+  campaign: string;
+  files: StoreFiles;
+  mustNotShip: MustNotShipFile;
+  /** Where the stores root may not be (the repo, `public/`, source folders). */
+  guard: StoresRootGuard;
+}
+
 export interface BuildAtlasResult {
   project: AtlasProject;
   searchIndex: SearchIndexEntry[];
   report: BuildAtlasReport;
   assets: BuildAssetWrites;
+  /** v2 player builds only: written by `writeBuildOutput` as the campaign's store. */
+  store?: BuildCampaignStore;
 }
 
 /**
@@ -374,15 +493,41 @@ export interface BuildAtlasResult {
  * Validation failures come back as `{ ok: false, exitCode }`. The dev save
  * plugin uses this so an in-flight save can rebuild atlas.json without
  * spawning a child process.
+ *
+ * A v2 player build without `--campaign` builds every campaign (R-17), all
+ * of them in memory first: if any campaign fails a gate, none is written.
  */
 export async function runBuild(
   flags: BuildFlags = { player: false, strict: false },
   root: string = process.cwd(),
 ): Promise<BuildResult> {
   const started = Date.now();
-  let result: BuildAtlasResult;
+  const results: BuildAtlasResult[] = [];
   try {
-    result = await buildAtlas(root, flags);
+    for (const campaign of campaignsToBuild(root, flags)) {
+      const result = await buildAtlas(root, { ...flags, campaign });
+      results.push(result);
+      if (campaign !== undefined && flags.campaign === undefined) {
+        console.log(`\n--- campaign ${campaign} ---`);
+      }
+      console.log(formatBuildReport(result.report));
+      const failure = result.report.failure;
+      if (failure) {
+        const where =
+          campaign !== undefined && flags.campaign === undefined ? `campaign ${campaign}: ` : "";
+        console.error(
+          where +
+            (failure.exitCode === 1 ? "Build failed: validation errors above." : failure.message),
+        );
+        console.error("Nothing written.");
+        return {
+          ok: false,
+          exitCode: failure.exitCode,
+          durationMs: Date.now() - started,
+          error: where + failure.message,
+        };
+      }
+    }
   } catch (e) {
     // buildAtlas throws BuildError for the failures it can't build past
     // (missing config, bad world.yaml); anything else is exit 1.
@@ -390,24 +535,66 @@ export async function runBuild(
     const error = e instanceof Error ? e.message : String(e);
     return { ok: false, exitCode, durationMs: Date.now() - started, error };
   }
-  console.log(formatBuildReport(result.report));
-  const failure = result.report.failure;
-  if (failure) {
-    console.error(
-      failure.exitCode === 1 ? "Build failed: validation errors above." : failure.message,
-    );
-    console.error("Nothing written.");
-    return {
-      ok: false,
-      exitCode: failure.exitCode,
-      durationMs: Date.now() - started,
-      error: failure.message,
-    };
+  try {
+    // v2 player builds: every campaign's store in one write, after every
+    // campaign built and passed its gates; a build of every campaign also
+    // removes stores of campaigns the content no longer has.
+    const stores = results.flatMap((r) => (r.store ? [r] : []));
+    if (stores.length > 0 && stores.length === results.length) {
+      const dirs = writeCampaignStores(
+        campaignStoresRoot(root, flags, stores[0]),
+        stores[0].store!.guard,
+        stores.map((r) => ({ campaign: r.store!.campaign, store: storeContent(r) })),
+        { prune: flags.campaign === undefined },
+      );
+      for (const dir of dirs) {
+        console.log(`\nWrote ${path.relative(root, path.join(dir, "atlas.json"))}`);
+        console.log(`Wrote ${path.relative(root, path.join(dir, "search-index.json"))}\n`);
+      }
+      return { ok: true, exitCode: 0, durationMs: Date.now() - started };
+    }
+    for (const result of results) {
+      const outDir = writeBuildOutput(root, flags, result);
+      console.log(`\nWrote ${path.relative(root, path.join(outDir, "atlas.json"))}`);
+      console.log(`Wrote ${path.relative(root, path.join(outDir, "search-index.json"))}\n`);
+    }
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    console.error(error);
+    return { ok: false, exitCode: 1, durationMs: Date.now() - started, error };
   }
-  const outDir = writeBuildOutput(root, flags, result);
-  console.log(`\nWrote ${path.relative(root, path.join(outDir, "atlas.json"))}`);
-  console.log(`Wrote ${path.relative(root, path.join(outDir, "search-index.json"))}\n`);
   return { ok: true, exitCode: 0, durationMs: Date.now() - started };
+}
+
+/**
+ * The campaigns one run builds: the one `--campaign` names; for a v2 player
+ * build without it, every campaign of the content, in `atlas.yaml` order;
+ * otherwise one build with the content's default (v1's `main`, a DM build's
+ * none). A config or content that can't be read leaves the error to
+ * `buildAtlas`, which reports it.
+ */
+function campaignsToBuild(root: string, flags: BuildFlags): (string | undefined)[] {
+  if (!flags.player || flags.campaign !== undefined) return [flags.campaign];
+  let cfg: Config;
+  try {
+    cfg = loadConfig(path.resolve(root, flags.configPath ?? "atlas.config.json"));
+  } catch {
+    return [undefined];
+  }
+  const configPath = path.resolve(root, flags.configPath ?? "atlas.config.json");
+  const contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
+  let loaded: ReturnType<typeof loadAtlasModel>;
+  try {
+    loaded = loadAtlasModel(
+      contentDir,
+      { ...cfg, include: cfg.include ?? [], exclude: cfg.exclude ?? [] },
+      { root: path.resolve(root) },
+    );
+  } catch {
+    return [undefined];
+  }
+  if (loaded.model.schemaVersion !== 2 || loaded.model.campaigns.length === 0) return [undefined];
+  return loaded.model.campaigns.map((c) => c.id);
 }
 
 /**
@@ -417,14 +604,27 @@ export async function runBuild(
  * `cfg.outputDir` (public/atlas, committed and served); DM builds to the
  * gitignored `.local-atlas`, so spoilers never land in the committed
  * atlas.json by accident. `--out` wins. Refuses a result whose gates failed.
+ * A v2 player build writes its campaign's store instead (`writeCampaignStore`):
+ * `<outputDir or --out>/<campaign>/atlas`, with its assets and, beside it,
+ * the must-not-ship file.
  */
 export function writeBuildOutput(
   root: string,
   flags: BuildFlags,
-  { project, searchIndex, report, assets }: BuildAtlasResult,
+  { project, searchIndex, report, assets, store }: BuildAtlasResult,
 ): string {
   if (report.failure) {
     throw new Error(`writeBuildOutput: refusing a failed build (${report.failure.message})`);
+  }
+  if (store) {
+    const [storeDir] = writeCampaignStores(
+      campaignStoresRoot(root, flags, { report }),
+      store.guard,
+      [{ campaign: store.campaign, store: storeContent({ project, searchIndex, store }) }],
+      { prune: false },
+    );
+    // Nothing goes to public/: v1's fog masks and audio folder aren't this store's.
+    return storeDir;
   }
   if (assets.fog) {
     for (const f of assets.fog.files) fs.writeFileSync(f.path, f.bytes);
@@ -446,6 +646,31 @@ export function writeBuildOutput(
     JSON.stringify(searchIndex, null, jsonIndent),
   );
   return outDir;
+}
+
+/** The root of the campaign stores: `--out`, else the config's `outputDir`. */
+function campaignStoresRoot(
+  root: string,
+  flags: BuildFlags,
+  { report }: Pick<BuildAtlasResult, "report">,
+): string {
+  return flags.outDir
+    ? path.resolve(root, flags.outDir)
+    : path.dirname(path.dirname(report.defaultOutDir));
+}
+
+/** A built campaign's store as written: the JSON exactly as the must-not-ship check read it. */
+function storeContent({
+  project,
+  searchIndex,
+  store,
+}: Pick<BuildAtlasResult, "project" | "searchIndex" | "store">) {
+  return {
+    atlasJson: JSON.stringify(project),
+    searchIndexJson: JSON.stringify(searchIndex),
+    files: store!.files,
+    mustNotShip: store!.mustNotShip,
+  };
 }
 
 /** The console build report, as the CLI prints it. */
@@ -623,6 +848,9 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // resolveImageEmbeds() below and validated once runAssetCheck exists
   // further down — see the "Asset validation" section.
   const embeddedAssetRefs: { raw: string; owner: string }[] = [];
+  // v2 player builds: markdown and HTML image refs in note bodies (R-17).
+  // They have no per-campaign copy yet, so each one fails the build.
+  const bodyImageRefs: { raw: string; owner: string }[] = [];
 
   const pending: Pending[] = [];
   const slugSeen = new Map<string, string>();
@@ -716,6 +944,10 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // (shipped or secret) plus the folder-excluded ones. The same function
   // builds the editor preview's context, so build and preview resolve and
   // redact links alike. Loose and basename matching: see createProjectionContext.
+  // Player builds add every other item the campaign doesn't ship (a hidden
+  // world, map, region, route or sound area: R-17), by id and name, as secret
+  // link targets: a `[[Hookhaven]]` in a shipped note is redacted like a link
+  // to a hidden note, and counts as a cross-ref leak (strict fails, exit 8).
   const projectionCtx = createProjectionContext(
     allParsed.map((p) => ({
       id: p.id,
@@ -724,7 +956,13 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
       visibility: p.visibility,
       isSecret: p.isSecret,
     })),
-    excludedNotes,
+    [
+      ...excludedNotes,
+      // v2 only: v1 output stays as it was.
+      ...(res && v2
+        ? hiddenItemLinkTargets(res.resolution.mustNotShip, allParsed, excludedNotes)
+        : []),
+    ],
   );
 
   // Warnings only: each note's visibility label (folder-excluded notes show
@@ -818,6 +1056,11 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
         raw: DEFAULT_RESOLVE_ASSET(filename),
         owner: `entity ${item.entity.id} (embedded image)`,
       });
+    }
+    if (flags.player && v2) {
+      for (const raw of localBodyUrls(rawBody)) {
+        bodyImageRefs.push({ raw, owner: `entity ${item.entity.id} (link or image URL)` });
+      }
     }
     if (flags.player) {
       const projected = projectEntityWithReport(item.entity, projectionCtx);
@@ -1204,6 +1447,9 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // borrow another area's (the adapter skips malformed areas), so every area
   // such an id names is dropped, and a strict build fails on it (exit 22).
   let audioPlan: AudioPlan | undefined;
+  // v2 player builds: the files the campaign's store holds (R-17), by path
+  // relative to the store. Audio here, map images after the asset check.
+  const storeFiles: StoreFiles = new Map();
   if (flags.player && v2) {
     maps = maps.map((m) => {
       if (!m.soundscape) return m;
@@ -1212,7 +1458,10 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
         m.soundscape,
         (a) => soundAreaIdTrusted(a, problems) && !!res?.soundShips(m.id, a.id),
       );
-      return { ...m, soundscape: v2PlayerAudio(m, sc, sourceById, warnings, hiddenFromPlayer) };
+      return {
+        ...m,
+        soundscape: v2PlayerAudio(m, sc, sourceById, warnings, hiddenFromPlayer, storeFiles),
+      };
     });
   } else if (flags.player) {
     maps = maps.map((m) => {
@@ -1359,6 +1608,35 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     if (f.severity === "warning") warnings.push(`${f.owner}: ${f.message} — ${f.suggestion}`);
   }
 
+  // v2 player builds: the campaign's store holds a copy of every file its
+  // atlas.json names (R-17). Map images are copied from their world's
+  // `_atlas/` under hashed names. Note images and embeds have no per-world
+  // source yet, so a v2 player build that ships one fails (fail closed)
+  // rather than naming a file its store doesn't hold.
+  if (flags.player && v2) {
+    const storeErrors: string[] = [];
+    maps = planMapImages(maps, (id) => sourceById.get(id)?.assetDir, storeFiles, storeErrors);
+    for (const { entity } of pending) {
+      for (const img of entity.images) {
+        if (img && !/^(https?:|data:|blob:)/i.test(img)) {
+          storeErrors.push(
+            `entity "${entity.id}": note images aren't published per campaign yet (${img})`,
+          );
+        }
+      }
+    }
+    for (const ref of embeddedAssetRefs) {
+      storeErrors.push(`${ref.owner}: note images aren't published per campaign yet (${ref.raw})`);
+    }
+    for (const ref of bodyImageRefs) {
+      storeErrors.push(
+        `${ref.owner}: a note may link only to the web or an atlas note; local files aren't published per campaign yet (${ref.raw})`,
+      );
+    }
+    // Validation errors fail the build (exit 1), so nothing is written.
+    errors.push(...storeErrors);
+  }
+
   // Async encrypt pass: convert raw AtlasSecretSpec entries into ciphertext blobs.
   // DM builds skip encryption (plaintext stays in the vault only).
   // Character secrets whose keys are missing are warned and dropped here.
@@ -1411,6 +1689,12 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
           },
         }
       : {}),
+    // v2 (ADR-0004 question 8): a player build names its own campaign only;
+    // the DM build, never published, holds every campaign's file.
+    ...(v2 && flags.player && campaignFile
+      ? { campaign: { id: campaignFile.id, name: campaignFile.name } }
+      : {}),
+    ...(v2 && !flags.player ? { campaigns: model.campaigns.map((c) => structuredClone(c)) } : {}),
     maps,
     entities: pending.map((p) => p.entity),
     placements,
@@ -1511,7 +1795,53 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     audio: audioPlan,
     publicDir: path.join(ROOT, "public"),
   };
-  return { project, searchIndex, report, assets };
+  const store: BuildCampaignStore | undefined =
+    flags.player && v2 && campaignFile && res
+      ? {
+          campaign: campaignFile.id,
+          files: storeFiles,
+          mustNotShip: {
+            campaign: campaignFile.id,
+            ...res.resolution.mustNotShip,
+            otherCampaigns: model.campaigns
+              .filter((c) => c.id !== campaignFile.id)
+              .map((c) => ({ id: c.id, name: c.name })),
+          },
+          guard: {
+            repoRoot: ROOT,
+            publicDir: path.join(ROOT, "public"),
+            protectedDirs: [path.join(ROOT, "src"), path.join(ROOT, "scripts"), contentDir],
+          },
+        }
+      : undefined;
+  // Every v2 player store, strict or not: nothing the campaign's must-not-ship
+  // set names (or another campaign's name) may be in its atlas.json or search
+  // index, as text or as a path, and no campaign field may name another
+  // campaign. The same checks as check-derived-secrets --must-not-ship, on the
+  // exact JSON to be written.
+  if (store && !report.failure) {
+    const secrets = mustNotShipSecrets(store.mustNotShip, "must-not-ship");
+    const otherIds = store.mustNotShip.otherCampaigns.map((c) => c.id);
+    const hits = [
+      ...foreignCampaignRefs(project, otherIds, store.campaign).map((h) => `atlas.json: ${h}`),
+      ...foreignCampaignRefs(searchIndex, otherIds).map((h) => `search-index.json: ${h}`),
+      ...findSecretsInText(JSON.stringify(project), secrets).map(
+        (s) => `atlas.json: ${s.field} "${s.name}"`,
+      ),
+      ...findSecretsInText(JSON.stringify(searchIndex), secrets).map(
+        (s) => `search-index.json: ${s.field} "${s.name}"`,
+      ),
+    ];
+    if (hits.length > 0) {
+      report.failure = {
+        exitCode: 12,
+        message:
+          `Player build: campaign "${store.campaign}" would ship ${hits.length} name(s) or path(s) it hides. Failing build.\n` +
+          hits.map((h) => `  ${h}`).join("\n"),
+      };
+    }
+  }
+  return { project, searchIndex, report, assets, ...(store ? { store } : {}) };
 }
 
 /**
@@ -1692,9 +2022,11 @@ async function redactMapsForPlayer(
 
 /**
  * v2 player audio: the shipped areas with content-hashed srcs, so DM file
- * names never ship. Hashed against the map's world folder (`_atlas/`) and
- * never copied into `public/`: publishing v2 assets is R-17's. An area whose
- * file isn't found keeps no src to rewrite, so it doesn't ship (fail closed).
+ * names never ship, and their files copied into the campaign's store
+ * (`files`, as `assets/audio/<hash>.<ext>`), never into `public/`. Read from
+ * the map's world folder (`_atlas/`). An area whose file isn't found there,
+ * or whose src leaves the folder, keeps no src to rewrite, so it doesn't ship
+ * (fail closed).
  */
 function v2PlayerAudio(
   m: MapDocument,
@@ -1702,20 +2034,35 @@ function v2PlayerAudio(
   sourceById: ReadonlyMap<string, WorldSource>,
   warnings: string[],
   hiddenFromPlayer: Set<string>,
+  files: StoreFiles,
 ): MapDocument["soundscape"] {
   if (!sc?.areas?.length) return sc;
   const dir = sourceById.get(m.worldId)?.assetDir;
   if (!dir) return { ...sc, areas: [] };
-  const rewrite = planAudioAssets(sc.areas, dir, { prune: false }).rewrite;
+  const inside = sc.areas.filter((a) =>
+    [a.bed.src, a.bed.srcFallback].every(
+      (src) => src === undefined || /^https?:\/\//i.test(src) || fileInside(dir, src) !== null,
+    ),
+  );
+  const plan = planAudioAssets(inside, dir, { prune: false });
+  const rewrite = plan.rewrite;
   const found = (src: string | undefined) =>
     src === undefined || /^https?:\/\//i.test(src) || rewrite.has(src);
-  const kept = sc.areas.filter((a) => {
-    if (found(a.bed.src) && found(a.bed.srcFallback)) return true;
-    const w = `map "${m.id}": a sound area's audio file isn't in ${path.basename(path.dirname(dir))}/_atlas — area dropped`;
+  const kept = inside.filter((a) => found(a.bed.src) && found(a.bed.srcFallback));
+  if (kept.length < sc.areas.length) {
+    const w = `map "${m.id}": ${sc.areas.length - kept.length} sound area(s) with an audio file not in ${path.basename(path.dirname(dir))}/_atlas — dropped`;
     warnings.push(w);
     hiddenFromPlayer.add(w);
-    return false;
-  });
+  }
+  // Copy only the files a kept area plays (a dropped area's file stays out).
+  const played = new Set(
+    kept.flatMap((a) => [a.bed.src, a.bed.srcFallback]).flatMap((s) => (s ? [rewrite.get(s)] : [])),
+  );
+  for (const c of plan.copies) {
+    if (played.has(`atlas/assets/audio/${path.basename(c.path)}`)) {
+      storeAudioFile(files, c.path, c.bytes);
+    }
+  }
   return { ...sc, areas: rewriteAudioSrcs(kept, rewrite) };
 }
 

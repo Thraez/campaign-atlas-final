@@ -1,6 +1,6 @@
 # R-17 One player output per campaign: visibility
 
-Status: ready-for-agent
+Status: done
 Blocked by: R-13, R-15, R-16 (plan.md lists R-15, R-16; it builds on R-13's build stages). R-11e (no per-campaign output ships before containment) was a blocker; done 2026-11-10
 Size: M
 Branch: `rebuild-r17-campaign-outputs`
@@ -54,3 +54,63 @@ Today's v1 output (`public/atlas/`, `dist/`) stays as it is.
 - Fog per campaign and the source-driven fog scan (R-18).
 - The Vite site build per campaign and publish (R-19). Hosting (phase H).
 - Moving today's `content/` to v2 (R-20 dry run; cutover in phase 6).
+
+## Done
+
+On v2 content the player build writes one store per campaign, `.atlas-campaigns/<id>/atlas/`
+(`scripts/atlas/build/campaignStore.ts`; `--campaign <id>` builds one, `--out` moves the root, a
+store inside `public/` is refused). Every campaign is built before any is written, so one failure
+writes nothing. Each store holds `atlas.json` (with `campaign: {id, name}` and no other campaign's
+id), `search-index.json` and `assets/`: byte copies of the map images it names
+(`assets/maps/<sha256-16><ext>`) and its audio (`assets/audio/<hash>.ogg`), replaced on every
+write. Hidden maps (with frames, subtree and images) and pins, routes and sound areas hidden by
+rule 9 are absent. The must-not-ship set is written beside the store
+(`.atlas-campaigns/<id>/must-not-ship.json`, with `otherCampaigns`); `check-derived-secrets
+--must-not-ship` reads it (whole-word ids and names, `normalizePath` on both sides for paths,
+fail closed on an unreadable file) and the scan registry passes and requires it for every v2
+campaign dir. `check-fog-safety` reads a v2 campaign's fog from the campaign file. `audit-assets`
+requires `assets/` only when the store names a file there. The DM build carries every campaign
+file (`campaigns`). v1 player and DM `atlas.json` and `search-index.json` are identical to
+before (ignoring `version` and `publishedAt`).
+
+The State.md leak (a hidden map or world name in a shipped note body): a link to any must-not-ship
+id or name is redacted to `…` like a link to a hidden note, and counts as a cross-reference leak,
+so `--strict` fails with exit 8. The must-not-ship scan catches any plain-text mention.
+
+Sentinels on `content-next/` (listed in its README) and `src/test/build/campaign-stores.test.ts`
+build both campaigns and grep every file of each store, bytes for images and audio.
+
+Review round 1 (five should-fixes):
+- S1: every v2 player build, strict or not, matches each campaign's `atlas.json` and
+  `search-index.json` against its must-not-ship set in memory and fails with exit 12, writing
+  nothing (`findSecretsInText` in `check-derived-secrets.ts`). The scan registry takes the stores
+  root from the config's `outputDir`.
+- S2: the set adds every other campaign's name and id (when `isReportableName`), in the build and
+  the scan.
+- S3: the stores root is compared on the real path of its nearest existing folder, case-folded on
+  macOS and Windows, so `--out PUBLIC` and a symlink to `public/` are refused.
+- S4: each store is built in a temp folder and renamed over the old one; a full build removes
+  root folders that aren't current campaigns. The root may not be the repo, `src/`, `scripts/`
+  or the content folder, and a non-empty root needs the `.atlas-campaigns-root` marker. Stores are
+  written only after every campaign passes; the per-campaign renames aren't one atomic step.
+- S5: markdown and HTML images in a v2 note fail the player build (exit 1); the path scan
+  matches a path after `(` or `=`.
+- v1 output is still identical; the link redaction runs only for v2.
+
+Review round 2:
+- Every URL a v2 note body yields (rendered `src`, `srcset`, `href`, `poster` and the like,
+  `url(...)`, reference definitions) fails the player build (exit 1) unless it is `http(s):`,
+  `data:`, `blob:`, `mailto:` or a `#fragment`: reference-style images, `<picture><source>`,
+  `<a href>` and markdown links to files are covered.
+- Other campaigns' ids left the word scan ("the main road" builds); `foreignCampaignRefs` checks
+  them by structure, in the build and in `check-derived-secrets`. Names stay in the word scan.
+- Pruning deletes only store-shaped folders and `.tmp-`/`.old-` leftovers and warns about the
+  rest; a campaign folder that isn't a store is refused. Names with `"` or `\` also match
+  JSON-escaped.
+
+Left out for R-17b: text split by markup or invisible characters (`Mire*fold*`, a soft hyphen)
+isn't matched; a campaign's name that is a common word ("Sandbox") fails another campaign's
+build when written as prose; the structural check knows only campaign-named fields and
+visibility/campaign-keyed maps. Entity images and embedded assets in v2 notes fail the player build closed (not
+published per campaign yet); a tiled map layer is an error; fogged v2 maps ship with no fog mask
+(R-18). `check-player-files` and the v1 store comments still describe the v1 layout (R-19).

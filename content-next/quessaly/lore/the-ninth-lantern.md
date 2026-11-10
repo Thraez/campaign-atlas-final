@@ -5,4 +5,4 @@ atlas:
   visibility: dm
 ---
 
-A lamp that should not be lit. Test note: frontmatter dm, ships to no campaign.
+A lamp that should not be lit.

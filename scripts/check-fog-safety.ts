@@ -26,8 +26,14 @@
  * the player build prunes it), so the "original beside redacted" check runs on
  * the built site only.
  *
+ * Schema v2 content (R-17): fog belongs to a campaign, so the source geometry
+ * is the campaign file's (`campaignFog`, the resolver's own reading). The
+ * campaign is `--campaign` (the scan registry passes it) or else the one the
+ * player atlas.json names; neither, or the two disagreeing, is 17 when the
+ * artifact has a fog map (fail closed).
+ *
  * Usage:
- *   tsx scripts/check-fog-safety.ts <artifact-dir> [--config atlas.config.json]
+ *   tsx scripts/check-fog-safety.ts <artifact-dir> [--config atlas.config.json] [--campaign <id>]
  *
  * Exit codes:
  *   0   clean
@@ -51,12 +57,14 @@ import { IMAGE_EXTENSIONS } from "./atlas/assetRefs";
 import { loadWorldConfig } from "./atlas/loadWorldConfig";
 import { locatePlayerAtlas, resolveAssetFile, type ArtifactLayout } from "./atlas/playerArtifact";
 import { isLit } from "../src/atlas/fog/effectiveLit";
-import { areaUnderFog, pathUnderFog } from "../src/atlas/content/resolveCampaign";
+import { areaUnderFog, campaignFog, pathUnderFog } from "../src/atlas/content/resolveCampaign";
+import { loadAtlasModel } from "./atlas/loadAtlasModel";
 import type { FogOverlay, Point } from "../src/atlas/content/schema";
 
 interface Args {
   target: string;
   config: string;
+  campaign?: string;
 }
 
 interface Finding {
@@ -96,12 +104,16 @@ interface PlayerMap {
 
 interface PlayerAtlas {
   maps: PlayerMap[];
+  /** v2 player builds: the campaign the artifact is (R-17). */
+  campaign?: { id?: unknown };
   placements?: Array<{ entityId: string; mapId: string; x: number; y: number }>;
 }
 
 interface AtlasConfig {
   contentRoot: string;
   defaultWorld: string;
+  include?: string[];
+  exclude?: string[];
 }
 
 function parseArgs(argv: string[]): Args | null {
@@ -109,11 +121,14 @@ function parseArgs(argv: string[]): Args | null {
   if (!target) return null;
   // Optional --config flag, defaults to atlas.config.json
   let config = "atlas.config.json";
+  let campaign: string | undefined;
   for (let i = 1; i < argv.length; i++) {
     if (argv[i] === "--config") config = argv[++i];
     else if (argv[i].startsWith("--config=")) config = argv[i].slice("--config=".length);
+    else if (argv[i] === "--campaign") campaign = argv[++i];
+    else if (argv[i].startsWith("--campaign=")) campaign = argv[i].slice("--campaign=".length);
   }
-  return { target, config };
+  return { target, config, ...(campaign ? { campaign } : {}) };
 }
 
 export interface RunOpts {
@@ -121,6 +136,36 @@ export interface RunOpts {
   config?: string;
   /** Where atlas.json must be; inferred when absent (a run by hand). */
   layout?: ArtifactLayout;
+  /** v2 content: the campaign whose fog the artifact must honour (R-17). */
+  campaign?: string;
+}
+
+/**
+ * v2: the fog of every map of the artifact's campaign, from its campaign
+ * file. Throws when the campaign can't be told or isn't in the content, so
+ * the geometry checks count as not run (17).
+ */
+function v2CampaignFogs(
+  cfg: AtlasConfig,
+  root: string,
+  contentRoot: string,
+  atlas: PlayerAtlas,
+  given: string | undefined,
+): FogOverlay[] {
+  const named = typeof atlas.campaign?.id === "string" ? atlas.campaign.id : undefined;
+  if (given !== undefined && named !== undefined && given !== named) {
+    throw new Error(`the artifact is campaign "${named}", not "${given}"`);
+  }
+  const id = given ?? named;
+  if (id === undefined) throw new Error("schema v2 content, but no campaign is given or named");
+  const { model } = loadAtlasModel(
+    contentRoot,
+    { ...cfg, include: cfg.include ?? [], exclude: cfg.exclude ?? [] },
+    { root },
+  );
+  const campaign = model.campaigns.find((c) => c.id === id);
+  if (!campaign) throw new Error(`campaign "${id}" is not in the content`);
+  return (atlas.maps ?? []).flatMap((m) => campaignFog(m.id, campaign) ?? []);
 }
 
 export async function run(opts: RunOpts): Promise<number> {
@@ -163,10 +208,20 @@ export async function run(opts: RunOpts): Promise<number> {
     try {
       const atlasConfig: AtlasConfig = JSON.parse(fs.readFileSync(configAbs, "utf8"));
       const contentRoot = path.resolve(path.dirname(configAbs), atlasConfig.contentRoot);
-      const worldId = atlasConfig.defaultWorld;
-      const worldCfg = loadWorldConfig(contentRoot, worldId);
-      if (worldCfg) {
-        sourceFogs = worldCfg.fogs as FogOverlay[];
+      if (fs.existsSync(path.join(contentRoot, "_atlas", "atlas.yaml"))) {
+        sourceFogs = v2CampaignFogs(
+          atlasConfig,
+          path.dirname(configAbs),
+          contentRoot,
+          atlas,
+          opts.campaign,
+        );
+      } else {
+        const worldId = atlasConfig.defaultWorld;
+        const worldCfg = loadWorldConfig(contentRoot, worldId);
+        if (worldCfg) {
+          sourceFogs = worldCfg.fogs as FogOverlay[];
+        }
       }
     } catch (e) {
       configLoadFailed = true;
@@ -380,7 +435,11 @@ export async function main(): Promise<number> {
     );
     return 1;
   }
-  return run({ dir: args.target, config: args.config });
+  return run({
+    dir: args.target,
+    config: args.config,
+    ...(args.campaign ? { campaign: args.campaign } : {}),
+  });
 }
 
 const invokedAsScript = (() => {
