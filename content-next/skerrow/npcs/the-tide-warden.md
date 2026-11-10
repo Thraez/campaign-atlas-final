@@ -5,4 +5,4 @@ atlas:
   visibility: player
 ---
 
-Rings the harbour bell at Hookhaven. Test note: ships to main; sandbox gets nothing of this world.
+Rings the harbour bell at Hookhaven.

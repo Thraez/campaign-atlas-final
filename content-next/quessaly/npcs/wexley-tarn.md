@@ -5,4 +5,4 @@ atlas:
   visibility: player
 ---
 
-A reed-cutter. Test note: its notes: entry has a stale basedOn, so it ships to no campaign.
+A reed-cutter.
