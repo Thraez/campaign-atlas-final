@@ -22,8 +22,8 @@
  *     is a must-not-ship name;
  *   - no string anywhere links a hidden id (`data-entity-id`, `#/entity/<id>`,
  *     `linkedIds`);
- *   - no placement sits at a must-not-ship pin location (same map, x/y within
- *     `PIN_EPSILON`);
+ *   - no placement of a dropped pin's note sits at that pin's location
+ *     (must-not-ship `pinLocations`: same map, x/y within `PIN_EPSILON`);
  *   - no single-token value is a hidden image path, ends in one, or has a
  *     hidden image's file name (percent-decoded, through `normalizePath`);
  *   - every note's `world` and every map's `worldId` is a world in `worlds`
@@ -280,7 +280,12 @@ const list = (v: unknown) =>
     (x): x is Record<string, unknown> => !!x && typeof x === "object",
   );
 
-/** A placement at a dropped pin's location (its map, x and y within `PIN_EPSILON`). */
+/**
+ * A placement of a dropped pin's note at that pin's location (its map, x and y
+ * within `PIN_EPSILON`): the dropped pin shipping. Another note's placement at
+ * the same spot carries nothing of that pin and passes. A pin location without
+ * a note (a malformed file) matches any note: fail closed.
+ */
 function pinLocationFindings(json: unknown, pins: MustNotShipFile["pinLocations"]): string[] {
   const top = (json ?? {}) as Record<string, unknown>;
   const out: string[] = [];
@@ -288,6 +293,8 @@ function pinLocationFindings(json: unknown, pins: MustNotShipFile["pinLocations"
     const hit = pins.find(
       (l) =>
         p.mapId === l.map &&
+        (typeof l.note !== "string" ||
+          (typeof p.entityId === "string" && norm(p.entityId) === norm(l.note))) &&
         typeof p.x === "number" &&
         typeof p.y === "number" &&
         Math.abs(p.x - l.x) <= PIN_EPSILON &&
@@ -295,7 +302,7 @@ function pinLocationFindings(json: unknown, pins: MustNotShipFile["pinLocations"
     );
     if (hit) {
       out.push(
-        `placements[${i}]: at the location of a pin that doesn't ship (map "${hit.map}", ${hit.x}, ${hit.y})`,
+        `placements[${i}]: note "${hit.note}" at the location of a pin that doesn't ship (map "${hit.map}", ${hit.x}, ${hit.y})`,
       );
     }
   });
@@ -579,7 +586,7 @@ function loadContent(configPath: string): Content {
   };
 }
 
-const pinKey = (p: PinLocation) => `${p.map} #${p.index} (${p.x}, ${p.y})`;
+const pinKey = (p: PinLocation) => `${p.map} #${p.index} ${p.note} (${p.x}, ${p.y})`;
 const campaignKey = (c: AtlasCampaign) => `${c.id} "${c.name}"`;
 
 /**

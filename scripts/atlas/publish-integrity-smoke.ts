@@ -483,7 +483,7 @@ type IsolationMustNotShip = {
   ids: string[];
   names: string[];
   paths: string[];
-  pinLocations: { map: string; index: number; x: number; y: number }[];
+  pinLocations: { map: string; index: number; note: string; x: number; y: number }[];
   otherCampaigns: { id: string; name: string }[];
 };
 
@@ -503,7 +503,10 @@ function cleanIsolationMustNotShip(): IsolationMustNotShip {
     ],
     names: ["Bog", "Fen", "Fen Reach", "Gloomharbour Vault", "Hookhaven", "S\u00e9verine"],
     paths: ["images/c1.png", "images/hookhaven-chart.png"],
-    pinLocations: [{ map: "vale-overview", index: 1, x: 500, y: 600 }],
+    pinLocations: [
+      { map: "vale-overview", index: 1, note: "gloomharbour-vault", x: 500, y: 600 },
+      { map: "vale-overview", index: 2, note: "inn", x: 300, y: 300 },
+    ],
     otherCampaigns: [{ id: "main", name: "Lantern Road" }],
   };
 }
@@ -574,13 +577,13 @@ function variantsIsolation(): VariantResult[] {
     variantIsolation("Unreferenced image in the store", 25, (o) => {
       o.extra.push("assets/maps/fedcba9876543210.png");
     }),
-    variantIsolation("Placement at a dropped pin's location", 23, (o) => {
+    variantIsolation("Note placed at its dropped pin's location", 23, (o) => {
       (o.atlas.placements as Record<string, unknown>[]).push({
         id: "inn@vale-overview#2",
         entityId: "inn",
         mapId: "vale-overview",
-        x: 500,
-        y: 600,
+        x: 300,
+        y: 300,
         label: "Inn",
       });
     }),

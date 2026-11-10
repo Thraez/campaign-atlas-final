@@ -234,9 +234,10 @@ It prints every finding and exits with the first kind it found, in this order:
   `worldId` name a shipped world; a world's `defaultMapId`, a map's `parent`, an ocean entry's
   `map` and a placement's `mapId` name a shipped map. Every map has a `worldId`, every
   placement's `entityId` is a shipped entity, and every search-index id is an atlas entity. No
-  placement sits where a pin that doesn't ship sat (the must-not-ship `pinLocations`: same map,
-  x and y within 1e-6; the build copies pin coordinates as written, so a dropped pin's spot is an
-  exact match). A shipped pin at exactly the same spot as a dropped one fails too: fail closed.
+  placement of a note sits where that note's dropped pin sat (the must-not-ship `pinLocations`,
+  each `{map, index, note, x, y}`: same note, same map, x and y within 1e-6; the build copies pin
+  coordinates as written, so the dropped pin shipping is an exact match). Another note's
+  placement at the same spot carries nothing of the dropped pin and passes.
 - **24, text.** Every text file (the bundle and `index.html` too, on a built site) is searched
   for the must-not-ship names and ids as whole words, and for hidden paths and their file names
   (when long enough to report, as in `check-derived-secrets`), in four forms: as written, with

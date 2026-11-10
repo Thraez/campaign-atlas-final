@@ -136,8 +136,11 @@ function cleanMustNotShip(): MustNotShipFile {
     ],
     names: ["Bog", "Fen", "Fen Reach", "Gloomharbour Vault", "Hookhaven", "S\u00e9verine"],
     paths: ["images/c1.png", "images/hookhaven-chart.png"],
-    // The vault's pin on the shipped map.
-    pinLocations: [{ map: "vale-overview", index: 1, x: 500, y: 600 }],
+    // The vault's pin and the inn's dm-only pin on the shipped map.
+    pinLocations: [
+      { map: "vale-overview", index: 1, note: "gloomharbour-vault", x: 500, y: 600 },
+      { map: "vale-overview", index: 2, note: "inn", x: 300, y: 300 },
+    ],
     otherCampaigns: [{ id: "main", name: "Lantern Road" }],
   };
 }
@@ -468,14 +471,14 @@ describe("check-campaign-isolation: text (exit 24)", () => {
 });
 
 describe("check-campaign-isolation: hidden pin locations (exit 23)", () => {
-  it("a placement at a dropped pin's map and coordinates", () => {
+  it("a placement of the dropped pin's note at its map and coordinates", () => {
     const o = output();
     (o.atlas.placements as Json[]).push({
       id: "inn@vale-overview",
       entityId: "inn",
       mapId: "vale-overview",
-      x: 500,
-      y: 600,
+      x: 300,
+      y: 300,
       label: "Inn",
     });
     write(o);
@@ -486,14 +489,21 @@ describe("check-campaign-isolation: hidden pin locations (exit 23)", () => {
   it("within the tolerance (float noise) still counts", () => {
     const o = output();
     const p = (o.atlas.placements as Json[])[0];
-    Object.assign(p, { x: 500 + 1e-9, y: 600 - 1e-9 });
+    Object.assign(p, { x: 300 + 1e-9, y: 300 - 1e-9 });
     write(o);
     expect(scan(o)).toBe(EXIT.structural);
   });
 
-  it("a placement a pixel away, or on another map, passes", () => {
+  it("a placement a pixel away passes", () => {
     const o = output();
-    Object.assign((o.atlas.placements as Json[])[0], { x: 501, y: 600 });
+    Object.assign((o.atlas.placements as Json[])[0], { x: 301, y: 300 });
+    write(o);
+    expect(scan(o), errors()).toBe(0);
+  });
+
+  it("another note's placement at a dropped pin's exact spot passes: nothing of that pin ships", () => {
+    const o = output();
+    Object.assign((o.atlas.placements as Json[])[0], { x: 500, y: 600 });
     write(o);
     expect(scan(o), errors()).toBe(0);
   });

@@ -20,6 +20,8 @@ maps:
     pins:
       - { note: inn, x: 1, y: 1, visibility: player }
       - { note: gloomharbour-vault, x: 500, y: 600, visibility: player }
+      # The shipped inn's second pin, dropped by visibility: its spot is guarded.
+      - { note: inn, x: 300, y: 300, visibility: dm }
   - id: c1
     name: Bog
     width: 100
