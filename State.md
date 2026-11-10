@@ -15,7 +15,7 @@ ticket merges on `npm run gate` plus an Opus review; a push or merge needs Isak'
 |---|---|---|---|
 | 0 Guard and quick wins | R-01 Sync guard, scans on real artifacts, Q-01..Q-04 | Links that work, a fitted map, the menu above the map, a region card. **Safe stop** | done |
 | 1 Spine and PRs | The other PRs, R-02..R-06, ADR-0001 addendum, ADR-0002 | A publish log with every scan reading `dist`; `docs/GOALS.md` agreed | done |
-| 2 Schema v2 and campaigns in the pipeline | R-10..R-20, ADR-0003, ADR-0004 | `npm run atlas:tree` on the v2 test world, per campaign; today's site unchanged | in progress (R-10, R-11a, R-11b, R-11c, R-11d, R-12, R-15, R-16, R-07b, R-13, R-11e, R-14, R-17, R-07, R-17b done; R-18 and R-19 next) |
+| 2 Schema v2 and campaigns in the pipeline | R-10..R-20, ADR-0003, ADR-0004 | `npm run atlas:tree` on the v2 test world, per campaign; today's site unchanged | in progress (R-10, R-11a, R-11b, R-11c, R-11d, R-12, R-15, R-16, R-07b, R-13, R-11e, R-14, R-17, R-07, R-17b, R-18 done; R-19 next) |
 | 3 Shared canvas | Ocean/frame/map-tree component; viewer on it; campaign links | Ocean > continent > city > back on the local test world. **Safe stop** | - |
 | 4 Editor core | Router, command store, E0-E5, Place pin, E9, Draw route with distance/time; v2 test world only; ADR-0005, ADR-0006 | Add a map inside a map, pin it, draw a route, reload | - |
 | 5 Story | Region card and story panel, monument strip, people and Inside lists, route labels, deep links, Browse, Timeline, Credits, Landing on v2 | Read a region, a person, a monument; follow three links | - |
@@ -66,7 +66,7 @@ Follow-up noted in its ticket: no scan derives DM region/route ids, so none woul
 | R-16 | Three-level test world, two campaigns (done) (`content-next/`, `npm run atlas:tree`) | R-12, R-11a |
 | R-17 | One player output per campaign: visibility (done) | R-13, R-15, R-16, R-11e |
 | R-17b | Structural campaign isolation scan (done) | R-17 |
-| R-18 | Fog baked per campaign; fog scan source-driven | R-17, R-17b |
+| R-18 | Fog baked per campaign; fog scan source-driven (done) | R-17, R-17b |
 | R-19 | Publish runs every campaign | R-17, R-17b |
 | R-20 | Migration script and down-migration, dry run only | R-17, R-18 |
 
@@ -105,7 +105,9 @@ State.md part is the same stale notes. Drop it once Isak decides the settings ch
 
 R-17b (done): `npm run atlas:check-isolation` scans v2 per-campaign outputs (exit 23 structural,
 24 text, 25 assets, 20 missing) and recomputes must-not-ship from the content. It runs on real
-content once R-19 wires publish to v2. Next: R-18 and R-19, then R-20.
+content once R-19 wires publish to v2. R-18 (done): fog is baked into each campaign's store; `redactLayer` now zeroes colour under fog
+(before, hidden pixels kept their RGB under alpha 0; no live fog was affected); `check-fog-safety` exit 27
+fails colour under fog. Next: R-19, then R-20.
 Since R-17b, each `must-not-ship.json` `pinLocations` entry carries `note` (the dropped pin's
 note), and the isolation scan flags only that note at that spot.
 
