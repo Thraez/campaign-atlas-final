@@ -386,6 +386,10 @@ describe("content-next/ can't reach a published build", () => {
       "vite.config.ts",
       "scripts/build-atlas.ts",
       "scripts/atlas/publish-orchestrator.ts",
+      "scripts/atlas/publish.ts",
+      "scripts/atlas/publishPlan.ts",
+      "scripts/atlas/campaignSitePublicDir.ts",
+      "scripts/atlas/campaignSiteBranding.ts",
       "scripts/atlas/scanRegistry.ts",
     ]) {
       expect(read(rel), rel).not.toMatch(NEXT_REFS);

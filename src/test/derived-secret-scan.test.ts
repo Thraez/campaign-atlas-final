@@ -63,6 +63,58 @@ describe("deriveSecretsFromVault", () => {
     }
   });
 
+  // R-19 review: the content root's own README.md is the folder's readme, not a
+  // note; excluded, it would make "README" (in every site bundle) a secret.
+  // A hidden note titled "Readme" is still one.
+  it("skips the content root's excluded README.md, not a hidden note titled Readme", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "derived-readme-"));
+    try {
+      const contentDir = path.join(tmp, "content");
+      fs.mkdirSync(path.join(contentDir, "_dm"), { recursive: true });
+      fs.writeFileSync(path.join(contentDir, "README.md"), "# About this folder\n");
+      const config = (exclude: string[]) => {
+        fs.writeFileSync(
+          path.join(tmp, "atlas.config.json"),
+          JSON.stringify({
+            contentRoot: "content",
+            outputDir: "out",
+            defaultWorld: "test",
+            include: [],
+            exclude,
+          }),
+        );
+        return deriveSecretsFromVault(path.join(tmp, "atlas.config.json"));
+      };
+      expect(config(["README.md", "**/_dm/**"]).map((s) => s.name)).not.toContain("README");
+      // With frontmatter it is a note, and a hidden one counts.
+      fs.writeFileSync(
+        path.join(contentDir, "README.md"),
+        "---\ntitle: Gloomharbour Ledger\n---\nbody\n",
+      );
+      expect(config(["README.md"]).map((s) => s.name)).toContain("Gloomharbour Ledger");
+      fs.writeFileSync(path.join(contentDir, "README.md"), "# About this folder\n");
+
+      fs.writeFileSync(
+        path.join(contentDir, "_dm", "tower-key.md"),
+        "---\ntitle: Readme\natlas:\n  visibility: dm\n---\nbody\n",
+      );
+      const secrets = config(["README.md", "**/_dm/**"]);
+      expect(secrets.map((s) => s.name)).toContain("Readme");
+      const r = scanArtifactForSecrets(
+        (() => {
+          const out = path.join(tmp, "site");
+          fs.mkdirSync(out, { recursive: true });
+          fs.writeFileSync(path.join(out, "page.txt"), "see the Readme for details");
+          return out;
+        })(),
+        secrets,
+      );
+      expect(r.hits.map((h) => h.match.name)).toContain("Readme");
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
   it("does NOT derive secrets from public/rumor entities", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "derived-public-"));
     try {

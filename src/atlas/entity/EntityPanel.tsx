@@ -54,6 +54,8 @@ export interface EntityPanelProps {
   /** World-level per-asset credit registry, keyed by image src. Takes
    *  precedence over `entity.credit` for any src with a registry entry. */
   assetCredits?: Record<string, AssetCredit>;
+  /** The loaded atlas's own name (its campaign, else its world), for the printed handout. */
+  siteName?: string;
   /**
    * What to render when nothing is open. This panel is a third of the player
    * screen and used to greet a first-time reader with an instruction ("Select a
@@ -310,6 +312,7 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
     onPeekLeave,
     credits,
     assetCredits,
+    siteName,
     emptyState,
   },
   ref,
@@ -479,7 +482,9 @@ export const EntityPanel = forwardRef<HTMLDivElement, EntityPanelProps>(function
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => printEntityHandout(entity, entityById, assetCredits, credits)}
+              onClick={() =>
+                printEntityHandout(entity, entityById, assetCredits, credits, siteName)
+              }
               title="Download as printable handout (PDF)"
               aria-label="Download handout as PDF"
             >

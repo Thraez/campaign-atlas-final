@@ -1474,3 +1474,28 @@ describe("EntityPanel — Connections dedup and grouping (Q15)", () => {
     expect(screen.getByText(/^Controls:$/)).toBeInTheDocument();
   });
 });
+
+describe("R-19: the handout names the site it was printed from", () => {
+  it("passes the host's site name to the handout", () => {
+    const fakeDoc = { open: vi.fn(), write: vi.fn(), close: vi.fn() };
+    const open = vi
+      .spyOn(window, "open")
+      .mockReturnValue({ document: fakeDoc, opener: null } as unknown as Window);
+    render(
+      <MemoryRouter>
+        <EntityPanel
+          entity={e}
+          placements={[]}
+          entityById={baseEntityById}
+          onOpenEntity={() => {}}
+          onClose={() => {}}
+          onShowOnMap={() => {}}
+          siteName="Lantern Road"
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /handout/i }));
+    expect(String(fakeDoc.write.mock.calls[0][0])).toContain("Lantern Road — player handout");
+    open.mockRestore();
+  });
+});

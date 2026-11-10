@@ -22,7 +22,7 @@ const NO_REQUIRE = {
 const VISIBILITY_EXEMPT = ["src/atlas/content/visibility.ts", "src/test/**", "**/*.test.{ts,tsx}"];
 
 export default tseslint.config(
-  { ignores: ["dist", ".claude/**", "dist-ssr", "coverage"] },
+  { ignores: ["dist", "dist-campaigns", ".atlas-campaigns", ".claude/**", "dist-ssr", "coverage"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
