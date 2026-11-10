@@ -38,7 +38,7 @@ const WORLD_YAML = `maps:
     regions:
       - id: unmarked-nested-region
         name: Secret Grove
-        points: [[0,0],[10,0],[10,10]]
+        points: [[500,500],[510,500],[510,510]]
       - id: marked-region
         name: Open Field
         visibility: player
@@ -63,7 +63,7 @@ regions:
   - id: unmarked-top-region
     mapId: m1
     name: Hidden Vale
-    points: [[0,0],[40,0],[40,40]]
+    points: [[500,500],[540,500],[540,540]]
 routes:
   - id: unmarked-top-route
     mapId: m1

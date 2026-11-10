@@ -199,13 +199,15 @@ describe("v1Model: regions, routes and pins", () => {
     expect(warnings.every((w) => w.includes('unknown map "nowhere"'))).toBe(true);
   });
 
-  it("drops a region with fewer than 3 points, with a warning", () => {
+  it("keeps a region with fewer than 3 points, with a warning, for the resolver to test (rule 9)", () => {
     const { model, warnings } = v1Model({
       worldId: W,
       maps: [map("a")],
       regions: [region("thin", "a", { points: sq.slice(0, 2) })],
     });
-    expect(model.worlds[0].maps[0].regions).toBeUndefined();
+    expect(model.worlds[0].maps[0].regions?.map((r) => [r.id, r.points])).toEqual([
+      ["thin", sq.slice(0, 2)],
+    ]);
     expect(warnings[0]).toMatch(/region "thin" needs at least 3 valid points/);
   });
 

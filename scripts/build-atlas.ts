@@ -48,7 +48,12 @@ import { characterKeysPath, parseCharacterKeys } from "../src/atlas/secrets/char
 import { PLAYER_VISIBLE_VISIBILITY, linkLeaksToPlayers, linkTargetLabel } from "./atlas/visibility";
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
 import { filterSoundscapeForPlayer } from "./atlas/filterSoundscape";
-import { playerResolution, resolverFailure, type PlayerResolution } from "./atlas/playerResolution";
+import {
+  droppedRegionMessages,
+  playerResolution,
+  resolverFailure,
+  type PlayerResolution,
+} from "./atlas/playerResolution";
 import { soundAreaIdProblems, soundAreaIdTrusted } from "../src/atlas/content/soundAreaIds";
 import { AtlasModelError } from "../src/atlas/content/atlasModel";
 import { resolveCampaign, type MustNotShip } from "../src/atlas/content/resolveCampaign";
@@ -311,6 +316,10 @@ export interface BuildAtlasReport {
   nameCollisions: string[];
   /** Player builds: the resolver's orphan `notes:` entries, one line each naming world and key. DM-only. */
   orphanEntries: string[];
+  /** Player builds: hidden regions too malformed to test (ADR-0004 rule 9), naming map and region. DM-only. */
+  badHidingRegions: string[];
+  /** Player builds: shipped notes whose every pin rule 9 hides, naming note and region. Warnings. DM-only. */
+  hiddenPinNotes: string[];
   /**
    * Player builds: what the campaign's resolution says must never ship (rule
    * 5's hidden worlds and their notes, hidden notes, maps and pins), for the
@@ -662,10 +671,23 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   if (bm.campaign !== null) {
     res = playerResolution(model, resolveCampaign(model, bm.notes, bm.campaign));
     const resolverWarnings = v2 ? res.resolution.warnings : [];
-    for (const w of [...res.collisionMessages, ...res.orphanMessages, ...resolverWarnings]) {
+    for (const w of [
+      ...res.collisionMessages,
+      ...res.orphanMessages,
+      ...res.badHidingRegionMessages,
+      ...res.hiddenPinNoteMessages,
+      ...resolverWarnings,
+    ]) {
       warnings.push(w);
       hiddenFromPlayer.add(w);
     }
+  }
+  // v1: regions the world loader dropped before the resolver saw them fail
+  // the player build unless marked player (rule 9; exit 12 below).
+  const droppedRegions = flags.player ? droppedRegionMessages(bm.v1Source?.droppedRegions) : [];
+  for (const w of droppedRegions) {
+    warnings.push(w);
+    hiddenFromPlayer.add(w);
   }
   // v2: a note whose frontmatter ships but that no campaign ships says why.
   for (const w of notesShippingNowhere(
@@ -1473,6 +1495,8 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     crossRefLeaks,
     nameCollisions: res?.collisionMessages ?? [],
     orphanEntries: res?.orphanMessages ?? [],
+    badHidingRegions: [...(res?.badHidingRegionMessages ?? []), ...droppedRegions],
+    hiddenPinNotes: res?.hiddenPinNoteMessages ?? [],
     ...(res ? { mustNotShip: res.resolution.mustNotShip } : {}),
     consoleWarnings: bm.consoleWarnings,
     soundAreaIdProblems: soundIdLines,
@@ -1729,7 +1753,10 @@ function buildSearchIndex(pending: Pending[]): SearchIndexEntry[] {
  * (exit 1); strict / strict-player builds additionally fail on invalid
  * visibility (3), missing assets (4), bad extensions (9), duplicate slugs (2),
  * relationship leaks (5), region leaks (6), route leaks (7), cross-ref
- * leaks (8), and sound areas with a missing or shared id (22). Returns the first failure, or undefined when every gate passes.
+ * leaks (8), and sound areas with a missing or shared id (22); every player
+ * build, strict or not, fails on the resolver's gates: name collisions (10),
+ * orphan `notes:` entries (11) and malformed hidden regions (12). Returns the
+ * first failure, or undefined when every gate passes.
  */
 function checkBuildGates(flags: BuildFlags, d: BuildAtlasReport): BuildFailure | undefined {
   if (d.errors.length > 0) return { exitCode: 1, message: "validation errors" };
@@ -1804,14 +1831,17 @@ function checkBuildGates(flags: BuildFlags, d: BuildAtlasReport): BuildFailure |
       message: `Strict player mode: ${d.soundAreaIdProblems.length} sound-area id problem(s). Failing build.\n  ${d.soundAreaIdProblems.join("\n  ")}`,
     };
   }
-  // The per-campaign resolver's own gates (ADR-0004): a DM-only item and a
-  // shipped one sharing a name (rule 8) fail a strict player build (10); an
-  // orphan `notes:` entry fails any player build (11).
+  // The per-campaign resolver's own gates (ADR-0004), on every player build,
+  // strict or not: a DM-only item and a shipped one sharing a name (rule 8,
+  // 10), an orphan `notes:` entry (11), a hidden region too malformed to test
+  // what lies inside it (rule 9, 12). Rule 8 used to fail only strict builds;
+  // a non-strict player build shipping the hidden name is still a leak.
   if (flags.player) {
-    return resolverFailure(
-      { collisionMessages: d.nameCollisions, orphanMessages: d.orphanEntries },
-      flags.strict,
-    );
+    return resolverFailure({
+      collisionMessages: d.nameCollisions,
+      orphanMessages: d.orphanEntries,
+      badHidingRegionMessages: d.badHidingRegions,
+    });
   }
   return undefined;
 }

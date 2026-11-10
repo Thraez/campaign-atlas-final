@@ -56,6 +56,23 @@ const MAPS = [
      <rect x="120" y="60" width="160" height="100" fill="#a8885a"/>`,
   ],
   [
+    "quessaly",
+    "mirefold",
+    400,
+    300,
+    "#9aa880",
+    `<rect x="100" y="80" width="200" height="140" fill="#6a7a5a"/>
+     <rect x="160" y="120" width="60" height="60" fill="#4a5a40"/>`,
+  ],
+  [
+    "quessaly",
+    "mirefold-cellars",
+    300,
+    300,
+    "#8a8070",
+    `<rect x="40" y="40" width="220" height="220" fill="#6a6050"/>`,
+  ],
+  [
     "skerrow",
     "skerrow-isles",
     500,

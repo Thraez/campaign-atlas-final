@@ -148,9 +148,23 @@ export interface WorldConfig {
   /** Optional world display name from world.yaml's top-level `name:` field. */
   name?: string;
   warnings: string[];
+  /**
+   * Regions this loader drops (a repeated id, fewer than 3 points), with the
+   * visibility as written. One not explicitly `player` may have hidden
+   * something (ADR-0004 rule 9), so the player build fails on it.
+   */
+  droppedRegions: DroppedRegion[];
   importConfig: ImportFolderConfig; // always present — defaults applied here
   credits: CreditsConfig; // always present — both default true
   assetCredits?: Record<string, AssetCredit>; // per-asset registry; undefined when absent
+}
+
+export interface DroppedRegion {
+  mapId: string;
+  id: string;
+  /** The `visibility` value as written in world.yaml (undefined when absent). */
+  visibility: unknown;
+  why: "duplicate id" | "fewer than 3 points";
 }
 
 export class WorldConfigError extends Error {}
@@ -313,15 +327,21 @@ export function loadWorldConfig(
     }
   }
   const seenRegionIds = new Set<string>();
+  const droppedRegions: DroppedRegion[] = [];
   const regions: Region[] = rawRegions
     .map((r) => {
-      if (seenRegionIds.has(r.id)) {
+      const dropped = (why: DroppedRegion["why"]) =>
+        droppedRegions.push({ mapId: r.mapId ?? "", id: r.id, visibility: r.visibility, why });
+      const seenBefore = seenRegionIds.has(r.id);
+      if (seenBefore) {
         warnings.push(`duplicate region id "${r.id}" — keeping first definition`);
+        dropped("duplicate id");
       }
       seenRegionIds.add(r.id);
       const visibility = normalizeVis(r.visibility, warnings, `region "${r.id}"`);
       if (!Array.isArray(r.points) || r.points.length < 3) {
         warnings.push(`region "${r.id}" has fewer than 3 points — skipping`);
+        if (!seenBefore) dropped("fewer than 3 points");
       }
       return {
         id: r.id,
@@ -502,6 +522,7 @@ export function loadWorldConfig(
     schemaVersion: resolvedVersion,
     name: typeof data.name === "string" ? data.name : undefined,
     warnings,
+    droppedRegions,
     importConfig,
     credits,
     assetCredits,
