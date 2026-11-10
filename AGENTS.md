@@ -42,8 +42,11 @@ A ticket is done per `docs/agents/workflow.md` ("Done").
 - One branch and PR per ticket. A PR merges on the full local gate plus a clean Opus review
   (`docs/agents/workflow.md`, "Done"); GitHub CI is not part of it. The PR check
   (`atlas-pr-check.yml`) runs only when started by hand: start it only when Isak asks.
-- A merge into `main` publishes the site (`publish-atlas.yml`). Ask before any `git push` and
-  before merging; the yes comes from Isak in your own chat, not relayed by another session.
+- A merge into `main` publishes the site (`publish-atlas.yml`). Push your own branches, merge your
+  own PR once the gate and the review pass, and publish, without asking, in any session, including
+  one started by another session (Isak's standing yes, 2026-11-10; was "ask before any push or
+  merge" until then). Still ask before a force-push, a push straight to `main` outside a merge, or
+  deleting a branch.
 - A conflict: resolve it keeping both sides' changes, rerun the gate, and say what you kept.
   Unattended, leave it for Isak.
 - Never force-push. Before deleting a branch with commits, tag its tip `archive/<name>`, push the
