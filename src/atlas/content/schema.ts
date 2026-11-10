@@ -16,6 +16,8 @@ export interface AtlasProject {
   publishedAt: string; // ISO timestamp
   changelog?: string;
   worlds: World[];
+  /** Schema v2 only (ADR-0003): the ocean and the top-level maps on it that ship. */
+  ocean?: AtlasOcean;
   maps: MapDocument[];
   entities: Entity[];
   placements: MapPlacement[];
@@ -86,6 +88,38 @@ export interface MapDocument {
   water?: WaterConfig;
   soundscape?: SoundscapeConfig;
   wrapX?: boolean;
+  /** Schema v2 only: the map this one sits inside. Absent on a top-level map. */
+  parent?: string;
+  /** Schema v2 only: where this map sits on its parent, in the parent's pixel space. */
+  frame?: MapFrame;
+  /** Schema v2 only: the parent zoom at which the viewer enters this map. */
+  enterZoom?: number;
+}
+
+/** A child map's rectangle on its parent (schema v2, ADR-0003). */
+export interface MapFrame {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+}
+
+/** A top-level map's place on the ocean (schema v2, `atlas.yaml` `onOcean`). */
+export interface OceanPlacement {
+  map: string;
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+}
+
+/** The ocean in a schema v2 atlas: its size and sea, and the placements of top-level maps that ship. */
+export interface AtlasOcean {
+  width: number;
+  height: number;
+  sea: string;
+  onOcean: OceanPlacement[];
 }
 
 export interface WaterConfig {
