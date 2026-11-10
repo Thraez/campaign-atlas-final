@@ -55,7 +55,7 @@ Follow-up noted in its ticket: no scan derives DM region/route ids, so none woul
 | R-10 | Schema v2 types (done, #123) | R-04 (done); Isak accepts ADR-0003, ADR-0004 |
 | R-11a | Pure per-campaign resolver (also arch-08's secret-note predicate) (done) | R-10 |
 | R-11b | Build calls the resolver (also arch-02, sound areas in fog) (done) | R-11a, R-12 |
-| R-11c | Old Publish Check calls the resolver | R-11a, R-12 |
+| R-11c | Old Publish Check calls the resolver (done) | R-11a, R-12 |
 | R-11d | Link redaction from wikilink tokens (arch-08's other half) (done) | R-11a |
 | R-12 | v2 loader and the one v1 adapter (v1 only with no `schemaVersion` or `1`; a mix fails) (done, #124) | R-10 |
 | R-13 | Build assembles every world and the map tree | R-11b, R-12 |

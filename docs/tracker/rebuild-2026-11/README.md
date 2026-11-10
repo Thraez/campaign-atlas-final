@@ -28,7 +28,7 @@ player output per campaign). Both are `accepted` (2026-11-08), with Isak's answe
 | 2 | [R-11a Per-campaign resolver](issues/R-11a-per-campaign-resolver.md) (+ arch-08 predicate) | S-M | R-10 | yes |
 | 2 | [R-12 v2 loader and the v1 adapter](issues/R-12-v2-loader.md) | M | R-10 | yes |
 | 3 | [R-11b Build calls the resolver](issues/R-11b-build-calls-resolver.md) (+ arch-02) (done) | S | R-11a, R-12 | yes |
-| 3 | [R-11c Old Publish Check calls the resolver](issues/R-11c-publish-check-calls-resolver.md) | S | R-11a, R-12 | yes |
+| 3 | [R-11c Old Publish Check calls the resolver (done)](issues/R-11c-publish-check-calls-resolver.md) | S | R-11a, R-12 | yes |
 | 3 | [R-11d Link redaction from wikilink tokens (done)](issues/R-11d-link-redaction-from-tokens.md) (+ arch-08 redaction) | S | R-11a | yes |
 | 3 | [R-15 Scan registry lists campaign dirs (done)](issues/R-15-scan-registry-campaign-dirs.md) | S | R-12 | yes |
 | 3 | [R-16 Three-level test world, two campaigns (done)](issues/R-16-test-world-two-campaigns.md) | S | R-12, R-11a | light |
