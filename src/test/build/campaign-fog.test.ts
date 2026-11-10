@@ -22,6 +22,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { runBuild } from "../../../scripts/build-atlas";
+import { planMapImages } from "../../../scripts/atlas/build/campaignStore";
 import { run as checkFogSafety } from "../../../scripts/check-fog-safety";
 
 const ROOT = path.resolve(__dirname, "../../..");
@@ -414,5 +415,40 @@ describe("R-18: a fog that can't be baked fails the build (fail closed)", () => 
     expect(r).toMatchObject({ ok: false, exitCode: 1 });
     expect(logged).toMatch(/map "oskmark": its unfogged image would ship as .* \(same pixels;/);
     expect(fs.existsSync(path.join(root, ".atlas-campaigns"))).toBe(false);
+  });
+});
+
+describe("R-18: planMapImages finds a fogged layer's pixels under other bytes", () => {
+  it("checks every layer of a fogged map, even two of the same file size", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-r18-layers-"));
+    const solid = (r: number) =>
+      sharp({ create: { width: 40, height: 40, channels: 3, background: { r, g: 10, b: 10 } } })
+        .png()
+        .toBuffer();
+    const a = await solid(100);
+    const b = await solid(200);
+    expect(a.length).toBe(b.length); // same size, different pixels
+    fs.writeFileSync(path.join(dir, "a.png"), a);
+    fs.writeFileSync(path.join(dir, "b.png"), b);
+    // b's pixels, other bytes
+    await sharp(b).png({ compressionLevel: 1 }).toFile(path.join(dir, "b-copy.png"));
+    expect(fs.readFileSync(path.join(dir, "b-copy.png")).equals(b)).toBe(false);
+    const layer = (id: string, src: string) => ({ id, src, x: 0, y: 0, width: 40, height: 40 });
+    const maps = [
+      {
+        id: "f",
+        worldId: "w",
+        width: 40,
+        height: 40,
+        layers: [layer("one", "a.png"), layer("two", "b.png")],
+        fog: { mapId: "f", enabled: true, reveals: [] },
+      },
+      { id: "o", worldId: "w", width: 40, height: 40, layers: [layer("base", "b-copy.png")] },
+    ];
+    const errors: string[] = [];
+    await planMapImages(maps as never, () => dir, new Map(), errors);
+    expect(errors.join("\n")).toMatch(
+      /map "f": its unfogged image would ship as .* \(same pixels;/,
+    );
   });
 });

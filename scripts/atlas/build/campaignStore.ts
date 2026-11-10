@@ -179,22 +179,27 @@ export async function planMapImages(
   // The same pixels under other bytes (a lossless re-encode) are the same
   // leak. A lossy re-encode, a crop or a resize is not caught: see
   // docs/VISIBILITY_AND_PLAYER_SAFETY.md, "Fog per campaign".
-  const decoded = new Map<string, Promise<Raw | null>>();
-  const decode = (key: string, b: Buffer) => {
-    if (!decoded.has(key)) decoded.set(key, decodeRaw(b));
-    return decoded.get(key)!;
-  };
+  // Only a fingerprint of each decoded image is kept (size and a hash of its
+  // RGBA), never the pixels: one decode per distinct fogged original, one
+  // per candidate whose header size matches one of them.
+  const prints = new Map<string, { map: string; print: Fingerprint }>();
   for (const { map, bytes } of fogged) {
-    const orig = await decode(`fogged:${map}:${bytes.length}`, bytes);
-    if (!orig) continue; // unreadable: redactLayer already failed on it
-    for (const [rel, held] of files) {
-      if (rel.endsWith(".fog.png") || held.equals(bytes)) continue;
-      const size = await sharp(held)
-        .metadata()
-        .catch(() => null); // not an image (audio)
-      if (size?.width !== orig.width || size?.height !== orig.height) continue;
-      const other = await decode(rel, held);
-      if (other?.data.equals(orig.data)) {
+    const key = sha256(bytes);
+    if (prints.has(key)) continue;
+    const print = await fingerprint(bytes);
+    if (print) prints.set(key, { map, print }); // unreadable: redactLayer already failed
+  }
+  const sizes = new Set([...prints.values()].map(({ print }) => `${print.width}x${print.height}`));
+  for (const [rel, held] of files) {
+    if (rel.endsWith(".fog.png") || prints.has(sha256(held))) continue; // byte matches: above
+    const meta = await sharp(held)
+      .metadata()
+      .catch(() => null); // not an image (audio)
+    if (!meta || !sizes.has(`${meta.width}x${meta.height}`)) continue;
+    const print = await fingerprint(held);
+    if (!print) continue;
+    for (const { map, print: p } of prints.values()) {
+      if (p.width === print.width && p.height === print.height && p.rgba === print.rgba) {
         errors.push(
           `map "${map}": its unfogged image would ship as "${rel}" (same pixels; fogged in this campaign)`,
         );
@@ -204,17 +209,19 @@ export async function planMapImages(
   return out;
 }
 
-type Raw = { width: number; height: number; data: Buffer };
+type Fingerprint = { width: number; height: number; rgba: string };
 
-/** RGBA pixels of an image, or null when it isn't one sharp can decode (audio). */
-async function decodeRaw(bytes: Buffer): Promise<Raw | null> {
+const sha256 = (b: Buffer) => crypto.createHash("sha256").update(b).digest("hex");
+
+/** Size and a hash of the RGBA pixels, or null when sharp can't decode it. */
+async function fingerprint(bytes: Buffer): Promise<Fingerprint | null> {
   try {
     const { data, info } = await sharp(bytes)
       .toColourspace("srgb")
       .ensureAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true });
-    return { width: info.width, height: info.height, data };
+    return { width: info.width, height: info.height, rgba: sha256(data) };
   } catch {
     return null;
   }
