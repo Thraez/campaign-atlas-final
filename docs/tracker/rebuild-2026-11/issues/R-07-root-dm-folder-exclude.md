@@ -1,6 +1,6 @@
 # A `_dm/` folder at the content root is not excluded
 
-Status: ready-for-agent
+Status: done
 Size: XS
 Branch: `rebuild-r07-root-dm-exclude`
 Needs: the adversarial player-safety review (`docs/agents/workflow.md`, "Done")
