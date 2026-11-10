@@ -13,6 +13,13 @@
  * Globs: `**` any depth, `*` within one segment, `?` one character, matched
  * against the content-root-relative POSIX path.
  *
+ * Exclude globs fail closed (R-07): a leading or inner `**` + `/` also means
+ * zero folders, so `**` + `/_dm/**` catches `_dm/` right under the content
+ * root, and they match case-blind, so `_DM/` and `Archive/` are caught too
+ * (the Mac's file system is case-blind). Include globs keep the strict
+ * reading (`**` + `/*.md` needs a folder, so a stray note at the content
+ * root stays unread): widening them would read more, not less.
+ *
  * Throws when any note's frontmatter is malformed: the build must not guess
  * what such a note is.
  */
@@ -42,8 +49,8 @@ export function scanContentFolder(
   files: readonly ContentFile[],
   rules: ContentRules,
 ): ContentScan {
-  const include = rules.include.map(globToRegExp);
-  const exclude = rules.exclude.map(globToRegExp);
+  const include = rules.include.map((g) => globToRegExp(g));
+  const exclude = rules.exclude.map((g) => globToRegExp(g, { failClosed: true }));
   const notes: Note[] = [];
   const excluded: Note[] = [];
   for (const f of files) {
@@ -66,12 +73,17 @@ function isExcluded(contentPath: string, include: RegExp[], exclude: RegExp[]): 
   return include.length > 0 && !include.some((re) => re.test(contentPath));
 }
 
-function globToRegExp(glob: string): RegExp {
-  const escaped = glob
+/**
+ * `failClosed` (exclude globs): `**` + `/` may match zero folders, and the
+ * match ignores case.
+ */
+function globToRegExp(glob: string, opts: { failClosed?: boolean } = {}): RegExp {
+  let escaped = glob
     .replace(/[.+^${}()|\\]/g, "\\$&")
+    .replace(/\*\*\//g, opts.failClosed ? "::DSTARSLASH::" : "::DSTAR::/")
     .replace(/\*\*/g, "::DSTAR::")
     .replace(/\*/g, "[^/]*")
-    .replace(/::DSTAR::/g, ".*")
     .replace(/\?/g, ".");
-  return new RegExp(`^${escaped}$`);
+  escaped = escaped.replace(/::DSTARSLASH::/g, "(?:.*/)?").replace(/::DSTAR::/g, ".*");
+  return new RegExp(`^${escaped}$`, opts.failClosed ? "i" : "");
 }

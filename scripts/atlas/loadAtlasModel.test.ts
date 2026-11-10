@@ -683,6 +683,27 @@ describe("loadAtlasModel: notes and v1 pins", () => {
     expect(byId.stray.world).toBe("");
   });
 
+  it("leaves out a _dm/ folder at the content root, in any case, with the repo's lists (R-07)", () => {
+    const root = copy("v2");
+    const player = (name: string) =>
+      `---\natlas:\n  type: npc\n  visibility: player\n---\n\n# ${name}\n`;
+    for (const rel of [
+      "_dm/spy.md",
+      "_DM/mole-two.md",
+      "Archive/old.md",
+      "aldmoor/_Drafts/wip.md",
+    ]) {
+      fs.mkdirSync(path.join(root, path.dirname(rel)), { recursive: true });
+      fs.writeFileSync(path.join(root, rel), player(path.basename(rel, ".md")));
+    }
+    const { notes } = loadAtlasModel(
+      root,
+      { defaultWorld: "aldmoor", include: REAL_CONFIG.include, exclude: REAL_CONFIG.exclude },
+      { root: path.dirname(root) },
+    );
+    expect(notes.map((n) => n.note.id).sort()).toEqual(["miller"]);
+  });
+
   it("checks folder-excluded v2 notes for pins too", () => {
     const root = copy("v2");
     fs.writeFileSync(
