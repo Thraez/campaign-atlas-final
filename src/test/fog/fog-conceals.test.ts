@@ -14,7 +14,11 @@ import yaml from "js-yaml";
 import sharp from "sharp";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildAtlas } from "../../../scripts/build-atlas";
-import { loadWorldConfig, WorldConfigError } from "../../../scripts/atlas/loadWorldConfig";
+import {
+  loadWorldConfig,
+  MAX_FEATHER_PX,
+  WorldConfigError,
+} from "../../../scripts/atlas/loadWorldConfig";
 import type { MapDocument, SoundArea } from "@/atlas/content/schema";
 
 const tmps: string[] = [];
@@ -123,7 +127,9 @@ describe("loadWorldConfig carries fog shapes (conceals)", () => {
   it("keeps the soft edge (featherPx) and rejects a bad one", () => {
     const ok = vault(world({ enabled: true, reveals: [REVEAL], featherPx: 4 }));
     expect(loadWorldConfig(path.join(ok, "content"), "w", ok)!.fogs[0].featherPx).toBe(4);
-    for (const featherPx of [-1, "wide"]) {
+    const max = vault(world({ enabled: true, reveals: [REVEAL], featherPx: MAX_FEATHER_PX }));
+    expect(loadWorldConfig(path.join(max, "content"), "w", max)!.fogs[0].featherPx).toBe(2000);
+    for (const featherPx of [-1, "wide", MAX_FEATHER_PX + 1, 5000]) {
       const bad = vault(world({ enabled: true, reveals: [REVEAL], featherPx }));
       expect(() => loadWorldConfig(path.join(bad, "content"), "w", bad)).toThrow(WorldConfigError);
     }
@@ -161,9 +167,69 @@ describe("loadWorldConfig carries fog shapes (conceals)", () => {
         ],
       ],
     ],
+    [
+      "a shape with only 2 distinct points",
+      [
+        [
+          [400, 400],
+          [600, 600],
+          [400, 400],
+        ],
+      ],
+    ],
+    [
+      "a shape whose points are all on one line",
+      [
+        [
+          [400, 400],
+          [500, 500],
+          [600, 600],
+          [450, 450],
+        ],
+      ],
+    ],
   ])("fails closed on a malformed conceal: %s", (_label, conceals) => {
     const root = vault(world({ enabled: true, reveals: [REVEAL], conceals }));
     expect(() => loadWorldConfig(path.join(root, "content"), "w", root)).toThrow(WorldConfigError);
+  });
+});
+
+describe("loadWorldConfig: fog for one map defined twice", () => {
+  it("fails closed when a map has both a top-level and a nested fog block", () => {
+    // Keeping either block would drop the other's fog shapes.
+    const root = vault(
+      world(
+        { enabled: true, reveals: [REVEAL] },
+        { fog: [{ mapId: "m1", enabled: true, reveals: [REVEAL], conceals: [CONCEAL] }] },
+      ),
+    );
+    expect(() => loadWorldConfig(path.join(root, "content"), "w", root)).toThrow(
+      /fog defined twice for map "m1"/,
+    );
+  });
+
+  it("fails closed on two top-level fog blocks for the same map", () => {
+    const root = vault({
+      maps: [{ id: "m1", name: "One", width: 1000, height: 1000, layers: [] }],
+      fog: [
+        { mapId: "m1", enabled: true, reveals: [REVEAL] },
+        { mapId: "m1", enabled: true, reveals: [REVEAL], conceals: [CONCEAL] },
+      ],
+    });
+    expect(() => loadWorldConfig(path.join(root, "content"), "w", root)).toThrow(WorldConfigError);
+  });
+
+  it("accepts a self-crossing fog shape (it still has area)", () => {
+    const bowtie = [
+      [400, 400],
+      [600, 600],
+      [600, 400],
+      [400, 600],
+    ];
+    const root = vault(world({ enabled: true, reveals: [REVEAL], conceals: [bowtie] }));
+    expect(loadWorldConfig(path.join(root, "content"), "w", root)!.fogs[0].conceals).toEqual([
+      bowtie,
+    ]);
   });
 });
 

@@ -170,7 +170,7 @@ function fogShapes(raw: unknown, where: string): Point[][] {
       new WorldConfigError(`${where}: fog shape #${i} in "conceals" ${why}.`);
     if (!Array.isArray(poly)) throw bad("is not a list of [x, y] points");
     if (poly.length < 3) throw bad("needs at least 3 points");
-    return poly.map((pt: unknown) => {
+    const points = poly.map((pt: unknown) => {
       if (
         !Array.isArray(pt) ||
         pt.length !== 2 ||
@@ -180,8 +180,31 @@ function fogShapes(raw: unknown, where: string): Point[][] {
       }
       return [pt[0], pt[1]] as Point;
     });
+    // A shape with no area hides nothing, so the DM's fog would silently not
+    // apply: stop instead.
+    if (new Set(points.map(([x, y]) => `${x},${y}`)).size < 3) {
+      throw bad("needs at least 3 distinct points");
+    }
+    if (allOnOneLine(points)) throw bad("has no area (its points are all on one line)");
+    return points;
   });
 }
+
+/** True when every point lies on the line through the first two distinct
+ *  points. (Not a shoelace test: a self-crossing shape can sum to 0 area.) */
+function allOnOneLine(points: Point[]): boolean {
+  const [ax, ay] = points[0];
+  const b = points.find(([x, y]) => x !== ax || y !== ay);
+  if (!b) return true;
+  const [bx, by] = b;
+  return points.every(([x, y]) => (bx - ax) * (y - ay) - (by - ay) * (x - ax) === 0);
+}
+
+/**
+ * Upper bound for `featherPx`. The build blurs the fog mask with sigma
+ * featherPx / 2 and sharp refuses a sigma above 1000.
+ */
+export const MAX_FEATHER_PX = 2000;
 
 export function loadWorldConfig(
   contentRoot: string,
@@ -337,8 +360,11 @@ export function loadWorldConfig(
   const seenFogMaps = new Set<string>();
   const fogs: FogOverlay[] = rawFogs.flatMap((f) => {
     if (seenFogMaps.has(f.mapId)) {
-      warnings.push(`fog defined twice for map "${f.mapId}" — keeping first definition`);
-      return [];
+      // Fail closed: keeping one block would drop the other's fog shapes.
+      throw new WorldConfigError(
+        `${rel}: fog defined twice for map "${f.mapId}" (top-level "fog:" and/or the map's own ` +
+          `"fog:" block). Merge them into one.`,
+      );
     }
     seenFogMaps.add(f.mapId);
     const where = `${rel}: fog for map "${f.mapId}"`;
@@ -349,6 +375,11 @@ export function loadWorldConfig(
       !(typeof featherPx === "number" && Number.isFinite(featherPx) && featherPx >= 0)
     ) {
       throw new WorldConfigError(`${where}: "featherPx" must be a number of pixels, 0 or more.`);
+    }
+    if (featherPx !== undefined && featherPx > MAX_FEATHER_PX) {
+      throw new WorldConfigError(
+        `${where}: "featherPx" is ${featherPx}; the most the build can blur is ${MAX_FEATHER_PX}.`,
+      );
     }
     return [
       {
