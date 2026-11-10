@@ -17,8 +17,12 @@
  *   - regions, routes, sound areas and pins move under their map; one whose
  *     map doesn't exist is dropped with a warning (it never shipped); a pin
  *     with no map goes on the first map, as in the v1 build;
- *   - a region or sound-only area with fewer than 3 points, or a sound area
- *     with no id or bed, is dropped with a warning (v1 never drew them);
+ *   - a sound-only area with fewer than 3 points, or a sound area with no id
+ *     or bed, is dropped with a warning (v1 never drew them);
+ *   - a region with fewer than 3 valid points is kept, with a warning, so the
+ *     resolver can test it: hidden, it is a hiding region too malformed to
+ *     test (ADR-0004 rule 9), which fails the player build. Dropping it here
+ *     would ship what lies inside it;
  *   - per-map `water` becomes the world's `water`; maps that disagree (one
  *     with a block and one without counts) are refused, naming both;
  *   - `soundscape.areas` move to the map's `sound:`; `enabled` and
@@ -235,11 +239,12 @@ function toSoundArea(a: unknown, mapId: string, i: number, warnings: string[]): 
   });
 }
 
-function toRegion(r: Region, warnings: string[]): RegionV2 | null {
+function toRegion(r: Region, warnings: string[]): RegionV2 {
   const where = `region "${r.id}"`;
   if (!Array.isArray(r.points) || r.points.length < 3 || !r.points.every(isPoint)) {
-    warnings.push(`${where} needs at least 3 valid points — skipped`);
-    return null;
+    warnings.push(
+      `${where} needs at least 3 valid points — kept as written; if it is hidden, the player build fails (rule 9)`,
+    );
   }
   return compact<RegionV2>({
     id: r.id,
@@ -248,7 +253,7 @@ function toRegion(r: Region, warnings: string[]): RegionV2 | null {
     color: r.color,
     fillOpacity: r.fillOpacity,
     strokeOpacity: r.strokeOpacity,
-    points: r.points,
+    points: Array.isArray(r.points) ? r.points : [],
     visibility: keepVisibility(r.visibility, where, warnings),
   });
 }
@@ -348,8 +353,7 @@ export function v1Model(input: V1WorldInput): LoadedAtlasModel {
       .map((a, i) => toSoundArea(a, m.id, i, warnings))
       .filter((a): a is SoundAreaV2 => a !== null);
     const mapRegions = (regions.get(m.id) ?? [])
-      .map((r) => toRegion(r, warnings))
-      .filter((r): r is RegionV2 => r !== null);
+      .map((r) => toRegion(r, warnings));
     const mapRoutes = (routes.get(m.id) ?? []).map((r) => toRoute(r, warnings));
     const mapPins = (pins.get(m.id) ?? []).map((p) =>
       compact<PinV2>({
