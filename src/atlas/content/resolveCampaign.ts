@@ -304,7 +304,7 @@ export function shipsIn(value: unknown, campaign: CampaignId): boolean {
  * with a non-finite coordinate can't be tested, so the whole map reads as
  * fogged (no reveals).
  */
-function campaignFog(mapId: MapId, campaign: CampaignFileV2): FogOverlay | null {
+export function campaignFog(mapId: MapId, campaign: CampaignFileV2): FogOverlay | null {
   const entry = hasOwn(campaign.maps, mapId) ? campaign.maps[mapId] : undefined;
   if (!entry || entry.state !== "fogged") return null;
   const polys = (v: unknown): Point[][] | null => {

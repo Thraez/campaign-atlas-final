@@ -1,6 +1,13 @@
 // AstrathDeeprealm Atlas — content schema (US-0001)
 // Entities and placements are SEPARATE objects. A wiki entry is the primary
 // object; a pin is only a placement of an entity on a map.
+import type { CampaignFileV2 } from "./schemaV2";
+
+/** A campaign as its player output names it (ADR-0004 question 8). */
+export interface AtlasCampaign {
+  id: string;
+  name: string;
+}
 
 export type EntityVisibility = "player" | "dm" | "hidden" | "rumor";
 export type CanonStatus = "canon" | "draft" | "rumor" | "deprecated" | "archived";
@@ -18,6 +25,16 @@ export interface AtlasProject {
   worlds: World[];
   /** Schema v2 only (ADR-0003): the ocean and the top-level maps on it that ship. */
   ocean?: AtlasOcean;
+  /**
+   * Schema v2 player builds only (ADR-0004 question 8): the one campaign this
+   * output is, its own id and name. No other campaign is named in it.
+   */
+  campaign?: AtlasCampaign;
+  /**
+   * Schema v2 DM builds only: every campaign, as its file says. Never in a
+   * player build (the DM build is never published).
+   */
+  campaigns?: CampaignFileV2[];
   maps: MapDocument[];
   entities: Entity[];
   placements: MapPlacement[];

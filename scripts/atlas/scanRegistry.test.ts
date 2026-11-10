@@ -30,6 +30,28 @@ afterAll(() => {
   for (const t of temps.splice(0)) fs.rmSync(t, { recursive: true, force: true });
 });
 
+/** `atlasJson` with one map whose layer shows `src`. */
+function withMap(atlasJson: string, src: string): string {
+  return JSON.stringify({
+    ...JSON.parse(atlasJson),
+    maps: [{ id: "m", layers: [{ id: "base", src }] }],
+  });
+}
+
+/** A v2 campaign's must-not-ship file (R-17), beside its store. */
+const MUST_NOT_SHIP = (id: string) => `.atlas-campaigns/${id}/must-not-ship.json`;
+function mustNotShipFile(id: string, over: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    campaign: id,
+    ids: [],
+    names: [],
+    paths: [],
+    pinLocations: [],
+    otherCampaigns: [],
+    ...over,
+  });
+}
+
 /** A temp repo root whose atlas.config.json points at `contentRoot` (v1 by default). */
 function repoWith(contentRoot = FIXTURE_CONTENT, defaultWorld = "test-world"): ScanContext {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "scan-registry-"));
@@ -148,7 +170,13 @@ describe("runPublishScans (the editor's Publish check)", () => {
     fs.mkdirSync(path.join(root, "public", "atlas", "assets"), { recursive: true });
     fs.writeFileSync(
       path.join(root, "public", "atlas", "atlas.json"),
-      JSON.stringify({ version: "1", schemaVersion: 1, worlds: [], entities: [], maps: [] }),
+      JSON.stringify({
+        version: "1",
+        schemaVersion: 1,
+        worlds: [],
+        entities: [],
+        maps: [{ id: "m", layers: [{ id: "base", src: "atlas/assets/maps/world.png" }] }],
+      }),
     );
   });
 
@@ -202,7 +230,7 @@ describe("publish mode: a missing artifact fails every scan (R-03)", () => {
     put("dist/index.html", "<html>");
     put("dist/atlas/atlas.json", atlas);
     put("dist/atlas/search-index.json", "[]");
-    put("public/atlas/atlas.json", atlas);
+    put("public/atlas/atlas.json", withMap(atlas, "atlas/assets/maps/world.png"));
     put("public/atlas/assets/maps/world.png", "png");
     put("content/world/place.md", "# Place");
     put(
@@ -468,13 +496,14 @@ describe("campaign dirs (R-15)", () => {
     };
     // The legacy pair the deploy still ships.
     put("dist/atlas/atlas.json", atlas);
-    put("public/atlas/atlas.json", atlas);
+    put("public/atlas/atlas.json", withMap(atlas, "atlas/assets/maps/vale.webp"));
     put("public/atlas/assets/maps/vale.webp", "webp");
     for (const id of ["a", "b"]) {
       put(`dist-campaigns/${id}/index.html`, "<html>");
       put(ATLAS_JSON["built-site"](id), atlas);
-      put(ATLAS_JSON.store(id), atlas);
+      put(ATLAS_JSON.store(id), withMap(atlas, "atlas/assets/maps/vale.webp"));
       put(`.atlas-campaigns/${id}/atlas/assets/maps/vale.webp`, "webp");
+      put(MUST_NOT_SHIP(id), mustNotShipFile(id));
     }
   }
 
@@ -583,6 +612,86 @@ describe("campaign dirs (R-15)", () => {
     it("the editor's Publish check rejects rather than report safe", async () => {
       const ctx = repoWith(brokenV2());
       await expect(runPublishScans(ctx.root)).rejects.toThrow(/campaign list can't be loaded/);
+    });
+  });
+
+  it("v2 (R-17): check-derived-secrets requires each campaign's must-not-ship file, not the legacy pair's", async () => {
+    const ctx = repoWith(V2_CONTENT);
+    writeCampaignOutputs(ctx);
+    const tasks = scanTasks(ctx).filter((t) => t.scan === "check-derived-secrets");
+    for (const t of tasks) {
+      const wants = t.requires
+        .map((a) => rel(ctx, a.path))
+        .filter((p) => p.endsWith("must-not-ship.json"));
+      expect(wants, t.label).toEqual(
+        t.campaign === LEGACY_OUTPUT ? [] : [MUST_NOT_SHIP(t.campaign!)],
+      );
+    }
+    fs.rmSync(path.join(ctx.root, MUST_NOT_SHIP("a")));
+    for (const t of tasks.filter((t) => t.campaign === "a")) {
+      expect(await t.run(), t.label).toBe(MISSING_ARTIFACT_EXIT);
+    }
+    for (const t of tasks.filter((t) => t.campaign !== "a")) {
+      expect(missingArtifacts(t), t.label).toEqual([]);
+    }
+  });
+
+  it("v2 (R-17): check-derived-secrets fails a store naming what its must-not-ship file lists", async () => {
+    const ctx = repoWith(V2_CONTENT);
+    writeCampaignOutputs(ctx);
+    fs.writeFileSync(
+      path.join(ctx.root, MUST_NOT_SHIP("b")),
+      mustNotShipFile("b", { ids: ["gloomharbour"], paths: ["images/gloomharbour.png"] }),
+    );
+    fs.writeFileSync(
+      path.join(ctx.root, ATLAS_JSON.store("b")),
+      JSON.stringify({
+        version: "1",
+        schemaVersion: 1,
+        worlds: [],
+        entities: [],
+        note: "Gloomharbour",
+      }),
+    );
+    const own = scanTasks(ctx).filter((t) => t.scan === "check-derived-secrets");
+    const byLabel = new Map(own.map((t) => [t.label, t]));
+    expect(await byLabel.get(`check-derived-secrets ${DIRS.store("b")}`)!.run()).toBe(12);
+    expect(await byLabel.get(`check-derived-secrets ${DIRS.store("a")}`)!.run()).toBe(0);
+  });
+
+  describe("v2 (R-17): audit-assets needs assets/ only when the store names a file in it", () => {
+    const auditOf = (ctx: ScanContext, id: string) =>
+      scanTasks(ctx).find((t) => t.scan === "audit-assets" && t.campaign === id)!;
+    const assetsDir = (ctx: ScanContext, id: string) =>
+      path.join(ctx.root, ".atlas-campaigns", id, "atlas", "assets");
+
+    it("a store naming no asset passes with no assets/ dir", async () => {
+      const ctx = repoWith(V2_CONTENT);
+      writeCampaignOutputs(ctx);
+      fs.writeFileSync(
+        path.join(ctx.root, ATLAS_JSON.store("a")),
+        JSON.stringify({ version: "1", schemaVersion: 1, worlds: [], entities: [], maps: [] }),
+      );
+      fs.rmSync(assetsDir(ctx, "a"), { recursive: true });
+      expect(missingArtifacts(auditOf(ctx, "a"))).toEqual([]);
+      expect(await auditOf(ctx, "a").run()).toBe(0);
+    });
+
+    it("a store naming an asset fails without its assets/ dir, or with it empty", async () => {
+      const ctx = repoWith(V2_CONTENT);
+      writeCampaignOutputs(ctx);
+      fs.rmSync(path.join(assetsDir(ctx, "a"), "maps"), { recursive: true });
+      expect(await auditOf(ctx, "a").run()).toBe(MISSING_ARTIFACT_EXIT);
+      fs.rmSync(assetsDir(ctx, "a"), { recursive: true });
+      expect(await auditOf(ctx, "a").run()).toBe(MISSING_ARTIFACT_EXIT);
+    });
+
+    it("a store whose atlas.json isn't valid JSON still needs assets/ (fail closed)", () => {
+      const ctx = repoWith(V2_CONTENT);
+      writeCampaignOutputs(ctx);
+      fs.writeFileSync(path.join(ctx.root, ATLAS_JSON.store("a")), "{not json");
+      fs.rmSync(assetsDir(ctx, "a"), { recursive: true });
+      expect(missingArtifacts(auditOf(ctx, "a"))).toContain(`${assetsDir(ctx, "a")} is missing`);
     });
   });
 

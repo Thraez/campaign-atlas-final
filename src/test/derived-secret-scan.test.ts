@@ -15,7 +15,9 @@ import os from "node:os";
 import path from "node:path";
 import {
   deriveSecretsFromVault,
+  run,
   scanArtifactForSecrets,
+  secretsFromMustNotShip,
 } from "../../scripts/check-derived-secrets";
 
 const ROOT = path.resolve(__dirname, "../..");
@@ -279,5 +281,83 @@ describe("scanArtifactForSecrets", () => {
     const secrets = deriveSecretsFromVault(FIXTURE_CONFIG);
     const r = scanArtifactForSecrets(dir, secrets);
     expect(r.hits).toEqual([]);
+  });
+});
+
+/**
+ * R-17: a v2 campaign store's must-not-ship file, beside the store. Its ids
+ * and names are scanned for as vault secrets are; its image paths through
+ * the resolver's normalizePath, whole, also at the end of a longer path.
+ */
+describe("must-not-ship file (R-17)", () => {
+  let tmp: string;
+  let file: string;
+  let store: string;
+  beforeAll(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), "derived-mns-"));
+    store = path.join(tmp, "sandbox", "atlas");
+    fs.mkdirSync(store, { recursive: true });
+    file = path.join(tmp, "sandbox", "must-not-ship.json");
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        campaign: "sandbox",
+        ids: ["brindlecross", "dm"],
+        names: ["Brindlecross Bells", "Map"],
+        paths: ["./Images\\Brindlecross.PNG"],
+        pinLocations: [],
+        otherCampaigns: [{ id: "main", name: "Lantern Road" }],
+      }),
+    );
+  });
+  afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
+
+  const hitsFor = (text: string, field?: string) => {
+    fs.writeFileSync(path.join(store, "atlas.json"), text);
+    const secrets = secretsFromMustNotShip(file).filter((s) => !field || s.field === field);
+    return scanArtifactForSecrets(store, secrets).hits.map((h) => h.match.name);
+  };
+
+  it("reads ids and names (generic ones dropped) and normalised paths", () => {
+    const s = secretsFromMustNotShip(file);
+    expect(s.map((e) => [e.field, e.name])).toEqual([
+      ["id", "brindlecross"],
+      ["title", "Brindlecross Bells"],
+      ["path", "images/brindlecross.png"],
+    ]);
+  });
+
+  it("flags an id or name, whole word, any case", () => {
+    expect(hitsFor(JSON.stringify({ bodyHtml: "the BRINDLECROSS bells" }))).toEqual([
+      "brindlecross",
+      "Brindlecross Bells",
+    ]);
+    expect(hitsFor(JSON.stringify({ body: "brindlecrossing" }))).toEqual([]);
+  });
+
+  it("flags a path as written or inside a longer one, but not inside a longer file name", () => {
+    expect(hitsFor(JSON.stringify({ src: "images/brindlecross.png" }), "path")).toEqual([
+      "images/brindlecross.png",
+    ]);
+    expect(
+      hitsFor(JSON.stringify({ src: "/atlas/assets/Images\\\\Brindlecross.png" }), "path"),
+    ).toEqual(["images/brindlecross.png"]);
+    expect(
+      hitsFor(JSON.stringify({ src: "atlas/assets/old-images/brindlecross.png.bak" }), "path"),
+    ).toEqual([]);
+    expect(hitsFor(JSON.stringify({ src: "atlas/assets/maps/0a1b2c3d4e5f6a7b.png" }))).toEqual([]);
+  });
+
+  it("run fails closed (exit 1) on a malformed must-not-ship file", () => {
+    const bad = path.join(tmp, "bad.json");
+    fs.writeFileSync(bad, JSON.stringify({ campaign: "x" }));
+    expect(run({ dir: store, config: FIXTURE_CONFIG, mustNotShip: bad })).toBe(1);
+  });
+
+  it("run exits 12 on a hit from the must-not-ship file", () => {
+    fs.writeFileSync(path.join(store, "atlas.json"), JSON.stringify({ name: "Brindlecross" }));
+    expect(run({ dir: store, config: FIXTURE_CONFIG, mustNotShip: file })).toBe(12);
+    fs.writeFileSync(path.join(store, "atlas.json"), JSON.stringify({ name: "Tallowford" }));
+    expect(run({ dir: store, config: FIXTURE_CONFIG, mustNotShip: file })).toBe(0);
   });
 });

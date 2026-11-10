@@ -20,11 +20,20 @@
  * list of the loaded model (`campaignArtifacts`), read through the config the
  * `ScanContext` carries: every per-artifact scan runs once per campaign per
  * layout, and the content-wide one (`check-vault-content`) once.
+ *
+ * Campaign stores (R-17). A v2 campaign's must-not-ship file sits beside its
+ * store (`.atlas-campaigns/<id>/must-not-ship.json`): `check-derived-secrets`
+ * requires it and scans both of that campaign's dirs for what it lists. A
+ * store whose player JSON names no `assets/` file has nothing for
+ * `audit-assets` to measure, so its `assets/` dir is required only when
+ * that JSON names one (or can't be read: fail closed).
  */
 import fs from "node:fs";
 import path from "node:path";
 import { playerAtlasJsonPath, type ArtifactLayout } from "./playerArtifact.js";
 import { SAFE_ID, loadAtlasModel } from "./loadAtlasModel.js";
+import { mustNotShipPath } from "./build/campaignStore.js";
+import { readPlayerImageRefs } from "./playerImageRefs.js";
 
 import { run as checkNoSecrets } from "../check-no-secrets.js";
 import { run as checkDerivedSecrets } from "../check-derived-secrets.js";
@@ -58,6 +67,12 @@ export interface ScanContext {
 export interface RequiredArtifact {
   path: string;
   kind: "file" | "dir";
+  /**
+   * A dir required only when the player JSON in this store dir names a file
+   * under `assets/` (R-17: a campaign may show no image at all). When that
+   * JSON can't be read the dir is required.
+   */
+  onlyIfStoreNamesAssets?: string;
 }
 
 export interface ScanTask {
@@ -90,8 +105,20 @@ interface ScanEntry {
 const file = (p: string): RequiredArtifact => ({ path: p, kind: "file" });
 const dir = (p: string): RequiredArtifact => ({ path: p, kind: "dir" });
 
+/** Whether the player JSON in `storeDir` names a file under `assets/`; true when it can't be read. */
+function storeNamesAssets(storeDir: string): boolean {
+  try {
+    return [...readPlayerImageRefs(storeDir)].some((r) => r.startsWith("assets/"));
+  } catch {
+    return true;
+  }
+}
+
 /** Why `a` can't be scanned (missing, wrong kind, empty), or null when it can. */
 function artifactProblem(a: RequiredArtifact): string | null {
+  if (a.onlyIfStoreNamesAssets !== undefined && !storeNamesAssets(a.onlyIfStoreNamesAssets)) {
+    return null;
+  }
   let stat: fs.Stats;
   try {
     stat = fs.statSync(a.path);
@@ -128,6 +155,8 @@ export interface CampaignArtifact {
   label: string;
   dir: string;
   layout: ArtifactLayout;
+  /** v2 campaigns only: the campaign's must-not-ship file (R-17), beside its store. */
+  mustNotShip?: string;
 }
 
 /**
@@ -175,11 +204,17 @@ export function campaignArtifacts(ctx: ScanContext): CampaignArtifact[] {
     );
   }
   const rel = (abs: string) => path.relative(ctx.root, abs).split(path.sep).join("/");
-  const artifact = (campaign: string, dir: string, layout: ArtifactLayout): CampaignArtifact => ({
+  const artifact = (
+    campaign: string,
+    dir: string,
+    layout: ArtifactLayout,
+    mustNotShip?: string,
+  ): CampaignArtifact => ({
     campaign,
     label: rel(dir),
     dir,
     layout,
+    ...(mustNotShip ? { mustNotShip } : {}),
   });
   const shared = (campaign: string) => [
     artifact(campaign, path.join(ctx.root, "dist"), "built-site"),
@@ -194,9 +229,11 @@ export function campaignArtifacts(ctx: ScanContext): CampaignArtifact[] {
     if (!SAFE_ID.test(id)) {
       throw new Error(`scan registry: campaign id ${JSON.stringify(id)} can't name a dir`);
     }
+    const store = path.join(ctx.root, ".atlas-campaigns", id, "atlas");
+    const mustNotShip = mustNotShipPath(store);
     return [
-      artifact(id, path.join(ctx.root, "dist-campaigns", id), "built-site"),
-      artifact(id, path.join(ctx.root, ".atlas-campaigns", id, "atlas"), "store"),
+      artifact(id, path.join(ctx.root, "dist-campaigns", id), "built-site", mustNotShip),
+      artifact(id, store, "store", mustNotShip),
     ];
   });
   return [...shared(LEGACY_OUTPUT), ...perCampaign];
@@ -244,13 +281,25 @@ export const SCANS: ScanEntry[] = [
   {
     id: "check-derived-secrets",
     script: "check-derived-secrets.ts",
+    // Secret names come from content/: with none, every artifact is "clean".
+    // A v2 campaign's dirs are also scanned for its must-not-ship file (R-17).
     tasks: (ctx, arts) =>
-      perDir(
-        "check-derived-secrets",
-        arts,
-        (a) => checkDerivedSecrets({ dir: a.dir, config: ctx.configPath }),
-        // Secret names come from content/: with none, every artifact is "clean".
-        [file(ctx.configPath), dir(ctx.contentDir)],
+      arts.map((a) =>
+        artifactTask(
+          "check-derived-secrets",
+          a,
+          () =>
+            checkDerivedSecrets({
+              dir: a.dir,
+              config: ctx.configPath,
+              ...(a.mustNotShip ? { mustNotShip: a.mustNotShip } : {}),
+            }),
+          [
+            file(ctx.configPath),
+            dir(ctx.contentDir),
+            ...(a.mustNotShip ? [file(a.mustNotShip)] : []),
+          ],
+        ),
       ),
   },
   {
@@ -290,7 +339,14 @@ export const SCANS: ScanEntry[] = [
       perDir(
         "check-fog-safety",
         arts,
-        (a) => checkFogSafety({ dir: a.dir, config: ctx.configPath, layout: a.layout }),
+        (a) =>
+          checkFogSafety({
+            dir: a.dir,
+            config: ctx.configPath,
+            layout: a.layout,
+            // v2 (R-17): fog is the campaign's; the legacy pair has no campaign.
+            ...(a.mustNotShip ? { campaign: a.campaign } : {}),
+          }),
         // Without the config the in-fog and alpha checks are skipped.
         [file(ctx.configPath)],
       ),
@@ -350,7 +406,7 @@ export const SCANS: ScanEntry[] = [
               publicDir: path.dirname(a.dir),
               contentDir: ctx.contentDir,
             }),
-          [dir(assetsDir), dir(ctx.contentDir)],
+          [{ ...dir(assetsDir), onlyIfStoreNamesAssets: a.dir }, dir(ctx.contentDir)],
           `${a.label}/assets`,
         );
       }),
