@@ -116,9 +116,11 @@ describe("atlas:tree on content-next/", () => {
       expect(t.worlds.map((w) => w.id)).toEqual(["quessaly", "skerrow"]);
       expect(shape(t)).toEqual({
         "quessaly-world": ["oskmark"],
-        oskmark: ["brindlecross", "tallowford"],
+        oskmark: ["brindlecross", "tallowford", "mirefold"],
         brindlecross: [],
         tallowford: [],
+        mirefold: ["mirefold-cellars"],
+        "mirefold-cellars": [],
         "skerrow-isles": ["hookhaven"],
         hookhaven: [],
       });
@@ -134,10 +136,14 @@ describe("atlas:tree on content-next/", () => {
     ]);
     expect(flat(main)).toEqual({
       "quessaly-world": "ships, open, pins 0 regions 1 routes 1 sound 0",
-      // Pin of marra-quillon hidden by notes: (entry); region the-murkwater is dm.
-      oskmark: "ships, open, pins 2 regions 1 routes 1 sound 2",
+      // Pin of marra-quillon hidden by notes: (entry); regions the-murkwater
+      // (dm) and heron-flats (sandbox only) hide what is in or reaching into
+      // them (rule 9); the-fenlands contains the-murkwater and ships.
+      oskmark: "ships, open, pins 1 regions 2 routes 0 sound 1",
       brindlecross: "ships, open, pins 1 regions 0 routes 0 sound 0",
       tallowford: "ships, open, pins 1 regions 0 routes 0 sound 0",
+      mirefold: "frame-in-hidden-region, open, pins 0 regions 0 routes 0 sound 0",
+      "mirefold-cellars": "parent-hidden, open, pins 0 regions 0 routes 0 sound 0",
       "skerrow-isles": "ships, open, pins 0 regions 1 routes 0 sound 0",
       hookhaven: "ships, open, pins 1 regions 0 routes 0 sound 0",
     });
@@ -158,10 +164,13 @@ describe("atlas:tree on content-next/", () => {
     ]);
     expect(flat(sandbox)).toEqual({
       "quessaly-world": "ships, open, pins 0 regions 1 routes 1 sound 0",
-      // Fogged: haskel-thimbleby's pin under fog; reedmere hidden (and reed-whisper with it).
-      oskmark: "ships, fogged, pins 2 regions 0 routes 1 sound 1",
+      // Fogged: haskel-thimbleby's pin under fog; reedmere hidden (and
+      // reed-whisper with it); heron-flats and heron-trail ship here.
+      oskmark: "ships, fogged, pins 1 regions 2 routes 1 sound 0",
       brindlecross: "visibility, open, pins 0 regions 0 routes 0 sound 0",
       tallowford: "frame-fogged, open, pins 0 regions 0 routes 0 sound 0", // rule 4
+      mirefold: "frame-in-hidden-region, open, pins 0 regions 0 routes 0 sound 0",
+      "mirefold-cellars": "parent-hidden, open, pins 0 regions 0 routes 0 sound 0",
       "skerrow-isles": "unknown-state, unknown, pins 0 regions 0 routes 0 sound 0",
       hookhaven: "parent-hidden, open, pins 0 regions 0 routes 0 sound 0",
     });
@@ -213,11 +222,35 @@ describe("atlas:tree on content-next/", () => {
     // notes: vault vs notes: hidden.
     expect([note(m, "pellam-ferry"), note(s, "pellam-ferry")]).toEqual(["ships", "not-named"]);
     expect([note(m, "gilda-moth"), note(s, "gilda-moth")]).toEqual(["ships", "not-named"]);
-    // The hidden region itself; its contents are the known gap below.
+    // The hidden region itself; its contents are tested below (rule 9).
     expect([item(m.regions, "the-murkwater"), item(s.regions, "the-murkwater")]).toEqual([
       "visibility",
       "visibility",
     ]);
+    // Rule 9: a player region wholly inside it, a route crossing it with no
+    // waypoint inside, a container that still ships, a city framed partly
+    // over it (hidden with its subtree), and a region hidden in main only.
+    for (const r of [m, s]) {
+      expect(item(r.regions, "sunken-bell")).toBe("in-hidden-region");
+      expect(item(r.routes, "ferrymans-cut")).toBe("in-hidden-region");
+      expect(item(r.regions, "the-fenlands")).toBe("ships");
+      expect(r.maps.find((x) => x.id === "mirefold")?.reason).toBe("frame-in-hidden-region");
+      expect(r.maps.find((x) => x.id === "mirefold-cellars")?.reason).toBe("parent-hidden");
+      expect(item(r.regions, "bog-market")).toBe("map-hidden");
+    }
+    expect([item(m.regions, "heron-flats"), item(s.regions, "heron-flats")]).toEqual([
+      "visibility",
+      "ships",
+    ]);
+    expect([item(m.routes, "heron-trail"), item(s.routes, "heron-trail")]).toEqual([
+      "in-hidden-region",
+      "ships",
+    ]);
+    // mossbeck-well ships as a note, but its only pin is hidden: the build warns.
+    expect(m.hiddenPinNotes).toEqual([
+      { note: "mossbeck-well", regions: [{ map: "oskmark", region: "the-murkwater" }] },
+    ]);
+    expect(s.hiddenPinNotes).toEqual(m.hiddenPinNotes);
   });
 
   const insideMurkwater = (c: string) => {
@@ -236,14 +269,14 @@ describe("atlas:tree on content-next/", () => {
     }
   });
 
-  // GOALS.md: a hidden zone and everything only inside it never ship. The
-  // resolver (ADR-0004) has no containment rule yet, so this fails today; when
-  // it passes, drop `.fails` and update content-next/README.md. A partial
-  // containment rule (hiding one or two of the three) keeps this green: it only
-  // passes once all three are hidden in both campaigns.
-  it.fails("known gap: a pin, route and sound-only area inside a hidden region don't ship", () => {
+  // GOALS.md: a hidden zone and everything inside it or reaching into it
+  // never ship (ADR-0004 rule 9, R-11e).
+  it("a pin, route and sound-only area inside a hidden region don't ship", () => {
     for (const c of ["main", "sandbox"]) {
-      for (const item of insideMurkwater(c)) expect(item!.ships).toBe(false);
+      for (const item of insideMurkwater(c)) {
+        expect(item!.ships).toBe(false);
+        expect(item!.reason).toBe("in-hidden-region");
+      }
     }
   });
 
@@ -253,8 +286,12 @@ describe("atlas:tree on content-next/", () => {
     expect(text).toContain('campaign sandbox "Sandbox" (notes: hidden)');
     expect(text).toContain("ocean 3000x2000, sea default");
     expect(text).toMatch(
-      /^ {6}oskmark "Oskmark": ships, fogged \| pins 2\/3, regions 0\/2, routes 1\/1, sound 1\/2$/m,
+      /^ {6}oskmark "Oskmark": ships, fogged \| pins 1\/3, regions 2\/5, routes 1\/3, sound 0\/2$/m,
     );
+    // Item reasons on a map that ships, rule 9's among them.
+    expect(text).toMatch(/^ {8}hidden: .*pin mossbeck-well \(in-hidden-region\)/m);
+    expect(text).toMatch(/^ {8}hidden: .*route ferrymans-cut \(in-hidden-region\)/m);
+    expect(text).toMatch(/^ {8}mirefold "Mirefold": hidden \(frame-in-hidden-region\), open \|/m);
     expect(text).toMatch(/^ {8}tallowford "Tallowford": hidden \(frame-fogged\), open \|/m);
     expect(text).toContain('world skerrow "The Skerrow Isles": hidden (no-map-ships)');
   });

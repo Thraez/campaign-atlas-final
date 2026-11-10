@@ -820,7 +820,7 @@ describe("links: a shipped item never points at a note that doesn't ship", () =>
       regions: [
         { id: "r1", name: "R1", entityId: "secret-note", points: rect(1, 1, 9, 9), visibility: "player" },
         { id: "r2", name: "R2", entityId: "ghost", points: rect(1, 1, 9, 9), visibility: "player" },
-        { id: "r3", name: "R3", entityId: "n", points: rect(1, 1, 9, 9), visibility: "player" },
+        { id: "r3", name: "R3", entityId: "n", points: rect(20, 20, 29, 29), visibility: "player" },
       ],
     });
     const mdl = model([world("w", [m])], [campaign("a", { m: OPEN })]);
@@ -1143,5 +1143,358 @@ describe("layer ids are per map; only shared images collide", () => {
     expect(a.collisions).toEqual([
       { name: "maps/drow.webp", hidden: { kind: "layer", id: "drow-city/x" }, shipped: { kind: "map", id: "m" } },
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rule 9: a hidden region hides what is inside or reaching into it
+// ---------------------------------------------------------------------------
+
+describe("rule 9: a hidden region hides what is inside or reaching into it", () => {
+  /** The hiding region: dm in a, player in b, so the two campaigns differ. */
+  const LAIR = { id: "lair", name: "The Lair", points: rect(400, 400, 600, 600), visibility: { a: "dm", b: "player" } as VisibilityValue };
+  const route = (id: string, waypoints: MapV2["routes"] extends (infer R)[] | undefined ? R extends { waypoints: infer W } ? W : never : never) => ({
+    id,
+    name: `Route ${id}`,
+    waypoints,
+    visibility: "player" as VisibilityValue,
+  });
+  const soundArea = (id: string, points: Point[]) => ({ id, name: `Sound ${id}`, points, visibility: "player" as VisibilityValue, bed: { src: `${id}.ogg` } });
+  const region = (id: string, points: Point[], extra: Record<string, unknown> = {}) => ({ id, name: `Region ${id}`, points, visibility: "player" as VisibilityValue, ...extra });
+  const two = (worlds: WorldFileV2[], states: Record<string, CampaignMapV2>) =>
+    model(worlds, [campaign("a", states), campaign("b", states)]);
+  const both = (mdl: CampaignResolverModel, ns: WorldNote[] = [note("n")]) =>
+    [resolveCampaign(mdl, ns, "a"), resolveCampaign(mdl, ns, "b")] as const;
+  const reason = <T extends { ships: boolean; reason: string }>(list: T[], pred: (t: T) => boolean) => find(list, pred).reason;
+
+  describe("pins", () => {
+    const m = map("m", {
+      regions: [LAIR],
+      pins: [
+        { note: "n", x: 500, y: 500, visibility: "player" }, // inside
+        { note: "n", x: 400, y: 500, visibility: "player" }, // on the edge
+        { note: "n", x: 600, y: 600, visibility: "player" }, // on a corner
+        { note: "n", x: 100, y: 100, visibility: "player" }, // outside
+      ],
+    });
+    const [a, b] = both(two([world("w", [m])], { m: OPEN }));
+
+    it("a pin inside or on the edge of the hiding region doesn't ship in a (in-hidden-region); all ship in b", () => {
+      expect([0, 1, 2, 3].map((i) => find(a.pins, (p) => p.index === i).reason)).toEqual([
+        "in-hidden-region",
+        "in-hidden-region",
+        "in-hidden-region",
+        "ships",
+      ]);
+      expect(b.pins.every((p) => p.ships)).toBe(true);
+    });
+
+    it("a hidden pin adds its location, not its note's name; the note still ships", () => {
+      expect(noteShips(a, "n")).toBe(true);
+      expect(a.mustNotShip.pinLocations).toEqual([
+        { map: "m", index: 0, x: 500, y: 500 },
+        { map: "m", index: 1, x: 400, y: 500 },
+        { map: "m", index: 2, x: 600, y: 600 },
+      ]);
+      expect(a.mustNotShip.names).toEqual(["The Lair"]);
+      expect(a.mustNotShip.ids).toEqual(["lair"]);
+    });
+
+    it("hidden wins: a pin inside the hiding region and a shipped region covering it doesn't ship", () => {
+      const kingdom = region("kingdom", rect(100, 100, 900, 900));
+      const mm = map("m", { regions: [LAIR, kingdom], pins: [{ note: "n", x: 500, y: 500, visibility: "player" }] });
+      const [ra] = both(two([world("w", [mm])], { m: OPEN }));
+      expect(regionShips(ra, "kingdom")).toBe(true);
+      expect(pinShips(ra, "m")).toBe(false);
+    });
+  });
+
+  describe("routes", () => {
+    const pinInLair = { note: "inside", x: 500, y: 500, visibility: "player" as VisibilityValue };
+    const pinOut = { note: "n", x: 100, y: 100, visibility: "player" as VisibilityValue };
+    const m = map("m", {
+      regions: [LAIR],
+      pins: [pinInLair, pinOut],
+      routes: [
+        route("vertex-in", [[100, 500], [500, 500]]),
+        route("crosses", [[300, 500], [700, 500]]),
+        route("along-edge", [[300, 400], [700, 400]]),
+        route("touches-corner", [[300, 700], [400, 600], [300, 500]]),
+        route("clear", [[300, 300], [700, 300]]),
+        route("via-hidden-pin", [{ entityId: "n" }, { entityId: "inside" }]),
+        route("crosses-via-pins", [{ entityId: "n" }, [900, 900]]),
+      ],
+    });
+    const [a, b] = both(two([world("w", [m])], { m: OPEN }), [note("n"), note("inside")]);
+    const r = (res: CampaignResolution, id: string) => reason(res.routes, (x) => x.id === id);
+
+    it("a vertex inside, a segment crossing with no vertex inside, along an edge, or touching a corner: hidden in a", () => {
+      for (const id of ["vertex-in", "crosses", "along-edge", "touches-corner"]) expect(r(a, id), id).toBe("in-hidden-region");
+      expect(r(a, "clear")).toBe("ships");
+    });
+
+    it("the resolved polyline counts: pin waypoints, and a pin hidden by rule 9 makes its route waypoint-hidden", () => {
+      expect(r(a, "via-hidden-pin")).toBe("waypoint-hidden");
+      // (100, 100) -> (900, 900) runs through the lair's interior.
+      expect(r(a, "crosses-via-pins")).toBe("in-hidden-region");
+    });
+
+    it("everything ships in b", () => {
+      expect(b.routes.every((x) => x.ships)).toBe(true);
+    });
+  });
+
+  describe("sound-only areas and regions", () => {
+    const shapes: [string, Point[], string][] = [
+      ["partly-over", rect(550, 550, 650, 650), "in-hidden-region"],
+      ["inside", rect(450, 450, 550, 550), "in-hidden-region"],
+      ["identical", rect(400, 400, 600, 600), "in-hidden-region"],
+      ["shares-an-edge-and-contains", rect(400, 300, 700, 700), "in-hidden-region"],
+      ["container", rect(300, 300, 700, 700), "ships"],
+      ["neighbour", rect(600, 400, 700, 600), "ships"],
+      ["corner-neighbour", rect(600, 600, 700, 700), "ships"],
+      ["apart", rect(10, 10, 90, 90), "ships"],
+    ];
+    const m = map("m", {
+      regions: [LAIR, ...shapes.map(([id, pts]) => region(`r-${id}`, pts))],
+      sound: [
+        ...shapes.map(([id, pts]) => soundArea(`s-${id}`, pts)),
+        { id: "ride-partly", name: "Ride", regionId: "r-partly-over", bed: { src: "r.ogg" } },
+        { id: "ride-container", name: "Ride 2", regionId: "r-container", bed: { src: "r2.ogg" } },
+      ],
+    });
+    const [a, b] = both(two([world("w", [m])], { m: OPEN }));
+
+    it.each(shapes)("%s: %s", (id, _pts, expected) => {
+      void _pts;
+      expect(reason(a.sound, (x) => x.id === `s-${id}`)).toBe(expected);
+      expect(reason(a.regions, (x) => x.id === `r-${id}`)).toBe(expected);
+      expect(soundShips(b, `s-${id}`)).toBe(true);
+      expect(regionShips(b, `r-${id}`)).toBe(true);
+    });
+
+    it("a ride-on sound area follows its region, including when rule 9 hides it", () => {
+      expect(reason(a.sound, (x) => x.id === "ride-partly")).toBe("region-hidden");
+      expect(soundShips(a, "ride-container")).toBe(true);
+      expect(soundShips(b, "ride-partly")).toBe(true);
+    });
+
+    it("a container doesn't reveal the hidden region: its id and name stay in must-not-ship", () => {
+      expect(regionShips(a, "r-container")).toBe(true);
+      expect(a.mustNotShip.ids).toContain("lair");
+      expect(a.mustNotShip.names).toContain("The Lair");
+    });
+  });
+
+  describe("frames", () => {
+    const land = (lair = LAIR) => map("land", { regions: [lair] });
+    const city = (frame: { x: number; y: number; width: number; height: number; rotation?: number }) =>
+      ({ ...furnished("city"), parent: "land", frame: { rotation: 0, ...frame }, enterZoom: 2 }) as MapV2;
+    const dungeon = { ...furnished("dungeon"), parent: "city", frame: { x: 10, y: 10, width: 50, height: 50, rotation: 0 }, enterZoom: 2 } as MapV2;
+    const states = { land: OPEN, city: OPEN, dungeon: OPEN };
+    const resolve = (f: Parameters<typeof city>[0]) => both(two([world("w", [land(), city(f), dungeon])], states));
+
+    it("a frame partly over the hiding region hides the child with its whole subtree in a; ships in b", () => {
+      const [a, b] = resolve({ x: 550, y: 550, width: 200, height: 200 });
+      expect(find(a.maps, (x) => x.id === "city").reason).toBe("frame-in-hidden-region");
+      expect(find(a.frames, (x) => x.map === "city").reason).toBe("frame-in-hidden-region");
+      expect(find(a.maps, (x) => x.id === "dungeon").reason).toBe("parent-hidden");
+      expect(everyItemOn(a, "city").every((s) => !s)).toBe(true);
+      expect(everyItemOn(a, "dungeon").every((s) => !s)).toBe(true);
+      expect(a.mustNotShip.ids).toEqual(expect.arrayContaining(["city", "dungeon", "city-region"]));
+      expect(mapShips(b, "city")).toBe(true);
+      expect(mapShips(b, "dungeon")).toBe(true);
+    });
+
+    it("a frame wholly containing the hiding region ships; the child decides its own items", () => {
+      const [a] = resolve({ x: 300, y: 300, width: 400, height: 400 });
+      expect(mapShips(a, "city")).toBe(true);
+      expect(mapShips(a, "dungeon")).toBe(true);
+      // The child's own region at 10..90 isn't touched by the parent's lair (no projection).
+      expect(everyItemOn(a, "city").every((s) => s)).toBe(true);
+    });
+
+    it("a frame identical to the hiding region, or sharing its edge, hides; one only touching its edge ships", () => {
+      expect(mapShips(resolve({ x: 400, y: 400, width: 200, height: 200 })[0], "city")).toBe(false);
+      expect(mapShips(resolve({ x: 400, y: 300, width: 300, height: 400 })[0], "city")).toBe(false);
+      expect(mapShips(resolve({ x: 600, y: 400, width: 100, height: 200 })[0], "city")).toBe(true);
+    });
+
+    it("a rotated frame is tested turned both ways: reaching in by a turned corner hides it", () => {
+      // A 100 x 100 frame left of the lair (x < 400), level with it (y 450..550).
+      // Turned 45 degrees, a corner sticks out 70.7 from the centre (centre
+      // turn) or 141.4 from the top-left (corner turn), sideways either way.
+      // At x 250 (centre 300) neither reaches x 400: ships. At x 290 (centre
+      // 340) the centre-turned corner reaches (410.7, 500), inside: hides.
+      expect(mapShips(resolve({ x: 250, y: 450, width: 100, height: 100, rotation: 45 })[0], "city")).toBe(true);
+      expect(mapShips(resolve({ x: 290, y: 450, width: 100, height: 100, rotation: 45 })[0], "city")).toBe(false);
+      // Unrotated, the same rectangle (290..390) misses the lair.
+      expect(mapShips(resolve({ x: 290, y: 450, width: 100, height: 100, rotation: 0 })[0], "city")).toBe(true);
+    });
+
+    it("a frame decided by fog first keeps frame-fogged", () => {
+      const mdl = model(
+        [world("w", [land(), city({ x: 550, y: 550, width: 100, height: 100 })])],
+        [campaign("a", { land: LEFT_HALF, city: OPEN })],
+      );
+      expect(find(resolveCampaign(mdl, [note("n")], "a").maps, (x) => x.id === "city").reason).toBe("frame-fogged");
+    });
+  });
+
+  describe("what is and isn't a hiding region", () => {
+    it("a region dropped only by fog hides nothing: a lit pin in it ships", () => {
+      const m = map("m", {
+        regions: [region("half-fogged", rect(400, 400, 600, 600))],
+        pins: [{ note: "n", x: 450, y: 450, visibility: "player" }],
+      });
+      const r = resolveCampaign(model([world("w", [m])], [campaign("a", { m: LEFT_HALF })]), [note("n")], "a");
+      expect(reason(r.regions, (x) => x.id === "half-fogged")).toBe("fogged");
+      expect(pinShips(r, "m")).toBe(true);
+    });
+
+    it("a region hidden by its link to a note that doesn't ship hides (link-hidden)", () => {
+      const m = map("m", {
+        regions: [region("lair", rect(400, 400, 600, 600), { entityId: "secret" })],
+        pins: [{ note: "n", x: 500, y: 500, visibility: "player" }],
+      });
+      const r = resolveCampaign(model([world("w", [m])], [campaign("a", { m: OPEN })]), [note("n"), note("secret", { visibility: "dm" })], "a");
+      expect(reason(r.regions, (x) => x.id === "lair")).toBe("link-hidden");
+      expect(reason(r.pins, () => true)).toBe("in-hidden-region");
+    });
+
+    it("no cascade: a region hidden only by rule 9 hides nothing", () => {
+      const m = map("m", {
+        regions: [LAIR, region("overlap", rect(500, 500, 800, 800))],
+        pins: [{ note: "n", x: 700, y: 700, visibility: "player" }],
+        sound: [soundArea("in-overlap", rect(650, 650, 750, 750))],
+      });
+      const [a] = both(two([world("w", [m])], { m: OPEN }));
+      expect(reason(a.regions, (x) => x.id === "overlap")).toBe("in-hidden-region");
+      expect(pinShips(a, "m")).toBe(true);
+      expect(soundShips(a, "in-overlap")).toBe(true);
+    });
+
+    it("a region on a map that doesn't ship hides nothing on other maps", () => {
+      const m = map("m", { visibility: "dm", regions: [LAIR] });
+      const other = map("o", { pins: [{ note: "n", x: 500, y: 500, visibility: "player" }] });
+      const r = resolveCampaign(model([world("w", [m, other])], [campaign("a", { m: OPEN, o: OPEN })]), [note("n")], "a");
+      expect(pinShips(r, "o")).toBe(true);
+      expect(r.badHidingRegions).toEqual([]);
+    });
+  });
+
+  describe("a malformed hiding region", () => {
+    it.each([
+      { label: "two points", points: [[1, 1], [2, 2]] as Point[] },
+      { label: "a non-finite point", points: [[1, 1], [2, Number.NaN], [3, 1]] as Point[] },
+    ])("$label: reported, and everything rule 9 tests on its map is hidden", ({ points }) => {
+      const m = map("m", {
+        regions: [{ id: "bad", name: "Bad", points, visibility: "dm" }, region("ok", rect(10, 10, 90, 90))],
+        pins: [{ note: "n", x: 900, y: 900, visibility: "player" }],
+        routes: [route("road", [[700, 700], [800, 800]])],
+        sound: [soundArea("hum", rect(700, 700, 800, 800))],
+      });
+      const kid = { ...map("kid"), parent: "m", frame: { x: 700, y: 700, width: 50, height: 50, rotation: 0 }, enterZoom: 2 } as MapV2;
+      const other = map("o", { pins: [{ note: "n", x: 1, y: 1, visibility: "player" }] });
+      const r = resolveCampaign(
+        model([world("w", [m, kid, other])], [campaign("a", { m: OPEN, kid: OPEN, o: OPEN })]),
+        [note("n")],
+        "a",
+      );
+      expect(r.badHidingRegions).toEqual([{ map: "m", region: "bad" }]);
+      expect(pinShips(r, "m")).toBe(false);
+      expect(routeShips(r, "road")).toBe(false);
+      expect(soundShips(r, "hum")).toBe(false);
+      expect(regionShips(r, "ok")).toBe(false);
+      expect(find(r.maps, (x) => x.id === "kid").reason).toBe("frame-in-hidden-region");
+      expect(pinShips(r, "o")).toBe(true);
+    });
+
+    it("a malformed region that ships (player) is not reported", () => {
+      const m = map("m", { regions: [{ id: "bad", name: "Bad", points: [[1, 1], [2, 2]] as Point[], visibility: "player" }] });
+      const r = resolveCampaign(model([world("w", [m])], [campaign("a", { m: OPEN })]), [], "a");
+      expect(r.badHidingRegions).toEqual([]);
+    });
+  });
+
+  describe("rule 8 with rule 9", () => {
+    const hazel = note("hazel-hollow", { title: "Hazel Hollow" });
+
+    it("a non-linking route hidden by rule 9 named like a shipped note is a collision", () => {
+      const m = map("m", {
+        regions: [LAIR],
+        routes: [{ ...route("hollow-road", [[300, 500], [700, 500]]), name: "Hazel Hollow" }],
+      });
+      const [a, b] = both(two([world("w", [m])], { m: OPEN }), [hazel]);
+      expect(a.collisions).toEqual([
+        { name: "Hazel Hollow", hidden: { kind: "route", id: "hollow-road" }, shipped: { kind: "note", id: "hazel-hollow" } },
+      ]);
+      expect(b.collisions).toEqual([]);
+    });
+
+    it("a region hidden by rule 9 that links the shipped note is exempt: no collision, its names stay out", () => {
+      const m = map("m", {
+        regions: [LAIR, region("hazel-hollow", rect(500, 500, 800, 800), { name: "Hazel Hollow", entityId: "hazel-hollow" })],
+      });
+      const [a] = both(two([world("w", [m])], { m: OPEN }), [hazel]);
+      expect(reason(a.regions, (x) => x.id === "hazel-hollow")).toBe("in-hidden-region");
+      expect(a.collisions).toEqual([]);
+      expect(a.mustNotShip.names).not.toContain("Hazel Hollow");
+    });
+  });
+
+  describe("the all-pins-hidden warning (hiddenPinNotes)", () => {
+    it("names a shipped note whose every pin rule 9 hides, and the region", () => {
+      const m = map("m", {
+        regions: [LAIR],
+        pins: [
+          { note: "n", x: 500, y: 500, visibility: "player" },
+          { note: "kept", x: 450, y: 450, visibility: "player" },
+          { note: "kept", x: 100, y: 100, visibility: "player" },
+          { note: "dm-note", x: 500, y: 500, visibility: "player" },
+        ],
+      });
+      const [a, b] = both(two([world("w", [m])], { m: OPEN }), [note("n"), note("kept"), note("dm-note", { visibility: "dm" })]);
+      expect(a.hiddenPinNotes).toEqual([{ note: "n", regions: [{ map: "m", region: "lair" }] }]);
+      expect(b.hiddenPinNotes).toEqual([]);
+      // Not in `warnings` (structured; the build words it).
+      expect(a.warnings).toEqual([]);
+    });
+  });
+
+  describe("frames iterate to a fixed point", () => {
+    it("a region linking a note of another world hides a frame once that world's notes are decided", () => {
+      // World w2's only map is dm in a, so w2 doesn't ship (rule 5), its note
+      // doesn't ship (rule 6), the region linking it on land is link-hidden,
+      // and the frame of city over that region hides city and its subtree.
+      const land = map("land", { regions: [region("gate", rect(400, 400, 600, 600), { entityId: "far-note" })] });
+      const cityMap = { ...furnished("city"), parent: "land", frame: { x: 500, y: 500, width: 200, height: 200, rotation: 0 }, enterZoom: 2 } as MapV2;
+      const keep = { ...map("keep"), parent: "city", frame: { x: 10, y: 10, width: 20, height: 20, rotation: 0 }, enterZoom: 2 } as MapV2;
+      const far = map("far", { visibility: { a: "dm", b: "player" } });
+      const mdl = model(
+        [world("w", [land, cityMap, keep]), world("w2", [far])],
+        [campaign("a", { land: OPEN, city: OPEN, keep: OPEN, far: OPEN }), campaign("b", { land: OPEN, city: OPEN, keep: OPEN, far: OPEN })],
+      );
+      const ns = [note("n"), note("far-note", { world: "w2" })];
+      const [a, b] = both(mdl, ns);
+      expect(worldShips(a, "w2")).toBe(false);
+      expect(reason(a.regions, (x) => x.id === "gate")).toBe("link-hidden");
+      expect(find(a.maps, (x) => x.id === "city").reason).toBe("frame-in-hidden-region");
+      expect(find(a.maps, (x) => x.id === "keep").reason).toBe("parent-hidden");
+      // Worlds and notes are re-decided after the frame pass: w still ships by land.
+      expect(worldShips(a, "w")).toBe(true);
+      expect(noteShips(a, "n")).toBe(true);
+      expect(mapShips(b, "city")).toBe(true);
+    });
+
+    it("a world whose root map ships always keeps it: frames hide children, never a root", () => {
+      // So a pass-2 world loss can't happen; the loop still re-decides and ends.
+      const land = map("land", { regions: [LAIR] });
+      const cityMap = { ...map("city"), parent: "land", frame: { x: 500, y: 500, width: 200, height: 200, rotation: 0 }, enterZoom: 2 } as MapV2;
+      const [a] = both(two([world("w", [land, cityMap])], { land: OPEN, city: OPEN }));
+      expect(mapShips(a, "land")).toBe(true);
+      expect(mapShips(a, "city")).toBe(false);
+      expect(worldShips(a, "w")).toBe(true);
+    });
   });
 });

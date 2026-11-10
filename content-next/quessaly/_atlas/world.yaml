@@ -53,11 +53,37 @@ maps:
         name: The Murkwater
         points: [[160, 220], [290, 220], [290, 380], [160, 380]]
         visibility: dm
+      # player, but wholly inside the-murkwater: hidden with it (rule 9).
+      - id: sunken-bell
+        name: Sunken Bell
+        points: [[175, 230], [215, 230], [215, 260], [175, 260]]
+        visibility: player
+      # Wholly contains the-murkwater, sharing no edge: still ships (rule 9's
+      # container exception).
+      - id: the-fenlands
+        name: The Fenlands
+        points: [[150, 210], [295, 210], [295, 390], [150, 390]]
+        visibility: player
+      # Hidden in main only: what reaches into it hides in main, ships in sandbox.
+      - id: heron-flats
+        name: Heron Flats
+        points: [[20, 20], [140, 20], [140, 50], [20, 50]]
+        visibility: { sandbox: player }
     routes:
       # Inside the hidden region the-murkwater.
       - id: eel-path
         name: Eel Path
         waypoints: [[180, 260], [270, 350]]
+        visibility: player
+      # Crosses the-murkwater with no waypoint inside it.
+      - id: ferrymans-cut
+        name: Ferryman's Cut
+        waypoints: [[140, 240], [295, 300]]
+        visibility: player
+      # Runs through heron-flats (hidden in main only).
+      - id: heron-trail
+        name: Heron Trail
+        waypoints: [[10, 35], [150, 35]]
         visibility: player
     sound:
       # Sound-only, inside the hidden region the-murkwater.
@@ -101,6 +127,39 @@ maps:
     zoom: { min: 0, max: 4 }
     pins:
       - { note: pellam-ferry, x: 300, y: 200, visibility: player }
+
+  - id: mirefold
+    name: Mirefold
+    width: 400
+    height: 300
+    visibility: player
+    parent: oskmark
+    # Partly over the-murkwater (y 350..395 against its 220..380): hidden in
+    # both campaigns with its subtree (rule 9).
+    frame: { x: 220, y: 350, width: 60, height: 45, rotation: 0 }
+    enterZoom: 2
+    layers:
+      - { id: base, src: images/mirefold.png, x: 0, y: 0, width: 400, height: 300 }
+    scale: { unitsPerPixel: 0.01, unitLabel: mi }
+    zoom: { min: 0, max: 4 }
+    regions:
+      - id: bog-market
+        name: Bog Market
+        points: [[100, 80], [300, 80], [300, 220], [100, 220]]
+        visibility: player
+
+  - id: mirefold-cellars
+    name: Mirefold Cellars
+    width: 300
+    height: 300
+    visibility: player
+    parent: mirefold
+    frame: { x: 160, y: 120, width: 60, height: 60, rotation: 0 }
+    enterZoom: 2
+    layers:
+      - { id: base, src: images/mirefold-cellars.png, x: 0, y: 0, width: 300, height: 300 }
+    scale: { unitsPerPixel: 0.005, unitLabel: mi }
+    zoom: { min: 0, max: 4 }
 
 notes:
   haskel-thimbleby:

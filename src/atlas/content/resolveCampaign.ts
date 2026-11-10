@@ -39,12 +39,36 @@
  *      of something that ships is a collision. A hidden region linking a note
  *      that ships keeps that note's id, title and aliases out of must-not-ship.
  *      A pin adds its location, never its note's name.
+ *   9. Containment: on a map that ships, a *hiding region* is a region that
+ *      doesn't ship for its own sake (`visibility`, or `link-hidden`); one
+ *      dropped only by fog, or only by this rule, hides nothing (no cascade).
+ *      It hides, with `in-hidden-region`: a pin inside it or on its edge; a
+ *      route with any vertex inside it or on its edge, or any segment meeting
+ *      its edge (crossing in, touching, running along); a sound-only area or
+ *      region that touches it (shares interior, `polygonsTouch`) without
+ *      wholly containing it (`polygonContainsStrictly`: an identical area or
+ *      one sharing any boundary is no container). A frame (either quad of a
+ *      rotated one) that touches it without wholly containing it hides its
+ *      child map with `frame-in-hidden-region`, and the subtree with it.
+ *      Hidden wins over any shipped region covering the same point. Geometry
+ *      is even-odd, in the map's pixels (`src/atlas/geometry/polygon.ts`). A
+ *      hiding region with fewer than 3 finite points is reported in
+ *      `badHidingRegions` and hides everything on its map that this rule
+ *      tests. Region own-verdicts come before pins, so a route's pin waypoint
+ *      hidden here makes it `waypoint-hidden`. Maps, worlds, notes and region
+ *      own-verdicts are re-decided until no frame is newly hidden.
  *
  * `warnings` and `staleEntries` name DM content: callers keep them out of
  * every player artifact.
  */
 import { isLit } from "../fog/effectiveLit";
-import { pointInPolygon } from "../geometry/polygon";
+import {
+  pathReachesPolygon,
+  pointInOrOnPolygon,
+  pointInPolygon,
+  polygonContainsStrictly,
+  polygonsTouch,
+} from "../geometry/polygon";
 import { slugify } from "./slugify";
 import type { MapModel, ModelNote, WorldModel } from "./atlasModel";
 import type { Note } from "./readNote";
@@ -135,7 +159,11 @@ export type ShipReason =
   /** A ride-on sound area's region doesn't ship, or doesn't exist on the map. */
   | "region-hidden"
   /** No geometry to place or fog-check (a route under 2 points, an area with none). */
-  | "no-geometry";
+  | "no-geometry"
+  /** Inside, on the edge of, or reaching into a region hidden for its own sake (rule 9). */
+  | "in-hidden-region"
+  /** The frame touches a hiding region on the parent without wholly containing it (rule 9). */
+  | "frame-in-hidden-region";
 
 export interface Verdict {
   ships: boolean;
@@ -199,6 +227,12 @@ export interface NameCollision {
   shipped: { kind: ResolvedKind; id: string };
 }
 
+/** A shipped note none of whose pins ships, some hidden by rule 9, and the regions that hid them. DM-only. */
+export interface HiddenPinNote {
+  note: NoteId;
+  regions: { map: MapId; region: string }[];
+}
+
 export interface CampaignResolution {
   campaign: CampaignId;
   worlds: WorldVerdict[];
@@ -218,6 +252,14 @@ export interface CampaignResolution {
    * retitled note, an entry in the wrong world). The build should fail on them.
    */
   orphanEntries: { world: WorldId; entry: string }[];
+  /**
+   * Hiding regions (rule 9) with fewer than 3 finite points, so nothing can be
+   * tested against them. The player build fails on them; everything on their
+   * map that rule 9 tests is hidden meanwhile.
+   */
+  badHidingRegions: { map: MapId; region: string }[];
+  /** Shipped notes whose every pin is hidden, some by rule 9: the build warns. DM-only. */
+  hiddenPinNotes: HiddenPinNote[];
   /** DM-facing; never shipped. */
   warnings: string[];
 }
@@ -473,6 +515,44 @@ interface MapEntry {
   world: WorldModel;
 }
 
+type RegionModel = NonNullable<MapModel["regions"]>[number];
+
+/** A region hiding things on its map (rule 9); `points` is null when it can't be tested. */
+interface HidingRegion {
+  region: RegionModel;
+  points: Point[] | null;
+}
+
+/** At least 3 points, each a pair of finite numbers; otherwise null. */
+function testablePolygon(points: unknown): Point[] | null {
+  if (!Array.isArray(points) || points.length < 3 || !points.every(isFinitePoint)) return null;
+  return points as Point[];
+}
+
+/** The hiding regions a pin's point is inside or on the edge of. A point that isn't finite is hidden by all. */
+function pointHiddenBy(p: unknown, hiding: readonly HidingRegion[]): HidingRegion[] {
+  if (hiding.length === 0) return [];
+  if (!isFinitePoint(p)) return [...hiding];
+  return hiding.filter((h) => !h.points || pointInOrOnPolygon(p[0], p[1], h.points));
+}
+
+/** The hiding regions a route's resolved path reaches (a vertex in or on, or a segment meeting an edge). */
+function pathHiddenBy(points: readonly unknown[], hiding: readonly HidingRegion[]): HidingRegion[] {
+  if (hiding.length === 0) return [];
+  if (!points.every(isFinitePoint)) return [...hiding];
+  return hiding.filter((h) => !h.points || pathReachesPolygon(points as Point[], h.points));
+}
+
+/** The hiding regions an area touches without wholly containing. An area that isn't finite is hidden by all. */
+function areaHiddenBy(points: readonly unknown[] | undefined, hiding: readonly HidingRegion[]): HidingRegion[] {
+  if (hiding.length === 0) return [];
+  if (!points || points.length === 0 || !points.every(isFinitePoint)) return [...hiding];
+  const pts = points as Point[];
+  return hiding.filter(
+    (h) => !h.points || (polygonsTouch(pts, h.points) && !polygonContainsStrictly(pts, h.points)),
+  );
+}
+
 /**
  * Resolve one campaign. Throws `ResolveCampaignError` when `campaignId` names
  * no campaign file, or more than one.
@@ -491,130 +571,223 @@ export function resolveCampaign(
     );
   }
   const campaign = matching[0];
-  const warnings: string[] = [];
 
-  // --- Maps (rules 2 and 4) -------------------------------------------------
   const worldCounts = countBy(model.worlds.map((w) => w.world.id));
   const mapsById = new Map<MapId, MapEntry[]>();
+  const entries: MapEntry[] = [];
   for (const world of model.worlds) {
     for (const map of world.maps ?? []) {
       const list = mapsById.get(map.id) ?? [];
-      list.push({ map, world });
+      const entry = { map, world };
+      list.push(entry);
       mapsById.set(map.id, list);
+      entries.push(entry);
     }
   }
+  const worldFileById = new Map<WorldId, WorldModel>();
+  for (const w of model.worlds) if (worldCounts.get(w.world.id) === 1) worldFileById.set(w.world.id, w);
+  const noteIdCounts = countBy(notes.map(({ note }) => note.id));
 
-  const mapVerdict = new Map<MapEntry, Verdict>();
-  const resolving = new Set<MapEntry>();
-  const resolveMap = (entry: MapEntry): Verdict => {
-    const done = mapVerdict.get(entry);
-    if (done) return done;
-    if (resolving.has(entry)) return { ships: false, reason: "bad-parent" }; // a cycle
-    resolving.add(entry);
-    const v = decideMap(entry);
-    resolving.delete(entry);
-    mapVerdict.set(entry, v);
-    return v;
-  };
-  const decideMap = ({ map, world }: MapEntry): Verdict => {
-    if ((mapsById.get(map.id)?.length ?? 0) !== 1 || (worldCounts.get(world.world.id) ?? 0) !== 1) {
-      return { ships: false, reason: "duplicate-id" };
-    }
-    if (map.parent !== undefined) {
-      const parents = mapsById.get(map.parent) ?? [];
-      if (parents.length !== 1 || parents[0].world !== world) return { ships: false, reason: "bad-parent" };
-      const parent = resolveMap(parents[0]);
-      if (!parent.ships) {
-        return { ships: false, reason: parent.reason === "bad-parent" ? "bad-parent" : "parent-hidden" };
+  // Rule 9 for frames needs the parent's hiding regions; a region hides by a
+  // hidden linked note, which needs note verdicts, world verdicts (rule 5)
+  // and map verdicts. So maps, worlds, notes and region own-verdicts are
+  // decided in a pass, then frames are tested against their parent's hiding
+  // regions; a frame so hidden hides its map, and the pass runs again until no
+  // frame is newly hidden. Each pass only hides more, so it ends.
+  const frameHidden = new Set<MapEntry>();
+  let pass = decidePass(frameHidden);
+  for (;;) {
+    let grew = false;
+    for (const entry of entries) {
+      if (frameHidden.has(entry) || entry.map.parent === undefined || !pass.mapShips.get(entry)) continue;
+      const parent = (mapsById.get(entry.map.parent) ?? [])[0];
+      const hiding = parent ? pass.hiding.get(parent) : undefined;
+      const quads = entry.map.frame ? frameQuads(entry.map.frame) : null;
+      if (!hiding || hiding.length === 0) continue;
+      if (!quads || quads.some((q) => areaHiddenBy(q, hiding).length > 0)) {
+        frameHidden.add(entry);
+        grew = true;
       }
     }
-    if (!shipsIn(map.visibility, campaignId)) return { ships: false, reason: "visibility" };
-    const state = hasOwn(campaign.maps, map.id) ? campaign.maps[map.id]?.state : undefined;
-    if (state !== "open" && state !== "fogged") return { ships: false, reason: "unknown-state" };
-    if (map.parent !== undefined) {
-      const quads = map.frame ? frameQuads(map.frame) : null;
-      if (!quads) return { ships: false, reason: "no-frame" };
-      const parentFog = campaignFog(map.parent, campaign);
-      if (quads.some((q) => frameUnderFog(q, parentFog))) return { ships: false, reason: "frame-fogged" };
-    }
-    return { ships: true, reason: "ships" };
-  };
+    if (!grew) break;
+    pass = decidePass(frameHidden);
+  }
+  const { maps, frames, mapShips, worlds, worldShipsById, noteVerdicts, notesById, noteIdShips, regionOwn, hiding } =
+    pass;
+  const { staleEntries, orphanEntries, warnings } = pass;
 
-  const maps: MapVerdict[] = [];
-  const frames: FrameVerdict[] = [];
-  const mapShips = new Map<MapEntry, boolean>();
-  for (const world of model.worlds) {
-    for (const map of world.maps ?? []) {
-      const entry = mapsById.get(map.id)!.find((e) => e.map === map)!;
+  /**
+   * One pass over maps (rules 2, 4 and 9 for frames), worlds (rule 5), notes
+   * (rules 5 and 6) and each region's own verdict (visibility, link, fog), with
+   * each shipped map's hiding regions (rule 9). `frameHidden` lists the maps
+   * whose frame an earlier pass found touching a hiding region on the parent.
+   */
+  function decidePass(frameHidden: ReadonlySet<MapEntry>) {
+    const warnings: string[] = [];
+
+    // --- Maps (rules 2, 4 and 9) ---------------------------------------------
+    const mapVerdict = new Map<MapEntry, Verdict>();
+    const resolving = new Set<MapEntry>();
+    const resolveMap = (entry: MapEntry): Verdict => {
+      const done = mapVerdict.get(entry);
+      if (done) return done;
+      if (resolving.has(entry)) return { ships: false, reason: "bad-parent" }; // a cycle
+      resolving.add(entry);
+      const v = decideMap(entry);
+      resolving.delete(entry);
+      mapVerdict.set(entry, v);
+      return v;
+    };
+    const decideMap = (entry: MapEntry): Verdict => {
+      const { map, world } = entry;
+      if ((mapsById.get(map.id)?.length ?? 0) !== 1 || (worldCounts.get(world.world.id) ?? 0) !== 1) {
+        return { ships: false, reason: "duplicate-id" };
+      }
+      if (map.parent !== undefined) {
+        const parents = mapsById.get(map.parent) ?? [];
+        if (parents.length !== 1 || parents[0].world !== world) return { ships: false, reason: "bad-parent" };
+        const parent = resolveMap(parents[0]);
+        if (!parent.ships) {
+          return { ships: false, reason: parent.reason === "bad-parent" ? "bad-parent" : "parent-hidden" };
+        }
+      }
+      if (!shipsIn(map.visibility, campaignId)) return { ships: false, reason: "visibility" };
+      const state = hasOwn(campaign.maps, map.id) ? campaign.maps[map.id]?.state : undefined;
+      if (state !== "open" && state !== "fogged") return { ships: false, reason: "unknown-state" };
+      if (map.parent !== undefined) {
+        const quads = map.frame ? frameQuads(map.frame) : null;
+        if (!quads) return { ships: false, reason: "no-frame" };
+        const parentFog = campaignFog(map.parent, campaign);
+        if (quads.some((q) => frameUnderFog(q, parentFog))) return { ships: false, reason: "frame-fogged" };
+        if (frameHidden.has(entry)) return { ships: false, reason: "frame-in-hidden-region" };
+      }
+      return { ships: true, reason: "ships" };
+    };
+
+    const maps: MapVerdict[] = [];
+    const frames: FrameVerdict[] = [];
+    const mapShips = new Map<MapEntry, boolean>();
+    for (const entry of entries) {
+      const { map, world } = entry;
       const v = resolveMap(entry);
       mapShips.set(entry, v.ships);
       maps.push({ id: map.id, world: world.world.id, ...v });
       if (map.parent !== undefined) frames.push({ map: map.id, parent: map.parent, ...v });
     }
-  }
 
-  // --- Worlds (rule 5) --------------------------------------------------------
-  const worlds: WorldVerdict[] = [];
-  const worldShipsById = new Map<WorldId, boolean>();
-  for (const world of model.worlds) {
-    const id = world.world.id;
-    let v: Verdict;
-    if ((worldCounts.get(id) ?? 0) !== 1) v = { ships: false, reason: "duplicate-id" };
-    else {
-      const any = (world.maps ?? []).some((m) => mapsById.get(m.id)?.some((e) => e.map === m && mapShips.get(e)));
-      v = any ? { ships: true, reason: "ships" } : { ships: false, reason: "no-map-ships" };
+    // --- Worlds (rule 5) ------------------------------------------------------
+    const worlds: WorldVerdict[] = [];
+    const worldShipsById = new Map<WorldId, boolean>();
+    for (const world of model.worlds) {
+      const id = world.world.id;
+      let v: Verdict;
+      if ((worldCounts.get(id) ?? 0) !== 1) v = { ships: false, reason: "duplicate-id" };
+      else {
+        const any = (world.maps ?? []).some((m) => mapsById.get(m.id)?.some((e) => e.map === m && mapShips.get(e)));
+        v = any ? { ships: true, reason: "ships" } : { ships: false, reason: "no-map-ships" };
+      }
+      worlds.push({ id, ...v });
+      worldShipsById.set(id, (worldShipsById.get(id) ?? true) && v.ships);
     }
-    worlds.push({ id, ...v });
-    worldShipsById.set(id, (worldShipsById.get(id) ?? true) && v.ships);
-  }
-  const worldFileById = new Map<WorldId, WorldModel>();
-  for (const w of model.worlds) if (worldCounts.get(w.world.id) === 1) worldFileById.set(w.world.id, w);
 
-  // --- Notes (rules 5 and 6) -----------------------------------------------
-  const staleEntries: { world: WorldId; note: NoteId }[] = [];
-  const noteVerdicts: NoteVerdict[] = [];
-  const noteIdCounts = countBy(notes.map(({ note }) => note.id));
+    // --- Notes (rules 5 and 6) -----------------------------------------------
+    const staleEntries: { world: WorldId; note: NoteId }[] = [];
+    const noteVerdicts: NoteVerdict[] = [];
 
-  // Orphan entries: a `notes:` key with no note of that id in that world. Each
-  // one may have been meant to narrow a note (a typo, a case change, a retitle,
-  // the wrong world's file), so it narrows every note whose id matches it
-  // case- and space-blind or by slug, in any world, unless it would ship that
-  // note here.
-  const orphanEntries: { world: WorldId; entry: string }[] = [];
-  const orphansByKey = new Map<string, NoteOverride[]>();
-  for (const w of model.worlds) {
-    if (!isRecord(w.notes)) continue;
-    for (const key of Object.keys(w.notes)) {
-      const owned = notes.some((n) => n.world === w.world.id && n.note.id === key);
-      if (owned && worldFileById.get(w.world.id) === w) continue;
-      orphanEntries.push({ world: w.world.id, entry: key });
-      warnings.push(`world "${w.world.id}": notes: entry "${key}" matches no note of that world`);
-      for (const k of orphanKeys(key)) orphansByKey.set(k, [...(orphansByKey.get(k) ?? []), w.notes[key]]);
+    // Orphan entries: a `notes:` key with no note of that id in that world. Each
+    // one may have been meant to narrow a note (a typo, a case change, a
+    // retitle, the wrong world's file), so it narrows every note whose id
+    // matches it case- and space-blind or by slug, in any world, unless it
+    // would ship that note here.
+    const orphanEntries: { world: WorldId; entry: string }[] = [];
+    const orphansByKey = new Map<string, NoteOverride[]>();
+    for (const w of model.worlds) {
+      if (!isRecord(w.notes)) continue;
+      for (const key of Object.keys(w.notes)) {
+        const owned = notes.some((n) => n.world === w.world.id && n.note.id === key);
+        if (owned && worldFileById.get(w.world.id) === w) continue;
+        orphanEntries.push({ world: w.world.id, entry: key });
+        warnings.push(`world "${w.world.id}": notes: entry "${key}" matches no note of that world`);
+        for (const k of orphanKeys(key)) orphansByKey.set(k, [...(orphansByKey.get(k) ?? []), w.notes[key]]);
+      }
     }
-  }
-  const orphanBlocks = (note: ResolverNote): boolean =>
-    [...new Set(orphanKeys(note.id).flatMap((k) => orphansByKey.get(k) ?? []))].some(
-      (e) =>
-        !isRecord(e) ||
-        e.basedOn === undefined ||
-        e.basedOn !== note.visibility ||
-        !shipsIn(e.visibility, campaignId),
-    );
-
-  for (const { world, note } of notes) {
-    const worldFile = worldFileById.get(world);
-    const entry: NoteOverride | undefined =
-      worldFile?.notes && hasOwn(worldFile.notes, note.id) ? worldFile.notes[note.id] : undefined;
-    let v = decideNote(note, entry, worldFile !== undefined && worldShipsById.get(world) === true);
-    if ((noteIdCounts.get(note.id) ?? 0) !== 1) v = { ...v, ships: false, reason: "duplicate-id" };
-    else if (v.ships && orphanBlocks(note)) v = { ...v, ships: false, reason: "orphan-entry" };
-    if (v.stale) staleEntries.push({ world, note: note.id });
-    if (v.widenAttempt) {
-      warnings.push(
-        `note "${note.id}": its notes: entry names campaign "${campaignId}" as player, but its frontmatter doesn't ship; the entry can only narrow`,
+    const orphanBlocks = (note: ResolverNote): boolean =>
+      [...new Set(orphanKeys(note.id).flatMap((k) => orphansByKey.get(k) ?? []))].some(
+        (e) =>
+          !isRecord(e) ||
+          e.basedOn === undefined ||
+          e.basedOn !== note.visibility ||
+          !shipsIn(e.visibility, campaignId),
       );
+
+    for (const { world, note } of notes) {
+      const worldFile = worldFileById.get(world);
+      const entry: NoteOverride | undefined =
+        worldFile?.notes && hasOwn(worldFile.notes, note.id) ? worldFile.notes[note.id] : undefined;
+      let v = decideNote(note, entry, worldFile !== undefined && worldShipsById.get(world) === true);
+      if ((noteIdCounts.get(note.id) ?? 0) !== 1) v = { ...v, ships: false, reason: "duplicate-id" };
+      else if (v.ships && orphanBlocks(note)) v = { ...v, ships: false, reason: "orphan-entry" };
+      if (v.stale) staleEntries.push({ world, note: note.id });
+      if (v.widenAttempt) {
+        warnings.push(
+          `note "${note.id}": its notes: entry names campaign "${campaignId}" as player, but its frontmatter doesn't ship; the entry can only narrow`,
+        );
+      }
+      noteVerdicts.push({ id: note.id, world, ships: v.ships, reason: v.reason });
     }
-    noteVerdicts.push({ id: note.id, world, ships: v.ships, reason: v.reason });
+
+    // A note id ships only when every note with that id ships (duplicates fail closed).
+    const notesById = new Map<NoteId, { note: ResolverNote; ships: boolean }[]>();
+    notes.forEach(({ note }, i) => {
+      const list = notesById.get(note.id) ?? [];
+      list.push({ note, ships: noteVerdicts[i].ships });
+      notesById.set(note.id, list);
+    });
+    const noteIdShips = (id: NoteId): boolean => {
+      const list = notesById.get(id);
+      return !!list && list.length > 0 && list.every((n) => n.ships);
+    };
+
+    // --- Region own-verdicts and hiding regions (rules 3 and 9) ---------------
+    // A region's own verdict: its map, visibility, link and fog. A hiding region
+    // is one on a shipped map that doesn't ship for its own sake (visibility or
+    // link), not one dropped only by fog, nor one hidden only by rule 9.
+    const regionOwn = new Map<RegionModel, Verdict>();
+    const hiding = new Map<MapEntry, HidingRegion[]>();
+    for (const entry of entries) {
+      const onMap = mapShips.get(entry) === true;
+      const fog = onMap ? campaignFog(entry.map.id, campaign) : null;
+      const list: HidingRegion[] = [];
+      for (const r of entry.map.regions ?? []) {
+        let v: Verdict;
+        if (!onMap) v = { ships: false, reason: "map-hidden" };
+        else if (!shipsIn(r.visibility, campaignId)) v = { ships: false, reason: "visibility" };
+        else if (r.entityId !== undefined && !noteIdShips(r.entityId)) v = { ships: false, reason: "link-hidden" };
+        else if (areaUnderFog(r.points, fog)) v = { ships: false, reason: "fogged" };
+        else v = { ships: true, reason: "ships" };
+        regionOwn.set(r, v);
+        if (onMap && (v.reason === "visibility" || v.reason === "link-hidden")) {
+          list.push({ region: r, points: testablePolygon(r.points) });
+        }
+      }
+      if (onMap) hiding.set(entry, list);
+    }
+
+    return {
+      maps,
+      frames,
+      mapShips,
+      worlds,
+      worldShipsById,
+      staleEntries,
+      orphanEntries,
+      warnings,
+      noteVerdicts,
+      notesById,
+      noteIdShips,
+      regionOwn,
+      hiding,
+    };
   }
 
   function decideNote(
@@ -639,19 +812,15 @@ export function resolveCampaign(
     return shipsIn(entry.visibility, campaignId) ? out(true, "ships") : out(false, "entry");
   }
 
-  // A note id ships only when every note with that id ships (duplicates fail closed).
-  const notesById = new Map<NoteId, { note: ResolverNote; ships: boolean }[]>();
-  notes.forEach(({ note }, i) => {
-    const list = notesById.get(note.id) ?? [];
-    list.push({ note, ships: noteVerdicts[i].ships });
-    notesById.set(note.id, list);
-  });
-  const noteIdShips = (id: NoteId): boolean => {
-    const list = notesById.get(id);
-    return !!list && list.length > 0 && list.every((n) => n.ships);
-  };
+  // Hiding regions too malformed to test (fewer than 3 finite points): the
+  // player build fails on them; until then everything on their map that rule 9
+  // tests is hidden (fail closed).
+  const badHidingRegions: { map: MapId; region: string }[] = [];
+  for (const [entry, list] of hiding) {
+    for (const h of list) if (!h.points) badHidingRegions.push({ map: entry.map.id, region: h.region.id });
+  }
 
-  // --- Items on maps (rules 3 and 7) ---------------------------------------
+  // --- Items on maps (rules 3, 7 and 9) ------------------------------------
   const pins: PinVerdict[] = [];
   const pinLocations: PinLocation[] = [];
   const regions: ItemVerdict[] = [];
@@ -659,89 +828,106 @@ export function resolveCampaign(
   const sound: ItemVerdict[] = [];
   /** Hidden regions that link a note that ships: names to keep out of must-not-ship. */
   const regionExempt = new Map<string, Set<string>>();
+  /** Per note id: whether any pin ships, and the hiding regions that hid its pins (rule 9). */
+  const pinsByNote = new Map<NoteId, { anyShips: boolean; hiddenBy: { map: MapId; region: string }[] }>();
+  const IN_HIDDEN: Verdict = { ships: false, reason: "in-hidden-region" };
 
-  for (const world of model.worlds) {
-    for (const map of world.maps ?? []) {
-      const entry = mapsById.get(map.id)!.find((e) => e.map === map)!;
-      const onMap = mapShips.get(entry) === true;
-      const fog = onMap ? campaignFog(map.id, campaign) : null;
+  for (const entry of entries) {
+    const { map } = entry;
+    const onMap = mapShips.get(entry) === true;
+    const fog = onMap ? campaignFog(map.id, campaign) : null;
+    const hidingHere = hiding.get(entry) ?? [];
 
-      const pinShips: boolean[] = [];
-      (map.pins ?? []).forEach((pin, index) => {
-        let v: Verdict;
-        if (!onMap) v = { ships: false, reason: "map-hidden" };
-        else if (!shipsIn(pin.visibility, campaignId)) v = { ships: false, reason: "visibility" };
-        else if (!noteIdShips(pin.note)) v = { ships: false, reason: "note-hidden" };
-        else if (pointUnderFog([pin.x, pin.y], fog)) v = { ships: false, reason: "fogged" };
-        else v = { ships: true, reason: "ships" };
-        pinShips.push(v.ships);
-        pins.push({ map: map.id, index, note: pin.note, ...v });
-        if (!v.ships) pinLocations.push({ map: map.id, index, x: pin.x, y: pin.y });
-      });
+    const pinShips: boolean[] = [];
+    (map.pins ?? []).forEach((pin, index) => {
+      let v: Verdict;
+      let hitBy: HidingRegion[] = [];
+      if (!onMap) v = { ships: false, reason: "map-hidden" };
+      else if (!shipsIn(pin.visibility, campaignId)) v = { ships: false, reason: "visibility" };
+      else if (!noteIdShips(pin.note)) v = { ships: false, reason: "note-hidden" };
+      else if (pointUnderFog([pin.x, pin.y], fog)) v = { ships: false, reason: "fogged" };
+      else if ((hitBy = pointHiddenBy([pin.x, pin.y], hidingHere)).length > 0) v = IN_HIDDEN;
+      else v = { ships: true, reason: "ships" };
+      pinShips.push(v.ships);
+      pins.push({ map: map.id, index, note: pin.note, ...v });
+      if (!v.ships) pinLocations.push({ map: map.id, index, x: pin.x, y: pin.y });
+      const seen = pinsByNote.get(pin.note) ?? { anyShips: false, hiddenBy: [] };
+      seen.anyShips ||= v.ships;
+      for (const h of hitBy) seen.hiddenBy.push({ map: map.id, region: h.region.id });
+      pinsByNote.set(pin.note, seen);
+    });
 
-      const regionShips = new Map<string, boolean>();
-      for (const r of map.regions ?? []) {
-        let v: Verdict;
-        if (!onMap) v = { ships: false, reason: "map-hidden" };
-        else if (!shipsIn(r.visibility, campaignId)) v = { ships: false, reason: "visibility" };
-        else if (r.entityId !== undefined && !noteIdShips(r.entityId)) v = { ships: false, reason: "link-hidden" };
-        else if (areaUnderFog(r.points, fog)) v = { ships: false, reason: "fogged" };
-        else v = { ships: true, reason: "ships" };
-        regionShips.set(r.id, (regionShips.get(r.id) ?? true) && v.ships);
-        regions.push({ id: r.id, map: map.id, ...v });
-        if (!v.ships && r.entityId !== undefined && noteIdShips(r.entityId)) {
-          const keys = regionExempt.get(regionKey(map.id, r.id)) ?? new Set<string>();
-          for (const n of notesById.get(r.entityId) ?? []) {
-            for (const name of [n.note.id, n.note.title, ...(n.note.aliases ?? [])]) {
-              const k = normalizeName(name);
-              if (k) keys.add(k);
-            }
+    const regionShips = new Map<string, boolean>();
+    for (const r of map.regions ?? []) {
+      let v = regionOwn.get(r)!;
+      if (v.ships && areaHiddenBy(r.points, hidingHere).length > 0) v = IN_HIDDEN;
+      regionShips.set(r.id, (regionShips.get(r.id) ?? true) && v.ships);
+      regions.push({ id: r.id, map: map.id, ...v });
+      if (!v.ships && r.entityId !== undefined && noteIdShips(r.entityId)) {
+        const keys = regionExempt.get(regionKey(map.id, r.id)) ?? new Set<string>();
+        for (const n of notesById.get(r.entityId) ?? []) {
+          for (const name of [n.note.id, n.note.title, ...(n.note.aliases ?? [])]) {
+            const k = normalizeName(name);
+            if (k) keys.add(k);
           }
-          regionExempt.set(regionKey(map.id, r.id), keys);
         }
-      }
-
-      for (const route of map.routes ?? []) {
-        let v: Verdict;
-        if (!onMap) v = { ships: false, reason: "map-hidden" };
-        else if (!shipsIn(route.visibility, campaignId)) v = { ships: false, reason: "visibility" };
-        else {
-          const points: Point[] = [];
-          let waypointHidden = false;
-          for (const w of route.waypoints ?? []) {
-            if (Array.isArray(w)) {
-              points.push(w as Point);
-              continue;
-            }
-            const entityId = isRecord(w) ? w.entityId : undefined;
-            const index = (map.pins ?? []).findIndex((p) => p.note === entityId);
-            if (index < 0 || !pinShips[index]) {
-              waypointHidden = true;
-              break;
-            }
-            const pin = map.pins![index];
-            points.push([pin.x, pin.y]);
-          }
-          if (waypointHidden) v = { ships: false, reason: "waypoint-hidden" };
-          else if (points.length < 2) v = { ships: false, reason: "no-geometry" };
-          else if (pathUnderFog(points, fog)) v = { ships: false, reason: "fogged" };
-          else v = { ships: true, reason: "ships" };
-        }
-        routes.push({ id: route.id, map: map.id, ...v });
-      }
-
-      for (const area of map.sound ?? []) {
-        let v: Verdict;
-        if (!onMap) v = { ships: false, reason: "map-hidden" };
-        else if (area.regionId !== undefined) {
-          v = regionShips.get(area.regionId) === true ? { ships: true, reason: "ships" } : { ships: false, reason: "region-hidden" };
-        } else if (!shipsIn(area.visibility, campaignId)) v = { ships: false, reason: "visibility" };
-        else if (!area.points || area.points.length === 0) v = { ships: false, reason: "no-geometry" };
-        else if (areaUnderFog(area.points, fog)) v = { ships: false, reason: "fogged" };
-        else v = { ships: true, reason: "ships" };
-        sound.push({ id: area.id, map: map.id, ...v });
+        regionExempt.set(regionKey(map.id, r.id), keys);
       }
     }
+
+    for (const route of map.routes ?? []) {
+      let v: Verdict;
+      if (!onMap) v = { ships: false, reason: "map-hidden" };
+      else if (!shipsIn(route.visibility, campaignId)) v = { ships: false, reason: "visibility" };
+      else {
+        const points: Point[] = [];
+        let waypointHidden = false;
+        for (const w of route.waypoints ?? []) {
+          if (Array.isArray(w)) {
+            points.push(w as Point);
+            continue;
+          }
+          const entityId = isRecord(w) ? w.entityId : undefined;
+          const index = (map.pins ?? []).findIndex((p) => p.note === entityId);
+          if (index < 0 || !pinShips[index]) {
+            waypointHidden = true;
+            break;
+          }
+          const pin = map.pins![index];
+          points.push([pin.x, pin.y]);
+        }
+        if (waypointHidden) v = { ships: false, reason: "waypoint-hidden" };
+        else if (points.length < 2) v = { ships: false, reason: "no-geometry" };
+        else if (pathUnderFog(points, fog)) v = { ships: false, reason: "fogged" };
+        else if (pathHiddenBy(points, hidingHere).length > 0) v = IN_HIDDEN;
+        else v = { ships: true, reason: "ships" };
+      }
+      routes.push({ id: route.id, map: map.id, ...v });
+    }
+
+    for (const area of map.sound ?? []) {
+      let v: Verdict;
+      if (!onMap) v = { ships: false, reason: "map-hidden" };
+      else if (area.regionId !== undefined) {
+        v = regionShips.get(area.regionId) === true ? { ships: true, reason: "ships" } : { ships: false, reason: "region-hidden" };
+      } else if (!shipsIn(area.visibility, campaignId)) v = { ships: false, reason: "visibility" };
+      else if (!area.points || area.points.length === 0) v = { ships: false, reason: "no-geometry" };
+      else if (areaUnderFog(area.points, fog)) v = { ships: false, reason: "fogged" };
+      else if (areaHiddenBy(area.points, hidingHere).length > 0) v = IN_HIDDEN;
+      else v = { ships: true, reason: "ships" };
+      sound.push({ id: area.id, map: map.id, ...v });
+    }
+  }
+
+  // A shipped note none of whose pins ships, with at least one hidden by rule 9:
+  // the DM is told which region hid it (the note itself still ships, rule 6).
+  const hiddenPinNotes: HiddenPinNote[] = [];
+  for (const [note, seen] of pinsByNote) {
+    if (seen.anyShips || seen.hiddenBy.length === 0 || !noteIdShips(note)) continue;
+    const regions = seen.hiddenBy.filter(
+      (h, i, all) => all.findIndex((o) => o.map === h.map && o.region === h.region) === i,
+    );
+    hiddenPinNotes.push({ note, regions });
   }
 
   // --- Must-not-ship and collisions (rule 8) --------------------------------
@@ -869,6 +1055,8 @@ export function resolveCampaign(
     collisions,
     staleEntries,
     orphanEntries,
+    badHidingRegions,
+    hiddenPinNotes,
     warnings,
   };
 }

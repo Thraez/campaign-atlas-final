@@ -64,6 +64,8 @@ const rect = (x0: number, y0: number, x1: number, y1: number) => [
 const LIT = rect(10, 10, 100, 100);
 /** Two corners in the lit half, two under fog. */
 const HALF_FOGGED = rect(400, 10, 600, 100);
+/** In the lit half, clear of every lit item (a dm region hides what it overlaps, rule 9). */
+const DM_SPOT = rect(200, 600, 300, 700);
 
 /** One 1000 x 1000 map whose fog reveals only its left half (x < 500). */
 function foggedWorld(extra: Record<string, unknown> = {}, sound: unknown[] = []) {
@@ -99,7 +101,8 @@ describe("player build: fog decided by the resolver", () => {
       regions: [
         { id: "lit-region", mapId: "m1", name: "Lit", visibility: "player", points: LIT },
         { id: "fog-region", mapId: "m1", name: "Foggy", visibility: "player", points: HALF_FOGGED },
-        { id: "dm-region", mapId: "m1", name: "Secret", visibility: "dm", points: LIT },
+        // Lit, but apart from every lit item: rule 9 would hide what it overlaps.
+        { id: "dm-region", mapId: "m1", name: "Secret", visibility: "dm", points: DM_SPOT },
       ],
       routes: [
         {
