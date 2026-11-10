@@ -76,7 +76,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { loadAtlasModel } from "./atlas/loadAtlasModel";
+import { loadAtlasModel, type LoadAtlasModelConfig } from "./atlas/loadAtlasModel";
 import { listTextFiles, type ArtifactLayout } from "./atlas/playerArtifact";
 import { readPlayerImageRefs } from "./atlas/playerImageRefs";
 import { STORE_DIR, readMustNotShip, type MustNotShipFile } from "./atlas/build/campaignStore";
@@ -536,12 +536,8 @@ export function siteAssetFindings(siteAtlasDir: string, storeDir: string): strin
 // Run
 // ---------------------------------------------------------------------------
 
-interface Config {
-  contentRoot: string;
-  defaultWorld: string;
-  include: string[];
-  exclude: string[];
-}
+/** `atlas.config.json`, passed to the loader as is: v2 content picks no world from it. */
+type Config = LoadAtlasModelConfig & { contentRoot: string };
 
 export interface RunOpts {
   /** The campaign's store (`<outputDir>/<id>/atlas`) or built site (`dist-campaigns/<id>`). */
@@ -572,11 +568,7 @@ interface Content {
 function loadContent(configPath: string): Content {
   const cfg = JSON.parse(fs.readFileSync(configPath, "utf8")) as Config;
   const root = path.dirname(configPath);
-  const loaded = loadAtlasModel(
-    path.resolve(root, cfg.contentRoot),
-    { defaultWorld: cfg.defaultWorld, include: cfg.include, exclude: cfg.exclude },
-    { root },
-  );
+  const loaded = loadAtlasModel(path.resolve(root, cfg.contentRoot), cfg, { root });
   if (loaded.model.schemaVersion !== 2) {
     throw new Error("the content is v1: campaign isolation is checked on v2 outputs only");
   }

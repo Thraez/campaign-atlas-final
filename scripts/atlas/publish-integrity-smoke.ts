@@ -525,7 +525,6 @@ function variantIsolation(
       JSON.stringify({
         contentRoot: "content",
         outputDir: ".atlas-campaigns",
-        defaultWorld: "vale",
         include: ["**/*.md"],
         exclude: [],
       }),
