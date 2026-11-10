@@ -1,6 +1,6 @@
 # R-20 Migration script and down-migration, dry run only
 
-Status: ready-for-agent
+Status: done
 Blocked by: R-17, R-18
 Size: S-M
 Branch: `rebuild-r20-migrate-v2`

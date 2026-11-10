@@ -198,6 +198,24 @@ Installs dependencies. Run it on a fresh clone and after `package.json` or the l
 
 A production build **with** the editor. Rarely needed; never publish it.
 
+### `npm run atlas:migrate-v2`
+
+Migrates the content root from schema v1 to v2 (ADR-0003), **into a separate folder**. Never
+writes to the content root: until the cutover ticket, real migration is the DM's call.
+
+- No flags (or `--dry-run`): prints what it would write and writes nothing.
+- `-- --out <dir>`: runs the check below first and, only if it passes, writes the migrated tree to
+  `<dir>`. The folder must be new or empty, outside the content root and the vault (the saved `vaultPath`, which must be absolute, and any folder with `.obsidian/` in or above it). v2 input is
+  left as is.
+- `-- --allow-drop-pin-style`: drop a shipping pin's `label` and pin style, which v2 pins can't
+  carry. Without it the migration refuses such a pin, because players would see the change.
+- `-- --check`: migrates into a temp folder and builds both: the v1 player output of the original
+  against the v2 player output of the copy (campaign `main`), the DM builds (the copy must hold
+  every item), and a v1 -> v2 -> v1 round trip. It prints any difference and fails on one.
+- `-- --down --out <dir>`: v2 back to v1, refusing what v1 can't say (several campaigns, a child
+  map, a `notes:` block, a campaign other than `main`, an image or sound missing from `public/`).
+  It checks first that the v1 copy shows players what the v2 original shows campaign `main`.
+
 ### `npm run build:dev`
 
 A Vite build in development mode, for debugging the build.

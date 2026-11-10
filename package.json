@@ -29,6 +29,7 @@
     "test:shard": "tsx scripts/dev/run-sharded-tests.ts --shard",
     "test:changed": "tsx scripts/dev/run-sharded-tests.ts --changed",
     "atlas:build": "tsx scripts/build-atlas.ts",
+    "atlas:migrate-v2": "tsx scripts/atlas/migrate-v2.ts",
     "atlas:build:player": "tsx scripts/build-atlas.ts --player --strict",
     "atlas:sync": "tsx scripts/atlas-sync.ts",
     "atlas:snapshot": "tsx scripts/atlas/snapshot-baseline.ts",

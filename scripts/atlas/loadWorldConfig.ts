@@ -138,6 +138,9 @@ interface WorldYaml {
   assetCredits?: unknown;
 }
 
+/** The fog colour a v1 map gets when its world.yaml names none. */
+export const DEFAULT_FOG_COLOR = "rgba(8, 12, 20, 0.55)";
+
 export interface WorldConfig {
   maps: MapDocument[];
   regions: Region[];
@@ -406,7 +409,7 @@ export function loadWorldConfig(
       {
         mapId: f.mapId,
         enabled: f.enabled !== false,
-        color: f.color ?? "rgba(8, 12, 20, 0.55)",
+        color: f.color ?? DEFAULT_FOG_COLOR,
         reveals,
         // Only when present, so a world without fog shapes builds as before.
         ...(conceals.length > 0 ? { conceals } : {}),

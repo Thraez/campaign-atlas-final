@@ -15,7 +15,7 @@ ticket merges on `npm run gate` plus an Opus review; a push or merge needs Isak'
 |---|---|---|---|
 | 0 Guard and quick wins | R-01 Sync guard, scans on real artifacts, Q-01..Q-04 | Links that work, a fitted map, the menu above the map, a region card. **Safe stop** | done |
 | 1 Spine and PRs | The other PRs, R-02..R-06, ADR-0001 addendum, ADR-0002 | A publish log with every scan reading `dist`; `docs/GOALS.md` agreed | done |
-| 2 Schema v2 and campaigns in the pipeline | R-10..R-20, ADR-0003, ADR-0004 | `npm run atlas:tree` on the v2 test world, per campaign; today's site unchanged | in progress (R-10, R-11a, R-11b, R-11c, R-11d, R-12, R-15, R-16, R-07b, R-13, R-11e, R-14, R-17, R-07, R-17b, R-18, R-19 done; R-20 next) |
+| 2 Schema v2 and campaigns in the pipeline | R-10..R-20, ADR-0003, ADR-0004 | `npm run atlas:tree` on the v2 test world, per campaign; today's site unchanged | done (R-10, R-11a, R-11b, R-11c, R-11d, R-12, R-15, R-16, R-07b, R-13, R-11e, R-14, R-17, R-07, R-17b, R-18, R-19, R-20 done) |
 | 3 Shared canvas | Ocean/frame/map-tree component; viewer on it; campaign links | Ocean > continent > city > back on the local test world. **Safe stop** | - |
 | 4 Editor core | Router, command store, E0-E5, Place pin, E9, Draw route with distance/time; v2 test world only; ADR-0005, ADR-0006 | Add a map inside a map, pin it, draw a route, reload | - |
 | 5 Story | Region card and story panel, monument strip, people and Inside lists, route labels, deep links, Browse, Timeline, Credits, Landing on v2 | Read a region, a person, a monument; follow three links | - |
@@ -68,7 +68,7 @@ Follow-up noted in its ticket: no scan derives DM region/route ids, so none woul
 | R-17b | Structural campaign isolation scan (done) | R-17 |
 | R-18 | Fog baked per campaign; fog scan source-driven (done) | R-17, R-17b |
 | R-19 | Publish runs every campaign (done) | R-17, R-17b |
-| R-20 | Migration script and down-migration, dry run only | R-17, R-18 |
+| R-20 | Migration script and down-migration, dry run only (done) | R-17, R-18 |
 
 Tickets R-10..R-20 (with R-11d and R-17b) are written, with ADR-0003 (schema v2: ocean, map tree, campaign files) and
 ADR-0004 (per-campaign resolver and outputs), both `proposed`. Isak accepted every
@@ -110,7 +110,19 @@ content once R-19 wires publish to v2. R-18 (done): fog is baked into each campa
 fails colour under fog. R-19 (done): `atlas:publish` builds and scans every campaign's site in
 `dist-campaigns/<id>` (isolation, fog, site identity per campaign); a failure partway leaves earlier
 sites built but unscanned, so a deploy must depend on publish's exit code (see the R-19 ticket, "For H-01").
-Next: R-20.
+R-20 (done): `npm run atlas:migrate-v2` plans v1 -> v2 (dry run by default; `--check` compares
+player, DM and round-trip output; `--out` writes a fresh copy only after the check passes, never into
+the content root or an Obsidian vault). The real migration of `content/` is Isak's call.
+
+For Isak (decide before the cutover):
+- H-01: the deploy must depend on `atlas:publish`'s exit code (a failure partway leaves earlier
+  campaign sites built but unscanned; R-19 ticket, "For H-01").
+- Running the real migration of `content/` (and later the vault).
+- Pin `label` and pin style have no v2 field: the migration refuses a shipping pin that has one
+  unless `--allow-drop-pin-style`. Today's content has none. Keep them in v2, or drop them?
+- A map with no scale is refused, not given one; the ocean places maps side by side; assets are
+  copied in place and move at the cutover.
+- Deleting the old `.atlas-campaigns/`.
 Since R-17b, each `must-not-ship.json` `pinLocations` entry carries `note` (the dropped pin's
 note), and the isolation scan flags only that note at that spot.
 
