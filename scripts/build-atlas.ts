@@ -546,36 +546,59 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // are read with the editor's parser: `Bob: 12345` is key "12345"; entries
   // that aren't a name and a key are left out, so their secrets take the
   // missing-key warning in the encrypt pass. Warnings name files, never keys.
-  const charKeys = new Map<string, string>();
+  // Keys are per world (R-13): a note's secrets use its own world's file only.
+  const charKeysByWorld = new Map<string, Map<string, string>>();
+  // Key-file warnings name a world's path: a player build hides those of a
+  // world that doesn't ship (checked once the campaign is resolved).
+  const keyFileWarnings: { line: string; worlds: string[] }[] = [];
   const configRel = (p: string) => path.relative(path.dirname(configPath), p).replace(/\\/g, "/");
   const keysPaths = sources.map((w) => characterKeysPath(contentDir, w.id));
-  for (const keysPath of keysPaths) {
-    if (!fs.existsSync(keysPath)) continue;
+  sources.forEach((w, i) => {
+    const keysPath = keysPaths[i]!;
+    if (!fs.existsSync(keysPath)) return;
     let text: string | null = null;
     try {
       text = fs.readFileSync(keysPath, "utf8");
     } catch {
-      warnings.push(`${configRel(keysPath)}: couldn't be read — character secrets skipped`);
+      const line = `${configRel(keysPath)}: couldn't be read — character secrets skipped`;
+      warnings.push(line);
+      keyFileWarnings.push({ line, worlds: [w.id] });
     }
     if (text !== null) {
       const parsed = parseCharacterKeys(text);
       if (parsed.ok) {
-        for (const { name, key } of parsed.entries) charKeys.set(name, key);
+        const keys = new Map<string, string>();
+        for (const { name, key } of parsed.entries) keys.set(name, key);
+        charKeysByWorld.set(w.id, keys);
       } else {
         // `brief`, not `error`: the parser's reason can quote a key, and
         // warnings ship in the player build report.
-        warnings.push(`${configRel(keysPath)}: ${parsed.brief} — character secrets skipped`);
+        const line = `${configRel(keysPath)}: ${parsed.brief} — character secrets skipped`;
+        warnings.push(line);
+        keyFileWarnings.push({ line, worlds: [w.id] });
       }
     }
+  });
+  // A name keyed in two worlds is two characters: each world's secrets use
+  // its own key. Said DM-side, since it names the character.
+  const keyedIn = new Map<string, string[]>();
+  for (const [world, keys] of charKeysByWorld) {
+    for (const name of keys.keys()) keyedIn.set(name, [...(keyedIn.get(name) ?? []), world]);
+  }
+  for (const [name, worlds] of keyedIn) {
+    if (worlds.length < 2) continue;
+    const line = `character key "${name}" is set in worlds ${worlds.map((x) => `"${x}"`).join(", ")} — each world's secrets use its own key`;
+    warnings.push(line);
+    hiddenFromPlayer.add(line);
   }
   // The build once read `<contentRoot>/_dm/character-keys.yaml`, which the
   // editor never wrote. A file left there is not read: say so, so the DM
   // moves its keys rather than wondering why secrets are skipped.
   const legacyKeysPath = path.join(contentDir, "_dm", "character-keys.yaml");
   if (fs.existsSync(legacyKeysPath)) {
-    warnings.push(
-      `${configRel(legacyKeysPath)} is ignored: character keys belong in ${keysPaths.map(configRel).join(" or ")} (where the editor's Character Keys panel saves them)`,
-    );
+    const line = `${configRel(legacyKeysPath)} is ignored: character keys belong in ${keysPaths.map(configRel).join(" or ")} (where the editor's Character Keys panel saves them)`;
+    warnings.push(line);
+    keyFileWarnings.push({ line, worlds: sources.map((w) => w.id) });
   }
   let strippedDmBlocks = 0;
   let detectedDmBlocks = 0;
@@ -842,6 +865,11 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   const worldShips = (id: string) =>
     !res || res.resolution.worlds.some((v) => v.id === id && v.ships);
   const shippedWorlds = sources.filter((w) => worldShips(w.id));
+  if (flags.player) {
+    for (const k of keyFileWarnings) {
+      if (!k.worlds.every(worldShips)) hiddenFromPlayer.add(k.line);
+    }
+  }
   const campaignFile = bm.campaign ? model.campaigns.find((c) => c.id === bm.campaign) : undefined;
 
   let maps: MapDocument[] = [];
@@ -1315,7 +1343,11 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   for (const { entity } of pending) {
     const specs = secretSpecsByEntity.get(entity.id);
     if (!specs || specs.length === 0) continue;
-    const { secrets, warnings: secWarn } = await buildEntitySecrets(entity.id, specs, charKeys);
+    const { secrets, warnings: secWarn } = await buildEntitySecrets(
+      entity.id,
+      specs,
+      charKeysByWorld.get(entity.world ?? "") ?? new Map<string, string>(),
+    );
     if (secrets.length > 0) entity.secrets = secrets;
     for (const w of secWarn) warnings.push(w);
   }

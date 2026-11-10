@@ -13,12 +13,15 @@
  * - A note that says `player` but ships to no campaign warns, DM-side only.
  * - An `atlas.world` that disagrees with the note's folder warns; the folder wins.
  * - R-11c: sound-area ids are checked on every world's maps.
+ * - Character keys are per world; v2 world.yaml, model and hidden worlds'
+ *   key-file warnings stay out of the player report.
  */
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildAtlas } from "../../../scripts/build-atlas";
+import { decryptSecret, type SecretBlob } from "@/atlas/secrets/secretCrypto";
 
 const ROOT = path.resolve(__dirname, "../../..");
 const tmps: string[] = [];
@@ -39,6 +42,13 @@ function testWorld(): { root: string; edit: (rel: string, from: string, to: stri
     fs.writeFileSync(file, text.replace(from, to));
   };
   return { root, edit };
+}
+
+/** Writes a file under the temp root's content folder. */
+function put(root: string, rel: string, body: string) {
+  const file = path.join(root, "content-next", rel);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, body);
 }
 
 const player = (campaign: string) => ({ player: true, strict: true, campaign });
@@ -172,5 +182,67 @@ describe("R-13: every world and the map tree", () => {
     const { report } = await buildAtlas(root, player("main"));
     expect(report.soundAreaIdProblems.join("\n")).toContain('map "skerrow-isles"');
     expect(report.failure?.exitCode).toBe(22);
+  });
+
+  it("character keys are per world: each world's secrets use its own key", async () => {
+    const { root, edit } = testWorld();
+    put(root, "quessaly/_dm/character-keys.yaml", "Bob: quessaly-bob-key\n");
+    put(root, "skerrow/_dm/character-keys.yaml", "Bob: skerrow-bob-key\n");
+    const secret = (id: string, reveal: string) =>
+      `atlas:\n  secrets:\n    - id: ${id}\n      for: Bob\n      reveal: ${reveal}\n`;
+    edit("quessaly/npcs/gilda-moth.md", "atlas:\n", secret("q-bob", "quessaly reveal"));
+    edit("skerrow/npcs/the-tide-warden.md", "atlas:\n", secret("s-bob", "skerrow reveal"));
+    const { project, report } = await buildAtlas(root, player("main"));
+    expect(report.failure).toBeUndefined();
+    const blob = (entity: string, id: string) =>
+      project.entities.find((e) => e.id === entity)?.secrets?.find((s) => s.id === id) as
+        SecretBlob | undefined;
+    const q = blob("gilda-moth", "q-bob");
+    const s = blob("the-tide-warden", "s-bob");
+    expect(await decryptSecret(q!, "quessaly-bob-key")).toBe("quessaly reveal");
+    expect(await decryptSecret(s!, "skerrow-bob-key")).toBe("skerrow reveal");
+    await expect(decryptSecret(q!, "skerrow-bob-key")).resolves.toBeNull();
+    await expect(decryptSecret(s!, "quessaly-bob-key")).resolves.toBeNull();
+    const line = report.warnings.find((w) => w.includes('character key "Bob"'));
+    expect(line).toContain('"quessaly", "skerrow"');
+    expect(project.buildReport?.warnings ?? []).not.toContain(line);
+  });
+
+  it("v2 world.yaml and model warnings stay out of the player report", async () => {
+    const { root, edit } = testWorld();
+    edit(
+      "skerrow/_atlas/world.yaml",
+      "        visibility: player\n",
+      "        visibility: bogus\n",
+    );
+    edit("_atlas/campaigns/main.yaml", "notes: vault\n", "");
+    const { project, report } = await buildAtlas(root, player("main"));
+    const shippedWarnings = project.buildReport?.warnings ?? [];
+    expect(report.warnings.some((w) => w.includes("skerrow/_atlas/world.yaml"))).toBe(true);
+    expect(report.warnings.some((w) => w.includes("campaigns/main.yaml"))).toBe(true);
+    expect(shippedWarnings).toHaveLength(1);
+    expect(shippedWarnings[0]).toMatch(/world\.yaml warnings? hidden in the player build/);
+    const text = shippedWarnings.join("\n");
+    for (const leak of ["world.yaml:", "main.yaml", "gannet-rock", "skerrow", "bogus"]) {
+      expect(text, leak).not.toContain(leak);
+    }
+  });
+
+  it("key-file warnings of a hidden world stay out of the player report", async () => {
+    const { root } = testWorld();
+    put(root, "skerrow/_dm/character-keys.yaml", "Bob: [unclosed\n");
+    put(root, "_dm/character-keys.yaml", "Bob: legacy\n");
+    const sandbox = await buildAtlas(root, player("sandbox"));
+    expect(sandbox.report.failure).toBeUndefined();
+    const dmSide = sandbox.report.warnings.join("\n");
+    expect(dmSide).toContain("skerrow/_dm/character-keys.yaml: it isn't valid YAML");
+    expect(dmSide).toContain("_dm/character-keys.yaml is ignored");
+    expect(JSON.stringify(sandbox.project)).not.toContain("character-keys");
+    expect(shipped(sandbox)).not.toContain("skerrow");
+    // main ships both worlds, so its player report still names the files.
+    const main = await buildAtlas(root, player("main"));
+    expect((main.project.buildReport?.warnings ?? []).join("\n")).toContain(
+      "skerrow/_dm/character-keys.yaml",
+    );
   });
 });
