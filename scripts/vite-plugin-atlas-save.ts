@@ -88,7 +88,8 @@ import {
 } from "./atlas/buildLock";
 import { DEV_API_PATHS, DEV_API_PREFIX } from "./atlas/devRoutes";
 import { syncWritesAllowed } from "./atlas/hosting";
-import { readRepoSyncMapFile } from "./atlas/syncMapFile";
+import { readRepoSyncMapFile, saveWorldSyncMap } from "./atlas/syncMapFile";
+import type { SyncMap } from "../src/atlas/import/syncMap";
 import {
   isVaultNote,
   readSyncMapSignals,
@@ -1778,7 +1779,7 @@ export const DEV_ROUTES: readonly DevRoute[] = [
 
   // GET /__atlas/local/sync-map.json — .local-atlas/sync-map.json as the
   // per-world file (R-14): a missing map is empty, an old flat map reads as
-  // atlas.config.json `defaultWorld`'s. A corrupt map is 500, never "empty",
+  // v1 world named in atlas.config.json. A corrupt map is 500, never "empty",
   // so the editor can't overwrite it.
   {
     method: "GET",
@@ -1790,6 +1791,31 @@ export const DEV_ROUTES: readonly DevRoute[] = [
         return { status: 200, json: await readRepoSyncMapFile(root) };
       } catch (e) {
         return { status: 500, json: { error: "SyncMapUnreadable", detail: (e as Error).message } };
+      }
+    },
+  },
+
+  // POST /__atlas/local/sync-map/world { worldId, map } — replaces one world's
+  // map and keeps the others, merged here under a lock (R-14), so two saves
+  // for different worlds both land.
+  {
+    method: "POST",
+    path: DEV_API_PATHS.localSyncMapWorld,
+    takesBuildLock: false,
+    body: { maxBytes: LOCAL_WRITE_BODY_LIMIT_BYTES },
+    handle: async ({ body, root }) => {
+      const b = body as { worldId?: unknown; map?: unknown };
+      if (typeof b.worldId !== "string" || !b.worldId) {
+        return { status: 400, json: { error: "BadRequest", detail: "worldId is required" } };
+      }
+      if (typeof b.map !== "object" || b.map === null || Array.isArray(b.map)) {
+        return { status: 400, json: { error: "BadRequest", detail: "map must be an object" } };
+      }
+      try {
+        await saveWorldSyncMap(root, b.worldId, b.map as SyncMap);
+        return { status: 200, json: { ok: true } };
+      } catch (e) {
+        return { status: 500, json: { error: "SyncMapWriteFailed", detail: (e as Error).message } };
       }
     },
   },

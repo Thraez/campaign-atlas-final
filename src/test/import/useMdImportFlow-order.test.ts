@@ -7,7 +7,7 @@ import { renderHook, act } from "@testing-library/react";
 import { toast } from "sonner";
 import { useMdImportFlow } from "@/atlas/import/useMdImportFlow";
 import { hashContent, saveAtlasPatchToLocalFs } from "@/atlas/save/localFsSave";
-import { loadSyncMapFile, saveSyncMapFile } from "@/atlas/sync/useSyncSettings";
+import { loadSyncMapFile, saveWorldSyncMap } from "@/atlas/sync/useSyncSettings";
 import type { SyncMap, SyncMapFile } from "@/atlas/import/syncMap";
 import type { ImportFolderConfig } from "@/atlas/content/schema";
 
@@ -23,7 +23,7 @@ vi.mock("@/atlas/save/localFsSave", async (importOriginal) => {
 
 vi.mock("@/atlas/sync/useSyncSettings", () => ({
   loadSyncMapFile: vi.fn(() => Promise.resolve({ version: 2, worlds: {} })),
-  saveSyncMapFile: vi.fn(() => Promise.resolve()),
+  saveWorldSyncMap: vi.fn(() => Promise.resolve()),
   loadSettings: vi.fn(() => Promise.resolve({})),
   saveSettings: vi.fn(() => Promise.resolve()),
 }));
@@ -95,7 +95,8 @@ describe("Sync commit order (code-retro 03)", () => {
       expect.stringMatching(/rebuild failed/),
       expect.anything(),
     );
-    const saved = (vi.mocked(saveSyncMapFile).mock.calls.at(-1)?.[0] as SyncMapFile).worlds.w;
+    const [savedWorld, saved] = vi.mocked(saveWorldSyncMap).mock.calls.at(-1) as [string, SyncMap];
+    expect(savedWorld).toBe("w");
     expect(saved["03_Entities/corven.md"]).toMatchObject({ id: "corven" });
   });
 
@@ -142,8 +143,8 @@ describe("Sync commit order (code-retro 03)", () => {
       },
     };
     vi.mocked(loadSyncMapFile).mockImplementation(async () => file);
-    vi.mocked(saveSyncMapFile).mockImplementation(async (f: SyncMapFile) => {
-      file = f;
+    vi.mocked(saveWorldSyncMap).mockImplementation(async (worldId: string, map: SyncMap) => {
+      file = { ...file, worlds: { ...file.worlds, [worldId]: map } };
     });
     const stored = (): SyncMap => file.worlds.w;
     fakeServer({ files: { "03_Entities/People/corven.md": NOTE } });
@@ -180,6 +181,6 @@ describe("Sync commit order (code-retro 03)", () => {
     await act(async () => {
       await result.current.openWithVaultScan("/vault", [], ["03_Entities"], "w");
     });
-    expect(saveSyncMapFile).not.toHaveBeenCalled();
+    expect(saveWorldSyncMap).not.toHaveBeenCalled();
   });
 });

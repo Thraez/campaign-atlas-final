@@ -107,6 +107,8 @@ export interface SyncMapFile {
   version: 2;
   /** World id → that world's sync map. */
   worlds: Record<string, SyncMap>;
+  /** Top-level fields a newer writer added: kept as they are. */
+  [field: string]: unknown;
 }
 
 export const EMPTY_SYNC_MAP_FILE: SyncMapFile = { version: 2, worlds: {} };
@@ -122,31 +124,56 @@ export class SyncMapFormatError extends Error {
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
-function isSyncMapFileShape(raw: Record<string, unknown>): boolean {
-  return raw.version === 2 && isRecord(raw.worlds);
+/**
+ * The world an old flat map reads as: `defaultWorld` from a parsed
+ * `atlas.config.json`, or null when it has none.
+ */
+export function legacySyncMapWorld(atlasConfig: unknown): string | null {
+  const v = isRecord(atlasConfig) ? atlasConfig.defaultWorld : undefined;
+  return typeof v === "string" && v ? v : null;
+}
+
+/** World ids that would collide with an object's own machinery. */
+const RESERVED_WORLD_IDS = new Set(["__proto__", "constructor", "prototype"]);
+
+function assertWorldId(worldId: string): void {
+  if (!worldId || RESERVED_WORLD_IDS.has(worldId)) {
+    throw new SyncMapFormatError(`sync-map.json: "${worldId}" can't be a world id`);
+  }
 }
 
 /**
  * A parsed sync-map file as `SyncMapFile`. A pre-R-14 map (no `version`)
  * becomes `legacyWorldId`'s map; with `legacyWorldId` null, a non-empty old
  * map throws, since nothing says which world it belongs to. Missing (null or
- * undefined) reads as empty.
+ * undefined) reads as empty. Top-level fields other than `version` and
+ * `worlds` are kept, so a newer writer's fields survive a write from here.
+ * Throws `SyncMapFormatError` on anything else: an unknown version, a
+ * `worlds` that isn't an object, or a reserved world id.
  */
 export function readSyncMapFile(raw: unknown, legacyWorldId: string | null): SyncMapFile {
   if (raw === null || raw === undefined) return { version: 2, worlds: {} };
   if (!isRecord(raw)) throw new SyncMapFormatError("sync-map.json is not a JSON object");
-  if (isSyncMapFileShape(raw)) {
+  if ("version" in raw) {
+    if (raw.version !== 2) {
+      throw new SyncMapFormatError(`sync-map.json has an unknown version ${String(raw.version)}`);
+    }
+    if (!isRecord(raw.worlds)) {
+      throw new SyncMapFormatError("sync-map.json: `worlds` is not an object");
+    }
     const worlds: Record<string, SyncMap> = {};
-    for (const [worldId, map] of Object.entries(raw.worlds as Record<string, unknown>)) {
+    for (const [worldId, map] of Object.entries(raw.worlds)) {
+      assertWorldId(worldId);
       if (!isRecord(map)) {
         throw new SyncMapFormatError(`sync-map.json: world "${worldId}" is not an object`);
       }
       worlds[worldId] = { ...(map as SyncMap) };
     }
-    return { version: 2, worlds };
-  }
-  if ("version" in raw) {
-    throw new SyncMapFormatError(`sync-map.json has an unknown version ${String(raw.version)}`);
+    const extra: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(raw)) {
+      if (k !== "version" && k !== "worlds" && !RESERVED_WORLD_IDS.has(k)) extra[k] = v;
+    }
+    return { ...extra, version: 2, worlds };
   }
   if (Object.keys(raw).length === 0) return { version: 2, worlds: {} };
   if (!legacyWorldId) {
@@ -154,31 +181,36 @@ export function readSyncMapFile(raw: unknown, legacyWorldId: string | null): Syn
       "sync-map.json predates worlds (R-14) and no default world is known to read it as",
     );
   }
+  assertWorldId(legacyWorldId);
   return { version: 2, worlds: { [legacyWorldId]: { ...(raw as SyncMap) } } };
 }
 
 /** One world's sync map (empty when the world has none yet). */
 export function worldSyncMap(file: SyncMapFile, worldId: string): SyncMap {
-  return { ...(file.worlds[worldId] ?? {}) };
+  assertWorldId(worldId);
+  return Object.prototype.hasOwnProperty.call(file.worlds, worldId)
+    ? { ...file.worlds[worldId] }
+    : {};
 }
 
-/** The file with one world's map replaced; every other world is kept as it was. */
+/** The file with one world's map replaced; every other world and top-level field is kept. */
 export function withWorldSyncMap(file: SyncMapFile, worldId: string, map: SyncMap): SyncMapFile {
-  return { version: 2, worlds: { ...file.worlds, [worldId]: { ...map } } };
+  assertWorldId(worldId);
+  return { ...file, version: 2, worlds: { ...file.worlds, [worldId]: { ...map } } };
 }
 
 /**
  * Every entry in a parsed sync-map file of either shape, whatever its world.
  * For the R-01 vault-content signals, which must see every world's entries.
+ * Validates as `readSyncMapFile` does, so a file Sync can't read (an unknown
+ * version, a malformed `worlds`) throws `SyncMapFormatError` here too rather
+ * than giving the guard no ids.
  */
 export function allSyncMapEntries(raw: unknown): SyncMapEntry[] {
-  if (!isRecord(raw)) return [];
-  const maps: unknown[] = isSyncMapFileShape(raw)
-    ? Object.values(raw.worlds as Record<string, unknown>)
-    : [raw];
+  // The world an old flat map belongs to doesn't matter here: every entry counts.
+  const file = readSyncMapFile(raw, "legacy");
   const out: SyncMapEntry[] = [];
-  for (const map of maps) {
-    if (!isRecord(map)) continue;
+  for (const map of Object.values(file.worlds)) {
     for (const entry of Object.values(map)) {
       if (isRecord(entry)) out.push(entry as unknown as SyncMapEntry);
     }

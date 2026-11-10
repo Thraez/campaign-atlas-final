@@ -14,7 +14,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { readNote } from "../../src/atlas/content/readNote";
-import { allSyncMapEntries } from "../../src/atlas/import/syncMap";
+import { allSyncMapEntries, SyncMapFormatError } from "../../src/atlas/import/syncMap";
 import { hasVaultSourceMarker } from "../../src/atlas/import/vaultSourceMarker";
 
 export interface SyncMapSignals {
@@ -42,7 +42,15 @@ export function readSyncMapSignals(repoRoot: string): SyncMapSignals {
       `.local-atlas/sync-map.json is not valid JSON (${(e as Error).message})`,
     );
   }
-  for (const entry of allSyncMapEntries(map)) {
+  let entries: ReturnType<typeof allSyncMapEntries>;
+  try {
+    entries = allSyncMapEntries(map);
+  } catch (e) {
+    // A map Sync itself can't read gives the guard no ids: refuse, never pass.
+    if (!(e instanceof SyncMapFormatError)) throw e;
+    throw new SyncMapUnreadableError(`.local-atlas/sync-map.json can't be read: ${e.message}`);
+  }
+  for (const entry of entries) {
     if (typeof entry?.id === "string" && entry.id) ids.add(entry.id);
     if (typeof entry?.syncedFileHash === "string") hashes.add(entry.syncedFileHash);
   }

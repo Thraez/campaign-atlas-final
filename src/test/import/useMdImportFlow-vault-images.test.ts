@@ -33,7 +33,7 @@ vi.mock("@/atlas/save/localFsSave", async (importOriginal) => {
 
 vi.mock("@/atlas/sync/useSyncSettings", () => ({
   loadSyncMapFile: vi.fn(() => Promise.resolve({ version: 2, worlds: {} })),
-  saveSyncMapFile: vi.fn(() => Promise.resolve()),
+  saveWorldSyncMap: vi.fn(() => Promise.resolve()),
   loadSettings: vi.fn(() => Promise.resolve({})),
   saveSettings: vi.fn(() => Promise.resolve()),
 }));

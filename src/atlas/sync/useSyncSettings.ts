@@ -1,4 +1,4 @@
-import { readSyncMapFile, type SyncMapFile } from "@/atlas/import/syncMap";
+import { readSyncMapFile, type SyncMap, type SyncMapFile } from "@/atlas/import/syncMap";
 
 export interface SyncSettings {
   vaultPath?: string;
@@ -57,9 +57,10 @@ export async function loadSyncMapFile(): Promise<SyncMapFile> {
   return readSyncMapFile(await resp.json(), null);
 }
 
-export async function saveSyncMapFile(file: SyncMapFile): Promise<void> {
-  await postJson("/__atlas/local-write", {
-    name: "sync-map.json",
-    contents: JSON.stringify(file, null, 2),
-  });
+/**
+ * Saves one world's sync map. The dev server merges it into the file under a
+ * lock, keeping every other world, so saves for two worlds never lose one.
+ */
+export async function saveWorldSyncMap(worldId: string, map: SyncMap): Promise<void> {
+  await postJson("/__atlas/local/sync-map/world", { worldId, map });
 }

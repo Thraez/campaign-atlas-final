@@ -5,8 +5,8 @@
 import { ImportCommitError } from "@/atlas/import/buildImportChanges";
 import { isWritableSourcePath } from "@/atlas/save/sourcePathAllowlist";
 import { saveAtlasPatchToLocalFs } from "@/atlas/save/localFsSave";
-import { withWorldSyncMap, worldSyncMap } from "@/atlas/import/syncMap";
-import { loadSettings, loadSyncMapFile, saveSettings, saveSyncMapFile } from "./useSyncSettings";
+import { worldSyncMap } from "@/atlas/import/syncMap";
+import { loadSettings, loadSyncMapFile, saveSettings, saveWorldSyncMap } from "./useSyncSettings";
 import { HOSTING_PUBLIC_ERROR, HostingPublicError } from "./hosting";
 import { VaultScanError, type VaultImageCopyResult, type VaultPort } from "./vaultPort";
 
@@ -83,9 +83,8 @@ export function createDevEndpointPort(
     writeAtlasFiles: (changes, opts) =>
       saveAtlasPatchToLocalFs(changes, { fetchFn }, { rebuild: true, origin: opts?.origin }),
     loadSyncMap: async (worldId) => worldSyncMap(await loadSyncMapFile(), worldId),
-    // Read the file again just before writing, so every other world's map is kept.
-    saveSyncMap: async (worldId, map) =>
-      saveSyncMapFile(withWorldSyncMap(await loadSyncMapFile(), worldId, map)),
+    // The dev server merges this world into the file under a lock (R-14).
+    saveSyncMap: (worldId, map) => saveWorldSyncMap(worldId, map),
     async markSynced(at) {
       const s = await loadSettings();
       await saveSettings({ ...s, lastSyncAt: at });

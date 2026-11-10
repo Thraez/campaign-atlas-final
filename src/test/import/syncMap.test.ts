@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  legacySyncMapWorld,
   classifyVaultNote,
   recordSync,
   findPathByApprovedHash,
@@ -121,5 +122,43 @@ describe("sync-map file, one map per world (R-14)", () => {
     const other = { ...entry, id: "mara" };
     const v2 = { version: 2, worlds: { a: { "A.md": entry }, b: { "B.md": other } } };
     expect(allSyncMapEntries(v2)).toEqual([entry, other]);
+  });
+
+  it("says when `worlds` isn't an object", () => {
+    expect(() => readSyncMapFile({ version: 2, worlds: [] }, "a")).toThrow(
+      /`worlds` is not an object/,
+    );
+  });
+
+  it("keeps unknown top-level fields through a write", () => {
+    const file = readSyncMapFile({ version: 2, worlds: {}, writtenBy: "later" }, null);
+    expect(withWorldSyncMap(file, "a", {})).toEqual({
+      version: 2,
+      worlds: { a: {} },
+      writtenBy: "later",
+    });
+  });
+
+  it("refuses reserved world ids instead of dropping them", () => {
+    const raw: unknown = JSON.parse('{"version":2,"worlds":{"__proto__":{}}}');
+    expect(() => readSyncMapFile(raw, null)).toThrow(/can't be a world id/);
+    const empty = readSyncMapFile(null, null);
+    expect(() => withWorldSyncMap(empty, "constructor", {})).toThrow(SyncMapFormatError);
+    expect(() => worldSyncMap(empty, "prototype")).toThrow(SyncMapFormatError);
+  });
+
+  it("lists entries only from a file Sync can read", () => {
+    expect(allSyncMapEntries(null)).toEqual([]);
+    expect(() => allSyncMapEntries({ version: 3, worlds: {} })).toThrow(SyncMapFormatError);
+    expect(() => allSyncMapEntries({ version: 2, worlds: [] })).toThrow(SyncMapFormatError);
+    expect(() => allSyncMapEntries([entry])).toThrow(SyncMapFormatError);
+  });
+
+  it("an old flat map reads as the config's v1 world, or none", () => {
+    expect(legacySyncMapWorld({ defaultWorld: "astrath" })).toBe("astrath");
+    expect(legacySyncMapWorld({ defaultWorld: "" })).toBeNull();
+    expect(legacySyncMapWorld({ defaultWorld: 3 })).toBeNull();
+    expect(legacySyncMapWorld(null)).toBeNull();
+    expect(legacySyncMapWorld(["astrath"])).toBeNull();
   });
 });
