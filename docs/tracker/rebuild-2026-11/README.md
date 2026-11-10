@@ -40,7 +40,7 @@ player output per campaign). Both are `accepted` (2026-11-08), with Isak's answe
 | 5 | [R-14 Sync targets any world (done)](issues/R-14-sync-any-world.md) | S-M | R-13 | if visibility |
 | 6 | [R-17b Structural campaign isolation scan](issues/R-17b-campaign-isolation-scan.md) (done) | S-M | R-17 | yes |
 | 7 | [R-18 Fog per campaign, source-driven fog scan](issues/R-18-fog-per-campaign.md) (done) | M | R-17, R-17b | yes |
-| 7 | [R-19 Publish runs every campaign](issues/R-19-publish-every-campaign.md) | S | R-17, R-17b | yes |
+| 7 | [R-19 Publish runs every campaign](issues/R-19-publish-every-campaign.md) (done) | S | R-17, R-17b | yes |
 | 8 | [R-20 Migration and down-migration, dry run](issues/R-20-migration-dry-run.md) | S-M | R-17, R-18 | yes |
 
 Same order number = can run side by side (one `npm run gate` at a time on the Mac). Blockers that
@@ -53,7 +53,7 @@ R-17b are new (split out of R-11a and R-17 in review).
 
 - **Done 2026-11-08:** Isak accepted every "Open for Isak" recommendation in ADR-0003 and ADR-0004
   and the three fail-closed rules.
-- **Done:** R-11c (merged), R-07b, R-13, R-11e, R-14, R-17, R-07, R-17b, R-18. **Now:** R-19. **Then:** R-20.
+- **Done:** R-11c (merged), R-07b, R-13, R-11e, R-14, R-17, R-07, R-17b, R-18, R-19. **Now:** R-20.
 
 Phase 3 and 4 tickets are written before phase 2 ends (plan.md section 5). Phase H (H-01..H-04)
 starts after R-19 at the earliest and before the first real Sync (`tidemarrow/01`).

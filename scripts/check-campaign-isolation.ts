@@ -33,7 +33,11 @@
  *     search-index id is an atlas entity;
  *   - the must-not-ship file equals the set resolved from the content
  *     (`mustNotShipDiff`; a stale or edited file can't vouch for the
- *     output), and both JSON files parse.
+ *     output), and both JSON files parse;
+ *   - a built site names only its own campaign: `index.html`'s title,
+ *     description, apple, og and twitter tags and the manifest's name,
+ *     short_name and description are what the site build writes for this
+ *     campaign's name (`siteIdentityFindings`).
  *
  * Text (exit 24), over every text file of the output (`listTextFiles`: the
  * store, or the whole built site with Vite's bundle): the must-not-ship ids
@@ -80,6 +84,7 @@ import { loadAtlasModel, type LoadAtlasModelConfig } from "./atlas/loadAtlasMode
 import { listTextFiles, type ArtifactLayout } from "./atlas/playerArtifact";
 import { readPlayerImageRefs } from "./atlas/playerImageRefs";
 import { STORE_DIR, readMustNotShip, type MustNotShipFile } from "./atlas/build/campaignStore";
+import { siteIdentityFindings } from "./atlas/campaignSiteBranding";
 import {
   findSecretsInText,
   foreignCampaignRefs,
@@ -701,6 +706,7 @@ export function run(opts: RunOpts): number {
   if ("atlas.json" in parsed && "search-index.json" in parsed) {
     structural.push(...indexFindings(parsed["atlas.json"], parsed["search-index.json"]));
   }
+  if (layout === "built-site") structural.push(...siteIdentityFindings(dir, campaign.name));
 
   // Text.
   const { text: secrets, structuralOnly } = isolationSecrets(m);

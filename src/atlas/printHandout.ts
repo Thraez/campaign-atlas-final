@@ -12,6 +12,10 @@ import type { AssetCredit, CreditsConfig, Entity } from "./content/schema";
 import { playerTypeLabel } from "./content/typeLabel";
 import { normalizeAtlasAssetUrl } from "./url";
 import { resolveImageCredit } from "./content/imageCredit";
+import { sanitizeAtlasHtml } from "./sanitizeHtml";
+
+/** Names the handout when the caller gives no site name; never a world's own name. */
+const DEFAULT_SITE_NAME = "Atlas";
 
 const EMPTY_ENTITIES: Map<string, Entity> = new Map();
 
@@ -97,6 +101,7 @@ function renderEntitySection(
   scope: number,
   assetCredits: Record<string, AssetCredit> | undefined,
   showCredits: boolean,
+  siteName: string,
 ): string {
   const creditFor = (src: string): string | null =>
     showCredits ? resolveImageCredit(src, assetCredits, entity.credit) : null;
@@ -113,12 +118,13 @@ function renderEntitySection(
     ? `<p class="aliases">Also known as ${escapeHtml(entity.aliases.join(", "))}</p>`
     : "";
   const summary = entity.summary ? `<p class="summary">${escapeHtml(entity.summary)}</p>` : "";
-  // entity.bodyHtml is sanitized server-side at build time and contains
-  // <a class="atlas-wikilink"> tokens; render as-is for the handout, except
-  // for footnote ids/hrefs, which are scoped per entity to avoid collisions
-  // when this section is concatenated into a multi-entity bundle.
+  // entity.bodyHtml is sanitized at build time; it is sanitized again here
+  // (defense in depth, as the viewer does before rendering) because the
+  // handout is written straight into a window with document.write. Footnote
+  // ids/hrefs are then scoped per entity to avoid collisions when this
+  // section is concatenated into a multi-entity bundle.
   const body = entity.bodyHtml
-    ? scopeFootnoteIds(entity.bodyHtml, scope)
+    ? scopeFootnoteIds(sanitizeAtlasHtml(entity.bodyHtml), scope)
     : `<p>${escapeHtml(entity.body || "")}</p>`;
   const cls = withPageBreak ? "handout page-break" : "handout";
   const connectionsHtml = entity.relationships?.length
@@ -159,7 +165,7 @@ function renderEntitySection(
     ${connectionsHtml}
     ${tagsHtml}
     <footer class="handout-foot">
-      <span>Astrath Atlas — player handout</span>
+      <span>${escapeHtml(siteName)} — player handout</span>
       <span>${new Date().toLocaleDateString()}</span>
     </footer>
   </article>`;
@@ -171,13 +177,14 @@ export function buildHandoutHtml(
   entitiesById: Map<string, Entity> = EMPTY_ENTITIES,
   assetCredits?: Record<string, AssetCredit>,
   credits?: CreditsConfig,
+  siteName: string = DEFAULT_SITE_NAME,
 ): string {
   const docTitle =
     entities.length === 0
       ? "Atlas handout"
       : entities.length === 1
-        ? `${entities[0].title} — Astrath Atlas handout`
-        : `${entities.length} entities — Astrath Atlas handout bundle`;
+        ? `${entities[0].title} — ${siteName} handout`
+        : `${entities.length} entities — ${siteName} handout bundle`;
 
   const showCredits = credits?.badges !== false;
 
@@ -193,6 +200,7 @@ export function buildHandoutHtml(
               i,
               assetCredits,
               showCredits,
+              siteName,
             ),
           )
           .join("\n");
@@ -230,11 +238,14 @@ export function buildHandoutHtml(
 }
 
 function openPrintWindow(html: string): boolean {
-  const w = window.open("", "_blank", "noopener,noreferrer,width=900,height=1100");
+  // No "noopener" here: with it, window.open returns null by spec, so the
+  // handout could never be written. The opener is cut by hand instead.
+  const w = window.open("", "_blank", "width=900,height=1100");
   if (!w) {
     toast.error("Pop-ups are blocked. Please allow pop-ups for this site to download the handout.");
     return false;
   }
+  w.opener = null;
   w.document.open();
   w.document.write(html);
   w.document.close();
@@ -246,8 +257,9 @@ export function printEntityHandout(
   entitiesById: Map<string, Entity> = EMPTY_ENTITIES,
   assetCredits?: Record<string, AssetCredit>,
   credits?: CreditsConfig,
+  siteName?: string,
 ): boolean {
-  return openPrintWindow(buildHandoutHtml([entity], entitiesById, assetCredits, credits));
+  return openPrintWindow(buildHandoutHtml([entity], entitiesById, assetCredits, credits, siteName));
 }
 
 /** Print a bundle of entities as a single PDF, one entity per page. */
@@ -255,6 +267,9 @@ export function printEntityBundle(
   entities: Entity[],
   assetCredits?: Record<string, AssetCredit>,
   credits?: CreditsConfig,
+  siteName?: string,
 ): boolean {
-  return openPrintWindow(buildHandoutHtml(entities, EMPTY_ENTITIES, assetCredits, credits));
+  return openPrintWindow(
+    buildHandoutHtml(entities, EMPTY_ENTITIES, assetCredits, credits, siteName),
+  );
 }

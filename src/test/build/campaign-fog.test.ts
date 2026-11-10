@@ -363,6 +363,47 @@ describe("R-18: fog baked per campaign", () => {
       save(atlas);
       expect(await scan(dir)).toBe(15);
     });
+
+    it("the legacy pair (no campaign) says so in one plain line, and fog maps are still 17", async () => {
+      const run = async (dir: string) => {
+        silence();
+        const code = await checkFogSafety({
+          dir,
+          config: config(),
+          layout: "store",
+          publish: true,
+        });
+        const calls = [console.log, console.warn, console.error].flatMap(
+          (fn) => vi.mocked(fn).mock.calls,
+        );
+        vi.restoreAllMocks();
+        return { code, calls };
+      };
+      // The legacy pair's store names no campaign.
+      const legacy = (label: string, change: (a: Atlas) => void = () => {}) => {
+        const c = copyOfSandbox(label);
+        delete (c.atlas as { campaign?: unknown }).campaign;
+        change(c.atlas);
+        c.save(c.atlas);
+        return c.dir;
+      };
+      const fogged = await run(legacy("legacy-fogged"));
+      expect(fogged.code).toBe(17);
+      const args = fogged.calls.flat();
+      expect(args.some((a) => a instanceof Error)).toBe(false);
+      expect(args.map(String).join("\n")).not.toMatch(/\n\s+at /);
+      expect(args.map(String).join("\n")).toMatch(
+        /legacy pair: no campaign, fog campaign checks skipped/,
+      );
+
+      const open = await run(
+        legacy("legacy-open", (atlas) => {
+          for (const m of atlas.maps) delete m.fog;
+        }),
+      );
+      expect(open.code).toBe(0);
+      expect(open.calls.flat().some((a) => a instanceof Error)).toBe(false);
+    });
   });
 });
 

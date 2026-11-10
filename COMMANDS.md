@@ -44,13 +44,29 @@ outside the editor.
 
 Exit 0 means it's safe to commit and push. Anything else: don't ship.
 
+### `npm run atlas:publish:next` (the v2 test world, local only)
+
+The same command with `-- --config atlas.next.config.json`: publishes every campaign of
+`content-next/`. No workflow runs it and nothing it writes is deployed. In order:
+
+1. `atlas:build:player` with that config: each campaign's store in `.atlas-campaigns/<id>/atlas/`.
+2. `build`: `dist/` as above (the scans still read it while the deploy uploads it).
+3. Per campaign: a public dir holding the app's static files and that campaign's store only,
+   built by Vite (player mode) into `dist-campaigns/<id>/`. Nothing of `public/atlas/` or of
+   another campaign goes in.
+4. `atlas:scan -- --config atlas.next.config.json`: every scan on every campaign's store and
+   site, the campaign-isolation scan included, plus `dist/` and `public/atlas/`.
+
+Any campaign whose build or scan fails fails the whole publish.
+
 ### `npm run atlas:build:player` · Windows: `bin/atlas-build-player.cmd`
 
 Step 2 alone. Use it to see in `public/atlas/atlas.json` exactly what players get.
 
 ### `npm run atlas:scan`
 
-Step 4 alone: runs every scan below at once on what's already built.
+Step 4 alone: runs every scan below at once on what's already built. `-- --config
+atlas.next.config.json` scans the test world's campaigns.
 
 ### `npm run atlas:tree`
 
@@ -93,7 +109,8 @@ Serves `dist/` locally, to see what GitHub Pages will serve. Run it after `build
 ### `npm run atlas:publish:integrity-smoke`
 
 Checks the scans themselves: feeds each one a planted leak and confirms it still fails. Run it
-after changing a scan or the publish chain.
+after changing a scan or the publish chain. `-- --config atlas.next.config.json` (after
+`atlas:publish:next`) also runs each pair on a copy of every campaign's store and site.
 
 ---
 

@@ -11,6 +11,12 @@ import {
 import { atlasSavePlugin } from "./scripts/vite-plugin-atlas-save";
 import { prunePlayerAudioPlugin } from "./scripts/vite-plugin-prune-player-audio";
 import { prunePlayerFilesPlugin } from "./scripts/vite-plugin-prune-player-files";
+import { sitePublicDir } from "./scripts/atlas/campaignSitePublicDir";
+import {
+  brandIndexHtml,
+  brandManifest,
+  campaignSiteName,
+} from "./scripts/atlas/campaignSiteBranding";
 import {
   ATLAS_ASSETS_CACHE,
   ATLAS_DATA_CACHE,
@@ -26,12 +32,20 @@ export default defineConfig(({ mode }) => {
   // the editor entirely (see src/App.tsx).
   const includeEditor =
     mode === "development" || mode === "editor" || process.env.INCLUDE_EDITOR === "true";
+  const publicDir = sitePublicDir(process.env, includeEditor);
+  // A campaign site's own name (R-19): from its staged store, null for v1 and
+  // the editor. It replaces the v1 world's name in index.html and the manifest.
+  const siteName = campaignSiteName(process.env);
 
   return {
     // For GitHub Pages project sites, set ATLAS_BASE=/<repo>/ at build time.
     // Defaults to "/" for local dev and Lovable preview.
     base: process.env.ATLAS_BASE || "/",
     define: { __INCLUDE_EDITOR__: JSON.stringify(includeEditor) },
+    // public/, or a campaign site's staged public dir (R-19, atlas:publish with a
+    // v2 config): the app's static files and that campaign's store only. Refused
+    // in an editor build. See scripts/atlas/campaignSitePublicDir.ts.
+    publicDir,
     server: {
       // Loopback by default. The dev server mounts /__atlas/* — file reads and
       // writes, vault scans, character keys, and publish-to-main. Binding every
@@ -53,6 +67,13 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       mode === "development" && componentTagger(),
+      siteName && {
+        name: "atlas-campaign-site-name",
+        transformIndexHtml: {
+          order: "pre" as const,
+          handler: (html: string) => brandIndexHtml(html, siteName),
+        },
+      },
       // Dev-only middleware that writes allowlisted source files to disk.
       // Auto-disabled in build modes via apply: "serve".
       atlasSavePlugin(),
@@ -70,9 +91,13 @@ export default defineConfig(({ mode }) => {
           "robots.txt",
         ],
         manifest: {
-          name: "AstrathDeeprealm Atlas",
-          short_name: "Astrath Atlas",
-          description: "Interactive fantasy world atlas for AstrathDeeprealm.",
+          ...(siteName
+            ? brandManifest(siteName)
+            : {
+                name: "AstrathDeeprealm Atlas",
+                short_name: "Astrath Atlas",
+                description: "Interactive fantasy world atlas for AstrathDeeprealm.",
+              }),
           start_url: "./atlas",
           scope: "./",
           display: "standalone",
