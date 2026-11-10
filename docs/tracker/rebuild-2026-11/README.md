@@ -31,7 +31,7 @@ player output per campaign). Both are `accepted` (2026-11-08), with Isak's answe
 | 3 | [R-11b Build calls the resolver](issues/R-11b-build-calls-resolver.md) (+ arch-02) (done) | S | R-11a, R-12 | yes |
 | 3 | [R-11c Old Publish Check calls the resolver (done)](issues/R-11c-publish-check-calls-resolver.md) | S | R-11a, R-12 | yes |
 | 3 | [R-11d Link redaction from wikilink tokens (done)](issues/R-11d-link-redaction-from-tokens.md) (+ arch-08 redaction) | S | R-11a | yes |
-| 3 | [R-11e A hidden region hides what is inside or reaching into it](issues/R-11e-region-containment.md) | S-M | R-11a | yes |
+| 3 | [R-11e A hidden region hides what is inside or reaching into it (done)](issues/R-11e-region-containment.md) | S-M | R-11a | yes |
 | 3 | [R-15 Scan registry lists campaign dirs (done)](issues/R-15-scan-registry-campaign-dirs.md) | S | R-12 | yes |
 | 3 | [R-16 Three-level test world, two campaigns (done)](issues/R-16-test-world-two-campaigns.md) | S | R-12, R-11a | light |
 | 4 | [R-07b Fog shapes (conceals) dropped by the loader (done)](issues/R-07b-fog-conceals-dropped.md) | S | - | yes |
@@ -53,7 +53,7 @@ R-17b are new (split out of R-11a and R-17 in review).
 
 - **Done 2026-11-08:** Isak accepted every "Open for Isak" recommendation in ADR-0003 and ADR-0004
   and the three fail-closed rules.
-- **Done:** R-11c (merged), R-07b, R-13. **Now:** R-11e. **Then:** R-17 (after R-11e) and R-14; R-17b; R-18 and R-19; R-20. R-07 before the first real Sync.
+- **Done:** R-11c (merged), R-07b, R-13, R-11e, R-14. **Now:** R-17. **Then:** R-17b; R-18 and R-19; R-20. R-07 before the first real Sync.
 
 Phase 3 and 4 tickets are written before phase 2 ends (plan.md section 5). Phase H (H-01..H-04)
 starts after R-19 at the earliest and before the first real Sync (`tidemarrow/01`).

@@ -1,7 +1,8 @@
 /**
  * `npm run atlas:tree` (R-16): for each campaign, the ocean and the map tree,
  * with each map's verdict and state, and per map how many pins, regions,
- * routes and sound areas ship (of how many). Read-only: it loads the content
+ * routes and sound areas ship (of how many) and, on a map that ships, which
+ * items don't and why (rule 9's `in-hidden-region` among them). Read-only: it loads the content
  * root with R-12's loader (`loadAtlasModel`) and asks R-11a's resolver
  * (`resolveCampaign`) per campaign; it decides nothing itself.
  *
@@ -19,6 +20,7 @@ import path from "node:path";
 import { formatIssue, type LoadedAtlasContent } from "../../src/atlas/content/atlasModel";
 import {
   resolveCampaign,
+  type CampaignResolution,
   type ItemVerdict,
   type PinVerdict,
   type ShipReason,
@@ -48,7 +50,18 @@ export interface TreeMap {
   /** Where a top-level map sits on the ocean; absent for child maps and v1. */
   onOcean?: OceanPlacementV2;
   counts: { pins: ItemCount; regions: ItemCount; routes: ItemCount; sound: ItemCount };
+  /**
+   * On a map that ships, each item that doesn't and its reason (a pin by its
+   * note's id). Empty on a hidden map: everything on it is hidden with it.
+   */
+  hidden: HiddenItem[];
   children: TreeMap[];
+}
+
+export interface HiddenItem {
+  kind: "pin" | "region" | "route" | "sound";
+  id: string;
+  reason: ShipReason;
 }
 
 export interface TreeWorld {
@@ -69,6 +82,21 @@ export interface CampaignTree {
   worlds: TreeWorld[];
   /** Ids of the notes that ship, in load order, and how many notes there are. */
   notes: { ships: string[]; total: number };
+}
+
+function hiddenOn(
+  r: Pick<CampaignResolution, "pins" | "regions" | "routes" | "sound">,
+  map: string,
+): HiddenItem[] {
+  const out: HiddenItem[] = [];
+  for (const p of r.pins)
+    if (p.map === map && !p.ships) out.push({ kind: "pin", id: p.note, reason: p.reason });
+  for (const kind of ["region", "route", "sound"] as const) {
+    const list = kind === "region" ? r.regions : kind === "route" ? r.routes : r.sound;
+    for (const x of list)
+      if (x.map === map && !x.ships) out.push({ kind, id: x.id, reason: x.reason });
+  }
+  return out;
 }
 
 function count(list: readonly (ItemVerdict | PinVerdict)[], map: string): ItemCount {
@@ -104,6 +132,7 @@ export function atlasTree(content: Pick<LoadedAtlasContent, "model" | "notes">):
             routes: count(r.routes, id),
             sound: count(r.sound, id),
           },
+          hidden: v.ships ? hiddenOn(r, id) : [],
           children: world.maps
             .filter((m) => m.parent === id && m.id !== id && !visited.has(m.id))
             .map((m) => build(m.id)),
@@ -156,6 +185,10 @@ export function formatAtlasTree(trees: readonly CampaignTree[]): string {
           `${"  ".repeat(depth)}${m.id} "${m.name}"${at}: ${verdict(m)}, ${m.state}` +
             ` | pins ${n(c.pins)}, regions ${n(c.regions)}, routes ${n(c.routes)}, sound ${n(c.sound)}`,
         );
+        if (m.hidden.length > 0) {
+          const list = m.hidden.map((h) => `${h.kind} ${h.id} (${h.reason})`).join(", ");
+          out.push(`${"  ".repeat(depth + 1)}hidden: ${list}`);
+        }
         for (const child of m.children) walk(child, depth + 1);
       };
       for (const m of w.maps) walk(m, 2);

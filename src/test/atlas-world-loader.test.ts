@@ -554,6 +554,28 @@ routes:
     expect(cfg.warnings.filter((w) => w.includes("rt-missing"))).toHaveLength(0);
   });
 
+  it("a repeated region id is dropped and listed once, with its visibility as written", () => {
+    writeWorldYaml(`
+maps:
+  - id: m1
+    name: Main
+    regions:
+      - id: r-dup
+        name: First
+        visibility: player
+        points: [[0,0],[10,0],[10,10]]
+      - id: r-dup
+        name: Second
+        visibility: dm
+        points: [[0,0],[10,0]]
+`);
+    const cfg = loadWorldConfig(tmpRoot, WORLD)!;
+    expect(cfg.regions.map((r) => r.name)).toEqual(["First"]);
+    expect(cfg.droppedRegions).toEqual([
+      { mapId: "m1", id: "r-dup", visibility: "dm", why: "duplicate id" },
+    ]);
+  });
+
   it("region with fewer than 3 points warns and is dropped", () => {
     writeWorldYaml(`
 maps:
@@ -572,6 +594,10 @@ regions:
     const cfg = loadWorldConfig(tmpRoot, WORLD)!;
     expect(cfg.regions.map((r) => r.id)).toEqual(["r-ok"]);
     expect(cfg.warnings.some((w) => w.includes("fewer than 3 points"))).toBe(true);
+    // Listed, so the player build can fail on it (ADR-0004 rule 9).
+    expect(cfg.droppedRegions).toEqual([
+      { mapId: "m1", id: "r-small", visibility: undefined, why: "fewer than 3 points" },
+    ]);
   });
 
   it("route with invalid mode warns and emits route with undefined mode", () => {

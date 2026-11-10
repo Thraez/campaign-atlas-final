@@ -19,3 +19,7 @@ maps:
     state: open
   hookhaven:
     state: open
+  mirefold:
+    state: open
+  mirefold-cellars:
+    state: open

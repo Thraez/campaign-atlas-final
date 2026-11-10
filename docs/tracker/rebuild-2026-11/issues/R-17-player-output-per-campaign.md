@@ -1,7 +1,7 @@
 # R-17 One player output per campaign: visibility
 
 Status: ready-for-agent
-Blocked by: R-13, R-15, R-16, R-11e (plan.md lists R-15, R-16; it builds on R-13's build stages; R-11e: no per-campaign output ships before containment)
+Blocked by: R-13, R-15, R-16 (plan.md lists R-15, R-16; it builds on R-13's build stages). R-11e (no per-campaign output ships before containment) was a blocker; done 2026-11-10
 Size: M
 Branch: `rebuild-r17-campaign-outputs`
 Needs: the adversarial player-safety review (`docs/agents/workflow.md`, "Done")
