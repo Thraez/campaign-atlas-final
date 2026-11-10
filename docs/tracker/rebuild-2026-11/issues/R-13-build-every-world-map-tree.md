@@ -1,6 +1,6 @@
 # R-13 Build assembles every world and the map tree
 
-Status: ready-for-agent
+Status: done
 Blocked by: R-11b, R-12
 Size: M
 Branch: `rebuild-r13-build-worlds-tree`
@@ -62,3 +62,16 @@ campaign `main` on v1); several campaigns come in R-17.
   (`src/atlas/sync/sync.ts:111`): R-14.
 - Per-campaign outputs and dirs (R-17), per-campaign fog (R-18).
 - The viewer showing the ocean or the tree (phase 3).
+
+## Done
+
+The build reads R-12's model for v1 and v2 in named stages (`scripts/atlas/build/`: load model,
+world sources, notes shipping nowhere) and assembles every shipped world: `worlds`, each map's
+`parent`, `frame` and `enterZoom`, and `ocean` filtered to shipped maps. A note's world is its
+folder; a disagreeing `atlas.world` warns. A hidden world is absent from the output and named in
+must-not-ship. Character keys are per world. World.yaml, model, ships-nowhere and hidden worlds'
+key-file warnings stay DM-side. v1 output is byte-identical apart from `version`/`publishedAt`.
+`scripts/atlas/default-world-allowlist.json` (shrink only) holds the remaining `defaultWorld` /
+`worlds[0]` hits in `scripts/`. Left for later: v2 assets aren't copied into the output (R-17),
+v2 fogged maps ship with no layers until R-18, and v2 DM builds keep per-campaign visibility
+objects as written.

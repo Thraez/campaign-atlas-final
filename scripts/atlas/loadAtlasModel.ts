@@ -46,7 +46,7 @@ import {
   type V2CampaignSource,
   type V2WorldSource,
 } from "../../src/atlas/content/v2Model";
-import { loadWorldConfig, WorldConfigError } from "./loadWorldConfig";
+import { loadWorldConfig, WorldConfigError, type WorldConfig } from "./loadWorldConfig";
 import { parseNoteFields } from "./parseFrontmatter";
 import { readSchemaVersion, SchemaVersionError, type AtlasSchemaVersion } from "./schemaVersion";
 
@@ -69,6 +69,19 @@ export interface LoadAtlasModelConfig {
    */
   include: readonly string[];
   exclude: readonly string[];
+}
+
+/**
+ * What the loader returns to `scripts/`: the model, its warnings and notes, and
+ * for v1 content the world file as `loadWorldConfig` read it (`v1Source`).
+ *
+ * The build assembles v1 maps, regions, routes and fog from `v1Source`, not
+ * from the model: the model is lossy for v1 (fog colour, per-map water, items
+ * v1 never drew but its DM build still lists), and the v1 player and DM
+ * `atlas.json` must not change (R-13). Deleted with the v1 path at retire.
+ */
+export interface LoadedContent extends LoadedAtlasContent {
+  v1Source?: WorldConfig;
 }
 
 export interface LoadAtlasModelOptions {
@@ -244,7 +257,7 @@ export function loadAtlasModel(
   contentRoot: string,
   config: LoadAtlasModelConfig,
   opts: LoadAtlasModelOptions = {},
-): LoadedAtlasContent {
+): LoadedContent {
   const l = new Loader(contentRoot, opts.root ?? process.cwd());
   const atlasDir = path.join(contentRoot, "_atlas");
   const atlasFile = path.join(atlasDir, "atlas.yaml");
@@ -293,7 +306,7 @@ function v1Pins(notes: ReadNotes, warnings: string[]): V1Pin[] {
   return pins;
 }
 
-function loadV1(l: Loader, config: LoadAtlasModelConfig, notes: ReadNotes): LoadedAtlasContent {
+function loadV1(l: Loader, config: LoadAtlasModelConfig, notes: ReadNotes): LoadedContent {
   const campaignsDir = path.join(l.contentRoot, "_atlas", "campaigns");
   if (fs.existsSync(campaignsDir)) {
     l.issue(
@@ -362,6 +375,7 @@ function loadV1(l: Loader, config: LoadAtlasModelConfig, notes: ReadNotes): Load
         ...loaded.warnings.map((w) => `${worldRel}: ${w}`),
       ],
       notes: notes.read.map(({ note }) => ({ world: worldId, file: note.relPath, note })),
+      v1Source: wc ?? undefined,
     };
   } catch (e) {
     if (!(e instanceof V1ModelError)) throw e;

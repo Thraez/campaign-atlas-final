@@ -15,7 +15,7 @@ ticket merges on `npm run gate` plus an Opus review; a push or merge needs Isak'
 |---|---|---|---|
 | 0 Guard and quick wins | R-01 Sync guard, scans on real artifacts, Q-01..Q-04 | Links that work, a fitted map, the menu above the map, a region card. **Safe stop** | done |
 | 1 Spine and PRs | The other PRs, R-02..R-06, ADR-0001 addendum, ADR-0002 | A publish log with every scan reading `dist`; `docs/GOALS.md` agreed | done |
-| 2 Schema v2 and campaigns in the pipeline | R-10..R-20, ADR-0003, ADR-0004 | `npm run atlas:tree` on the v2 test world, per campaign; today's site unchanged | in progress (R-10, R-11a, R-11b, R-11c, R-11d, R-12, R-15, R-16, R-07b done; R-13, R-11e next) |
+| 2 Schema v2 and campaigns in the pipeline | R-10..R-20, ADR-0003, ADR-0004 | `npm run atlas:tree` on the v2 test world, per campaign; today's site unchanged | in progress (R-10, R-11a, R-11b, R-11c, R-11d, R-12, R-15, R-16, R-07b, R-13 done; R-11e next) |
 | 3 Shared canvas | Ocean/frame/map-tree component; viewer on it; campaign links | Ocean > continent > city > back on the local test world. **Safe stop** | - |
 | 4 Editor core | Router, command store, E0-E5, Place pin, E9, Draw route with distance/time; v2 test world only; ADR-0005, ADR-0006 | Add a map inside a map, pin it, draw a route, reload | - |
 | 5 Story | Region card and story panel, monument strip, people and Inside lists, route labels, deep links, Browse, Timeline, Credits, Landing on v2 | Read a region, a person, a monument; follow three links | - |
@@ -60,7 +60,7 @@ Follow-up noted in its ticket: no scan derives DM region/route ids, so none woul
 | R-11e | A hidden region hides what is inside or reaching into it (ADR-0004 rule 9) | R-11a |
 | R-12 | v2 loader and the one v1 adapter (v1 only with no `schemaVersion` or `1`; a mix fails) (done, #124) | R-10 |
 | R-07b | Loader drops fog shapes (conceals) (done) | - |
-| R-13 | Build assembles every world and the map tree | R-11b, R-12 |
+| R-13 | Build assembles every world and the map tree (done) | R-11b, R-12 |
 | R-14 | Sync targets any world | R-13 |
 | R-15 | Scan registry lists campaign dirs (done) | R-03 (done), R-12 |
 | R-16 | Three-level test world, two campaigns (done) (`content-next/`, `npm run atlas:tree`) | R-12, R-11a |
@@ -106,6 +106,11 @@ State.md part is the same stale notes. Drop it once Isak decides the settings ch
 Lowest number first within each folder.
 
 - Rebuild: phase 2 next; Isak decides when it starts (Rebuild queue above).
+- Hidden map and world names in note bodies (e.g. `[[Hookhaven]]` in a note that ships) still ship
+  as text: nothing consumes the build's `report.mustNotShip` yet. For R-17/R-17b (found in R-13).
+- ADR-0004 rule 8 says a name collision fails the player build, but `resolverFailure` fails only
+  strict builds. The publish path is strict; decide whether the ADR wording or the code changes
+  (found in R-13's review).
 - `arch-2026-11/` (architecture pass): ranked tickets 02-09 in its `README.md`. The rebuild folds
   02 (sound areas inside fog ship) into R-11b and 08 into R-11a and R-11d: build them there, not here. 07 merged (#110: an invalid world.yaml visibility loads
   as `dm`).

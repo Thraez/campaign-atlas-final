@@ -6,7 +6,7 @@
  * - A note the resolver refuses (though its frontmatter would ship) is a
  *   secret link target: its name is redacted from other notes' bodies and
  *   scrubbed from the shipped report. In v1 only a duplicate id makes the
- *   resolver refuse a note frontmatter allows, so the test wraps the loader
+ *   resolver refuse a note frontmatter allows, so the test wraps the resolution
  *   to refuse one id.
  * - A region the resolver drops for linking a DM note isn't named in the
  *   shipped report.
@@ -29,8 +29,8 @@ vi.mock("../../../scripts/atlas/playerResolution", async (importOriginal) => {
   const real = await importOriginal<typeof import("../../../scripts/atlas/playerResolution")>();
   return {
     ...real,
-    loadPlayerResolution: (...args: Parameters<typeof real.loadPlayerResolution>) => {
-      const r = real.loadPlayerResolution(...args);
+    playerResolution: (...args: Parameters<typeof real.playerResolution>) => {
+      const r = real.playerResolution(...args);
       return { ...r, noteShips: (id: string) => !refused.has(id) && r.noteShips(id) };
     },
   };

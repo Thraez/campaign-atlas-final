@@ -33,8 +33,7 @@ import {
   projectEntityWithReport,
   type ProjectionReport,
 } from "../src/atlas/content/projectEntityForPlayer";
-import { loadWorldConfig, projectAssetCredits } from "./atlas/loadWorldConfig";
-import { CURRENT_ATLAS_SCHEMA_VERSION } from "./atlas/schemaVersion";
+import { projectAssetCredits } from "./atlas/loadWorldConfig";
 import { sanitizeAtlasHtml } from "../src/atlas/sanitizeHtml";
 import { searchBodyText } from "../src/atlas/search/search";
 import {
@@ -49,13 +48,13 @@ import { characterKeysPath, parseCharacterKeys } from "../src/atlas/secrets/char
 import { PLAYER_VISIBLE_VISIBILITY, linkLeaksToPlayers, linkTargetLabel } from "./atlas/visibility";
 import { redactLayer, FogRedactionError } from "./atlas/redactFogMap";
 import { filterSoundscapeForPlayer } from "./atlas/filterSoundscape";
+import { playerResolution, resolverFailure, type PlayerResolution } from "./atlas/playerResolution";
 import { soundAreaIdProblems, soundAreaIdTrusted } from "../src/atlas/content/soundAreaIds";
-import {
-  loadPlayerResolution,
-  resolverFailure,
-  type PlayerResolution,
-} from "./atlas/playerResolution";
 import { AtlasModelError } from "../src/atlas/content/atlasModel";
+import { resolveCampaign, type MustNotShip } from "../src/atlas/content/resolveCampaign";
+import { BuildStageError, loadBuildModel, type BuildModel } from "./atlas/build/loadBuildModel";
+import { worldSources, type WorldSource } from "./atlas/build/worldSources";
+import { notesShippingNowhere } from "./atlas/build/notesShippingNowhere";
 import {
   applyAudioPlan,
   planAudioAssets,
@@ -199,6 +198,12 @@ export interface BuildFlags {
   strict: boolean;
   outDir?: string;
   configPath?: string;
+  /**
+   * The campaign a player build resolves. Defaults to the content's only
+   * campaign (v1: `main`); content with several needs it (one output per run
+   * until R-17).
+   */
+  campaign?: string;
 }
 
 /**
@@ -226,7 +231,7 @@ export interface BuildResult {
   error?: string;
 }
 
-/** CLI arguments → flags (`--player`, `--strict`, `--out <dir>`, `--config <file>`). */
+/** CLI arguments → flags (`--player`, `--strict`, `--out <dir>`, `--config <file>`, `--campaign <id>`). */
 export function parseFlags(args: string[] = process.argv.slice(2)): BuildFlags {
   const flags: BuildFlags = { player: false, strict: false };
   for (let i = 0; i < args.length; i++) {
@@ -237,6 +242,8 @@ export function parseFlags(args: string[] = process.argv.slice(2)): BuildFlags {
     else if (a.startsWith("--out=")) flags.outDir = a.slice(6);
     else if (a === "--config") flags.configPath = args[++i];
     else if (a.startsWith("--config=")) flags.configPath = a.slice(9);
+    else if (a === "--campaign") flags.campaign = args[++i];
+    else if (a.startsWith("--campaign=")) flags.campaign = a.slice(11);
   }
   return flags;
 }
@@ -304,6 +311,14 @@ export interface BuildAtlasReport {
   nameCollisions: string[];
   /** Player builds: the resolver's orphan `notes:` entries, one line each naming world and key. DM-only. */
   orphanEntries: string[];
+  /**
+   * Player builds: what the campaign's resolution says must never ship (rule
+   * 5's hidden worlds and their notes, hidden notes, maps and pins), for the
+   * output scans. DM-only: never written.
+   */
+  mustNotShip?: MustNotShip;
+  /** Loader notes the build never reported in `warnings` (v1's adapter): console only. */
+  consoleWarnings: string[];
   /** Player builds: sound areas with a missing or shared id on their map, one line each. DM-only. */
   soundAreaIdProblems: string[];
   unresolvedRelationships: number;
@@ -464,6 +479,7 @@ export function formatBuildReport(r: BuildAtlasReport): string {
   log(`Errors:                  ${r.errors.length}`);
   for (const e of r.errors) log(`  ✗ ${e}`);
   for (const w of r.warnings) log(`  ! ${w}`);
+  for (const w of r.consoleWarnings) log(`  · ${w}`);
   // DM-side only: these name sound areas, so they never go in the shipped buildReport.
   for (const l of r.soundAreaIdProblems) log(`  ! sound area dropped: ${l}`);
   for (const a of r.assetErrors) log(`  ${a}`);
@@ -496,16 +512,27 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     excludedPaths: scan.excluded.map((n) => path.resolve(ROOT, n.relPath)),
   };
 
-  // Load world config up-front so entity parsing can resolve dates against
-  // the in-world calendar.
-  let worldCfg: ReturnType<typeof loadWorldConfig> | null = null;
+  // Stage: load model. Every world, v1 or v2, through R-12's loader; the
+  // build never picks a world of its own.
+  let bm: BuildModel;
   try {
-    worldCfg = loadWorldConfig(contentDir, cfg.defaultWorld, ROOT);
+    bm = loadBuildModel(
+      contentDir,
+      { defaultWorld: cfg.defaultWorld, include: cfg.include ?? [], exclude: cfg.exclude ?? [] },
+      ROOT,
+      { player: flags.player, campaign: flags.campaign },
+    );
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error(`\n✗ ${msg}\n`);
-    throw new BuildError(1, msg);
+    if (!(e instanceof AtlasModelError) && !(e instanceof BuildStageError)) throw e;
+    console.error(`\n✗ ${e.message}\n`);
+    throw new BuildError(1, e.message);
   }
+  const { model } = bm;
+  const v2 = model.schemaVersion === 2;
+  const sources: WorldSource[] = worldSources(bm, contentDir, ROOT, bm.campaign);
+  const sourceById = new Map(sources.map((w) => [w.id, w]));
+  // The world of each note: its folder's (v2), the one world (v1).
+  const noteWorld = new Map(bm.notes.map((n) => [n.file, n.world]));
 
   const warnings: string[] = [];
   // Warnings the console log keeps but the player atlas.json must not ship,
@@ -519,35 +546,59 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // are read with the editor's parser: `Bob: 12345` is key "12345"; entries
   // that aren't a name and a key are left out, so their secrets take the
   // missing-key warning in the encrypt pass. Warnings name files, never keys.
-  const charKeys = new Map<string, string>();
+  // Keys are per world (R-13): a note's secrets use its own world's file only.
+  const charKeysByWorld = new Map<string, Map<string, string>>();
+  // Key-file warnings name a world's path: a player build hides those of a
+  // world that doesn't ship (checked once the campaign is resolved).
+  const keyFileWarnings: { line: string; worlds: string[] }[] = [];
   const configRel = (p: string) => path.relative(path.dirname(configPath), p).replace(/\\/g, "/");
-  const keysPath = characterKeysPath(contentDir, cfg.defaultWorld);
-  if (fs.existsSync(keysPath)) {
+  const keysPaths = sources.map((w) => characterKeysPath(contentDir, w.id));
+  sources.forEach((w, i) => {
+    const keysPath = keysPaths[i]!;
+    if (!fs.existsSync(keysPath)) return;
     let text: string | null = null;
     try {
       text = fs.readFileSync(keysPath, "utf8");
     } catch {
-      warnings.push(`${configRel(keysPath)}: couldn't be read — character secrets skipped`);
+      const line = `${configRel(keysPath)}: couldn't be read — character secrets skipped`;
+      warnings.push(line);
+      keyFileWarnings.push({ line, worlds: [w.id] });
     }
     if (text !== null) {
       const parsed = parseCharacterKeys(text);
       if (parsed.ok) {
-        for (const { name, key } of parsed.entries) charKeys.set(name, key);
+        const keys = new Map<string, string>();
+        for (const { name, key } of parsed.entries) keys.set(name, key);
+        charKeysByWorld.set(w.id, keys);
       } else {
         // `brief`, not `error`: the parser's reason can quote a key, and
         // warnings ship in the player build report.
-        warnings.push(`${configRel(keysPath)}: ${parsed.brief} — character secrets skipped`);
+        const line = `${configRel(keysPath)}: ${parsed.brief} — character secrets skipped`;
+        warnings.push(line);
+        keyFileWarnings.push({ line, worlds: [w.id] });
       }
     }
+  });
+  // A name keyed in two worlds is two characters: each world's secrets use
+  // its own key. Said DM-side, since it names the character.
+  const keyedIn = new Map<string, string[]>();
+  for (const [world, keys] of charKeysByWorld) {
+    for (const name of keys.keys()) keyedIn.set(name, [...(keyedIn.get(name) ?? []), world]);
+  }
+  for (const [name, worlds] of keyedIn) {
+    if (worlds.length < 2) continue;
+    const line = `character key "${name}" is set in worlds ${worlds.map((x) => `"${x}"`).join(", ")} — each world's secrets use its own key`;
+    warnings.push(line);
+    hiddenFromPlayer.add(line);
   }
   // The build once read `<contentRoot>/_dm/character-keys.yaml`, which the
   // editor never wrote. A file left there is not read: say so, so the DM
   // moves its keys rather than wondering why secrets are skipped.
   const legacyKeysPath = path.join(contentDir, "_dm", "character-keys.yaml");
   if (fs.existsSync(legacyKeysPath)) {
-    warnings.push(
-      `${configRel(legacyKeysPath)} is ignored: character keys belong in ${configRel(keysPath)} (where the editor's Character Keys panel saves them)`,
-    );
+    const line = `${configRel(legacyKeysPath)} is ignored: character keys belong in ${keysPaths.map(configRel).join(" or ")} (where the editor's Character Keys panel saves them)`;
+    warnings.push(line);
+    keyFileWarnings.push({ line, worlds: sources.map((w) => w.id) });
   }
   let strippedDmBlocks = 0;
   let detectedDmBlocks = 0;
@@ -601,31 +652,30 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     allParsed.push({ rel, parsed, title, id, visibility, isSecret });
   }
 
-  // Player builds ship what the per-campaign resolver (ADR-0004) decides for
-  // campaign `main`, read through R-12's loader and its v1 adapter: notes,
-  // maps, regions, pins, routes and sound below ask it, never a visibility or
-  // fog rule of the build's own. Anything it has no verdict for doesn't ship.
-  // Its collision and orphan findings name DM-only items: the console keeps
-  // them, the shipped report doesn't (R-06).
-  let loaded: PlayerResolution | null = null;
-  if (flags.player) {
-    try {
-      loaded = loadPlayerResolution(
-        contentDir,
-        { defaultWorld: cfg.defaultWorld, include: cfg.include ?? [], exclude: cfg.exclude ?? [] },
-        ROOT,
-      );
-    } catch (e) {
-      if (!(e instanceof AtlasModelError)) throw e;
-      console.error(`\n✗ ${e.message}\n`);
-      throw new BuildError(1, e.message);
-    }
-    for (const w of [...loaded.collisionMessages, ...loaded.orphanMessages]) {
+  // Stage: resolve campaign. Player builds ship what the per-campaign
+  // resolver (ADR-0004) decides for the build's campaign (v1: `main`): worlds,
+  // notes, maps, regions, pins, routes and sound below ask it, never a
+  // visibility or fog rule of the build's own. Anything it has no verdict for
+  // doesn't ship. Its findings name DM-only items: the console keeps them,
+  // the shipped report doesn't (R-06).
+  let res: PlayerResolution | null = null;
+  if (bm.campaign !== null) {
+    res = playerResolution(model, resolveCampaign(model, bm.notes, bm.campaign));
+    const resolverWarnings = v2 ? res.resolution.warnings : [];
+    for (const w of [...res.collisionMessages, ...res.orphanMessages, ...resolverWarnings]) {
       warnings.push(w);
       hiddenFromPlayer.add(w);
     }
   }
-  const res = loaded;
+  // v2: a note whose frontmatter ships but that no campaign ships says why.
+  for (const w of notesShippingNowhere(
+    model,
+    bm.notes,
+    res ? new Map([[res.resolution.campaign, res.resolution]]) : undefined,
+  )) {
+    warnings.push(w);
+    if (flags.player) hiddenFromPlayer.add(w);
+  }
   // In player builds a note is secret when the resolver doesn't ship it (an
   // unknown id included), so link redaction and warning scrubbing below
   // follow the resolver, not frontmatter alone.
@@ -668,6 +718,12 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
       for (const a of p.parsed.atlas.aliases ?? []) secretNames.add(a);
     }
   }
+  // Everything the campaign's resolution says must not ship (a hidden world's
+  // id and name among them) is scrubbed from player warnings too.
+  if (res) {
+    for (const n of res.resolution.mustNotShip.ids) secretNames.add(n);
+    for (const n of res.resolution.mustNotShip.names) secretNames.add(n);
+  }
   const excludedById = new Map(scan.excluded.map((n) => [n.id, n]));
   for (const { id, title, aliases = [] } of excludedNotes) {
     const note = excludedById.get(id)!;
@@ -685,10 +741,18 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
       visibilityExcluded += 1;
       continue;
     }
+    // Entities carry the world of their folder; `atlas.world` can't move one.
+    const world = noteWorld.get(item.rel) ?? "";
+    const written = item.parsed.atlas.world;
+    if (written !== undefined && written !== world) {
+      const w = `${item.rel}: atlas.world "${written}" disagrees with its folder's world "${world}" — the folder wins`;
+      warnings.push(w);
+      hiddenFromPlayer.add(w);
+    }
     const built = buildEntity(item, {
       player: flags.player,
-      defaultWorld: cfg.defaultWorld,
-      calendar: worldCfg?.calendar,
+      world,
+      calendar: sourceById.get(world)?.calendar,
     });
     detectedDmBlocks += built.detectedDmBlocks;
     if (flags.player) strippedDmBlocks += built.detectedDmBlocks;
@@ -780,18 +844,15 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
         .map(([id, title]) => ({ id, title }));
   }
 
-  const worldId = cfg.defaultWorld;
-  const fallbackMapId = `${worldId}-overview`;
-
-  // worldCfg was loaded earlier (so entity dates can resolve against the calendar).
-  // world.yaml warnings name region and route ids, which are slugs of their
-  // names, DM-only ones included (R-06). The player build ships only a count;
-  // the DM build keeps the full text.
-  if (worldCfg) {
-    warnings.push(...worldCfg.warnings);
-    const n = worldCfg.warnings.length;
+  // Stage: assemble maps and items per world.
+  // World files and model warnings name map, region and route ids, which are
+  // slugs of their names, DM-only ones included (R-06), for every world. The
+  // player build ships only a count; the DM build keeps the full text.
+  warnings.push(...bm.worldWarnings);
+  {
+    const n = bm.worldWarnings.length;
     if (flags.player && n > 0) {
-      for (const w of worldCfg.warnings) hiddenFromPlayer.add(w);
+      for (const w of bm.worldWarnings) hiddenFromPlayer.add(w);
       warnings.push(
         `${n} world.yaml warning${n === 1 ? "" : "s"} hidden in the player build; ` +
           "run `npm run atlas:build` (DM build) to see them",
@@ -799,56 +860,36 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     }
   }
 
-  let maps: MapDocument[] = worldCfg?.maps?.length
-    ? worldCfg.maps
-    : [
-        {
-          id: fallbackMapId,
-          worldId,
-          name: "Overview",
-          width: 200000,
-          height: 100000,
-          layers: [],
-          oceanColor: "#18313f",
-          wrapX: true,
-        },
-      ];
-
-  // Soft warning: if the maps assets directory has uploaded image files but
-  // every map has empty layers, the user almost certainly forgot to wire them
-  // into world.yaml. This catches the "uploaded map.jpg but it never shows up"
-  // failure mode.
-  try {
-    const mapsAssetsDir = path.join(ROOT, "public/atlas/assets/maps");
-    const allEmpty = maps.every((m) => !m.layers || m.layers.length === 0);
-    if (allEmpty && fs.existsSync(mapsAssetsDir)) {
-      const imgs = fs
-        .readdirSync(mapsAssetsDir)
-        .filter((f) => /\.(png|jpe?g|webp|gif|svg)$/i.test(f));
-      if (imgs.length > 0) {
-        warnings.push(
-          `world.yaml: every map has layers: [] but ${imgs.length} image file(s) are present in public/atlas/assets/maps/ (${imgs.slice(0, 3).join(", ")}${imgs.length > 3 ? ", …" : ""}). Add a layers: entry referencing them.`,
-        );
-      }
+  // A world ships when the resolver says so (rule 5: a world with no map that
+  // ships ships nothing, not even its name). DM builds keep every world.
+  const worldShips = (id: string) =>
+    !res || res.resolution.worlds.some((v) => v.id === id && v.ships);
+  const shippedWorlds = sources.filter((w) => worldShips(w.id));
+  if (flags.player) {
+    for (const k of keyFileWarnings) {
+      if (!k.worlds.every(worldShips)) hiddenFromPlayer.add(k.line);
     }
-  } catch {
-    /* ignore */
   }
+  const campaignFile = bm.campaign ? model.campaigns.find((c) => c.id === bm.campaign) : undefined;
 
-  let regions: Region[] = worldCfg?.regions ?? [];
-  const fogs: FogOverlay[] = worldCfg?.fogs ?? [];
+  let maps: MapDocument[] = [];
+  const regions: Region[] = [];
+  const fogs: FogOverlay[] = [];
   let regionsExcluded = 0;
-
   // Regions the region-leak check reads: every one in the DM build; in the
   // player build, the ones the resolver refused only for linking a note that
   // doesn't ship, plus the shipped ones (the leak still warns and fails strict).
-  let leakCheckRegions: Region[] = regions;
+  const leakCheckRegions: Region[] = [];
+  // Each world's first top-level map that ships: its `defaultMapId`, and the
+  // map a v1 placement without a `mapId` lands on.
+  const defaultMapIds = new Map<string, string>();
 
-  // Sound-area ids are checked on every map, shipped or not, before hidden
-  // maps go (the Publish Check checks them all too). See the soundscape strip.
+  // Sound-area ids are checked on every map of every world, shipped or not,
+  // before hidden maps go (the Publish Check checks them all too). See the
+  // soundscape strip.
   const soundIdLines: string[] = [];
   if (flags.player) {
-    for (const m of maps) {
+    for (const m of sources.flatMap((w) => w.maps)) {
       for (const p of soundAreaIdProblems(m.soundscape?.areas ?? [])) {
         soundIdLines.push(
           p.kind === "missing-id"
@@ -859,36 +900,90 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     }
   }
 
-  if (res) {
-    // A map the resolver doesn't ship takes everything on it along.
-    maps = maps.filter((m) => res.mapShips(m.id));
-    const verdict = (r: Region) => (r.mapId ? res.regionVerdict(r.mapId, r.id) : undefined);
-    leakCheckRegions = regions.filter((r) => {
-      const reason = verdict(r)?.reason;
-      return reason === "ships" || reason === "link-hidden";
-    });
-    regions = regions
-      .filter((r) => {
-        const v = verdict(r);
-        if (v?.ships) return true;
-        if (v?.reason !== "fogged") regionsExcluded += 1;
-        return false;
-      })
-      // Region names ship to players; strip any %% blocks the DM left behind.
-      .map((r) => ({ ...r, name: stripDmFromShippingString(r.name) ?? r.name }));
-    // Map names ship to players too; sanitize before attaching overlays below.
-    maps = maps.map((m) => ({
-      ...m,
-      name: stripDmFromShippingString(m.name) ?? m.name,
-    }));
-  }
+  for (const w of shippedWorlds) {
+    let wMaps = w.maps;
+    let wRegions = w.regions;
+    let wLeak = w.regions;
+    let wFogs = w.fogs;
 
-  // Default placements to first map if no specific mapId on entity.
-  const primaryMapId = maps[0]?.id ?? fallbackMapId;
+    // v1 soft warning: if the maps assets directory has uploaded image files
+    // but every map has empty layers, the user almost certainly forgot to
+    // wire them into world.yaml ("uploaded map.jpg but it never shows up").
+    if (w.pins === null) {
+      try {
+        const mapsAssetsDir = path.join(w.assetDir, "atlas/assets/maps");
+        const allEmpty = wMaps.every((m) => !m.layers || m.layers.length === 0);
+        if (allEmpty && fs.existsSync(mapsAssetsDir)) {
+          const imgs = fs
+            .readdirSync(mapsAssetsDir)
+            .filter((f) => /\.(png|jpe?g|webp|gif|svg)$/i.test(f));
+          if (imgs.length > 0) {
+            warnings.push(
+              `world.yaml: every map has layers: [] but ${imgs.length} image file(s) are present in public/atlas/assets/maps/ (${imgs.slice(0, 3).join(", ")}${imgs.length > 3 ? ", …" : ""}). Add a layers: entry referencing them.`,
+            );
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (res) {
+      // A map the resolver doesn't ship takes everything on it along.
+      wMaps = wMaps.filter((m) => res.mapShips(m.id));
+      const verdict = (r: Region) => (r.mapId ? res.regionVerdict(r.mapId, r.id) : undefined);
+      wLeak = wRegions.filter((r) => {
+        const reason = verdict(r)?.reason;
+        return reason === "ships" || reason === "link-hidden";
+      });
+      wRegions = wRegions
+        .filter((r) => {
+          const v = verdict(r);
+          if (v?.ships) return true;
+          if (v?.reason !== "fogged") regionsExcluded += 1;
+          return false;
+        })
+        // Region names ship to players; strip any %% blocks the DM left behind.
+        .map((r) => ({ ...r, name: stripDmFromShippingString(r.name) ?? r.name }));
+      // Map names ship to players too; sanitize before attaching overlays below.
+      wMaps = wMaps.map((m) => ({
+        ...m,
+        name: stripDmFromShippingString(m.name) ?? m.name,
+      }));
+      // v2 fogged maps: per-campaign fog is R-18. Until then their imagery
+      // doesn't ship at all (fail closed); only the items the resolver let
+      // through (outside the fog) do.
+      if (w.pins !== null) {
+        wFogs = [];
+        wMaps = wMaps.map((m) => {
+          if (campaignFile?.maps[m.id]?.state !== "fogged") return m;
+          const note = `map "${m.id}": fogged in campaign "${bm.campaign}" — its layers don't ship until per-campaign fog (R-18)`;
+          warnings.push(note);
+          hiddenFromPlayer.add(note);
+          wFogs.push({ mapId: m.id, enabled: true } as FogOverlay);
+          return { ...m, layers: [] };
+        });
+      }
+    } else if (w.pins !== null) {
+      // A v2 DM build has no campaign, so no campaign's fog.
+      wFogs = [];
+    }
+
+    maps.push(...wMaps);
+    regions.push(...wRegions);
+    leakCheckRegions.push(...wLeak);
+    fogs.push(...wFogs);
+    const first = wMaps.find((m) => m.parent === undefined) ?? wMaps.find(() => true);
+    defaultMapIds.set(w.id, first?.id ?? w.fallbackMapId);
+  }
   const validMapIds = new Set(maps.map((m) => m.id));
   const placements: MapPlacement[] = [];
-  for (const item of pending) {
+
+  // v1 placements: note frontmatter, defaulting to the world's first map.
+  for (const item of v2 ? [] : pending) {
     const { entity } = item;
+    const world = entity.world ?? "";
+    const primaryMapId = defaultMapIds.get(world) ?? `${world}-overview`;
     // Build the effective list: explicit placements win; legacy x/y only as fallback.
     const list =
       item.placements.length > 0
@@ -931,6 +1026,34 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     }
   }
 
+  // v2 placements: the pins under each map in world.yaml.
+  const pendingById = new Map(pending.map((p) => [p.entity.id, p]));
+  for (const w of shippedWorlds) {
+    for (const pin of w.pins ?? []) {
+      // The resolver's pin verdict: its note, visibility, map and fog.
+      if (res && !res.takePin(pin.note, pin.mapId, pin.x, pin.y)) {
+        secretPlacementsExcluded += 1;
+        continue;
+      }
+      const item = pendingById.get(pin.note);
+      if (!item || !validMapIds.has(pin.mapId)) {
+        const note = `map "${pin.mapId}": pin of note "${pin.note}", which isn't an entity of this build — skipped`;
+        warnings.push(note);
+        hiddenFromPlayer.add(note);
+        continue;
+      }
+      placements.push({
+        id: `${pin.note}@${pin.mapId}`,
+        entityId: pin.note,
+        mapId: pin.mapId,
+        x: pin.x,
+        y: pin.y,
+        label: item.entity.title,
+        visibility: item.entity.visibility,
+      });
+    }
+  }
+
   // Resolve route waypoints (entity ids → coordinates) and filter for player.
   let routesExcluded = 0;
   // Routes must resolve waypoints using a placement on the SAME map. Using a
@@ -946,7 +1069,7 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   let routeLeaks = 0;
   let routeWaypointMisses = 0;
   const routes: Route[] = [];
-  for (const r of worldCfg?.routes ?? []) {
+  for (const r of shippedWorlds.flatMap((w) => w.routes)) {
     // The resolver's verdict: visibility, map, waypoint pins, geometry and fog.
     const routeVerdict = res?.routeVerdict(r.mapId, r.id);
     if (
@@ -1035,8 +1158,10 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // mask PNG, write <name>.fog.png next to the source, rewrite the layer src
   // in the player atlas, and strip fog geometry so reveal polygons never ship.
   // (See docs/superpowers/specs/2026-05-19-fog-player-mechanic-design.md.)
+  // v1 only: v2 maps never write into public/ (their fogged imagery doesn't
+  // ship yet, above), and the prune must never touch v1's masks for them.
   let fogWrites: BuildAssetWrites["fog"];
-  if (flags.player) {
+  if (flags.player && !v2) {
     const redacted = await redactMapsForPlayer(maps, ROOT, warnings);
     maps = redacted.maps;
     fogWrites = {
@@ -1057,7 +1182,17 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // borrow another area's (the adapter skips malformed areas), so every area
   // such an id names is dropped, and a strict build fails on it (exit 22).
   let audioPlan: AudioPlan | undefined;
-  if (flags.player) {
+  if (flags.player && v2) {
+    maps = maps.map((m) => {
+      if (!m.soundscape) return m;
+      const problems = soundAreaIdProblems(m.soundscape.areas ?? []);
+      const sc = filterSoundscapeForPlayer(
+        m.soundscape,
+        (a) => soundAreaIdTrusted(a, problems) && !!res?.soundShips(m.id, a.id),
+      );
+      return { ...m, soundscape: v2PlayerAudio(m, sc, sourceById, warnings, hiddenFromPlayer) };
+    });
+  } else if (flags.player) {
     maps = maps.map((m) => {
       if (!m.soundscape) return m;
       const problems = soundAreaIdProblems(m.soundscape.areas ?? []);
@@ -1165,11 +1300,11 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   // Fog masks are written by writeBuildOutput, after this check.
   const planned = new Map((fogWrites?.files ?? []).map((f) => [f.path, f.bytes.length]));
 
-  const runAssetCheck = (raw: string, owner: string) => {
+  const runAssetCheck = (raw: string, owner: string, publicDir: string = PUBLIC_DIR) => {
     if (!raw) return;
     if (/^(https?:|data:|blob:)/i.test(raw)) externalAssets += 1;
     else localAssets += 1;
-    const found = validateAsset(raw, owner, { publicDir: PUBLIC_DIR, svgPolicy, planned });
+    const found = validateAsset(raw, owner, { publicDir, svgPolicy, planned });
     for (const f of found) {
       assetFindings.push(f);
       if (f.category === "missing") missingAssets += 1;
@@ -1180,7 +1315,10 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     for (const img of entity.images) runAssetCheck(img, `entity ${entity.id}`);
   }
   for (const m of maps) {
-    for (const layer of m.layers ?? []) runAssetCheck(layer.src, `map ${m.id} layer ${layer.id}`);
+    const dir = sourceById.get(m.worldId)?.assetDir ?? PUBLIC_DIR;
+    for (const layer of m.layers ?? []) {
+      runAssetCheck(layer.src, `map ${m.id} layer ${layer.id}`, dir);
+    }
   }
   // Inline Obsidian embeds (`![[image.png]]` in a note body) render to real
   // <img> tags via resolveImageEmbeds() above but, unlike entity.images and
@@ -1205,17 +1343,14 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   for (const { entity } of pending) {
     const specs = secretSpecsByEntity.get(entity.id);
     if (!specs || specs.length === 0) continue;
-    const { secrets, warnings: secWarn } = await buildEntitySecrets(entity.id, specs, charKeys);
+    const { secrets, warnings: secWarn } = await buildEntitySecrets(
+      entity.id,
+      specs,
+      charKeysByWorld.get(entity.world ?? "") ?? new Map<string, string>(),
+    );
     if (secrets.length > 0) entity.secrets = secrets;
     for (const w of secWarn) warnings.push(w);
   }
-
-  // Per-asset credit registry. In player builds, strip disabled/empty entries
-  // so a DM-typed-but-disabled attribution never ships. DM builds keep all.
-  const assetCredits: Record<string, AssetCredit> | undefined = projectAssetCredits(
-    worldCfg?.assetCredits,
-    flags.player,
-  );
 
   // Live asset inventory: every entity image + map layer src, deduped.
   const assetList: AssetRef[] = collectAssets({
@@ -1225,25 +1360,40 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
 
   const project: AtlasProject = {
     version: new Date().toISOString().replace(/[:.]/g, "-"),
-    schemaVersion: worldCfg?.schemaVersion ?? CURRENT_ATLAS_SCHEMA_VERSION,
+    schemaVersion: bm.v1Source?.schemaVersion ?? model.schemaVersion,
     publishedAt: new Date().toISOString(),
-    worlds: [
-      {
-        id: worldId,
-        name: worldCfg?.name ?? "Astrath Deeprealm",
-        defaultMapId: primaryMapId,
-        ...(flags.player
-          ? {}
-          : { importFolders: worldCfg?.importConfig ?? { folders: {}, defaultFolder: "imports" } }),
-        credits: worldCfg?.credits ?? ({ badges: true, page: true } satisfies CreditsConfig),
+    worlds: shippedWorlds.map((w) => {
+      // Per-asset credit registry. In player builds, strip disabled/empty
+      // entries so a DM-typed-but-disabled attribution never ships.
+      const assetCredits: Record<string, AssetCredit> | undefined = projectAssetCredits(
+        w.assetCredits,
+        flags.player,
+      );
+      return {
+        id: w.id,
+        name: w.name,
+        defaultMapId: defaultMapIds.get(w.id) ?? w.fallbackMapId,
+        ...(flags.player ? {} : { importFolders: w.importConfig }),
+        credits: w.credits satisfies CreditsConfig,
         ...(assetCredits ? { assetCredits } : {}),
-      },
-    ],
+      };
+    }),
+    // v2: the ocean, with the placements of the top-level maps that ship.
+    ...(model.ocean
+      ? {
+          ocean: {
+            width: model.ocean.width,
+            height: model.ocean.height,
+            sea: model.ocean.sea,
+            onOcean: model.onOcean.filter((p) => validMapIds.has(p.map)).map((p) => ({ ...p })),
+          },
+        }
+      : {}),
     maps,
     entities: pending.map((p) => p.entity),
     placements,
     assets: assetList,
-    calendar: worldCfg?.calendar,
+    calendar: shippedWorlds.find((w) => w.calendar !== undefined)?.calendar,
     buildReport: {
       scanned: files.length + scanInfo.excludedFiles,
       included: pending.length,
@@ -1287,7 +1437,11 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
   const report: BuildAtlasReport = {
     player: flags.player,
     strict: flags.strict,
-    defaultOutDir: path.resolve(ROOT, flags.player ? cfg.outputDir : ".local-atlas"),
+    // v2 player builds go to `<outputDir>/<campaign>/atlas` (R-17's layout).
+    defaultOutDir:
+      flags.player && v2
+        ? path.resolve(ROOT, cfg.outputDir, bm.campaign!, "atlas")
+        : path.resolve(ROOT, flags.player ? cfg.outputDir : ".local-atlas"),
     scanned: project.buildReport!.scanned,
     included: project.buildReport!.included,
     excludedByFolder: scanInfo.excludedFiles,
@@ -1319,6 +1473,8 @@ export async function buildAtlas(root: string, flags: BuildFlags): Promise<Build
     crossRefLeaks,
     nameCollisions: res?.collisionMessages ?? [],
     orphanEntries: res?.orphanMessages ?? [],
+    ...(res ? { mustNotShip: res.resolution.mustNotShip } : {}),
+    consoleWarnings: bm.consoleWarnings,
     soundAreaIdProblems: soundIdLines,
     unresolvedRelationships,
     warnings,
@@ -1350,7 +1506,7 @@ function buildEntity(
   item: AllParsed,
   opts: {
     player: boolean;
-    defaultWorld: string;
+    world: string;
     calendar: Parameters<typeof parseAtlasDate>[1];
   },
 ): BuiltEntity {
@@ -1375,7 +1531,7 @@ function buildEntity(
     id,
     title,
     type: parsed.atlas.type ?? "note",
-    world: parsed.atlas.world ?? opts.defaultWorld,
+    world: opts.world,
     visibility,
     canon: (parsed.atlas.canon as Entity["canon"]) ?? "canon",
     aliases,
@@ -1508,6 +1664,35 @@ async function redactMapsForPlayer(
     redactedMaps.push({ ...m, layers: newLayers, fog: playerFog });
   }
   return { maps: redactedMaps, files };
+}
+
+/**
+ * v2 player audio: the shipped areas with content-hashed srcs, so DM file
+ * names never ship. Hashed against the map's world folder (`_atlas/`) and
+ * never copied into `public/`: publishing v2 assets is R-17's. An area whose
+ * file isn't found keeps no src to rewrite, so it doesn't ship (fail closed).
+ */
+function v2PlayerAudio(
+  m: MapDocument,
+  sc: MapDocument["soundscape"],
+  sourceById: ReadonlyMap<string, WorldSource>,
+  warnings: string[],
+  hiddenFromPlayer: Set<string>,
+): MapDocument["soundscape"] {
+  if (!sc?.areas?.length) return sc;
+  const dir = sourceById.get(m.worldId)?.assetDir;
+  if (!dir) return { ...sc, areas: [] };
+  const rewrite = planAudioAssets(sc.areas, dir, { prune: false }).rewrite;
+  const found = (src: string | undefined) =>
+    src === undefined || /^https?:\/\//i.test(src) || rewrite.has(src);
+  const kept = sc.areas.filter((a) => {
+    if (found(a.bed.src) && found(a.bed.srcFallback)) return true;
+    const w = `map "${m.id}": a sound area's audio file isn't in ${path.basename(path.dirname(dir))}/_atlas — area dropped`;
+    warnings.push(w);
+    hiddenFromPlayer.add(w);
+    return false;
+  });
+  return { ...sc, areas: rewriteAudioSrcs(kept, rewrite) };
 }
 
 /**
