@@ -48,6 +48,7 @@ import { deriveSecretsFromVault, isReportableName } from "../check-derived-secre
 import { LEGACY_OUTPUT, campaignArtifacts } from "./scanRegistry";
 import { readMustNotShip } from "./build/campaignStore";
 import { parsePublishArgs } from "./publishPlan";
+import { variantsCampaignFog } from "./publish-integrity-smoke-fog";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPTS_DIR = path.resolve(HERE, "..");
@@ -895,6 +896,7 @@ async function main(): Promise<number> {
   results.push(await variantExif());
   results.push(variantFog());
   results.push(variantSoundFog());
+  results.push(...(await variantsCampaignFog({ runScan, assertCleanThenDirty, freshDir })));
   results.push(variantShape());
   results.push(
     variantPlayerSecret("Forbidden field on a player secret", {

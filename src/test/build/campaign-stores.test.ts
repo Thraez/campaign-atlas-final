@@ -129,7 +129,8 @@ const EXPECT: Record<Campaign, { ships: string[]; hidden: string[] }> = {
     hidden: [IMAGES.mirefold, IMAGES.mirefoldCellars, AUDIO.frogChorus],
   },
   sandbox: {
-    // oskmark is fogged in sandbox: its layers don't ship (no fog mask yet).
+    // oskmark is fogged in sandbox: only its redacted image ships (R-18), so
+    // the original's bytes don't.
     ships: [IMAGES.quessalyWorld],
     hidden: [
       IMAGES.oskmark,
@@ -196,7 +197,7 @@ describe("R-17: one player store per campaign", () => {
       for (const f of walk(store)) expect(fs.lstatSync(f).isSymbolicLink(), f).toBe(false);
       // Hashed names only: no DM file name ships.
       for (const a of assets)
-        expect(a).toMatch(/^assets\/(maps\/[0-9a-f]{16}\.png|audio\/[0-9a-f]{8}\.ogg)$/);
+        expect(a).toMatch(/^assets\/(maps\/[0-9a-f]{16}(\.fog)?\.png|audio\/[0-9a-f]{8}\.ogg)$/);
     },
   );
 

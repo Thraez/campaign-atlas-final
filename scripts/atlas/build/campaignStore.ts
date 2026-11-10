@@ -13,14 +13,22 @@
  * the store, `<outputRoot>/<id>/must-not-ship.json`, never inside it: the
  * scans read it, the site never serves it.
  *
- * This module plans the copies (`planMapImages`, `storeAudioFile`) and
+ * This module plans the copies (`planMapImages`, which bakes each fogged
+ * map's fog into its images, R-18; `storeAudioFile`) and
  * writes finished stores (`writeCampaignStores`, which first checks the
  * stores root: `checkStoresRoot`); the build core decides what ships.
  */
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import type { AtlasCampaign, MapDocument } from "../../../src/atlas/content/schema";
+import sharp from "sharp";
+import type {
+  AtlasCampaign,
+  FogOverlay,
+  MapDocument,
+  MapLayer,
+} from "../../../src/atlas/content/schema";
+import { redactLayer } from "../redactFogMap";
 import type { MustNotShip } from "../../../src/atlas/content/resolveCampaign";
 
 /** The store's dir name under a campaign's dir. */
@@ -89,50 +97,141 @@ const isExternal = (src: string) => /^(https?:|data:|blob:)/i.test(src);
  * outside `_atlas/`, unreadable, or tiled (`tileSrc`, not published per
  * campaign yet) is an error: the store must hold every file its atlas names.
  * External URLs are left as written.
+ *
+ * R-18: a map fogged in the campaign (`fog.enabled`, with the campaign's
+ * reveals, conceals and feather) never ships its original. Each layer is
+ * baked with `redactLayer` into `assets/maps/<sha256>.fog.png` (lossless
+ * PNG) and the map keeps only the `{ mapId, enabled }` marker. A fogged
+ * layer that can't be baked (external, tiled, rotated, unreadable) is an
+ * error, and so is any store file whose bytes are a fogged layer's original
+ * (an open map sharing the image would ship it): fail closed.
  */
-export function planMapImages(
+export async function planMapImages(
   maps: MapDocument[],
   assetDirOf: (worldId: string) => string | undefined,
   files: StoreFiles,
   errors: string[],
-): MapDocument[] {
-  return maps.map((m) => {
-    if (!m.layers?.length) return m;
+): Promise<MapDocument[]> {
+  const fogged: { map: string; bytes: Buffer }[] = [];
+  const out: MapDocument[] = [];
+  for (const m of maps) {
+    const fog = m.fog?.enabled ? m.fog : undefined;
     const dir = assetDirOf(m.worldId);
-    const layers = m.layers.map((layer) => {
+    const layers: MapLayer[] = [];
+    for (const layer of m.layers ?? []) {
+      const where = `map "${m.id}" layer "${layer.id}"`;
       if (layer.tileSrc) {
-        errors.push(
-          `map "${m.id}" layer "${layer.id}": tiled layers aren't published per campaign yet`,
-        );
-        return layer;
+        errors.push(`${where}: tiled layers aren't published per campaign yet`);
+        layers.push(layer);
+        continue;
       }
-      if (!layer.src || isExternal(layer.src)) return layer;
+      if (!layer.src || isExternal(layer.src)) {
+        if (fog) errors.push(`${where}: a fogged map's image must be a local file to be redacted`);
+        layers.push(layer);
+        continue;
+      }
       const abs = dir ? fileInside(dir, layer.src) : null;
       if (!abs) {
-        errors.push(
-          `map "${m.id}" layer "${layer.id}": image "${layer.src}" is not inside its world's _atlas folder`,
-        );
-        return layer;
+        errors.push(`${where}: image "${layer.src}" is not inside its world's _atlas folder`);
+        layers.push(layer);
+        continue;
       }
       let bytes: Buffer;
       try {
         bytes = fs.readFileSync(abs);
       } catch {
-        errors.push(`map "${m.id}" layer "${layer.id}": image "${layer.src}" can't be read`);
-        return layer;
+        errors.push(`${where}: image "${layer.src}" can't be read`);
+        layers.push(layer);
+        continue;
       }
-      const rel = `${MAPS_DIR}/${hashName(bytes, layer.src, 16)}`;
-      files.set(rel, bytes);
-      return { ...layer, src: `${STORE_DIR}/${rel}` };
-    });
-    return { ...m, layers };
-  });
+      if (!fog) {
+        const rel = `${MAPS_DIR}/${hashName(bytes, layer.src, 16)}`;
+        files.set(rel, bytes);
+        layers.push({ ...layer, src: `${STORE_DIR}/${rel}` });
+        continue;
+      }
+      fogged.push({ map: m.id, bytes });
+      let baked: Buffer;
+      try {
+        baked = await redactLayer(bytes, { width: m.width, height: m.height }, fog, layer);
+      } catch (e) {
+        errors.push(`${where}: fog can't be baked into "${layer.src}": ${(e as Error).message}`);
+        layers.push(layer);
+        continue;
+      }
+      const rel = `${MAPS_DIR}/${hashName(baked, ".fog.png", 16)}`;
+      files.set(rel, baked);
+      layers.push({ ...layer, src: `${STORE_DIR}/${rel}` });
+    }
+    const next = m.layers ? { ...m, layers } : { ...m };
+    if (fog) next.fog = { mapId: m.id, enabled: true } as FogOverlay;
+    out.push(next);
+  }
+  for (const { map, bytes } of fogged) {
+    for (const [rel, held] of files) {
+      if (held.equals(bytes)) {
+        errors.push(
+          `map "${map}": its unfogged image would ship as "${rel}" (fogged in this campaign)`,
+        );
+      }
+    }
+  }
+  // The same pixels under other bytes (a lossless re-encode) are the same
+  // leak. A lossy re-encode, a crop or a resize is not caught: see
+  // docs/VISIBILITY_AND_PLAYER_SAFETY.md, "Fog per campaign".
+  // Only a fingerprint of each decoded image is kept (size and a hash of its
+  // RGBA), never the pixels: one decode per distinct fogged original, one
+  // per candidate whose header size matches one of them.
+  const prints = new Map<string, { map: string; print: Fingerprint }>();
+  for (const { map, bytes } of fogged) {
+    const key = sha256(bytes);
+    if (prints.has(key)) continue;
+    const print = await fingerprint(bytes);
+    if (print) prints.set(key, { map, print }); // unreadable: redactLayer already failed
+  }
+  const sizes = new Set([...prints.values()].map(({ print }) => `${print.width}x${print.height}`));
+  for (const [rel, held] of files) {
+    if (rel.endsWith(".fog.png") || prints.has(sha256(held))) continue; // byte matches: above
+    const meta = await sharp(held)
+      .metadata()
+      .catch(() => null); // not an image (audio)
+    if (!meta || !sizes.has(`${meta.width}x${meta.height}`)) continue;
+    const print = await fingerprint(held);
+    if (!print) continue;
+    for (const { map, print: p } of prints.values()) {
+      if (p.width === print.width && p.height === print.height && p.rgba === print.rgba) {
+        errors.push(
+          `map "${map}": its unfogged image would ship as "${rel}" (same pixels; fogged in this campaign)`,
+        );
+      }
+    }
+  }
+  return out;
 }
 
-/** `<sha256 prefix><ext>`, the extension lower-cased. */
+type Fingerprint = { width: number; height: number; rgba: string };
+
+const sha256 = (b: Buffer) => crypto.createHash("sha256").update(b).digest("hex");
+
+/** Size and a hash of the RGBA pixels, or null when sharp can't decode it. */
+async function fingerprint(bytes: Buffer): Promise<Fingerprint | null> {
+  try {
+    const { data, info } = await sharp(bytes)
+      .toColourspace("srgb")
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    return { width: info.width, height: info.height, rgba: sha256(data) };
+  } catch {
+    return null;
+  }
+}
+
+/** `<sha256 prefix><ext>`, the extension lower-cased (`.fog.png` kept whole). */
 function hashName(bytes: Buffer, src: string, length: number): string {
   const hash = crypto.createHash("sha256").update(bytes).digest("hex").slice(0, length);
-  return `${hash}${path.extname(src).toLowerCase()}`;
+  const ext = src.toLowerCase().endsWith(".fog.png") ? ".fog.png" : path.extname(src).toLowerCase();
+  return `${hash}${ext}`;
 }
 
 /**
