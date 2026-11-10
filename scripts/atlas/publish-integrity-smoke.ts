@@ -41,6 +41,7 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { DM_CONTENT_SENTINELS } from "../check-no-secrets";
 import { deriveSecretsFromVault } from "../check-derived-secrets";
+import { variantsCampaignFog } from "./publish-integrity-smoke-fog";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPTS_DIR = path.resolve(HERE, "..");
@@ -622,6 +623,7 @@ async function main(): Promise<number> {
   results.push(await variantExif());
   results.push(variantFog());
   results.push(variantSoundFog());
+  results.push(...(await variantsCampaignFog({ runScan, assertCleanThenDirty, freshDir })));
   results.push(variantShape());
   results.push(
     variantPlayerSecret("Forbidden field on a player secret", {

@@ -406,6 +406,8 @@ export const SCANS: ScanEntry[] = [
             layout: a.layout,
             // v2 (R-17): fog is the campaign's; the legacy pair has no campaign.
             ...(a.mustNotShip ? { campaign: a.campaign } : {}),
+            // R-18: the source fog must load, fog maps in the output or not.
+            publish: true,
           }),
         // Without the config the in-fog and alpha checks are skipped.
         [file(ctx.configPath)],

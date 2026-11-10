@@ -3,7 +3,7 @@
  *
  * Independent re-check of player artifacts (atlas.json + asset PNGs) against
  * the source world.yaml's fog geometry. Complements the build-time enforcement
- * by re-deriving the boundary and asserting five invariants:
+ * by re-deriving the boundary and asserting these invariants:
  *
  *   13  IMAGE-LEAK    original layer image referenced by the player atlas, or
  *                     (built site only) shipped beside its redacted one
@@ -26,14 +26,25 @@
  * the player build prunes it), so the "original beside redacted" check runs on
  * the built site only.
  *
- * Schema v2 content (R-17): fog belongs to a campaign, so the source geometry
- * is the campaign file's (`campaignFog`, the resolver's own reading). The
- * campaign is `--campaign` (the scan registry passes it) or else the one the
- * player atlas.json names; neither, or the two disagreeing, is 17 when the
- * artifact has a fog map (fail closed).
+ * The source is read through `loadAtlasModel` for v1 and v2 alike (R-18):
+ * v1 is one campaign, `main`; for v2 the fog is the campaign file's
+ * (`campaignFog`, the resolver's own reading). The campaign is `--campaign`
+ * (the scan registry passes it) or else the one the player atlas.json names;
+ * the two disagreeing is 17. The checks are driven by the source, not the
+ * output: a map fogged in source must ship its fog marker (26), and on v2
+ * every file under the artifact dir is hashed against the fogged maps'
+ * original images (13) and the images of maps hidden under fog by ADR-0004
+ * rule 4 (a child whose frame is under fog, and its subtree, using the
+ * resolver's own frame geometry, so not independent of it); those maps'
+ * ids must not appear in maps, placements, the ocean or a world's default
+ * map (15). No world is picked from the config's default (R-13).
+ *
+ * `--publish` (the scan registry sets it): the source must load, fog maps in
+ * the output or not; a missing config or content root is 17, not a
+ * configless run.
  *
  * Usage:
- *   tsx scripts/check-fog-safety.ts <artifact-dir> [--config atlas.config.json] [--campaign <id>]
+ *   tsx scripts/check-fog-safety.ts <artifact-dir> [--config atlas.config.json] [--campaign <id>] [--publish]
  *
  * Exit codes:
  *   0   clean
@@ -45,26 +56,36 @@
  *   17  COULD-NOT-VERIFY-GEOMETRY — a source world config was present but failed
  *       to load, so the geometry-dependent checks (15, 16, 21) never ran and the
  *       fog maps cannot be certified. (Config *absent* is a legitimate
- *       configless run and still exits 0.) Also a fog layer whose redacted
+ *       configless run and exits 0, outside `--publish`.) Also a fog layer whose redacted
  *       `.fog.png` is not in the artifact (the alpha check cannot run on it),
  *       or a built site (`layout: "built-site"`) with no `atlas/atlas.json`.
  *   21  SOUND-IN-FOG (21, not 18: check-player-files already exits 18)
+ *   26  FOG-MARKER-MISSING a map fogged in source ships without `fog.enabled`
+ *   27  COLOUR-UNDER-FOG a redacted layer keeps colour (RGB ≠ 0) at alpha 0
  */
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { IMAGE_EXTENSIONS } from "./atlas/assetRefs";
-import { loadWorldConfig } from "./atlas/loadWorldConfig";
 import { locatePlayerAtlas, resolveAssetFile, type ArtifactLayout } from "./atlas/playerArtifact";
 import { isLit } from "../src/atlas/fog/effectiveLit";
-import { areaUnderFog, campaignFog, pathUnderFog } from "../src/atlas/content/resolveCampaign";
-import { loadAtlasModel } from "./atlas/loadAtlasModel";
+import {
+  areaUnderFog,
+  campaignFog,
+  frameQuads,
+  frameUnderFog,
+  pathUnderFog,
+} from "../src/atlas/content/resolveCampaign";
+import { loadAtlasModel, type LoadAtlasModelConfig } from "./atlas/loadAtlasModel";
+import { V1_CAMPAIGN_ID } from "../src/atlas/content/v1Model";
 import type { FogOverlay, Point } from "../src/atlas/content/schema";
 
 interface Args {
   target: string;
   config: string;
   campaign?: string;
+  publish?: boolean;
 }
 
 interface Finding {
@@ -98,6 +119,7 @@ interface PlayerMap {
   layers: PlayerLayer[];
   regions?: Array<{ id: string; points: Point[] }>;
   routes?: Array<{ id: string; resolvedPoints?: Point[] }>;
+  parent?: string;
   fog?: PlayerFogObject;
   soundscape?: { areas?: Array<{ regionId?: string; points?: Point[] }> };
 }
@@ -107,13 +129,116 @@ interface PlayerAtlas {
   /** v2 player builds: the campaign the artifact is (R-17). */
   campaign?: { id?: unknown };
   placements?: Array<{ entityId: string; mapId: string; x: number; y: number }>;
+  ocean?: { onOcean?: Array<{ map?: unknown }> };
+  worlds?: Array<{ id?: unknown; defaultMapId?: unknown }>;
 }
 
-interface AtlasConfig {
+/**
+ * `atlas.config.json` as the scan reads it: the loader's config (the v1
+ * world and the note globs) with the globs optional, plus `contentRoot`.
+ */
+type AtlasConfig = Omit<LoadAtlasModelConfig, "include" | "exclude"> & {
   contentRoot: string;
-  defaultWorld: string;
   include?: string[];
   exclude?: string[];
+};
+
+/** v2 content with no campaign given or named (the legacy `dist`/`public/atlas` pair). */
+class NoCampaignError extends Error {}
+
+/** What the source says the artifact's campaign must honour. */
+interface SourceFog {
+  v2: boolean;
+  /** The campaign's fog per source map, for every map fogged in it. */
+  fogs: Map<string, FogOverlay>;
+  /** Source-relative path to each fogged map's layer images (v2: to compare bytes). */
+  foggedImages: Array<{ map: string; file: string }>;
+  /** v2: maps whose frame is under the parent's fog, and their subtrees (rule 4). */
+  fogHidden: Set<string>;
+  /** v2: the image files of the fog-hidden maps. */
+  fogHiddenImages: Array<{ map: string; file: string }>;
+}
+
+/**
+ * The artifact's campaign and its fog, loaded through the one loader (v1 too:
+ * its one campaign `main` has the world.yaml fog). v2: the campaign is the
+ * one given (the scan registry passes it) or the one the artifact names;
+ * they must agree. Throws when the campaign can't be told or isn't in the
+ * content, so the geometry checks count as not run (17).
+ */
+function loadSourceFog(
+  cfg: AtlasConfig,
+  root: string,
+  contentRoot: string,
+  atlas: PlayerAtlas,
+  given: string | undefined,
+): SourceFog {
+  const v2 = fs.existsSync(path.join(contentRoot, "_atlas", "atlas.yaml"));
+  const named = typeof atlas.campaign?.id === "string" ? atlas.campaign.id : undefined;
+  if (given !== undefined && named !== undefined && given !== named) {
+    throw new Error(`the artifact is campaign "${named}", not "${given}"`);
+  }
+  const id = v2 ? (given ?? named) : V1_CAMPAIGN_ID;
+  if (id === undefined) {
+    throw new NoCampaignError("schema v2 content, but no campaign is given or named");
+  }
+  if (!v2 && (given ?? named ?? id) !== id) {
+    throw new Error(`v1 content has one campaign, "${id}", not "${given ?? named}"`);
+  }
+  const { model } = loadAtlasModel(
+    contentRoot,
+    { ...cfg, include: cfg.include ?? [], exclude: cfg.exclude ?? [] },
+    { root },
+  );
+  const campaign = model.campaigns.find((c) => c.id === id);
+  if (!campaign) throw new Error(`campaign "${id}" is not in the content`);
+
+  const maps = model.worlds.flatMap((w) =>
+    w.maps.map((m) => ({ map: m, assetDir: path.join(contentRoot, w.world.id, "_atlas") })),
+  );
+  const fogs = new Map<string, FogOverlay>();
+  for (const { map } of maps) {
+    const fog = campaignFog(map.id, campaign);
+    if (fog) fogs.set(map.id, fog);
+  }
+  const imagesOf = (ids: Set<string>) =>
+    maps.flatMap(({ map, assetDir }) =>
+      ids.has(map.id)
+        ? map.layers.flatMap((l) =>
+            l.src && !/^(https?:|data:|blob:)/i.test(l.src)
+              ? [{ map: map.id, file: path.resolve(assetDir, l.src) }]
+              : [],
+          )
+        : [],
+    );
+
+  const fogHidden = new Set<string>();
+  if (v2) {
+    // Rule 4 from source: a frame with any part under the parent's fog, then
+    // every map below it, until nothing more is added.
+    for (const { map } of maps) {
+      if (map.parent === undefined || !map.frame) continue;
+      const quads = frameQuads(map.frame);
+      const parentFog = fogs.get(map.parent) ?? null;
+      if (quads?.some((q) => frameUnderFog(q, parentFog))) fogHidden.add(map.id);
+    }
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const { map } of maps) {
+        if (map.parent !== undefined && fogHidden.has(map.parent) && !fogHidden.has(map.id)) {
+          fogHidden.add(map.id);
+          grew = true;
+        }
+      }
+    }
+  }
+  return {
+    v2,
+    fogs,
+    foggedImages: v2 ? imagesOf(new Set(fogs.keys())) : [],
+    fogHidden,
+    fogHiddenImages: imagesOf(fogHidden),
+  };
 }
 
 function parseArgs(argv: string[]): Args | null {
@@ -122,13 +247,15 @@ function parseArgs(argv: string[]): Args | null {
   // Optional --config flag, defaults to atlas.config.json
   let config = "atlas.config.json";
   let campaign: string | undefined;
+  let publish = false;
   for (let i = 1; i < argv.length; i++) {
     if (argv[i] === "--config") config = argv[++i];
     else if (argv[i].startsWith("--config=")) config = argv[i].slice("--config=".length);
     else if (argv[i] === "--campaign") campaign = argv[++i];
     else if (argv[i].startsWith("--campaign=")) campaign = argv[i].slice("--campaign=".length);
+    else if (argv[i] === "--publish") publish = true;
   }
-  return { target, config, ...(campaign ? { campaign } : {}) };
+  return { target, config, ...(campaign ? { campaign } : {}), ...(publish ? { publish } : {}) };
 }
 
 export interface RunOpts {
@@ -138,34 +265,22 @@ export interface RunOpts {
   layout?: ArtifactLayout;
   /** v2 content: the campaign whose fog the artifact must honour (R-17). */
   campaign?: string;
+  /**
+   * The publish chain (the scan registry): the source fog must be read, so a
+   * missing or broken config, content or campaign file is 17 even when the
+   * artifact has no fog map (R-18).
+   */
+  publish?: boolean;
 }
 
-/**
- * v2: the fog of every map of the artifact's campaign, from its campaign
- * file. Throws when the campaign can't be told or isn't in the content, so
- * the geometry checks count as not run (17).
- */
-function v2CampaignFogs(
-  cfg: AtlasConfig,
-  root: string,
-  contentRoot: string,
-  atlas: PlayerAtlas,
-  given: string | undefined,
-): FogOverlay[] {
-  const named = typeof atlas.campaign?.id === "string" ? atlas.campaign.id : undefined;
-  if (given !== undefined && named !== undefined && given !== named) {
-    throw new Error(`the artifact is campaign "${named}", not "${given}"`);
-  }
-  const id = given ?? named;
-  if (id === undefined) throw new Error("schema v2 content, but no campaign is given or named");
-  const { model } = loadAtlasModel(
-    contentRoot,
-    { ...cfg, include: cfg.include ?? [], exclude: cfg.exclude ?? [] },
-    { root },
-  );
-  const campaign = model.campaigns.find((c) => c.id === id);
-  if (!campaign) throw new Error(`campaign "${id}" is not in the content`);
-  return (atlas.maps ?? []).flatMap((m) => campaignFog(m.id, campaign) ?? []);
+const sha256 = (bytes: Buffer) => crypto.createHash("sha256").update(bytes).digest("hex");
+
+/** Every file under `dir`, symlinks not followed. */
+function filesUnder(dir: string): string[] {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const p = path.join(dir, e.name);
+    return e.isDirectory() ? filesUnder(p) : e.isFile() ? [p] : [];
+  });
 }
 
 export async function run(opts: RunOpts): Promise<number> {
@@ -194,51 +309,63 @@ export async function run(opts: RunOpts): Promise<number> {
 
   const atlas: PlayerAtlas = JSON.parse(fs.readFileSync(located.atlasJson, "utf8"));
 
-  // Load source fog geometry from world config.
-  // loadWorldConfig(contentRoot, worldId) — we derive these from atlas.config.json.
+  // The source fog, read through the loader (v1 and v2). Config absent is a
+  // legitimate configless run, except in the publish chain; a config that
+  // fails to load is a verification gap we must not paper over.
   const configAbs = path.resolve(process.cwd(), args.config);
-  let sourceFogs: FogOverlay[] = [];
-  // Distinguish "config present but FAILED to load" (a verification gap we must
-  // not paper over) from "config absent" (a legitimate configless run) and from
-  // "world.yaml absent" (loadWorldConfig returns null without throwing). Only a
-  // genuine load failure — a thrown WorldConfigError — sets this.
+  let source: SourceFog | null = null;
   let configLoadFailed = false;
-
+  let noCampaign = false;
   if (fs.existsSync(configAbs)) {
     try {
       const atlasConfig: AtlasConfig = JSON.parse(fs.readFileSync(configAbs, "utf8"));
       const contentRoot = path.resolve(path.dirname(configAbs), atlasConfig.contentRoot);
-      if (fs.existsSync(path.join(contentRoot, "_atlas", "atlas.yaml"))) {
-        sourceFogs = v2CampaignFogs(
+      // No content at all is a configless run too, outside the publish chain.
+      if (opts.publish || fs.existsSync(contentRoot)) {
+        source = loadSourceFog(
           atlasConfig,
           path.dirname(configAbs),
           contentRoot,
           atlas,
           opts.campaign,
         );
-      } else {
-        const worldId = atlasConfig.defaultWorld;
-        const worldCfg = loadWorldConfig(contentRoot, worldId);
-        if (worldCfg) {
-          sourceFogs = worldCfg.fogs as FogOverlay[];
-        }
       }
     } catch (e) {
       configLoadFailed = true;
+      noCampaign = e instanceof NoCampaignError;
       console.error(
-        `atlas:check-fog-safety: failed to load source world config — in-fog-content + alpha-leak checks could not run`,
+        `atlas:check-fog-safety: failed to load the source fog — the source-driven checks could not run`,
         e,
       );
     }
+  } else if (opts.publish) {
+    configLoadFailed = true;
+    console.error(
+      `atlas:check-fog-safety: ${args.config} not found — the source fog can't be read`,
+    );
   }
 
-  const sourceFogByMapId = new Map(sourceFogs.map((f) => [f.mapId, f]));
+  const sourceFogByMapId = source?.fogs ?? new Map<string, FogOverlay>();
   const findings: Finding[] = [];
-  const fogMaps = (atlas.maps ?? []).filter((m) => m.fog?.enabled);
+  const outputMaps = atlas.maps ?? [];
+
+  // ----- 26 FOG-MARKER-MISSING -----
+  // A map fogged in the campaign that ships without its fog marker shipped
+  // unredacted (or the marker was dropped after the bake).
+  for (const m of outputMaps) {
+    if (sourceFogByMapId.has(m.id) && !m.fog?.enabled) {
+      findings.push({
+        code: 26,
+        message: `map "${m.id}" is fogged in the source but ships without its fog marker`,
+      });
+    }
+  }
+  const fogMaps = outputMaps.filter((m) => m.fog?.enabled || sourceFogByMapId.has(m.id));
 
   // ----- 14 GEOMETRY-LEAK -----
   for (const m of fogMaps) {
-    const fog = m.fog!;
+    const fog = m.fog;
+    if (!fog) continue;
     if (fog.reveals !== undefined) {
       findings.push({ code: 14, message: `map "${m.id}" player atlas.fog.reveals not stripped` });
     }
@@ -288,6 +415,70 @@ export async function run(opts: RunOpts): Promise<number> {
             message: `map "${m.id}" original "${path.relative(targetAbs, base + ext)}" still present in artifact dir alongside redacted`,
           });
         }
+      }
+    }
+  }
+
+  // v2: the unfogged original of a map fogged in this campaign, or the image
+  // of a map rule 4 hides, must not be in the artifact under any name.
+  if (source?.v2) {
+    const shipped = new Map<string, string>();
+    for (const f of filesUnder(targetAbs)) shipped.set(sha256(fs.readFileSync(f)), f);
+    const check = (list: SourceFog["foggedImages"], what: string) => {
+      for (const { map, file } of list) {
+        let bytes: Buffer;
+        try {
+          bytes = fs.readFileSync(file);
+        } catch {
+          findings.push({
+            code: 17,
+            message: `map "${map}": source image "${file}" can't be read, so the artifact can't be checked for it`,
+          });
+          continue;
+        }
+        const hit = shipped.get(sha256(bytes));
+        if (hit) {
+          findings.push({
+            code: 13,
+            message: `map "${map}" (${what}): its source image ships as "${path.relative(targetAbs, hit)}"`,
+          });
+        }
+      }
+    };
+    check(source.foggedImages, "fogged in this campaign");
+    check(source.fogHiddenImages, "its frame is under the parent's fog");
+  }
+
+  // ----- 15 rule 4: a map whose frame is under its parent's fog, and its subtree -----
+  if (source && source.fogHidden.size > 0) {
+    const hidden = source.fogHidden;
+    for (const m of outputMaps) {
+      if (hidden.has(m.id) || (m.parent !== undefined && hidden.has(m.parent))) {
+        findings.push({
+          code: 15,
+          message: `map "${m.id}" ships, but its frame (or an ancestor's) is under the parent's fog`,
+        });
+      }
+    }
+    for (const p of atlas.placements ?? []) {
+      if (hidden.has(p.mapId)) {
+        findings.push({
+          code: 15,
+          message: `placement "${p.entityId}" is on map "${p.mapId}", whose frame is under the parent's fog`,
+        });
+      }
+    }
+    for (const o of atlas.ocean?.onOcean ?? []) {
+      if (typeof o.map === "string" && hidden.has(o.map)) {
+        findings.push({ code: 15, message: `the ocean places map "${o.map}", hidden by fog` });
+      }
+    }
+    for (const w of atlas.worlds ?? []) {
+      if (typeof w.defaultMapId === "string" && hidden.has(w.defaultMapId)) {
+        findings.push({
+          code: 15,
+          message: `world "${String(w.id)}" opens on map "${w.defaultMapId}", hidden by fog`,
+        });
       }
     }
   }
@@ -394,6 +585,31 @@ export async function run(opts: RunOpts): Promise<number> {
     }
   }
 
+  // ----- 27 COLOUR-UNDER-FOG (every redacted layer, every pixel; no source needed) -----
+  // A PNG keeps RGB under alpha 0, so stripping alpha would bring a fogged
+  // image back. redactLayer zeroes it; any colour at alpha 0 is a leak.
+  for (const m of fogMaps) {
+    for (const layer of m.layers) {
+      if (!layer.src.endsWith(".fog.png")) continue; // already flagged by check 13
+      const layerAbs = resolveAssetFile(atlasDir, layer.src);
+      if (!layerAbs || !fs.existsSync(layerAbs)) continue; // already flagged (17)
+      const { data } = await sharp(fs.readFileSync(layerAbs))
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      let hidden = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] === 0 && (data[i] | data[i + 1] | data[i + 2]) !== 0) hidden++;
+      }
+      if (hidden > 0) {
+        findings.push({
+          code: 27,
+          message: `layer "${layer.id}" on map "${m.id}" keeps colour in ${hidden} pixel(s) at alpha 0 — stripping alpha would show the fogged image`,
+        });
+      }
+    }
+  }
+
   // ----- Report -----
   console.log(
     `atlas:check-fog-safety: scanned ${fogMaps.length} fog-enabled map(s) in ${args.target}`,
@@ -402,7 +618,11 @@ export async function run(opts: RunOpts): Promise<number> {
   // A config we were handed but could not load means the geometry-dependent
   // checks (IN-FOG-CONTENT, ALPHA-LEAK) never ran for these maps, so we cannot
   // certify them — surface the gap rather than silently reporting "clean".
-  const geometryUnverified = configLoadFailed && fogMaps.length > 0;
+  // In the publish chain any load failure counts, fog maps in the output or
+  // not (a dropped marker would hide them). The legacy pair of a v2 run names
+  // no campaign: it keeps the old rule until R-19 retires it.
+  const geometryUnverified =
+    configLoadFailed && (opts.publish && !noCampaign ? true : fogMaps.length > 0);
   if (geometryUnverified) {
     console.error(
       "atlas:check-fog-safety: source world config failed to load — IN-FOG-CONTENT and " +
@@ -439,6 +659,7 @@ export async function main(): Promise<number> {
     dir: args.target,
     config: args.config,
     ...(args.campaign ? { campaign: args.campaign } : {}),
+    ...(args.publish ? { publish: true } : {}),
   });
 }
 

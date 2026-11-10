@@ -54,10 +54,15 @@ function plant(layout: Layout, atlas: object, files: Record<string, Buffer> = {}
   return target;
 }
 
-/** A 10×10 RGBA PNG, fully transparent or fully opaque white. */
-function png(alpha: 0 | 1): Promise<Buffer> {
+/**
+ * A 10×10 RGBA PNG: fully transparent (black, as the build writes fog) or
+ * fully opaque white; `"hidden"` is transparent white, colour kept under fog.
+ */
+function png(alpha: 0 | 1 | "hidden"): Promise<Buffer> {
+  const v = alpha === 0 ? 0 : 255;
+  const a = alpha === 1 ? 1 : 0;
   return sharp({
-    create: { width: 10, height: 10, channels: 4, background: { r: 255, g: 255, b: 255, alpha } },
+    create: { width: 10, height: 10, channels: 4, background: { r: v, g: v, b: v, alpha: a } },
   })
     .png()
     .toBuffer();
@@ -126,6 +131,12 @@ describe("check-fog-safety", () => {
       const config = writeSourceConfig(CLEAN_WORLD_YAML);
       const dir = plant(layout, fogAtlas(), { [FOG_FILE]: await png(1) });
       expect(await run({ dir, config })).toBe(16);
+    });
+
+    it("colour-under-fog (27): a redacted PNG keeps colour at alpha 0", async () => {
+      const config = writeSourceConfig(CLEAN_WORLD_YAML);
+      const dir = plant(layout, fogAtlas(), { [FOG_FILE]: await png("hidden") });
+      expect(await run({ dir, config })).toBe(27);
     });
 
     it("a fog layer whose .fog.png is missing is a finding (17), not a skip", async () => {
@@ -444,5 +455,53 @@ ${conceals ? "    conceals:\n      - [[200, 200], [210, 200], [210, 210], [200, 
     } finally {
       process.argv = argv;
     }
+  });
+});
+
+describe("check-fog-safety reads the fog from source (R-18)", () => {
+  /** The clean map with its fog marker dropped: an unredacted map, as the scan sees it. */
+  const unmarked = () => {
+    const atlas = fogAtlas();
+    delete (atlas.maps as Record<string, unknown>[])[0].fog;
+    return atlas;
+  };
+
+  it("a map fogged in the source but shipped without its fog marker → 26", async () => {
+    const config = writeSourceConfig(CLEAN_WORLD_YAML);
+    const dir = plant("dist", unmarked(), { [FOG_FILE]: await png(0) });
+    expect(await run({ dir, config })).toBe(26);
+  });
+
+  it("a map open in the source may ship without a marker → 0", async () => {
+    const config = writeSourceConfig(CLEAN_WORLD_YAML.replace("enabled: true", "enabled: false"));
+    const dir = plant("dist", unmarked(), { [FOG_FILE]: await png(0) });
+    expect(await run({ dir, config })).toBe(0);
+  });
+
+  it("publish: no config → 17, even with no fog map in the output", async () => {
+    const dir = plant("dist", unmarked());
+    const config = path.join(root, "atlas.config.json");
+    expect(await run({ dir, config })).toBe(0);
+    expect(await run({ dir, config, publish: true })).toBe(17);
+  });
+
+  it("publish: no content → 17, even with no fog map in the output", async () => {
+    const config = writeSourceConfig(null);
+    const dir = plant("dist", unmarked());
+    expect(await run({ dir, config })).toBe(0);
+    expect(await run({ dir, config, publish: true })).toBe(17);
+  });
+
+  it("publish: a broken world.yaml → 17, even with no fog map in the output", async () => {
+    const config = writeSourceConfig("maps: [unclosed");
+    const dir = plant("dist", unmarked());
+    expect(await run({ dir, config, publish: true })).toBe(17);
+  });
+
+  it("publish: v1 content checked as another campaign → 17", async () => {
+    const config = writeSourceConfig(CLEAN_WORLD_YAML);
+    const dir = plant("dist", fogAtlas(), { [FOG_FILE]: await png(0) });
+    expect(await run({ dir, config, publish: true })).toBe(0);
+    expect(await run({ dir, config, publish: true, campaign: "other" })).toBe(17);
   });
 });

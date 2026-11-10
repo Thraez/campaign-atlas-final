@@ -304,7 +304,7 @@ export function shipsIn(value: unknown, campaign: CampaignId): boolean {
 /**
  * The fog a map has in a campaign, or `null` when the map is open. A polygon
  * with a non-finite coordinate can't be tested, so the whole map reads as
- * fogged (no reveals).
+ * fogged (no reveals). `featherPx` rides along for the build's redaction (R-18).
  */
 export function campaignFog(mapId: MapId, campaign: CampaignFileV2): FogOverlay | null {
   const entry = hasOwn(campaign.maps, mapId) ? campaign.maps[mapId] : undefined;
@@ -322,8 +322,9 @@ export function campaignFog(mapId: MapId, campaign: CampaignFileV2): FogOverlay 
   };
   const reveals = polys(entry.reveals);
   const conceals = polys(entry.conceals);
-  if (!reveals || !conceals) return { mapId, enabled: true, reveals: [] };
-  return { mapId, enabled: true, reveals, conceals };
+  const feather = typeof entry.featherPx === "number" && Number.isFinite(entry.featherPx) ? { featherPx: entry.featherPx } : {};
+  if (!reveals || !conceals) return { mapId, enabled: true, reveals: [], ...feather };
+  return { mapId, enabled: true, reveals, conceals, ...feather };
 }
 
 function pointUnderFog(p: unknown, fog: FogOverlay | null): boolean {
@@ -389,7 +390,7 @@ export function areaUnderFog(points: readonly unknown[] | undefined, fog: FogOve
  * frame is tested twice, turned about its centre and about its top-left
  * corner; fog over either hides the child (fail closed).
  */
-function frameQuads(frame: FrameV2): Point[][] | null {
+export function frameQuads(frame: FrameV2): Point[][] | null {
   const { x, y, width, height, rotation } = frame;
   const nums = [x, y, width, height, rotation ?? 0];
   if (!nums.every((n) => typeof n === "number" && Number.isFinite(n))) return null;

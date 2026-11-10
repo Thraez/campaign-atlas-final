@@ -1,6 +1,6 @@
 # R-18 Fog baked per campaign; fog scan source-driven
 
-Status: ready-for-agent
+Status: done
 Blocked by: R-17, R-17b
 Size: M
 Branch: `rebuild-r18-campaign-fog`
