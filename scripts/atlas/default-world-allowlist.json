@@ -1,0 +1,13 @@
+{
+  "_about": "R-13: non-test files under scripts/ that still say defaultWorld or worlds[0], with their exact hit counts. Checked by src/test/build/default-world-allowlist.test.ts. Shrink only: remove a file or lower its count when you take a hit out; never add one.",
+  "files": {
+    "scripts/atlas/atlas-tree.ts": 3,
+    "scripts/atlas/audit-assets.ts": 1,
+    "scripts/atlas/loadAtlasModel.ts": 4,
+    "scripts/atlas/publish-integrity-smoke.ts": 1,
+    "scripts/atlas/scanRegistry.ts": 3,
+    "scripts/build-atlas.ts": 4,
+    "scripts/check-derived-secrets.ts": 1,
+    "scripts/check-fog-safety.ts": 2
+  }
+}

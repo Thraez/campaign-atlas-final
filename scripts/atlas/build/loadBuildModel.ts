@@ -3,8 +3,8 @@
  * for v1 and v2 alike, and the campaign a player build resolves.
  *
  * The build never reads `world.yaml` itself and never picks a world: every
- * world comes from `model.worlds`. `atlas.config.json`'s `defaultWorld` is
- * passed to the loader only, which reads it for v1 content.
+ * world comes from `model.worlds`. The config's v1 world key is passed to
+ * the loader only, which reads it for v1 content.
  *
  * Warnings are DM-only (R-06): `worldWarnings` go in the build's warnings and
  * its hidden-from-player set; `consoleWarnings` are printed to the console
