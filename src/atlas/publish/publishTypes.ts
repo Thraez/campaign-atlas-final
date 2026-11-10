@@ -14,6 +14,7 @@ export interface PublishScanReason {
     | "check-no-secrets-dm"
     | "check-no-secrets-editor"
     | "check-derived-secrets"
+    | "check-campaign-isolation"
     | "check-image-privacy"
     | "check-fog-safety"
     | "check-artifact-shape"

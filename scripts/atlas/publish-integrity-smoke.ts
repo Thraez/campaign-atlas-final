@@ -421,6 +421,140 @@ function variantVaultContent(): VariantResult {
   );
 }
 
+// ---- Variants: one campaign's output against its must-not-ship file ---------
+// (check-campaign-isolation, R-17b). A hand-made clean store for campaign `a`
+// of the two-campaign scan-registry fixture; each variant plants one sentinel
+// and must fail with the exit code for its kind (23 structure, 24 text, 25
+// assets), so a fault caught only by accident doesn't count.
+const ISOLATION_CONTENT = path.join(
+  PROJECT_ROOT,
+  "src",
+  "test",
+  "fixtures",
+  "scan-registry",
+  "v2",
+  "content",
+);
+const ISOLATION_MAP = "assets/maps/0123456789abcdef.png";
+
+type IsolationOutput = {
+  atlas: Record<string, unknown> & {
+    campaign: Record<string, unknown>;
+    maps: Record<string, unknown>[];
+    ocean: { onOcean: Record<string, unknown>[] };
+    entities: Record<string, unknown>[];
+  };
+  index: Record<string, unknown>[];
+  /** Extra files in the store, relative to its atlas dir. */
+  extra: string[];
+};
+
+function cleanIsolationOutput(): IsolationOutput {
+  return {
+    atlas: {
+      version: "1",
+      schemaVersion: 2,
+      worlds: [{ id: "vale", name: "The Vale", defaultMapId: "vale-overview" }],
+      ocean: { onOcean: [{ map: "vale-overview", x: 0, y: 0, scale: 1, rotation: 0 }] },
+      campaign: { id: "a", name: "Campaign A" },
+      maps: [
+        {
+          id: "vale-overview",
+          worldId: "vale",
+          name: "Vale",
+          width: 100,
+          height: 100,
+          layers: [{ id: "base", src: `atlas/${ISOLATION_MAP}` }],
+        },
+      ],
+      entities: [{ id: "inn", title: "Inn", type: "location", world: "vale", body: "An inn." }],
+      placements: [
+        { id: "inn@vale-overview", entityId: "inn", mapId: "vale-overview", label: "Inn" },
+      ],
+    },
+    index: [{ id: "inn", title: "Inn", type: "location", excerpt: "An inn.", bodyText: "An inn." }],
+    extra: [],
+  };
+}
+
+function variantIsolation(
+  name: string,
+  wantExit: number,
+  plant: (o: IsolationOutput) => void,
+): VariantResult {
+  const run = (label: string, dirty: boolean) => {
+    const root = freshDir(label);
+    fs.cpSync(ISOLATION_CONTENT, path.join(root, "content"), { recursive: true });
+    const config = path.join(root, "atlas.config.json");
+    fs.writeFileSync(
+      config,
+      JSON.stringify({
+        contentRoot: "content",
+        outputDir: ".atlas-campaigns",
+        defaultWorld: "vale",
+        include: ["**/*.md"],
+        exclude: [],
+      }),
+    );
+    const out = cleanIsolationOutput();
+    if (dirty) plant(out);
+    const store = path.join(root, ".atlas-campaigns", "a", "atlas");
+    for (const rel of [ISOLATION_MAP, ...out.extra]) {
+      fs.mkdirSync(path.dirname(path.join(store, rel)), { recursive: true });
+      fs.writeFileSync(path.join(store, rel), "img");
+    }
+    fs.writeFileSync(path.join(store, "atlas.json"), JSON.stringify(out.atlas));
+    fs.writeFileSync(path.join(store, "search-index.json"), JSON.stringify(out.index));
+    const mns = path.join(root, ".atlas-campaigns", "a", "must-not-ship.json");
+    fs.writeFileSync(
+      mns,
+      JSON.stringify({
+        campaign: "a",
+        ids: ["c1", "fen", "gloomharbour-vault"],
+        names: ["Gloomharbour Vault", "Fen"],
+        paths: [],
+        pinLocations: [],
+        otherCampaigns: [{ id: "b", name: "Campaign B" }],
+      }),
+    );
+    const args = [store, "--must-not-ship", mns, "--config", config, "--layout", "store"];
+    return runScan("check-campaign-isolation.ts", args);
+  };
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  return assertCleanThenDirty(
+    name,
+    "check-campaign-isolation.ts",
+    () => run(`${slug}-clean`, false),
+    () => {
+      const r = run(`${slug}-dirty`, true);
+      return r.code === wantExit || r.code < 0 ? r : { code: 0, stderr: r.stderr };
+    },
+  );
+}
+
+function variantsIsolation(): VariantResult[] {
+  return [
+    variantIsolation("Another campaign's id in the campaign field", 23, (o) => {
+      o.atlas.campaign = { id: "b", name: "Campaign A" };
+    }),
+    variantIsolation("Hidden short map id in maps", 23, (o) => {
+      o.atlas.maps.push({ ...o.atlas.maps[0], id: "c1", name: "Chart" });
+    }),
+    variantIsolation("Hidden world id in the ocean", 23, (o) => {
+      o.atlas.ocean.onOcean.push({ map: "fen", x: 1, y: 1, scale: 1, rotation: 0 });
+    }),
+    variantIsolation("Entity whose world isn't shipped", 23, (o) => {
+      o.atlas.entities.push({ id: "hut", title: "Hut", type: "location", world: "moor" });
+    }),
+    variantIsolation("Hidden long name in the search index", 24, (o) => {
+      o.index[0].bodyText = "The road to Gloomharbour Vault.";
+    }),
+    variantIsolation("Unreferenced image in the store", 25, (o) => {
+      o.extra.push("assets/maps/fedcba9876543210.png");
+    }),
+  ];
+}
+
 async function main(): Promise<number> {
   if (!fs.existsSync(PLAYER_ATLAS)) {
     console.error(
@@ -459,6 +593,7 @@ async function main(): Promise<number> {
   );
   results.push(variantPlayerFiles());
   results.push(variantVaultContent());
+  results.push(...variantsIsolation());
 
   const pad = Math.max(...results.map((r) => r.name.length));
   for (const r of results) {

@@ -131,7 +131,7 @@ function loadConfig(configPath: string): Config {
 }
 
 /** Should the candidate name be included in the must-not-appear list? */
-function isReportableName(name: string): boolean {
+export function isReportableName(name: string): boolean {
   const trimmed = name.trim();
   if (trimmed.length < MIN_NAME_LENGTH) return false;
   if (GENERIC_NAMES.has(trimmed.toLowerCase())) return false;

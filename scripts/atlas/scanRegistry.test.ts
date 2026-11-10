@@ -276,6 +276,13 @@ describe("publish mode: a missing artifact fails every scan (R-03)", () => {
     const tasks = scanTasks(ctx);
     for (const s of SCANS) {
       const own = tasks.filter((t) => t.scan === s.id);
+      // The one exemption: a scan of v2 per-campaign outputs only (R-17b) has
+      // no task on this v1 fixture; "v2: %s" below requires its tasks there.
+      if (s.v2Only !== undefined) {
+        expect(own, s.id).toEqual([]);
+        expect(s.v2Only.length, `${s.id} v2-only reason`).toBeGreaterThan(10);
+        continue;
+      }
       expect(own.length, s.id).toBeGreaterThan(0);
       for (const t of own) expect(t.requires.length, t.label).toBeGreaterThan(0);
     }
@@ -442,6 +449,7 @@ describe("campaign dirs (R-15)", () => {
   const PER_ARTIFACT: [string, ("built-site" | "store")[]][] = [
     ["check-no-secrets", ["built-site", "store"]],
     ["check-derived-secrets", ["built-site", "store"]],
+    ["check-campaign-isolation", ["built-site", "store"]],
     ["check-artifact-shape", ["store"]],
     ["check-image-privacy", ["built-site", "store"]],
     ["check-fog-safety", ["built-site", "store"]],
@@ -481,6 +489,40 @@ describe("campaign dirs (R-15)", () => {
     });
   });
 
+  it("only check-campaign-isolation is v2-only, and it has no task on the legacy pair", () => {
+    expect(SCANS.filter((s) => s.v2Only !== undefined).map((s) => s.id)).toEqual([
+      "check-campaign-isolation",
+    ]);
+    const legacy = scanTasks(repoWith(V2_CONTENT)).filter(
+      (t) => t.scan === "check-campaign-isolation" && t.campaign === LEGACY_OUTPUT,
+    );
+    expect(legacy).toEqual([]);
+  });
+
+  it("v2: check-campaign-isolation needs the must-not-ship file, the config and content, and a built site's store", () => {
+    const ctx = repoWith(V2_CONTENT);
+    const own = scanTasks(ctx).filter(
+      (t) => t.scan === "check-campaign-isolation" && t.campaign === "a",
+    );
+    expect(own.map((t) => t.requires.map((r) => `${r.kind} ${rel(ctx, r.path)}`))).toEqual([
+      [
+        "file dist-campaigns/a/atlas/atlas.json",
+        "file dist-campaigns/a/atlas/search-index.json",
+        `file ${MUST_NOT_SHIP("a")}`,
+        "file atlas.config.json",
+        `dir ${rel(ctx, V2_CONTENT)}`,
+        "file .atlas-campaigns/a/atlas/atlas.json",
+      ],
+      [
+        "file .atlas-campaigns/a/atlas/atlas.json",
+        "file .atlas-campaigns/a/atlas/search-index.json",
+        `file ${MUST_NOT_SHIP("a")}`,
+        "file atlas.config.json",
+        `dir ${rel(ctx, V2_CONTENT)}`,
+      ],
+    ]);
+  });
+
   it("v2: every scan of v1's deployed dirs still runs, labelled as the legacy output", () => {
     const ctx = repoWith(V2_CONTENT);
     const v1Labels = scanTasks(repoWith())
@@ -495,6 +537,8 @@ describe("campaign dirs (R-15)", () => {
     expect(tasks).toHaveLength(1);
     expect(tasks[0].campaign).toBeUndefined();
   });
+
+  const CAMPAIGN_NAMES: Record<string, string> = { a: "Campaign A", b: "Campaign B" };
 
   /** Both campaigns' outputs, with every artifact a task lists. */
   function writeCampaignOutputs(ctx: ScanContext) {
@@ -511,9 +555,15 @@ describe("campaign dirs (R-15)", () => {
     for (const id of ["a", "b"]) {
       put(`dist-campaigns/${id}/index.html`, "<html>");
       // Each campaign's atlas.json names its own campaign (check-derived-secrets checks it).
-      const own = JSON.stringify({ ...JSON.parse(atlas), campaign: { id, name: id } });
+      const own = JSON.stringify({
+        ...JSON.parse(atlas),
+        campaign: { id, name: CAMPAIGN_NAMES[id] },
+      });
       put(ATLAS_JSON["built-site"](id), own);
       put(ATLAS_JSON.store(id), withMap(own, "atlas/assets/maps/vale.webp"));
+      // check-campaign-isolation reads each campaign's search index too.
+      put(ATLAS_JSON["built-site"](id).replace(/atlas\.json$/, "search-index.json"), "[]");
+      put(ATLAS_JSON.store(id).replace(/atlas\.json$/, "search-index.json"), "[]");
       put(`.atlas-campaigns/${id}/atlas/assets/maps/vale.webp`, "webp");
       put(MUST_NOT_SHIP(id), mustNotShipFile(id));
     }
@@ -544,8 +594,15 @@ describe("campaign dirs (R-15)", () => {
       }
       const errors = vi.mocked(console.error).mock.calls.flat().join("\n");
       expect(errors).toContain(gone);
+      // The one cross-layout need: the isolation scan of a built site compares
+      // its files with the store's, so it needs the store's atlas.json too.
+      const needsStore = (t: (typeof tasks)[number]) =>
+        layout === "store" &&
+        t.scan === "check-campaign-isolation" &&
+        t.campaign === id &&
+        t.label.includes(DIRS["built-site"](id));
       for (const t of tasks.filter((t) => !hit.includes(t))) {
-        expect(missingArtifacts(t), t.label).toEqual([]);
+        expect(missingArtifacts(t), t.label).toEqual(needsStore(t) ? [`${gone} is missing`] : []);
       }
     },
   );
