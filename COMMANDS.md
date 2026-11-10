@@ -188,7 +188,7 @@ writes to the content root: until the cutover ticket, real migration is the DM's
 
 - No flags (or `--dry-run`): prints what it would write and writes nothing.
 - `-- --out <dir>`: runs the check below first and, only if it passes, writes the migrated tree to
-  `<dir>`. The folder must be new or empty, outside the content root and the vault. v2 input is
+  `<dir>`. The folder must be new or empty, outside the content root and the vault (the saved `vaultPath`, which must be absolute, and any folder with `.obsidian/` in or above it). v2 input is
   left as is.
 - `-- --allow-drop-pin-style`: drop a shipping pin's `label` and pin style, which v2 pins can't
   carry. Without it the migration refuses such a pin, because players would see the change.

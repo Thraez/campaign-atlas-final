@@ -25,7 +25,7 @@ import {
 import {
   MigrationRefused,
   checkOutDir,
-  vaultPathOf,
+  guardedFolders,
   planMigrateDown,
   planMigrateUp,
   writeMigration,
@@ -125,8 +125,7 @@ async function main(): Promise<number> {
   if (args.check) return (await runCheck(args, root, configPath)) ? 0 : 1;
   const config = readConfig(configPath);
   const contentRoot = path.resolve(path.dirname(configPath), config.contentRoot);
-  const vault = vaultPathOf(root);
-  const guarded = vault ? [vault] : [];
+  const guarded = args.out ? guardedFolders(root) : [];
   const opts = {
     contentRoot,
     config,

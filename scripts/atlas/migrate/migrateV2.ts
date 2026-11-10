@@ -61,6 +61,7 @@ import {
 import { AtlasModelError, loadAtlasModel, type LoadAtlasModelConfig } from "../loadAtlasModel";
 import { DEFAULT_FOG_COLOR } from "../loadWorldConfig";
 import { parseNoteFields } from "../parseFrontmatter";
+import { savedVaultPath } from "../vaultContent";
 import { addPlacements, hasPinFields, stripPinFields, type PlacementText } from "./notePins";
 
 /** The campaign v1 content is (ADR-0003 "Versions"). */
@@ -193,15 +194,24 @@ function localAsset(src: string | undefined): string | null {
   return src;
 }
 
-/** The comment and blank lines a YAML file starts with (its header), kept as written. */
-function leadingComments(text: string): string {
+/**
+ * The comment and blank lines a YAML file starts with (its header), kept as
+ * written, less any `yaml-language-server` line: it names the v1 schema, and
+ * there is no v2 world schema to point it at (`dropped` says so).
+ */
+function leadingComments(text: string): { header: string; dropped: string[] } {
   const lines = text.replace(/^\uFEFF/, "").split(/(?<=\n)/);
   let out = "";
+  const dropped: string[] = [];
   for (const l of lines) {
     if (!/^\s*(#.*)?\r?\n?$/.test(l) || l === "") break;
+    if (/^\s*#\s*yaml-language-server:/.test(l)) {
+      dropped.push(l.trim());
+      continue;
+    }
     out += l.endsWith("\n") ? l : `${l}\n`;
   }
-  return out.replace(/\s+$/, "") === "" ? "" : out;
+  return { header: out.replace(/\s+$/, "") === "" ? "" : out, dropped };
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -506,10 +516,16 @@ export function planMigrateUp(opts: MigrateOptions): MigrationPlan {
         plan.warnings.push(`${rel}: ${k} is not carried over (the loader doesn't model it)`);
       }
     }
+    const head = leadingComments(rawText ?? "");
+    for (const l of head.dropped) {
+      plan.warnings.push(
+        `${rel}: header line "${l}" dropped (it names the v1 schema; there is no v2 world schema yet)`,
+      );
+    }
     plan.files.set(
       rel,
       dumpYaml(
-        `${leadingComments(rawText ?? "")}# Schema v2 (ADR-0003), written by atlas:migrate-v2 from the v1 world.yaml.\n`,
+        `${head.header}# Schema v2 (ADR-0003), written by atlas:migrate-v2 from the v1 world.yaml.\n`,
         worldFile,
       ),
     );
@@ -926,17 +942,36 @@ function realNearest(p: string): string {
 }
 
 /**
- * The DM's vault, when this machine knows it (`.local-atlas/editor-settings.json`
- * `vaultPath`, as the editor's Sync panel saves it): `--out` stays out of it too.
+ * The folders `--out` must stay out of besides the content root: the DM's
+ * vault, when this machine's editor saved one (`savedVaultPath`, read as it
+ * is, no `~` expansion). A saved path that isn't absolute is refused: it can't
+ * be told where it points. With no saved path, `checkOutDir`'s `.obsidian`
+ * rule still keeps `--out` out of any vault.
  */
-export function vaultPathOf(root: string): string | null {
-  try {
-    const s = JSON.parse(
-      fs.readFileSync(path.join(root, ".local-atlas", "editor-settings.json"), "utf8"),
-    ) as { vaultPath?: unknown };
-    return typeof s.vaultPath === "string" && s.vaultPath.trim() ? s.vaultPath.trim() : null;
-  } catch {
-    return null;
+export function guardedFolders(root: string): string[] {
+  const vault = savedVaultPath(root);
+  if (vault === null) return [];
+  if (!path.isAbsolute(vault)) {
+    throw new MigrationRefused([
+      `.local-atlas/editor-settings.json vaultPath "${vault}" isn't absolute; ` +
+        `set the full path in the editor's Sync panel first`,
+    ]);
+  }
+  return [vault];
+}
+
+/** The folder (`dir` or a parent of it) that holds a `.obsidian` folder: a vault. */
+function obsidianVaultAround(dir: string): string | null {
+  let at = path.resolve(dir);
+  for (;;) {
+    try {
+      if (fs.statSync(path.join(at, ".obsidian")).isDirectory()) return at;
+    } catch {
+      // none here
+    }
+    const parent = path.dirname(at);
+    if (parent === at) return null;
+    at = parent;
   }
 }
 
@@ -944,12 +979,17 @@ export function vaultPathOf(root: string): string | null {
  * Refuse an output folder that is the content root (or another folder that
  * must never be written, such as the vault: `guarded`), inside one, holds one
  * (any ancestor), or already has files: the migration only writes a fresh copy.
+ * Whatever the settings say, a folder that holds `.obsidian`, or sits under a
+ * folder that does, is a vault and refused.
  */
 export function checkOutDir(outDir: string, contentRoot: string, guarded: string[] = []): void {
   const fold = (p: string) =>
     process.platform === "darwin" || process.platform === "win32" ? p.toLowerCase() : p;
-  const out = fold(realNearest(outDir));
+  const real = realNearest(outDir);
+  const out = fold(real);
   const reasons: string[] = [];
+  const vault = obsidianVaultAround(real);
+  if (vault) reasons.push(`--out ${outDir} is in an Obsidian vault (${vault} has .obsidian/)`);
   for (const [what, dir] of [
     ["the content root", contentRoot],
     ...guarded.map((g) => ["the vault", g] as const),
@@ -977,9 +1017,11 @@ export function writeMigration(
 ): void {
   checkOutDir(outDir, contentRoot, guarded);
   const target = path.resolve(outDir);
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  const staging = fs.mkdtempSync(path.join(path.dirname(target), `.${path.basename(target)}-`));
+  // The first folder this created, if any: removed again on a failure.
+  const created = fs.mkdirSync(path.dirname(target), { recursive: true });
+  let staging: string | null = null;
   try {
+    staging = fs.mkdtempSync(path.join(path.dirname(target), `.${path.basename(target)}-`));
     for (const [rel, bytes] of plan.files) {
       const to = path.join(staging, ...rel.split("/"));
       fs.mkdirSync(path.dirname(to), { recursive: true });
@@ -988,7 +1030,18 @@ export function writeMigration(
     if (fs.existsSync(target)) fs.rmdirSync(target); // empty, as checked
     fs.renameSync(staging, target);
   } catch (e) {
-    fs.rmSync(staging, { recursive: true, force: true });
+    if (staging) fs.rmSync(staging, { recursive: true, force: true });
+    if (created) {
+      // Empty folders only, from the target's parent up to the first one created.
+      for (let d = path.dirname(target); ; d = path.dirname(d)) {
+        try {
+          fs.rmdirSync(d);
+        } catch {
+          break;
+        }
+        if (path.resolve(d) === path.resolve(created)) break;
+      }
+    }
     throw e;
   }
 }

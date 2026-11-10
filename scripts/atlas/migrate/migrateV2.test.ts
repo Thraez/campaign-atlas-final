@@ -22,6 +22,7 @@ import { checkMigration, checkMigrationDown, readConfig } from "./checkMigration
 import {
   MigrationRefused,
   checkOutDir,
+  guardedFolders,
   planMigrateDown,
   planMigrateUp,
   writeMigration,
@@ -242,6 +243,23 @@ describe("up: the fixture's migrated files", () => {
     expect(plan.warnings.join("\n")).not.toMatch(/not carried over/);
   });
 
+  it("drop the header's yaml-language-server line (v1 schema; no v2 one) and warn", () => {
+    const d = copyProject(FIXTURE, (c) =>
+      replaceIn(
+        path.join(c, "content/vale/_atlas/world.yaml"),
+        /^/,
+        "# yaml-language-server: $schema=../../../schemas/world.schema.json\n",
+      ),
+    );
+    const p = up(d);
+    const text = fileText(p, "vale/_atlas/world.yaml");
+    expect(text).not.toMatch(/yaml-language-server/);
+    expect(text).toMatch(/^# R-20 fixture: a v1 vault[^]*\n# Schema v2 \(ADR-0003\)/);
+    expect(p.warnings.join("\n")).toMatch(
+      /vale\/_atlas\/world\.yaml: header line "# yaml-language-server: .*" dropped/,
+    );
+  });
+
   it("write campaign main: the fogged map with its reveals and feather, the other open, notes: vault", () => {
     expect(yamlOf(plan, "_atlas/campaigns/main.yaml")).toEqual({
       id: "main",
@@ -431,9 +449,40 @@ describe("--out", () => {
     }
   });
 
-  it("leaves nothing at --out when a write fails", () => {
+  it("refuses any folder in an Obsidian vault, with no settings file at all", () => {
+    const root = tmp();
+    expect(guardedFolders(root)).toEqual([]);
+    const vault = path.join(tmp(), "Vault");
+    fs.mkdirSync(path.join(vault, ".obsidian"), { recursive: true });
+    for (const out of [vault, path.join(vault, "x"), path.join(vault, "x", "y")]) {
+      expect(() => checkOutDir(out, content, guardedFolders(root))).toThrow(/in an Obsidian vault/);
+    }
+  });
+
+  it("refuses a target folder that itself holds .obsidian", () => {
+    const d = tmp();
+    fs.mkdirSync(path.join(d, ".obsidian"));
+    expect(refusal(() => checkOutDir(d, content)).join("\n")).toMatch(/Obsidian vault/);
+  });
+
+  it("refuses a saved vaultPath that isn't absolute", () => {
+    const root = tmp();
+    fs.mkdirSync(path.join(root, ".local-atlas"));
+    fs.writeFileSync(
+      path.join(root, ".local-atlas", "editor-settings.json"),
+      JSON.stringify({ vaultPath: "Vault-DnD" }),
+    );
+    expect(refusal(() => guardedFolders(root)).join("\n")).toMatch(/isn't absolute/);
+    fs.writeFileSync(
+      path.join(root, ".local-atlas", "editor-settings.json"),
+      JSON.stringify({ vaultPath: "/somewhere/Vault" }),
+    );
+    expect(guardedFolders(root)).toEqual(["/somewhere/Vault"]);
+  });
+
+  it("leaves nothing at --out, not even the parents it made, when a write fails", () => {
     const parent = tmp();
-    const out = path.join(parent, "migrated");
+    const out = path.join(parent, "new", "deeper", "migrated");
     const bad: MigrationPlan = {
       ...up(FIXTURE),
       files: new Map([
