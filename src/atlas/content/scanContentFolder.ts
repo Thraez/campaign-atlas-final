@@ -74,16 +74,28 @@ function isExcluded(contentPath: string, include: RegExp[], exclude: RegExp[]): 
 }
 
 /**
- * `failClosed` (exclude globs): `**` + `/` may match zero folders, and the
- * match ignores case.
+ * `failClosed` (exclude globs): the glob is normalised first (a backslash read as
+ * `/`, a leading `/` or `./` dropped, a trailing `/` read as `/**`), every
+ * regex character is literal (`[dm]` is a folder name, not a class), `**` + `/`
+ * may match zero folders, and the match ignores case. Include globs keep the
+ * plain reading.
  */
 function globToRegExp(glob: string, opts: { failClosed?: boolean } = {}): RegExp {
-  let escaped = glob
-    .replace(/[.+^${}()|\\]/g, "\\$&")
+  const source = opts.failClosed ? normaliseExcludeGlob(glob) : glob;
+  const meta = opts.failClosed ? /[.+^${}()|[\]\\]/g : /[.+^${}()|\\]/g;
+  let escaped = source
+    .replace(meta, "\\$&")
     .replace(/\*\*\//g, opts.failClosed ? "::DSTARSLASH::" : "::DSTAR::/")
     .replace(/\*\*/g, "::DSTAR::")
     .replace(/\*/g, "[^/]*")
     .replace(/\?/g, ".");
   escaped = escaped.replace(/::DSTARSLASH::/g, "(?:.*/)?").replace(/::DSTAR::/g, ".*");
   return new RegExp(`^${escaped}$`, opts.failClosed ? "i" : "");
+}
+
+function normaliseExcludeGlob(glob: string): string {
+  let g = glob.replace(/\\/g, "/").replace(/\/{2,}/g, "/");
+  while (g.startsWith("./") || g.startsWith("/")) g = g.startsWith("/") ? g.slice(1) : g.slice(2);
+  if (g.endsWith("/")) g += "**";
+  return g;
 }

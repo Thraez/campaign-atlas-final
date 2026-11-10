@@ -94,6 +94,35 @@ describe("scanContentFolder", () => {
       expect(scan.excluded).toHaveLength(5);
     });
 
+    describe("odd exclude glob forms still fail closed", () => {
+      const forms: Array<[string, string, string]> = [
+        ["a trailing slash", "**/_dm/", "w/_dm/spy.md"],
+        ["a leading slash", "/_dm/**", "_dm/spy.md"],
+        ["a leading ./", "./_dm/**", "_dm/spy.md"],
+        ["backslash separators", "**\\_dm\\**", "w/_dm/spy.md"],
+        ["brackets in a folder name", "**/[dm]/**", "w/[dm]/spy.md"],
+        ["other regex characters", "**/a+b(c)/**", "w/a+b(c)/spy.md"],
+      ];
+      for (const [name, glob, notePath] of forms) {
+        it(`${name}: ${glob}`, () => {
+          const scan = scanContentFolder([file(notePath, playerNote)], {
+            include: [],
+            exclude: [glob],
+          });
+          expect(scan.notes).toEqual([]);
+          expect(scan.excluded).toHaveLength(1);
+        });
+      }
+
+      it("brackets are literal, not a character class", () => {
+        const scan = scanContentFolder([file("w/d/spy.md")], {
+          include: [],
+          exclude: ["**/[dm]/**"],
+        });
+        expect(scan.notes).toHaveLength(1);
+      });
+    });
+
     it("still needs a whole folder name: _dm-notes/ and my_dm/ are read", () => {
       const scan = scanContentFolder([file("_dm-notes/a.md"), file("w/my_dm/b.md")], real);
       expect(scan.notes).toHaveLength(2);
