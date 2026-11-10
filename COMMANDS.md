@@ -181,6 +181,20 @@ Installs dependencies. Run it on a fresh clone and after `package.json` or the l
 
 A production build **with** the editor. Rarely needed; never publish it.
 
+### `npm run atlas:migrate-v2`
+
+Migrates the content root from schema v1 to v2 (ADR-0003), **into a separate folder**. Never
+writes to the content root: until the cutover ticket, real migration is the DM's call.
+
+- No flags (or `--dry-run`): prints what it would write and writes nothing.
+- `-- --out <dir>`: writes the migrated tree to `<dir>`, which must be new or empty and outside
+  the content root. v2 input is left as is.
+- `-- --check`: migrates into a temp folder and builds both: the v1 player output of the original
+  against the v2 player output of the copy (campaign `main`), the DM builds (the copy must hold
+  every item), and a v1 -> v2 -> v1 round trip. It prints any difference and fails on one.
+- `-- --down --out <dir>`: v2 back to v1, refusing what v1 can't say (several campaigns, a child
+  map, a `notes:` block, a campaign other than `main`).
+
 ### `npm run build:dev`
 
 A Vite build in development mode, for debugging the build.
