@@ -48,6 +48,8 @@ export interface UseMdImportFlowArgs {
   /** Entity id → its visibility and type in the DM atlas, so an update row shows
    *  the visibility it keeps and a secrecy increase is held for review. */
   entityMeta?: StagingContext["entityMeta"];
+  /** Ids other worlds hold: a new note with one is held, never created (R-14). */
+  idsInOtherWorlds?: ReadonlyMap<string, string>;
   /** Entities with a source file in the whole DM build (see `SyncWorld.dmBuildSize`). */
   dmBuildSize?: number;
   /** Called after a successful import so the editor can reload canon. */
@@ -57,7 +59,15 @@ export interface UseMdImportFlowArgs {
 }
 
 export function useMdImportFlow(args: UseMdImportFlowArgs) {
-  const { worldId, importConfig, existingById, entityMeta, dmBuildSize, onImported } = args;
+  const {
+    worldId,
+    importConfig,
+    existingById,
+    entityMeta,
+    idsInOtherWorlds,
+    dmBuildSize,
+    onImported,
+  } = args;
   const [rows, setRows] = useState<StagingRow[]>([]);
   const [open, setOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -67,8 +77,15 @@ export function useMdImportFlow(args: UseMdImportFlowArgs) {
   const sourceRef = useRef<SyncSource | null>(null);
 
   const world = useMemo(
-    (): SyncWorld => ({ worldId, importConfig, existingById, entityMeta, dmBuildSize }),
-    [worldId, importConfig, existingById, entityMeta, dmBuildSize],
+    (): SyncWorld => ({
+      worldId,
+      importConfig,
+      existingById,
+      entityMeta,
+      idsInOtherWorlds,
+      dmBuildSize,
+    }),
+    [worldId, importConfig, existingById, entityMeta, idsInOtherWorlds, dmBuildSize],
   );
   const ctx = useMemo(() => stagingContext(world), [world]);
 

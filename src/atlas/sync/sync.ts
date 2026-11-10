@@ -37,6 +37,8 @@ import { makeIgnore } from "@/atlas/import/ignoreRules";
 import { rewriteEmbeds } from "@/atlas/import/resolveVaultImage";
 import {
   buildStagingRows,
+  isHeldForOtherWorld,
+  otherWorldMessage,
   type RawImportFile,
   type StagingContext,
   type StagingRow,
@@ -61,6 +63,11 @@ export interface SyncWorld {
   /** Entity id → its content path: this world's entities only (R-14). */
   existingById: ReadonlyMap<string, string>;
   entityMeta?: StagingContext["entityMeta"];
+  /**
+   * Entity id → world, for ids other worlds already hold. Note ids are global
+   * across worlds, so a new note with one of them is held, never created (R-14).
+   */
+  idsInOtherWorlds?: ReadonlyMap<string, string>;
   /**
    * Entities with a source file in the whole DM build, every world's. Tells
    * "no DM build loaded" apart from "a world with nothing in it yet"; when
@@ -123,26 +130,39 @@ export class SyncWorldError extends Error {
 /**
  * One world's entities in a DM build: id → source path, and the meta Staging
  * reads. An entity of another world is left out, so a vault note can never
- * match, update or overwrite it (R-14). An entity with no `world` counts only
- * when the build has a single world (an older build).
+ * match, update or overwrite it (R-14); its id goes into `idsInOtherWorlds`
+ * instead, because note ids are global across worlds (the build refuses a
+ * duplicate) and a new note with that id must be held, not created. An
+ * entity with no `world` counts only when the build has a single world (an
+ * older build).
  */
 export function worldEntities(
   project: Pick<AtlasProject, "worlds" | "entities">,
   worldId: string,
-): { existingById: Map<string, string>; entityMeta: NonNullable<SyncWorld["entityMeta"]> } {
+): {
+  existingById: Map<string, string>;
+  entityMeta: NonNullable<SyncWorld["entityMeta"]>;
+  idsInOtherWorlds: Map<string, string>;
+} {
   const oneWorld = project.worlds.length === 1 && project.worlds[0].id === worldId;
   const existingById = new Map<string, string>();
   const entityMeta = new Map<
     string,
     { visibility: EntityVisibility; type: string; sourcePath: string }
   >();
+  const idsInOtherWorlds = new Map<string, string>();
   for (const e of project.entities) {
     if (!e.id || !e.sourcePath) continue;
-    if (e.world !== undefined && e.world !== "" ? e.world !== worldId : !oneWorld) continue;
+    if (e.world !== undefined && e.world !== "" ? e.world !== worldId : !oneWorld) {
+      if (!idsInOtherWorlds.has(e.id)) idsInOtherWorlds.set(e.id, e.world || "(no world)");
+      continue;
+    }
     existingById.set(e.id, e.sourcePath);
     entityMeta.set(e.id, { visibility: e.visibility, type: e.type, sourcePath: e.sourcePath });
   }
-  return { existingById, entityMeta };
+  // An id this world holds updates here; it is only "elsewhere" when it isn't.
+  for (const id of existingById.keys()) idsInOtherWorlds.delete(id);
+  return { existingById, entityMeta, idsInOtherWorlds };
 }
 
 /**
@@ -189,6 +209,7 @@ export function stagingContext(world: SyncWorld, syncMap?: SyncMap): StagingCont
     existingById: world.existingById,
     existingPaths: new Set(world.existingById.values()),
     entityMeta: world.entityMeta,
+    idsInOtherWorlds: world.idsInOtherWorlds,
     syncMap,
   };
 }
@@ -295,6 +316,9 @@ export function unattendedRefusal(row: StagingRow, world: SyncWorld): Unattended
     isPlayerVisible(row.resolvedVisibility)
   ) {
     return { kind: "lowers-secrecy", reason: `would show players a ${atlasVis} entity` };
+  }
+  if (isHeldForOtherWorld(row)) {
+    return { kind: "held", reason: `held for review (${otherWorldMessage(row)})` };
   }
   if (row.needsReview)
     return { kind: "held", reason: `held for review (${row.needsReview.reason})` };

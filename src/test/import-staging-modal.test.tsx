@@ -143,6 +143,19 @@ describe("ImportStagingModal", () => {
     ).toBe(true);
   });
 
+  it("R-14: a note whose id lives in another world is uncheckable and says which world", () => {
+    const ctx: StagingContext = { ...makeCtx(), idsInOtherWorlds: new Map([["corven", "nyr"]]) };
+    const rows = buildStagingRows(
+      [{ filename: "Corven.md", raw: "---\natlas: { type: npc, id: corven }\n---\n" }],
+      ctx,
+    );
+    render(<Harness initial={rows} ctx={ctx} />);
+    const cb = screen.getByLabelText("Include Corven.md") as HTMLInputElement;
+    expect(cb.disabled).toBe(true);
+    expect(cb.checked).toBe(false);
+    expect(screen.getByText(/"corven" is already a note in world nyr/)).toBeTruthy();
+  });
+
   it("Cancel calls onCancel without committing", () => {
     const onCommit = vi.fn();
     const rows = buildStagingRows(

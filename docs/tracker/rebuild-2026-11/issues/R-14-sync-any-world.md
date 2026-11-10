@@ -15,14 +15,19 @@ the wrong folder. The CLI already takes `--world` (`scripts/atlas-sync.ts:72`).
 
 - `syncWorldFromProject` requires a world id when the build has more than one world, and fails with
   a message listing the worlds; with exactly one world it may default to it. No `worlds[0]`.
-- `existingById` and `entityMeta` hold only the target world's entities; an entity with the same
-  id in another world is not matched, updated or overwritten.
+- `existingById` and `entityMeta` hold only the target world's entities; an entity of another
+  world is not matched, updated or overwritten. Note ids are global across worlds (the build's
+  duplicate-slug check refuses a second note with the same id; provisional call 2026-11-10), so a
+  vault note whose id lives in another world is held for review (`id-in-other-world`, naming that
+  world), can't be ticked or committed, and is refused by an unattended sync. The same holds for
+  the editor's drag-and-drop and paste import.
 - Files land under `content/<target world>/`; entries in the sync map (`.local-atlas/sync-map.json`,
-  read by `src/atlas/sync/useSyncSettings.ts`) carry their world, so the same vault note synced into
-  two worlds doesn't clash; an old map without worlds reads as the v1 default world.
+  read by `src/atlas/sync/useSyncSettings.ts`) carry their world; an old map without worlds reads as
+  the v1 default world.
 - A memory-port test (`VaultPort` in-memory adapter, `src/atlas/sync/vaultPort.ts`) with a DM build
-  of two worlds sharing one entity id: a sync into world B creates or updates only B's file and
-  leaves A's untouched; a dry run lists only B's rows.
+  of two worlds: a sync into world B with a vault note whose id is already in A holds that note and
+  writes nothing for it, B's own notes update only B's files, A's are untouched, and a dry run lists
+  only B's rows.
 - The editor's Sync panel and `useMdImportFlow` (`src/atlas/import/useMdImportFlow.ts`) pass an
   explicit world id; the old editor keeps working on today's one-world content.
 - R-01's guard is untouched: a real (non-dry-run) Sync still refuses while `hosting: public`.
@@ -53,5 +58,9 @@ the target's file only. `commitSync` refuses any change outside `content/<world>
 flat map reads as `defaultWorld`'s (the dev route and the CLI port normalize it; the browser
 never guesses), and a failed read throws instead of reading as empty. R-01's guard and the scan
 read every world's entries. The Sync panel shows and passes the open map's world and is disabled
-without one. Beyond the spec: `SyncWorld.dmBuildSize` lets a sync create notes in a world that
+without one. Note ids are global across worlds: a note whose id another world holds is held
+(`id-in-other-world`) in Sync and in the editor's import, can't be ticked or committed, and an
+unattended sync refuses it. Per-world map saves merge server-side under a lock file
+(`saveWorldSyncMap`, the dev route `/__atlas/local/sync-map/world` and the CLI port), so two worlds'
+saves never lose each other's entries. Beyond the spec: `SyncWorld.dmBuildSize` lets a sync create notes in a world that
 has no entities yet while the DM-build check still covers the whole build.

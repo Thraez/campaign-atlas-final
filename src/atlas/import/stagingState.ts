@@ -85,6 +85,12 @@ export interface StagingContext {
   existingPaths: ReadonlySet<string>;
   /** Vault-path → { id, baseType } from the last sync. Used for identity resolution when atlas.id is absent. */
   syncMap?: SyncMap;
+  /**
+   * Entity id → the world holding it, for ids taken by other worlds (R-14).
+   * A new note with one of these ids is held ("id-in-other-world"): note ids
+   * are global across worlds, so it would be a second copy the build refuses.
+   */
+  idsInOtherWorlds?: ReadonlyMap<string, string>;
   /** entity id → { visibility, type, sourcePath } from the DM atlas. Used to detect exposure/type conflicts. */
   entityMeta?: ReadonlyMap<
     string,
@@ -131,7 +137,18 @@ export interface StagingRow {
   /** Opt-in review flag: row defaults to included=false until the DM ticks it (Phase 2 populates). */
   needsReview?: {
     reason:
-      "secrecy-increase" | "vault-more-secret" | "rename-link" | "type-conflict" | "local-edits";
+      | "secrecy-increase"
+      | "vault-more-secret"
+      | "rename-link"
+      | "type-conflict"
+      | "local-edits"
+      | "id-in-other-world";
+    /**
+     * For "id-in-other-world": the world that already has a note with this id.
+     * Note ids are global across worlds (the build refuses a duplicate), so
+     * the row can't be written until the DM gives the note another id.
+     */
+    otherWorld?: string;
   };
   /** Vault-relative POSIX path — present when the row came from a vault scan (openWithVaultScan). */
   vaultRelPath?: string;
@@ -272,7 +289,11 @@ export function buildStagingRow(input: RawImportFile, ctx: StagingContext): Stag
   // Only computed for update rows; create/collision rows are never auto-exposed.
   let needsReview: StagingRow["needsReview"] = undefined;
   const meta = rowKind === "update" ? ctx.entityMeta?.get(resolvedId) : undefined;
-  if (meta) {
+  const otherWorld = rowKind !== "update" ? ctx.idsInOtherWorlds?.get(resolvedId) : undefined;
+  if (otherWorld !== undefined) {
+    // R-14: the id already names a note in another world. Never a second copy.
+    needsReview = { reason: "id-in-other-world", otherWorld };
+  } else if (meta) {
     // Check secrecy increase: canon is hidden-tier, vault wants player visibility
     if (detectExposureIncrease(meta.visibility, note.atlas)) {
       needsReview = { reason: "secrecy-increase" };
@@ -395,7 +416,9 @@ export function updateStagingRow(
   }
 
   let nextIncluded: boolean;
-  if (patch.included !== undefined) {
+  if (isHeldForOtherWorld(row)) {
+    nextIncluded = false; // R-14: no tick or edit writes a second copy of another world's note
+  } else if (patch.included !== undefined) {
     nextIncluded = !row.parseError && pathAllowed && patch.included;
   } else if (typeChanged || pathChangedByCaller) {
     nextIncluded = !row.parseError && pathAllowed && nextRowKind !== "path-collision";
@@ -412,4 +435,15 @@ export function updateStagingRow(
     included: nextIncluded,
     resolvedVisibility: patch.resolvedVisibility ?? row.resolvedVisibility,
   };
+}
+
+/** R-14: the row's id names a note in another world; it can't be written from here. */
+export function isHeldForOtherWorld(row: Pick<StagingRow, "needsReview">): boolean {
+  return row.needsReview?.reason === "id-in-other-world";
+}
+
+/** What the DM is told about a row held because its id lives in another world. */
+export function otherWorldMessage(row: Pick<StagingRow, "resolvedId" | "needsReview">): string {
+  const world = row.needsReview?.otherWorld ?? "another world";
+  return `id "${row.resolvedId}" is already a note in world ${world}; give the vault note its own atlas.id to bring it in here`;
 }

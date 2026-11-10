@@ -48,9 +48,13 @@ the player projection drops all frontmatter, so it never reaches players.
 **One world per sync (R-14).** A sync writes into one world: the editor's Sync panel uses the
 world of the open map and says which; `npm run atlas:sync` needs `--world <id>` when the DM build has
 more than one world. It only matches notes against that world's entities and only writes under
-`content/<world>/`. `.local-atlas/sync-map.json` keeps one map per world
-(`{"version": 2, "worlds": {...}}`); an older flat map reads as `defaultWorld`'s from
-`atlas.config.json`. The save guard and the scan read every world's entries.
+`content/<world>/`. Note ids are global across worlds (the build refuses a duplicate), so a
+vault note whose id another world already holds is held for review and never written as a second
+copy. `.local-atlas/sync-map.json` keeps one map per world (`{"version": 2, "worlds": {...}}`),
+and each save merges its world into the file under a lock. An older flat map is assigned wholesale
+to `defaultWorld` from `atlas.config.json`: entries synced into another world before R-14 can't be
+split back out. The save guard and the scan read every world's entries; while hosting is public, a map they
+can't read (an unknown version, a malformed `worlds`) refuses every note save.
 
 **A stale sync map.** A machine whose old `.local-atlas/sync-map.json` lists sample notes fails the
 scan (and can't save those notes while public). The scan's message says to delete the map.

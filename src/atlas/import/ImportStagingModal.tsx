@@ -29,7 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { StagingRow } from "./stagingState";
+import { isHeldForOtherWorld, otherWorldMessage, type StagingRow } from "./stagingState";
 import type { ImportFolderConfig } from "../content/schema";
 import { ALL_VISIBILITY } from "../content/visibility";
 
@@ -141,7 +141,7 @@ export function ImportStagingModal({
                         type="checkbox"
                         aria-label={`Include ${row.filename}`}
                         checked={row.included}
-                        disabled={blocked}
+                        disabled={blocked || isHeldForOtherWorld(row)}
                         onChange={(e) => onPatchRow(row.id, { included: e.target.checked })}
                       />
                     </td>
@@ -301,7 +301,9 @@ export function ImportStagingModal({
                                 ? "vault marks this player note DM-only; ticking it hides it from players"
                                 : row.needsReview.reason === "type-conflict"
                                   ? "type changed on both sides"
-                                  : "needs your attention"}
+                                  : row.needsReview.reason === "id-in-other-world"
+                                    ? otherWorldMessage(row)
+                                    : "needs your attention"}
                           </Badge>
                         )}
 

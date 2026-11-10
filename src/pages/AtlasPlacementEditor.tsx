@@ -280,7 +280,8 @@ function AtlasPlacementEditorInner() {
   // so the staging layer can detect same-id imports and route them to the
   // existing file in-place (update), rather than creating a parallel copy.
   // R-14: import and Sync target the active map's world, and see only that
-  // world's entities, so a note never updates another world's entity.
+  // world's entities, so a note never updates another world's entity; a note
+  // whose id another world holds is held (ids are global across worlds).
   const importWorldId = project?.maps.find((m) => m.id === activeMapId)?.worldId ?? "";
   const importEntities = useMemo(
     () =>
@@ -292,6 +293,7 @@ function AtlasPlacementEditorInner() {
               string,
               { visibility: EntityVisibility; type: string; sourcePath: string }
             >(),
+            idsInOtherWorlds: new Map<string, string>(),
           },
     [project, importWorldId],
   );
@@ -312,6 +314,7 @@ function AtlasPlacementEditorInner() {
     importConfig,
     existingById: importExistingById,
     entityMeta: importEntityMeta,
+    idsInOtherWorlds: importEntities.idsInOtherWorlds,
     dmBuildSize,
     onImported: reloadCanon,
   });
