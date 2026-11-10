@@ -10,6 +10,7 @@ import {
   pointOnPolygonEdge,
   pointStrictlyInPolygon,
   polygonContainsStrictly,
+  polygonHasArea,
   polygonsTouch,
   segmentsCrossProperly,
   segmentsIntersect,
@@ -184,6 +185,28 @@ describe("segment helpers", () => {
 });
 
 describe("pathReachesPolygon (routes)", () => {
+  it("a path entering only through two corners (the review's collinear diagonal) reaches it", () => {
+    const hiding = rect(100, 100, 200, 200);
+    expect(
+      pathReachesPolygon(
+        [
+          [50, 50],
+          [250, 250],
+          [300, 300],
+        ],
+        hiding,
+      ),
+    ).toBe(true);
+    expect(
+      pathReachesPolygon(
+        [
+          [50, 50],
+          [300, 300],
+        ],
+        hiding,
+      ),
+    ).toBe(true);
+  });
   it("a vertex inside or on the edge reaches it", () => {
     expect(
       pathReachesPolygon(
@@ -318,6 +341,79 @@ describe("polygonsTouch (areas share interior)", () => {
       ),
     ).toBe(true);
   });
+  describe("an area with no width entering only through the other's vertices (review)", () => {
+    const hiding = rect(100, 100, 200, 200);
+    it("a collinear area along the diagonal, through two corners: yes, both ways round", () => {
+      const line: Point[] = [
+        [50, 50],
+        [250, 250],
+        [300, 300],
+      ];
+      expect(polygonsTouch(line, hiding)).toBe(true);
+      expect(polygonsTouch(hiding, line)).toBe(true);
+    });
+    it("a collinear area through a corner and across to an edge: yes", () => {
+      expect(
+        polygonsTouch(
+          [
+            [50, 50],
+            [150, 150],
+            [150, 200],
+          ],
+          hiding,
+        ),
+      ).toBe(true);
+      expect(
+        polygonsTouch(
+          [
+            [-5, 5],
+            [15, 5],
+            [20, 5],
+          ],
+          rect(0, 0, 10, 10),
+        ),
+      ).toBe(true);
+    });
+    it("a zero-width spike off a normal polygon, out through two corners: yes", () => {
+      const spiked: Point[] = [
+        [250, 250],
+        [400, 250],
+        [400, 400],
+        [250, 400],
+        [250, 250],
+        [50, 50],
+      ];
+      expect(polygonsTouch(spiked, hiding)).toBe(true);
+      expect(polygonsTouch(hiding, spiked)).toBe(true);
+      // Without the spike the body is apart.
+      expect(polygonsTouch(rect(250, 250, 400, 400), hiding)).toBe(false);
+    });
+    it("a thin sliver through two corners: yes", () => {
+      expect(
+        polygonsTouch(
+          [
+            [-5, -5],
+            [15, 15.0000001],
+            [15, 15],
+            [-5, -5.0000001],
+          ],
+          rect(0, 0, 10, 10),
+        ),
+      ).toBe(true);
+    });
+    it("a collinear area running only along an edge: no (boundary, not interior)", () => {
+      expect(
+        polygonsTouch(
+          [
+            [50, 100],
+            [250, 100],
+            [300, 100],
+          ],
+          hiding,
+        ),
+      ).toBe(false);
+    });
+  });
   it("a rotated frame reaching in by its turned corner: yes", () => {
     const c = Math.SQRT1_2;
     // A 100 x 100 square turned 45 degrees about (0, 0): its corner at (0, 141) reaches into the zone.
@@ -329,6 +425,52 @@ describe("polygonsTouch (areas share interior)", () => {
     ];
     expect(polygonsTouch(turned, rect(-10, 130, 10, 160))).toBe(true);
     expect(polygonsTouch(turned, rect(80, 0, 100, 20))).toBe(false);
+  });
+});
+
+describe("polygonHasArea (a hiding region with no area is malformed)", () => {
+  it("a normal, concave or self-crossing polygon has area", () => {
+    expect(polygonHasArea(square)).toBe(true);
+    expect(polygonHasArea(U)).toBe(true);
+    expect(polygonHasArea(BOW_TIE)).toBe(true);
+    expect(polygonHasArea(STAR)).toBe(true);
+  });
+  it("collinear, repeated, retraced or too few points: no area", () => {
+    expect(
+      polygonHasArea([
+        [0, 5],
+        [10, 5],
+        [5, 5],
+      ]),
+    ).toBe(false);
+    expect(
+      polygonHasArea([
+        [0, 0],
+        [10, 10],
+        [20, 20],
+      ]),
+    ).toBe(false);
+    expect(
+      polygonHasArea([
+        [5, 5],
+        [5, 5],
+        [5, 5],
+      ]),
+    ).toBe(false);
+    expect(
+      polygonHasArea([
+        [0, 0],
+        [10, 0],
+        [10, 10],
+        [10, 0],
+      ]),
+    ).toBe(false);
+    expect(
+      polygonHasArea([
+        [0, 0],
+        [10, 0],
+      ]),
+    ).toBe(false);
   });
 });
 

@@ -52,7 +52,7 @@
  *      child map with `frame-in-hidden-region`, and the subtree with it.
  *      Hidden wins over any shipped region covering the same point. Geometry
  *      is even-odd, in the map's pixels (`src/atlas/geometry/polygon.ts`). A
- *      hiding region with fewer than 3 finite points is reported in
+ *      hiding region with fewer than 3 finite points, or no area, is reported in
  *      `badHidingRegions` and hides everything on its map that this rule
  *      tests. Region own-verdicts come before pins, so a route's pin waypoint
  *      hidden here makes it `waypoint-hidden`. Maps, worlds, notes and region
@@ -67,6 +67,7 @@ import {
   pointInOrOnPolygon,
   pointInPolygon,
   polygonContainsStrictly,
+  polygonHasArea,
   polygonsTouch,
 } from "../geometry/polygon";
 import { slugify } from "./slugify";
@@ -523,9 +524,12 @@ interface HidingRegion {
   points: Point[] | null;
 }
 
-/** At least 3 points, each a pair of finite numbers; otherwise null. */
+/** At least 3 points, each a pair of finite numbers, enclosing some area; otherwise null. */
 function testablePolygon(points: unknown): Point[] | null {
   if (!Array.isArray(points) || points.length < 3 || !points.every(isFinitePoint)) return null;
+  // No area (all on a line, repeated points): a drawing mistake, and what it
+  // was meant to hide can't be known, so it fails the player build too.
+  if (!polygonHasArea(points as Point[])) return null;
   return points as Point[];
 }
 
@@ -812,9 +816,9 @@ export function resolveCampaign(
     return shipsIn(entry.visibility, campaignId) ? out(true, "ships") : out(false, "entry");
   }
 
-  // Hiding regions too malformed to test (fewer than 3 finite points): the
-  // player build fails on them; until then everything on their map that rule 9
-  // tests is hidden (fail closed).
+  // Hiding regions too malformed to test (fewer than 3 finite points, or no
+  // area): the player build fails on them; until then everything on their map
+  // that rule 9 tests is hidden (fail closed).
   const badHidingRegions: { map: MapId; region: string }[] = [];
   for (const [entry, list] of hiding) {
     for (const h of list) if (!h.points) badHidingRegions.push({ map: entry.map.id, region: h.region.id });

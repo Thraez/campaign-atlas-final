@@ -1221,6 +1221,7 @@ describe("rule 9: a hidden region hides what is inside or reaching into it", () 
         route("along-edge", [[300, 400], [700, 400]]),
         route("touches-corner", [[300, 700], [400, 600], [300, 500]]),
         route("clear", [[300, 300], [700, 300]]),
+        route("diagonal-via-corners", [[300, 300], [650, 650], [700, 700]]),
         route("via-hidden-pin", [{ entityId: "n" }, { entityId: "inside" }]),
         route("crosses-via-pins", [{ entityId: "n" }, [900, 900]]),
       ],
@@ -1229,7 +1230,7 @@ describe("rule 9: a hidden region hides what is inside or reaching into it", () 
     const r = (res: CampaignResolution, id: string) => reason(res.routes, (x) => x.id === id);
 
     it("a vertex inside, a segment crossing with no vertex inside, along an edge, or touching a corner: hidden in a", () => {
-      for (const id of ["vertex-in", "crosses", "along-edge", "touches-corner"]) expect(r(a, id), id).toBe("in-hidden-region");
+      for (const id of ["vertex-in", "crosses", "along-edge", "touches-corner", "diagonal-via-corners"]) expect(r(a, id), id).toBe("in-hidden-region");
       expect(r(a, "clear")).toBe("ships");
     });
 
@@ -1254,6 +1255,10 @@ describe("rule 9: a hidden region hides what is inside or reaching into it", () 
       ["neighbour", rect(600, 400, 700, 600), "ships"],
       ["corner-neighbour", rect(600, 600, 700, 700), "ships"],
       ["apart", rect(10, 10, 90, 90), "ships"],
+      // No width, entering only through the lair's corners (400,400) and (600,600).
+      ["collinear-through-corners", [[300, 300], [650, 650], [700, 700]], "in-hidden-region"],
+      ["spike-through-corners", [[650, 650], [800, 650], [800, 800], [650, 800], [650, 650], [300, 300]], "in-hidden-region"],
+      ["collinear-along-edge", [[300, 400], [650, 400], [700, 400]], "ships"],
     ];
     const m = map("m", {
       regions: [LAIR, ...shapes.map(([id, pts]) => region(`r-${id}`, pts))],
@@ -1387,6 +1392,8 @@ describe("rule 9: a hidden region hides what is inside or reaching into it", () 
     it.each([
       { label: "two points", points: [[1, 1], [2, 2]] as Point[] },
       { label: "a non-finite point", points: [[1, 1], [2, Number.NaN], [3, 1]] as Point[] },
+      { label: "no area: all on one line", points: [[1, 1], [2, 2], [3, 3]] as Point[] },
+      { label: "no area: one point repeated", points: [[5, 5], [5, 5], [5, 5]] as Point[] },
     ])("$label: reported, and everything rule 9 tests on its map is hidden", ({ points }) => {
       const m = map("m", {
         regions: [{ id: "bad", name: "Bad", points, visibility: "dm" }, region("ok", rect(10, 10, 90, 90))],
@@ -1410,8 +1417,11 @@ describe("rule 9: a hidden region hides what is inside or reaching into it", () 
       expect(pinShips(r, "o")).toBe(true);
     });
 
-    it("a malformed region that ships (player) is not reported", () => {
-      const m = map("m", { regions: [{ id: "bad", name: "Bad", points: [[1, 1], [2, 2]] as Point[], visibility: "player" }] });
+    it.each([
+      [[[1, 1], [2, 2]] as Point[]],
+      [[[1, 1], [2, 2], [3, 3]] as Point[]],
+    ])("a malformed region that ships (player) is not reported: %j", (points) => {
+      const m = map("m", { regions: [{ id: "bad", name: "Bad", points, visibility: "player" }] });
       const r = resolveCampaign(model([world("w", [m])], [campaign("a", { m: OPEN })]), [], "a");
       expect(r.badHidingRegions).toEqual([]);
     });

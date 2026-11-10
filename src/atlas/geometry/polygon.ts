@@ -217,12 +217,49 @@ function boxesOverlap(a: BBox, b: BBox): boolean {
 }
 
 /**
+ * True when any edge of `a` runs through the interior of `b`: each edge is
+ * cut at every point where it meets an edge of `b` (a crossing, or a vertex of
+ * `b` on it), and a piece whose middle is strictly inside `b` lies inside it,
+ * since no piece meets `b`'s boundary between its ends. Catches an edge that
+ * enters `b` only through `b`'s vertices, which no proper crossing sees.
+ */
+function edgeRunsInside(a: readonly Point[], b: readonly Point[]): boolean {
+  if (a.length < 2 || b.length < 3) return false;
+  const eb = ring(b);
+  for (const [p, q] of ring(a)) {
+    const dx = q[0] - p[0];
+    const dy = q[1] - p[1];
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) continue;
+    const along = (c: Point) => ((c[0] - p[0]) * dx + (c[1] - p[1]) * dy) / len2;
+    const ts = [0, 1];
+    for (const [r, s] of eb) {
+      if (pointOnSegment(r, p, q)) ts.push(along(r));
+      if (pointOnSegment(s, p, q)) ts.push(along(s));
+      if (segmentsCrossProperly(p, q, r, s)) {
+        const d = dx * (s[1] - r[1]) - dy * (s[0] - r[0]);
+        if (d !== 0) ts.push(((r[0] - p[0]) * (s[1] - r[1]) - (r[1] - p[1]) * (s[0] - r[0])) / d);
+      }
+    }
+    const sorted = ts.map((t) => Math.min(1, Math.max(0, t))).sort((x, y) => x - y);
+    for (let i = 0; i + 1 < sorted.length; i++) {
+      if (sorted[i + 1] <= sorted[i]) continue;
+      const t = (sorted[i] + sorted[i + 1]) / 2;
+      if (pointStrictlyInPolygon(p[0] + t * dx, p[1] + t * dy, b)) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * True when the two areas share interior (rule 9's "touches"): a vertex of
- * either strictly inside the other, two edges properly crossing, or any face
- * of their edges' arrangement inside both (so an identical area, or one
- * overlapping along a collinear edge, touches). Two neighbours that only share
- * an edge, or a vertex, don't. An item with no area (fewer than 3 points, or
- * all on a line) touches when it reaches into the other's interior.
+ * either strictly inside the other, two edges properly crossing, an edge of
+ * either running through the other's interior (entering only through its
+ * vertices, say), or any face of their edges' arrangement inside both (so an
+ * identical area, or one overlapping along a collinear edge, touches). Two
+ * neighbours that only share an edge, or a vertex, don't. An area with no
+ * width (all on a line, or a zero-width spike) touches wherever an edge of it
+ * passes through the other's interior: Leaflet draws its stroke there.
  */
 export function polygonsTouch(a: readonly Point[], b: readonly Point[]): boolean {
   const ba = bboxOf(a as Point[]);
@@ -234,6 +271,7 @@ export function polygonsTouch(a: readonly Point[], b: readonly Point[]): boolean
   const eb = b.length >= 2 ? ring(b) : [];
   for (const [p, q] of ea)
     for (const [r, s] of eb) if (segmentsCrossProperly(p, q, r, s)) return true;
+  if (edgeRunsInside(a, b) || edgeRunsInside(b, a)) return true;
   if (a.length < 3 || b.length < 3) return false;
   const box: BBox = {
     minX: Math.max(ba.minX, bb.minX),
@@ -244,6 +282,18 @@ export function polygonsTouch(a: readonly Point[], b: readonly Point[]): boolean
   return faceSamples([a, b], box).some(
     ([x, y]) => pointInPolygon(x, y, a as Point[]) && pointInPolygon(x, y, b as Point[]),
   );
+}
+
+/**
+ * True when the polygon encloses any area (even-odd): some face of its own
+ * edges' arrangement is inside it. False for fewer than 3 points, points all
+ * on one line, or a ring that retraces itself.
+ */
+export function polygonHasArea(poly: readonly Point[]): boolean {
+  if (poly.length < 3) return false;
+  const box = bboxOf(poly as Point[]);
+  if (!box) return false;
+  return faceSamples([poly], box).some(([x, y]) => pointInPolygon(x, y, poly as Point[]));
 }
 
 /**

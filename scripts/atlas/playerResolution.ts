@@ -18,6 +18,7 @@ import {
 } from "../../src/atlas/content/resolveCampaign";
 import { V1_CAMPAIGN_ID } from "../../src/atlas/content/v1Model";
 import { loadAtlasModel, type LoadAtlasModelConfig } from "./loadAtlasModel";
+import type { DroppedRegion } from "./loadWorldConfig";
 
 export interface PlayerResolution {
   resolution: CampaignResolution;
@@ -110,7 +111,7 @@ export function playerResolution(
     ),
     badHidingRegionMessages: resolution.badHidingRegions.map(
       (b) =>
-        `map "${b.map}": hidden region "${b.region}" has fewer than 3 finite points, so what lies inside it can't be tested (rule 9) — fix its points`,
+        `map "${b.map}": hidden region "${b.region}" has fewer than 3 finite points or no area, so what lies inside it can't be tested (rule 9) — fix its points`,
     ),
     hiddenPinNoteMessages: resolution.hiddenPinNotes.map(
       (h) =>
@@ -129,6 +130,22 @@ export function loadPlayerResolution(
 ): PlayerResolution {
   const { model, notes } = loadAtlasModel(contentDir, config, { root });
   return playerResolution(model, resolveCampaign(model, notes, V1_CAMPAIGN_ID));
+}
+
+/**
+ * v1 only: regions `loadWorldConfig` dropped before the resolver could see
+ * them (a repeated id, fewer than 3 points). One whose visibility isn't
+ * explicitly `player` may have been meant to hide what lies inside it (rule
+ * 9), so the player build fails on it as on a bad hiding region (exit 12).
+ * The DM build is unchanged. Messages name DM-only regions.
+ */
+export function droppedRegionMessages(dropped: readonly DroppedRegion[] | undefined): string[] {
+  return (dropped ?? [])
+    .filter((d) => d.visibility !== "player")
+    .map(
+      (d) =>
+        `map "${d.mapId}": region "${d.id}" was dropped (${d.why}) and isn't marked visibility: player, so what it may hide can't be tested (rule 9) — fix it, or mark it player`,
+    );
 }
 
 /**
