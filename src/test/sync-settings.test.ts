@@ -113,7 +113,7 @@ describe("loadSyncMapFile", () => {
 
   it("rejects an old flat map: the dev server upgrades it, the browser can't tell its world", async () => {
     stubFetch(true, { "notes/corven.md": { id: "corven", baseType: "npc" } });
-    await expect(loadSyncMapFile()).rejects.toThrow(/predates worlds/);
+    await expect(loadSyncMapFile()).rejects.toThrow(/predates per-world sync/);
   });
 });
 

@@ -139,7 +139,7 @@ describe("a sync into world B over the memory port", () => {
     createMemoryVaultPort({
       notes: { "03_Entities/Corven.md": VAULT_CORVEN, "03_Entities/Sela.md": VAULT_SELA },
       atlas: { [A_CORVEN]: A_TEXT, [B_SELA]: B_TEXT },
-      defaultWorld: "a",
+      legacyWorld: "a",
     });
 
   it("a dry run updates B's own note and holds the note whose id lives in A", async () => {
@@ -192,7 +192,15 @@ describe("a sync into world B over the memory port", () => {
     const forced = plan.rows.map((r) => (r === corven ? { ...r, included: true } : r));
     await expect(commitSync(p, world, forced, plan.source)).rejects.toThrow(ImportCommitError);
     await expect(commitSync(p, world, forced, plan.source)).rejects.toThrow(/world a/);
+    // With its review flag stripped too, commitSync still checks the id itself.
+    const stripped = plan.rows.map((r) =>
+      r === corven ? { ...r, included: true, needsReview: undefined } : r,
+    );
+    await expect(commitSync(p, world, stripped, plan.source)).rejects.toThrow(
+      /"corven" is already a note in world a/,
+    );
     expect(p.writes).toEqual([]);
+    expect(p.atlas.has(B_CORVEN)).toBe(false);
   });
 
   it("creates under content/b/ a note whose id no world has", async () => {
@@ -221,7 +229,7 @@ describe("a sync into world B over the memory port", () => {
     createMemoryVaultPort({
       notes: { "03_Entities/Corven.md": VAULT_CORVEN_DM, "03_Entities/Sela.md": VAULT_SELA },
       atlas: { [A_CORVEN]: A_TEXT, [B_SELA]: B_TEXT },
-      defaultWorld: "a",
+      legacyWorld: "a",
     });
 
   it("syncing A then B keeps each world's sync-map entries", async () => {
@@ -240,13 +248,13 @@ describe("a sync into world B over the memory port", () => {
     expect(rowFor(again.rows, "corven").vaultState).toBe("unchanged");
   });
 
-  it("an old flat sync map reads as the default world's, not B's", async () => {
+  it("an old flat sync map belongs to the build's only world", async () => {
     const hash = await hashContent(VAULT_SELA);
     const p = createMemoryVaultPort({
       notes: { "03_Entities/Sela.md": VAULT_SELA },
       atlas: { [A_CORVEN]: A_TEXT, [B_SELA]: B_TEXT },
       syncMap: { "03_Entities/Sela.md": { id: "sela", baseType: "npc", approvedHash: hash } },
-      defaultWorld: "a",
+      legacyWorld: "a",
     });
     const inA = await planSync(p, syncWorldFromProject(twoWorlds(), "a"), SOURCE, {
       dryRun: true,
@@ -258,13 +266,27 @@ describe("a sync into world B over the memory port", () => {
     expect(inB.rows.map((r) => r.vaultState)).toEqual(["new"]);
   });
 
+  it("an old flat sync map is refused when the build has several worlds", () => {
+    expect(() =>
+      createMemoryVaultPort({
+        syncMap: { "03_Entities/Sela.md": { id: "sela", baseType: "npc" } },
+        legacyWorld: null,
+      }),
+    ).toThrow(/predates per-world sync/);
+  });
+
   it("refuses rows staged for another world, writing nothing", async () => {
     const p = dmPort();
     const planA = await planSync(p, syncWorldFromProject(twoWorlds(), "a"), SOURCE);
     const aRows = planA.rows.filter((r) => r.resolvedId === "corven");
-    await expect(
-      commitSync(p, syncWorldFromProject(twoWorlds(), "b"), aRows, planA.source),
-    ).rejects.toThrow(/outside the world being synced/);
+    const intoB = syncWorldFromProject(twoWorlds(), "b");
+    await expect(commitSync(p, intoB, aRows, planA.source)).rejects.toThrow(
+      /already a note in world a/,
+    );
+    // The path guard holds on its own too, without the id check.
+    await expect(commitSync(p, { worldId: "b" }, aRows, planA.source)).rejects.toThrow(
+      /outside the world being synced/,
+    );
     expect(p.atlas.get(A_CORVEN)).toBe(A_TEXT);
     expect(p.writes).toEqual([]);
   });
@@ -346,13 +368,42 @@ describe("the sync-map file on disk", () => {
       root: tmp,
     })) as { status: number; json: unknown };
 
-  it("the dev route serves an old flat map as the default world's", async () => {
-    write("atlas.config.json", JSON.stringify({ defaultWorld: "a" }));
+  const oneWorldBuild = () => {
+    const two = twoWorlds();
+    return { ...two, worlds: two.worlds.filter((w) => w.id === "a") };
+  };
+
+  it("the dev route serves an old flat map as the one-world build's", async () => {
+    write(".local-atlas/atlas.json", JSON.stringify(oneWorldBuild()));
     write(".local-atlas/sync-map.json", JSON.stringify({ "x.md": { id: "x", baseType: "npc" } }));
     expect(await getSyncMap()).toEqual({
       status: 200,
       json: { version: 2, worlds: { a: { "x.md": { id: "x", baseType: "npc" } } } },
     });
+  });
+
+  it("the dev route refuses an old flat map when the build has several worlds, or none", async () => {
+    write(".local-atlas/sync-map.json", JSON.stringify({ "x.md": { id: "x", baseType: "npc" } }));
+    const noBuild = (await getSyncMap()) as { status: number; json: { detail: string } };
+    expect(noBuild.status).toBe(500);
+    write(".local-atlas/atlas.json", JSON.stringify(twoWorlds()));
+    const two = (await getSyncMap()) as { status: number; json: { detail: string } };
+    expect(two.status).toBe(500);
+    expect(two.json.detail).toMatch(/predates per-world sync.*delete .*sync once on a one-world/);
+  });
+
+  it("local-write refuses sync-map.json and names the merge route; reads still work", async () => {
+    const before = JSON.stringify({ version: 2, worlds: { a: { "A.md": { id: "x" } } } });
+    write(".local-atlas/sync-map.json", before);
+    const r = await route(DEV_API_PATHS.localWrite, "POST").handle({
+      url: new URL(`http://localhost${DEV_API_PATHS.localWrite}`),
+      body: { name: "sync-map.json", contents: "{}" },
+      root: tmp,
+    });
+    expect(r).toMatchObject({ status: 400 });
+    expect(JSON.stringify(r)).toContain(DEV_API_PATHS.localSyncMapWorld);
+    expect(fs.readFileSync(path.join(tmp, ".local-atlas/sync-map.json"), "utf8")).toBe(before);
+    expect(await getSyncMap()).toMatchObject({ status: 200, json: JSON.parse(before) });
   });
 
   it("the dev route serves no map as empty, and a broken one as an error", async () => {
@@ -362,6 +413,7 @@ describe("the sync-map file on disk", () => {
   });
 
   it("two concurrent saves for different worlds both land", async () => {
+    write(".local-atlas/atlas.json", JSON.stringify(twoWorlds()));
     write(
       ".local-atlas/sync-map.json",
       JSON.stringify({ version: 2, worlds: { c: { "C.md": { id: "c", baseType: "npc" } } } }),
@@ -375,13 +427,60 @@ describe("the sync-map file on disk", () => {
     expect(fs.existsSync(path.join(tmp, ".local-atlas/sync-map.json.lock"))).toBe(false);
   });
 
+  it("a lock taken over by another process is left alone", async () => {
+    write(".local-atlas/atlas.json", JSON.stringify(twoWorlds()));
+    const lock = path.join(tmp, ".local-atlas/sync-map.json.lock");
+    // A stale lock (older than 30 s): the save takes it over and removes only its own.
+    write(".local-atlas/sync-map.json.lock", "dead:1");
+    const old = new Date(Date.now() - 60_000);
+    fs.utimesSync(lock, old, old);
+    expect((await postWorld({ worldId: "a", map: {} })).status).toBe(200);
+    expect(fs.existsSync(lock)).toBe(false);
+    // The token is checked on release: a lock that now holds someone else's token stays.
+    const real = fs.promises.readFile.bind(fs.promises);
+    const spy = vi.spyOn(fs.promises, "readFile").mockImplementation((async (
+      f: Parameters<typeof real>[0],
+      o?: Parameters<typeof real>[1],
+    ) => {
+      if (String(f) === lock) {
+        fs.writeFileSync(lock, "other:2");
+        return "other:2";
+      }
+      return real(f, o);
+    }) as typeof fs.promises.readFile);
+    try {
+      expect((await postWorld({ worldId: "b", map: {} })).status).toBe(200);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(fs.readFileSync(lock, "utf8")).toBe("other:2");
+  });
+
   it("the merge route keeps unknown top-level fields and refuses a bad body", async () => {
+    write(".local-atlas/atlas.json", JSON.stringify(twoWorlds()));
     write(".local-atlas/sync-map.json", JSON.stringify({ version: 2, worlds: {}, note: "keep" }));
     await postWorld({ worldId: "a", map: {} });
     expect(readMap()).toEqual({ version: 2, worlds: { a: {} }, note: "keep" });
-    expect((await postWorld({ worldId: "", map: {} })).status).toBe(400);
-    expect((await postWorld({ worldId: "a", map: [] })).status).toBe(400);
-    expect((await postWorld({ worldId: "__proto__", map: {} })).status).toBe(500);
+    for (const body of [
+      null,
+      "a",
+      [],
+      { worldId: "", map: {} },
+      { worldId: "a", map: [] },
+      { worldId: "__proto__", map: {} },
+      { worldId: "constructor", map: {} },
+      { worldId: "z", map: {} },
+      { worldId: "a", map: { "x.md": "str" } },
+      { worldId: "a", map: { "x.md": { baseType: "npc" } } },
+    ]) {
+      expect((await postWorld(body)).status, JSON.stringify(body)).toBe(400);
+    }
+    expect(readMap()).toEqual({ version: 2, worlds: { a: {} }, note: "keep" });
+  });
+
+  it("the merge route refuses every world while there is no DM build", async () => {
+    expect((await postWorld({ worldId: "a", map: {} })).status).toBe(400);
+    expect(fs.existsSync(path.join(tmp, ".local-atlas/sync-map.json"))).toBe(false);
   });
 
   describe("the R-01 save guard while public", () => {
@@ -411,6 +510,8 @@ describe("the sync-map file on disk", () => {
       ["an unknown version", { version: 3, worlds: {} }],
       ["worlds as a list", { version: 2, worlds: [{ "x.md": { id: "corven" } }] }],
       ["a reserved world id", '{"version":2,"worlds":{"__proto__":{}}}'],
+      ["an entry that isn't an object", { version: 2, worlds: { a: { "x.md": "str" } } }],
+      ["an entry with no id", { version: 2, worlds: { a: { "x.md": { baseType: "npc" } } } }],
     ])("refuses every note save on a map Sync can't read: %s", async (_label, map) => {
       write(".local-atlas/sync-map.json", typeof map === "string" ? map : JSON.stringify(map));
       expect(await save("content/a/npcs/other.md", "Other")).toBe(403);
@@ -424,10 +525,7 @@ describe("the sync-map file on disk", () => {
       write("vault/03_Entities/Sela.md", VAULT_SELA);
       write(A_CORVEN, A_TEXT);
       write(B_SELA, B_TEXT);
-      write(
-        "atlas.config.json",
-        JSON.stringify({ contentRoot: "content", defaultWorld: "a", hosting: "private" }),
-      );
+      write("atlas.config.json", JSON.stringify({ contentRoot: "content", hosting: "private" }));
       write(".local-atlas/atlas.json", JSON.stringify(twoWorlds()));
     });
 
@@ -445,10 +543,23 @@ describe("the sync-map file on disk", () => {
       expect(fs.readFileSync(path.join(tmp, B_SELA), "utf8")).toBe(B_TEXT);
     });
 
-    it("--world b --skip-held writes only B's note and B's map, keeping A's old entries", async () => {
+    it("refuses an old flat sync map on a two-world build", async () => {
       write(
         ".local-atlas/sync-map.json",
         JSON.stringify({ "01_Lore/Old.md": { id: "old", baseType: "lore" } }),
+      );
+      await expect(
+        runSyncCli(parseSyncArgs(["--dry-run", vault(), "--repo", tmp, "--world", "b"])),
+      ).rejects.toThrow(/predates per-world sync/);
+    });
+
+    it("--world b --skip-held writes only B's note and B's map, keeping A's entries", async () => {
+      write(
+        ".local-atlas/sync-map.json",
+        JSON.stringify({
+          version: 2,
+          worlds: { a: { "01_Lore/Old.md": { id: "old", baseType: "lore" } } },
+        }),
       );
       const out = await runSyncCli(
         parseSyncArgs(["--write", "--skip-held", vault(), "--repo", tmp, "--world", "b"]),

@@ -144,7 +144,7 @@ export function worldEntities(
   entityMeta: NonNullable<SyncWorld["entityMeta"]>;
   idsInOtherWorlds: Map<string, string>;
 } {
-  const oneWorld = project.worlds.length === 1 && project.worlds[0].id === worldId;
+  const oneWorld = project.worlds.length === 1 && project.worlds.some((w) => w.id === worldId);
   const existingById = new Map<string, string>();
   const entityMeta = new Map<
     string,
@@ -172,16 +172,16 @@ export function worldEntities(
  */
 export function syncWorldFromProject(project: AtlasProject, worldId?: string): SyncWorld {
   const ids = project.worlds.map((x) => x.id);
+  // With exactly one world, naming it is optional.
+  const target = worldId || (ids.length === 1 ? ids[0] : undefined);
   let w: AtlasProject["worlds"][number] | undefined;
-  if (worldId) {
-    w = project.worlds.find((x) => x.id === worldId);
+  if (target) {
+    w = project.worlds.find((x) => x.id === target);
     if (!w) {
       throw new SyncWorldError(
-        `No world "${worldId}" in the DM build. Worlds: ${ids.join(", ") || "(none)"}.`,
+        `No world "${target}" in the DM build. Worlds: ${ids.join(", ") || "(none)"}.`,
       );
     }
-  } else if (ids.length === 1) {
-    w = project.worlds[0];
   } else if (ids.length === 0) {
     throw new SyncWorldError("The DM build has no world.");
   } else {
@@ -340,11 +340,24 @@ export function existingFileReader(port: VaultPort): (path: string) => Promise<s
 
 export async function commitSync(
   port: VaultPort,
-  world: Pick<SyncWorld, "worldId">,
+  world: Pick<SyncWorld, "worldId" | "idsInOtherWorlds">,
   rows: StagingRow[],
   source: SyncSource | null,
 ): Promise<SyncCommitResult> {
   const readFile = existingFileReader(port);
+
+  // R-14: ids are global across worlds. Re-checked here from the world, not
+  // from the row's own review flag, so a row whose flag was lost or stripped
+  // still can't put a second copy of another world's note in this one.
+  for (const row of rows) {
+    const otherWorld = row.included ? world.idsInOtherWorlds?.get(row.resolvedId) : undefined;
+    if (otherWorld !== undefined) {
+      throw new ImportCommitError(
+        `${row.targetPath}: id "${row.resolvedId}" is already a note in world ${otherWorld}`,
+        row.targetPath,
+      );
+    }
+  }
 
   // Conflicts first: a commit the save will refuse must not copy images.
   const firstChanges = await buildImportChanges(rows, { readFile });

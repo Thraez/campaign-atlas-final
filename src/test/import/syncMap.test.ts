@@ -102,7 +102,7 @@ describe("sync-map file, one map per world (R-14)", () => {
     expect(worldSyncMap(file, "b")).toEqual({});
   });
 
-  it("refuses an old flat map when no default world is known", () => {
+  it("refuses an old flat map when the DM build has no single world to give it to", () => {
     expect(() => readSyncMapFile({ "Corven.md": entry }, null)).toThrow(SyncMapFormatError);
   });
 
@@ -154,11 +154,23 @@ describe("sync-map file, one map per world (R-14)", () => {
     expect(() => allSyncMapEntries([entry])).toThrow(SyncMapFormatError);
   });
 
-  it("an old flat map reads as the config's v1 world, or none", () => {
-    expect(legacySyncMapWorld({ defaultWorld: "astrath" })).toBe("astrath");
-    expect(legacySyncMapWorld({ defaultWorld: "" })).toBeNull();
-    expect(legacySyncMapWorld({ defaultWorld: 3 })).toBeNull();
+  it("an old flat map belongs to the DM build's only world, or none", () => {
+    expect(legacySyncMapWorld(["astrath"])).toBe("astrath");
+    expect(legacySyncMapWorld(["astrath", "nyr"])).toBeNull();
+    expect(legacySyncMapWorld([])).toBeNull();
     expect(legacySyncMapWorld(null)).toBeNull();
-    expect(legacySyncMapWorld(["astrath"])).toBeNull();
+  });
+
+  it("every entry must be an object with a string id", () => {
+    const bad = [
+      { version: 2, worlds: { a: { "x.md": "str" } } },
+      { version: 2, worlds: { a: { "x.md": { baseType: "npc" } } } },
+      { version: 2, worlds: { a: { "x.md": { id: 3 } } } },
+      { "x.md": null },
+    ];
+    for (const raw of bad) {
+      expect(() => readSyncMapFile(raw, "a"), JSON.stringify(raw)).toThrow(SyncMapFormatError);
+      expect(() => allSyncMapEntries(raw), JSON.stringify(raw)).toThrow(SyncMapFormatError);
+    }
   });
 });

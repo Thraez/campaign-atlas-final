@@ -22,8 +22,9 @@ the wrong folder. The CLI already takes `--world` (`scripts/atlas-sync.ts:72`).
   world), can't be ticked or committed, and is refused by an unattended sync. The same holds for
   the editor's drag-and-drop and paste import.
 - Files land under `content/<target world>/`; entries in the sync map (`.local-atlas/sync-map.json`,
-  read by `src/atlas/sync/useSyncSettings.ts`) carry their world; an old map without worlds reads as
-  the v1 default world.
+  read by `src/atlas/sync/useSyncSettings.ts`) carry their world; an old map without worlds belongs to the DM
+  build's world when it has exactly one, and is refused (delete it, or sync once on a one-world
+  build) when it has several.
 - A memory-port test (`VaultPort` in-memory adapter, `src/atlas/sync/vaultPort.ts`) with a DM build
   of two worlds: a sync into world B with a vault note whose id is already in A holds that note and
   writes nothing for it, B's own notes update only B's files, A's are untouched, and a dry run lists
@@ -55,8 +56,10 @@ and none named, lists them; one world is the default. `worldEntities` keeps only
 world's entities (a worldless entity counts only in a one-world build), so a shared id matches
 the target's file only. `commitSync` refuses any change outside `content/<world>/`.
 `.local-atlas/sync-map.json` is now `{version: 2, worlds}`, read and written per world; an old
-flat map reads as `defaultWorld`'s (the dev route and the CLI port normalize it; the browser
-never guesses), and a failed read throws instead of reading as empty. R-01's guard and the scan
+flat map belongs to the DM build's only world and is refused with several (the dev route and the
+CLI port normalize it; the browser never guesses; no `defaultWorld` read), and a failed read
+throws instead of reading as empty. `commitSync` re-checks every ticked row's id against the other
+worlds itself, and `/__atlas/local-write` refuses `sync-map.json`. R-01's guard and the scan
 read every world's entries. The Sync panel shows and passes the open map's world and is disabled
 without one. Note ids are global across worlds: a note whose id another world holds is held
 (`id-in-other-world`) in Sync and in the editor's import, can't be ticked or committed, and an

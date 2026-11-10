@@ -33,11 +33,14 @@ export interface MemoryVaultInit {
   atlas?: Record<string, string>;
   /**
    * The stored `sync-map.json`: a per-world file, or an old flat map, which
-   * reads as `defaultWorld`'s (R-14).
+   * belongs to `legacyWorld` (R-14).
    */
   syncMap?: SyncMap | SyncMapFile;
-  /** `atlas.config.json` `defaultWorld`, the v1 world an old flat map belongs to. Default "w". */
-  defaultWorld?: string;
+  /**
+   * The DM build's only world, which an old flat map belongs to. Default "w";
+   * null stands for a build with several worlds (the old map is refused).
+   */
+  legacyWorld?: string | null;
   /** Make every write report a failed rebuild (the files are still written). */
   rebuildFails?: boolean;
   /**
@@ -67,7 +70,10 @@ export function createMemoryVaultPort(init: MemoryVaultInit = {}): MemoryVaultPo
     notes: { ...init.notes },
     images: [...(init.images ?? [])],
     atlas: new Map(Object.entries(init.atlas ?? {})),
-    syncMapFile: readSyncMapFile(init.syncMap ?? null, init.defaultWorld ?? "w"),
+    syncMapFile: readSyncMapFile(
+      init.syncMap ?? null,
+      init.legacyWorld === undefined ? "w" : init.legacyWorld,
+    ),
     syncMapOf: (worldId: string) => worldSyncMap(port.syncMapFile, worldId),
     copiedImages: [],
     writes: [],
