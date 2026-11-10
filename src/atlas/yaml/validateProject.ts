@@ -11,19 +11,29 @@
  * its own small named function makes the individual rules readable and
  * testable in isolation; the driver in `validateProject` just concatenates
  * their output in order and tallies the counts.
+ *
+ * What ships (R-11c): every "does it reach players" question about notes,
+ * regions, routes and sound areas is answered by the one resolver for campaign
+ * `main` (`resolveProject.ts`: the v1 adapter, then `resolveCampaign`), so the
+ * leak rules below block exactly when the strict player build fails. This file
+ * keeps only the presentation: categories, messages, locators.
  */
-import type { AtlasProject, MapDocument, Entity, EntityVisibility } from "@/atlas/content/schema";
+import type { AtlasProject, MapDocument, Entity } from "@/atlas/content/schema";
 import { findDmMarkup } from "@/atlas/content/dmMarkup";
+import { soundAreaIdProblems, soundAreaIdTrusted } from "@/atlas/content/soundAreaIds";
 import {
   PLAYER_VISIBLE_VISIBILITY,
   VALID_VISIBILITY,
   isSecretVisibility,
-  linkLeaksToPlayers,
-  linkTargetLabel,
 } from "@/atlas/content/visibility";
-import { buildProjectionContext } from "@/atlas/content/projectEntityForPlayer";
+import {
+  shipsIn,
+  type CampaignResolution,
+  type ItemVerdict,
+} from "@/atlas/content/resolveCampaign";
 import type { LocalLayer } from "@/atlas/useMapLayers";
 import type { PlacementOverride } from "./buildPatches";
+import { PUBLISH_CHECK_CAMPAIGN, resolveProject } from "./resolveProject";
 
 export type Severity = "blocking" | "warning" | "suggestion" | "passed";
 
@@ -89,11 +99,18 @@ interface ValidationContext {
   /** All entity ids (slugs) in the project. */
   entityIds: Set<string>;
   /**
-   * Entity id -> visibility for the notes a player build ships (player-visible
-   * and not `atlas.publish: false`), from the player projection's own context.
-   * A wikilink or relationship to an id missing here leaks, as in the build.
+   * The resolver's verdicts for campaign `main` (`resolveProject`), or `null`
+   * when the project couldn't be resolved (then nothing ships: fail closed).
    */
-  shippedVisibility: ReadonlyMap<string, EntityVisibility>;
+  resolution: CampaignResolution | null;
+  /** Why `resolution` is null. */
+  resolutionError?: string;
+  /**
+   * True when the note with this id ships (the resolver says so for every
+   * note with the id). A wikilink, relationship, region or route waypoint to
+   * an id that doesn't ship leaks, as in the build.
+   */
+  noteShips: (id: string) => boolean;
   /** Visibilities that are shown to players (player | rumor). */
   playerVisibleVis: Set<string>;
   /** The complete set of accepted visibility values. */
@@ -115,6 +132,33 @@ function describeHiddenTarget(target: Entity | undefined): string {
   if (!target) return "unknown or folder-excluded note";
   if (isSecretVisibility(target.visibility)) return `${target.visibility} entity`;
   return "atlas.publish: false";
+}
+
+/** How a region or route leak names its target: "dm entity", "unknown entity". */
+function hiddenTargetLabel(target: Entity | undefined): string {
+  if (!target) return "unknown entity";
+  if (isSecretVisibility(target.visibility)) return `${target.visibility} entity`;
+  return "unpublished entity (atlas.publish: false)";
+}
+
+/** The resolver's verdicts for one region, route or sound area (duplicate ids give several). */
+function verdictsFor(
+  list: readonly ItemVerdict[] | undefined,
+  mapId: string,
+  id: string,
+): ItemVerdict[] {
+  return (list ?? []).filter((v) => v.map === mapId && v.id === id);
+}
+
+/**
+ * Would this item ship but for what it links? With verdicts, the resolver
+ * decides: it judges the item's own visibility and map first, so any other
+ * reason means the item's own call is "ship". Without (an item the adapter
+ * skips, or no resolution), the item's own visibility for campaign `main`.
+ */
+function itemWouldShip(verdicts: ItemVerdict[], visibility: unknown): boolean {
+  if (verdicts.length === 0) return shipsIn(visibility, PUBLISH_CHECK_CAMPAIGN);
+  return verdicts.some((v) => v.reason !== "visibility" && v.reason !== "map-hidden");
 }
 
 // 1. Duplicate map IDs across project
@@ -262,13 +306,18 @@ const checkRegionsAndRoutes: Rule = (ctx) => {
           scope: { mapId: m.id, entityId: r.entityId },
         });
       }
-      const regionTargetVis = r.entityId ? ctx.entityById.get(r.entityId)?.visibility : undefined;
-      if (r.entityId && linkLeaksToPlayers(r.visibility, regionTargetVis)) {
+      // A region that would ship but links a note that doesn't (the resolver
+      // drops it as `link-hidden`) leaks: the strict build fails (exit 6).
+      if (
+        r.entityId &&
+        !ctx.noteShips(r.entityId) &&
+        itemWouldShip(verdictsFor(ctx.resolution?.regions, m.id, r.id), r.visibility)
+      ) {
         issues.push({
           severity: "blocking",
           code: "spoiler-leak-region",
           category: "safety",
-          message: `Player-visible region "${r.name}" links to ${linkTargetLabel(regionTargetVis)} "${r.entityId}"`,
+          message: `Player-visible region "${r.name}" links to ${hiddenTargetLabel(ctx.entityById.get(r.entityId))} "${r.entityId}"`,
           hint: "Players would see the region polygon and the entity title would leak. Either hide the region (visibility: dm) or unlink the entity.",
           scope: { mapId: m.id, entityId: r.entityId },
         });
@@ -286,6 +335,30 @@ const checkRegionsAndRoutes: Rule = (ctx) => {
         });
       }
     }
+    // Sound-area ids must name one area on their map: the player build looks
+    // verdicts up by id, so the strict build fails on a missing or shared one
+    // (exit 22) and every build drops the areas it names.
+    for (const p of soundAreaIdProblems(m.soundscape?.areas ?? [])) {
+      issues.push(
+        p.kind === "missing-id"
+          ? {
+              severity: "blocking",
+              code: "sound-area-missing-id",
+              category: "yaml",
+              message: `${p.count} sound area(s) on map "${m.id}" have no id`,
+              hint: "Give each sound area an id in the Sound tab; the player build won't publish until then.",
+              scope: { mapId: m.id },
+            }
+          : {
+              severity: "blocking",
+              code: "duplicate-sound-area-id",
+              category: "yaml",
+              message: `Duplicate sound area "${p.id}" (${p.count} areas on map "${m.id}")`,
+              hint: "Sound areas on one map share an id. Rename all but one in the Sound tab.",
+              scope: { mapId: m.id },
+            },
+      );
+    }
     // Route ids only need to be unique within a single map.
     const seenRoute = new Set<string>();
     for (const route of m.routes ?? []) {
@@ -298,6 +371,10 @@ const checkRegionsAndRoutes: Rule = (ctx) => {
           scope: { mapId: m.id },
         });
       seenRoute.add(route.id);
+      const routeWouldShip = itemWouldShip(
+        verdictsFor(ctx.resolution?.routes, m.id, route.id),
+        route.visibility,
+      );
       if (route.waypoints.length < 2)
         issues.push({
           severity: "blocking",
@@ -318,13 +395,14 @@ const checkRegionsAndRoutes: Rule = (ctx) => {
               scope: { mapId: m.id, entityId: w.entityId },
             });
           }
-          const waypointVis = ctx.entityById.get(w.entityId)?.visibility;
-          if (linkLeaksToPlayers(route.visibility, waypointVis)) {
+          // A waypoint on a note that doesn't ship, on a route that would
+          // otherwise ship, is a route leak: the strict build fails (exit 7).
+          if (routeWouldShip && !ctx.noteShips(w.entityId)) {
             issues.push({
               severity: "blocking",
               code: "spoiler-leak-route",
               category: "safety",
-              message: `Player-visible route "${route.name}" routes through ${linkTargetLabel(waypointVis)} "${w.entityId}"`,
+              message: `Player-visible route "${route.name}" routes through ${hiddenTargetLabel(ctx.entityById.get(w.entityId))} "${w.entityId}"`,
               hint: "The waypoint label would expose a DM-only or missing entity to players. Fix the slug, hide the route, or replace the waypoint with raw coordinates.",
               scope: { mapId: m.id, entityId: w.entityId },
             });
@@ -342,12 +420,23 @@ const checkEntities: Rule = (ctx) => {
   const seenSlug = new Map<string, number>();
   for (const e of ctx.project.entities) {
     seenSlug.set(e.id, (seenSlug.get(e.id) ?? 0) + 1);
-    if (!ctx.validVis.has(e.visibility)) {
+    // Whether this note reaches players, from the resolver.
+    const ships = ctx.noteShips(e.id);
+    // The DM build reads an invalid `atlas.visibility` as "dm" (with a
+    // warning), so the written value is checked too: the strict player build
+    // fails on it (exit 3).
+    const writtenVis = (e.frontmatter?.atlas as { visibility?: unknown } | undefined)?.visibility;
+    const badVis = !ctx.validVis.has(e.visibility)
+      ? e.visibility
+      : typeof writtenVis === "string" && !ctx.validVis.has(writtenVis)
+        ? writtenVis
+        : undefined;
+    if (badVis !== undefined) {
       issues.push({
         severity: "blocking",
         code: "invalid-visibility",
         category: "safety",
-        message: `Entity "${e.title}" has invalid visibility "${e.visibility}"`,
+        message: `Entity "${e.title}" has invalid visibility "${badVis}"`,
         hint: "Visibility must be one of player | dm | hidden | rumor. Unknown values default to dm in the build, but strict mode will fail.",
         scope: { entityId: e.id },
       });
@@ -374,7 +463,7 @@ const checkEntities: Rule = (ctx) => {
     }
     // DM markup in a player-visible source body. The build strips it, but the
     // source markdown still holds DM notes. Flag it to encourage cleanup.
-    const markup = ctx.playerVisibleVis.has(e.visibility) ? findDmMarkup(e.body || "") : null;
+    const markup = ships ? findDmMarkup(e.body || "") : null;
     if (markup === "%%" || markup === ":::dm") {
       issues.push({
         severity: "warning",
@@ -388,7 +477,7 @@ const checkEntities: Rule = (ctx) => {
     // Image embeds (![[image.ext]]) in player-visible body are silently dropped
     // by the player projection (no embed-to-img conversion there). Warn so the
     // DM can fix before publishing.
-    if (ctx.playerVisibleVis.has(e.visibility)) {
+    if (ships) {
       for (const m of (e.body || "").matchAll(/!\[\[([^[\]\n]+?)\]\]/g)) {
         const target = m[1].split("|")[0].trim();
         if (/\.(?:png|jpe?g|gif|webp|svg|avif)$/i.test(target)) {
@@ -409,10 +498,10 @@ const checkEntities: Rule = (ctx) => {
     // `publish: false`, or folder-excluded) leak its name. The strict player
     // build redacts them and fails (cross-ref leak, exit 8), so this blocks.
     // Only notes that ship are judged: the build skips the rest.
-    if (ctx.shippedVisibility.has(e.id) && Array.isArray(e.links)) {
+    if (ships && Array.isArray(e.links)) {
       for (const link of e.links) {
         if (!link.resolvedId) continue;
-        if (!linkLeaksToPlayers(e.visibility, ctx.shippedVisibility.get(link.resolvedId))) continue;
+        if (ctx.noteShips(link.resolvedId)) continue;
         const target = ctx.entityById.get(link.resolvedId);
         issues.push({
           severity: "blocking",
@@ -427,7 +516,7 @@ const checkEntities: Rule = (ctx) => {
     // Broken wikilinks in player-visible entities render as dead, non-clickable
     // text to players. Aggregate all broken targets into one suggestion per
     // entity so the Publish Check stays sleek (not one issue per link).
-    if (ctx.playerVisibleVis.has(e.visibility) && Array.isArray(e.links)) {
+    if (ships && Array.isArray(e.links)) {
       const broken = e.links.filter((l) => l.broken);
       if (broken.length > 0) {
         const CAP = 3;
@@ -448,7 +537,7 @@ const checkEntities: Rule = (ctx) => {
       }
     }
     // Player-visible relationships pointing at DM-only entities leak too.
-    if (ctx.playerVisibleVis.has(e.visibility) && Array.isArray(e.relationships)) {
+    if (ships && Array.isArray(e.relationships)) {
       for (const rel of e.relationships) {
         // Schema field is `entity` (the target slug). Older code used `targetId`
         // — accept both for back-compat with any in-flight YAML.
@@ -469,11 +558,7 @@ const checkEntities: Rule = (ctx) => {
         // relationship to a note that doesn't ship (unknown ones included) is
         // a relationship leak, which fails the strict player build (exit 5).
         // Only on notes that ship: the build skips the rest.
-        if (
-          ctx.shippedVisibility.has(e.id) &&
-          ctx.playerVisibleVis.has(relVis) &&
-          linkLeaksToPlayers(relVis as EntityVisibility, ctx.shippedVisibility.get(targetId))
-        ) {
+        if (ctx.playerVisibleVis.has(relVis) && !ctx.noteShips(targetId)) {
           issues.push({
             severity: "blocking",
             code: "spoiler-leak-relationship",
@@ -496,6 +581,78 @@ const checkEntities: Rule = (ctx) => {
         hint: "Two markdown files produce the same slug. Rename one or set atlas.id to disambiguate.",
         scope: { entityId: slug },
       });
+    }
+  }
+  return { issues };
+};
+
+// 4b. What the resolver itself reports: a project it can't resolve, orphan
+// `notes:` entries, and sound areas fog keeps from players.
+const checkWhatShips: Rule = (ctx) => {
+  const issues: Issue[] = [];
+  if (!ctx.resolution) {
+    issues.push({
+      severity: "blocking",
+      code: "visibility-unresolved",
+      category: "safety",
+      message: `Couldn't work out what reaches players: ${ctx.resolutionError ?? "unknown error"}`,
+      hint: "Until this is fixed the Publish Check treats every note as hidden: note checks are skipped and every region or route that links a note is flagged. Fix the problem named here (often two maps sharing an id) first.",
+    });
+    return { issues };
+  }
+  for (const o of ctx.resolution.orphanEntries) {
+    issues.push({
+      severity: "blocking",
+      code: "orphan-notes-entry",
+      category: "safety",
+      message: `world.yaml of world "${o.world}" has a notes: entry "${o.entry}" that matches no note of that world`,
+      hint: "A typo, a renamed note or an entry in the wrong world: the note it was meant to narrow may ship. Fix the key to the note's id, or remove the entry.",
+    });
+  }
+  // Sound areas: the build plays an area only on a "ships" verdict, so every
+  // other outcome the DM can fix gets a warning here. Ride-on or not is the
+  // resolver's call (via the v1 adapter), never re-derived from `regionId`.
+  const res = ctx.resolution;
+  for (const m of ctx.project.maps) {
+    if (!res.maps.some((v) => v.id === m.id)) continue; // the map itself is reported elsewhere
+    const idProblems = soundAreaIdProblems(m.soundscape?.areas ?? []);
+    for (const [i, a] of (m.soundscape?.areas ?? []).entries()) {
+      if (!soundAreaIdTrusted(a, idProblems)) continue; // blocking above
+      const label = `Sound area "${a.name ?? a.id ?? `#${i + 1}`}"`;
+      const verdicts = typeof a.id === "string" ? verdictsFor(res.sound, m.id, a.id) : [];
+      // The build doesn't fail on any of these; it leaves the area out, so
+      // they warn rather than block.
+      if (verdicts.length === 0) {
+        issues.push({
+          severity: "warning",
+          code: "sound-area-malformed",
+          category: "map",
+          message: `${label} won't play for players: it has no sound file, or (without a region) fewer than 3 points, so the player build skips it`,
+          hint: "Choose a sound file, and draw at least 3 points or attach it to a region.",
+          scope: { mapId: m.id },
+        });
+        continue;
+      }
+      const reasons = new Set(verdicts.map((v) => v.reason));
+      if (reasons.has("fogged")) {
+        issues.push({
+          severity: "warning",
+          code: "sound-area-fogged",
+          category: "map",
+          message: `${label} is left out of the player atlas: part of its shape is under fog, so players won't hear it`,
+          hint: "Reveal its whole shape in the Fog tab, or shrink it to the revealed part, so it keeps playing for players.",
+          scope: { mapId: m.id },
+        });
+      } else if (reasons.has("region-hidden")) {
+        issues.push({
+          severity: "warning",
+          code: "sound-area-region-hidden",
+          category: "map",
+          message: `${label} is left out of the player atlas: its region "${a.regionId}" doesn't reach players (hidden, missing or under fog), so players won't hear it`,
+          hint: "Make the region visible to players and reveal it in the Fog tab, or detach the sound area and draw its own shape.",
+          scope: { mapId: m.id },
+        });
+      }
     }
   }
   return { issues };
@@ -619,6 +776,7 @@ const RULES: Rule[] = [
   checkMapLayers,
   checkRegionsAndRoutes,
   checkEntities,
+  checkWhatShips,
   checkDraftPlacements,
   checkDraftLayers,
   checkUploadedAssetsPending,
@@ -629,6 +787,17 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
   const { project, draftPlacements, draftMap, draftLocalLayers = [] } = opts;
 
   const entityById = new Map(project.entities.map((e) => [e.id, e] as const));
+  let resolution: CampaignResolution | null = null;
+  let resolutionError: string | undefined;
+  try {
+    resolution = resolveProject(project);
+  } catch (e) {
+    resolutionError = e instanceof Error ? e.message : String(e);
+  }
+  const noteVerdicts = new Map<string, boolean>();
+  for (const v of resolution?.notes ?? []) {
+    noteVerdicts.set(v.id, (noteVerdicts.get(v.id) ?? true) && v.ships);
+  }
   const ctx: ValidationContext = {
     project,
     draftPlacements,
@@ -636,7 +805,9 @@ export function validateProject(opts: ValidateProjectOpts): ValidationReport {
     draftLocalLayers,
     mapIds: new Set(project.maps.map((m) => m.id)),
     entityIds: new Set(project.entities.map((e) => e.id)),
-    shippedVisibility: buildProjectionContext(entityById).entityVisibility,
+    resolution,
+    resolutionError,
+    noteShips: (id) => noteVerdicts.get(id) === true,
     playerVisibleVis: new Set<string>(PLAYER_VISIBLE_VISIBILITY),
     validVis: new Set<string>(VALID_VISIBILITY),
     entityById,

@@ -207,7 +207,8 @@ function toSoundArea(a: unknown, mapId: string, i: number, warnings: string[]): 
     return null;
   }
   const bed = a.bed;
-  if (!isObj(bed) || typeof bed.src !== "string") {
+  // A blank src plays nothing and the build drops it, so it gets no verdict.
+  if (!isObj(bed) || typeof bed.src !== "string" || bed.src.trim() === "") {
     warnings.push(`${where}: no bed with a src — skipped`);
     return null;
   }
