@@ -14,6 +14,12 @@ vi.mock("react-leaflet", async () => {
   const json = (v: unknown) => JSON.stringify(v ?? null);
   return {
     ...base,
+    // The canvas's frame and map names are Tooltips with this class; regions' are not.
+    Tooltip: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
+      <span data-leaflet="Tooltip" className={className}>
+        {children}
+      </span>
+    ),
     Polygon: ({
       children,
       positions,
@@ -31,6 +37,19 @@ vi.mock("react-leaflet", async () => {
         {children}
       </div>
     ),
+  };
+});
+
+// Keep the canvas's latest props, so a test can fire its handoff and camera callbacks.
+let canvasProps: import("@/atlas/canvas/AtlasCanvas").AtlasCanvasProps;
+vi.mock("@/atlas/canvas/AtlasCanvas", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("@/atlas/canvas/AtlasCanvas")>();
+  return {
+    ...orig,
+    AtlasCanvas: (props: import("@/atlas/canvas/AtlasCanvas").AtlasCanvasProps) => {
+      canvasProps = props;
+      return orig.AtlasCanvas(props);
+    },
   };
 });
 
@@ -94,7 +113,7 @@ const crumbs = () =>
 const canvasView = () =>
   document.querySelector("[data-canvas-view]")?.getAttribute("data-canvas-view");
 const frameLabels = () =>
-  [...document.querySelectorAll('[data-leaflet="Polygon"]')].map((p) => p.textContent);
+  [...document.querySelectorAll(".atlas-canvas-label")].map((t) => t.textContent);
 
 describe("AtlasViewer, v2 output", () => {
   it.each(["main", "sandbox"] as const)(
@@ -114,13 +133,29 @@ describe("AtlasViewer, v2 output", () => {
     expect(frameLabels()).toEqual(["Quessaly", "Skerrow Isles"]);
   });
 
-  it("sandbox: no frame or crumb for tallowford, brindlecross or skerrow-isles", async () => {
-    await open("sandbox", "/?map=quessaly-world");
-    expect(crumbs()).toEqual(["Ocean", "Quessaly"]);
-    const all = document.body.innerHTML;
-    for (const id of ["tallowford", "brindlecross", "skerrow-isles", "Skerrow"]) {
-      expect(all).not.toContain(id);
-    }
+  it("sandbox: the ocean frames only Quessaly", async () => {
+    await open("sandbox");
+    expect(frameLabels()).toEqual(["Quessaly"]);
+  });
+
+  it("sandbox: Oskmark shows no frame or crumb for Brindlecross, Tallowford or Skerrow Isles", async () => {
+    await open("sandbox", "/?map=oskmark");
+    expect(crumbs()).toEqual(["Ocean", "Quessaly", "Oskmark"]);
+    expect(frameLabels()).toEqual([]);
+    const text = (document.body.textContent ?? "").toLowerCase();
+    for (const name of ["brindlecross", "tallowford", "skerrow"]) expect(text).not.toContain(name);
+  });
+
+  it("sandbox: a map only main has (?map=tallowford) opens the ocean", async () => {
+    await open("sandbox", "/?map=tallowford");
+    expect(canvasView()).toBe("ocean");
+    expect(crumbs()).toEqual(["Ocean"]);
+    expect(new URLSearchParams(window.location.search).has("map")).toBe(false);
+  });
+
+  it("main: Oskmark does frame Brindlecross and Tallowford (so the sandbox checks can fail)", async () => {
+    await open("main", "/?map=oskmark");
+    expect(frameLabels().sort()).toEqual(["Brindlecross", "Tallowford"]);
   });
 
   it("main: a click on a map enters it (a Back entry), and Back returns to the ocean", async () => {
@@ -168,5 +203,84 @@ describe("AtlasViewer, v2 output", () => {
     window.history.pushState({}, "", "/?map=quessaly-world");
     act(() => window.dispatchEvent(new PopStateEvent("popstate")));
     await waitFor(() => expect(canvasView()).toBe("map:quessaly-world"));
+  });
+
+  it("the ruler puts the crosshair class on the canvas", async () => {
+    await open("main", "/?map=oskmark");
+    expect(document.querySelector(".atlas-ruler")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /distance ruler/i }));
+    expect(document.querySelector(".atlas-canvas.atlas-ruler")).not.toBeNull();
+  });
+
+  describe("history and camera memory", () => {
+    const search = () => new URLSearchParams(window.location.search);
+    const spies = () => ({
+      push: vi.spyOn(window.history, "pushState"),
+      replace: vi.spyOn(window.history, "replaceState"),
+    });
+
+    it("a handoff pushes, a pan or zoom replaces, a crumb returns to the remembered camera", async () => {
+      await open("main");
+      const { push, replace } = spies();
+      const ocean = { center: [1000, 700] as [number, number], zoom: -1.5 };
+      act(() => canvasProps.onCameraChange!(ocean));
+      expect(push).not.toHaveBeenCalled();
+      expect(replace).toHaveBeenCalled();
+      expect(search().get("cx")).toBe("1000");
+
+      // Zooming in past Quessaly's threshold: the canvas hands the view over.
+      act(() =>
+        canvasProps.onViewChange!(
+          { kind: "map", mapId: "quessaly-world" },
+          { center: [300, 200], zoom: 0.5 },
+        ),
+      );
+      expect(push).toHaveBeenCalledTimes(1);
+      expect(search().get("map")).toBe("quessaly-world");
+      expect(search().get("cx")).toBe("300");
+      expect(crumbs()).toEqual(["Ocean", "Quessaly"]);
+
+      // Panning and zooming inside it only replace.
+      push.mockClear();
+      act(() => canvasProps.onCameraChange!({ center: [310, 210], zoom: 1 }));
+      act(() => canvasProps.onCameraChange!({ center: [320, 220], zoom: 1.25 }));
+      expect(push).not.toHaveBeenCalled();
+      expect(search().get("cx")).toBe("320");
+
+      // The Ocean crumb goes back where the user left the ocean, not fitted.
+      fireEvent.click(screen.getByRole("button", { name: "Ocean" }));
+      expect(push).toHaveBeenCalledTimes(1);
+      expect(canvasProps.view).toEqual({ kind: "ocean" });
+      expect(canvasProps.camera).toEqual(ocean);
+      expect(search().has("map")).toBe(false);
+      expect(search().get("cx")).toBe("1000");
+
+      // And Quessaly's crumb-less return (handoff back in) is remembered too.
+      act(() =>
+        canvasProps.onViewChange!(
+          { kind: "map", mapId: "quessaly-world" },
+          { center: [330, 230], zoom: 0.5 },
+        ),
+      );
+      act(() => canvasProps.onCameraChange!({ center: [340, 240], zoom: 0.75 }));
+      act(() =>
+        canvasProps.onViewChange!(
+          { kind: "map", mapId: "oskmark" },
+          { center: [50, 60], zoom: 0.25 },
+        ),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Quessaly" }));
+      expect(canvasProps.view).toEqual({ kind: "map", mapId: "quessaly-world" });
+      expect(canvasProps.camera).toEqual({ center: [340, 240], zoom: 0.75 });
+      push.mockRestore();
+      replace.mockRestore();
+    });
+
+    it("a crumb to a view not visited yet lands fitted", async () => {
+      await open("main", "/?map=oskmark");
+      fireEvent.click(screen.getByRole("button", { name: "Ocean" }));
+      expect(canvasProps.camera).toBe("fit");
+      expect(search().get("cx")).toBeNull();
+    });
   });
 });

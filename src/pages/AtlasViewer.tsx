@@ -209,6 +209,13 @@ type FlyTarget = { x: number; y: number; height: number; zoom?: number };
 const OCEAN_KEY = "ocean";
 const viewKeyOf = (mapId: string | null) => (mapId === null ? OCEAN_KEY : `map:${mapId}`);
 
+/** The `resolveDeepLink` option for v2 output: the ocean's height and the ids the tree can show. */
+const oceanOption = (tree: MapTree) =>
+  tree.ocean ? { height: tree.ocean.height, isMap: (id: string) => tree.byId.has(id) } : undefined;
+
+/** Zoom to keep when flying within the view on screen (as v1's flyTo does). */
+const keepZoom = (vc: { zoom: number } | null) => Math.max(vc?.zoom ?? -1, -1);
+
 /** A fly target (a point in the view's own pixels) as a canvas camera. */
 function cameraAt(t: FlyTarget, fallbackZoom: number): CanvasCameraState {
   return { center: [t.x, t.y], zoom: t.zoom ?? fallbackZoom };
@@ -301,9 +308,7 @@ export default function AtlasViewer() {
         currentMapId,
         defaultMapId: project.worlds[0]?.defaultMapId ?? project.maps[0]?.id ?? null,
         hasDesktopAside: hasDesktopAsideRef.current,
-        ocean: tree.ocean
-          ? { height: tree.ocean.height, isMap: (id) => tree.byId.has(id) }
-          : undefined,
+        ocean: oceanOption(tree),
       });
       setActiveMapId(r.mapId);
       setOpenId(r.openId);
@@ -315,7 +320,7 @@ export default function AtlasViewer() {
       // v2: the camera is the canvas's. Same view and no point named: leave it where it is.
       const sameView = r.mapId === currentMapId;
       if (r.fly) {
-        const cam = cameraAt(r.fly, sameView ? Math.max(viewCenterRef.current?.zoom ?? -1, -1) : 0);
+        const cam = cameraAt(r.fly, sameView ? keepZoom(viewCenterRef.current) : 0);
         setCamera(cam);
         handleViewChange(cam.center[0], cam.center[1], cam.zoom);
       } else if (!sameView) {
@@ -508,9 +513,10 @@ export default function AtlasViewer() {
       const same = activeMapIdRef.current === p.mapId;
       const cam = cameraAt(
         { x: p.x, y: p.y, height: m.height },
-        same ? Math.max(viewCenterRef.current?.zoom ?? -1, -1) : 0,
+        same ? keepZoom(viewCenterRef.current) : 0,
       );
-      goView({ kind: "map", mapId: p.mapId }, cam, push);
+      // A spot on the map already in view is a pan: replace. Another map is a step: push.
+      goView({ kind: "map", mapId: p.mapId }, cam, push && !same);
     },
     [data, goView, setActiveMapId],
   );
@@ -531,9 +537,7 @@ export default function AtlasViewer() {
                 currentMapId: activeId,
                 defaultMapId: activeId,
                 hasDesktopAside,
-                ocean: ocean
-                  ? { height: ocean.height, isMap: (m) => data.tree.byId.has(m) }
-                  : undefined,
+                ocean: oceanOption(data.tree),
               },
             )
           : null;
@@ -559,7 +563,7 @@ export default function AtlasViewer() {
         goView({ kind: "map", mapId: r.mapId! }, cam ?? "fit", false);
       } else if (fly && r?.fly) {
         if (ocean) {
-          setCamera(cameraAt(r.fly, Math.max(viewCenterRef.current?.zoom ?? -1, -1)));
+          setCamera(cameraAt(r.fly, keepZoom(viewCenterRef.current)));
         } else {
           setFlyTarget(r.fly);
         }
@@ -937,6 +941,7 @@ export default function AtlasViewer() {
                 tree={data.tree}
                 view={view}
                 camera={camera}
+                className={rulerActive ? "atlas-ruler" : ""}
                 onCameraChange={onCanvasCamera}
                 onEnterMap={onCanvasEnterMap}
                 onViewChange={onCanvasViewChange}

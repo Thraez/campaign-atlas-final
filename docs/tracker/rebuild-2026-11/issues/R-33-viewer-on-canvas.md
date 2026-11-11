@@ -94,8 +94,26 @@ smoke-test assertions on `fitBounds`/`setMaxBounds`/`flyTo`; v1 "one top-level m
   button as the fit control (bottom-right). It shows on the ocean and on maps with child frames.
 - The ocean fit has no margin (the placed maps touch the edges, Skerrow Isles runs under the aside edge
   on main at 1280 wide); a margin belongs in the canvas fit, not done here.
-- Search on the ocean offers every placement; picking one enters that map. The ruler's crosshair cursor
-  is not applied on the v2 canvas.
+- Search on the ocean offers every placement; picking one enters that map.
+- Accepted as provisional (review): v1 keeps its own `MapContainer`; fit is the Reset button plus
+  Leaflet's +/-; the breadcrumb wraps onto its own line on a phone; search on the ocean as above.
+- The ocean-fit margin is a follow-up for R-31's fit, not R-33.
+- Fixed after review: the ruler's crosshair now shows on the v2 canvas (`className="atlas-ruler"` on
+  the canvas, `.atlas-ruler .leaflet-container{cursor:crosshair}` in `index.css`; a wrapper cursor alone
+  loses to Leaflet's grab cursor). `showPlacement` on v2 pushes history only when the map changes (a spot
+  on the map in view is a pan and replaces). The `ocean` resolver option and the keep-zoom rule are built
+  once (`oceanOption`, `keepZoom`).
+
+**Review round.** The sandbox test now opens `?map=oskmark` (crumbs Ocean > Quessaly > Oskmark, no frame
+label or text for Brindlecross, Tallowford or Skerrow, case-insensitive), the sandbox ocean frames exactly
+Quessaly, `?map=tallowford` on sandbox opens the ocean, and a main control case shows the same assertions
+do see Brindlecross and Tallowford. New viewer tests fire the canvas's `onViewChange`/`onCameraChange`
+props: a handoff pushes, pan and zoom replace, a crumb returns to the remembered camera (fitted when the
+view was never visited). Real browser on `atlas:serve:next` (main): a wheel from the ocean over Quessaly
+crosses the thresholds in one gesture and lands on Oskmark (one history entry, crumbs Ocean > Quessaly >
+Oskmark); wheel out steps Oskmark > Quessaly > Ocean (one entry each); Back goes Quessaly then Oskmark,
+Forward goes Quessaly then Ocean, each with its own camera in the URL; the Quessaly crumb lands fitted
+(never visited), and the Ocean crumb returns to the ocean camera the user left (cz -0.3 at 1150,700).
 
 **Checked:** typecheck:all, lint, the page, canvas and deep-link tests, publish:next (44 scans clean),
 real-browser click-enter / crumb / Back on `main`. **Not checked:** wheel handoff in the viewer by hand,
