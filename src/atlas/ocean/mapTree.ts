@@ -82,7 +82,10 @@ function aspectMismatch(a: MapSize, w: number, h: number): boolean {
  * trimmed (see `dropped`).
  */
 export function buildMapTree(project: AtlasProject): MapTree {
-  const maps = project.maps;
+  // A malformed entry (not an object, or no string id) is skipped; it has no id to report.
+  const maps = project.maps.filter(
+    (m): m is MapDocument => m !== null && typeof m === "object" && typeof m.id === "string",
+  );
   const mapById = new Map<string, MapDocument>();
   for (const m of maps) if (!mapById.has(m.id)) mapById.set(m.id, m);
 
@@ -116,7 +119,8 @@ export function buildMapTree(project: AtlasProject): MapTree {
     }
   } else {
     for (const m of mapById.values()) {
-      if (!positiveSize(m)) continue;
+      // Real v1 output never has a parent: such a map is dropped, not shown flat.
+      if (m.parent !== undefined || !positiveSize(m)) continue;
       const n = node(m, null, null);
       roots.push(n);
       byId.set(m.id, n);

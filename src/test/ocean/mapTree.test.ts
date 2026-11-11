@@ -72,7 +72,7 @@ describe("buildMapTree: shape", () => {
   });
 
   it("v1: no ocean, every map top-level in maps order", () => {
-    const tree = buildMapTree(makeProject({ maps: [m("z"), m("a"), m("q", { parent: "z" })] }));
+    const tree = buildMapTree(makeProject({ maps: [m("z"), m("a"), m("q")] }));
     expect(tree.ocean).toBeNull();
     expect(ids(tree.roots)).toEqual(["z", "a", "q"]);
     expect(tree.roots.every((r) => r.placement === null && r.children.length === 0)).toBe(true);
@@ -166,6 +166,26 @@ describe("buildMapTree: fails closed, never throws", () => {
   });
 });
 
+describe("buildMapTree: malformed input", () => {
+  it("skips map entries that are not objects or have no string id, without throwing", () => {
+    const bad = [null, 5, "x", { name: "no id" }, { id: 3 }] as unknown as MapDocument[];
+    const p = v2([m("a"), ...bad, m("c", { parent: "a", frame: frame() })], [place("a")]);
+    let tree!: MapTree;
+    expect(() => (tree = buildMapTree(p))).not.toThrow();
+    expect(ids(tree.roots)).toEqual(["a"]);
+    expect(ids(tree.byId.get("a")!.children)).toEqual(["c"]);
+    expect(() => buildMapTree(makeProject({ maps: bad }))).not.toThrow();
+  });
+
+  it("v1 (no ocean): a map with a parent is dropped, not made top-level", () => {
+    const tree = buildMapTree(
+      makeProject({ maps: [m("a"), m("kid", { parent: "a", frame: frame() }), m("b")] }),
+    );
+    expect(ids(tree.roots)).toEqual(["a", "b"]);
+    expect(tree.dropped).toEqual(["kid"]);
+  });
+});
+
 describe("buildMapTree: aspect warnings", () => {
   it("warns when frame and child aspect differ by more than 1%", () => {
     const p = v2(
@@ -232,7 +252,7 @@ describe("frame geometry", () => {
 
   it("rotation is clockwise on screen about the frame centre", () => {
     const f = frame({ rotation: 90 });
-    // centre (200,100); child's right-middle (400,100) is 100 right of centre -> 100 below centre... in frame px: (300,100)
+    // The child's right-middle is 100 frame px right of the centre (200,100); turned 90 deg clockwise it lands 100 below it.
     close(childToParent(f, child, [200, 100]), [200, 100]);
     close(childToParent(f, child, [400, 100]), [200, 200]);
     close(childToParent(f, child, [0, 100]), [200, 0]);

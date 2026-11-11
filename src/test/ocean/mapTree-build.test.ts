@@ -31,7 +31,10 @@ beforeAll(async () => {
     const file = path.join(root, ".atlas-campaigns", c, "atlas", "atlas.json");
     const raw = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, unknown>;
     expect(raw.schemaVersion).toBe(2);
+    const before = structuredClone(raw);
     projects[c] = parseAtlasProject(raw, file); // each real v2 output loads
+    expect(raw, `${c}: the guard changes nothing on real output`).toEqual(before);
+    expect(projects[c].ocean, `${c} has an ocean`).toBeDefined();
   }
 }, 120_000);
 afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
