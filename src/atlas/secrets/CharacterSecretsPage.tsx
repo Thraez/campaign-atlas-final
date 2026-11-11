@@ -19,7 +19,7 @@ function SafeHtml({ html }: { html: string }) {
   return <div ref={ref} />;
 }
 
-function SecretsBody({ entities }: { entities: Entity[] }) {
+function SecretsBody({ entities, campaignId }: { entities: Entity[]; campaignId?: string }) {
   const [key, setKey] = useState<string | null>(() => getCharacterKey());
   const [found, setFound] = useState<CollectedSecret[]>([]);
   const [tried, setTried] = useState(false);
@@ -114,7 +114,7 @@ function SecretsBody({ entities }: { entities: Entity[] }) {
           <li key={`${s.entityId}:${s.secretId}`} className="border border-border rounded p-4">
             <SafeHtml html={s.html} />
             <Link
-              to={entityHref(s.entityId)}
+              to={entityHref(s.entityId, campaignId)}
               className="text-xs text-muted-foreground hover:text-foreground mt-2 inline-block"
             >
               On: {s.entityTitle}
@@ -150,7 +150,7 @@ export default function CharacterSecretsPage() {
           </Link>
           <h1 className="text-2xl font-display">Your character's secrets</h1>
         </div>
-        <SecretsBody entities={project.entities} />
+        <SecretsBody entities={project.entities} campaignId={project.campaign?.id} />
       </main>
     </div>
   );

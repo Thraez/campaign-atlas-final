@@ -143,3 +143,29 @@ describe("entityHref", () => {
     expect(parseDeepLink(search).entityId).toBe(id);
   });
 });
+
+describe("c= (R-35)", () => {
+  it("serializes first, and parses back", () => {
+    const s = serializeDeepLink({
+      campaign: "main",
+      mapId: "m",
+      entityId: null,
+      center: null,
+      zoom: null,
+    });
+    expect(s).toBe("c=main&map=m");
+    expect(parseDeepLink(s).campaign).toBe("main");
+  });
+
+  it("writes no c when none is given (v1), and an empty c reads as none", () => {
+    expect(serializeDeepLink({ mapId: "m", entityId: null, center: null, zoom: null })).toBe(
+      "map=m",
+    );
+    expect(parseDeepLink("c=").campaign).toBeNull();
+  });
+
+  it("entityHref carries the campaign when given", () => {
+    expect(entityHref("corven", "main")).toBe("/atlas?c=main&entity=corven");
+    expect(entityHref("corven")).toBe("/atlas?entity=corven");
+  });
+});
