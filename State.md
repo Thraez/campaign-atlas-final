@@ -154,6 +154,7 @@ Lowest number first within each folder.
   R-17b's isolation scan reads the same file.
 - An `.atlas-campaigns/` left by a build before R-17's review fixes has no `.atlas-campaigns-root`
   marker, so the player build refuses it: delete it once.
+- Phase H follow-up (from R-35): campaigns sharing one origin would share localStorage, character key included.
 - Sync follow-ups from R-14: (a) the map-import wizard (`mapImport.ts`, `MapImportWizard.tsx`) still
   reads `defaultWorldId`; rework it to pick a world, then widen the default-world tripwire to
   `src/atlas/import`. (b) Sync writes notes before saving the sync map; with no DM build it fails

@@ -347,7 +347,9 @@ export default function AtlasViewer() {
       // whatever the id is or whether it exists elsewhere (R-35: no oracle).
       const missing =
         !!tree.ocean &&
-        ((link.campaign != null && link.campaign !== project.campaign?.id) ||
+        ((link.campaign != null &&
+          project.campaign != null &&
+          link.campaign !== project.campaign.id) ||
           (link.mapId != null && !tree.byId.has(link.mapId)) ||
           (link.entityId != null && !project.entities.some((e) => e.id === link.entityId)));
       setNotFound(missing);

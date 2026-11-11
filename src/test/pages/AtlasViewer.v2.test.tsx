@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AtlasProject } from "@/atlas/content/schema";
@@ -410,6 +410,31 @@ describe("AtlasViewer, v2 output", () => {
       fireEvent.click(document.querySelectorAll('[data-leaflet="Polygon"]')[0]);
       await waitFor(() => expect(canvasView()).toBe("map:quessaly-world"));
       expect(notices()).toHaveLength(0);
+    });
+
+    it("opening an entity clears the notice", async () => {
+      await open("sandbox", "/?c=main");
+      expect(notices()).toHaveLength(1);
+      fireEvent.click(document.querySelector('[aria-label="Search atlas (Ctrl+K)"]')!);
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.change(within(dialog).getByLabelText("Search"), { target: { value: "iron" } });
+      await waitFor(() => expect(dialog.querySelector("#sp-result-iron-tower")).not.toBeNull());
+      fireEvent.click(dialog.querySelector("#sp-result-iron-tower")!);
+      await waitFor(() => expect(search().get("entity")).toBe("iron-tower"));
+      expect(notices()).toHaveLength(0);
+    });
+
+    it("a v2 build with no campaign (DM or dev) skips the c check", async () => {
+      const saved = projects.sandbox.campaign;
+      delete projects.sandbox.campaign;
+      try {
+        await open("sandbox", "/?c=anything&map=oskmark");
+        expect(notices()).toHaveLength(0);
+        expect(canvasView()).toBe("map:oskmark");
+        expect(search().has("c")).toBe(false);
+      } finally {
+        projects.sandbox.campaign = saved;
+      }
     });
 
     it("Back/Forward onto a wrong-campaign entry gives the same notice, ocean and URL", async () => {

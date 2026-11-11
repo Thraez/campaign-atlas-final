@@ -161,3 +161,26 @@ describe("popstate the viewer should ignore", () => {
     expect(window.location.search).toBe("");
   });
 });
+
+describe("v1 output ignores c= (R-35)", () => {
+  const NOTICE = "Not found in this campaign";
+  it.each([
+    ["/?c=other&map=nope", "World"],
+    ["/?c=other&entity=nope", "World"],
+    ["/?c=other&map=city&entity=tower", "City"],
+  ])("%s shows no notice and lands as before", async (url, expectedMap) => {
+    await renderAt(url);
+    await act(async () => {});
+    expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(NOTICE);
+    expect(mapName()).toBe(expectedMap);
+  });
+
+  it("the URL v1 writes after loading has no c", async () => {
+    await renderAt("/?c=other&map=city&entity=tower");
+    await act(async () => {});
+    expect(panelTitle()).toBe("Tower");
+    expect(window.location.search).not.toMatch(/(^|[?&])c=/);
+    expect(new URLSearchParams(window.location.search).get("map")).toBe("city");
+  });
+});
