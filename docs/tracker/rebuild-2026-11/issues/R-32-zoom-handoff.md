@@ -163,8 +163,8 @@ addendum, marked provisional.
 - Emitted `zoom`: main has quessaly-world -2..3, oskmark -1.5..3, brindlecross -0.5..4,
   tallowford -0.5..4, skerrow-isles -2..3, hookhaven -1..4; sandbox has quessaly-world -2..3,
   oskmark -1.5..3.
-- `npm run gate`: passed before review (7 of 7 steps, 2m11s); the rerun after the review fixes
-  is in the commit that follows this note's ticket status.
+- `npm run gate`: passed before review (7 of 7 steps, 2m11s) and again after the review fixes on
+  e86d2f4d, with origin/main already merged (7 of 7 steps, 2m10s).
 
 **Known limits** (for "zoom feel", State.md):
 - At a handoff, a rotated placement or frame turns square, because the child view is unrotated.
