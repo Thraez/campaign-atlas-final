@@ -1,6 +1,6 @@
 # R-32 Zoom handoff: ocean > map > child map > back
 
-Status: ready-for-agent
+Status: in-review
 Blocked by: R-30, R-31
 Size: M
 Branch: `rebuild-r32-zoom-handoff`
@@ -59,3 +59,80 @@ map or frame also enters it. Build the rule as a pure function, then wire it int
 ## Out of scope
 
 The breadcrumb, URL and deep links (R-33), Show on map across maps (phase 5).
+
+## Build notes (2026-11-11)
+
+**Output.** `scripts/atlas/build/worldSources.ts` emits `zoom: { min, max }` per v2 map
+(`MapDocument.zoom`). `atlasGuard` drops a malformed one (not a record, a non-finite bound, or
+`min > max`) and keeps the map. `compareOutputs` allows it as a v2-only addition. The v1 player
+build of `content/` is unchanged: `atlas.json` and `search-index.json` match a build from before
+the change, ignoring `version` and `publishedAt`, and so do the assets. ADR-0003 has a one-line
+addendum, marked provisional.
+
+**The rule** (`src/atlas/ocean/zoomHandoff.ts`, pure). M = `HANDOFF_MARGIN` = 0.5 zoom levels.
+- Enter a child when zoom >= its enter zoom and the centre is inside its frame (rotated outline).
+  The enter zoom is `enterZoom`, or with none, the fill rule: log2(min(viewport w, h) / min(frame
+  w, h)). Enter a top-level map from the ocean by the fill rule on its placed size.
+- **Clamp on entering (viewer):** a child's enter zoom is at least M above where a zoom entry lands
+  on its parent. The fill landing depends on the screen: on a 1280x800 canvas a fill entry lands on
+  `quessaly-world` at exactly 1, oskmark's authored `enterZoom`, and without the clamp one wheel
+  step went from the ocean straight to oskmark, skipping the continent.
+- Leave (to the parent, or to the ocean from a top-level map) when zoom < leave zoom =
+  min(`zoom.min` ?? fitted zoom, fitted zoom - M, enter landing - M).
+- **Clamp on leaving (viewer):** the last two terms. A click enter lands fitted and a zoom enter
+  lands at the enter landing; both then sit at least M above the way back out. A zoom leave lands
+  more than M below the child's enter zoom. So nothing flips back until the user zooms M the other
+  way.
+- **Build warning:** when an authored `enterZoom` lands below the child's own `zoom.min`, the loader
+  warns (`src/atlas/content/v2Model.ts`), and the viewer lowers the leave zoom as above.
+  - The test world had three of these, so their `zoom.min` went from 0 to -1: `mirefold`,
+    `mirefold-cellars` and `hookhaven`.
+  - In the fixture, `millbrook-cellar` went from 0 to -2.
+- A v1 tree (no ocean) never leaves its top-level map.
+- One big gesture can cross several thresholds: the steps chain (at most 32), and every result is
+  one `nextView` leaves alone.
+- An unknown view, a non-finite camera or an empty viewport stays.
+
+**Canvas.**
+- `ZoomHandoff` (in `AtlasCanvas`) runs `nextView` on `zoomend`, which covers wheel, pinch end,
+  double-click, keyboard and the zoom buttons, but only after a user input event on the map
+  (wheel, touchstart, dblclick, keydown, mousedown, pointerdown; `moveend` clears it). A fit or an
+  explicit camera never hands off: sandbox's ocean fits to its one map at almost the fill zoom.
+- On a handoff it calls `onViewChange(view, camera)`. The caller renders the new view and camera,
+  and `CanvasCamera` applies it with no animation: no remount, no refetch.
+- `AtlasCanvas` drops the camera report from the old view's `moveend`, which Leaflet fires right
+  after `zoomend` in the same dispatch. Without that, the harness kept the ocean camera on the new
+  map, and the screen showed open sea. Found in the real-Leaflet check; there is a test for it.
+- `zoomSnap={0}`, so the zoom lands exactly where the handoff puts it.
+- `zoomAnimation={!reduceMotion}`.
+- Without `onViewChange`, the canvas never hands off.
+
+**Tests.**
+- `src/test/ocean/zoomHandoff.test.ts` (synthetic tree) covers:
+  - entering, the fill rule for a child and from the ocean, the enter clamp, and chaining
+  - leaving to the parent and to the ocean, fit - M with no range, and both leave clamps
+  - v1, and hysteresis (wiggle +-0.25 at every threshold, handoffs counted)
+  - a rotated frame and a rotated placement
+  - an unknown or dropped map, and bad input
+- `src/test/ocean/mapTree-build.test.ts` builds content-next and zooms in quarter steps:
+  - main: ocean > quessaly-world > oskmark > brindlecross and back
+  - sandbox: up to oskmark and back
+  - the rotated fixture on main
+  - each at 1280x800 and 390x844, with a wiggle at every handoff
+  - back on the ocean, the centre is off by less than 1 screen px
+- `src/test/canvas/canvas-camera.test.tsx`: the wiring.
+
+**Real-Leaflet check** (`/__canvas`, canvas 1024x728), screenshots in `previews/r32/`
+(gitignored):
+- main: ocean > Quessaly at ocean zoom -0.15 > +0.05, then Quessaly > Oskmark. The centre point
+  (414, 132) on Quessaly became (380, 173) on Oskmark, which is what the frame math gives.
+- sandbox: ocean > Quessaly, then back out to the ocean at the same spot. Quessaly (298, 205) at
+  -1.97 became ocean (797, 708) at -3.17; the math gives (796, 710).
+- rotated main: ocean > Quessaly.
+
+**Known limits** (for "zoom feel", State.md):
+- At a handoff, a rotated placement or frame turns square, because the child view is unrotated.
+- The map's art switches from the parent's picture to the child's.
+- The global `maxZoom` of 4 could put a deep child's enter zoom out of reach.
+- Overlapping sibling frames: the first in the list wins.
+- A wheel at max zoom that fires no `zoomend` leaves the input flag set until the next `moveend`.

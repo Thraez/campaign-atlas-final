@@ -28,7 +28,7 @@
  * or viewer-only modules (search, entity panel, sound). Pinned by
  * src/test/canvas/canvas-imports.test.ts.
  */
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { MapContainer } from "react-leaflet";
 import { useReduceMotion } from "@/hooks/use-reduce-motion";
 import { FlatCRS } from "../map/flatCRS";
@@ -130,6 +130,26 @@ export function AtlasCanvas({
   const [fit, setFit] = useState({ gen: 0, on: isFit });
   if (fit.on !== isFit) setFit({ gen: fit.gen + (isFit ? 1 : 0), on: isFit });
 
+  // A handoff is decided on zoomend, and Leaflet fires that move's moveend
+  // right after, in the same dispatch and still in the old view's pixels.
+  // Drop camera reports until the dispatch ends, so the caller keeps the
+  // handed-over camera.
+  const handingOff = useRef(false);
+  const reportView =
+    onViewChange &&
+    ((v: CanvasView, c: CanvasCameraState) => {
+      handingOff.current = true;
+      queueMicrotask(() => {
+        handingOff.current = false;
+      });
+      onViewChange(v, c);
+    });
+  const reportCamera =
+    onCameraChange &&
+    ((c: CanvasCameraState) => {
+      if (!handingOff.current) onCameraChange(c);
+    });
+
   const water = resolved?.water ?? {};
   const waterOff = water.water?.enabled === false;
 
@@ -174,13 +194,13 @@ export function AtlasCanvas({
               view={view}
               viewKey={resolved.key}
               viewHeight={resolved.height}
-              onViewChange={onViewChange}
+              onViewChange={reportView}
             />
             <CanvasCamera
               viewKey={resolved.key}
               viewHeight={resolved.height}
               camera={isFit ? null : camera}
-              onCameraChange={onCameraChange}
+              onCameraChange={reportCamera}
               reduceMotion={reduceMotion}
             />
             <FitMapOnOpen

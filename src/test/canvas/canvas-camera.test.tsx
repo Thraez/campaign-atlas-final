@@ -234,6 +234,23 @@ describe("AtlasCanvas zoom handoff (R-32)", () => {
     expect(onViewChange).not.toHaveBeenCalled();
   });
 
+  it("drops the old view's moveend that follows a handoff's zoomend", async () => {
+    const onViewChange = vi.fn();
+    const m = mount(OCEAN, "fit", onViewChange);
+    m.onCameraChange.mockClear();
+    fake.container.dispatchEvent(new Event("wheel"));
+    zoomTo([500, 500], 1);
+    act(() => {
+      fake.fire("zoomend"); // Leaflet fires both in one dispatch
+      fake.fire("moveend");
+    });
+    expect(onViewChange).toHaveBeenCalledTimes(1);
+    expect(m.onCameraChange).not.toHaveBeenCalled();
+    await Promise.resolve();
+    act(() => fake.fire("moveend")); // later moves report again
+    expect(m.onCameraChange).toHaveBeenCalledTimes(1);
+  });
+
   it("swaps to the new view's camera without animation and without a refit", () => {
     const m = mount(OCEAN, "fit", (v, c) => m.update(v, c));
     fake.fitBounds.mockClear();

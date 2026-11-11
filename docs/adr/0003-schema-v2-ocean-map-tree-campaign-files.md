@@ -73,6 +73,10 @@ placements of maps that ship), and per map `parent`, `frame`, `enterZoom`. The v
 nothing. `worlds` and `ocean` list only worlds that ship to the campaign: a world with no map that
 ships there is left out, and its id and name are guarded (ADR-0004, rule 5).
 
+*Addendum, 2026-11-11 (R-32), provisional until Isak accepts it:* a v2 player `atlas.json` also
+emits per map `zoom` (`{ min, max }`, the authored range from `world.yaml`), which the viewer's
+zoom handoff needs; the v1 output still gains nothing.
+
 **Where the v2 test world lives.** `content-next/`, its own content root with its own config
 (`atlas.next.config.json`, read through `build-atlas.ts --config`), built by its own commands into
 a gitignored dir outside `public/`, never published, until cutover. It is committed: its content
