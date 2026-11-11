@@ -17,7 +17,8 @@
  *     or bad encoding is refused (400), and a file whose real path (links
  *     resolved) is outside the dir is refused (403);
  *   - no directory listing: a directory, like any unknown path, gets the
- *     site's `index.html` (the SPA fallback);
+ *     site's `index.html` (the SPA fallback), except a missing name with an
+ *     extension, which is a 404 so a missing asset shows;
  *   - before serving, it refuses a missing or stale build (`planServe`) and
  *     any site holding the picker's marker or another campaign's name
  *     (`siteLeaks`).
@@ -78,28 +79,36 @@ export function parseServeArgs(argv: string[]): { port: number; configPath: stri
   return { port, configPath };
 }
 
-/** The newest file under `dir` (links not followed), or null when it holds none. */
-function newestFile(dir: string): { file: string; mtimeMs: number } | null {
-  let best: { file: string; mtimeMs: number } | null = null;
+/**
+ * The newest change under `dir` (links not followed) or to `extra`: every
+ * file's mtime and every directory's, `dir` included, since deleting or
+ * renaming a note changes only its directory's mtime.
+ */
+function newestChange(dir: string, extra: string[]): { file: string; mtimeMs: number } {
+  let best = { file: dir, mtimeMs: fs.lstatSync(dir).mtimeMs };
+  const see = (file: string) => {
+    const m = fs.lstatSync(file).mtimeMs;
+    if (m > best.mtimeMs) best = { file, mtimeMs: m };
+  };
   const walk = (d: string) => {
+    see(d);
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       const full = path.join(d, e.name);
       if (e.isDirectory()) walk(full);
-      else {
-        const m = fs.lstatSync(full).mtimeMs;
-        if (!best || m > best.mtimeMs) best = { file: full, mtimeMs: m };
-      }
+      else see(full);
     }
   };
   walk(dir);
+  extra.forEach(see);
   return best;
 }
 
 /**
  * The campaigns to serve, in content order, each with its built site dir.
  * Refuses (`ServeRefusal`) when `dist-campaigns/` is missing, a campaign the
- * content lists has no site (or no `atlas/atlas.json` in it), or a file under
- * the content root is newer than a site's `atlas/atlas.json`. Throws a plain
+ * content lists has no site (or no `atlas/atlas.json` in it), a site dir (or
+ * `dist-campaigns/`) is a link, or a file or directory under the content root,
+ * or the config, is newer than a site's `atlas/atlas.json`. Throws a plain
  * error when the config or content can't be loaded or isn't v2.
  */
 export function planServe({
@@ -127,19 +136,21 @@ export function planServe({
     loadAtlasModel(contentDir, cfg, { root }).model.campaigns.map((c) => [c.id, c.name] as const),
   );
   const sitesRoot = path.join(root, "dist-campaigns");
-  if (!fs.statSync(sitesRoot, { throwIfNoEntry: false })?.isDirectory()) {
-    refuse("dist-campaigns/ is missing");
-  }
-  const newest = newestFile(contentDir);
+  const rootStat = fs.lstatSync(sitesRoot, { throwIfNoEntry: false });
+  if (!rootStat) refuse("dist-campaigns/ is missing");
+  if (!rootStat!.isDirectory()) refuse("dist-campaigns/ is not a directory (a link?)");
+  const newest = newestChange(contentDir, [configPath]);
   const rel = (p: string) => path.relative(root, p).split(path.sep).join("/");
   return sites.map((site) => {
-    if (!fs.statSync(site.dir, { throwIfNoEntry: false })?.isDirectory()) {
-      refuse(`campaign ${site.campaign} has no site dir ${site.label}`);
+    const dirStat = fs.lstatSync(site.dir, { throwIfNoEntry: false });
+    if (!dirStat) refuse(`campaign ${site.campaign} has no site dir ${site.label}`);
+    if (!dirStat!.isDirectory()) {
+      refuse(`${site.label} is not a directory (a link?), so it is not the built site`);
     }
     const atlasJson = path.join(site.dir, "atlas", "atlas.json");
-    const built = fs.statSync(atlasJson, { throwIfNoEntry: false });
+    const built = fs.lstatSync(atlasJson, { throwIfNoEntry: false });
     if (!built?.isFile()) refuse(`${rel(atlasJson)} is missing`);
-    if (newest && newest.mtimeMs > built!.mtimeMs) {
+    if (newest.mtimeMs > built!.mtimeMs) {
       refuse(`${rel(site.dir)} is stale: ${rel(newest.file)} is newer than ${rel(atlasJson)}`);
     }
     return {
@@ -188,13 +199,13 @@ const escapeHtml = (s: string) =>
     (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!,
   );
 
-/** The picker page (P6), in memory: each campaign's name and a link to its port. */
+/** The picker page (P6), in memory: each campaign's name and a link to its port (IPv4, as bound). */
 export function pickerHtml(campaigns: { name: string; port: number }[]): string {
   const items = campaigns
     .map(
       (c) =>
-        `<li><a href="http://localhost:${c.port}/">${escapeHtml(c.name)}</a>` +
-        ` <span class="port">localhost:${c.port}</span></li>`,
+        `<li><a href="http://127.0.0.1:${c.port}/">${escapeHtml(c.name)}</a>` +
+        ` <span class="port">127.0.0.1:${c.port}</span></li>`,
     )
     .join("\n      ");
   return `<!doctype html>
@@ -302,7 +313,12 @@ export function resolveSitePath(siteRoot: string, rawUrl: string): Resolved {
   try {
     real = fs.realpathSync(candidate);
   } catch {
-    return fallback(); // missing: the SPA's route
+    // Missing: a name with an extension is a file the site lacks (404, so a
+    // missing asset shows); anything else is an SPA route.
+    if (path.extname(segments[segments.length - 1]) !== "") {
+      return { kind: "refused", status: 404, why: "no such file" };
+    }
+    return fallback();
   }
   if (!inside(siteRoot, real)) {
     return { kind: "refused", status: 403, why: "links outside the site" };

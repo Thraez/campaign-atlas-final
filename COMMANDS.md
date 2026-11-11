@@ -69,11 +69,15 @@ after it. The preview pane's `atlas-campaigns-preview` (`.claude/launch.json`) r
 
 - It binds `127.0.0.1` only and answers only `localhost`/`127.0.0.1` hosts.
 - A site port serves files of its own dir only: no `..` (raw or encoded), no backslashes, no link
-  that leaves the dir, no directory listing; any unknown path gets the site's `index.html`.
+  that leaves the dir, no directory listing; an unknown path gets the site's `index.html`, except
+  a missing file name with an extension (`/assets/x.js`), which is a 404.
 - The picker lives in memory: it is never written into a site, and the command refuses to start
   if any site holds the picker or another campaign's name.
 - It refuses, naming `atlas:publish:next`, when `dist-campaigns/` is missing, a campaign has no
-  site, or a file under `content-next/` is newer than a site's `atlas/atlas.json`.
+  site, a site dir is a link, or anything under `content-next/` (a file, or a directory, so a
+  deleted or renamed note counts) or `atlas.next.config.json` is newer than a site's
+  `atlas/atlas.json`.
+- The picker links to `http://127.0.0.1:<port>/`, the address it binds.
 
 ### `npm run atlas:build:player` · Windows: `bin/atlas-build-player.cmd`
 

@@ -8,34 +8,32 @@
 import path from "node:path";
 import { parseServeArgs, planServe, startServe, ServeRefusal } from "./serveCampaigns.js";
 
-async function main(): Promise<number> {
+async function main(): Promise<void> {
   const root = process.cwd();
   let args: { port: number; configPath: string };
   try {
     args = parseServeArgs(process.argv.slice(2));
   } catch (e) {
     console.error(`serve: ${(e as Error).message}`);
-    return 1;
+    process.exit(1);
   }
   try {
     const campaigns = planServe({ root, configPath: path.resolve(root, args.configPath) });
     const running = await startServe(campaigns, args.port);
     console.log("serve: test site only, on 127.0.0.1");
-    console.log(`  picker              http://localhost:${running.picker}/`);
+    console.log(`  picker              http://127.0.0.1:${running.picker}/`);
     for (const c of running.campaigns) {
       const rel = path.relative(root, c.siteDir).split(path.sep).join("/");
-      console.log(`  ${c.id.padEnd(18)}  http://localhost:${c.port}/  (${rel}/)`);
+      console.log(`  ${c.id.padEnd(18)}  http://127.0.0.1:${c.port}/  (${rel}/)`);
     }
+    // The servers keep the process alive until a signal closes them.
     const stop = () => void running.close().then(() => process.exit(0));
     process.on("SIGINT", stop);
     process.on("SIGTERM", stop);
-    return -1; // keep running
   } catch (e) {
     console.error(e instanceof ServeRefusal ? e.message : `serve: ${(e as Error).message}`);
-    return e instanceof ServeRefusal ? 2 : 1;
+    process.exit(e instanceof ServeRefusal ? 2 : 1);
   }
 }
 
-void main().then((code) => {
-  if (code >= 0) process.exit(code);
-});
+void main();

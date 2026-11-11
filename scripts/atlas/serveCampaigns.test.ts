@@ -40,6 +40,8 @@ function tmp(label: string): string {
 }
 
 const OLD = new Date("2020-01-01T00:00:00Z");
+/** When the fixture sites were "built": after the content, before the test's own change. */
+const BUILT = new Date("2021-01-01T00:00:00Z");
 
 function touchTree(dir: string, when: Date): void {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -76,6 +78,11 @@ function builtRoot(): { root: string; configPath: string } {
   fs.mkdirSync(path.join(root, ".atlas-campaigns", "a"), { recursive: true });
   fs.writeFileSync(path.join(root, ".atlas-campaigns", "a", "must-not-ship.json"), "{}");
   fs.writeFileSync(path.join(root, "secret.txt"), "outside");
+  fs.utimesSync(path.join(root, "content"), OLD, OLD);
+  fs.utimesSync(configPath, OLD, OLD);
+  for (const id of ["a", "b"]) {
+    fs.utimesSync(path.join(root, "dist-campaigns", id, "atlas", "atlas.json"), BUILT, BUILT);
+  }
   return { root, configPath };
 }
 
@@ -160,6 +167,52 @@ describe("planServe refuses a missing or stale build, naming atlas:publish:next"
       /campaign b has no site dir.*atlas:publish:next/,
     );
   });
+  it("refuses after a note is deleted (only its directory's mtime changes)", () => {
+    const { root, configPath } = builtRoot();
+    fs.rmSync(path.join(root, "content", "vale", "places", "inn.md"));
+    expect(() => planServe({ root, configPath })).toThrow(ServeRefusal);
+    expect(() => planServe({ root, configPath })).toThrow(
+      /stale: content\/vale\/places is newer.*atlas:publish:next/,
+    );
+  });
+  it("refuses after a note is renamed", () => {
+    const { root, configPath } = builtRoot();
+    const places = path.join(root, "content", "vale", "places");
+    fs.renameSync(path.join(places, "inn.md"), path.join(places, "tavern.md"));
+    // A rename keeps the file's own mtime; only the directory's moves.
+    expect(fs.statSync(path.join(places, "tavern.md")).mtimeMs).toBe(OLD.getTime());
+    expect(() => planServe({ root, configPath })).toThrow(/stale: content\/vale\/places is newer/);
+  });
+  it("refuses after a file is added at the content root", () => {
+    const { root, configPath } = builtRoot();
+    fs.writeFileSync(path.join(root, "content", "new.md"), "x");
+    fs.utimesSync(path.join(root, "content", "new.md"), OLD, OLD);
+    expect(() => planServe({ root, configPath })).toThrow(/stale: content is newer/);
+  });
+  it("refuses when the config is newer than the build", () => {
+    const { root, configPath } = builtRoot();
+    const later = new Date(Date.now() + 60_000);
+    fs.utimesSync(configPath, later, later);
+    expect(() => planServe({ root, configPath })).toThrow(
+      /stale: atlas\.next\.config\.json is newer.*atlas:publish:next/,
+    );
+  });
+  it("refuses a site dir that is a link", () => {
+    const { root, configPath } = builtRoot();
+    const site = path.join(root, "dist-campaigns", "b");
+    const elsewhere = path.join(root, "elsewhere-b");
+    fs.renameSync(site, elsewhere);
+    fs.symlinkSync(elsewhere, site);
+    expect(() => planServe({ root, configPath })).toThrow(ServeRefusal);
+    expect(() => planServe({ root, configPath })).toThrow(/dist-campaigns\/b is not a directory/);
+  });
+  it("refuses a dist-campaigns/ that is a link", () => {
+    const { root, configPath } = builtRoot();
+    const sites = path.join(root, "dist-campaigns");
+    fs.renameSync(sites, path.join(root, "elsewhere"));
+    fs.symlinkSync(path.join(root, "elsewhere"), sites);
+    expect(() => planServe({ root, configPath })).toThrow(/dist-campaigns\/ is not a directory/);
+  });
   it("refuses a site without atlas/atlas.json", () => {
     const { root, configPath } = builtRoot();
     fs.rmSync(path.join(root, "dist-campaigns", "a", "atlas"), { recursive: true });
@@ -213,6 +266,11 @@ describe("resolveSitePath", () => {
     expect(fileOf("/map/quessaly")).toBe("index.html");
     expect(fileOf("/atlas/")).toBe("index.html");
     expect(fileOf("/atlas")).toBe("index.html");
+  });
+  it("gives a missing file name with an extension a 404, not the index", () => {
+    expect(fileOf("/assets/missing.js")).toBe(404);
+    expect(fileOf("/atlas/assets/maps/gone.webp")).toBe(404);
+    expect(fileOf("/missing.css?v=1")).toBe(404);
   });
   it.each([
     "/../outside/secret.txt",
@@ -269,12 +327,12 @@ describe("siteLeaks", () => {
 });
 
 describe("pickerHtml", () => {
-  it("lists each campaign with a localhost link, escaped, and the test-site note", () => {
+  it("lists each campaign with a 127.0.0.1 link, escaped, and the test-site note", () => {
     const html = pickerHtml([
       { name: "Lantern Road", port: 4301 },
       { name: `<script>"&'`, port: 4302 },
     ]);
-    expect(html).toContain(`<a href="http://localhost:4301/">Lantern Road</a>`);
+    expect(html).toContain(`<a href="http://127.0.0.1:4301/">Lantern Road</a>`);
     expect(html).toContain("&lt;script&gt;&quot;&amp;&#39;");
     expect(html).not.toContain("<script>");
     expect(html).toContain(PICKER_NOTE);
@@ -314,6 +372,9 @@ describe("startServe", () => {
     expect(dir.body).toContain("site a"); // no listing
     expect(dir.body).not.toContain("app.js");
     expect((await raw(port("a"), "/assets/app.js")).headers).toContain("text/javascript");
+    const missing = await raw(port("a"), "/assets/missing.js");
+    expect(missing.status).toBe(404);
+    expect(missing.body).not.toContain("site a");
   });
   it.each([
     "/../b/index.html",
@@ -358,7 +419,7 @@ describe("startServe", () => {
   });
   it("serves the picker from memory at / only", async () => {
     const page = await raw(running.picker, "/");
-    expect(page.body).toContain(`http://localhost:${port("a")}/`);
+    expect(page.body).toContain(`http://127.0.0.1:${port("a")}/`);
     expect(page.body).toContain("Campaign A");
     expect(page.body).toContain("Campaign B");
     expect(page.body).toContain(PICKER_NOTE);

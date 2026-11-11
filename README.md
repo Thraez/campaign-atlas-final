@@ -564,7 +564,7 @@ Script	Purpose
 `npm run atlas:build:player`	Strict player build to `public/atlas/`.
 `npm run atlas:publish`	Player build plus Vite production build + all safety scans.
 `npm run atlas:publish:next`	The v2 test world (`content-next/`), local only: every campaign's store, its own site in `dist-campaigns/<id>/`, then every scan per campaign. Same as `atlas:publish -- --config atlas.next.config.json`.
-`npm run atlas:serve:next`	Serves each built `dist-campaigns/<id>/` as built on its own port on 127.0.0.1 (4301, 4302, ...) and a campaign picker on 4300 (`-- --port <n>` moves them). Refuses a missing or stale build: run `atlas:publish:next` first.
+`npm run atlas:serve:next`	Serves each built `dist-campaigns/<id>/` as built on its own port on 127.0.0.1 (4301, 4302, ...) and a campaign picker on 4300 (links use `127.0.0.1`) (`-- --port <n>` moves them). Refuses a missing or stale build: run `atlas:publish:next` first.
 `npm run atlas:check-secrets`	Scan a built artifact for sentinel-string DM leaks.
 `npm run atlas:check-derived`	Scan a built artifact for verbatim hidden/dm entity name leaks.
 `npm run atlas:check-shape`	Structural check on `atlas.json` (visibility / sourcePath / frontmatter / DM block).
