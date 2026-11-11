@@ -1,6 +1,6 @@
 # R-33 The player viewer on the shared canvas, with a breadcrumb
 
-Status: ready-for-agent
+Status: in-review
 Blocked by: R-32, R-34
 Size: M
 Branch: `rebuild-r33-viewer-on-canvas`
@@ -53,3 +53,50 @@ Move `src/pages/AtlasViewer.tsx` onto `AtlasCanvas` (R-31, R-32). The flat map `
 
 Campaign param in links and the local campaign picker (R-34, R-35), region cards and the story
 panel (phase 5), the new deep-link names (`note`, `x`, `y`, `z`) from ux-flows p5 (phase 5).
+
+## Build notes (2026-11-11)
+
+**Screenshots** (gitignored, in the worktree `.claude/worktrees/r33/previews/`): v1 player build of
+`content/` at `ATLAS_BASE=/campaign-atlas-final/` on `npm run preview`, desktop 1280x800 and 375 wide:
+- `r33-baseline/` (before any change) and `r33-after/`: `atlas`, `atlas-cam` (`?map=...&cx&cy&cz`),
+  `atlas-unknownmap` (`?map=nope...`), `atlas-entity` (`?entity=...`), each `-desktop.png` and `-mobile.png`.
+- Verdict: they look the same by eye (map, pins, aside, toolbar, scale bar, minimap; only the animated
+  sea differs in bytes). `content/` has one map, so no Select shows in either set.
+- `r33-v2/` on R-34's server (`atlas:publish:next`, `atlas:serve:next`): `main-ocean`, `main-oskmark`
+  (Ocean > Quessaly > Oskmark), `sandbox-ocean`, `sandbox-quessaly`, desktop and mobile.
+
+**Approach.** v2 output (`tree.ocean`) renders through `AtlasCanvas`; the viewer keeps the pins, regions,
+routes, fog, sound, ruler, scale bar and minimap as canvas children (map views only; `WrappedWorld` with
+`showImageLayers={false}`). v1 output keeps its own `MapContainer` path unchanged (provisional call:
+the canvas sets `zoomSnap` 0 and has no max-bounds, which would change v1's feel and its existing
+smoke-test assertions on `fitBounds`/`setMaxBounds`/`flyTo`; v1 "one top-level map per v1 map" holds via
+`buildMapTree`). The map layers are one shared fragment for both paths.
+- `src/pages/AtlasViewer.tsx`: state holds `{project, tree}`; `activeMapId` null = the ocean (v2); a
+  `camera` ("fit" or explicit) feeds the canvas; `goView` is the one way to change view; the last camera
+  of each view is remembered for the crumbs. Handoffs, click-enters and crumb clicks push a history
+  entry; the canvas's camera reports only replace. Credits and asset credits come from the map's world
+  (`map.worldId`), on the ocean from all worlds; header and panel show `campaign.name`. Select only on v1.
+- `src/atlas/resolveDeepLink.ts`: optional `ocean` option. No `map` is the ocean (camera kept); a `map`
+  id not in the tree opens the ocean and drops `cx/cy/cz`; an entity link lands on its placement's map
+  (a child too). v1 behaviour unchanged.
+- `src/atlas/map/MapBreadcrumb.tsx` (new), `src/atlas/map/viewCredits.ts` (new).
+- `deepLink.ts` and `viewerHistory.ts` needed no change.
+- Tests: `src/test/pages/AtlasViewer.v2.test.tsx` (built test world, both campaigns: crumbs, no Select,
+  ocean frames, no sandbox crumb or frame for tallowford/brindlecross/skerrow-isles, click enter and
+  Back, crumb push, unknown map, ocean camera, popstate) and `src/test/resolve-deep-link-v2.test.ts`.
+  Existing viewer, deep-link, canvas and region/ruler tests pass unchanged.
+
+**Provisional calls.**
+- v1 keeps its own map container (above).
+- Phone (P7): the breadcrumb wraps onto its own line of the toolbar (the toolbar has no room for it at
+  375 px, and the search button wraps too); not one shared line with search.
+- The P1 corner is the legend line (top-left, beside Leaflet's +/-) plus the existing "Reset map view"
+  button as the fit control (bottom-right). It shows on the ocean and on maps with child frames.
+- The ocean fit has no margin (the placed maps touch the edges, Skerrow Isles runs under the aside edge
+  on main at 1280 wide); a margin belongs in the canvas fit, not done here.
+- Search on the ocean offers every placement; picking one enters that map. The ruler's crosshair cursor
+  is not applied on the v2 canvas.
+
+**Checked:** typecheck:all, lint, the page, canvas and deep-link tests, publish:next (44 scans clean),
+real-browser click-enter / crumb / Back on `main`. **Not checked:** wheel handoff in the viewer by hand,
+`npm run gate`, touch pinch.

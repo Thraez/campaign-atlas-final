@@ -22,6 +22,12 @@ export interface ResolveDeepLinkOptions {
   currentMapId: string | null;
   defaultMapId: string | null;
   hasDesktopAside: boolean;
+  /**
+   * v2 output (R-33): the ocean is the home view, so `mapId: null` in the
+   * result means the ocean. `isMap` says which ids the viewer can show (the
+   * map tree's), `height` is the ocean's, for a camera on it. Absent for v1.
+   */
+  ocean?: { height: number; isMap: (id: string) => boolean };
 }
 
 /**
@@ -35,24 +41,28 @@ export interface ResolveDeepLinkOptions {
  * - Center: kept only when the URL's map exists, or when there is no entity
  *   (then it is flown to on the default map). An entity link whose map is
  *   missing drops its center: those coordinates belong to the missing map.
+ * - v2 (`ocean` option): the ocean is the fallback, so "no map" means the ocean (`mapId`
+ *   null) and an unknown map id opens it, centre dropped, without saying whether the
+ *   id exists elsewhere.
  * - Fly: to the kept center on the chosen map; else to the entity's
  *   placement on that map, if it has one there.
  */
 export function resolveDeepLink(
   link: DeepLinkState,
   project: Pick<AtlasProject, "maps" | "placements">,
-  { currentMapId, defaultMapId, hasDesktopAside }: ResolveDeepLinkOptions,
+  { currentMapId, defaultMapId, hasDesktopAside, ocean }: ResolveDeepLinkOptions,
 ): ResolvedDeepLink {
   const mapExists = (id: string | null): id is string =>
-    id != null && project.maps.some((m) => m.id === id);
-  const fallbackMapId = mapExists(defaultMapId)
-    ? defaultMapId
-    : mapExists(currentMapId)
-      ? currentMapId
-      : (project.maps[0]?.id ?? null);
+    id != null && (ocean ? ocean.isMap(id) : project.maps.some((m) => m.id === id));
+  const fallbackMapId = ocean
+    ? null
+    : mapExists(defaultMapId)
+      ? defaultMapId
+      : mapExists(currentMapId)
+        ? currentMapId
+        : (project.maps[0]?.id ?? null);
 
   const openId = link.entityId;
-  const center = mapExists(link.mapId) || !openId ? link.center : null;
   const entityPlacements = openId ? project.placements.filter((p) => p.entityId === openId) : [];
 
   let mapId: string | null;
@@ -66,9 +76,23 @@ export function resolveDeepLink(
     mapId = fallbackMapId;
   }
 
+  // The center belongs to the URL's map. v1: kept when that map exists or no entity is
+  // named. v2: also kept for no map at all (an ocean camera) while the view stays the
+  // ocean; a map id the output doesn't have drops it, whatever else the link says.
+  const center = ocean
+    ? (link.mapId != null ? mapExists(link.mapId) : mapId === null)
+      ? link.center
+      : null
+    : mapExists(link.mapId) || !openId
+      ? link.center
+      : null;
+
   const map = project.maps.find((m) => m.id === mapId);
   let fly: DeepLinkFly | null = null;
-  if (map && center) {
+  if (ocean && mapId === null && center) {
+    fly = { x: center.x, y: center.y, height: ocean.height };
+    if (link.zoom != null) fly.zoom = link.zoom;
+  } else if (map && center) {
     fly = { x: center.x, y: center.y, height: map.height };
     if (link.zoom != null) fly.zoom = link.zoom;
   } else if (map && openId) {
