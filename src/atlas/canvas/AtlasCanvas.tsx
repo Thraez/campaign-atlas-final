@@ -150,19 +150,23 @@ export function AtlasCanvas({
       >
         {resolved && (
           <>
-            <FitMapOnOpen
-              mapId={`${resolved.key}#${fit.gen}`}
-              mapWidth={resolved.fit.maxX - resolved.fit.minX}
-              mapHeight={resolved.fit.maxY - resolved.fit.minY}
-              bounds={boxBounds(resolved.height, resolved.fit)}
-              skip={!isFit}
-            />
+            {/* CanvasCamera before FitMapOnOpen: sibling effects run in order (after
+                every cleanup), so its moveend listener for this view is attached
+                before the fit's synchronous fitBounds fires moveend, and the
+                caller hears the fitted camera. */}
             <CanvasCamera
               viewKey={resolved.key}
               viewHeight={resolved.height}
               camera={isFit ? null : camera}
               onCameraChange={onCameraChange}
               reduceMotion={reduceMotion}
+            />
+            <FitMapOnOpen
+              mapId={`${resolved.key}#${fit.gen}`}
+              mapWidth={resolved.fit.maxX - resolved.fit.minX}
+              mapHeight={resolved.fit.maxY - resolved.fit.minY}
+              bounds={boxBounds(resolved.height, resolved.fit)}
+              skip={!isFit}
             />
             {resolved.kind === "ocean" ? (
               <OceanMaps

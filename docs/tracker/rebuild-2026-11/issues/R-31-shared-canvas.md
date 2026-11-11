@@ -59,7 +59,7 @@ The zoom handoff between views (R-32), the breadcrumb and URL (R-33), region car
 
 ## Build notes
 
-Built on `rebuild-r31-shared-canvas`, stacked on R-30 (`rebuild-r30-map-tree-model`, not merged yet).
+Built on `rebuild-r31-shared-canvas`, on R-30 (merged in #143; origin/main merged into the branch).
 
 **What's where.** `src/atlas/canvas/`: `AtlasCanvas.tsx` (the component), `CanvasLayers.tsx` (ocean
 maps, child frames, outlines and labels), `CanvasCamera.tsx` (explicit camera and `moveend`
@@ -137,3 +137,19 @@ No console errors.
     handed to Vite;
   - its paths are kept in a separate `DEV_CANVAS_PATHS` (not `DEV_API_PATHS`, whose entries must
     all be save-plugin routes) and are added to the player-bundle editor fingerprints.
+
+**Review fix (camera report).** `onCameraChange` didn't hear the fitted camera: on a view change,
+and on first mount when the map already had a size, `FitMapOnOpen`'s synchronous `fitBounds` fired
+`moveend` before `CanvasCamera` had re-attached its listener (effect cleanups run first, then
+siblings in order). `CanvasCamera` now renders before `FitMapOnOpen`. Pinned by
+`src/test/canvas/canvas-camera.test.tsx` on a mock map that fires `moveend` from `fitBounds` /
+`setView`: the report after a fit (first mount and view change), an explicit `setView`, an echoed
+camera ignored, `animate: false` under reduced motion, a re-fit when the camera turns back to "fit".
+
+**Known limits, left for later (from the review):**
+- The ocean SVG clips any layer that extends past `map.width`/`map.height` (the viewBox is the
+  placement's box).
+- In a `wrapX` map view, child frames are drawn only on the middle copy (dx = 0), not on the wrap
+  copies.
+- The store middleware matches `/__atlas/...` and `/__canvas` without the base, so it won't match
+  when `ATLAS_BASE` is set on the dev server.

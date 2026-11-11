@@ -12,8 +12,9 @@ import { SRC, importChain, importGraph, srcRelative } from "@/test/helpers/impor
 
 const CANVAS = path.join(SRC, "atlas", "canvas");
 
-/** Folders only the viewer uses: its search palette, entity panel and sound. */
-const VIEWER_ONLY = ["atlas/search/", "atlas/entity/", "atlas/sound/", "atlas/canvas-harness/"];
+/** Folders only the viewer uses: its search palette, entity panel and sound. (The harness,
+ *  `atlas/canvas-harness/`, is caught as editor-only.) */
+const VIEWER_ONLY = ["atlas/search/", "atlas/entity/", "atlas/sound/"];
 
 describe("shared canvas import fence", () => {
   const entries = fs
