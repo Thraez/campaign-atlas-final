@@ -24,6 +24,15 @@
         "--strictPort"
       ],
       "port": 4173
+    },
+    {
+      "name": "atlas-campaigns-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "atlas:serve:next"
+      ],
+      "port": 4300
     }
   ]
 }
