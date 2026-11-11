@@ -5,6 +5,7 @@ Blocked by: R-30
 Size: M
 Branch: `rebuild-r31-shared-canvas`
 Model: Opus (design call: how the ocean renders rotated, scaled maps on Leaflet)
+Needs: the adversarial player-safety review (light): the dev harness must never reach a player build
 
 ADR-0002 and plan.md section 2 call for one canvas component used by the viewer (R-33) and later
 the editor's E1 (phase 4). Today the viewer's `<MapContainer>` (`src/pages/AtlasViewer.tsx`
@@ -34,14 +35,21 @@ show one flat map. Build `AtlasCanvas` in `src/atlas/canvas/`, on R-30's tree.
   `src/pages/` or editor modules).
 - Respects reduced motion (`useReduceMotion`) for the sea and any fly animation.
 - Tests: rendering with the `react-leaflet` mock (`src/test/helpers/reactLeafletMock`) for both
-  views on the test-world tree (which maps, frames and labels appear per campaign), and a
-  preview-pane check of the real Leaflet render on a page or story that mounts the canvas on the
-  `content-next/` `main` store (screenshot in the PR; the viewer isn't switched yet).
+  views on the test-world tree (which maps, frames and labels appear per campaign), plus a rotated
+  fixture (a frame at 30°, an ocean placement at 15°): the test world has only rotation 0.
+- **A dev harness for v2 stores.** Nothing serves a v2 store in dev today (`npm run dev` is v1, and
+  the editor build refuses a campaign public dir). Add a dev-only route (`/__canvas?c=<id>`)
+  behind `__INCLUDE_EDITOR__`, fed by a dev-server-only middleware that serves
+  `.atlas-campaigns/<id>/atlas/` read-only (no directory listing, no path outside that dir). It
+  mounts `AtlasCanvas` on that campaign's store, with a switch for a rotated fixture. It must be
+  absent from every player build (`player-import-graph.test.ts` or a new check pins it). Phase 4's
+  editor reuses it. Real-Leaflet check in the preview pane on both campaigns, including the
+  rotated case; screenshots in the PR.
 - `npm run gate` passes.
 
 ## Touches
 
-`src/atlas/canvas/` (new), maybe small props on `src/atlas/map/WrappedWorld.tsx` and
+`src/atlas/canvas/` (new), the dev harness route and middleware (`vite.config.ts` or a dev plugin under `scripts/`), maybe small props on `src/atlas/map/WrappedWorld.tsx` and
 `src/atlas/ocean/OceanBackground.tsx`. Not `AtlasViewer.tsx` (R-33) or the editor.
 
 ## Out of scope

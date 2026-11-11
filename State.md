@@ -24,8 +24,8 @@ ticket merges on `npm run gate` plus an Opus review; a push or merge needs Isak'
 | 7 Retire | Delete the old editor, the v1 path, the down-migration, arch-06 | `grep` finds no `AtlasPlacementEditor`, `worlds[0]`, `placementOverrides` | - |
 | T Tiles (only if triggered) | Pyramid step; fog scan replaced in the same PR; ADR-0008 | A real map over about 8k px that was slow on a phone, now smooth | - |
 
-Safe stops: after phase 3 (the viewer shows the ocean and map tree on today's content, nothing
-half-built is live) and after phase 6 (new editor at parity, old one retired next). Phase 0 was
+Safe stops: after phase 3 (the viewer shows the ocean and map tree on the local test world; the live
+v1 site is unchanged) and after phase 6 (new editor at parity, old one retired next). Phase 0 was
 also a stop. Phase 3 and 4 tickets are written before phase 2 ends.
 
 Phase H runs before the first real Sync (`tidemarrow/01`), which stays blocked by H-04 (R-01's
@@ -89,7 +89,7 @@ orchestrating session opens and merges each PR. Provisional calls are in the tab
 | R-30 | Map tree and ocean geometry in the app (pure), `atlasGuard` checks v2 fields | - | Sonnet | - |
 | R-31 | The shared canvas `AtlasCanvas`: the ocean and one map with child frames | R-30 | Opus | - |
 | R-32 | Zoom handoff: ocean > map > child > back, with hysteresis | R-30, R-31 | Opus | - |
-| R-33 | The player viewer on the canvas, breadcrumb; v1 site looks as today | R-32 | Sonnet | - |
+| R-33 | The player viewer on the canvas, breadcrumb; v1 site looks as today | R-32, R-34 | Sonnet | - |
 | R-34 | Serve the test world's campaign sites locally, with a picker | R-30 | Opus | - |
 | R-35 | Campaign links: `c=` and "Not found in this campaign" | R-33, R-34 | Sonnet | - |
 | R-36 | Phase 3 check: Ocean > continent > city > back (playtester) | R-35 | Sonnet | - |
@@ -132,6 +132,8 @@ player, DM and round-trip output; `--out` writes a fresh copy only after the che
 the content root or an Obsidian vault). The real migration of `content/` is Isak's call.
 
 For Isak (decide before the cutover):
+- ADR-0003 addendum: v2 output emits per-map `zoom {min, max}` (R-32, provisional), and the
+  rotation pivot is the centre (R-30, provisional).
 - H-01: the deploy must depend on `atlas:publish`'s exit code (a failure partway leaves earlier
   campaign sites built but unscanned; R-19 ticket, "For H-01").
 - Running the real migration of `content/` (and later the vault).
@@ -288,10 +290,10 @@ All calls below were kept by Isak on 2026-11-07 (batch review: "Keep all").
 | 2026-11-10 | R-14 review: may two worlds hold notes with the same id, so one vault note feeds both?                                                                        | Note ids are global across worlds (as the build's duplicate-slug check already says); Sync holds a vault note whose id lives in another world instead of creating a second copy | Coordinator call 2026-11-10; Isak may revisit if one vault should feed two worlds                                                      | R-14   |
 | 2026-11-11 | Phase 3 tickets: the pivot of a frame's or ocean placement's `rotation` (ADR-0003 leaves it open)? | The centre, in the viewer; the resolver keeps testing both pivots (fail closed) until ADR-0003 is amended | The viewer must draw one; a rotate handle turns about the centre | R-30 |
 | 2026-11-11 | Phase 3 tickets: a frame whose aspect differs from its child map's? | The width ratio wins; the tree warns | The editor (E5) will keep aspects equal | R-30 |
-| 2026-11-11 | Phase 3 tickets: what is a map's "minimum" for zooming back out (the output has no per-map zoom range)? | Its fitted zoom; authored minimums can come later as an additive output field | No build change in phase 3 | R-32 |
+| 2026-11-11 | Phase 3 tickets: what is a map's "minimum" for zooming back out (the output has no per-map zoom range)? | `zoom.min` from the source, now emitted per map in v2 output (`MapDocument.zoom`); the fitted zoom when absent | Needs an ADR-0003 addendum (For Isak) | R-32 |
 | 2026-11-11 | Phase 3 tickets: when does the ocean, or a frame with no `enterZoom`, hand over to a map? | When the map would fill the viewport's shorter side; a click always enters | The ocean has no `enterZoom` | R-32 |
-| 2026-11-11 | Phase 3 tickets: how is the local test site served? | One port, a path per campaign, a picker at `/` that never lands in a campaign's site; no remembered choice | The picker must link to each site; hosted sites (H-01) are one hostname each | R-34 |
-| 2026-11-11 | Phase 3 tickets: what does `c=` do on a campaign site? | A check, not a switch: a wrong `c`, map or note opens the ocean with "Not found in this campaign"; v1 writes no `c` | Each site holds one campaign (ADR-0004) | R-35 |
+| 2026-11-11 | Phase 3 tickets: how is the local test site served? | One port per campaign, serving `dist-campaigns/<id>/` exactly as built, plus a picker on its own port that never lands in a campaign's site; no remembered choice | The local site is the artifact H-01 would deploy | R-34 |
+| 2026-11-11 | Phase 3 tickets: what does `c=` do on a campaign site? | A check, not a switch: a wrong `c`, map or note opens the ocean with "Not found in this campaign"; v1 writes no `c`; the campaign chip links to the picker only when `location.hostname` is `localhost` or `127.0.0.1` | Each site holds one campaign (ADR-0004); no build flag can turn the link on | R-35 |
 
 ## End of the 2026-11-07 improvement loop
 

@@ -1,7 +1,7 @@
 # R-33 The player viewer on the shared canvas, with a breadcrumb
 
 Status: ready-for-agent
-Blocked by: R-32
+Blocked by: R-32, R-34
 Size: M
 Branch: `rebuild-r33-viewer-on-canvas`
 Model: Sonnet (settled plan)
@@ -19,14 +19,18 @@ Move `src/pages/AtlasViewer.tsx` onto `AtlasCanvas` (R-31, R-32). The flat map `
   the map in view (`map.worldId`), on the ocean from every world in the output. The site name stays
   `campaign.name`.
 - **v1 output** (no `ocean`): one top-level map per v1 map, opened on the default map fitted, the
-  `<Select>` kept when there is more than one map, no "Ocean" crumb. The live site must look the
-  same: compare the smoke test's render and a preview-pane screenshot of `npm run dev` before and
-  after.
+  `<Select>` kept when there is more than one map, no "Ocean" crumb. Merging publishes, so the live
+  site must look the same: before any change, take baseline screenshots on `main` of the player
+  build of `content/` (`atlas-pages-preview` in `.claude/launch.json`, desktop and 375 px), record
+  their paths in the ticket, and compare after; the smoke test's v1 render is unchanged too.
+- The P1 corner: a legend line ("▭ map: zoom in or click") and zoom controls (+, −, fit) on v2
+  views (player wireframe).
 - **URL:** the existing params keep working (`map`, `entity`, `cx`, `cy`, `cz`, `src/atlas/deepLink.ts`);
   a v2 ocean view is a URL with no `map` (camera in ocean coordinates). Back/forward
   (`viewerHistory.ts`) steps through handoffs: a handoff pushes a history entry, panning and
   zooming inside a view replace it. A `map` id not in the output opens the ocean (v2) or the
-  default map (v1), without saying whether it exists elsewhere.
+  default map (v1), ignoring `cx`/`cy`/`cz`, without saying whether it exists elsewhere.
+- Check on R-34's server, both campaigns, desktop and 375 px.
 - `resolveDeepLink` picks the map for an `entity` link from its placements as today; on v2 it may
   land on a child map (no cross-map fly yet, phase 5).
 - Pins, regions, routes, fog, sound and the ruler still work on a map view (they are `WrappedWorld`

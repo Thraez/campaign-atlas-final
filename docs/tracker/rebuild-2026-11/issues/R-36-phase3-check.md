@@ -20,13 +20,14 @@ test world, and nothing half-built is live.
   - `sandbox`: no `skerrow-isles` on the ocean, no frame for `tallowford`, `brindlecross` or
     `mirefold`; `oskmark` shows its baked fog.
   - A wrong-campaign link and a hidden-map link show "Not found in this campaign" (R-35).
-  - The live v1 site (`npm run dev`, then `atlas-pages-preview`) looks as before.
+  - The live v1 site (`atlas-pages-preview`) looks as R-33's recorded baseline.
 - Bugs found are fixed here if small (one module, under about 50 lines); others become tickets
   in this folder.
 - The notes and up to six screenshots are saved in the ticket's `## Check` section (screenshots in
   `previews/`, gitignored, paths only).
 - `State.md` lists for Isak's look: the ocean, the zoom handoff feel, the breadcrumb, the phone top
-  bar, and the provisional calls of R-30..R-35.
+  bar, and the provisional calls of R-30..R-35; and that Browse, Timeline, Credits and the nav
+  still read `worlds[0]` on v2 until phase 5.
 - `npm run gate` passes, and `atlas:publish:next` scans pass on both campaigns.
 
 ## Out of scope
