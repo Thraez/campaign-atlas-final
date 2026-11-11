@@ -1,6 +1,6 @@
 # State
 
-Updated 2026-11-08 on the Mac. Branch `main` (= origin/main cab9748).
+Updated 2026-11-11 on the Mac. Branch `main` (= origin/main 3ea4ef44). Phase 3 tickets written.
 
 ## Rebuild queue
 
@@ -16,7 +16,7 @@ ticket merges on `npm run gate` plus an Opus review; a push or merge needs Isak'
 | 0 Guard and quick wins | R-01 Sync guard, scans on real artifacts, Q-01..Q-04 | Links that work, a fitted map, the menu above the map, a region card. **Safe stop** | done |
 | 1 Spine and PRs | The other PRs, R-02..R-06, ADR-0001 addendum, ADR-0002 | A publish log with every scan reading `dist`; `docs/GOALS.md` agreed | done |
 | 2 Schema v2 and campaigns in the pipeline | R-10..R-20, ADR-0003, ADR-0004 | `npm run atlas:tree` on the v2 test world, per campaign; today's site unchanged | done (R-10, R-11a, R-11b, R-11c, R-11d, R-12, R-15, R-16, R-07b, R-13, R-11e, R-14, R-17, R-07, R-17b, R-18, R-19, R-20 done) |
-| 3 Shared canvas | Ocean/frame/map-tree component; viewer on it; campaign links | Ocean > continent > city > back on the local test world. **Safe stop** | - |
+| 3 Shared canvas | Ocean/frame/map-tree component; viewer on it; campaign links | Ocean > continent > city > back on the local test world. **Safe stop** | in progress (R-30..R-36 written 2026-11-11) |
 | 4 Editor core | Router, command store, E0-E5, Place pin, E9, Draw route with distance/time; v2 test world only; ADR-0005, ADR-0006 | Add a map inside a map, pin it, draw a route, reload | - |
 | 5 Story | Region card and story panel, monument strip, people and Inside lists, route labels, deep links, Browse, Timeline, Credits, Landing on v2 | Read a region, a person, a monument; follow three links | - |
 | 6 Editor jobs, parity, cutover | E13, E6, E7, E8, E10 Sync, E11, E12, parity items; cutover last | Every job on the parity list in the new editor. **Safe stop** | - |
@@ -24,8 +24,8 @@ ticket merges on `npm run gate` plus an Opus review; a push or merge needs Isak'
 | 7 Retire | Delete the old editor, the v1 path, the down-migration, arch-06 | `grep` finds no `AtlasPlacementEditor`, `worlds[0]`, `placementOverrides` | - |
 | T Tiles (only if triggered) | Pyramid step; fog scan replaced in the same PR; ADR-0008 | A real map over about 8k px that was slow on a phone, now smooth | - |
 
-Safe stops: after phase 3 (the viewer shows the ocean and map tree on today's content, nothing
-half-built is live) and after phase 6 (new editor at parity, old one retired next). Phase 0 was
+Safe stops: after phase 3 (the viewer shows the ocean and map tree on the local test world; the live
+v1 site is unchanged) and after phase 6 (new editor at parity, old one retired next). Phase 0 was
 also a stop. Phase 3 and 4 tickets are written before phase 2 ends.
 
 Phase H runs before the first real Sync (`tidemarrow/01`), which stays blocked by H-04 (R-01's
@@ -77,6 +77,23 @@ side by side. Phase H tickets, for later: H-01 Cloudflare
 Pages per campaign (after R-19), H-02 Access test, H-03 pre-switch safety check, H-04 the switch
 (Isak's clicks; unblocks `tidemarrow/01`).
 
+### Phase 3, in order (tickets in `docs/tracker/rebuild-2026-11/issues/`)
+
+Written 2026-11-11 by the phase 3 coordinator from plan.md, ux-flows.md (p1, p2, p5-p7), the player
+wireframe, ADR-0003 and ADR-0004. Built one ticket at a time, each in its own worktree; the
+orchestrating session opens and merges each PR. Provisional calls are in the table below
+("Phase 3 tickets"). Phase 4 waits for Isak to accept ADR-0005 and ADR-0006.
+
+| Ticket | What | Blocked by | Model | State |
+|---|---|---|---|---|
+| R-30 | Map tree and ocean geometry in the app (pure), `atlasGuard` checks v2 fields | - | Sonnet | - |
+| R-31 | The shared canvas `AtlasCanvas`: the ocean and one map with child frames | R-30 | Opus | - |
+| R-32 | Zoom handoff: ocean > map > child > back, with hysteresis | R-30, R-31 | Opus | - |
+| R-33 | The player viewer on the canvas, breadcrumb; v1 site looks as today | R-32, R-34 | Sonnet | - |
+| R-34 | Serve the test world's campaign sites locally, with a picker | R-30 | Opus | - |
+| R-35 | Campaign links: `c=` and "Not found in this campaign" | R-33, R-34 | Sonnet | - |
+| R-36 | Phase 3 check: Ocean > continent > city > back (playtester) | R-35 | Sonnet | - |
+
 ### Kept notes
 
 Cleaned 2026-11-07 (Isak: delete unless meaningful): branch `local-main-backup-2026-11-07` held two
@@ -115,6 +132,8 @@ player, DM and round-trip output; `--out` writes a fresh copy only after the che
 the content root or an Obsidian vault). The real migration of `content/` is Isak's call.
 
 For Isak (decide before the cutover):
+- ADR-0003 addendum: v2 output emits per-map `zoom {min, max}` (R-32, provisional), and the
+  rotation pivot is the centre (R-30, provisional).
 - H-01: the deploy must depend on `atlas:publish`'s exit code (a failure partway leaves earlier
   campaign sites built but unscanned; R-19 ticket, "For H-01").
 - Running the real migration of `content/` (and later the vault).
@@ -269,6 +288,12 @@ All calls below were kept by Isak on 2026-11-07 (batch review: "Keep all").
 | 2026-11-07 | eval-44: does Reset map settings clear sound edits?                                                                                                           | Yes                                                                                                                          | They now live in the same override                                                                                                     | 44     |
 | 2026-11-10 | R-11e: does a rule-8 name collision fail a non-strict player build too? | Rule 8 collisions fail every player build, not only strict | Safer for players; matches ADR-0004 wording. Coordinator call 2026-11-10 | R-11e |
 | 2026-11-10 | R-14 review: may two worlds hold notes with the same id, so one vault note feeds both?                                                                        | Note ids are global across worlds (as the build's duplicate-slug check already says); Sync holds a vault note whose id lives in another world instead of creating a second copy | Coordinator call 2026-11-10; Isak may revisit if one vault should feed two worlds                                                      | R-14   |
+| 2026-11-11 | Phase 3 tickets: the pivot of a frame's or ocean placement's `rotation` (ADR-0003 leaves it open)? | The centre, in the viewer; the resolver keeps testing both pivots (fail closed) until ADR-0003 is amended | The viewer must draw one; a rotate handle turns about the centre | R-30 |
+| 2026-11-11 | Phase 3 tickets: a frame whose aspect differs from its child map's? | The width ratio wins; the tree warns | The editor (E5) will keep aspects equal | R-30 |
+| 2026-11-11 | Phase 3 tickets: what is a map's "minimum" for zooming back out (the output has no per-map zoom range)? | `zoom.min` from the source, now emitted per map in v2 output (`MapDocument.zoom`); the fitted zoom when absent | Needs an ADR-0003 addendum (For Isak) | R-32 |
+| 2026-11-11 | Phase 3 tickets: when does the ocean, or a frame with no `enterZoom`, hand over to a map? | When the map would fill the viewport's shorter side; a click always enters | The ocean has no `enterZoom` | R-32 |
+| 2026-11-11 | Phase 3 tickets: how is the local test site served? | One port per campaign, serving `dist-campaigns/<id>/` exactly as built, plus a picker on its own port that never lands in a campaign's site; no remembered choice | The local site is the artifact H-01 would deploy | R-34 |
+| 2026-11-11 | Phase 3 tickets: what does `c=` do on a campaign site? | A check, not a switch: a wrong `c`, map or note opens the ocean with "Not found in this campaign"; v1 writes no `c`; the campaign chip links to the picker only when `location.hostname` is `localhost` or `127.0.0.1` | Each site holds one campaign (ADR-0004); no build flag can turn the link on | R-35 |
 
 ## End of the 2026-11-07 improvement loop
 

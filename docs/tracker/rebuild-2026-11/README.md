@@ -55,5 +55,23 @@ R-17b are new (split out of R-11a and R-17 in review).
   and the three fail-closed rules.
 - **Done:** R-11c (merged), R-07b, R-13, R-11e, R-14, R-17, R-07, R-17b, R-18, R-19, R-20. Phase 2 complete.
 
-Phase 3 and 4 tickets are written before phase 2 ends (plan.md section 5). Phase H (H-01..H-04)
-starts after R-19 at the earliest and before the first real Sync (`tidemarrow/01`).
+## Phase 3: the shared canvas
+
+Goal check: Ocean > continent > city > back on the local test world (`content-next/`), per
+campaign. Safe stop. The live v1 site looks as today throughout.
+
+| Order | Ticket | Size | Blocked by | Safety review |
+|---|---|---|---|---|
+| 1 | [R-30 Map tree and ocean geometry in the app](issues/R-30-map-tree-model.md) | S | - | light (`atlasGuard`) |
+| 2 | [R-31 The shared canvas](issues/R-31-shared-canvas.md) | M | R-30 | light (dev harness) |
+| 2 | [R-34 Serve the test world's campaign sites locally](issues/R-34-local-campaign-sites.md) | S | R-30 | yes |
+| 3 | [R-32 Zoom handoff](issues/R-32-zoom-handoff.md) | M | R-30, R-31 | light (build output) |
+| 4 | [R-33 The player viewer on the canvas](issues/R-33-viewer-on-canvas.md) | M | R-32, R-34 | yes |
+| 5 | [R-35 Campaign links](issues/R-35-campaign-in-links.md) | S | R-33, R-34 | yes |
+| 6 | [R-36 Phase 3 check](issues/R-36-phase3-check.md) | S | R-35 | - |
+
+Provisional calls (rotation pivot, zoom-out minimum, handoff rule, local serving, `c=`) are in
+`State.md`. Phase 4 needs ADR-0005 and ADR-0006, which Isak accepts first.
+
+Phase 3 tickets are written (2026-11-11); phase 4's wait for ADR-0005 and ADR-0006. Phase H
+(H-01..H-04) starts after R-19 at the earliest and before the first real Sync (`tidemarrow/01`).
