@@ -27,7 +27,7 @@ import http from "node:http";
 import path from "node:path";
 import type { AddressInfo } from "node:net";
 import { campaignArtifacts, LEGACY_OUTPUT } from "./scanRegistry.js";
-import { loadAtlasModel } from "./loadAtlasModel.js";
+import { loadAtlasModel, type LoadAtlasModelConfig } from "./loadAtlasModel.js";
 import { listTextFiles } from "./playerArtifact.js";
 import { findSecretsInText, isReportableName } from "../check-derived-secrets.js";
 import { decodeForSearch } from "../check-campaign-isolation.js";
@@ -109,11 +109,9 @@ export function planServe({
   root: string;
   configPath: string;
 }): ServedCampaign[] {
-  const cfg = JSON.parse(fs.readFileSync(configPath, "utf8")) as {
+  // The config as the loader reads it (v2 picks no world from it, R-13).
+  const cfg = JSON.parse(fs.readFileSync(configPath, "utf8")) as LoadAtlasModelConfig & {
     contentRoot: string;
-    defaultWorld: string;
-    include: string[];
-    exclude: string[];
   };
   const contentDir = path.resolve(path.dirname(configPath), cfg.contentRoot);
   // The dirs the publish builds and the scans read (one source).
@@ -126,11 +124,7 @@ export function planServe({
     );
   }
   const names = new Map(
-    loadAtlasModel(
-      contentDir,
-      { defaultWorld: cfg.defaultWorld, include: cfg.include, exclude: cfg.exclude },
-      { root },
-    ).model.campaigns.map((c) => [c.id, c.name] as const),
+    loadAtlasModel(contentDir, cfg, { root }).model.campaigns.map((c) => [c.id, c.name] as const),
   );
   const sitesRoot = path.join(root, "dist-campaigns");
   if (!fs.statSync(sitesRoot, { throwIfNoEntry: false })?.isDirectory()) {
