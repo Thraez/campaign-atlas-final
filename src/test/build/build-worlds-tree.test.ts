@@ -85,8 +85,8 @@ describe("R-13: every world and the map tree", () => {
     });
     // R-32: every v2 map carries its authored zoom range.
     expect(map("quessaly-world")?.zoom).toEqual({ min: -2, max: 3 });
-    expect(map("oskmark")?.zoom).toEqual({ min: -1, max: 3 });
-    expect(map("brindlecross")?.zoom).toEqual({ min: 0, max: 4 });
+    expect(map("oskmark")?.zoom).toEqual({ min: -1.5, max: 3 });
+    expect(map("brindlecross")?.zoom).toEqual({ min: -0.5, max: 4 });
     expect(map("hookhaven")?.zoom).toEqual({ min: -1, max: 4 });
 
     expect(project.ocean).toMatchObject({ width: 3000, height: 2000, sea: "default" });

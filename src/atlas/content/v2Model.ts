@@ -219,10 +219,12 @@ export function assembleV2Model(src: V2Sources): V2ModelResult {
       if (!(m.frame.width > 0)) return;
       // Entering at the parent's enterZoom shows the same ground at this zoom on the child.
       const landing = m.enterZoom + Math.log2(m.frame.width / m.width);
-      if (landing < m.zoom.min) {
+      // The viewer keeps M (HANDOFF_MARGIN, 0.5) between a landing and the leave zoom.
+      if (landing - 0.5 < m.zoom.min) {
         warnings.push(
           `${w.file}: maps[${i}].enterZoom: entering "${m.id}" at ${m.enterZoom} lands at zoom ` +
-            `${landing.toFixed(2)} on it, below its zoom.min ${m.zoom.min}; the viewer lowers ` +
+            `${landing.toFixed(2)} on it, less than half a level above its zoom.min ` +
+            `${m.zoom.min}; the viewer lowers ` +
             `the zoom it leaves at to keep the handoff from flipping back`,
         );
       }

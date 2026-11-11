@@ -135,6 +135,8 @@ export function AtlasCanvas({
   // Drop camera reports until the dispatch ends, so the caller keeps the
   // handed-over camera.
   const handingOff = useRef(false);
+  // User input waiting for its zoom (ZoomHandoff); cleared by the canvas's own moves.
+  const armed = useRef(false);
   const reportView =
     onViewChange &&
     ((v: CanvasView, c: CanvasCameraState) => {
@@ -194,6 +196,8 @@ export function AtlasCanvas({
               view={view}
               viewKey={resolved.key}
               viewHeight={resolved.height}
+              fitKey={`${resolved.key}#${fit.gen}`}
+              armed={armed}
               onViewChange={reportView}
             />
             <CanvasCamera
@@ -201,6 +205,9 @@ export function AtlasCanvas({
               viewHeight={resolved.height}
               camera={isFit ? null : camera}
               onCameraChange={reportCamera}
+              onApply={() => {
+                armed.current = false;
+              }}
               reduceMotion={reduceMotion}
             />
             <FitMapOnOpen

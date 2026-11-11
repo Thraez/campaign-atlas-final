@@ -38,7 +38,7 @@ maps:
     layers:
       - { id: base, src: images/millbrook.webp, x: 0, y: 0, width: 800, height: 600 }
     scale: { unitsPerPixel: 0.001, unitLabel: mi }
-    zoom: { min: -1, max: 3 }
+    zoom: { min: -1.5, max: 3 }
     pins:
       - { note: miller, x: 100, y: 100, visibility: player }
   - id: millbrook-cellar

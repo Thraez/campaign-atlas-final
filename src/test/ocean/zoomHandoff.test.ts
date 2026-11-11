@@ -278,6 +278,90 @@ describe("nextView: rotation", () => {
   });
 });
 
+describe("nextView: a click enter, direction and zoom limits (R-32 review)", () => {
+  // The review's repro: b is 1000 x 1000 in a 200 x 200 frame on a 2000 x 2000
+  // root, enterZoom -1; c is a child of b over b's centre, enterZoom -1.
+  // A click enter lands b fitted (log2(800 / 1000) = -0.32 on 800 x 800).
+  const VP8: Viewport = { width: 800, height: 800 };
+  const big = () =>
+    buildMapTree(
+      makeProject({
+        maps: [
+          m("r", { width: 2000, height: 2000 }),
+          m("b", {
+            parent: "r",
+            width: 1000,
+            height: 1000,
+            frame: frame({ x: 900, y: 900, width: 200, height: 200 }),
+            enterZoom: -1,
+          }),
+          m("c", {
+            parent: "b",
+            width: 1000,
+            height: 1000,
+            frame: frame({ x: 400, y: 400, width: 200, height: 200 }),
+            enterZoom: -1,
+          }),
+        ],
+        ocean: {
+          width: 5000,
+          height: 5000,
+          sea: "default",
+          onOcean: [{ map: "r", x: 0, y: 0, scale: 1, rotation: 0 }],
+        },
+      }),
+    );
+
+  it("clamps a child's enter zoom to M above its parent's fitted zoom too", () => {
+    const t = big();
+    const fitB = Math.log2(800 / 1000);
+    expect(enterZoom(t, t.byId.get("c")!, VP8)).toBeCloseTo(fitB + M, 9);
+  });
+
+  it("click-enter, then zoom out a step: stays (the review's repro)", () => {
+    const t = big();
+    const fitB = Math.log2(800 / 1000);
+    const c = cam([500, 500], -0.5);
+    expect(c.zoom).toBeLessThan(fitB);
+    expect(stays(t, at("b"), c, VP8)).toBe(true);
+    expect(nextView(t, at("b"), c, VP8, { direction: "out" }).kind).toBe("stay");
+  });
+
+  it("a zoom out never enters and a zoom in never leaves", () => {
+    const t = tree();
+    // Past c's enter zoom with the centre in c's frame, but going out.
+    const inC = cam([200, 100], 3.5);
+    expect(nextView(t, at("a"), inC, VP).kind).toBe("handoff");
+    expect(nextView(t, at("a"), inC, VP, { direction: "out" }).kind).toBe("stay");
+    // Below c's leave zoom, but going in.
+    const low = cam([200, 100], -5);
+    expect(nextView(t, at("c"), low, VP).kind).toBe("handoff");
+    expect(nextView(t, at("c"), low, VP, { direction: "in" }).kind).toBe("stay");
+  });
+
+  it("the canvas's zoom limits: an enter past the max zoom is lowered to it", () => {
+    const t = tree({ c: { enterZoom: 6 } });
+    const c = t.byId.get("c")!;
+    expect(enterZoom(t, c, VP)).toBe(6);
+    expect(enterZoom(t, c, VP, { maxZoom: 4 })).toBe(4);
+    const r = nextView(t, at("a"), cam([200, 100], 4), VP, { maxZoom: 4 });
+    expect(r.kind === "handoff" && r.view).toEqual(at("c"));
+  });
+
+  it("the canvas's zoom limits: a leave below the min zoom is raised just above it", () => {
+    const t = tree({ c: { zoom: { min: -9, max: 3 } } });
+    const c = t.byId.get("c")!;
+    expect(leaveZoom(t, c, VP)).toBe(-9);
+    const lifted = leaveZoom(t, c, VP, { minZoom: -6 });
+    expect(lifted).toBeGreaterThan(-6);
+    expect(lifted).toBeLessThan(-5.99);
+    expect(nextView(t, at("c"), cam([200, 100], -6), VP, { minZoom: -6 }).kind).toBe("handoff");
+    // A map that can't be left stays unleavable.
+    const v1 = buildMapTree(makeProject({ maps: [m("solo")] }));
+    expect(leaveZoom(v1, v1.byId.get("solo")!, VP, { minZoom: -6 })).toBe(-Infinity);
+  });
+});
+
 describe("nextView: what it can't show stays", () => {
   it("an unknown map, a map left out of the tree, a bad camera or an empty viewport", () => {
     const t = buildMapTree(

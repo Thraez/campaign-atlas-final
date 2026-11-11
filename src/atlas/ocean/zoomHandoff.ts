@@ -13,7 +13,9 @@
 //   viewport's shorter side ("fills the shorter side"). A top-level map is
 //   entered from the ocean the same way, by the fill rule (the ocean has no
 //   `enterZoom`). The viewer clamps a child's enter zoom to at least M above
-//   where a zoom entry lands on its parent, so a zoom never skips a level.
+//   both ways into its parent: where a zoom entry lands and the parent's
+//   fitted zoom (a click enter lands fitted). So a zoom never skips a level,
+//   and zooming out from a fresh landing never enters a child.
 // - Leave a map (to its parent, or to the ocean for a top-level map) when the
 //   zoom drops below its leave zoom: `zoom.min`, or its fitted zoom when it has
 //   none, lowered where needed so every way in lands at least M above it:
@@ -24,6 +26,12 @@
 // - Hysteresis: a zoom enter lands at least M above the leave zoom, and a zoom
 //   leave lands more than M below the enter zoom, so neither can flip back
 //   until the user zooms M the other way. M is half a zoom level.
+// - Direction: a zoom in only enters, a zoom out only leaves (when the caller
+//   says which way the zoom went).
+// - Zoom limits: an enter zoom is lowered to the canvas's max zoom and a leave
+//   zoom raised just above its min zoom, so every map can be entered and left.
+//   A handed-over zoom outside the limits is clamped by the canvas; the centre
+//   keeps its ground, only the scale steps.
 // - A v1 tree (no ocean) never leaves its top-level map.
 // - A big gesture can cross several thresholds; the steps chain (ocean to a
 //   grandchild in one pinch) and the result is always a view `nextView` then
@@ -56,6 +64,18 @@ export interface Viewport {
   width: number;
   height: number;
 }
+
+/** Optional context from the canvas. */
+export interface HandoffOptions {
+  /** Which way the settled zoom went: "in" only enters, "out" only leaves. */
+  direction?: "in" | "out";
+  /** The canvas's zoom limits (Leaflet's minZoom and maxZoom). */
+  minZoom?: number;
+  maxZoom?: number;
+}
+
+/** How far above the min zoom a clamped leave zoom sits, so zooming to the min leaves. */
+const LIMIT_EPSILON = 1e-3;
 
 export type HandoffResult =
   { kind: "stay" } | { kind: "handoff"; view: TreeView; camera: ViewCamera };
@@ -106,17 +126,33 @@ function ownEnterZoom(node: MapTreeNode, vp: Viewport): number | null {
  * `enterZoom` can sit at or below it on a large screen, and the zoom would
  * skip the parent.
  */
-export function enterZoom(tree: MapTree, node: MapTreeNode, vp: Viewport): number | null {
+export function enterZoom(
+  tree: MapTree,
+  node: MapTreeNode,
+  vp: Viewport,
+  opts: HandoffOptions = {},
+): number | null {
   const own = ownEnterZoom(node, vp);
-  if (own === null || node.parentId === null) return own;
-  const parent = tree.byId.get(node.parentId);
-  const landing = parent ? landingZoom(tree, parent, vp) : null;
-  return landing === null ? own : Math.max(own, landing + HANDOFF_MARGIN);
+  if (own === null) return null;
+  let z = own;
+  const parent = node.parentId !== null ? tree.byId.get(node.parentId) : undefined;
+  if (parent) {
+    // Both ways into the parent: a zoom entry, and a click entry (fitted).
+    const landing = landingZoom(tree, parent, vp, opts);
+    const fit = fitZoom(parent.map.width, parent.map.height, vp);
+    z = Math.max(z, Math.max(landing ?? fit, fit) + HANDOFF_MARGIN);
+  }
+  return finite(opts.maxZoom) ? Math.min(z, opts.maxZoom) : z;
 }
 
 /** Where a zoom entry lands on the node, in its own zoom. */
-function landingZoom(tree: MapTree, node: MapTreeNode, vp: Viewport): number | null {
-  const enter = enterZoom(tree, node, vp);
+function landingZoom(
+  tree: MapTree,
+  node: MapTreeNode,
+  vp: Viewport,
+  opts: HandoffOptions,
+): number | null {
+  const enter = enterZoom(tree, node, vp, opts);
   const off = offsetOf(node);
   return enter === null || off === null ? null : enter + off;
 }
@@ -125,15 +161,21 @@ function landingZoom(tree: MapTree, node: MapTreeNode, vp: Viewport): number | n
  * The zoom, in the map's own zoom, below which the canvas leaves it; -Infinity
  * when it can't be left (a v1 top-level map, or one with nowhere to go).
  */
-export function leaveZoom(tree: MapTree, node: MapTreeNode, vp: Viewport): number {
+export function leaveZoom(
+  tree: MapTree,
+  node: MapTreeNode,
+  vp: Viewport,
+  opts: HandoffOptions = {},
+): number {
   if (node.parentId === null && !tree.ocean) return -Infinity;
   const off = offsetOf(node);
-  const enter = enterZoom(tree, node, vp);
+  const enter = enterZoom(tree, node, vp, opts);
   if (off === null || enter === null) return -Infinity;
   const fit = fitZoom(node.map.width, node.map.height, vp);
   const z = node.map.zoom;
   const authored = z && finite(z.min) ? z.min : fit;
-  return Math.min(authored, fit - HANDOFF_MARGIN, enter + off - HANDOFF_MARGIN);
+  const leave = Math.min(authored, fit - HANDOFF_MARGIN, enter + off - HANDOFF_MARGIN);
+  return finite(opts.minZoom) ? Math.max(leave, opts.minZoom + LIMIT_EPSILON) : leave;
 }
 
 function inside(size: MapSize, p: Point): boolean {
@@ -147,8 +189,9 @@ function enterStep(
   node: MapTreeNode,
   camera: ViewCamera,
   vp: Viewport,
+  opts: HandoffOptions,
 ): Step | null {
-  const enter = enterZoom(tree, node, vp);
+  const enter = enterZoom(tree, node, vp, opts);
   const off = offsetOf(node);
   if (enter === null || off === null || camera.zoom < enter) return null;
   const { map } = node;
@@ -160,18 +203,26 @@ function enterStep(
   return { view: { kind: "map", mapId: map.id }, camera: { center, zoom: camera.zoom + off } };
 }
 
-function step(tree: MapTree, view: TreeView, camera: ViewCamera, vp: Viewport): Step | null {
+function step(
+  tree: MapTree,
+  view: TreeView,
+  camera: ViewCamera,
+  vp: Viewport,
+  opts: HandoffOptions,
+): Step | null {
+  const canEnter = opts.direction !== "out";
+  const canLeave = opts.direction !== "in";
   if (view.kind === "ocean") {
-    if (!tree.ocean) return null;
+    if (!tree.ocean || !canEnter) return null;
     for (const root of tree.roots) {
-      const s = enterStep(tree, root, camera, vp);
+      const s = enterStep(tree, root, camera, vp, opts);
       if (s) return s;
     }
     return null;
   }
   const node = tree.byId.get(view.mapId);
   if (!node) return null;
-  if (camera.zoom < leaveZoom(tree, node, vp)) {
+  if (canLeave && camera.zoom < leaveZoom(tree, node, vp, opts)) {
     const off = offsetOf(node)!;
     const zoom = camera.zoom - off;
     if (node.parentId !== null) {
@@ -181,8 +232,9 @@ function step(tree: MapTree, view: TreeView, camera: ViewCamera, vp: Viewport): 
     const center = mapToOcean(node.placement!, node.map, camera.center);
     return { view: { kind: "ocean" }, camera: { center, zoom } };
   }
+  if (!canEnter) return null;
   for (const child of node.children) {
-    const s = enterStep(tree, child, camera, vp);
+    const s = enterStep(tree, child, camera, vp, opts);
     if (s) return s;
   }
   return null;
@@ -191,13 +243,15 @@ function step(tree: MapTree, view: TreeView, camera: ViewCamera, vp: Viewport): 
 /**
  * Where a settled camera should be shown: "stay", or the view to hand over to
  * and its camera, showing the same ground. Never throws; a view the tree
- * can't show, a non-finite camera or an empty viewport stays.
+ * can't show, a non-finite camera or an empty viewport stays. `opts` carries
+ * the zoom's direction and the canvas's zoom limits (see the rule above).
  */
 export function nextView(
   tree: MapTree,
   view: TreeView,
   camera: ViewCamera,
   viewport: Viewport,
+  opts: HandoffOptions = {},
 ): HandoffResult {
   if (
     !finite(camera.zoom) ||
@@ -213,7 +267,7 @@ export function nextView(
   let cur: Step = { view, camera };
   let moved = false;
   for (let i = 0; i < MAX_STEPS; i++) {
-    const s = step(tree, cur.view, cur.camera, viewport);
+    const s = step(tree, cur.view, cur.camera, viewport, opts);
     if (!s) break;
     cur = s;
     moved = true;

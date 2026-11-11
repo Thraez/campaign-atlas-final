@@ -37,7 +37,7 @@ maps:
     layers:
       - { id: base, src: images/oskmark.png, x: 0, y: 0, width: 600, height: 400 }
     scale: { unitsPerPixel: 1, unitLabel: mi }
-    zoom: { min: -1, max: 3 }
+    zoom: { min: -1.5, max: 3 }
     pins:
       # Under sandbox's fog (x >= 300); open in main.
       - { note: haskel-thimbleby, x: 450, y: 120, visibility: player }
@@ -108,7 +108,7 @@ maps:
     layers:
       - { id: base, src: images/brindlecross.png, x: 0, y: 0, width: 400, height: 300 }
     scale: { unitsPerPixel: 0.01, unitLabel: mi }
-    zoom: { min: 0, max: 4 }
+    zoom: { min: -0.5, max: 4 }
     pins:
       - { note: gilda-moth, x: 200, y: 150, visibility: player }
 
@@ -124,7 +124,7 @@ maps:
     layers:
       - { id: base, src: images/tallowford.png, x: 0, y: 0, width: 400, height: 300 }
     scale: { unitsPerPixel: 0.01, unitLabel: mi }
-    zoom: { min: 0, max: 4 }
+    zoom: { min: -0.5, max: 4 }
     pins:
       - { note: pellam-ferry, x: 300, y: 200, visibility: player }
 
@@ -141,7 +141,7 @@ maps:
     layers:
       - { id: base, src: images/mirefold.png, x: 0, y: 0, width: 400, height: 300 }
     scale: { unitsPerPixel: 0.01, unitLabel: mi }
-    zoom: { min: -1, max: 4 }
+    zoom: { min: -1.5, max: 4 }
     regions:
       - id: bog-market
         name: Bog Market
