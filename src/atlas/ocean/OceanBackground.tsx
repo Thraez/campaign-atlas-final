@@ -9,13 +9,17 @@
  * existing background:oceanColor fallback on MapContainer applies unchanged.
  *
  * Animation stops when motion is reduced: the OS setting (media query) or
- * calm mode (`<html data-calm>`, see use-reduce-motion.ts).
+ * calm mode (`<html data-calm>`, see use-reduce-motion.ts). A caller that
+ * already reads `useReduceMotion` can pass `reduceMotion` to stop it outright
+ * (the shared canvas does, R-31).
  */
 import type { MapDocument } from "@/atlas/content/schema";
 import { resolveWater } from "./resolveWater";
 
 interface Props {
   map: Pick<MapDocument, "water" | "oceanColor">;
+  /** True: draw the waves still (no animation), whatever the CSS says. */
+  reduceMotion?: boolean;
 }
 
 const KEYFRAMES = `
@@ -30,7 +34,7 @@ const KEYFRAMES = `
 :root[data-calm="true"] .ocean-wave-3{animation:none!important}
 `;
 
-export function OceanBackground({ map }: Props) {
+export function OceanBackground({ map, reduceMotion = false }: Props) {
   const resolved = resolveWater(map);
 
   if (!resolved.enabled) return null;
@@ -69,7 +73,7 @@ export function OceanBackground({ map }: Props) {
           backgroundImage: `repeating-linear-gradient(-18deg,transparent 0,transparent 34px,${crestColor} 35px,${crestColor} 37px,transparent 38px)`,
           backgroundSize: "80px 100%",
           opacity: intensity * 0.3,
-          animation: `ocean-bg-drift-1 ${dur1} linear infinite`,
+          animation: reduceMotion ? "none" : `ocean-bg-drift-1 ${dur1} linear infinite`,
         }}
       />
       <div
@@ -81,7 +85,7 @@ export function OceanBackground({ map }: Props) {
           backgroundImage: `repeating-linear-gradient(-22deg,transparent 0,transparent 50px,${crestColor} 51px,${crestColor} 53px,transparent 54px)`,
           backgroundSize: "120px 100%",
           opacity: intensity * 0.2,
-          animation: `ocean-bg-drift-2 ${dur2} linear infinite`,
+          animation: reduceMotion ? "none" : `ocean-bg-drift-2 ${dur2} linear infinite`,
         }}
       />
       <div
@@ -93,7 +97,7 @@ export function OceanBackground({ map }: Props) {
           backgroundImage: `repeating-linear-gradient(-14deg,transparent 0,transparent 22px,${crestColor} 23px,${crestColor} 25px,transparent 26px)`,
           backgroundSize: "60px 100%",
           opacity: intensity * 0.15,
-          animation: `ocean-bg-drift-3 ${dur3} linear infinite`,
+          animation: reduceMotion ? "none" : `ocean-bg-drift-3 ${dur3} linear infinite`,
         }}
       />
     </div>

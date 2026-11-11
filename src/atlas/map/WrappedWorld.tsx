@@ -11,13 +11,12 @@
  * PLAYER-SAFE: the player bundle imports this file. Import nothing editor-only.
  */
 import { memo, useMemo } from "react";
-import { ImageOverlay, Popup, Polyline } from "react-leaflet";
-import type L from "leaflet";
+import { Popup, Polyline } from "react-leaflet";
 import type { Entity, MapDocument, MapPlacement } from "@/atlas/content/schema";
-import { normalizeAtlasAssetUrl } from "@/atlas/url";
 import { gridLines } from "./geometry";
 import { RegionShape, RouteShape } from "./featureShapes";
 import { PlacementMarkers } from "./PlacementMarkers";
+import { MapImageLayers } from "./MapImageLayers";
 
 export interface WrappedWorldProps {
   dx: number;
@@ -33,6 +32,11 @@ export interface WrappedWorldProps {
   /** Region hover cards: true only for a fine pointer (touch can't hover). */
   peekEnabled?: boolean;
   rulerActive?: boolean;
+  /**
+   * Draw the map's image layers (default). `AtlasCanvas` draws them itself, so a
+   * caller passing this as the canvas's children sets it to false (R-31).
+   */
+  showImageLayers?: boolean;
 }
 
 export const WrappedWorld = memo(function WrappedWorld({
@@ -48,26 +52,13 @@ export const WrappedWorld = memo(function WrappedWorld({
   onPinPeekLeave,
   peekEnabled,
   rulerActive,
+  showImageLayers = true,
 }: WrappedWorldProps) {
   const H = map.height;
   const shapes = useMemo(
     () => (
       <>
-        {[...map.layers]
-          .sort((a, b) => a.zIndex - b.zIndex)
-          .map((layer) => (
-            <ImageOverlay
-              key={`${layer.id}-${dx}`}
-              url={normalizeAtlasAssetUrl(layer.src)}
-              bounds={
-                [
-                  [H - (layer.y + layer.height), layer.x + dx],
-                  [H - layer.y, layer.x + layer.width + dx],
-                ] as L.LatLngBoundsLiteral
-              }
-              opacity={layer.opacity}
-            />
-          ))}
+        {showImageLayers && <MapImageLayers map={map} dx={dx} />}
 
         {(map.regions ?? []).map((region) => {
           const ent = region.entityId ? entityById.get(region.entityId) : undefined;
@@ -149,6 +140,7 @@ export const WrappedWorld = memo(function WrappedWorld({
       onPinPeek,
       onPinPeekLeave,
       peekEnabled,
+      showImageLayers,
     ],
   );
 

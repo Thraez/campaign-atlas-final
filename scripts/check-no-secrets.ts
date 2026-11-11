@@ -20,7 +20,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { DEV_API_PATHS } from "./atlas/devRoutes";
+import { DEV_API_PATHS, DEV_CANVAS_PATHS } from "./atlas/devRoutes";
 import { listTextFiles } from "./atlas/playerArtifact";
 
 export const DM_CONTENT_SENTINELS = [
@@ -35,6 +35,7 @@ export const DM_CONTENT_SENTINELS = [
 // fingerprinted automatically.
 export const EDITOR_CODE_FINGERPRINTS: readonly string[] = [
   ...Object.values(DEV_API_PATHS),
+  ...Object.values(DEV_CANVAS_PATHS),
   "saveAtlasPatchToLocalFs",
   "AtlasPlacementEditor",
   "/atlas/edit",
