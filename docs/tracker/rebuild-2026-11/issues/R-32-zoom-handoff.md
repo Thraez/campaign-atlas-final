@@ -1,6 +1,6 @@
 # R-32 Zoom handoff: ocean > map > child map > back
 
-Status: in-review
+Status: done
 Blocked by: R-30, R-31
 Size: M
 Branch: `rebuild-r32-zoom-handoff`

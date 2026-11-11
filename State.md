@@ -96,9 +96,9 @@ orchestrating session (local_a8dba6ed-82b1-48f6-800e-b9733658539e) opens and mer
 
 Phase 3 is complete, pending Isak's look. Phase 4 waits for Isak to accept ADR-0005 and ADR-0006.
 R-36's playtest (`docs/tracker/rebuild-2026-11/issues/R-36-phase3-check.md`, "Check") passed every
-step on both campaigns; it fixed the ocean's missing zoom-out limit and wrote six follow-up tickets
-(R-37..R-42: ocean fit margin, phone top bar, audio toast, fling `moveend`, dotted tag 404,
-scans-passed stamp).
+step on both campaigns; it fixed the ocean's missing zoom-out limit and wrote seven follow-up tickets
+(R-37..R-43: ocean fit margin, phone top bar, audio toast, fling `moveend`, dotted tag 404,
+scans-passed stamp, `audit-assets` v2 image paths).
 
 **For Isak's look** (run `npm run atlas:publish:next`, then `npm run atlas:serve:next`; picker on
 `http://127.0.0.1:4300/`):
@@ -118,7 +118,7 @@ scans-passed stamp).
 - [R-33](docs/tracker/rebuild-2026-11/issues/R-33-viewer-on-canvas.md): v1 keeps its own map container; on a phone the breadcrumb wraps onto its own row; the ocean fit has no margin; search on the ocean offers every placement.
 - [R-34](docs/tracker/rebuild-2026-11/issues/R-34-local-campaign-sites.md): picker on 4300 and sites on 4301+, bound to 127.0.0.1; the server refuses stale or leaking sites; a missing file with an extension is a 404.
 - [R-35](docs/tracker/rebuild-2026-11/issues/R-35-campaign-in-links.md): any v2 link problem drops the whole link and shows a fixed "Not found in this campaign" bar; the chip links to the picker only on localhost and assumes port 4300.
-- [R-36](docs/tracker/rebuild-2026-11/issues/R-36-phase3-check.md): the ocean's zoom-out floor is one level below the fit; on v1 an unknown map now opens the default map (baseline: blank).
+- [R-36](docs/tracker/rebuild-2026-11/issues/R-36-phase3-check.md): the ocean's zoom-out floor is one level below the fit, set before the camera applies (no bounce) and recomputed on a window resize; on v1 an unknown map now opens the default map (baseline: blank).
 
 ### Kept notes
 

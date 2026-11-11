@@ -20,7 +20,7 @@ const fake = {
   center: { lat: 0, lng: 0 } as LL,
   zoom: 0,
   minZoom: -6,
-  options: { zoomSnap: 1 },
+  options: { zoomSnap: 1, minZoom: -6 },
   handlers: new Map<string, Set<Handler>>(),
   on(ev: string, h: Handler) {
     if (!this.handlers.has(ev)) this.handlers.set(ev, new Set());
@@ -43,7 +43,7 @@ const fake = {
     return this.zoom;
   },
   getMinZoom() {
-    return this.minZoom;
+    return this.options.minZoom;
   },
   getMaxZoom() {
     return 4;
@@ -58,6 +58,7 @@ const fake = {
     this.fire("moveend");
   },
   setMinZoom: vi.fn(),
+  setZoom: vi.fn(),
   invalidateSize: vi.fn(),
   container: document.createElement("div"),
   getContainer() {
@@ -66,8 +67,9 @@ const fake = {
   fitBounds: vi.fn((b: [[number, number], [number, number]]) => {
     fake.moveTo({ lat: (b[0][0] + b[1][0]) / 2, lng: (b[0][1] + b[1][1]) / 2 }, -1);
   }),
+  // Like Leaflet, setView clamps to the floor (options.minZoom).
   setView: vi.fn((c: [number, number], z: number) => {
-    fake.moveTo({ lat: c[0], lng: c[1] }, z);
+    fake.moveTo({ lat: c[0], lng: c[1] }, Math.max(z, fake.options.minZoom));
   }),
 };
 
@@ -127,10 +129,13 @@ beforeEach(() => {
   fake.size = { x: 800, y: 600 };
   fake.center = { lat: 0, lng: 0 };
   fake.zoom = 0;
+  fake.options.minZoom = -6;
   fake.handlers.clear();
   fake.container = document.createElement("div");
   fake.fitBounds.mockClear();
   fake.setView.mockClear();
+  fake.setMinZoom.mockClear();
+  fake.setZoom.mockClear();
 });
 afterEach(cleanup);
 
@@ -178,6 +183,35 @@ describe("AtlasCanvas camera", () => {
     const m = mount(OCEAN, "fit");
     m.update(ISLE, { center: [100, 50], zoom: 1 });
     expect(fake.setView).toHaveBeenCalledWith([350, 100], 1, { animate: false });
+  });
+
+  // R-36: the ocean floor (one level below the fit zoom) is set before the camera applies.
+  // The test ocean fits 600x400 in 800x600: fit zoom log2(4/3), floor 1 below it.
+  const OCEAN_FLOOR = Math.log2(800 / 600) - 1;
+
+  it("clamps a handed-over ocean camera below the floor to it, with no animated setZoom", () => {
+    const m = mount(ISLE, "fit");
+    m.update(OCEAN, { center: [500, 500], zoom: -5 });
+    expect(fake.options.minZoom).toBeCloseTo(OCEAN_FLOOR, 9);
+    expect(fake.zoom).toBeCloseTo(OCEAN_FLOOR, 9);
+    expect(fake.setMinZoom).not.toHaveBeenCalled();
+    // the old map's zoom (-1) sat below the new floor: moved at once, never animated
+    for (const call of fake.setZoom.mock.calls) expect(call[1]).toEqual({ animate: false });
+  });
+
+  it("opens the ocean at a URL zoom below the floor at the floor, not animating up to it", () => {
+    mount(OCEAN, { center: [500, 500], zoom: -6 });
+    expect(fake.zoom).toBeCloseTo(OCEAN_FLOOR, 9);
+    expect(fake.setZoom).not.toHaveBeenCalled();
+    expect(fake.setView).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives a map view the canvas floor back after the ocean's", () => {
+    const m = mount(OCEAN, "fit");
+    expect(fake.options.minZoom).toBeCloseTo(OCEAN_FLOOR, 9);
+    m.update(ISLE, { center: [300, 200], zoom: -3 });
+    expect(fake.options.minZoom).toBe(-6);
+    expect(fake.zoom).toBe(-3);
   });
 
   it("re-fits when the camera turns back to fit", () => {

@@ -59,7 +59,7 @@ in v1 too (R-39).
 - `previews/r36/09-mobile-ocean.png`
 - `previews/r36/13-sandbox-oskmark.png`
 - `previews/r36/14-wrong-campaign-notice.png`
-- `previews/r36/15-ocean-zoomout-limit.png` (after the fix)
+- `previews/r36/15-ocean-zoomout-limit.png` (after the fix); later re-check shots `16-ocean-375-floor.png`, `17-notice-375.png`
 
 **Bug fixed here: the ocean zoom-out limit.** `AtlasCanvas` gave every view `minZoom -6`.
 New `src/atlas/canvas/OceanZoomLimit.tsx` sets the ocean's floor to the fit zoom minus one level
@@ -69,21 +69,37 @@ New `src/atlas/canvas/OceanZoomLimit.tsx` sets the ocean's floor to the fit zoom
 stop at cz -2.5 (before: -5.7), Quessaly and Skerrow Isles still whole and apart. Servers stopped.
 Provisional: one level below the fit; the floor is set on open, not on a window resize.
 
-**Broken refs in the publish audit: no ticket.** The 8 `BROKEN REF (info)` lines (e.g. `mirefold.png`,
+**Broken refs in the publish audit: not missing images, ticket R-43.** The 8 `BROKEN REF (info)` lines (e.g. `mirefold.png`,
 `skerrow-isles.png`, `hookhaven.png`) name images that exist: `content-next/quessaly/_atlas/images/`
-and `content-next/skerrow/_atlas/images/` hold them, and the ocean and maps draw them. `audit-assets`
-only looks in a v1-shaped assets folder, so it reports per-world images of the v2 test world (the
-audit's own text says build-atlas is the authority; R-32 recorded these as known). `sandbox` ships only 2
-images because it hides the other maps, as intended. R-34's and R-32's follow-ups already cover the
-rest of the audit's v2 handling; if `audit-assets` should read v2 worlds, that is for phase 5/6.
+and `content-next/skerrow/_atlas/images/` hold them, and the ocean and maps draw them. The scan does
+walk each campaign's `assets/`; the cause is the references. A v2 `world.yaml` layer `src` is relative to the
+world's `_atlas/` folder (`content-next/quessaly/_atlas/world.yaml:142` has `images/mirefold.png`), and
+`collectReferences` (`audit-assets.ts`) never resolves it, so it never matches the shipped path. The
+lines are info only (build-atlas is the authority; R-32 recorded them as known), but a real missing
+image would hide among them: ticket R-43. `sandbox` ships only 2
+images because it hides the other maps, as intended.
 
 **New tickets:** R-37 ocean fit margin, R-38 phone top bar, R-39 audio toast, R-40 fling `moveend`
-(R-32 follow-up), R-41 dotted tag 404 (R-34 follow-up), R-42 scans-passed stamp (R-34 follow-up).
+(R-32 follow-up), R-41 dotted tag 404 (R-34 follow-up), R-42 scans-passed stamp (R-34 follow-up), R-43 `audit-assets` v2 image paths.
 
 **v1 difference.** An unknown map (`?map=nope`) on v1 now opens the default map (overview); the baseline
 showed a blank page. R-33's ticket asks for this and its review accepted it.
 
-**Not checked:** a real-device pinch (only CDP-synthesized touch); the "Not found" notice at 375 px;
+**Review fixes (same day).** The floor is now set before `CanvasCamera` applies its camera, by writing
+`map.options.minZoom` and firing `zoomlevelschange` instead of `setMinZoom` (which calls an animated
+`setZoom` when the floor rises: a bounce after a big zoom-out handoff, or a zoom-in on open with a URL
+`cz` below the floor). `setView` and `fitBounds` clamp without animation; a zoom already below the floor
+moves to it with `animate: false`. The floor is recomputed on the map's `resize`. Tests: the camera
+tests (handed-over ocean camera below the floor lands at it, URL `cz -6` opens at the floor, a map view
+gets -6 back) and `ocean-zoom-limit.test.tsx` (no size yet, resize, listener removed). Real browser on
+`atlas:serve:next`, `main`: a big wheel-out from Quessaly crossed to the ocean with the frame
+width falling steadily and no change after the handoff (no bounce); `?cz=-6` opened at cz -2.5 with no
+further change; at 375 px the floor is -3.7 and back at 1280 it is -2.5 again; the "Not found in this
+campaign" bar at 375 px (sandbox, `?map=tallowford`) is one readable row under the toolbar, clear of
+the controls, and the URL is rewritten to the ocean (`17-notice-375.png`). Limits: the bounce check
+samples frame width per frame in the page, after load; a real-device pinch is still not checked.
+
+**Not checked:** a real-device pinch (only CDP-synthesized touch);
 the exact baseline URLs for `atlas-cam` and `atlas-unknownmap` (not recorded, so the playtester used
 `?cx=100&cy=100&cz=2` and `?map=nope`; those two shots are approximate); the v2 console (only v1's was
 read); `npm run gate` (not run here).

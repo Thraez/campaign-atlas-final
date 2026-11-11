@@ -1,3 +1,4 @@
+import type { Map } from "leaflet";
 import { useEffect } from "react";
 import { useMap } from "react-leaflet";
 import { whenMapHasSize } from "../map/whenMapHasSize";
@@ -25,10 +26,24 @@ export function oceanMinZoom(
 }
 
 /**
+ * Set the floor without Leaflet's `setMinZoom`, which calls an animated
+ * `setZoom(floor)` when the floor rises above the current zoom (a visible
+ * bounce). Leaflet's own `getMinZoom` reads `options.minZoom`; `zoomlevelschange`
+ * tells the controls. `setView`/`fitBounds` then clamp to it without animation,
+ * and a zoom already below the floor is moved to it at once.
+ */
+function setFloor(map: Map, min: number) {
+  map.options.minZoom = min;
+  map.fire("zoomlevelschange");
+  if (map.getZoom() < min) map.setZoom(min, { animate: false });
+}
+
+/**
  * Stops the ocean zooming out to a few pixels (the R-36 playtest reached
- * zoom -5.7): its floor is `oceanMinZoom`. Other views get the canvas floor
- * back; `FitMapOnOpen` lowers it again if a map would not fit above it.
- * Place before `FitMapOnOpen` so the fit sees the right floor.
+ * zoom -5.7): its floor is `oceanMinZoom`, recomputed when the map resizes.
+ * Other views get the canvas floor back; `FitMapOnOpen` lowers it again if a
+ * map would not fit above it. Place before `CanvasCamera` (so a handed-over
+ * camera is clamped, not bounced) and before `FitMapOnOpen`.
  */
 export function OceanZoomLimit({
   ocean,
@@ -44,13 +59,21 @@ export function OceanZoomLimit({
   const map = useMap();
   useEffect(() => {
     if (!ocean) {
-      map.setMinZoom(CANVAS_MIN_ZOOM);
+      setFloor(map, CANVAS_MIN_ZOOM);
       return;
     }
-    return whenMapHasSize(map, () => {
-      const min = oceanMinZoom(map.getSize(), fitWidth, fitHeight);
-      if (min !== null) map.setMinZoom(min);
-    });
+    const apply = () => {
+      const size = map.getSize();
+      if (!(size.x > 0 && size.y > 0)) return;
+      const min = oceanMinZoom(size, fitWidth, fitHeight);
+      if (min !== null) setFloor(map, min);
+    };
+    const cancel = whenMapHasSize(map, apply);
+    map.on("resize", apply);
+    return () => {
+      cancel();
+      map.off("resize", apply);
+    };
   }, [map, ocean, fitWidth, fitHeight, viewKey]);
   return null;
 }

@@ -201,6 +201,12 @@ export function AtlasCanvas({
               armed={armed}
               onViewChange={reportView}
             />
+            <OceanZoomLimit
+              ocean={resolved.kind === "ocean"}
+              fitWidth={resolved.fit.maxX - resolved.fit.minX}
+              fitHeight={resolved.fit.maxY - resolved.fit.minY}
+              viewKey={resolved.key}
+            />
             <CanvasCamera
               viewKey={resolved.key}
               viewHeight={resolved.height}
@@ -210,12 +216,6 @@ export function AtlasCanvas({
                 armed.current = false;
               }}
               reduceMotion={reduceMotion}
-            />
-            <OceanZoomLimit
-              ocean={resolved.kind === "ocean"}
-              fitWidth={resolved.fit.maxX - resolved.fit.minX}
-              fitHeight={resolved.fit.maxY - resolved.fit.minY}
-              viewKey={resolved.key}
             />
             <FitMapOnOpen
               mapId={`${resolved.key}#${fit.gen}`}

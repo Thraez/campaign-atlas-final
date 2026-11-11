@@ -73,8 +73,9 @@ campaign. Safe stop. The live v1 site looks as today throughout.
 | after | [R-38 Phone top bar](issues/R-38-phone-top-bar.md) | S | - | - |
 | after | [R-39 The audio toast no longer covers the minimap](issues/R-39-audio-toast-overlap.md) | S | - | - |
 | after | [R-40 A fling's moveend must not disarm a zoom](issues/R-40-fling-moveend-disarms-zoom.md) | S | - | - |
-| after | [R-41 A dotted tag loads on a direct link](issues/R-41-dotted-tag-404.md) | S | - | - |
-| after | [R-42 Publish writes a scans-passed stamp](issues/R-42-publish-scans-stamp.md) | S | - | - |
+| after | [R-41 A dotted tag loads on a direct link](issues/R-41-dotted-tag-404.md) | S | - | yes |
+| after | [R-42 Publish writes a scans-passed stamp](issues/R-42-publish-scans-stamp.md) | S | - | yes |
+| after | [R-43 audit-assets resolves v2 world image paths](issues/R-43-audit-assets-v2-paths.md) | S | - | - |
 
 Provisional calls (rotation pivot, zoom-out minimum, handoff rule, local serving, `c=`) are in
 `State.md`. Phase 4 needs ADR-0005 and ADR-0006, which Isak accepts first.

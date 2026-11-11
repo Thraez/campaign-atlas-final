@@ -1,6 +1,6 @@
 # R-30 Map tree and ocean geometry in the app
 
-Status: in-review
+Status: done
 Blocked by: -
 Size: S
 Branch: `rebuild-r30-map-tree-model`

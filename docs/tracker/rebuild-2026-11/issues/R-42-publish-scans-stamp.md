@@ -4,7 +4,8 @@ Status: ready-for-agent
 Blocked by: -
 Size: S
 Branch: `rebuild-r42-scans-stamp`
-Model: Sonnet (settled plan)
+Model: Opus (scripts/ and the security path)
+Needs: the adversarial player-safety review
 
 Found by the R-36 Phase 3 playtest (2026-11-11, `previews/r36/notes.md`, gitignored).
 
