@@ -10,7 +10,13 @@
  * - Map view: the map's images (as the viewer draws them) and each child's
  *   frame as a soft outline with its name.
  * - Clicking a map or a frame calls `onEnterMap`; hovering one calls
- *   `onFrameHover` (null when it leaves).
+ *   `onFrameHover` (null when it leaves). The caller lands a click enter
+ *   fitted (`camera: "fit"`).
+ * - Zoom handoff (R-32): when a user zoom settles past a threshold
+ *   (`src/atlas/ocean/zoomHandoff.ts`), `onViewChange` gets the new view and
+ *   the camera showing the same ground; the caller renders them. No page
+ *   load, no refetch: only the view swaps. Fractional zoom (`zoomSnap` 0)
+ *   keeps that camera exact.
  * - A view the tree can't show (a map id that isn't a tree node, the ocean of
  *   a v1 atlas) draws nothing, and no children.
  *
@@ -22,7 +28,7 @@
  * or viewer-only modules (search, entity panel, sound). Pinned by
  * src/test/canvas/canvas-imports.test.ts.
  */
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { MapContainer } from "react-leaflet";
 import { useReduceMotion } from "@/hooks/use-reduce-motion";
 import { FlatCRS } from "../map/flatCRS";
@@ -30,14 +36,16 @@ import { FitMapOnOpen } from "../map/FitMapOnOpen";
 import { MapImageLayers } from "../map/MapImageLayers";
 import { OceanBackground } from "../ocean/OceanBackground";
 import type { MapTree, MapTreeNode } from "../ocean/mapTree";
+import type { TreeView } from "../ocean/zoomHandoff";
 import { boxBounds, oceanFitBox, type Box } from "./canvasGeometry";
 import { CanvasCamera, type CanvasCameraState } from "./CanvasCamera";
 import { CANVAS_IMAGE_PANE, ChildFrames, OceanMaps } from "./CanvasLayers";
 import { seaStyle, type SeaStyle } from "./seaStyle";
+import { ZoomHandoff } from "./ZoomHandoff";
 
 export type { CanvasCameraState } from "./CanvasCamera";
 
-export type CanvasView = { kind: "ocean" } | { kind: "map"; mapId: string };
+export type CanvasView = TreeView;
 export type CanvasCamera = "fit" | CanvasCameraState;
 
 export interface AtlasCanvasProps {
@@ -47,6 +55,8 @@ export interface AtlasCanvasProps {
   onCameraChange?: (camera: CanvasCameraState) => void;
   onEnterMap?: (mapId: string) => void;
   onFrameHover?: (mapId: string | null) => void;
+  /** A zoom handoff: show `view` at `camera` (R-32). Without it the canvas never hands off. */
+  onViewChange?: (view: CanvasView, camera: CanvasCameraState) => void;
   /** Caller layers, drawn inside the map pane above the canvas's own. */
   children?: ReactNode;
   className?: string;
@@ -108,6 +118,7 @@ export function AtlasCanvas({
   onCameraChange,
   onEnterMap,
   onFrameHover,
+  onViewChange,
   children,
   className,
 }: AtlasCanvasProps) {
@@ -118,6 +129,28 @@ export function AtlasCanvas({
   const isFit = camera === "fit";
   const [fit, setFit] = useState({ gen: 0, on: isFit });
   if (fit.on !== isFit) setFit({ gen: fit.gen + (isFit ? 1 : 0), on: isFit });
+
+  // A handoff is decided on zoomend, and Leaflet fires that move's moveend
+  // right after, in the same dispatch and still in the old view's pixels.
+  // Drop camera reports until the dispatch ends, so the caller keeps the
+  // handed-over camera.
+  const handingOff = useRef(false);
+  // User input waiting for its zoom (ZoomHandoff); cleared by the canvas's own moves.
+  const armed = useRef(false);
+  const reportView =
+    onViewChange &&
+    ((v: CanvasView, c: CanvasCameraState) => {
+      handingOff.current = true;
+      queueMicrotask(() => {
+        handingOff.current = false;
+      });
+      onViewChange(v, c);
+    });
+  const reportCamera =
+    onCameraChange &&
+    ((c: CanvasCameraState) => {
+      if (!handingOff.current) onCameraChange(c);
+    });
 
   const water = resolved?.water ?? {};
   const waterOff = water.water?.enabled === false;
@@ -138,6 +171,8 @@ export function AtlasCanvas({
         zoom={-2}
         minZoom={-6}
         maxZoom={4}
+        zoomSnap={0}
+        zoomAnimation={!reduceMotion}
         zoomControl
         keyboard
         keyboardPanDelta={80}
@@ -154,11 +189,25 @@ export function AtlasCanvas({
                 every cleanup), so its moveend listener for this view is attached
                 before the fit's synchronous fitBounds fires moveend, and the
                 caller hears the fitted camera. */}
+            {/* ZoomHandoff first: its zoomend listener for the new view is attached
+                before CanvasCamera applies the handed-over camera. */}
+            <ZoomHandoff
+              tree={tree}
+              view={view}
+              viewKey={resolved.key}
+              viewHeight={resolved.height}
+              fitKey={`${resolved.key}#${fit.gen}`}
+              armed={armed}
+              onViewChange={reportView}
+            />
             <CanvasCamera
               viewKey={resolved.key}
               viewHeight={resolved.height}
               camera={isFit ? null : camera}
-              onCameraChange={onCameraChange}
+              onCameraChange={reportCamera}
+              onApply={() => {
+                armed.current = false;
+              }}
               reduceMotion={reduceMotion}
             />
             <FitMapOnOpen

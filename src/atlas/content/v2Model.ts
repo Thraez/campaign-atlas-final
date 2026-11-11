@@ -212,6 +212,25 @@ export function assembleV2Model(src: V2Sources): V2ModelResult {
     }
   }
 
+  // --- zoom handoff (R-32) ----------------------------------------------------
+  for (const w of src.worlds) {
+    w.value.maps.forEach((m, i) => {
+      if (!m.frame || m.enterZoom === undefined || !m.zoom || !(m.width > 0)) return;
+      if (!(m.frame.width > 0)) return;
+      // Entering at the parent's enterZoom shows the same ground at this zoom on the child.
+      const landing = m.enterZoom + Math.log2(m.frame.width / m.width);
+      // The viewer keeps M (HANDOFF_MARGIN, 0.5) between a landing and the leave zoom.
+      if (landing - 0.5 < m.zoom.min) {
+        warnings.push(
+          `${w.file}: maps[${i}].enterZoom: entering "${m.id}" at ${m.enterZoom} lands at zoom ` +
+            `${landing.toFixed(2)} on it, less than half a level above its zoom.min ` +
+            `${m.zoom.min}; the viewer lowers ` +
+            `the zoom it leaves at to keep the handoff from flipping back`,
+        );
+      }
+    });
+  }
+
   // --- the ocean --------------------------------------------------------------
   const placed = new Map<string, number>();
   atlas.onOcean.forEach((p, i) => {

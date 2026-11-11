@@ -107,9 +107,13 @@ function validFrame(v: unknown): boolean {
   );
 }
 
+function validZoom(v: unknown): boolean {
+  return isRecord(v) && isNum(v.min) && isNum(v.max) && v.min <= v.max;
+}
+
 /**
  * Type-check the optional schema v2 output fields (ocean, campaign, and each
- * map's parent, frame, enterZoom). A malformed one is dropped, not fatal: the
+ * map's parent, frame, enterZoom, zoom). A malformed one is dropped, not fatal: the
  * map tree then leaves out whatever depended on it (fail closed). Edits the
  * freshly parsed payload in place; a well-formed payload is untouched.
  */
@@ -132,6 +136,7 @@ function dropMalformedV2Fields(obj: Record<string, unknown>): void {
     if (m.parent !== undefined && typeof m.parent !== "string") delete m.parent;
     if (m.frame !== undefined && !validFrame(m.frame)) delete m.frame;
     if (m.enterZoom !== undefined && !isNum(m.enterZoom)) delete m.enterZoom;
+    if (m.zoom !== undefined && !validZoom(m.zoom)) delete m.zoom;
   }
 }
 

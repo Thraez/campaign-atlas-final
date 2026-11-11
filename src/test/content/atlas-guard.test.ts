@@ -82,7 +82,10 @@ describe("parseAtlasProject: optional schema v2 fields", () => {
     validAtlas({
       ocean,
       campaign: { id: "main", name: "Main" },
-      maps: [{ id: "a" }, { id: "c", parent: "a", frame, enterZoom: 1, ...map }],
+      maps: [
+        { id: "a", zoom: { min: -2, max: 3 } },
+        { id: "c", parent: "a", frame, enterZoom: 1, zoom: { min: 0, max: 4 }, ...map },
+      ],
       ...over,
     });
 
@@ -133,5 +136,20 @@ describe("parseAtlasProject: optional schema v2 fields", () => {
 
   it.each([["1"], [null], [[]]])("drops a malformed enterZoom %j", (bad) => {
     expect(parseAtlasProject(v2({}, { enterZoom: bad })).maps[1].enterZoom).toBeUndefined();
+  });
+
+  it.each([
+    ["not an object", 5],
+    ["null", null],
+    ["a list", [0, 1]],
+    ["a string min", { min: "0", max: 1 }],
+    ["no max", { min: 0 }],
+    ["an infinite max", { min: 0, max: Infinity }],
+    ["min above max", { min: 2, max: 1 }],
+  ])("drops a malformed zoom range (%s), keeping the map (R-32)", (_label, bad) => {
+    const p = parseAtlasProject(v2({}, { zoom: bad }));
+    expect(p.maps[1].zoom).toBeUndefined();
+    expect(p.maps[1].id).toBe("c");
+    expect(p.maps[0].zoom).toEqual({ min: -2, max: 3 });
   });
 });

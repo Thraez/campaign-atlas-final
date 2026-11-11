@@ -32,6 +32,6 @@ maps:
     layers:
       - { id: base, src: images/hookhaven.png, x: 0, y: 0, width: 300, height: 300 }
     scale: { unitsPerPixel: 0.01, unitLabel: mi }
-    zoom: { min: 0, max: 4 }
+    zoom: { min: -1, max: 4 }
     pins:
       - { note: the-tide-warden, x: 150, y: 110, visibility: player }

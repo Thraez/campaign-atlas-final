@@ -88,7 +88,7 @@ orchestrating session (local_a8dba6ed-82b1-48f6-800e-b9733658539e) opens and mer
 |---|---|---|---|---|
 | R-30 | Map tree and ocean geometry in the app (pure), `atlasGuard` checks v2 fields | - | Sonnet | done (#143) |
 | R-31 | The shared canvas `AtlasCanvas`: the ocean and one map with child frames | R-30 | Opus | in review |
-| R-32 | Zoom handoff: ocean > map > child > back, with hysteresis | R-30, R-31 | Opus | - |
+| R-32 | Zoom handoff: ocean > map > child > back, with hysteresis | R-30, R-31 | Opus | in review |
 | R-33 | The player viewer on the canvas, breadcrumb; v1 site looks as today | R-32, R-34 | Sonnet | - |
 | R-34 | Serve the test world's campaign sites locally, with a picker | R-30 | Opus | ready (review clean) |
 | R-35 | Campaign links: `c=` and "Not found in this campaign" | R-33, R-34 | Sonnet | - |
@@ -207,7 +207,14 @@ Lowest number first within each folder.
   reload; the pin stays gone. After #104: the calm-mode button in the map toolbar (look and place).
   After #105: start a route with the ruler on; one click adds one vertex and no ruler point. After
   #103: rename the world, edit the calendar, Discard all; both go back. After #107: change one
-  map's soundscape, switch maps, save; only that map changes.
+  map's soundscape, switch maps, save; only that map changes. After R-32, zoom feel: in
+  `/__canvas?c=main` (and `&rotated=1`), wheel and pinch from the ocean into Quessaly, Oskmark and
+  Brindlecross and back out. Check:
+  - it feels like one zoom
+  - half a level of hysteresis is enough and not too much
+  - the art switching from parent to child at the handoff reads well
+  - a rotated map turning square as you enter it reads well
+  Screenshots: `previews/r32/` in the R-32 worktree.
 - Look at fog once it is switched on (today's content has none): redaction now uses a sharp mask
   (alpha = min(sharp, blurred)), so a thin dark seam can show where two reveals share an edge that
   falls off a pixel boundary; and `featherPx` is in image pixels, so on scaled layers the soft edge
@@ -292,6 +299,9 @@ All calls below were kept by Isak on 2026-11-07 (batch review: "Keep all").
 | 2026-11-11 | Phase 3 tickets: a frame whose aspect differs from its child map's? | The width ratio wins; the tree warns | The editor (E5) will keep aspects equal | R-30 |
 | 2026-11-11 | Phase 3 tickets: what is a map's "minimum" for zooming back out (the output has no per-map zoom range)? | `zoom.min` from the source, now emitted per map in v2 output (`MapDocument.zoom`); the fitted zoom when absent | Needs an ADR-0003 addendum (For Isak) | R-32 |
 | 2026-11-11 | Phase 3 tickets: when does the ocean, or a frame with no `enterZoom`, hand over to a map? | When the map would fill the viewport's shorter side; a click always enters | The ocean has no `enterZoom` | R-32 |
+| 2026-11-11 | R-32 build: hysteresis, and an authored `enterZoom` that conflicts with the child's `zoom.min`? | A half-level margin M. The viewer leaves a map below min(`zoom.min` ?? fit, fit - M, enter landing - M). The build warns when `enterZoom` lands less than M above the child's `zoom.min`. Test-world and fixture `zoom.min` values were lowered so they load with no warning (documentation, not needed by the viewer) | Every way in lands at least M inside the new view, so a wheel step or pinch can't flip back | R-32 |
+| 2026-11-11 | R-32 build: an authored `enterZoom` at or below where a zoom entry lands on the parent (the fill landing depends on screen size)? | The viewer raises the child's enter zoom to at least M above both the parent's zoom landing and its fitted zoom (a click enter); a zoom in only enters, a zoom out only leaves; enter and leave zooms are kept inside the canvas's -6..4 | Without it, a 1280x800 screen went from the ocean straight into oskmark, skipping Quessaly | R-32 |
+| 2026-11-11 | R-32 build: which zooms hand off? | Only zooms the user made (wheel, pinch, double-click, keys, buttons); a fit or an explicit camera never does. Input arms a flag that the canvas's own moves (explicit camera, fit, new view) and a pan clear | Sandbox's ocean fits to its one map at nearly the fill zoom and would enter it on load | R-32 |
 | 2026-11-11 | Phase 3 tickets: how is the local test site served? | One port per campaign, serving `dist-campaigns/<id>/` exactly as built, plus a picker on its own port that never lands in a campaign's site; no remembered choice | The local site is the artifact H-01 would deploy | R-34 |
 | 2026-11-11 | R-34 build: which ports, and what else does the server refuse? | Picker on 4300, campaigns on 4301, 4302, ... in content order (`-- --port <n>` moves them); every port answers only a `localhost`/`127.0.0.1` `Host` (no DNS rebinding) and only GET/HEAD; it won't start if a site holds the picker or another campaign's name | Free of the editor (8080) and v1 preview (4173); cheap extra fences on a server that can see every campaign | R-34 |
 | 2026-11-11 | Phase 3 tickets: what does `c=` do on a campaign site? | A check, not a switch: a wrong `c`, map or note opens the ocean with "Not found in this campaign"; v1 writes no `c`; the campaign chip links to the picker only when `location.hostname` is `localhost` or `127.0.0.1` | Each site holds one campaign (ADR-0004); no build flag can turn the link on | R-35 |

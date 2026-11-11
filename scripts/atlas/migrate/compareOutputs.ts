@@ -33,6 +33,12 @@ export const ALLOWED_DIFFERENCES = {
    * exactly `EXPECTED_CAMPAIGN`.
    */
   atlas: ["version", "publishedAt", "schemaVersion", "ocean", "campaign"],
+  /**
+   * Per-map keys: the authored zoom range v2 emits (R-32), as `{ min, max }`
+   * with finite numbers and `min <= max`. v1 output has none; the v1 viewer
+   * gives every map the same range.
+   */
+  map: ["zoom"],
 } as const;
 
 /** The one campaign a migrated output may name: v1's. */
@@ -44,6 +50,23 @@ export function allowedViolations(project: unknown, label: string): string[] {
   const out: string[] = [];
   if (p.campaign !== undefined && !isDeepStrictEqual(p.campaign, EXPECTED_CAMPAIGN)) {
     out.push(`${label} atlas.json campaign: ${JSON.stringify(p.campaign)} is not "main"/"Main"`);
+  }
+  for (const m of Array.isArray(p.maps) ? (p.maps as Record<string, unknown>[]) : []) {
+    const z = m?.zoom as { min?: unknown; max?: unknown } | undefined;
+    if (z === undefined) continue;
+    const ok =
+      z !== null &&
+      typeof z === "object" &&
+      Object.keys(z).every((k) => k === "min" || k === "max") &&
+      typeof z.min === "number" &&
+      typeof z.max === "number" &&
+      Number.isFinite(z.min) &&
+      Number.isFinite(z.max) &&
+      z.min <= z.max;
+    if (!ok)
+      out.push(
+        `${label} atlas.json map ${String(m.id)} zoom: ${JSON.stringify(z)} is not a zoom range`,
+      );
   }
   if (p.ocean !== undefined) {
     const shipped = new Set(
@@ -157,6 +180,7 @@ function withoutAllowed(project: unknown, pinStyleDrops: ReadonlySet<string>): u
   if (Array.isArray(p.maps)) {
     p.maps = p.maps.map((m: Record<string, unknown>) => {
       const c = { ...m };
+      for (const k of ALLOWED_DIFFERENCES.map) delete c[k];
       const fog = c.fog as { enabled?: unknown; reveals?: unknown[] } | undefined;
       if (fog && fog.enabled === false && (fog.reveals ?? []).length === 0) delete c.fog;
       return c;

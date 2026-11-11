@@ -249,6 +249,23 @@ describe("loadAtlasModel: v2", () => {
     expect(warnings.some((w) => w.includes("notes.miller.basedOn"))).toBe(true);
   });
 
+  it("warns when entering a child at its enterZoom would land less than M above its zoom.min (R-32)", () => {
+    // millbrook: 800 px wide in a 200 px frame (zoom offset -2), enterZoom 1, zoom.min -1.5:
+    // the landing (-1) is exactly M (0.5) above zoom.min, which is allowed.
+    const ok = load(path.join(FIX, "v2/content")).warnings;
+    expect(ok.filter((w) => w.includes("enterZoom"))).toEqual([]);
+    const root = copy("v2");
+    edit(root, "aldmoor/_atlas/world.yaml", (d) => {
+      d.maps[1].enterZoom = 0.9; // lands at -1.1, 0.4 above zoom.min
+    });
+    const { warnings } = load(root);
+    expect(warnings).toContain(
+      `${ALDMOOR}: maps[1].enterZoom: entering "millbrook" at 0.9 lands at zoom -1.10 on it, ` +
+        `less than half a level above its zoom.min -1.5; the viewer lowers the zoom it leaves at ` +
+        `to keep the handoff from flipping back`,
+    );
+  });
+
   it("refuses a campaign notes value that is null or unknown", () => {
     for (const notes of [null, "public"]) {
       const root = copy("v2");

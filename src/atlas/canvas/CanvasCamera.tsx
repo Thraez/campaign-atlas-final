@@ -27,6 +27,7 @@ export function CanvasCamera({
   viewHeight,
   camera,
   onCameraChange,
+  onApply,
   reduceMotion,
 }: {
   /** Changes whenever the view (and so the coordinate space) changes. */
@@ -35,14 +36,18 @@ export function CanvasCamera({
   /** null: leave the camera alone (the canvas is fitting). */
   camera: CanvasCameraState | null;
   onCameraChange?: (camera: CanvasCameraState) => void;
+  /** Called just before the canvas moves the map to an explicit camera. */
+  onApply?: () => void;
   reduceMotion: boolean;
 }) {
   const map = useMap();
   const reported = useRef<CanvasCameraState | null>(null);
   const lastViewKey = useRef(viewKey);
   const onChangeRef = useRef(onCameraChange);
+  const onApplyRef = useRef(onApply);
   useEffect(() => {
     onChangeRef.current = onCameraChange;
+    onApplyRef.current = onApply;
   });
 
   useEffect(() => {
@@ -70,6 +75,7 @@ export function CanvasCamera({
     // The caller handing back what the canvas just reported: nothing to do.
     if (!viewChanged && reported.current && near(reported.current, target)) return;
     return whenMapHasSize(map, () => {
+      onApplyRef.current?.();
       map.setView(toLatLng(viewHeight, target.center), zoom, {
         animate: !reduceMotion && !viewChanged,
       });
