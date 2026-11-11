@@ -166,6 +166,18 @@ addendum, marked provisional.
 - `npm run gate`: passed before review (7 of 7 steps, 2m11s) and again after the review fixes on
   e86d2f4d, with origin/main already merged (7 of 7 steps, 2m10s).
 
+**Real-Leaflet recheck after review** (1f3e4c5b, `/__canvas` at 800x600, mouse wheel, shots in
+`previews/r32-v2/`):
+- **main:** ocean > Quessaly > Oskmark and back out to the ocean: 4 handoffs. Each one kept the
+  ground under the cursor to within about 3 screen px.
+- **sandbox:** opens fitted with no handoff, enters Quessaly, and leaves back to the ocean on the
+  same ground.
+- **Rotated main:** ocean > Quessaly; the map turns square, as before.
+- **Click, then re-fit:** a click on open sea with no move (pointerdown and mousedown seen), then
+  the "Ocean" breadcrumb's re-fit, gave no handoff. That re-fit (-0.23) stayed short of the enter
+  threshold, which one wheel tick crossed. Fits can't cross a threshold under the rule, and the
+  harness has no explicit-camera control, so the stale-flag case rests on the canvas tests.
+
 **Known limits** (for "zoom feel", State.md):
 - At a handoff, a rotated placement or frame turns square, because the child view is unrotated.
 - The map's art switches from the parent's picture to the child's.
