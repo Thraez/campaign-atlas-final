@@ -69,6 +69,12 @@ campaign. Safe stop. The live v1 site looks as today throughout.
 | 4 | [R-33 The player viewer on the canvas](issues/R-33-viewer-on-canvas.md) | M | R-32, R-34 | yes |
 | 5 | [R-35 Campaign links](issues/R-35-campaign-in-links.md) | S | R-33, R-34 | yes |
 | 6 | [R-36 Phase 3 check](issues/R-36-phase3-check.md) | S | R-35 | - |
+| after | [R-37 The ocean fit gets a margin](issues/R-37-ocean-fit-margin.md) | S | - | - |
+| after | [R-38 Phone top bar](issues/R-38-phone-top-bar.md) | S | - | - |
+| after | [R-39 The audio toast no longer covers the minimap](issues/R-39-audio-toast-overlap.md) | S | - | - |
+| after | [R-40 A fling's moveend must not disarm a zoom](issues/R-40-fling-moveend-disarms-zoom.md) | S | - | - |
+| after | [R-41 A dotted tag loads on a direct link](issues/R-41-dotted-tag-404.md) | S | - | - |
+| after | [R-42 Publish writes a scans-passed stamp](issues/R-42-publish-scans-stamp.md) | S | - | - |
 
 Provisional calls (rotation pivot, zoom-out minimum, handoff rule, local serving, `c=`) are in
 `State.md`. Phase 4 needs ADR-0005 and ADR-0006, which Isak accepts first.

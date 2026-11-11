@@ -1,6 +1,6 @@
 # R-35 Campaign links: links name their campaign
 
-Status: in-review
+Status: done (#148)
 Blocked by: R-33, R-34
 Size: S
 Branch: `rebuild-r35-campaign-links`

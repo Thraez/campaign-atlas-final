@@ -1,6 +1,6 @@
 # State
 
-Updated 2026-11-11 on the Mac. Branch `main` (= origin/main 3ea4ef44). Phase 3 tickets written.
+Updated 2026-11-11 on the Mac. Phase 3 complete (R-36 check in review), pending Isak's look.
 
 ## Rebuild queue
 
@@ -16,7 +16,7 @@ ticket merges on `npm run gate` plus an Opus review; a push or merge needs Isak'
 | 0 Guard and quick wins | R-01 Sync guard, scans on real artifacts, Q-01..Q-04 | Links that work, a fitted map, the menu above the map, a region card. **Safe stop** | done |
 | 1 Spine and PRs | The other PRs, R-02..R-06, ADR-0001 addendum, ADR-0002 | A publish log with every scan reading `dist`; `docs/GOALS.md` agreed | done |
 | 2 Schema v2 and campaigns in the pipeline | R-10..R-20, ADR-0003, ADR-0004 | `npm run atlas:tree` on the v2 test world, per campaign; today's site unchanged | done (R-10, R-11a, R-11b, R-11c, R-11d, R-12, R-15, R-16, R-07b, R-13, R-11e, R-14, R-17, R-07, R-17b, R-18, R-19, R-20 done) |
-| 3 Shared canvas | Ocean/frame/map-tree component; viewer on it; campaign links | Ocean > continent > city > back on the local test world. **Safe stop** | in progress (R-30..R-36 written 2026-11-11) |
+| 3 Shared canvas | Ocean/frame/map-tree component; viewer on it; campaign links | Ocean > continent > city > back on the local test world. **Safe stop** | complete (R-30..R-35 done, R-36 in review), pending Isak's look |
 | 4 Editor core | Router, command store, E0-E5, Place pin, E9, Draw route with distance/time; v2 test world only; ADR-0005, ADR-0006 | Add a map inside a map, pin it, draw a route, reload | - |
 | 5 Story | Region card and story panel, monument strip, people and Inside lists, route labels, deep links, Browse, Timeline, Credits, Landing on v2 | Read a region, a person, a monument; follow three links | - |
 | 6 Editor jobs, parity, cutover | E13, E6, E7, E8, E10 Sync, E11, E12, parity items; cutover last | Every job on the parity list in the new editor. **Safe stop** | - |
@@ -87,12 +87,38 @@ orchestrating session (local_a8dba6ed-82b1-48f6-800e-b9733658539e) opens and mer
 | Ticket | What | Blocked by | Model | State |
 |---|---|---|---|---|
 | R-30 | Map tree and ocean geometry in the app (pure), `atlasGuard` checks v2 fields | - | Sonnet | done (#143) |
-| R-31 | The shared canvas `AtlasCanvas`: the ocean and one map with child frames | R-30 | Opus | in review |
-| R-32 | Zoom handoff: ocean > map > child > back, with hysteresis | R-30, R-31 | Opus | in review |
-| R-33 | The player viewer on the canvas, breadcrumb; v1 site looks as today | R-32, R-34 | Sonnet | ready (review clean) |
-| R-34 | Serve the test world's campaign sites locally, with a picker | R-30 | Opus | ready (review clean) |
-| R-35 | Campaign links: `c=` and "Not found in this campaign" | R-33, R-34 | Sonnet | in review |
-| R-36 | Phase 3 check: Ocean > continent > city > back (playtester) | R-35 | Sonnet | - |
+| R-31 | The shared canvas `AtlasCanvas`: the ocean and one map with child frames | R-30 | Opus | done |
+| R-32 | Zoom handoff: ocean > map > child > back, with hysteresis | R-30, R-31 | Opus | done |
+| R-33 | The player viewer on the canvas, breadcrumb; v1 site looks as today | R-32, R-34 | Sonnet | done (#147) |
+| R-34 | Serve the test world's campaign sites locally, with a picker | R-30 | Opus | done |
+| R-35 | Campaign links: `c=` and "Not found in this campaign" | R-33, R-34 | Sonnet | done (#148) |
+| R-36 | Phase 3 check: Ocean > continent > city > back (playtester) | R-35 | Sonnet | in review |
+
+Phase 3 is complete, pending Isak's look. Phase 4 waits for Isak to accept ADR-0005 and ADR-0006.
+R-36's playtest (`docs/tracker/rebuild-2026-11/issues/R-36-phase3-check.md`, "Check") passed every
+step on both campaigns; it fixed the ocean's missing zoom-out limit and wrote six follow-up tickets
+(R-37..R-42: ocean fit margin, phone top bar, audio toast, fling `moveend`, dotted tag 404,
+scans-passed stamp).
+
+**For Isak's look** (run `npm run atlas:publish:next`, then `npm run atlas:serve:next`; picker on
+`http://127.0.0.1:4300/`):
+- **The ocean:** `main` shows Quessaly and Skerrow Isles; `sandbox` only Quessaly. The fit has no
+  margin yet (R-37) and zooming out stops one level below the fit.
+- **The zoom handoff feel:** zoom in over a map and it hands over (ocean > Quessaly > Oskmark >
+  Brindlecross), out and it hands back. A rotated map turns square at the handoff; the art switches
+  from the parent's picture to the child's; one big wheel gesture can cross two thresholds.
+- **The breadcrumb:** Ocean > Quessaly > Oskmark, a crumb returns to the camera you left.
+- **The phone top bar:** 137 px in three rows at 375 px, with the offline icon alone on a row (R-38).
+- **Browse, Timeline, Credits and the nav** still read `worlds[0]` on v2 until phase 5.
+
+**Provisional calls, R-30..R-35** (one line each):
+- [R-30](docs/tracker/rebuild-2026-11/issues/R-30-map-tree-model.md): bad placements, repeated `onOcean` entries and duplicate map ids are dropped (first wins); a malformed `ocean` makes the output read as v1.
+- [R-31](docs/tracker/rebuild-2026-11/issues/R-31-shared-canvas.md): each ocean map is one `SVGOverlay` (rotation in SVG); labels are plain permanent tooltips; an unknown view draws only the sea.
+- [R-32](docs/tracker/rebuild-2026-11/issues/R-32-zoom-handoff.md): half a zoom level of hysteresis; the enter zoom is the authored one or the fill rule; `zoom: {min, max}` is a v2 output field (ADR-0003 addendum).
+- [R-33](docs/tracker/rebuild-2026-11/issues/R-33-viewer-on-canvas.md): v1 keeps its own map container; on a phone the breadcrumb wraps onto its own row; the ocean fit has no margin; search on the ocean offers every placement.
+- [R-34](docs/tracker/rebuild-2026-11/issues/R-34-local-campaign-sites.md): picker on 4300 and sites on 4301+, bound to 127.0.0.1; the server refuses stale or leaking sites; a missing file with an extension is a 404.
+- [R-35](docs/tracker/rebuild-2026-11/issues/R-35-campaign-in-links.md): any v2 link problem drops the whole link and shows a fixed "Not found in this campaign" bar; the chip links to the picker only on localhost and assumes port 4300.
+- [R-36](docs/tracker/rebuild-2026-11/issues/R-36-phase3-check.md): the ocean's zoom-out floor is one level below the fit; on v1 an unknown map now opens the default map (baseline: blank).
 
 ### Kept notes
 
