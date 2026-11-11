@@ -89,9 +89,9 @@ orchestrating session (local_a8dba6ed-82b1-48f6-800e-b9733658539e) opens and mer
 | R-30 | Map tree and ocean geometry in the app (pure), `atlasGuard` checks v2 fields | - | Sonnet | done (#143) |
 | R-31 | The shared canvas `AtlasCanvas`: the ocean and one map with child frames | R-30 | Opus | in review |
 | R-32 | Zoom handoff: ocean > map > child > back, with hysteresis | R-30, R-31 | Opus | in review |
-| R-33 | The player viewer on the canvas, breadcrumb; v1 site looks as today | R-32, R-34 | Sonnet | in review |
+| R-33 | The player viewer on the canvas, breadcrumb; v1 site looks as today | R-32, R-34 | Sonnet | ready (review clean) |
 | R-34 | Serve the test world's campaign sites locally, with a picker | R-30 | Opus | ready (review clean) |
-| R-35 | Campaign links: `c=` and "Not found in this campaign" | R-33, R-34 | Sonnet | - |
+| R-35 | Campaign links: `c=` and "Not found in this campaign" | R-33, R-34 | Sonnet | in review |
 | R-36 | Phase 3 check: Ocean > continent > city > back (playtester) | R-35 | Sonnet | - |
 
 ### Kept notes
