@@ -111,6 +111,14 @@ export interface MapDocument {
   frame?: MapFrame;
   /** Schema v2 only: the parent zoom at which the viewer enters this map. */
   enterZoom?: number;
+  /** Schema v2 only: the map's authored zoom range (Leaflet zoom: log2 of screen px per map px). */
+  zoom?: MapZoomRange;
+}
+
+/** A map's zoom range (schema v2, ADR-0003); `min <= max`. */
+export interface MapZoomRange {
+  min: number;
+  max: number;
 }
 
 /** A child map's rectangle on its parent (schema v2, ADR-0003). */

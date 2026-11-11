@@ -51,7 +51,7 @@ maps:
     enterZoom: 2
     layers: []
     scale: { unitsPerPixel: 0.0001, unitLabel: mi }
-    zoom: { min: 0, max: 4 }
+    zoom: { min: -2, max: 4 }
     sound:
       - id: drip
         points: [[0, 0], [50, 0], [50, 50]]

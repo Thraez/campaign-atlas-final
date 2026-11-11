@@ -7,7 +7,8 @@
  *   items the adapter skipped but the DM build lists, key order). Pins come
  *   from note frontmatter, as before. Deleted with v1 at retire.
  * - v2: the model's maps, each with its nested regions, routes, pins and
- *   sound, and the tree fields `parent`, `frame`, `enterZoom` (ADR-0003).
+ *   sound, and the tree fields `parent`, `frame`, `enterZoom` (ADR-0003),
+ *   plus each map's `zoom` range (R-32).
  *
  * Visibility of v2 items is read for the build's campaign
  * (`visibilityFor`), so a per-campaign mapping naming other campaigns never
@@ -218,5 +219,7 @@ function v2Map(m: MapModel, w: WorldModel, vis: (value: unknown) => EntityVisibi
     parent: m.parent,
     frame: m.frame ? { ...m.frame } : undefined,
     enterZoom: m.enterZoom,
+    // R-32: the authored zoom range, for the viewer's zoom handoff. v2 only.
+    zoom: { min: m.zoom.min, max: m.zoom.max },
   });
 }

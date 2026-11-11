@@ -4,7 +4,8 @@
  * Loads one v2 campaign store through the dev server's read-only store server
  * (`scripts/vite-plugin-campaign-stores.ts`), builds the map tree and mounts
  * `AtlasCanvas` on it, with a switch for the rotated fixture. Phase 4's editor
- * reuses it.
+ * reuses it. Zooming hands over between the ocean and the maps (R-32); the
+ * status line counts the handoffs.
  *
  * EDITOR-ONLY: routed in `src/App.tsx` behind `__INCLUDE_EDITOR__`, and its
  * folder is in `src/test/helpers/editorOnlyPaths.ts`, so the player import
@@ -65,6 +66,7 @@ export default function CanvasHarnessPage() {
   const [view, setView] = useState<CanvasView>({ kind: "ocean" });
   const [camera, setCamera] = useState<CanvasCamera>("fit");
   const [hover, setHover] = useState<string | null>(null);
+  const [handoffs, setHandoffs] = useState(0);
 
   useEffect(() => {
     fetch(`${base()}${DEV_CANVAS_PATHS.campaignStores}`)
@@ -118,6 +120,12 @@ export default function CanvasHarnessPage() {
   };
   const onCameraChange = useCallback((c: CanvasCameraState) => setCamera(c), []);
   const onEnterMap = useCallback((id: string) => go({ kind: "map", mapId: id }), [go]);
+  const onViewChange = useCallback((next: CanvasView, c: CanvasCameraState) => {
+    setView(next);
+    setCamera(c);
+    setHover(null);
+    setHandoffs((n) => n + 1);
+  }, []);
 
   const crumbs = tree && view.kind === "map" ? breadcrumb(tree, view.mapId) : [];
 
@@ -172,7 +180,8 @@ export default function CanvasHarnessPage() {
         <span className="text-muted-foreground" data-testid="canvas-harness-status">
           {hover ? `hover: ${hover}` : ""}
           {camera !== "fit" &&
-            ` camera: ${camera.center[0].toFixed(0)}, ${camera.center[1].toFixed(0)} z${camera.zoom}`}
+            ` camera: ${camera.center[0].toFixed(0)}, ${camera.center[1].toFixed(0)} z${camera.zoom.toFixed(2)}`}
+          {` handoffs: ${handoffs}`}
         </span>
       </header>
       <main className="flex-1 min-h-0 relative">
@@ -186,6 +195,7 @@ export default function CanvasHarnessPage() {
             onCameraChange={onCameraChange}
             onEnterMap={onEnterMap}
             onFrameHover={setHover}
+            onViewChange={onViewChange}
           />
         )}
       </main>

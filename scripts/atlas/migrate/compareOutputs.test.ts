@@ -45,6 +45,7 @@ describe("comparePlayerOutputs", () => {
           };
           p.campaign = { id: "main", name: "Main" };
           p.placements.reverse();
+          p.maps[0].zoom = { min: -6, max: 4 }; // R-32: v2's per-map zoom range
         }),
       ),
     ).toEqual([]);
@@ -62,6 +63,12 @@ describe("comparePlayerOutputs", () => {
     ).toMatch(/"nowhere" is not a map it ships/);
     expect(same(tweak(a, (p) => (p.maps[1].parent = "vale"))).join()).toMatch(/parent/);
     expect(same(tweak(a, (p) => (p.maps[1].enterZoom = 1))).join()).toMatch(/enterZoom/);
+    expect(same(tweak(a, (p) => (p.maps[0].zoom = { min: 2, max: 1 }))).join()).toMatch(
+      /zoom: .* is not a zoom range/,
+    );
+    expect(same(tweak(a, (p) => (p.maps[0].zoom = { min: 0, max: 1, x: 1 }))).join()).toMatch(
+      /is not a zoom range/,
+    );
 
     // A DM entity that leaks, a pin moved, a fog reveal grown: all differences.
     expect(same(tweak(a, (p) => p.entities.push({ id: "vampire-lord" })))).not.toEqual([]);

@@ -5,7 +5,8 @@
  * quessaly (quessaly-world > oskmark > brindlecross, tallowford) and skerrow
  * (skerrow-isles > hookhaven), campaigns `main` and `sandbox`.
  *
- * - main ships both worlds, the tree (parent, frame, enterZoom), the ocean,
+ * - main ships both worlds, the tree (parent, frame, enterZoom), each map's
+ *   zoom range (R-32), the ocean,
  *   and every map's pins and regions on the right map id.
  * - sandbox hides skerrow (rule 5): absent from worlds, ocean, maps,
  *   entities and the search index, and named in must-not-ship.
@@ -82,6 +83,11 @@ describe("R-13: every world and the map tree", () => {
       enterZoom: 2,
       frame: { x: 300, y: 300, width: 60, height: 60, rotation: 0 },
     });
+    // R-32: every v2 map carries its authored zoom range.
+    expect(map("quessaly-world")?.zoom).toEqual({ min: -2, max: 3 });
+    expect(map("oskmark")?.zoom).toEqual({ min: -1, max: 3 });
+    expect(map("brindlecross")?.zoom).toEqual({ min: 0, max: 4 });
+    expect(map("hookhaven")?.zoom).toEqual({ min: -1, max: 4 });
 
     expect(project.ocean).toMatchObject({ width: 3000, height: 2000, sea: "default" });
     expect(project.ocean?.onOcean.map((o) => o.map)).toEqual(["quessaly-world", "skerrow-isles"]);
