@@ -1,4 +1,6 @@
 export interface DeepLinkState {
+  /** `c=`: the campaign the link names (R-35). v2 output writes its own id; v1 writes none. */
+  campaign?: string | null;
   mapId: string | null;
   entityId: string | null;
   center: { x: number; y: number } | null;
@@ -7,6 +9,7 @@ export interface DeepLinkState {
 
 export function serializeDeepLink(state: DeepLinkState): string {
   const params = new URLSearchParams();
+  if (state.campaign) params.set("c", state.campaign);
   if (state.mapId != null) params.set("map", state.mapId);
   if (state.entityId != null) params.set("entity", state.entityId);
   if (state.center != null) {
@@ -30,6 +33,7 @@ export function parseDeepLink(search: string): DeepLinkState {
   const cz = czStr ? Number(czStr) : NaN;
 
   return {
+    campaign: params.get("c") || null,
     mapId,
     entityId,
     center: Number.isFinite(cx) && Number.isFinite(cy) ? { x: cx, y: cy } : null,
@@ -39,6 +43,7 @@ export function parseDeepLink(search: string): DeepLinkState {
 
 /** Link to the viewer with one entity open, for pages outside the viewer. The viewer
  *  writes its own URL with `serializeDeepLink`; both parse back the same. */
-export function entityHref(id: string): string {
-  return `/atlas?entity=${encodeURIComponent(id)}`;
+export function entityHref(id: string, campaignId?: string | null): string {
+  const c = campaignId ? `c=${encodeURIComponent(campaignId)}&` : "";
+  return `/atlas?${c}entity=${encodeURIComponent(id)}`;
 }

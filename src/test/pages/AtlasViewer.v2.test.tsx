@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AtlasProject } from "@/atlas/content/schema";
@@ -281,6 +281,176 @@ describe("AtlasViewer, v2 output", () => {
       fireEvent.click(screen.getByRole("button", { name: "Ocean" }));
       expect(canvasProps.camera).toBe("fit");
       expect(search().get("cx")).toBeNull();
+    });
+  });
+  // R-35: links name their campaign. `c` is a check; a link that names something this output
+  // lacks must look the same whatever the reason (another campaign, DM-only, never existed).
+  describe("campaign links (c=)", () => {
+    const NOTICE = "Not found in this campaign";
+    const search = () => new URLSearchParams(window.location.search);
+    const notices = () =>
+      screen.queryAllByRole("status").filter((n) => n.textContent!.includes(NOTICE));
+    /** Everything a viewer of the page could compare, after the page has settled. */
+    async function page(campaign: "main" | "sandbox", url: string) {
+      const len = window.history.length;
+      await open(campaign, url);
+      await act(async () => {});
+      const snap = {
+        url: window.location.pathname + window.location.search,
+        history: window.history.length - len,
+        view: canvasView(),
+        crumbs: crumbs(),
+        frames: frameLabels(),
+        notice: notices().length,
+        html: document.body.innerHTML,
+      };
+      cleanup();
+      return snap;
+    }
+    const mainOnlyEntity = () => {
+      const sb = new Set(projects.sandbox.entities.map((e) => e.id));
+      return projects.main.entities.find((e) => !sb.has(e.id))!;
+    };
+
+    it("the chip shows the campaign's name, and is a plain label off a local host", async () => {
+      await open("sandbox");
+      const chip = document.querySelector("[data-campaign-chip]")!;
+      expect(chip.textContent).toBe(projects.sandbox.campaign!.name);
+      // jsdom's host is localhost: the picker link. A hosted host: no link at all.
+      expect(chip.tagName).toBe("A");
+      expect(chip.getAttribute("href")).toBe("http://localhost:4300/");
+      cleanup();
+      const real = window.location;
+      vi.stubGlobal(
+        "location",
+        Object.assign(Object.create(Object.getPrototypeOf(real)), {
+          hostname: "campaign-atlas.example.org",
+          pathname: "/",
+          search: "",
+          protocol: "https:",
+        }),
+      );
+      await open("sandbox");
+      vi.unstubAllGlobals();
+      expect(document.querySelector("[data-campaign-chip]")!.tagName).toBe("SPAN");
+      expect(document.querySelector("a[href*='4300']")).toBeNull();
+    });
+
+    it("v2 writes c=<its campaign> on every URL it writes, and a right c shows no notice", async () => {
+      await open("sandbox");
+      expect(search().get("c")).toBe("sandbox");
+      expect(notices()).toHaveLength(0);
+      fireEvent.click(document.querySelectorAll('[data-leaflet="Polygon"]')[0]);
+      await waitFor(() => expect(canvasView()).toBe("map:quessaly-world"));
+      expect(search().get("c")).toBe("sandbox");
+      expect(search().get("map")).toBe("quessaly-world");
+      cleanup();
+      await open("sandbox", "/?c=sandbox&map=oskmark");
+      expect(canvasView()).toBe("map:oskmark");
+      expect(notices()).toHaveLength(0);
+    });
+
+    it("a missing c works as before and gets c written", async () => {
+      await open("main", "/?map=oskmark");
+      expect(canvasView()).toBe("map:oskmark");
+      expect(notices()).toHaveLength(0);
+      expect(search().get("c")).toBe("main");
+    });
+
+    it("another campaign's id, and a map or entity this output lacks, all look the same", async () => {
+      const hidden = mainOnlyEntity();
+      const urls = [
+        "/?c=main",
+        "/?c=zzz-nope",
+        "/?c=main&map=oskmark&cx=10&cy=20&cz=1",
+        "/?c=sandbox&map=tallowford",
+        "/?map=tallowford",
+        "/?map=zzz-nope",
+        `/?entity=${encodeURIComponent(hidden.id)}`,
+        "/?c=sandbox&entity=zzz-nope",
+        `/?c=main&map=tallowford&entity=${encodeURIComponent(hidden.id)}&cx=5&cy=6`,
+      ];
+      const pages = [];
+      for (const u of urls) pages.push(await page("sandbox", u));
+      const [first, ...rest] = pages;
+      expect(first.notice).toBe(1);
+      expect(first.view).toBe("ocean");
+      expect(first.crumbs).toEqual(["Ocean"]);
+      expect(first.url).toBe("/?c=sandbox");
+      for (const [i, p] of rest.entries()) expect(p, urls[i + 1]).toEqual(first);
+    });
+
+    it("the same notice is shown whatever the id: its text is fixed and no id appears anywhere", async () => {
+      const hidden = mainOnlyEntity();
+      const ids = ["tallowford", "zzz-nope", "zzcamp", hidden.id, hidden.title];
+      for (const u of [
+        "/?c=zzcamp",
+        "/?map=tallowford",
+        "/?map=zzz-nope",
+        `/?entity=${encodeURIComponent(hidden.id)}`,
+      ]) {
+        await open("sandbox", u);
+        expect(notices()[0].textContent).toBe(NOTICE + "Dismiss");
+        const text = (document.body.textContent ?? "").toLowerCase();
+        const where = window.location.href.toLowerCase();
+        for (const id of ids) {
+          expect(text, `${u} text has ${id}`).not.toContain(id.toLowerCase());
+          expect(where, `${u} URL has ${id}`).not.toContain(id.toLowerCase());
+        }
+        cleanup();
+      }
+    });
+
+    it("the notice goes on Dismiss, and on the next move", async () => {
+      await open("sandbox", "/?c=main");
+      fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+      expect(notices()).toHaveLength(0);
+      cleanup();
+      await open("sandbox", "/?c=main");
+      fireEvent.click(document.querySelectorAll('[data-leaflet="Polygon"]')[0]);
+      await waitFor(() => expect(canvasView()).toBe("map:quessaly-world"));
+      expect(notices()).toHaveLength(0);
+    });
+
+    it("opening an entity clears the notice", async () => {
+      await open("sandbox", "/?c=main");
+      expect(notices()).toHaveLength(1);
+      fireEvent.click(document.querySelector('[aria-label="Search atlas (Ctrl+K)"]')!);
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.change(within(dialog).getByLabelText("Search"), { target: { value: "iron" } });
+      await waitFor(() => expect(dialog.querySelector("#sp-result-iron-tower")).not.toBeNull());
+      fireEvent.click(dialog.querySelector("#sp-result-iron-tower")!);
+      await waitFor(() => expect(search().get("entity")).toBe("iron-tower"));
+      expect(notices()).toHaveLength(0);
+    });
+
+    it("a v2 build with no campaign (DM or dev) skips the c check", async () => {
+      const saved = projects.sandbox.campaign;
+      delete projects.sandbox.campaign;
+      try {
+        await open("sandbox", "/?c=anything&map=oskmark");
+        expect(notices()).toHaveLength(0);
+        expect(canvasView()).toBe("map:oskmark");
+        expect(search().has("c")).toBe(false);
+      } finally {
+        projects.sandbox.campaign = saved;
+      }
+    });
+
+    it("Back/Forward onto a wrong-campaign entry gives the same notice, ocean and URL", async () => {
+      await open("sandbox", "/?c=sandbox&map=oskmark");
+      expect(notices()).toHaveLength(0);
+      window.history.pushState({}, "", "/?c=main&map=tallowford");
+      act(() => window.dispatchEvent(new PopStateEvent("popstate")));
+      await waitFor(() => expect(canvasView()).toBe("ocean"));
+      expect(notices()).toHaveLength(1);
+      expect(window.location.search).toBe("?c=sandbox");
+    });
+
+    it("main: its own hidden-from-sandbox map is not 'not found' on main", async () => {
+      await open("main", "/?c=main&map=tallowford");
+      expect(canvasView()).toBe("map:tallowford");
+      expect(notices()).toHaveLength(0);
     });
   });
 });

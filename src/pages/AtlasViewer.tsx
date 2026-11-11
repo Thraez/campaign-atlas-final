@@ -213,12 +213,47 @@ const viewKeyOf = (mapId: string | null) => (mapId === null ? OCEAN_KEY : `map:$
 const oceanOption = (tree: MapTree) =>
   tree.ocean ? { height: tree.ocean.height, isMap: (id: string) => tree.byId.has(id) } : undefined;
 
+/** The `c=` this output writes: its own campaign on v2, nothing on v1 (R-35). */
+const campaignOf = (d: ViewerState) => (d.tree.ocean ? (d.project.campaign?.id ?? null) : null);
+
+/** The one notice a link into another campaign, or to something this output lacks, gets. Fixed text. */
+const NOT_FOUND_NOTICE = "Not found in this campaign";
+
+/** The local picker (R-34), on its default port. Only offered on a local host. */
+const PICKER_PORT = 4300;
+const isLocalHost = (h: string) => h === "localhost" || h === "127.0.0.1";
+
 /** Zoom to keep when flying within the view on screen (as v1's flyTo does). */
 const keepZoom = (vc: { zoom: number } | null) => Math.max(vc?.zoom ?? -1, -1);
 
 /** A fly target (a point in the view's own pixels) as a canvas camera. */
 function cameraAt(t: FlyTarget, fallbackZoom: number): CanvasCameraState {
   return { center: [t.x, t.y], zoom: t.zoom ?? fallbackZoom };
+}
+
+/**
+ * The campaign's name in the top bar. A label, not a picker: a campaign site can't switch
+ * campaigns. It links to the local picker (R-34) only on a local host; the check is the
+ * hostname alone, so nothing in a deployed build can turn it on.
+ */
+function CampaignChip({ name }: { name: string }) {
+  const host = typeof window === "undefined" ? "" : window.location.hostname;
+  const cls =
+    "shrink-0 max-w-[9rem] sm:max-w-[14rem] truncate rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs text-muted-foreground";
+  return isLocalHost(host) ? (
+    <a
+      className={`${cls} hover:text-foreground`}
+      href={`${window.location.protocol}//${host}:${PICKER_PORT}/`}
+      title="Choose another campaign (local)"
+      data-campaign-chip=""
+    >
+      {name}
+    </a>
+  ) : (
+    <span className={cls} data-campaign-chip="">
+      {name}
+    </span>
+  );
 }
 
 export default function AtlasViewer() {
@@ -235,6 +270,8 @@ export default function AtlasViewer() {
   const [camera, setCamera] = useState<CanvasCamera>("fit");
   const viewMemory = useRef(new Map<string, CanvasCameraState>());
   const [openId, setOpenId] = useState<string | null>(null);
+  // v2: a link named another campaign or something this output doesn't have (R-35).
+  const [notFound, setNotFound] = useState(false);
   const [flyTarget, setFlyTarget] = useState<FlyTarget | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -285,6 +322,7 @@ export default function AtlasViewer() {
     if (!urlReady || window.location.pathname !== viewerPathRef.current) return;
     replaceViewerSearch(
       serializeDeepLink({
+        campaign: campaignOf(data),
         mapId: activeMapId,
         entityId: openId,
         center: viewCenter ? { x: viewCenter.x, y: viewCenter.y } : null,
@@ -292,7 +330,7 @@ export default function AtlasViewer() {
       }),
     );
     shownSearchRef.current = window.location.search;
-  }, [urlReady, activeMapId, openId, viewCenter]);
+  }, [data, urlReady, activeMapId, openId, viewCenter]);
 
   // Load and Back/Forward read the viewport at call time, not at render.
   const hasDesktopAsideRef = useRef(hasDesktopAside);
@@ -303,8 +341,24 @@ export default function AtlasViewer() {
   /** Show what the current URL names: one rule for load and Back/Forward (resolveDeepLink). */
   const applyUrl = useCallback(
     ({ project, tree }: ViewerState, currentMapId: string | null) => {
+      let link = parseDeepLink(window.location.search);
+      // v2: `c` is a check, not a switch. Another campaign's id, or a map or entity this output
+      // doesn't hold, opens the ocean fitted with the same notice and drops every other param,
+      // whatever the id is or whether it exists elsewhere (R-35: no oracle).
+      const missing =
+        !!tree.ocean &&
+        ((link.campaign != null &&
+          project.campaign != null &&
+          link.campaign !== project.campaign.id) ||
+          (link.mapId != null && !tree.byId.has(link.mapId)) ||
+          (link.entityId != null && !project.entities.some((e) => e.id === link.entityId)));
+      setNotFound(missing);
+      if (missing) {
+        link = { campaign: null, mapId: null, entityId: null, center: null, zoom: null };
+        replaceViewerSearch(serializeDeepLink({ campaign: project.campaign?.id ?? null, ...link }));
+      }
       shownSearchRef.current = window.location.search;
-      const r = resolveDeepLink(parseDeepLink(window.location.search), project, {
+      const r = resolveDeepLink(link, project, {
         currentMapId,
         defaultMapId: project.worlds[0]?.defaultMapId ?? project.maps[0]?.id ?? null,
         hasDesktopAside: hasDesktopAsideRef.current,
@@ -323,7 +377,7 @@ export default function AtlasViewer() {
         const cam = cameraAt(r.fly, sameView ? keepZoom(viewCenterRef.current) : 0);
         setCamera(cam);
         handleViewChange(cam.center[0], cam.center[1], cam.zoom);
-      } else if (!sameView) {
+      } else if (!sameView || missing) {
         setCamera("fit");
         setViewCenter(null);
         viewCenterRef.current = null;
@@ -465,6 +519,7 @@ export default function AtlasViewer() {
       if (push) {
         pushViewerSearch(
           serializeDeepLink({
+            campaign: data ? campaignOf(data) : null,
             mapId,
             entityId: openId,
             center: vc ? { x: vc.x, y: vc.y } : null,
@@ -473,12 +528,13 @@ export default function AtlasViewer() {
         );
       }
       shownSearchRef.current = window.location.search;
+      setNotFound(false);
       setActiveMapId(mapId);
       setCamera(c);
       setViewCenter(vc);
       viewCenterRef.current = vc;
     },
-    [openId, setActiveMapId],
+    [data, openId, setActiveMapId],
   );
 
   /** v2: the canvas reports the camera of the view on screen; remember it per view. */
@@ -547,6 +603,7 @@ export default function AtlasViewer() {
       const vc = switching ? null : viewCenterRef.current;
       pushViewerSearch(
         serializeDeepLink({
+          campaign: data ? campaignOf(data) : null,
           mapId: switching ? r.mapId : activeId,
           entityId: id,
           center: cam ? { x: cam.center[0], y: cam.center[1] } : vc ? { x: vc.x, y: vc.y } : null,
@@ -554,6 +611,7 @@ export default function AtlasViewer() {
         }),
       );
       shownSearchRef.current = window.location.search;
+      setNotFound(false);
       setOpenId(id);
       // Only open the bottom sheet on viewports where the desktop aside
       // isn't rendered; otherwise the Radix overlay covers the screen
@@ -823,10 +881,13 @@ export default function AtlasViewer() {
           <Link
             to="/"
             className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2 min-w-0"
+            aria-label={isV2 ? "Home" : undefined}
           >
             <Compass className="h-5 w-5 shrink-0" aria-hidden="true" />
-            <span className="truncate max-w-[8.5rem] sm:max-w-none">{titleName}</span>
+            {/* v2: the campaign's name is the chip beside it. */}
+            {!isV2 && <span className="truncate max-w-[8.5rem] sm:max-w-none">{titleName}</span>}
           </Link>
+          {isV2 && data.project.campaign && <CampaignChip name={data.project.campaign.name} />}
           {isV2 ? (
             <div className="order-last basis-full min-w-0 md:order-none md:basis-auto md:flex-1 md:pl-3">
               <MapBreadcrumb tree={data.tree} view={view} onGo={(v) => goView(v, "memory", true)} />
@@ -929,6 +990,21 @@ export default function AtlasViewer() {
           </span>
         </header>
         <OfflineStatus />
+        {notFound && (
+          <div
+            role="status"
+            className="flex items-center justify-between gap-2 border-b border-border bg-muted px-4 py-1.5 text-xs text-muted-foreground"
+          >
+            <span>{NOT_FOUND_NOTICE}</span>
+            <button
+              type="button"
+              className="underline hover:text-foreground"
+              onClick={() => setNotFound(false)}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         <div className="flex-1 flex relative min-h-0">
           <main

@@ -37,7 +37,7 @@ function buildCreditRows(project: AtlasProject | null): CreditRow[] {
       key: `entity:${e.id}`,
       title: e.title,
       typeLabel: e.type ? playerTypeLabel(e.type) : undefined,
-      href: entityHref(e.id),
+      href: entityHref(e.id, project.campaign?.id),
       credit: e.credit as string,
     }));
 
@@ -64,7 +64,7 @@ function buildCreditRows(project: AtlasProject | null): CreditRow[] {
       key: `asset:${src}`,
       title: owner ? owner.title : (src.split("/").pop() ?? src),
       typeLabel: owner?.type ? playerTypeLabel(owner.type) : undefined,
-      href: owner ? entityHref(owner.id) : undefined,
+      href: owner ? entityHref(owner.id, project.campaign?.id) : undefined,
       credit: entry.credit,
     });
   }
