@@ -103,6 +103,10 @@
   background: hsl(var(--ocean));
   font-family: inherit;
 }
+/* The ruler's crosshair on the shared canvas; a wrapper cursor alone loses to Leaflet's grab. */
+.atlas-ruler .leaflet-container {
+  cursor: crosshair;
+}
 .leaflet-container:focus-visible {
   outline: 2px solid hsl(var(--ring));
   outline-offset: -2px;

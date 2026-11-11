@@ -1,6 +1,6 @@
 # R-33 The player viewer on the shared canvas, with a breadcrumb
 
-Status: ready-for-agent
+Status: in-review
 Blocked by: R-32, R-34
 Size: M
 Branch: `rebuild-r33-viewer-on-canvas`
@@ -53,3 +53,68 @@ Move `src/pages/AtlasViewer.tsx` onto `AtlasCanvas` (R-31, R-32). The flat map `
 
 Campaign param in links and the local campaign picker (R-34, R-35), region cards and the story
 panel (phase 5), the new deep-link names (`note`, `x`, `y`, `z`) from ux-flows p5 (phase 5).
+
+## Build notes (2026-11-11)
+
+**Screenshots** (gitignored, in the worktree `.claude/worktrees/r33/previews/`): v1 player build of
+`content/` at `ATLAS_BASE=/campaign-atlas-final/` on `npm run preview`, desktop 1280x800 and 375 wide:
+- `r33-baseline/` (before any change) and `r33-after/`: `atlas`, `atlas-cam` (`?map=...&cx&cy&cz`),
+  `atlas-unknownmap` (`?map=nope...`), `atlas-entity` (`?entity=...`), each `-desktop.png` and `-mobile.png`.
+- Verdict: they look the same by eye (map, pins, aside, toolbar, scale bar, minimap; only the animated
+  sea differs in bytes). `content/` has one map, so no Select shows in either set.
+- `r33-v2/` on R-34's server (`atlas:publish:next`, `atlas:serve:next`): `main-ocean`, `main-oskmark`
+  (Ocean > Quessaly > Oskmark), `sandbox-ocean`, `sandbox-quessaly`, desktop and mobile.
+
+**Approach.** v2 output (`tree.ocean`) renders through `AtlasCanvas`; the viewer keeps the pins, regions,
+routes, fog, sound, ruler, scale bar and minimap as canvas children (map views only; `WrappedWorld` with
+`showImageLayers={false}`). v1 output keeps its own `MapContainer` path unchanged (provisional call:
+the canvas sets `zoomSnap` 0 and has no max-bounds, which would change v1's feel and its existing
+smoke-test assertions on `fitBounds`/`setMaxBounds`/`flyTo`; v1 "one top-level map per v1 map" holds via
+`buildMapTree`). The map layers are one shared fragment for both paths.
+- `src/pages/AtlasViewer.tsx`: state holds `{project, tree}`; `activeMapId` null = the ocean (v2); a
+  `camera` ("fit" or explicit) feeds the canvas; `goView` is the one way to change view; the last camera
+  of each view is remembered for the crumbs. Handoffs, click-enters and crumb clicks push a history
+  entry; the canvas's camera reports only replace. Credits and asset credits come from the map's world
+  (`map.worldId`), on the ocean from all worlds; header and panel show `campaign.name`. Select only on v1.
+- `src/atlas/resolveDeepLink.ts`: optional `ocean` option. No `map` is the ocean (camera kept); a `map`
+  id not in the tree opens the ocean and drops `cx/cy/cz`; an entity link lands on its placement's map
+  (a child too). v1 behaviour unchanged.
+- `src/atlas/map/MapBreadcrumb.tsx` (new), `src/atlas/map/viewCredits.ts` (new).
+- `deepLink.ts` and `viewerHistory.ts` needed no change.
+- Tests: `src/test/pages/AtlasViewer.v2.test.tsx` (built test world, both campaigns: crumbs, no Select,
+  ocean frames, no sandbox crumb or frame for tallowford/brindlecross/skerrow-isles, click enter and
+  Back, crumb push, unknown map, ocean camera, popstate) and `src/test/resolve-deep-link-v2.test.ts`.
+  Existing viewer, deep-link, canvas and region/ruler tests pass unchanged.
+
+**Provisional calls.**
+- v1 keeps its own map container (above).
+- Phone (P7): the breadcrumb wraps onto its own line of the toolbar (the toolbar has no room for it at
+  375 px, and the search button wraps too); not one shared line with search.
+- The P1 corner is the legend line (top-left, beside Leaflet's +/-) plus the existing "Reset map view"
+  button as the fit control (bottom-right). It shows on the ocean and on maps with child frames.
+- The ocean fit has no margin (the placed maps touch the edges, Skerrow Isles runs under the aside edge
+  on main at 1280 wide); a margin belongs in the canvas fit, not done here.
+- Search on the ocean offers every placement; picking one enters that map.
+- Accepted as provisional (review): v1 keeps its own `MapContainer`; fit is the Reset button plus
+  Leaflet's +/-; the breadcrumb wraps onto its own line on a phone; search on the ocean as above.
+- The ocean-fit margin is a follow-up for R-31's fit, not R-33.
+- Fixed after review: the ruler's crosshair now shows on the v2 canvas (`className="atlas-ruler"` on
+  the canvas, `.atlas-ruler .leaflet-container{cursor:crosshair}` in `index.css`; a wrapper cursor alone
+  loses to Leaflet's grab cursor). `showPlacement` on v2 pushes history only when the map changes (a spot
+  on the map in view is a pan and replaces). The `ocean` resolver option and the keep-zoom rule are built
+  once (`oceanOption`, `keepZoom`).
+
+**Review round.** The sandbox test now opens `?map=oskmark` (crumbs Ocean > Quessaly > Oskmark, no frame
+label or text for Brindlecross, Tallowford or Skerrow, case-insensitive), the sandbox ocean frames exactly
+Quessaly, `?map=tallowford` on sandbox opens the ocean, and a main control case shows the same assertions
+do see Brindlecross and Tallowford. New viewer tests fire the canvas's `onViewChange`/`onCameraChange`
+props: a handoff pushes, pan and zoom replace, a crumb returns to the remembered camera (fitted when the
+view was never visited). Real browser on `atlas:serve:next` (main): a wheel from the ocean over Quessaly
+crosses the thresholds in one gesture and lands on Oskmark (one history entry, crumbs Ocean > Quessaly >
+Oskmark); wheel out steps Oskmark > Quessaly > Ocean (one entry each); Back goes Quessaly then Oskmark,
+Forward goes Quessaly then Ocean, each with its own camera in the URL; the Quessaly crumb lands fitted
+(never visited), and the Ocean crumb returns to the ocean camera the user left (cz -0.3 at 1150,700).
+
+**Checked:** typecheck:all, lint, the page, canvas and deep-link tests, publish:next (44 scans clean),
+real-browser click-enter / crumb / Back on `main`. **Not checked:** wheel handoff in the viewer by hand,
+`npm run gate`, touch pinch.

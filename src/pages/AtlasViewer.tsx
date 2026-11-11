@@ -78,6 +78,11 @@ import { HoverPeekCard } from "@/atlas/peek/HoverPeekCard";
 import { usePeekController } from "@/atlas/peek/usePeekController";
 import { resolvePeekEntityId } from "@/atlas/peek/resolvePeekEntityId";
 import { FlatCRS } from "@/atlas/map/flatCRS";
+import { AtlasCanvas, type CanvasCamera, type CanvasCameraState } from "@/atlas/canvas/AtlasCanvas";
+import { buildMapTree, type MapTree } from "@/atlas/ocean/mapTree";
+import type { TreeView } from "@/atlas/ocean/zoomHandoff";
+import { MapBreadcrumb } from "@/atlas/map/MapBreadcrumb";
+import { creditsForView } from "@/atlas/map/viewCredits";
 
 import { PinLegend } from "@/atlas/pins/PinLegend";
 import { FitMapOnOpen } from "@/atlas/map/FitMapOnOpen";
@@ -195,19 +200,42 @@ function MaxBoundsController({
 
 interface ViewerState {
   project: AtlasProject;
+  /** The map tree (R-30). `tree.ocean` is set for v2 output only. */
+  tree: MapTree;
+}
+
+type FlyTarget = { x: number; y: number; height: number; zoom?: number };
+
+const OCEAN_KEY = "ocean";
+const viewKeyOf = (mapId: string | null) => (mapId === null ? OCEAN_KEY : `map:${mapId}`);
+
+/** The `resolveDeepLink` option for v2 output: the ocean's height and the ids the tree can show. */
+const oceanOption = (tree: MapTree) =>
+  tree.ocean ? { height: tree.ocean.height, isMap: (id: string) => tree.byId.has(id) } : undefined;
+
+/** Zoom to keep when flying within the view on screen (as v1's flyTo does). */
+const keepZoom = (vc: { zoom: number } | null) => Math.max(vc?.zoom ?? -1, -1);
+
+/** A fly target (a point in the view's own pixels) as a canvas camera. */
+function cameraAt(t: FlyTarget, fallbackZoom: number): CanvasCameraState {
+  return { center: [t.x, t.y], zoom: t.zoom ?? fallbackZoom };
 }
 
 export default function AtlasViewer() {
   const [data, setData] = useState<ViewerState | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeMapId, setActiveMapId] = useState<string | null>(null);
+  // null: the ocean (v2 output), or nothing yet.
+  const [activeMapId, setActiveMapIdState] = useState<string | null>(null);
+  const activeMapIdRef = useRef<string | null>(null);
+  const setActiveMapId = useCallback((id: string | null) => {
+    activeMapIdRef.current = id;
+    setActiveMapIdState(id);
+  }, []);
+  // v2: where the canvas looks, and the last camera of each view the user left.
+  const [camera, setCamera] = useState<CanvasCamera>("fit");
+  const viewMemory = useRef(new Map<string, CanvasCameraState>());
   const [openId, setOpenId] = useState<string | null>(null);
-  const [flyTarget, setFlyTarget] = useState<{
-    x: number;
-    y: number;
-    height: number;
-    zoom?: number;
-  } | null>(null);
+  const [flyTarget, setFlyTarget] = useState<FlyTarget | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   // Search index is deliberately NOT part of the initial load — it's fetched
@@ -252,8 +280,9 @@ export default function AtlasViewer() {
   const shownSearchRef = useRef<string | null>(null);
 
   // Keep URL in sync with viewport (replace — no new Back entries for pan/zoom)
+  const urlReady = data !== null && (activeMapId !== null || data.tree.ocean !== null);
   useEffect(() => {
-    if (!activeMapId || window.location.pathname !== viewerPathRef.current) return;
+    if (!urlReady || window.location.pathname !== viewerPathRef.current) return;
     replaceViewerSearch(
       serializeDeepLink({
         mapId: activeMapId,
@@ -263,7 +292,7 @@ export default function AtlasViewer() {
       }),
     );
     shownSearchRef.current = window.location.search;
-  }, [activeMapId, openId, viewCenter]);
+  }, [urlReady, activeMapId, openId, viewCenter]);
 
   // Load and Back/Forward read the viewport at call time, not at render.
   const hasDesktopAsideRef = useRef(hasDesktopAside);
@@ -272,24 +301,42 @@ export default function AtlasViewer() {
   }, [hasDesktopAside]);
 
   /** Show what the current URL names: one rule for load and Back/Forward (resolveDeepLink). */
-  const applyUrl = useCallback((project: AtlasProject, currentMapId: string | null) => {
-    shownSearchRef.current = window.location.search;
-    const r = resolveDeepLink(parseDeepLink(window.location.search), project, {
-      currentMapId,
-      defaultMapId: project.worlds[0]?.defaultMapId ?? project.maps[0]?.id ?? null,
-      hasDesktopAside: hasDesktopAsideRef.current,
-    });
-    setActiveMapId(r.mapId);
-    setOpenId(r.openId);
-    setMobilePanelOpen(r.openSheet);
-    if (r.fly) setFlyTarget(r.fly);
-  }, []);
+  const applyUrl = useCallback(
+    ({ project, tree }: ViewerState, currentMapId: string | null) => {
+      shownSearchRef.current = window.location.search;
+      const r = resolveDeepLink(parseDeepLink(window.location.search), project, {
+        currentMapId,
+        defaultMapId: project.worlds[0]?.defaultMapId ?? project.maps[0]?.id ?? null,
+        hasDesktopAside: hasDesktopAsideRef.current,
+        ocean: oceanOption(tree),
+      });
+      setActiveMapId(r.mapId);
+      setOpenId(r.openId);
+      setMobilePanelOpen(r.openSheet);
+      if (!tree.ocean) {
+        if (r.fly) setFlyTarget(r.fly);
+        return;
+      }
+      // v2: the camera is the canvas's. Same view and no point named: leave it where it is.
+      const sameView = r.mapId === currentMapId;
+      if (r.fly) {
+        const cam = cameraAt(r.fly, sameView ? keepZoom(viewCenterRef.current) : 0);
+        setCamera(cam);
+        handleViewChange(cam.center[0], cam.center[1], cam.zoom);
+      } else if (!sameView) {
+        setCamera("fit");
+        setViewCenter(null);
+        viewCenterRef.current = null;
+      }
+    },
+    [setActiveMapId, handleViewChange],
+  );
 
   // Back navigation: restore entity/map when the user presses Back
   const popStateHandler = useCallback(() => {
     if (!data || window.location.pathname !== viewerPathRef.current) return;
     if (window.location.search === shownSearchRef.current) return;
-    applyUrl(data.project, activeMapId);
+    applyUrl(data, activeMapId);
   }, [data, activeMapId, applyUrl]);
 
   useEffect(() => {
@@ -303,8 +350,9 @@ export default function AtlasViewer() {
     loadAtlasContent(true)
       .then((project) => {
         setError(null);
-        setData({ project });
-        applyUrl(project, null);
+        const loaded = { project, tree: buildMapTree(project) };
+        setData(loaded);
+        applyUrl(loaded, null);
       })
       .catch((e: Error) => setError(e.message));
   }, [applyUrl]);
@@ -327,9 +375,16 @@ export default function AtlasViewer() {
   }, [error, retryLoad]);
 
   const activeMap: MapDocument | undefined = useMemo(
-    () => data?.project.maps.find((m) => m.id === activeMapId),
+    () =>
+      data?.tree.ocean
+        ? activeMapId !== null
+          ? data.tree.byId.get(activeMapId)?.map
+          : undefined
+        : data?.project.maps.find((m) => m.id === activeMapId),
     [data, activeMapId],
   );
+  const isV2 = !!data?.tree.ocean;
+  const view: TreeView = activeMap ? { kind: "map", mapId: activeMap.id } : { kind: "ocean" };
   // The offline menu and banner describe what is stored for this map.
   const offlineMap: OfflineMap | null = useMemo(() => {
     if (!activeMap) return null;
@@ -348,11 +403,16 @@ export default function AtlasViewer() {
     return m;
   }, [data]);
 
-  const worldCredits = data?.project.worlds[0]?.credits;
-  const worldAssetCredits = data?.project.worlds[0]?.assetCredits;
+  // v1: the first world's. v2: the world of the map in view, on the ocean every world's.
+  const { credits: worldCredits, assetCredits: worldAssetCredits } = useMemo(
+    () => (data ? creditsForView(data.project, activeMap ?? null) : {}),
+    [data, activeMap],
+  );
   const worldName = data?.project.worlds[0]?.name ?? "Atlas";
   /** The loaded atlas's own name: its campaign in a v2 build, else its world. */
   const siteName = data?.project.campaign?.name ?? worldName;
+  /** What the toolbar and panel call the atlas: the campaign in v2, as `siteName`. */
+  const titleName = isV2 ? siteName : worldName;
 
   /** A few entries to offer in the reading panel before anything is opened. */
   const starterEntries = useMemo(() => {
@@ -392,37 +452,124 @@ export default function AtlasViewer() {
     if (rulerActive) dismissPeek();
   }, [rulerActive, dismissPeek]);
 
+  /**
+   * v2: show `next` at `cam` ("memory": where the user left that view, else
+   * fitted). `push` adds a Back entry: a handoff, a click into a map, a crumb;
+   * panning and zooming inside a view only replace it (the sync effect above).
+   */
+  const goView = useCallback(
+    (next: TreeView, cam: CanvasCamera | "memory", push: boolean) => {
+      const mapId = next.kind === "map" ? next.mapId : null;
+      const c = cam === "memory" ? (viewMemory.current.get(viewKeyOf(mapId)) ?? "fit") : cam;
+      const vc = c === "fit" ? null : { x: c.center[0], y: c.center[1], zoom: c.zoom };
+      if (push) {
+        pushViewerSearch(
+          serializeDeepLink({
+            mapId,
+            entityId: openId,
+            center: vc ? { x: vc.x, y: vc.y } : null,
+            zoom: vc?.zoom ?? null,
+          }),
+        );
+      }
+      shownSearchRef.current = window.location.search;
+      setActiveMapId(mapId);
+      setCamera(c);
+      setViewCenter(vc);
+      viewCenterRef.current = vc;
+    },
+    [openId, setActiveMapId],
+  );
+
+  /** v2: the canvas reports the camera of the view on screen; remember it per view. */
+  const onCanvasCamera = useCallback(
+    (c: CanvasCameraState) => {
+      viewMemory.current.set(viewKeyOf(activeMapIdRef.current), c);
+      setCamera(c);
+      handleViewChange(c.center[0], c.center[1], c.zoom);
+    },
+    [handleViewChange],
+  );
+  const onCanvasViewChange = useCallback(
+    (next: TreeView, c: CanvasCameraState) => goView(next, c, true),
+    [goView],
+  );
+  const onCanvasEnterMap = useCallback(
+    (id: string) => goView({ kind: "map", mapId: id }, "fit", true),
+    [goView],
+  );
+
+  /** Put a placement's spot in view (a pin's "show on map", wander). v1 flies, v2 sets the camera. */
+  const showPlacement = useCallback(
+    (p: { mapId: string; x: number; y: number }, push: boolean) => {
+      const m = data?.project.maps.find((mm) => mm.id === p.mapId);
+      if (!data || !m) return;
+      if (!data.tree.ocean) {
+        setActiveMapId(p.mapId);
+        setFlyTarget({ x: p.x, y: p.y, height: m.height });
+        return;
+      }
+      if (!data.tree.byId.has(p.mapId)) return;
+      const same = activeMapIdRef.current === p.mapId;
+      const cam = cameraAt(
+        { x: p.x, y: p.y, height: m.height },
+        same ? keepZoom(viewCenterRef.current) : 0,
+      );
+      // A spot on the map already in view is a pan: replace. Another map is a step: push.
+      goView({ kind: "map", mapId: p.mapId }, cam, push && !same);
+    },
+    [data, goView, setActiveMapId],
+  );
+
   const openEntity = useCallback(
     (id: string, fly = true) => {
+      const activeId = activeMapIdRef.current;
+      // Same rule as a URL naming this map and entity with no center: stay on
+      // the active map and fly to the entity's placement there, if it has one.
+      // v2 on the ocean: the entity's map (a child map too; no cross-map fly yet).
+      const ocean = data?.tree.ocean;
+      const r =
+        data && (activeId || ocean)
+          ? resolveDeepLink(
+              { mapId: activeId, entityId: id, center: null, zoom: null },
+              data.project,
+              {
+                currentMapId: activeId,
+                defaultMapId: activeId,
+                hasDesktopAside,
+                ocean: oceanOption(data.tree),
+              },
+            )
+          : null;
+      const switching = !!ocean && !!r && r.mapId !== activeId;
+      const cam = switching && fly && r?.fly ? cameraAt(r.fly, 0) : null;
       // Push a history entry so Back returns to the previous entity (or no-entity state)
-      const vc = viewCenterRef.current;
+      const vc = switching ? null : viewCenterRef.current;
       pushViewerSearch(
         serializeDeepLink({
-          mapId: activeMapId,
+          mapId: switching ? r.mapId : activeId,
           entityId: id,
-          center: vc ? { x: vc.x, y: vc.y } : null,
-          zoom: vc?.zoom ?? null,
+          center: cam ? { x: cam.center[0], y: cam.center[1] } : vc ? { x: vc.x, y: vc.y } : null,
+          zoom: cam ? cam.zoom : (vc?.zoom ?? null),
         }),
       );
       shownSearchRef.current = window.location.search;
-      // Same rule as a URL naming this map and entity with no center: stay on
-      // the active map and fly to the entity's placement there, if it has one.
-      const r =
-        data && activeMapId
-          ? resolveDeepLink(
-              { mapId: activeMapId, entityId: id, center: null, zoom: null },
-              data.project,
-              { currentMapId: activeMapId, defaultMapId: activeMapId, hasDesktopAside },
-            )
-          : null;
       setOpenId(id);
       // Only open the bottom sheet on viewports where the desktop aside
       // isn't rendered; otherwise the Radix overlay covers the screen
       // while the panel is the user-visible target (the gray-screen bug).
       if (!hasDesktopAside) setMobilePanelOpen(true);
-      if (fly && r?.fly) setFlyTarget(r.fly);
+      if (switching) {
+        goView({ kind: "map", mapId: r.mapId! }, cam ?? "fit", false);
+      } else if (fly && r?.fly) {
+        if (ocean) {
+          setCamera(cameraAt(r.fly, keepZoom(viewCenterRef.current)));
+        } else {
+          setFlyTarget(r.fly);
+        }
+      }
     },
-    [data, hasDesktopAside, activeMapId],
+    [data, hasDesktopAside, goView],
   );
 
   // "Discovered" = an entity panel opened by ANY means (click, search, wander,
@@ -445,11 +592,16 @@ export default function AtlasViewer() {
       return;
     }
     setWanderEmpty(false);
+    if (data.tree.ocean) {
+      showPlacement(target, false);
+      openEntity(target.entityId, false);
+      return;
+    }
     if (target.mapId !== activeMapId) setActiveMapId(target.mapId);
     const targetMap = data.project.maps.find((m) => m.id === target.mapId);
     openEntity(target.entityId, false);
     if (targetMap) setFlyTarget({ x: target.x, y: target.y, height: targetMap.height });
-  }, [data, visited, activeMapId, openEntity]);
+  }, [data, visited, activeMapId, openEntity, showPlacement, setActiveMapId]);
 
   useEffect(() => {
     if (!wanderEmpty) return;
@@ -567,7 +719,7 @@ export default function AtlasViewer() {
   // Atlas loaded but no map to render — either world.yaml has zero maps or
   // every map was filtered out. Give the user useful guidance instead of an
   // indefinite loading spinner.
-  if (!activeMap) {
+  if (!activeMap && !isV2) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-background text-foreground p-6 text-center">
         <div className="max-w-md space-y-3">
@@ -605,9 +757,51 @@ export default function AtlasViewer() {
   }
 
   const openEntity_ = openId ? (entityById.get(openId) ?? null) : null;
+  const hasChildFrames =
+    !!activeMap && (data.tree.byId.get(activeMap.id)?.children.length ?? 0) > 0;
+  const showLegend = isV2 && (!activeMap || hasChildFrames);
   const openPlacements = openEntity_
     ? data.project.placements.filter((p) => p.entityId === openEntity_.id)
     : [];
+
+  // Everything a map view draws over its images; the same for both outputs. v2's canvas
+  // draws the images itself.
+  const mapLayers = activeMap ? (
+    <>
+      <ScaleBarController scale={activeMap.scale} onChange={setScaleBar} />
+      <SoundscapeLayer map={activeMap} />
+      <RulerLayer
+        active={rulerActive}
+        mapId={activeMap.id}
+        mapHeight={activeMap.height}
+        scale={activeMap.scale}
+      />
+
+      {/* Horizontal wrap: render copies at -W, 0, +W when wrapX enabled */}
+      {(activeMap.wrapX ? [-activeMap.width, 0, activeMap.width] : [0]).map((dx) => (
+        <WrappedWorld
+          key={`wrap-${dx}`}
+          dx={dx}
+          map={activeMap}
+          placements={placementsOnMap}
+          entityById={entityById}
+          showGrid={showGrid}
+          onOpenEntity={openEntity}
+          visited={visited}
+          openId={openId}
+          onPinPeek={onPinPeek}
+          onPinPeekLeave={peekCtl.onTriggerLeave}
+          peekEnabled={pointerFine}
+          rulerActive={rulerActive}
+          showImageLayers={!isV2}
+        />
+      ))}
+
+      {/* (markers, layers, regions, routes, fog, grid handled inside WrappedWorld) */}
+
+      <AtlasMinimap map={activeMap} layers={activeMap.layers} />
+    </>
+  ) : null;
 
   return (
     <SoundSettingsProvider>
@@ -615,11 +809,13 @@ export default function AtlasViewer() {
         <a href="#atlas-main" className="skip-to-main">
           Skip to map
         </a>
-        <header className="atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border">
+        <header
+          className={`atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border ${isV2 ? "flex-wrap md:flex-nowrap" : ""}`}
+        >
           <AtlasNavMenu
             publishedAt={data.project.publishedAt}
             showCredits={showCredits}
-            worldName={worldName}
+            worldName={titleName}
           />
           {/* The name used to be `hidden sm:inline`, so a phone showed only the
               compass — someone opening a shared link couldn't see which world
@@ -629,10 +825,16 @@ export default function AtlasViewer() {
             className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2 min-w-0"
           >
             <Compass className="h-5 w-5 shrink-0" aria-hidden="true" />
-            <span className="truncate max-w-[8.5rem] sm:max-w-none">{worldName}</span>
+            <span className="truncate max-w-[8.5rem] sm:max-w-none">{titleName}</span>
           </Link>
-          <div className="flex-1" />
-          {data.project.maps.length > 1 && (
+          {isV2 ? (
+            <div className="order-last basis-full min-w-0 md:order-none md:basis-auto md:flex-1 md:pl-3">
+              <MapBreadcrumb tree={data.tree} view={view} onGo={(v) => goView(v, "memory", true)} />
+            </div>
+          ) : (
+            <div className="flex-1" />
+          )}
+          {!isV2 && activeMap && data.project.maps.length > 1 && (
             <Select
               value={activeMap.id}
               onValueChange={(id) => {
@@ -652,7 +854,7 @@ export default function AtlasViewer() {
               </SelectContent>
             </Select>
           )}
-          {activeMap.grid && (
+          {activeMap?.grid && (
             <Button
               variant={(showGrid ?? activeMap.grid.enabled !== false) ? "secondary" : "ghost"}
               size="sm"
@@ -732,103 +934,99 @@ export default function AtlasViewer() {
           <main
             id="atlas-main"
             className="flex-1 relative min-h-0"
-            aria-label={`Interactive map: ${activeMap.name}. Use arrow keys to pan, plus and minus to zoom.`}
+            aria-label={`Interactive map: ${activeMap?.name ?? "Ocean"}. Use arrow keys to pan, plus and minus to zoom.`}
           >
-            <OceanBackground map={activeMap} />
-            <MapContainer
-              crs={FlatCRS}
-              center={[activeMap.height / 2, activeMap.width / 2]}
-              zoom={-2}
-              minZoom={-6}
-              maxZoom={4}
-              zoomControl
-              keyboard
-              keyboardPanDelta={80}
-              attributionControl={false}
-              style={{
-                width: "100%",
-                height: "100%",
-                background:
-                  activeMap.water?.enabled === false
-                    ? (activeMap.oceanColor ?? "#18313f")
-                    : "transparent",
-                cursor: rulerActive ? "crosshair" : undefined,
-              }}
-            >
-              <MapController flyTo={flyTarget} />
-              <FitMapOnOpen
-                mapId={activeMap.id}
-                mapWidth={activeMap.width}
-                mapHeight={activeMap.height}
-                skip={flyTarget !== null}
-              />
-              <FitBoundsController
-                mapWidth={activeMap.width}
-                mapHeight={activeMap.height}
-                fitRef={fitMapRef}
-              />
-              <MaxBoundsController
-                mapId={activeMap.id}
-                mapWidth={activeMap.width}
-                mapHeight={activeMap.height}
-                wrapX={activeMap.wrapX}
-              />
-              <ViewSyncController
-                mapId={activeMap.id}
-                mapHeight={activeMap.height}
-                onViewChange={handleViewChange}
-              />
-              <ScaleBarController scale={activeMap.scale} onChange={setScaleBar} />
-              <SoundscapeLayer map={activeMap} />
-              <RulerLayer
-                active={rulerActive}
-                mapId={activeMap.id}
-                mapHeight={activeMap.height}
-                scale={activeMap.scale}
-              />
+            {isV2 && (
+              <AtlasCanvas
+                tree={data.tree}
+                view={view}
+                camera={camera}
+                className={rulerActive ? "atlas-ruler" : ""}
+                onCameraChange={onCanvasCamera}
+                onEnterMap={onCanvasEnterMap}
+                onViewChange={onCanvasViewChange}
+              >
+                {mapLayers}
+              </AtlasCanvas>
+            )}
+            {showLegend && (
+              <div className="atlas-canvas-legend pointer-events-none absolute left-14 top-3 z-[500] rounded border border-border bg-background/85 px-2 py-1 text-xs text-muted-foreground">
+                <span aria-hidden="true">▭</span> map: zoom in or click
+              </div>
+            )}
+            {!isV2 && activeMap && (
+              <>
+                <OceanBackground map={activeMap} />
+                <MapContainer
+                  crs={FlatCRS}
+                  center={[activeMap.height / 2, activeMap.width / 2]}
+                  zoom={-2}
+                  minZoom={-6}
+                  maxZoom={4}
+                  zoomControl
+                  keyboard
+                  keyboardPanDelta={80}
+                  attributionControl={false}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    background:
+                      activeMap.water?.enabled === false
+                        ? (activeMap.oceanColor ?? "#18313f")
+                        : "transparent",
+                    cursor: rulerActive ? "crosshair" : undefined,
+                  }}
+                >
+                  <MapController flyTo={flyTarget} />
+                  <FitMapOnOpen
+                    mapId={activeMap.id}
+                    mapWidth={activeMap.width}
+                    mapHeight={activeMap.height}
+                    skip={flyTarget !== null}
+                  />
+                  <FitBoundsController
+                    mapWidth={activeMap.width}
+                    mapHeight={activeMap.height}
+                    fitRef={fitMapRef}
+                  />
+                  <MaxBoundsController
+                    mapId={activeMap.id}
+                    mapWidth={activeMap.width}
+                    mapHeight={activeMap.height}
+                    wrapX={activeMap.wrapX}
+                  />
+                  <ViewSyncController
+                    mapId={activeMap.id}
+                    mapHeight={activeMap.height}
+                    onViewChange={handleViewChange}
+                  />
+                  {mapLayers}
+                </MapContainer>
+              </>
+            )}
 
-              {/* Horizontal wrap: render copies at -W, 0, +W when wrapX enabled */}
-              {(activeMap.wrapX ? [-activeMap.width, 0, activeMap.width] : [0]).map((dx) => (
-                <WrappedWorld
-                  key={`wrap-${dx}`}
-                  dx={dx}
+            {activeMap && (
+              <>
+                <MapCreditOverlay
                   map={activeMap}
-                  placements={placementsOnMap}
-                  entityById={entityById}
-                  showGrid={showGrid}
-                  onOpenEntity={openEntity}
-                  visited={visited}
-                  openId={openId}
-                  onPinPeek={onPinPeek}
-                  onPinPeekLeave={peekCtl.onTriggerLeave}
-                  peekEnabled={pointerFine}
-                  rulerActive={rulerActive}
+                  assetCredits={worldAssetCredits}
+                  credits={worldCredits}
+                  clearanceBottomPx={
+                    12 /* minimap's own bottom-3 offset */ + minimapHeightFor(activeMap) + 8
+                  }
                 />
-              ))}
 
-              {/* (markers, layers, regions, routes, fog, grid handled inside WrappedWorld) */}
+                {/* Pin legend — top-right map corner, collapsed by default */}
+                <PinLegend placements={placementsOnMap} entityById={entityById} />
 
-              <AtlasMinimap map={activeMap} layers={activeMap.layers} />
-            </MapContainer>
-
-            <MapCreditOverlay
-              map={activeMap}
-              assetCredits={worldAssetCredits}
-              credits={worldCredits}
-              clearanceBottomPx={
-                12 /* minimap's own bottom-3 offset */ + minimapHeightFor(activeMap) + 8
-              }
-            />
-
-            {/* Pin legend — top-right map corner, collapsed by default */}
-            <PinLegend placements={placementsOnMap} entityById={entityById} />
-
-            <SoundControl
-              hasSoundscape={
-                activeMap.soundscape?.enabled !== false &&
-                (activeMap.soundscape?.areas?.length ?? 0) > 0
-              }
-            />
+                <SoundControl
+                  hasSoundscape={
+                    activeMap.soundscape?.enabled !== false &&
+                    (activeMap.soundscape?.areas?.length ?? 0) > 0
+                  }
+                />
+              </>
+            )}
 
             {/* Wander button + discovery meter — bottom-left map overlay */}
             <WanderControl
@@ -844,7 +1042,7 @@ export default function AtlasViewer() {
             )}
 
             {/* Scale bar — bottom-center map overlay */}
-            {scaleBar && (
+            {activeMap && scaleBar && (
               <div
                 className="atlas-scale-bar absolute bottom-3 left-1/2 -translate-x-1/2 z-[500] pointer-events-none select-none"
                 role="note"
@@ -866,7 +1064,7 @@ export default function AtlasViewer() {
             {/* Reset view — bottom-right map corner */}
             <button
               type="button"
-              onClick={() => fitMapRef.current?.()}
+              onClick={() => (isV2 ? setCamera("fit") : fitMapRef.current?.())}
               className="absolute bottom-3 right-3 z-[500] h-8 w-8 rounded bg-background/90 border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               aria-label="Reset map view"
               title="Reset view (fit map to screen)"
@@ -897,18 +1095,14 @@ export default function AtlasViewer() {
                 entityById={entityById}
                 onOpenEntity={openEntity}
                 onClose={() => setOpenId(null)}
-                onShowOnMap={(p) => {
-                  setActiveMapId(p.mapId);
-                  const m = data.project.maps.find((mm) => mm.id === p.mapId);
-                  if (m) setFlyTarget({ x: p.x, y: p.y, height: m.height });
-                }}
+                onShowOnMap={(p) => showPlacement(p, true)}
                 onPeek={(id, rect) => peekCtl.onTriggerEnter(id, rect)}
                 onPeekLeave={peekCtl.onTriggerLeave}
                 // Desktop only: the mobile sheet opens because an entity was
                 // picked, so its empty state is never on screen.
                 emptyState={
                   <ReadingPanelWelcome
-                    worldName={worldName}
+                    worldName={titleName}
                     starters={starterEntries}
                     onOpenEntity={openEntity}
                   />
@@ -949,9 +1143,7 @@ export default function AtlasViewer() {
                 onOpenEntity={openEntity}
                 onClose={() => setMobilePanelOpen(false)}
                 onShowOnMap={(p) => {
-                  setActiveMapId(p.mapId);
-                  const m = data.project.maps.find((mm) => mm.id === p.mapId);
-                  if (m) setFlyTarget({ x: p.x, y: p.y, height: m.height });
+                  showPlacement(p, true);
                   setMobilePanelOpen(false);
                 }}
                 onPeek={(id, rect) => peekCtl.onTriggerEnter(id, rect)}
@@ -971,7 +1163,7 @@ export default function AtlasViewer() {
               query={query}
               setQuery={setQuery}
               index={searchIndex}
-              placements={placementsOnMap}
+              placements={isV2 && !activeMap ? data.project.placements : placementsOnMap}
               onPick={(id, fly) => {
                 setSearchOpen(false);
                 setQuery("");
@@ -1019,7 +1211,10 @@ export default function AtlasViewer() {
                   const id = peekCtl.peek!.entityId;
                   peekCtl.dismiss();
                   const pl = data.project.placements.find((p) => p.entityId === id);
-                  if (pl) {
+                  if (pl && isV2) {
+                    showPlacement(pl, false);
+                    openEntity(id, false);
+                  } else if (pl) {
                     if (pl.mapId !== activeMapId) setActiveMapId(pl.mapId);
                     const m = data.project.maps.find((mm) => mm.id === pl.mapId);
                     openEntity(id, false);
