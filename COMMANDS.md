@@ -59,6 +59,26 @@ The same command with `-- --config atlas.next.config.json`: publishes every camp
 
 Any campaign whose build or scan fails fails the whole publish.
 
+### `npm run atlas:serve:next` (the test world's sites, local only)
+
+Serves what `atlas:publish:next` built, unchanged: each campaign's `dist-campaigns/<id>/` on its
+own port (base `/`, so it is the site a deploy would upload), plus a campaign picker ("Test site
+only") on one more port. It prints the ports: the picker on 4300, campaigns on 4301, 4302, ... in
+the order `content-next/` lists them; `-- --port <n>` moves the picker to `<n>` and the campaigns
+after it. The preview pane's `atlas-campaigns-preview` (`.claude/launch.json`) runs it.
+
+- It binds `127.0.0.1` only and answers only `localhost`/`127.0.0.1` hosts.
+- A site port serves files of its own dir only: no `..` (raw or encoded), no backslashes, no link
+  that leaves the dir, no directory listing; an unknown path gets the site's `index.html`, except
+  a missing file name with an extension (`/assets/x.js`), which is a 404.
+- The picker lives in memory: it is never written into a site, and the command refuses to start
+  if any site holds the picker or another campaign's name.
+- It refuses, naming `atlas:publish:next`, when `dist-campaigns/` is missing, a campaign has no
+  site, a site dir is a link, or anything under `content-next/` (a file, or a directory, so a
+  deleted or renamed note counts) or `atlas.next.config.json` is newer than a site's
+  `atlas/atlas.json`.
+- The picker links to `http://127.0.0.1:<port>/`, the address it binds.
+
 ### `npm run atlas:build:player` · Windows: `bin/atlas-build-player.cmd`
 
 Step 2 alone. Use it to see in `public/atlas/atlas.json` exactly what players get.

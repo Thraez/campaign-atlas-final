@@ -1,6 +1,6 @@
 # R-34 Serve the test world's campaign sites locally, with a picker
 
-Status: ready-for-agent
+Status: in-review
 Blocked by: R-30 (its `schemaVersion` guard fix, so a v2 site loads at all)
 Size: S
 Branch: `rebuild-r34-local-campaign-sites`
@@ -50,3 +50,41 @@ players arrive by their own campaign's link (ADR-0007, phase H).
 ## Out of scope
 
 Hosting (H-01..H-04), the editor's preview as a campaign (E11, phase 6).
+
+## Build notes
+
+- `scripts/atlas/serveCampaigns.ts` (logic) and `scripts/atlas/serve-next.ts` (CLI);
+  `npm run atlas:serve:next [-- --port <n>]`. Campaigns and their dirs come from the scan
+  registry's `campaignArtifacts` (the dirs the publish builds), names from the loaded model.
+- Ports: picker 4300, `main` 4301, `sandbox` 4302 (content order). The picker's links and the
+  printed URLs use `http://127.0.0.1:<port>/` (review call: the server binds IPv4 only), not the
+  ticket's `localhost`. `atlas-campaigns-preview` in
+  `.claude/launch.json` runs it with `port` 4300.
+- Paths: only GET/HEAD; 400 for a backslash, NUL, bad encoding, a non-origin-form target or a
+  `.`/`..` segment raw or decoded (including double-encoded `%252e%252e`); 403 for a file whose
+  real path is outside the site (links); directories and unknown paths get the site's
+  `index.html` (no listing). Every port refuses a `Host` other than `localhost:<port>` or
+  `127.0.0.1:<port>`. The picker port serves only `/` from memory, with a `default-src 'none'` CSP.
+  A missing name with an extension (`/assets/x.js`) is a 404, not the SPA index (review), so a
+  missing asset shows.
+- Refusals (`ServeRefusal`, exit 2, naming `npm run atlas:publish:next`): no `dist-campaigns/`, a
+  listed campaign without a site dir or `atlas/atlas.json`, a site dir or `dist-campaigns/` that is
+  a link (lstat), and anything newer than a site's `atlas/atlas.json`: a file or a directory under
+  the content root (the root included, so a deleted or renamed note counts) or the config file
+  (review must-fix). Before listening it also runs `siteLeaks` on every site (the
+  picker's marker and note, other campaigns' reportable names, raw and decoded) and refuses on a hit.
+- Tests: `scripts/atlas/serveCampaigns.test.ts` (46): refusals, path resolution (traversal raw,
+  encoded, double-encoded, backslashes, NUL, links out), raw-socket requests against running
+  servers (fallback, no listing, `.atlas-campaigns/` unreachable, host and method checks, not
+  reachable on `::1`), the picker page, and that serving leaves every site dir byte-identical and
+  free of the picker and the other campaign's name.
+- Checked for real: `atlas:publish:next` (44 scans clean), then the server: picker, `main` and
+  `sandbox` load in the preview pane past the schema guard (the old viewer draws the map; the
+  ocean is R-33). The preview pane's browser fails to register the service worker (`sw.js` is
+  served 200 as JavaScript; the pane's own limit). `preview_start` reads the main checkout's
+  `launch.json`, so until this merges the entry is reachable only from the worktree.
+- Follow-up (not built; `publishPlan.ts` stays unchanged here): the stale check proves the sites
+  are newer than the content, not that the scans passed on them. A "scans passed" stamp written
+  by the publish, which the server would require, would close that gap.
+
+Follow-up (review, not blocking): a direct load of `/atlas/tag/<tag>` with a dotted tag (e.g. `v1.2`) gets 404 locally; limit the 404 rule to asset folders or known extensions if that ever matters. No tag in `content-next/` has a dot today.
