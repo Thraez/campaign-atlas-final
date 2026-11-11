@@ -10,6 +10,10 @@ import { whenMapHasSize } from "./whenMapHasSize";
  * `skip` (a pending deep-link fly) leaves the view alone so the fly target
  * wins. The min zoom is lowered if the whole map would not fit above it. The fit waits until the container has a size.
  *
+ * `bounds` fits an area other than the whole map (the shared canvas's ocean
+ * fits the placed maps, R-31); `mapWidth` and `mapHeight` are then that area's
+ * size. Its value is read when `mapId` changes, like the rest.
+ *
  * Player-safe: no editor imports. Used by the viewer and the editor.
  */
 export function FitMapOnOpen({
@@ -17,14 +21,20 @@ export function FitMapOnOpen({
   mapWidth,
   mapHeight,
   skip = false,
+  bounds,
 }: {
   mapId: string;
   mapWidth: number;
   mapHeight: number;
   skip?: boolean;
+  bounds?: LatLngBoundsLiteral;
 }) {
   const map = useMap();
   const seenMapIdRef = useRef<string | null>(null);
+  const boundsRef = useRef(bounds);
+  useEffect(() => {
+    boundsRef.current = bounds;
+  });
 
   useEffect(() => {
     if (seenMapIdRef.current === mapId) return;
@@ -32,7 +42,7 @@ export function FitMapOnOpen({
     // map had no size is rescheduled by the next run of this effect.
     return whenMapHasSize(map, () => {
       seenMapIdRef.current = mapId;
-      const bounds: LatLngBoundsLiteral = [
+      const fit: LatLngBoundsLiteral = boundsRef.current ?? [
         [0, 0],
         [mapHeight, mapWidth],
       ];
@@ -44,7 +54,7 @@ export function FitMapOnOpen({
       const raw = Math.log2(ratio);
       const fitZoom = snap ? Math.floor(raw / snap) * snap : raw;
       if (Number.isFinite(fitZoom) && fitZoom < map.getMinZoom()) map.setMinZoom(fitZoom);
-      if (!skip) map.fitBounds(bounds, { animate: false });
+      if (!skip) map.fitBounds(fit, { animate: false });
     });
   }, [mapId, mapWidth, mapHeight, skip, map]);
 

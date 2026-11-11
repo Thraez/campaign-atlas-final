@@ -13,6 +13,10 @@ const AtlasViewer = lazy(() => import("./pages/AtlasViewer.tsx"));
 const AtlasPlacementEditor = __INCLUDE_EDITOR__
   ? lazy(() => import("./pages/AtlasPlacementEditor.tsx"))
   : null;
+// The shared canvas's dev harness (R-31): same gate as the editor route.
+const CanvasHarness = __INCLUDE_EDITOR__
+  ? lazy(() => import("./atlas/canvas-harness/CanvasHarnessPage.tsx"))
+  : null;
 const AtlasTimeline = lazy(() => import("./pages/AtlasTimeline.tsx"));
 const AtlasBrowse = lazy(() => import("./pages/AtlasBrowse.tsx"));
 const AtlasCredits = lazy(() => import("./pages/AtlasCredits.tsx"));
@@ -53,6 +57,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/atlas" element={<AtlasViewer />} />
             {AtlasPlacementEditor && <Route path="/atlas/edit" element={<AtlasEditorRoute />} />}
+            {CanvasHarness && <Route path="/__canvas" element={<CanvasHarness />} />}
             <Route path="/atlas/timeline" element={<AtlasTimeline />} />
             <Route path="/atlas/browse" element={<AtlasBrowse mode="browse" />} />
             <Route path="/atlas/tag/:tag" element={<AtlasBrowse mode="tag" />} />

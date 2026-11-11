@@ -25,3 +25,18 @@ export const DEV_API_PATHS = {
   publishPush: "/__atlas/publish-push",
   publishCheck: "/__atlas/publish-check",
 } as const;
+
+/**
+ * The shared canvas's dev harness (R-31): the page and the read-only server of
+ * the v2 campaign stores it loads. Served by
+ * `scripts/vite-plugin-campaign-stores.ts`, dev server only, and fingerprinted
+ * like the routes above, so a player build that carries them fails the scan.
+ */
+export const DEV_CANVAS_PATHS = {
+  /** GET: `{ campaigns: string[] }`, the v2 campaign list. */
+  campaignStores: "/__atlas/campaign-stores",
+  /** GET `<prefix><id>/<file>`: one file of `<outputDir>/<id>/atlas/`. */
+  campaignStorePrefix: "/__atlas/campaign-store/",
+  /** The harness page (client route, `__INCLUDE_EDITOR__` only). */
+  canvasPage: "/__canvas",
+} as const;

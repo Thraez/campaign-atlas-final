@@ -13,6 +13,7 @@
  * - atlas/import: Obsidian/markdown import, staging and the map import wizard.
  * - atlas/publish: build report, published diff and the publish flow.
  * - atlas/session: the editor's IndexedDB session snapshot, save status and discard modal.
+ * - atlas/canvas-harness: the shared canvas's dev harness page (`/__canvas`, R-31).
  * - pages/AtlasPlacementEditor.tsx: the editor page itself.
  *
  * Known gap: some editor-only files sit in mixed folders that the player also uses, so they are
@@ -31,6 +32,7 @@ export const EDITOR_ONLY_PATHS: readonly string[] = [
   "atlas/import/",
   "atlas/publish/",
   "atlas/session/",
+  "atlas/canvas-harness/",
   "pages/AtlasPlacementEditor.tsx",
 ];
 

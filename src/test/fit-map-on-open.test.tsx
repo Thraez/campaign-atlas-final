@@ -105,4 +105,12 @@ describe("FitMapOnOpen", () => {
     expect(fake.setMinZoom).toHaveBeenCalledWith(-9);
     expect(fake.fitBounds).not.toHaveBeenCalled();
   });
+  it("fits a given area instead of the whole map (the shared canvas, R-31)", () => {
+    const area: [[number, number], [number, number]] = [
+      [100, 200],
+      [900, 1400],
+    ];
+    render(<FitMapOnOpen mapId="ocean" mapWidth={1200} mapHeight={800} bounds={area} />);
+    expect(fake.fitBounds).toHaveBeenCalledWith(area, { animate: false });
+  });
 });

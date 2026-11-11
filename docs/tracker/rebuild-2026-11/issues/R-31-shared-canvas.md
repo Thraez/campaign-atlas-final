@@ -1,6 +1,6 @@
 # R-31 The shared canvas: the ocean and one map
 
-Status: ready-for-agent
+Status: in-review
 Blocked by: R-30
 Size: M
 Branch: `rebuild-r31-shared-canvas`
@@ -56,3 +56,100 @@ show one flat map. Build `AtlasCanvas` in `src/atlas/canvas/`, on R-30's tree.
 
 The zoom handoff between views (R-32), the breadcrumb and URL (R-33), region cards on the ocean
 (phase 5), tiles (phase T).
+
+## Build notes
+
+Built on `rebuild-r31-shared-canvas`, on R-30 (merged in #143; origin/main merged into the branch).
+
+**What's where.** `src/atlas/canvas/`: `AtlasCanvas.tsx` (the component), `CanvasLayers.tsx` (ocean
+maps, child frames, outlines and labels), `CanvasCamera.tsx` (explicit camera and `moveend`
+reports), `canvasGeometry.ts` (pure), `seaStyle.ts`. The viewer's image drawing moved out of
+`WrappedWorld` into `src/atlas/map/MapImageLayers.tsx`, so the canvas reuses it rather than copying.
+Dev harness: `src/atlas/canvas-harness/` (routed at `/__canvas` behind `__INCLUDE_EDITOR__`, and in
+`EDITOR_ONLY_PATHS`), fed by `scripts/vite-plugin-campaign-stores.ts`.
+
+**Rotation approach: one `SVGOverlay` per top-level map.** Leaflet positions and scales the `<svg>`
+the same way it does an image overlay, through pan, zoom and the zoom animation. The svg's viewBox
+is in ocean pixels, and the map's images sit in a `<g transform="rotate(r cx cy)">`. So rotation is
+plain SVG: it needs no code per frame and no new dependency, and it uses the same about-the-centre,
+clockwise convention as R-30's `mapToOcean`. The rejected options:
+- `ImageOverlay` can't rotate.
+- A CSS transform on the image fights Leaflet's own transform during zoom.
+- A rotated-image plugin is a new dependency.
+- A canvas layer redraws on every move.
+
+The click target is a separate, invisible `Polygon` over `mapToOcean`'s corners, so hit-testing
+follows the rotation exactly. The real-Leaflet check confirmed it: hovering just outside the
+rotated corner doesn't register, and just inside it does.
+
+**Real-Leaflet check** (dev server, preview pane). Screenshots are in `previews/r31/`
+(gitignored, in the worktree):
+- `1-main-ocean.jpg`: main ocean, Quessaly and Skerrow Isles, sea `default`.
+- `2-main-quessaly-hover-oskmark.jpg`: map view, Oskmark frame highlighted on hover.
+- `3-main-oskmark.jpg`: Brindlecross and Tallowford frames.
+- `4-main-rotated-ocean-15.jpg`: `rotated=1`, Quessaly turned 15°.
+- `5-main-rotated-ocean-zoomed.jpg`: the same, zoomed in. The rotation holds and the outline
+  matches the image.
+- `6-main-rotated-frame-30.jpg`: the Oskmark frame at 30°.
+- `7-sandbox-ocean.jpg`, `8-sandbox-quessaly.jpg`, `9-sandbox-oskmark.jpg`: sandbox. One map, one
+  frame, and oskmark frames nothing.
+
+No console errors.
+
+**Tests**:
+- `src/test/canvas/atlas-canvas.test.tsx`: both views, per campaign, on the built test world; the
+  rotated fixture; an unknown id draws nothing and no children; click and hover; reduced motion;
+  an unknown sea style.
+- `canvas-imports.test.ts`: the import fence. The graph walker was moved to
+  `src/test/helpers/importGraph.ts` and is shared with the player import-graph test, which now also
+  asserts the harness is out of the player graph.
+- `campaign-store-server.test.ts`: traversal (raw and encoded), listing, unknown or `__proto__`
+  id, file types, symlink escape, loopback, read-only methods. It also checks the plugin is absent
+  from a production build's plugin list and that its paths are editor fingerprints.
+- `canvas-geometry.test.ts`.
+- One `FitMapOnOpen` case for the new `bounds`.
+
+**Small calls (provisional):**
+- New optional props on shared parts:
+  - `FitMapOnOpen` `bounds` (fit an area instead of the whole map);
+  - `OceanBackground` `reduceMotion`;
+  - `WrappedWorld` `showImageLayers` (default true), so a caller drawing pins etc. over the canvas
+    doesn't draw the images twice.
+- Map view draws the `wrapX` copies, as the viewer does.
+- `zoomSnap` is left at Leaflet's default (1), so a fit lands on a whole zoom. R-32 owns
+  fractional zoom.
+- A view the tree can't show (unknown id, or the ocean of a v1 atlas) renders the sea and nothing
+  else. Children aren't mounted either, since they'd have no coordinate space.
+- `onFrameHover` fires for ocean maps as well as child frames.
+- Labels are permanent, centred Leaflet tooltips styled as plain text.
+- Canvas images go in `tilePane`. The repo's `.leaflet-pane{z-index:1 !important}` makes DOM order
+  decide stacking, and this keeps caller layers above the images.
+- `camera: "fit"` re-fits each time the caller switches back to it.
+- An explicit camera uses `setView`. It animates unless motion is reduced or the view just changed.
+  A camera equal to the last reported one is ignored, so echoing `onCameraChange` back doesn't loop.
+- `ocean.sea`: only `default` exists. The lookup is own-key only, and anything else falls back to
+  `default`. The value never reaches the DOM.
+- Store server:
+  - reads `atlas.next.config.json`'s campaign list, from `campaignArtifacts` (`layout: "store"`);
+  - adds a list endpoint, `/__atlas/campaign-stores`;
+  - serves only a fixed set of file types;
+  - uses the raw request path, so `..` and `%2e%2e` get a 404 instead of being folded away and
+    handed to Vite;
+  - its paths are kept in a separate `DEV_CANVAS_PATHS` (not `DEV_API_PATHS`, whose entries must
+    all be save-plugin routes) and are added to the player-bundle editor fingerprints.
+
+**Review fix (camera report).** `onCameraChange` didn't hear the fitted camera: on a view change,
+and on first mount when the map already had a size, `FitMapOnOpen`'s synchronous `fitBounds` fired
+`moveend` before `CanvasCamera` had re-attached its listener (effect cleanups run first, then
+siblings in order). `CanvasCamera` now renders before `FitMapOnOpen`. Pinned by
+`src/test/canvas/canvas-camera.test.tsx` on a mock map that fires `moveend` from `fitBounds` /
+`setView`: the report after a fit (first mount and view change), an explicit `setView`, an echoed
+camera ignored, `animate: false` under reduced motion, a re-fit when the camera turns back to "fit".
+
+**Known limits, left for later (from the review):**
+- The ocean SVG clips any layer that extends past `map.width`/`map.height` (the viewBox is the
+  placement's box).
+- In a `wrapX` map view, child frames are drawn only on the middle copy (dx = 0), not on the wrap
+  copies.
+- The store middleware matches `/__atlas/...` and `/__canvas` without the base, so it won't match
+  when `ATLAS_BASE` is set on the dev server.

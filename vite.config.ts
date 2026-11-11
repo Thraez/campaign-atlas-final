@@ -9,6 +9,7 @@ import {
   precacheShippedOnlyPlugin,
 } from "./scripts/pwaPrecache";
 import { atlasSavePlugin } from "./scripts/vite-plugin-atlas-save";
+import { campaignStoresPlugin } from "./scripts/vite-plugin-campaign-stores";
 import { prunePlayerAudioPlugin } from "./scripts/vite-plugin-prune-player-audio";
 import { prunePlayerFilesPlugin } from "./scripts/vite-plugin-prune-player-files";
 import { sitePublicDir } from "./scripts/atlas/campaignSitePublicDir";
@@ -77,6 +78,10 @@ export default defineConfig(({ mode }) => {
       // Dev-only middleware that writes allowlisted source files to disk.
       // Auto-disabled in build modes via apply: "serve".
       atlasSavePlugin(),
+      // Dev-only, read-only server of the v2 campaign stores for the shared
+      // canvas's harness (/__canvas, R-31). Editor dev server only; after
+      // atlasSavePlugin so its /__atlas/ loopback gate runs first as well.
+      includeEditor && campaignStoresPlugin(),
       // Production-only PWA. devOptions.enabled = false so the service
       // worker is NEVER active during `vite dev` or in the Lovable editor
       // preview — registration is also iframe/host-guarded in src/main.tsx.
