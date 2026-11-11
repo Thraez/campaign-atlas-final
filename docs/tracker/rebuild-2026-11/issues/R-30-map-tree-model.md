@@ -44,11 +44,17 @@ later Phase 3 ticket uses.
 - `atlasGuard` (`src/atlas/content/atlasGuard.ts`) accepts and type-checks the optional v2 output
   fields (`ocean`, `campaign`, `parent`, `frame`, `enterZoom`) instead of passing them through
   unchecked; a malformed one is dropped, not fatal, with a test per field.
+- `parseAtlasProject` accepts `schemaVersion` up to `MAX_ATLAS_SCHEMA_VERSION` (2), not
+  `CURRENT_ATLAS_SCHEMA_VERSION` (1): today it refuses every v2 `atlas.json`, so the viewer can't
+  open one. Test: each campaign's real `content-next` `atlas.json` passes it.
+- Rotated fixtures (a frame at 30°, an ocean placement at 15°) in the geometry tests: the test
+  world has only rotation 0.
+- The viewer logs only a count of dropped maps, never their ids (the API returns ids for tests).
 - Tests use the real test-world output: build `content-next/` (`atlas:build:player -- --config
   atlas.next.config.json --campaign <id>`, as `src/test/build/campaign-stores.test.ts` does) and
   check the tree for both campaigns: `main` has ocean > `quessaly-world` > `oskmark` >
-  `brindlecross` and `tallowford`; `sandbox` has no `skerrow-isles`, `tallowford` or
-  `brindlecross`; neither has `mirefold`. Plus fixture tests (`src/test/helpers/makeProject`) for
+  `brindlecross` and `tallowford`; `sandbox` has no `skerrow-isles`, `hookhaven`, `tallowford`
+  or `brindlecross`; neither has `mirefold`. Plus fixture tests (`src/test/helpers/makeProject`) for
   every drop case above.
 - `npm run gate` passes.
 
