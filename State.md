@@ -81,16 +81,16 @@ Pages per campaign (after R-19), H-02 Access test, H-03 pre-switch safety check,
 
 Written 2026-11-11 by the phase 3 coordinator from plan.md, ux-flows.md (p1, p2, p5-p7), the player
 wireframe, ADR-0003 and ADR-0004. Built one ticket at a time, each in its own worktree; the
-orchestrating session opens and merges each PR. Provisional calls are in the table below
+orchestrating session (local_a8dba6ed-82b1-48f6-800e-b9733658539e) opens and merges each PR. Provisional calls are in the table below
 ("Phase 3 tickets"). Phase 4 waits for Isak to accept ADR-0005 and ADR-0006.
 
 | Ticket | What | Blocked by | Model | State |
 |---|---|---|---|---|
-| R-30 | Map tree and ocean geometry in the app (pure), `atlasGuard` checks v2 fields | - | Sonnet | - |
-| R-31 | The shared canvas `AtlasCanvas`: the ocean and one map with child frames | R-30 | Opus | - |
+| R-30 | Map tree and ocean geometry in the app (pure), `atlasGuard` checks v2 fields | - | Sonnet | done (#143) |
+| R-31 | The shared canvas `AtlasCanvas`: the ocean and one map with child frames | R-30 | Opus | in review |
 | R-32 | Zoom handoff: ocean > map > child > back, with hysteresis | R-30, R-31 | Opus | - |
 | R-33 | The player viewer on the canvas, breadcrumb; v1 site looks as today | R-32, R-34 | Sonnet | - |
-| R-34 | Serve the test world's campaign sites locally, with a picker | R-30 | Opus | - |
+| R-34 | Serve the test world's campaign sites locally, with a picker | R-30 | Opus | ready (review clean) |
 | R-35 | Campaign links: `c=` and "Not found in this campaign" | R-33, R-34 | Sonnet | - |
 | R-36 | Phase 3 check: Ocean > continent > city > back (playtester) | R-35 | Sonnet | - |
 

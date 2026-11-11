@@ -86,3 +86,5 @@ Hosting (H-01..H-04), the editor's preview as a campaign (E11, phase 6).
 - Follow-up (not built; `publishPlan.ts` stays unchanged here): the stale check proves the sites
   are newer than the content, not that the scans passed on them. A "scans passed" stamp written
   by the publish, which the server would require, would close that gap.
+
+Follow-up (review, not blocking): a direct load of `/atlas/tag/<tag>` with a dotted tag (e.g. `v1.2`) gets 404 locally; limit the 404 rule to asset folders or known extensions if that ever matters. No tag in `content-next/` has a dot today.
