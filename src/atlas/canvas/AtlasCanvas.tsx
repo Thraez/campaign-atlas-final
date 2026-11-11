@@ -37,6 +37,7 @@ import { MapImageLayers } from "../map/MapImageLayers";
 import { OceanBackground } from "../ocean/OceanBackground";
 import type { MapTree, MapTreeNode } from "../ocean/mapTree";
 import type { TreeView } from "../ocean/zoomHandoff";
+import { CANVAS_MIN_ZOOM, OceanZoomLimit } from "./OceanZoomLimit";
 import { boxBounds, oceanFitBox, type Box } from "./canvasGeometry";
 import { CanvasCamera, type CanvasCameraState } from "./CanvasCamera";
 import { CANVAS_IMAGE_PANE, ChildFrames, OceanMaps } from "./CanvasLayers";
@@ -169,7 +170,7 @@ export function AtlasCanvas({
         crs={FlatCRS}
         center={[0, 0]}
         zoom={-2}
-        minZoom={-6}
+        minZoom={CANVAS_MIN_ZOOM}
         maxZoom={4}
         zoomSnap={0}
         zoomAnimation={!reduceMotion}
@@ -199,6 +200,12 @@ export function AtlasCanvas({
               fitKey={`${resolved.key}#${fit.gen}`}
               armed={armed}
               onViewChange={reportView}
+            />
+            <OceanZoomLimit
+              ocean={resolved.kind === "ocean"}
+              fitWidth={resolved.fit.maxX - resolved.fit.minX}
+              fitHeight={resolved.fit.maxY - resolved.fit.minY}
+              viewKey={resolved.key}
             />
             <CanvasCamera
               viewKey={resolved.key}

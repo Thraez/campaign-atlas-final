@@ -1,6 +1,6 @@
 # R-33 The player viewer on the shared canvas, with a breadcrumb
 
-Status: in-review
+Status: done (#147)
 Blocked by: R-32, R-34
 Size: M
 Branch: `rebuild-r33-viewer-on-canvas`

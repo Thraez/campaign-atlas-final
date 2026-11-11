@@ -54,6 +54,7 @@ const STABLE_MAP = {
   fitBounds: vi.fn(),
   getBoundsZoom: () => 0,
   setMinZoom: vi.fn(),
+  fire: vi.fn(),
   setZoom: vi.fn(),
   setMaxBounds: vi.fn(),
   invalidateSize: vi.fn(),

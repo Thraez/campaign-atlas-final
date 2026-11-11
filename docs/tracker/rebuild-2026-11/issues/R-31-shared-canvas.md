@@ -1,6 +1,6 @@
 # R-31 The shared canvas: the ocean and one map
 
-Status: in-review
+Status: done
 Blocked by: R-30
 Size: M
 Branch: `rebuild-r31-shared-canvas`

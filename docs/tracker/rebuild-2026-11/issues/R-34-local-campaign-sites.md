@@ -1,6 +1,6 @@
 # R-34 Serve the test world's campaign sites locally, with a picker
 
-Status: in-review
+Status: done
 Blocked by: R-30 (its `schemaVersion` guard fix, so a v2 site loads at all)
 Size: S
 Branch: `rebuild-r34-local-campaign-sites`
