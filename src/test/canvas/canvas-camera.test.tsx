@@ -6,6 +6,7 @@
  * back is ignored, that reduced motion never animates, and that turning the
  * camera back to "fit" re-fits.
  */
+import type React from "react";
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AtlasProject } from "@/atlas/content/schema";
@@ -60,7 +61,9 @@ const fake = {
 
 vi.mock("react-leaflet", async () => {
   const { makeReactLeafletModule } = await import("../helpers/reactLeafletMock");
-  return { ...makeReactLeafletModule(), useMap: () => fake };
+  // SVGOverlay's children are SVG elements: give them an <svg> to sit in.
+  const SVGOverlay = ({ children }: { children?: React.ReactNode }) => <svg>{children}</svg>;
+  return { ...makeReactLeafletModule(), SVGOverlay, useMap: () => fake };
 });
 
 let reduceMotion = false;
