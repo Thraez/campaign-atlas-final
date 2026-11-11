@@ -1,6 +1,6 @@
 # R-30 Map tree and ocean geometry in the app
 
-Status: ready-for-agent
+Status: in-review
 Blocked by: -
 Size: S
 Branch: `rebuild-r30-map-tree-model`
@@ -67,3 +67,24 @@ later Phase 3 ticket uses.
 ## Out of scope
 
 Rendering (R-31), the zoom handoff (R-32), the viewer (R-33). Build output changes: none.
+
+## Build notes
+
+- Built `src/atlas/ocean/mapTree.ts`; `atlasGuard` now checks the v2 fields (in place on the parsed
+  payload; a well-formed payload is returned as the same object). Tests: `src/test/ocean/mapTree.test.ts`
+  (fixtures, geometry), `mapTree-build.test.ts` (real `content-next` output), `atlas-guard.test.ts`.
+- Real output, trusted over the ticket: `main` also has `skerrow-isles > hookhaven` on the ocean
+  (the ticket only listed the quessaly branch). `sandbox` is `quessaly-world > oskmark`. No `mirefold` in either.
+  No drops and no warnings on either.
+- Review additions (coordinator): `parseAtlasProject` now accepts `schemaVersion` up to
+  `MAX_ATLAS_SCHEMA_VERSION` (2), so v2 output loads; the build test parses each campaign's real
+  `atlas.json` through it unchanged. Rotated fixtures (frame 30 deg, ocean placement 15 deg, and
+  the two composed) are in `mapTree.test.ts`. `dropped` stays an id list for tests; the viewer
+  should log only its count. `hookhaven` is also absent from `sandbox`'s tree (asserted).
+- Fail-closed calls beyond the ticket: a repeated `onOcean` entry (first wins) and an `onOcean` entry
+  naming a child are ignored; a top-level map with an unusable placement (non-finite, `scale <= 0`) or
+  non-positive size is dropped; a map reusing an id is dropped (first wins); in v2 a map with `parent`
+  is never top-level. A malformed `ocean` in the guard is dropped whole (the output then reads as v1);
+  malformed `onOcean` entries are filtered one by one.
+- `frameOutline` returns `null` for a frame `frameQuads` rejects. `warnings` entries are
+  `{ mapId, kind: "aspect-mismatch", message }`. `breadcrumb` of an unknown id is `[]`.

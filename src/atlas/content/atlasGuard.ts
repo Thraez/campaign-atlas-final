@@ -11,7 +11,7 @@ import type { AtlasProject } from "./schema";
 import type { SearchIndexEntry } from "./loader";
 // Single source of truth for the schema version the build stamps into the
 // artifact — imported (not re-declared) so runtime and build cannot drift.
-import { CURRENT_ATLAS_SCHEMA_VERSION } from "../../../scripts/atlas/schemaVersion";
+import { MAX_ATLAS_SCHEMA_VERSION } from "../../../scripts/atlas/schemaVersion";
 
 /** Top-level lists an AtlasProject must always carry (possibly empty). */
 const REQUIRED_ARRAYS = ["worlds", "maps", "entities", "placements", "assets"] as const;
@@ -38,10 +38,10 @@ export function parseAtlasProject(data: unknown, source = "atlas.json"): AtlasPr
         `${source} has an invalid schemaVersion (${JSON.stringify(sv)}). Rebuild the atlas.`,
       );
     }
-    if (sv > CURRENT_ATLAS_SCHEMA_VERSION) {
+    if (sv > MAX_ATLAS_SCHEMA_VERSION) {
       throw new Error(
         `${source} was built for schema v${sv}, but this app only understands up to ` +
-          `v${CURRENT_ATLAS_SCHEMA_VERSION}. Update the app, or rebuild the atlas with a matching version.`,
+          `v${MAX_ATLAS_SCHEMA_VERSION}. Update the app, or rebuild the atlas with a matching version.`,
       );
     }
   }
@@ -61,7 +61,78 @@ export function parseAtlasProject(data: unknown, source = "atlas.json"): AtlasPr
     }
   }
 
+  dropMalformedV2Fields(obj);
+
   return data as AtlasProject;
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  v !== null && typeof v === "object" && !Array.isArray(v);
+const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+
+function validOcean(v: unknown): boolean {
+  return (
+    isRecord(v) &&
+    isNum(v.width) &&
+    v.width > 0 &&
+    isNum(v.height) &&
+    v.height > 0 &&
+    typeof v.sea === "string" &&
+    Array.isArray(v.onOcean)
+  );
+}
+
+function validPlacement(v: unknown): boolean {
+  return (
+    isRecord(v) &&
+    typeof v.map === "string" &&
+    isNum(v.x) &&
+    isNum(v.y) &&
+    isNum(v.scale) &&
+    v.scale > 0 &&
+    isNum(v.rotation)
+  );
+}
+
+function validFrame(v: unknown): boolean {
+  return (
+    isRecord(v) &&
+    isNum(v.x) &&
+    isNum(v.y) &&
+    isNum(v.width) &&
+    v.width > 0 &&
+    isNum(v.height) &&
+    v.height > 0 &&
+    isNum(v.rotation)
+  );
+}
+
+/**
+ * Type-check the optional schema v2 output fields (ocean, campaign, and each
+ * map's parent, frame, enterZoom). A malformed one is dropped, not fatal: the
+ * map tree then leaves out whatever depended on it (fail closed). Edits the
+ * freshly parsed payload in place; a well-formed payload is untouched.
+ */
+function dropMalformedV2Fields(obj: Record<string, unknown>): void {
+  if (obj.ocean !== undefined) {
+    if (!validOcean(obj.ocean)) delete obj.ocean;
+    else {
+      const ocean = obj.ocean as { onOcean: unknown[] };
+      if (!ocean.onOcean.every(validPlacement)) ocean.onOcean = ocean.onOcean.filter(validPlacement);
+    }
+  }
+  if (
+    obj.campaign !== undefined &&
+    !(isRecord(obj.campaign) && typeof obj.campaign.id === "string" && typeof obj.campaign.name === "string")
+  ) {
+    delete obj.campaign;
+  }
+  for (const m of obj.maps as unknown[]) {
+    if (!isRecord(m)) continue;
+    if (m.parent !== undefined && typeof m.parent !== "string") delete m.parent;
+    if (m.frame !== undefined && !validFrame(m.frame)) delete m.frame;
+    if (m.enterZoom !== undefined && !isNum(m.enterZoom)) delete m.enterZoom;
+  }
 }
 
 /**
