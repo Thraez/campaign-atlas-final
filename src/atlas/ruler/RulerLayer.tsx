@@ -91,7 +91,7 @@ export function RulerLayer({ active, mapId, mapHeight, scale, onClear }: RulerLa
           }}
           className="text-xs bg-black/60 text-white px-3 py-1.5 rounded-full whitespace-nowrap"
         >
-          Click two points to measure
+          Click or tap two points to measure
         </div>,
         map.getContainer(),
       )
