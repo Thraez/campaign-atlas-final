@@ -27,7 +27,8 @@ Plan: `plan.md`. Orchestrator notes, newest last.
 ## 2026-11-19
 
 - Round 1 is done: all eight items merged and published. Each went through the full local gate and
-  an Opus review; fixes from the reviews are in the item notes under `items/`.
+  an Opus review; fixes from the reviews are in the item notes under `items/` and, for P-02 and P-03, in the
+  R-37 and R-38 tickets.
 - What Isak should look at, the open questions and three new round-2 candidates are in `State.md`
   ("Polish round 1").
 - Not checked on real hardware: P-06's wheel speed on a retina trackpad, Windows scaling, Safari and

@@ -102,42 +102,42 @@ scans-passed stamp, `audit-assets` v2 image paths).
 
 **For Isak's look** (run `npm run atlas:publish:next`, then `npm run atlas:serve:next`; picker on
 `http://127.0.0.1:4300/`):
-- **The ocean:** `main` shows Quessaly and Skerrow Isles; `sandbox` only Quessaly. The fit has no
-  margin yet (R-37) and zooming out stops one level below the fit.
+- **The ocean:** `main` shows Quessaly and Skerrow Isles; `sandbox` only Quessaly. The fit had no
+  margin (fixed in polish round 1, P-02) and zooming out stops one level below the fit.
 - **The zoom handoff feel:** zoom in over a map and it hands over (ocean > Quessaly > Oskmark >
   Brindlecross), out and it hands back. A rotated map turns square at the handoff; the art switches
-  from the parent's picture to the child's; one big wheel gesture can cross two thresholds.
+  from the parent's picture to the child's (a crossfade since polish round 1, P-05); one big wheel gesture could cross two thresholds (a wheel now enters one map at most, P-06; keyboard and pinch still chain).
 - **The breadcrumb:** Ocean > Quessaly > Oskmark, a crumb returns to the camera you left.
-- **The phone top bar:** 137 px in three rows at 375 px, with the offline icon alone on a row (R-38).
+- **The phone top bar:** 137 px in three rows at 375 px, with the offline icon alone on a row (R-38; one row since polish round 1, P-03).
 - **Browse, Timeline, Credits and the nav** still read `worlds[0]` on v2 until phase 5.
 
 **Provisional calls, R-30..R-35** (one line each):
 - [R-30](docs/tracker/rebuild-2026-11/issues/R-30-map-tree-model.md): bad placements, repeated `onOcean` entries and duplicate map ids are dropped (first wins); a malformed `ocean` makes the output read as v1.
 - [R-31](docs/tracker/rebuild-2026-11/issues/R-31-shared-canvas.md): each ocean map is one `SVGOverlay` (rotation in SVG); labels are plain permanent tooltips; an unknown view draws only the sea.
 - [R-32](docs/tracker/rebuild-2026-11/issues/R-32-zoom-handoff.md): half a zoom level of hysteresis; the enter zoom is the authored one or the fill rule; `zoom: {min, max}` is a v2 output field (ADR-0003 addendum).
-- [R-33](docs/tracker/rebuild-2026-11/issues/R-33-viewer-on-canvas.md): v1 keeps its own map container; on a phone the breadcrumb wraps onto its own row; the ocean fit has no margin; search on the ocean offers every placement.
+- [R-33](docs/tracker/rebuild-2026-11/issues/R-33-viewer-on-canvas.md): v1 keeps its own map container; on a phone the breadcrumb wraps onto its own row (superseded by polish round 1, P-03); the ocean fit has no margin (superseded, P-02); search on the ocean offers every placement.
 - [R-34](docs/tracker/rebuild-2026-11/issues/R-34-local-campaign-sites.md): picker on 4300 and sites on 4301+, bound to 127.0.0.1; the server refuses stale or leaking sites; a missing file with an extension is a 404.
 - [R-35](docs/tracker/rebuild-2026-11/issues/R-35-campaign-in-links.md): any v2 link problem drops the whole link and shows a fixed "Not found in this campaign" bar; the chip links to the picker only on localhost and assumes port 4300.
 - [R-36](docs/tracker/rebuild-2026-11/issues/R-36-phase3-check.md): the ocean's zoom-out floor is one level below the fit, set before the camera applies (no bounce) and recomputed on a window resize; on v1 an unknown map now opens the default map (baseline: blank).
 
 ### Polish round 1 (2026-11-18/19, all merged and published)
 
-Plan and notes: `docs/polish-2026-11/` (`plan.md`, `progress.md`, one note per item in `items/`,
+Plan and notes: `docs/polish-2026-11/` (`plan.md`, `progress.md`, one note per item in `items/` (P-02 and P-03: the R-37 and R-38 tickets; P-01 has none),
 before and after pictures in `shots/`). Eight items, PRs #150-#157. The live site still runs v1, so
 only P-01 and P-08 show there; the rest shows on the local test sites.
 
 **For Isak's look** (run `npm run atlas:publish:next`, then `npm run atlas:serve:next`):
 
-- **P-01 notices** (live): the update toast has a "Later" button; on desktop the sound control sits
+- **P-01 notices** (live): the update toast has a ✕ ("Later") that hides it for this visit; on desktop the sound control sits
   beside the minimap.
 - **P-02 ocean fit:** every top-level map shows whole with sea around it, clear of the side panel.
-- **P-03 phone top bar:** one row (137 px to 61 px). The campaign name shows only in the home link
-  and the menu title; the grid toggle moved into the menu; the switch is at 768 px.
+- **P-03 phone top bar:** one row (137 px to 61 px). The campaign name is the menu title and the
+  home link's tooltip; the grid toggle moved into the menu; the switch is at 768 px.
 - **P-04 handoff always fires:** a zoom toward a child at the zoom limit enters it. The rule is
   "the map under the pointer first" (an R-32 change).
 - **P-05 soft handoff:** the old and new pictures crossfade in about 250 ms; a plain cut in calm
   mode.
-- **P-06 zoom and crumb feel:** a wheel notch zooms about 0.48 of a level (4-5 notches per level)
+- **P-06 zoom and crumb feel:** a wheel notch zooms about half a zoom level (4-5 notches per map level)
   and enters at most one map; a crumb click and Reset glide for 0.4 s. Not tried on a real retina
   trackpad, Windows scaling, Safari or Firefox: trackpad scrolling got faster by the same ratio.
 - **P-07 frames and pictures:** frames glow on hover and turn gold when pressed; map names are in
