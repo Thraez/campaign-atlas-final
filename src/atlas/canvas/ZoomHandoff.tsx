@@ -15,8 +15,12 @@
  * Callers move the map through `camera`; a layer that calls `map.setView`
  * itself bypasses the disarm.
  *
- * A pan's moveend that lands while a zoom is in flight (between zoomstart and
- * zoomend, a fling's inertia) is ignored, so it can't disarm that zoom (R-40).
+ * A pan's moveend that comes just after input (within
+ * `INPUT_STOP_WINDOW_MS`) keeps the flag: wheel, pinch and double-click stop a
+ * running fling, and Leaflet fires that fling's moveend before the zoom's
+ * zoomstart, so it would disarm the zoom (R-40). A moveend while a zoom is in
+ * flight with no zoom animation running ends that zoom: in calm mode a pinch
+ * never fires zoomend (P-04 review).
  *
  * The zoom's direction (zoom at zoomstart against zoomend) and the map's zoom
  * limits go to `nextView`: a zoom in only enters, a zoom out only leaves.
@@ -37,10 +41,39 @@ import { useMap } from "react-leaflet";
 import type { MapTree } from "../ocean/mapTree";
 import { nextView, type TreeView, type ViewCamera } from "../ocean/zoomHandoff";
 import type { Point } from "../content/schema";
-import { fromLatLng } from "./canvasGeometry";
+import { fromLatLng, oceanFitBox } from "./canvasGeometry";
+import { CANVAS_MIN_ZOOM, oceanMinZoom } from "./OceanZoomLimit";
 
 /** DOM events that start a user zoom (or a pan, which clears on its moveend). */
 const USER_INPUT = ["wheel", "touchstart", "dblclick", "keydown", "mousedown", "pointerdown"];
+
+/**
+ * How soon after user input a pan's moveend still belongs to that input (the
+ * fling a wheel, pinch or double-click stops). Leaflet's wheel zoom waits up to
+ * 40 ms (`wheelDebounceTime`) before it stops the pan; a pinch and a
+ * double-click stop it at once. A keyboard pan animates for 250 ms, so its own
+ * moveend still clears the flag.
+ */
+export const INPUT_STOP_WINDOW_MS = 150;
+
+/**
+ * The zoom limits `view` will have once shown: the ocean's floor
+ * (`OceanZoomLimit`), else the canvas floor; `maxZoom` above.
+ */
+function viewZoomLimits(
+  tree: MapTree,
+  view: TreeView,
+  size: { x: number; y: number },
+  maxZoom: number,
+): [number, number] {
+  if (view.kind === "ocean" && tree.ocean) {
+    const box = oceanFitBox(tree);
+    const w = box ? box.maxX - box.minX : tree.ocean.width;
+    const h = box ? box.maxY - box.minY : tree.ocean.height;
+    return [oceanMinZoom(size, w, h) ?? CANVAS_MIN_ZOOM, maxZoom];
+  }
+  return [CANVAS_MIN_ZOOM, maxZoom];
+}
 
 /**
  * The zoom's anchor: the view point that sat at the same screen point before
@@ -102,15 +135,19 @@ export function ZoomHandoff({
     armed.current = false;
     // The zoom in flight: its zoom and centre at zoomstart; null between zooms.
     let zoomFrom: { zoom: number; center: Point } | null = null;
+    // When the last user input came (performance.now()).
+    let inputAt = -Infinity;
     const el = map.getContainer();
     const mark = () => {
       armed.current = true;
+      inputAt = performance.now();
     };
     for (const e of USER_INPUT) el.addEventListener(e, mark, { capture: true, passive: true });
     const onZoomStart = () => {
       zoomFrom = { zoom: map.getZoom(), center: fromLatLng(viewHeight, map.getCenter()) };
     };
-    const onZoomEnd = () => {
+    // The zoom has settled: hand off if the user made it.
+    const finish = () => {
       const from = zoomFrom;
       zoomFrom = null;
       if (!armed.current) return;
@@ -130,12 +167,16 @@ export function ZoomHandoff({
       if (anchor) {
         const r = nextView(t, v, { center: anchor.point, zoom }, viewport, opts);
         if (r.kind === "handoff") {
-          // Keep the anchor's ground at the same screen offset from the centre.
-          const k = 2 ** -r.camera.zoom;
+          // Keep the anchor's ground at the same screen offset from the centre,
+          // at the zoom the new view will really show: setView clamps the zoom
+          // to its limits (the ocean's floor) but keeps the centre.
+          const [lo, hi] = viewZoomLimits(t, r.view, size, opts.maxZoom);
+          const z = Math.min(hi, Math.max(lo, r.camera.zoom));
+          const k = 2 ** -z;
           const c = r.camera.center;
           report(r.view, {
             center: [c[0] - anchor.offset[0] * k, c[1] - anchor.offset[1] * k],
-            zoom: r.camera.zoom,
+            zoom: z,
           });
           return;
         }
@@ -143,10 +184,23 @@ export function ZoomHandoff({
       const r = nextView(t, v, { center, zoom }, viewport, opts);
       if (r.kind === "handoff") report(r.view, r.camera);
     };
-    // Leaflet fires zoomend before moveend; a pan has only moveend. A pan's
-    // moveend during a zoom (a fling ending mid-zoom) leaves that zoom armed.
+    const onZoomEnd = finish;
+    // Leaflet fires zoomend before moveend; a pan has only moveend, which
+    // clears the flag, with two exceptions:
+    // - A zoom in flight whose zoomend never comes: in calm mode
+    //   (zoomAnimation off) a pinch's touchend `_resetView`s at the zoom the
+    //   pinch already shows, so it fires only moveend. That moveend ends the
+    //   zoom. During a running zoom animation a moveend is ignored.
+    // - The moveend of a pan stopped by the input that starts a zoom (R-40):
+    //   wheel, pinch and double-click call `map._stop()`, which ends a running
+    //   fling with a moveend before the zoom's zoomstart. A moveend this soon
+    //   after input keeps the flag; an explicit camera still clears it.
     const onMoveEnd = () => {
-      if (zoomFrom !== null) return;
+      if (zoomFrom !== null) {
+        if (!(map as unknown as { _animatingZoom?: boolean })._animatingZoom) finish();
+        return;
+      }
+      if (performance.now() - inputAt <= INPUT_STOP_WINDOW_MS) return;
       armed.current = false;
     };
     map.on("zoomstart", onZoomStart);

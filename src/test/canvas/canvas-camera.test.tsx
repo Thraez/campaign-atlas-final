@@ -21,6 +21,8 @@ const fake = {
   zoom: 0,
   minZoom: -6,
   options: { zoomSnap: 1, minZoom: -6 },
+  /** Leaflet's flag for a running zoom animation. */
+  _animatingZoom: false,
   handlers: new Map<string, Set<Handler>>(),
   on(ev: string, h: Handler) {
     if (!this.handlers.has(ev)) this.handlers.set(ev, new Set());
@@ -85,7 +87,8 @@ vi.mock("@/hooks/use-reduce-motion", () => ({ useReduceMotion: () => reduceMotio
 
 const { buildMapTree } = await import("@/atlas/ocean/mapTree");
 const { AtlasCanvas } = await import("@/atlas/canvas/AtlasCanvas");
-const { OCEAN_FIT_MARGIN } = await import("@/atlas/canvas/canvasGeometry");
+const { OCEAN_FIT_MARGIN, oceanFitBox } = await import("@/atlas/canvas/canvasGeometry");
+const { oceanMinZoom } = await import("@/atlas/canvas/OceanZoomLimit");
 type Camera = import("@/atlas/canvas/AtlasCanvas").CanvasCamera;
 type View = import("@/atlas/canvas/AtlasCanvas").CanvasView;
 
@@ -130,8 +133,18 @@ function mount(
   };
 }
 
+// The clock ZoomHandoff reads (performance.now): tests move it with `elapse`.
+let now = 1000;
+const elapse = (ms: number) => {
+  now += ms;
+};
+let clock: { mockRestore: () => void } | null = null;
+
 beforeEach(() => {
+  now = 1000;
+  clock = vi.spyOn(performance, "now").mockImplementation(() => now);
   reduceMotion = false;
+  fake._animatingZoom = false;
   fake.size = { x: 800, y: 600 };
   fake.center = { lat: 0, lng: 0 };
   fake.zoom = 0;
@@ -143,7 +156,10 @@ beforeEach(() => {
   fake.setMinZoom.mockClear();
   fake.setZoom.mockClear();
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  clock?.mockRestore();
+});
 
 describe("AtlasCanvas camera", () => {
   it("reports the fitted camera on first mount, in the view's own pixels", () => {
@@ -308,6 +324,7 @@ describe("AtlasCanvas zoom handoff (R-32)", () => {
     const onViewChange = vi.fn();
     mount(OCEAN, "fit", onViewChange);
     fake.container.dispatchEvent(new Event("mousedown"));
+    elapse(300); // a drag takes a while
     act(() => fake.fire("moveend"));
     zoomTo([500, 500], 1);
     act(() => fake.fire("zoomend"));
@@ -357,16 +374,93 @@ describe("AtlasCanvas zoom handoff: a pan's moveend during a zoom (R-40)", () =>
     fake.zoom = zoom;
   };
 
-  it("still hands off when a pan's moveend lands between zoomstart and zoomend", () => {
+  // Leaflet's real order (R-40): the wheel (after its 40 ms debounce) or the
+  // touchstart calls map._stop(), which ends the running fling with a moveend;
+  // the zoom's zoomstart comes after.
+  for (const input of ["wheel", "touchstart", "dblclick"]) {
+    it(`still hands off when a ${input} stops a fling (input, moveend, zoomstart, zoomend)`, () => {
+      const onViewChange = vi.fn();
+      mount(OCEAN, "fit", onViewChange);
+      fake.container.dispatchEvent(new Event(input));
+      elapse(40);
+      act(() => fake.fire("moveend")); // the fling's end, before the zoom starts
+      act(() => fake.fire("zoomstart"));
+      zoomTo([500, 500], 1);
+      act(() => {
+        fake.fire("zoomend");
+        fake.fire("moveend");
+      });
+      expect(onViewChange).toHaveBeenCalledTimes(1);
+      expect(onViewChange.mock.calls[0][0]).toEqual(ISLE);
+    });
+  }
+
+  it("a fling that stops on its own still disarms", () => {
+    const onViewChange = vi.fn();
+    mount(OCEAN, "fit", onViewChange);
+    fake.container.dispatchEvent(new Event("mousedown"));
+    elapse(600); // drag, release, inertia
+    act(() => fake.fire("moveend"));
+    act(() => fake.fire("zoomstart")); // a zoom nobody asked for
+    zoomTo([500, 500], 1);
+    act(() => fake.fire("zoomend"));
+    expect(onViewChange).not.toHaveBeenCalled();
+  });
+
+  it("never hands off a caller's camera right after a click that stopped a fling", () => {
+    const onViewChange = vi.fn();
+    const m = mount(OCEAN, "fit", onViewChange);
+    fake.container.dispatchEvent(new Event("pointerdown"));
+    fake.container.dispatchEvent(new Event("mousedown"));
+    act(() => fake.fire("moveend")); // the click stopped a fling
+    m.update(OCEAN, { center: [500, 500], zoom: 2 }); // a pin's camera, past the threshold
+    expect(fake.setView).toHaveBeenCalledTimes(1);
+    expect(onViewChange).not.toHaveBeenCalled();
+  });
+
+  it("ignores a moveend while a zoom animation runs", () => {
     const onViewChange = vi.fn();
     mount(OCEAN, "fit", onViewChange);
     fake.container.dispatchEvent(new Event("wheel"));
     act(() => fake.fire("zoomstart"));
-    act(() => fake.fire("moveend")); // a fling's inertia ends mid-zoom
+    fake._animatingZoom = true;
+    elapse(300);
+    act(() => fake.fire("moveend"));
     zoomTo([500, 500], 1);
+    fake._animatingZoom = false;
     act(() => fake.fire("zoomend"));
     expect(onViewChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("a calm-mode pinch (zoomstart, then only moveend) hands off at its moveend", () => {
+    const onViewChange = vi.fn();
+    mount(OCEAN, "fit", onViewChange);
+    fake.container.dispatchEvent(new Event("touchstart"));
+    elapse(50);
+    act(() => fake.fire("zoomstart")); // the first touchmove
+    zoomTo([500, 500], 1); // the pinch moves the map as it goes
+    elapse(400);
+    act(() => fake.fire("moveend")); // touchend: _resetView at the same zoom, no zoomend
+    expect(onViewChange).toHaveBeenCalledTimes(1);
     expect(onViewChange.mock.calls[0][0]).toEqual(ISLE);
+  });
+
+  it("a calm-mode pinch that never fires zoomend leaves no zoom in flight", () => {
+    const onViewChange = vi.fn();
+    mount(OCEAN, "fit", onViewChange);
+    fake.container.dispatchEvent(new Event("touchstart"));
+    act(() => fake.fire("zoomstart"));
+    zoomTo([500, 500], 0.25); // below the threshold
+    elapse(400);
+    act(() => fake.fire("moveend")); // the pinch's end
+    elapse(1000);
+    fake.container.dispatchEvent(new Event("mousedown"));
+    elapse(300);
+    act(() => fake.fire("moveend")); // a pan: disarms
+    act(() => fake.fire("zoomstart")); // a zoom nobody asked for
+    zoomTo([500, 500], 1);
+    act(() => fake.fire("zoomend"));
+    expect(onViewChange).not.toHaveBeenCalled();
   });
 
   it("a pan's moveend after the zoom has ended still disarms", () => {
@@ -380,6 +474,7 @@ describe("AtlasCanvas zoom handoff: a pan's moveend during a zoom (R-40)", () =>
       fake.fire("moveend");
     });
     fake.container.dispatchEvent(new Event("mousedown"));
+    elapse(300);
     act(() => fake.fire("moveend")); // a pan
     act(() => fake.fire("zoomstart")); // a zoom nobody asked for
     zoomTo([500, 500], 1);
@@ -394,6 +489,7 @@ describe("AtlasCanvas zoom handoff: a pan's moveend during a zoom (R-40)", () =>
     act(() => fake.fire("zoomstart")); // never ends: the view changes first
     m.update(ISLE, "fit");
     fake.container.dispatchEvent(new Event("mousedown"));
+    elapse(300);
     act(() => fake.fire("moveend")); // a pan on the new view disarms as usual
     m.update(ISLE, { center: [300, 200], zoom: -4 }); // the caller's camera, past the leave zoom
     expect(onViewChange).not.toHaveBeenCalled();
@@ -528,10 +624,38 @@ describe("AtlasCanvas zoom handoff: the zoom's anchor point (P-04)", () => {
     const onViewChange = start(ISLE, [300, 200], 1);
     fake.container.dispatchEvent(new Event("wheel"));
     act(() => fake.fire("zoomstart"));
-    // the centre moved far while the zoom barely changed: no screen point stayed put
-    fake.center = { lat: 400 - 300, lng: 500 };
-    fake.zoom = 1.01;
+    // Past the cove's enter zoom (2), the centre outside its frame. The point that
+    // "stayed put" would be isle (50, 40), in the frame, but 500 px left of the
+    // centre: off the 800 px screen, so it is no anchor and nothing enters.
+    const d = 2 ** -1 - 2 ** -2.5;
+    fake.center = { lat: 400 - (200 - 320 * d), lng: 300 - 500 * d };
+    fake.zoom = 2.5;
     act(() => fake.fire("zoomend"));
+    expect(fake.center.lng).toBeGreaterThan(100);
     expect(onViewChange).not.toHaveBeenCalled();
+  });
+
+  it("a hand-back below the ocean's floor keeps the anchor at the floor's zoom", () => {
+    // A pinch out of the isle, far off-centre, landing two levels below the
+    // ocean's floor: setView will clamp the zoom and keep the centre, so the
+    // offset must be scaled at the floor's zoom, or the ocean is off screen.
+    const box = oceanFitBox(tree)!;
+    const floor = oceanMinZoom(fake.size, box.maxX - box.minX, box.maxY - box.minY)!;
+    const onViewChange = vi.fn();
+    mount(ISLE, { center: [300, 200], zoom: 0 }, onViewChange);
+    fake.container.dispatchEvent(new Event("touchstart"));
+    anchoredZoom(400, [10, 10], [-390, -290], 0, floor - 2);
+    expect(onViewChange).toHaveBeenCalledTimes(1);
+    const [view, cam] = onViewChange.mock.calls[0] as [View, { center: number[]; zoom: number }];
+    expect(view).toEqual(OCEAN);
+    expect(cam.zoom).toBeCloseTo(floor, 9);
+    // isle (10, 10) is ocean (210, 310), still 390,290 screen px up-left of the centre
+    const k = 2 ** -floor;
+    expect(cam.center[0]).toBeCloseTo(210 + 390 * k, 9);
+    expect(cam.center[1]).toBeCloseTo(310 + 290 * k, 9);
+    // the screen still shows the fitted ocean box
+    const half = [400 * k, 300 * k];
+    expect(cam.center[0] - half[0]).toBeLessThan(box.maxX);
+    expect(cam.center[1] - half[1]).toBeLessThan(box.maxY);
   });
 });
