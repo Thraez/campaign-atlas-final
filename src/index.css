@@ -61,6 +61,12 @@
     --z-minimap: 400;
     --z-map-control: 500;
     --z-map-notice: 510;
+
+    /* Fonts (P-08). Display: the Cinzel headings (Tailwind's font-display uses
+       this too). Body: the system stack the app has always rendered; Inter was
+       downloaded but never used, and is no longer loaded. */
+    --font-display: "Cinzel", Georgia, serif;
+    --font-body: "Avenir Next", "Segoe UI", system-ui, sans-serif;
   }
 
   .dark { /* same; app is dark-only */ }
@@ -70,9 +76,9 @@
   * { @apply border-border; }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-body);
   }
-  h1, h2, h3, h4 { font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif; letter-spacing: 0; }
+  h1, h2, h3, h4 { font-family: var(--font-body); letter-spacing: 0; }
 }
 
 /* Player-viewer pin (atlas-viewer-pin class on Leaflet DivIcon).
@@ -392,7 +398,7 @@
   font-style: italic;
 }
 .atlas-prose h1, .atlas-prose h2, .atlas-prose h3 {
-  font-family: var(--font-display, serif);
+  font-family: var(--font-display);
   color: hsl(var(--foreground));
   margin-top: 1em;
 }
@@ -526,21 +532,21 @@
   margin: 1.25rem 0;
 }
 .atlas-prose h4 {
-  font-family: var(--font-display, serif);
+  font-family: var(--font-display);
   color: hsl(var(--foreground));
   margin-top: 0.85em;
   font-size: 1em;
   font-weight: 600;
 }
 .atlas-prose h5 {
-  font-family: var(--font-display, serif);
+  font-family: var(--font-display);
   color: hsl(var(--muted-foreground));
   margin-top: 0.75em;
   font-size: 0.9em;
   font-weight: 600;
 }
 .atlas-prose h6 {
-  font-family: var(--font-display, serif);
+  font-family: var(--font-display);
   color: hsl(var(--muted-foreground));
   margin-top: 0.75em;
   font-size: 0.85em;
@@ -584,6 +590,25 @@
 }
 .atlas-notice { animation: atlas-notice-in 220ms ease-out both; }
 
+/* The first-load screen (P-08, src/atlas/content/AtlasLoader.tsx): a fade-in
+   and a slow needle sway. The component leaves both classes out under calm
+   mode or the OS setting; the blocks below are the CSS-side backstop. The
+   sway period matches SWAY_MS there. */
+@keyframes atlas-loader-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes atlas-loader-sway {
+  0%, 100% { transform: rotate(-7deg); }
+  50% { transform: rotate(7deg); }
+}
+.atlas-loader-motion { animation: atlas-loader-in 600ms ease-out both; }
+.atlas-loader-needle {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  animation: atlas-loader-sway 3600ms ease-in-out infinite;
+}
+
 /* Accessibility: reduce motion when the OS asks for it or calm mode is on
    (`<html data-calm>`, set by src/hooks/use-reduce-motion.ts). Keep the two
    blocks identical. */
@@ -600,6 +625,7 @@
     transition: none !important;
   }
   .atlas-notice { animation: none !important; }
+  .atlas-loader-motion, .atlas-loader-needle { animation: none !important; }
 }
 :root[data-calm="true"] *,
 :root[data-calm="true"] *::before,
@@ -614,6 +640,8 @@
   transition: none !important;
 }
 :root[data-calm="true"] .atlas-notice { animation: none !important; }
+:root[data-calm="true"] .atlas-loader-motion,
+:root[data-calm="true"] .atlas-loader-needle { animation: none !important; }
 
 /* Skip-to-main link, only visible on keyboard focus. */
 .skip-to-main {
