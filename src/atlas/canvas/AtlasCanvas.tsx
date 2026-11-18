@@ -6,7 +6,10 @@
  * - Ocean view: the sea (`ocean.sea`, looked up in `seaStyle.ts`), every
  *   top-level map's images at its placement (position, scale, rotation about
  *   the centre) and its name. No pins, regions or routes. Opens fitted to the
- *   placed maps, not the whole ocean.
+ *   placed maps plus a margin of sea (`OCEAN_FIT_MARGIN`, R-37), not the
+ *   whole ocean. The canvas is only as wide as the space the caller gives it,
+ *   so the viewer's side panel (a sibling of the canvas) is already outside
+ *   the fit. A map view fits edge to edge.
  * - Map view: the map's images (as the viewer draws them) and each child's
  *   frame as a soft outline with its name.
  * - Clicking a map or a frame calls `onEnterMap`; hovering one calls
@@ -40,6 +43,7 @@ import type { TreeView } from "../ocean/zoomHandoff";
 import { CANVAS_MIN_ZOOM, OceanZoomLimit } from "./OceanZoomLimit";
 import { boxBounds, oceanFitBox, type Box } from "./canvasGeometry";
 import { CanvasCamera, type CanvasCameraState } from "./CanvasCamera";
+import { KeepCanvasSized } from "./KeepCanvasSized";
 import { CANVAS_IMAGE_PANE, ChildFrames, OceanMaps } from "./CanvasLayers";
 import { seaStyle, type SeaStyle } from "./seaStyle";
 import { ZoomHandoff } from "./ZoomHandoff";
@@ -184,6 +188,7 @@ export function AtlasCanvas({
           background: waterOff ? (water.oceanColor ?? DEFAULT_SEA) : "transparent",
         }}
       >
+        <KeepCanvasSized />
         {resolved && (
           <>
             {/* CanvasCamera before FitMapOnOpen: sibling effects run in order (after

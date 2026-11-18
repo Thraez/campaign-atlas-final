@@ -60,11 +60,34 @@ export function placementCorners(
   return corners.map((c) => mapToOcean(placement, map, c));
 }
 
-/** The box around every top-level map on the ocean: what the ocean view fits on open. */
-export function oceanFitBox(tree: MapTree): Box | null {
+/**
+ * Sea around the placed maps in the ocean's fit (R-37): this fraction of the
+ * box's width and height on every side, so no map touches the canvas edge or
+ * the controls drawn over it. A map view fits edge to edge, without it.
+ */
+export const OCEAN_FIT_MARGIN = 0.08;
+
+/** A box grown on every side by `fraction` of its own width (x) and height (y). */
+export function padBox(b: Box, fraction: number): Box {
+  const dx = (b.maxX - b.minX) * fraction;
+  const dy = (b.maxY - b.minY) * fraction;
+  return { minX: b.minX - dx, minY: b.minY - dy, maxX: b.maxX + dx, maxY: b.maxY + dy };
+}
+
+/** The box around every top-level map on the ocean, with no margin. */
+export function oceanPlacedBox(tree: MapTree): Box | null {
   return boxOf(
     tree.roots.flatMap((n) => (n.placement ? placementCorners(n.placement, n.map) : [])),
   );
+}
+
+/**
+ * What the ocean view fits on open: the placed maps plus `OCEAN_FIT_MARGIN` of
+ * sea on every side. `OceanZoomLimit` takes its floor from this same box.
+ */
+export function oceanFitBox(tree: MapTree): Box | null {
+  const placed = oceanPlacedBox(tree);
+  return placed && padBox(placed, OCEAN_FIT_MARGIN);
 }
 
 /**
