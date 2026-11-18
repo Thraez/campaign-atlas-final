@@ -46,6 +46,14 @@ Polish item P-03, branch `polish-p03-phone-top-bar`.
   reachable. Crumb buttons, home, menu and search are 40 px tall at least.
 - Bar height at 375 px: 137 px before, 61 px after (ocean and Quessaly > Oskmark, both campaigns).
   Desktop (1280): 61 px and the same controls as the baseline.
+- Review fixes: search shows its word only off the phone bar; earlier crumbs shrink and truncate
+  while the current one keeps its room; a visible "Done measuring" chip (top right of the map)
+  ends the ruler on the phone bar, and the ruler hint reads "Click or tap two points to measure";
+  the "..." menu returns focus to the breadcrumb; menu rows are named by their visible text
+  (offline row also shows its short state); the menu drawer closes on Back/Forward and link
+  changes; the header wraps as before on v2 desktop and tablet (wrap, then no wrap from 768 px).
+- Provisional call: campaign name not shown on the phone bar (it is the drawer title and the
+  home link's name, aria-label and tooltip); Isak to look.
 - Provisional calls: the grid toggle also moved into the menu; the phone breakpoint is `md`
   (768), so a 768 to 1023 px tablet keeps the full bar plus the hamburger as before. v1 is
   untouched (its bar never wraps, and the phone layout is v2 only).

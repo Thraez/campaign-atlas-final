@@ -216,7 +216,7 @@ export function OfflineMenu({ className, row = false }: OfflineMenuProps) {
         <Button
           variant="ghost"
           size={row ? "default" : "icon"}
-          aria-label="Offline options"
+          aria-label={row ? undefined : "Offline options"}
           className={
             row ? `w-full justify-start gap-3 px-3 font-normal ${className ?? ""}` : className
           }
@@ -227,7 +227,12 @@ export function OfflineMenu({ className, row = false }: OfflineMenuProps) {
           ) : (
             <CloudOff className="h-4 w-4" aria-hidden="true" />
           )}
-          {row && "Offline options"}
+          {row && (
+            <>
+              <span className="flex-1 text-left">Offline options</span>
+              <span className="text-xs text-muted-foreground">{text.label}</span>
+            </>
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align={row ? "start" : "end"} className="w-64">

@@ -30,7 +30,6 @@ export function PhoneBarTools({
           variant={grid.on ? "secondary" : "ghost"}
           className={ROW}
           onClick={grid.toggle}
-          aria-label="Toggle grid overlay"
           aria-pressed={grid.on}
         >
           <Grid3x3 className="h-4 w-4" aria-hidden="true" />
@@ -44,7 +43,6 @@ export function PhoneBarTools({
           onToggleRuler();
           close();
         }}
-        aria-label="Toggle distance ruler"
         aria-pressed={rulerActive}
       >
         <Ruler className="h-4 w-4" aria-hidden="true" />
@@ -55,7 +53,6 @@ export function PhoneBarTools({
         className={ROW}
         onClick={() => setCalmMode(!calm)}
         title="Calm mode: no map flights, waves, transitions or sound"
-        aria-label="Calm mode"
         aria-pressed={calm}
       >
         <Wind className="h-4 w-4" aria-hidden="true" />

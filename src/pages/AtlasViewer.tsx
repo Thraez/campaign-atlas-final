@@ -877,7 +877,7 @@ export default function AtlasViewer() {
           Skip to map
         </a>
         <header
-          className={`atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border ${isV2 ? "flex-nowrap" : ""}`}
+          className={`atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border ${isV2 ? (phoneBar ? "flex-nowrap" : "flex-wrap md:flex-nowrap") : ""}`}
         >
           <AtlasNavMenu
             publishedAt={data.project.publishedAt}
@@ -904,16 +904,24 @@ export default function AtlasViewer() {
                 : undefined
             }
           />
-          {/* The name used to be `hidden sm:inline`, so a phone showed only the
-              compass — someone opening a shared link couldn't see which world
-              they were looking at. Truncate instead of hiding. */}
+          {/* v1 shows the world's name here (truncated, never hidden). v2 shows
+              only the compass: the campaign chip is hidden on the phone bar, so
+              the campaign name is the link's accessible name and tooltip (and
+              the menu drawer's title). */}
           <Link
             to="/"
             className={`font-display text-lg text-primary hover:opacity-80 flex items-center gap-2 min-w-0 ${phoneBar ? "min-h-10 min-w-10 justify-center" : ""}`}
-            aria-label={isV2 ? "Home" : undefined}
+            aria-label={
+              isV2
+                ? phoneBar && data.project.campaign
+                  ? `${data.project.campaign.name}, home`
+                  : "Home"
+                : undefined
+            }
+            title={phoneBar ? data.project.campaign?.name : undefined}
           >
             <Compass className="h-5 w-5 shrink-0" aria-hidden="true" />
-            {/* v2: the campaign's name is the chip beside it. */}
+            {/* v2: the campaign chip beside it names the campaign (not on the phone bar). */}
             {!isV2 && <span className="truncate max-w-[8.5rem] sm:max-w-none">{titleName}</span>}
           </Link>
           {isV2 && !phoneBar && data.project.campaign && (
@@ -984,7 +992,7 @@ export default function AtlasViewer() {
             aria-label="Search atlas (Ctrl+K)"
           >
             <Search className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Search</span>
+            {!phoneBar && <span className="hidden sm:inline">Search</span>}
             <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded bg-muted border border-border">
               ⌘K
             </kbd>
@@ -1052,6 +1060,16 @@ export default function AtlasViewer() {
             className="flex-1 relative min-h-0 isolate"
             aria-label={`Interactive map: ${activeMap?.name ?? "Ocean"}. Use arrow keys to pan, plus and minus to zoom.`}
           >
+            {phoneBar && rulerActive && (
+              <Button
+                variant="secondary"
+                className="absolute top-14 right-3 z-20 min-h-10 min-w-10 gap-2 shadow"
+                onClick={() => setRulerActive(false)}
+              >
+                <Ruler className="h-4 w-4" aria-hidden="true" />
+                Done measuring
+              </Button>
+            )}
             {isV2 && (
               <AtlasCanvas
                 tree={data.tree}

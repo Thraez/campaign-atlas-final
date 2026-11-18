@@ -8,6 +8,7 @@
  *
  * PLAYER-SAFE: reads only the map tree.
  */
+import { useRef } from "react";
 import { MoreHorizontal } from "lucide-react";
 import {
   DropdownMenu,
@@ -41,14 +42,15 @@ export function MapBreadcrumb({
   const { hidden, shown } = compact
     ? collapseCrumbs(crumbs, COMPACT_MAX_CRUMBS)
     : { hidden: [], shown: crumbs };
-  const tap = compact ? "min-h-10 px-1" : "";
+  const tap = compact ? "min-h-10 min-w-10 px-1" : "";
+  const navRef = useRef<HTMLElement>(null);
   const sep = (
     <span aria-hidden="true" className="shrink-0 text-muted-foreground">
       &gt;
     </span>
   );
   return (
-    <nav aria-label="Breadcrumb" className="min-w-0 text-sm">
+    <nav aria-label="Breadcrumb" className="min-w-0 text-sm" ref={navRef} tabIndex={-1}>
       <ol className="flex items-center gap-1 min-w-0 overflow-hidden whitespace-nowrap">
         {hidden.length > 0 && (
           <li className="flex items-center gap-1 shrink-0">
@@ -62,7 +64,14 @@ export function MapBreadcrumb({
                   <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
+              <DropdownMenuContent
+                align="start"
+                onCloseAutoFocus={(e) => {
+                  // The chosen level re-renders the trail; keep focus in it.
+                  e.preventDefault();
+                  navRef.current?.focus();
+                }}
+              >
                 {hidden.map((c) => (
                   <DropdownMenuItem
                     key={keyOf(c)}
@@ -81,7 +90,9 @@ export function MapBreadcrumb({
           return (
             <li
               key={keyOf(c)}
-              className={`flex items-center gap-1 min-w-0 ${last ? "" : "shrink-0"}`}
+              className={`flex items-center gap-1 min-w-0 ${
+                last ? "shrink-0 max-w-full" : compact ? "max-w-[30%]" : "shrink-0"
+              }`}
             >
               {(i > 0 || hidden.length > 0) && sep}
               {last ? (

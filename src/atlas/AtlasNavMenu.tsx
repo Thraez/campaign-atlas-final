@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router";
 import {
   Menu,
   Compass,
@@ -54,6 +54,15 @@ export function AtlasNavMenu({
 }: AtlasNavMenuProps) {
   const editorEnabled = __INCLUDE_EDITOR__ && isDmToolsEnabled();
   const [open, setOpen] = useState(false);
+  // The drawer is controlled: close it when the page or the map changes under it
+  // (a link, Back/Forward), so it never stays open over the new view.
+  const { pathname, search } = useLocation();
+  useEffect(() => setOpen(false), [pathname, search]);
+  useEffect(() => {
+    const close = () => setOpen(false);
+    window.addEventListener("popstate", close);
+    return () => window.removeEventListener("popstate", close);
+  }, []);
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
