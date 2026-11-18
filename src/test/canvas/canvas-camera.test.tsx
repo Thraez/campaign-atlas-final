@@ -104,11 +104,16 @@ const tree = buildMapTree(PROJECT);
 const OCEAN: View = { kind: "ocean" };
 const ISLE: View = { kind: "map", mapId: "isle" };
 
-function mount(view: View, camera: Camera, onViewChange?: (v: View, c: Camera) => void) {
+function mount(
+  view: View,
+  camera: Camera,
+  onViewChange?: (v: View, c: Camera) => void,
+  canvasTree = tree,
+) {
   const onCameraChange = vi.fn();
   const el = (v: View, c: Camera) => (
     <AtlasCanvas
-      tree={tree}
+      tree={canvasTree}
       view={v}
       camera={c}
       onCameraChange={onCameraChange}
@@ -343,5 +348,190 @@ describe("AtlasCanvas zoom handoff (R-32)", () => {
     expect(latLng[1]).toBeCloseTo(300, 9);
     expect(zoom).toBeCloseTo(1, 9);
     expect(opts).toEqual({ animate: false });
+  });
+});
+
+describe("AtlasCanvas zoom handoff: a pan's moveend during a zoom (R-40)", () => {
+  const zoomTo = (oceanPoint: [number, number], zoom: number) => {
+    fake.center = { lat: 2000 - oceanPoint[1], lng: oceanPoint[0] };
+    fake.zoom = zoom;
+  };
+
+  it("still hands off when a pan's moveend lands between zoomstart and zoomend", () => {
+    const onViewChange = vi.fn();
+    mount(OCEAN, "fit", onViewChange);
+    fake.container.dispatchEvent(new Event("wheel"));
+    act(() => fake.fire("zoomstart"));
+    act(() => fake.fire("moveend")); // a fling's inertia ends mid-zoom
+    zoomTo([500, 500], 1);
+    act(() => fake.fire("zoomend"));
+    expect(onViewChange).toHaveBeenCalledTimes(1);
+    expect(onViewChange.mock.calls[0][0]).toEqual(ISLE);
+  });
+
+  it("a pan's moveend after the zoom has ended still disarms", () => {
+    const onViewChange = vi.fn();
+    mount(OCEAN, "fit", onViewChange);
+    fake.container.dispatchEvent(new Event("wheel"));
+    act(() => fake.fire("zoomstart"));
+    zoomTo([500, 500], 0.25); // below the threshold: stays
+    act(() => {
+      fake.fire("zoomend");
+      fake.fire("moveend");
+    });
+    fake.container.dispatchEvent(new Event("mousedown"));
+    act(() => fake.fire("moveend")); // a pan
+    act(() => fake.fire("zoomstart")); // a zoom nobody asked for
+    zoomTo([500, 500], 1);
+    act(() => fake.fire("zoomend"));
+    expect(onViewChange).not.toHaveBeenCalled();
+  });
+
+  it("a new view while a zoom is in flight leaves no stale state behind", () => {
+    const onViewChange = vi.fn();
+    const m = mount(OCEAN, "fit", onViewChange);
+    fake.container.dispatchEvent(new Event("wheel"));
+    act(() => fake.fire("zoomstart")); // never ends: the view changes first
+    m.update(ISLE, "fit");
+    fake.container.dispatchEvent(new Event("mousedown"));
+    act(() => fake.fire("moveend")); // a pan on the new view disarms as usual
+    m.update(ISLE, { center: [300, 200], zoom: -4 }); // the caller's camera, past the leave zoom
+    expect(onViewChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("AtlasCanvas zoom handoff: the zoom's anchor point (P-04)", () => {
+  // The isle (600x400, ocean (200,300), scale 1) holds a child "cove" (400x300)
+  // in the frame (0,0)-(100,75), entered at isle zoom 2 (cove zoom = isle zoom - 2).
+  const NESTED = {
+    schemaVersion: 2,
+    maps: [
+      { id: "isle", name: "Isle", width: 600, height: 400, layers: [] },
+      {
+        id: "cove",
+        name: "Cove",
+        width: 400,
+        height: 300,
+        layers: [],
+        parent: "isle",
+        frame: { x: 0, y: 0, width: 100, height: 75, rotation: 0 },
+        enterZoom: 2,
+      },
+    ],
+    ocean: {
+      width: 3000,
+      height: 2000,
+      sea: "default",
+      onOcean: [{ map: "isle", x: 200, y: 300, scale: 1, rotation: 0 }],
+    },
+  } as unknown as AtlasProject;
+  const nested = buildMapTree(NESTED);
+  const COVE: View = { kind: "map", mapId: "cove" };
+
+  /**
+   * A zoom anchored at a screen point, as Leaflet's wheel and double-click
+   * make it: the ground `p` (view px) sits `s` screen px from the centre
+   * before and after. The view is `h` px tall.
+   */
+  const anchoredZoom = (
+    h: number,
+    p: [number, number],
+    s: [number, number],
+    z0: number,
+    z1: number,
+  ) => {
+    const at = (z: number) => {
+      const k = 2 ** -z;
+      fake.center = { lat: h - (p[1] - s[1] * k), lng: p[0] - s[0] * k };
+      fake.zoom = z;
+    };
+    at(z0);
+    act(() => fake.fire("zoomstart"));
+    at(z1);
+    act(() => fake.fire("zoomend"));
+  };
+
+  const start = (view: View, center: [number, number], zoom: number) => {
+    const onViewChange = vi.fn();
+    mount(view, { center, zoom }, onViewChange, nested);
+    return onViewChange;
+  };
+
+  it("enters the child under the cursor at max zoom, though the centre is outside its frame", () => {
+    // The Oskmark dead end: the cursor sits by the frame's bottom-right corner,
+    // so the frame slides up-left and the centre never reaches it.
+    const onViewChange = start(ISLE, [250, 180], 1);
+    fake.container.dispatchEvent(new Event("wheel"));
+    anchoredZoom(400, [95, 70], [-310, -220], 1, 4);
+    // the centre ends at (114.4, 83.75): outside the frame (0..100, 0..75)
+    expect(fake.center.lng).toBeGreaterThan(100);
+    expect(onViewChange).toHaveBeenCalledTimes(1);
+    const [view, cam] = onViewChange.mock.calls[0] as [View, { center: number[]; zoom: number }];
+    expect(view).toEqual(COVE);
+    expect(cam.zoom).toBeCloseTo(2, 9);
+    // the same ground under the centre: isle (114.375, 83.75) is cove (457.5, 335)
+    expect(cam.center[0]).toBeCloseTo(457.5, 9);
+    expect(cam.center[1]).toBeCloseTo(335, 9);
+  });
+
+  it("still enters by the centre when the cursor is beside the frame (keyboard, buttons, today's rule)", () => {
+    const onViewChange = start(ISLE, [50, 40], 1);
+    fake.container.dispatchEvent(new Event("keydown"));
+    anchoredZoom(400, [50, 40], [0, 0], 1, 2.5); // zoom about the centre
+    expect(onViewChange.mock.calls[0][0]).toEqual(COVE);
+  });
+
+  it("stays below the child's enter zoom with the cursor on the frame", () => {
+    const onViewChange = start(ISLE, [250, 180], 1);
+    fake.container.dispatchEvent(new Event("wheel"));
+    anchoredZoom(400, [95, 70], [-310, -220], 1, 1.9);
+    expect(onViewChange).not.toHaveBeenCalled();
+  });
+
+  it("never enters on a zoom out with the cursor on the frame", () => {
+    const onViewChange = start(ISLE, [114.375, 83.75], 4);
+    fake.container.dispatchEvent(new Event("wheel"));
+    anchoredZoom(400, [95, 70], [-310, -220], 4, 3);
+    expect(onViewChange).not.toHaveBeenCalled();
+  });
+
+  it("never enters on the canvas's own zoom with the cursor on the frame", () => {
+    const onViewChange = start(ISLE, [250, 180], 1);
+    anchoredZoom(400, [95, 70], [-310, -220], 1, 4); // no input event first
+    expect(onViewChange).not.toHaveBeenCalled();
+  });
+
+  it("zooming out of the child hands back with the ground under the cursor kept", () => {
+    // cove leaves below min(fit (1), fit - 0.5, landing (0) - 0.5): -0.5
+    const onViewChange = start(COVE, [200, 150], 1);
+    fake.container.dispatchEvent(new Event("wheel"));
+    anchoredZoom(300, [100, 80], [-200, -140], 1, -0.75);
+    expect(onViewChange).toHaveBeenCalledTimes(1);
+    const [view, cam] = onViewChange.mock.calls[0] as [View, { center: number[]; zoom: number }];
+    expect(view).toEqual(ISLE);
+    expect(cam.zoom).toBeCloseTo(1.25, 9);
+    // cove (100, 80) is isle (25, 20), still 200,140 screen px up-left of the centre
+    const k = 2 ** -1.25;
+    expect(cam.center[0]).toBeCloseTo(25 + 200 * k, 9);
+    expect(cam.center[1]).toBeCloseTo(20 + 140 * k, 9);
+  });
+
+  it("one wheel step from the ocean with the cursor on the frame enters the isle only", () => {
+    // isle entry: ocean fill zoom log2(600/400) = 0.58; the cove needs isle 2 = ocean 2
+    const onViewChange = start(OCEAN, [400, 400], 0);
+    fake.container.dispatchEvent(new Event("wheel"));
+    anchoredZoom(2000, [295, 370], [-100, -60], 0, 1.5); // the cove's frame is ocean (200..300, 300..375)
+    expect(onViewChange.mock.calls[0][0]).toEqual(ISLE);
+  });
+
+  it("an anchor that a pan pushed off the screen falls back to the centre", () => {
+    const onViewChange = start(ISLE, [300, 200], 1);
+    fake.container.dispatchEvent(new Event("wheel"));
+    act(() => fake.fire("zoomstart"));
+    // the centre moved far while the zoom barely changed: no screen point stayed put
+    fake.center = { lat: 400 - 300, lng: 500 };
+    fake.zoom = 1.01;
+    act(() => fake.fire("zoomend"));
+    expect(onViewChange).not.toHaveBeenCalled();
   });
 });
