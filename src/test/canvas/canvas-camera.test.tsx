@@ -85,6 +85,7 @@ vi.mock("@/hooks/use-reduce-motion", () => ({ useReduceMotion: () => reduceMotio
 
 const { buildMapTree } = await import("@/atlas/ocean/mapTree");
 const { AtlasCanvas } = await import("@/atlas/canvas/AtlasCanvas");
+const { OCEAN_FIT_MARGIN } = await import("@/atlas/canvas/canvasGeometry");
 type Camera = import("@/atlas/canvas/AtlasCanvas").CanvasCamera;
 type View = import("@/atlas/canvas/AtlasCanvas").CanvasView;
 
@@ -143,7 +144,7 @@ describe("AtlasCanvas camera", () => {
   it("reports the fitted camera on first mount, in the view's own pixels", () => {
     const m = mount(OCEAN, "fit");
     expect(fake.fitBounds).toHaveBeenCalledTimes(1);
-    // the fit box is the placed map: (200,300)-(800,700), centre (500,500)
+    // the fit box is the placed map (200,300)-(800,700) plus the margin: same centre (500,500)
     expect(m.onCameraChange).toHaveBeenLastCalledWith({ center: [500, 500], zoom: -1 });
   });
 
@@ -186,8 +187,9 @@ describe("AtlasCanvas camera", () => {
   });
 
   // R-36: the ocean floor (one level below the fit zoom) is set before the camera applies.
-  // The test ocean fits 600x400 in 800x600: fit zoom log2(4/3), floor 1 below it.
-  const OCEAN_FLOOR = Math.log2(800 / 600) - 1;
+  // The test ocean fits 600x400 plus the R-37 margin (8% a side: 696x464) in 800x600:
+  // fit zoom log2(800/696), floor 1 below it.
+  const OCEAN_FLOOR = Math.log2(800 / (600 * (1 + 2 * OCEAN_FIT_MARGIN))) - 1;
 
   it("clamps a handed-over ocean camera below the floor to it, with no animated setZoom", () => {
     const m = mount(ISLE, "fit");
