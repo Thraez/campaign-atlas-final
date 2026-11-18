@@ -19,7 +19,9 @@
  *   (`src/atlas/ocean/zoomHandoff.ts`), `onViewChange` gets the new view and
  *   the camera showing the same ground; the caller renders them. No page
  *   load, no refetch: only the view swaps. Fractional zoom (`zoomSnap` 0)
- *   keeps that camera exact.
+ *   keeps that camera exact. The old view's pictures fade out over the new
+ *   one's on the same ground (P-05, `HandoffCrossfade`); a plain cut with
+ *   reduced motion.
  * - A view the tree can't show (a map id that isn't a tree node, the ocean of
  *   a v1 atlas) draws nothing, and no children.
  *
@@ -47,6 +49,7 @@ import { KeepCanvasSized } from "./KeepCanvasSized";
 import { CANVAS_IMAGE_PANE, ChildFrames, OceanMaps } from "./CanvasLayers";
 import { seaStyle, type SeaStyle } from "./seaStyle";
 import { ZoomHandoff } from "./ZoomHandoff";
+import { HandoffCrossfade, type CrossfadeControl } from "./HandoffCrossfade";
 
 export type { CanvasCameraState } from "./CanvasCamera";
 
@@ -142,6 +145,8 @@ export function AtlasCanvas({
   const handingOff = useRef(false);
   // User input waiting for its zoom (ZoomHandoff); cleared by the canvas's own moves.
   const armed = useRef(false);
+  // The soft handoff's copy of the old view (HandoffCrossfade).
+  const crossfade = useRef<CrossfadeControl | null>(null);
   const reportView =
     onViewChange &&
     ((v: CanvasView, c: CanvasCameraState) => {
@@ -149,6 +154,15 @@ export function AtlasCanvas({
       queueMicrotask(() => {
         handingOff.current = false;
       });
+      // P-05: copy the old view's pictures to fade out over the new one. The
+      // copy is only a nicety: if it fails, the handoff is a plain cut and
+      // still reaches the caller (R-32).
+      try {
+        const to = resolveView(tree, v);
+        if (to) crossfade.current?.capture(to.key, to.height, c);
+      } catch {
+        // A plain cut.
+      }
       onViewChange(v, c);
     });
   const reportCamera =
@@ -228,6 +242,12 @@ export function AtlasCanvas({
               mapHeight={resolved.fit.maxY - resolved.fit.minY}
               bounds={boxBounds(resolved.height, resolved.fit)}
               skip={!isFit}
+            />
+            {/* After CanvasCamera: the ghost goes on once the handed-over camera is applied. */}
+            <HandoffCrossfade
+              viewKey={resolved.key}
+              reduceMotion={reduceMotion}
+              control={crossfade}
             />
             {resolved.kind === "ocean" ? (
               <OceanMaps

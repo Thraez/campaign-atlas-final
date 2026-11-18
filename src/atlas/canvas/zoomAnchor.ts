@@ -1,12 +1,18 @@
 /**
- * The zoom handoff's pure helpers (`ZoomHandoff`): the zoom's anchor, the
- * limits a view will have once shown, and how soon after input a pan's
- * moveend still belongs to that input. Kept out of the component file.
+ * The zoom handoff's pure helpers (`ZoomHandoff`): the zoom's anchor and the
+ * handoff it asks for, the limits a view will have once shown, and how soon
+ * after input a pan's moveend still belongs to that input. Kept out of the
+ * component file.
  *
  * PLAYER-SAFE: import nothing editor- or viewer-only.
  */
 import type { MapTree } from "../ocean/mapTree";
-import type { TreeView } from "../ocean/zoomHandoff";
+import {
+  nextView,
+  type HandoffOptions,
+  type TreeView,
+  type ViewCamera,
+} from "../ocean/zoomHandoff";
 import type { Point } from "../content/schema";
 import { oceanFitBox } from "./canvasGeometry";
 import { CANVAS_MIN_ZOOM, oceanMinZoom } from "./OceanZoomLimit";
@@ -62,4 +68,31 @@ export function zoomAnchor(
   if (Math.abs(offset[0]) > size.x / 2 + 1 || Math.abs(offset[1]) > size.y / 2 + 1) return null;
   const k0 = 2 ** -z0;
   return { point: [c0[0] + offset[0] * k0, c0[1] + offset[1] * k0], offset };
+}
+
+/**
+ * The handoff a zoom's anchor asks for (P-04), or null when the anchor stays.
+ * The new camera keeps the anchor's ground at the same screen offset from the
+ * centre, at the zoom the new view will really show: setView clamps the zoom
+ * to its limits (the ocean's floor) but keeps the centre.
+ */
+export function anchoredHandoff(
+  tree: MapTree,
+  view: TreeView,
+  anchor: { point: Point; offset: Point },
+  zoom: number,
+  size: { x: number; y: number },
+  opts: HandoffOptions,
+): { view: TreeView; camera: ViewCamera } | null {
+  const viewport = { width: size.x, height: size.y };
+  const r = nextView(tree, view, { center: anchor.point, zoom }, viewport, opts);
+  if (r.kind !== "handoff") return null;
+  const [lo, hi] = viewZoomLimits(tree, r.view, size, opts.maxZoom ?? Infinity);
+  const z = Math.min(hi, Math.max(lo, r.camera.zoom));
+  const k = 2 ** -z;
+  const c = r.camera.center;
+  return {
+    view: r.view,
+    camera: { center: [c[0] - anchor.offset[0] * k, c[1] - anchor.offset[1] * k], zoom: z },
+  };
 }
