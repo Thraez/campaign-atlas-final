@@ -26,13 +26,17 @@ instead of the app's Cinzel.
   (two rings, four cardinal ticks, a faint four-point rose, a gold-and-grey needle), the site title
   in Cinzel gold (`text-2xl`), and a muted "Loading atlas…" `role="status"` line, centred on
   `bg-background`. Used by `App.tsx`'s Suspense fallback (`RouteFallback`, was "Loading…") and by
-  `AtlasLoadState`'s loading branch (viewer, timeline, browse, credits, secrets), so the route
+  `AtlasLoadState`'s loading branch (viewer, timeline, browse, credits, secrets; its default label
+  is now "Loading atlas…", was "Loading…", so browse, credits and secrets say the same as the
+  fallback and screen readers don't hear a second, different status), so the route
   chunk's fallback and the page's data wait are the same picture.
 - **Title** comes from `document.title`, which the build already sets per campaign
   (`brandIndexHtml`); the loader shows nothing the player site doesn't ship. Falls back to "Atlas".
-- **Motion:** a 600 ms fade-in and a ±7° needle sway on a 3.6 s cycle. Both run on the page clock
-  (negative `animation-delay` from `performance.now()`), so when the Suspense fallback hands over
-  to the page's loader the needle carries on instead of restarting, and the fade isn't replayed.
+- **Motion:** a 600 ms fade-in and a ±7° needle sway on a 3.6 s cycle. The fade runs once from
+  mount, on the first loader of the page load only: a module-level flag (`atlasLoaderShown.ts`) skips it when the Suspense
+  fallback hands over to the page's loader, so it doesn't fade twice. The sway runs on the page
+  clock (negative `animation-delay` from `performance.now()`), so the needle carries on across
+  that remount instead of restarting.
   `useReduceMotion()` (calm mode OR the OS setting) leaves both classes out; the
   `prefers-reduced-motion` and `:root[data-calm]` blocks in `src/index.css` also switch them off.
   Calm mode reaches the document before React renders (`syncCalmModeToDocument()` in `main.tsx`).

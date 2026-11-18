@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { useReduceMotion } from "@/hooks/use-reduce-motion";
+import { loaderShownThisLoad, markLoaderShown } from "./atlasLoaderShown";
 
 /** One sway of the needle (ms); keep in step with `.atlas-loader-needle` in src/index.css. */
 const SWAY_MS = 3600;
@@ -17,18 +19,22 @@ function siteTitle(): string {
  * app's dark ground. Shared by the route fallback and every reader page's
  * loading state, so the switch between them shows no flash.
  *
- * Motion: a short fade-in and a slow needle sway, both left out under
- * `useReduceMotion` (calm mode or the OS setting). Both animations are phased
- * on the page clock (negative delay), so a remount carries on where the last
- * one was instead of restarting.
+ * Motion: a 600 ms fade-in on the first loader this page load (the route
+ * fallback handing over to a page's loader doesn't fade again) and a slow
+ * needle sway phased on the page clock (negative delay), so a remount carries
+ * on where the last one was. Both are left out under `useReduceMotion` (calm
+ * mode or the OS setting).
  */
 export function AtlasLoader({ label = "Loading atlas…" }: { label?: string }) {
   const reduce = useReduceMotion();
+  const [fade] = useState(() => !loaderShownThisLoad());
+  useEffect(() => {
+    markLoaderShown();
+  }, []);
   const now = typeof performance !== "undefined" ? performance.now() : 0;
   return (
     <div
-      className={`atlas-loader h-screen w-screen flex flex-col items-center justify-center gap-4 bg-background px-6 text-center ${reduce ? "" : "atlas-loader-motion"}`}
-      style={reduce ? undefined : { animationDelay: `-${Math.round(now)}ms` }}
+      className={`atlas-loader h-screen w-screen flex flex-col items-center justify-center gap-4 bg-background px-6 text-center ${fade && !reduce ? "atlas-loader-motion" : ""}`}
       data-reduce-motion={reduce ? "true" : undefined}
     >
       <svg

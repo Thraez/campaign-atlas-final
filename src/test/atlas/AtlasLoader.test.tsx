@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { AtlasLoader } from "@/atlas/content/AtlasLoader";
+import { _resetLoaderForTests } from "@/atlas/content/atlasLoaderShown";
 import { _resetCalmModeForTests, setCalmMode } from "@/hooks/use-reduce-motion";
 
 const originalMatchMedia = window.matchMedia;
@@ -29,6 +30,7 @@ describe("AtlasLoader (P-08)", () => {
   const originalTitle = document.title;
   beforeEach(() => {
     _resetCalmModeForTests();
+    _resetLoaderForTests();
     osReducedMotion(false);
     document.title = "Lantern Road";
   });
@@ -46,6 +48,20 @@ describe("AtlasLoader (P-08)", () => {
     render(<AtlasLoader label="Loading timeline…" />);
     expect(screen.getByRole("status")).toHaveTextContent("Loading timeline…");
     expect(screen.getByText("Lantern Road")).toBeInTheDocument();
+  });
+
+  it("hides the compass drawing from screen readers", () => {
+    const { container } = render(<AtlasLoader />);
+    expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("fades in only on the first loader of the page load", () => {
+    const first = render(<AtlasLoader />);
+    expect(first.container.querySelector(".atlas-loader-motion")).not.toBeNull();
+    first.unmount();
+    const second = render(<AtlasLoader />);
+    expect(second.container.querySelector(".atlas-loader-motion")).toBeNull();
+    expect(second.container.querySelector(".atlas-loader-needle")).not.toBeNull();
   });
 
   it("says Loading atlas… by default", () => {

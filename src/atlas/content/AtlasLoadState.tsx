@@ -28,7 +28,7 @@ export function AtlasLoadState({
   loading,
   backHref = "/atlas",
   backLabel = "Back to atlas",
-  loadingLabel = "Loading…",
+  loadingLabel = "Loading atlas…",
   errorTitle = "Atlas not built yet",
   offlineTitle = "Atlas not available offline yet",
   extraHint,
