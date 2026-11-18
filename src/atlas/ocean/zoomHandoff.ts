@@ -72,6 +72,13 @@ export interface HandoffOptions {
   /** The canvas's zoom limits (Leaflet's minZoom and maxZoom). */
   minZoom?: number;
   maxZoom?: number;
+  /**
+   * At most this many handoffs (levels) for one settled zoom. Default: chain
+   * as far as the zoom reaches. The canvas passes 1 for a wheel step (P-06),
+   * so one notch never crosses two handoffs; the result may then be a view
+   * the next zoom the same way leaves at once.
+   */
+  maxSteps?: number;
 }
 
 /** How far above the min zoom a clamped leave zoom sits, so zooming to the min leaves. */
@@ -266,7 +273,8 @@ export function nextView(
   }
   let cur: Step = { view, camera };
   let moved = false;
-  for (let i = 0; i < MAX_STEPS; i++) {
+  const steps = Math.min(MAX_STEPS, opts.maxSteps ?? MAX_STEPS);
+  for (let i = 0; i < steps; i++) {
     const s = step(tree, cur.view, cur.camera, viewport, opts);
     if (!s) break;
     cur = s;

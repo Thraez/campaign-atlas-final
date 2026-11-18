@@ -272,6 +272,8 @@ export default function AtlasViewer() {
   }, []);
   // v2: where the canvas looks, and the last camera of each view the user left.
   const [camera, setCamera] = useState<CanvasCamera>("fit");
+  // P-06: bumped with a crumb or Reset so the canvas glides there.
+  const [glide, setGlide] = useState(0);
   const viewMemory = useRef(new Map<string, CanvasCameraState>());
   const [openId, setOpenId] = useState<string | null>(null);
   // v2: a link named another campaign or something this output doesn't have (R-35).
@@ -932,7 +934,10 @@ export default function AtlasViewer() {
               <MapBreadcrumb
                 tree={data.tree}
                 view={view}
-                onGo={(v) => goView(v, "memory", true)}
+                onGo={(v) => {
+                  setGlide((g) => g + 1);
+                  goView(v, "memory", true);
+                }}
                 compact={phoneBar}
               />
             </div>
@@ -1075,6 +1080,7 @@ export default function AtlasViewer() {
                 tree={data.tree}
                 view={view}
                 camera={camera}
+                glide={glide}
                 className={rulerActive ? "atlas-ruler" : ""}
                 onCameraChange={onCanvasCamera}
                 onEnterMap={onCanvasEnterMap}
@@ -1205,7 +1211,14 @@ export default function AtlasViewer() {
             {/* Reset view — bottom-right map corner */}
             <button
               type="button"
-              onClick={() => (isV2 ? setCamera("fit") : fitMapRef.current?.())}
+              onClick={() => {
+                if (!isV2) {
+                  fitMapRef.current?.();
+                  return;
+                }
+                setGlide((g) => g + 1);
+                setCamera("fit");
+              }}
               className="absolute bottom-3 right-3 z-map-control h-8 w-8 rounded bg-background/90 border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               aria-label="Reset map view"
               title="Reset view (fit map to screen)"

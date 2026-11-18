@@ -1,4 +1,4 @@
-import type { LatLngBoundsLiteral } from "leaflet";
+import type { LatLngBoundsLiteral, Map as LeafletMap } from "leaflet";
 import { useEffect, useRef } from "react";
 import { useMap } from "react-leaflet";
 import { whenMapHasSize } from "./whenMapHasSize";
@@ -14,6 +14,9 @@ import { whenMapHasSize } from "./whenMapHasSize";
  * fits the placed maps, R-31); `mapWidth` and `mapHeight` are then that area's
  * size. Its value is read when `mapId` changes, like the rest.
  *
+ * `fit` replaces the final `fitBounds(bounds, { animate: false })` (the shared
+ * canvas glides a Reset, P-06); read when the fit runs. Without it, as before.
+ *
  * Player-safe: no editor imports. Used by the viewer and the editor.
  */
 export function FitMapOnOpen({
@@ -22,18 +25,22 @@ export function FitMapOnOpen({
   mapHeight,
   skip = false,
   bounds,
+  fit: fitWith,
 }: {
   mapId: string;
   mapWidth: number;
   mapHeight: number;
   skip?: boolean;
   bounds?: LatLngBoundsLiteral;
+  fit?: (map: LeafletMap, bounds: LatLngBoundsLiteral) => void;
 }) {
   const map = useMap();
   const seenMapIdRef = useRef<string | null>(null);
   const boundsRef = useRef(bounds);
+  const fitRef = useRef(fitWith);
   useEffect(() => {
     boundsRef.current = bounds;
+    fitRef.current = fitWith;
   });
 
   useEffect(() => {
@@ -54,7 +61,9 @@ export function FitMapOnOpen({
       const raw = Math.log2(ratio);
       const fitZoom = snap ? Math.floor(raw / snap) * snap : raw;
       if (Number.isFinite(fitZoom) && fitZoom < map.getMinZoom()) map.setMinZoom(fitZoom);
-      if (!skip) map.fitBounds(fit, { animate: false });
+      if (skip) return;
+      if (fitRef.current) fitRef.current(map, fit);
+      else map.fitBounds(fit, { animate: false });
     });
   }, [mapId, mapWidth, mapHeight, skip, map]);
 
