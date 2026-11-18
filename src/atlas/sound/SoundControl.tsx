@@ -18,9 +18,14 @@ function SoundInvite({
   return (
     <div
       data-sound-invite
-      className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 shadow-sm"
+      className="atlas-notice flex items-center gap-1 rounded-full border border-border bg-card/95 pl-3 pr-1 shadow-md"
     >
-      <button type="button" onClick={onEnable} className="flex items-center gap-2 text-sm">
+      {/* h-10: a 40px tap target on a phone (was the 20px line of text). */}
+      <button
+        type="button"
+        onClick={onEnable}
+        className="flex h-10 items-center gap-2 whitespace-nowrap text-sm"
+      >
         <span aria-hidden>🔊</span>
         {label}
       </button>
@@ -30,7 +35,7 @@ function SoundInvite({
         type="button"
         aria-label="Dismiss"
         onClick={onDismiss}
-        className="-mr-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
       >
         <span aria-hidden>✕</span>
       </button>
@@ -66,7 +71,9 @@ export function SoundControl({ hasSoundscape = true }: SoundControlProps) {
   const ambienceActive = soundEnabled && audioUnlocked && ambiencePlaying && !muted && !calmMode;
 
   return (
-    <div className="absolute bottom-4 right-4 z-[1000] flex items-center gap-2">
+    // Placed by the map's notice dock (MapNoticeDock), not pinned to a corner:
+    // the corner is the minimap's.
+    <div data-sound-control className="flex flex-wrap items-center justify-end gap-2">
       <span role="status" aria-live="polite" className="sr-only">
         {ambienceActive ? "Ambience playing" : ""}
       </span>

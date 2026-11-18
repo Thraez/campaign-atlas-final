@@ -13,7 +13,7 @@ export function WanderControl({ discovered, total, canWander, onWander }: Wander
   if (total === 0) return null;
   const pct = total > 0 ? Math.round((discovered / total) * 100) : 0;
   return (
-    <div className="atlas-wander absolute left-3 bottom-3 z-[500] flex flex-col gap-1.5">
+    <div className="atlas-wander absolute left-3 bottom-3 z-map-control flex flex-col gap-1.5">
       {canWander ? (
         <button
           type="button"

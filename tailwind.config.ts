@@ -39,6 +39,14 @@ export default {
         display: ['Cinzel', 'Georgia', 'serif'],
         body: ['Inter', 'system-ui', 'sans-serif'],
       },
+      // The stacking scale; the values and why live with the CSS variables in src/index.css.
+      zIndex: {
+        chrome: "var(--z-chrome)",
+        toast: "var(--z-toast)",
+        scrim: "var(--z-scrim)",
+        "map-control": "var(--z-map-control)",
+        "map-notice": "var(--z-map-notice)",
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",

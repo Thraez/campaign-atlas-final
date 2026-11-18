@@ -26,7 +26,7 @@ export function PinLegend({ placements, entityById }: PinLegendProps) {
   if (presets.length === 0) return null;
 
   return (
-    <div className="absolute top-3 right-3 z-[500] select-none">
+    <div className="absolute top-3 right-3 z-map-control select-none">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
