@@ -5,11 +5,12 @@
  *
  * PLAYER-SAFE: import nothing editor- or viewer-only.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MutableRefObject } from "react";
 import { useMap } from "react-leaflet";
 import type { Point } from "../content/schema";
 import { whenMapHasSize } from "../map/whenMapHasSize";
 import { fromLatLng, toLatLng } from "./canvasGeometry";
+import { GLIDE_SECONDS, runGlide, takeGlide, type GlideControl } from "./canvasMotion";
 
 /** A camera in a view's own pixels (top-left origin) and Leaflet zoom. */
 export interface CanvasCameraState {
@@ -29,6 +30,7 @@ export function CanvasCamera({
   onCameraChange,
   onApply,
   reduceMotion,
+  glide,
 }: {
   /** Changes whenever the view (and so the coordinate space) changes. */
   viewKey: string;
@@ -39,6 +41,8 @@ export function CanvasCamera({
   /** Called just before the canvas moves the map to an explicit camera. */
   onApply?: () => void;
   reduceMotion: boolean;
+  /** P-06: this commit's glide request, taken by an explicit camera (CanvasGlide). */
+  glide?: MutableRefObject<GlideControl>;
 }) {
   const map = useMap();
   const reported = useRef<CanvasCameraState | null>(null);
@@ -76,11 +80,19 @@ export function CanvasCamera({
     if (!viewChanged && reported.current && near(reported.current, target)) return;
     return whenMapHasSize(map, () => {
       onApplyRef.current?.();
+      const g = takeGlide(glide);
+      if (g && glide) {
+        // P-06: a crumb or Reset glides (CanvasGlide).
+        runGlide(map, glide, viewHeight, g, () =>
+          map.flyTo(toLatLng(viewHeight, target.center), zoom, { duration: GLIDE_SECONDS }),
+        );
+        return;
+      }
       map.setView(toLatLng(viewHeight, target.center), zoom, {
         animate: !reduceMotion && !viewChanged,
       });
     });
-  }, [map, viewKey, viewHeight, cx, cy, zoom, reduceMotion]);
+  }, [map, viewKey, viewHeight, cx, cy, zoom, reduceMotion, glide]);
 
   return null;
 }

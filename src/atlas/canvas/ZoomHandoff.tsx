@@ -34,6 +34,12 @@
  * screen point. A zoom about the centre (keyboard, buttons) has the centre as
  * its anchor, so it behaves exactly as before.
  *
+ * Feel (P-06): a zoom whose last input was a wheel event (a mouse notch, or a
+ * trackpad scroll or pinch batch) hands off one level at most (`maxSteps` 1),
+ * so one notch never crosses two handoffs. Other zooms chain as before. A
+ * glide (a breadcrumb or Reset, `CanvasGlide`) marks its own zoomstart; that
+ * zoom, and any user input during it, ends without a handoff.
+ *
  * PLAYER-SAFE: import nothing editor- or viewer-only.
  */
 import { useEffect, useRef, type MutableRefObject } from "react";
@@ -43,6 +49,7 @@ import { nextView, type TreeView, type ViewCamera } from "../ocean/zoomHandoff";
 import type { Point } from "../content/schema";
 import { fromLatLng } from "./canvasGeometry";
 import { INPUT_STOP_WINDOW_MS, anchoredHandoff, zoomAnchor } from "./zoomAnchor";
+import type { GlideControl } from "./canvasMotion";
 
 /** DOM events that start a user zoom (or a pan, which clears on its moveend). */
 const USER_INPUT = ["wheel", "touchstart", "dblclick", "keydown", "mousedown", "pointerdown"];
@@ -54,6 +61,7 @@ export function ZoomHandoff({
   viewHeight,
   fitKey,
   armed,
+  glide,
   onViewChange,
 }: {
   tree: MapTree;
@@ -65,6 +73,8 @@ export function ZoomHandoff({
   fitKey: string;
   /** The user-input flag, shared with AtlasCanvas so CanvasCamera can clear it. */
   armed: MutableRefObject<boolean>;
+  /** P-06: marks the zoomstart of the canvas's own glide (CanvasGlide). */
+  glide?: MutableRefObject<GlideControl>;
   onViewChange?: (view: TreeView, camera: ViewCamera) => void;
 }) {
   const map = useMap();
@@ -81,19 +91,28 @@ export function ZoomHandoff({
   useEffect(() => {
     armed.current = false;
     // The zoom in flight: its zoom and centre at zoomstart; null between zooms.
-    let zoomFrom: { zoom: number; center: Point } | null = null;
+    // "glide": the canvas's own glide (P-06), which never hands off.
+    let zoomFrom: { zoom: number; center: Point } | "glide" | null = null;
     // When the last user input came (performance.now()).
     let inputAt = -Infinity;
+    // The last input's DOM event type: a wheel step hands off one level at most (P-06).
+    let inputType = "";
     const el = map.getContainer();
-    const mark = () => {
+    const mark = (e: Event) => {
       armed.current = true;
       inputAt = performance.now();
+      inputType = e.type;
     };
     for (const e of USER_INPUT) el.addEventListener(e, mark, { capture: true, passive: true });
     // The first zoomstart of a zoom counts: a calm-mode pinch past a zoom limit
     // fires a second one at touchend (`_resetView` clamps the zoom back), which
     // would read the zoom's direction from that last step.
     const onZoomStart = () => {
+      if (glide?.current.flying) {
+        glide.current.flying = false;
+        zoomFrom = "glide";
+        return;
+      }
       if (zoomFrom !== null) return;
       zoomFrom = { zoom: map.getZoom(), center: fromLatLng(viewHeight, map.getCenter()) };
     };
@@ -103,6 +122,8 @@ export function ZoomHandoff({
       zoomFrom = null;
       if (!armed.current) return;
       armed.current = false;
+      // A glide, or a user zoom or drag that cut one short: no handoff.
+      if (from === "glide") return;
       const { tree: t, view: v, onViewChange: report } = latest.current;
       if (!report) return;
       const size = map.getSize();
@@ -112,7 +133,14 @@ export function ZoomHandoff({
         from === null || from.zoom === zoom ? undefined : zoom > from.zoom ? "in" : "out";
       if (from !== null && direction === undefined) return;
       const viewport = { width: size.x, height: size.y };
-      const opts = { direction, minZoom: map.getMinZoom(), maxZoom: map.getMaxZoom() } as const;
+      // One wheel step (a notch, or a 40 ms trackpad batch) crosses one handoff at most.
+      const maxSteps = inputType === "wheel" ? 1 : undefined;
+      const opts = {
+        direction,
+        minZoom: map.getMinZoom(),
+        maxZoom: map.getMaxZoom(),
+        maxSteps,
+      } as const;
       // The anchor first (the ground under the pointer), then the centre.
       const anchor = from && zoomAnchor(from.center, from.zoom, center, zoom, size);
       if (anchor) {
@@ -154,7 +182,7 @@ export function ZoomHandoff({
       map.off("zoomend", onZoomEnd);
       map.off("moveend", onMoveEnd);
     };
-  }, [map, viewKey, viewHeight, armed]);
+  }, [map, viewKey, viewHeight, armed, glide]);
 
   return null;
 }

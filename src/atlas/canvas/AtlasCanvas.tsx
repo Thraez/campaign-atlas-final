@@ -22,6 +22,10 @@
  *   keeps that camera exact. The old view's pictures fade out over the new
  *   one's on the same ground (P-05, `HandoffCrossfade`); a plain cut with
  *   reduced motion.
+ * - Feel (P-06): a wheel notch zooms about half a level on any platform
+ *   (`canvasMotion.ts`), and hands off one level at most. Bumping `glide` in
+ *   the same update as a camera or view change glides there (`CanvasGlide`):
+ *   the viewer's breadcrumb and Reset. A jump with reduced motion.
  * - A view the tree can't show (a map id that isn't a tree node, the ocean of
  *   a v1 atlas) draws nothing, and no children.
  *
@@ -34,6 +38,7 @@
  * src/test/canvas/canvas-imports.test.ts.
  */
 import { useRef, useState, type ReactNode } from "react";
+import L from "leaflet";
 import { MapContainer } from "react-leaflet";
 import { useReduceMotion } from "@/hooks/use-reduce-motion";
 import { FlatCRS } from "../map/flatCRS";
@@ -50,6 +55,16 @@ import { CANVAS_IMAGE_PANE, ChildFrames, OceanMaps } from "./CanvasLayers";
 import { seaStyle, type SeaStyle } from "./seaStyle";
 import { ZoomHandoff } from "./ZoomHandoff";
 import { HandoffCrossfade, type CrossfadeControl } from "./HandoffCrossfade";
+import { GlideRequest } from "./CanvasGlide";
+import {
+  GLIDE_SECONDS,
+  canvasWheelPxPerZoomLevel,
+  leafletWheelPxFactor,
+  newGlideControl,
+  runGlide,
+  takeGlide,
+  type GlideControl,
+} from "./canvasMotion";
 
 export type { CanvasCameraState } from "./CanvasCamera";
 
@@ -66,6 +81,12 @@ export interface AtlasCanvasProps {
   /** A zoom handoff: show `view` at `camera` (R-32). Without it the canvas never hands off. */
   onViewChange?: (view: CanvasView, camera: CanvasCameraState) => void;
   /** Caller layers, drawn inside the map pane above the canvas's own. */
+  /**
+   * P-06: bump in the same update as a camera or view change to glide there
+   * (a breadcrumb, Reset) instead of jumping. A view change glides only up
+   * the tree. Ignored under reduced motion.
+   */
+  glide?: number;
   children?: ReactNode;
   className?: string;
 }
@@ -127,6 +148,7 @@ export function AtlasCanvas({
   onEnterMap,
   onFrameHover,
   onViewChange,
+  glide = 0,
   children,
   className,
 }: AtlasCanvasProps) {
@@ -147,6 +169,17 @@ export function AtlasCanvas({
   const armed = useRef(false);
   // The soft handoff's copy of the old view (HandoffCrossfade).
   const crossfade = useRef<CrossfadeControl | null>(null);
+  // This commit's glide request (P-06).
+  const glideControl = useRef<GlideControl>(newGlideControl());
+  // Wheel speed for this platform, set once: Leaflet reads it at creation.
+  const [wheelPxPerZoomLevel] = useState(() =>
+    canvasWheelPxPerZoomLevel(
+      leafletWheelPxFactor(
+        L.Browser as { linux?: boolean; chrome?: boolean; mac?: boolean },
+        typeof window === "undefined" ? 1 : window.devicePixelRatio || 1,
+      ),
+    ),
+  );
   const reportView =
     onViewChange &&
     ((v: CanvasView, c: CanvasCameraState) => {
@@ -191,6 +224,7 @@ export function AtlasCanvas({
         minZoom={CANVAS_MIN_ZOOM}
         maxZoom={4}
         zoomSnap={0}
+        wheelPxPerZoomLevel={wheelPxPerZoomLevel}
         zoomAnimation={!reduceMotion}
         zoomControl
         keyboard
@@ -205,6 +239,16 @@ export function AtlasCanvas({
         <KeepCanvasSized />
         {resolved && (
           <>
+            {/* First: reads the camera still on screen before any other effect moves it. */}
+            <GlideRequest
+              tree={tree}
+              view={view}
+              viewKey={resolved.key}
+              viewHeight={resolved.height}
+              glide={glide}
+              reduceMotion={reduceMotion}
+              control={glideControl}
+            />
             {/* CanvasCamera before FitMapOnOpen: sibling effects run in order (after
                 every cleanup), so its moveend listener for this view is attached
                 before the fit's synchronous fitBounds fires moveend, and the
@@ -218,6 +262,7 @@ export function AtlasCanvas({
               viewHeight={resolved.height}
               fitKey={`${resolved.key}#${fit.gen}`}
               armed={armed}
+              glide={glideControl}
               onViewChange={reportView}
             />
             <OceanZoomLimit
@@ -235,6 +280,7 @@ export function AtlasCanvas({
                 armed.current = false;
               }}
               reduceMotion={reduceMotion}
+              glide={glideControl}
             />
             <FitMapOnOpen
               mapId={`${resolved.key}#${fit.gen}`}
@@ -242,6 +288,14 @@ export function AtlasCanvas({
               mapHeight={resolved.fit.maxY - resolved.fit.minY}
               bounds={boxBounds(resolved.height, resolved.fit)}
               skip={!isFit}
+              fit={(map, b) => {
+                const g = takeGlide(glideControl);
+                if (!g) map.fitBounds(b, { animate: false });
+                else
+                  runGlide(map, glideControl, resolved.height, g, () =>
+                    map.flyToBounds(b, { duration: GLIDE_SECONDS }),
+                  );
+              }}
             />
             {/* After CanvasCamera: the ghost goes on once the handed-over camera is applied. */}
             <HandoffCrossfade
