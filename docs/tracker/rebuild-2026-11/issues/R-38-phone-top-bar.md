@@ -29,3 +29,37 @@ alone on row 2; the breadcrumb on row 3. R-33 accepted the wrapping as provision
 ## Out of scope
 
 Redesigning the desktop bar.
+
+## Built
+
+Polish item P-03, branch `polish-p03-phone-top-bar`.
+
+- On v2 below 768 px (new `usePhoneBar`, a `matchMedia` hook; false in jsdom and on desktop) the
+  bar is `[menu][home][breadcrumb][search icon]` on one row, no wrapping. Ruler, calm mode, grid
+  and offline options moved into the menu drawer as a "Map tools" group (`PhoneBarTools`, new
+  `tools` render prop on `AtlasNavMenu`, which is now controlled so the ruler row closes the
+  drawer). Calm shows On/Off and keeps `aria-pressed`; offline options is a row (`OfflineMenu
+  row`) that opens the same dropdown. The campaign chip is not repeated: the drawer's title is
+  already the campaign name. The legend is on the map, not in the bar.
+- Breadcrumb: `collapseCrumbs` (pure, tested). Up to three levels show in full; deeper trails show
+  "…" plus the last two, and "…" opens a menu of the earlier levels, so every level stays
+  reachable. Crumb buttons, home, menu and search are 40 px tall at least.
+- Bar height at 375 px: 137 px before, 61 px after (ocean and Quessaly > Oskmark, both campaigns).
+  Desktop (1280): 61 px and the same controls as the baseline.
+- Review fixes: search shows its word only off the phone bar; earlier crumbs shrink and truncate
+  while the current one keeps its room; a visible "Done measuring" chip (top right of the map)
+  ends the ruler on the phone bar, and the ruler hint reads "Click or tap two points to measure";
+  the "..." menu returns focus to the breadcrumb; menu rows are named by their visible text
+  (offline row also shows its short state); the menu drawer closes on Back/Forward and link
+  changes; the header wraps as before on v2 desktop and tablet (wrap, then no wrap from 768 px).
+- Provisional call: campaign name not shown on the phone bar (it is the drawer title and the
+  home link's name, aria-label and tooltip); Isak to look.
+- Provisional calls: the grid toggle also moved into the menu; the phone breakpoint is `md`
+  (768), so a 768 to 1023 px tablet keeps the full bar plus the hamburger as before. v1 is
+  untouched (its bar never wraps, and the phone layout is v2 only).
+- Tests: `collapseCrumbs.test.ts`; two cases in `AtlasViewer.v2.test.tsx` (bar holds only the
+  four items; menu holds ruler and calm, ruler closes it).
+- Not checked: v1 in a browser (unchanged code path, covered by the existing smoke tests); a
+  trail deeper than three levels in a browser (the test world has three; the fold is unit
+  tested); a real touch device.
+- Shots: `docs/polish-2026-11/shots/p03-*.jpg`.

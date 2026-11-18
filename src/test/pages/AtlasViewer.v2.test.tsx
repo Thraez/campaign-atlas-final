@@ -454,3 +454,77 @@ describe("AtlasViewer, v2 output", () => {
     });
   });
 });
+
+// R-38: at phone width the bar is breadcrumb and search; the other controls live in the menu.
+describe("AtlasViewer, v2 phone bar", () => {
+  const realMatchMedia = window.matchMedia;
+  beforeEach(() => {
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("max-width: 767px"),
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+  });
+  afterEach(() => {
+    window.matchMedia = realMatchMedia;
+  });
+
+  const header = () => within(document.querySelector("header")!);
+  const openMenu = () =>
+    fireEvent.click(header().getByRole("button", { name: /navigation menu/i }));
+
+  it("keeps only the menu, home, breadcrumb and search in the bar", async () => {
+    await open("main", "/?map=oskmark");
+    const bar = header();
+    expect(bar.getByRole("navigation", { name: "Breadcrumb" })).toBeInTheDocument();
+    expect(bar.getByRole("button", { name: /search atlas/i })).toBeInTheDocument();
+    for (const name of [/distance/i, /calm mode/i, /offline options/i, /grid/i]) {
+      expect(bar.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    expect(document.querySelector("header [data-campaign-chip]")).toBeNull();
+  });
+
+  it("offers the ruler and calm mode in the menu, under the campaign's name; the ruler closes it", async () => {
+    await open("main", "/?map=oskmark");
+    openMenu();
+    const tools = await screen.findByRole("group", { name: "Map tools" });
+    expect(screen.getByRole("dialog").textContent).toContain(projects.main.campaign!.name);
+    const calm = within(tools).getByRole("button", { name: /calm mode/i });
+    const before = calm.getAttribute("aria-pressed");
+    fireEvent.click(calm);
+    expect(calm.getAttribute("aria-pressed")).not.toBe(before);
+    fireEvent.click(calm);
+    const ruler = within(tools).getByRole("button", { name: /measure distance/i });
+    expect(ruler).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(ruler);
+    await waitFor(() =>
+      expect(screen.queryByRole("group", { name: "Map tools" })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("the ruler from the drawer turns the ruler on, and Done measuring turns it off", async () => {
+    await open("main", "/?map=oskmark");
+    expect(screen.queryByRole("button", { name: /done measuring/i })).not.toBeInTheDocument();
+    openMenu();
+    const tools = await screen.findByRole("group", { name: "Map tools" });
+    fireEvent.click(within(tools).getByRole("button", { name: /measure distance/i }));
+    const done = await screen.findByRole("button", { name: /done measuring/i });
+    // (The hint portals into the map container, which the Leaflet mock keeps detached.)
+    fireEvent.click(done);
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /done measuring/i })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("names the home link after the campaign, since the chip is not on the phone bar", async () => {
+    await open("main", "/?map=oskmark");
+    expect(
+      header().getByRole("link", { name: `${projects.main.campaign!.name}, home` }),
+    ).toBeInTheDocument();
+  });
+});

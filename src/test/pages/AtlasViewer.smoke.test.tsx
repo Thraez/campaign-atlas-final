@@ -805,3 +805,43 @@ describe("Search 'this map only' filter is scoped to the active map (N115)", () 
     expect(within(dialog).queryByText("Silver Lake")).not.toBeInTheDocument();
   });
 });
+
+// R-38: the phone bar is v2 only; v1 at phone width keeps its bar.
+describe("AtlasViewer v1 at phone width (R-38)", () => {
+  const originalMatchMedia = window.matchMedia;
+  afterEach(() => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: originalMatchMedia,
+    });
+  });
+
+  it("keeps ruler and calm in the bar and has no Map tools group", async () => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        matches: query.includes("max-width: 767px"),
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(document.querySelector("main#atlas-main")).toBeInTheDocument());
+    const bar = within(document.querySelector("header")!);
+    expect(bar.getByRole("button", { name: "Toggle distance ruler" })).toBeInTheDocument();
+    expect(bar.getByRole("button", { name: /calm mode/i })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Map tools" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /done measuring/i })).not.toBeInTheDocument();
+  });
+});

@@ -1,4 +1,5 @@
-import { Link } from "react-router";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router";
 import {
   Menu,
   Compass,
@@ -29,6 +30,11 @@ interface AtlasNavMenuProps {
   showCredits?: boolean;
   /** The world's display name. Falls back to "Atlas" when absent. */
   worldName?: string;
+  /**
+   * Phone-bar controls (R-38): the viewer's ruler, calm mode and the like, shown
+   * under the links. Gets a `close` that shuts the drawer (the ruler uses it).
+   */
+  tools?: (close: () => void) => React.ReactNode;
 }
 
 /**
@@ -39,10 +45,26 @@ interface AtlasNavMenuProps {
  * Embedded in the toolbar of `AtlasViewer`, `AtlasBrowse`, `AtlasTimeline`
  * with `lg:hidden` so it disappears once the inline buttons fit naturally.
  */
-export function AtlasNavMenu({ publishedAt, footer, showCredits, worldName }: AtlasNavMenuProps) {
+export function AtlasNavMenu({
+  publishedAt,
+  footer,
+  showCredits,
+  worldName,
+  tools,
+}: AtlasNavMenuProps) {
   const editorEnabled = __INCLUDE_EDITOR__ && isDmToolsEnabled();
+  const [open, setOpen] = useState(false);
+  // The drawer is controlled: close it when the page or the map changes under it
+  // (a link, Back/Forward), so it never stays open over the new view.
+  const { pathname, search } = useLocation();
+  useEffect(() => setOpen(false), [pathname, search]);
+  useEffect(() => {
+    const close = () => setOpen(false);
+    window.addEventListener("popstate", close);
+    return () => window.removeEventListener("popstate", close);
+  }, []);
   return (
-    <Sheet>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button
           variant="ghost"
@@ -68,6 +90,16 @@ export function AtlasNavMenu({ publishedAt, footer, showCredits, worldName }: At
           {showCredits && <NavItem to="/atlas/credits" icon={Star} label="Credits" />}
           {editorEnabled && <NavItem to="/atlas/edit" icon={MapPin} label="Edit pins" badge="DM" />}
         </nav>
+        {tools && (
+          <div
+            className="px-2 py-2 border-t border-border space-y-1"
+            role="group"
+            aria-label="Map tools"
+            data-menu-tools=""
+          >
+            {tools(() => setOpen(false))}
+          </div>
+        )}
         {(publishedAt || footer) && (
           <div className="px-4 py-3 border-t border-border space-y-2">
             {footer}
@@ -97,7 +129,7 @@ function NavItem({
   return (
     <Link
       to={to}
-      className="flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+      className="flex items-center gap-3 px-3 py-2 min-h-10 rounded-md text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
     >
       <Icon className="h-4 w-4 text-muted-foreground" aria-hidden={true} />
       <span className="flex-1">{label}</span>

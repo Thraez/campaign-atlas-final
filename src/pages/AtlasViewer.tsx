@@ -59,8 +59,10 @@ import { ReadingPanelWelcome } from "@/atlas/entity/ReadingPanelWelcome";
 import { pickStarters } from "@/atlas/entity/pickStarters";
 import { MapCreditOverlay, activeMapCredits } from "@/atlas/map/MapCreditOverlay";
 import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
+import { usePhoneBar } from "@/hooks/use-phone-bar";
 import { useReduceMotion } from "@/hooks/use-reduce-motion";
 import { CalmModeToggle } from "@/atlas/CalmModeToggle";
+import { PhoneBarTools } from "@/atlas/PhoneBarTools";
 import { AtlasNavMenu } from "@/atlas/AtlasNavMenu";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RulerLayer } from "@/atlas/ruler/RulerLayer";
@@ -287,6 +289,7 @@ export default function AtlasViewer() {
   // desktop-aside breakpoint (1024px) — not just mobile. Otherwise tablets
   // sit in a dead zone where neither the aside nor the sheet is mounted.
   const hasDesktopAside = useHasDesktopAside();
+  const phoneBarQuery = usePhoneBar();
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const [showGrid, setShowGrid] = useState<boolean | null>(null); // null = use map default
   const [rulerActive, setRulerActive] = useState(false);
@@ -440,6 +443,8 @@ export default function AtlasViewer() {
     [data, activeMapId],
   );
   const isV2 = !!data?.tree.ocean;
+  // R-38: v2 on a phone: breadcrumb and search on one bar, the rest in the menu.
+  const phoneBar = isV2 && phoneBarQuery;
   const view: TreeView = activeMap ? { kind: "map", mapId: activeMap.id } : { kind: "ocean" };
   // The offline menu and banner describe what is stored for this map.
   const offlineMap: OfflineMap | null = useMemo(() => {
@@ -872,29 +877,64 @@ export default function AtlasViewer() {
           Skip to map
         </a>
         <header
-          className={`atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border ${isV2 ? "flex-wrap md:flex-nowrap" : ""}`}
+          className={`atlas-toolbar flex items-center gap-2 px-3 md:px-4 py-2.5 border-b border-border ${isV2 ? (phoneBar ? "flex-nowrap" : "flex-wrap md:flex-nowrap") : ""}`}
         >
           <AtlasNavMenu
             publishedAt={data.project.publishedAt}
             showCredits={showCredits}
             worldName={titleName}
+            tools={
+              phoneBar
+                ? (close) => (
+                    <PhoneBarTools
+                      grid={
+                        activeMap?.grid
+                          ? {
+                              on: showGrid ?? activeMap.grid.enabled !== false,
+                              toggle: () =>
+                                setShowGrid((v) => !(v ?? activeMap.grid!.enabled !== false)),
+                            }
+                          : undefined
+                      }
+                      rulerActive={rulerActive}
+                      onToggleRuler={() => setRulerActive((v) => !v)}
+                      close={close}
+                    />
+                  )
+                : undefined
+            }
           />
-          {/* The name used to be `hidden sm:inline`, so a phone showed only the
-              compass — someone opening a shared link couldn't see which world
-              they were looking at. Truncate instead of hiding. */}
+          {/* v1 shows the world's name here (truncated, never hidden). v2 shows
+              only the compass: the campaign chip is hidden on the phone bar, so
+              the campaign name is the link's accessible name and tooltip (and
+              the menu drawer's title). */}
           <Link
             to="/"
-            className="font-display text-lg text-primary hover:opacity-80 flex items-center gap-2 min-w-0"
-            aria-label={isV2 ? "Home" : undefined}
+            className={`font-display text-lg text-primary hover:opacity-80 flex items-center gap-2 min-w-0 ${phoneBar ? "min-h-10 min-w-10 justify-center" : ""}`}
+            aria-label={
+              isV2
+                ? phoneBar && data.project.campaign
+                  ? `${data.project.campaign.name}, home`
+                  : "Home"
+                : undefined
+            }
+            title={phoneBar ? data.project.campaign?.name : undefined}
           >
             <Compass className="h-5 w-5 shrink-0" aria-hidden="true" />
-            {/* v2: the campaign's name is the chip beside it. */}
+            {/* v2: the campaign chip beside it names the campaign (not on the phone bar). */}
             {!isV2 && <span className="truncate max-w-[8.5rem] sm:max-w-none">{titleName}</span>}
           </Link>
-          {isV2 && data.project.campaign && <CampaignChip name={data.project.campaign.name} />}
+          {isV2 && !phoneBar && data.project.campaign && (
+            <CampaignChip name={data.project.campaign.name} />
+          )}
           {isV2 ? (
-            <div className="order-last basis-full min-w-0 md:order-none md:basis-auto md:flex-1 md:pl-3">
-              <MapBreadcrumb tree={data.tree} view={view} onGo={(v) => goView(v, "memory", true)} />
+            <div className="min-w-0 flex-1 md:pl-3">
+              <MapBreadcrumb
+                tree={data.tree}
+                view={view}
+                onGo={(v) => goView(v, "memory", true)}
+                compact={phoneBar}
+              />
             </div>
           ) : (
             <div className="flex-1" />
@@ -919,7 +959,7 @@ export default function AtlasViewer() {
               </SelectContent>
             </Select>
           )}
-          {activeMap?.grid && (
+          {!phoneBar && activeMap?.grid && (
             <Button
               variant={(showGrid ?? activeMap.grid.enabled !== false) ? "secondary" : "ghost"}
               size="sm"
@@ -931,26 +971,28 @@ export default function AtlasViewer() {
               <Grid3x3 className="h-4 w-4" aria-hidden="true" />
             </Button>
           )}
-          <Button
-            variant={rulerActive ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setRulerActive((v) => !v)}
-            title="Measure distance (click two points)"
-            aria-label="Toggle distance ruler"
-            aria-pressed={rulerActive}
-          >
-            <Ruler className="h-4 w-4" aria-hidden="true" />
-          </Button>
-          <CalmModeToggle />
+          {!phoneBar && (
+            <Button
+              variant={rulerActive ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setRulerActive((v) => !v)}
+              title="Measure distance (click two points)"
+              aria-label="Toggle distance ruler"
+              aria-pressed={rulerActive}
+            >
+              <Ruler className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          )}
+          {!phoneBar && <CalmModeToggle />}
           <Button
             variant="secondary"
-            size="sm"
+            size={phoneBar ? "icon" : "sm"}
             onClick={() => setSearchOpen(true)}
-            className="gap-2"
+            className={phoneBar ? "shrink-0" : "gap-2"}
             aria-label="Search atlas (Ctrl+K)"
           >
             <Search className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Search</span>
+            {!phoneBar && <span className="hidden sm:inline">Search</span>}
             <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded bg-muted border border-border">
               ⌘K
             </kbd>
@@ -988,7 +1030,7 @@ export default function AtlasViewer() {
               </Link>
             </Button>
           )}
-          <OfflineMenu />
+          {!phoneBar && <OfflineMenu />}
           <span className="hidden lg:block text-[11px] text-muted-foreground ml-2">
             Updated {new Date(data.project.publishedAt).toLocaleDateString()}
           </span>
@@ -1018,6 +1060,16 @@ export default function AtlasViewer() {
             className="flex-1 relative min-h-0 isolate"
             aria-label={`Interactive map: ${activeMap?.name ?? "Ocean"}. Use arrow keys to pan, plus and minus to zoom.`}
           >
+            {phoneBar && rulerActive && (
+              <Button
+                variant="secondary"
+                className="absolute top-14 right-3 z-20 min-h-10 min-w-10 gap-2 shadow"
+                onClick={() => setRulerActive(false)}
+              >
+                <Ruler className="h-4 w-4" aria-hidden="true" />
+                Done measuring
+              </Button>
+            )}
             {isV2 && (
               <AtlasCanvas
                 tree={data.tree}
