@@ -247,7 +247,13 @@ describe("AtlasCanvas, map view", () => {
     const d = draw(projects.main, { kind: "map", mapId: "quessaly-world" });
     expect(d.images.length).toBeGreaterThan(0);
     for (const i of d.images) expect(i.getAttribute("data-pane")).toBe("tilePane");
-    expect(d.svgs).toHaveLength(0);
+    // No ocean maps: the one SVG overlay is the drawn chart paper (P-07), no pictures in it.
+    expect(d.svgs).toHaveLength(1);
+    expect(d.svgs[0].querySelector(".atlas-chart-paper")).not.toBeNull();
+    expect(d.svgs[0].querySelectorAll("image")).toHaveLength(0);
+    expect(parse<Record<string, string>>(d.svgs[0], "data-attributes")["data-canvas-map"]).toBe(
+      undefined,
+    );
     expect(d.labels).toEqual(["Oskmark"]);
     const node = d.tree.byId.get("oskmark")!;
     expect(parse<number[][]>(d.polygons[0], "data-positions")).toEqual(

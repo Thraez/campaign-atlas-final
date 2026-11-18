@@ -42,7 +42,6 @@ import { MapContainer } from "react-leaflet";
 import { useReduceMotion } from "@/hooks/use-reduce-motion";
 import { FlatCRS } from "../map/flatCRS";
 import { FitMapOnOpen } from "../map/FitMapOnOpen";
-import { MapImageLayers } from "../map/MapImageLayers";
 import { OceanBackground } from "../ocean/OceanBackground";
 import type { MapTree, MapTreeNode } from "../ocean/mapTree";
 import type { TreeView } from "../ocean/zoomHandoff";
@@ -50,7 +49,7 @@ import { CANVAS_MIN_ZOOM, OceanZoomLimit } from "./OceanZoomLimit";
 import { boxBounds, oceanFitBox, type Box } from "./canvasGeometry";
 import { CanvasCamera, type CanvasCameraState } from "./CanvasCamera";
 import { KeepCanvasSized } from "./KeepCanvasSized";
-import { CANVAS_IMAGE_PANE, ChildFrames, OceanMaps } from "./CanvasLayers";
+import { ChildFrames, MapPictures, OceanMaps } from "./CanvasLayers";
 import { seaStyle, type SeaStyle } from "./seaStyle";
 import { ZoomHandoff } from "./ZoomHandoff";
 import { HandoffCrossfade, type CrossfadeControl } from "./HandoffCrossfade";
@@ -130,14 +129,6 @@ function resolveView(tree: MapTree, view: CanvasView): Resolved | null {
 
 const DEFAULT_SEA = "#18313f";
 
-/** Label look: a name on the map, not a card. Leaflet's tooltip box is turned off. */
-const LABEL_CSS = `
-.atlas-canvas .atlas-canvas-label{background:transparent;border:0;box-shadow:none;padding:0;
-color:#f8f1df;font-weight:600;font-size:13px;letter-spacing:.02em;white-space:nowrap;
-text-shadow:0 0 3px rgba(0,0,0,.9),0 1px 2px rgba(0,0,0,.8)}
-.atlas-canvas .atlas-canvas-label::before{display:none}
-`;
-
 /** The canvas's wheel zoom (P-06, `canvasWheel.ts`) in place of Leaflet's. */
 function CanvasWheelZoom() {
   useCanvasWheelZoom();
@@ -210,7 +201,6 @@ export function AtlasCanvas({
       role="region"
       aria-label={resolved ? `Map canvas: ${resolved.label}` : "Map canvas"}
     >
-      <style>{LABEL_CSS}</style>
       <OceanBackground map={water} reduceMotion={reduceMotion} />
       <MapContainer
         crs={FlatCRS}
@@ -333,12 +323,9 @@ function MapView({
   onEnterMap?: (mapId: string) => void;
   onFrameHover?: (mapId: string | null) => void;
 }) {
-  const { map } = node;
   return (
     <>
-      {(map.wrapX ? [-map.width, 0, map.width] : [0]).map((dx) => (
-        <MapImageLayers key={`wrap-${dx}`} map={map} dx={dx} pane={CANVAS_IMAGE_PANE} />
-      ))}
+      <MapPictures node={node} />
       <ChildFrames node={node} onEnterMap={onEnterMap} onFrameHover={onFrameHover} />
     </>
   );

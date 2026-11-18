@@ -86,18 +86,20 @@ export function makeReactLeafletModule() {
   // forwardRef so layers that attach a ref to an overlay (e.g.
   // MapLayerEditableOverlay → ImageOverlay) don't trip React's
   // "function components cannot be given refs" warning.
-  const pass = (name: string) =>
-    React.forwardRef<HTMLDivElement, { children?: React.ReactNode }>(function LeafletMock(
+  // SVGOverlay is an <svg>, so the SVG it holds (<g>, <image>, <rect>) renders
+  // in the SVG namespace, as it does in Leaflet.
+  const pass = (name: string, tag: "div" | "svg" = "div") =>
+    React.forwardRef<Element, { children?: React.ReactNode }>(function LeafletMock(
       { children },
       ref,
     ) {
-      return React.createElement("div", { "data-leaflet": name, ref }, children);
+      return React.createElement(tag, { "data-leaflet": name, ref }, children);
     });
   return {
     MapContainer: pass("MapContainer"),
     TileLayer: pass("TileLayer"),
     ImageOverlay: pass("ImageOverlay"),
-    SVGOverlay: pass("SVGOverlay"),
+    SVGOverlay: pass("SVGOverlay", "svg"),
     VideoOverlay: pass("VideoOverlay"),
     Marker: pass("Marker"),
     Popup: pass("Popup"),
