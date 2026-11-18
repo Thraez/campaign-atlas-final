@@ -77,7 +77,10 @@ const { parseAtlasProject } = await import("@/atlas/content/atlasGuard");
 const { buildMapTree } = await import("@/atlas/ocean/mapTree");
 const { frameOutline } = await import("@/atlas/ocean/mapTree");
 const { AtlasCanvas } = await import("@/atlas/canvas/AtlasCanvas");
-const { boxBounds, oceanFitBox, toLatLng } = await import("@/atlas/canvas/canvasGeometry");
+const { OCEAN_FIT_MARGIN, boxBounds, oceanFitBox, oceanPlacedBox, placementCorners, toLatLng } =
+  await import("@/atlas/canvas/canvasGeometry");
+const { oceanMinZoom } = await import("@/atlas/canvas/OceanZoomLimit");
+const { nextView } = await import("@/atlas/ocean/zoomHandoff");
 const { rotatedFixture, OCEAN_TURN, FRAME_TURN } =
   await import("@/atlas/canvas-harness/rotatedFixture");
 const { stableMap } = await import("../helpers/reactLeafletMock");
@@ -346,5 +349,87 @@ describe("AtlasCanvas, map view", () => {
       );
     });
     expect(onFrameHover).toHaveBeenLastCalledWith(null);
+  });
+});
+
+// R-37: the ocean's fit leaves sea around the placed maps.
+describe("AtlasCanvas, ocean fit margin (R-37)", () => {
+  // The canvas at 1280x800 with the 400px open aside beside it (the aside is a
+  // flex sibling of the canvas, so its width is simply not the canvas's).
+  const VIEWPORT = { x: 1280 - 400, y: 800 - 61 };
+  const fitZoom = (w: number, h: number, size: { x: number; y: number }) =>
+    Math.log2(Math.min(size.x / w, size.y / h));
+
+  it.each(["main", "sandbox"] as const)(
+    "%s: the fit box holds every placement with the margin",
+    (c) => {
+      const tree = buildMapTree(projects[c]);
+      const fit = oceanFitBox(tree)!;
+      const placed = oceanPlacedBox(tree)!;
+      const w = placed.maxX - placed.minX;
+      const h = placed.maxY - placed.minY;
+      const corners = tree.roots.flatMap((n) =>
+        n.placement ? placementCorners(n.placement, n.map) : [],
+      );
+      expect(corners.length).toBeGreaterThan(0);
+      for (const [x, y] of corners) {
+        expect(x - fit.minX).toBeGreaterThanOrEqual(w * OCEAN_FIT_MARGIN - 1e-6);
+        expect(fit.maxX - x).toBeGreaterThanOrEqual(w * OCEAN_FIT_MARGIN - 1e-6);
+        expect(y - fit.minY).toBeGreaterThanOrEqual(h * OCEAN_FIT_MARGIN - 1e-6);
+        expect(fit.maxY - y).toBeGreaterThanOrEqual(h * OCEAN_FIT_MARGIN - 1e-6);
+      }
+    },
+  );
+
+  it("main at 1280x800: what the canvas fits shows every frame whole, with sea beside it", () => {
+    const d = draw(projects.main, { kind: "ocean" });
+    const [[south, west], [north, east]] = vi.mocked(stableMap.fitBounds).mock.calls[0][0] as [
+      [number, number],
+      [number, number],
+    ];
+    const zoom = fitZoom(east - west, north - south, VIEWPORT);
+    const k = 2 ** zoom;
+    const cx = (west + east) / 2;
+    const cy = (north + south) / 2; // lat; ocean y is 2000 - lat
+    const placed = oceanPlacedBox(d.tree)!;
+    for (const [x, y] of d.tree.roots.flatMap((n) =>
+      n.placement ? placementCorners(n.placement, n.map) : [],
+    )) {
+      const sx = VIEWPORT.x / 2 + (x - cx) * k;
+      const sy = VIEWPORT.y / 2 + (2000 - y - cy) * -k;
+      expect(sx).toBeGreaterThanOrEqual(24); // clear of the left edge (and the zoom control)
+      expect(sx).toBeLessThanOrEqual(VIEWPORT.x - 24); // clear of the aside's edge
+      expect(sy).toBeGreaterThanOrEqual(24);
+      expect(sy).toBeLessThanOrEqual(VIEWPORT.y - 24);
+    }
+    expect(placed.maxX).toBeLessThan(east); // the same margin the box carries
+  });
+
+  it("the zoom floor stays one level below the padded fit, and a map view fits edge to edge", () => {
+    const tree = buildMapTree(projects.main);
+    const fit = oceanFitBox(tree)!;
+    const w = fit.maxX - fit.minX;
+    const h = fit.maxY - fit.minY;
+    expect(oceanMinZoom(VIEWPORT, w, h)).toBeCloseTo(fitZoom(w, h, VIEWPORT) - 1, 9);
+    draw(projects.main, { kind: "map", mapId: "quessaly-world" });
+    expect(stableMap.fitBounds).toHaveBeenCalledWith(
+      boxBounds(400, { minX: 0, minY: 0, maxX: 600, maxY: 400 }),
+      { animate: false },
+    );
+  });
+
+  it.each(["main", "sandbox"] as const)("%s: a fit never hands off", (c) => {
+    const tree = buildMapTree(projects[c]);
+    const fit = oceanFitBox(tree)!;
+    for (const size of [VIEWPORT, { x: 375, y: 600 }, { x: 1920, y: 1080 }]) {
+      const zoom = fitZoom(fit.maxX - fit.minX, fit.maxY - fit.minY, size);
+      const camera = {
+        center: [(fit.minX + fit.maxX) / 2, (fit.minY + fit.maxY) / 2] as [number, number],
+        zoom,
+      };
+      expect(
+        nextView(tree, { kind: "ocean" }, camera, { width: size.x, height: size.y }).kind,
+      ).toBe("stay");
+    }
   });
 });

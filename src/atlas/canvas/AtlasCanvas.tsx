@@ -6,7 +6,10 @@
  * - Ocean view: the sea (`ocean.sea`, looked up in `seaStyle.ts`), every
  *   top-level map's images at its placement (position, scale, rotation about
  *   the centre) and its name. No pins, regions or routes. Opens fitted to the
- *   placed maps, not the whole ocean.
+ *   placed maps plus a margin of sea (`OCEAN_FIT_MARGIN`, R-37), not the
+ *   whole ocean. The canvas is only as wide as the space the caller gives it,
+ *   so the viewer's side panel (a sibling of the canvas) is already outside
+ *   the fit. A map view fits edge to edge.
  * - Map view: the map's images (as the viewer draws them) and each child's
  *   frame as a soft outline with its name.
  * - Clicking a map or a frame calls `onEnterMap`; hovering one calls
