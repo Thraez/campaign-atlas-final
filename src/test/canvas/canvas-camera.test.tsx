@@ -66,6 +66,10 @@ const fake = {
   getContainer() {
     return this.container;
   },
+  /** No panes: the soft handoff (P-05) has no pictures to copy and stays a cut. */
+  getPane(): HTMLElement | undefined {
+    return undefined;
+  },
   fitBounds: vi.fn((b: [[number, number], [number, number]]) => {
     fake.moveTo({ lat: (b[0][0] + b[1][0]) / 2, lng: (b[0][1] + b[1][1]) / 2 }, -1);
   }),
