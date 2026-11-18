@@ -36,8 +36,8 @@ export default {
         },
       },
       fontFamily: {
-        display: ['Cinzel', 'Georgia', 'serif'],
-        body: ['Inter', 'system-ui', 'sans-serif'],
+        display: ["var(--font-display)"],
+        body: ["var(--font-body)"],
       },
       // The stacking scale; the values and why live with the CSS variables in src/index.css.
       zIndex: {
