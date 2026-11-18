@@ -154,9 +154,15 @@ export function AtlasCanvas({
       queueMicrotask(() => {
         handingOff.current = false;
       });
-      // P-05: copy the old view's pictures to fade out over the new one.
-      const to = resolveView(tree, v);
-      if (to) crossfade.current?.capture(to.key, to.height, c);
+      // P-05: copy the old view's pictures to fade out over the new one. The
+      // copy is only a nicety: if it fails, the handoff is a plain cut and
+      // still reaches the caller (R-32).
+      try {
+        const to = resolveView(tree, v);
+        if (to) crossfade.current?.capture(to.key, to.height, c);
+      } catch {
+        // A plain cut.
+      }
       onViewChange(v, c);
     });
   const reportCamera =

@@ -108,3 +108,29 @@ Quessaly to Oskmark and back with the wheel at the Oskmark frame.
 - Large maps with many layers: the copy clones every picture element in the pane once per handoff.
 - The ghost's placement during Leaflet's zoom animation relies on Leaflet's private
   `_latLngBoundsToNewLayerBounds`, as `ImageOverlay` does; a Leaflet upgrade should re-check it.
+
+## Review fixes
+
+From an adversarial Opus review of 2bec327e (2026-11-18):
+
+- **The handoff always goes through.** `AtlasCanvas` takes the copy inside a `try`: if copying
+  throws, the handoff is a plain cut and still reaches `onViewChange` (R-32).
+- **The ocean's pictures are waited for too.** Besides `<img>`, the wait covers the SVG `<image>`
+  elements `OceanMaps` draws. They have no `complete`, so each gets a probe `<img>` with the same
+  address: a cached picture counts as loaded at once, otherwise the first `load` or `error` on the
+  `<image>` or the probe counts. Still capped at 400 ms.
+- **Pane comments fixed, dead z-index gone.** The ghost's pane has no z-index of its own; it stacks
+  by DOM order (every pane is `z-index: 1 !important` in `index.css`).
+- **The copy carries no `id` or `data-*`** (`data-canvas-map` among them), so nothing that looks
+  those up finds the ghost.
+- **The unused copy's 1 s expiry timer** is cleared on a new capture and on unmount.
+- **The reduce-motion flag** that `capture` reads is set in a layout effect, in the commit itself,
+  not in a passive effect. (Setting it during render, as the review suggested, is refused by the
+  `react-hooks/refs` lint rule; the layout effect closes the same gap.)
+- Tests: `src/test/canvas/handoff-crossfade-canvas.test.tsx` (new, through `AtlasCanvas` with the
+  real `useReduceMotion`): the copy is taken before the caller hears the handoff; a copy that
+  throws still hands off; calm mode and the OS setting are plain cuts; calm mode on mid-fade takes
+  the ghost off. The component tests gained: SVG `<image>` held until load, cached, and never
+  loading; no pointer events on the ghost or its pane; ids and `data-*` stripped; a `zoomanim`
+  mid-fade moves and scales the ghost and its listeners go with it; unmount clears the expiry
+  timer.

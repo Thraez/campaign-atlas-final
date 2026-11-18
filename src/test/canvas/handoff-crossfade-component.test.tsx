@@ -23,10 +23,15 @@ function makeMap() {
   const panes: Record<string, HTMLElement> = { mapPane, tilePane, overlayPane };
   const handlers = new Map<string, Set<Handler>>();
   const layers = new Set<L.Layer>();
+  // Like Leaflet's addLayer: a layer's getEvents() are bound to it while it is on the map.
+  const layerEvents = new Map<L.Layer, [string, Handler][]>();
   const map = {
     container,
     panes,
     layers,
+    fire(ev: string, e?: unknown) {
+      for (const h of [...(handlers.get(ev) ?? [])]) h(e);
+    },
     getContainer: () => container,
     getPane: (name: string) => panes[name],
     createPane: (name: string) => {
@@ -37,9 +42,11 @@ function makeMap() {
     },
     getSize: () => ({ x: 800, y: 600 }),
     getZoom: () => 0,
-    getZoomScale: () => 1,
+    getZoomScale: (to: number, from: number) => 2 ** (to - from),
     // Zoom 0 and a view-pixel origin: layer px = (lng, -lat).
     latLngToLayerPoint: (ll: { lat: number; lng: number }) => ({ x: ll.lng, y: -ll.lat }),
+    // Leaflet's private helper ImageOverlay uses for its zoom animation.
+    _latLngBoundsToNewLayerBounds: () => ({ min: { x: -50, y: -70 } }),
     on(ev: string, h: Handler) {
       if (!handlers.has(ev)) handlers.set(ev, new Set());
       handlers.get(ev)!.add(h);
@@ -50,10 +57,18 @@ function makeMap() {
     addLayer(l: L.Layer) {
       layers.add(l);
       l.onAdd(map as unknown as L.Map);
+      const evs = Object.entries(l.getEvents?.() ?? {}).map(
+        ([ev, f]) => [ev, (f as Handler).bind(l)] as [string, Handler],
+      );
+      evs.forEach(([ev, h]) => map.on(ev, h));
+      layerEvents.set(l, evs);
       return map;
     },
     removeLayer(l: L.Layer) {
-      if (layers.delete(l)) l.onRemove(map as unknown as L.Map);
+      if (!layers.delete(l)) return map;
+      layerEvents.get(l)?.forEach(([ev, h]) => map.off(ev, h));
+      layerEvents.delete(l);
+      l.onRemove(map as unknown as L.Map);
       return map;
     },
   };
@@ -78,6 +93,17 @@ function showPictures(src: string, complete = true) {
   Object.defineProperty(img, "complete", { value: complete, configurable: true });
   fake.panes.tilePane.appendChild(img);
   return img;
+}
+
+/** The ocean's pictures: SVG <image> elements, which have no `complete`. */
+function showSvgPictures(href: string) {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  const image = document.createElementNS(ns, "image");
+  image.setAttribute("href", href);
+  svg.appendChild(image);
+  fake.panes.tilePane.replaceChildren(svg);
+  return image;
 }
 
 function mount(viewKey: string, reduceMotion = false) {
@@ -249,5 +275,110 @@ describe("HandoffCrossfade (P-05)", () => {
     c.unmount();
     expect(ghosts()).toHaveLength(0);
     expect(fake.layers.size).toBe(0);
+  });
+
+  it("holds the copy while the new view's SVG <image> loads (the ocean's maps), then fades", () => {
+    const c = mount("map:isle");
+    showPictures("isle.png");
+    c.control.current!.capture("ocean", 2000, CAM);
+    const image = showSvgPictures("isle.png");
+    c.rerender("ocean");
+    act(() => vi.advanceTimersByTime(50));
+    expect(ghostOpacity()).toBe("1");
+    act(() => {
+      image.dispatchEvent(new Event("load"));
+    });
+    expect(ghostOpacity()).toBe("0");
+    act(() => vi.advanceTimersByTime(HANDOFF_FADE_MS + 60));
+    expect(ghosts()).toHaveLength(0);
+  });
+
+  it("an SVG <image> already in the cache does not hold the copy", () => {
+    // The probe <img> a cached picture gets is complete at once.
+    vi.stubGlobal(
+      "Image",
+      class {
+        src = "";
+        complete = true;
+      },
+    );
+    try {
+      const c = mount("map:isle");
+      showPictures("isle.png");
+      c.control.current!.capture("ocean", 2000, CAM);
+      showSvgPictures("isle.png");
+      c.rerender("ocean");
+      act(() => vi.advanceTimersByTime(0));
+      expect(ghostOpacity()).toBe("0");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("an SVG <image> that never loads fades after the wait", () => {
+    const c = mount("map:isle");
+    showPictures("isle.png");
+    c.control.current!.capture("ocean", 2000, CAM);
+    showSvgPictures("isle.png");
+    c.rerender("ocean");
+    act(() => vi.advanceTimersByTime(HANDOFF_LOAD_WAIT_MS - 1));
+    expect(ghostOpacity()).toBe("1");
+    act(() => vi.advanceTimersByTime(1));
+    expect(ghostOpacity()).toBe("0");
+  });
+
+  it("the ghost takes no pointer events, and neither does its pane", () => {
+    const c = mount("map:isle");
+    showPictures("isle.png");
+    c.control.current!.capture("map:cove", 300, CAM);
+    c.rerender("map:cove");
+    expect((ghosts()[0] as HTMLElement).style.pointerEvents).toBe("none");
+    expect(fake.panes[HANDOFF_GHOST_PANE].style.pointerEvents).toBe("none");
+    // No z-index of its own: panes stack in DOM order (index.css).
+    expect(fake.panes[HANDOFF_GHOST_PANE].style.zIndex).toBe("");
+  });
+
+  it("the copy carries no ids or data-* attributes of the real layers", () => {
+    const c = mount("map:isle");
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.id = "isle-frame";
+    svg.setAttribute("data-canvas-map", "isle");
+    svg.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "image"));
+    fake.panes.tilePane.replaceChildren(svg);
+    c.control.current!.capture("map:cove", 300, CAM);
+    c.rerender("map:cove");
+    const g = ghosts()[0];
+    expect(g.querySelector("svg")).not.toBeNull();
+    expect(g.querySelector("[id]")).toBeNull();
+    expect(g.querySelector("[data-canvas-map]")).toBeNull();
+    expect(fake.container.querySelectorAll("[data-canvas-map]")).toHaveLength(1);
+  });
+
+  it("follows Leaflet's zoom animation mid-fade, like an image overlay", () => {
+    const c = mount("map:isle");
+    showPictures("isle.png");
+    c.control.current!.capture("map:cove", 300, CAM);
+    c.rerender("map:cove");
+    act(() => vi.advanceTimersByTime(100)); // mid-fade
+    expect(ghostOpacity()).toBe("0");
+    expect(ghosts()).toHaveLength(1);
+    act(() => fake.fire("zoomanim", { zoom: 1, center: { lat: 0, lng: 0 } }));
+    const g = ghosts()[0] as HTMLElement;
+    expect(g.style.transform).toMatch(/-50px, ?-70px/);
+    expect(g.style.transform).toContain("scale(2)");
+    // The fade still ends and the layer's listeners go with it.
+    act(() => vi.advanceTimersByTime(HANDOFF_FADE_MS));
+    expect(ghosts()).toHaveLength(0);
+    act(() => fake.fire("zoomanim", { zoom: 2, center: { lat: 0, lng: 0 } }));
+    expect(fake.layers.size).toBe(0);
+  });
+
+  it("unmounting clears the unused copy's expiry timer", () => {
+    const c = mount("map:isle");
+    showPictures("isle.png");
+    c.control.current!.capture("map:cove", 300, CAM);
+    expect(vi.getTimerCount()).toBe(1);
+    c.unmount();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

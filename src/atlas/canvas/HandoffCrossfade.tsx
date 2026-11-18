@@ -25,16 +25,20 @@
  * PLAYER-SAFE: import nothing editor- or viewer-only. It copies only what the
  * canvas already shows.
  */
-import { useEffect, useRef, type MutableRefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, type MutableRefObject } from "react";
 import L from "leaflet";
 import { useMap } from "react-leaflet";
 import { boxBounds } from "./canvasGeometry";
 import { CANVAS_IMAGE_PANE } from "./CanvasLayers";
 import { HANDOFF_FADE_MS, HANDOFF_LOAD_WAIT_MS, ghostBox, type GhostCamera } from "./handoffGhost";
 
-/** The ghost's pane: above the canvas's pictures (tilePane, 200), below outlines (overlayPane, 400). */
+/**
+ * The ghost's pane. The app's stylesheet pins every Leaflet pane to
+ * `z-index: 1 !important` (`src/index.css`), so panes stack in DOM order: the
+ * ghost's goes straight after the pictures (tilePane), under the outlines,
+ * labels and pins.
+ */
 export const HANDOFF_GHOST_PANE = "atlasHandoffGhost";
-const GHOST_PANE_Z = "250";
 /** How long a copy waits for the caller to show the new view. */
 const PENDING_TTL_MS = 1000;
 
@@ -107,6 +111,13 @@ function snapshot(map: L.Map) {
   if (!(size.x > 0 && size.y > 0)) return null;
   const copy = pane.cloneNode(true) as HTMLElement;
   copy.removeAttribute("class");
+  // A copy only: no duplicate ids, and nothing that queries `data-*` (a map's
+  // `data-canvas-map`) finds the ghost instead of the real layer.
+  for (const node of [copy, ...copy.querySelectorAll("*")]) {
+    for (const name of node.getAttributeNames()) {
+      if (name === "id" || name.startsWith("data-")) node.removeAttribute(name);
+    }
+  }
   copy.style.position = "absolute";
   copy.style.left = "0";
   copy.style.top = "0";
@@ -134,11 +145,26 @@ function snapshot(map: L.Map) {
   return { el, inner, size };
 }
 
-/** The new view's pictures that are still loading. */
-function loading(map: L.Map): HTMLImageElement[] {
+/**
+ * The new view's pictures that are still loading, each as the elements whose
+ * `load` or `error` means it is done. An `<img>` says so itself (`complete`).
+ * An SVG `<image>` (the ocean's maps) has no `complete` and may have loaded
+ * from cache before anyone listened, so a probe `<img>` with the same address
+ * asks the cache; whichever of the two finishes first counts.
+ */
+function loading(map: L.Map): EventTarget[][] {
   const pane = map.getPane(CANVAS_IMAGE_PANE);
   if (!pane) return [];
-  return [...pane.querySelectorAll("img")].filter((img) => !img.complete);
+  const left: EventTarget[][] = [];
+  for (const img of pane.querySelectorAll("img")) if (!img.complete) left.push([img]);
+  for (const image of pane.querySelectorAll("image")) {
+    const href = image.getAttribute("href") ?? image.getAttribute("xlink:href");
+    if (!href) continue;
+    const probe = new Image();
+    probe.src = href;
+    if (!probe.complete) left.push([image, probe]);
+  }
+  return left;
 }
 
 type Pending = {
@@ -161,23 +187,32 @@ export function HandoffCrossfade({
   const pending = useRef<Pending | null>(null);
   // The ghost on the map and how to take it off (clears its timers too).
   const active = useRef<{ viewKey: string; stop: () => void } | null>(null);
+  // Read by `capture`, which runs outside React (a zoomend). Kept current in
+  // the commit itself (a layout effect; the lint rule forbids writing refs
+  // during render), so no event can land between calm mode turning on and the
+  // ref seeing it, as it could before a passive effect ran.
   const motion = useRef(!reduceMotion);
-  useEffect(() => {
+  useLayoutEffect(() => {
     motion.current = !reduceMotion;
   }, [reduceMotion]);
+  // The unused-copy expiry; cleared on a new capture and on unmount.
+  const expiry = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     control.current = {
       capture(toViewKey, toViewHeight, camera) {
         active.current?.stop();
         pending.current = null;
+        if (expiry.current !== null) clearTimeout(expiry.current);
+        expiry.current = null;
         if (!motion.current) return;
         const shot = snapshot(map);
         if (!shot) return;
         const p = { toViewKey, toViewHeight, camera, shot };
         pending.current = p;
         // A caller that never shows the new view: forget the copy.
-        setTimeout(() => {
+        expiry.current = setTimeout(() => {
+          expiry.current = null;
           if (pending.current === p) pending.current = null;
         }, PENDING_TTL_MS);
       },
@@ -198,6 +233,8 @@ export function HandoffCrossfade({
   useEffect(
     () => () => {
       pending.current = null;
+      if (expiry.current !== null) clearTimeout(expiry.current);
+      expiry.current = null;
       active.current?.stop();
     },
     [],
@@ -221,10 +258,9 @@ export function HandoffCrossfade({
     let pane = map.getPane(HANDOFF_GHOST_PANE);
     if (!pane) {
       pane = map.createPane(HANDOFF_GHOST_PANE);
-      pane.style.zIndex = GHOST_PANE_Z;
       pane.style.pointerEvents = "none";
-      // The app's stylesheet pins every pane to z-index 1 (`index.css`), so
-      // panes stack in DOM order: put the ghost's right after the pictures,
+      // No z-index of its own: `index.css` pins every pane to z-index 1, so
+      // panes stack in DOM order. Put the ghost's right after the pictures,
       // under the outlines, labels and pins.
       const pictures = map.getPane(CANVAS_IMAGE_PANE);
       if (pictures?.parentNode === pane.parentNode) pictures.after(pane);
@@ -232,13 +268,13 @@ export function HandoffCrossfade({
     map.addLayer(layer);
 
     const timers: ReturnType<typeof setTimeout>[] = [];
-    const listeners: [HTMLImageElement, () => void][] = [];
+    const listeners: [EventTarget, () => void][] = [];
     let fading = false;
     const stop = () => {
       timers.forEach(clearTimeout);
-      listeners.forEach(([img, f]) => {
-        img.removeEventListener("load", f);
-        img.removeEventListener("error", f);
+      listeners.forEach(([target, f]) => {
+        target.removeEventListener("load", f);
+        target.removeEventListener("error", f);
       });
       map.removeLayer(layer);
       if (active.current?.stop === stop) active.current = null;
@@ -260,14 +296,20 @@ export function HandoffCrossfade({
         const left = loading(map);
         if (left.length === 0) return fade();
         let n = left.length;
-        const one = () => {
-          n -= 1;
-          if (n === 0) fade();
-        };
-        for (const img of left) {
-          img.addEventListener("load", one, { once: true });
-          img.addEventListener("error", one, { once: true });
-          listeners.push([img, one]);
+        for (const targets of left) {
+          // One picture: the first load or error on any of its targets.
+          let done = false;
+          const one = () => {
+            if (done) return;
+            done = true;
+            n -= 1;
+            if (n === 0) fade();
+          };
+          for (const t of targets) {
+            t.addEventListener("load", one);
+            t.addEventListener("error", one);
+            listeners.push([t, one]);
+          }
         }
       }, 0),
     );
