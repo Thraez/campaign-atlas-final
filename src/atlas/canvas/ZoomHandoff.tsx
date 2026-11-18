@@ -42,7 +42,7 @@ import type { MapTree } from "../ocean/mapTree";
 import { nextView, type TreeView, type ViewCamera } from "../ocean/zoomHandoff";
 import type { Point } from "../content/schema";
 import { fromLatLng } from "./canvasGeometry";
-import { INPUT_STOP_WINDOW_MS, viewZoomLimits, zoomAnchor } from "./zoomAnchor";
+import { INPUT_STOP_WINDOW_MS, anchoredHandoff, zoomAnchor } from "./zoomAnchor";
 
 /** DOM events that start a user zoom (or a pan, which clears on its moveend). */
 const USER_INPUT = ["wheel", "touchstart", "dblclick", "keydown", "mousedown", "pointerdown"];
@@ -116,19 +116,10 @@ export function ZoomHandoff({
       // The anchor first (the ground under the pointer), then the centre.
       const anchor = from && zoomAnchor(from.center, from.zoom, center, zoom, size);
       if (anchor) {
-        const r = nextView(t, v, { center: anchor.point, zoom }, viewport, opts);
-        if (r.kind === "handoff") {
-          // Keep the anchor's ground at the same screen offset from the centre,
-          // at the zoom the new view will really show: setView clamps the zoom
-          // to its limits (the ocean's floor) but keeps the centre.
-          const [lo, hi] = viewZoomLimits(t, r.view, size, opts.maxZoom);
-          const z = Math.min(hi, Math.max(lo, r.camera.zoom));
-          const k = 2 ** -z;
-          const c = r.camera.center;
-          report(r.view, {
-            center: [c[0] - anchor.offset[0] * k, c[1] - anchor.offset[1] * k],
-            zoom: z,
-          });
+        // Keeps the anchor's ground at the same screen offset from the centre.
+        const a = anchoredHandoff(t, v, anchor, zoom, size, opts);
+        if (a) {
+          report(a.view, a.camera);
           return;
         }
       }
