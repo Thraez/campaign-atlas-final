@@ -120,6 +120,43 @@ scans-passed stamp, `audit-assets` v2 image paths).
 - [R-35](docs/tracker/rebuild-2026-11/issues/R-35-campaign-in-links.md): any v2 link problem drops the whole link and shows a fixed "Not found in this campaign" bar; the chip links to the picker only on localhost and assumes port 4300.
 - [R-36](docs/tracker/rebuild-2026-11/issues/R-36-phase3-check.md): the ocean's zoom-out floor is one level below the fit, set before the camera applies (no bounce) and recomputed on a window resize; on v1 an unknown map now opens the default map (baseline: blank).
 
+### Polish round 1 (2026-11-18/19, all merged and published)
+
+Plan and notes: `docs/polish-2026-11/` (`plan.md`, `progress.md`, one note per item in `items/`,
+before and after pictures in `shots/`). Eight items, PRs #150-#157. The live site still runs v1, so
+only P-01 and P-08 show there; the rest shows on the local test sites.
+
+**For Isak's look** (run `npm run atlas:publish:next`, then `npm run atlas:serve:next`):
+
+- **P-01 notices** (live): the update toast has a "Later" button; on desktop the sound control sits
+  beside the minimap.
+- **P-02 ocean fit:** every top-level map shows whole with sea around it, clear of the side panel.
+- **P-03 phone top bar:** one row (137 px to 61 px). The campaign name shows only in the home link
+  and the menu title; the grid toggle moved into the menu; the switch is at 768 px.
+- **P-04 handoff always fires:** a zoom toward a child at the zoom limit enters it. The rule is
+  "the map under the pointer first" (an R-32 change).
+- **P-05 soft handoff:** the old and new pictures crossfade in about 250 ms; a plain cut in calm
+  mode.
+- **P-06 zoom and crumb feel:** a wheel notch zooms about 0.48 of a level (4-5 notches per level)
+  and enters at most one map; a crumb click and Reset glide for 0.4 s. Not tried on a real retina
+  trackpad, Windows scaling, Safari or Firefox: trackpad scrolling got faster by the same ratio.
+- **P-07 frames and pictures:** frames glow on hover and turn gold when pressed; map names are in
+  Cinzel; a picture fades in over a drawn "chart paper". Taste calls: the paper tone, the gold, the
+  glow strength, the label size.
+- **P-08 first load** (live): a drawn compass and the atlas title; place-panel headings are now in
+  Cinzel; no placeholder before the app starts.
+
+**Questions** (none blocks anything; recommendation first):
+
+1. The live site's 19 MB of map pictures: leave it until the sample world is replaced, or run
+   `npm run maps:optimize` on `content/` now.
+2. A map reveal moment the first time a player enters a map (round 2): yes after a mock, or skip.
+3. Updates that install themselves instead of asking: a later round, or keep "ask first".
+
+Round 2 candidates: `docs/polish-2026-11/plan.md` ("Round 2"), plus three found on the way: the
+phone ruler hint sits under Wander and the minimap; the scale bar overlaps the minimap on a phone;
+the Reset button sits on the minimap's corner.
+
 ### Kept notes
 
 Cleaned 2026-11-07 (Isak: delete unless meaningful): branch `local-main-backup-2026-11-07` held two
