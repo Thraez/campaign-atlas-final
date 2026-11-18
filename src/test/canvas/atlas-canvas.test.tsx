@@ -373,6 +373,7 @@ describe("AtlasCanvas, ocean fit margin (R-37)", () => {
       );
       expect(corners.length).toBeGreaterThan(0);
       for (const [x, y] of corners) {
+        expect(OCEAN_FIT_MARGIN).toBeGreaterThan(0);
         expect(x - fit.minX).toBeGreaterThanOrEqual(w * OCEAN_FIT_MARGIN - 1e-6);
         expect(fit.maxX - x).toBeGreaterThanOrEqual(w * OCEAN_FIT_MARGIN - 1e-6);
         expect(y - fit.minY).toBeGreaterThanOrEqual(h * OCEAN_FIT_MARGIN - 1e-6);
