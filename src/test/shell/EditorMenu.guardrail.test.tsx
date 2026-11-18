@@ -54,14 +54,20 @@ describe("toolbar stacking guard", () => {
       expect(m, sel).not.toBeNull();
       return m![1];
     };
+    // A z-index is a number or a stacking token (P-01's `var(--z-chrome)`),
+    // resolved to its number from the same file.
+    const zIndexOf = (decls: string) => {
+      const raw = /z-index:\s*([^;]+);/.exec(decls)?.[1].trim();
+      const token = raw && /^var\((--z-[\w-]+)\)$/.exec(raw)?.[1];
+      const value = token ? new RegExp(`${token}:\\s*(\\d+);`).exec(css)?.[1] : raw;
+      return Number(value);
+    };
     const toolbar = block("\\.atlas-toolbar");
-    const z = Number(/z-index:\s*(\d+)/.exec(toolbar)?.[1]);
+    const z = zIndexOf(toolbar);
     expect(toolbar).toMatch(/position:\s*relative/);
     expect(z).toBeGreaterThan(2);
     expect(toolbar).not.toMatch(/backdrop-filter/);
-    const open = Number(
-      /z-index:\s*(\d+)/.exec(block('\\.atlas-toolbar\\[data-menu-open="true"\\]'))?.[1],
-    );
+    const open = zIndexOf(block('\\.atlas-toolbar\\[data-menu-open="true"\\]'));
     expect(open).toBeGreaterThan(500);
   });
 });

@@ -48,6 +48,19 @@
     --sidebar-accent-foreground: 38 35% 88%;
     --sidebar-border: 218 16% 18%;
     --sidebar-ring: 36 70% 58%;
+
+    /* Stacking scale (P-01); Tailwind names them z-chrome, z-toast, z-scrim,
+       z-minimap, z-map-control and z-map-notice. Page level: the viewer's map area
+       (<main>) is isolated, so everything floating on the map stays one
+       layer under the toolbar, page toasts and every scrim. --z-scrim is
+       the shadcn dialogs' and sheets' z-50, named here, not changed. Inside
+       the map: Leaflet 1-2, the minimap 400, controls, then notices. */
+    --z-chrome: 30;
+    --z-toast: 40;
+    --z-scrim: 50;
+    --z-minimap: 400;
+    --z-map-control: 500;
+    --z-map-notice: 510;
   }
 
   .dark { /* same; app is dark-only */ }
@@ -140,7 +153,7 @@
      portals). The blur lives on ::before: backdrop-filter on the header itself
      would make it the containing block of the editor menu's fixed backdrop. */
   position: relative;
-  z-index: 30;
+  z-index: var(--z-chrome);
 }
 .atlas-toolbar::before {
   content: "";
@@ -536,6 +549,41 @@
   letter-spacing: 0.03em;
 }
 
+/* Map notices (P-01): the sound invite and controls, the update toast and the
+   Wander note share one dock instead of each picking a corner. It floats
+   above the bottom row of map controls (Wander, scale bar, minimap, reset),
+   never over them. Phone: full width, lifted over the taller of Wander and
+   the minimap (--atlas-dock-clear, set from the minimap's height). From sm:
+   in the gap between Wander and the minimap, above the scale bar. */
+.atlas-notice-dock {
+  position: absolute;
+  z-index: var(--z-map-notice);
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: var(--atlas-dock-clear, 5rem);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+.atlas-notice-dock > * { pointer-events: auto; max-width: 100%; }
+@media (min-width: 640px) {
+  .atlas-notice-dock {
+    left: 8rem; /* Wander is 101px wide at left-3 */
+    /* the minimap is 180px wide at right-3; wider when credits sit above it */
+    right: var(--atlas-dock-right, calc(180px + 1.5rem));
+    bottom: 4rem; /* the scale bar is 42px tall at bottom-3 */
+  }
+}
+/* A gentle rise when a notice appears; none under reduced motion or calm
+   mode (both blocks below). */
+@keyframes atlas-notice-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.atlas-notice { animation: atlas-notice-in 220ms ease-out both; }
+
 /* Accessibility: reduce motion when the OS asks for it or calm mode is on
    (`<html data-calm>`, set by src/hooks/use-reduce-motion.ts). Keep the two
    blocks identical. */
@@ -551,6 +599,7 @@
   .leaflet-zoom-anim .leaflet-zoom-animated {
     transition: none !important;
   }
+  .atlas-notice { animation: none !important; }
 }
 :root[data-calm="true"] *,
 :root[data-calm="true"] *::before,
@@ -564,6 +613,7 @@
 :root[data-calm="true"] .leaflet-zoom-anim .leaflet-zoom-animated {
   transition: none !important;
 }
+:root[data-calm="true"] .atlas-notice { animation: none !important; }
 
 /* Skip-to-main link, only visible on keyboard focus. */
 .skip-to-main {

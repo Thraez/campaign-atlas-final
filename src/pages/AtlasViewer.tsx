@@ -48,14 +48,16 @@ import { OceanBackground } from "@/atlas/ocean/OceanBackground";
 import { SoundSettingsProvider } from "@/atlas/sound/SoundSettingsProvider";
 import { SoundscapeLayer } from "@/atlas/sound/SoundscapeLayer";
 import { SoundControl } from "@/atlas/sound/SoundControl";
-import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
+import { OfflineMenu, OfflineStatus, UpdateNotice } from "@/atlas/OfflineStatus";
+import { MapNoticeDock } from "@/atlas/MapNoticeDock";
+import { creditOverlayBottomPx } from "@/atlas/noticeDockLayout";
 import { setOfflineMap, type OfflineMap } from "@/pwa";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 import { SearchPalette } from "@/atlas/search/SearchPalette";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
 import { ReadingPanelWelcome } from "@/atlas/entity/ReadingPanelWelcome";
 import { pickStarters } from "@/atlas/entity/pickStarters";
-import { MapCreditOverlay } from "@/atlas/map/MapCreditOverlay";
+import { MapCreditOverlay, activeMapCredits } from "@/atlas/map/MapCreditOverlay";
 import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
 import { useReduceMotion } from "@/hooks/use-reduce-motion";
 import { CalmModeToggle } from "@/atlas/CalmModeToggle";
@@ -476,6 +478,8 @@ export default function AtlasViewer() {
   }, [data]);
   const showCredits =
     worldCredits?.page !== false && (data?.project.entities.some((e) => e.credit) ?? false);
+  /** Layer credits in the corner above the minimap; the notice dock clears them. */
+  const mapCreditCount = activeMapCredits(activeMap, worldAssetCredits, worldCredits).length;
 
   const { visited, mark: markVisitedEntity } = useVisitedPlaces();
 
@@ -1009,7 +1013,9 @@ export default function AtlasViewer() {
         <div className="flex-1 flex relative min-h-0">
           <main
             id="atlas-main"
-            className="flex-1 relative min-h-0"
+            // isolate: everything floating on the map stacks inside it, so no
+            // map overlay can rise above the toolbar, a toast or a scrim.
+            className="flex-1 relative min-h-0 isolate"
             aria-label={`Interactive map: ${activeMap?.name ?? "Ocean"}. Use arrow keys to pan, plus and minus to zoom.`}
           >
             {isV2 && (
@@ -1026,7 +1032,7 @@ export default function AtlasViewer() {
               </AtlasCanvas>
             )}
             {showLegend && (
-              <div className="atlas-canvas-legend pointer-events-none absolute left-14 top-3 z-[500] rounded border border-border bg-background/85 px-2 py-1 text-xs text-muted-foreground">
+              <div className="atlas-canvas-legend pointer-events-none absolute left-14 top-3 z-map-control rounded border border-border bg-background/85 px-2 py-1 text-xs text-muted-foreground">
                 <span aria-hidden="true">▭</span> map: zoom in or click
               </div>
             )}
@@ -1087,20 +1093,11 @@ export default function AtlasViewer() {
                   map={activeMap}
                   assetCredits={worldAssetCredits}
                   credits={worldCredits}
-                  clearanceBottomPx={
-                    12 /* minimap's own bottom-3 offset */ + minimapHeightFor(activeMap) + 8
-                  }
+                  clearanceBottomPx={creditOverlayBottomPx(minimapHeightFor(activeMap))}
                 />
 
                 {/* Pin legend — top-right map corner, collapsed by default */}
                 <PinLegend placements={placementsOnMap} entityById={entityById} />
-
-                <SoundControl
-                  hasSoundscape={
-                    activeMap.soundscape?.enabled !== false &&
-                    (activeMap.soundscape?.areas?.length ?? 0) > 0
-                  }
-                />
               </>
             )}
 
@@ -1111,16 +1108,32 @@ export default function AtlasViewer() {
               canWander={meter.discovered < meter.total}
               onWander={wander}
             />
-            {wanderEmpty && (
-              <div className="atlas-wander-note absolute left-3 bottom-20 z-[500] max-w-xs rounded-lg border bg-background/95 px-3 py-2 text-xs text-muted-foreground">
-                You've explored everything you can reach — travel onward to uncover more.
-              </div>
-            )}
+
+            {/* Notices: one stack above the bottom row, top to bottom. */}
+            <MapNoticeDock
+              minimapHeight={activeMap ? minimapHeightFor(activeMap) : null}
+              creditCount={activeMap ? mapCreditCount : 0}
+            >
+              <UpdateNotice />
+              {wanderEmpty && (
+                <div className="atlas-wander-note atlas-notice self-start max-w-xs rounded-lg border bg-background/95 px-3 py-2 text-xs text-muted-foreground">
+                  You've explored everything you can reach — travel onward to uncover more.
+                </div>
+              )}
+              {activeMap && (
+                <SoundControl
+                  hasSoundscape={
+                    activeMap.soundscape?.enabled !== false &&
+                    (activeMap.soundscape?.areas?.length ?? 0) > 0
+                  }
+                />
+              )}
+            </MapNoticeDock>
 
             {/* Scale bar — bottom-center map overlay */}
             {activeMap && scaleBar && (
               <div
-                className="atlas-scale-bar absolute bottom-3 left-1/2 -translate-x-1/2 z-[500] pointer-events-none select-none"
+                className="atlas-scale-bar absolute bottom-3 left-1/2 -translate-x-1/2 z-map-control pointer-events-none select-none"
                 role="note"
                 aria-label={`Map scale: ${scaleBar.label}`}
               >
@@ -1141,7 +1154,7 @@ export default function AtlasViewer() {
             <button
               type="button"
               onClick={() => (isV2 ? setCamera("fit") : fitMapRef.current?.())}
-              className="absolute bottom-3 right-3 z-[500] h-8 w-8 rounded bg-background/90 border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="absolute bottom-3 right-3 z-map-control h-8 w-8 rounded bg-background/90 border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               aria-label="Reset map view"
               title="Reset view (fit map to screen)"
             >

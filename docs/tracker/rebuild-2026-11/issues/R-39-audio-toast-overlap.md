@@ -22,3 +22,9 @@ the live v1 look: it is a fix, not part of the rebuild.
 ## Touches
 
 `src/atlas/sound/SoundControl.tsx`, `src/index.css`.
+
+## Built in P-01
+
+Folded into polish item P-01 (branch `polish-p01-overlay-stack`): the invite now sits in one notice
+dock above Wander, the minimap and the layer credits. Details and checks:
+`docs/polish-2026-11/items/P-01-overlay-stack.md`.

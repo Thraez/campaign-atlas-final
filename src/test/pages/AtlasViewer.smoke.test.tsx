@@ -86,6 +86,21 @@ describe("AtlasViewer smoke", () => {
       expect.stringContaining("Overview"),
     );
   });
+
+  it("isolates the map area and puts map notices in one dock inside it (P-01)", async () => {
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(document.querySelector("main#atlas-main")).toBeInTheDocument());
+    const main = document.querySelector("main#atlas-main")!;
+    // Its own stacking context: no map overlay can rise above a scrim.
+    expect(main).toHaveClass("isolate");
+    const dock = main.querySelector('[data-testid="map-notice-dock"]');
+    expect(dock).toBeInTheDocument();
+    expect(dock!.querySelector("[data-sound-control]")).toBeInTheDocument();
+  });
 });
 
 describe("Load-error Try again retry (Q94)", () => {
