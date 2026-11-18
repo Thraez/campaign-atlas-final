@@ -93,6 +93,20 @@ describe("SoundControl", () => {
     expect(screen.getByRole("button", { name: "Unmute sound" })).toBeTruthy();
   });
 
+  it("is placed by the map's notice dock, not pinned over the minimap (P-01)", () => {
+    const { container } = renderControl();
+    const root = container.querySelector("[data-sound-control]")!;
+    expect(root.className).not.toMatch(/\babsolute\b|\bbottom-|\bright-|z-\[/);
+  });
+
+  it("the invite's buttons are 40px tap targets (P-01)", () => {
+    renderControl();
+    expect(screen.getByRole("button", { name: /bring the world to life/i }).className).toMatch(
+      /\bh-10\b/,
+    );
+    expect(screen.getByRole("button", { name: /dismiss/i }).className).toMatch(/\bh-10\b/);
+  });
+
   it("has no calm-mode switch (it lives in the toolbar's view toggles)", () => {
     renderControl();
     expect(screen.queryByRole("button", { name: /calm mode/i })).toBeNull();

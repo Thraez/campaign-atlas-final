@@ -86,7 +86,7 @@ export function RulerLayer({ active, mapId, mapHeight, scale, onClear }: RulerLa
             bottom: "2.5rem",
             left: "50%",
             transform: "translateX(-50%)",
-            zIndex: 500,
+            zIndex: "var(--z-map-control)",
             pointerEvents: "none",
           }}
           className="text-xs bg-black/60 text-white px-3 py-1.5 rounded-full whitespace-nowrap"

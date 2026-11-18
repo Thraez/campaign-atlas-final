@@ -92,7 +92,7 @@ export function AtlasMinimap({ map, layers, width = 180, className }: Props) {
       }}
       className={
         className ??
-        "absolute bottom-3 right-3 z-[400] rounded-md border border-border shadow-lg cursor-crosshair overflow-hidden bg-card/80 backdrop-blur-sm"
+        "absolute bottom-3 right-3 z-minimap rounded-md border border-border shadow-lg cursor-crosshair overflow-hidden bg-card/80 backdrop-blur-sm"
       }
       style={{ width, height, background: map.oceanColor ?? "#18313f" }}
       role="img"

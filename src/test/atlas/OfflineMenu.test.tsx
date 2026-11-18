@@ -14,7 +14,7 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 type Coverage = "none" | "notes" | "notes-map-online" | "notes-and-map";
 const pwa = vi.hoisted(() => {
   const listeners = new Set<() => void>();
-  const state = { coverage: null as Coverage | null };
+  const state = { coverage: null as Coverage | null, updateWaiting: false };
   const set = (c: Coverage) => {
     state.coverage = c;
     listeners.forEach((fn) => fn());
@@ -37,7 +37,10 @@ const pwa = vi.hoisted(() => {
 vi.mock("@/pwa", () => ({
   activateUpdate: vi.fn(),
   reloadLatestAtlas: vi.fn(async () => ({ ok: true })),
-  onUpdateAvailable: () => () => {},
+  onUpdateAvailable: (fn: () => void) => {
+    if (pwa.state.updateWaiting) queueMicrotask(fn);
+    return () => {};
+  },
   shouldEnableServiceWorker: () => true,
   subscribeOfflineCoverage: (fn: () => void) => {
     pwa.listeners.add(fn);
@@ -49,7 +52,7 @@ vi.mock("@/pwa", () => ({
   clearOfflineCache: pwa.clearOfflineCache,
 }));
 
-import { OfflineMenu, OfflineStatus } from "@/atlas/OfflineStatus";
+import { OfflineMenu, OfflineStatus, UpdateNotice } from "@/atlas/OfflineStatus";
 
 const SAVE = /save this map for offline/i;
 const NOTES = "Works offline: the notes; pictures you have opened";
@@ -174,6 +177,38 @@ describe("OfflineStatus banner while offline", () => {
   it("shows no banner while online", () => {
     Object.defineProperty(navigator, "onLine", { value: true, configurable: true });
     render(<OfflineStatus />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+});
+
+describe("UpdateNotice (P-01)", () => {
+  afterEach(() => {
+    pwa.state.updateWaiting = false;
+  });
+
+  it("shows nothing while no update waits", () => {
+    render(<UpdateNotice />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("is placed by the map's notice dock, not fixed over the page", async () => {
+    pwa.state.updateWaiting = true;
+    render(<UpdateNotice />);
+    const toast = await screen.findByRole("status");
+    expect(toast).toHaveTextContent("Atlas update available");
+    expect(toast.className).not.toMatch(/\bfixed\b|z-\[/);
+    // Full width on a phone instead of a 100px column of single words.
+    expect(toast.className).toMatch(/\bw-full\b/);
+  });
+
+  it("Later hides it; Refresh and Later are 40px tap targets", async () => {
+    pwa.state.updateWaiting = true;
+    render(<UpdateNotice />);
+    await screen.findByRole("status");
+    expect(screen.getByRole("button", { name: /refresh/i }).className).toMatch(/\bh-10\b/);
+    const later = screen.getByRole("button", { name: "Later" });
+    expect(later.className).toMatch(/\bh-10\b/);
+    fireEvent.click(later);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

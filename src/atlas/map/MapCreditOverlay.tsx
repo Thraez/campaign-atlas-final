@@ -59,7 +59,7 @@ export function MapCreditOverlay({
   if (active.length === 0) return null;
   return (
     <div
-      className="atlas-map-credit-overlay pointer-events-none absolute right-2 z-[500] flex max-w-[240px] flex-col items-end gap-1"
+      className="atlas-map-credit-overlay pointer-events-none absolute right-2 z-map-control flex max-w-[240px] flex-col items-end gap-1"
       style={{ bottom: clearanceBottomPx != null ? `${clearanceBottomPx}px` : "0.5rem" }}
     >
       {active.map((credit) => (

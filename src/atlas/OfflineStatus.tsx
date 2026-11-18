@@ -78,7 +78,52 @@ function useCoverageText(): CoverageText {
 }
 
 /**
- * Floating offline status + update banner for /atlas.
+ * The "update available" toast. It sits in the map's notice dock
+ * (MapNoticeDock), so it never covers the map controls and stays under every
+ * scrim. Prompt mode: the new service worker waits until the player taps
+ * Refresh (or closes every tab of the atlas), so until then it shows on every
+ * load. "Later" hides it for this page only.
+ * Hidden in dev, where the SW is intentionally not registered.
+ */
+export function UpdateNotice() {
+  const enabled = shouldEnableServiceWorker();
+  const [updateReady, setUpdateReady] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    if (!enabled) return;
+    return onUpdateAvailable(() => setUpdateReady(true));
+  }, [enabled]);
+
+  if (!enabled || !updateReady || dismissed) return null;
+
+  return (
+    <div
+      role="status"
+      className="atlas-notice flex w-full items-center gap-2 rounded-lg border border-border bg-card/95 py-1.5 pl-4 pr-1 text-sm shadow-lg sm:w-auto sm:max-w-md"
+    >
+      <span className="min-w-0 flex-1">
+        Atlas update available. Refresh to load the newest version.
+      </span>
+      <Button size="sm" className="h-10 shrink-0" onClick={activateUpdate}>
+        <RefreshCw className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
+        Refresh
+      </Button>
+      <button
+        type="button"
+        aria-label="Later"
+        title="Later"
+        onClick={() => setDismissed(true)}
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+      >
+        <span aria-hidden>✕</span>
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Floating offline indicator for /atlas, under the toolbar.
  * Hidden in dev, where the SW is intentionally not registered.
  */
 export function OfflineStatus() {
@@ -86,7 +131,6 @@ export function OfflineStatus() {
   const [online, setOnline] = useState<boolean>(
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
-  const [updateReady, setUpdateReady] = useState(false);
   const text = useCoverageText();
 
   useEffect(() => {
@@ -100,41 +144,17 @@ export function OfflineStatus() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!enabled) return;
-    return onUpdateAvailable(() => setUpdateReady(true));
-  }, [enabled]);
-
-  if (!enabled) return null;
+  if (!enabled || online) return null;
 
   return (
-    <>
-      {/* Update banner */}
-      {updateReady && (
-        <div
-          role="status"
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[1100] flex items-center gap-3 px-4 py-2.5 rounded-lg border border-border bg-card shadow-lg text-sm"
-        >
-          <span>Atlas update available. Refresh to load the newest version.</span>
-          <Button size="sm" onClick={activateUpdate}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
-            Refresh
-          </Button>
-        </div>
-      )}
-
-      {/* Offline indicator */}
-      {!online && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed top-14 left-1/2 -translate-x-1/2 z-[1100] flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-card text-xs text-muted-foreground shadow"
-        >
-          <CloudOff className="h-3.5 w-3.5" aria-hidden="true" />
-          {text.banner}
-        </div>
-      )}
-    </>
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed top-14 left-1/2 -translate-x-1/2 z-toast flex w-max max-w-[calc(100vw-1.5rem)] items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-card text-xs text-muted-foreground shadow"
+    >
+      <CloudOff className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      {text.banner}
+    </div>
   );
 }
 
