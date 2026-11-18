@@ -1,6 +1,6 @@
 # R-37 The ocean fit gets a margin
 
-Status: ready-for-agent
+Status: done
 Blocked by: -
 Size: S
 Branch: `rebuild-r37-ocean-fit-margin`
