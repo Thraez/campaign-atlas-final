@@ -31,6 +31,12 @@ describe("AtlasLoadState", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 
+  it("shows the drawn loader, saying Loading atlas… when no label is given", () => {
+    const { container } = renderState({ loading: true });
+    expect(container.querySelector(".atlas-loader")).not.toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading atlas…");
+  });
+
   it("shows the error title and message when online and errored", () => {
     setOnline(true);
     renderState({ error: "atlas.json 404", errorTitle: "Timeline unavailable" });

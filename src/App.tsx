@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Landing from "./pages/Landing.tsx";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AtlasLoader } from "@/atlas/content/AtlasLoader";
 
 // Lazy-load heavy/secondary routes to keep the landing bundle small.
 const AtlasViewer = lazy(() => import("./pages/AtlasViewer.tsx"));
@@ -37,15 +38,9 @@ const RouteErrorBoundary = ({ children }: { children: ReactNode }) => {
   return <ErrorBoundary resetKeys={[location.pathname]}>{children}</ErrorBoundary>;
 };
 
-const RouteFallback = () => (
-  <div
-    role="status"
-    aria-live="polite"
-    className="h-screen w-screen flex items-center justify-center bg-background text-muted-foreground text-sm"
-  >
-    Loading…
-  </div>
-);
+// The same drawn loader the reader pages show while their data loads (P-08),
+// so the first load goes from one to the other without a flash.
+const RouteFallback = () => <AtlasLoader />;
 
 const App = () => (
   <TooltipProvider>

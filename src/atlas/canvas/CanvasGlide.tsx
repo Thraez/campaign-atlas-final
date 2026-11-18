@@ -19,8 +19,9 @@
  *
  * A glide is the canvas's own move, never a handoff: the explicit camera has
  * already cleared the user-input flag, and `flying` tells `ZoomHandoff` that
- * the zoomstart it is about to see is the glide's, so that zoom (and a user
- * zoom or drag that interrupts it) ends without a handoff.
+ * the zoomstart it is about to see is the glide's, so the glide (landed, or
+ * stopped by a drag) ends without a handoff. A wheel or pinch that stops it
+ * is a zoom of its own and hands off as usual (ZoomHandoff).
  *
  * PLAYER-SAFE: import nothing editor- or viewer-only.
  */

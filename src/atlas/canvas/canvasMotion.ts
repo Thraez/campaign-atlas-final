@@ -13,7 +13,9 @@
  * `WHEEL_PX_PER_LEVEL_AT_FACTOR_1 / factor`, which undoes the platform factor:
  * a 100 px notch zooms the same `ZOOM_PER_NOTCH` (about 0.48) everywhere, so a
  * level takes 4-5 notches, and on Windows it is close to Leaflet's default
- * (w 72 instead of 60). Trackpad scrolls and pinches (small pixel deltas,
+ * (w 72 instead of 60). Line- and page-mode wheels (Firefox, some
+ * Windows mice) skip Leaflet's factor, so the canvas scales those deltas
+ * itself (`canvasWheelDeltaScale`, `canvasWheel.ts`). Trackpad scrolls and pinches (small pixel deltas,
  * batched every 40 ms) scale by the same ratio; Leaflet's curve still flattens
  * big batches (at most 4 levels a batch, about 1.3 for a 300 px flick).
  *
@@ -49,6 +51,22 @@ export function leafletWheelPxFactor(
   if (browser.linux && browser.chrome) return devicePixelRatio;
   if (browser.mac) return devicePixelRatio * 3;
   return devicePixelRatio > 0 ? 2 * devicePixelRatio : 1;
+}
+
+/** A wheel notch in line mode (Firefox, some Windows mice): 3 lines. */
+export const NOTCH_LINES = 3;
+
+/**
+ * What the canvas multiplies Leaflet's wheel delta by, per event. Leaflet
+ * divides only pixel-mode deltas by the platform factor; a line is a plain 20
+ * wheel px and a page 60 (DomEvent `getWheelDelta`). So with
+ * `canvasWheelPxPerZoomLevel(factor)` a 3-line notch would count as
+ * 0.6 x factor notches (2.4 on Windows at 200 %, 3.6 on a retina Mac). Line and page deltas are scaled so a 3-line notch (and a
+ * page, which Leaflet counts as 3 lines) zooms what a 100 px notch does.
+ */
+export function canvasWheelDeltaScale(deltaMode: number, factor: number): number {
+  if (deltaMode !== 1 && deltaMode !== 2) return 1;
+  return NOTCH_DELTA_Y / (NOTCH_LINES * 20) / (factor > 0 ? factor : 1);
 }
 
 /** The canvas's `wheelPxPerZoomLevel` for a platform factor. */

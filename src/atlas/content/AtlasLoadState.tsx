@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AtlasLoader } from "./AtlasLoader";
 
 interface AtlasLoadStateProps {
   error: string | null;
@@ -27,7 +28,7 @@ export function AtlasLoadState({
   loading,
   backHref = "/atlas",
   backLabel = "Back to atlas",
-  loadingLabel = "Loading…",
+  loadingLabel = "Loading atlas…",
   errorTitle = "Atlas not built yet",
   offlineTitle = "Atlas not available offline yet",
   extraHint,
@@ -63,9 +64,5 @@ export function AtlasLoadState({
     );
   }
 
-  return (
-    <div className="h-screen w-screen flex items-center justify-center bg-background text-muted-foreground">
-      {loadingLabel}
-    </div>
-  );
+  return <AtlasLoader label={loadingLabel} />;
 }

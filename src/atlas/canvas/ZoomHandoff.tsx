@@ -37,8 +37,12 @@
  * Feel (P-06): a zoom whose last input was a wheel event (a mouse notch, or a
  * trackpad scroll or pinch batch) hands off one level at most (`maxSteps` 1),
  * so one notch never crosses two handoffs. Other zooms chain as before. A
- * glide (a breadcrumb or Reset, `CanvasGlide`) marks its own zoomstart; that
- * zoom, and any user input during it, ends without a handoff.
+ * glide (a breadcrumb or Reset, `CanvasGlide`) marks its own zoomstart, and
+ * the glide ends without a handoff when it lands (zoomend) or a drag stops it
+ * (moveend only). A wheel or pinch that stops it starts a zoom of its own
+ * (a new zoomstart), which hands off as usual; so does a wheel batch that
+ * lands just after the glide, since input in `INPUT_STOP_WINDOW_MS` keeps
+ * the flag.
  *
  * PLAYER-SAFE: import nothing editor- or viewer-only.
  */
@@ -113,17 +117,24 @@ export function ZoomHandoff({
         zoomFrom = "glide";
         return;
       }
-      if (zoomFrom !== null) return;
+      // A zoomstart during a glide is a new zoom: Leaflet stopped the flight
+      // (`_stop`, no zoomend) for it. A user's wheel or pinch hands off as usual.
+      if (zoomFrom !== null && zoomFrom !== "glide") return;
       zoomFrom = { zoom: map.getZoom(), center: fromLatLng(viewHeight, map.getCenter()) };
     };
     // The zoom has settled: hand off if the user made it.
     const finish = () => {
       const from = zoomFrom;
       zoomFrom = null;
+      if (from === "glide") {
+        // The glide landed (or a drag stopped it): the canvas's move, no
+        // handoff. Input in its last moments (a wheel batch still waiting on
+        // Leaflet's 40 ms debounce) keeps the flag for its own zoom.
+        if (performance.now() - inputAt > INPUT_STOP_WINDOW_MS) armed.current = false;
+        return;
+      }
       if (!armed.current) return;
       armed.current = false;
-      // A glide, or a user zoom or drag that cut one short: no handoff.
-      if (from === "glide") return;
       const { tree: t, view: v, onViewChange: report } = latest.current;
       if (!report) return;
       const size = map.getSize();

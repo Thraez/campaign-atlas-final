@@ -16,6 +16,17 @@ undoes the platform factor: a 100 px notch zooms **0.479** levels everywhere (re
 Mac at dpr 1 w = 48, Windows w = 72, close to Leaflet's 60). A level of 1.6-2.4 zoom takes 4-5
 notches.
 
+Line- and page-mode wheels (Firefox, some Windows mice: `deltaMode` 1 or 2) skip Leaflet's
+factor: `getWheelDelta` gives a plain 20 wheel px a line and 60 a page. With w = 144 / factor
+alone, a 3-line notch would count as 0.6 x factor notches (about 1.1 levels at 200 % on Windows,
+1.5 on a retina Mac; review finding). So the canvas runs its own wheel handler
+(`src/atlas/canvas/canvasWheel.ts`: Leaflet's `ScrollWheelZoom` extended, Leaflet's own turned
+off with `scrollWheelZoom={false}`), which scales each line- or page-mode event's delta by
+`(100 / 60) / factor` (`canvasWheelDeltaScale`). A 3-line notch and a page now zoom what a 100 px
+notch does, 0.479. The factor is computed once at module load, as Leaflet fixes its own. Rechecked
+in Chromium after the review fixes: a 100 px notch and a synthetic 3-line notch each zoomed about
+0.45-0.5 (URL `cz` 0.6 to 1.0, then 1.0 to 1.5), and the notch counts stayed 4, 1 and 5.
+
 Trackpad: two-finger scroll and pinch arrive as small pixel deltas in the same 40 ms batches, so
 they speed up by the same ratio as the mouse (about 2.4x on a retina Mac, about 1.2x on Windows).
 Leaflet's curve still flattens big batches (a 300 px flick is about 1.3 levels, never more than 4).
@@ -48,8 +59,13 @@ jumps, as before.
 
 **No handoff during a glide.** The explicit camera already clears the user-input flag; on top of
 that `runGlide` sets `flying` around the fly call, and `ZoomHandoff` marks that zoomstart as the
-glide's. That zoom, and a wheel or drag that cuts it short, ends without a handoff. The next user
-zoom hands off as usual. A crumb changes the view, which drops any P-05 crossfade ghost, so the two
+glide's. The glide ends without a handoff when it lands (zoomend) or a drag stops it (Leaflet's
+`_stop`, then only the drag's moveend). A wheel or pinch that stops it is a zoom of its own: Leaflet
+fires a fresh zoomstart for it, which replaces the glide marker, so that zoom hands off as usual.
+A wheel in the glide's last moments (its batch still in Leaflet's 40 ms debounce when the glide
+lands) keeps the user-input flag (input within `INPUT_STOP_WINDOW_MS`, 150 ms, of the landing), so
+its zoom hands off too; older input is cleared at the landing, so a stray click long before can't
+turn a later canvas move into a handoff. A crumb changes the view, which drops any P-05 crossfade ghost, so the two
 never overlap; a glide never captures a ghost (only a handoff does).
 
 **URL camera.** Leaflet fires `moveend` when the flight lands; `CanvasCamera` reports that camera
@@ -58,16 +74,21 @@ camera.
 
 ## Tests
 
-- `src/test/canvas/canvas-motion.test.ts` (8): Leaflet's factor, the curve against the measured
+- `src/test/canvas/canvas-motion.test.ts` (9): Leaflet's factor, the curve against the measured
   Chromium value, the same notch on every platform, 4-5 notches for spans 1.6-2.39 (8+ with the old
-  numbers on a retina Mac), flick flattening, `ancestorCamera` one and two levels up and null cases.
-- `src/test/canvas/canvas-glide.test.tsx` (9, fake-map harness with `flyTo`/`flyToBounds`): Reset
+  numbers on a retina Mac), a line-mode notch and a page equal to a pixel notch, flick flattening, `ancestorCamera` one and two levels up and null cases.
+- `src/test/canvas/canvas-glide.test.tsx` (12, fake-map harness with `flyTo`/`flyToBounds`): Reset
   glides with flyToBounds and reports the landed camera; a crumb cuts to the same ground then
   flies; a crumb to a fit flies to bounds; calm mode jumps; no bump still jumps; a glide past the
-  threshold never hands off; a wheel or drag mid-flight doesn't either, and the next zoom does;
+  threshold never hands off; Leaflet's interrupts modelled as Leaflet fires them (a wheel: the
+  flight stops with no zoomend, then the wheel's own zoomstart and zoomend, which hands off; a
+  drag: moveend only, no handoff, nothing left armed, the next user zoom hands off); a wheel in the
+  last 10 ms of a glide hands off after the landing; a click 400 ms before the landing doesn't;
   a wheel step past two thresholds enters one level; a keyboard zoom still chains.
 - `src/test/helpers/reactLeafletMock.tsx`: the shared fake map gained `flyToBounds` (the viewer v2
   tests now reach it on crumbs).
+- `src/test/canvas/canvas-wheel.test.ts` (2, a real Leaflet map in jsdom): the canvas's handler adds
+  the same delta for a 3-line notch and a page as for a 100 px notch.
 
 Run: typecheck:all clean, lint 0 errors (warnings as before), format:check clean; vitest on
 `src/test/canvas`, `src/test/ocean`, `fit-map-on-open`, every test that uses the react-leaflet mock,
@@ -102,7 +123,7 @@ crumb from Oskmark).
 
 - A real retina Mac mouse and trackpad (pinch, two-finger scroll), and Windows at 125-150 %
   scaling. The numbers assume Chrome reports a notch as deltaY 100 CSS px, as Leaflet does.
-- Safari and Firefox (Firefox line-mode deltas go through Leaflet's x20, also divided by the factor).
+- Safari and Firefox in a real browser (line mode is covered by unit tests only).
 
 ## Provisional calls for Isak
 
