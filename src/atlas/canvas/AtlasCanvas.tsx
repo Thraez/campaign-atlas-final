@@ -38,7 +38,6 @@
  * src/test/canvas/canvas-imports.test.ts.
  */
 import { useRef, useState, type ReactNode } from "react";
-import L from "leaflet";
 import { MapContainer } from "react-leaflet";
 import { useReduceMotion } from "@/hooks/use-reduce-motion";
 import { FlatCRS } from "../map/flatCRS";
@@ -56,10 +55,9 @@ import { seaStyle, type SeaStyle } from "./seaStyle";
 import { ZoomHandoff } from "./ZoomHandoff";
 import { HandoffCrossfade, type CrossfadeControl } from "./HandoffCrossfade";
 import { GlideRequest } from "./CanvasGlide";
+import { CANVAS_WHEEL_PX_PER_ZOOM_LEVEL, useCanvasWheelZoom } from "./canvasWheel";
 import {
   GLIDE_SECONDS,
-  canvasWheelPxPerZoomLevel,
-  leafletWheelPxFactor,
   newGlideControl,
   runGlide,
   takeGlide,
@@ -80,13 +78,13 @@ export interface AtlasCanvasProps {
   onFrameHover?: (mapId: string | null) => void;
   /** A zoom handoff: show `view` at `camera` (R-32). Without it the canvas never hands off. */
   onViewChange?: (view: CanvasView, camera: CanvasCameraState) => void;
-  /** Caller layers, drawn inside the map pane above the canvas's own. */
   /**
    * P-06: bump in the same update as a camera or view change to glide there
    * (a breadcrumb, Reset) instead of jumping. A view change glides only up
    * the tree. Ignored under reduced motion.
    */
   glide?: number;
+  /** Caller layers, drawn inside the map pane above the canvas's own. */
   children?: ReactNode;
   className?: string;
 }
@@ -140,6 +138,12 @@ text-shadow:0 0 3px rgba(0,0,0,.9),0 1px 2px rgba(0,0,0,.8)}
 .atlas-canvas .atlas-canvas-label::before{display:none}
 `;
 
+/** The canvas's wheel zoom (P-06, `canvasWheel.ts`) in place of Leaflet's. */
+function CanvasWheelZoom() {
+  useCanvasWheelZoom();
+  return null;
+}
+
 export function AtlasCanvas({
   tree,
   view,
@@ -171,15 +175,6 @@ export function AtlasCanvas({
   const crossfade = useRef<CrossfadeControl | null>(null);
   // This commit's glide request (P-06).
   const glideControl = useRef<GlideControl>(newGlideControl());
-  // Wheel speed for this platform, set once: Leaflet reads it at creation.
-  const [wheelPxPerZoomLevel] = useState(() =>
-    canvasWheelPxPerZoomLevel(
-      leafletWheelPxFactor(
-        L.Browser as { linux?: boolean; chrome?: boolean; mac?: boolean },
-        typeof window === "undefined" ? 1 : window.devicePixelRatio || 1,
-      ),
-    ),
-  );
   const reportView =
     onViewChange &&
     ((v: CanvasView, c: CanvasCameraState) => {
@@ -224,7 +219,8 @@ export function AtlasCanvas({
         minZoom={CANVAS_MIN_ZOOM}
         maxZoom={4}
         zoomSnap={0}
-        wheelPxPerZoomLevel={wheelPxPerZoomLevel}
+        scrollWheelZoom={false}
+        wheelPxPerZoomLevel={CANVAS_WHEEL_PX_PER_ZOOM_LEVEL}
         zoomAnimation={!reduceMotion}
         zoomControl
         keyboard
@@ -237,6 +233,7 @@ export function AtlasCanvas({
         }}
       >
         <KeepCanvasSized />
+        <CanvasWheelZoom />
         {resolved && (
           <>
             {/* First: reads the camera still on screen before any other effect moves it. */}

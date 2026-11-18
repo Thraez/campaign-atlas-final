@@ -10,6 +10,7 @@ import {
   NOTCH_DELTA_Y,
   ZOOM_PER_NOTCH,
   ancestorCamera,
+  canvasWheelDeltaScale,
   canvasWheelPxPerZoomLevel,
   leafletWheelPxFactor,
   wheelBatchZoom,
@@ -37,6 +38,22 @@ describe("wheel speed (P-06)", () => {
     }
     expect(ZOOM_PER_NOTCH).toBeGreaterThan(0.45);
     expect(ZOOM_PER_NOTCH).toBeLessThan(0.5);
+  });
+
+  it("a 3-line notch (line mode) and a page zoom what a 100 px notch does, on any platform", () => {
+    for (const factor of [6, 4, 3, 2, 1]) {
+      const w = canvasWheelPxPerZoomLevel(factor);
+      // Leaflet: a line is 20 wheel px and a page 60, never divided by the factor
+      expect(wheelBatchZoom(3 * 20 * canvasWheelDeltaScale(1, factor), w)).toBeCloseTo(
+        ZOOM_PER_NOTCH,
+        9,
+      );
+      expect(wheelBatchZoom(60 * canvasWheelDeltaScale(2, factor), w)).toBeCloseTo(
+        ZOOM_PER_NOTCH,
+        9,
+      );
+      expect(canvasWheelDeltaScale(0, factor)).toBe(1);
+    }
   });
 
   it("a level of 1.6 to 2.39 zoom levels takes 4-5 notches (was 8-12 on a retina Mac)", () => {

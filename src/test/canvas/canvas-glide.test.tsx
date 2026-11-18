@@ -254,18 +254,73 @@ describe("glide (P-06)", () => {
     expect(m.onViewChange).not.toHaveBeenCalled();
   });
 
-  it("a wheel or a drag in mid-flight doesn't make the glide a handoff", () => {
+  // Leaflet's interrupts: a wheel's zoom calls `map._stop()` (the flight ends
+  // with no zoomend) and fires its own zoomstart and zoomend; a drag also
+  // stops it, and ends with a moveend only.
+  const stopFlight = () => {
+    landing = null;
+  };
+  const isleZoom = (zoom = 1.2) => act(() => fake.moveTo({ lat: 1500, lng: 500 }, zoom));
+
+  it("a wheel that stops a glide zooms on its own, and that zoom hands off", () => {
+    const m = mount(OCEAN, { center: [1500, 1000], zoom: -2 });
+    m.glideTo(OCEAN, { center: [1500, 1000], zoom: 0 });
+    fake.container.dispatchEvent(new Event("wheel"));
+    now += 40; // Leaflet's wheel debounce
+    stopFlight();
+    isleZoom();
+    expect(m.onViewChange).toHaveBeenCalledTimes(1);
+    expect(m.onViewChange.mock.calls[0][0]).toEqual(ISLE);
+    // nothing left armed: a camera the canvas applies later never hands off
+    m.update(OCEAN, { center: [500, 500], zoom: 1.5 });
+    expect(m.onViewChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("a drag that stops a glide ends it with no handoff, and nothing sticks", () => {
     const m = mount(OCEAN, { center: [1500, 1000], zoom: -2 });
     m.glideTo(OCEAN, { center: [500, 500], zoom: 1 });
     fake.container.dispatchEvent(new Event("mousedown"));
-    fake.container.dispatchEvent(new Event("wheel"));
-    land();
+    stopFlight();
+    now += 300;
+    act(() => {
+      fake.center = { lat: 1400, lng: 600 };
+      fake.zoom = 0.4;
+      fake.fire("moveend");
+    });
     expect(m.onViewChange).not.toHaveBeenCalled();
-    // the next user zoom hands off as before
+    // the flag is clear: the canvas's own camera doesn't hand off ...
+    m.update(OCEAN, { center: [500, 500], zoom: 1.5 });
+    expect(m.onViewChange).not.toHaveBeenCalled();
+    // ... and the next user zoom does
+    now += 300;
     fake.container.dispatchEvent(new Event("wheel"));
-    act(() => fake.moveTo({ lat: 1500, lng: 500 }, 1.2));
+    isleZoom(2);
     expect(m.onViewChange).toHaveBeenCalledTimes(1);
     expect(m.onViewChange.mock.calls[0][0]).toEqual(ISLE);
+  });
+
+  it("a wheel in a glide's last moments still hands off once the glide lands", () => {
+    const m = mount(OCEAN, { center: [1500, 1000], zoom: -2 });
+    m.glideTo(OCEAN, { center: [1500, 1000], zoom: 0 });
+    fake.container.dispatchEvent(new Event("wheel"));
+    now += 10;
+    land();
+    expect(m.onViewChange).not.toHaveBeenCalled();
+    now += 30;
+    isleZoom();
+    expect(m.onViewChange).toHaveBeenCalledTimes(1);
+    expect(m.onViewChange.mock.calls[0][0]).toEqual(ISLE);
+  });
+
+  it("a click long before a glide lands doesn't make the landing a handoff", () => {
+    const m = mount(OCEAN, { center: [1500, 1000], zoom: -2 });
+    m.glideTo(OCEAN, { center: [500, 500], zoom: 1 });
+    fake.container.dispatchEvent(new Event("mousedown"));
+    now += 400;
+    land();
+    expect(m.onViewChange).not.toHaveBeenCalled();
+    m.update(OCEAN, { center: [500, 500], zoom: 1.5 });
+    expect(m.onViewChange).not.toHaveBeenCalled();
   });
 });
 
