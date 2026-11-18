@@ -94,6 +94,7 @@ vi.mock("react-leaflet", async () => {
         src={url}
         className={className}
         onLoad={(e) => eventHandlers?.load?.({ target: { getElement: () => e.currentTarget } })}
+        onError={(e) => eventHandlers?.error?.({ target: { getElement: () => e.currentTarget } })}
       />
     ),
   };
@@ -160,6 +161,21 @@ describe("P-07 frames", () => {
     const rule = css.match(/\.atlas-canvas \.atlas-canvas-label \{([^}]*)\}/)?.[1] ?? "";
     expect(rule).toMatch(/font-family:\s*var\(--font-display,\s*"Cinzel"/);
     expect(rule).toMatch(/letter-spacing/);
+  });
+
+  it("our transitions keep Leaflet's zoom transform while the map zooms (CSS)", () => {
+    // jsdom can't run a zoom: check the stylesheet. Leaflet sets `transition:
+    // transform` on .leaflet-zoom-animated under .leaflet-zoom-anim; a rule of
+    // ours that sets `transition` on a tooltip or image must list it again there.
+    const css = fs.readFileSync(path.resolve(__dirname, "../../index.css"), "utf8");
+    for (const sel of [
+      ".atlas-canvas-label.atlas-canvas-eased",
+      ".atlas-canvas-picture.is-revealing",
+    ]) {
+      const esc = sel.replace(/[.-]/g, "\\$&");
+      const twin = css.match(new RegExp(`\\.leaflet-zoom-anim ${esc} \\{([^}]*)\\}`))?.[1] ?? "";
+      expect(twin, sel).toMatch(/transition:\s*transform 0\.25s cubic-bezier\(0, 0, 0\.25, 1\),/);
+    }
   });
 
   it("the outline is created with the frame classes the stylesheet keys on", () => {
@@ -278,18 +294,25 @@ describe("P-07 map pictures", () => {
     expect(imgs[0].className).toBe("atlas-canvas-picture");
   });
 
-  it("a wrapped map keeps its paper until every copy has loaded; an error keeps it", () => {
+  it("a wrapped map keeps its paper until every copy has settled", () => {
     const wrapped: MapTreeNode = { ...parent, map: { ...parent.map, wrapX: true } };
     const { imgs, papers } = pictures(wrapped);
     expect(imgs).toHaveLength(3);
     expect(papers).toHaveLength(3);
     fireEvent.load(imgs[0]);
-    fireEvent.load(imgs[1]);
     fireEvent.error(imgs[2]);
     for (const p of papers) expect(p.classList.contains("is-done")).toBe(false);
-    expect(imgs[2].classList.contains("is-pending")).toBe(true);
-    fireEvent.load(imgs[2]);
+    fireEvent.load(imgs[1]);
+    // A failed layer among loaded ones lets the paper go: no tan box round transparent art.
     for (const p of papers) expect(p.classList.contains("is-done")).toBe(true);
+    expect(imgs[2].classList.contains("is-pending")).toBe(true);
+  });
+
+  it("a map whose pictures all fail keeps its paper", () => {
+    const wrapped: MapTreeNode = { ...parent, map: { ...parent.map, wrapX: true } };
+    const { imgs, papers } = pictures(wrapped);
+    for (const img of imgs) fireEvent.error(img);
+    for (const p of papers) expect(p.classList.contains("is-done")).toBe(false);
   });
 });
 
@@ -308,6 +331,25 @@ describe("P-07 ocean pictures", () => {
     fireEvent.load(image);
     expect(image.getAttribute("class")).toBe("atlas-canvas-picture is-revealing");
     expect(paper.getAttribute("class")).toContain("is-done");
+  });
+
+  it("a new box remounts the pictures and the paper comes back until they load", () => {
+    const r = render(<OceanMaps roots={[parent]} oceanHeight={2000} />);
+    fireEvent.load(r.container.querySelector("image")!);
+    expect(r.container.querySelector(".atlas-chart-paper")!.getAttribute("class")).toContain(
+      "is-done",
+    );
+    const moved: MapTreeNode = { ...parent, placement: { ...parent.placement!, x: 260 } };
+    r.rerender(<OceanMaps roots={[moved]} oceanHeight={2000} />);
+    const image = r.container.querySelector("image")!;
+    expect(image.getAttribute("class")).toBe("atlas-canvas-picture is-pending");
+    expect(r.container.querySelector(".atlas-chart-paper")!.getAttribute("class")).not.toContain(
+      "is-done",
+    );
+    fireEvent.load(image);
+    expect(r.container.querySelector(".atlas-chart-paper")!.getAttribute("class")).toContain(
+      "is-done",
+    );
   });
 
   it("the ocean outline gets the same hover and press states", () => {

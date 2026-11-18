@@ -210,27 +210,55 @@ function Outline({
 
 /**
  * Pictures that show once loaded (P-07): `onLoad` takes each loaded picture's
- * element; `done` once all `total` have shown (an error keeps its paper).
+ * element, `onError` each one that failed. The paper is `done` once every
+ * picture has settled and at least one has loaded: a failed layer among loaded
+ * ones lets the paper go (no tan box around transparent art), a map whose
+ * pictures all failed keeps it. A new `resetKey` (a new set of picture
+ * elements) starts the count again, and settles from the old set are ignored.
  */
-function usePictureReveal(total: number) {
+function usePictureReveal(total: number, resetKey: string) {
   const motion = !useReduceMotion();
   // Read when a picture loads, outside React's render.
   const motionRef = useRef(motion);
+  const keyRef = useRef(resetKey);
   useLayoutEffect(() => {
     motionRef.current = motion;
-  }, [motion]);
+    keyRef.current = resetKey;
+  }, [motion, resetKey]);
   const seen = useRef(new WeakSet<Element>());
-  const [shown, setShown] = useState(0);
-  const onLoad = useCallback((el: Element | null | undefined) => {
-    if (!el || seen.current.has(el)) return;
-    seen.current.add(el);
-    showLoadedPicture(
-      el,
-      () => motionRef.current,
-      () => setShown((n) => n + 1),
+  const [count, setCount] = useState({ key: resetKey, loaded: 0, failed: 0 });
+  const settle = useCallback((key: string, loaded: number, failed: number) => {
+    if (key !== keyRef.current) return;
+    setCount((c) =>
+      c.key === key
+        ? { key, loaded: c.loaded + loaded, failed: c.failed + failed }
+        : { key, loaded, failed },
     );
   }, []);
-  return { motion, done: shown >= total, onLoad };
+  const onLoad = useCallback(
+    (el: Element | null | undefined) => {
+      if (!el || seen.current.has(el)) return;
+      seen.current.add(el);
+      const key = keyRef.current;
+      showLoadedPicture(
+        el,
+        () => motionRef.current,
+        () => settle(key, 1, 0),
+      );
+    },
+    [settle],
+  );
+  const onError = useCallback(
+    (el: Element | null | undefined) => {
+      if (!el || seen.current.has(el)) return;
+      seen.current.add(el);
+      settle(keyRef.current, 0, 1);
+    },
+    [settle],
+  );
+  const { loaded, failed } = count.key === resetKey ? count : { loaded: 0, failed: 0 };
+  const done = total === 0 || (loaded + failed >= total && loaded > 0);
+  return { motion, done, onLoad, onError };
 }
 
 /**
@@ -296,9 +324,11 @@ function OceanMap({
   onEnterMap?: (mapId: string) => void;
 }) {
   const svg = oceanMapSvg(node);
-  const { motion, done, onLoad } = usePictureReveal(svg?.layers.length ?? 0);
-  if (!svg || !node.placement) return null;
-  const { box } = svg;
+  const box = svg?.box;
+  // The overlay remounts on a new box (below), with new picture elements.
+  const boxKey = box ? `${box.minX},${box.minY},${box.maxX},${box.maxY}` : "";
+  const { motion, done, onLoad, onError } = usePictureReveal(svg?.layers.length ?? 0, boxKey);
+  if (!svg || !box || !node.placement) return null;
   const p = node.placement;
   const corners = placementCorners(p, node.map);
   const id = node.map.id;
@@ -306,7 +336,7 @@ function OceanMap({
     <>
       <SVGOverlay
         // viewBox is set once, when Leaflet creates the <svg>: remount on a new box.
-        key={`${box.minX},${box.minY},${box.maxX},${box.maxY}`}
+        key={boxKey}
         bounds={boxBounds(oceanHeight, box)}
         attributes={{
           viewBox: `${box.minX} ${box.minY} ${box.maxX - box.minX} ${box.maxY - box.minY}`,
@@ -335,6 +365,7 @@ function OceanMap({
               // Set once; pictureReveal changes the classes on the element.
               className={PICTURE_START_CLASS}
               onLoad={(e) => onLoad(e.currentTarget)}
+              onError={(e) => onError(e.currentTarget)}
               href={normalizeAtlasAssetUrl(l.src)}
               x={l.x}
               y={l.y}
@@ -392,10 +423,17 @@ export function OceanMaps({
 export function MapPictures({ node }: { node: MapTreeNode }) {
   const { map } = node;
   const offsets = map.wrapX ? [-map.width, 0, map.width] : [0];
-  const { motion, done, onLoad } = usePictureReveal(map.layers.length * offsets.length);
+  const pictureKey = `${map.id}|${offsets.join()}|${map.layers.map((l) => l.id).join()}`;
+  const { motion, done, onLoad, onError } = usePictureReveal(
+    map.layers.length * offsets.length,
+    pictureKey,
+  );
   const handlers = useMemo<L.LeafletEventHandlerFnMap>(
-    () => ({ load: (e) => onLoad((e.target as L.ImageOverlay).getElement()) }),
-    [onLoad],
+    () => ({
+      load: (e) => onLoad((e.target as L.ImageOverlay).getElement()),
+      error: (e) => onError((e.target as L.ImageOverlay).getElement()),
+    }),
+    [onLoad, onError],
   );
   const paperHandlers = useMemo<L.LeafletEventHandlerFnMap>(
     // Under the pictures, whatever order Leaflet added them in.

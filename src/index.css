@@ -382,6 +382,13 @@
 .atlas-canvas .atlas-canvas-label.is-hover { color: #fff6dc; }
 .atlas-canvas .atlas-canvas-label.is-pressed { color: var(--atlas-frame-press); }
 .atlas-canvas .atlas-canvas-label.atlas-canvas-eased { transition: color 150ms ease-out; }
+/* Leaflet zooms a tooltip or image overlay with a transform transition on
+   .leaflet-zoom-animated, only while the map pane is .leaflet-zoom-anim
+   (leaflet.css). A transition set here replaces Leaflet's, so the zoom one is
+   listed again for that moment, or names and pictures jump ahead of the map. */
+.atlas-canvas .leaflet-zoom-anim .atlas-canvas-label.atlas-canvas-eased {
+  transition: transform 0.25s cubic-bezier(0, 0, 0.25, 1), color 150ms ease-out;
+}
 
 /* Map pictures (src/atlas/canvas/pictureReveal.ts): hidden until loaded,
    over a drawn chart paper; then a 250 ms fade (.is-revealing), or at once
@@ -389,6 +396,9 @@
    picture is in, after the fade. No stand-in images: maps stay lossless. */
 .atlas-canvas .atlas-canvas-picture.is-pending { opacity: 0 !important; }
 .atlas-canvas .atlas-canvas-picture.is-revealing { transition: opacity 250ms ease-out; }
+.atlas-canvas .leaflet-zoom-anim .atlas-canvas-picture.is-revealing {
+  transition: transform 0.25s cubic-bezier(0, 0, 0.25, 1), opacity 250ms ease-out;
+}
 .atlas-canvas .atlas-chart-paper__sheet { fill: var(--atlas-paper); }
 .atlas-canvas .atlas-chart-paper__grid { fill: none; stroke: var(--atlas-paper-ink); stroke-opacity: 0.16; stroke-width: 1px; }
 .atlas-canvas .atlas-chart-paper__border { fill: none; stroke: var(--atlas-paper-ink); stroke-opacity: 0.4; stroke-width: 1.5px; }

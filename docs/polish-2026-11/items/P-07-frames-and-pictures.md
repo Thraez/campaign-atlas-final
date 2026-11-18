@@ -32,10 +32,19 @@ shared canvas only; the v1 viewer passes no new props to `MapImageLayers`, so it
   removed after the fade, so a P-05 clone of the image pane never replays it.
 - **Calm / reduced motion** (`useReduceMotion`): states still apply (hover, pressed, loaded), with
   no `atlas-canvas-eased` or `is-revealing` class anywhere; the global calm CSS zeroes the rest.
-- A picture that fails to load keeps the paper: the sheet stays under the loaded ones (hidden by
-  them where they cover it) and shows where the missing one would be, better than bare sea.
+- The paper goes once every picture has settled (loaded or failed) and at least one loaded. A
+  failed layer among loaded ones doesn't leave a tan box round transparent art; a map whose
+  pictures all failed keeps its paper (better than bare sea). Failed pictures stay hidden.
+- A new set of picture elements starts the count again: the ocean overlay remounts on a new box,
+  and the map view keys on map, copies and layer ids. Settles from the old set are ignored, so
+  the paper never goes while the new pictures are still hidden.
+- **Leaflet's zoom transition is kept.** Leaflet animates zoom with `transition: transform` on
+  `.leaflet-zoom-animated` (every tooltip and image overlay) while the map pane has
+  `.leaflet-zoom-anim`. Our label colour ease and picture fade would replace it, so each has a twin
+  rule under `.leaflet-zoom-anim` listing `transform 0.25s cubic-bezier(0, 0, 0.25, 1)` first.
+  If Leaflet's timing changes on an upgrade, change both twins.
 - A map with no picture layers shows no paper. `wrapX` maps draw paper under every copy and wait
-  for all copies.
+  for all copies to settle.
 - The paper sits in the same pane as the pictures, before them, so pins, regions and routes stay
   above both.
 
@@ -46,12 +55,19 @@ shared canvas only; the v1 viewer passes no new props to `MapImageLayers`, so it
   (13 tests): label class and Cinzel rule, frame classes, hover/out, pressed until pointerup or
   dragstart, click still enters, reduced motion, pending start, load then fade then done paper,
   calm mode, under-ghost instant reveal, `wrapX` with an error, ocean `<image>` and outline.
+  Review fixes added: the zoom-transition twins (a stylesheet check; jsdom can't zoom), an error
+  among loaded copies lets the paper go, all failing keeps it, a new ocean box brings the paper
+  back until the new picture loads. The shared `reactLeafletMock` now draws `SVGOverlay` as an
+  `<svg>` (no more "unrecognized tag" warnings); every test that uses it passes.
 - Browser (Chrome, `atlas:serve:next` on 4380-4382, built atlas): hovered frame mid-ease (150 ms
   transition, glow filter computed); pressed frame gold with glow; Cinzel labels on desktop and at
   375 px over sea and map art; picture requests delayed 3 s show the chart paper, then the fade.
   Click into Oskmark: one `is-revealing` on the new picture, no ghost. Wheel into Oskmark: a P-05
   ghost appears, the new picture shows with no `is-revealing` (one fade only). Calm mode
   (`atlas-calm-mode-v1`): no eased or revealing classes, transition ~0.
+- Double-click zoom on empty map next to Oskmark, label centre against frame centre sampled every
+  40 ms: with the fix within 2 px through the whole zoom, computed transition `transform, color`
+  (picture `transform, opacity`); with the twin rule overridden the label ran up to 161 px ahead.
 - Shots: `docs/polish-2026-11/shots/p07-before-*.jpg`, `p07-after-*.jpg` (desktop 1280, phone 375,
   including the loading paper and a hovered and a pressed frame).
 
