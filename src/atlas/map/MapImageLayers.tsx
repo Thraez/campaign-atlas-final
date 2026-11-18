@@ -3,6 +3,9 @@
  * `dx` map units sideways. `WrappedWorld` (the viewer) and `AtlasCanvas` (R-31)
  * both draw a map's images through this, so they draw them the same way.
  *
+ * The canvas (P-07) also passes a class and load handlers so a picture can
+ * fade in over its chart paper; the viewer passes neither and is unchanged.
+ *
  * PLAYER-SAFE: the player bundle imports this file. Import nothing editor-only.
  */
 import { ImageOverlay } from "react-leaflet";
@@ -14,11 +17,17 @@ export function MapImageLayers({
   map,
   dx = 0,
   pane,
+  className,
+  eventHandlers,
 }: {
   map: Pick<MapDocument, "layers" | "height">;
   dx?: number;
   /** Leaflet pane for the overlays; Leaflet's default (`overlayPane`) when unset. */
   pane?: string;
+  /** Extra class on each overlay's `<img>` (Leaflet sets it once, at creation). */
+  className?: string;
+  /** Leaflet events on each overlay (`load`, `error`, ...). */
+  eventHandlers?: L.LeafletEventHandlerFnMap;
 }) {
   const H = map.height;
   return (
@@ -37,6 +46,8 @@ export function MapImageLayers({
             }
             opacity={layer.opacity}
             {...(pane ? { pane } : {})}
+            {...(className ? { className } : {})}
+            {...(eventHandlers ? { eventHandlers } : {})}
           />
         ))}
     </>

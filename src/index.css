@@ -325,6 +325,72 @@
 .leaflet-pane, .leaflet-control { z-index: 1 !important; }
 .leaflet-top, .leaflet-bottom { z-index: 2 !important; }
 
+/* Shared canvas (P-07, src/atlas/canvas/CanvasLayers.tsx). Frames and map
+   names answer hover (.is-hover) and press (.is-pressed); .atlas-canvas-eased
+   adds the 150 ms ease and is never set under reduced motion or calm mode.
+   These rules draw over the attributes Leaflet sets on the outline. */
+.atlas-canvas {
+  --atlas-frame-ink: #f4ead2;
+  --atlas-frame-press: #f2c46d;
+  --atlas-paper: #bfae86;
+  --atlas-paper-ink: #4a3b22;
+}
+.atlas-canvas .atlas-canvas-frame { stroke: var(--atlas-frame-ink); fill: var(--atlas-frame-ink); }
+.atlas-canvas .atlas-canvas-frame--child {
+  stroke-width: 1.5px; stroke-opacity: 0.6; stroke-dasharray: 6 6; fill-opacity: 0.04;
+}
+.atlas-canvas .atlas-canvas-frame--child.is-hover {
+  stroke-width: 2.5px; stroke-opacity: 1; stroke-dasharray: 12 0; fill-opacity: 0.14;
+  filter: drop-shadow(0 0 3px rgba(244, 234, 210, 0.55));
+}
+.atlas-canvas .atlas-canvas-frame--ocean { stroke-width: 1px; stroke-opacity: 0; fill-opacity: 0; }
+.atlas-canvas .atlas-canvas-frame--ocean.is-hover {
+  stroke-width: 2px; stroke-opacity: 0.85; fill-opacity: 0.06;
+  filter: drop-shadow(0 0 3px rgba(244, 234, 210, 0.45));
+}
+.atlas-canvas .atlas-canvas-frame.is-pressed {
+  stroke: var(--atlas-frame-press); fill: var(--atlas-frame-press);
+  stroke-width: 3px; stroke-opacity: 1; stroke-dasharray: 12 0; fill-opacity: 0.2;
+  filter: drop-shadow(0 0 5px rgba(242, 196, 109, 0.7));
+}
+.atlas-canvas .atlas-canvas-frame.atlas-canvas-eased {
+  transition-property: stroke, stroke-width, stroke-opacity, stroke-dasharray, fill, fill-opacity, filter;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+
+/* Map names: the display font, letter-spaced like the app's headings, with a
+   dark halo so they read on sea and map art alike. Leaflet's tooltip box is
+   turned off. */
+.atlas-canvas .atlas-canvas-label {
+  background: transparent; border: 0; box-shadow: none; padding: 0;
+  font-family: var(--font-display, "Cinzel", Georgia, serif);
+  font-weight: 700; font-size: 13px; letter-spacing: 0.08em; white-space: nowrap;
+  color: #f8f1df;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.95), 0 0 6px rgba(0, 0, 0, 0.75), 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+@media (min-width: 640px) {
+  .atlas-canvas .atlas-canvas-label { font-size: 14px; }
+}
+.atlas-canvas .atlas-canvas-label::before { display: none; }
+.atlas-canvas .atlas-canvas-label.is-hover { color: #fff6dc; }
+.atlas-canvas .atlas-canvas-label.is-pressed { color: var(--atlas-frame-press); }
+.atlas-canvas .atlas-canvas-label.atlas-canvas-eased { transition: color 150ms ease-out; }
+
+/* Map pictures (src/atlas/canvas/pictureReveal.ts): hidden until loaded,
+   over a drawn chart paper; then a 250 ms fade (.is-revealing), or at once
+   under reduced motion and under a handoff ghost. The paper goes once every
+   picture is in, after the fade. No stand-in images: maps stay lossless. */
+.atlas-canvas .atlas-canvas-picture.is-pending { opacity: 0 !important; }
+.atlas-canvas .atlas-canvas-picture.is-revealing { transition: opacity 250ms ease-out; }
+.atlas-canvas .atlas-chart-paper__sheet { fill: var(--atlas-paper); }
+.atlas-canvas .atlas-chart-paper__grid { fill: none; stroke: var(--atlas-paper-ink); stroke-opacity: 0.16; stroke-width: 1px; }
+.atlas-canvas .atlas-chart-paper__border { fill: none; stroke: var(--atlas-paper-ink); stroke-opacity: 0.4; stroke-width: 1.5px; }
+.atlas-canvas .atlas-chart-paper.is-done { opacity: 0; visibility: hidden; }
+.atlas-canvas .atlas-chart-paper.is-done.atlas-canvas-eased {
+  transition: opacity 150ms ease-out 250ms, visibility 0s linear 400ms;
+}
+
 /* Atlas viewer: rendered markdown link styling */
 .atlas-prose a.atlas-wikilink {
   color: hsl(var(--primary));
