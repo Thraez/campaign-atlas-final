@@ -13,13 +13,23 @@ Plan: `plan.md`. Orchestrator notes, newest last.
 - `State.md` gets one "for Isak's look" entry for the round in a closing docs PR, so parallel
   item PRs don't collide on it.
 
-| Item                             | State  | PR  |
-| -------------------------------- | ------ | --- |
-| P-01 Overlays stop piling up     | queued | -   |
-| P-02 Ocean fit margin (R-37)     | queued | -   |
-| P-03 Phone top bar (R-38)        | queued | -   |
-| P-04 Handoff always fires (R-40) | queued | -   |
-| P-05 Soft handoff                | queued | -   |
-| P-06 Zoom and crumb feel         | queued | -   |
-| P-07 Frames and pictures respond | queued | -   |
-| P-08 First load and fonts        | queued | -   |
+| Item | State | PR |
+| --- | --- | --- |
+| P-01 Overlays stop piling up | merged | #151 |
+| P-02 Ocean fit margin (R-37) | merged | #150 |
+| P-03 Phone top bar (R-38) | merged | #153 |
+| P-04 Handoff always fires (R-40) | merged | #152 |
+| P-05 Soft handoff | merged | #154 |
+| P-06 Zoom and crumb feel | merged | #156 |
+| P-07 Frames and pictures respond | merged | #157 |
+| P-08 First load and fonts | merged | #155 |
+
+## 2026-11-19
+
+- Round 1 is done: all eight items merged and published. Each went through the full local gate and
+  an Opus review; fixes from the reviews are in the item notes under `items/` and, for P-02 and P-03, in the
+  R-37 and R-38 tickets.
+- What Isak should look at, the open questions and three new round-2 candidates are in `State.md`
+  ("Polish round 1").
+- Not checked on real hardware: P-06's wheel speed on a retina trackpad, Windows scaling, Safari and
+  Firefox; P-07's glow in Safari and Firefox and the pressed state on a real phone.
