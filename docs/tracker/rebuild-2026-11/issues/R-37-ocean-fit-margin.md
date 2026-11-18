@@ -59,3 +59,13 @@ Polish item P-02, branch `polish-p02-ocean-fit-margin`.
   desktop but the phone's top-left control and the legend still float over sea only.
 - **Not checked:** `sandbox` in a browser (covered by tests only); the full gate and review (run
   afterwards); the serve ran on ports 4330-4332 because 4321 was held by another worktree's server.
+
+## Review fixes (2026-11-18)
+
+- The Opus review found the canvas kept its first measured width: with the side panel collapsed on
+  load and then opened, Leaflet drew, fitted and limited zoom for the old width, so the right-hand
+  map sat clipped. `KeepCanvasSized` (`src/atlas/map/keepMapSized.ts`) now re-measures the canvas
+  whenever its container changes size; `OceanZoomLimit` already recomputes on Leaflet's `resize`.
+- The margin test now also asserts `OCEAN_FIT_MARGIN > 0`.
+- Accepted as provisional: the margin is a fraction of the box, so a box whose shape matches the
+  canvas leaves about 50 px, less than the Wander block's height in the bottom-left corner.

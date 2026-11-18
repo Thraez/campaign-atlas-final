@@ -43,6 +43,7 @@ import type { TreeView } from "../ocean/zoomHandoff";
 import { CANVAS_MIN_ZOOM, OceanZoomLimit } from "./OceanZoomLimit";
 import { boxBounds, oceanFitBox, type Box } from "./canvasGeometry";
 import { CanvasCamera, type CanvasCameraState } from "./CanvasCamera";
+import { KeepCanvasSized } from "./KeepCanvasSized";
 import { CANVAS_IMAGE_PANE, ChildFrames, OceanMaps } from "./CanvasLayers";
 import { seaStyle, type SeaStyle } from "./seaStyle";
 import { ZoomHandoff } from "./ZoomHandoff";
@@ -187,6 +188,7 @@ export function AtlasCanvas({
           background: waterOff ? (water.oceanColor ?? DEFAULT_SEA) : "transparent",
         }}
       >
+        <KeepCanvasSized />
         {resolved && (
           <>
             {/* CanvasCamera before FitMapOnOpen: sibling effects run in order (after
