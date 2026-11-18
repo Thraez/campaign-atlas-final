@@ -454,3 +454,56 @@ describe("AtlasViewer, v2 output", () => {
     });
   });
 });
+
+// R-38: at phone width the bar is breadcrumb and search; the other controls live in the menu.
+describe("AtlasViewer, v2 phone bar", () => {
+  const realMatchMedia = window.matchMedia;
+  beforeEach(() => {
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("max-width: 767px"),
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+  });
+  afterEach(() => {
+    window.matchMedia = realMatchMedia;
+  });
+
+  const header = () => within(document.querySelector("header")!);
+  const openMenu = () =>
+    fireEvent.click(header().getByRole("button", { name: /navigation menu/i }));
+
+  it("keeps only the menu, home, breadcrumb and search in the bar", async () => {
+    await open("main", "/?map=oskmark");
+    const bar = header();
+    expect(bar.getByRole("navigation", { name: "Breadcrumb" })).toBeInTheDocument();
+    expect(bar.getByRole("button", { name: /search atlas/i })).toBeInTheDocument();
+    for (const name of [/distance ruler/i, /calm mode/i, /offline options/i, /grid overlay/i]) {
+      expect(bar.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    expect(document.querySelector("header [data-campaign-chip]")).toBeNull();
+  });
+
+  it("offers the ruler and calm mode in the menu, under the campaign's name; the ruler closes it", async () => {
+    await open("main", "/?map=oskmark");
+    openMenu();
+    const tools = await screen.findByRole("group", { name: "Map tools" });
+    expect(screen.getByRole("dialog").textContent).toContain(projects.main.campaign!.name);
+    const calm = within(tools).getByRole("button", { name: "Calm mode" });
+    const before = calm.getAttribute("aria-pressed");
+    fireEvent.click(calm);
+    expect(calm.getAttribute("aria-pressed")).not.toBe(before);
+    fireEvent.click(calm);
+    const ruler = within(tools).getByRole("button", { name: /distance ruler/i });
+    expect(ruler).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(ruler);
+    await waitFor(() =>
+      expect(screen.queryByRole("group", { name: "Map tools" })).not.toBeInTheDocument(),
+    );
+  });
+});

@@ -160,6 +160,8 @@ export function OfflineStatus() {
 
 interface OfflineMenuProps {
   className?: string;
+  /** A full-width labelled row, for the phone menu drawer (R-38). */
+  row?: boolean;
 }
 
 const SAVE_MESSAGES = {
@@ -169,7 +171,7 @@ const SAVE_MESSAGES = {
 } as const;
 
 /** Compact dropdown trigger to be placed in the toolbar. */
-export function OfflineMenu({ className }: OfflineMenuProps) {
+export function OfflineMenu({ className, row = false }: OfflineMenuProps) {
   const enabled = shouldEnableServiceWorker();
   const [busy, setBusy] = useState<null | "save" | "reload" | "clear">(null);
   const [done, setDone] = useState<null | string>(null);
@@ -213,9 +215,11 @@ export function OfflineMenu({ className }: OfflineMenuProps) {
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="icon"
+          size={row ? "default" : "icon"}
           aria-label="Offline options"
-          className={className}
+          className={
+            row ? `w-full justify-start gap-3 px-3 font-normal ${className ?? ""}` : className
+          }
           title={text.label}
         >
           {text.saved ? (
@@ -223,9 +227,10 @@ export function OfflineMenu({ className }: OfflineMenuProps) {
           ) : (
             <CloudOff className="h-4 w-4" aria-hidden="true" />
           )}
+          {row && "Offline options"}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent align={row ? "start" : "end"} className="w-64">
         <DropdownMenuLabel className="flex items-start gap-2 text-xs font-normal">
           {text.saved ? (
             <CheckCircle2
