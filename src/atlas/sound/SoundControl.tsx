@@ -92,7 +92,7 @@ export function SoundControl({ hasSoundscape = true }: SoundControlProps) {
       {hasSoundscape && audioAvailable && soundEnabled && audioUnlocked && (
         <>
           {ambienceActive && (
-            <span className="rounded-full border border-border bg-card px-3 py-2 text-xs shadow-sm text-muted-foreground">
+            <span className="atlas-notice rounded-full border border-border bg-card px-3 py-2 text-xs shadow-sm text-muted-foreground">
               <span aria-hidden="true">♪</span> Ambience playing
             </span>
           )}

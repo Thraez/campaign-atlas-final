@@ -50,13 +50,14 @@ import { SoundscapeLayer } from "@/atlas/sound/SoundscapeLayer";
 import { SoundControl } from "@/atlas/sound/SoundControl";
 import { OfflineMenu, OfflineStatus, UpdateNotice } from "@/atlas/OfflineStatus";
 import { MapNoticeDock } from "@/atlas/MapNoticeDock";
+import { creditOverlayBottomPx } from "@/atlas/noticeDockLayout";
 import { setOfflineMap, type OfflineMap } from "@/pwa";
 import { isDmToolsEnabled } from "@/atlas/dmTools";
 import { SearchPalette } from "@/atlas/search/SearchPalette";
 import { EntityPanel } from "@/atlas/entity/EntityPanel";
 import { ReadingPanelWelcome } from "@/atlas/entity/ReadingPanelWelcome";
 import { pickStarters } from "@/atlas/entity/pickStarters";
-import { MapCreditOverlay } from "@/atlas/map/MapCreditOverlay";
+import { MapCreditOverlay, activeMapCredits } from "@/atlas/map/MapCreditOverlay";
 import { useHasDesktopAside } from "@/hooks/use-has-desktop-aside";
 import { useReduceMotion } from "@/hooks/use-reduce-motion";
 import { CalmModeToggle } from "@/atlas/CalmModeToggle";
@@ -477,6 +478,8 @@ export default function AtlasViewer() {
   }, [data]);
   const showCredits =
     worldCredits?.page !== false && (data?.project.entities.some((e) => e.credit) ?? false);
+  /** Layer credits in the corner above the minimap; the notice dock clears them. */
+  const mapCreditCount = activeMapCredits(activeMap, worldAssetCredits, worldCredits).length;
 
   const { visited, mark: markVisitedEntity } = useVisitedPlaces();
 
@@ -1090,9 +1093,7 @@ export default function AtlasViewer() {
                   map={activeMap}
                   assetCredits={worldAssetCredits}
                   credits={worldCredits}
-                  clearanceBottomPx={
-                    12 /* minimap's own bottom-3 offset */ + minimapHeightFor(activeMap) + 8
-                  }
+                  clearanceBottomPx={creditOverlayBottomPx(minimapHeightFor(activeMap))}
                 />
 
                 {/* Pin legend — top-right map corner, collapsed by default */}
@@ -1109,7 +1110,10 @@ export default function AtlasViewer() {
             />
 
             {/* Notices: one stack above the bottom row, top to bottom. */}
-            <MapNoticeDock minimapHeight={activeMap ? minimapHeightFor(activeMap) : null}>
+            <MapNoticeDock
+              minimapHeight={activeMap ? minimapHeightFor(activeMap) : null}
+              creditCount={activeMap ? mapCreditCount : 0}
+            >
               <UpdateNotice />
               {wanderEmpty && (
                 <div className="atlas-wander-note atlas-notice self-start max-w-xs rounded-lg border bg-background/95 px-3 py-2 text-xs text-muted-foreground">

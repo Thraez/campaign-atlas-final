@@ -31,13 +31,15 @@ close it.
   Legend, Wander and minimap drawing over the drawer, search and sheet, and the two overprints.
 - **Scale.** CSS variables in `src/index.css` (`:root`), Tailwind names in `tailwind.config.ts`:
   page level `--z-chrome` 30 (toolbar), `--z-toast` 40 (offline indicator), `--z-scrim` 50 (the
-  shadcn `z-50`, named, not changed); inside the map `--z-map-control` 500 (hint, Legend, Wander,
-  scale bar, reset, credits) and `--z-map-notice` 510 (the dock). The minimap keeps its 400.
+  shadcn `z-50`, named, not changed); inside the map `--z-minimap` 400, `--z-map-control` 500
+  (hint, Legend, Wander, scale bar, reset, credits, ruler hint) and `--z-map-notice` 510 (the
+  dock). The place peek card keeps its 1000.
 - **One notice dock** (`src/atlas/MapNoticeDock.tsx`, `.atlas-notice-dock` in `src/index.css`):
   update toast, Wander's "explored everything" note and the sound control (invite, or mute and
-  volume) stack top to bottom, right-aligned. Phone (< 640 px): full width, lifted above the taller
-  of Wander and the minimap (`noticeDockClearancePx`). From 640 px: in the gap between Wander and
-  the minimap, above the scale bar.
+  volume, with "Ambience playing") stack top to bottom, right-aligned. Phone (< 640 px): full
+  width, lifted above the taller of Wander and the minimap, and above the layer-credit stack when
+  the map has credits (`src/atlas/noticeDockLayout.ts`). From 640 px: in the gap between Wander and
+  the minimap (or the wider credit column), above the scale bar.
 - **Update toast** moved out of `OfflineStatus` into `UpdateNotice` (same file), placed by the dock:
   full width on a phone, `max-w-md` from 640 px, Refresh 40 px high, and a "Later" ✕ that hides it
   for this page.
@@ -70,16 +72,17 @@ is a product call, not part of P-01.
 
 ## Not done, seen on the way
 
-- On a phone the scale bar overlaps the minimap's left part (bottom row, pre-existing; there is no
-  room between Wander and a 180 px minimap at 375 px). Needs a call: a smaller phone minimap or
-  the scale bar elsewhere.
-- The reset-view button sits on the minimap's corner (both `bottom-3 right-3`), desktop too; it
-  was like that before.
 - The clipped "alm mode off" label was not found in this branch: the calm button is an icon in the
   toolbar (P-03's area). Probably an older live build.
-- A map with layer credits would put the credit badge where the phone dock sits; no content has
-  credits today.
-- R-39's ticket file is not updated (left for whoever closes the round).
+- R-39's ticket has a "Built in P-01" note; its status is left for whoever closes the round.
+
+## Follow-ups
+
+- Phone: the scale bar overlaps the minimap's left part (pre-existing; there is no room between
+  Wander and a 180 px minimap at 375 px). Needs a call: a smaller phone minimap or the scale bar
+  elsewhere.
+- The reset-view button sits on the minimap's corner (both `bottom-3 right-3`), phone and desktop
+  (pre-existing).
 
 ## Checked
 

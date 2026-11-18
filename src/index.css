@@ -50,7 +50,7 @@
     --sidebar-ring: 36 70% 58%;
 
     /* Stacking scale (P-01); Tailwind names them z-chrome, z-toast, z-scrim,
-       z-map-control and z-map-notice. Page level: the viewer's map area
+       z-minimap, z-map-control and z-map-notice. Page level: the viewer's map area
        (<main>) is isolated, so everything floating on the map stays one
        layer under the toolbar, page toasts and every scrim. --z-scrim is
        the shadcn dialogs' and sheets' z-50, named here, not changed. Inside
@@ -58,6 +58,7 @@
     --z-chrome: 30;
     --z-toast: 40;
     --z-scrim: 50;
+    --z-minimap: 400;
     --z-map-control: 500;
     --z-map-notice: 510;
   }
@@ -570,7 +571,8 @@
 @media (min-width: 640px) {
   .atlas-notice-dock {
     left: 8rem; /* Wander is 101px wide at left-3 */
-    right: calc(180px + 1.5rem); /* the minimap is 180px wide at right-3 */
+    /* the minimap is 180px wide at right-3; wider when credits sit above it */
+    right: var(--atlas-dock-right, calc(180px + 1.5rem));
     bottom: 4rem; /* the scale bar is 42px tall at bottom-3 */
   }
 }

@@ -44,6 +44,7 @@ export default {
         chrome: "var(--z-chrome)",
         toast: "var(--z-toast)",
         scrim: "var(--z-scrim)",
+        minimap: "var(--z-minimap)",
         "map-control": "var(--z-map-control)",
         "map-notice": "var(--z-map-notice)",
       },
