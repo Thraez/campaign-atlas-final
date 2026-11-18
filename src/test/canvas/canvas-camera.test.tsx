@@ -635,6 +635,23 @@ describe("AtlasCanvas zoom handoff: the zoom's anchor point (P-04)", () => {
     expect(onViewChange).not.toHaveBeenCalled();
   });
 
+  it("a calm-mode pinch past max zoom still enters (a second zoomstart at the bounce)", () => {
+    // TouchZoom lets the pinch reach 4.3 (bounceAtZoomLimits); touchend's
+    // _resetView clamps it to 4 and, the zoom having changed, fires zoomstart again.
+    const onViewChange = start(ISLE, [50, 40], 3.5);
+    fake.container.dispatchEvent(new Event("touchstart"));
+    act(() => fake.fire("zoomstart")); // the first touchmove, at 3.5
+    fake.zoom = 4.3;
+    act(() => fake.fire("zoomstart")); // touchend: _resetView(center, 4)
+    fake.zoom = 4;
+    act(() => {
+      fake.fire("zoomend");
+      fake.fire("moveend");
+    });
+    expect(onViewChange).toHaveBeenCalledTimes(1);
+    expect(onViewChange.mock.calls[0][0]).toEqual(COVE);
+  });
+
   it("a hand-back below the ocean's floor keeps the anchor at the floor's zoom", () => {
     // A pinch out of the isle, far off-centre, landing two levels below the
     // ocean's floor: setView will clamp the zoom and keep the centre, so the

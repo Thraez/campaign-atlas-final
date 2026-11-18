@@ -90,7 +90,11 @@ export function ZoomHandoff({
       inputAt = performance.now();
     };
     for (const e of USER_INPUT) el.addEventListener(e, mark, { capture: true, passive: true });
+    // The first zoomstart of a zoom counts: a calm-mode pinch past a zoom limit
+    // fires a second one at touchend (`_resetView` clamps the zoom back), which
+    // would read the zoom's direction from that last step.
     const onZoomStart = () => {
+      if (zoomFrom !== null) return;
       zoomFrom = { zoom: map.getZoom(), center: fromLatLng(viewHeight, map.getCenter()) };
     };
     // The zoom has settled: hand off if the user made it.

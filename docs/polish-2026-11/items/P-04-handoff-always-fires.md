@@ -99,6 +99,11 @@ levels only past the same thresholds as before.
   a pinch out far off-centre, below the ocean's floor, put the ocean box off screen. The handed
   zoom is now clamped to the new view's limits (the ocean's `oceanMinZoom`, else the canvas floor;
   max zoom) before the offset is applied.
+- **The first `zoomstart` counts** (re-check). A calm-mode pinch past max zoom reaches about 4.3
+  (`bounceAtZoomLimits`, and `getScaleZoom` doesn't clamp); touchend's `_resetView` clamps it to
+  4, sees a zoom change (`Map.js` `_resetView`, `zoomChanged`) and fires a second `zoomstart`.
+  That overwrote the zoom's start, so the direction read "out" and a pinch into a child at max
+  zoom never entered. `onZoomStart` now keeps the first one (a `moveend` or `zoomend` clears it).
 - The test "an anchor that a pan pushed off the screen" now zooms past the cove's enter zoom with
   the would-be anchor inside the frame, so it can fail.
 
