@@ -1,6 +1,6 @@
 # R-40 A fling's moveend must not disarm a zoom in flight
 
-Status: ready-for-agent
+Status: done
 Blocked by: -
 Size: S
 Branch: `rebuild-r40-fling-moveend`
