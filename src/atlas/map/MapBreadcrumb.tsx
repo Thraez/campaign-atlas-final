@@ -51,7 +51,8 @@ export function MapBreadcrumb({
   );
   return (
     <nav aria-label="Breadcrumb" className="min-w-0 text-sm" ref={navRef} tabIndex={-1}>
-      <ol className="flex items-center gap-1 min-w-0 overflow-hidden whitespace-nowrap">
+      {/* p-1 -m-1: room inside the clip for the 4px focus ring, same footprint. */}
+      <ol className="flex items-center gap-1 min-w-0 overflow-hidden whitespace-nowrap p-1 -m-1">
         {hidden.length > 0 && (
           <li className="flex items-center gap-1 shrink-0">
             <DropdownMenu>
@@ -59,7 +60,7 @@ export function MapBreadcrumb({
                 <button
                   type="button"
                   aria-label="Earlier levels"
-                  className="flex min-h-10 min-w-10 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+                  className="atlas-focus-ring flex min-h-10 min-w-10 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
                 >
                   <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                 </button>
@@ -103,7 +104,7 @@ export function MapBreadcrumb({
                 <button
                   type="button"
                   onClick={() => onGo(targetOf(c))}
-                  className={`truncate text-muted-foreground hover:text-foreground underline-offset-2 hover:underline ${tap}`}
+                  className={`atlas-focus-ring rounded-sm truncate text-muted-foreground hover:text-foreground underline-offset-2 hover:underline ${tap}`}
                 >
                   {labelOf(c)}
                 </button>

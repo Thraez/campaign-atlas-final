@@ -28,7 +28,9 @@ export function WanderControl({ discovered, total, canWander, onWander }: Wander
           All {total} places found
         </div>
       )}
-      <div className="flex items-center gap-2 px-0.5">
+      {/* A quiet pill like the other map overlays (Q-04), so the count reads over
+          light map art. The ring is drawn inside: same 16px height, no shift. */}
+      <div className="flex items-center gap-1 rounded-full bg-background/85 px-1.5 ring-1 ring-inset ring-border">
         <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
           <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
         </div>

@@ -138,9 +138,20 @@
   color: hsl(var(--foreground)) !important;
   border-color: hsl(var(--border)) !important;
 }
+/* One keyboard focus ring for the map's own controls (Q-04): the same 2px
+   gold ring with a 2px gap as the Button component (ring-2 ring-offset-2),
+   for the zoom buttons, the breadcrumb's crumbs and Reset. */
+.leaflet-control-zoom a:focus-visible,
+.atlas-focus-ring:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px hsl(var(--background)),
+    0 0 0 4px hsl(var(--ring));
+}
+/* Lift the focused zoom button so its neighbour doesn't paint over the ring. */
 .leaflet-control-zoom a:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: -2px;
+  position: relative;
+  z-index: 1;
 }
 .leaflet-control-zoom a:focus:not(:focus-visible) {
   outline: none;
@@ -655,7 +666,10 @@
     left: 8rem; /* Wander is 101px wide at left-3 */
     /* the minimap is 180px wide at right-3; wider when credits sit above it */
     right: var(--atlas-dock-right, calc(180px + 1.5rem));
-    bottom: 4rem; /* the scale bar is 42px tall at bottom-3 */
+    /* the scale bar is 42px tall at bottom-3 (top at 54px); 18px above it so
+       a wide notice's shadow-md (about 9px below its box) stays off the bar
+       where the two share columns (Q-04; was 4rem). */
+    bottom: 4.5rem;
   }
 }
 /* A gentle rise when a notice appears; none under reduced motion or calm
