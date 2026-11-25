@@ -20,7 +20,8 @@ const fake = {
   center: { lat: 0, lng: 0 } as LL,
   zoom: 0,
   minZoom: -6,
-  options: { zoomSnap: 1, minZoom: -6 },
+  // The canvas runs at zoomSnap 0 (AtlasCanvas), so FitMapOnOpen's fit zoom is the floor itself.
+  options: { zoomSnap: 0, minZoom: -6 },
   /** Leaflet's flag for a running zoom animation. */
   _animatingZoom: false,
   handlers: new Map<string, Set<Handler>>(),
@@ -76,6 +77,11 @@ const fake = {
   // Like Leaflet, setView clamps to the floor (options.minZoom).
   setView: vi.fn((c: [number, number], z: number) => {
     fake.moveTo({ lat: c[0], lng: c[1] }, Math.max(z, fake.options.minZoom));
+  }),
+  // Q-01: the ocean floor slides to the fit with a pan (moveend only).
+  panTo: vi.fn((c: [number, number]) => {
+    fake.center = { lat: c[0], lng: c[1] };
+    fake.fire("moveend");
   }),
 };
 
@@ -211,10 +217,10 @@ describe("AtlasCanvas camera", () => {
     expect(fake.setView).toHaveBeenCalledWith([350, 100], 1, { animate: false });
   });
 
-  // R-36: the ocean floor (one level below the fit zoom) is set before the camera applies.
+  // R-36: the ocean floor is set before the camera applies; since Q-01 it is the fit zoom.
   // The test ocean fits 600x400 plus the R-37 margin (8% a side: 696x464) in 800x600:
-  // fit zoom log2(800/696), floor 1 below it.
-  const OCEAN_FLOOR = Math.log2(800 / (600 * (1 + 2 * OCEAN_FIT_MARGIN))) - 1;
+  // fit zoom log2(800/696).
+  const OCEAN_FLOOR = Math.log2(800 / (600 * (1 + 2 * OCEAN_FIT_MARGIN)));
 
   it("clamps a handed-over ocean camera below the floor to it, with no animated setZoom", () => {
     const m = mount(ISLE, "fit");
@@ -229,7 +235,8 @@ describe("AtlasCanvas camera", () => {
   it("opens the ocean at a URL zoom below the floor at the floor, not animating up to it", () => {
     mount(OCEAN, { center: [500, 500], zoom: -6 });
     expect(fake.zoom).toBeCloseTo(OCEAN_FLOOR, 9);
-    expect(fake.setZoom).not.toHaveBeenCalled();
+    // the mount zoom (0) sat below the floor: moved at once, never animated
+    for (const call of fake.setZoom.mock.calls) expect(call[1]).toEqual({ animate: false });
     expect(fake.setView).toHaveBeenCalledTimes(1);
   });
 
