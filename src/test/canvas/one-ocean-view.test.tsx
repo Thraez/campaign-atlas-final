@@ -20,6 +20,29 @@ type Handler = () => void;
 type Bounds = [[number, number], [number, number]];
 
 let landing: (() => void) | null = null;
+let slowPans = false;
+let dragMoving = false;
+let panning: { from: LL; to: LL } | null = null;
+/** Cut the running pan short halfway, as the next wheel batch does. */
+const stopPan = () =>
+  act(() => {
+    const p = panning!;
+    panning = null;
+    fake.center = { lat: (p.from.lat + p.to.lat) / 2, lng: (p.from.lng + p.to.lng) / 2 };
+    fake.fire("moveend");
+  });
+const finishPan = () =>
+  act(() => {
+    const p = panning!;
+    panning = null;
+    fake.center = p.to;
+    fake.fire("moveend");
+  });
+/** Let the canvas's next-tick work run. */
+const tick = () =>
+  act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
 const fitOf = (b: Bounds) => {
   const w = b[1][1] - b[0][1];
   const h = b[1][0] - b[0][0];
@@ -91,11 +114,27 @@ const fake = {
   setView: vi.fn((c: [number, number], z: number) => {
     fake.moveTo({ lat: c[0], lng: c[1] }, Math.max(z, fake.options.minZoom));
   }),
-  /** Leaflet's panTo: a pan, so only moveend (when it lands; at once here). */
-  panTo: vi.fn((c: [number, number], _opts?: { animate?: boolean; duration?: number }) => {
+  /**
+   * Leaflet's panTo: a pan, so only moveend when it lands. At once, unless
+   * `slowPans` is set: then an animated pan waits for `finishPan()` and can be
+   * cut short by `stopPan()` (Leaflet's `_stop()`: moveend where it stands).
+   */
+  panTo: vi.fn((c: [number, number], opts?: { animate?: boolean; duration?: number }) => {
+    if (slowPans && opts?.animate) {
+      const from = fake.center;
+      panning = { from, to: { lat: c[0], lng: c[1] } };
+      return;
+    }
     fake.center = { lat: c[0], lng: c[1] };
     fake.fire("moveend");
   }),
+  dragging: { moving: () => dragMoving },
+  /** Leaflet's pan animation: in progress while a slow pan waits. */
+  _panAnim: {
+    get _inProgress() {
+      return panning !== null;
+    },
+  },
   flyTo: vi.fn((c: [number, number], z: number) => {
     fake.fire("zoomstart");
     landing = () => {
@@ -216,6 +255,9 @@ beforeEach(() => {
   clock = vi.spyOn(performance, "now").mockImplementation(() => now);
   reduceMotion = false;
   landing = null;
+  slowPans = false;
+  dragMoving = false;
+  panning = null;
   fake.size = { x: 1040, y: 839 };
   fake.center = { lat: 0, lng: 0 };
   fake.zoom = 0;
@@ -345,7 +387,89 @@ describe("one ocean view (Q-01)", () => {
     expect(shown()).toEqual({ center: [400, 450], zoom: f.zoom + 0.5 });
     fake.size = { x: 4000, y: 3000 }; // a much bigger canvas: the floor rises above the zoom
     act(() => fake.fire("resize"));
-    expect(fake.zoom).toBeCloseTo(oceanFit().zoom, 9);
+    // Raised to the floor, so on the fit; a resize never animates.
+    expectOnFit();
+    for (const call of fake.panTo.mock.calls) expect(call[1]).toMatchObject({ animate: false });
+  });
+
+  it("a resize at the floor re-fits even after a drag there (at the floor the camera is the fit)", () => {
+    mount(OCEAN, "fit");
+    act(() => fake.moveTo(at([700, 600]), fake.zoom)); // a drag: moveend only
+    expect(shown().center).toEqual([700, 600]);
+    fake.size = { x: 1440, y: 839 }; // the side panel closes
+    act(() => fake.fire("resize"));
+    expectOnFit();
+    expect(fake.panTo).not.toHaveBeenCalled();
+  });
+
+  it("a slide cut short by the next wheel batch carries on to the fit", async () => {
+    slowPans = true;
+    const m = mount(OCEAN, "fit");
+    const f = oceanFit();
+    m.update(OCEAN, { center: [400, 450], zoom: f.zoom + 1 });
+    now += 1000;
+    userZoom([380, 440], f.zoom - 2);
+    // The zoom's own moveend, after the slide started, leaves the slide alone.
+    await tick();
+    expect(fake.panTo).toHaveBeenCalledTimes(1);
+    // Two more batches of inertia at the floor: each stops the pan (delta 0, no zoomend).
+    for (let i = 2; i <= 3; i++) {
+      stopPan();
+      await tick();
+      expect(fake.panTo).toHaveBeenCalledTimes(i);
+      expect(fake.panTo.mock.calls[i - 1][1]).toMatchObject({ animate: true, duration: 0.4 });
+    }
+    finishPan();
+    await tick();
+    expectOnFit();
+    expect(fake.panTo).toHaveBeenCalledTimes(3); // landed: no more
+    expect(m.onViewChange).not.toHaveBeenCalled();
+  });
+
+  it("a drag that cuts the slide short ends it there", async () => {
+    slowPans = true;
+    const m = mount(OCEAN, "fit");
+    const f = oceanFit();
+    m.update(OCEAN, { center: [400, 450], zoom: f.zoom + 1 });
+    userZoom([380, 440], f.zoom - 2);
+    dragMoving = true;
+    stopPan();
+    await tick();
+    expect(fake.panTo).toHaveBeenCalledTimes(1);
+  });
+
+  it("Reset from a dragged camera at the floor glides to the fit, with nothing after", () => {
+    const m = mount(OCEAN, "fit");
+    act(() => fake.moveTo(at([700, 600]), fake.zoom)); // dragged at the floor
+    m.update(OCEAN, { center: [700, 600], zoom: fake.zoom });
+    m.glideTo(OCEAN, "fit");
+    land();
+    expectOnFit();
+    expect(fake.panTo).not.toHaveBeenCalled();
+    expect(m.onViewChange).not.toHaveBeenCalled();
+  });
+
+  it("a glide that lands on the floor off-centre ends on the fit", () => {
+    const m = mount(OCEAN, "fit");
+    const f = oceanFit();
+    m.update(OCEAN, { center: [600, 500], zoom: f.zoom + 1 });
+    m.glideTo(OCEAN, { center: [700, 600], zoom: f.zoom });
+    land();
+    expectOnFit();
+    expect(m.onViewChange).not.toHaveBeenCalled();
+  });
+
+  it("a map hidden at mount sets the floor once when it is first shown", () => {
+    const size = fake.size;
+    fake.size = { x: 0, y: 0 };
+    mount(OCEAN, "fit");
+    const set = vi.spyOn(fake, "fire");
+    fake.size = size;
+    act(() => fake.fire("resize"));
+    const levels = set.mock.calls.filter(([ev]) => ev === "zoomlevelschange").length;
+    set.mockRestore();
+    expect(levels).toBe(1);
+    expectOnFit();
   });
 
   it("a map view has no ocean floor and never slides", () => {

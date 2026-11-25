@@ -23,6 +23,12 @@ const SAME_ZOOM = 1e-6;
 const SAME_CENTRE_PX = 1;
 
 /**
+ * How often one slide may start again after being cut short: a guard against a
+ * loop, well above a few seconds of wheel batches or key repeats.
+ */
+const MAX_RESUMES = 100;
+
+/**
  * The ocean's minimum zoom: the zoom that fits `fitWidth` x `fitHeight` in
  * `size` (less `OCEAN_ZOOM_OUT_MARGIN`). CRS.Simple: pixels = units * 2^zoom.
  * Never lower than the canvas floor; null when there is nothing to compute from.
@@ -60,10 +66,12 @@ function setFloor(map: Map, min: number) {
  * - A zoom that settles at the floor (a wheel, pinch, keyboard or zoom-button
  *   zoom-out, or a hand-back from a map clamped to it) slides to the fit's
  *   centre (`GLIDE_SECONDS`; a jump in calm mode). The fit, Reset and the
- *   crumb land there already, so they don't move.
+ *   crumb land there already, so they don't move. A slide cut short (the
+ *   next wheel batch, a held key) carries on; a drag ends it.
  * - A resize (the window, the side panel) while the camera is at the floor
- *   re-fits: new floor, fit centre, no animation. Elsewhere the zoom is only
- *   raised to a floor that rose above it, as before.
+ *   re-fits: new floor, fit centre, no animation, even after a drag at the
+ *   floor. Elsewhere the zoom is only raised to a floor that rose above it,
+ *   and the slide that follows is a jump too.
  * These are the canvas's own moves: they clear the user-input flag (`armed`),
  * so they never hand off.
  *
@@ -103,11 +111,29 @@ export function OceanZoomLimit({
     const centre: Point | null =
       cx !== undefined && cy !== undefined && viewHeight !== undefined ? [cx, cy] : null;
     let floor: number | null = null;
+    /** A resize is moving the map: its slides jump. */
+    let resizing = false;
+    /** An animated slide to the fit is running (or was cut short). */
+    let sliding = false;
+    let retries = 0;
+    let retry: ReturnType<typeof setTimeout> | undefined;
     const atFloor = () => floor !== null && map.getZoom() <= floor + SAME_ZOOM;
     const offCentre = (c: Point) => {
       const now = fromLatLng(viewHeight!, map.getCenter());
       const k = 2 ** map.getZoom();
       return Math.hypot(now[0] - c[0], now[1] - c[1]) * k >= SAME_CENTRE_PX;
+    };
+    // Map.Drag's `moving()` (not in Leaflet's types, which give a plain Handler).
+    const dragging = () =>
+      !!(map as unknown as { dragging?: { moving?: () => boolean } }).dragging?.moving?.();
+    // Leaflet's running pan (private, like `_animatingZoom`): a moveend from
+    // something else (a zoom ending as the slide starts) must not restart it.
+    const panning = () =>
+      !!(map as unknown as { _panAnim?: { _inProgress?: boolean } })._panAnim?._inProgress;
+    const slide = (c: Point, animate: boolean) => {
+      if (armed) armed.current = false;
+      sliding = animate;
+      map.panTo(toLatLng(viewHeight!, c), { animate, duration: GLIDE_SECONDS });
     };
     const apply = () => {
       const size = map.getSize();
@@ -116,34 +142,62 @@ export function OceanZoomLimit({
       if (min === null) return;
       const wasAtFloor = atFloor();
       floor = min;
-      if (wasAtFloor && centre) {
-        // The fit stays the fit across a resize.
-        map.options.minZoom = min;
-        map.fire("zoomlevelschange");
-        if (armed) armed.current = false;
-        map.setView(toLatLng(viewHeight!, centre), min, { animate: false });
-        return;
+      resizing = true;
+      try {
+        if (wasAtFloor && centre) {
+          // The fit stays the fit across a resize, even after a drag at the floor.
+          map.options.minZoom = min;
+          map.fire("zoomlevelschange");
+          if (armed) armed.current = false;
+          map.setView(toLatLng(viewHeight!, centre), min, { animate: false });
+          return;
+        }
+        if (map.getZoom() < min && armed) armed.current = false;
+        setFloor(map, min);
+      } finally {
+        resizing = false;
       }
-      if (map.getZoom() < min && armed) armed.current = false;
-      setFloor(map, min);
     };
     // A zoom that settles at the floor ends on the fit (after ZoomHandoff's
     // own zoomend listener, which is attached first).
     const settle = () => {
       if (!centre || !atFloor() || !offCentre(centre)) return;
-      if (armed) armed.current = false;
-      map.panTo(toLatLng(viewHeight!, centre), {
-        animate: !reduceMotion,
-        duration: GLIDE_SECONDS,
-      });
+      retries = 0;
+      slide(centre, !reduceMotion && !resizing);
     };
-    const cancel = whenMapHasSize(map, apply);
-    map.on("resize", apply);
+    // Leaflet stops a running pan on every wheel batch and every setView
+    // (`map._stop()`), firing moveend with no zoomend: a slide cut short by
+    // trackpad inertia or a held key starts again from where it stopped. Next
+    // tick, so a setView that stopped it finishes first; never against a drag.
+    const resume = () => {
+      if (!sliding) return;
+      clearTimeout(retry);
+      retry = setTimeout(() => {
+        if (panning()) return; // still going: its own end comes back here
+        const done =
+          !centre || !atFloor() || !offCentre(centre) || dragging() || retries >= MAX_RESUMES;
+        if (done) {
+          sliding = false;
+          return;
+        }
+        retries += 1;
+        slide(centre, true);
+      }, 0);
+    };
+    const start = () => {
+      apply();
+      // Only now: whenMapHasSize already ran the first sized resize.
+      map.on("resize", apply);
+    };
+    const cancel = whenMapHasSize(map, start);
     map.on("zoomend", settle);
+    map.on("moveend", resume);
     return () => {
       cancel();
+      clearTimeout(retry);
       map.off("resize", apply);
       map.off("zoomend", settle);
+      map.off("moveend", resume);
     };
   }, [map, ocean, fitWidth, fitHeight, cx, cy, viewHeight, viewKey, reduceMotion, armed]);
   return null;
