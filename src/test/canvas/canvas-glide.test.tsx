@@ -73,6 +73,11 @@ const fake = {
   setView: vi.fn((c: [number, number], z: number) => {
     fake.moveTo({ lat: c[0], lng: c[1] }, Math.max(z, fake.options.minZoom));
   }),
+  // Q-01: the ocean floor slides to the fit with a pan (moveend only).
+  panTo: vi.fn((c: [number, number]) => {
+    fake.center = { lat: c[0], lng: c[1] };
+    fake.fire("moveend");
+  }),
   /** Leaflet's flyTo: zoomstart and movestart now, zoomend and moveend when it lands. */
   flyTo: vi.fn((c: [number, number], z: number) => {
     fake.fire("zoomstart");
@@ -204,7 +209,8 @@ describe("glide (P-06)", () => {
   it("a crumb up the tree cuts to the same ground, then glides to the ancestor's camera", () => {
     const m = mount(ISLE, { center: [300, 200], zoom: 2 });
     fake.setView.mockClear();
-    m.glideTo(OCEAN, { center: [1500, 1000], zoom: -2 });
+    // (a zoom above the ocean's floor, the fit zoom 0.2: at the floor the camera slides to the fit, Q-01)
+    m.glideTo(OCEAN, { center: [1500, 1000], zoom: 0.5 });
     // the cut: the isle's (300,200) is the ocean's (500,500); zoom unchanged (scale 1)
     expect(fake.setView).toHaveBeenCalledTimes(1);
     const [c, z] = fake.setView.mock.calls[0] as [[number, number], number];
@@ -213,9 +219,9 @@ describe("glide (P-06)", () => {
     expect(z).toBeCloseTo(2, 9);
     expect(fake.flyTo).toHaveBeenCalledTimes(1);
     const [fc, fz] = fake.flyTo.mock.calls[0] as [[number, number], number];
-    expect([fc[1], 2000 - fc[0], fz]).toEqual([1500, 1000, -2]);
+    expect([fc[1], 2000 - fc[0], fz]).toEqual([1500, 1000, 0.5]);
     land();
-    expect(lastCam(m)).toEqual({ center: [1500, 1000], zoom: -2 });
+    expect(lastCam(m)).toEqual({ center: [1500, 1000], zoom: 0.5 });
   });
 
   it("a crumb to an ancestor's fit glides with flyToBounds", () => {
@@ -231,11 +237,11 @@ describe("glide (P-06)", () => {
     reduceMotion = true;
     const m = mount(ISLE, { center: [100, 100], zoom: 2 });
     m.glideTo(ISLE, "fit");
-    m.glideTo(OCEAN, { center: [1500, 1000], zoom: 0 });
+    m.glideTo(OCEAN, { center: [1500, 1000], zoom: 0.5 });
     expect(fake.flyTo).not.toHaveBeenCalled();
     expect(fake.flyToBounds).not.toHaveBeenCalled();
     expect(fake.fitBounds).toHaveBeenCalled();
-    expect(lastCam(m)).toEqual({ center: [1500, 1000], zoom: 0 });
+    expect(lastCam(m)).toEqual({ center: [1500, 1000], zoom: 0.5 });
   });
 
   it("a change without a glide bump still jumps", () => {
@@ -300,8 +306,8 @@ describe("glide (P-06)", () => {
   });
 
   it("a wheel in a glide's last moments still hands off once the glide lands", () => {
-    const m = mount(OCEAN, { center: [1500, 1000], zoom: -2 });
-    m.glideTo(OCEAN, { center: [1500, 1000], zoom: 0 });
+    const m = mount(OCEAN, { center: [1500, 1000], zoom: 0.3 });
+    m.glideTo(OCEAN, { center: [1500, 1000], zoom: 0.6 });
     fake.container.dispatchEvent(new Event("wheel"));
     now += 10;
     land();

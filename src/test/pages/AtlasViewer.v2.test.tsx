@@ -219,7 +219,7 @@ describe("AtlasViewer, v2 output", () => {
       replace: vi.spyOn(window.history, "replaceState"),
     });
 
-    it("a handoff pushes, a pan or zoom replaces, a crumb returns to the remembered camera", async () => {
+    it("a handoff pushes, a pan or zoom replaces, the Ocean crumb fits, a map crumb remembers", async () => {
       await open("main");
       const { push, replace } = spies();
       const ocean = { center: [1000, 700] as [number, number], zoom: -1.5 };
@@ -247,13 +247,18 @@ describe("AtlasViewer, v2 output", () => {
       expect(push).not.toHaveBeenCalled();
       expect(search().get("cx")).toBe("320");
 
-      // The Ocean crumb goes back where the user left the ocean, not fitted.
+      // Q-01: the Ocean crumb shows the ocean fit (as first load and Reset do),
+      // not the camera the user left the ocean at (the handoff point).
+      const glideBefore = canvasProps.glide;
       fireEvent.click(screen.getByRole("button", { name: "Ocean" }));
       expect(push).toHaveBeenCalledTimes(1);
       expect(canvasProps.view).toEqual({ kind: "ocean" });
-      expect(canvasProps.camera).toEqual(ocean);
+      expect(canvasProps.camera).toBe("fit");
+      expect(canvasProps.glide).toBe((glideBefore ?? 0) + 1);
       expect(search().has("map")).toBe(false);
-      expect(search().get("cx")).toBe("1000");
+      expect(search().get("cx")).toBeNull();
+      // The canvas reports the fitted camera; the ocean remembers that one.
+      act(() => canvasProps.onCameraChange!(ocean));
 
       // And Quessaly's crumb-less return (handoff back in) is remembered too.
       act(() =>

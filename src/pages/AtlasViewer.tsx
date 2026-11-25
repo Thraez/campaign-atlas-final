@@ -936,7 +936,10 @@ export default function AtlasViewer() {
                 view={view}
                 onGo={(v) => {
                   setGlide((g) => g + 1);
-                  goView(v, "memory", true);
+                  // Q-01: the Ocean crumb shows the one ocean view (the fit, as
+                  // first load and Reset do); a map's crumb returns where the
+                  // user left it.
+                  goView(v, v.kind === "ocean" ? "fit" : "memory", true);
                 }}
                 compact={phoneBar}
               />

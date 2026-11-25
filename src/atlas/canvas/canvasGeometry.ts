@@ -37,6 +37,9 @@ export function boxOf(points: readonly Point[]): Box | null {
   };
 }
 
+/** A box's centre: where a fit of it puts the camera. */
+export const boxCentre = (b: Box): Point => [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2];
+
 /** A box as Leaflet bounds in a view `viewHeight` tall. */
 export function boxBounds(viewHeight: number, b: Box): [LatLngTuple, LatLngTuple] {
   return [
