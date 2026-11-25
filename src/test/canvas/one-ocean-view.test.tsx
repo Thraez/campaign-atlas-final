@@ -538,6 +538,38 @@ describe("one ocean view (Q-01)", () => {
     expectOnFit();
   });
 
+  it.each(["wheel", "-"])(
+    "a glide stopped by a drag leaves no zoom behind: a %s at the floor still settles",
+    (key) => {
+      const m = mount(OCEAN, "fit");
+      act(() => fake.moveTo(at([700, 600]), fake.zoom)); // dragged at the floor
+      m.update(OCEAN, { center: [700, 600], zoom: fake.zoom });
+      m.glideTo(OCEAN, "fit"); // Reset: zoomstart
+      // A drag during the glide: `_stop()` cancels the flight, no zoomend.
+      input("pointerdown");
+      act(() => fake.fire("dragstart"));
+      landing = null;
+      act(() => fake.moveTo(at([650, 560]), fake.zoom)); // the drag ends: moveend only
+      if (key === "wheel") input("wheel");
+      else fake.container.dispatchEvent(new KeyboardEvent("keydown", { key }));
+      idle();
+      expectOnFit();
+    },
+  );
+
+  it("a calm-mode pinch that ends with a moveend only leaves no zoom behind", () => {
+    reduceMotion = true;
+    mount(OCEAN, "fit");
+    act(() => fake.moveTo(at([700, 600]), fake.zoom)); // dragged at the floor
+    input("touchstart");
+    zoomStarts();
+    act(() => fake.fire("moveend")); // no limit reached: no zoomend
+    input("wheel"); // delta 0 at the floor
+    idle();
+    expect(fake.panTo.mock.calls.at(-1)![1]).toMatchObject({ animate: false });
+    expectOnFit();
+  });
+
   it("calm mode: a slide cut short by inertia jumps to the fit", () => {
     reduceMotion = true;
     const m = mount(OCEAN, "fit");

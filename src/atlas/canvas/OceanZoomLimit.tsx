@@ -182,6 +182,12 @@ export function OceanZoomLimit({
       if (resizing) slide(centre, false);
       else arm();
     };
+    // Some zooms end with a moveend only: a glide stopped by a drag
+    // (`map._stop()`), a calm-mode pinch that reaches no limit. Like
+    // ZoomHandoff's onMoveEnd: no zoom animation running means none is.
+    const onMoveEnd = () => {
+      if (!(map as unknown as { _animatingZoom?: boolean })._animatingZoom) zooming = false;
+    };
     const onKey = (e: KeyboardEvent) => {
       if (ZOOM_OUT_KEYS.has(e.key)) arm();
     };
@@ -194,6 +200,7 @@ export function OceanZoomLimit({
     const box = map.getContainer();
     map.on("zoomstart", onZoomStart);
     map.on("zoomend", onZoomEnd);
+    map.on("moveend", onMoveEnd);
     map.on("dragstart", disarm);
     box.addEventListener("wheel", arm, { passive: true });
     box.addEventListener("keydown", onKey);
@@ -205,6 +212,7 @@ export function OceanZoomLimit({
       map.off("resize", apply);
       map.off("zoomstart", onZoomStart);
       map.off("zoomend", onZoomEnd);
+      map.off("moveend", onMoveEnd);
       map.off("dragstart", disarm);
       box.removeEventListener("wheel", arm);
       box.removeEventListener("keydown", onKey);
