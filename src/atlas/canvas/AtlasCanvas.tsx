@@ -176,6 +176,17 @@ export function AtlasCanvas({
   const glideControl = useRef<GlideControl>(newGlideControl());
   // Q-02: the settle after a zoom in or a handoff into a map (MapZoomSettle).
   const settle = useRef<SettleControl>(newSettleControl());
+  // Whether map `id` lies below `here` (a map id, or null for the ocean).
+  const below = (id: string, here: string | null) => {
+    if (id === here) return false;
+    const seen = new Set<string>();
+    let at = tree.byId.get(id)?.parentId ?? null;
+    while (at !== null && at !== here && !seen.has(at)) {
+      seen.add(at);
+      at = tree.byId.get(at)?.parentId ?? null;
+    }
+    return at === here;
+  };
   const reportView =
     onViewChange &&
     ((v: CanvasView, c: CanvasCameraState) => {
@@ -183,12 +194,14 @@ export function AtlasCanvas({
       queueMicrotask(() => {
         handingOff.current = false;
       });
-      // Entering a child map: once it is shown, keep it on screen (Q-02).
-      if (v.kind === "map") {
-        const parentId = tree.byId.get(v.mapId)?.parentId ?? null;
-        const here = resolved?.kind === "map" ? resolved.node.map.id : null;
-        settle.current.entered = parentId === here ? `map:${v.mapId}` : null;
-      }
+      // Entering a map below this view (a child, or deeper when one pinch,
+      // key or double-click passes several enter zooms): once it is shown,
+      // keep it on screen (Q-02). A hand-back up clears the mark.
+      const here = resolved?.kind === "map" ? resolved.node.map.id : null;
+      settle.current.entered =
+        v.kind === "map" && below(v.mapId, here)
+          ? { key: `map:${v.mapId}`, at: performance.now() }
+          : null;
       // P-05: copy the old view's pictures to fade out over the new one. The
       // copy is only a nicety: if it fails, the handoff is a plain cut and
       // still reaches the caller (R-32).

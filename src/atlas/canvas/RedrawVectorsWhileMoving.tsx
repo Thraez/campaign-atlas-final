@@ -13,25 +13,38 @@ import { useMap } from "react-leaflet";
  * off short, at the old scale, until the glide landed. Pins, labels and map
  * pictures already update every frame.
  *
- * On each `zoom` event that is not part of Leaflet's own zoom animation (a
- * wheel or button zoom, which ends in one CSS transition and redraws at its
- * end), every renderer redraws: re-projects and re-clips its paths for the
- * current camera (`_reset`, Leaflet 1.9's viewreset handler). Calm-mode jumps
- * have no in-between frames and are right already.
+ * From the second `zoom` event of a zoom on (the in-between frames of a glide
+ * or pinch), outside Leaflet's own zoom animation, every renderer redraws:
+ * re-projects and re-clips its paths for the current camera (`_reset`,
+ * Leaflet 1.9's viewreset handler). The one `zoom` of a calm-mode jump and
+ * the one at the end of a wheel or button zoom's CSS transition are skipped:
+ * Leaflet redraws those itself when the move ends.
  */
 export function RedrawVectorsWhileMoving() {
   const map = useMap();
   useEffect(() => {
+    let zooms = 0;
+    const onZoomStart = () => {
+      zooms = 0;
+    };
     const onZoom = () => {
       if ((map as unknown as { _animatingZoom?: boolean })._animatingZoom) return;
+      zooms += 1;
+      if (zooms < 2) return;
       const each = (map as Partial<L.Map>).eachLayer;
       if (!each) return;
       each.call(map, (layer) => {
-        if (layer instanceof L.Renderer) (layer as unknown as { _reset: () => void })._reset();
+        if (!(layer instanceof L.Renderer)) return;
+        const r = layer as unknown as { _reset?: unknown };
+        if (typeof r._reset === "function") r._reset();
       });
     };
+    map.on("zoomstart", onZoomStart);
+    map.on("zoomend", onZoomStart);
     map.on("zoom", onZoom);
     return () => {
+      map.off("zoomstart", onZoomStart);
+      map.off("zoomend", onZoomStart);
       map.off("zoom", onZoom);
     };
   }, [map]);

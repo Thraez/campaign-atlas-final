@@ -10,7 +10,9 @@
  * (`RedrawVectorsWhileMoving`).
  *
  * A mock map like canvas-camera.test.tsx's: moves fire their events
- * synchronously; the settle timer runs on fake timers.
+ * synchronously; the settle timer runs on fake timers. With `slowPans`, an
+ * animated pan and a glide wait to be finished or stopped, as in
+ * one-ocean-view.test.tsx.
  */
 import type React from "react";
 import L from "leaflet";
@@ -21,11 +23,31 @@ import type { AtlasProject } from "@/atlas/content/schema";
 type LL = { lat: number; lng: number };
 type Handler = () => void;
 
+let slowPans = false;
+let dragMoving = false;
+let panning: { from: LL; to: LL } | null = null;
+let landing: (() => void) | null = null;
+/** Leaflet's `map._stop()`: a running pan stops halfway, with a moveend there. */
+const stop = () => {
+  const p = panning;
+  if (!p) return;
+  panning = null;
+  fake.center = { lat: (p.from.lat + p.to.lat) / 2, lng: (p.from.lng + p.to.lng) / 2 };
+  fake.fire("moveend");
+};
+const stopPan = () => act(stop);
+const land = () =>
+  act(() => {
+    const l = landing;
+    landing = null;
+    l?.();
+  });
+
 const fake = {
   size: { x: 800, y: 600 },
   center: { lat: 0, lng: 0 } as LL,
   zoom: 0,
-  options: { zoomSnap: 0, minZoom: -6 },
+  options: { zoomSnap: 0, minZoom: -6, maxZoom: 4 },
   _animatingZoom: false,
   handlers: new Map<string, Set<Handler>>(),
   on(ev: string, h: Handler) {
@@ -52,7 +74,7 @@ const fake = {
     return this.options.minZoom;
   },
   getMaxZoom() {
-    return 4;
+    return this.options.maxZoom;
   },
   moveTo(center: LL, zoom: number) {
     const zoomed = zoom !== this.zoom;
@@ -88,11 +110,29 @@ const fake = {
     fake.moveTo({ lat: (b[0][0] + b[1][0]) / 2, lng: (b[0][1] + b[1][1]) / 2 }, -1);
   }),
   setView: vi.fn((c: [number, number], z: number) => {
+    stop();
     fake.moveTo({ lat: c[0], lng: c[1] }, Math.max(z, fake.options.minZoom));
   }),
-  panTo: vi.fn((c: [number, number], _opts?: { animate?: boolean }) => {
+  /** At once, unless `slowPans`: then an animated pan waits (`stopPan`). */
+  panTo: vi.fn((c: [number, number], opts?: { animate?: boolean }) => {
+    if (slowPans && opts?.animate) {
+      panning = { from: fake.center, to: { lat: c[0], lng: c[1] } };
+      return;
+    }
     fake.center = { lat: c[0], lng: c[1] };
     fake.fire("moveend");
+  }),
+  dragging: { moving: () => dragMoving },
+  /** A glide: zoomstart now, the rest when `land()` is called. */
+  flyTo: vi.fn((c: [number, number], z: number) => {
+    stop();
+    fake.fire("zoomstart");
+    landing = () => {
+      fake.center = { lat: c[0], lng: c[1] };
+      fake.zoom = z;
+      fake.fire("zoomend");
+      fake.fire("moveend");
+    };
   }),
 };
 
@@ -114,6 +154,8 @@ type View = import("@/atlas/canvas/AtlasCanvas").CanvasView;
 
 // The isle (600x400, on the ocean at (200,300)) holds "cove" (400x300) in the
 // frame (0,0)-(100,75), entered at isle zoom 2 (cove zoom = isle zoom - 2).
+// The cove holds "pool" (400x300) in the frame (300,225)-(400,300), entered at
+// cove zoom 2 (pool zoom = cove zoom - 2).
 const PROJECT = {
   schemaVersion: 2,
   maps: [
@@ -128,6 +170,16 @@ const PROJECT = {
       frame: { x: 0, y: 0, width: 100, height: 75, rotation: 0 },
       enterZoom: 2,
     },
+    {
+      id: "pool",
+      name: "Pool",
+      width: 400,
+      height: 300,
+      layers: [],
+      parent: "cove",
+      frame: { x: 300, y: 225, width: 100, height: 75, rotation: 0 },
+      enterZoom: 2,
+    },
   ],
   ocean: {
     width: 3000,
@@ -139,17 +191,25 @@ const PROJECT = {
 const tree = buildMapTree(PROJECT);
 const ISLE: View = { kind: "map", mapId: "isle" };
 const COVE: View = { kind: "map", mapId: "cove" };
+const POOL: View = { kind: "map", mapId: "pool" };
 
 function mount(view: View, camera: Camera) {
   const onViewChange = vi.fn();
+  let glide = 0;
   const el = (v: View, c: Camera) => (
-    <AtlasCanvas tree={tree} view={v} camera={c} onViewChange={onViewChange} />
+    <AtlasCanvas tree={tree} view={v} camera={c} glide={glide} onViewChange={onViewChange} />
   );
   const r = render(el(view, camera));
   return {
     onViewChange,
     update: (v: View, c: Camera) =>
       act(() => {
+        r.rerender(el(v, c));
+      }),
+    /** A crumb or Reset: glide to the camera. */
+    glideTo: (v: View, c: Camera) =>
+      act(() => {
+        glide += 1;
         r.rerender(el(v, c));
       }),
   };
@@ -174,6 +234,24 @@ const wheelZoom = (h: number, c: [number, number], z: number) => {
 /** The camera centre in view px of a view `h` px tall. */
 const centre = (h: number) => [fake.center.lng, h - fake.center.lat];
 const idle = () => act(() => vi.advanceTimersByTime(SETTLE_IDLE_MS + 1));
+/** The pointer at container point (x, y) (jsdom's container sits at 0,0). */
+const pointAt = (x: number, y: number) =>
+  fake.container.dispatchEvent(new MouseEvent("pointermove", { clientX: x, clientY: y }));
+/** The wheel handoff from the isle into the cove at its frame's corner (P-04). */
+const wheelIntoCove = (before?: () => void) => {
+  const m = mount(ISLE, { center: [250, 180], zoom: 1 });
+  before?.();
+  fake.container.dispatchEvent(new Event("wheel"));
+  const k = 2 ** -4;
+  act(() => fake.fire("zoomstart"));
+  fake.center = { lat: 400 - (70 + 220 * k), lng: 95 + 310 * k };
+  fake.zoom = 4;
+  act(() => fake.fire("zoomend"));
+  expect(m.onViewChange).toHaveBeenCalledTimes(1);
+  const [view, cam] = m.onViewChange.mock.calls[0] as [View, Camera];
+  expect(view).toEqual(COVE);
+  return { m, cam };
+};
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -185,12 +263,18 @@ beforeEach(() => {
   fake.center = { lat: 0, lng: 0 };
   fake.zoom = 0;
   fake.options.minZoom = -6;
+  fake.options.maxZoom = 4;
+  slowPans = false;
+  dragMoving = false;
+  panning = null;
+  landing = null;
   fake.layers = [];
   fake.handlers.clear();
   fake.container = document.createElement("div");
   fake.fitBounds.mockClear();
   fake.setView.mockClear();
   fake.panTo.mockClear();
+  fake.flyTo.mockClear();
 });
 afterEach(() => {
   cleanup();
@@ -250,16 +334,7 @@ describe("MapZoomSettle: the map stays on screen (Q-02)", () => {
   it("lands a handoff into a child on the child, not in its corner", () => {
     // P-04's anchored entry at the frame's bottom-right corner: the cove's
     // camera centre (457.5, 335) is outside the 400x300 cove.
-    const m = mount(ISLE, { center: [250, 180], zoom: 1 });
-    fake.container.dispatchEvent(new Event("wheel"));
-    const k = 2 ** -4;
-    act(() => fake.fire("zoomstart"));
-    fake.center = { lat: 400 - (70 + 220 * k), lng: 95 + 310 * k };
-    fake.zoom = 4;
-    act(() => fake.fire("zoomend"));
-    expect(m.onViewChange).toHaveBeenCalledTimes(1);
-    const [view, cam] = m.onViewChange.mock.calls[0] as [View, Camera];
-    expect(view).toEqual(COVE);
+    const { m, cam } = wheelIntoCove();
     m.update(COVE, cam);
     expect(centre(300)[0]).toBeCloseTo(457.5, 6); // the handed-over camera, as before
     idle();
@@ -303,6 +378,126 @@ describe("MapZoomSettle: the map stays on screen (Q-02)", () => {
     expect(fake.panTo).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps a grandchild's frame under a pointer that has not moved since the handoff", () => {
+    // The pointer stays where the one notch was: container (90, 80), the
+    // anchor's screen spot, over cove (380, 280) inside the pool's frame.
+    const { m, cam } = wheelIntoCove(() => pointAt(90, 80));
+    m.update(COVE, cam);
+    expect(centre(300)[0]).toBeCloseTo(457.5, 6);
+    idle();
+    expect(fake.panTo).not.toHaveBeenCalled();
+    // The pointer leaves: the next zoom in settles again.
+    fake.container.dispatchEvent(new Event("pointerleave"));
+    wheelZoom(300, centre(300) as [number, number], 2.1);
+    idle();
+    expect(fake.panTo).toHaveBeenCalledTimes(1);
+  });
+
+  it("settles a keyboard zoom that enters two levels at once", () => {
+    fake.options.maxZoom = 8;
+    fake.size = { x: 800, y: 600 };
+    const m = mount(ISLE, { center: [99.5, 74.5], zoom: 3 });
+    fake.container.dispatchEvent(new KeyboardEvent("keydown", { key: "+" }));
+    act(() => fake.fire("zoomstart"));
+    at(400, [99.5, 74.5], 6); // cove zoom 4, past the pool's enter zoom 2
+    act(() => fake.fire("zoomend"));
+    act(() => fake.fire("moveend"));
+    expect(m.onViewChange).toHaveBeenCalledTimes(1);
+    const [view, cam] = m.onViewChange.mock.calls[0] as [View, Camera];
+    expect(view).toEqual(POOL);
+    m.update(POOL, cam);
+    expect(centre(300)[0]).toBeCloseTo(392, 6); // the pool's corner, sea past it
+    idle();
+    expect(fake.panTo).toHaveBeenCalledTimes(1);
+    // pool zoom 2: the screen is 200x150 pool px
+    expect(centre(300)).toEqual([300, 225]);
+  });
+
+  it("settles a pinch that ends with a moveend only (calm mode)", () => {
+    mount(ISLE, { center: [300, 200], zoom: 1 });
+    fake.container.dispatchEvent(new Event("touchstart"));
+    act(() => fake.fire("zoomstart"));
+    at(400, [580, 200], 2);
+    act(() => fake.fire("moveend")); // touchend's _resetView: no zoomend
+    idle();
+    expect(fake.panTo).toHaveBeenCalledTimes(1);
+    expect(centre(400)).toEqual([500, 200]);
+  });
+
+  it("settles after a glide that a drag stopped (a zoomstart with no zoomend)", () => {
+    const m = mount(ISLE, { center: [300, 200], zoom: 1 });
+    m.glideTo(ISLE, { center: [300, 200], zoom: 1.5 });
+    expect(fake.flyTo).toHaveBeenCalledTimes(1);
+    fake.container.dispatchEvent(new Event("pointerdown"));
+    act(() => fake.fire("dragstart"));
+    landing = null; // `_stop()` cancels the flight
+    act(() => fake.moveTo({ lat: 200, lng: 320 }, fake.zoom)); // the drag ends: moveend only
+    now += 1000;
+    wheelZoom(400, [580, 200], 2);
+    idle();
+    expect(fake.panTo).toHaveBeenCalledTimes(1);
+    expect(centre(400)).toEqual([500, 200]);
+  });
+
+  it("never slides under a glide that starts while it waits", () => {
+    const m = mount(ISLE, { center: [300, 200], zoom: 1 });
+    wheelZoom(400, [580, 200], 2); // armed
+    m.glideTo(ISLE, { center: [580, 200], zoom: 2.5 }); // a crumb: flyTo's zoomstart
+    idle();
+    expect(fake.panTo).not.toHaveBeenCalled();
+    land();
+    act(() => vi.advanceTimersByTime(1000));
+    expect(fake.panTo).not.toHaveBeenCalled(); // the glide's landing is the canvas's own
+  });
+
+  it("lets the user's input win over a running slide", () => {
+    slowPans = true;
+    mount(ISLE, { center: [300, 200], zoom: 1.5 });
+    wheelZoom(400, [580, 200], 1.8);
+    idle();
+    expect(fake.panTo).toHaveBeenCalledTimes(1);
+    expect(panning).not.toBeNull();
+    // A drag: Leaflet stops the pan where it is.
+    fake.container.dispatchEvent(new Event("pointerdown"));
+    act(() => fake.fire("dragstart"));
+    stopPan();
+    dragMoving = true;
+    act(() => vi.advanceTimersByTime(1000));
+    dragMoving = false;
+    act(() => fake.fire("moveend"));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(fake.panTo).toHaveBeenCalledTimes(1);
+    // A wheel during a new slide: the zoom it makes stands where it ends.
+    wheelZoom(400, [580, 200], 1.85);
+    idle();
+    expect(fake.panTo).toHaveBeenCalledTimes(2);
+    fake.container.dispatchEvent(new Event("wheel"));
+    stopPan();
+    act(() => fake.fire("zoomstart"));
+    at(400, [300, 200], 1.9); // on the map: nothing to settle
+    act(() => fake.fire("zoomend"));
+    act(() => fake.fire("moveend"));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(fake.panTo).toHaveBeenCalledTimes(2);
+    expect(centre(400)).toEqual([300, 200]);
+  });
+
+  it("is disarmed by an arrow-key pan", () => {
+    mount(ISLE, { center: [300, 200], zoom: 1 });
+    wheelZoom(400, [580, 200], 2);
+    fake.container.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft" }));
+    idle();
+    expect(fake.panTo).not.toHaveBeenCalled();
+  });
+
+  it("forgets a handoff the caller ignored: a later jump to that map does not slide", () => {
+    const { m, cam } = wheelIntoCove(); // the caller stays on the isle
+    now += 2000;
+    m.update(COVE, cam); // later, a calm-mode crumb jump to the cove
+    idle();
+    expect(fake.panTo).not.toHaveBeenCalled();
+  });
+
   it("leaves the ocean to OceanZoomLimit", () => {
     mount({ kind: "ocean" }, { center: [1500, 1000], zoom: 1 });
     wheelZoom(2000, [2900, 1000], 1.5);
@@ -319,22 +514,42 @@ describe("RedrawVectorsWhileMoving (Q-02)", () => {
     return r;
   };
 
-  it("redraws every renderer on a glide's or pinch's zoom frame", () => {
+  it("redraws every renderer on a glide's or pinch's in-between frames", () => {
     const svg = renderer();
     const other = { _reset: vi.fn() };
     fake.layers = [svg, other];
     mount(ISLE, { center: [300, 200], zoom: 1 });
-    act(() => fake.fire("zoom"));
-    expect(svg._reset).toHaveBeenCalledTimes(1);
+    act(() => fake.fire("zoomstart"));
+    for (let i = 0; i < 3; i++) act(() => fake.fire("zoom"));
+    expect(svg._reset).toHaveBeenCalledTimes(2); // not the first: Leaflet's own
     expect(other._reset).not.toHaveBeenCalled();
   });
 
-  it("leaves Leaflet's own zoom animation to Leaflet", () => {
+  it("leaves a calm-mode jump and Leaflet's own zoom animation to Leaflet", () => {
     const svg = renderer();
     fake.layers = [svg];
     mount(ISLE, { center: [300, 200], zoom: 1 });
+    // A calm-mode jump: one zoom between zoomstart and zoomend.
+    act(() => fake.fire("zoomstart"));
+    act(() => fake.fire("zoom"));
+    act(() => fake.fire("zoomend"));
+    // A wheel zoom: the CSS transition, then one zoom at its end.
+    act(() => fake.fire("zoomstart"));
     fake._animatingZoom = true;
     act(() => fake.fire("zoom"));
+    fake._animatingZoom = false;
+    act(() => fake.fire("zoom"));
     expect(svg._reset).not.toHaveBeenCalled();
+  });
+
+  it("skips a renderer without _reset instead of throwing", () => {
+    const bare = Object.create(L.Renderer.prototype) as { _reset?: unknown };
+    bare._reset = undefined;
+    fake.layers = [bare];
+    mount(ISLE, { center: [300, 200], zoom: 1 });
+    act(() => fake.fire("zoomstart"));
+    expect(() => {
+      for (let i = 0; i < 2; i++) act(() => fake.fire("zoom"));
+    }).not.toThrow();
   });
 });
