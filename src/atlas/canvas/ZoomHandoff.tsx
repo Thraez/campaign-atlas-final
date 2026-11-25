@@ -54,6 +54,7 @@ import type { Point } from "../content/schema";
 import { fromLatLng } from "./canvasGeometry";
 import { INPUT_STOP_WINDOW_MS, anchoredHandoff, zoomAnchor } from "./zoomAnchor";
 import type { GlideControl } from "./canvasMotion";
+import type { SettleControl } from "./MapZoomSettle";
 
 /** DOM events that start a user zoom (or a pan, which clears on its moveend). */
 const USER_INPUT = ["wheel", "touchstart", "dblclick", "keydown", "mousedown", "pointerdown"];
@@ -66,6 +67,7 @@ export function ZoomHandoff({
   fitKey,
   armed,
   glide,
+  settle,
   onViewChange,
 }: {
   tree: MapTree;
@@ -79,6 +81,8 @@ export function ZoomHandoff({
   armed: MutableRefObject<boolean>;
   /** P-06: marks the zoomstart of the canvas's own glide (CanvasGlide). */
   glide?: MutableRefObject<GlideControl>;
+  /** Q-02: told when a user zoom in settles without a handoff (MapZoomSettle). */
+  settle?: MutableRefObject<SettleControl>;
   onViewChange?: (view: TreeView, camera: ViewCamera) => void;
 }) {
   const map = useMap();
@@ -135,14 +139,23 @@ export function ZoomHandoff({
       }
       if (!armed.current) return;
       armed.current = false;
-      const { tree: t, view: v, onViewChange: report } = latest.current;
-      if (!report) return;
-      const size = map.getSize();
       const zoom = map.getZoom();
-      const center = fromLatLng(viewHeight, map.getCenter());
       const direction =
         from === null || from.zoom === zoom ? undefined : zoom > from.zoom ? "in" : "out";
       if (from !== null && direction === undefined) return;
+      // Q-02: a user zoom in that stays in this view settles (MapZoomSettle).
+      if (!handOff(from, zoom, direction) && direction === "in") settle?.current.zoomedIn?.();
+    };
+    /** Hands off if the zoom crossed a threshold; whether it did. */
+    const handOff = (
+      from: { zoom: number; center: Point } | null,
+      zoom: number,
+      direction: "in" | "out" | undefined,
+    ): boolean => {
+      const { tree: t, view: v, onViewChange: report } = latest.current;
+      if (!report) return false;
+      const size = map.getSize();
+      const center = fromLatLng(viewHeight, map.getCenter());
       const viewport = { width: size.x, height: size.y };
       // One wheel step (a notch, or a 40 ms trackpad batch) crosses one handoff at most.
       const maxSteps = inputType === "wheel" ? 1 : undefined;
@@ -159,11 +172,13 @@ export function ZoomHandoff({
         const a = anchoredHandoff(t, v, anchor, zoom, size, opts);
         if (a) {
           report(a.view, a.camera);
-          return;
+          return true;
         }
       }
       const r = nextView(t, v, { center, zoom }, viewport, opts);
-      if (r.kind === "handoff") report(r.view, r.camera);
+      if (r.kind !== "handoff") return false;
+      report(r.view, r.camera);
+      return true;
     };
     const onZoomEnd = finish;
     // Leaflet fires zoomend before moveend; a pan has only moveend, which
@@ -193,7 +208,7 @@ export function ZoomHandoff({
       map.off("zoomend", onZoomEnd);
       map.off("moveend", onMoveEnd);
     };
-  }, [map, viewKey, viewHeight, armed, glide]);
+  }, [map, viewKey, viewHeight, armed, glide, settle]);
 
   return null;
 }

@@ -24,6 +24,10 @@
  *   keeps that camera exact. The old view's pictures fade out over the new
  *   one's on the same ground (P-05, `HandoffCrossfade`); a plain cut with
  *   reduced motion.
+ * - The entered map stays on screen (Q-02, `MapZoomSettle`): after a zoom in
+ *   on a map, or a handoff into one, the camera slides, once left alone, the
+ *   shortest way that shows no sea the map could fill. Vectors redraw every
+ *   frame of a glide or pinch (`RedrawVectorsWhileMoving`).
  * - Feel (P-06): a wheel notch zooms about half a level on any platform
  *   (`canvasMotion.ts`), and hands off one level at most. Bumping `glide` in
  *   the same update as a camera or view change glides there (`CanvasGlide`):
@@ -56,6 +60,8 @@ import { seaStyle, type SeaStyle } from "./seaStyle";
 import { ZoomHandoff } from "./ZoomHandoff";
 import { HandoffCrossfade, type CrossfadeControl } from "./HandoffCrossfade";
 import { GlideRequest } from "./CanvasGlide";
+import { MapZoomSettle, newSettleControl, type SettleControl } from "./MapZoomSettle";
+import { RedrawVectorsWhileMoving } from "./RedrawVectorsWhileMoving";
 import { CANVAS_WHEEL_PX_PER_ZOOM_LEVEL, useCanvasWheelZoom } from "./canvasWheel";
 import {
   GLIDE_SECONDS,
@@ -168,6 +174,8 @@ export function AtlasCanvas({
   const crossfade = useRef<CrossfadeControl | null>(null);
   // This commit's glide request (P-06).
   const glideControl = useRef<GlideControl>(newGlideControl());
+  // Q-02: the settle after a zoom in or a handoff into a map (MapZoomSettle).
+  const settle = useRef<SettleControl>(newSettleControl());
   const reportView =
     onViewChange &&
     ((v: CanvasView, c: CanvasCameraState) => {
@@ -175,6 +183,12 @@ export function AtlasCanvas({
       queueMicrotask(() => {
         handingOff.current = false;
       });
+      // Entering a child map: once it is shown, keep it on screen (Q-02).
+      if (v.kind === "map") {
+        const parentId = tree.byId.get(v.mapId)?.parentId ?? null;
+        const here = resolved?.kind === "map" ? resolved.node.map.id : null;
+        settle.current.entered = parentId === here ? `map:${v.mapId}` : null;
+      }
       // P-05: copy the old view's pictures to fade out over the new one. The
       // copy is only a nicety: if it fails, the handoff is a plain cut and
       // still reaches the caller (R-32).
@@ -252,6 +266,7 @@ export function AtlasCanvas({
               fitKey={`${resolved.key}#${fit.gen}`}
               armed={armed}
               glide={glideControl}
+              settle={settle}
               onViewChange={reportView}
             />
             <OceanZoomLimit
@@ -290,6 +305,16 @@ export function AtlasCanvas({
                   );
               }}
             />
+            {/* After CanvasCamera: a handoff's settle starts once its camera is applied. */}
+            <MapZoomSettle
+              node={resolved.kind === "map" ? resolved.node : null}
+              viewKey={resolved.key}
+              viewHeight={resolved.height}
+              reduceMotion={reduceMotion}
+              armed={armed}
+              control={settle}
+            />
+            <RedrawVectorsWhileMoving />
             {/* After CanvasCamera: the ghost goes on once the handed-over camera is applied. */}
             <HandoffCrossfade
               viewKey={resolved.key}
