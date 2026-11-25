@@ -79,6 +79,14 @@ describe("Q7 — RulerLayer: third-click reset, hint, Escape", () => {
     expect(screen.getByTestId("ruler-hint")).toBeInTheDocument();
   });
 
+  it("leaves the hint's placement to .atlas-ruler-hint (Q-03), not inline offsets", () => {
+    renderRuler();
+    const hint = screen.getByTestId("ruler-hint");
+    expect(hint).toHaveClass("atlas-ruler-hint");
+    expect(hint.style.bottom).toBe("");
+    expect(hint.style.top).toBe("");
+  });
+
   it("shows hint after first click (p1 set, p2 not yet placed)", () => {
     renderRuler();
     click(100, 900); // first click → p1

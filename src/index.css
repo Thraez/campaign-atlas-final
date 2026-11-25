@@ -666,6 +666,72 @@
 }
 .atlas-notice { animation: atlas-notice-in 220ms ease-out both; }
 
+/* Map corner controls (Q-03). Top-left: Leaflet's zoom bar (10px in, 10px
+   down), Reset under it, the canvas legend to its right. Top-right: the pin
+   legend, and on a phone "Done measuring" under it with the ruler hint under
+   that, as one group. Bottom: Wander left, minimap right, the scale bar
+   centred between them (or above Wander on a phone), the notice dock above.
+   Touch widths (and coarse pointers) get 40px tap targets. */
+.atlas-reset-view {
+  left: 10px; /* lines up with the zoom bar's outer edge */
+  top: 84px; /* under the zoom bar: 10 + 2 + 30 + 1 + 30 + 2 = 75 */
+  width: 34px;
+  height: 34px;
+}
+.atlas-canvas-legend { left: 3.5rem; top: 0.75rem; }
+.atlas-scale-bar { bottom: 0.75rem; left: 50%; transform: translateX(-50%); }
+/* The hint's own placement (bottom centre) is what the DM editor keeps; the
+   viewer's map (#atlas-main) moves it to the top, clear of the scale bar. */
+.atlas-ruler-hint {
+  position: absolute;
+  z-index: var(--z-map-control);
+  pointer-events: none;
+  bottom: 2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+#atlas-main .atlas-ruler-hint { top: 0.75rem; bottom: auto; }
+.atlas-ruler-done {
+  position: absolute;
+  z-index: var(--z-map-control);
+  right: 0.75rem;
+  top: 60px; /* under the 40px pin legend at top-3 */
+}
+@media (max-width: 1023px), (pointer: coarse) {
+  .leaflet-container .leaflet-bar.leaflet-control-zoom a {
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+  }
+  .atlas-reset-view {
+    top: 104px; /* under the 40px zoom bar: 10 + 2 + 40 + 1 + 40 + 2 = 95 */
+    width: 44px;
+    height: 44px;
+  }
+  .atlas-canvas-legend { left: 4rem; }
+  .atlas-pin-legend-toggle,
+  .atlas-wander-button,
+  .atlas-touch-target { min-height: 40px; }
+  .atlas-pin-legend-toggle { padding-inline: 0.75rem; }
+}
+@media (max-width: 767px) {
+  /* Below the top row (zoom bar left, pin legend right), clear of both. */
+  #atlas-main .atlas-ruler-hint { top: 60px; }
+}
+/* With "Done measuring" on screen (the v2 phone bar; AtlasViewer sets the
+   attribute), right under it, so the two read as one group. */
+#atlas-main[data-ruler-done] .atlas-ruler-hint {
+  top: 106px;
+  left: auto;
+  right: 0.75rem;
+  transform: none;
+}
+@media (max-width: 639px) {
+  /* No room between Wander and the 180px minimap: above Wander instead.
+     PHONE_SCALE_BAR_BOTTOM_PX in src/atlas/noticeDockLayout.ts. */
+  .atlas-scale-bar { left: 0.75rem; bottom: 82px; transform: none; }
+}
+
 /* The first-load screen (P-08, src/atlas/content/AtlasLoader.tsx): a fade-in
    and a slow needle sway. The component leaves both classes out under calm
    mode or the OS setting; the blocks below are the CSS-side backstop. The

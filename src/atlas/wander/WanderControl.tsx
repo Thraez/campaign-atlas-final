@@ -19,7 +19,7 @@ export function WanderControl({ discovered, total, canWander, onWander }: Wander
           type="button"
           onClick={onWander}
           aria-label="Wander to a place you haven't seen yet"
-          className="flex items-center gap-2 rounded-lg border bg-background/95 px-3 py-2 text-sm font-medium shadow-sm hover:bg-accent"
+          className="atlas-wander-button flex items-center gap-2 rounded-lg border bg-background/95 px-3 py-2 text-sm font-medium shadow-sm hover:bg-accent"
         >
           <Dices className="h-4 w-4" aria-hidden="true" /> Wander
         </button>

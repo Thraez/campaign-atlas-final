@@ -13,6 +13,7 @@ export function CalmModeToggle() {
     <Button
       variant={calm ? "secondary" : "ghost"}
       size="sm"
+      className="atlas-touch-target"
       onClick={() => setCalmMode(!calm)}
       title="Calm mode: no map flights, waves, transitions or sound"
       aria-label="Calm mode"
