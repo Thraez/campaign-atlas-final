@@ -51,8 +51,11 @@ export function MapBreadcrumb({
   );
   return (
     <nav aria-label="Breadcrumb" className="min-w-0 text-sm" ref={navRef} tabIndex={-1}>
-      {/* p-1 -m-1: room inside the clip for the 4px focus ring, same footprint. */}
-      <ol className="flex items-center gap-1 min-w-0 overflow-hidden whitespace-nowrap p-1 -m-1">
+      {/* Room inside the clip for the 4px focus ring. Above, below and on the
+          left the clip grows by 4px (nothing overflows that way). On the right
+          it stays at the nav's edge, so a trail too long for the nav is still
+          cut there: the room comes out of the inside instead (pr-1). */}
+      <ol className="flex items-center gap-1 min-w-0 overflow-hidden whitespace-nowrap py-1 -my-1 pl-1 -ml-1 pr-1">
         {hidden.length > 0 && (
           <li className="flex items-center gap-1 shrink-0">
             <DropdownMenu>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type Ref } from "react";
 import { useSoundSettings } from "@/atlas/sound/SoundSettingsProvider";
 import { useCalmMode, useReduceMotion } from "@/hooks/use-reduce-motion";
 
@@ -24,30 +24,42 @@ function SoundInvite({
   onDismiss,
   fading = false,
   onHold,
+  rootRef,
 }: {
   label: string;
   onEnable: () => void;
   onDismiss: () => void;
   /** The text and ✕ are fading out before the invite folds (Q-04). */
   fading?: boolean;
-  /** Pointer over or focus inside the invite (true), or gone (false). */
+  /**
+   * Pointer over it or focus inside it (true), or neither (false). The two are
+   * tracked apart, so a pointer leaving doesn't release a keyboard user's hold.
+   * Unmounting releases it, so a remounted invite starts unheld.
+   */
   onHold?: (held: boolean) => void;
+  rootRef?: Ref<HTMLDivElement>;
 }) {
+  const [hovered, setHovered] = useState(false);
+  const [focusWithin, setFocusWithin] = useState(false);
+  const held = hovered || focusWithin;
+  useEffect(() => {
+    if (!onHold) return;
+    onHold(held);
+    return () => onHold(false);
+  }, [onHold, held]);
   const fade = `transition-opacity${fading ? " opacity-0" : ""}`;
   const fadeStyle = { transitionDuration: `${INVITE_FADE_MS}ms` };
   return (
     <div
+      ref={rootRef}
       data-sound-invite
       className="atlas-notice flex items-center gap-1 rounded-full border border-border bg-card/95 pl-3 pr-1 shadow-md"
-      onPointerEnter={onHold && (() => onHold(true))}
-      onPointerLeave={onHold && (() => onHold(false))}
-      onFocus={onHold && (() => onHold(true))}
-      onBlur={
-        onHold &&
-        ((e) => {
-          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onHold(false);
-        })
-      }
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+      onFocus={() => setFocusWithin(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocusWithin(false);
+      }}
     >
       {/* h-10: a 40px tap target on a phone (was the 20px line of text). */}
       <button
@@ -98,24 +110,38 @@ export function SoundControl({ hasSoundscape = true }: SoundControlProps) {
   const [dismissed, setDismissed] = useState(false);
   const [invitePhase, setInvitePhase] = useState<InvitePhase>("full");
   const [inviteHeld, setInviteHeld] = useState(false);
+  const inviteRoot = useRef<HTMLDivElement>(null);
+  const focusSpeaker = useRef(false);
   const welcomeShown = hasSoundscape && audioAvailable && !soundEnabled && !dismissed;
 
   // The welcome invite folds to its speaker button after a while (Q-04). A
   // timer on the invite's look only; nothing here touches sound.
   useEffect(() => {
     if (!welcomeShown || inviteHeld || invitePhase === "folded") return;
+    const fold = () => {
+      // Focus is held open, so this shouldn't happen; if it does, don't drop
+      // focus to the page: hand it to the speaker button.
+      focusSpeaker.current = !!inviteRoot.current?.contains(document.activeElement);
+      setInvitePhase("folded");
+    };
     const t =
       invitePhase === "full"
-        ? setTimeout(() => setInvitePhase(reduceMotion ? "folded" : "fading"), INVITE_VISIBLE_MS)
-        : setTimeout(() => setInvitePhase("folded"), INVITE_FADE_MS);
+        ? setTimeout(() => (reduceMotion ? fold() : setInvitePhase("fading")), INVITE_VISIBLE_MS)
+        : setTimeout(fold, INVITE_FADE_MS);
     return () => clearTimeout(t);
   }, [welcomeShown, inviteHeld, invitePhase, reduceMotion]);
 
-  const holdInvite = (held: boolean) => {
+  const holdInvite = useCallback((held: boolean) => {
     setInviteHeld(held);
     // Caught mid-fade: show the text again; the wait starts over on leaving.
     if (held) setInvitePhase((p) => (p === "fading" ? "full" : p));
-  };
+  }, []);
+  const speakerRef = useCallback((el: HTMLButtonElement | null) => {
+    if (el && focusSpeaker.current) {
+      focusSpeaker.current = false;
+      el.focus();
+    }
+  }, []);
 
   // Sound is on (saved from an earlier visit, or the browser kept the context
   // suspended) but audio isn't running yet: the first tap or key press
@@ -141,12 +167,14 @@ export function SoundControl({ hasSoundscape = true }: SoundControlProps) {
           onDismiss={() => setDismissed(true)}
           fading={invitePhase === "fading"}
           onHold={holdInvite}
+          rootRef={inviteRoot}
         />
       )}
 
       {welcomeShown && invitePhase === "folded" && (
         <div data-sound-invite>
           <button
+            ref={speakerRef}
             type="button"
             aria-label="Turn on sound"
             title="Tap to bring the world to life"

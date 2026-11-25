@@ -274,14 +274,64 @@ describe("Q-04 — the welcome invite folds to its speaker button", () => {
     renderControl();
     const pill = invite()!.closest("[data-sound-invite]")!;
     fireEvent.pointerEnter(pill);
-    advance(INVITE_VISIBLE_MS * 2);
+    fold();
     expect(invite()).not.toBeNull();
     fireEvent.pointerLeave(pill);
     act(() => invite()!.focus());
-    advance(INVITE_VISIBLE_MS * 2);
+    fold();
     expect(invite()).not.toBeNull();
     act(() => invite()!.blur());
     fold();
+    expect(speaker()).not.toBeNull();
+  });
+
+  it("a pointer leaving doesn't release focus's hold", () => {
+    renderControl();
+    const pill = invite()!.closest("[data-sound-invite]")!;
+    act(() => invite()!.focus());
+    fireEvent.pointerEnter(pill);
+    fireEvent.pointerLeave(pill);
+    fold();
+    expect(invite()).not.toBeNull();
+    expect(screen.getByText(/bring the world to life/i).className).not.toMatch(/opacity-0/);
+    expect(document.activeElement).toBe(invite());
+    // And the other way round: focus leaving while the pointer is still over it.
+    fireEvent.pointerEnter(pill);
+    act(() => invite()!.blur());
+    fold();
+    expect(invite()).not.toBeNull();
+    expect(screen.getByText(/bring the world to life/i).className).not.toMatch(/opacity-0/);
+    fireEvent.pointerLeave(pill);
+    fold();
+    expect(speaker()).not.toBeNull();
+  });
+
+  it("an invite that comes back after a failed enable isn't stuck held", async () => {
+    let fail: (e: Error) => void = () => {};
+    const failing = {
+      ...stubDeps,
+      createContext: () => ({
+        ...stubDeps.createContext(),
+        resume: () => new Promise<void>((_, reject) => (fail = reject)),
+      }),
+    };
+    render(
+      <SoundSettingsProvider deps={failing as any} audioAvailable={true}>
+        <SoundControl />
+      </SoundSettingsProvider>,
+    );
+    const pill = invite()!.closest("[data-sound-invite]")!;
+    fireEvent.pointerEnter(pill);
+    act(() => invite()!.focus());
+    await act(async () => invite()!.click());
+    // Enabling is under way: the invite is gone (no pointerleave or blur reaches it).
+    expect(invite()).toBeNull();
+    await act(async () => fail(new Error("no Web Audio")));
+    // Enabling failed, so soundEnabled rolled back and the invite is back, unheld.
+    expect(loadSoundPrefs().soundEnabled).toBe(false);
+    expect(invite()).not.toBeNull();
+    fold();
+    expect(invite()).toBeNull();
     expect(speaker()).not.toBeNull();
   });
 
