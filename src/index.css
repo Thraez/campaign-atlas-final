@@ -680,14 +680,17 @@
 }
 .atlas-canvas-legend { left: 3.5rem; top: 0.75rem; }
 .atlas-scale-bar { bottom: 0.75rem; left: 50%; transform: translateX(-50%); }
+/* The hint's own placement (bottom centre) is what the DM editor keeps; the
+   viewer's map (#atlas-main) moves it to the top, clear of the scale bar. */
 .atlas-ruler-hint {
   position: absolute;
   z-index: var(--z-map-control);
   pointer-events: none;
-  top: 0.75rem;
+  bottom: 2.5rem;
   left: 50%;
   transform: translateX(-50%);
 }
+#atlas-main .atlas-ruler-hint { top: 0.75rem; bottom: auto; }
 .atlas-ruler-done {
   position: absolute;
   z-index: var(--z-map-control);
@@ -708,19 +711,20 @@
   .atlas-canvas-legend { left: 4rem; }
   .atlas-pin-legend-toggle,
   .atlas-wander-button,
-  .atlas-tool-button { min-height: 40px; }
+  .atlas-touch-target { min-height: 40px; }
   .atlas-pin-legend-toggle { padding-inline: 0.75rem; }
 }
 @media (max-width: 767px) {
   /* Below the top row (zoom bar left, pin legend right), clear of both. */
-  .atlas-ruler-hint { top: 60px; }
-  /* With "Done measuring" on screen (the v2 phone bar), right under it. */
-  #atlas-main:has(.atlas-ruler-done) .atlas-ruler-hint {
-    top: 106px;
-    left: auto;
-    right: 0.75rem;
-    transform: none;
-  }
+  #atlas-main .atlas-ruler-hint { top: 60px; }
+}
+/* With "Done measuring" on screen (the v2 phone bar; AtlasViewer sets the
+   attribute), right under it, so the two read as one group. */
+#atlas-main[data-ruler-done] .atlas-ruler-hint {
+  top: 106px;
+  left: auto;
+  right: 0.75rem;
+  transform: none;
 }
 @media (max-width: 639px) {
   /* No room between Wander and the 180px minimap: above Wander instead.

@@ -968,7 +968,7 @@ export default function AtlasViewer() {
             <Button
               variant={(showGrid ?? activeMap.grid.enabled !== false) ? "secondary" : "ghost"}
               size="sm"
-              className="atlas-tool-button"
+              className="atlas-touch-target"
               onClick={() => setShowGrid((v) => !(v ?? activeMap.grid!.enabled !== false))}
               title="Toggle grid"
               aria-label="Toggle grid overlay"
@@ -981,7 +981,7 @@ export default function AtlasViewer() {
             <Button
               variant={rulerActive ? "secondary" : "ghost"}
               size="sm"
-              className="atlas-tool-button"
+              className="atlas-touch-target"
               onClick={() => setRulerActive((v) => !v)}
               title="Measure distance (click two points)"
               aria-label="Toggle distance ruler"
@@ -995,7 +995,7 @@ export default function AtlasViewer() {
             variant="secondary"
             size={phoneBar ? "icon" : "sm"}
             onClick={() => setSearchOpen(true)}
-            className={phoneBar ? "shrink-0" : "atlas-tool-button gap-2"}
+            className={phoneBar ? "shrink-0" : "atlas-touch-target gap-2"}
             aria-label="Search atlas (Ctrl+K)"
           >
             <Search className="h-4 w-4" aria-hidden="true" />
@@ -1065,6 +1065,8 @@ export default function AtlasViewer() {
             // isolate: everything floating on the map stacks inside it, so no
             // map overlay can rise above the toolbar, a toast or a scrim.
             className="flex-1 relative min-h-0 isolate"
+            // Puts the ruler hint right under "Done measuring" (index.css, Q-03).
+            data-ruler-done={phoneBar && rulerActive ? "" : undefined}
             aria-label={`Interactive map: ${activeMap?.name ?? "Ocean"}. Use arrow keys to pan, plus and minus to zoom.`}
           >
             {phoneBar && rulerActive && (
