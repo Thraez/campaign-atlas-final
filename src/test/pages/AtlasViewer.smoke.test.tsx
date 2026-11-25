@@ -224,6 +224,21 @@ describe("FitBoundsController (Q2)", () => {
     );
   });
 
+  it("Reset keeps its name and tooltip; its map icon is hidden from screen readers (Q-04)", async () => {
+    render(
+      <MemoryRouter>
+        <AtlasViewer />
+      </MemoryRouter>,
+    );
+    const reset = await screen.findByRole("button", { name: "Reset map view" });
+    expect(reset.getAttribute("title")).toBe("Reset view (fit map to screen)");
+    const icon = reset.querySelector("svg")!;
+    expect(icon.getAttribute("aria-hidden")).toBe("true");
+    // Was the fullscreen-looking "expand arrows" (lucide Maximize2).
+    expect(icon.getAttribute("class")).toMatch(/\blucide-map\b/);
+    expect(icon.getAttribute("class")).not.toMatch(/maximize/);
+  });
+
   it("clicking Reset map view calls fitBounds", async () => {
     render(
       <MemoryRouter>

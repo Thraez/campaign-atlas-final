@@ -33,7 +33,7 @@ import {
   Ruler,
   Star,
   KeyRound,
-  Maximize2,
+  Map as MapIcon,
 } from "lucide-react";
 import { Link } from "react-router";
 import {
@@ -1227,11 +1227,11 @@ export default function AtlasViewer() {
                 setGlide((g) => g + 1);
                 setCamera("fit");
               }}
-              className="atlas-reset-view absolute z-map-control rounded bg-background/90 border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="atlas-reset-view atlas-focus-ring absolute z-map-control rounded bg-background/90 border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               aria-label="Reset map view"
               title="Reset view (fit map to screen)"
             >
-              <Maximize2 className="h-4 w-4" aria-hidden="true" />
+              <MapIcon className="h-4 w-4" aria-hidden="true" />
             </button>
           </main>
 

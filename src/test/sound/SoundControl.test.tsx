@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useEffect } from "react";
 import { render, screen, act, fireEvent, cleanup } from "@testing-library/react";
 import { SoundSettingsProvider, useSoundSettings } from "@/atlas/sound/SoundSettingsProvider";
-import { SoundControl } from "@/atlas/sound/SoundControl";
+import { SoundControl, INVITE_FADE_MS, INVITE_VISIBLE_MS } from "@/atlas/sound/SoundControl";
+import { setCalmMode, _resetCalmModeForTests } from "@/hooks/use-reduce-motion";
 import { _resetSoundPrefsForTests, loadSoundPrefs } from "@/atlas/sound/soundPrefs";
 
 const stubDeps = {
@@ -213,5 +214,132 @@ describe("Q36 — hide sound controls when map has no soundscape", () => {
   it("all controls render when hasSoundscape is true", () => {
     renderControl({ hasSoundscape: true });
     expect(screen.getByRole("button", { name: /bring the world to life/i })).toBeTruthy();
+  });
+});
+
+describe("Q-04 — the welcome invite folds to its speaker button", () => {
+  beforeEach(() => {
+    _resetSoundPrefsForTests();
+    _resetCalmModeForTests();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    _resetCalmModeForTests();
+  });
+
+  const invite = () => screen.queryByRole("button", { name: /bring the world to life/i });
+  const speaker = () => screen.queryByRole("button", { name: "Turn on sound" });
+  const advance = (ms: number) => act(() => void vi.advanceTimersByTime(ms));
+  // Two steps: the fade timer starts once the first one has rendered.
+  const fold = () => {
+    advance(INVITE_VISIBLE_MS);
+    advance(INVITE_FADE_MS);
+  };
+
+  it("shows in full until the wait is over, fades, then leaves only the speaker", () => {
+    renderControl();
+    advance(INVITE_VISIBLE_MS - 1);
+    expect(invite()).not.toBeNull();
+    expect(screen.getByText(/bring the world to life/i).className).not.toMatch(/opacity-0/);
+    advance(1);
+    // Fading: still there, text going transparent.
+    expect(invite()).not.toBeNull();
+    expect(screen.getByText(/bring the world to life/i).className).toMatch(/opacity-0/);
+    advance(INVITE_FADE_MS);
+    expect(invite()).toBeNull();
+    expect(screen.queryByRole("button", { name: /dismiss/i })).toBeNull();
+    expect(speaker()).not.toBeNull();
+  });
+
+  it("the speaker still turns sound on, and folding never does", async () => {
+    renderControl();
+    fold();
+    expect(loadSoundPrefs().soundEnabled).toBe(false);
+    await act(async () => speaker()!.click());
+    expect(loadSoundPrefs().soundEnabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Mute sound" })).toBeTruthy();
+  });
+
+  it("calm mode folds it at once, with no fade", () => {
+    setCalmMode(true);
+    renderControl();
+    advance(INVITE_VISIBLE_MS);
+    expect(invite()).toBeNull();
+    expect(speaker()).not.toBeNull();
+  });
+
+  it("a pointer over it or focus inside holds it open", () => {
+    renderControl();
+    const pill = invite()!.closest("[data-sound-invite]")!;
+    fireEvent.pointerEnter(pill);
+    fold();
+    expect(invite()).not.toBeNull();
+    fireEvent.pointerLeave(pill);
+    act(() => invite()!.focus());
+    fold();
+    expect(invite()).not.toBeNull();
+    act(() => invite()!.blur());
+    fold();
+    expect(speaker()).not.toBeNull();
+  });
+
+  it("a pointer leaving doesn't release focus's hold", () => {
+    renderControl();
+    const pill = invite()!.closest("[data-sound-invite]")!;
+    act(() => invite()!.focus());
+    fireEvent.pointerEnter(pill);
+    fireEvent.pointerLeave(pill);
+    fold();
+    expect(invite()).not.toBeNull();
+    expect(screen.getByText(/bring the world to life/i).className).not.toMatch(/opacity-0/);
+    expect(document.activeElement).toBe(invite());
+    // And the other way round: focus leaving while the pointer is still over it.
+    fireEvent.pointerEnter(pill);
+    act(() => invite()!.blur());
+    fold();
+    expect(invite()).not.toBeNull();
+    expect(screen.getByText(/bring the world to life/i).className).not.toMatch(/opacity-0/);
+    fireEvent.pointerLeave(pill);
+    fold();
+    expect(speaker()).not.toBeNull();
+  });
+
+  it("an invite that comes back after a failed enable isn't stuck held", async () => {
+    let fail: (e: Error) => void = () => {};
+    const failing = {
+      ...stubDeps,
+      createContext: () => ({
+        ...stubDeps.createContext(),
+        resume: () => new Promise<void>((_, reject) => (fail = reject)),
+      }),
+    };
+    render(
+      <SoundSettingsProvider deps={failing as any} audioAvailable={true}>
+        <SoundControl />
+      </SoundSettingsProvider>,
+    );
+    const pill = invite()!.closest("[data-sound-invite]")!;
+    fireEvent.pointerEnter(pill);
+    act(() => invite()!.focus());
+    await act(async () => invite()!.click());
+    // Enabling is under way: the invite is gone (no pointerleave or blur reaches it).
+    expect(invite()).toBeNull();
+    await act(async () => fail(new Error("no Web Audio")));
+    // Enabling failed, so soundEnabled rolled back and the invite is back, unheld.
+    expect(loadSoundPrefs().soundEnabled).toBe(false);
+    expect(invite()).not.toBeNull();
+    fold();
+    expect(invite()).toBeNull();
+    expect(speaker()).not.toBeNull();
+  });
+
+  it("dismissing still removes it entirely", () => {
+    renderControl();
+    act(() => screen.getByRole("button", { name: /dismiss/i }).click());
+    fold();
+    expect(invite()).toBeNull();
+    expect(speaker()).toBeNull();
   });
 });

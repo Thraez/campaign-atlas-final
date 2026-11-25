@@ -51,7 +51,11 @@ export function MapBreadcrumb({
   );
   return (
     <nav aria-label="Breadcrumb" className="min-w-0 text-sm" ref={navRef} tabIndex={-1}>
-      <ol className="flex items-center gap-1 min-w-0 overflow-hidden whitespace-nowrap">
+      {/* Room inside the clip for the 4px focus ring. Above, below and on the
+          left the clip grows by 4px (nothing overflows that way). On the right
+          it stays at the nav's edge, so a trail too long for the nav is still
+          cut there: the room comes out of the inside instead (pr-1). */}
+      <ol className="flex items-center gap-1 min-w-0 overflow-hidden whitespace-nowrap py-1 -my-1 pl-1 -ml-1 pr-1">
         {hidden.length > 0 && (
           <li className="flex items-center gap-1 shrink-0">
             <DropdownMenu>
@@ -59,7 +63,7 @@ export function MapBreadcrumb({
                 <button
                   type="button"
                   aria-label="Earlier levels"
-                  className="flex min-h-10 min-w-10 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+                  className="atlas-focus-ring flex min-h-10 min-w-10 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
                 >
                   <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                 </button>
@@ -103,7 +107,7 @@ export function MapBreadcrumb({
                 <button
                   type="button"
                   onClick={() => onGo(targetOf(c))}
-                  className={`truncate text-muted-foreground hover:text-foreground underline-offset-2 hover:underline ${tap}`}
+                  className={`atlas-focus-ring rounded-sm truncate text-muted-foreground hover:text-foreground underline-offset-2 hover:underline ${tap}`}
                 >
                   {labelOf(c)}
                 </button>
