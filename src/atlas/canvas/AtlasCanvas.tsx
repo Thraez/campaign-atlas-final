@@ -9,7 +9,9 @@
  *   placed maps plus a margin of sea (`OCEAN_FIT_MARGIN`, R-37), not the
  *   whole ocean. The canvas is only as wide as the space the caller gives it,
  *   so the viewer's side panel (a sibling of the canvas) is already outside
- *   the fit. A map view fits edge to edge.
+ *   the fit. That fit is the one ocean view (Q-01): Reset, a "fit" camera
+ *   (the viewer's Ocean crumb) and the zoom-out floor all end on it
+ *   (`OceanZoomLimit`). A map view fits edge to edge.
  * - Map view: the map's images (as the viewer draws them) and each child's
  *   frame as a soft outline with its name.
  * - Clicking a map or a frame calls `onEnterMap`; hovering one calls
@@ -46,7 +48,7 @@ import { OceanBackground } from "../ocean/OceanBackground";
 import type { MapTree, MapTreeNode } from "../ocean/mapTree";
 import type { TreeView } from "../ocean/zoomHandoff";
 import { CANVAS_MIN_ZOOM, OceanZoomLimit } from "./OceanZoomLimit";
-import { boxBounds, oceanFitBox, type Box } from "./canvasGeometry";
+import { boxBounds, boxCentre, oceanFitBox, type Box } from "./canvasGeometry";
 import { CanvasCamera, type CanvasCameraState } from "./CanvasCamera";
 import { KeepCanvasSized } from "./KeepCanvasSized";
 import { ChildFrames, MapPictures, OceanMaps } from "./CanvasLayers";
@@ -256,7 +258,11 @@ export function AtlasCanvas({
               ocean={resolved.kind === "ocean"}
               fitWidth={resolved.fit.maxX - resolved.fit.minX}
               fitHeight={resolved.fit.maxY - resolved.fit.minY}
+              fitCenter={boxCentre(resolved.fit)}
+              viewHeight={resolved.height}
               viewKey={resolved.key}
+              reduceMotion={reduceMotion}
+              armed={armed}
             />
             <CanvasCamera
               viewKey={resolved.key}

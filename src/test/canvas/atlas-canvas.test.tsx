@@ -412,12 +412,12 @@ describe("AtlasCanvas, ocean fit margin (R-37)", () => {
     expect(placed.maxX).toBeLessThan(east); // the same margin the box carries
   });
 
-  it("the zoom floor stays one level below the padded fit, and a map view fits edge to edge", () => {
+  it("the zoom floor is the padded fit (Q-01), and a map view fits edge to edge", () => {
     const tree = buildMapTree(projects.main);
     const fit = oceanFitBox(tree)!;
     const w = fit.maxX - fit.minX;
     const h = fit.maxY - fit.minY;
-    expect(oceanMinZoom(VIEWPORT, w, h)).toBeCloseTo(fitZoom(w, h, VIEWPORT) - 1, 9);
+    expect(oceanMinZoom(VIEWPORT, w, h)).toBeCloseTo(fitZoom(w, h, VIEWPORT), 9);
     draw(projects.main, { kind: "map", mapId: "quessaly-world" });
     expect(stableMap.fitBounds).toHaveBeenCalledWith(
       boxBounds(400, { minX: 0, minY: 0, maxX: 600, maxY: 400 }),
