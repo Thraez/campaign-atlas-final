@@ -11,16 +11,19 @@ import { noticeDockClearancePx, noticeDockRightPx } from "@/atlas/noticeDockLayo
 export function MapNoticeDock({
   minimapHeight,
   creditCount = 0,
+  scaleBar = false,
   children,
 }: {
   minimapHeight: number | null;
   /** Active layer credits shown in the corner above the minimap. */
   creditCount?: number;
+  /** The map shows a scale bar (above Wander on a phone, Q-03). */
+  scaleBar?: boolean;
   children: ReactNode;
 }) {
   const right = noticeDockRightPx(creditCount);
   const style = {
-    "--atlas-dock-clear": `${noticeDockClearancePx(minimapHeight, creditCount)}px`,
+    "--atlas-dock-clear": `${noticeDockClearancePx(minimapHeight, creditCount, scaleBar)}px`,
     ...(right != null ? { "--atlas-dock-right": `${right}px` } : {}),
   } as CSSProperties;
   return (

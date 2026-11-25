@@ -81,15 +81,9 @@ export function RulerLayer({ active, mapId, mapHeight, scale, onClear }: RulerLa
     ? createPortal(
         <div
           data-testid="ruler-hint"
-          style={{
-            position: "absolute",
-            bottom: "2.5rem",
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: "var(--z-map-control)",
-            pointerEvents: "none",
-          }}
-          className="text-xs bg-black/60 text-white px-3 py-1.5 rounded-full whitespace-nowrap"
+          // Placed by `.atlas-ruler-hint` (src/index.css, Q-03): top-center, or
+          // on a phone right under "Done measuring".
+          className="atlas-ruler-hint text-xs bg-black/60 text-white px-3 py-1.5 rounded-full whitespace-nowrap"
         >
           Click or tap two points to measure
         </div>,

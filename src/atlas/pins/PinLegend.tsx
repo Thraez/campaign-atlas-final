@@ -30,7 +30,7 @@ export function PinLegend({ placements, entityById }: PinLegendProps) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 rounded bg-background/90 border border-border shadow-sm px-2 py-1 text-xs text-foreground hover:bg-accent transition-colors"
+        className="atlas-pin-legend-toggle flex items-center gap-1 rounded bg-background/90 border border-border shadow-sm px-2 py-1 text-xs text-foreground hover:bg-accent transition-colors"
         aria-expanded={open}
         aria-label={open ? "Collapse pin legend" : "Expand pin legend"}
         title="Pin legend"

@@ -968,6 +968,7 @@ export default function AtlasViewer() {
             <Button
               variant={(showGrid ?? activeMap.grid.enabled !== false) ? "secondary" : "ghost"}
               size="sm"
+              className="atlas-tool-button"
               onClick={() => setShowGrid((v) => !(v ?? activeMap.grid!.enabled !== false))}
               title="Toggle grid"
               aria-label="Toggle grid overlay"
@@ -980,6 +981,7 @@ export default function AtlasViewer() {
             <Button
               variant={rulerActive ? "secondary" : "ghost"}
               size="sm"
+              className="atlas-tool-button"
               onClick={() => setRulerActive((v) => !v)}
               title="Measure distance (click two points)"
               aria-label="Toggle distance ruler"
@@ -993,7 +995,7 @@ export default function AtlasViewer() {
             variant="secondary"
             size={phoneBar ? "icon" : "sm"}
             onClick={() => setSearchOpen(true)}
-            className={phoneBar ? "shrink-0" : "gap-2"}
+            className={phoneBar ? "shrink-0" : "atlas-tool-button gap-2"}
             aria-label="Search atlas (Ctrl+K)"
           >
             <Search className="h-4 w-4" aria-hidden="true" />
@@ -1068,7 +1070,7 @@ export default function AtlasViewer() {
             {phoneBar && rulerActive && (
               <Button
                 variant="secondary"
-                className="absolute top-14 right-3 z-20 min-h-10 min-w-10 gap-2 shadow"
+                className="atlas-ruler-done min-h-10 min-w-10 gap-2 shadow"
                 onClick={() => setRulerActive(false)}
               >
                 <Ruler className="h-4 w-4" aria-hidden="true" />
@@ -1090,7 +1092,7 @@ export default function AtlasViewer() {
               </AtlasCanvas>
             )}
             {showLegend && (
-              <div className="atlas-canvas-legend pointer-events-none absolute left-14 top-3 z-map-control rounded border border-border bg-background/85 px-2 py-1 text-xs text-muted-foreground">
+              <div className="atlas-canvas-legend pointer-events-none absolute z-map-control rounded border border-border bg-background/85 px-2 py-1 text-xs text-muted-foreground">
                 <span aria-hidden="true">▭</span> map: zoom in or click
               </div>
             )}
@@ -1171,6 +1173,7 @@ export default function AtlasViewer() {
             <MapNoticeDock
               minimapHeight={activeMap ? minimapHeightFor(activeMap) : null}
               creditCount={activeMap ? mapCreditCount : 0}
+              scaleBar={!!activeMap && !!scaleBar}
             >
               <UpdateNotice />
               {wanderEmpty && (
@@ -1188,10 +1191,10 @@ export default function AtlasViewer() {
               )}
             </MapNoticeDock>
 
-            {/* Scale bar — bottom-center map overlay */}
+            {/* Scale bar: bottom-center; above Wander on a phone (Q-03) */}
             {activeMap && scaleBar && (
               <div
-                className="atlas-scale-bar absolute bottom-3 left-1/2 -translate-x-1/2 z-map-control pointer-events-none select-none"
+                className="atlas-scale-bar absolute z-map-control pointer-events-none select-none"
                 role="note"
                 aria-label={`Map scale: ${scaleBar.label}`}
               >
@@ -1208,7 +1211,7 @@ export default function AtlasViewer() {
               </div>
             )}
 
-            {/* Reset view — bottom-right map corner */}
+            {/* Reset view: under the zoom buttons (Q-03; it sat on the minimap's corner) */}
             <button
               type="button"
               onClick={() => {
@@ -1219,7 +1222,7 @@ export default function AtlasViewer() {
                 setGlide((g) => g + 1);
                 setCamera("fit");
               }}
-              className="absolute bottom-3 right-3 z-map-control h-8 w-8 rounded bg-background/90 border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="atlas-reset-view absolute z-map-control rounded bg-background/90 border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               aria-label="Reset map view"
               title="Reset view (fit map to screen)"
             >

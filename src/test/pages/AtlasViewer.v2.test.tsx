@@ -514,6 +514,8 @@ describe("AtlasViewer, v2 phone bar", () => {
     const tools = await screen.findByRole("group", { name: "Map tools" });
     fireEvent.click(within(tools).getByRole("button", { name: /measure distance/i }));
     const done = await screen.findByRole("button", { name: /done measuring/i });
+    // Q-03: placed with the ruler hint as one group (src/index.css).
+    expect(done).toHaveClass("atlas-ruler-done");
     // (The hint portals into the map container, which the Leaflet mock keeps detached.)
     fireEvent.click(done);
     await waitFor(() =>
