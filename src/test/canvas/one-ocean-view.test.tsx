@@ -23,14 +23,18 @@ let landing: (() => void) | null = null;
 let slowPans = false;
 let dragMoving = false;
 let panning: { from: LL; to: LL } | null = null;
-/** Cut the running pan short halfway, as the next wheel batch does. */
-const stopPan = () =>
-  act(() => {
-    const p = panning!;
-    panning = null;
-    fake.center = { lat: (p.from.lat + p.to.lat) / 2, lng: (p.from.lng + p.to.lng) / 2 };
-    fake.fire("moveend");
-  });
+/**
+ * Leaflet's `map._stop()` (every wheel batch, a pinch start, a drag start,
+ * setView and flyTo): a running pan stops halfway, with a moveend there.
+ */
+const stop = () => {
+  const p = panning;
+  if (!p) return;
+  panning = null;
+  fake.center = { lat: (p.from.lat + p.to.lat) / 2, lng: (p.from.lng + p.to.lng) / 2 };
+  fake.fire("moveend");
+};
+const stopPan = () => act(stop);
 const finishPan = () =>
   act(() => {
     const p = panning!;
@@ -38,11 +42,23 @@ const finishPan = () =>
     fake.center = p.to;
     fake.fire("moveend");
   });
-/** Let the canvas's next-tick work run. */
-const tick = () =>
-  act(async () => {
-    await new Promise((r) => setTimeout(r, 0));
+/** Let `ms` pass on the (fake) clock. */
+const wait = (ms: number) =>
+  act(() => {
+    vi.advanceTimersByTime(ms);
   });
+/** The idle settle's quiet period, and a little more. */
+const idle = () => wait(SETTLE_IDLE_MS + 10);
+/** An animated zoom, in two steps: `zoomStarts` (Leaflet's next frame), `zoomEnds` later. */
+const zoomStarts = () => act(() => fake.fire("zoomstart"));
+const zoomEnds = (center: number[], zoom: number) =>
+  act(() => {
+    fake.center = at(center);
+    fake.zoom = Math.max(zoom, fake.options.minZoom);
+    fake.fire("zoomend");
+    fake.fire("moveend");
+  });
+const input = (type: string) => fake.container.dispatchEvent(new Event(type));
 const fitOf = (b: Bounds) => {
   const w = b[1][1] - b[0][1];
   const h = b[1][0] - b[0][0];
@@ -112,6 +128,7 @@ const fake = {
     fake.moveTo(f.center, f.zoom);
   }),
   setView: vi.fn((c: [number, number], z: number) => {
+    stop();
     fake.moveTo({ lat: c[0], lng: c[1] }, Math.max(z, fake.options.minZoom));
   }),
   /**
@@ -129,13 +146,8 @@ const fake = {
     fake.fire("moveend");
   }),
   dragging: { moving: () => dragMoving },
-  /** Leaflet's pan animation: in progress while a slow pan waits. */
-  _panAnim: {
-    get _inProgress() {
-      return panning !== null;
-    },
-  },
   flyTo: vi.fn((c: [number, number], z: number) => {
+    stop();
     fake.fire("zoomstart");
     landing = () => {
       fake.center = { lat: c[0], lng: c[1] };
@@ -168,7 +180,7 @@ vi.mock("@/hooks/use-reduce-motion", () => ({ useReduceMotion: () => reduceMotio
 const { buildMapTree } = await import("@/atlas/ocean/mapTree");
 const { AtlasCanvas } = await import("@/atlas/canvas/AtlasCanvas");
 const { oceanFitBox } = await import("@/atlas/canvas/canvasGeometry");
-const { oceanMinZoom } = await import("@/atlas/canvas/OceanZoomLimit");
+const { oceanMinZoom, SETTLE_IDLE_MS } = await import("@/atlas/canvas/OceanZoomLimit");
 type Camera = import("@/atlas/canvas/AtlasCanvas").CanvasCamera;
 type View = import("@/atlas/canvas/AtlasCanvas").CanvasView;
 
@@ -243,14 +255,15 @@ function mount(view: View, camera: Camera) {
 }
 
 /** A user zoom (wheel by default) that settles at `zoom` about `center`, clamped as Leaflet does. */
-function userZoom(center: number[], zoom: number, input = "wheel") {
-  fake.container.dispatchEvent(new Event(input));
+function userZoom(center: number[], zoom: number, type = "wheel") {
+  input(type);
   act(() => fake.moveTo(at(center), Math.max(zoom, fake.options.minZoom)));
 }
 
 let now = 1000;
 let clock: { mockRestore: () => void } | null = null;
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   now = 1000;
   clock = vi.spyOn(performance, "now").mockImplementation(() => now);
   reduceMotion = false;
@@ -276,6 +289,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   clock?.mockRestore();
 });
 
@@ -325,6 +339,9 @@ describe("one ocean view (Q-01)", () => {
       now += 1000;
       userZoom([380, 440], f.zoom - 2, input);
       expect(fake.zoom).toBeCloseTo(f.zoom, 9); // the floor holds (R-36)
+      wait(SETTLE_IDLE_MS - 20);
+      expect(fake.panTo).not.toHaveBeenCalled(); // not before the map is left alone
+      idle();
       expect(fake.panTo).toHaveBeenCalledTimes(1);
       expect(fake.panTo.mock.calls[0][1]).toMatchObject({ animate: true, duration: 0.4 });
       expectOnFit();
@@ -342,6 +359,7 @@ describe("one ocean view (Q-01)", () => {
     m.update(OCEAN, { center: [400, 450], zoom: f.zoom + 2 });
     now += 1000;
     userZoom([400, 450], f.zoom + 1);
+    idle();
     expect(fake.panTo).not.toHaveBeenCalled();
     expect(shown().center).toEqual([400, 450]);
   });
@@ -352,6 +370,8 @@ describe("one ocean view (Q-01)", () => {
     const f = oceanFit();
     m.update(OCEAN, { center: [400, 450], zoom: f.zoom + 1 });
     userZoom([400, 450], f.zoom - 1);
+    idle();
+    expect(fake.panTo).toHaveBeenCalledTimes(1);
     expect(fake.panTo.mock.calls[0][1]).toMatchObject({ animate: false });
     expectOnFit();
   });
@@ -360,6 +380,7 @@ describe("one ocean view (Q-01)", () => {
     const m = mount(ISLE, { center: [300, 200], zoom: 0 });
     // What the canvas hands the caller after a zoom out of the isle, off-centre.
     m.update(OCEAN, { center: [350, 420], zoom: oceanFit().zoom - 1.5 });
+    idle();
     expectOnFit();
     expect(m.onViewChange).not.toHaveBeenCalled();
   });
@@ -402,40 +423,145 @@ describe("one ocean view (Q-01)", () => {
     expect(fake.panTo).not.toHaveBeenCalled();
   });
 
-  it("a slide cut short by the next wheel batch carries on to the fit", async () => {
+  /** Zoomed in off to one side, wheeled out to the floor, the slide to the fit running. */
+  function sliding() {
     slowPans = true;
     const m = mount(OCEAN, "fit");
     const f = oceanFit();
     m.update(OCEAN, { center: [400, 450], zoom: f.zoom + 1 });
     now += 1000;
     userZoom([380, 440], f.zoom - 2);
-    // The zoom's own moveend, after the slide started, leaves the slide alone.
-    await tick();
+    idle();
     expect(fake.panTo).toHaveBeenCalledTimes(1);
-    // Two more batches of inertia at the floor: each stops the pan (delta 0, no zoomend).
-    for (let i = 2; i <= 3; i++) {
-      stopPan();
-      await tick();
-      expect(fake.panTo).toHaveBeenCalledTimes(i);
-      expect(fake.panTo.mock.calls[i - 1][1]).toMatchObject({ animate: true, duration: 0.4 });
-    }
-    finishPan();
-    await tick();
-    expectOnFit();
-    expect(fake.panTo).toHaveBeenCalledTimes(3); // landed: no more
+    expect(panning).not.toBeNull();
+    return { m, f };
+  }
+
+  it("a wheel-in during the slide wins: no pan after it, the camera stays where the user zoomed", () => {
+    const { m, f } = sliding();
+    // Leaflet: the wheel event, the batch 40 ms later stops the pan, the zoom
+    // animation starts a frame after that and ends 250 ms later.
+    input("wheel");
+    wait(40);
+    stopPan();
+    wait(16);
+    zoomStarts();
+    wait(250);
+    zoomEnds([520, 610], f.zoom + 0.8);
+    wait(1000);
+    expect(fake.panTo).toHaveBeenCalledTimes(1);
+    expect(shown()).toEqual({ center: [520, 610], zoom: f.zoom + 0.8 });
     expect(m.onViewChange).not.toHaveBeenCalled();
   });
 
-  it("a drag that cuts the slide short ends it there", async () => {
-    slowPans = true;
+  it("a pinch starting during the slide wins", () => {
+    const { f } = sliding();
+    input("touchstart");
+    stopPan(); // TouchZoom stops the map
+    wait(30);
+    zoomStarts(); // the first touchmove
+    wait(400);
+    zoomEnds([500, 600], f.zoom + 1.2);
+    wait(1000);
+    expect(fake.panTo).toHaveBeenCalledTimes(1);
+    expect(shown()).toEqual({ center: [500, 600], zoom: f.zoom + 1.2 });
+  });
+
+  it("a drag ends the slide, and a drag before it starts stops it", () => {
+    sliding();
+    input("pointerdown");
+    act(() => fake.fire("dragstart"));
+    stopPan();
+    dragMoving = true;
+    wait(1000);
+    dragMoving = false;
+    act(() => fake.fire("moveend")); // the drag ends off-centre at the floor
+    wait(1000);
+    expect(fake.panTo).toHaveBeenCalledTimes(1);
+
+    // Zoom out again, then press before the quiet period is over.
+    fake.panTo.mockClear();
+    panning = null;
+    const f = oceanFit();
+    act(() => fake.moveTo(at([400, 450]), f.zoom + 1));
+    userZoom([380, 440], f.zoom - 1);
+    wait(50);
+    input("pointerdown");
+    act(() => fake.fire("dragstart"));
+    wait(1000);
+    expect(fake.panTo).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["Reset", "fit" as Camera],
+    ["a crumb or search glide", { center: [700, 650], zoom: 0 } as Camera],
+  ])("%s pressed during the slide completes its glide", (_name, target) => {
+    const { m, f } = sliding();
+    const camera: Camera = target === "fit" ? "fit" : { ...target, zoom: f.zoom + 1 };
+    m.glideTo(OCEAN, camera);
+    expect(fake.flyTo).toHaveBeenCalledTimes(1);
+    wait(1000); // nothing re-starts the slide under the glide
+    expect(fake.panTo).toHaveBeenCalledTimes(1);
+    land();
+    wait(1000);
+    expect(fake.panTo).toHaveBeenCalledTimes(1);
+    if (camera === "fit") expectOnFit();
+    else expect(shown()).toEqual({ center: [700, 650], zoom: f.zoom + 1 });
+    expect(m.onViewChange).not.toHaveBeenCalled();
+  });
+
+  it("a trackpad inertia burst at the floor still ends on the fit", () => {
+    const { m } = sliding();
+    // 20 wheel-out batches at the floor: each stops the pan (delta 0, no zoom).
+    for (let i = 0; i < 20; i++) {
+      input("wheel");
+      wait(40);
+      stopPan();
+      wait(10);
+    }
+    expect(fake.panTo).toHaveBeenCalledTimes(1); // nothing while the input goes on
+    idle();
+    expect(fake.panTo).toHaveBeenCalledTimes(2);
+    expect(fake.panTo.mock.calls[1][1]).toMatchObject({ animate: true, duration: 0.4 });
+    finishPan();
+    wait(1000);
+    expectOnFit();
+    expect(fake.panTo).toHaveBeenCalledTimes(2);
+    expect(m.onViewChange).not.toHaveBeenCalled();
+  });
+
+  it("a wheel-out at the floor after a drag there slides back to the fit", () => {
+    mount(OCEAN, "fit");
+    act(() => fake.moveTo(at([700, 600]), fake.zoom)); // dragged at the floor
+    input("wheel"); // delta 0: no zoom
+    idle();
+    expectOnFit();
+  });
+
+  it("calm mode: a slide cut short by inertia jumps to the fit", () => {
+    reduceMotion = true;
     const m = mount(OCEAN, "fit");
     const f = oceanFit();
     m.update(OCEAN, { center: [400, 450], zoom: f.zoom + 1 });
     userZoom([380, 440], f.zoom - 2);
-    dragMoving = true;
-    stopPan();
-    await tick();
+    input("wheel");
+    wait(100);
+    input("wheel");
+    idle();
     expect(fake.panTo).toHaveBeenCalledTimes(1);
+    expect(fake.panTo.mock.calls[0][1]).toMatchObject({ animate: false });
+    expectOnFit();
+  });
+
+  it("arrow-key pans at the floor stay where they go", () => {
+    mount(OCEAN, "fit");
+    fake.container.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft" }));
+    act(() => fake.moveTo(at([700, 600]), fake.zoom));
+    idle();
+    expect(fake.panTo).not.toHaveBeenCalled();
+    fake.container.dispatchEvent(new KeyboardEvent("keydown", { key: "-" })); // at the floor: no zoom
+    idle();
+    expectOnFit();
   });
 
   it("Reset from a dragged camera at the floor glides to the fit, with nothing after", () => {
@@ -455,6 +581,7 @@ describe("one ocean view (Q-01)", () => {
     m.update(OCEAN, { center: [600, 500], zoom: f.zoom + 1 });
     m.glideTo(OCEAN, { center: [700, 600], zoom: f.zoom });
     land();
+    idle();
     expectOnFit();
     expect(m.onViewChange).not.toHaveBeenCalled();
   });
@@ -476,6 +603,7 @@ describe("one ocean view (Q-01)", () => {
     mount(ISLE, "fit");
     expect(fake.options.minZoom).toBe(-6);
     userZoom([100, 100], -3);
+    idle();
     expect(fake.panTo).not.toHaveBeenCalled();
   });
 });

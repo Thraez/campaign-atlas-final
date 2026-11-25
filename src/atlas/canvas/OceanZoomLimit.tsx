@@ -23,10 +23,13 @@ const SAME_ZOOM = 1e-6;
 const SAME_CENTRE_PX = 1;
 
 /**
- * How often one slide may start again after being cut short: a guard against a
- * loop, well above a few seconds of wheel batches or key repeats.
+ * How long the map must be left alone (no wheel, key, touch or pointer input,
+ * no zoom) before a camera at the floor slides to the fit.
  */
-const MAX_RESUMES = 100;
+export const SETTLE_IDLE_MS = 150;
+
+/** Keys Leaflet's keyboard handler zooms out with. */
+const ZOOM_OUT_KEYS = new Set(["-", "_", "Subtract"]);
 
 /**
  * The ocean's minimum zoom: the zoom that fits `fitWidth` x `fitHeight` in
@@ -63,11 +66,14 @@ function setFloor(map: Map, min: number) {
  * load, the Ocean crumb and Reset show, recomputed when the map resizes.
  *
  * One ocean view (Q-01): at the floor the camera is the fit.
- * - A zoom that settles at the floor (a wheel, pinch, keyboard or zoom-button
- *   zoom-out, or a hand-back from a map clamped to it) slides to the fit's
- *   centre (`GLIDE_SECONDS`; a jump in calm mode). The fit, Reset and the
- *   crumb land there already, so they don't move. A slide cut short (the
- *   next wheel batch, a held key) carries on; a drag ends it.
+ * - Settle when idle: a zoom that ends at the floor off the fit's centre (a
+ *   wheel, pinch, keyboard or zoom-button zoom-out, a hand-back clamped to
+ *   it, a glide landing there), or a wheel or zoom-out key at the floor, arms
+ *   one timer. After `SETTLE_IDLE_MS` with no input the camera slides to the
+ *   fit's centre (`GLIDE_SECONDS`; a jump in calm mode). A zoom starting
+ *   (the user's, a P-06 glide, a handoff), a drag, a touch or a pointer press
+ *   disarms it, and the user's input always wins over a running slide. The
+ *   fit, Reset and the crumb land on the fit already, so they don't move.
  * - A resize (the window, the side panel) while the camera is at the floor
  *   re-fits: new floor, fit centre, no animation, even after a drag at the
  *   floor. Elsewhere the zoom is only raised to a floor that rose above it,
@@ -113,10 +119,9 @@ export function OceanZoomLimit({
     let floor: number | null = null;
     /** A resize is moving the map: its slides jump. */
     let resizing = false;
-    /** An animated slide to the fit is running (or was cut short). */
-    let sliding = false;
-    let retries = 0;
-    let retry: ReturnType<typeof setTimeout> | undefined;
+    /** A zoom (the user's, a glide, a handoff's) is running. */
+    let zooming = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const atFloor = () => floor !== null && map.getZoom() <= floor + SAME_ZOOM;
     const offCentre = (c: Point) => {
       const now = fromLatLng(viewHeight!, map.getCenter());
@@ -126,13 +131,8 @@ export function OceanZoomLimit({
     // Map.Drag's `moving()` (not in Leaflet's types, which give a plain Handler).
     const dragging = () =>
       !!(map as unknown as { dragging?: { moving?: () => boolean } }).dragging?.moving?.();
-    // Leaflet's running pan (private, like `_animatingZoom`): a moveend from
-    // something else (a zoom ending as the slide starts) must not restart it.
-    const panning = () =>
-      !!(map as unknown as { _panAnim?: { _inProgress?: boolean } })._panAnim?._inProgress;
     const slide = (c: Point, animate: boolean) => {
       if (armed) armed.current = false;
-      sliding = animate;
       map.panTo(toLatLng(viewHeight!, c), { animate, duration: GLIDE_SECONDS });
     };
     const apply = () => {
@@ -158,31 +158,32 @@ export function OceanZoomLimit({
         resizing = false;
       }
     };
-    // A zoom that settles at the floor ends on the fit (after ZoomHandoff's
-    // own zoomend listener, which is attached first).
-    const settle = () => {
-      if (!centre || !atFloor() || !offCentre(centre)) return;
-      retries = 0;
-      slide(centre, !reduceMotion && !resizing);
+    // Settle when idle: one timer, armed by a zoom ending at the floor or by a
+    // wheel or zoom-out key (a wheel-out at the floor makes no zoom at all),
+    // disarmed by any other input or a zoom starting. It slides only if the
+    // camera is still at the floor, off the fit, and nothing is moving it.
+    const disarm = () => clearTimeout(timer);
+    const fire = () => {
+      if (!centre || !atFloor() || !offCentre(centre) || zooming || dragging()) return;
+      slide(centre, !reduceMotion);
     };
-    // Leaflet stops a running pan on every wheel batch and every setView
-    // (`map._stop()`), firing moveend with no zoomend: a slide cut short by
-    // trackpad inertia or a held key starts again from where it stopped. Next
-    // tick, so a setView that stopped it finishes first; never against a drag.
-    const resume = () => {
-      if (!sliding) return;
-      clearTimeout(retry);
-      retry = setTimeout(() => {
-        if (panning()) return; // still going: its own end comes back here
-        const done =
-          !centre || !atFloor() || !offCentre(centre) || dragging() || retries >= MAX_RESUMES;
-        if (done) {
-          sliding = false;
-          return;
-        }
-        retries += 1;
-        slide(centre, true);
-      }, 0);
+    const arm = () => {
+      disarm();
+      timer = setTimeout(fire, SETTLE_IDLE_MS);
+    };
+    const onZoomStart = () => {
+      zooming = true;
+      disarm();
+    };
+    // After ZoomHandoff's own zoomend listener, which is attached first.
+    const onZoomEnd = () => {
+      zooming = false;
+      if (!centre || !atFloor() || !offCentre(centre)) return;
+      if (resizing) slide(centre, false);
+      else arm();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (ZOOM_OUT_KEYS.has(e.key)) arm();
     };
     const start = () => {
       apply();
@@ -190,14 +191,25 @@ export function OceanZoomLimit({
       map.on("resize", apply);
     };
     const cancel = whenMapHasSize(map, start);
-    map.on("zoomend", settle);
-    map.on("moveend", resume);
+    const box = map.getContainer();
+    map.on("zoomstart", onZoomStart);
+    map.on("zoomend", onZoomEnd);
+    map.on("dragstart", disarm);
+    box.addEventListener("wheel", arm, { passive: true });
+    box.addEventListener("keydown", onKey);
+    box.addEventListener("touchstart", disarm, { passive: true });
+    box.addEventListener("pointerdown", disarm);
     return () => {
       cancel();
-      clearTimeout(retry);
+      disarm();
       map.off("resize", apply);
-      map.off("zoomend", settle);
-      map.off("moveend", resume);
+      map.off("zoomstart", onZoomStart);
+      map.off("zoomend", onZoomEnd);
+      map.off("dragstart", disarm);
+      box.removeEventListener("wheel", arm);
+      box.removeEventListener("keydown", onKey);
+      box.removeEventListener("touchstart", disarm);
+      box.removeEventListener("pointerdown", disarm);
     };
   }, [map, ocean, fitWidth, fitHeight, cx, cy, viewHeight, viewKey, reduceMotion, armed]);
   return null;
